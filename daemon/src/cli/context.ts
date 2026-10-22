@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { type Platform, LINUX_BIN_DIRS, platformOf, places, systemdUserDir, userBinDir } from '../platform.ts'
+import { type Platform, LINUX_BIN_DIRS, inContainer, platformOf, places, systemdUserDir, userBinDir, wslOf } from '../platform.ts'
 
 export type Ran = { code: number | null; out: string; err: string; missing: boolean }
 
@@ -55,7 +55,23 @@ export type Cli = {
   selfDaemon: string
   /** Colours and the QR code's own colours: a terminal on the other end. */
   tty: boolean
+  /** WSL on a Windows PC (platform.ts), or null: what doctor, pair and setup say about it (cli/wsl.ts). */
+  wsl: WslHere | null
   sys: Sys
+}
+
+/**
+ * This WSL as the commands see it: its version, whether systemd runs it (/run/systemd/system exists
+ * only then), whether this is a container on WSL's kernel (Docker Desktop on Windows), and the
+ * distribution's name when WSL gave this shell one (for the commands to type in Windows).
+ */
+export type WslHere = { version: 1 | 2; systemd: boolean; container: boolean; distro: string | null }
+
+/** This machine's WSL, or null when it isn't one. */
+export function wslHere(env: NodeJS.ProcessEnv, exists: (p: string) => boolean = existsSync, read?: () => string): WslHere | null {
+  const w = wslOf(env, read)
+  if (!w) return null
+  return { version: w.version, systemd: exists('/run/systemd/system'), container: inContainer(env, exists), distro: env.WSL_DISTRO_NAME || null }
 }
 
 /** The service's name with systemd. */
@@ -97,6 +113,7 @@ export function cliContext(o: Partial<Cli> = {}): Cli {
     unitFile: join(unitDir, UNIT),
     selfDaemon: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..'),
     tty: !!process.stdout.isTTY,
+    wsl: platform === 'linux' ? wslHere(env) : null,
     sys: o.sys ?? realSys(env),
     ...o,
   }

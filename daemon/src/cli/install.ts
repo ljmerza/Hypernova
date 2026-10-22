@@ -3,7 +3,7 @@
 // official installer, and the integration (hooks, status line, the `claude` shell function).
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { claudeCandidates } from '../platform.ts'
+import { claudeCandidates, onWindowsDrive } from '../platform.ts'
 import { local, waitHealthy, health } from './api.ts'
 import { recordedNode } from './node.ts'
 import type { Cli } from './context.ts'
@@ -140,7 +140,9 @@ export const buildToolsMessage = (tools: string[]) =>
 export function findClaudeBin(cli: Cli): string | null {
   const env = cli.env.CLAUDE_BIN
   if (env && existsSync(env)) return env
-  return claudeCandidates(cli.platform, cli.home).find((p) => existsSync(p)) ?? cli.sys.which('claude')
+  const found = claudeCandidates(cli.platform, cli.home).find((p) => existsSync(p)) ?? cli.sys.which('claude')
+  // Under WSL, Windows' PATH can name Claude Code's Windows install: not the one to run (cli/wsl.ts).
+  return found && cli.wsl && onWindowsDrive(found) ? null : found
 }
 
 export async function claudeVersionOf(cli: Cli, bin: string): Promise<string | null> {

@@ -11,11 +11,12 @@ import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { cliContext, realSys, type Cli, type Ran, type RunOptions, type Sys } from '../src/cli/context.ts'
-import { doctor, logs, name, pair, parseArgs, setup, status, tailscale, uninstall } from '../src/cli/commands.ts'
+import { cliContext, realSys, wslHere, type Cli, type Ran, type RunOptions, type Sys, type WslHere } from '../src/cli/context.ts'
+import { doctor, lan, logs, name, pair, parseArgs, setup, status, tailscale, uninstall } from '../src/cli/commands.ts'
 import { CARRIED, enableLinger, installService, userManager, launcherText, ownLauncher, removeService, serviceState, servicePath, unitText, userBusEnv } from '../src/cli/service.ts'
 import { downloadNode, majorOf, nodeArch, pickRelease, shaFor } from '../src/cli/node.ts'
-import { daemonIn, integrationDir, isDaemonDir, setIntegration } from '../src/cli/install.ts'
+import { daemonIn, findClaudeBin, integrationDir, isDaemonDir, setIntegration } from '../src/cli/install.ts'
+import { claudeCandidates } from '../src/platform.ts'
 import { listenersOn, loopback, parseProcNet } from '../src/cli/doctor.ts'
 import { encodeQr, formatBits, qrLines, versionFor } from '../src/cli/qr.ts'
 
@@ -63,6 +64,8 @@ function ctx(sys: Sys, o: Partial<Cli> = {}, env: NodeJS.ProcessEnv = {}): Cli {
     user: 'ada',
     uid: 1000,
     tty: false,
+    // Not WSL, whatever machine runs the test (WSL's own tests, at the end, say otherwise).
+    wsl: null,
     sys,
     ...o,
   })
@@ -892,4 +895,157 @@ test('status shows the private name, and doctor warns when it has an error', asy
   } finally {
     daemon.name = saved
   }
+})
+
+// ── WSL on a Windows PC (cli/wsl.ts; experimental, never yet run on a real Windows PC) ─────────
+
+const WSL2: WslHere = { version: 2, systemd: true, container: false, distro: 'Ubuntu' }
+/** A stand-in system whose wslinfo prints [mode] (null: there's no wslinfo). */
+const wslSys = (mode: string | null, have: string[] = []) =>
+  fakeSys((cmd, args) => (cmd === 'wslinfo' ? (mode === null ? { code: null, missing: true } : { out: `${mode}\n` }) : claudeAnswers(true)(cmd, args)), have)
+/** doctor's checks, as --json gives them. */
+async function checksOf(c: Cli): Promise<{ name: string; mark: string; text: string; fix?: string }[]> {
+  await doctor(c, { json: true }, { listeners: () => ['127.0.0.1'] })
+  return JSON.parse((c.sys as ReturnType<typeof fakeSys>).out.join('\n'))
+}
+
+test('WSL is read from the kernel and systemd’s folder: its version, systemd, a container, the distribution’s name', () => {
+  const wsl2 = () => 'Linux version 6.6.87.2-microsoft-standard-WSL2 (root@build) (gcc 13.2.0) #1 SMP'
+  assert.deepEqual(wslHere({ WSL_DISTRO_NAME: 'Ubuntu-24.04' }, (p) => p === '/run/systemd/system', wsl2), { version: 2, systemd: true, container: false, distro: 'Ubuntu-24.04' })
+  // A service started by systemd has no WSL_DISTRO_NAME; Docker Desktop's containers run on WSL's kernel.
+  assert.deepEqual(wslHere({}, (p) => p === '/.dockerenv', wsl2), { version: 2, systemd: false, container: true, distro: null })
+  assert.equal(wslHere({}, () => true, () => 'Linux version 6.8.0-45-generic (buildd@lcy02) (gcc 13.2.0)'), null)
+})
+
+test('doctor under WSL 2’s NAT: experimental, systemd, keeping WSL running, and the phone over Tailscale (not yet connected, then connected)', async () => {
+  const checks = await checksOf(ctx(wslSys('nat', ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }))
+  const by = (n: string) => checks.find((x) => x.name === n)!
+  assert.equal(by('wsl').mark, 'info')
+  assert.match(by('wsl').text, /WSL 2 on Windows: experimental, not yet tried on a real Windows PC/)
+  assert.equal(by('wsl-systemd').mark, 'ok')
+  assert.match(by('wsl-awake').fix!, /%UserProfile%\\\.wslconfig[^]*\[general\]\n {2}instanceIdleTimeout=-1\nthen wsl --shutdown/)
+  assert.match(by('wsl-awake').fix!, /https:\/\/learn\.microsoft\.com\/windows\/wsl\/wsl-config/)
+  // No tailnet in this stand-in: no way in at all, said as a problem worth fixing, with both ways out.
+  assert.equal(by('wsl-network').mark, 'warn')
+  assert.match(by('wsl-network').text, /WSL’s NAT networking: a phone can’t reach this Linux on the Wi‑Fi, so it comes in over Tailscale, which isn’t connected yet/)
+  assert.match(by('wsl-network').fix!, /^hypernova pair/)
+  assert.match(by('wsl-network').fix!, /networkingMode=mirrored under \[wsl2\]/)
+  // The daemon's listener on (it was told so): on a network no phone is on.
+  assert.equal(by('lan').mark, 'warn')
+  assert.match(by('lan').text, /behind WSL’s NAT network no phone can reach it/)
+  // Connected through the built-in node: fine.
+  const saved = structuredClone(daemon.status)
+  try {
+    daemon.status.tsnet = { mode: 'builtIn', available: true, enabled: true, helper: { state: 'Running', listening: 'https://100.64.0.2:47321', account: 'owner@example.com' } }
+    delete daemon.status.lan
+    const up = await checksOf(ctx(wslSys('nat', ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }))
+    const net = up.find((x) => x.name === 'wsl-network')!
+    assert.equal(net.mark, 'ok')
+    assert.match(net.text, /which is connected/)
+    assert.match(up.find((x) => x.name === 'lan')!.text, /Local network route off \(behind WSL’s network the phone comes in over Tailscale\)/)
+  } finally {
+    daemon.status = saved
+  }
+  // No wslinfo (a WSL older than 2.0.4): taken as NAT, with how to get it.
+  const old = await checksOf(ctx(wslSys(null, ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }))
+  assert.match(old.find((x) => x.name === 'wsl-network')!.text, /wslinfo didn’t say: taken as NAT, the default/)
+  assert.match(old.find((x) => x.name === 'wsl-network')!.fix!, /wsl --update/)
+})
+
+test('doctor under WSL: mirrored networking needs the Hyper-V firewall rule; no systemd says how to turn it on; WSL 1 and Docker Desktop are named', async () => {
+  const mirrored = await checksOf(ctx(wslSys('mirrored', ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }))
+  const net = mirrored.find((x) => x.name === 'wsl-network')!
+  assert.equal(net.mark, 'info')
+  assert.match(net.text, /mirrored networking: this Linux has Windows’ own addresses/)
+  assert.match(net.fix!, /New-NetFirewallHyperVRule -Name Hypernova -DisplayName "Hypernova local route" -Direction Inbound -VMCreatorId '\{40E0AC32-46A5-438A-A0B2-2B479E8F2E90\}' -Protocol TCP -LocalPorts 47323/)
+  assert.match(net.fix!, /learn\.microsoft\.com\/windows\/wsl\/networking/)
+  // The local route as on any PC there.
+  assert.equal(mirrored.find((x) => x.name === 'lan')!.mark, 'ok')
+
+  const nosd = await checksOf(ctx(wslSys('nat', ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: { ...WSL2, systemd: false } }))
+  const sd = nosd.find((x) => x.name === 'wsl-systemd')!
+  assert.equal(sd.mark, 'warn')
+  assert.match(sd.fix!, /\/etc\/wsl\.conf[^]*\n {2}\[boot\]\n {2}systemd=true\nthen in PowerShell on Windows: wsl --shutdown, open Ubuntu again and run hypernova setup/)
+  assert.match(nosd.find((x) => x.name === 'service')!.fix!, /Turn on systemd for WSL \(above\), then hypernova setup/)
+
+  const one = ctx(wslSys('nat', ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: { ...WSL2, version: 1, distro: 'Debian' } })
+  const v1 = await checksOf(one)
+  assert.equal(v1.find((x) => x.name === 'wsl')!.mark, 'warn')
+  assert.match(v1.find((x) => x.name === 'wsl')!.fix!, /wsl --set-version Debian 2/)
+  assert.ok(!(one.sys as ReturnType<typeof fakeSys>).calls.some((x) => x.cmd === 'wslinfo'), 'WSL 1 has no wslinfo to ask')
+
+  const box = await checksOf(ctx(wslSys(null, ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: { ...WSL2, container: true, systemd: false } }))
+  assert.match(box.find((x) => x.name === 'wsl')!.text, /Docker Desktop on Windows/)
+  assert.ok(!box.some((x) => x.name === 'wsl-systemd' || x.name === 'wsl-awake'), 'a container has no systemd to turn on')
+  assert.doesNotMatch(box.find((x) => x.name === 'wsl-network')!.fix!, /mirrored/)
+
+  // Not WSL: nothing of it.
+  const plain = await checksOf(ctx(fakeSys(claudeAnswers(true), ['openssl']), { apiPort: daemon.api, localPort: daemon.local }))
+  assert.ok(!plain.some((x) => x.name.startsWith('wsl')))
+})
+
+test('pair under WSL: the phone comes in over Tailscale, and a code with no tailnet says it has no way in; mirrored pairs on the Wi‑Fi too', async () => {
+  let sys = wslSys('nat')
+  assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }), { 'no-wait': true, 'no-qr': true }), 0)
+  let text = sys.out.join('\n')
+  assert.match(text, /! WSL on Windows: WSL’s NAT network keeps this PC off the phone’s Wi‑Fi, so this code has no way in until Tailscale is signed in\.\n {6}hypernova pair {3}\(without --local; sign in when it asks\)\n {6}or mirrored networking on Windows 11/)
+  // Not the plain Linux words, which would promise the same network.
+  assert.doesNotMatch(text, /same network only|local network route is off too/)
+  assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`))
+
+  const saved = structuredClone(daemon.status)
+  try {
+    daemon.status.tsnet = { mode: 'builtIn', available: true, enabled: true, helper: { state: 'Running', listening: 'https://100.64.0.2:47321', account: 'owner@example.com' } }
+    sys = wslSys('nat')
+    assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }), { 'no-wait': true, 'no-qr': true }), 0)
+    text = sys.out.join('\n')
+    assert.match(text, /· WSL on Windows: the phone reaches this PC over Tailscale \(WSL’s NAT network keeps it off the Wi‑Fi\)\./)
+    assert.doesNotMatch(text, /no way in/)
+  } finally {
+    daemon.status = saved
+  }
+
+  sys = wslSys('mirrored')
+  await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }), { 'no-wait': true, 'no-qr': true })
+  text = sys.out.join('\n')
+  assert.match(text, /WSL’s mirrored networking: a phone on the same Wi‑Fi can pair directly once Windows’ Hyper-V firewall lets port 47323 in/)
+  assert.match(text, /Tailscale isn’t installed: this code pairs a phone on the same network only/)
+})
+
+test('hypernova lan on under WSL’s NAT says no phone can reach the port; setup without systemd says how to turn it on and touches no systemctl', async () => {
+  const l = wslSys('nat')
+  assert.equal(await lan(ctx(l, { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }), ['on']), 0)
+  assert.match(l.out.join('\n'), /! Behind WSL’s NAT network no phone can reach this port, and pairing links leave its addresses out\.\n {6}Mirrored networking makes it reachable/)
+  const m = wslSys('mirrored')
+  await lan(ctx(m, { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }), ['on'])
+  assert.doesNotMatch(m.out.join('\n'), /no phone can reach/)
+
+  const sys = fakeSys((cmd, args) => {
+    if (cmd === 'npm') return { code: 0 }
+    if (cmd === 'tar') return null
+    return claudeAnswers(false)(cmd === 'node' || cmd === process.execPath.split('/').pop() ? 'node' : cmd, args)
+  }, ['systemctl', 'loginctl', 'make', 'g++', 'python3', 'npm', 'claude'])
+  const c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local, wsl: { ...WSL2, systemd: false } })
+  assert.equal(await setup(c, { from: DAEMON }), 0, sys.out.join('\n'))
+  const text = sys.out.join('\n')
+  assert.match(text, /! WSL doesn’t run systemd here, so there’s no service yet[^]*\[boot\]\n {8}systemd=true[^]*wsl --shutdown/)
+  assert.match(text, /Until then: hypernova run, in a terminal you keep open\./)
+  assert.ok(!sys.calls.some((x) => x.cmd === 'systemctl' || x.cmd === 'loginctl'), 'no systemd to ask')
+  assert.ok(!existsSync(c.unitFile))
+  assert.match(text, /Keep WSL running for the phone: instanceIdleTimeout=-1 under \[general\] in %UserProfile%\\\.wslconfig on Windows/)
+  assert.match(text, /Pair your phone: hypernova pair \(over Tailscale: WSL keeps this PC off the Wi‑Fi unless its networking is mirrored\)/)
+  await uninstall(c, { yes: true, purge: true })
+})
+
+test('under WSL, Claude Code’s Windows install on Windows’ PATH is never taken for the agent', (t) => {
+  const win = '/mnt/c/Users/ada/AppData/Roaming/npm/claude'
+  const on = (path: string): Sys => ({ ...fakeSys(() => ({})), which: (n) => (n === 'claude' ? path : null) })
+  const c = ctx(on(win), { wsl: WSL2 })
+  // A Claude Code in a system folder would be found first: the PATH isn't asked then.
+  if (claudeCandidates('linux', c.home).some((p) => existsSync(p))) return t.skip('a Claude Code in a system folder here')
+  assert.equal(findClaudeBin(c), null)
+  // Not WSL: whatever the PATH has, as before.
+  assert.equal(findClaudeBin(ctx(on(win))), win)
+  // The Linux build inside WSL: found.
+  assert.equal(findClaudeBin(ctx(on('/usr/local/bin/claude'), { wsl: WSL2 })), '/usr/local/bin/claude')
 })

@@ -12,6 +12,7 @@ import { CODEX_LOGIN, codexChecks, doctorChecks, tailscaleBin, type CodexState, 
 import { claudeSignedIn, claudeVersionOf, findClaudeBin, installClaude, installDaemon, setIntegration } from './install.ts'
 import { ensureNode, recordedNode } from './node.ts'
 import { encodeQr, qrLines } from './qr.ts'
+import { WSL_GUIDE, behindNat, systemdFix, wslNetworkingOf, wslPairNote } from './wsl.ts'
 import { installService, lingering, ownLauncher, removeService, serviceState, userManager, writeLauncher } from './service.ts'
 
 export type Flags = Record<string, string | boolean>
@@ -96,8 +97,12 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
   else {
     // Lingering first: it also starts the user's systemd manager when this shell has no login
     // session of its own (su, sudo -u, a script), which systemctl --user needs.
-    const sd = await userManager(cli)
-    if (!sd.ok && !cli.sys.which('systemctl')) {
+    // WSL runs systemd only when /etc/wsl.conf says so (cli/wsl.ts): no lingering to try without it.
+    const wslNoSystemd = !!cli.wsl && !cli.wsl.container && cli.wsl.version === 2 && !cli.wsl.systemd
+    const sd = wslNoSystemd ? { ok: false, why: '', linger: 'no_loginctl' as const } : await userManager(cli)
+    if (wslNoSystemd) {
+      line(cli, 'warn', 'WSL doesn’t run systemd here, so there’s no service yet: Hypernova would stop with the terminal it runs in.', `${systemdFix(cli.wsl!)}\nUntil then: hypernova run, in a terminal you keep open.`)
+    } else if (!sd.ok && !cli.sys.which('systemctl')) {
       line(cli, 'warn', `No systemd user service here: ${sd.why}`, 'Start the daemon with: hypernova run   (a container’s command does this)')
     } else if (!sd.ok) {
       line(cli, 'warn', `systemd’s user manager isn’t running for ${cli.user}: ${sd.why}`, `Turn on lingering, which starts it: sudo loginctl enable-linger ${cli.user}\nor log in as ${cli.user} over ssh; then run hypernova setup again.`)
@@ -158,7 +163,8 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
   const next: string[] = []
   if (auth && !auth.loggedIn) next.push('Sign in to Claude: run `claude` once on this server and follow its steps.')
   if (cx?.available && !cx.enabled) next.push('Use Codex too: hypernova codex on')
-  next.push('Pair your phone: hypernova pair')
+  if (cli.wsl && !cli.wsl.container) next.push(`Keep WSL running for the phone: instanceIdleTimeout=-1 under [general] in %UserProfile%\\.wslconfig on Windows (${WSL_GUIDE}).`)
+  next.push(cli.wsl ? 'Pair your phone: hypernova pair (over Tailscale: WSL keeps this PC off the Wi‑Fi unless its networking is mirrored)' : 'Pair your phone: hypernova pair')
   next.push('Check everything: hypernova doctor')
   await nameTermsOnce(cli)
   cli.sys.say(bold(cli, failed ? 'Setup finished with problems (above). Then:' : 'Done. Next:'))
@@ -385,11 +391,19 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
   const link = p.link
   const lan = /[?&]lan=([^&]+)/.exec(p.appLink)?.[1]
   cli.sys.say()
+  // WSL on a Windows PC (cli/wsl.ts): behind its NAT the Wi-Fi is no way in, so Tailscale is the only one.
+  const wslNote = cli.wsl ? wslPairNote(cli, cli.wsl, await wslNetworkingOf(cli), tailnet) : null
   if (!tailnet) {
+    const noLocal = wslNote?.mark === 'warn'
     if (ts && !ts.ok) line(cli, 'warn', ts.message, ts.fix)
-    else if (tsnet?.mode === 'builtIn') line(cli, 'warn', 'Built-in Tailscale isn’t signed in yet: this code pairs a phone on the same network only.', 'hypernova tailscale')
-    else line(cli, 'warn', 'Tailscale isn’t installed: this code pairs a phone on the same network only.', 'curl -fsSL https://tailscale.com/install.sh | sh, sudo tailscale up, then hypernova pair')
-    if (!lan) line(cli, 'warn', 'The local network route is off too, so a phone has no way in yet.', 'hypernova lan on   (only on a network you trust), or set up Tailscale')
+    else if (!noLocal && tsnet?.mode === 'builtIn') line(cli, 'warn', 'Built-in Tailscale isn’t signed in yet: this code pairs a phone on the same network only.', 'hypernova tailscale')
+    else if (!noLocal) line(cli, 'warn', 'Tailscale isn’t installed: this code pairs a phone on the same network only.', 'curl -fsSL https://tailscale.com/install.sh | sh, sudo tailscale up, then hypernova pair')
+    if (noLocal) line(cli, wslNote.mark, wslNote.text, wslNote.fix)
+    else if (!lan) line(cli, 'warn', 'The local network route is off too, so a phone has no way in yet.', 'hypernova lan on   (only on a network you trust), or set up Tailscale')
+    cli.sys.say()
+  }
+  if (wslNote && wslNote.mark !== 'warn') {
+    line(cli, wslNote.mark, wslNote.text, wslNote.fix)
     cli.sys.say()
   }
   // The app's page (on the local network's name whenever that works: the daemon's names.ts). The
@@ -608,6 +622,8 @@ export async function lan(cli: Cli, rest: string[]): Promise<number> {
     await local(cli, 'POST', '/local/settings', { lanAccess: want === 'on' })
     const st = await local(cli, 'GET', '/local/status')
     line(cli, 'ok', st.lan ? `Local route on, port ${st.lan.port}${st.lan.addresses?.length ? ` on ${st.lan.addresses.join(', ')}` : ''}.` : 'Local route off.')
+    // Behind WSL's NAT the port is on, but on a network no phone is on (cli/wsl.ts).
+    if (st.lan && cli.wsl && behindNat(cli.wsl, await wslNetworkingOf(cli))) line(cli, 'warn', `Behind ${cli.wsl.container ? 'the container’s' : 'WSL’s NAT'} network no phone can reach this port, and pairing links leave its addresses out.`, cli.wsl.container ? 'The phone comes in over Tailscale: hypernova pair. hypernova lan off turns the route off again.' : `Mirrored networking makes it reachable (${WSL_GUIDE}); hypernova lan off turns it off again.`)
     return 0
   } catch (e: any) {
     line(cli, 'fail', e instanceof ApiError && e.status === 0 ? 'The daemon isn’t running.' : e.message)

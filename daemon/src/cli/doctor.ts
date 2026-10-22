@@ -12,6 +12,7 @@ import { claudeSignedIn, claudeVersionOf, findClaudeBin, isDaemonDir, missingBui
 import { NODE_MAJOR, majorOf, recordedNode, versionOf } from './node.ts'
 import { hasUserSystemd, lingering, serviceState } from './service.ts'
 import { sdkAt } from '../sdk.ts'
+import { behindNat, wslMachineChecks, wslNetworkCheck, wslNetworkingOf } from './wsl.ts'
 
 export type Check = { name: string; mark: 'ok' | 'warn' | 'fail' | 'info'; text: string; fix?: string }
 
@@ -153,6 +154,10 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   // The machine.
   if (cli.platform !== 'linux') add({ name: 'system', mark: 'fail', text: 'This is a Mac: Hypernova runs from its menu bar app there.', fix: 'Open Hypernova on the Mac (Setup in its menu).' })
   else add({ name: 'system', mark: cli.arch === 'x64' || cli.arch === 'arm64' ? 'ok' : 'warn', text: `Linux on ${cli.arch}`, ...(cli.arch === 'x64' || cli.arch === 'arm64' ? {} : { fix: 'Hypernova is built and tested on x86_64 and arm64 only.' }) })
+  // WSL on a Windows PC (experimental, cli/wsl.ts): what WSL does and doesn't do for the service.
+  if (cli.wsl) for (const c of wslMachineChecks(cli.wsl)) add(c)
+  const wslNet = cli.wsl ? await wslNetworkingOf(cli) : null
+  const wslNat = !!cli.wsl && behindNat(cli.wsl, wslNet)
   if (cli.uid === 0) add({ name: 'user', mark: 'warn', text: 'Running as root: Claude Code’s sessions would have the whole server, and Claude Code refuses to skip permissions as root, so phone sessions run without the Bypass mode.', fix: 'Safer: adduser claude; loginctl enable-linger claude; su - claude, and run hypernova setup there.' })
 
   // Node and the daemon's files.
@@ -179,7 +184,8 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
 
   // The service.
   const sd = await hasUserSystemd(cli)
-  if (!sd.ok) add({ name: 'service', mark: 'warn', text: `No systemd user service here: ${sd.why}`, fix: 'Start the daemon yourself with hypernova run (a container’s command does), or log in as this user directly (ssh) so systemd starts your user manager.' })
+  const wslNoSystemd = !!cli.wsl && !cli.wsl.container && cli.wsl.version === 2 && !cli.wsl.systemd
+  if (!sd.ok) add({ name: 'service', mark: 'warn', text: `No systemd user service here: ${sd.why}`, fix: wslNoSystemd ? 'Turn on systemd for WSL (above), then hypernova setup. Until then: hypernova run, in a terminal you keep open.' : 'Start the daemon yourself with hypernova run (a container’s command does), or log in as this user directly (ssh) so systemd starts your user manager.' })
   else {
     const st = await serviceState(cli)
     if (!st.installed) add({ name: 'service', mark: 'fail', text: `${UNIT} isn’t installed.`, fix: 'Run hypernova setup.' })
@@ -218,10 +224,12 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
       status = await local(cli, 'GET', '/local/status?fresh=1', undefined, 15_000)
     } catch {}
   }
-  if (status?.lan) {
+  if (status?.lan && wslNat) {
+    add({ name: 'lan', mark: 'warn', text: `Local network route on port ${status.lan.port}, but behind ${cli.wsl!.container ? 'the container’s' : 'WSL’s NAT'} network no phone can reach it`, fix: `hypernova lan off${cli.wsl!.container ? '' : '   (or mirrored networking, below)'}` })
+  } else if (status?.lan) {
     const pub = ownAddresses().filter(publicIPv4)
     add({ name: 'lan', mark: pub.length ? 'warn' : 'ok', text: `Local network route on port ${status.lan.port}${status.lan.addresses?.length ? ` (${status.lan.addresses.join(', ')})` : ''}, device certificates required`, ...(pub.length ? { fix: `This server has a public address (${pub.join(', ')}): turn the local route off unless the phone shares its network:\n  hypernova lan off` } : {}) })
-  } else if (status) add({ name: 'lan', mark: 'info', text: 'Local network route off (a server with a public address is reached through the tailnet only)' })
+  } else if (status) add({ name: 'lan', mark: 'info', text: wslNat ? 'Local network route off (behind WSL’s network the phone comes in over Tailscale)' : 'Local network route off (a server with a public address is reached through the tailnet only)' })
 
   // The private name (names.ts): a failing name is silent otherwise.
   if (loc) {
@@ -282,6 +290,10 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   else if (ts && !ts.httpsEnabled) add({ name: 'tailscale', mark: 'warn', text: 'Your tailnet has HTTPS certificates off: tailscale serve can’t give the phone https.', fix: 'Turn on MagicDNS and HTTPS Certificates at https://login.tailscale.com/admin/dns' })
   else if (ts && !ts.serveOn) add({ name: 'tailscale', mark: 'warn', text: `Tailscale is on, but doesn’t serve port ${cli.apiPort} to the tailnet yet.`, fix: 'hypernova pair turns it on (it may ask you to run sudo tailscale set --operator=$USER once).' })
   else if (ts?.url) add({ name: 'tailscale', mark: 'ok', text: `Phones reach it at ${ts.url} (tailscale serve)` })
+  if (cli.wsl) {
+    const tailnet = (tsnet?.mode === 'builtIn' && tsnet.helper?.state === 'Running' && !!tsnet.helper.listening) || (tsnet?.mode !== 'builtIn' && !!ts?.serveOn && !!ts?.url)
+    add(wslNetworkCheck(cli, cli.wsl, wslNet, tailnet))
+  }
 
   // Telescope's optional sources.
   const chrome = chromeCandidates(cli.platform, cli.home).find((p) => existsSync(p))
