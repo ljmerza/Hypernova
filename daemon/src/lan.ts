@@ -13,7 +13,7 @@ import { log } from './util.ts'
 import { deviceForCert, saveSettings, settings, type Device } from './store.ts'
 import { certFingerprint, serverIdentity } from './tls.ts'
 import { broadcast } from './hub.ts'
-import { PLATFORM, lanByDefault, virtualInterface } from './platform.ts'
+import { PLATFORM, lanByDefault, virtualInterface, wslBehindNatHere } from './platform.ts'
 
 /** 0 takes a free port (tests); the snapshot says which. */
 export const LAN_PORT = Number(process.env.HYPERNOVA_LAN_PORT ?? 47323)
@@ -92,6 +92,15 @@ export function lanAddresses(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = netwo
     }
   }
   return [...new Set([...v4, ...v6])]
+}
+
+/**
+ * The addresses a phone is told (the snapshot, the pairing link, the private name's record): the
+ * local network's, except behind WSL's NAT (platform.ts), where every address this Linux has is on
+ * Windows' private network for it and no phone can reach one, whatever `lanAccess` says.
+ */
+export function advertisedAddresses(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = networkInterfaces(), behindWslNat: boolean = wslBehindNatHere()): string[] {
+  return behindWslNat ? [] : lanAddresses(ifaces)
 }
 
 /**
@@ -213,14 +222,15 @@ let lastAddresses = ''
 
 /**
  * The owner's setting; unset, on, except on a Linux server with a public address of its own (a
- * VPS), where the phone is never on its network and the port would face the internet (platform.ts).
+ * VPS), where the phone is never on its network and the port would face the internet, and in a
+ * container, on a cloud VM and behind WSL's NAT, where no phone is on its network (platform.ts).
  */
 export const lanEnabled = (): boolean => settings.lanAccess ?? lanByDefault(PLATFORM, networkInterfaces())
 
 /** What the snapshot and the pairing link say; `null` while the listener is off or couldn't start. */
 export function lanInfo(): LanInfo | null {
   const id = server && serverIdentity()
-  return id ? { port, addresses: lanAddresses(), fingerprint: id.fingerprint } : null
+  return id ? { port, addresses: advertisedAddresses(), fingerprint: id.fingerprint } : null
 }
 
 /**
@@ -251,10 +261,10 @@ export function startLan(handler: Handler, upgrade: Upgrade): void {
   onUpgrade = upgrade
   if (lanEnabled()) listen()
   if (!watcher) {
-    lastAddresses = lanAddresses().join(',')
+    lastAddresses = advertisedAddresses().join(',')
     // Interfaces come and go (Wi-Fi joins, the hotspot starts): a cheap read every 5 s, told only on a change.
     watcher = setInterval(() => {
-      const now = lanAddresses().join(',')
+      const now = advertisedAddresses().join(',')
       if (now === lastAddresses) return
       lastAddresses = now
       if (server) broadcast({ t: 'lan', lan: lanInfo() })

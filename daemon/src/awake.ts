@@ -33,7 +33,7 @@ import { join } from 'node:path'
 import { broadcast, listSessionRecs } from './hub.ts'
 import { getBattery, type Battery } from './battery.ts'
 import { SUPPORT, log, readJson, writeJson } from './util.ts'
-import { has, LINUX_REASONS } from './platform.ts'
+import { has, LINUX_REASONS, UNAVAILABLE } from './platform.ts'
 
 export type AwakeMode = 'working' | 'backpack' | 'off'
 /** Why the Mac is let go: the battery, the heat, or Backpack's hours are up. */
@@ -801,7 +801,7 @@ export const keepAwake = (key: string, on: boolean): void => {
 
 /** `POST /v1/mac/awake`: `{mode?, minBattery?}` or `{extend: true}` → the new state, or why not. */
 export function setAwake(b: { mode?: unknown; minBattery?: unknown; extend?: unknown }): { ok: true; awake: Awake } | { ok: false; code: string; message: string } {
-  if (!has('awake')) return { ok: false, code: 'unavailable', message: LINUX_REASONS.awake }
+  if (!has('awake')) return { ok: false, code: 'unavailable', message: UNAVAILABLE.awake ?? LINUX_REASONS.awake }
   if (b.extend === true) {
     const r = daemonKeeper().extend()
     return r.ok ? { ok: true, awake: awakeState() } : r

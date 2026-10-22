@@ -3,7 +3,7 @@ import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { HOME } from '../util.ts'
-import { PLATFORM, loginShell, packageBinDirs } from '../platform.ts'
+import { PLATFORM, isWsl, loginShell, onWindowsDrive, packageBinDirs } from '../platform.ts'
 
 /**
  * The version Hypernova's use of the app-server was checked against (2026-10-21). Later versions
@@ -27,7 +27,8 @@ export function findCodex(): string | null {
   if (fromShell === undefined) {
     try {
       const p = execFileSync(loginShell(PLATFORM), ['-lc', 'command -v codex'], { encoding: 'utf8', timeout: 5000 }).trim()
-      fromShell = p.startsWith('/') && existsSync(p) ? p : null
+      // Under WSL, never Codex's Windows install found through Windows' PATH.
+      fromShell = p.startsWith('/') && existsSync(p) && !(PLATFORM === 'linux' && onWindowsDrive(p) && isWsl()) ? p : null
     } catch {
       fromShell = null
     }

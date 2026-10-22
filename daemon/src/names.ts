@@ -33,7 +33,7 @@ import { SUPPORT, VERSION, log, readJson, writeJson } from './util.ts'
 import { settings, saveSettings } from './store.ts'
 import { NameServiceClient, NameServiceError, exportPrivateKey, fromBase64, generateServerKey, importServerKey, toBase64, type Registration, type ServerKey } from './names-client.ts'
 import { AcmeClient, AcmeError, LETS_ENCRYPT, certHosts, chainTrusted, httpsTransport, newEcKey, renewAt, splitPem } from './acme.ts'
-import { lanAddresses, lanEnabled, lanInfo, onLanChange, pickLanAddress, setNamedCert, type NamedCert } from './lan.ts'
+import { advertisedAddresses, lanEnabled, lanInfo, onLanChange, pickLanAddress, setNamedCert, type NamedCert } from './lan.ts'
 
 export const DEFAULT_SERVICE = 'https://api.hypernova.observer'
 export const DEFAULT_DOMAIN = 'hypernova.observer'
@@ -154,7 +154,7 @@ export function envConfig(env: NodeJS.ProcessEnv = process.env): NamesConfig {
     acmeCa: caFile ? splitPem(readFileSync(caFile, 'utf8')) : undefined,
     dnsServers: env.HYPERNOVA_NAMES_DNS ? env.HYPERNOVA_NAMES_DNS.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
     roots: rootsFile ? extraRoots!.roots : rootCertificates,
-    lanAddress: () => pickLanAddress(lanAddresses()),
+    lanAddress: () => pickLanAddress(advertisedAddresses()),
     fetch: serviceFetch,
     settleMs: 15_000,
     checkDelayMs: 30_000,

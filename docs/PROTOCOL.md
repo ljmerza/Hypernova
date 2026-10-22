@@ -182,7 +182,12 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   192.168/16), link-local (169.254/16, fe80::/10), CGNAT 100.64/10 or IPv6 ULA fc00::/7 is dropped
   at accept, before any TLS. The daemon setting `lanAccess` (default true; `POST /local/settings
   {lanAccess: false}`) turns the listener off, and the snapshot then says `lan: null`. When the
-  port can't be bound the daemon logs it and runs without the listener (`lan: null` too).
+  port can't be bound the daemon logs it and runs without the listener (`lan: null` too). On Linux,
+  unset means off in a container, on a cloud VM, on a machine with a public IPv4 address of its own
+  and behind WSL 2's NAT on a Windows PC (`platform.ts`, `lanByDefault`). Behind WSL's NAT (any
+  networking mode but mirrored, as `wslinfo --networking-mode` says) no address of the machine is
+  one a phone can reach, so `lan.addresses` is `[]` and pairing links carry `lan=` empty, even
+  with `lanAccess: true`.
 - **What the listener holds** (anyone on the network, a café's Wi-Fi say, can reach it): at most
   32 open connections per source address and 64 in all; one more is closed at accept. A TLS
   handshake must finish within 10 s, and a request's headers within 15 s (408 and closed

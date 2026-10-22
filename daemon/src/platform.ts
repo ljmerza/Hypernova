@@ -1,11 +1,12 @@
-// The machine the daemon runs on: a Mac (with the menu bar app) or a Linux server or PC, run from
-// the command line only (docs/DECISIONS.md, "Direction: open source, self-hosted, Tailscale
+// The machine the daemon runs on: a Mac (with the menu bar app) or a Linux server or PC (WSL on a
+// Windows PC too, experimental), run from the command line only (docs/DECISIONS.md, "Direction: open source, self-hosted, Tailscale
 // inside"; docs/LINUX.md). Where state and logs live, which of the Mac's features exist here and
 // why not, and where the programs the daemon runs are found.
 //
 // Everything here is a pure function of the platform, the environment and the home folder, so the
 // tests can ask about either system from either one; the constants at the bottom are this
 // process's answers. Nothing here imports the rest of the daemon (util.ts imports this).
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { NetworkInterfaceInfo } from 'node:os'
@@ -84,8 +85,14 @@ export const LINUX_REASONS: Record<Feature, string> = {
   simulator: 'The iOS Simulator runs on a Mac only.',
 }
 
-/** The features this platform lacks, each with the reason to show. */
-export const unavailableOn = (platform: Platform): Partial<Record<Feature, string>> => (platform === 'darwin' ? {} : { ...LINUX_REASONS })
+/** Under WSL on a Windows PC, the reasons that would point at a server's ways (cli/wsl.ts). */
+export const WSL_REASONS: Partial<Record<Feature, string>> = {
+  awake: 'Stay awake is for a Mac. On Windows, keep the PC from sleeping in its power settings, and WSL running (docs/INSTALL.md, “Windows (experimental)”).',
+  openWindow: 'Opening a window is for a Mac. On Windows, attach from a WSL terminal instead: hn attach.',
+}
+
+/** The features this platform lacks, each with the reason to show ([wsl]: Linux under WSL on Windows). */
+export const unavailableOn = (platform: Platform, wsl = false): Partial<Record<Feature, string>> => (platform === 'darwin' ? {} : { ...LINUX_REASONS, ...(wsl ? WSL_REASONS : {}) })
 
 // ── Programs ──────────────────────────────────────────────────────────────
 
@@ -218,11 +225,12 @@ export function publicIPv4(ip: string): boolean {
  * would face the internet (the listener drops strangers at accept, but a scan still finds a port).
  * Such a server is reached through the tailnet only; `lanAccess: true` turns the listener on anyway.
  */
-export function lanByDefault(platform: Platform, ifaces: NodeJS.Dict<NetworkInterfaceInfo[]>, where: { container?: boolean; cloud?: boolean } = { container: inContainer(), cloud: onCloudVm() }): boolean {
+export function lanByDefault(platform: Platform, ifaces: NodeJS.Dict<NetworkInterfaceInfo[]>, where: { container?: boolean; cloud?: boolean; wslNat?: boolean } = { container: inContainer(), cloud: onCloudVm(), wslNat: wslBehindNatHere() }): boolean {
   if (platform === 'darwin') return true
-  // A container's bridge address (172.17.x) and a cloud VM's NATed one are private, yet no phone
-  // is ever on that network: the local route (and its certificate) would serve nobody.
-  if (where.container || where.cloud) return false
+  // A container's bridge address (172.17.x), a cloud VM's NATed one and WSL's own network behind
+  // Windows (172.x) are private, yet no phone is ever on that network: the local route (and its
+  // certificate) would serve nobody.
+  if (where.container || where.cloud || where.wslNat) return false
   for (const list of Object.values(ifaces)) for (const a of list ?? []) if (!a.internal && a.family === 'IPv4' && publicIPv4(a.address)) return false
   return true
 }
@@ -249,6 +257,94 @@ export function onCloudVm(read: (f: string) => string = (f) => { try { return re
   return CLOUD_VENDORS.test(`${read('sys_vendor')} ${read('product_name')} ${read('bios_vendor')}`) || read('chassis_asset_tag') === AZURE_TAG
 }
 
+// ── WSL ───────────────────────────────────────────────────────────────────
+// Windows Subsystem for Linux: a Linux on a Windows PC, where Hypernova runs as on any Linux
+// (experimental: docs/INSTALL.md, "Windows (experimental)"). What differs is the network. Under WSL
+// 2's default NAT this Linux sits behind Windows on a network of its own (172.x, or another private
+// range), which no phone can reach: the phone comes in through the built-in Tailscale node. With
+// mirrored networking (Windows 11 22H2 and later, `networkingMode=mirrored` in .wslconfig) it has
+// Windows' own addresses, and WSL 1 shares Windows' network outright.
+
+export type Wsl = { version: 1 | 2 }
+
+const readProcVersion = (): string => {
+  try {
+    return readFileSync('/proc/version', 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Whether, and which, WSL this is: the kernel's release in /proc/version says "microsoft"
+ * ("6.6.87.2-microsoft-standard-WSL2"; WSL 1's is "4.4.0-19041-Microsoft"). A WSL 2 with a kernel
+ * of the owner's own may not say so; the variables WSL gives a session do (WSL_DISTRO_NAME,
+ * WSL_INTEROP), though a service started by systemd has neither. `HYPERNOVA_WSL=1` or `0` decides.
+ * Docker Desktop's containers on Windows run on the same kernel, so they count too.
+ */
+export function wslOf(env: NodeJS.ProcessEnv = process.env, read: () => string = readProcVersion): Wsl | null {
+  if (env.HYPERNOVA_WSL === '0') return null
+  const text = read()
+  const release = /^Linux version (\S+)/.exec(text)?.[1] ?? text
+  if (/microsoft/i.test(release)) return { version: /microsoft-standard|wsl2/i.test(release) ? 2 : 1 }
+  if (env.HYPERNOVA_WSL === '1' || env.WSL_DISTRO_NAME || env.WSL_INTEROP) return { version: 2 }
+  return null
+}
+
+/** Whether this is WSL (1 or 2). */
+export const isWsl = (env: NodeJS.ProcessEnv = process.env, read: () => string = readProcVersion): boolean => wslOf(env, read) !== null
+
+/**
+ * A path on one of Windows' own drives as WSL mounts them (/mnt/c/…). WSL adds Windows' PATH to a
+ * shell's, so `command -v claude` there can find Claude Code's or Codex's Windows install (an npm
+ * shim under AppData): never the agent Hypernova runs, which must be the Linux build inside WSL.
+ */
+export const onWindowsDrive = (p: string): boolean => /^\/mnt\/[a-z]\//i.test(p)
+
+/**
+ * WSL's networking mode as `wslinfo --networking-mode` prints it (WSL 2.0.4 and later): "nat",
+ * "mirrored", "none", "virtioproxy" and the like, in lower case; null when there's no answer (an
+ * older WSL, or no wslinfo in a container). `HYPERNOVA_WSL_NETWORKING` stands in for it.
+ */
+export function wslNetworking(env: NodeJS.ProcessEnv = process.env, ask: () => string | null = askWslinfo): string | null {
+  const v = (env.HYPERNOVA_WSL_NETWORKING || ask() || '').trim().toLowerCase()
+  return /^[a-z]+$/.test(v) ? v : null
+}
+
+function askWslinfo(): string | null {
+  for (const bin of ['/usr/bin/wslinfo', '/bin/wslinfo']) {
+    if (!existsSync(bin)) continue
+    try {
+      return execFileSync(bin, ['--networking-mode'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] })
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+/**
+ * Whether this Linux is behind WSL 2's NAT, where none of its own addresses is one a phone can
+ * reach: every mode but mirrored (and the deprecated bridged, which gives the VM an address on the
+ * Wi-Fi). An unknown mode counts as NAT, WSL's default. WSL 1 shares Windows' own network.
+ */
+export const wslBehindNat = (wsl: Wsl | null, networking: string | null): boolean => !!wsl && wsl.version === 2 && networking !== 'mirrored' && networking !== 'bridged'
+
+let wslHere: { wsl: Wsl | null; networking: string | null } | undefined
+/** This process's WSL and its networking mode, asked once (they change only with a restart of WSL, which restarts the daemon). */
+export function wslFacts(): { wsl: Wsl | null; networking: string | null } {
+  if (!wslHere) {
+    const wsl = process.platform === 'linux' || process.env.HYPERNOVA_WSL === '1' ? wslOf() : null
+    wslHere = { wsl, networking: wsl ? wslNetworking() : null }
+  }
+  return wslHere
+}
+/** Whether this daemon is behind WSL's NAT (wslBehindNat, for this process). */
+export const wslBehindNatHere = (): boolean => {
+  const f = wslFacts()
+  return wslBehindNat(f.wsl, f.networking)
+}
+
 /**
  * Claude Code refuses --allow-dangerously-skip-permissions (and bypass mode) when run as root,
  * unless IS_SANDBOX=1 says it is in one. On a root server a phone session started with the flag
@@ -262,7 +358,7 @@ export function bypassBlockedByRoot(uid: number | undefined = process.getuid?.()
 
 export const PLATFORM: Platform = platformOf(process.platform)
 export const ON_MAC = PLATFORM === 'darwin'
-export const UNAVAILABLE = unavailableOn(PLATFORM)
+export const UNAVAILABLE = unavailableOn(PLATFORM, PLATFORM === 'linux' && isWsl())
 
 /** Whether this machine has [f]. */
 export const has = (f: Feature): boolean => !(f in UNAVAILABLE)

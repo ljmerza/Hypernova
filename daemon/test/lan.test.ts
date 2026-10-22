@@ -42,6 +42,8 @@ const LOCAL = await freePort()
 process.env.HYPERNOVA_API_PORT = String(API)
 process.env.HYPERNOVA_LOCAL_PORT = String(LOCAL)
 process.env.HYPERNOVA_LAN_PORT = '0'
+// Not WSL, whatever machine runs the test: behind WSL's NAT no address is advertised (test/wsl.test.ts).
+process.env.HYPERNOVA_WSL = '0'
 
 const { privateAddress, lanAddresses, resetPairLimits, lanLimits, lanInfo, setLanAccess } = await import('../src/lan.ts')
 const { serverIdentity, TLS_DIR } = await import('../src/tls.ts')

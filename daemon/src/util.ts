@@ -4,7 +4,7 @@ import { homedir, hostname } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { ON_MAC, PLATFORM, claudeCandidates, loginShell, places } from './platform.ts'
+import { ON_MAC, PLATFORM, claudeCandidates, isWsl, loginShell, onWindowsDrive, places } from './platform.ts'
 
 export const HOME = homedir()
 
@@ -127,7 +127,9 @@ export function findClaude(): string | null {
   const candidates = [process.env.CLAUDE_BIN, ...claudeCandidates(PLATFORM, HOME)]
   for (const c of candidates) if (c && existsSync(c)) return c
   try {
-    return execFileSync(loginShell(PLATFORM), ['-lc', 'command -v claude'], { encoding: 'utf8', timeout: 5000 }).trim() || null
+    const p = execFileSync(loginShell(PLATFORM), ['-lc', 'command -v claude'], { encoding: 'utf8', timeout: 5000 }).trim() || null
+    // Under WSL, never Claude Code's Windows install found through Windows' PATH.
+    return p && PLATFORM === 'linux' && onWindowsDrive(p) && isWsl() ? null : p
   } catch {
     return null
   }
