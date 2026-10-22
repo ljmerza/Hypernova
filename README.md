@@ -38,6 +38,8 @@ Everything runs on **a computer of your own**, next to your agents: **a Mac** (w
 The phone and the glasses reach it directly on your Wi-Fi, or over **your own Tailscale network**
 from anywhere. No Hypernova server sits in between: the only thing we host is a small name service
 for pairing and a private name (see [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md)).
+**A Windows PC** runs the Linux service inside WSL 2 or Docker Desktop: **experimental**, documented
+but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop)).
 
 ## Highlights
 
@@ -177,7 +179,8 @@ flowchart LR
 **You need:**
 
 - A computer to host it: a Mac with Apple silicon on macOS 14 or later, a Linux machine on Ubuntu
-  or Debian (x86_64 or arm64, a VPS or a home server), or Docker.
+  or Debian (x86_64 or arm64, a VPS or a home server), or Docker. Or, experimentally, a Windows PC
+  with WSL 2 or Docker Desktop.
 - An agent on it, signed in: [Claude Code](https://docs.claude.com/en/docs/claude-code), OpenAI's
   [Codex](https://github.com/openai/codex) 0.163.0 or later, or both. Either one alone is enough, and
   Hypernova installs Claude Code for you if you want it.
@@ -219,6 +222,11 @@ Install `Hypernova.apk` on your phone and scan the code. `hypernova doctor` chec
 *In Docker:* `docker build -t hypernova .` from a clone of this repository, `docker run` it with a
 volume for its state, then `docker exec -it hypernova hypernova pair` (the exact commands:
 [`docs/INSTALL.md`](docs/INSTALL.md#4-in-docker)).
+
+*On Windows (experimental):* the Linux steps inside WSL 2 (Ubuntu), with Claude Code and Codex
+installed there too, or the Docker steps in Docker Desktop; the phone pairs over the built-in
+Tailscale. Nobody has tried it on a Windows PC yet: [`docs/INSTALL.md`](docs/INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop)
+has the steps and what is and isn't verified.
 
 **Build from source:**
 

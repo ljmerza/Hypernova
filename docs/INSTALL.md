@@ -17,6 +17,10 @@ This is the whole install guide. Setup, in the Mac app, uses the same step names
 | You drive it with | Setup and the menu bar | `hypernova` over SSH | `docker exec … hypernova` |
 | Runs | macOS 14 or later, Apple silicon | Ubuntu or Debian, x86_64 or arm64, systemd | Docker (tested on arm64; the image is about 2.7 GB) |
 
+**A Windows PC** runs the Linux service too, inside WSL 2 (Ubuntu) or in a Docker Desktop container:
+**experimental**, documented but not yet tried on a real Windows PC. See
+[5. Windows (experimental)](#5-windows-experimental-wsl2-or-docker-desktop).
+
 Whichever you choose, the phone side is the same: **the Android app** (Android 10 or later) pairs
 with the computer by a code, and **Hypernova Lens** on Even Realities G2 glasses goes through the
 app. The Mac's menu bar is a second control room, on that Mac only.
@@ -373,6 +377,176 @@ docker cp codex hypernova:/home/hypernova/.local/bin/codex
 docker exec -it hypernova codex login --device-auth
 docker exec -it hypernova hypernova codex on
 ```
+
+## 5. Windows (experimental): WSL2 or Docker Desktop
+
+There is no Windows app and no native Windows service yet ([PLATFORMS.md](PLATFORMS.md) plans one).
+A Windows PC runs Hypernova's **Linux** service instead, inside **WSL 2** (Windows Subsystem for
+Linux, with Ubuntu) or in a **Docker Desktop** container, and your phone pairs with it as with any
+Linux machine.
+
+> **Experimental.** These steps are written from Microsoft's and Docker's documentation and from
+> Hypernova's Linux tests. **Nobody has tried them on a real Windows PC yet.** If you do, please
+> [open an issue](https://github.com/prudnik-web/Hypernova/issues) with what worked and what
+> `hypernova doctor` printed (it names your folders: look it over first).
+
+**What works**, as on any Linux (tested on Linux and in Linux containers, not on Windows): the
+service, Claude Code and Codex sessions, approvals, usage, shared terminals (`claude` typed in an
+Ubuntu terminal), Telescope's terminal and web pages, the built-in Tailscale and pairing.
+`hypernova doctor` and `hypernova pair` know when they run in WSL and say what differs.
+
+**What doesn't:**
+
+- **Claude Code and Codex must be installed inside WSL** (their Linux builds; a Windows install
+  that WSL's shell finds through Windows' PATH is ignored). Sessions you run in PowerShell, Command
+  Prompt or a Windows app are outside WSL: Hypernova doesn't see them.
+- What a Linux server lacks ([LINUX.md](LINUX.md), "What a Linux server doesn't have"): battery,
+  Stay awake, the Mac's voice, app windows in Telescope, opening a terminal window from the phone.
+- No tray app and no Setup window: everything is the `hypernova` command in an Ubuntu terminal.
+- WSL's default network (NAT) keeps the PC off your phone's Wi‑Fi: the phone comes in over
+  **Tailscale**, which is built in. A direct route on the Wi‑Fi needs mirrored networking (below).
+
+**Not verified on Windows yet:** all of it on real hardware, and in particular WSL stopping and
+starting the service, mirrored networking with the Hyper-V firewall rule, Docker Desktop building
+the image on an x86_64 PC (the image is tested on arm64 so far), and Windows on Arm.
+
+### With WSL 2 (recommended)
+
+1. **Install WSL and Ubuntu.** In PowerShell as administrator:
+
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+
+   Restart when asked, open **Ubuntu** from the Start menu and make your Linux user. Already have
+   WSL? Run `wsl --update`, then `wsl -l -v`: Ubuntu's VERSION must be 2 (if it's 1:
+   `wsl --set-version Ubuntu 2`). Microsoft's guide:
+   [Install WSL](https://learn.microsoft.com/windows/wsl/install).
+2. **Check that systemd runs** (the service needs it). In Ubuntu, `ps -p 1 -o comm=` should print
+   `systemd`; Ubuntu installed by `wsl --install` has it on. If it prints something else, add these
+   two lines to `/etc/wsl.conf` (`sudo nano /etc/wsl.conf`):
+
+   ```ini
+   [boot]
+   systemd=true
+   ```
+
+   then run `wsl --shutdown` in PowerShell and open Ubuntu again
+   ([Microsoft: systemd in WSL](https://learn.microsoft.com/windows/wsl/systemd)).
+3. **Install Hypernova inside Ubuntu**, as on a Linux server (keep it in your Linux home, not under
+   `/mnt/c`):
+
+   ```sh
+   cd ~
+   curl -fLO https://github.com/prudnik-web/Hypernova/releases/latest/download/Hypernova-linux.tar.gz
+   curl -fLO https://github.com/prudnik-web/Hypernova/releases/latest/download/SHA256SUMS.txt
+   sha256sum -c --ignore-missing SHA256SUMS.txt
+   tmp=$(mktemp -d) && tar -xzf Hypernova-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
+   ```
+
+   The script says it found WSL, and installs Claude Code's Linux build unless you add
+   `--no-claude`. For Codex, install it inside Ubuntu as in
+   [Sign in to your agents](#sign-in-to-your-agents).
+4. **Sign in** inside Ubuntu: run `claude` once (and `codex login --device-auth` for Codex).
+5. **Keep WSL running.** WSL stops Ubuntu soon after its last window closes, and a systemd service
+   doesn't keep it running. In Windows, create or edit `%UserProfile%\.wslconfig` (for example
+   `notepad "$env:USERPROFILE\.wslconfig"` in PowerShell) and add:
+
+   ```ini
+   [general]
+   instanceIdleTimeout=-1
+   ```
+
+   Then `wsl --shutdown` in PowerShell and open Ubuntu again. `-1` turns WSL's idle shutdown off
+   ([Microsoft: .wslconfig](https://learn.microsoft.com/windows/wsl/wsl-config); if your WSL doesn't
+   know the setting, `wsl --update`). WSL starts only when something opens it, so after Windows
+   restarts, open Ubuntu once. (A Task Scheduler task "at log on" that runs `wsl.exe -d Ubuntu
+   --exec true` should do the same without a window; untested.) And the PC must be awake: don't let
+   it sleep, in Windows' power settings, while you want to reach it.
+6. **Pair your phone**, in Ubuntu:
+
+   ```sh
+   hypernova pair
+   ```
+
+   It shows Tailscale's sign-in first (the built-in node: nothing to install, nothing opened on your
+   network, and it works from anywhere), then the pairing code, as in
+   [Pair your phone](#pair-your-phone). Install `Hypernova.apk` on the phone first.
+7. **Check it**: `hypernova doctor` adds WSL's own lines (systemd, keeping WSL running, the network
+   mode, Tailscale), each with what to do.
+
+### Optional: the phone on the same Wi‑Fi (mirrored networking)
+
+On Windows 11 22H2 and later, WSL can share Windows' own network addresses
+([Microsoft: mirrored mode networking](https://learn.microsoft.com/windows/wsl/networking#mirrored-mode-networking)).
+Then a phone on the same Wi‑Fi can reach Hypernova directly, as it does a Mac:
+
+1. In `%UserProfile%\.wslconfig`:
+
+   ```ini
+   [wsl2]
+   networkingMode=mirrored
+   ```
+
+   then `wsl --shutdown` and open Ubuntu again. In Ubuntu, `wslinfo --networking-mode` now prints
+   `mirrored`.
+2. Let the local route's port in through Windows' Hyper-V firewall, once, in PowerShell as
+   administrator:
+
+   ```powershell
+   New-NetFirewallHyperVRule -Name Hypernova -DisplayName "Hypernova local route" -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 47323
+   ```
+
+3. `hypernova status` should show the local route on, with the PC's Wi‑Fi address
+   (`hypernova lan on` if it's off), and `hypernova pair` makes a code that carries it.
+
+Untested on Windows. With WSL's default NAT, Hypernova keeps the local route off and leaves WSL's
+own addresses out of the pairing link, since no phone can reach them. A `netsh interface portproxy`
+forward isn't supported: from inside WSL the service can't learn the PC's Wi‑Fi address to put in
+the pairing link.
+
+### With Docker Desktop
+
+Docker Desktop for Windows runs Linux containers on WSL 2 (its "Use the WSL 2 based engine"
+setting, on by default where WSL 2 is installed:
+[Docker's guide](https://docs.docker.com/desktop/features/wsl/)). There's no published image yet,
+so build it from a clone of this repository, in PowerShell (with [Git](https://git-scm.com)) or in
+Ubuntu:
+
+```sh
+git clone https://github.com/prudnik-web/Hypernova.git
+cd Hypernova
+docker build -t hypernova .
+docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
+docker exec -it hypernova claude              # sign in to Claude once
+docker exec -it hypernova hypernova pair      # Tailscale's sign-in, then the pairing code
+docker exec -it hypernova hypernova doctor
+```
+
+Everything else is as in [4. In Docker](#4-in-docker): Claude Code is inside the image (Codex can be
+copied in), your state is in the `hypernova-home` volume, nothing is published to the network, and
+the phone comes in through the built-in Tailscale node. Docker Desktop must be running for the
+container to run (it has a setting to start when you sign in). The image is tested on arm64; an
+x86_64 PC builds the amd64 image, which nobody has tried yet.
+
+### Updating on Windows
+
+- **WSL:** in Ubuntu, download the new `Hypernova-linux.tar.gz` and run its install script again,
+  as in step 3. Open sessions keep running; phones and settings stay. `wsl --update` updates WSL
+  itself.
+- **Docker Desktop:** `git pull` in the clone, then build, remove and run again as in
+  [Update](#update) (the same `docker run` line, the same volume).
+
+### Uninstalling on Windows
+
+- **WSL:** in Ubuntu, `hypernova uninstall` (`--purge` also removes paired phones and settings, as
+  on Linux). Then remove what you added on Windows: the lines in `%UserProfile%\.wslconfig`, and the
+  firewall rule, in PowerShell as administrator: `Remove-NetFirewallHyperVRule -Name Hypernova`.
+  `wsl --unregister Ubuntu` deletes the whole Ubuntu with everything in it: only if you want that.
+- **Docker Desktop:** `docker rm -f hypernova`, `docker volume rm hypernova-home` (its state) and
+  `docker image rm hypernova`.
+- **Then**, as anywhere: uninstall the app on the phone and remove `hypernova-<name>` from your
+  tailnet ([Uninstall](#uninstall)).
 
 ## Your phone
 

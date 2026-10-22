@@ -9,6 +9,13 @@ pairs with a Mac (docs/DECISIONS.md, "Direction: open source, self-hosted, Tails
 Supported: Ubuntu and Debian (other distributions work with their packages installed by hand), on
 x86_64 and arm64.
 
+**A Windows PC** runs the same service inside WSL 2 (Ubuntu) or in a Docker Desktop container:
+**experimental**, documented from Microsoft's and Docker's guides but not yet tried on a real Windows
+PC. The steps, what works and what doesn't, are in
+[INSTALL.md, "5. Windows (experimental)"](INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop);
+under WSL, `hypernova doctor`, `pair`, `lan` and `setup` say what differs there (systemd, keeping
+WSL running, the phone over Tailscale behind WSL's NAT).
+
 ## Install
 
 Run it as the user who will use Claude Code or Codex, not as root. The script asks `sudo` for system
@@ -155,6 +162,9 @@ The same as on a Mac (docs/PROTOCOL.md, "Transport and auth", "Local network (di
 - The local route is **off by default** in a container and on a cloud VM (AWS, Google, Azure,
   DigitalOcean, Hetzner and others, which sit behind a NAT) as well as on a machine with a public
   address; bridge interfaces (docker0, br-*, virbr0) are never offered as a phone's address.
+  Behind WSL 2's NAT on a Windows PC (any networking mode but mirrored, as `wslinfo
+  --networking-mode` says) it is off too, and even when turned on its addresses are left out of
+  pairing links: none of them is one a phone can reach.
 
 **Tailscale is built in** (docs/PROTOCOL.md, "Tailscale built in"): the daemon runs its own node
 (`daemon/bin/hypernova-tsnet-linux-*`, in the package when it was built with Go), named

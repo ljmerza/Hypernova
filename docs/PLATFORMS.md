@@ -247,6 +247,17 @@ app keeps working throughout, so each step ships to the owner's phone as before.
 layer is `daemon/src/platform.ts`, the `hypernova` command `daemon/src/cli/`, and how to install
 and run it [LINUX.md](LINUX.md). Windows is still only this research.
 
+**Status (2026-10-22):** a Windows PC can run the **Linux** host inside WSL 2 (Ubuntu) or in a
+Docker Desktop container, documented as **experimental** in
+[INSTALL.md, "5. Windows (experimental)"](INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop).
+The daemon knows when it runs in WSL (`isWsl()` and the networking mode from `wslinfo` in
+`platform.ts`): behind WSL's NAT the LAN listener is off by default and its unreachable addresses
+are never advertised, so the phone comes in over the built-in Tailscale node; `hypernova doctor`,
+`pair`, `lan` and `setup` explain systemd, keeping WSL running and mirrored networking
+(`daemon/src/cli/wsl.ts`). Verified only on Linux and by unit tests that simulate WSL; nobody has
+tried it on a real Windows PC (LATER L92). The native Windows host and its tray app below are still
+only this plan (LATER L91).
+
 **The idea.** Let the daemon run on a Linux or Windows computer, and give those computers a
 small tray app like the Mac's menu bar app. Claude Code itself already runs on both
 ([ON-DEVICE.md](ON-DEVICE.md) lists the official builds: `linux-x64`, `linux-arm64`,
