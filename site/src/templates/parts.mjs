@@ -14,6 +14,8 @@ export const icon = {
   phone: (c) => svg('<rect x="7" y="2.8" width="10" height="18.4" rx="2.2"/><path d="M10.6 18h2.8"/>', c),
   server: (c) => svg('<rect x="4" y="4" width="16" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="16" height="6.5" rx="1.6"/><path d="M7.5 7.25h.01M7.5 16.75h.01M11 7.25h5M11 16.75h5"/>', c),
   box: (c) => svg('<path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/>', c),
+  // A PC: a monitor on its stand (no vendor's logo).
+  desktop: (c) => svg('<rect x="3.5" y="4" width="17" height="12" rx="1.6"/><path d="M12 16v4M8.5 20h7"/>', c),
   glasses: (c) => svg('<circle cx="7" cy="13.5" r="3.5"/><circle cx="17" cy="13.5" r="3.5"/><path d="M10.5 13.2c1-.8 2-.8 3 0M3.5 13 2.5 9.5M20.5 13l1-3.5"/>', c),
   shield: (c) => svg('<path d="M12 3.5 19 6v5.5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z"/>', c),
   clock: (c) => svg('<circle cx="12" cy="13" r="7"/><path d="M12 9.5V13l2.3 1.6M10 3.5h4"/>', c),

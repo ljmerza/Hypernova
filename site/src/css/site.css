@@ -783,6 +783,8 @@ a.card:active { transform: scale(0.985); }
 .host .cmd { margin-top: auto; padding-top: 8px; }
 .host .go { margin-top: 6px; color: var(--accent); font-weight: 600; font-size: 14px; display: inline-flex; gap: 6px; align-items: center; }
 .host .glyph-big { width: 40px; height: 40px; color: var(--muted); margin-bottom: 6px; }
+/* A host's state chip (Windows: experimental), its own width in the card's column. */
+.host > .chip { align-self: flex-start; margin: -2px 0 2px; }
 
 /* Two agents. */
 .agents { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
@@ -1023,6 +1025,7 @@ code.inline, .lede code, .muted code, .host code, .faq code {
 .way.gh .stack { display: grid; gap: 10px; }
 .way.gh .stack small { display: block; font-size: 13px; color: var(--dim-text); font-weight: 500; }
 .way.gh .pill .txt { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.way.gh .pill-top { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
 .ways-side { display: grid; gap: 14px; align-content: start; }
 .qr-card { display: none; gap: 18px; align-items: center; padding: 18px; }
 @media (min-width: 720px) { .qr-card { display: flex; } }

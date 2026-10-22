@@ -160,9 +160,9 @@ ${filmHtml}
 
 <section class="section" id="where" aria-labelledby="where-h">
   <div class="wrap">
-    <div class="head reveal">${seam('WHERE IT RUNS', { state: 'live', trail: 'Mac · Linux · Docker' })}<h2 id="where-h" class="title">Your Mac, or a server that never sleeps.</h2>
+    <div class="head reveal">${seam('WHERE IT RUNS', { state: 'live', trail: 'Mac · Linux · Docker · Windows' })}<h2 id="where-h" class="title">Your Mac, or a server that never sleeps.</h2>
       <p class="lede">Hypernova's service runs next to your agents, on your own machine. The phone and the glasses pair with any of these the same way.</p></div>
-    <div class="grid three">
+    <div class="grid two">
       <article class="card host reveal">${icon.laptop('glyph-big')}${seam('MAC', { trail: 'macOS 14+ · Apple silicon' })}
         <h3>A Mac, from the menu bar.</h3>
         <p>The menu bar app installs and runs the service, connects Claude Code and Codex, sets up Tailscale and pairs your phone with a QR code. A planet in the menu bar turns while anything works and shows a dot when something needs you.</p>
@@ -177,6 +177,12 @@ ${filmHtml}
         <h3>A container, to try it.</h3>
         <p>Build the image from a checkout and run it with a volume for its state. Nothing is published to the network; sign in to Claude once and pair with <code class="inline">hypernova pair</code> inside it.</p>
         <a class="go" href="/install/linux/#try-it-in-docker">Try it in Docker ${icon.right()}</a>
+      </article>
+      <article class="card host reveal">${icon.desktop('glyph-big')}${seam('WINDOWS', { trail: 'WSL 2 · Docker Desktop' })}
+        ${chip('Experimental', 'amber')}
+        <h3>A Windows PC, through Linux.</h3>
+        <p>The Linux service inside WSL 2 or Docker Desktop, with Claude Code and Codex installed there too; the phone pairs over the built-in Tailscale. Written down and tested on Linux, not yet tried on a real Windows PC.</p>
+        <a class="go" href="/guides/claude-code-on-windows-wsl/">Windows, experimental ${icon.right()}</a>
       </article>
     </div>
   </div>
@@ -309,7 +315,7 @@ ${filmHtml}
       ${seam('WHAT YOU NEED', { state: 'live' })}
       <h2 id="req-h" class="title">Requirements</h2>
       <ul>
-        <li><strong>A host:</strong> a Mac with Apple silicon on macOS 14 or later, or a Linux machine on Ubuntu or Debian (x86_64 or arm64), including a VPS or a Docker container.</li>
+        <li><strong>A host:</strong> a Mac with Apple silicon on macOS 14 or later, or a Linux machine on Ubuntu or Debian (x86_64 or arm64), including a VPS or a Docker container. Experimental: a Windows PC, through WSL 2 or Docker Desktop.</li>
         <li><strong>An agent:</strong> Claude Code, OpenAI's Codex (0.163.0 or later), or both.</li>
         <li><strong>An Android phone</strong> on Android 10 or later.</li>
         <li><strong>Optional:</strong> a Tailscale account to reach the host away from home (on the same Wi‑Fi you don't need one), Even Realities G2 glasses, and a Soniox API key for voice.</li>
@@ -442,6 +448,7 @@ function downloads(ctx) {
         <a class="pill" href="${s.releases}" rel="noopener">${icon.github()}<span class="txt">The latest release<small>Hypernova.dmg, Hypernova.apk, Hypernova-linux.tar.gz, Hypernova-Lens.ehpk</small></span></a>
         <a class="pill" href="#build-it-yourself">${icon.code()}<span class="txt">Build it from source<small>Command Line Tools, Node.js, Go; Android Studio's JDK</small></span></a>
         <a class="pill" href="/install/linux/">${icon.server()}<span class="txt">On a Linux server<small>Ubuntu, Debian · or Docker</small></span></a>
+        <a class="pill" href="#5-windows-experimental-wsl2-or-docker-desktop">${icon.desktop()}<span class="txt"><span class="pill-top">On a Windows PC${chip('Experimental', 'amber')}</span><small>The Linux service in WSL 2 or Docker Desktop</small></span></a>
       </div>
     </section>
     <aside class="card qr-card" aria-label="Open this page on your phone">${ctx.qr}<div><b>Get it on your phone</b><p>Scan to open this page on your Android phone and download the app there. A Mac also hands the app to your phone during Setup.</p></div></aside>

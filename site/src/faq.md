@@ -75,7 +75,8 @@ how to report them privately.
 
 A host and a phone. The host is either a Mac with Apple silicon (M1 or later; Intel Macs aren't
 supported) on macOS 14 or later, or a Linux machine on Ubuntu or Debian, x86_64 or arm64 (a VPS, a
-home server, a PC, or Docker). The phone is Android 10 or later. On the host you need Claude Code,
+home server, a PC, or Docker). A Windows PC works experimentally, through WSL 2 or Docker Desktop.
+The phone is Android 10 or later. On the host you need Claude Code,
 Codex or both. Tailscale and Even G2 glasses are optional. The full lists are in the
 [install guide](/install/#what-you-need) and [Hypernova on Linux](/install/linux/).
 
@@ -90,6 +91,15 @@ Yes. The host can be a Linux server, a VPS, a home PC or a Docker container, wit
 command instead of the menu bar, and the phone pairs with it the same way. See
 [Claude Code on a VPS or home server](/guides/claude-code-on-a-vps/) and
 [Hypernova on Linux](/install/linux/).
+
+### Does it run on Windows?
+
+Experimentally, through Linux. There's no Windows app yet, but a Windows PC runs Hypernova's Linux
+service inside WSL 2 (Ubuntu) or in a Docker Desktop container, with Claude Code and Codex
+installed there too, and the phone pairs over the built-in Tailscale. It's written down and tested
+on Linux, but nobody has tried it on a real Windows PC yet. See
+[Claude Code and Codex on a Windows PC](/guides/claude-code-on-windows-wsl/) and the install
+page's [Windows section](/install/#5-windows-experimental-wsl2-or-docker-desktop).
 
 ### Why does macOS warn me the first time I open it?
 

@@ -166,6 +166,7 @@ const GUIDE_ORDER = [
   ['claude-code-remote-access-tailscale', 'Remote access with Tailscale', 'Remote access'],
   ['claude-code-on-a-vps', 'An always-on host (VPS)', 'VPS'],
   ['run-claude-code-on-a-linux-server', 'Set up a Linux server', 'Linux'],
+  ['claude-code-on-windows-wsl', 'On a Windows PC (experimental)', 'Windows'],
   ['claude-code-on-even-g2-glasses', 'On Even G2 glasses', 'Glasses'],
 ];
 const ctx = {
@@ -272,6 +273,7 @@ const llms = `# Hypernova
 
 - Current version: ${version} (${date}), alpha.
 - Hosts: a Mac with Apple silicon on macOS 14 or later (the menu bar app), or Linux (Ubuntu or Debian, x86_64 or arm64; a VPS, a home server or Docker; the \`hypernova\` command).
+- Windows: experimental. A Windows PC runs the Linux service inside WSL 2 (Ubuntu) or a Docker Desktop container, with Claude Code and Codex installed there, and the phone pairs over the built-in Tailscale. Documented and tested on Linux, not yet tried on a real Windows PC; there is no native Windows app.
 - Phone: Android 10 or later. Glasses: Even Realities G2 (Hypernova Lens, through the phone app).
 - Agents: Claude Code, OpenAI's Codex (0.163.0 or later), or both.
 - Connection: directly on the same Wi-Fi (mutual TLS), or over your own Tailscale network (built in on the Mac, Linux and the phone). Only a small name service for pairing and private names is hosted; it never sees sessions.
@@ -281,6 +283,7 @@ const llms = `# Hypernova
 
 - [Install Hypernova](${abs('/install/')}): downloads for Mac, Linux and Android, and the setup step by step
 - [Hypernova on Linux](${abs('/install/linux/')}): a VPS, a home server or Docker
+- [Windows (experimental)](${abs('/install/#5-windows-experimental-wsl2-or-docker-desktop')}): WSL 2 or Docker Desktop, not yet tried on a real Windows PC
 - [Latest release on GitHub](${site.releases}): Hypernova.dmg, Hypernova.apk, Hypernova-linux.tar.gz, Hypernova-Lens.ehpk, SHA256SUMS.txt
 
 ## Guides
