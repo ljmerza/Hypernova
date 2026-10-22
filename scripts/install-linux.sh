@@ -61,6 +61,37 @@ if [ "$(id -u)" -eq 0 ]; then
   say "Safer: adduser claude; loginctl enable-linger claude; su - claude, and install there."
 fi
 
+# WSL on a Windows PC (experimental: docs/INSTALL.md, "Windows (experimental)"): a word on what
+# differs there, and on systemd, which the service needs and which /etc/wsl.conf may leave off. The
+# install goes on either way, with no question. $1: the kernel's version file, $2: the folder that
+# exists while systemd runs the system. Not in a container (Docker Desktop's run on WSL's kernel).
+wsl_hint() {
+  [ "${HYPERNOVA_WSL:-}" = 0 ] && return 0
+  [ "${HYPERNOVA_CONTAINER:-}" = 1 ] && return 0
+  local release distro="${WSL_DISTRO_NAME:-Ubuntu}"
+  release="$(sed -n 's/^Linux version \([^ ]*\).*/\1/p' "$1" 2>/dev/null || true)"
+  case "$release" in
+    *[Mm]icrosoft*) ;;
+    *) [ "${HYPERNOVA_WSL:-}" = 1 ] || [ -n "${WSL_DISTRO_NAME:-}" ] || return 0 ;;
+  esac
+  say "This is WSL on Windows. Hypernova's support for it is experimental (docs/INSTALL.md, \"Windows (experimental)\")."
+  case "$release" in
+    *microsoft-standard*|*WSL2*|"") ;;
+    *Microsoft*) say "WSL 1: Hypernova is meant for WSL 2. In PowerShell on Windows: wsl --set-version $distro 2" ;;
+  esac
+  if [ ! -d "$2" ]; then
+    say "WSL doesn't run systemd here, so Hypernova can't install its service yet. To turn it on, add"
+    say "    [boot]"
+    say "    systemd=true"
+    say "  to /etc/wsl.conf (sudo nano /etc/wsl.conf), run  wsl --shutdown  in PowerShell, open $distro"
+    say "  again and run this script again. Installing anyway: until then, start it with  hypernova run"
+  fi
+  say "Your phone reaches this PC over Tailscale (hypernova pair signs in the built-in node): WSL's"
+  say "default network keeps it off the Wi-Fi. To keep WSL running with no window open, see the guide."
+  echo
+}
+wsl_hint /proc/version /run/systemd/system
+
 DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
 case "$DATA" in /*) ;; *) DATA="$HOME/.local/share" ;; esac
 SUPPORT="${HYPERNOVA_SUPPORT:-$DATA/hypernova}"
