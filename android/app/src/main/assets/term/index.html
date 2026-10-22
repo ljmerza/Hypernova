@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Terminal</title>
+<link rel="stylesheet" href="xterm.css">
+<style>
+  /* Hypernova's shared terminal on the phone: the session's real Claude Code screen. */
+  @font-face { font-family: "JetBrains Mono"; src: url("JetBrainsMono.ttf") format("truetype"); font-weight: 100 800; }
+  html, body { margin: 0; height: 100%; background: #14110E; overflow: hidden; overscroll-behavior: none; }
+  #t { position: absolute; inset: 0 6px 0 8px; }
+  .xterm .xterm-viewport { background: #14110E !important; }
+  .xterm .xterm-viewport::-webkit-scrollbar { width: 0; }
+  #zoom { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); font: 500 12px/1 "JetBrains Mono", monospace; color: #B5B0A6; background: rgba(34,31,27,.9); border: 1px solid rgba(245,242,235,.1); border-radius: 999px; padding: 7px 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #zoom.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="t"></div>
+<div id="zoom"></div>
+<script src="xterm.js"></script>
+<script src="addon-fit.js"></script>
+<script>
+(() => {
+  const native = window.HN || { ready() {}, state() {}, closed() {}, exited() {}, tapped() {}, open() { return -1 }, send() {}, sendText() {}, shut() {}, took() {} }
+  const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } }
+  // The owner's text size. While a Mac window sets the terminal's size, the screen is shown
+  // whole at a smaller size ("following"); typing here takes the size back.
+  let userFont = Number(store.get('fontSize')) || 11.5
+  let following = false
+  let quiet = false
+  let pty = null
+  const term = new Terminal({
+    fontFamily: '"JetBrains Mono", monospace',
+    fontSize: userFont,
+    lineHeight: 1.12,
+    cursorBlink: true,
+    cursorStyle: 'bar',
+    scrollback: 5000,
+    allowProposedApi: true,
+    macOptionIsMeta: true,
+    theme: {
+      background: '#14110E', foreground: '#F5F2EB', cursor: '#7FFFA0', cursorAccent: '#14110E',
+      selectionBackground: 'rgba(127,255,160,0.28)',
+      black: '#1B1814', red: '#FF7878', green: '#7FFFA0', yellow: '#E8B341', blue: '#8AB4FF', magenta: '#D69CFF', cyan: '#7FE7FF', white: '#B5B0A6',
+      brightBlack: '#7A7468', brightRed: '#FF9C9C', brightGreen: '#B6FFC9', brightYellow: '#F2CC6E', brightBlue: '#AFCBFF', brightMagenta: '#E5BDFF', brightCyan: '#A9F0FF', brightWhite: '#F5F2EB',
+    },
+  })
+  const fit = new FitAddon.FitAddon()
+  term.loadAddon(fit)
+
+  let ws = null
+  let macOpen = false
+  let ended = false
+  const enc = new TextEncoder()
+
+  // Replies a terminal sends by itself (device attributes, cursor position, colours). When the
+  // Mac's terminal is attached, it answers those; a second answer would reach claude as typing.
+  const REPLY = /^(\x1b\[\??[\d;]*[cRn]|\x1b\[\?[\d;]*\$y|\x1b\][\d;]*;rgb:[^\x07\x1b]*(\x07|\x1b\\)|\x1bP[\s\S]*\x1b\\)$/
+  term.onData((d) => {
+    if (!ws || ws.readyState !== 1) return
+    if (macOpen && REPLY.test(d)) return
+    // Focus reports would make this phone "the one in use" just by being open.
+    if (d === '\x1b[I' || d === '\x1b[O') return
+    ws.send(enc.encode(d))
+  })
+  term.onBinary((d) => {
+    if (!ws || ws.readyState !== 1) return
+    const b = new Uint8Array(d.length)
+    for (let i = 0; i < d.length; i++) b[i] = d.charCodeAt(i) & 255
+    ws.send(b)
+  })
+  term.onResize(({ cols, rows }) => {
+    if (quiet) return
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'resize', cols, rows }))
+  })
+
+  /** What fits this screen at the owner's text size. */
+  function mine() {
+    const p = fit.proposeDimensions()
+    if (!p || !p.cols) return null
+    const k = term.options.fontSize / userFont
+    return { cols: Math.max(20, Math.floor(p.cols * k)), rows: Math.max(6, Math.floor(p.rows * k)) }
+  }
+  function quietly(f) { quiet = true; try { f() } finally { quiet = false } }
+
+  /** The terminal's size changed (or someone else set it): show it whole. */
+  function follow(cols, rows) {
+    pty = { cols, rows }
+    const m = mine()
+    if (!m) return
+    if (cols === m.cols && rows === m.rows) {
+      // Our own size: this phone is the one in use.
+      following = false
+      quietly(() => { term.options.fontSize = userFont; if (term.cols !== cols || term.rows !== rows) term.resize(cols, rows) })
+      return
+    }
+    following = true
+    const scale = Math.min(1, m.cols / cols, m.rows / rows)
+    quietly(() => {
+      term.options.fontSize = Math.max(4, Math.floor(userFont * scale * 2) / 2)
+      term.resize(cols, rows)
+    })
+  }
+  /** About to type, press a key or zoom here: take the terminal's size back for this phone. */
+  function takeOver() {
+    if (!following) return
+    following = false
+    quietly(() => { term.options.fontSize = userFont })
+    refit()
+  }
+
+  function refit() {
+    if (following && pty) return follow(pty.cols, pty.rows)
+    try { fit.fit() } catch {}
+  }
+  let fitTimer = 0
+  window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(refit, 40) })
+
+  // Pinch to change the text size (and with it, how many columns claude gets).
+  const zoomEl = document.getElementById('zoom')
+  let pinch = null, zoomTimer = 0
+  function showZoom() {
+    zoomEl.textContent = `${term.cols} × ${term.rows}`
+    zoomEl.classList.add('on')
+    clearTimeout(zoomTimer)
+    zoomTimer = setTimeout(() => zoomEl.classList.remove('on'), 900)
+  }
+  const dist = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 2) return
+    takeOver()
+    pinch = { d: dist(e), size: userFont }
+  }, { passive: true, capture: true })
+  document.addEventListener('touchmove', (e) => {
+    if (!pinch || e.touches.length !== 2) return
+    e.preventDefault()
+    const next = Math.round(Math.max(7, Math.min(20, pinch.size * dist(e) / pinch.d)) * 2) / 2
+    if (next !== userFont) {
+      userFont = next
+      term.options.fontSize = next
+      refit()
+      showZoom()
+    }
+  }, { passive: false, capture: true })
+  document.addEventListener('touchend', (e) => {
+    if (pinch && e.touches.length < 2) { pinch = null; store.set('fontSize', String(userFont)) }
+  }, { passive: true, capture: true })
+
+  // On the local route the app opens the socket (this page's own WebSocket can't trust the Mac's
+  // pinned certificate or show the phone's device certificate) and this stands in for it, with the
+  // face hn.connect expects of a WebSocket: readyState, send, close, onmessage, onclose. What
+  // arrives comes through hn.rx, in order; bytes cross as base64.
+  const fromB64 = Uint8Array.fromBase64 ? (s) => Uint8Array.fromBase64(s) : (s) => {
+    const t = atob(s)
+    const b = new Uint8Array(t.length)
+    for (let i = 0; i < t.length; i++) b[i] = t.charCodeAt(i)
+    return b
+  }
+  function toB64(b) {
+    if (b.toBase64) return b.toBase64()
+    let s = ''
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000))
+    return btoa(s)
+  }
+  function appSocket(cols, rows) {
+    const s = { app: true, readyState: 0, onmessage: null, onclose: null }
+    s.id = native.open(cols, rows)
+    s.send = (d) => {
+      if (s.readyState !== 1) return
+      if (typeof d === 'string') native.sendText(s.id, d)
+      else native.send(s.id, toB64(d instanceof Uint8Array ? d : new Uint8Array(d)))
+    }
+    s.close = () => {
+      if (s.readyState > 1) return
+      s.readyState = 3
+      native.shut(s.id)
+    }
+    // Nothing to open (the link was used): closed, as a socket that never connected says.
+    if (s.id < 0) setTimeout(() => take(s.id, ['c1006']), 0)
+    return s
+  }
+  /** What the app's socket [id] had, handed to the stand-in's handlers in order (hn.rx). */
+  function take(id, items) {
+    const s = ws
+    if (!s || !s.app || s.id !== id) return
+    for (const it of items) {
+      const k = it[0]
+      if (k === 'o') {
+        if (s.readyState === 0) s.readyState = 1
+      } else if (k === 'b') {
+        if (s.onmessage) s.onmessage({ data: fromB64(it.slice(1)).buffer })
+      } else if (k === 't') {
+        if (s.onmessage) s.onmessage({ data: it.slice(1) })
+      } else if (k === 'c') {
+        s.readyState = 3
+        if (s.onclose) s.onclose({ code: Number(it.slice(1)) || 0 })
+        return
+      }
+      // The page may have let go of this socket while handling a message.
+      if (ws !== s) return
+    }
+  }
+
+  const KEYS = {
+    esc: '\x1b', tab: '\t', stab: '\x1b[Z', enter: '\r', ctrlc: '\x03', slash: '/',
+    up: 'A', down: 'B', right: 'C', left: 'D',
+  }
+  window.hn = {
+    // [url]: the ticket's WebSocket URL (over Tailscale); null when the app holds the socket.
+    connect(url) {
+      ended = false
+      if (ws) { try { ws.onclose = null; ws.close() } catch {} }
+      refit()
+      const sock = url ? new WebSocket(`${url}&cols=${term.cols}&rows=${term.rows}`) : appSocket(term.cols, term.rows)
+      sock.binaryType = 'arraybuffer'
+      ws = sock
+      sock.onmessage = (ev) => {
+        if (typeof ev.data !== 'string') return void term.write(new Uint8Array(ev.data))
+        let m
+        try { m = JSON.parse(ev.data) } catch { return }
+        if (m.t === 'snapshot') {
+          term.reset()
+          term.write(m.data, () => term.scrollToBottom())
+        } else if (m.t === 'hello' || m.t === 'state') {
+          macOpen = m.tty > 0
+          if (m.cols && m.rows) follow(m.cols, m.rows)
+          native.state(JSON.stringify({ cols: m.cols, rows: m.rows, mac: m.tty, phone: m.phone, title: m.title || '' }))
+        } else if (m.t === 'exit') {
+          ended = true
+          native.exited(typeof m.code === 'number' ? m.code : 0)
+        }
+      }
+      sock.onclose = (ev) => {
+        if (ws !== sock) return
+        ws = null
+        if (!ended) native.closed(ev.code || 0)
+      }
+    },
+    close() {
+      if (ws) { const s = ws; ws = null; try { s.onclose = null; s.close() } catch {} }
+    },
+    // From the app: what its socket [id] had ("o" opened, "b" bytes, "t" a message, "c" closed).
+    // Saying it was taken lets the app send what came meanwhile.
+    rx(id, items) {
+      try { take(id, items) } finally { native.took() }
+    },
+    key(name) {
+      if (!ws || ws.readyState !== 1) return
+      takeOver()
+      let seq = KEYS[name]
+      if (!seq) return
+      if (seq.length === 1 && /[A-D]/.test(seq)) seq = (term.modes.applicationCursorKeysMode ? '\x1bO' : '\x1b[') + seq
+      ws.send(enc.encode(seq))
+    },
+    text(s) {
+      if (!ws || ws.readyState !== 1 || !s) return
+      takeOver()
+      ws.send(enc.encode(s))
+    },
+    // Pasted the way a terminal pastes (bracketed when claude asks for it), so newlines don't submit.
+    paste(s) {
+      if (!ws || ws.readyState !== 1 || !s) return
+      takeOver()
+      term.paste(s)
+    },
+    focus() { term.focus() },
+    blur() { term.blur() },
+    bottom() { term.scrollToBottom() },
+  }
+
+  const el = document.getElementById('t')
+  el.addEventListener('click', () => native.tapped())
+  ;(document.fonts ? document.fonts.load(`${userFont}px "JetBrains Mono"`) : Promise.resolve()).catch(() => {}).then(() => {
+    term.open(el)
+    refit()
+    native.ready()
+  })
+})()
+</script>
+</body>
+</html>

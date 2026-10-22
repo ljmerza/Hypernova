@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's glass card (GlassCard in the app): warm near-black, a faint green nebula in one
+     corner, a hairline ring at ink 8%, and highlight lines along the top (ink 25%) and bottom
+     (ink 12%). Denser than the app's 78–86% card fill, because a wallpaper behind it is busier
+     than the sky. Android 12+ adds film grain (drawable-v31), where the card is clipped to its
+     rounded outline. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/widget_radius" />
+            <gradient
+                android:angle="270"
+                android:centerColor="#E01B1814"
+                android:endColor="#EB1B1814"
+                android:startColor="#E6221F1B" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/widget_radius" />
+            <gradient
+                android:centerX="0.9"
+                android:centerY="0.0"
+                android:endColor="#007FFFA0"
+                android:gradientRadius="80%p"
+                android:startColor="#127FFFA0"
+                android:type="radial" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/widget_radius" />
+            <stroke
+                android:width="1dp"
+                android:color="#14F5F2EB" />
+        </shape>
+    </item>
+    <item
+        android:height="1dp"
+        android:gravity="top|fill_horizontal"
+        android:left="@dimen/widget_radius"
+        android:right="@dimen/widget_radius">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:centerColor="#40F5F2EB"
+                android:endColor="#00F5F2EB"
+                android:startColor="#00F5F2EB" />
+        </shape>
+    </item>
+    <item
+        android:height="1dp"
+        android:gravity="bottom|fill_horizontal"
+        android:left="@dimen/widget_radius"
+        android:right="@dimen/widget_radius">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:centerColor="#1FF5F2EB"
+                android:endColor="#00F5F2EB"
+                android:startColor="#00F5F2EB" />
+        </shape>
+    </item>
+</layer-list>

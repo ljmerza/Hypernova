@@ -1,0 +1,67 @@
+{
+  "skill_name": "hyper-cosmos",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Build me a one-page landing site for Hyperscribe Companion, my little Mac menu-bar app that transcribes your voice locally with Whisper and types the text into whatever app you're in. Mobile-first, a single self-contained index.html.",
+      "expected_output": "A landing page in the Hyper cosmos language: warm near-black, mint accent, Manrope + JetBrains Mono, living cosmos + grain, seams, glass cards, pill CTAs, honest short copy.",
+      "files": [],
+      "assertions": [
+        "Single self-contained index.html (no local CSS/JS files)",
+        "Loads with no JavaScript errors",
+        "No horizontal scroll at a 412px phone width",
+        "Base is the warm near-black #14110E, not pure black",
+        "Mint #7FFFA0 is the accent",
+        "Manrope for UI and JetBrains Mono for numbers/code",
+        "An animated cosmos canvas sits behind the content",
+        "Film grain with overlay blending over everything",
+        "Respects prefers-reduced-motion",
+        "Ambient animation pauses when the page is hidden",
+        "Tiny tracked uppercase labels (~0.18em, the seam style)",
+        "Wordmark: lowercase name with a mint slash"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I want a dashboard for my home server that I can keep open on my phone: CPU, RAM, disk, and my docker containers (some running, some stopped, one crash-looping). Use fake data that moves. Single index.html.",
+      "expected_output": "A phone dashboard where the key load is a living sky (e.g. sun = CPU/RAM pressure, planets = hosts or stacks, moons = containers), crash-looping container clearly flagged, plus cards/meters below; tokens, cosmos, grain, reduced-motion support.",
+      "files": [],
+      "assertions": [
+        "Single self-contained index.html (no local CSS/JS files)",
+        "Loads with no JavaScript errors",
+        "No horizontal scroll at a 412px phone width",
+        "Base is the warm near-black #14110E, not pure black",
+        "Mint #7FFFA0 is the accent",
+        "Manrope for UI and JetBrains Mono for numbers/code",
+        "An animated cosmos canvas sits behind the content",
+        "Film grain with overlay blending over everything",
+        "Respects prefers-reduced-motion",
+        "Ambient animation pauses when the page is hidden",
+        "Tiny tracked uppercase labels (~0.18em, the seam style)",
+        "The key quantity is a living solar system (sun + planets/moons)",
+        "The crash-looping container is flagged in the house amber/red (#E8B341 / #FF7878)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Make the main screen for a new budgeting app of mine: spending categories (food, transport, subscriptions, fun), recent transactions, how much is left this month, and what happens when I go over budget. Fake data, phone-sized, single index.html.",
+      "expected_output": "A budget home where the month's budget is the sun ageing toward a supernova at overspend, categories as planets, transactions as moons, death drains colour, reset = rebirth; cards and meters below in the house style.",
+      "files": [],
+      "assertions": [
+        "Single self-contained index.html (no local CSS/JS files)",
+        "Loads with no JavaScript errors",
+        "No horizontal scroll at a 412px phone width",
+        "Base is the warm near-black #14110E, not pure black",
+        "Mint #7FFFA0 is the accent",
+        "Manrope for UI and JetBrains Mono for numbers/code",
+        "An animated cosmos canvas sits behind the content",
+        "Film grain with overlay blending over everything",
+        "Respects prefers-reduced-motion",
+        "Ambient animation pauses when the page is hidden",
+        "Tiny tracked uppercase labels (~0.18em, the seam style)",
+        "The key quantity is a living solar system (sun + planets/moons)",
+        "Going over budget triggers a supernova and the colour drains"
+      ]
+    }
+  ]
+}

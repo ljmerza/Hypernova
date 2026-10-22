@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Where the camera app saves a photo for an attachment (see ui/session/Attach.kt). -->
+<paths>
+    <cache-path name="camera" path="camera/" />
+    <!-- Files shared to Hypernova, copied here for the upload (ui/share/ShareStage.kt). -->
+    <cache-path name="shared" path="shared/" />
+</paths>

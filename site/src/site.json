@@ -1,0 +1,44 @@
+{
+  "name": "Hypernova",
+  "url": "https://hypernova.nikbraun.tech",
+  "repo": "https://github.com/prudnik-web/Hypernova",
+  "releases": "https://github.com/prudnik-web/Hypernova/releases/latest",
+  "issues": "https://github.com/prudnik-web/Hypernova/issues",
+  "version": "0.2.0",
+  "date": "2026-10-22",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Nikita Prudnikov",
+    "url": "https://nikbraun.tech",
+    "github": "https://github.com/prudnik-web"
+  },
+  "downloads": {
+    "mac": {
+      "file": "Hypernova.dmg",
+      "label": "Download for Mac",
+      "detail": "Apple silicon, macOS 14+",
+      "os": "macOS 14 or later, Apple silicon"
+    },
+    "linux": {
+      "file": "Hypernova-linux.tar.gz",
+      "label": "Download for Linux",
+      "detail": "Ubuntu, Debian · x86_64, arm64",
+      "os": "Linux: Ubuntu or Debian, x86_64 or arm64"
+    },
+    "android": {
+      "file": "Hypernova.apk",
+      "label": "Download for Android",
+      "detail": "Android 10+",
+      "os": "Android 10 or later"
+    },
+    "g2": {
+      "file": "Hypernova-Lens.ehpk",
+      "label": "Download for Even G2",
+      "detail": "Hypernova Lens · upload it to the Even Hub",
+      "os": "Even Realities G2, through the Android app"
+    },
+    "sums": {
+      "file": "SHA256SUMS.txt"
+    }
+  }
+}

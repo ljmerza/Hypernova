@@ -1,0 +1,4 @@
+/* The home stage's still picture (src/img/orrery-*.webp), shown when scripts don't run: the
+   desktop stage's size, on a transparent ground so the page's own sky shows through. */
+html, body { background: transparent !important; margin: 0; }
+.stage { position: absolute; left: 0; top: 0; width: 620px; height: 558px; aspect-ratio: auto; margin: 0; }

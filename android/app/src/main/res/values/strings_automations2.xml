@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Automations, second round (ui/automations/): Retry, the runs' new reasons and problems, Run now's
+     answers, a deleted automation, offline, Duplicate (docs/PROTOCOL.md, "Automations"). -->
+<resources>
+    <!-- Runs that a block stopped once they had started (failed, by the block's reason). -->
+    <string name="au_run_f_signed_out">Stopped: Claude Code signed out on the Mac</string>
+    <!-- The same for a run whose session Codex runs (as the Mac's WorkflowWords say them). -->
+    <string name="au_run_f_signed_out_codex">Stopped: Codex signed out on the Mac</string>
+    <string name="au_run_signed_out_codex">Skipped: Codex is signed out on the Mac</string>
+    <string name="au_run_no_codex">Failed: Codex isn\'t set up on the Mac</string>
+    <string name="au_run_start_failed_codex">Failed: Codex didn\'t start</string>
+    <!-- A start step Codex runs, in the summary sentence and the editor (au_sum_start_verb, au_sum_start_quote, au_err_prompt for Claude). -->
+    <string name="au_sum_start_verb_codex">in %1$s, ask Codex to %2$s</string>
+    <string name="au_sum_start_quote_codex">in %1$s, ask Codex: “%2$s”</string>
+    <string name="au_err_prompt_codex">Write what Codex should do.</string>
+    <string name="au_run_f_no_plan">Stopped: there\'s no Claude plan on the Mac</string>
+    <string name="au_run_f_on_hold">Stopped: the account went on hold</string>
+    <string name="au_run_f_no_credit">Stopped: out of usage credits</string>
+    <string name="au_run_f_provider">Stopped: %1$s</string>
+    <string name="au_run_f_provider_plain">Stopped: the provider had a problem</string>
+    <string name="au_run_f_limited">Stopped at the usage limit</string>
+    <!-- The runs' new reasons. -->
+    <string name="au_run_outside">Failed: its folder is outside your projects folder</string>
+    <string name="au_run_no_model">Failed: its model isn\'t offered any more</string>
+    <string name="au_run_paused">Skipped: you paused automations</string>
+    <string name="au_run_mac_restart">Stopped: the Mac restarted mid-run</string>
+    <string name="au_run_ended">Stopped: its session ended mid-run</string>
+    <string name="au_run_retry_note">A retry</string>
+    <!-- Problems in place of "Next …". -->
+    <string name="au_problem_outside">Its folder is outside your projects folder.</string>
+    <string name="au_problem_no_model">Its model isn\'t offered any more.</string>
+    <string name="au_problem_bad_definition">Your Mac couldn\'t read it. Save it again to switch it back on.</string>
+
+    <!-- Retry, on a run that failed, stopped or was skipped. -->
+    <string name="au_retry">Retry</string>
+    <!-- Run now and Retry: what the run does, or why it didn't start. -->
+    <string name="au_now_queued">In line: it starts when one of the two runs at work ends</string>
+    <string name="au_now_limited">Your usage limit is reached: try again after %1$s</string>
+    <string name="au_now_limited_plain">Your usage limit is reached</string>
+    <string name="au_now_daily_cap">24 runs a day is the most: try again tomorrow</string>
+    <string name="au_now_signed_out">Claude Code is signed out on the Mac</string>
+    <string name="au_now_no_plan">There\'s no Claude plan on the Mac</string>
+    <string name="au_now_on_hold">The account is on hold</string>
+    <string name="au_now_no_credit">Out of usage credits</string>
+    <string name="au_err_active">That run is still going.</string>
+
+    <!-- Refusals at Save. -->
+    <string name="au_err_outside">That folder is outside your projects folder. Pick a project.</string>
+    <string name="au_err_outside_root">That folder is outside your projects folder (%1$s). Pick a project.</string>
+    <string name="au_err_no_model">That model isn\'t offered by its provider any more. Pick another.</string>
+    <string name="au_err_placeholder">“No asking” can\'t use another session\'s words ({session}, {result}, {ask}).</string>
+    <string name="au_err_target">“The session that fired it” needs a trigger from a session.</string>
+
+    <!-- A deleted automation (from History or a session's AUTO line). -->
+    <string name="au_deleted_title">This automation was deleted</string>
+    <string name="au_deleted_body">The sessions it started stay in History:</string>
+    <string name="au_deleted_none">None of its sessions are on your Mac\'s list any more.</string>
+    <string name="au_loading_list">Getting your automations…</string>
+    <string name="au_history_deleted">Deleted</string>
+
+    <!-- Duplicate. -->
+    <string name="au_duplicate">Duplicate</string>
+    <string name="au_copy_name">%1$s (copy)</string>
+    <string name="au_duplicated">Copy saved, off until you switch it on</string>
+
+    <!-- A spent Once switched on again: the editor moved it to the next day at that time. -->
+    <string name="au_once_moved">Moved to %1$s. Save to switch it back on.</string>
+
+    <!-- Switch provider at the limit, with no other provider. -->
+    <string name="au_t_switch_needs">Add a provider first</string>
+    <string name="au_add_provider">Add a provider</string>
+    <string name="au_needs_provider">There\'s no other provider to carry on with yet.</string>
+
+    <!-- Permissions: rules in every mode that asks or edits. -->
+    <string name="au_rules_also">Also allowed without asking</string>
+    <string name="au_rules_note_edits">Claude Code\'s own rules: Bash(npm test:*) allows every npm test; Edit(src/**) allows edits under src.</string>
+
+    <!-- Allow next time: a rule already allowed. -->
+    <string name="au_allowed_rule_said">%1$s is allowed</string>
+
+    <!-- Every few hours, around the clock: the first run of the day. -->
+    <string name="au_first_at">First at %1$s</string>
+
+    <!-- Offline. -->
+    <string name="au_offline_as_of">Can\'t reach your Mac. These are as of %1$s.</string>
+    <string name="au_offline_edit">Can\'t reach your Mac: Save and Run now wait until it\'s back.</string>
+
+    <!-- Notify me with the phone\'s notifications off. -->
+    <string name="au_notify_blocked">Notifications from Hypernova are off on this phone, so this wouldn\'t reach you.</string>
+    <string name="au_turn_on">Turn on</string>
+    <!-- Read aloud needs glasses. -->
+    <string name="au_say_needs_glasses">Read aloud needs glasses paired with Hypernova Lens.</string>
+
+    <!-- The header with nothing due on the clock: what the next one waits for. -->
+    <string name="au_trail_wait_reset">%1$d on, waiting for a reset</string>
+    <string name="au_trail_wait_limit">%1$d on, waiting for a limit</string>
+    <string name="au_trail_wait_session">%1$d on, waiting for a session</string>
+    <string name="au_trail_wait_power">%1$d on, waiting for power</string>
+
+    <string name="au_search_sessions">Search sessions</string>
+
+    <!-- Delete with a run at work. -->
+    <string name="au_delete_body_busy">Its run at work now stops first. Its run history goes too; sessions it started stay in History.</string>
+
+    <!-- A session that still needs you after a while (the session trigger's `after`). -->
+    <string name="au_after_label">Only if still waiting after</string>
+    <string name="au_after_now">No wait</string>
+    <string name="au_after_note">It runs only if the session still needs you by then. Answered sooner, nothing happens.</string>
+    <string name="au_after_now_note">It runs as soon as a session needs you.</string>
+    <plurals name="au_sum_event_needs_after">
+        <item quantity="one">still needs me after %d minute</item>
+        <item quantity="other">still needs me after %d minutes</item>
+    </plurals>
+</resources>

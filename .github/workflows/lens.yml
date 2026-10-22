@@ -1,0 +1,33 @@
+name: lens
+on:
+  push:
+    branches: [main]
+    paths: ['lens/**', '.github/workflows/lens.yml']
+  pull_request:
+    paths: ['lens/**', '.github/workflows/lens.yml']
+  workflow_dispatch:
+concurrency:
+  group: lens-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: lens
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: lens/package-lock.json
+      # The browser the screenshot scripts use is not needed for tests, so skip its download.
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - run: npm test
+      - run: npx tsc --noEmit -p .

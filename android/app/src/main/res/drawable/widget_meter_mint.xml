@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's Meter: a 1dp track and a 3dp round-ended fill (a scale drawable keeps the
+     ends round as the fill grows, where a clip would cut them square). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@android:id/background"
+        android:height="1dp"
+        android:gravity="center_vertical|fill_horizontal">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/widget_line" />
+        </shape>
+    </item>
+    <!-- The pace: a faint fill on to where it leads by the reset (the app's projection meter). -->
+    <item android:id="@android:id/secondaryProgress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="1.5dp" />
+                <solid android:color="@color/widget_accent_pace" />
+            </shape>
+        </scale>
+    </item>
+    <item android:id="@android:id/progress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="1.5dp" />
+                <solid android:color="@color/widget_accent" />
+            </shape>
+        </scale>
+    </item>
+</layer-list>

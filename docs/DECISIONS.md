@@ -1,0 +1,1543 @@
+# Decisions
+
+These are product decisions agreed with the owner on 2026-10-13. Change them
+only on purpose, and log the change here.
+
+## Product
+- **Name: Hypernova**, part of the Hyper* family (Hyperscribe, Hypernavigate). We don't use "Claude" in the name because of Anthropic's trademark, but describing it as "a control room for Claude Code" is fine.
+- Built to public quality from the start. The repo is local for now (see LATER L4).
+- One phone can pair with **several Macs**, with a switcher in the app.
+- English only for now (see LATER L5). All strings live in resources.
+
+## Sessions
+- **PTY model (4b):** `hc` runs `claude` inside a pseudo-terminal owned by the daemon. The phone and the Mac terminal share the *same* live session. The phone sends prompts and Esc (interrupt) into the PTY, and approvals come through hooks. The phone's chat is rendered natively from the transcript JSONL. Sessions started from the phone run headless, and `hc attach` brings one into a terminal.
+- **Mini terminals (5a):** Bash tool calls inside a session render as small live terminal cards.
+- **Approvals are answered from the phone** (and later also from the Mac menu bar app: done 2026-10-15, see "The Mac mini app"). If nobody answers within **10 minutes**, the request is denied automatically with a message to Claude: the user didn't respond in time and is probably away, so it shouldn't retry or work around it, and should stop and wait for them to come back. In the app, a session stopped this way shows a **Continue** button that tells it the user is back (milestone 3). Decided 2026-10-13.
+- **`claude` starts through `hc`.** A marked block in `~/.zshrc` aliases `claude` to `hc`, so every interactive session can be controlled from the phone without changing habits. `hc` hands non-interactive uses (`-p`, subcommands like `mcp` or `update`, pipes) straight to the real `claude`, and falls back to plain `claude` if the daemon isn't running. `hc uninstall` removes the alias. Sessions started any other way still show up with live transcripts and approvals through the hooks; they just can't be typed into from the phone. The owner left this choice to us; decided 2026-10-13 for the best everyday UX.
+- **Usage numbers are the official ones**: the 5-hour and 7-day `rate_limits` (used % and reset time) that Claude Code passes to the status line. The daemon chains into the existing status line script rather than replacing it. Estimates from transcripts are only a fallback, and the app labels them "estimated". Decided 2026-10-13.
+- **Daemon runtime until milestone 5:** the system Node (nvm), run by launchd. Bundling Node inside the Mac app comes with milestone 5.
+- **The Telegram bot is retired** (2026-10-13): hooks, status line block, launchd service and folder removed. The code is archived in `~/Archive/`. Hypernova installs its own hooks.
+- **Sessions survive a restart of the Mac** (owner, 2026-10-16: he wants to "watch from the history what was done last time and continue working on projects"). Built.
+  - A conversation a restart cut short stays on Home, marked "Mac restarted · Resume", for 48 hours from the boot, instead of dropping to History. Which ones: open when the Mac went down, or active in the 48 hours before it; the 10 most recent.
+  - Opening one shows its whole history. Writing in it resumes it in place: the same conversation, in a new shared terminal. Any ended session resumes the same way, by writing in it.
+  - History reaches back 30 days (300 conversations), up from 7 days and 40.
+  - Parked: dismissing a card early, a note in the session screen, restarted sessions on the glasses and the Mac popover (LATER L50).
+- The 1.0 scope includes everything: approvals (allow, deny, always, edit), inline reply from notifications, new session (project, model, mode, effort), interrupt, AskUserQuestion and plan approval, diff viewer, file browser, attachments from the phone, usage meters, alerts and a widget, history and search, slash commands and skills, share target, Quick Settings tile. The git panel and tablet layouts come in 1.1.
+
+## Design
+- 0stems look: green digital cosmos (`DigitalCosmos`), grain overlay (`GrainField`), warm near-black, mint `#7FFFA0`, Manrope 500 with JetBrains Mono.
+- **The home sky is one solar system** (decided 2026-10-13, superseding constellations and per-project systems). The **sun is the 5-hour usage**: it ages as usage grows and goes **supernova** at the limit, full-screen and dramatic. A nebula collapses during the cooldown and a new star is born at the reset. **Projects are planets** and **sessions are moons**. The **7-day budget dims the galaxy**.
+- Effects: a scramble effect only when a new session appears, subtle haptics, no sounds.
+- New logo mark: the **Nova** mark (see DESIGN.md).
+- Optimized, but never at the cost of the experience: 30fps cosmos, paused when not visible, and a Reduce Motion toggle.
+- **Portrait only for now** (decided while building M1; see LATER L9). Phone layouts are portrait-first, and landscape and tablet layouts come later.
+- **Fullscreen, edge to edge.** The app draws under the status bar and around the camera cutout (Nothing Phone 3). Content scrolling under the status bar gets a progressive blur, like Telegram. No black strip.
+
+## Mac
+- Menu bar app only. Native SwiftUI, with the TypeScript daemon bundled inside; Setup downloads Node.js (the newest LTS) into the app's own folder when the Mac has none that stays put, so users install nothing.
+- The DMG is ad-hoc signed and not notarized (LATER L6): macOS asks once per version (docs/INSTALL.md, "The first launch").
+
+## Android and connection
+- Kotlin + Jetpack Compose, minSdk 29 (Android 10), APK through GitHub Releases with an in-app updater.
+- **No Firebase for now** (see LATER L1). Background delivery uses a foreground service holding a WebSocket over Tailscale. Its permanent notification shows live sessions and usage.
+- Security: QR pairing carries the address, a token and the **pinned certificate fingerprint**. A biometric check guards "Always allow" and bypass mode.
+- Transport: Tailscale (`tailscale serve`) by default. An optional local-network listener can be turned on in settings. It uses TLS with the same pinned self-signed certificate plus the token, so other devices on the LAN can't eavesdrop, impersonate the Mac, or call endpoints. The listener only exists while the setting is on.
+
+## Process
+- Work in milestones, each ending with something you can install and screenshots.
+  1. Design system, cosmos and the home screen with fake data (APK)
+  2. Daemon (`hc`, PTY, transcripts, hooks, API, pairing)
+  3. Android connected to the real daemon
+  4. Notifications, widget, Quick Settings tile, share target, biometrics
+  5. Mac menu bar app, onboarding, DMG
+  6. Release polish
+
+## Built overnight 2026-10-14 (milestones 2–4 compressed)
+The owner asked for a near-final product by morning, plus new features. These were
+decided while building; each can be revisited.
+- **Sessions Hypernova starts run through the Agent SDK**, not a shared PTY. Each prompt
+  runs `claude` through `@anthropic-ai/claude-agent-sdk` with `resume`, so text streams
+  live, approvals arrive through `canUseTool`, Interrupt works, and the sessions survive
+  daemon restarts. They are ordinary Claude Code sessions (`claude --resume <id>` opens
+  them in a terminal). Why: research showed daemon-owned PTYs die with the daemon, the
+  `claude` alias collides with claude's own `attach`/`agents` subcommands, and node-pty
+  needs a patch on install. The SDK path was proven by the retired bot. The shared live
+  terminal (`hc`) was parked as LATER L10. **Superseded the next morning** by "Shared live
+  terminals" below.
+- **Terminal sessions** are observed through global http hooks plus their transcripts,
+  with live status from Claude Code's session registry. Their approvals race the terminal
+  dialog (first answer wins). A phone prompt to a terminal session that's still open
+  continues it in a fork; once it has ended, it continues in place.
+- **Transport:** the daemon listens only on loopback (47321 phone API, 47322 Mac app and
+  hooks). Phones reach it through `tailscale serve` on https port 47321 with the
+  publicly trusted ts.net certificate, so there's no pinning (the ts.net key rotates on
+  every renewal). The pinned self-signed LAN listener is parked (LATER L11).
+- **Providers:** profiles that become Claude Code environment variables
+  (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, model mappings): the built-in
+  subscription, OpenRouter, or any Anthropic-compatible custom endpoint. Keys stay on the
+  Mac (0600), never sent to the phone. Configurable from the phone and the Mac app.
+- **Projects from the phone:** "New project" creates a folder under the projects root
+  (default ~/Programming) with `git init`.
+- **Artifacts in the app:** project files, images, text, and web previews through signed
+  12-hour URLs that a WebView can load (static folders, or any localhost dev server
+  proxied through the daemon).
+- **Setup is a guided Mac app** (menu bar + setup window): finds or installs Claude Code
+  and Node, installs the background service, connects Claude Code, turns on phone access
+  in Tailscale, serves the APK by QR, and pairs by QR (the phone's camera opens
+  `https://hypernova.observer/pair#…`, an App Link, straight in the app; it was a
+  `hypernova://pair` link, which cameras don't open). No Terminal commands.
+- **Testing checklist:** the daemon serves a checklist page (`/qa`) where the owner marks
+  each check, writes notes and pastes screenshots; results land in
+  `~/Library/Application Support/Hypernova/qa/`.
+
+## Shared live terminals (2026-10-14)
+
+The owner asked for shared live terminals ("i wanna have shared live terminals") on the
+morning after the overnight build. This replaces the fork behaviour and makes the SDK
+path a fallback.
+
+- **One holder process per session** owns claude's PTY and a headless xterm of its
+  screen. It runs detached, so closing the terminal window or restarting the daemon
+  leaves the session running; the phone and any number of Mac terminal windows attach
+  to it. Every client joining gets the current screen.
+- **`claude` in a terminal is shared automatically.** The integration step adds a
+  marked `claude` shell function to `~/.zshrc`; it only takes over when stdin and stdout
+  are a terminal, and hands subcommands (`mcp`, `agents`, `attach`…), `-p`, pipes and
+  `--bg` straight to the real claude. Exit code 97 from `hn` always falls back to plain
+  claude, so the command never breaks. `command claude` or `HYPERNOVA_OFF=1` skips it.
+  This answers last night's collision: the wrapper is named `hn`, and claude's own
+  `attach`/`agents` pass through.
+- **Phone sessions are shared terminals too**, so "Open on the Mac" brings one up live
+  in the owner's terminal app (Alacritty's own IPC, or a `.command` file for Terminal.app
+  and iTerm). The Agent SDK path stays as a fallback when node-pty can't load or the
+  hooks aren't installed.
+- **On the phone, a session has two views:** the native chat (as before; prompts are
+  typed into the live terminal) and the Terminal: the real Claude Code screen in
+  xterm.js, bundled in the app, with a key bar (Esc, Tab, Shift+Tab, arrows, ^C, /,
+  paste, Enter). The keyboard goes through a native input connection (Termux-style, no
+  autocorrect), because xterm.js's own text box drops letters with Android keyboards.
+- **Size follows whoever used it last** (tmux's "latest"): the phone's screen once you
+  type there, the Mac's again when you type there. A phone that is only watching shows
+  the Mac's screen whole, scaled down, so neither side's screen gets garbled.
+- **Closing a terminal window ends a session started there** (30 seconds later), as plain
+  claude would, so dev servers and memory don't pile up. It keeps running if the phone has
+  it open at that moment, or if you detach with Ctrl+\. Sessions started on the phone keep
+  running until they end or sit unwatched for 12 hours (and quiet for 2).
+- **Approvals** still come through the hooks, so a shared session shows approval cards,
+  questions and plans in the chat view; the terminal's own dialog can answer too.
+  Prompts from the phone are typed only into Claude Code's own empty input box, and Enter
+  follows only once the text shows there, so it can never answer a dialog by accident.
+- **Removing a phone cuts it off at once**, its live terminal included.
+
+## Attachments from the phone (2026-10-14)
+
+The owner asked to "attach files from the app" (attachments from the phone were already in
+the 1.0 scope).
+
+- **A paperclip in the composer** opens a small tray: Photos (the system photo picker),
+  Camera and Files (any file). The new-session sheet has the same three under its prompt.
+  Up to 10 files per message.
+- **Files upload as soon as they're picked**, with a thumbnail and a spinner on each chip;
+  Send waits until all of them are on the Mac. Chips stay while you move around the app,
+  and come back with the text if sending fails.
+- **Photos are scaled down on the phone** (2048 px on the long side, JPEG), which also
+  turns them upright and drops their location. PNG screenshots that are small enough go
+  as they are, so text stays sharp.
+- **On the Mac they live in `~/Library/Application Support/Hypernova/attachments`** for
+  30 days, and Claude Code gets them as `@"path"` mentions before the text. That works the
+  same in shared terminals, SDK sessions and new sessions, needs no permission prompt,
+  and shows images to Claude as images. Measured before choosing: a plain path makes
+  Claude ask for permission to read outside the project; a mention doesn't.
+- **The chat shows them apart from the text**: thumbnails for pictures, a tile with the
+  name and size for other files. Tapping one opens it in the app's viewer.
+- **Claude may read attached files without asking** (the owner sent them): a PDF isn't
+  inlined by the mention, so Claude opens it with Read, which Hypernova pre-approves for
+  the attachments folder only. Found while testing: Claude Code reads a PDF's page ranges
+  only with poppler installed, which this Mac doesn't have, so without it Hypernova has
+  the first read take the whole PDF. With `brew install poppler`, long PDFs work in page
+  ranges too, also in the owner's own terminal sessions.
+- **Uploads stream** (phone and Mac never hold a whole file in memory), two at a time, on
+  their own connection pool so prompts and approvals never wait behind a big file.
+
+## Notifications, updates and the owner's first feedback (2026-10-14)
+
+From the owner's testing notes (items 1, 2, 4 and 8 of his list) and the session where a
+message with two pictures "did nothing".
+
+- **In-app banners** (item 4): while the app is open, a banner slides in at the top when a
+  session needs an answer (approval, question, plan), waits in its terminal, finishes a
+  turn, or stops on an error; tap it to open the session, swipe it up to dismiss. Never for
+  the session whose chat or terminal is on screen. In the background the same events are
+  system notifications ("Session updates" channel; approvals keep their own).
+- **App updates**: every Android build gets a higher versionCode (minutes since 2026-01-01)
+  and a version note next to the APK; the daemon reports it in the snapshot. A newer one on
+  the Mac shows a banner once and an "Update" card in Settings, which opens the Mac's
+  download page in the browser.
+- **Unsent text in a shared terminal stops a prompt, visibly**: instead of a toast (it was
+  behind the keyboard), a card shows the text that's in the way with "Replace and send" and
+  "Open the live terminal". What's left of the phone's own interrupted prompt is cleared
+  without asking. Toasts sit above the keyboard now.
+- **Permission mode from the phone** (item 2): tap the session's status line; a shared
+  terminal switches by Shift+Tab, checked against Claude Code's footer.
+- **A session keeps the folder it started in** (item 1): hooks carry Claude's current
+  folder, which moved sessions to subfolders and worktrees and showed them as new projects.
+- **Text can be selected and copied** (item 8): your messages and Claude's replies.
+- **Fewer approvals during research** (item 7): a research run fetched 61 sites through six
+  subagents, and Claude Code asks once per site. Web and read approvals offer "Allow all web
+  pages / web searches / file reads this session": one answer covers the ones waiting and
+  the rest of the session. Commands and edits stay per-command ("Always") or go with a mode,
+  since "all commands" is too broad.
+- The prompt box keeps the paperclip and Send on its last line as the text grows.
+- **Never silence after a prompt**: from the prompt to the reply, the session's status line
+  says what Claude is doing ("THINKING", "BASH") with a timer, in dim green, and its
+  activity meter, a small planet, spins on its axis. That planet replaced the three bars
+  everywhere (they read as an audio meter). Tried on the way: a vibrating string under the
+  last message and in the line, a plucked string, a comet crossing the line with a trail of
+  glyphs, and a moon orbiting a planet; the owner chose one planet spinning in place. It
+  never snaps between states: finishing, it slows to a stop and fades to grey. The status
+  row has no hairline.
+- **Older shared terminals get the new behaviour too**: a holder keeps the code it started
+  with, so the daemon does "replace", "clear our leftover" and mode changes itself for
+  holders that don't announce those capabilities (from their screen, with keys).
+- **Reading Claude Code's screen** allows for the owner's status line between the input box
+  and the mode line. "Claude is working" is any of: Claude Code's session registry says
+  busy, a spinner shows, or the screen is still changing (it shows no spinner while it
+  streams text). The input box is only ever cleared when none of them holds.
+- **Terminal menus as buttons** (item 3): when a shared terminal shows a menu or dialog in
+  place of the input box (the /model picker, "Switch model?", a permission dialog with no
+  card on the phone), the daemon reads it off the screen and the session shows it as a card:
+  a tap arrows to that option and presses Enter, Cancel presses Esc, and a footer's other
+  key ("s to use this session only") becomes a switch. Not while an approval card answers the
+  same dialog. A menu counts once it holds still for two looks (under two seconds), and an
+  answer names the menu it was for, so it never lands in a different one. Menus that scroll
+  say so ("More options in the terminal"); typing into one (AskUserQuestion's "Type
+  something") still needs the terminal.
+- **The planet is the logo** (owner: "make the planet we used for status bar as the icon"):
+  the launcher, notification, Mac app and menu bar icons and the in-app mark are the activity
+  meter's planet, still, turned so its two meridians sit evenly.
+- **The home sky's planets look like planets** ("now planets look like stars"): lit spheres
+  that turn while a session in them works, sized by how long their sessions have run (moons
+  too). Orbits aren't drawn whole any more: each planet trails a fading tail of its orbit.
+- **The sun looks like a real star** ("make a star look like a more real one, in terms of
+  effects as well"): a smooth bloom instead of flat rings, a corona of uneven streamers,
+  limb darkening, granulation, diffraction spikes (no twinkle: there is no air in space); near the limit,
+  sunspots and prominence arches instead of straight flare lines.
+- **"/" lists commands and skills** (item 5): typing "/" in a session's prompt box (or the
+  new-session prompt) lists what Claude Code offers in that project: the owner's skills and
+  commands and plugins' first, then Claude Code's own, each with what it does and what it
+  takes. Typing filters, best match first; a tap puts "/name " in the box and shows the
+  arguments it takes. The list comes from Claude Code itself (an SDK process asked for its
+  commands, hooks off, no prompt, about a second, then cached), so it's always the installed
+  version's. Commands only the interactive terminal has (/resume, /export, /rewind…) aren't
+  in it, but typing them still works; menus they open show as cards.
+- **Commands from the phone show as sent, with their output under them** (the owner sent
+  "/effort", then "/effort ultracode", and the chat stuck on "Sending…" with no answer): a
+  slash command shows as typed, args included, and what Claude Code printed for it
+  ("Ultracode on (this session only)…") sits under it; "!" shell commands too, with their
+  output. "Unknown command" and Claude Code's other warnings show as notices, and a command
+  that leaves nothing behind (a picker closed with Esc) doesn't stay on "Sending" for good.
+  A session is named after its first prompt, a skill given a task or a "!" command, never
+  after "/effort high"; one with only commands is named after the first.
+- **Three kinds of command, three looks**: Claude Code's own commands (/effort, /model) are a
+  slim COMMAND row with their output under them; skills and the owner's own commands are a
+  mint chip with the text he typed as the message (Claude answers them); a shell command
+  ("!") is a SHELL row, like a line in a terminal. Typing in the prompt box, the leading
+  /name is highlighted. Terminal and Hypernova (Agent SDK) sessions look the same, and a
+  session's title never shows a key typed into a command (it's masked as •••).
+- **A message sent while Claude works says it's queued** (item 11, the owner: "when I send a
+  message while the agent works, it stays sending … the status of a message should be 'waiting
+  for the previous response to finish'"). Claude Code takes a prompt while it works and hands
+  it to Claude when the step it's on finishes (or as the next turn). The phone shows it at the
+  bottom, under Claude's live output, as the terminal does: "YOU · QUEUED" and one quiet line,
+  "Claude reads it when this step finishes" ("Waits for the current reply to finish" in a
+  Hypernova SDK session, which runs one prompt at a time). The header keeps saying what Claude
+  does, with "1 queued". Once Claude has it, it becomes the message in the same place; prompts
+  typed in the Mac terminal while Claude works show the same way. Stop in a shared terminal
+  keeps the queue, as Claude Code does (the prompt runs right after); Stop in an SDK session
+  drops it and says so ("Stopped. 1 queued message wasn't sent."), so nothing hangs. A queued
+  message that doesn't go (dropped, or taken back into the terminal's box with the Up arrow)
+  leaves the chat, and its text goes back into the phone's message box. A slash command sent
+  while Claude works isn't marked queued unless Claude Code's queue shows it: most run at once
+  (/cost, /model open their panels over the work).
+- **Tables in replies read as GitHub reads them** (decided 2026-10-14): a table runs until a
+  blank line or a line without a pipe, so two tables written back to back with no blank line
+  between draw as one card, as on GitHub (the second one's header becomes a row). This replaced
+  splitting at the second table's separator, which also split a table at a `|---|---|` divider
+  over its totals row. A row of only dashes (three or more in each cell, colons allowed so a
+  glued table's separator counts, empty cells aside) draws as a firmer hairline across the card
+  rather than a row of "---", and TalkBack skips it; one still being typed waits until it is
+  whole, so it never flashes up as dashes first.
+
+## Agents and workflows (2026-10-15)
+
+The owner (item 12): "add agents which are run by a main one in a session, so we see them." Claude
+Code 2.1.29x no longer writes subagents' turns into the session's transcript: each agent has a file
+of its own, and an Agent or Workflow call returns at once while its agents work for minutes. Until
+now the phone showed such a call "done" half a second after launch, with Claude Code's internal
+launch note as its output, and nothing of the agents themselves.
+
+- **Each agent is a card under the call that started it**, in the mini terminal's frame: its own
+  planet (turning while it works, amber while it waits for an answer, still once done, a cross when
+  it failed), "AGENT · EXPLORE" with how long it has run, its tokens and tool calls, what it's for,
+  and a live mono line of what it does now ("▸ Bash: ./gradlew build", with the cursor). Once done,
+  the card shows the first lines of its report. A tap opens the agent's own transcript, read-only:
+  its task folded at the top, everything it did, its report last, fetched again every 1.5 s while
+  it runs. Agents an agent started sit under its card.
+- **A workflow is one card**: its name and summary, a rail of its phases ("SURVEY 4/4" in mint, the
+  live one turning, the rest ghosts), and its agents one line each, grouped by phase; a finished
+  phase folds to "+4 done". A row opens that agent.
+- **The session says when only its agents work**: Claude Code stays busy while agents run after the
+  main turn, so the session read "working" with nothing happening. Now the main agent is idle then,
+  and the status line reads "AGENTS · 3 running" (while the main agent works too: "· 3 agents").
+  A turn that ends with agents still at work doesn't notify as finished; the turn started by the
+  last agent's report does, once. On the Home card (a live "2 AGENTS" chip), in the connection
+  notification ("1 working · 2 agents") and on the Mac's menu bar planet and popover, its running
+  agents show too, so there a session whose main agent waits on agents never reads as done. Lens and
+  the widgets don't count agents yet: Lens announces such a turn as finished (a blip and a DONE
+  card), and the widgets count the session as idle (LATER L28).
+- **Agents end with their session**: when Claude Code quits (SessionEnd, except for `/clear` and
+  resume, where the process lives on; or its process leaves the registry), the agents and workflows
+  it ran in the background end with it: an agent is done if its report was its last word, else
+  stopped, and its call ends the same way. A workflow none of whose agents run and whose files have
+  been quiet for 2 minutes in an ended session (2 hours in a live one) ends stopped, so no card
+  spins forever.
+- **Approvals name the agent that asks** ("NEEDS YOU · BASH · survey:agents"), and the main turn
+  moving on no longer closes an agent's approval as "answered on the Mac".
+- **Cheap by design**: what an agent does comes from the hooks it already sends (no file read);
+  folders of live sessions are looked at every 2 s and a file is read only when it changed; only
+  running agents' own files are followed; a whole agent transcript is read only when the phone
+  opens that agent, and while it stays open the phone asks every 1.5 s only for what changed since
+  its last look (usually nothing), then once more for the whole of it when the agent ends. No new
+  hooks (SubagentStart/Stop would make existing installs look unconnected until a reinstall).
+- Item 23, the owner's call: **approvals from agents and background tasks notify only if they're
+  still waiting after 10 seconds** (agents often settle them themselves, or the run moves on); the
+  main agent's notify at once, and every approval's card is in the session at once either way.
+  Background work that asks always runs as an agent (a workflow's agents too), so "from an agent"
+  is the test: the approval carries the agent's id.
+
+## Hypernova Lens (2026-10-15)
+
+The owner wants "an on the go app for developers so wherever they are they can still develop
+products, see results": a developer out walking with XR glasses, the Mac in the backpack, voice as
+the keyboard. Hypernova Lens (`lens/`) is that app for Even Realities G2 glasses. LATER L3 had it
+"after 1.0"; v1 was built on 2026-10-15. `lens/README.md` shows every screen; `lens/DAEMON.md` is
+what Lens relies on from the daemon, and `docs/PROTOCOL.md` stays the daemon's whole contract.
+
+- **A third client of the same daemon.** Lens is a web page inside the Even App on the phone (Even
+  Hub SDK, TypeScript, Vite, no framework). The Mac does the work, the glasses are where you glance
+  and decide, the phone is for reading, and the earbuds are a second screen. Nothing goes through
+  anyone else's server.
+- **v1 is the owner's five things**: the glance, talk, needs-you approvals, result cards read
+  aloud, and "show me" screenshots. On 2026-10-16 "show me" grew into Telescope (below), which also
+  shows the emulator, a terminal, pictures and Mac app windows.
+- **The glance**: up to four sessions that matter (working, needing you, or finished in the last 45
+  minutes), the one that needs you on top, the 5-hour usage in the corner. Each line has the app's
+  small planet (turning while Claude works, in a focus bracket when it needs you, with a ring when a
+  reply waits), and a sun above them is the usage. Text uses the glasses' own text boxes, so a
+  change is one small Bluetooth write. A double tap quiets the lens; only something that needs you
+  brings it back.
+- **Talk**: hold the temple and speak, with captions as you go; let go, then tap sends to the
+  session in front of you, double tap throws it away, a swipe sends it elsewhere. Naming a project
+  routes it ("in hyperscribe, …"), "new session in 0stems: …" starts one, and "send it" at the end
+  skips the tap. Nothing is sent until you tap or say so, so a misheard prompt never runs.
+- **Needs you, safely**: "hypernova wants to run git push origin main"; tap allows, double tap
+  denies, and taps are ignored for 700 ms after a card appears, so a stray tap can't approve.
+  Spoken "approve", "always allow" and "deny, use a feature branch" answer only the card on the
+  lens; said anywhere else they bring the card up to read first (a reason said with "deny" stays
+  with it). "No, …" is a deny only on a card that asks; anywhere else it's a prompt. Every card can
+  be left unanswered (a swipe on a command, "Back · answer later" on a question or menu, Back in
+  the long-press menu), and a new approval doesn't take the focus while you're swiping. Why: a
+  first build let "approve" allow another session's `git push` that was never on the lens.
+- **Pairing**: the Mac's "Pair a phone" QR, scanned in Lens (or its link pasted), works before the
+  glasses connect. Each code pairs one device, so the phone app and the glasses each take a fresh
+  one (the Mac mini app makes a new code every time). The daemon keeps `client: "lens"` with the
+  device. The token lives in the Even App's storage for this app, not the WebView's localStorage.
+- **How it talks to the Mac**: the phone API, with a device token of its own. A page in the Even App
+  is cross-origin, so the daemon answers `/v1/*` with CORS (`*`, no credentials: the token is a
+  header, never a cookie), and the WebSocket takes the token in its query string (a page can't set
+  headers on one); if the socket keeps failing and HTTP works, Lens polls the snapshot every 4 s. A
+  packaged app can only reach the hosts in its whitelist and the Even Hub documents no wildcards, so
+  `npm run pack` writes this Mac's Tailscale name (ports 47321 and 7443) into a git-ignored
+  manifest; the repository never names a tailnet.
+- **Speech goes through the Mac**: while you hold the temple, the glasses' microphone streams
+  through the phone to the Mac over Tailscale; nothing is recorded. v1 used Hyperscribe Companion
+  (`wss`, port 7443). Since 2026-10-15 the Mac can use Soniox instead ("Voice through Soniox", below)
+  and the Companion stays as the other way. The daemon hands Lens the Companion's address
+  (`GET /v1/speech/companion`: only its tailnet https route, never a LAN `ws://` that would expose
+  the token, the audio and the words), so the phone pairs once, with Hypernova. The Companion's
+  client is Hyperscribe's own, copied in.
+- **Results**: when a session finishes, a soft blip and a card: the reply's first sentence and what
+  the session's own events show (files changed, tests passed or failed with their counts, builds,
+  how long it took). A long reply scrolls (see "A long text on the glasses scrolls", below); a tap reads it aloud. The facts come from
+  `events?limit=120&output=8192&turn=last` (each output's last 8 KB, where test counts are); when
+  the daemon's last turn starts at a slash command (`/cost` after a reply), Lens asks again without
+  `turn=last` (LATER L23).
+- **Read aloud by the Mac**: Android's WebView has no speechSynthesis, so the Mac renders the reply
+  with `say` (AAC) and the phone plays it. Lens sends a long reply in pieces of at most 8000
+  characters, cut between paragraphs, the next rendered while the last plays; one clip at a time per
+  device. The text goes to `say` on its standard input and is never logged or written down; the last
+  6 clips (32 MB at most) stay in memory by a hash, each dropped exactly 10 minutes after it was
+  made, so reading a reply again is instant without the replies lingering. Until the phone has been
+  touched once, the lens says "Touch your phone once to allow sound".
+- **Telescope** (built 2026-10-16; the owner's "Telescope" note, in the second round below):
+  "telescope" puts what the session in front of you is building on the whole lens, from wherever it
+  shows: its web page (headless Chrome, as Show me did), the Android emulator or a phone (adb), the
+  iOS Simulator, its shared terminal (drawn crisp by the Mac in Hypernova's terminal colours), the
+  last picture, chart or PDF page it made, or its Mac app's window. The Mac picks: each source the
+  transcript points at (commands it ran, files it wrote or read; never what Claude only wrote
+  about), newest first, then a page served from its folder, then the terminal as the fallback for
+  command-line work. The terminal isn't ranked by recency, because a web session's last command is
+  usually `npm test`. "Telescope emulator / web / terminal / simulator / image / window" picks one;
+  "telescope localhost 3000" a page; "telescope pdf page 3" a PDF's page. "Show me" is a quiet alias
+  only on its own; "show me the app" or "show me localhost 3000" with more words is an ordinary
+  prompt. The lens shows "TELESCOPE · project · source · just now" over a 576 × 256 picture. Tap
+  zooms into a quarter cut from the full-size picture; swipes go round the quarters, double tap
+  zooms out and then goes back, and a tap on a quarter opens the picture on the phone. "Watch" looks
+  again 3 s after each answer for a minute and stops at any gesture. A picture that didn't change
+  isn't reloaded or sent again, and only the parts that changed are redrawn.
+- **Telescope's limits**:
+  - The web source keeps Show me's rules. Only http(s) on this Mac's loopback and never the daemon's
+    own ports, checked on every page load (the first address, each redirect, each script or meta
+    refresh). Addresses Claude only mentions don't count: a first version that took any localhost
+    address from a transcript opened the daemon's own API. Each capture runs in a throwaway Chrome
+    context in a profile of its own (never the owner's cookies), with downloads denied, preloading
+    off and no debugging port; 20 s at most. Pictures are kept 0600, served for 12 hours by an
+    unguessable name and deleted after 24. Frames inside a page aren't held to the loopback rule
+    yet (LATER L22).
+  - Pictures from files only from inside the session folder by real path, never a secret file,
+    never Hypernova's own folder, and only files whose bytes are really a picture.
+  - Programs run by full path with fixed arguments, never through a shell.
+  - **Mac app windows only of a program whose real path is in the session folder** (or Xcode's build
+    folder for a project in it). Never by bundle id, which any folder could claim, and never for a
+    session in the home folder. An installed copy elsewhere, like `/Applications/Hypernova.app`,
+    isn't shown, on purpose. The Mac app takes the picture, because the daemon can't hold Screen
+    Recording in a way the owner could grant. Screen Recording is asked for once, the first time the
+    owner says "telescope window"; when the telescope picks by itself it never asks.
+- **Frames only on real news**: the planets are a small picture, and every picture costs a Bluetooth
+  write. Frames go out only while something moves, at most about three a second, never ahead of
+  text. News is the lens showing something new, from the Mac or a gesture: its words with the
+  clock's own ("2m", "1h 12m", "now") masked, or the planets' states, focus and usage. The clock, a
+  redraw that shows the same, and the hub repeating itself while the Mac is away (reconnects, failed
+  checks, a 4 s poll that finds the same snapshot) aren't news. After 90 s without news one last
+  frame puts everything at rest; after that only the clock's text goes out, about once a minute.
+  Why: an earlier build never stopped: 537 pictures in 3 minutes with nothing happening, because the
+  clock counted as news.
+- **A session's screens follow it.** A result card is worked out from the turn as it is now: the
+  hub's copy, which the socket keeps current. A turn that ran while the socket was down (no finish,
+  no events) shows once the Mac is back: a card whose session moved on since (newer activity) is
+  loaded again, after a reconnect or on a poll. A reply said on a session's result or live view goes
+  back to that session's screen, which shows it at work once the prompt starts it.
+- **The time and the batteries on the glance.** The glance shows the time; the batteries show on
+  request (second round, below). The glasses' level comes from the Even App's device status. That
+  status writes 0 and "none" for what it leaves out, so a 0 off the charger, or a status that
+  doesn't say how the glasses are connected, is no reading, and the last level stays. The Mac's
+  level is left out of "status" while the Mac is away, because the last level would pass for the
+  current one.
+- **The phone screen**: inside the Even App, Lens has a screen in the Hypernova look: the living
+  sky, a live mirror of the lens with the gestures as buttons (it works without glasses), the last
+  "show me" picture, a box to type a prompt instead of saying it, and settings (the Mac, which
+  sessions the lens shows, the speech companion, the read-aloud voice and speed, the blip).
+- **AGPL-3.0-or-later** (until Lens 0.1.11; Apache-2.0 since, see the owner's morning answers), because Lens copied Hyperscribe's companion client (`lens/src/companion/`),
+  which is AGPL. The rest of Hypernova isn't affected: Lens is a separate program talking to the
+  daemon's public API. The app shows its license and the third-party notices under "Source and
+  licenses". The owner wrote both, so he can relicense the three copied files if Lens should ship
+  under another license. Before the `.ehpk` goes to anyone else, its source link needs a real
+  address (the repository has no remote yet; LATER L4).
+- **Lens versions.** The owner uploaded Lens 0.1.2 to the Even portal on 2026-10-16. The next glasses build is 0.1.3.
+- **Checked in the Even Hub simulator 0.9.5, not yet on glasses**: whether a long press reaches the
+  app (if not, the long-press menu's hands-free Talk is the way in), whether a double tap arrives
+  with a tap first, the whitelist with ports and `wss://`, and the real Companion. The list is in
+  `lens/README.md`, "Not verified yet". There's no development shim any more: Lens is developed
+  against a second daemon from this tree.
+
+## Home-screen widgets (2026-10-15)
+
+The owner picked two: a small one with the sun and "2 working · 1 needs you", and a large one with
+up to four sessions and Allow / Deny on the widget.
+
+- **Small: the sun.** The 5-hour usage drawn as the sky's star (it ages with usage, a protostar at
+  the limit, an ember at the weekly limit, drained of colour when offline), "72% · resets 16:40"
+  (amber past 80%) and "2 working · 1 needs you" or "All quiet". 2 × 2 by default; at one cell only
+  the star, the percentage and an amber dot when someone needs you; wide, the words sit beside it. A
+  tap opens the app.
+- **Large: sessions.** A header with the counts (the needs-you part in amber), the oldest approval,
+  up to four sessions (a planet, the title, the project, what it's doing; a tap opens that session),
+  and the 5-hour and weekly meters. 4 × 3 by default, down to 3 × 2; when room runs out the approval
+  comes first, then one session, the meters, then more sessions.
+- **Allow and Deny only when the whole command shows** (or the one path, pattern, address or search
+  a read-only tool asks about: Read, Glob, Grep, WebFetch, WebSearch): exactly as it will run, line
+  breaks and all, nothing cut, nothing masked, no invisible or reordering characters, and only at a
+  size that shows all of it. Anything else gets "Open", which opens the session. Questions, plans,
+  edits, agents and other tools always open the app, and "Always" stays in the app. Why: Allow
+  promises the exact command, and a cut or masked line can hide what follows. The answer goes the
+  session screen's way (`POST /v1/approvals/{id}`), with "Allowing…", then gone or "Didn't go
+  through".
+- **Rows hold still**: needs you first, then working, then idle; within each, busy sessions by when
+  they started (newest first), idle ones by when they last did something (newest first). By latest
+  activity, two busy sessions would swap places every few seconds and the widget would redraw each
+  time.
+- **It updates without the app on screen**: while the background connection runs, the widgets
+  follow the Mac with no screen of the app open.
+- **Stale never looks fresh**: a picture is live only while the app is on screen or the background
+  connection runs. Otherwise it says "Last updated 14:05" (a weekday or date when older), or "Not
+  connected to your Mac". An approval past the Mac's 10-minute auto-deny loses its buttons when the
+  widget isn't live, and a reset time that has passed draws as a fresh window, not as a future time.
+- **Cheap**: no update period (it would wake the phone every half hour to redraw what's known), no
+  timer of its own, and no redraws while the screen is off: the newest state is drawn when it comes
+  on. Changes you'd act on (who's working, who needs you, an approval, the connection) redraw within
+  1.5 s, anything else at most every 12 s. A picture that goes out of date by itself (a reset
+  passing, an approval the Mac gives up on) is redrawn then by an alarm that doesn't wake the phone.
+- **RemoteViews, not Glance**, which would add WorkManager for nothing. Widgets can't load the app's
+  fonts, so the system sans at Manrope's weights and monospace stand in.
+- **Secrets stay off the home screen**: titles, activity lines and commands are masked by the one
+  rule for secrets ("One rule for secrets", below), which the widget shares with the Mac and the
+  phone. It shows at most the first 600 characters of a text.
+
+## The Mac mini app (2026-10-15)
+
+The owner: "the button (logo) that opens the mini app should spin when there is activity", and a
+popover with the sessions, approvals answerable there, usage and quick actions.
+
+- **The menu bar planet turns while anything works**: a session, or agents a session started, its
+  main agent idle or not, so an overnight workflow keeps it turning. One turn in 3 s, spinning up
+  over 0.7 s; when the work stops it slows over about a second and stops on its rest pose, never
+  mid-turn. Still when idle, outlined while the background service isn't answering. Its tooltip and
+  VoiceOver label say it in words ("Hypernova: 1 needs you, 2 sessions working, 3 agents working").
+- **Needs you is a dot** cut into the planet's upper right, so it reads on light and dark menu bars
+  (the icon is a template, so there's no amber); from two waiting, the number shows beside it.
+- **Reduce Motion**: a working icon breathes (a slow fade) instead of turning, so working still
+  looks different from idle.
+- **It costs nothing while still**: an AppKit status item swapping pre-drawn frames, with a timer
+  only while it moves, paused while the displays sleep.
+- **The popover is a mini app**: a glass panel under the icon in the hyper-cosmos look, top to
+  bottom:
+  - the header: the planet logo (turning while sessions or agents work, amber when something needs
+    you), `hypernova/`, the Mac's name, and a quiet pill for the connection ("tailnet · 1 phone");
+  - one-line notices: a newer background service (Update), unfinished setup, a Tailscale key about
+    to expire (Fix), a service error (Restart);
+  - NEEDS YOU;
+  - SESSIONS: needs you first, then working (and idle with agents at work: "agents · 2 running"),
+    then idle; six at most, then "+ 2 more on your phone". A click opens a shared session's
+    terminal, a phone glyph shows when a phone has it open, and one stopped while you were away has
+    Continue;
+  - USAGE: the 5-hour and weekly meters with their reset times;
+  - quick actions: Pair a phone, Checklist, Settings; Quit in the footer.
+- **Approvals are answered there**: the tool, project and title, Claude Code's reason, the exact
+  command (up to 12 lines, as on the phone), the time left before the auto-deny, then Deny, Always
+  and Allow, and "Allow all web pages this session" where the daemon offers it. An answered card
+  folds to one line ("Allowed · git push") for 1.6 s, then goes. Questions and plans show one line,
+  "Open terminal" and "or answer on your phone".
+- **Pairing a second device**: the Pair page asks for a fresh single-use code every time it opens
+  and shows it as a QR, watches for the new device every 2 s, renews the code before it expires, and
+  offers "Pair another" with a new code, so the glasses pair after the phone.
+- **Settings holds the old menu**: the phone access address, paired phones (Forget), the background
+  service (Restart, Show log, Update), Providers, Open setup, Open at login, Uninstall.
+- It closes on Esc, a click elsewhere, another app or a space switch. Open, it reads the snapshot
+  every 1.5 s; closed, every 5 s, so the icon starts turning soon after a session does. The planet
+  replaced the three bars everywhere on the Mac.
+
+## The sky, second pass (2026-10-15)
+
+The owner's notes 15–22 on the home sky, plus a new eclipse. These are the decisions;
+`docs/DESIGN.md` (Atmosphere, "One solar system, and the sun is your usage") holds the look in
+detail.
+
+- **15, no replays** (the explosion and the rebirth kept repeating): a lifted limit counts only at
+  its reset time or once it has held for 20 s, and the same limit coming back never explodes twice
+  (nor does the universe die twice). A limit that came while the app wasn't watching fades in with
+  no blast, and a rebirth or Big Bang that happened more than 10 s before the app saw it isn't
+  replayed. The orbits come back smoothly as the planets form out of the collapsing gas.
+- **16, the reborn star**: it ignites deep red in its dust, then warms through orange and pale gold to its own colour.
+- **17, out of the plate** (owner: "they move on a plate"): each orbit is tilted, turned and
+  slightly eccentric, seen from 20° above, with planets faster near the sun; each planet turns about
+  its own tilted axis while a session in it works, is lit from the sun (a crescent in front of it),
+  and its moons circle its equator.
+- **18, the supernova** (it "looks like confetti"): a blinding flash, a shock shell, and hot gas
+  cooling from white to red into a remnant of thin filaments; the planets flare as it passes and keep
+  their orbits (changed 2026-10-16). No coloured dots.
+- **19, the heat death** (not smooth): it went unseen, because the 7-day meter sits below the sky.
+  Now it cools over 14 s (names first, the sun through ember to black, the stars burning out one by
+  one, the planets drifting off), and when an event in the sky starts while you watch, the list
+  scrolls back up to show it. Opened later, it settles into the dark in 1.6 s.
+- **20, planets out of gas**: at the Big Bang (after the 5-hour limit the planets survive, so they only light up again), dust flows onto each orbit as a
+  faint lane and gathers into the planet, inner ones first, labels last.
+- **21, no size jumps**: one continuous depth scale (no step as a planet passes behind the sun), a
+  session's length never shrinks while it lives, and sizes ease over a few seconds.
+- **22, parallax**: tilting the phone shifts the sky's layers by up to 9 dp, the solar system stays
+  put so taps land. On only while the sky is visible and the app is in front; off under Reduce
+  Motion.
+- **The eclipse**, for when the app can't follow usage (signed out, a plan that ended): a dark disc
+  slides over the sun with a diamond ring, leaving the corona and the line saying why. Until those
+  states drive it, the demo shows it on a long press of the sun.
+
+## Claude Code on the phone itself (research, 2026-10-15)
+
+The owner: "can't we run claude code in kind of linux image or container on android? ... So right
+on device". Research only; nothing was built. `docs/ON-DEVICE.md` has the whole of it.
+
+- **Yes, without root, as a Linux userland rather than Docker**: Claude Code's official linux-arm64
+  build runs unchanged in Debian under `proot` (Termux first, our own userland inside the app
+  later), and so does the core of the daemon; the app would show the phone as one more host, "This
+  phone". Proven in Linux arm64 containers on the Mac, not yet on a phone. There's no Android build
+  of Claude Code, and Docker on a stock phone is a no.
+- **Where it would start**: a half-day spike on the Nothing Phone 3 (Android's system call filter,
+  the process killer, sign-in, speed, battery), then a Linux layer in the daemon, which also gives
+  Hypernova on any Linux box. Parked as LATER L26.
+
+## The owner's second round of notes (2026-10-15, evening)
+
+From his notes after a day with the glasses, and his answers to the questions that followed.
+The build details go in the sections above as each piece lands; this records what was decided.
+
+- **The black hole is the supernova's remnant, not a replacement for the star** (owner: "What if
+  we replace star with a black hole?"). The star is the 5-hour window and ages with it, so it stays.
+  At the limit the supernova's core collapses into a black hole for the cooldown. He noted "in
+  reality, black hole doesn't turn back into a star", so at the reset the hole evaporates in one
+  flash (Hawking radiation, time-compressed like the 5-hour supernova itself) and the leftover gas
+  collapses into the new red star. Sky effects stay physically honest. Built; see "The sky, third
+  pass" below.
+- **Voice through Soniox for now** (built; see "Voice through Soniox", below. "it is good for real time"): the daemon relays the audio to
+  Soniox's real-time API with the owner's key, which stays on the Mac. The Hyperscribe Companion
+  stays as the alternative. Voice is offered during the Mac app's setup, not only when glasses
+  pair; once it's set up, the phone's composer gets a mic. On the phone, speech is reviewed before
+  sending ("Review it, but it should be done fast"): captions show while you hold, and on release
+  the text is in the box with Send one tap away. No confirm step, no wait. Built 2026-10-16; see
+  "Voice on the phone" below. (The glasses differ on purpose: they have no Send button.)
+- **Statistics instead of achievements** ("Maybe it is better to have some statistics? Like hours
+  worked, tokens used and so on? So it would also have cosmos aesthetic"). **The sun opens it; it
+  isn't a tab** (the owner's decision). Home's bottom bar stays Sessions, History, Settings
+  (Automations will join later). Tapping the sun opens Statistics as a screen of its own; Back
+  returns to Home as it was. While the sun is eclipsed (signed out, no plan, on hold) its tap still
+  goes to the account card. The tap is taught once: the sun's readout gets a second line, "Tap the
+  sun for your statistics", until Statistics is first opened. TalkBack has "Open statistics" among
+  the sky's actions.
+  - **An answer never stands in for another range.** Switching to a range with no answer yet while
+    the Mac can't be reached shows "Couldn't load statistics" with Try again, not the last range's
+    numbers. A range's own old answer shows with "Couldn't refresh. These are from 14:05."
+- **Lens shows a working session live, in two boxes** (owner: "upper shows commands which are now
+  running, and below it the output of a session"). The output auto-scrolls, agents show
+  everywhere, and a session that is working never shows its old reply as if it were current.
+  Reading aloud has its own on/off switch. The glance shows the time. The batteries of the glasses
+  and the Mac show on request (the owner chose this over a line on the glance, "GLASSES 84% · MAC
+  62%" looked ugly): say "battery" or swipe up on the main screen for a small card, each with its own
+  drawn icon, a 5-segment bar, the percent and "charging"; a Mac without a battery isn't listed. A
+  battery at 15% still pops up by itself.
+- **The Mac's battery shows in the apps** (owner: "don't forget that mac mini and desktop macs
+  don't have battery"). The Mac popover shows it only when it's at or under 20% and not charging:
+  one quiet amber line under the Mac's name. The phone and the glasses keep their 15% warning. A Mac
+  without a battery shows nothing. (Whether both apps should use one rule is a question below.)
+- **Limits on other providers** (built 2026-10-16): other providers have no 5-hour or weekly
+  windows, only credit, rate limits, keys and being down.
+  - **Each session shows its provider's own state**, such as "OpenRouter · out of credits" (amber
+    when it needs you) or "OpenRouter · rate limited". The status line says OUT OF CREDITS, RATE
+    LIMITED, KEY REFUSED or NOT ANSWERING. The card offers Add credits, Try again and Continue on
+    your subscription when out of credits; Fix the key when the key is refused; Try again when the
+    provider gave no reset or isn't answering.
+  - **OpenRouter's balance** comes from its key's own limits: what's left under the key's cap
+    ("$4.20 left"), else what it spent today, else free requests left. It shows in Settings →
+    Providers, on the Mac's Providers window and under the companion star. The account's own credit
+    needs a second, management key, so it is never claimed (LATER L48). Credit coming back ends "out
+    of credits" by itself only for a key cap or budget; otherwise the owner taps Try again.
+  - **The companion star.** Sessions on other providers are ringed moons of a white dwarf at the
+    sky's lower right, not of their project's planet. The sun's death leaves it be. (Look: DESIGN.md.)
+  - **Tested against a fake provider** on the Mac (canned replies and 13 recorded faults, never the
+    owner's login). Claude Code keeps only an error's message, so limits are read from those words.
+    A bare 429 with no reset in its words waits for Try again.
+- **Automations** (owner: "a new category like scheduled tasks - where user could make some
+  automation workflow like in apple automation app"): a tab of "When … → Do …" cards. Triggers: a
+  time (once, daily, weekdays, every N hours), a limit resetting, a session finishing or needing
+  you, the Mac plugged in or low on battery. Actions: start a session in a project with a prompt,
+  model and mode; continue a session; run a skill or slash command; notify or read aloud on the
+  glasses. They run on the Mac, so they work with the phone off, and every run keeps its
+  transcript. Whether an automated session may approve its own commands is the user's choice per
+  automation (its permission mode), with a clear warning for the modes that skip asking.
+- **Auto-continue is a switch on the card.** "Continues by itself at 2:00" with Don't; "Back at
+  2:00" with "Continue automatically at 2:00". Built 2026-10-16.
+  - Claude Code decides for its own terminal sessions: its notices drive the card. Don't presses
+    Esc; turning it on uses /rate-limit-options, only while idle and never over the owner's text.
+  - The Mac carries on SDK sessions at the subscription's reset (30 to 90 s after), and other
+    providers' rate limits at their announced reset (5 to 20 s after; owner: yes).
+  - At most 2 re-arms in a row, within 24 hours. More than 30 minutes late, it waits for Continue.
+  - Never after running out of credit or a refused key (owner: no). When it's over, the card says
+    "OpenRouter has credit again" with Continue.
+  - A continuation shows as a slim row in the chat, never as the owner's message.
+- **Files open properly**: Markdown and code formatted, pictures, video and audio viewable, and
+  everything downloadable.
+- **Phone ↔ Mac without Wi-Fi**: sharing the phone's mobile data with the Mac already works
+  through Tailscale. With no internet at all, a direct local connection (LATER L11) would be
+  needed; the owner chose later. A raw Bluetooth link between the apps is not planned (slow,
+  short range, limited in the background).
+- **Starting a session from the glasses** (owner: "in main menu user can hold temple to start a new
+  session. And it will be created in devoted folder (can be changed in settings). But if there a
+  project, which needs user's attention, it will show talk to [project]"). Built 2026-10-16.
+  - On the glance a hold goes to the first session that needs you (an approval, question, plan or
+    terminal menu; never just an unread reply), otherwise to a new session in Nebula. Inside a
+    session a hold talks to it, so to talk to a working session you open it first. Naming a project
+    in speech still wins.
+  - The talk screen always names the target before the tap that sends: "TO 0stems · NEEDS YOU", or
+    "NEW · Nebula/landing-page-bakery". After the send, the glasses return to the main screen (the
+    owner is asked whether to open the new session's live view instead; see the questions below). A swipe switches between those two first, then the other
+    sessions and projects.
+  - New sessions get their own subfolder in **Nebula** (`~/Programming/Nebula`, the folder where new
+    stars are born; changeable in Settings and the phone, only to a folder inside the home folder,
+    because the phone decides where folders get made). The lens names the folder from the first
+    prompt in short kebab-case (filler words dropped, at most 4 words, Russian transliterated). The
+    Mac makes the name safe and unique, creates Nebula if needed and runs `git init`.
+  - Nothing is created before the send tap. That review is the "+ New project" confirmation: the
+    header shows the folder name and the hint says "tap make its folder & send". There is no
+    separate yes/no card.
+  - "+ New session" under the glance's lines opens a picker ("+ New project", then projects,
+    newest first). "new session: …" and "new project, …" go to Nebula; "new session in 0stems: …"
+    to that project. Said to a terminal session waiting on an approval, a prompt isn't lost: the
+    card comes up with it as the deny reason, sent with a double tap.
+- **Pop-ups on the glasses** (built): a framed two-line band over the bottom of any screen. A tap
+  opens it, a swipe puts away the whole band, and several merge into one ("+2").
+  - Needs-you stays until opened or swiped. Done fades after about 6 s, stopped and limit after
+    10 s. The Mac's battery at 15% pops once per discharge. "MAC SLEEPS IN 2 MIN" says why (battery,
+    heat, 8 hours) and goes when its countdown ends.
+  - Nothing shows while you talk, are being read to, or the lens is quiet: they wait, and a done or
+    stopped one that waited over a minute is dropped. A needs-you pop-up never appears on that
+    session's own screens, or on the glance, which already moves its focus to it.
+  - A switch per kind. On by default: needs-you (as the owner said), the Mac's battery, and the Mac
+    about to sleep. Off by default: done, stopped and limit, since a finished turn already takes the
+    glance.
+- **"Telescope": see what's being built, from the glasses** (owner: "when a user says 'show what
+  happens' or choose a simpler phrase that has cosmos aesthetic you show on glasses what is being
+  built - like android emulator or web page or whatever so user can check result visually on the
+  go"). The word is "Telescope", instead of "show me" (the owner: "Make it instead of show me"; "show
+  me…" also starts ordinary prompts). It shows what the session in front of you is building, picked
+  automatically, newest first: web page, Android emulator or phone, iOS Simulator, its terminal,
+  the last picture, chart or PDF page, or a Mac app window. Built; how it picks and what it may
+  touch are in "Hypernova Lens" above. **Windows only of a program whose real path is in the
+  session folder**, and Screen Recording is asked once, on the first "telescope window". Full
+  screen, dithered for the green display; tap zooms into a quarter, swipe goes round the quarters,
+  double tap goes back; "watch" refreshes it for up to a minute.
+- **Glasses for cycling and walking** (owner: "think of different phrases and other features which
+  would made app usage for glasses better, more productive, so I can do whatever i want - cycling,
+  walking, and still do develop things"; approved as proposed). Built 2026-10-16; see "Glasses on a
+  bike or a walk" below. Later (LATER L32, L33): moving mode by itself when the phone detects
+  cycling; the Even ring as a remote.
+- **Everyday quick wins, built before the bigger pieces** (approved 2026-10-15): usage in the chat
+  (model, a context ring, the session's tokens and cost, the 5-hour window; Compact at 85%);
+  Claude's to-do list as a live pinned checklist; "What changed" (files with +/− and a diff, a
+  Commit button); long-press on a message (copy, quote, read aloud, rewind to here); quick prompts
+  as chips above the box; Share to Hypernova and launcher shortcuts. Also listed: a fingerprint for
+  risky approvals, search across sessions, git status on project cards, muting a project.
+  The chat part was built 2026-10-16:
+  - **Usage in the chat**: a slim glass strip under the session's status line with a context ring
+    and its percentage, the model, the cost, the tokens and the 5-hour window. A tap opens the
+    breakdown (context in tokens, tokens by kind with agents, the cost, the plan's two windows).
+    From 85% context a "Compact" chip sends /compact. **Numbers are honest:** where Claude Code's
+    status line gives the window and the cost they're its own; otherwise they're worked out from
+    the transcript at list prices and marked "≈". Another provider's sessions show no cost. When
+    the line is too narrow, whole parts give way (tokens, then the reset time, then the window),
+    never one cut in half.
+  - **Claude's to-do list** is pinned over the prompt box only while a turn runs and something is
+    left. It reads both TodoWrite and the newer task list. The header folds it to one line.
+  - **Long-press on a message** (yours or Claude's): Copy, Quote, Read aloud (the Mac's voice; the
+    phone's own when the Mac can't), Select text (selection moved here), and for your own messages
+    Save as quick prompt and Rewind to here.
+  - **Rewind branches, it never cuts in place.** The conversation up to just before the message is
+    copied into a new session, "<title> (rewound)", and the message (with its files) comes back
+    into the box. The original stays, and files Claude changed stay as they are; the confirm sheet
+    says so. No rewind on the first message, one not yet on the Mac, or Claude Code's own commands
+    and "!" lines. Not Claude Code's /rewind in the terminal: its picker lists messages by cut-off
+    text, so the daemon couldn't pick the right one, and it can restore code, which is destructive.
+    Rewinding the code too is LATER L46.
+  - **Quick prompts**: chips over the box (Continue, Run the tests, Explain the last change, Commit
+    this, then your own; 12 at most), kept on the phone. A tap sends at once; a long-press edits
+    (emptying one deletes it). They show only while the box is empty and Claude isn't at work,
+    waiting for your answer or unable to reply (a little stricter than asked: the owner asked only
+    for them to hide while typing).
+  - **What changed** is a read-only view of the session's folder (git status and diff, limited to
+    files the session's edit tools wrote, with Show all). Its Commit button is a prompt to Claude,
+    never a daemon commit, so the repo's own conventions apply; it's disabled while a turn runs.
+    Credential files and anything outside the folder are never shown.
+  - **Share to Hypernova** is an Android share target (text, links, images, files): pick a project
+    or session, or New session, and the composer opens with the content attached. **Launcher
+    shortcuts:** New session plus the 3 most recent projects.
+- **Automation templates around limits** (owner: "we can add automation templates like the one with
+  limits"): carry on after the limit, do it when I have budget again, switch provider at the limit
+  (opt-in, costs money), night shift, weekly debrief. They lead the template list.
+- **"Stay awake": the Mac in the backpack** (owner: "the idea is that I could use my hypernova even
+  when I have my MacBook closed backpack"; he uses Amphetamine for it today). Built 2026-10-16.
+  - **While working** (the default): awake while sessions are starting, working or waiting on an
+    answer mid-turn, their agents run, an automation asks, or a phone or the glasses are connected.
+    It keeps holding 3 minutes after the last of those, because macOS sleeps an idle Mac the moment
+    a hold goes. It's the daemon that holds, not the Mac app, because the daemon knows when there's
+    work and runs without the app; the hold ends with the daemon even if it is killed.
+  - **Backpack**: awake with the lid closed, for 8 hours. Choosing it again restarts the 8 hours;
+    when they're up it drops back to While working. **Off** lets the Mac sleep as usual.
+  - **The lid-closed permission is a narrow rule, not a helper running as root** (this changes the
+    first plan). One rule lets the owner's account switch only the Mac's "disable sleep" setting on
+    or off, and nothing else. The Mac app installs it after one macOS password prompt. A rule is
+    something macOS enforces to the letter; a helper would be a program with full power running all
+    the time.
+  - **Putting back**: Backpack never touches a setting that was already on (Amphetamine's). If it
+    changed it, it puts it back when Backpack ends. When the daemon itself stops, it puts it back
+    only with the lid open, since a closed lid most likely means a restart in a bag.
+  - **Guards**: at 15% battery (5 to 50% adjustable) when not on power, in either mode; in Backpack
+    also when macOS reports heavy heat, and after the 8 hours. Each counts down 2 minutes first, on
+    the phone and the glasses ("Your Mac will sleep in 2 minutes · battery 15%"), and plugging in or
+    cooling down calls it off. Desktops get no Backpack and no battery guard.
+  - **Where it shows**: the Mac popover (While working / Backpack / Off, plus a line), Mac Settings
+    (permission set up or Remove, battery level), the phone's Mac card ("Awake · lid closed · 62%",
+    a picker, a line), a crescent on the phone's connection chip while the Mac is awake with the lid
+    closed, and "Stay awake" / "Let it sleep" on the glasses. "Stay awake" asks for Backpack once
+    it's set up (until then, While working, with a hint); "let it sleep" goes from Backpack to While
+    working, and from there to Off.
+  - **Removal**: Settings → Remove, Uninstall…, or the setup step's undo. Each ends Backpack first,
+    so the setting is put back.
+- **More platforms, planned before built** (owner: "I don't want to limit this to platforms for now
+  because we will lose potential audience"). Proposed order: a web app served by the owner's own
+  Mac (any browser, installable), iOS through Kotlin/Compose Multiplatform sharing the Android
+  app's screens and data logic, then Linux and Windows hosts (a platform layer in the daemon and a
+  small tray app). A research plan comes first (docs/PLATFORMS.md); nothing is migrated before the
+  owner reads it.
+- **"Transmission": text that arrives like speech, on the glasses** (owner: "a settings which
+  would imitate text appearance like somebody talks … pauses and so on"). Built. A setting, "Text
+  arrives: All at once / Like speech", **All at once by default**, so nothing changes until he turns
+  it on. Like speech: words appear at a speaking pace (110 to 260 words a minute, default 170), a
+  few at a time, with short pauses at commas and longer ones at full stops and paragraphs; in step
+  with the voice when a reply is read aloud. It covers Claude's words in the live view, agents'
+  reports and the whole of a finished reply, which scrolls as it arrives. Code and commands appear whole, approvals always show at
+  once, and a tap shows the rest immediately. Updates are batched by phrase so the glasses get a few
+  text updates a second at most.
+- **A long text on the glasses scrolls, never pages** (owner, testing on real glasses: "I don't want to see this page split, I would rather have scrollable. So, like, native scrolling, instead of page separation"; with text arriving like speech, one phrase arrived and the rest sat on other pages). Built.
+  - A finished reply is one text that scrolls from its start, over its facts: no REPLY pages, no "2/5". A plan read whole (after its three lines) and a diff scroll the same way.
+  - A swipe moves one line less than the window, so the line you were on stays in view. A ↓ at the end of the last line says there's more.
+  - Text that arrives like speech flows through the whole reply. The view follows the newest line; a swipe back stops it (the words go on underneath); swiping on to the end follows again; a tap shows the rest at once, under where you are. Read aloud, it follows the voice.
+  - **The lens scrolls the text itself, not the firmware.** Tried in the Even Hub simulator: the firmware's own scrolling jumps back to the top whenever the box's text changes (every step of words arriving), the app can neither move it nor tell where it is, and a box holds about 1000 bytes. Worth trying again on real glasses (LATER L52).
+- **Parity with the phone, on the glasses** (built). The glance corner shows the same limit states
+  as the phone: a black hole at the 5-hour limit, a cold ember at the weekly limit, an eclipse when
+  signed out, without a plan or on hold, and a short flash when a limit lifts. A session a limit
+  paused stays on the glance with the phone's words, and its card says PAUSED. Queued prompts show.
+  "Status" says the limits, paused sessions, and a Mac kept awake with its lid closed.
+
+## Voice through Soniox, and the Lens guide (2026-10-15)
+
+The owner: "We have to download hyperscribe companion to use it (voice). But can't we built what's in Hyperscribe companion into hypernova app on mac? Or use soniox api. I gues soniox api is better for now. Well, we can leave an option there…", then "Let's leave soniox for now. And it is good for real time."
+
+- **Soniox, through the Mac, is the voice for now; Hyperscribe Companion stays as the other way.**
+  The phone streams the glasses' microphone to the daemon, at the Tailscale address and with the
+  device token it already uses, so nothing new goes in the Even App's whitelist. The daemon relays
+  it to Soniox's real-time API with the owner's key. Lens uses Soniox while the Mac says voice is
+  ready, else the Companion; a hold keeps the one it started with. The daemon speaks the
+  Companion's protocol to the phone, so Lens needed no second speech path.
+- **The key stays on the Mac** in a private file (readable by the owner only). It's set from the
+  Mac's guide window or from Lens on the phone; the phone sends it once and never stores it. It's
+  never sent back: clients see only "ready" and its last four characters.
+  - Before keeping a key, the Mac tries it with a quarter of a second of silence, so a mistyped key
+    is caught at once.
+  - A key whose account has no balance is kept and says so; Test tries again. A key tried while
+    Soniox is busy, or has a problem of its own, is kept, with Soniox's words. A key tried while
+    Soniox can't be reached is kept untried; the next hold tells.
+  - Removing the key asks first ("Remove the Soniox key? Voice stops until you add one."), as
+    forgetting a device does.
+- **Bounded and private.** One hold carries at most 2 minutes of audio; then the words so far are
+  kept and listening stops. A stream with no audio for 20 s closes. One stream per device. Audio,
+  words and the key are never logged or written down.
+- **Hearing right, and only what's needed.** Soniox gets "Claude Code", "Hypernova" and the projects
+  in use as hints, so "in hyperscribe, …" is heard right. "In use" means with sessions, or a folder
+  changed in the last two weeks; newest first, 20 at most. Folders never used with Claude stay on
+  the Mac, and a key's test sends no names. Language hints follow Lens' setting with English beside
+  it. No endpoint detection: letting go of the temple ends the utterance. (Sending project names at
+  all is a question below.)
+- **Glasses pairing opens a guide on the Mac**, the "Hypernova Lens" window, in three steps: what
+  Lens is for (the owner's words: "an on the go app for developers so wherever they are they can
+  still develop products, see results"); the four gestures; and voice (connect Soniox, with
+  Hyperscribe Companion beside it).
+- **How the Companion is offered.** It has no app to download yet (a source release). Installed as
+  an app: "Open Hyperscribe Companion". Running here from source: its name. Otherwise: "Hyperscribe
+  Companion on GitHub ↗", its source and setup steps.
+- **The phone shows the same guide at the same place.** The Mac keeps the step, so a step taken on
+  either screen moves the other. "Show on my Mac" brings the window forward, and the phone is told
+  when no Mac app is listening. Done closes it for good (more glasses pairing won't reopen it);
+  Settings → "Lens guide…" on the Mac and "Open the Lens guide" on the phone bring it back.
+- **Glasses aren't phones on the Mac.** A device paired by Lens shows as "Even glasses" with a
+  glasses glyph, the list is titled "Phones and glasses", and the header pill says "1 phone ·
+  glasses". The Mac app's own live connection isn't counted as a phone.
+- **The Mac app's connection pill is honest.** It says connected only while it has heard the daemon
+  in the last 30 s (the daemon pings every 25 s; the extra 5 s are room for a late ping from a busy
+  daemon).
+
+## Voice on the phone (2026-10-16)
+
+The owner's second round of notes asked for voice in the Mac's setup and a mic in the phone's composer, reviewed before sending: "Review it, but it should be done fast". Built; the visual spec is in DESIGN.md, "Voice".
+
+- **Setup asks.** The Mac's Setup has a Voice step (6 of 7, optional) between Tailscale and Your phone, so a phone that pairs already has its mic: connect Soniox (the key is checked with a silent probe), use Hyperscribe Companion (found by itself), or Not now. The Mac never listens; there is no "hold to try".
+- **One voice panel on the Mac**, shared by Setup and the Lens guide. The Lens guide skips its Voice step when voice is ready as it opens (two steps, ending in Done); the "Voice ready" chip still opens it. The phone's Lens page does the same.
+- **Existing installs** get one quiet popover notice, "Talk to your sessions: set up voice", until voice is ready or they choose Not now. Walking past the step by clicking Your phone doesn't count as answering.
+- **The phone's mic sits where Send is** while the box is empty (no text, no files) and the Mac offers voice: Soniox through the daemon while it is ready, else the Companion the Mac knows of. An older daemon: no mic.
+- **Hold to talk, tap for hands-free, on the same button.** The mic opens on touch-down. Let go after 350 ms and it's done; sooner and it keeps listening until Done. Slide away to cancel.
+- **The words are in the box at once.** On release the box gets everything heard (the part that may still change shown dim); Soniox's settled words replace it silently. Send works at once and waits for words still settling (1.5 s at most). An edit made meanwhile wins. Voice never opens or closes the keyboard and never sends anything.
+- **Hold Send (400 ms) to add more** when the box has text; a tap still sends. The new-session sheet has a mic at the end of the PROMPT line; it always appends.
+- **Mic source:** the phone's own microphone. A Bluetooth headset's is opt-in (Settings → Voice, Android 12+), because its route takes a moment and lowers music quality. A wired headset's is used by Android itself.
+- **Battery:** the microphone, the stream and any headset route exist only between the press and the end. Leaving the app ends listening (words kept). No foreground service, nothing warmed up. Hands-free ends at Done, Cancel, Back or the 2-minute cap.
+- **Settings → Voice:** the state, the key's last four, Language (Auto hints English and Russian, then the phone's own), Headset microphone, and paste or remove a Soniox key (it goes to the Mac, which tries it first; the phone never keeps it).
+- **No sounds.** Haptics mark start, armed to cancel, done and cancel. TalkBack hears nothing while the mic is open (it would be transcribed), then one line: "Ready to send: …".
+- **Raw audio for now**: 16 kHz 16-bit, about 32 KB/s on mobile data (Opus: LATER L53).
+- **A stop while Soniox is still being reached keeps the audio**, so a quick "yes" over a slow link isn't lost. The log keeps only the time from the phone's stop to the last words, never words.
+
+### On the glasses, letting go of the temple
+
+Owner, on real G2, 2026-10-16: "release the temple… it sends rapidly and I don't even see what is being said, and I think that not whole text was get". This differs from the phone on purpose: the glasses have no Send button, and "tap to send" on a card cut at five lines made prompts feel sent unseen.
+
+- **The microphone stays on 0.4 s after the release**, then Lens waits for Soniox's last words, 2.5 s at most. The last word is often still being said as the finger lifts, and the glasses' audio reaches the phone late; switching off at once lost it.
+- **After the release the captions stay and settle** ("getting the last words…"). Then the prompt shows whole, never cut with "…": a long one opens at its end with ↑/↓ marks and scrolls by swipe.
+- **It sends by itself after a short count** ("sending in 2"): 2 s for up to two lines, then 1 s more per line, 8 s at most, so a long prompt can be read. Tap sends at once; double tap cancels and keeps nothing; any swipe pauses the count ("tap to send") until a tap sends or a double tap cancels; hold adds more and the count restarts on the next release. "Send it" at the end still sends without the count.
+- **If the last words don't come back in time**, what was heard stays, the top line says "last words missing?", there is no count, and it waits for a tap. A voice word heard that way isn't acted on ("stop" might have been "stop the server…").
+- **Parked:** a setting to turn the countdown off (owner: "a setting can turn the countdown off later — not now"; LATER L51).
+
+## The Mac's battery, signing in again, and one rule for secrets (2026-10-15)
+
+- **The Mac's battery on the phone** (owner: "add battery status into app (battery of mac, but don't
+  forget that mac mini and desktop macs don't have battery)").
+  - The daemon reads the battery at start and once a minute. The first reading after the Mac wakes
+    comes within 10 s. A phone is told only when the percentage, charging or the power source
+    changes, so it isn't woken for a minute-by-minute estimate.
+  - **No battery, nothing shown.** A Mac mini, iMac, Mac Studio or Mac Pro shows nothing: no empty
+    battery, no "unknown". A UPS on USB, which macOS lists as a battery, isn't one.
+  - **Minutes left** means until empty while discharging and until full while charging, and there
+    is none when the battery is full, while optimized charging holds it, or while it's still
+    estimating. It comes from the battery's own estimate, not macOS's: on macOS 26 the system showed
+    "20:00 remaining" for a whole evening while the charge fell about 6% an hour. The battery's
+    figure swings with the load, so the daemon averages the pace over the last five minutes.
+  - The Mac popover's tooltip gives the time left. Plugged in but not charging, it says so and ends
+    "Use a stronger charger to keep them going."; on battery, "Plug it in to keep them going."
+- **Signing in again from the phone: a refused code.** Claude Code's sign-in is a plain line prompt
+  with no error page: a code the server refuses prints "Login failed: …" and ends the command.
+  - **A refused code starts a new sign-in by itself.** The phone is told the code didn't work and
+    gets a new page to open (the old page's codes are spent). The 10 minutes start over, up to
+    three times; after the fourth refused code it stops and says so. A wrong code the owner pastes
+    himself on the Mac starts over the same way.
+  - **A right code the account can't use ends it, in Claude Code's words.** An account on hold, or
+    one an organisation's policy turns away, would end the same way again, so there is no restart.
+  - **Codes that can't work are turned away first**: half a code, or one from another sign-in's
+    page. A second code sent while the first is checked is turned away with "wait a moment".
+  - **Only Claude Code's "Login successful." counts as signing in.** The owner's sign-out came from
+    the server ("Please run /login · API Error: 403") while `claude auth status` still said signed
+    in, because it reads the token on disk and a failed sign-in leaves the old one there. So a
+    refused code, an account on hold, a Ctrl-C or a time-out never ends a sign-out, and the phone
+    never says "signed in" when it isn't.
+- **Moving a session to another provider** restarts its claude in the same terminal. For 15 s after
+  the new one starts, the old one's end doesn't count as the session ending. Agents it ran in the
+  background end with it. One move at a time (another gets "busy"). If the new claude can't start,
+  the session has ended and resumes like any other.
+- **One rule for secrets.** Session titles on the Mac and the phone, agents' reports and the
+  home-screen widget mask secrets by the same rule, and both sides run the same test cases.
+  - After a key's name, a value that looks like a credential is masked: 8 or more characters with a
+    digit, or 16 or more mixed-case ones. "auth" alone is never a name; AUTH_TOKEN and
+    AUTHORIZATION are.
+  - After a scheme word (Bearer, Basic, Token and so on) that follows a name, any 8 or more token
+    characters are masked; the scheme word stays visible.
+  - Curly quotes are never part of a value. An opening one right after the "=" or ":" stays with the
+    name and the value inside is judged (PASSWORD=“s3cretpass” becomes PASSWORD=“•••”); prose in
+    curly quotes stays prose (password: “forgotten”).
+  - After the plural "tokens", a number with commas, dots or underscores between its digits is a
+    count, not a credential (tokens: 12,345,678; max_tokens=4096), so usage in a title stays
+    readable.
+  - curl's and wget's credentials (`-u user:pass`, `--user`, `--proxy-user`, `--oauth2-bearer`) are
+    masked only inside a curl or wget command, never past a `;`, `&`, `|` or line break, so
+    `docker run -u 1000:1000` stays as written. A quoted string up to 600 characters counts whole,
+    so a long JSON body never hides a later `-u`.
+  - Ordinary prose stays as written, and masking a long line stays fast.
+
+## The sky, third pass (2026-10-16)
+
+- **Real stars and deep-sky objects** (owner: "stars on the bg look like dots ... some objects like
+  in real life which are usually captured by Hubble"). The background stars are drawn in the sun's
+  family, with a real sky's colour and brightness proportions and no twinkle (there is no air in
+  space; the sun's twinkle went too). A few faint Hubble-like objects (a spiral, an edge-on galaxy,
+  an elliptical, star-forming pillars, a ring nebula, a globular cluster, a deep-field corner) sit
+  in the farthest layer, placed from a seed that's different for each install and the same at every
+  launch. They never compete with the sessions.
+- **The 5-hour limit is light, not grey** (owner: "everything turns dark ... I'd like to have
+  accretion disk fill like it feels space with it's light ... watching black hole speeding up
+  accretion disk"). Only the universe dies: the weekly heat death stays the one truly dark state.
+  Through the 5-hour cooldown the app keeps its colours. The black hole's disk lights space, the gas
+  and the planets, and it drains faster and brighter toward the reset, with two jets in the last
+  minutes.
+- **The planets survive.** The supernova's shock flares them and darkens their day side; it doesn't
+  destroy them, because a black hole of the star's mass holds the same orbits. At the reset they
+  simply light up again with the new star. Planets condense out of dust only after a Big Bang.
+- **Names come back around the hole** (a call made while building, since a sky without names felt
+  dead): planet names at 70%, orbit wakes and needs-you brackets return once the disk has formed,
+  and the camera can fly to a planet. They fade during the evaporation and come back last.
+- **Still old elsewhere**: the widget, Lens and the Mac app still show the old cooldown (LATER).
+
+## Bypass mode and the think-twice card (2026-10-16)
+
+- The phone offers Claude Code's fifth permission mode, **Bypass** ("bypass permissions": nothing
+  is asked, not even risky commands), next to Ask, Edits, Plan and Auto, in the new-session sheet
+  and in a session's mode picker (the daemon already accepts `bypassPermissions`). A session the
+  phone started can switch to Bypass later, from its next turn if one is running (switching a
+  running turn is untested; LATER L35). A terminal
+  session on the Mac that wasn't started with bypass allowed shows Bypass dimmed, with the reason
+  (also when Bypass is allowed only through the owner's Claude settings, until it is in bypass; the
+  phone's own terminal sessions are started with it allowed). The glasses never set Auto or Bypass
+  ("Auto and Bypass only from the phone"). The Mac app doesn't have the think-twice step yet
+  (LATER L36).
+- Choosing **Auto** or **Bypass** first opens a think-twice card: one real incident, picked at
+  random and never the one shown last, where an AI agent with too much freedom did damage (for example, deleting a production
+  database or a user's folders). Headline, two plain sentences on what happened, the month and year,
+  "Read the story" (the source), and at the bottom: "AI makes mistakes. Never rely on it as on
+  something that can't." Buttons: "Use Auto/Bypass anyway" and "Keep asking" (the default). It
+  shows every time, with no "don't show again": the point is to make you think twice. Back, a tap
+  outside and "Keep asking" all keep the mode. Bypass's card
+  is stronger in tone (red-shifted, like a star's warning light) than Auto's.
+- The incidents must be real and sourced: each one checked against at least two reputable reports,
+  told without exaggeration, with the source link kept in the app. About 8 to 12 cases, Claude Code
+  included, not only other companies' tools; the list ships with the app and is updated by hand. Three entries are marked weakly sourced in the
+  list's notes (never shown): the Gemini CLI one (its Ars Technica link wasn't opened), the Claude
+  Code home-directory one (mostly a Reddit post), and the month of the Terraform one.
+
+
+## Glasses on a bike or a walk (2026-10-16)
+
+The build of the owner's "Glasses for cycling and walking" note (second round). Details for the
+code: `lens/README.md`, "On the glasses"; `lens/DAEMON.md`, section 11.
+
+- **A guide on the glasses themselves, offered once.** The first time the glasses have the Mac's
+  sessions and nothing needs the owner, they offer "LENS GUIDE: tap start · double tap not now". A
+  lens set up before the guide existed gets the offer once too. Each step asks for one gesture (tap,
+  double tap, swipe, hold) and checks it as it is done: the right one is ticked, a wrong one is
+  named ("That was a swipe. Just one tap."). The last step is voice practice (hold, say a few words,
+  let go; any words tick it, and nothing is sent to Claude), which double tap skips because voice
+  isn't required. Pop-ups wait while the steps run. "guide" replays it, and so
+  does "Practise the gestures on the glasses" in the phone's Settings.
+- **The phrases are whole utterances**, so a sentence that only starts with one stays a prompt
+  ("continue with the parser…", "go ahead and rename…"). "show me the diff" stays a prompt; "show
+  diff" is the command.
+  - **"debrief"** covers what happened since the last debrief (the first one, the last hour): what
+    finished, then what needs the owner, then what's running. A turn that ended while the phone
+    slept still counts. It is spoken one sentence per item and shown as a list, so a tap answers
+    what needs him.
+  - **"Note: …"** saves an idea to a notes file in Nebula, under a heading per day, with the session
+    in front as the project. Claude isn't started. "note that …" is a prompt.
+  - **"next", "previous", "back"**: back leaves a card unanswered.
+  - **"one", "two", "three"** answer the question or terminal menu on the lens. For multi-select,
+    each number ticks one option and "approve" sends.
+  - **"plan first" and "go ahead"** set the mode of the session in front to plan or default. On a
+    plan card, go ahead approves it and plan first keeps planning.
+  - **Never Auto or Bypass by voice.**
+  - **"continue"** carries on a stopped session.
+- **Eclipse** ("eclipse" / "eclipse off", also a switch on the phone): only needs-you gets through.
+  No other pop-up, no chime for a finished turn, and a finished turn doesn't take the lens.
+- **Moving mode** ("moving" / "still", also a switch on the phone): two short lines at the top-left
+  and nothing else, with no planets and no animation. A pop-up chimes and takes the first line. A
+  finished turn is spoken in one sentence, never over the owner's own voice. Questions and terminal
+  menus are read out with numbered options. Telescope's picture stays whole, because he asked to
+  look.
+- **Risky commands are the lens' own check**, since the daemon has none: force pushes and deleted
+  remote branches, `rm -rf`, hard resets and discarded changes; deploys and publishes; dropping
+  data. It reads through `sudo`, `npx` and `env`, and MCP tools by their names.
+  - The card says "careful: force push can't be undone" under the command.
+  - Such a command is approved by voice only with its own verb ("approve push / delete / deploy /
+    publish / drop / reset"). Another kind's verb, plain "approve" and "always allow" are refused.
+  - A tap still allows it when standing still. Moving, a tap never does: the command is read out,
+    and the verb counts only once that reading played to the end. With read-aloud off it can't be
+    heard, so the owner says "unmute", or "still" and taps.
+- **"What changed?" and "show diff"** use the diffs Claude Code made for each edit, already in the
+  turn the lens loads. The answer is spoken in a sentence or two (the files and line counts, then
+  Claude's first sentence), and the files are listed with + and - counts.
+- **Checked in the simulator, unit tests and a test daemon** (notes, mode, continue). Nothing yet on
+  G2 hardware or outdoors (`lens/README.md`, "Not verified yet").
+
+### The glasses after the owner's morning test (2026-10-16)
+
+- **"Like speech" wherever a reply first shows.** A turn started from the glasses arrives like
+  speech in the live view or on the result card, for 30 minutes after the send, and the card
+  carries on from where the live view was, so a reply never starts over. An old backlog still
+  shows at once. (Owner: it worked in an existing session but not in a new one.)
+- **"Telescope", even misheard.** Soniox heard "Telescope terminal" as "To the scope terminal".
+  The Mac now gives Soniox the glasses' own words (Telescope, debrief, eclipse, note and the
+  source names) as hints, and the glasses accept near-misses ("to the scope", "tele scope",
+  "telescopes", "the telescope", "tell a scope") only alone or before a source name; anything
+  else stays a prompt to Claude.
+- **No blank cards in Russian.** A text box on the G2 holds about 999 bytes and Cyrillic takes
+  two bytes a letter, so every box stays under 990 bytes: a scrolling window shows fewer rows when
+  its lines are dense (swipes still skip nothing), the live feed keeps its newest lines.
+
+### Speech out, and the thinking label (2026-10-16)
+
+- **Read aloud with Soniox** instead of the Mac's voices (owner: "I would add today [Soniox TTS]
+  instead of TTS that is configured in settings"). Same key as listening; natural voices, Russian
+  included; it streams, so speech starts while Claude is still writing. The Mac's voices stay as
+  the fallback (no key, offline) and as a choice in Settings → Voice.
+- **The phone plays the glasses' speech** (owner: "it's not possible to send speech from Even
+  app ... send speech via Android application ... connect its audio device, like headphones").
+  The Even app's web view only makes sound after a touch on the screen, so with the phone in a
+  pocket it stayed silent. The Hypernova app plays it natively, through headphones if connected,
+  in the background, and reports progress back, so text on the glasses stays in step and a risky
+  command counts as heard only when it was played to the end.
+- **You can see when it speaks** (owner: "some label or logo animations ... like audio wave ...
+  both on Android application, on glasses, so everywhere"): a small wave (a pulsar's beat, in the
+  cosmos look) that moves with the voice's real loudness on the message being read, in the status
+  line and a "Speaking · Stop" bar on the phone, in the glasses' header, and on the Mac popover's
+  session row; flat and gone when it stops.
+- **Thinking shows it's alive** (owner: "make this thinking label colored or fading ... when it's
+  finished it should be just constant color"): while Claude thinks, the label shimmers between the
+  accent colours; when it's done it settles to one colour ("Thought for 12s"). Reduce Motion: a
+  steady colour.
+
+### The owner's answers (2026-10-16)
+
+1. Soniox keeps getting recent project names (up to 20) as hints. **Keep.**
+2. The Hyperscribe Companion link is hidden until it has a public page; setup offers Soniox only.
+3. Eclipse lets the Mac's low-battery and 2-minute sleep warnings through, besides needs-you.
+4. Moving mode still shows a Telescope picture whole: you asked for it. **Keep.**
+5. A risky card still needs the risky verb ("approve push") by voice, moving or not. **Keep.**
+6. Planet names come back around the black hole once the disk forms. **Keep.**
+7. Backpack gets an "extend": before its 8 hours end, a pop-up on the phone, the Mac and the
+   glasses offers "+2 h".
+8. One battery-warning rule for the Mac, the phone and the glasses: **20%** when not charging.
+   (Stay awake's guard, which lets the Mac sleep, stays at 15%.)
+9. After a new session from the glasses, they open its live view (double tap goes back).
+10. Sessions cut by a restart stay on Home whether started on the phone or in a Mac terminal.
+11. Quick prompt chips send on a tap. **Keep.**
+12. The glasses' send count (2 s, +1 s a line, 8 s at most, a swipe pauses it). **Keep.**
+13. "Rewind the code too": yes, later, as a separate and clearly warned option (LATER).
+14. A limit that continues by itself offers both "Don't" and "Continue now".
+
+### Tips on the glasses (2026-10-16)
+
+The owner: "add tips for glasses application where we could see some advice how can we use the app
+in a more productive way ... the phrases like 'Telescope' — so this phrases we use to activate some
+functions". A tip teaches **one spoken phrase and what it does**; the guide teaches the gestures.
+
+- **The phrase first:** `"telescope terminal" · the Mac's terminal on your lens`. One line, the
+  phrase bright, what it does dim.
+- **Every voice command has a tip**, and a test keeps it so (a new command without a tip fails;
+  a tip whose phrase the glasses don't understand fails): telescope (terminal, emulator, phone,
+  simulator, web, localhost 3000, window, image), watch, show diff, what changed, status, read
+  it, debrief, note, continue, plan first, go ahead, approve + its verb, option two, send, never
+  mind, stop, moving, still, eclipse, backpack, extend, let it sleep, battery, mute, guide.
+- **At the moment it's useful**, one dim line under the card, never a pop-up: a dev server
+  running → "telescope localhost 3000"; tests running → "telescope terminal" then "watch";
+  files changed → "what changed" / "show diff"; a long reply → "read it"; the Mac on battery
+  with its lid closed → "backpack"; back after a long gap → "debrief"; Claude stopped → "continue".
+  Each retires after three showings, or for good once the owner has said it.
+- **One phrase of the day** on the quiet main screen (nothing working, nothing needs you); never
+  during needs-you, a risky card, speech or Eclipse.
+- **"What can I say?"** (also "tips", "commands", "help"): every phrase, grouped (Talk, Approve,
+  Watch, On the move, Your Mac), scrolling, never pages; the same list on the phone companion
+  page, where tips can be turned off.
+
+## Automations, speech and the answers, built (2026-10-16)
+
+**Automations** (docs/specs/spec-automations.md; the owner: "we can build it today")
+- Four tabs: Sessions, History, Automations, Settings; Statistics opens from the sun. The editor
+  writes a plain-English sentence; templates lead with the five around limits (When I hit the
+  limit, Do it when I have budget again, Night shift, Carry on after the limit, Switch provider
+  at the limit), then Morning brief, Weekly debrief and the rest.
+- **Never on paid usage, never the owner's work.** A run waits for a limit's reset or is
+  skipped, also when usage credits would carry Claude on, and one that crosses onto credits
+  stops. Anything that would run on a provider other than the built-in one (starting a session
+  there, or continuing one that is on it) needs the owner's "This costs money" on every save.
+  An automation closes only terminals it started; it never forks a session open in a plain
+  terminal, and its own continues don't trigger it again.
+- "Allow next time" reads refusals from the transcript: Claude Code 2.1.301 doesn't fire its
+  PermissionDenied hook for dontAsk refusals (recorded in a test fixture).
+- Run now never uses up "only the next time". A missed "every N hours" time is caught up only
+  within N hours. A run that works or needs you keeps the Mac awake through Stay awake.
+- The Mac: one quiet line under SESSIONS (next run, the run working, or "Automations paused"
+  with Resume), an AUTO tag, and a "Run automations" switch; no editor. The glasses: a note is a
+  card "AUTOMATION · <name>" on the glance or a pop-up otherwise, read aloud if reading is on,
+  quiet in Eclipse; a note older than 5 minutes when the glasses first see it isn't shown.
+
+**Speech** (Soniox `tts-rt-v2` over its real-time WebSocket, the listening key)
+- Speech starts with a short first piece and streams. The Mac's voice reads when Soniox can't
+  (no key, refused, offline, silent for a few seconds, a failure mid-reply, from the word it got
+  to). Square brackets are read as text, never as stage directions.
+- One setting on the Mac, set from the phone: engine, voice, speed (0.8×–1.3×), Test, and "Glasses
+  speak through this phone" (per phone, on by default). The phone plays through its current
+  output with music ducked, screen off, a media notification with Stop, and stops for a call or
+  unplugged headphones. A risky command counts as heard only when the phone played its last
+  sample. No app, or one that doesn't start within 12 s: the glasses play it themselves.
+- The speaking wave: see DESIGN "Speaking wave".
+
+**The owner's answers**
+- (2) The Companion offer is hidden behind one flag per app. (3) Eclipse lets the Mac's low
+  battery, its 2-minute sleep warning and Backpack's "ends soon" through. (7) Backpack offers
+  "+2 h" in its last 10 minutes (`{t:"mac_backpack_ending"}`, POST /v1/mac/awake {extend:true}),
+  repeatable; the battery and heat guards still apply. (8) One low-battery rule: 20% when not
+  charging, re-armed above 25%. (9) A new session from the glasses opens its live view. (14)
+  "Don't" and "Continue now" side by side. (15) The thinking label pulses between accent dim and
+  bright (about 1.8 s) and settles to one colour when done; steady under Reduce Motion and
+  battery saver.
+
+**Glass everywhere, and the voice's light curve** (the owner, 2026-10-16)
+- "Please check all the buttons, chips in the app so we have glass style everywhere": every
+  button and chip is frosted glass with no outline ring and no solid slab. Primary is mint-tinted
+  glass with a mint label, Danger red-tinted, Outline neutral, Ghost fainter; the floating New
+  session / New automation is dense glass with a mint "+" lit from inside (the solid mint pill
+  "doesn't match the application's style"). Cards, sheets, fields, tables and widgets keep their
+  own surfaces.
+- "When we record audio through STT ... see kind of space audioform changing when someone speaks
+  louder or silent": the dictation capsule's seam is the voice's light curve, 2.4 s of it, the
+  newest by the timer: faint star-dots in silence, mirrored strokes of light as the voice rises,
+  a glint on the loudest. Under Reduce Motion it stands still and steps four times a second.
+
+## Direction: open source, self-hosted, Tailscale inside (2026-10-16)
+
+Not built yet; the plan after the weekly reset (Oct 21).
+- **Open source, entirely** (the owner: "making it entirely open source is fine"). Before the
+  launch: a licence for the rest of the repo, an install on a clean machine, one security review
+  of the whole remote surface plus `SECURITY.md`, and Anthropic's current terms checked.
+- **Claude Code stays the engine.** Hypernova drives the official Claude Code, so a Claude
+  subscription stays legitimate. Since April 2026 Anthropic has kept third-party tools like
+  OpenClaw off subscription limits. Hypernova never touches Claude Code's login tokens, and the
+  Agent SDK fallback is limited to API keys.
+- **Self-hosted, like OpenClaw or Hermes:** the daemon runs on your Mac or on any always-on
+  Linux machine or VPS. Linux is command-line only: `hypernova setup`, `pair` (prints the QR
+  code), `status`, `doctor`, `logs`. The main route is an install script plus a service, with
+  Docker as the quick way to try it. Safe by default: it listens only on the machine itself and
+  is reachable only through the tailnet, never on a public port.
+- **Tailscale inside the apps** (the owner: "we'll have tailscale built into native apps"): the
+  daemon and every native app carry Tailscale (`tsnet`). Setup on the server shows the sign-in
+  links as QR codes. The app scans the pairing code, then signs in with the same account. There
+  is no Tailscale app to install and no server of ours to run. Self-hosters can use Headscale.
+  The glasses reach the server through the Hypernova app on the same phone. **Tested on the
+  owner's Android phone (2026-10-17, Lens 0.1.5):** the Even app serves Lens from
+  `http://127.0.0.1:<port>`, and its web view reached the Hypernova app's loopback server
+  (127.0.0.1 and localhost, both 200 in 16–25 ms) with the addresses in the Lens whitelist. So on
+  Android a loopback bridge in the Hypernova app is enough (no VPN mode). On iOS the app is
+  suspended in the background, so VPN mode (a tailnet-only system VPN) is the plan there.
+  The whole chain worked too: Lens → the app → the Mac's `/v1/health`, 200 in 434 ms.
+- **Lens talks only to the Hypernova app** (decided from that test). Lens and the app exchange
+  everything on the phone over loopback, with no network; the app holds the one connection to
+  the server. So one public Lens build works for everyone: its whitelist only needs
+  `127.0.0.1:47380`, never a user's tailnet name. The glasses need no pairing of their own, and
+  they keep the app's state through network drops. Any app on the phone can reach loopback, so
+  the bridge needs a one-time "Allow Hypernova Lens to connect?" in the app before it does more
+  than ping.
+  - **After its security review (2026-10-17)** the bridge takes pages only from the Even App's Lens
+    origin (`http://127.0.0.1:<port>`): never `null` (sandboxed frames, `data:` and `file:` pages)
+    and, in the APK the Mac hands out, never a private network address (captive portals, routers);
+    a Lens developer's own build may opt in. It carries nothing without a token but a Telescope
+    picture and the previews a granted Lens opened, only to be looked at, and only to the paired
+    computer. A Lens's grant belongs to the pairing it was made under (Forget or pairing again ends
+    it), and Allow on a locked phone needs unlocking. The voice and speed of the glasses' speech
+    are the Mac's (Settings → Voice → Read aloud, for phone and glasses at once), so Lens's own stay
+    at their defaults on purpose. PROTOCOL.md, "The phone bridge", has the details.
+  - **After its second review (2026-10-17)**: any app can take the port while Hypernova doesn't
+    hold it (after a reboot, say), so nothing Lens sends there is worth having. Lens and the app
+    agree the token at Allow (an X25519 exchange with a six-digit code both work out, compared by
+    the owner) and it never travels: each call is signed with a key made from it, body and all, for
+    one listener, once, within a minute, and Lens signs only for a listener that proved it holds the
+    key, and takes only answers proven with it (status and body). After Allow on the phone, one tap
+    on the glasses ("Allowed on your phone? Tap to connect") keeps the new token: another app on the
+    port could say "allowed" by itself. The app keeps retrying a busy port and says so meanwhile.
+    Plain HTTP on loopback still can't keep a relay from reading (PROTOCOL.md says when one can).
+- **Start coding in a few clicks** (the owner, 2026-10-17: "a user clicks several download
+  buttons and starts coding in few moments"). Every end carries Tailscale; the user signs in with
+  one account on the computer (Mac, Linux, later Windows) and on the phone, and sets up nothing
+  else.
+  - **Local first, automatically:** Tailscale already takes the direct path when both devices
+    share a network. That includes the phone's hotspot with the Mac on it, where the phone is
+    the router, and it falls back to the internet route when you walk away. For no signal at
+    all, Hypernova adds its own direct local connection, encrypted and pinned to the computer's
+    identity from the pairing code.
+  - **The computer's setup:**
+    1. Only the essential permissions (background service, local network, notifications); the
+       rest when a feature first needs it, such as Screen Recording for Telescope. A
+       Permissions page shows their status.
+    2. "Sign in to connect your devices" (Tailscale).
+    3. "Sign in to Claude": Hypernova installs Claude Code with Anthropic's official installer
+       and opens its own login.
+    4. Optional: GitHub, for cloning projects.
+    5. Then the code.
+  - **The code** is a QR code drawn as a star field (the dots are stars, the corners ringed
+    planets; it still scans), and the moment of pairing is animated on both screens, like
+    pairing an Apple Watch. A custom "constellation code" (like App Clip codes) is for later.
+  - **Also:** pairing without a camera on the same Wi-Fi (found automatically, the same small
+    constellation on both screens to confirm), several computers in one app, removing a lost
+    phone, auto-updates for the computer app, and a Doctor page with fix buttons.
+- **Clients from one Kotlin codebase** (Compose Multiplatform): Android, iOS, Windows and Mac
+  desktop, and a web app (PWA) the daemon serves. iOS needs a small push relay (or ntfy) for
+  "needs you" with the app closed. Android keeps its connection, and the web app uses Web Push
+  straight from the daemon.
+- **Order:** a 1–2 day prototype (Tailscale in the Linux daemon, in the Android app, Lens
+  through the phone), the Linux daemon and its commands, Android with Tailscale inside, then
+  the shared Kotlin code for iOS, desktop and the web.
+- **First: Hypernova on a VPS** (the owner, 2026-10-17: "we should first suggest users an
+  opportunity to install the daemon on their VPS ... so we have more audience"). The Linux daemon
+  comes before Hypernavigate's city packs. Why Hypernova exists, in his words: "I didn't really
+  like the experience of using Claude Code ... I wanted something my own." 
+- **The owner's comments on the plan (2026-10-17):**
+  - Hypernova installs Claude Code itself; the user only signs in.
+  - The glasses app stays simple: its phone page is one status card, and the glasses' settings
+    live in the Hypernova app.
+  - Speech runs on the device only, chosen in setup with guidance (the owner: "Device only ...
+    multiple choice or skip at all ... similar with TTS"):
+    - **Voice input:** Nemotron 3.5 ASR on the phone, Soniox, or the phone's built-in
+      recognizer. Skip means no mic in the app or on the glasses.
+    - **Read aloud:** a voice model on the phone, Soniox TTS, or the phone's built-in voice.
+      Skip means no read-aloud.
+    - The server never handles audio or speech keys; Soniox calls move to the phone.
+  - Hypernavigate is postponed until he decides.
+- **How the phone reaches the computer (2026-10-17):** the owner pointed out that VPNs drop
+  connections (Claude Code dislikes that), that Android allows one VPN at a time (iOS too), and that
+  a VPN's traffic can be filtered on some networks.
+  - Claude Code runs on the computer that hosts Hypernova (a Mac or a Linux server); the phone
+    only reaches that computer.
+  - Three connection types: the local network (or the phone's hotspot), direct HTTPS for a
+    server with a public address, and built-in Tailscale for a Mac at home reached from
+    outside. Hypernova never takes the phone's VPN slot.
+  - Direct HTTPS: a self-signed certificate pinned by the pairing code needs no domain. Real
+    names come from a domain the owner buys: random `<name>.hypernova.<tld>` per server via a
+    free Cloudflare Worker, Let's Encrypt by DNS check, the Public Suffix List applied for
+    early. On a public port, nothing answers without a device's pairing key.
+  - **The domain is `hypernova.observer`** (bought by the owner at Cloudflare Registrar,
+    2026-10-17), only for users' servers: `<random>.hypernova.observer`, the whole domain on
+    the Public Suffix List, a static page at its root.
+  - A day-long test from a phone on mobile data to a server decides the default.
+- **What the network tests showed (2026-10-17, a phone on mobile data, a server on a public address):**
+  - Plain HTTPS to the server opens, then freezes after a few KB on mobile data.
+  - Through Cloudflare it doesn't load at all.
+  - Home Wi-Fi passes everything.
+  - **Tailscale held on mobile data with no VPN** (no drops, about 100 ms); a VPN
+    worked but reconnected three times in two minutes.
+  - So **Tailscale (built in) is the main route from outside**; direct HTTPS is for the local
+    network and hotspot (shipped: the Local route) and for places without such filtering; the
+    app keeps whichever route works.
+  - Hypernova adds no protocol of its own to disguise traffic. It rides on whatever route
+    exists and handles gaps instead: reconnects by itself, queues prompts and taps made offline,
+    and catches the owner up afterwards.
+  - The Mac is no longer required. A server is a VPS or one's own computer (iOS builds,
+    emulators, USB hardware, more power), and one app can switch between several.
+- **The owner's choices (2026-10-17, night):**
+  - **Licence: Apache-2.0** for everything outside `lens/` (LICENSE, NOTICE); Lens stayed AGPL
+    while it carried the Companion client (until 0.1.11; Apache-2.0 since the morning answers).
+  - **Hyperscribe's first public release is 1.0.0.**
+  - **Hyperscribe Companion gets real installers:** a .dmg for the Mac, an .exe for Windows, an
+    AppImage for Linux.
+  - **His website goes on Cloudflare Pages.**
+
+## Links that open the app, and firmware text on the glasses (2026-10-18)
+
+- **Hypernova links open in Hypernova** (the owner: "hypernova links don't open in hypernova"):
+  phone cameras and Google Lens don't open `hypernova://` from a QR code, and Lens runs in the Even
+  App's web view, which hands no link of another app's to Android (and the Even Hub SDK has no way
+  to open one). So:
+  - The pairing QR code is `https://hypernova.observer/pair#<the app link's parameters>`, an
+    Android App Link (the domain's `assetlinks.json` from the name service's Worker, the signing
+    keys' fingerprints a Worker var). The details are in the fragment, which never reaches the
+    site; without the app (or before Android has verified the domain) the site's page hands over
+    with an `intent://` link and says how to get the app from the computer. `hypernova://` keeps
+    working.
+  - Lens's **Open Hypernova** asks the app through the bridge (`POST /bridge/open`), which opens
+    Settings → Glasses when it's on screen and otherwise puts up "Tap to open Hypernova" (Android
+    starts an app from the background only on a tap). Without access Lens says to open Hypernova
+    on the phone.
+- **Firmware text on the glasses is the default** (the owner, on real G2 glasses: "let's use
+  firmware text on glasses, because responsiveness really sucks with images"). The glasses' own
+  font is the default look in Lens, in the app's Settings → Glasses and in the bridge's settings;
+  "Type on the lens" keeps the drawn Hypernova look as an option. Settings kept before this take
+  the new default once (until now every save wrote the drawn look, chosen or not). Lens 0.1.10.
+
+## One design across phone, Mac and glasses (2026-10-18)
+
+- The owner: "we should also update Hypernova Lens when we are finished with the Android
+  application. And we should also do the same with application for Mac because design differs."
+  The Android app leads (the calm sky, projection meters, drawn metadata instead of "·"-joined
+  text, the new Start-a-session sheet). Once its current work lands, the Mac menu-bar app and
+  Lens get a pass to match it: the same words, order, states and meters, each within its medium
+  (Lens in the glasses' own text, so drawn chips become clear spacing and short phrases there).
+
+## The sky, physically true (2026-10-18, night)
+
+The owner, before sleeping: "Think about how can we make this solar system better in terms of
+physics … I don't think that's star-borns … after black hole dies … this should be truly from
+physics point of view, but still, which would reflect the limits and so on, usage for instance.
+So everything should be overthought."
+
+What was wrong: a sun-like star never goes supernova or leaves a black hole (that needs more than
+about eight solar masses at birth, twenty or more for a hole); a stellar black hole evaporates in
+about 10^67 years and nothing is reborn from one; a red giant doesn't come back to the main
+sequence. And the limit cycle must be periodic, because the window resets.
+
+- **The sun is an accretion disk: a white dwarf fed by a companion, the dwarf-nova cycle.** The
+  disk is the 5-hour window. Its hot part is the budget left (spent from the rim inward, as a dwarf
+  nova's disk cools from its rim in, by area); its light is the spend rate (accretion luminosity is
+  the accretion rate: knots spiral in and the inner edge glows while something works, nothing moves
+  at rest); the limit is the disk gone quiet (cool, dim, red, the white dwarf a point, the stream's
+  bright spot the brightest warm thing); the wait is the stream refilling it (`REFILLS IN 0:24`);
+  the reset is the outburst, a heating front sweeping in from the rim; the donor goes once round
+  per window, so it is the window's clock like the ring's time arc. The white dwarf survives it
+  all. Everything has a real name and a real analogue (SS Cygni, U Geminorum; the disk-instability
+  model), and the cycle is periodic by nature. Built; the look is in DESIGN.md ("The sun is an
+  accretion disk").
+- **Weighed and not chosen:**
+  - *A recurrent nova* (T CrB, RS Oph: hydrogen piles up on a white dwarf and ignites every
+    decades). Periodic and honest, but the quantity that builds is an invisible surface layer, so
+    usage would have had no picture of its own, and the eruption would have made the limit the big
+    bright event again, with the wait a fading fireball: "you're out" read as a spectacle.
+  - *A Cepheid's pulsation* and *an eclipsing binary*: periodic, but clocks. Nothing in them is
+    spent and nothing reaches a threshold at the user's pace; the window's clock is already the
+    ring's time arc (and the eclipse is already the sign-out). Kept only as what they are: the
+    donor's orbit is the clock.
+  - *Main sequence → red giant → planetary nebula → white dwarf*: true, one-way. Nothing makes it
+    periodic short of star formation from enriched clouds over millions of years.
+  - *A planet's day or seasons*: honest periodicity, but time again, not spending; and a horizon
+    would have replaced the whole sky.
+- **The meter stays the source of truth.** The ring and its number are unchanged; the disk is the
+  mood. Nothing in the physics forecasts the limit; the pace arc and the notch do.
+- **Only working things move.** The knots flow only while something spends; a quiet disk through
+  the wait and a full disk at rest ask for the far sky's slow frames only (the old hole's disk
+  turned at 30 a second through the whole cooldown). Measured idle Home costs the same as before.
+- **Kepler everywhere something goes round:** the knots, the moons' shells (6 s inner, slower
+  outward by (r/r₀)^1.5), the donor. Planets keep their fixed places: at their distance a year is
+  days, so nothing of their orbits shows in five hours, and the labels' slots stay put.
+- **The week: the honest low state** (replaced the heat death and the Big Bang kept here at first,
+  by the owner's answer of 2026-10-18, "The owner's morning answers" below). At the weekly limit
+  the donor's stream stops (a VY Sculptoris low state) and the disk drains to nothing in one short
+  transition, the white dwarf a faint point with the donor still on its orbit; nothing else in the
+  sky ends. The meters and the line under the sun (`REFILLS IN 2d 4h`) say the wait. At the week's
+  reset the stream returns, refills the disk, and it ignites as at the 5-hour reset. The week
+  still outranks the 5-hour window. Built on the phone, the widget and the glasses (DESIGN.md,
+  "The week"); the Mac draws no sun.
+- **Per-model weeks** stay on the meters: a model's week is a slice of the same budget, not a
+  second reservoir. **Mac asleep / paused / stale numbers:** nothing is measured, so the disk and
+  the ring hold as last seen.
+- **The Mac and the glasses follow in the "One design across phone, Mac and glasses" pass**
+  (DESIGN.md says what each becomes: the widget's star becomes the disk; Lens's `hole` mode becomes
+  `quiet`, its `limit-jets` scene goes, `pop-lifted` draws the outburst; "reborn" becomes "refills"
+  everywhere). The hyper-cosmos skill's Solar copy is older still and needs the new sky files
+  (LATER L44).
+
+## The owner's morning answers (2026-10-18)
+
+The overnight log of 2026-10-18 left seven calls. The owner, in the morning:
+
+1. **The week: the honest low state.** "Switch to the physically honest one." At the weekly limit
+   the donor's stream stops (a VY Sculptoris low state) and the disk drains to nothing; no stars
+   burn out and there is no Big Bang. Until the week resets the white dwarf is a faint point in
+   an unlit disk; then the stream returns and the disk ignites (the outburst). Replaces the heat
+   death and the Big Bang of 2026-10-16 ("The sky, physically true" above).
+2. **The fingerprint (or the screen lock) on every "Always" and on switching to Bypass** stays:
+   "Yeah. Do it." Everywhere a phone can give either: the chat, the start sheet, automations' No
+   asking. The glasses can't check a fingerprint, so Lens offers Allow and Deny, not Always.
+3. **The chat's status bar stays while an approval waits** (amber, saying what it waits on), instead
+   of stepping aside for the approval card.
+4. **Browsing a session's folder outside the projects folder** (such as `~`): "allow … but this should
+   be turned on in settings. So, it's up to user." A setting, off by default; secret files and key
+   folders stay locked whatever it says (LATER L60).
+5. **Lens drops Hyperscribe Companion's client**: voice goes through the Mac (Soniox) only, and Lens
+   takes the repository's licence, Apache-2.0 (LATER L68).
+6. **A release signing key: later** (LATER L65).
+7. **The n8n-style workflow builder: build it**, as `docs/specs/workflows.md` lays it out and in its
+   order of work.
+
+## The owner's afternoon answers (2026-10-18)
+
+Asked as multiple choice after the morning's work shipped:
+
+1. **Build four practices from the competitor study** (scratchpad audit, "Top 15"): a worktree per
+   session (an "isolated copy" switch on New session, with What changed and clean-up), a pull request
+   from the phone (Push, Open pull request through `gh`, the checks' state, "Ask Claude to fix this
+   comment"), watch-only sharing (a device or link that can follow a session but not answer or type),
+   and an offline prompt queue (prompts typed while the Mac is away send themselves when it's back).
+   The owner also asked about n8n: the n8n-style workflows were built this morning ("The owner's
+   morning answers", 7); n8n itself can fire a workflow through its webhook trigger and receive its
+   results through a plain POST output.
+2. **Sessions that carry on at a reset start staggered**, one every 2 minutes, oldest first (LATER L67).
+3. **"Always" shows its rule** before the tap: the card and the fingerprint prompt say exactly what
+   gets allowed for the session (LATER L72).
+4. **Deleting a provider is a soft delete with Undo**; its sessions keep saying which provider they
+   ran on (LATER L61).
+
+
+## Codex as a second agent (2026-10-21)
+
+The owner wants Claude Code and OpenAI Codex in one app. A first attempt by another assistant
+(2026-10-19) never worked: every new Codex thread was resumed before Codex had written it down
+(`no rollout found`), the shell's `codex` was taken over and failed on those threads, and broken
+records retried forever. It is kept on the branch `archive/chatgpt-codex-2026-10-19` and not merged.
+Agreed with the owner: rebuild it, with switching mid-conversation and Codex automations. The
+app-server facts it rests on are in `docs/specs/codex-app-server.md`; the contract in PROTOCOL.md,
+"Codex" and "Switching agents".
+
+1. **Codex's own shared app-server, never a server of Hypernova's.** The daemon is one client of it
+   (`codex app-server daemon`), so Codex sessions and their terminals outlive daemon restarts.
+2. **Nothing changes for a Claude-only computer**: no Codex: `snapshot.codex` is null and no session
+   carries `agent`. The daemon reaches Codex only while the owner uses it (Setup's switch, or the
+   first Codex session from the phone), with backoff, and no per-session retry loops.
+3. **Codex 0.163.0 or later**, not one exact version: the handshake tells whether a later one still
+   speaks the protocol. Hypernova never installs or updates Codex; Setup says how.
+4. **A Codex session is a Codex thread** in its own sandbox: Read only or Can edit, Codex asking for
+   more on request. Approvals race with a terminal as Claude's do. Rewind, providers, auto-continue
+   and terminal menus are Claude Code's only.
+5. **The protocol only grows**: `agent`, `switchedFrom`/`switchedTo`, `snapshot.codex` and
+   `{t:"codex"}`; no protocol version, so no client of before breaks.
+6. **A switch is a new session of the other agent**, seeded with the text the owner read and edited
+   (Recent, Entire, None), running nothing until the next message, and linked to the old one. A
+   terminal showing the old one follows to the new one.
+7. **The shell's `codex`** runs in a shared terminal only once Codex is on for Hypernova, and plain
+   codex whenever anything is off (exit 97), as `claude` does.
+8. **Codex automations** are a start step on Codex (`providerId: "codex"`) in its sandbox, asking
+   nobody, gated on Codex's account. Hook and limit triggers stay Claude Code's (LATER L81).
+
+## Claude Code and Codex as equals (2026-10-22)
+
+After the first Codex install the owner asked: why there's no Codex in Providers; why a new session
+offered "GPT Sol" and the session then said "Astra"; why Claude's card says "Usage" and Codex's "Codex
+usage"; why Statistics (and much else) say only Claude; whether the solar system counts Codex;
+whether the app has different scenarios for Codex, Claude, or both; and that the widgets should know
+both. The calls, one rule in every client (PROTOCOL.md, "Codex", Which agent leads):
+
+1. **The leading agent** is Claude Code where it's installed, else Codex. The sun, the widget's star
+   and Lens's orrery follow the leading agent's usage. The other agent, while in use, is a second
+   star in the sky with its own sessions around it; OpenRouter and other providers keep the white
+   dwarf. A new session with no agent named goes to the leading agent.
+2. **Usage**: "Claude usage" and "Codex usage" whenever both are in use; plain "Usage" when only one
+   is. Codex only: its card is the usage card, with no Claude card waiting for numbers.
+3. **Providers becomes "Agents & providers"**: an Agents section (Claude Code and Codex: installed or
+   not, version, account, Codex's on/off switch, from the phone too: `POST /v1/codex`) above Claude
+   Code's providers, which stay Claude Code's.
+4. **The models' default is the owner's own**: Codex's pickers mark the model and effort in
+   `~/.codex/config.toml` as the default (what a thread starts on), not `model/list`'s.
+5. **Statistics count both agents**: totals over both, `byAgent` splitting them, `days[].codexMs`
+   for the chart. Codex's are the turns Hypernova followed, counted as each ends (Codex's own
+   rollouts aren't read: LATER L84). "This week…" says "your agents" or "Codex" when Codex worked.
+6. **Wording**: wherever "Claude" meant "the agent", it's the session's agent (Codex sessions say
+   Codex) or neutral ("the reply", "your agents"). What is truly Claude Code's (its account, its
+   install, its providers, Rewind) says "Claude Code", and Rewind isn't offered on Codex.
+7. **Codex only works**: a Mac with Codex and no Claude Code gets no Claude nags or cards, Setup has
+   a "Use Codex only" path, the shell's `codex` function goes in when Codex is turned on, and new
+   sessions, automations and Lens's typed prompt go to Codex.
+8. **Claude-only users see no change**, but for the Agents section listing Codex as not installed.
+
+## Going public: the first release, 0.2.0 (2026-10-22)
+
+The owner asked to push to GitHub, make the first release (Mac DMG and Android app), a new film, a
+project site and a search presence, after checking the Mac install, that nothing personal is in the
+repo, and that Linux is told as a way to run Hypernova, not only Android and Mac.
+
+1. **A fresh repository with one commit.** The working history (390 commits, in which the owner,
+   the agents and the notes were mixed) stays in a private archive; the public
+   `prudnik-web/Hypernova` starts from a single squashed commit whose author is the GitHub noreply
+   address, so no e-mail is in it. Nothing from the old history can be reached by a SHA.
+2. **Three ways to host, two ways to hold it.** The computer that runs the agents is a Mac (the menu
+   bar app), a Linux server or VPS (`hypernova`) or Docker; the clients are the Android app, the
+   glasses and, on a Mac, the menu bar. Every page, the README, the site, the film and the GitHub
+   description say so; no text implies "Android and Mac only".
+3. **Release files have fixed names**, so `releases/latest/download/<name>` links never change:
+   `Hypernova.dmg`, `Hypernova.apk`, `Hypernova-linux.tar.gz`, `Hypernova-Lens.ehpk`,
+   `SHA256SUMS.txt` (`scripts/release.sh`, docs/RELEASING.md). The same files are served from the
+   project site (hypernova.nikbraun.tech) for a direct download.
+4. **The APK is release-signed with a dedicated key** (R8-minified, not debuggable), kept outside the
+   repository in `~/.hypernova-signing/` and backed up by the owner. The debug build is for
+   development only. Phones with the debug build reinstall once.
+5. **The Mac app is ad-hoc signed and not notarized** until there's a Developer ID (L6). The DMG says
+   how to allow it. It bundles no Anthropic binary: the Agent SDK's own Claude Code binaries are left
+   out, the daemon always runs the user's installed `claude`.
+6. **Node.js: 22.18 or newer, and 24 (LTS) is what the installers fetch** (L64 closed). Node 25 is an
+   odd line past its end of life; the Mac already took the newest LTS, and the Linux installer now
+   takes the same line.
+7. **Codex is set up on a server too** (`hypernova codex [on|off]`, `status`, `doctor`), with Codex
+   alone as a complete install.
+8. **Found, not bought**: a project site with guides for the words people search, a sitemap,
+   structured data, `llms.txt` and an IndexNow submission; no paid promotion, no accounts made for us.
+

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A session a restart of the Mac ended (its terminal went with it): Home keeps it, and writing resumes it. Its chip draws the resume arrow in place of its point. -->
+    <string name="state_mac_restarted">Mac restarted</string>
+</resources>

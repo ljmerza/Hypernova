@@ -1,0 +1,7 @@
+Hypernova
+Copyright 2026 Nikita Prudnikov (prudnik-web)
+
+Licensed under the Apache License, Version 2.0 (see LICENSE), except:
+
+- third_party/ keeps its own licences: the Manrope and JetBrains Mono fonts under the SIL Open
+  Font License 1.1, and xterm.js and its fit addon under the MIT License (see the files there).

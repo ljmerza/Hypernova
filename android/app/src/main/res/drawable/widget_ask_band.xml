@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "NEEDS YOU": the filled amber band across the top of the approval block (from Hypernavigate). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners
+        android:topLeftRadius="@dimen/widget_inner_radius"
+        android:topRightRadius="@dimen/widget_inner_radius" />
+    <solid android:color="@color/widget_amber" />
+</shape>

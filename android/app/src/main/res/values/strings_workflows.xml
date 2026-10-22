@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Workflows: automations with steps, guards, outputs and a budget (ui/automations/, data/Workflows.kt;
+     docs/PROTOCOL.md, "Automations", "Workflows"; docs/specs/workflows.md). Phrases, never "·"-joined. -->
+<resources>
+    <!-- The sentence: its trigger, its first step and how many follow, then where the result goes. -->
+    <string name="wf_sum_more">%1$s, %2$s, then %3$s</string>
+    <plurals name="wf_more_steps">
+        <item quantity="one">%d more step</item>
+        <item quantity="other">%d more steps</item>
+    </plurals>
+    <string name="wf_sum_outputs">When it\'s done, %1$s.</string>
+    <string name="wf_told_notify">notify me</string>
+    <string name="wf_told_notify_glasses">notify me and my glasses</string>
+    <string name="wf_told_say">read it aloud on my glasses</string>
+    <string name="wf_told_webhook">post it to %1$s</string>
+    <string name="wf_told_file">add it to %1$s</string>
+    <string name="wf_preset_ntfy">ntfy</string>
+    <string name="wf_preset_slack">Slack</string>
+    <string name="wf_preset_discord">Discord</string>
+    <string name="wf_preset_telegram">Telegram</string>
+    <string name="wf_preset_post_said">a web address</string>
+    <string name="wf_or">%1$s or %2$s</string>
+    <!-- New triggers in the sentence. -->
+    <string name="wf_sum_webhook">When a script or a webhook fires it</string>
+    <string name="wf_sum_cron">On the schedule “%1$s”</string>
+    <string name="wf_sum_file_created">When a file is added in %1$s</string>
+    <string name="wf_sum_file_created_glob">When a file matching %1$s is added in %2$s</string>
+    <string name="wf_sum_file_changed">When a file changes in %1$s</string>
+    <string name="wf_sum_file_changed_glob">When a file matching %1$s changes in %2$s</string>
+    <string name="wf_sum_file_deleted">When a file is deleted in %1$s</string>
+    <string name="wf_sum_file_deleted_glob">When a file matching %1$s is deleted in %2$s</string>
+    <string name="wf_gh_pr_opened">a new pull request</string>
+    <string name="wf_gh_review">a review on my pull requests</string>
+    <string name="wf_gh_checks">failed checks on my pull requests</string>
+    <string name="wf_sum_github">When %1$s gets %2$s on GitHub</string>
+    <string name="wf_hook_who_mine">one of my sessions</string>
+    <string name="wf_hook_who_auto">an automated session</string>
+    <string name="wf_hook_who_any">any session</string>
+    <string name="wf_hook_who_in">%1$s in %2$s</string>
+    <string name="wf_hook_stop">ends a turn</string>
+    <string name="wf_hook_stop_failure">stops on an API error</string>
+    <string name="wf_hook_tool_failure">has a tool call fail</string>
+    <string name="wf_hook_tool_failure_named">has a %1$s call fail</string>
+    <string name="wf_hook_pre_compact">is about to compact its context</string>
+    <string name="wf_hook_session_end">ends</string>
+    <string name="wf_sum_hook">When %1$s %2$s</string>
+    <!-- New steps in the sentence. -->
+    <string name="wf_sum_ask">ask me “%1$s”</string>
+    <string name="wf_sum_ask_empty">ask me</string>
+    <string name="wf_sum_shell">in %1$s, run “%2$s”</string>
+    <string name="wf_sum_shell_empty">in %1$s, run a command</string>
+    <string name="wf_sum_target_step">the session from an earlier step</string>
+
+    <!-- The editor: When, Then, Tell, Budget. -->
+    <string name="wf_then">Then</string>
+    <string name="wf_tell">Tell</string>
+    <string name="wf_budget">Budget</string>
+    <plurals name="wf_steps_n">
+        <item quantity="one">%d step</item>
+        <item quantity="other">%d steps</item>
+    </plurals>
+    <string name="wf_add_step">Add a step</string>
+    <string name="wf_add_output">Add a place to tell</string>
+    <string name="wf_pick_step">What should this step do?</string>
+    <string name="wf_pick_output">Where should the result go?</string>
+    <string name="wf_tell_none">Nothing is sent when it\'s done; its runs still show here.</string>
+    <string name="wf_step_said">Step %1$d: %2$s</string>
+    <string name="wf_move_up">Move up</string>
+    <string name="wf_move_down">Move down</string>
+    <string name="wf_remove">Remove</string>
+    <string name="wf_expand">Show its settings</string>
+    <string name="wf_d_ask">Ask me</string>
+    <string name="wf_d_shell">Run a shell command</string>
+    <string name="wf_d_unknown">Something this app doesn\'t know yet</string>
+    <string name="wf_detail_continue">%1$s: %2$s</string>
+    <string name="wf_target_step_short">Its earlier session</string>
+    <string name="wf_t_step">The session from step %1$d</string>
+    <string name="wf_steps_section">Earlier steps</string>
+
+    <!-- A step's condition (its guard), about the step before it. -->
+    <string name="wf_condition">Condition</string>
+    <string name="wf_pick_condition">When should this step run?</string>
+    <string name="wf_g_none">unless the step before failed</string>
+    <string name="wf_g_ok">only if the step before went fine</string>
+    <string name="wf_g_failed">only if the step before failed</string>
+    <string name="wf_g_quiet">only if the step before had nothing new</string>
+    <string name="wf_g_not_quiet">only if the step before had news</string>
+    <string name="wf_g_contains">only if the step before mentions “%1$s”</string>
+    <string name="wf_g_contains_any">only if the step before mentions certain words</string>
+    <string name="wf_g_answer">only if the answer is %1$s</string>
+    <string name="wf_g_unknown">only if something this app doesn\'t know yet</string>
+    <string name="wf_g_words">Words to look for</string>
+    <string name="wf_g_words_note">Plain words, any case, anywhere in its whole reply or output; not a pattern.</string>
+
+    <!-- Ask me. -->
+    <string name="wf_question">Question</string>
+    <string name="wf_question_hint">Post this review?</string>
+    <string name="wf_answers">Answers</string>
+    <string name="wf_answer_hint">Another answer</string>
+    <string name="wf_add_answer">Add</string>
+    <string name="wf_remove_answer">Remove %1$s</string>
+    <string name="wf_default">If nobody answers</string>
+    <string name="wf_waits">It waits</string>
+    <plurals name="wf_rules_n">
+        <item quantity="one">%d rule</item>
+        <item quantity="other">%d rules</item>
+    </plurals>
+    <string name="wf_minutes">%1$d min</string>
+    <string name="wf_ask_note">Your phone and glasses ask; the first answer counts. The run keeps its slot while it waits.</string>
+
+    <!-- Run a shell command. -->
+    <string name="wf_command">Command</string>
+    <string name="wf_command_hint">npm test</string>
+    <string name="wf_timeout">Stops after</string>
+    <string name="wf_seconds">%1$ds</string>
+    <string name="wf_shell_note">Runs with /bin/sh in the project folder, without a terminal. Words from other sessions or a webhook reach it only through its environment.</string>
+    <string name="wf_shell_fingerprint">Saving it asks for your fingerprint, every time.</string>
+    <string name="wf_shell_title">Let an automation run commands</string>
+    <string name="wf_lock_needed">Set up a screen lock on this phone first: saving a command needs it.</string>
+
+    <!-- Placeholders, one line each. -->
+    <string name="wf_ph_project">{project}: the project\'s name</string>
+    <string name="wf_ph_session">{session}: the title of the session that fired it</string>
+    <string name="wf_ph_result">{result}: that session\'s last reply, two sentences</string>
+    <string name="wf_ph_ask">{ask}: what that session asks, like Bash: git push</string>
+    <string name="wf_ph_battery">{battery}: how full the Mac\'s battery is</string>
+    <string name="wf_ph_time">{time}: when it runs, like 9:00</string>
+    <string name="wf_ph_week">{week}: your week from Statistics</string>
+    <string name="wf_ph_prev">{prev}: what the step before said, two sentences, or why it failed</string>
+    <string name="wf_ph_exit">{exit}: the last command\'s exit code</string>
+    <string name="wf_ph_output">{output}: the last command\'s output</string>
+    <string name="wf_ph_answer">{answer}: the answer you gave</string>
+    <string name="wf_ph_payload">{payload}: what fired it: a webhook\'s body, the files that changed, GitHub\'s news</string>
+    <string name="wf_ph_other">Filled in when it runs</string>
+    <string name="wf_env_prev">$HYPERNOVA_PREV: what the step before said</string>
+    <string name="wf_env_payload">$HYPERNOVA_PAYLOAD: what fired it</string>
+    <string name="wf_env_output">$HYPERNOVA_OUTPUT: the last command\'s output</string>
+    <string name="wf_env_answer">$HYPERNOVA_ANSWER: the answer you gave</string>
+    <string name="wf_step_result">Step %1$d\'s result</string>
+    <string name="wf_ph_step">Step %1$d\'s result: what it said in two sentences, a command\'s last lines, or your answer</string>
+    <string name="wf_env_step">Step %1$d\'s whole result for the command: Claude\'s whole reply, a command\'s output, or your answer</string>
+    <string name="wf_budget_label">Budget</string>
+    <string name="wf_budget_of_min">%1$d of %2$d min</string>
+    <string name="wf_budget_of_pts">%1$s of %2$d points</string>
+    <string name="wf_budget_min">%1$d min at work</string>
+    <string name="wf_budget_pts">%1$s points of the 5-hour window</string>
+    <string name="wf_budget_said">Budget used: %1$s.</string>
+    <string name="wf_ph_step_gone">A step that isn\'t before this one any more: take it out, or move that step up</string>
+
+    <!-- Outputs. -->
+    <string name="wf_o_notify">Notify me</string>
+    <string name="wf_o_notify_glasses">Notify me and my glasses</string>
+    <string name="wf_o_say">Read aloud</string>
+    <string name="wf_o_webhook">A webhook</string>
+    <string name="wf_o_file">A file</string>
+    <string name="wf_ot_notify">Notify me</string>
+    <string name="wf_ot_say">Read aloud on my glasses</string>
+    <string name="wf_ot_webhook">Post to a webhook</string>
+    <string name="wf_ot_file">Add to a file</string>
+    <string name="wf_o_result">The run\'s result</string>
+    <string name="wf_o_text_hint">Leave it empty to send the run\'s result</string>
+    <string name="wf_service">Service</string>
+    <string name="wf_p_post">POST</string>
+    <string name="wf_url">Address</string>
+    <string name="wf_url_hint_ntfy">https://ntfy.sh/your-topic</string>
+    <string name="wf_url_hint_slack">https://hooks.slack.com/services/…</string>
+    <string name="wf_url_hint_discord">https://discord.com/api/webhooks/…</string>
+    <string name="wf_url_hint_post">https://example.com/hook</string>
+    <string name="wf_url_note_ntfy">The topic\'s address, on ntfy.sh or your own server.</string>
+    <string name="wf_url_note_slack">An incoming webhook from your Slack app.</string>
+    <string name="wf_url_note_discord">A channel\'s webhook, from its Integrations settings.</string>
+    <string name="wf_url_note_post">It gets JSON: the automation, the run and the text.</string>
+    <string name="wf_tg_note">A bot from @BotFather, and the chat it writes to: a number or @channel.</string>
+    <string name="wf_bot_token">Bot token</string>
+    <string name="wf_bot_token_hint">123456789:AA…</string>
+    <string name="wf_chat">Chat</string>
+    <string name="wf_chat_hint">-1001234567890 or @channel</string>
+    <string name="wf_secret_said">Kept on your Mac for %1$s, ending in %2$s</string>
+    <string name="wf_replace">Replace</string>
+    <string name="wf_secret_note">Kept on your Mac only, never shown again.</string>
+    <string name="wf_file">File</string>
+    <string name="wf_file_hint">notes/briefs.md</string>
+    <string name="wf_file_note">Each run adds one line: the date, its name and what it said.</string>
+    <string name="wf_glasses_too">Also on my glasses</string>
+
+    <!-- Budget. -->
+    <string name="wf_budget_on">Limit each run</string>
+    <string name="wf_budget_body">It stops when it works too long, or spends too much of your 5-hour window.</string>
+    <string name="wf_budget_minutes">Time at work</string>
+    <string name="wf_budget_pct">Of the 5-hour window</string>
+    <string name="wf_off">Off</string>
+    <string name="wf_min">%1$dm</string>
+    <string name="wf_hours">%1$dh</string>
+    <string name="wf_pct">%1$d%%</string>
+
+    <!-- New triggers: the tiles and their forms. -->
+    <string name="wf_w_cron">On a cron schedule</string>
+    <string name="wf_w_webhook">A script or webhook fires it</string>
+    <string name="wf_w_file">Files change</string>
+    <string name="wf_w_github">Something on GitHub</string>
+    <string name="wf_w_hook">A Claude Code hook</string>
+    <string name="wf_wh_before">Save it to get its address and a token, shown once.</string>
+    <string name="wf_wh_token">Token</string>
+    <string name="wf_wh_made">made %1$s</string>
+    <string name="wf_wh_new_token">New token</string>
+    <string name="wf_wh_new_q">Make a new token?</string>
+    <string name="wf_wh_new_body">The old one stops working at once: scripts that use it need the new one.</string>
+    <string name="wf_wh_new_ok">Make a new one</string>
+    <string name="wf_wh_copy_command">Copy the command</string>
+    <string name="wf_copied">Copied</string>
+    <string name="wf_copy">Copy</string>
+    <string name="wf_tc_eyebrow">Shown once</string>
+    <string name="wf_tc_title">Its token</string>
+    <string name="wf_tc_line">Copy it now: your Mac can\'t show it again.</string>
+    <string name="wf_tc_url">Address</string>
+    <string name="wf_tc_curl">With curl</string>
+    <string name="wf_tc_cli">From a script on the Mac</string>
+    <string name="wf_tc_local">The address answers on the Mac itself, for its git hooks, cron and CI.</string>
+    <string name="wf_tc_done">Done</string>
+    <string name="wf_tc_copy_all">Copy all</string>
+    <string name="wf_cron_expr">Schedule</string>
+    <string name="wf_cron_hint">*/15 9-18 * * 1-5</string>
+    <string name="wf_cron_next">Next %1$s</string>
+    <string name="wf_next_label">Next</string>
+    <string name="wf_cron_checking">Checking…</string>
+    <string name="wf_cron_note">Five fields on the Mac\'s clock: minute, hour, day, month, weekday.</string>
+    <string name="wf_cron_friendly">Prefer a time of day? Pick At a time or Every few hours.</string>
+    <string name="wf_file_folder">Folder</string>
+    <string name="wf_file_glob">Files</string>
+    <string name="wf_file_glob_hint">Any file, or *.md, docs/**</string>
+    <string name="wf_file_event">When a file is</string>
+    <string name="wf_fe_created">Added</string>
+    <string name="wf_fe_changed">Changed</string>
+    <string name="wf_fe_deleted">Deleted</string>
+    <string name="wf_file_watch_note">*.md matches a file\'s name in any folder. Not .git, node_modules or secret files, nor what its own runs change; it waits for 10 quiet seconds.</string>
+    <string name="wf_gh_repo">Repository</string>
+    <string name="wf_gh_when">When</string>
+    <string name="wf_gh_e_pr">A pull request opens</string>
+    <string name="wf_gh_e_review">Someone reviews my pull request</string>
+    <string name="wf_gh_e_checks">Checks fail on my pull request</string>
+    <string name="wf_gh_every">Looks every</string>
+    <string name="wf_gh_note">Uses gh on your Mac, and fires only when something changed.</string>
+    <string name="wf_hook_event">Event</string>
+    <string name="wf_he_stop">A turn ends</string>
+    <string name="wf_he_stop_failure">A turn ends on an API error</string>
+    <string name="wf_he_tool">A tool call fails</string>
+    <string name="wf_he_compact">Its context is about to compact</string>
+    <string name="wf_he_end">A session ends</string>
+    <string name="wf_hook_tool">Tool</string>
+    <string name="wf_hook_tool_hint">Any tool, or Bash</string>
+    <string name="wf_hook_note">From Claude Code\'s hooks, at most once a minute per session. For sessions without a terminal, a turn\'s end and a failed tool result stand in.</string>
+    <string name="wf_trail_wait_webhook">%1$d on, waiting to be fired</string>
+    <string name="wf_trail_wait_files">%1$d on, watching files</string>
+    <string name="wf_trail_wait_github">%1$d on, watching GitHub</string>
+    <string name="wf_trail_wait_hook">%1$d on, waiting for a hook</string>
+
+    <!-- A run's steps, on its timeline. -->
+    <string name="wf_rs_pending">Not yet</string>
+    <string name="wf_rs_running">Working</string>
+    <string name="wf_rs_running_for">Working for %1$s</string>
+    <string name="wf_rs_asking">Waiting for your answer</string>
+    <string name="wf_rs_exit">Exited %1$d</string>
+    <string name="wf_rs_exit_said">Exited %1$d: %2$s</string>
+    <string name="wf_rs_shell_timeout">Stopped: it ran past its time</string>
+    <string name="wf_rs_shell_lost">Stopped: Hypernova restarted while it ran</string>
+    <string name="wf_rs_told">Sent</string>
+    <string name="wf_rs_guard">Skipped: its condition didn\'t hold</string>
+    <string name="wf_rs_failed_before">Skipped: a step before it failed</string>
+    <string name="wf_rs_not_reached">Not reached</string>
+    <string name="wf_rs_reused">From the run it retried</string>
+    <string name="wf_rs_answer">Answered %1$s</string>
+    <string name="wf_rs_answer_glasses">Answered %1$s on your glasses</string>
+    <string name="wf_rs_answer_mac">Answered %1$s on the Mac</string>
+    <string name="wf_rs_answer_timeout">Nobody answered: taken as %1$s</string>
+    <string name="wf_ro_sent">Sent</string>
+    <string name="wf_ro_sending">Sending</string>
+    <string name="wf_ro_retrying">Trying again: %1$s</string>
+    <string name="wf_ro_failed">Didn\'t go</string>
+    <string name="wf_ro_failed_said">Didn\'t go: %1$s</string>
+    <string name="wf_ro_skipped">Not sent</string>
+    <string name="wf_told_label">Told</string>
+    <string name="wf_run_budget">Stopped: it reached its budget</string>
+    <string name="wf_run_exit">Failed: a command exited with an error</string>
+    <string name="wf_run_exit_said">Failed: %1$s</string>
+    <string name="wf_steps_toggle">Its steps</string>
+    <string name="wf_retry_q">Retry from step %1$d?</string>
+    <string name="wf_retry_body">The steps before it are kept, with what they said. Or run it all again.</string>
+    <string name="wf_retry_from_start">From the start</string>
+    <string name="wf_retry_from_step">From step %1$d</string>
+
+    <!-- A question an automation asks: an attention card, a notification with its answers. -->
+    <string name="wf_ask_default_in">%1$s in %2$s</string>
+    <string name="wf_ask_said">%1$s asks: %2$s. If nobody answers, %3$s in %4$s.</string>
+    <string name="wf_answered_toast">Answered %1$s</string>
+    <string name="wf_not_asking_by">It was answered already: %1$s</string>
+    <string name="wf_not_asking_plain">It was answered already.</string>
+    <string name="wf_ask_notif_default">If nobody answers: %1$s</string>
+    <string name="au_err_answer">Couldn\'t send your answer.</string>
+
+    <!-- Problems in place of "Next …". -->
+    <string name="wf_problem_no_gh">GitHub\'s gh is missing or signed out on the Mac.</string>
+    <string name="wf_problem_no_hooks">Claude Code\'s hooks aren\'t installed on the Mac.</string>
+    <string name="wf_problem_output_lost">A webhook\'s address is gone from the Mac. Save it again with it.</string>
+
+    <!-- Refusals (docs/PROTOCOL.md, "Workflows", Errors), and the editor's own checks. -->
+    <string name="wf_err_steps">A workflow has 1 to 5 steps.</string>
+    <string name="wf_err_step">Your Mac can\'t run this step yet. Update Hypernova on the Mac, or pick another.</string>
+    <string name="wf_err_guard">That condition doesn\'t fit here.</string>
+    <string name="wf_err_guard_text">Write the words to look for.</string>
+    <string name="wf_err_question">Write the question, 200 characters at most.</string>
+    <string name="wf_err_answers">Give 2 or 3 different answers, 24 characters each at most.</string>
+    <string name="wf_err_timeout">Pick how long it waits.</string>
+    <string name="wf_err_command">Write the command to run.</string>
+    <string name="wf_err_confirm_shell">A command needs your fingerprint or screen lock first.</string>
+    <string name="wf_err_placeholder">Words from another session or from outside can\'t go there. A command reads them from its environment.</string>
+    <string name="wf_err_outputs">Tell two places at most.</string>
+    <string name="wf_err_output">Your Mac can\'t send there yet.</string>
+    <string name="wf_err_text">500 characters at most.</string>
+    <string name="wf_err_url_needed">Paste its address.</string>
+    <string name="wf_err_url">That isn\'t this service\'s address.</string>
+    <string name="wf_err_insecure">Use an https address.</string>
+    <string name="wf_err_bot_token">That isn\'t a bot token from @BotFather.</string>
+    <string name="wf_err_chat">A chat is a number or @channel.</string>
+    <string name="wf_err_path">Pick a file inside the project.</string>
+    <string name="wf_err_secret_file">That file holds secrets. Pick another.</string>
+    <string name="wf_err_budget">A budget is 1 to 720 minutes, or 1 to 100 points of the window.</string>
+    <string name="wf_err_glob">That pattern doesn\'t read: 200 characters and four ** at most.</string>
+    <string name="wf_err_cron">That isn\'t a schedule: five fields, like */15 9-18 * * 1-5.</string>
+    <string name="wf_err_too_often">That runs more often than every 5 minutes.</string>
+    <string name="wf_err_not_github">That project has no GitHub remote.</string>
+    <string name="wf_err_no_gh">GitHub\'s gh is missing or signed out on the Mac.</string>
+    <string name="wf_err_has_steps">This automation has steps. Edit it in a newer Hypernova.</string>
+    <string name="wf_err_steps_changed">Its steps changed since that run. Retry it from the start.</string>
+    <string name="wf_err_not_asking">That was answered already.</string>
+    <string name="wf_err_bad_answer">That isn\'t one of its answers.</string>
+    <string name="wf_err_not_webhook">That automation isn\'t fired by a webhook.</string>
+
+    <!-- Templates that need steps (shown only when the Mac can run them). -->
+    <string name="wf_t_fix">Fix the tests while I sleep</string>
+    <string name="wf_t_fix_blurb">At the night reset Claude fixes what fails; you hear only if it couldn\'t</string>
+    <string name="wf_t_fix_prompt">Run the tests. If anything fails, find the cause and fix it, then run them again. Sum up what you changed.</string>
+    <string name="wf_t_fix_notify">Tests still failing: {prev}</string>
+    <string name="wf_t_review">Review before merge</string>
+    <string name="wf_t_review_blurb">A new pull request gets a review, posted only when you approve it</string>
+    <string name="wf_t_review_prompt">Review the pull request that just opened: {payload}. Reply with the review exactly as you would post it, starting with two sentences that sum it up.</string>
+    <string name="wf_t_review_ask">Post this review? {prev}</string>
+    <string name="wf_t_digest">Morning brief with a digest</string>
+    <string name="wf_t_digest_blurb">Weekdays at 9:00, the brief on your phone and a line in a Markdown file</string>
+    <string name="wf_t_digest_file">briefs.md</string>
+    <string name="wf_t_team">Tell my team</string>
+    <string name="wf_t_team_blurb">When a session still needs you after 10 minutes, a note in Slack too</string>
+    <string name="wf_t_team_notify">{session} is still waiting for you: {ask}</string>
+    <string name="wf_t_team_text">{session} is waiting for a hand: {ask}</string>
+</resources>

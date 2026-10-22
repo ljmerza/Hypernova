@@ -1,0 +1,14 @@
+{
+  "_comment": "The intro film. build.mjs copies the files that exist in --media <dir> into dist/media/ and shows the film only when the mp4 and the poster are both there (the webm is optional). width and height give the player its aspect ratio, so nothing shifts as it loads. duration (ISO 8601, e.g. PT1M30S) and uploadDate feed the VideoObject JSON-LD; leave duration empty if unknown.",
+  "film": {
+    "mp4": "hypernova-intro.mp4",
+    "webm": "hypernova-intro.webm",
+    "poster": "poster.jpg",
+    "width": 1920,
+    "height": 1080,
+    "duration": "PT47S",
+    "uploadDate": "2026-10-22",
+    "title": "Hypernova, the intro film",
+    "description": "Hypernova in a short film: Claude Code and Codex sessions on your Android phone, in the Mac's menu bar, on a Linux server and on Even G2 glasses."
+  }
+}

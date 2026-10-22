@@ -1,0 +1,53 @@
+<resources>
+    <!-- What changed, Share to Hypernova and the launcher shortcuts (their own file, apart from the app's strings). -->
+    <string name="changes_title">What changed</string>
+    <string name="changes_entry">What changed</string>
+    <string name="changes_subtitle_branch">%2$s on %1$s</string>
+    <plurals name="changes_files">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <string name="changes_loading">Looking at the folder…</string>
+    <string name="changes_err">Couldn\'t read the changes. Check that your Mac is reachable.</string>
+    <string name="changes_clean">Nothing changed since the last commit.</string>
+    <string name="changes_no_git">This folder isn\'t a git repository, so there is nothing to compare with.</string>
+    <string name="changes_binary">A picture or binary file: no lines to show.</string>
+    <string name="changes_truncated">The diff is long, so this is the first part of it.</string>
+    <string name="changes_diff_empty">No line changes in this file.</string>
+    <plurals name="changes_hidden">
+        <item quantity="one">%d credential file stays on your Mac and is not listed.</item>
+        <item quantity="other">%d credential files stay on your Mac and are not listed.</item>
+    </plurals>
+    <string name="changes_more">More than 300 files changed: the first 300 are listed.</string>
+    <plurals name="changes_others">
+        <item quantity="one">%d more change in this folder that this session didn\'t make</item>
+        <item quantity="other">%d more changes in this folder that this session didn\'t make</item>
+    </plurals>
+    <string name="changes_show_all">Show all</string>
+    <string name="changes_only_session">Only this session\'s</string>
+    <string name="changes_commit">Commit these changes</string>
+    <string name="changes_commit_busy">%1$s is working. Commit when this turn is done.</string>
+    <string name="changes_commit_note">%1$s writes the message in your repo\'s style. Nothing is pushed.</string>
+    <!-- The prompt Commit sends: a request to the session's agent, so it follows the repository\'s own conventions. -->
+    <string name="changes_commit_prompt">Please commit the changes made in this session. Look at git status and git diff first, and at git log to match this repository\'s commit message style. Write a clear message about what changed and why. Stage only the files that belong to this work and leave out credentials and unrelated changes. Don\'t push.</string>
+    <string name="changes_commit_prompt_files">Please commit the changes made in this session. Look at git diff for these files first, and at git log to match this repository\'s commit message style: %1$s. Write a clear message about what changed and why. Stage only these files, and leave out credentials and unrelated changes. Don\'t push.</string>
+
+    <!-- Share to Hypernova -->
+    <string name="share_title">Send to Claude</string>
+    <string name="share_new_session">New session</string>
+    <string name="share_new_session_body">Start something with this</string>
+    <string name="share_recent">Recent</string>
+    <string name="share_projects">Projects</string>
+    <string name="share_not_paired">Open Hypernova and pair it with your Mac first, then share again.</string>
+    <string name="share_nothing">There is nothing here to send.</string>
+    <string name="share_no_sessions">No sessions yet. Start a new one.</string>
+    <string name="share_reading">Getting your files ready…</string>
+    <string name="share_files_label">%d files</string>
+    <string name="share_cancel">Cancel</string>
+    <string name="share_unreadable">That file couldn\'t be read.</string>
+
+    <!-- Launcher shortcuts -->
+    <string name="shortcut_new_short">New session</string>
+    <string name="shortcut_new_long">Start a new session</string>
+    <string name="shortcut_project_long">New session in %1$s</string>
+</resources>

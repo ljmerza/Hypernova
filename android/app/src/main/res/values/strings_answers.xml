@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The owner's answers (2026-10-16): Backpack's "+2 h", the thinking label, "Continue now". -->
+<resources>
+    <string name="notice_kind_backpack">Backpack</string>
+    <string name="notice_extend">+2 h</string>
+    <plurals name="notice_backpack_ends">
+        <item quantity="one">Backpack ends in %d minute. Your Mac then sleeps with the lid closed.</item>
+        <item quantity="other">Backpack ends in %d minutes. Your Mac then sleeps with the lid closed.</item>
+    </plurals>
+    <!-- A limit that carries on by itself: Don't, or go now. -->
+    <string name="resume_continue_now">Continue now</string>
+    <string name="resume_continuing">Continuing…</string>
+    <!-- A finished thought, with how long it took: "Thought for 12s". -->
+    <string name="thought_for">Thought for %1$s</string>
+</resources>

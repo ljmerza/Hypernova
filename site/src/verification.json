@@ -1,0 +1,9 @@
+{
+  "_comment": "Webmaster-tool verification (site/README.md, 'Search engines'). Empty strings are skipped. google, bing and yandex are the content of the <meta> tag each tool offers and go into every page's head. The *File entries are the alternative: the file name the tool asks for (googleFile like google1234abcd.html, yandexFile like yandex_1234abcd.html) is written at the site root with the content the tool expects; bingXml is the whole content of BingSiteAuth.xml.",
+  "google": "",
+  "bing": "",
+  "yandex": "",
+  "googleFile": "",
+  "yandexFile": "",
+  "bingXml": ""
+}

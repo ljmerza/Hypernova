@@ -1,0 +1,1 @@
+{"type": "assistant", "timestamp": "2026-10-16T05:00:00.000Z", "isApiErrorMessage": true, "error": "unknown", "apiErrorStatus": 402, "message": {"model": "<synthetic>", "role": "assistant", "content": [{"type": "text", "text": "API Error: 402 Request would exceed your in-flight budget. Retry after the requests in flight finish."}]}}

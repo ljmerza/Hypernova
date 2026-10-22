@@ -1,0 +1,50 @@
+╭─── Claude Code v2.1.302 ─────────────────────────────────────────────────────────────────────────╮
+│                                                  │ Tips for getting started                      │
+│                  Welcome back!                   │ Run /init to create a CLAUDE.md file with ins… │
+│                                                  │ ───────────────────────────────────────────── │
+│                      ▐▛███▜▌                     │ Recent activity                               │
+│                     ▝▜█████▛▘                    │ No recent activity                            │
+│                       ▘▘ ▝▝                      │                                               │
+│       Fable 5.1 · Claude Max · Organization      │                                               │
+│      ~/Library/Application Support/Hypernova/usage-probe                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+> /usage
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  Settings:  Status   Config   Usage   Stats  (←/→ or tab to cycle)
+
+
+  Loading usage data…
+
+  Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

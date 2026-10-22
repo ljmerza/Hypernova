@@ -1,0 +1,45 @@
+<resources>
+    <!-- Settings › Agents & providers (ui/settings/Providers.kt): the agents on the Mac first, then Claude Code's providers. -->
+    <string name="ag_agents">Agents</string>
+    <string name="ag_claude_providers">Claude Code providers</string>
+    <string name="ag_providers_without_claude">Claude Code’s sessions can run on other providers, such as OpenRouter. They show here once Claude Code is on your Mac.</string>
+    <string name="ag_vendor_anthropic">Anthropic</string>
+    <string name="ag_vendor_openai">OpenAI</string>
+    <!-- An agent that isn't on the computer (%1$s: its name, "Nikita's MacBook Air"). -->
+    <string name="ag_not_installed">Not installed on %1$s.</string>
+    <string name="ag_install">Install</string>
+    <string name="ag_update">Update</string>
+    <string name="ag_sign_in">Sign in</string>
+
+    <!-- Claude Code's account, in a line. %1$s: its plan ("Max"). -->
+    <string name="ag_claude_signed_in_plan">Signed in with Claude %1$s.</string>
+    <string name="ag_claude_signed_in">Signed in.</string>
+    <string name="ag_claude_resting">Resting at a usage limit. It carries on after the reset.</string>
+    <string name="ag_claude_signed_out">Signed out on %1$s. Sign in again from Home’s account card.</string>
+    <string name="ag_claude_no_plan">The Claude plan has ended. Renew it on claude.ai, then sign in again.</string>
+    <string name="ag_claude_on_hold">The account is on hold.</string>
+    <string name="ag_claude_no_credit">Out of usage credits.</string>
+
+    <!-- Codex: its version against the oldest Hypernova works with, its account, its trouble, and the switch. -->
+    <string name="ag_codex_too_old">Version %1$s: Hypernova needs %2$s or newer.</string>
+    <string name="ag_codex_too_old_plain">This version is too old for Hypernova.</string>
+    <!-- %1$s: the ChatGPT plan ("Plus", "Pro"). -->
+    <string name="ag_codex_chatgpt_plan">Signed in with ChatGPT %1$s.</string>
+    <string name="ag_codex_chatgpt">Signed in with ChatGPT.</string>
+    <string name="ag_codex_api_key">Signed in with an API key: every session costs money.</string>
+    <string name="ag_codex_signed_out">Signed out. Run codex login on %1$s.</string>
+    <string name="ag_codex_reaching">Reaching Codex on %1$s…</string>
+    <string name="ag_codex_off">Not in use with Hypernova.</string>
+    <string name="ag_codex_use">Use Codex with Hypernova</string>
+    <string name="ag_codex_use_body">Start Codex sessions from this phone, next to Claude Code’s. Codex gets its own star in the sky and a usage card on Home.</string>
+    <string name="ag_codex_use_body_alone">Start Codex sessions from this phone. Its usage shows on Home.</string>
+
+    <!-- Settings' row when Codex is on the Mac too (otherwise providers_desc). -->
+    <plurals name="ag_settings_desc">
+        <item quantity="one">Claude Code and Codex on your Mac, and %d provider set up for Claude Code.</item>
+        <item quantity="other">Claude Code and Codex on your Mac, and %d providers set up for Claude Code.</item>
+    </plurals>
+    <!-- About: Codex's version, or that it's too old. -->
+    <string name="ag_about_codex">Codex</string>
+    <string name="ag_about_not_installed">not installed</string>
+</resources>

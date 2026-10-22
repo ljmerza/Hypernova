@@ -1,0 +1,29 @@
+<resources>
+    <!-- The widgets with Codex as a second agent (data/AgentLead.kt; widget/WidgetModel.kt). Nothing
+         here shows on a Mac with Claude Code alone. -->
+
+    <!-- Both agents in use: Claude's account trouble leads as Claude Code's, not the app's. -->
+    <string name="widget_claude_signed_out">Claude Code signed out</string>
+    <string name="widget_claude_on_hold">Claude account on hold</string>
+    <string name="widget_claude_no_credit">Claude out of usage credits</string>
+
+    <!-- Codex leads (Claude Code isn't installed): what stops it, in amber, and its limits. -->
+    <string name="widget_codex_signed_out">Codex signed out</string>
+    <string name="widget_codex_limit_five">5-hour limit</string>
+
+    <!-- The other agent's compact readout ("CODEX 61%"; an amber dash in trouble, a dim one without numbers). -->
+    <string name="widget_other_none">—</string>
+
+    <!-- TalkBack. The meters' names while both agents are in use, and the other agent's sentence. -->
+    <string name="widget_a11y_claude_five">Claude 5-hour usage</string>
+    <string name="widget_a11y_claude_week">Claude weekly usage</string>
+    <string name="widget_a11y_other">%1$s %2$d%% used, resets %3$s.</string>
+    <string name="widget_a11y_other_plain">%1$s %2$d%% used.</string>
+    <string name="widget_a11y_other_limited">%1$s: limit reached, refills %2$s.</string>
+    <string name="widget_a11y_other_limited_plain">%1$s: limit reached.</string>
+    <string name="widget_a11y_other_signed_out">%1$s: signed out on your Mac.</string>
+    <string name="widget_a11y_other_trouble">%1$s: %2$s</string>
+    <string name="widget_a11y_other_none">%1$s: no numbers yet.</string>
+    <string name="widget_a11y_row_codex">%1$s, %2$s, Codex. %3$s</string>
+    <string name="widget_a11y_row_plain_codex">%1$s, Codex. %2$s</string>
+</resources>

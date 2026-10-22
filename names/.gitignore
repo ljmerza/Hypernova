@@ -1,0 +1,4 @@
+node_modules/
+.wrangler/
+# Local secrets for `wrangler dev` (CF_API_TOKEN=...); never committed.
+.dev.vars

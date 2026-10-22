@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings → Providers, the editor (ui/settings/Providers.kt): Check, the Mac's refusals by field,
+     the model lists, what it costs, and what a delete leaves behind (docs/PROTOCOL.md, "Providers"). -->
+<resources>
+    <!-- Check's verdict under the key, when the Mac said nothing in words. -->
+    <string name="pv_check_ok">Key works.</string>
+    <string name="pv_check_bad_key">The provider refused this key.</string>
+    <string name="pv_check_no_credit">The key works, but the account is out of credits.</string>
+    <string name="pv_check_limited">Rate limited just now. Try again in a minute.</string>
+    <string name="pv_check_not_found">Something answers there, but not as an Anthropic-compatible API.</string>
+    <string name="pv_check_unreachable">Nothing answers at this address.</string>
+    <string name="err_provider_check">Couldn\'t check the key.</string>
+    <!-- TalkBack, the verdict: "Check: Key works. $4.20 left." -->
+    <string name="pv_check_said">Check: %1$s</string>
+
+    <!-- The address, as it's typed: plain http to the internet. -->
+    <string name="pv_insecure_typed">Plain http: the key would travel unencrypted. Use https://, or an address on this network or your tailnet.</string>
+    <!-- Saved with an address on another host and no new key. -->
+    <string name="pv_key_dropped">The address moved to another host, so its saved key was dropped. Paste the key for the new address.</string>
+    <string name="pv_saved">Saved</string>
+    <string name="pv_saved_verdict">Saved. %1$s</string>
+
+    <!-- What it costs. -->
+    <string name="pv_paid">Costs money</string>
+    <string name="pv_paid_on">Automations ask before they run on it.</string>
+    <string name="pv_paid_off">Free, like a model on your own computer: automations run on it without asking.</string>
+
+    <!-- A slot's list of models. -->
+    <string name="pv_models_pick">List</string>
+    <string name="pv_models_pick_said">Choose the %1$s from the list</string>
+    <string name="pv_models_title">Models on %1$s</string>
+    <string name="pv_models_search">Search models</string>
+    <string name="pv_models_typed">Or type any id the provider knows in the field.</string>
+    <string name="pv_models_none">No model matches “%1$s”.</string>
+    <string name="pv_models_loading">Getting the list…</string>
+
+    <!-- Delete's line: what still runs on it. -->
+    <plurals name="pv_delete_sessions">
+        <item quantity="one">%1$d session is on it: it stops until you move it to another provider.</item>
+        <item quantity="other">%1$d sessions are on it: they stop until you move them to another provider.</item>
+    </plurals>
+    <plurals name="pv_delete_automations">
+        <item quantity="one">%1$d automation runs on it: its runs fail until you pick another provider.</item>
+        <item quantity="other">%1$d automations run on it: their runs fail until you pick another provider.</item>
+    </plurals>
+    <string name="pv_deleted">Deleted</string>
+    <string name="pv_free_chip">No cost</string>
+</resources>

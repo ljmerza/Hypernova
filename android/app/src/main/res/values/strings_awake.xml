@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stay awake: the Mac kept awake while it works, and in a closed bag (docs/PROTOCOL.md, "Stay awake"). -->
+<resources>
+    <string name="awake_title">Stay awake</string>
+    <string name="awake_mode_working">While working</string>
+    <string name="awake_mode_backpack">Backpack</string>
+    <string name="awake_mode_off">Off</string>
+    <string name="awake_help_working">Awake while sessions, agents or automations run, or this phone or the glasses are connected. It sleeps as usual after.</string>
+    <string name="awake_help_backpack">Awake with the lid closed, on battery, for up to 8 hours: Claude keeps working in your bag.</string>
+    <string name="awake_help_off">Hypernova never keeps your Mac awake.</string>
+
+    <!-- The Mac card's line: "Awake with the lid closed", its battery drawn beside it. -->
+    <string name="awake_state_awake">Awake</string>
+    <string name="awake_state_awake_lid">Awake with the lid closed</string>
+    <string name="awake_state_idle">Sleeps when idle</string>
+    <string name="awake_state_off">Stay awake off</string>
+    <string name="awake_state_let_go">Letting it sleep</string>
+    <string name="awake_state_sleeps_in">Sleeps in %1$s</string>
+    <!-- Another app (Amphetamine) keeps the Mac awake: Hypernova only lets go. -->
+    <string name="awake_state_lets_go_in">Hypernova lets go in %1$s</string>
+    <string name="awake_state_kept_by">Kept awake by %1$s</string>
+    <string name="awake_state_percent">%1$d%%</string>
+    <!-- "Your Mac will sleep in 2 minutes: battery 15%". -->
+    <string name="awake_dot">%1$s: %2$s</string>
+
+    <!-- Why the Mac is let go. -->
+    <string name="awake_why_battery">battery %1$d%%</string>
+    <string name="awake_why_battery_low">battery low</string>
+    <string name="awake_why_hot">it\'s running hot</string>
+    <string name="awake_why_time">8 hours are up</string>
+    <string name="awake_sleep_soon">Your Mac will sleep in %1$s</string>
+    <string name="awake_lets_go_in">Hypernova lets go in %1$s</string>
+    <!-- "Hypernova lets go in 2 minutes: battery 15%, but Amphetamine is still keeping your Mac awake". -->
+    <string name="awake_but_kept">%1$s, but %2$s is still keeping your Mac awake</string>
+    <string name="awake_backpack_ends_kept">Backpack ends in %1$s, but %2$s is still keeping your Mac awake</string>
+    <string name="awake_another_app">another app</string>
+    <plurals name="awake_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <plurals name="awake_seconds">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
+
+    <string name="awake_let_go_battery">Letting it sleep: battery %1$d%%. Plug it in to keep it awake.</string>
+    <string name="awake_let_go_hot">Letting it sleep: it\'s running hot. It carries on once it cools down.</string>
+    <string name="awake_let_go_battery_kept">Hypernova let go at %1$d%%, but %2$s is still keeping your Mac awake</string>
+    <string name="awake_let_go_hot_kept">Hypernova let go: it\'s running hot, but %1$s is still keeping your Mac awake</string>
+    <string name="awake_backpack_until">Awake with the lid closed until %1$s, or until the battery is at %2$d%%</string>
+    <string name="awake_problem_setup">Backpack mode\'s permission is gone on the Mac. Set it up again there: Hypernova in the menu bar, Settings.</string>
+    <string name="awake_problem_failed">The Mac didn\'t take the lid-closed setting. It tries again in a moment.</string>
+    <string name="awake_needs_setup">Backpack needs a one-time setup on your Mac: open Hypernova in its menu bar and choose Backpack. It asks for the Mac\'s password once.</string>
+    <string name="err_awake">Couldn\'t change Stay awake.</string>
+
+    <!-- TalkBack, after the connection chip's words. -->
+    <string name="link_said_awake_lid">%1$s, kept awake with the lid closed</string>
+    <string name="link_said_sleep_soon">%1$s, sleeps soon</string>
+</resources>

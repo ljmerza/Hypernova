@@ -1,0 +1,35 @@
+<resources>
+    <!-- Words that name the agent a session runs on: Claude Code, or Codex (data/AgentLead.kt). A Mac
+         with Claude Code alone reads exactly as before Codex. -->
+
+    <!-- Home with no sessions: what to run in a terminal, by which agents are here. -->
+    <string name="empty_body_both">Start one here, or run claude or codex in a terminal on your Mac. It shows up here on its own.</string>
+    <string name="empty_body_codex">Start one here, or run codex in a terminal on your Mac. It shows up here on its own.</string>
+    <string name="empty_body_codex_off">Start one here. Your first Codex session turns Codex on for Hypernova; after that, codex in a terminal on your Mac shows up here too.</string>
+
+    <!-- Share to Hypernova's title: share_title ("Send to Claude") where Claude Code is alone. -->
+    <string name="share_title_codex">Send to Codex</string>
+    <string name="share_title_both">Send to Claude or Codex</string>
+
+    <!-- Automations' intro with none yet (au_intro: Claude Code alone). -->
+    <string name="au_intro_codex">Let Codex work on a schedule, or when something happens on your Mac. They run on the Mac, so your phone can be off.</string>
+    <string name="au_intro_both">Let Claude or Codex work on a schedule, or when something happens on your Mac. They run on the Mac, so your phone can be off.</string>
+
+    <!-- Settings → Glasses, text arriving like speech (glasses_text_speech_desc: Claude Code alone). -->
+    <string name="glasses_text_speech_desc_codex">Codex\'s words come a few at a time, with pauses at commas and full stops, in step with the voice when a reply is read aloud. Code and approvals show at once.</string>
+    <string name="glasses_text_speech_desc_both">A reply\'s words come a few at a time, with pauses at commas and full stops, in step with the voice when it is read aloud. Code and approvals show at once.</string>
+
+    <!-- Stay awake, Backpack (awake_help_backpack: Claude Code alone). -->
+    <string name="awake_help_backpack_codex">Awake with the lid closed, on battery, for up to 8 hours: Codex keeps working in your bag.</string>
+    <string name="awake_help_backpack_both">Awake with the lid closed, on battery, for up to 8 hours: Claude and Codex keep working in your bag.</string>
+
+    <!-- Claude Code's account trouble while Codex is in use too: said as Claude's, not every session's
+         (the permanent notification's first line and the account notice; Claude alone: headline_*, notice_*). -->
+    <string name="headline_signed_out_claude">Claude Code signed out on %1$s</string>
+    <string name="headline_on_hold_claude">Claude account on hold</string>
+    <string name="headline_no_credit_claude">Claude out of usage credits</string>
+    <string name="headline_limit_claude">%1$s for Claude until %2$s</string>
+    <string name="notice_signed_out_both">Claude Code is signed out, so its sessions can\'t reply. Codex carries on.</string>
+    <string name="notice_on_hold_both">Anthropic has put the account on hold. Claude Code can\'t run; Codex carries on.</string>
+    <string name="notice_no_credit_both">Claude is out of usage credits. Its sessions on your subscription can\'t reply.</string>
+</resources>

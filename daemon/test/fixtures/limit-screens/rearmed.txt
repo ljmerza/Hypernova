@@ -1,0 +1,20 @@
+> now the parser tests
+
+● I'll start with the tokenizer's edge cases.
+
+● Read(src/parser/tokenize.ts)
+  ⎿  Read 212 lines
+
+  ⎿  You've hit your session limit · resets 2am (Europe/Moscow)
+
+  ⎿  Usage limit reached · continuing automatically at 2am (Europe/Moscow) · esc to cancel
+
+  ⎿  Automatic continue cancelled · /rate-limit-options to re-arm
+
+> /rate-limit-options
+  ⎿  Claude Code will continue automatically at 2am (Europe/Moscow). Keep this session open; it may still pause for permission prompts. Press esc to cancel the wait.
+
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  ? for shortcuts

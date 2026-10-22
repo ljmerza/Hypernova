@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hypernova Lens through this app: the bridge's prompt and Settings → Glasses (bridge/, ui/glasses/, ui/settings/GlassesSection.kt). -->
+<resources>
+    <string name="glasses_channel">Glasses</string>
+    <string name="glasses_channel_desc">Hypernova Lens on your Even glasses asking to connect through this app, or to open it.</string>
+    <string name="glasses_ask_title">Allow Hypernova Lens to connect?</string>
+    <!-- Always "Hypernova Lens", never the asker's own name or version: whatever asks could call itself anything, and the code must be the only number here. -->
+    <string name="glasses_ask_body">Hypernova Lens on your glasses asks to reach your Mac through Hypernova. It shows %1$s.</string>
+    <string name="glasses_ask_detail">It shows this code. Allow only if it\'s the one on your glasses: Lens can then see your sessions, answer them and send prompts, as this app does.</string>
+    <string name="glasses_ask_locked">Unlock your phone to answer.</string>
+    <string name="glasses_allow">Allow</string>
+    <string name="glasses_deny">Deny</string>
+    <!-- Lens's "Open Hypernova" while the app isn't on screen (bridge/BridgeOpen.kt): Android opens an app only on a tap. -->
+    <string name="glasses_open_title">Tap to open Hypernova</string>
+    <string name="glasses_open_body">Hypernova Lens asked for the glasses\' settings.</string>
+
+    <string name="glasses">Glasses</string>
+    <!-- No glasses allowed yet: what Lens is, and how to get it (it isn't in the Even Hub yet; owner decision pending on where "get Lens" points). -->
+    <string name="glasses_lens_title">Hypernova Lens</string>
+    <string name="glasses_lens_about">Hypernova on Even Realities G2 glasses: your sessions at a glance, approvals with a tap, replies read into your earbuds. It reaches your Mac through this app.</string>
+    <string name="glasses_none">Hypernova Lens isn\'t in the Even Hub yet. Once it\'s on your glasses, open it in the Even app on this phone: it asks to connect here, and you allow it once.</string>
+    <string name="glasses_how">How to connect</string>
+    <string name="glasses_how_title">Connect your glasses</string>
+    <string name="glasses_how_line">Open Hypernova Lens on your glasses while Hypernova runs on this phone, then allow it here.</string>
+    <string name="glasses_how_steps">The steps</string>
+    <string name="glasses_how_1">Put Hypernova Lens on your glasses in the Even app. It isn\'t in the Even Hub yet.</string>
+    <string name="glasses_how_2">Open it on the glasses: it asks to connect, here or in a notification.</string>
+    <string name="glasses_how_3">Check the code is the one on your glasses, then Allow.</string>
+    <string name="glasses_how_4">Tap your glasses, or Connect in Lens, to finish.</string>
+    <string name="glasses_how_ok">Got it</string>
+    <string name="glasses_settings_fold">Glasses settings</string>
+    <string name="glasses_settings_fold_desc">Reading, pop-ups, the road and which sessions show, ready for when glasses connect.</string>
+    <string name="glasses_fold_open">Open</string>
+    <string name="glasses_fold_closed">Closed</string>
+    <!-- Allowed here, and the glasses haven't collected it yet. -->
+    <string name="glasses_allowed_now">Now tap your glasses, or Connect in Lens, to finish</string>
+    <string name="glasses_waiting">Waiting for a tap on the glasses</string>
+    <string name="glasses_waiting_desc">Tap your glasses, or Connect in Lens, within 10 minutes to finish.</string>
+    <string name="glasses_bridge_failed">The glasses can\'t connect: another app on this phone uses port 47380. Hypernova keeps trying.</string>
+    <string name="glasses_port_channel">Glasses\' port</string>
+    <string name="glasses_port_channel_desc">Another app holds the port Hypernova Lens reaches this app on.</string>
+    <string name="glasses_port_busy_title">Another app is using the glasses\' port</string>
+    <string name="glasses_port_busy_body">Hypernova Lens can\'t reach your Mac through this phone while another app holds port %1$d. Hypernova keeps trying; closing that app frees it.</string>
+    <string name="glasses_connected_now">Connected now</string>
+    <string name="glasses_last_used">Last connected %1$s</string>
+    <string name="glasses_disconnect">Disconnect</string>
+    <string name="glasses_disconnect_title">Disconnect %1$s?</string>
+    <!-- With several Lenses allowed: the day tells them apart. -->
+    <string name="glasses_disconnect_title_dated">Disconnect the Lens allowed %1$s?</string>
+    <string name="glasses_allowed_on">allowed %1$s</string>
+    <string name="glasses_disconnect_body">The glasses stop reaching your Mac through this phone at once. They can ask again; you\'d allow them here.</string>
+    <string name="glasses_disconnected">Disconnected</string>
+    <string name="glasses_lens_version">Lens %1$s</string>
+
+    <string name="glasses_read_aloud">Read replies aloud</string>
+    <string name="glasses_read_aloud_on">A tap on a reply reads it into your earbuds. On the glasses, “mute” and “unmute”.</string>
+    <string name="glasses_read_aloud_off">Off: taps and “status” stay silent.</string>
+    <string name="glasses_read_aloud_voice">The voice and its speed are the ones under Voice → Read aloud above: one setting for this phone and the glasses.</string>
+    <string name="glasses_blip">Soft blip</string>
+    <string name="glasses_blip_desc">A tone when a session finishes or needs you.</string>
+    <string name="glasses_text_arrives">Text arrives</string>
+    <string name="glasses_text_all">All at once</string>
+    <string name="glasses_text_speech">Like speech</string>
+    <string name="glasses_text_all_desc">Text shows as soon as it arrives.</string>
+    <string name="glasses_text_speech_desc">Claude\'s words come a few at a time, with pauses at commas and full stops, in step with the voice when a reply is read aloud. Code and approvals show at once.</string>
+    <string name="glasses_pace">%1$d words a minute</string>
+    <string name="glasses_slower">Slower</string>
+    <string name="glasses_faster">Faster</string>
+
+    <string name="glasses_look">Type on the lens</string>
+    <string name="glasses_look_hypernova">Hypernova</string>
+    <string name="glasses_look_native">Built-in</string>
+    <string name="glasses_look_hypernova_desc">Hypernova\'s own type, drawn: the glance and approvals in the app\'s look; long replies in the glasses\' built-in font, which scrolls. Slower on the glasses: each change is a picture.</string>
+    <string name="glasses_look_native_desc">The glasses\' built-in font everywhere.</string>
+
+    <string name="glasses_popups">Pop-ups on the glasses</string>
+    <string name="glasses_popups_desc">A band over whatever the lens shows: a tap opens it, a swipe puts it away. None while you talk or are read to.</string>
+    <string name="glasses_pop_needs">A session needs you</string>
+    <string name="glasses_pop_done">A session is done</string>
+    <string name="glasses_pop_stopped">A session stopped</string>
+    <string name="glasses_pop_limit">A limit is hit or lifted</string>
+    <string name="glasses_pop_battery" formatted="false">The Mac\'s battery at 20%</string>
+    <string name="glasses_pop_sleep">The Mac is about to sleep</string>
+    <string name="glasses_pop_note">An automation has news</string>
+
+    <string name="glasses_road">On a bike or a walk</string>
+    <string name="glasses_moving">Moving</string>
+    <string name="glasses_moving_desc">Two short lines on the lens, one sentence per result, a chime per pop-up. Risky commands only by saying “approve push”.</string>
+    <string name="glasses_eclipse">Eclipse</string>
+    <string name="glasses_eclipse_desc">Only what needs you gets through, and the Mac\'s low-battery and about-to-sleep warnings.</string>
+    <string name="glasses_guide">Practise the gestures on the glasses</string>
+    <string name="glasses_guide_sent">On your glasses now</string>
+    <string name="glasses_guide_offline">Open Hypernova Lens on your glasses first</string>
+
+    <string name="glasses_sessions">Sessions on the lens</string>
+    <string name="glasses_sessions_all">All active</string>
+    <string name="glasses_sessions_only">Only these</string>
+    <string name="glasses_sessions_all_desc">Sessions that work, need you, or finished in the last 45 minutes; four at most, the one that needs you first.</string>
+    <string name="glasses_sessions_none">No projects on your Mac yet.</string>
+
+    <string name="glasses_language">Speech on the glasses</string>
+    <string name="glasses_language_desc">The language you speak to the glasses in.</string>
+    <string name="glasses_lang_en">English</string>
+    <string name="glasses_lang_auto">Detect</string>
+    <string name="glasses_lang_ru">Russian</string>
+    <string name="glasses_lang_de">German</string>
+    <string name="glasses_lang_fr">French</string>
+    <string name="glasses_lang_es">Spanish</string>
+    <string name="glasses_lang_it">Italian</string>
+    <string name="glasses_lang_uk">Ukrainian</string>
+</resources>

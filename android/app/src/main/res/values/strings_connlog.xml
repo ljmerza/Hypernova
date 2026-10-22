@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The connection log (ui/settings/ConnectionLog.kt) and the offline card's words about the routes
+     it tried (data/LanRoute.kt RouteWords). -->
+<resources>
+    <string name="connlog_title">Connection log</string>
+    <string name="connlog_desc">What the app tried to reach your Mac, newest first</string>
+    <string name="connlog_subtitle">%1$d entries, newest first</string>
+    <string name="connlog_empty">Nothing yet. Each try to reach your Mac shows here: the network, each route and its answer, and the route chosen.</string>
+    <string name="connlog_copy">Copy</string>
+    <string name="connlog_copied">Connection log copied</string>
+    <string name="connlog_header">Hypernova connection log, app %1$s, copied %2$s</string>
+    <string name="connlog_open">Connection log</string>
+    <string name="connlog_row_said">%1$s ago. %2$s.</string>
+
+    <string name="connlog_kind_network">Network</string>
+    <string name="connlog_kind_probe">Probe</string>
+    <string name="connlog_kind_route">Route</string>
+    <string name="connlog_kind_link">Link</string>
+    <string name="connlog_kind_socket">Socket</string>
+    <string name="connlog_kind_wait">Wait</string>
+    <string name="connlog_kind_node">This phone\'s node</string>
+    <string name="connlog_kind_mac">The Mac</string>
+
+    <string name="connlog_route_local">Local</string>
+    <string name="connlog_route_tailnet">Tailscale</string>
+    <string name="connlog_route_base">Base URL</string>
+
+    <string name="connlog_result_ok">OK</string>
+    <string name="connlog_result_refused">Refused</string>
+    <string name="connlog_result_timeout">No answer</string>
+    <string name="connlog_result_unreachable">Unreachable</string>
+    <string name="connlog_result_no_name">No such name</string>
+    <string name="connlog_result_pin_wrong">Other certificate</string>
+    <string name="connlog_result_pin_expired">Certificate expired</string>
+    <string name="connlog_result_tls">TLS failed</string>
+    <string name="connlog_result_no_peer">Not on tailnet</string>
+    <string name="connlog_result_proxy">Proxy refused</string>
+    <string name="connlog_result_http">Error</string>
+    <string name="connlog_result_closed">Closed</string>
+    <string name="connlog_result_failed">Failed</string>
+    <string name="connlog_result_skipped">Not tried</string>
+
+    <string name="problem_route_both">Can\'t reach your Mac on Wi‑Fi or over Tailscale. Check that it\'s awake and that Hypernova runs there.</string>
+    <string name="problem_route_local">Your Mac doesn\'t answer on this Wi‑Fi. Check that it\'s awake, on the same network, and that Hypernova runs there.</string>
+    <string name="problem_route_tailnet">This phone isn\'t on Wi‑Fi, and your Mac doesn\'t answer over Tailscale. Check that it\'s awake and that Hypernova runs there, signed in to the same Tailscale account.</string>
+    <string name="problem_route_wrong_mac">Another device answers at your Mac\'s address on this Wi‑Fi, and Tailscale didn\'t reach your Mac. If the Mac was set up again, pair again.</string>
+    <string name="route_tried_said">Tried: %1$s.</string>
+</resources>

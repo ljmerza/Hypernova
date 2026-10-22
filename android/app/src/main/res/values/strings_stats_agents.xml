@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Statistics with Codex (ui/stats/, docs/PROTOCOL.md "Statistics", byAgent): only while Codex has work in
+     the range, or where Codex leads (no Claude Code on the Mac). Claude's alone reads as strings_stats.xml has it. -->
+<resources>
+    <!-- The hero: both agents' busy time, and Codex's alone. -->
+    <string name="stats_agents_worked">Your agents worked</string>
+    <string name="stats_codex_worked">Codex worked</string>
+    <string name="a11y_stats_hero_agents">Your agents worked %1$s. %2$s tokens, %3$d sessions, %4$d agents.</string>
+    <string name="a11y_stats_hero_codex">Codex worked %1$s. %2$s tokens, %3$d sessions, %4$d agents.</string>
+    <!-- The split under the hero's number, for TalkBack: "Claude worked 5 hours 10 minutes, Codex 1 hour 20 minutes." -->
+    <string name="a11y_stats_split">Claude worked %1$s, Codex %2$s.</string>
+    <!-- A duration spoken in full ("5 hours 10 minutes"). -->
+    <plurals name="stats_said_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <plurals name="stats_said_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <string name="stats_said_hm">%1$s %2$s</string>
+
+    <!-- The galaxy's readout: a day's Codex share after its hours and tokens ("CODEX 5m"); TalkBack appends it. -->
+    <string name="stats_day_codex_said">%1$s, Codex %2$s</string>
+
+    <!-- The streak, the footer and the loading line, for both agents and for Codex alone. -->
+    <string name="stats_streak_detail_agents">Your agents have worked every day since %1$s.</string>
+    <string name="stats_streak_detail_codex">Codex has worked every day since %1$s.</string>
+    <string name="stats_footer_agents">From Claude Code’s transcripts and the Codex turns Hypernova followed on %1$s.</string>
+    <string name="stats_footer_codex">From the Codex turns Hypernova followed on %1$s.</string>
+    <string name="stats_loading_agents">Reading Claude’s and Codex’s history on %1$s…</string>
+    <string name="stats_loading_codex">Reading Codex’s history on %1$s…</string>
+</resources>

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Statistics: how much Claude worked on the Mac (ui/stats/, docs/PROTOCOL.md "Statistics"). A tap on the sun opens it.
+     With Codex at work in the range (or leading), the hero, streak, footer and loading line take strings_stats_agents.xml's words. -->
+<resources>
+    <string name="stats_title">Statistics</string>
+    <!-- The second line of the sun's readout, once, until Statistics is first opened. -->
+    <string name="sun_stats_hint">Tap the sun for your statistics</string>
+    <!-- TalkBack: the sky's action, and the hint's. -->
+    <string name="a11y_open_stats">Open statistics</string>
+
+    <!-- The range switcher. -->
+    <string name="stats_range_today">Today</string>
+    <string name="stats_range_week">Week</string>
+    <string name="stats_range_month">Month</string>
+    <string name="stats_range_all">All</string>
+    <!-- Under the title: the days the range covers ("9 – 15 Oct", "since 13 Oct"). -->
+    <string name="stats_span">%1$s – %2$s</string>
+    <string name="stats_since">since %1$s</string>
+
+    <!-- Durations: Claude's working time ("34h 26m", "152h", "26m"). -->
+    <string name="stats_hm">%1$dh %2$dm</string>
+    <string name="stats_h">%1$dh</string>
+    <string name="stats_m">%1$dm</string>
+    <!-- Counts, short ("1.2k", "9.2M", "3.6B"). -->
+    <string name="stats_k">%1$sk</string>
+    <string name="stats_mn">%1$sM</string>
+    <string name="stats_bn">%1$sB</string>
+    <!-- TalkBack (and a day without a star's figures): "8h 11m, 855M tokens". -->
+    <string name="stats_day_said">%1$s, %2$s tokens</string>
+    <string name="stats_in_project">in %1$s</string>
+
+    <!-- The hero. -->
+    <string name="stats_claude_worked">Claude worked</string>
+    <!-- Sessions that overlap count once here: the time anything ran. -->
+    <string name="stats_by_clock">%1$s by the clock</string>
+    <string name="stats_agent_work">%1$s of agent work</string>
+    <string name="stats_quiet_today">Quiet so far today.</string>
+    <string name="stats_quiet">A quiet stretch.</string>
+    <string name="stats_tokens">Tokens</string>
+    <string name="stats_sessions">Sessions</string>
+    <string name="stats_agents">Agents</string>
+    <string name="a11y_stats_hero">Claude worked %1$s. %2$s tokens, %3$d sessions, %4$d agents.</string>
+
+    <!-- The galaxy of the last 30 days. -->
+    <string name="stats_galaxy">Last 30 days</string>
+    <plurals name="stats_active_days">
+        <item quantity="one">%d day with work</item>
+        <item quantity="other">%d days with work</item>
+    </plurals>
+    <string name="stats_galaxy_legend">One star a day: its size is the hours, its light the tokens.</string>
+    <string name="stats_today_tick">Today</string>
+    <string name="stats_day_tokens">%1$s tokens</string>
+    <string name="stats_day_none">no work</string>
+    <string name="a11y_stats_galaxy">Last 30 days as a galaxy, one star a day. %1$s</string>
+    <string name="a11y_stats_prev_day">Day before</string>
+    <string name="a11y_stats_next_day">Day after</string>
+
+    <!-- Projects as planets. -->
+    <string name="stats_projects">Projects</string>
+    <string name="stats_by_hours">by hours</string>
+    <plurals name="stats_sessions_count">
+        <item quantity="one">%d session</item>
+        <item quantity="other">%d sessions</item>
+    </plurals>
+
+    <!-- Records. -->
+    <string name="stats_records">Records</string>
+    <string name="stats_longest">Longest session</string>
+    <string name="stats_busiest">Busiest day</string>
+    <string name="stats_streak">Streak</string>
+    <plurals name="stats_streak_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <string name="stats_streak_detail">Claude has worked every day since %1$s.</string>
+    <string name="stats_limits">Limits reached</string>
+    <!-- Limits reached of several kinds, as a breakdown: a name per row, its count beside it. -->
+    <string name="stats_limit_five">5-hour</string>
+    <string name="stats_limit_week">weekly</string>
+    <string name="stats_limit_model">a model\'s own</string>
+    <string name="stats_limit_five_only">The 5-hour window</string>
+    <string name="stats_limit_week_only">The weekly limit</string>
+    <!-- A limit of one model's own ("Opus limit"). -->
+    <string name="stats_limit_model_only">A model’s own limit</string>
+
+    <!-- The work behind it. -->
+    <string name="stats_work">Work</string>
+    <string name="stats_prompts">Prompts</string>
+    <!-- Of the prompts: sent from the phone, from the glasses, and spoken (on either). -->
+    <string name="stats_from_phone">phone</string>
+    <string name="stats_from_glasses">glasses</string>
+    <string name="stats_by_voice">spoken</string>
+    <string name="stats_tool_calls">Tool calls</string>
+    <string name="stats_files">Files edited</string>
+    <string name="stats_approvals">Approvals</string>
+    <string name="stats_ap_phone">phone</string>
+    <string name="stats_ap_glasses">glasses</string>
+    <string name="stats_ap_mac">Mac</string>
+    <string name="stats_counting_since">Counted since %1$s</string>
+    <!-- The tokens by kind, under the work. -->
+    <string name="stats_tok_out">Out</string>
+    <string name="stats_tok_in">In</string>
+    <string name="stats_tok_cache_read">Cache read</string>
+    <string name="stats_tok_cache_write">Cache write</string>
+
+    <string name="stats_footer">From Claude Code’s transcripts on %1$s.</string>
+    <string name="stats_footer_demo">Demo numbers.</string>
+    <string name="stats_loading">Reading Claude’s history on %1$s…</string>
+    <string name="stats_error">Couldn’t load statistics.</string>
+    <string name="stats_old_mac">Update Hypernova on your Mac to see statistics.</string>
+    <string name="stats_stale">Couldn’t refresh. These are from %1$s.</string>
+</resources>

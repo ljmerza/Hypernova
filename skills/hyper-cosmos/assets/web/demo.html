@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hyper cosmos demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="hyper-cosmos.css">
+</head>
+<body>
+<canvas class="hn-sky" id="sky"></canvas>
+<div class="hn-page">
+  <header class="hn-topbar" style="display:flex;align-items:center;gap:10px"><span class="hn-wordmark">hypernova</span><span style="flex:1"></span><span class="hn-chip live">my-mac</span></header>
+  <div style="height:52vh"></div>
+  <div class="hn-seam" style="margin:0 4px 10px"><span class="hn-planet alert"><i></i></span><span class="hn-label">Sessions</span><span class="hn-trail">1 needs you · 2 live</span></div>
+  <div class="hn-card needs" style="margin-bottom:10px">
+    <div class="hn-seam"><span class="hn-planet alert"><i></i></span><span class="hn-label" style="color:var(--hn-amber)">0stems</span><span class="hn-trail">c7 · 1m</span></div>
+    <div class="hn-heading" style="margin-top:12px">release landing copy</div>
+    <div class="hn-mono-s" style="color:var(--hn-amber);margin-top:4px">wants to run git push origin main</div>
+    <div style="margin-top:12px"><span class="hn-chip filled" style="--c:var(--hn-amber)">Needs you</span></div>
+  </div>
+  <div class="hn-term running"><div class="hn-seam"><span class="hn-planet live"><i></i></span><span class="hn-label" style="color:var(--hn-accent)">Bash</span><span class="hn-trail">running 4.2s</span></div>
+    <div class="cmd" style="margin-top:10px">./gradlew :app:assembleDebug</div>
+    <div>&gt; Task :app:compileDebugKotlin</div><div class="warn">w: Cosmos.kt:212 'alpha' is never used</div><div>&gt; Task :app:packageDebug<span class="cursor"></span></div>
+  </div>
+  <div style="height:30vh"></div>
+</div>
+<canvas class="hn-grain" id="grain"></canvas>
+<script src="cosmos.js"></script>
+<script>
+  const sky = HyperCosmos.mount({ canvas: document.getElementById('sky'), grain: document.getElementById('grain'),
+    band: () => ({ top: 90, bottom: innerHeight * .5 }) });
+  sky.setData({ usage: .42, resetAt: Date.now() + 2.2 * 3600e3, week: .18, weekResetAt: Date.now() + 61 * 3600e3,
+    groups: [
+      { name: 'hypernova', items: [{ id: 'a3', minutes: 190, label: 'cosmos renderer', state: 'working' }, { id: 'b8', minutes: 50, label: 'pairing over tailscale', state: 'idle' }, { id: 'e2', minutes: 12, label: 'release notes', state: 'idle' }] },
+      { name: '0stems', items: [{ id: 'c7', minutes: 95, label: 'release landing copy', state: 'needs' }] },
+      { name: 'prudnikov-site', items: [{ id: '1f', minutes: 18, label: 'blog layout', state: 'idle' }] },
+      { name: 'Hyperscribe', items: [{ id: '9b', minutes: 360, label: 'transcript export', state: 'idle' }] },
+      { name: 'Hypernavigate', items: [{ id: '5e', minutes: 40, label: 'route alerts', state: 'working' }] },
+    ] });
+  sky.onHit = h => { if (h.type === 'sun') sky.zoom(window.__z = null); if (h.type === 'group') sky.zoom(h.name === window.__z ? (window.__z = null) : (window.__z = h.name)); };
+  // ?supernova: watch the sun die and be reborn (30s demo cooldown). ?heat: the universe's heat death and Big Bang.
+  if (location.search.includes('supernova')) setTimeout(() => sky.setData({ limitedAt: Date.now(), resetAt: Date.now() + 30000 }), 1500);
+  if (location.search.includes('heat')) setTimeout(() => sky.setData({ weekLimitedAt: Date.now(), weekResetAt: Date.now() + 20000 }), 1500);
+</script>
+</body>
+</html>

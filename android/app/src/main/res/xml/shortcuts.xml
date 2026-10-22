@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press on the app icon: "New session". The three latest projects are added as dynamic
+     shortcuts (ui/share/LauncherShortcuts.kt). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_session"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new"
+        android:shortcutShortLabel="@string/shortcut_new_short"
+        android:shortcutLongLabel="@string/shortcut_new_long">
+        <intent
+            android:action="com.prudnikweb.hypernova.NEW_SESSION"
+            android:targetPackage="com.prudnikweb.hypernova"
+            android:targetClass="com.prudnikweb.hypernova.MainActivity" />
+    </shortcut>
+</shortcuts>

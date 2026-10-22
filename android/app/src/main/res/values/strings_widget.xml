@@ -1,0 +1,59 @@
+<resources>
+    <!-- Home screen widgets (their own file, so they stay apart from the app's strings). -->
+    <string name="widget_sun_label">Usage sun</string>
+    <string name="widget_sun_desc">Your 5-hour usage as the sky\'s sun, and who\'s working.</string>
+    <string name="widget_sessions_label">Sessions</string>
+    <string name="widget_sessions_desc">Live sessions, approvals you can answer right here, and your usage.</string>
+    <string name="widget_quiet">All quiet</string>
+    <string name="widget_not_connected">Not connected to your Mac</string>
+    <string name="widget_last_updated">Last updated %1$s</string>
+    <string name="widget_connecting">Connecting to your Mac…</string>
+    <string name="widget_pair">Open Hypernova to pair</string>
+    <string name="widget_retry">Open Hypernova to reconnect</string>
+    <!-- The background connection is off and the app is closed: nothing is wrong, it just waits. -->
+    <string name="widget_app_only">Updates while Hypernova is open</string>
+    <string name="widget_offline">Offline</string>
+    <string name="widget_refills">refills %1$s</string>
+    <string name="widget_no_numbers">waiting for numbers</string>
+    <!-- At a limit the widgets' line leads with it, in the permanent notification's words (limit_session,
+         limit_weekly, AccountWords.clock): "Session limit until 2:00", "Weekly limit until Fri 10:00". -->
+    <string name="widget_back">until %1$s</string>
+    <string name="widget_lead">%1$s %2$s</string>
+    <!-- The account stops Claude until the owner acts: these lead instead, in amber. -->
+    <string name="widget_signed_out">Signed out</string>
+    <string name="widget_no_plan">No Claude plan</string>
+    <string name="widget_on_hold">Account on hold</string>
+    <string name="widget_no_credit">Out of usage credits</string>
+    <plurals name="widget_agents_running">
+        <item quantity="one">%d agent running</item>
+        <item quantity="other">%d agents running</item>
+    </plurals>
+    <string name="widget_no_sessions">No sessions running</string>
+    <string name="widget_start_one">Start one from the app</string>
+    <string name="widget_allowing">Allowing…</string>
+    <string name="widget_denying">Denying…</string>
+    <string name="widget_failed">Didn\'t go through</string>
+    <string name="widget_open">Open</string>
+    <string name="widget_question">Question</string>
+    <string name="widget_plan">Plan</string>
+    <plurals name="widget_more">
+        <item quantity="one">+%d more</item>
+        <item quantity="other">+%d more</item>
+    </plurals>
+    <!-- The meters, one sentence each. The widget shows clock times ("at 4:40 PM", "Sun 10:00",
+         AccountWords.atClock), not durations. -->
+    <string name="widget_a11y_five">5-hour usage</string>
+    <string name="widget_a11y_week">Weekly usage</string>
+    <string name="widget_a11y_week_unknown">Weekly usage: no numbers yet.</string>
+    <string name="widget_a11y_meter_plain">%1$s %2$d%%.</string>
+    <string name="widget_a11y_meter">%1$s %2$d%%, resets %3$s.</string>
+    <string name="widget_a11y_meter_lasts">%1$s %2$d%%. At this pace it lasts until the reset, %3$s.</string>
+    <string name="widget_a11y_meter_limit">%1$s %2$d%%. At this pace you reach the limit %3$s, before the reset %4$s.</string>
+    <string name="widget_a11y_lead">%1$s %2$s.</string>
+    <string name="widget_a11y_open">Open the approval in %1$s</string>
+    <string name="widget_a11y_open_plain">Open the approval</string>
+    <string name="widget_a11y_allow">Allow: %1$s</string>
+    <string name="widget_a11y_deny">Deny: %1$s</string>
+    <string name="widget_a11y_row">%1$s, %2$s. %3$s</string>
+    <string name="widget_a11y_row_plain">%1$s. %2$s</string>
+</resources>

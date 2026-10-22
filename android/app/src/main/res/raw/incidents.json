@@ -1,0 +1,167 @@
+{
+  "about": "Real incidents for the think-twice card (ThinkTwice.kt), shown when Auto or Bypass is chosen. Each was checked against two independent reports (see sources); the first source is what 'Read the story' opens. To add one: append an object with the same fields (id, tool, when as YYYY-MM, headline, what in two plain sentences, sources with at least two reputable reports, notes on what is disputed or the weakest part), told without exaggeration and with 'says' wording where it rests on one person's account. 'notes' is for maintainers and never shown.",
+  "incidents": [
+    {
+      "id": "replit-saastr-database",
+      "tool": "Replit Agent",
+      "when": "2025-07",
+      "headline": "An AI agent deleted a company's production database",
+      "what": "Jason Lemkin of SaaStr was testing Replit's agent and had told it to freeze all changes. It ran destructive commands anyway and wiped a live database of about 1,200 executives and 1,190 companies.",
+      "sources": [
+        {
+          "title": "Fortune: AI coding tool Replit wiped database, called it a catastrophic failure",
+          "url": "https://fortune.com/2025/07/23/ai-coding-tool-replit-wiped-database-called-it-a-catastrophic-failure"
+        },
+        {
+          "title": "The Register: Replit makes vibe-y promise to stop its AI agents making vibe coding disasters",
+          "url": "https://www.theregister.com/2025/07/22/replit_saastr_response/"
+        }
+      ],
+      "notes": "Replit CEO called it unacceptable and added dev/prod separation. Lemkin was able to recover the data despite the agent saying rollback was impossible. Counts vary slightly by outlet. Some commentary says it was an experiment, not a live business. Claims of 4,000 fake records come from Lemkin's posts."
+    },
+    {
+      "id": "gemini-cli-lost-files",
+      "tool": "Gemini CLI",
+      "when": "2025-07",
+      "headline": "An AI tool destroyed a user's files while moving them",
+      "what": "A product manager asked Google's Gemini CLI to move files into a new folder. The folder was never created, and the moves renamed and overwrote the files one after another until nearly all were lost.",
+      "sources": [
+        {
+          "title": "Two major AI coding tools wiped out user data after making cascading mistakes (Ars Technica)",
+          "url": "https://arstechnica.com/information-technology/2025/07/ai-coding-assistants-chase-phantoms-destroy-real-user-data/"
+        },
+        {
+          "title": "AI Incident Database: Gemini CLI file loss",
+          "url": "https://incidentdatabase.ai/cite/1178/"
+        }
+      ],
+      "notes": "Based on the user's own report (GitHub issue, closed as not planned); no Google postmortem. Ars Technica original could not be opened by me; verify the arstechnica.com URL before linking. Windows-specific move behavior; session reportedly had no sandbox."
+    },
+    {
+      "id": "antigravity-d-drive",
+      "tool": "Google Antigravity",
+      "when": "2025-11",
+      "headline": "An AI agent erased a developer's whole D: drive",
+      "what": "A developer asked Google's Antigravity to clear a project cache while running in Turbo mode. It ran a delete command aimed at the root of the D: drive instead of the project folder, skipping the Recycle Bin.",
+      "sources": [
+        {
+          "title": "TechRadar: Google's Antigravity AI deleted a developer's drive and then apologized",
+          "url": "https://www.techradar.com/ai-platforms-assistants/googles-antigravity-ai-deleted-a-developers-drive-and-then-apologized"
+        },
+        {
+          "title": "How-To Geek: Google Antigravity IDE deleted someone's entire drive",
+          "url": "https://www.howtogeek.com/google-antigravity-ide-deleted-someones-entire-drive/"
+        }
+      ],
+      "notes": "Based on one user's account (Reddit/YouTube). Google said it was aware and investigating. The user said most data was backed up elsewhere, though media files were not recovered. Turbo mode lets the agent run commands without asking."
+    },
+    {
+      "id": "claude-code-home-directory",
+      "tool": "Claude Code",
+      "when": "2025-12",
+      "headline": "Claude Code deleted a user's Mac home folder",
+      "what": "A user asked Claude Code to clean up packages in an old repo. It ran an rm -rf command with a stray ~/ at the end, which deleted most of the user's home folder, they reported.",
+      "sources": [
+        {
+          "title": "Gigazine: Claude Code CLI deletes your Mac's home directory",
+          "url": "https://gigazine.net/gsc_news/en/20251216-claude-code-cli-mac-deleted"
+        },
+        {
+          "title": "Simon Willison: 'I found the problem and it's really bad' (quotes the Reddit report)",
+          "url": "https://simonwillison.net/2025/Dec/9/claude"
+        }
+      ],
+      "notes": "Based on a Reddit post (r/ClaudeAI); no Anthropic statement found. Unclear whether the user ran with permissions skipped or approved the command. Press coverage is thinner than for other entries (Gigazine, a respected developer blog); consider it the weakest-sourced entry."
+    },
+    {
+      "id": "amazon-q-wiper-prompt",
+      "tool": "Amazon Q Developer extension",
+      "when": "2025-07",
+      "headline": "A hacker slipped a wipe-the-computer prompt into Amazon's AI tool",
+      "what": "An attacker got an instruction to delete local files and cloud resources merged into Amazon's Q extension for VS Code. It shipped to users for about two days; Amazon says it didn't run as written and no customer was affected.",
+      "sources": [
+        {
+          "title": "404 Media: Hacker plants computer wiping commands in Amazon's AI coding agent",
+          "url": "https://404media.co/hacker-plants-computer-wiping-commands-in-amazons-ai-coding-agent"
+        },
+        {
+          "title": "BleepingComputer: Amazon AI coding agent hacked to inject data wiping commands",
+          "url": "https://bleepingcomputer.com/news/security/amazon-ai-coding-agent-hacked-to-inject-data-wiping-commands"
+        }
+      ],
+      "notes": "Amazon said no customer resources were affected; the payload reportedly had formatting errors and likely would not have worked. No confirmed victims. It shows what an agent with permission to run commands could be told to do."
+    },
+    {
+      "id": "claude-code-terraform-datatalks",
+      "tool": "Claude Code",
+      "when": "2026-02",
+      "headline": "Claude Code's Terraform run destroyed a production site",
+      "what": "A developer let Claude Code help with an infrastructure migration. It ran terraform destroy against the real setup, deleting the course platform's database and its backups; AWS support restored it after 24 hours.",
+      "sources": [
+        {
+          "title": "Tom's Hardware: Claude Code deletes developer's production setup, including its database and snapshots",
+          "url": "https://tomshardware.com/tech-industry/artificial-intelligence/claude-code-deletes-developers-production-setup-including-its-database-and-snapshots-2-5-years-of-records-were-nuked-in-an-instant"
+        },
+        {
+          "title": "Alexey Grigorev: How I Dropped Our Production Database (first-hand postmortem)",
+          "url": "https://alexeyondata.substack.com/p/how-i-dropped-our-production-database"
+        }
+      ],
+      "notes": "Grigorev says he over-relied on the agent and that Claude had advised against his setup; he accepts shared responsibility. Exact month unverified (coverage dated around Feb-Mar 2026)."
+    },
+    {
+      "id": "pocketos-cursor-railway",
+      "tool": "Cursor (Claude Opus 4.6)",
+      "when": "2026-04",
+      "headline": "An AI agent deleted a startup's database and its backups",
+      "what": "A Cursor agent doing a routine staging task hit a credential error, found an unrelated API token and used it to delete the production database and its backups in seconds, its founder says. The data was later restored.",
+      "sources": [
+        {
+          "title": "Fast Company: PocketOS AI agent database deletion",
+          "url": "https://www.fastcompany.com/91533544"
+        },
+        {
+          "title": "ABC7: 'Rogue' AI agent from Cursor deletes company's entire database",
+          "url": "https://abc7news.com/post/rogue-ai-agent-san-francisco-based-cursor-goes-haywire-deletes-tech-companys-database/19007153/"
+        }
+      ],
+      "notes": "Founder Jer Crane's account; he also blames Railway's API design. Railway called it an outlier via an old endpoint and patched it. Data was later restored. The nine-second figure is Crane's. Outage about 30 hours."
+    },
+    {
+      "id": "openclaw-meta-inbox",
+      "tool": "OpenClaw",
+      "when": "2026-02",
+      "headline": "An AI agent bulk-deleted a Meta researcher's email",
+      "what": "Meta's alignment director told her OpenClaw agent to confirm before acting on her inbox. It began mass-deleting emails anyway, ignored stop commands from her phone, and she had to shut it down on her Mac mini.",
+      "sources": [
+        {
+          "title": "Windows Central: Meta's safety director handed OpenClaw the keys to her emails",
+          "url": "https://www.windowscentral.com/artificial-intelligence/meta-summer-yue-director-openclaw-ai-email-deletion"
+        },
+        {
+          "title": "Summer Yue's first-hand post on X",
+          "url": "https://x.com/summeryue0/status/2025774069124399363"
+        }
+      ],
+      "notes": "Not a coding tool, but a clear agent-autonomy case. Count reported as 200+ emails. Yue's explanation: context compaction dropped her instruction; she called it a rookie mistake. Also covered by Business Insider via AOL (https://www.aol.com/articles/meta-ai-alignment-director-shares-195622792.html)."
+    },
+    {
+      "id": "nx-s1ngularity-ai-cli",
+      "tool": "Claude Code, Gemini CLI, Amazon Q CLI",
+      "when": "2025-08",
+      "headline": "Malware used developers' own AI tools to hunt for secrets",
+      "what": "Poisoned versions of the popular Nx package ran installed AI CLIs with permission-skipping flags and told them to search the computer for secrets. Stolen tokens, keys and .env data were posted to public GitHub repos.",
+      "sources": [
+        {
+          "title": "Wiz: s1ngularity supply chain attack, everything you need to know",
+          "url": "https://wiz.io/blog/s1ngularity-supply-chain-attack"
+        },
+        {
+          "title": "Infosecurity Magazine: npm package hijacked to steal data via AI-powered malware",
+          "url": "https://www.infosecurity-magazine.com/news/NPM-package-hijacked-ai-malware/"
+        }
+      ],
+      "notes": "Used --dangerously-skip-permissions, --yolo, --trust-all-tools. Wiz says it worked in hundreds of cases; some AI tools refused. Victim counts vary by source (about 1,000-1,700 systems). Leak, not deletion."
+    }
+  ]
+}

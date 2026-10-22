@@ -1,0 +1,11 @@
+# Only the daemon, its font, the install script and the Tailscale helper's Go sources go into the image (Dockerfile).
+**
+!daemon/package.json
+!daemon/package-lock.json
+!daemon/src/**
+!daemon/tsnet/*.go
+!daemon/tsnet/go.mod
+!daemon/tsnet/go.sum
+!android/app/src/main/res/font/jetbrains_mono.ttf
+!scripts/install-linux.sh
+!scripts/docker-entrypoint.sh

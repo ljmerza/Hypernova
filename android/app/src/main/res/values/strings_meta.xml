@@ -1,0 +1,19 @@
+<resources>
+    <!-- A session's metadata drawn as chips and glyphs (ui/components/SessionMeta.kt): what TalkBack hears for each. -->
+    <string name="meta_model_said">Model: %1$s.</string>
+    <string name="meta_mode_said">Permission mode: %1$s.</string>
+    <string name="meta_session_said">Session %1$s, active %2$s.</string>
+    <string name="meta_ago_now">just now</string>
+    <plurals name="meta_ago_minutes">
+        <item quantity="one">%d minute ago</item>
+        <item quantity="other">%d minutes ago</item>
+    </plurals>
+    <plurals name="meta_ago_hours">
+        <item quantity="one">%d hour ago</item>
+        <item quantity="other">%d hours ago</item>
+    </plurals>
+    <plurals name="meta_ago_days">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
+</resources>

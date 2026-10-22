@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The background notification: the working sessions and the agents behind them, "2 working with 11 agents". -->
+    <plurals name="notif_with_agents">
+        <item quantity="one">with %d agent</item>
+        <item quantity="other">with %d agents</item>
+    </plurals>
+
+    <!-- Approval notifications (data/Core.kt, Notifier): the lock screen shows who asks, not what. -->
+    <string name="notif_unlock_to_see">Unlock to see what it wants to run.</string>
+    <string name="notif_answer_failed">That answer didn\'t reach your Mac. Try again.</string>
+    <!-- Reply on a finished or waiting session's notification. -->
+    <string name="notif_reply">Reply</string>
+    <string name="notif_reply_hint">Tell %1$s what\'s next</string>
+    <string name="notif_reply_failed">Your reply didn\'t reach your Mac. Open the session to send it again.</string>
+
+    <!-- A Linux server or PC paired (data/ComputerWords.kt): its own way where a Mac's menu bar is meant. -->
+    <string name="problem_not_running_linux">Hypernova isn\'t running on your server. On it, run hypernova doctor: it says what stopped and how to start it.</string>
+    <string name="problem_tls_linux">The secure connection to your server failed. On it, run hypernova doctor to finish the Tailscale setup.</string>
+    <string name="unpaired_body_linux">%1$s no longer accepts this phone. To pair again, run hypernova pair on it and scan the code.</string>
+    <string name="problem_unpaired_linux">This phone was unpaired. Pair it again: run hypernova pair on your server.</string>
+    <string name="problem_code_expired_linux">Codes work once and last 10 minutes. On your server, run hypernova pair again and scan the new code.</string>
+
+    <!-- Home with nothing alive while History has sessions (audit P21: not "No sessions yet."). -->
+    <string name="empty_quiet_title">Nothing running right now.</string>
+    <string name="empty_quiet_body">Start a session here, or pick up one that ended.</string>
+    <string name="empty_open_history">Open History</string>
+
+    <!-- History (ui/home/History.kt): a search, project chips and the days sessions ended on. -->
+    <string name="history_search">Search ended sessions</string>
+    <string name="history_today">Today</string>
+    <string name="history_yesterday">Yesterday</string>
+    <string name="history_no_match">Nothing ended matches “%1$s”.</string>
+    <string name="history_none_in">Nothing in %1$s has ended lately.</string>
+
+    <!-- Scanning another computer's code while paired (data/AppModel.kt, audit P12). -->
+    <string name="pair_replace_q">Replace %1$s with %2$s?</string>
+    <string name="pair_replace_body">This phone works with one computer at a time. %1$s stops reaching it.</string>
+    <string name="pair_replace">Replace</string>
+
+    <!-- A notification's session that isn't known (ui/App.kt, audit P11). -->
+    <string name="open_gone">That session isn\'t on your Mac any more.</string>
+    <string name="open_unreachable">Can\'t reach your Mac to open that session.</string>
+
+    <!-- Home: sessions whose provider was deleted (docs/PROTOCOL.md, "A deleted provider"). -->
+    <string name="provider_removed_title">Its provider was removed</string>
+    <plurals name="provider_removed_line">
+        <item quantity="one">%d session can\'t reply until you move it to another provider.</item>
+        <item quantity="other">%d sessions can\'t reply until you move them to another provider.</item>
+    </plurals>
+    <string name="open_session_short">Open</string>
+</resources>

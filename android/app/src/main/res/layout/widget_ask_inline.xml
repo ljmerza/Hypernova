@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- widget_ask for a widget two rows tall: the same band, then the command and the buttons on
+     one line. The buttons' touch targets are 44dp tall around 32dp pills (hence the 1dp padding
+     above and below the line). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/a_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/widget_ask_bg"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:background="@drawable/widget_ask_band"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
+
+        <TextView
+            android:id="@+id/a_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.18"
+            android:maxLines="1"
+            android:text="@string/state_needs_you"
+            android:textAllCaps="true"
+            android:textColor="@color/widget_bg"
+            android:textFontWeight="700"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/a_project"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.14"
+            android:maxLines="1"
+            android:textAllCaps="true"
+            android:textColor="#B314110E"
+            android:textFontWeight="600"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/a_tool"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.18"
+            android:maxLines="1"
+            android:textAllCaps="true"
+            android:textColor="#B314110E"
+            android:textFontWeight="700"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="46dp"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="1dp">
+
+        <TextView
+            android:id="@+id/a_command"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_command_bg"
+            android:breakStrategy="simple"
+            android:ellipsize="end"
+            android:fontFamily="monospace"
+            android:gravity="center_vertical"
+            android:hyphenationFrequency="none"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="@color/widget_ink"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/a_text"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/widget_ink"
+            android:textFontWeight="500"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/a_note"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/widget_ink_dim"
+            android:textFontWeight="500"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/a_deny"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp">
+
+            <TextView
+                android:id="@+id/a_deny_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/widget_pill_deny"
+                android:duplicateParentState="true"
+                android:fontFamily="sans-serif"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:minWidth="64dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/deny"
+                android:textColor="@color/widget_danger"
+                android:textFontWeight="600"
+                android:textSize="13sp" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/a_allow"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp">
+
+            <TextView
+                android:id="@+id/a_allow_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/widget_pill_allow"
+                android:duplicateParentState="true"
+                android:fontFamily="sans-serif"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:minWidth="64dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/allow"
+                android:textColor="@color/widget_bg"
+                android:textFontWeight="600"
+                android:textSize="13sp" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/a_open"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/a_open_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/widget_pill_open"
+                android:duplicateParentState="true"
+                android:fontFamily="sans-serif"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:minWidth="64dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/widget_open"
+                android:textColor="@color/widget_ink"
+                android:textFontWeight="600"
+                android:textSize="13sp" />
+        </FrameLayout>
+    </LinearLayout>
+</LinearLayout>

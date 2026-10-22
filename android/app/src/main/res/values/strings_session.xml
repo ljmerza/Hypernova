@@ -1,0 +1,73 @@
+<resources>
+    <!-- The session screen's own words: switching the model, approvals, the Mac away, a long history, attachments, Stop, the terminal's keys. -->
+
+    <!-- The model, from the status line's panel (P4). -->
+    <string name="model_change">Change the model</string>
+    <string name="err_model">Couldn’t switch the model. Try again.</string>
+    <string name="model_next_turn">%1$s from the next turn</string>
+    <string name="model_paid_q">This costs money</string>
+    <string name="model_paid_body">This session runs on %1$s, which bills its own credit, not your Claude subscription.</string>
+    <string name="model_paid_ok">Switch anyway</string>
+
+    <!-- Approvals. -->
+    <string name="ask_show_less">Show less</string>
+    <plurals name="ask_show_all">
+        <item quantity="one">Show all (%d line)</item>
+        <item quantity="other">Show all (%d lines)</item>
+    </plurals>
+    <string name="always_means">Always is Claude Code’s own “Yes, and don’t ask again” for this.</string>
+    <string name="answered_elsewhere">Answered elsewhere</string>
+    <string name="check_always_title">Allow this from now on</string>
+    <string name="check_bypass_title">Let this session run without asking</string>
+    <string name="check_no_lock">Set up a screen lock on this phone first: this step needs it.</string>
+    <string name="check_failed">The fingerprint check didn’t open. Try again.</string>
+
+    <!-- The Mac away. -->
+    <string name="hint_mac_away">Your Mac isn’t reachable right now</string>
+    <string name="waiting_mac_title">Waiting for your Mac</string>
+    <string name="waiting_mac_body">Connecting to your Mac…</string>
+    <string name="waiting_mac_retry">Try now</string>
+
+    <!-- Stop. -->
+    <string name="status_stopping">Stopping…</string>
+
+    <!-- A long history. -->
+    <string name="earlier_show">Show earlier</string>
+    <string name="earlier_loading">Loading earlier messages…</string>
+
+    <!-- Attachments. -->
+    <string name="attach_too_big_named">%1$s is too big to attach (30 MB at most).</string>
+    <string name="attach_failed_named">%1$s didn’t upload. %2$s</string>
+    <string name="attach_retry">Send %1$s again</string>
+    <string name="attach_fix_first">%1$s didn’t reach your Mac. Tap it to try again, or remove it.</string>
+
+    <!-- Unsent text in the terminal. -->
+    <string name="busy_dismiss">Dismiss</string>
+
+    <!-- A terminal menu's current option, for TalkBack. -->
+    <string name="menu_current">Current</string>
+
+    <!-- The terminal's key bar: the sticky Ctrl. -->
+    <string name="key_ctrl">Ctrl</string>
+    <string name="key_ctrl_said">Ctrl for the next key</string>
+    <string name="key_ctrl_on">Ctrl on: the next key goes with Ctrl</string>
+    <!-- The offline queue: prompts typed while the Mac is away wait on the phone -->
+    <string name="hint_mac_away_queue">Your Mac is away. Prompts wait.</string>
+    <string name="waiting_mac_label">Waiting for your Mac</string>
+    <string name="waiting_mac_hint">Sends itself when your Mac is back</string>
+    <string name="waiting_gone_label">This session ended</string>
+    <string name="waiting_gone_hint">Your Mac no longer has this session. Your words are kept.</string>
+    <string name="waiting_start_new">Start a new session with it</string>
+    <string name="waiting_edit">Edit</string>
+    <string name="waiting_remove">Remove</string>
+    <string name="waiting_save">Save</string>
+    <string name="waiting_removed">Removed</string>
+    <string name="waiting_chip">%d waiting</string>
+    <string name="waiting_a11y">%d prompts waiting for your Mac</string>
+    <string name="waiting_orphan_title">A prompt for a session that ended</string>
+    <string name="waiting_files_gone">A file on your Mac is gone, so this prompt went without it.</string>
+    <string name="attach_mac_away">Can’t attach while your Mac is away. Your words stay in the box.</string>
+    <string name="start_mac_away">Your Mac is away. Start waits for it; your words stay here.</string>
+    <string name="waiting_no_folder">Your Mac doesn’t say which folder this was for. Copy the words and start a session there.</string>
+    <string name="demo_waiting_prompt">Also add a short section to the README about running the daemon on a second Mac.</string>
+</resources>

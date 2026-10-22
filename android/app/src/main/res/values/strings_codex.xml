@@ -1,0 +1,78 @@
+<resources>
+    <!-- Codex as a second agent (data/Codex.kt; docs/PROTOCOL.md, "Codex (a second agent)", "Switching agents"). Nothing here shows on a Mac without Codex. -->
+
+    <!-- The agents. -->
+    <string name="cx_agent">Agent</string>
+    <string name="cx_agent_claude">Claude Code</string>
+    <string name="cx_agent_codex">Codex</string>
+
+    <!-- Codex's two modes (its sandboxes): the chips and pickers, the cards' words, what each does. -->
+    <string name="cx_mode_read_only">Read only</string>
+    <string name="cx_mode_can_edit">Can edit</string>
+    <string name="cx_mode_label_read_only">read only</string>
+    <string name="cx_mode_label_can_edit">can edit</string>
+    <string name="cx_mode_read_only_desc">Reads and looks around. Asks before it changes anything.</string>
+    <string name="cx_mode_can_edit_desc">Edits files and runs commands in this folder. Asks before it goes further.</string>
+    <string name="cx_mode_next_turn">The new mode starts with Codex’s next turn.</string>
+
+    <!-- The new-session sheet and the model picker. -->
+    <string name="cx_prompt_new_hint">What should Codex do?</string>
+    <string name="cx_models_line">Codex’s own models, on your Mac.</string>
+    <string name="cx_loading_models">Asking Codex for its models…</string>
+    <string name="cx_models_when_on">Your first Codex session turns Codex on. Its models show after that.</string>
+    <string name="cx_err_models">Couldn’t get Codex’s models.</string>
+    <string name="cx_effort">Reasoning effort</string>
+    <string name="cx_effort_none">None</string>
+    <string name="cx_effort_minimal">Minimal</string>
+    <string name="cx_effort_low">Low</string>
+    <string name="cx_effort_medium">Medium</string>
+    <string name="cx_effort_high">High</string>
+    <string name="cx_effort_xhigh">Extra high</string>
+    <string name="cx_done">Done</string>
+    <string name="cx_model_effort_said">Model: %1$s, %2$s reasoning effort.</string>
+
+    <!-- Home: Codex's own limits. -->
+    <string name="cx_usage">Codex usage</string>
+    <string name="cx_usage_limited">limited</string>
+    <string name="cx_usage_none">No numbers from Codex yet.</string>
+    <string name="cx_usage_signed_out">Codex is signed out on your Mac.</string>
+    <string name="cx_usage_name_five">Codex 5-hour window</string>
+    <string name="cx_usage_name_seven">Codex weekly window</string>
+
+    <!-- A session that switched agents, and the switch from its panel. -->
+    <string name="cx_continued_from">Continued from %1$s</string>
+    <string name="cx_continued_in">Continued in %1$s</string>
+    <string name="cx_hint_went_on">This conversation went on with %1$s</string>
+    <string name="cx_went_on">This conversation went on in another session.</string>
+    <string name="cx_switch_to_codex">Switch to Codex</string>
+    <string name="cx_switch_to_claude">Switch to Claude</string>
+    <string name="cx_switch_line">%1$s goes on with this conversation in a new session in the same folder, with what you carry over as background. It does nothing until your next message.</string>
+    <string name="cx_carry">Carry over</string>
+    <string name="cx_carry_recent">Recent</string>
+    <string name="cx_carry_all">Entire</string>
+    <string name="cx_carry_none">None</string>
+    <string name="cx_carry_empty">Nothing: %1$s starts fresh.</string>
+    <string name="cx_reading">Reading the conversation…</string>
+    <plurals name="cx_messages">
+        <item quantity="one">%d message</item>
+        <item quantity="other">%d messages</item>
+    </plurals>
+    <string name="cx_size">%1$s of %2$s</string>
+    <string name="cx_too_long">That’s more than %1$s. Shorten it, or pick Recent.</string>
+    <string name="cx_starts_with">%1$s starts with</string>
+    <string name="cx_stop_first">%1$s is still at work here. Switching stops it first.</string>
+    <string name="cx_stop_timeout">%1$s didn’t stop in time. Try again in a moment.</string>
+    <string name="cx_switch">Switch</string>
+    <string name="cx_stop_and_switch">Stop and switch</string>
+    <string name="cx_switching">Switching…</string>
+    <string name="cx_err_preview">Couldn’t read this conversation for the switch.</string>
+    <string name="cx_err_switch">Couldn’t switch. Try again.</string>
+    <string name="cx_err_turn_on">Couldn’t turn Codex on.</string>
+    <string name="cx_err_turn_off">Couldn’t turn Codex off.</string>
+
+    <!-- An automation's start step on Codex. -->
+    <string name="cx_au_read_only_body">Reads the folder and runs commands that change nothing.</string>
+    <string name="cx_au_can_edit_body">Edits files and runs commands in its folder, nothing outside it.</string>
+    <string name="cx_au_asks_nobody">In an automation Codex asks nobody: what its mode doesn’t allow, it doesn’t do.</string>
+    <string name="cx_paid_body">Codex is signed in with an API key on your Mac, so every run costs money.</string>
+</resources>

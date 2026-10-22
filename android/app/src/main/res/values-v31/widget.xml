@@ -1,0 +1,5 @@
+<resources>
+    <!-- The launcher's widget corner radii, so the glass card sits flush with every other widget. -->
+    <dimen name="widget_radius">@android:dimen/system_app_widget_background_radius</dimen>
+    <dimen name="widget_inner_radius">@android:dimen/system_app_widget_inner_radius</dimen>
+</resources>

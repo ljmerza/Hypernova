@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Files: why something can't be opened, and what to do next. -->
+    <string name="fp_outside_title">Outside your projects</string>
+    <string name="fp_outside_body">Hypernova only opens folders inside %1$s.</string>
+    <string name="fp_outside_body_none">Hypernova only opens folders inside your projects folder and your sessions\' own folders.</string>
+    <string name="fp_open_projects">Open projects</string>
+    <string name="fp_secret_title">Stays on the Mac</string>
+    <string name="fp_secret_body">This holds keys or passwords, so Hypernova never sends it to the phone.</string>
+    <string name="fp_toolarge_title">Too large to show</string>
+    <string name="fp_toolarge_body">This file is %1$s, more than the phone previews (%2$s).</string>
+    <string name="fp_toolarge_body_plain">This file is too large to show on the phone.</string>
+    <string name="fp_toolarge_dl_title">Too large to download</string>
+    <string name="fp_toolarge_dl_body">This file is %1$s. The phone downloads files up to %2$s.</string>
+    <string name="fp_download_instead">Download instead</string>
+    <string name="fp_notfound_file_title">It\'s gone from the Mac</string>
+    <string name="fp_notfound_file_body">This file was moved or deleted after the list was made.</string>
+    <string name="fp_notfound_dir_title">That folder is gone</string>
+    <string name="fp_notfound_dir_body">It was moved or deleted on the Mac.</string>
+    <string name="fp_up_folder">Go up a folder</string>
+    <string name="fp_attach_title">The attachment is gone</string>
+    <string name="fp_attach_body">The Mac keeps attachments for 30 days. Attach the file again.</string>
+    <string name="fp_privacy_title">macOS is keeping Hypernova out</string>
+    <string name="fp_privacy_body">Allow it on the Mac, then open this again.</string>
+    <string name="fp_privacy_steps">System Settings → Privacy &amp; Security → Files and Folders (or Full Disk Access) → node</string>
+    <string name="fp_unreadable_title">Can\'t be read</string>
+    <string name="fp_unreadable_body">Hypernova isn\'t allowed to open this on the Mac.</string>
+    <string name="fp_wrong_dir_title">That\'s a folder</string>
+    <string name="fp_wrong_file_title">That\'s a file</string>
+    <string name="fp_wrong_body">It opens the other way.</string>
+    <string name="fp_open_folder">Open the folder</string>
+    <string name="fp_open_file">Open the file</string>
+    <string name="fp_network_title">Can\'t reach the Mac</string>
+    <string name="fp_other_title">Couldn\'t open it</string>
+
+    <string name="fp_locked_title">Stays on the Mac</string>
+    <string name="fp_locked_body">Keys, passwords and private data live here, so Hypernova never opens it on the phone.</string>
+    <string name="fp_turn_on">Turn on in Settings</string>
+
+    <!-- Settings → Files: Browse outside projects (docs/PROTOCOL.md, "Files"). -->
+    <string name="st_files">Files</string>
+    <string name="st_browse_title">Browse outside projects</string>
+    <string name="st_browse_desc">Open sessions\' folders in your home folder too, read only.</string>
+    <string name="st_browse_why">A paired phone can then read those folders and download their files. Folders with keys and private data (.ssh, keychains, mail, browsers\' profiles, app data) and files with passwords stay locked whatever this says, and folders outside your home folder stay closed.</string>
+    <string name="st_browse_check_title">Open folders outside your projects</string>
+    <string name="st_browse_check_sub">Read only. Keys and private folders stay locked.</string>
+    <string name="st_browse_no_lock">Set up a screen lock on this phone first: this switch needs it.</string>
+    <string name="err_browse_setting">Couldn\'t change Browse outside projects.</string>
+    <string name="fl_locked_folder_row">Folder, %1$s, stays on the Mac</string>
+
+    <string name="fl_truncated">First %1$s of %2$s. Open a subfolder to see the rest.</string>
+    <string name="fl_locked_secret">Stays on the Mac</string>
+    <string name="fl_locked_outside">Leads outside your projects</string>
+    <string name="fl_locked_outside_body">This link points outside the folders Hypernova opens.</string>
+    <string name="fl_ok">OK</string>
+    <string name="fl_row_folder">Folder, %1$s</string>
+    <string name="fl_row_file">File, %1$s, %2$s, changed %3$s</string>
+    <string name="fl_row_file_nodate">File, %1$s, %2$s</string>
+    <string name="fl_row_locked">File, %1$s, stays on the Mac</string>
+
+    <!-- The viewer and downloads. -->
+    <string name="fv_share">Share</string>
+    <string name="fv_save">Save</string>
+    <string name="fv_open_with">Open with</string>
+    <string name="fv_cancel">Cancel</string>
+    <string name="fv_noview_title">Not shown on the phone</string>
+    <string name="fv_noview_body">Share it, open it with another app, or save it to a folder.</string>
+    <string name="fv_downloading">Downloading %1$s</string>
+    <string name="fv_progress">%1$s of %2$s</string>
+    <string name="fv_progress_unknown">%1$s so far</string>
+    <string name="fv_ready">Ready, %1$s</string>
+    <string name="fv_saved">Saved to the folder you picked.</string>
+    <string name="fv_save_failed">Couldn\'t save it there. Pick another folder.</string>
+    <string name="fv_open">Open</string>
+    <string name="fv_no_app">No app on this phone opens this kind of file. Share it or save it instead.</string>
+    <string name="fv_dl_interrupted">The download stopped at %1$s. It carries on from there.</string>
+    <string name="fv_dl_stopped">The download stopped.</string>
+    <string name="size_gb">%1$.1f GB</string>
+    <string name="pg_connect">Can\'t reach your Mac. Is it awake, and is Tailscale on?</string>
+    <string name="pg_dns">This phone can\'t find your Mac. Turn Tailscale on.</string>
+    <string name="pg_timeout">Your Mac took too long to answer. Is it awake?</string>
+    <string name="pg_ssl">The secure connection to your Mac failed.</string>
+    <string name="pg_dev_server">Nothing answers behind this preview. Is the dev server still running on your Mac?</string>
+    <string name="pg_gone">That page isn\'t on the Mac any more.</string>
+    <string name="pg_other">The page didn\'t load.</string>
+</resources>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The calm sky on Home (docs/DESIGN.md, "The calm sky"), its filter, and the provider card. -->
+<resources>
+    <!-- A planet's second line: what its project is doing. -->
+    <plurals name="sky_needs_you">
+        <item quantity="one">needs you</item>
+        <item quantity="other">%d need you</item>
+    </plurals>
+    <plurals name="sky_working">
+        <item quantity="one">working</item>
+        <item quantity="other">%d working</item>
+    </plurals>
+    <string name="sky_just_now">just now</string>
+    <!-- %1$s is a short duration: 4m, 2h, 3d. -->
+    <string name="sky_ago">%1$s ago</string>
+    <!-- The belt of projects that are quiet now: no planet of their own. -->
+    <string name="sky_quiet">+%1$d quiet</string>
+
+    <!-- The filter above the list: the project (or the quiet ones) the list shows. -->
+    <plurals name="filter_quiet">
+        <item quantity="one">%d quiet project</item>
+        <item quantity="other">%d quiet projects</item>
+    </plurals>
+    <plurals name="filter_waiting_elsewhere">
+        <item quantity="one">%d needs you elsewhere</item>
+        <item quantity="other">%d need you elsewhere</item>
+    </plurals>
+    <string name="a11y_filter_clear">Show all sessions</string>
+    <string name="a11y_filter_showing">Showing %1$s</string>
+    <string name="a11y_show_quiet">Show the quiet projects</string>
+    <string name="a11y_sky_quiet">%1$s. %2$d projects in orbit, %3$d quiet, %4$d need you.</string>
+
+    <!-- A provider in trouble, as a card on Home: what's wrong and the way to fix it. -->
+    <string name="provider_card_bad_key">%1$s key refused</string>
+    <string name="provider_card_bad_key_body">Sessions on it can\'t reply until you paste a new key.</string>
+    <string name="provider_card_no_credit">%1$s is out of credits</string>
+    <string name="provider_card_budget">%1$s reached its budget</string>
+    <string name="provider_card_no_credit_body">Sessions on it can\'t reply until it has credit again.</string>
+    <string name="provider_card_limited">%1$s is rate limited</string>
+    <string name="provider_card_limited_body">Sessions on it carry on by themselves %1$s.</string>
+    <string name="provider_card_down">%1$s isn\'t answering</string>
+    <string name="provider_card_other">%1$s can\'t reply</string>
+    <plurals name="provider_card_paused">
+        <item quantity="one">%d session paused</item>
+        <item quantity="other">%d sessions paused</item>
+    </plurals>
+    <string name="provider_fix">Fix</string>
+</resources>

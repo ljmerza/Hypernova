@@ -1,0 +1,30 @@
+{
+  "package_id": "com.prudnikweb.hypernova.lens",
+  "edition": "202601",
+  "name": "Hypernova Lens",
+  "version": "0.1.12",
+  "min_app_version": "2.2.10",
+  "min_sdk_version": "0.0.16",
+  "tagline": "Your Claude Code and Codex sessions on your glasses, with your computer in your bag",
+  "description": "Hypernova on Even G2: look up to see your Claude Code and Codex sessions, one line each, the one that needs you on top. Hold the temple and speak to send a prompt, tap to allow a command, read a finished reply or have it read into your earbuds, and see a picture of what your agent built. Talks only to the Hypernova app on your phone, which connects to your own Mac or Linux server. Nothing goes through anyone else's server.",
+  "author": "prudnik-web",
+  "entrypoint": "index.html",
+  "supported_languages": [
+    "en"
+  ],
+  "permissions": [
+    {
+      "name": "network",
+      "whitelist": [],
+      "desc": "Connects only to the Hypernova app on this phone (127.0.0.1), which carries everything to your own computer."
+    },
+    {
+      "name": "g2-microphone",
+      "desc": "While you hold the temple, your voice goes through the Hypernova app on your phone to your own computer to become text. Nothing is recorded."
+    },
+    {
+      "name": "camera",
+      "desc": "Takes one photo to scan a pairing code on your Mac or server. Nothing is stored."
+    }
+  ]
+}

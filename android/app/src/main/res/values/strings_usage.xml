@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A model's own weekly limit (Fable, Sonnet) is a meter labelled like the plan's week ("7 days"),
+         led by the model's chip (ui/home/ModelWeekMeters.kt); TalkBack names it with usage_name_model. -->
+</resources>

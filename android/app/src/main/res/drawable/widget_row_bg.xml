@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A session row: no fill at rest, a soft ink ripple when pressed. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#1AF5F2EB">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/widget_inner_radius" />
+            <solid android:color="#FFFFFFFF" />
+        </shape>
+    </item>
+</ripple>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The projection meter's red notch: at the bar's end when the pace reaches the limit before the
+     reset, and before the time it comes in the tag. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <size android:width="2dp" android:height="9dp" />
+    <solid android:color="@color/widget_danger" />
+</shape>

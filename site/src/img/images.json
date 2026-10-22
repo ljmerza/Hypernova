@@ -1,0 +1,207 @@
+{
+  "phone-home": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        630,
+        1400
+      ]
+    ]
+  },
+  "phone-chat": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        630,
+        1400
+      ]
+    ]
+  },
+  "phone-automations": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        486,
+        1080
+      ]
+    ]
+  },
+  "phone-dictation": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        486,
+        1080
+      ]
+    ]
+  },
+  "phone-new-session": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        630,
+        1400
+      ]
+    ]
+  },
+  "phone-statistics": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        486,
+        1080
+      ]
+    ]
+  },
+  "phone-sky-limit": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        630,
+        1400
+      ]
+    ]
+  },
+  "phone-model-picker": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        630,
+        1400
+      ]
+    ]
+  },
+  "phone-files": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        630,
+        1400
+      ]
+    ]
+  },
+  "phone-dialog": {
+    "ratio": 2.22222,
+    "widths": [
+      [
+        320,
+        711
+      ],
+      [
+        630,
+        1400
+      ]
+    ]
+  },
+  "mac-popover": {
+    "ratio": 2.06094,
+    "widths": [
+      [
+        320,
+        660
+      ],
+      [
+        640,
+        1319
+      ]
+    ]
+  },
+  "mac-automation": {
+    "ratio": 1.6625,
+    "widths": [
+      [
+        320,
+        532
+      ],
+      [
+        640,
+        1064
+      ]
+    ]
+  },
+  "lens-glance": {
+    "ratio": 0.5,
+    "widths": [
+      [
+        1152,
+        576
+      ]
+    ],
+    "png": true
+  },
+  "lens-needs-you": {
+    "ratio": 0.5,
+    "widths": [
+      [
+        1152,
+        576
+      ]
+    ],
+    "png": true
+  },
+  "lens-result": {
+    "ratio": 0.5,
+    "widths": [
+      [
+        1152,
+        576
+      ]
+    ],
+    "png": true
+  },
+  "lens-telescope": {
+    "ratio": 0.5,
+    "widths": [
+      [
+        1152,
+        576
+      ]
+    ],
+    "png": true
+  },
+  "orrery": {
+    "ratio": 0.9,
+    "widths": [
+      [
+        1240,
+        1116
+      ]
+    ]
+  }
+}

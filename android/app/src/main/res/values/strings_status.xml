@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The status bar above the prompt box while a turn runs (ui/session/StatusBar.kt). -->
+<resources>
+    <string name="status_starting">Starting</string>
+    <string name="status_sending">Sending</string>
+    <string name="status_thinking">Thinking</string>
+    <string name="status_writing">Writing the reply</string>
+    <string name="status_working">Working</string>
+    <string name="status_retrying">%1$s</string>
+    <string name="status_reading">Reading %1$s</string>
+    <string name="status_reading_many">Reading %1$d files</string>
+    <string name="status_searching">Searching %1$s</string>
+    <string name="status_editing">Editing %1$s</string>
+    <string name="status_creating">Creating %1$s</string>
+    <string name="status_running">Running %1$s</string>
+    <string name="status_fetching">Fetching %1$s</string>
+    <string name="status_searching_web">Searching the web for %1$s</string>
+    <string name="status_planning">Updating the to-do list</string>
+    <string name="status_tool">Using %1$s</string>
+    <plurals name="status_agents">
+        <item quantity="one">%1$d agent working</item>
+        <item quantity="other">%1$d agents working</item>
+    </plurals>
+    <string name="status_wait_approve">Waiting for you: approve %1$s</string>
+    <string name="status_wait_answer">Waiting for you: answer a question</string>
+    <string name="status_wait_plan">Waiting for you: review the plan</string>
+    <string name="status_wait_you">Waiting for you</string>
+    <string name="status_failed">Stopped on an error</string>
+
+    <string name="status_stop">Stop</string>
+    <string name="status_stop_desc">Stop %1$s</string>
+    <string name="status_expand">Show the to-do list</string>
+    <string name="status_fold">Fold the to-do list</string>
+    <string name="status_open">Open</string>
+    <string name="status_folded">Folded</string>
+    <!-- TalkBack: what the bar reads. %1$s is the sentence above, so no full stop of its own. -->
+    <string name="status_desc_todos">%1$s. %2$d of %3$d to-dos done. %4$s elapsed</string>
+    <string name="status_desc_plain">%1$s. %2$s elapsed</string>
+</resources>

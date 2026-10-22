@@ -1,0 +1,31 @@
+name: daemon
+on:
+  push:
+    branches: [main]
+    paths: ['daemon/**', '.github/workflows/daemon.yml']
+  pull_request:
+    paths: ['daemon/**', '.github/workflows/daemon.yml']
+  workflow_dispatch:
+concurrency:
+  group: daemon-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: daemon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: daemon/package-lock.json
+      # node-pty has no Linux prebuild, so npm compiles it; the runner has the compiler for that.
+      - run: npm ci
+      - run: npx tsc -p .
+      - run: npm test

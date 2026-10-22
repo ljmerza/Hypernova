@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The planet for themed icons (only its alpha counts). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- the sphere, bright toward the light and into shadow on the far side -->
+    <path android:pathData="M32.00,54.00a22.00,22.00 0,1 1,44.00,0a22.00,22.00 0,1 1,-44.00,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="44.04" android:centerY="44.04" android:gradientRadius="37.40">
+                <item android:offset="0" android:color="#CCFFFFFF"/>
+                <item android:offset="0.5" android:color="#3DFFFFFF"/>
+                <item android:offset="1" android:color="#0DFFFFFF"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- meridians: it turns -->
+    <path android:strokeColor="#3CFFFFFF" android:strokeWidth="1.6" android:fillColor="#00000000" android:pathData="M54.00,32.00 A15.56,22.00 0 0,1 54.00,76.00"/>
+    <path android:strokeColor="#9EFFFFFF" android:strokeWidth="1.6" android:fillColor="#00000000" android:pathData="M54.00,76.00 A15.56,22.00 0 0,1 54.00,32.00"/>
+    <path android:strokeColor="#6BFFFFFF" android:strokeWidth="1.6" android:fillColor="#00000000" android:pathData="M32.00,54.00a22.00,22.00 0,1 1,44.00,0a22.00,22.00 0,1 1,-44.00,0"/>
+</vector>

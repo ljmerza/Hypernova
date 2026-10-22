@@ -1,0 +1,610 @@
+# Install Hypernova
+
+Hypernova is a control room for Claude Code and Codex. A small service runs on a computer you own,
+next to your agents, and you reach it from your phone (the Android app), from your glasses
+(Hypernova Lens, through the phone) and, on a Mac, from the menu bar. Your phone reaches that
+computer over your Wi‑Fi, or from anywhere through your own Tailscale network. There is no
+Hypernova server in between.
+
+This is the whole install guide. Setup, in the Mac app, uses the same step names.
+
+## Where Hypernova runs
+
+| | **A Mac** | **A Linux server** | **Docker** |
+| --- | --- | --- | --- |
+| For | Your own Mac, at home or in your bag | A VPS, a home server, a Linux PC | Trying it out, or a box that already runs containers |
+| You install | `Hypernova.dmg`: the menu bar app, the service inside | `Hypernova-linux.tar.gz`: the `hypernova` command and the service | The image built from this repository |
+| You drive it with | Setup and the menu bar | `hypernova` over SSH | `docker exec … hypernova` |
+| Runs | macOS 14 or later, Apple silicon | Ubuntu or Debian, x86_64 or arm64, systemd | Docker (tested on arm64; the image is about 2.7 GB) |
+
+Whichever you choose, the phone side is the same: **the Android app** (Android 10 or later) pairs
+with the computer by a code, and **Hypernova Lens** on Even Realities G2 glasses goes through the
+app. The Mac's menu bar is a second control room, on that Mac only.
+
+## What you need
+
+- **The computer**:
+  - a Mac with Apple silicon (M1 or later) on macOS 14 Sonoma or later (Intel Macs aren't
+    supported), or
+  - a Linux machine on Ubuntu or Debian (others work with their packages installed by hand),
+    x86_64 or arm64, with systemd, sudo for the system packages, and a normal user to run it as, or
+  - Docker (the image is tested on arm64 so far).
+- **An agent** on that computer: [Claude Code](https://docs.claude.com/en/docs/claude-code),
+  OpenAI's [Codex](https://github.com/openai/codex) (0.163.0 or later), or both. Either one alone is
+  enough. Hypernova can install Claude Code for you; Codex you install yourself.
+- **An Android phone** on **Android 10 or later**.
+- Optional: a [Tailscale](https://tailscale.com) account, to reach the computer when the phone isn't
+  on its network (always, for a VPS). On the same Wi‑Fi you don't need one.
+- Optional: Even Realities G2 glasses (see [Hypernova Lens](../lens/README.md)), and a
+  [Soniox](https://soniox.com) API key for voice.
+
+Nothing else: Hypernova brings its own Node.js and its own Tailscale.
+
+## 1. Download
+
+From the [latest release](https://github.com/prudnik-web/Hypernova/releases/latest), download what
+you need:
+
+- `Hypernova.dmg`: the Mac app
+- `Hypernova-linux.tar.gz`: the Linux package
+- `Hypernova.apk`: the Android app (a Mac can also hand it to your phone during Setup)
+- `Hypernova-Lens.ehpk`: the glasses app for Even Realities G2 (see [Hypernova Lens](../lens/README.md))
+- `SHA256SUMS.txt`: their checksums
+
+To check the downloads, run this in the folder you saved them to. Each file you downloaded should
+say `OK`:
+
+```sh
+shasum -a 256 -c --ignore-missing SHA256SUMS.txt     # on a Mac
+sha256sum -c --ignore-missing SHA256SUMS.txt         # on Linux
+```
+
+## 2. On a Mac
+
+### Install the Mac app
+
+1. Open `Hypernova.dmg`.
+2. Drag **Hypernova** onto **Applications**.
+3. Eject the disk image.
+
+If you open Hypernova from somewhere else (the disk image, Downloads), it offers to move itself:
+**Move to Applications**.
+
+### The first launch
+
+Hypernova is open source and signed on the machine that built it, but it is not notarized by
+Apple, so macOS stops it the first time. You allow it once.
+
+**macOS 15 Sequoia and macOS 26 Tahoe**
+
+1. Open Hypernova from Applications. macOS says *Apple could not verify “Hypernova” is free of
+   malware that may harm your Mac or compromise your privacy*. Click **Done**.
+2. Open **System Settings → Privacy & Security** and scroll down to **Security**. Next to
+   *“Hypernova” was blocked to protect your Mac*, click **Open Anyway**. (The button stays there
+   for about an hour after you tried to open the app.)
+3. macOS asks for your password or Touch ID, and once more whether to open Hypernova: click
+   **Open Anyway**.
+
+**macOS 14 Sonoma**
+
+1. Open Hypernova from Applications. macOS says it can't be opened because the developer cannot be
+   verified. Click **Cancel**.
+2. In Applications, **Control‑click** Hypernova, choose **Open**, then click **Open**.
+   (System Settings → Privacy & Security → **Open Anyway** works too.)
+
+**Any version, in Terminal**
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Hypernova.app
+```
+
+Then open Hypernova as usual. macOS asks only once per version.
+
+### Setup
+
+Hypernova lives in the menu bar (a small planet). The first time, it opens **Setup**: seven steps
+on a rail. Each step finds what's already there and offers one main button. You can close the
+window at any time; Setup picks up where you left off, and **Open setup…** in the menu bar's
+settings brings it back. **Check again** looks once more after you've installed something in a
+terminal.
+
+| Step | What it does | Can you skip it? |
+| --- | --- | --- |
+| 1. **Claude Code** | Finds Claude Code and checks that it's signed in. **Install Claude Code** runs Anthropic's official installer. | Yes, with Codex: **Use Codex only** |
+| 2. **Background service** | Starts the service your phone talks to, so it works with the menu closed. | No |
+| 3. **Connect Claude Code** | Adds Hypernova's hooks, its status line tap and the `claude` shell function. | Skipped with Codex only |
+| 4. **Tailscale** | Lets your phone reach this Mac from anywhere. | **Not now**: the same Wi‑Fi is enough |
+| 5. **Voice** | Speech for the phone and the glasses (Soniox, or Hyperscribe Companion). | **Not now** |
+| 6. **Codex** | Finds Codex and turns on **Use Codex with Hypernova**. | **Not now** |
+| 7. **Your phone** | **Get the app**, then pair it with a code. | No |
+
+#### 1. Claude Code
+
+Setup looks for `claude` (see [How Hypernova finds your agents](#how-hypernova-finds-your-agents)).
+
+- **Found and signed in**: **Continue**.
+- **Not signed in**: **Sign in** (once the service runs; you open a page and paste back the code it
+  shows), or **Open Terminal to sign in** before that.
+- **Not installed**: **Install Claude Code** runs Anthropic's installer, the same as
+
+  ```sh
+  curl -fsSL https://claude.ai/install.sh | bash
+  ```
+
+  It takes about a minute and doesn't ask for your password. Claude Code lands in
+  `~/.local/bin/claude`.
+- **Not installed, and you want Codex instead**: install Codex in a terminal (see
+  [Codex](#codex)), click **Check again**, then **Use Codex only**. Setup skips Claude Code's two
+  steps and turns Codex on. You can add Claude Code later.
+
+#### 2. Background service
+
+**Start background service** does this:
+
+1. **Node.js.** The service runs on Node.js 22.18 or newer. If your Mac has one that stays put
+   (Homebrew's, or the nodejs.org installer's), Hypernova uses it. Otherwise it downloads the
+   current Node.js LTS from nodejs.org, checks it against nodejs.org's published checksums, and
+   keeps it in its own folder.
+2. **Copy the service** into `~/Library/Application Support/Hypernova`.
+3. **Add it to your login items**: a launch agent, so it starts with your Mac and restarts itself.
+   Hypernova also turns on **Open at login** for the menu bar app (the first time only).
+4. **Start it**, and check that it answers.
+
+macOS may show a *Background Items Added* notice. Both items appear in **System Settings → General
+→ Login Items & Extensions**; leave them on.
+
+#### 3. Connect Claude Code
+
+**Connect Claude Code** adds three things, each marked as Hypernova's:
+
+- **Hooks** in `~/.claude/settings.json`, so the phone sees sessions, prompts and approvals as they
+  happen. They call the service on `127.0.0.1` only.
+- **A status line tap**, for your 5‑hour and weekly limits. Your own status line keeps working;
+  Hypernova only listens in.
+- **Shared terminals**: a `claude` function in `~/.zshrc` (see
+  [The shell integration](#the-shell-integration)). Open a new terminal tab for it to take effect.
+
+#### 4. Tailscale
+
+On the same Wi‑Fi your phone reaches the Mac directly, encrypted and pinned to this Mac by the
+pairing code. Tailscale is for everywhere else: a private network between your own devices.
+Nothing is opened to the internet. You can do this step later.
+
+- **Built in (the usual case).** Hypernova carries its own Tailscale node, so there's no Tailscale
+  app to install. Scan the code with your phone or click **Open the sign-in link**, and sign in
+  with Google, GitHub, Apple or Microsoft. The Android app carries Tailscale too: sign in there with
+  the same account. Your Mac appears in your tailnet as `hypernova-<your Mac's name>`.
+- **With the Tailscale app.** If the Tailscale app is on your Mac and signed in, Setup can use it
+  instead (**Use the Tailscale app**), and **Turn on phone access** gives Hypernova a private
+  `https` address in your tailnet. That needs HTTPS certificates turned on for your tailnet
+  (Tailscale admin console → DNS → HTTPS Certificates → Enable; **Open DNS settings** goes there).
+- **Key expiry.** Tailscale asks every device to sign in again after a while. In the
+  [admin console](https://login.tailscale.com/admin/machines), open your Mac's ⋯ menu and choose
+  **Disable key expiry**, so your phone doesn't lose it. With the Tailscale app, Setup and the menu
+  bar warn you two weeks ahead.
+
+#### 5. Voice
+
+Optional. Hold the mic on your phone or glasses, say what to do, read it, send. Connect
+[Soniox](https://soniox.com) with your own API key (audio goes to Soniox only then), or use
+Hyperscribe Companion if it's on your Mac. **Not now** skips it; **Voice…** in the menu bar's
+settings brings it back.
+
+#### 6. Codex
+
+Optional, and Hypernova never installs or updates Codex for you. The step shows what it found: the
+path, the version (Hypernova needs 0.163.0 or later) and, once it's on, the account.
+
+- **Not installed**: run one of the lines it shows, then **Check again**.
+- **Too old**: `codex update`, then **Check again**.
+- **Found**: turn on **Use Codex with Hypernova**. Hypernova then connects to Codex's own app
+  server, your phone can start Codex sessions, and a `codex` function joins `claude` in
+  `~/.zshrc`. Signed out: `codex login`.
+
+You can also turn Codex on later in **Agents & providers…**, or by starting a Codex session from
+the phone.
+
+#### 7. Your phone
+
+1. **Get the app**: scan the code with your phone's camera and open the link. It downloads
+   `Hypernova.apk` from your Mac. (Or install the `Hypernova.apk` you downloaded.)
+2. Android asks before installing from your browser: tap **Settings**, allow installs from this
+   source, go back and tap **Install**.
+3. On the Mac, click **I have the app**. A pairing code appears.
+4. Point the phone's camera at the code. The link (`https://hypernova.observer/pair#…`) opens
+   Hypernova and pairs. No camera? Click **Copy link** on the Mac, send it to your phone, and use
+   **Paste pairing link** in the app.
+5. Allow notifications when the app asks, so approvals reach you.
+
+A code works once and lasts 10 minutes; Setup shows a fresh one by itself. To pair another phone
+later, click **Pair a phone** in the menu bar.
+
+When the download page is served over your Wi‑Fi, the phone's browser may warn that it can't check
+the page's certificate (it's this Mac's own). Setup shows the file's checksum next to the code:
+compare it with the one on the page before installing. With **Use a private name for this Mac**
+on (the default), the page has a real certificate instead (see
+[docs/SECURITY-MODEL.md](SECURITY-MODEL.md)).
+
+## 3. On a Linux server
+
+Everything is the `hypernova` command, over SSH: there is no menu bar and no window. Run it all as
+the user who will use Claude Code or Codex, **not as root** (the script asks `sudo` for system
+packages only). On a fresh VPS, make that user first: `adduser claude`, then log in as `claude`.
+
+### Install
+
+```sh
+tmp=$(mktemp -d)
+tar -xzf Hypernova-linux.tar.gz -C "$tmp"
+"$tmp"/hypernova-*/scripts/install-linux.sh
+```
+
+The script, then `hypernova setup` which it runs for you:
+
+1. **System packages** it lacks, with `apt-get` (it asks for your password through `sudo`): curl,
+   tar, openssl, git, build tools (node-pty, which runs the shared terminals, is built on the
+   server), `ps` and `lsof`.
+2. **Node.js 24** from nodejs.org, checked against nodejs.org's checksums, into Hypernova's own
+   folder. A Node.js 24 or newer already on the server is used instead.
+3. **The daemon** in `~/.local/share/hypernova/app`, and **the `hypernova` command** in
+   `~/.local/bin`.
+4. **Claude Code**, with Anthropic's installer, when it isn't there. For Codex alone, add
+   `--no-claude` to the script.
+5. **The service**: a systemd user service, `hypernova.service`, with **lingering** turned on so it
+   runs at boot with nobody logged in.
+6. **The integration**: hooks and the status line tap in `~/.claude/settings.json`, and the `claude`
+   function in `~/.bashrc` (or `~/.zshrc`).
+7. **Tailscale**: the daemon starts its built-in node, signed in later by `hypernova pair`.
+
+It ends with what's left to do. Options: `--no-claude`, `--yes` (no questions). The folder in
+`$tmp` isn't needed afterwards. `hypernova: command not found` right after? Log in again (Ubuntu
+adds `~/.local/bin` to your PATH at login), or run `~/.local/bin/hypernova`.
+
+### Sign in to your agents
+
+**Claude Code.** Run `claude` once on the server and follow its steps: it shows a link to open on
+any device and asks for the code that page gives you. (Paired already? Home's account card on the
+phone can sign it in too.)
+
+**Codex** (optional beside Claude Code, the agent without it). Install it, sign it in, and turn it on
+for Hypernova:
+
+```sh
+sudo apt-get install -y nodejs npm     # if this server has no npm yet
+sudo npm i -g @openai/codex            # lands in /usr/local/bin/codex
+codex login --device-auth              # a code to enter on any device; no browser needed here
+hypernova codex on
+```
+
+Or put Codex's own Linux build from its [GitHub releases](https://github.com/openai/codex/releases)
+in `~/.local/bin/codex`. With an API key instead of ChatGPT:
+`printenv OPENAI_API_KEY | codex login --with-api-key`. `hypernova codex` on its own says what it
+found, and `hypernova codex off` lets go of it.
+
+### Pair your phone
+
+1. Install `Hypernova.apk` on the phone: open it from the phone's Downloads, and when Android asks,
+   allow installs from that source. (A Linux server carries no copy of the app to hand out.)
+2. On the server:
+
+   ```sh
+   hypernova pair
+   ```
+
+   The first time, it shows **Tailscale's sign-in** as a QR code and a link: open it and sign in
+   with Google, GitHub, Apple or Microsoft. The Android app signs in to Tailscale itself: use the
+   same account there. Enter skips this (a home server on your own network doesn't need it, and
+   `--local` leaves Tailscale out altogether).
+3. Then the **pairing code**: point the phone's camera at the QR code in the terminal; it opens
+   Hypernova and pairs. Too narrow a window, or no camera? Copy the `https://hypernova.observer/pair#…`
+   link under it and use **Paste pairing link** in the app. A code works once and lasts 10 minutes;
+   `hypernova pair` again makes a new one.
+4. Allow notifications when the app asks, so approvals reach you.
+
+### Check it
+
+```sh
+hypernova status      # what runs, how phones reach it, Claude Code, Codex, who's paired
+hypernova doctor      # every piece checked, each problem with the command that fixes it
+hypernova logs -f     # the daemon's log
+systemctl --user status hypernova
+```
+
+### Remote access
+
+- **Built in (the usual case).** The daemon runs its own Tailscale node, `hypernova-<host>` in your
+  tailnet, and serves the phone API over it: nothing to install, and nothing listens on a public
+  port. `hypernova tailscale` shows who it's signed in as, or its sign-in code; `hypernova tailscale
+  logout` signs it out for another account; `control <url>` points it at a Headscale server.
+- **With the Tailscale app** on the server instead: install it, sign in and let your user change
+  `serve` once, then pair. Your tailnet needs MagicDNS and HTTPS certificates on.
+
+  ```sh
+  curl -fsSL https://tailscale.com/install.sh | sh
+  sudo tailscale up
+  sudo tailscale set --operator=$USER
+  hypernova pair
+  ```
+
+- **On the same network** (a home server, a PC), the phone also has a direct route, encrypted and
+  pinned to this server by the pairing code. It's off on a machine with a public address (a VPS)
+  and in a container: `hypernova lan on|off`.
+- **Key expiry**: in the [admin console](https://login.tailscale.com/admin/machines), open the
+  server's ⋯ menu and choose **Disable key expiry**, so your phone doesn't lose it.
+
+[docs/LINUX.md](LINUX.md) has every command and flag, where things live, and what a server doesn't
+have (battery, Stay awake, the Mac's voice, app windows in Telescope).
+
+## 4. In Docker
+
+The quick way to try it, on a machine with Docker. The image is built from this repository:
+
+```sh
+git clone https://github.com/prudnik-web/Hypernova.git && cd Hypernova
+docker build -t hypernova .
+docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped \
+  --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
+docker exec -it hypernova claude              # sign in to Claude once
+docker exec -it hypernova hypernova pair      # Tailscale's sign-in, then the pairing code
+docker exec -it hypernova hypernova doctor
+```
+
+The image is Ubuntu 24.04 with the install script already run in it, as a normal user. Your state
+(paired phones, settings, keys, the agents' logins) lives in the `hypernova-home` volume. Nothing is
+published to the network: the phone reaches the container through the built-in Tailscale node.
+On a Linux host, `--network host` also lets a phone on the same network pair directly.
+`--build-arg CLAUDE=no` builds it without Claude Code.
+
+**Codex in the container**: its npm package needs Node.js on the PATH, which the image doesn't
+have, so use Codex's own Linux build from its [GitHub releases](https://github.com/openai/codex/releases):
+
+```sh
+docker exec hypernova mkdir -p /home/hypernova/.local/bin
+docker cp codex hypernova:/home/hypernova/.local/bin/codex
+docker exec -it hypernova codex login --device-auth
+docker exec -it hypernova hypernova codex on
+```
+
+## Your phone
+
+The Android app is the same for every computer, and pairs with one at a time.
+
+- **Get it** from the release (`Hypernova.apk`), or, from a Mac, by scanning **Get the app** in
+  Setup. Android asks before installing from your browser or Files: allow installs from that
+  source, then tap **Install**.
+- **Pair** by scanning the code (Setup's **Your phone** step or **Pair a phone** in the menu bar on a
+  Mac, `hypernova pair` on Linux). The camera opens the `https://hypernova.observer/pair#…` link,
+  which opens Hypernova; the details after the `#` never reach that site. **Paste pairing link** in
+  the app takes the same link.
+- **Notifications**: allow them when the app asks, so approvals reach you with the app closed.
+- **The glasses**: Hypernova Lens goes through the app on the same phone; you allow it once in the
+  app by comparing a six-digit code ([lens/README.md](../lens/README.md)).
+
+## Claude Code and Codex
+
+| On the computer | What Hypernova does |
+| --- | --- |
+| **Claude Code only** | Everything as above. On a Mac the Codex step says how to add Codex; **Not now** skips it. |
+| **Codex only** | On a Mac, Setup offers **Use Codex only**: Claude Code's two steps are skipped and Codex is turned on. On Linux, install with `--no-claude` and run `hypernova codex on`. New sessions go to Codex. |
+| **Both** | Claude Code leads (the sun in the app is its usage). Turn Codex on (Setup's Codex step, **Agents & providers…**, `hypernova codex on`, or a first Codex session from the phone) to use both: each has its own usage meters, and a conversation can switch from one to the other. |
+| **Neither** | On a Mac, Setup offers **Install Claude Code**, or the lines to install Codex, and the menu bar says *No agent on this Mac yet*. On Linux, `hypernova setup` installs Claude Code unless told not to, and `hypernova doctor` says what's missing. |
+
+### Claude Code
+
+- Install it from Setup or `hypernova setup`, or yourself with
+  `curl -fsSL https://claude.ai/install.sh | bash` (Homebrew and npm installs work too).
+- Sign in once with your Claude plan or an API key. Hypernova never reads your Claude login: the
+  service asks `claude auth status`.
+- Keep it current with `claude update`. Hypernova follows the current Claude Code.
+
+### Codex
+
+Install it in a terminal, then sign in:
+
+```sh
+npm i -g @openai/codex        # needs Node.js and npm (on Linux: sudo npm i -g @openai/codex)
+brew install --cask codex     # on a Mac, with Homebrew
+codex login                   # your browser opens; on a server: codex login --device-auth
+```
+
+Hypernova needs **Codex 0.163.0 or later** (`codex --version`; `codex update` to update). It uses
+Codex only while it's on for Hypernova (**Use Codex with Hypernova** on a Mac, `hypernova codex on`
+on Linux, or the switch in the phone's **Agents & providers**), as one client of Codex's own shared
+app server, so your Codex sessions keep running when Hypernova restarts.
+
+### How Hypernova finds your agents
+
+For `claude` and `codex` alike, Hypernova looks in `~/.local/bin` (the official installers), in
+Homebrew's and the system's folders (`/opt/homebrew/bin` and `/usr/local/bin` on a Mac;
+`/usr/local/bin` and `/usr/bin` on Linux), npm's global folder (`~/.npm-global/bin`), Volta
+(`~/.volta/bin`), Bun (`~/.bun/bin`), pnpm, every Node.js version under nvm
+(`~/.nvm/versions/node/*/bin`), and whatever your login shell finds (`command -v claude`). If you
+installed one somewhere else, make sure a new terminal finds it, then click **Check again** (Mac) or
+run `hypernova codex` (Linux).
+
+## The shell integration
+
+Connect Claude Code (or turning on Codex, where Claude Code isn't installed) adds one marked block to
+your shell's startup file: `~/.zshrc` on a Mac; on Linux `~/.bashrc` for bash or `~/.zshrc` for zsh.
+
+```sh
+# >>> hypernova shared terminals (lets your phone see and type into claude sessions; safe to delete) …
+function claude { … }
+function codex { … }      # only while Codex is on for Hypernova
+function hn { … }
+# <<< hypernova shared terminals
+```
+
+- `claude` (and `codex`) typed in a terminal, or over SSH, look and work the same, but run in a
+  **shared terminal**: your phone can watch them live and type into them.
+- Anything else (pipes, `claude -p`, subcommands such as `claude mcp`) goes straight to the real
+  command, and so does everything when Hypernova isn't running.
+- `command claude`, or `HYPERNOVA_OFF=1`, skips it for one run.
+- `hn ls` lists the shared terminals; `hn attach <id>` joins one from any terminal.
+- zsh and bash only. With another shell nothing is added: sessions you start in a terminal still
+  show on the phone through the hooks, but the phone can't type into them.
+
+Before changing your startup file or `~/.claude/settings.json`, Hypernova saves a copy in its
+`backups` folder. If the block's marker lines are changed by hand, Hypernova won't touch the file
+again and says how to remove the block yourself.
+
+## What Hypernova puts on the computer
+
+**On a Mac**
+
+| Where | What |
+| --- | --- |
+| `/Applications/Hypernova.app` | The menu bar app, with the service inside |
+| `~/Library/Application Support/Hypernova` | The service, its Node.js, paired phones, settings and keys (private to your user) |
+| `~/Library/Logs/Hypernova/daemon.log` | The service's log |
+| `~/Library/LaunchAgents/com.prudnikweb.hypernova.daemon.plist` | Starts the service at login |
+| Login items | Hypernova itself (**Open at login**) |
+| `~/.claude/settings.json` | Hooks and the status line tap (Connect Claude Code) |
+| `~/.zshrc` | The shell integration block |
+
+**On Linux**
+
+| Where | What |
+| --- | --- |
+| `~/.local/share/hypernova` | Paired phones, settings and keys (private to your user); the daemon in `app/`, its Node.js in `node/` |
+| `~/.local/state/hypernova/logs/daemon.log` | The daemon's log |
+| `~/.local/bin/hypernova` | The command |
+| `~/.config/systemd/user/hypernova.service` | The service, with lingering on for your user |
+| `~/.claude/settings.json` | Hooks and the status line tap |
+| `~/.bashrc` or `~/.zshrc` | The shell integration block |
+
+The service listens on `127.0.0.1:47321` (the phone API, reached through Tailscale) and
+`127.0.0.1:47322` (the menu bar app, the `hypernova` command and the hooks), and on port 47323 on
+your Wi‑Fi for paired phones only (mutual TLS; off on a VPS and in a container).
+[docs/SECURITY-MODEL.md](SECURITY-MODEL.md) explains what each one lets in.
+
+macOS may also ask, later and only when a feature needs it:
+
+- **Files and Folders** (Documents, Desktop, iCloud Drive) for `node`, when your phone opens a
+  project there. Allow it, or keep projects elsewhere.
+- **Screen Recording**, the first time Telescope shows a Mac window on your phone or glasses.
+- **Incoming connections** for `node`, if the macOS firewall is on: allow it, or phones on your
+  Wi‑Fi can't connect.
+- Your **password**, if you choose Backpack mode (keep the Mac awake with its lid closed).
+
+## Update
+
+**The Mac app.** Download the new `Hypernova.dmg`, quit Hypernova (menu bar → **Quit**), drag the
+new one onto Applications and replace the old one, then open it. macOS may ask as on the first
+launch. The menu bar then says *A newer service is ready*: click **Update**. Shared terminals keep
+running.
+
+**Linux.** Download the new `Hypernova-linux.tar.gz` and run the install script from it again, as
+the first time. The new daemon is prepared beside the old one and swapped in once it works; open
+sessions keep running, and your phones and settings stay.
+
+**Docker.** Pull the repository, build the image again, remove the container and run it again with
+the same volume: `docker build -t hypernova . && docker rm -f hypernova`, then the same
+`docker run` as before.
+
+**The phone.** A Mac offers the phone the app it carries, and the app updates itself when a newer
+one is signed with the same key. Anywhere, you can install a newer `Hypernova.apk` over the old
+one; your pairing stays.
+
+**Claude Code and Codex** update themselves or with `claude update` and `codex update`. Hypernova
+doesn't need to know.
+
+## Uninstall
+
+**On a Mac**
+
+1. In the menu bar, open **Settings** (the gear) → **Uninstall…**. Hypernova removes what it added
+   to Claude Code (hooks, status line tap), the block in `~/.zshrc`, the background service and its
+   login items, Backpack mode's permission, and this Mac's private name under
+   `hypernova.observer`. Claude Code and Codex stay as they are. Tick **Also delete Hypernova's
+   data** to remove its folder and logs too (paired phones, providers, the downloaded Node.js).
+2. Quit Hypernova and move `/Applications/Hypernova.app` to the Trash.
+
+**On Linux**
+
+```sh
+hypernova uninstall            # keeps paired phones and settings, for a reinstall
+hypernova uninstall --purge    # removes them too, and signs the built-in Tailscale node out
+```
+
+It removes the integration (hooks, status line tap, the shell block), Tailscale's route to the
+daemon, the service, the command, the daemon and the Node.js it downloaded. Claude Code, Codex and
+their logins stay. Lingering stays on too (other services of yours may use it); it says how to
+turn it off.
+
+**In Docker**: `docker rm -f hypernova`, then `docker volume rm hypernova-home` to drop its state.
+
+**Then, anywhere**: uninstall Hypernova on the phone like any app, and with the built-in Tailscale,
+remove `hypernova-<name>` from your tailnet in the
+[admin console](https://login.tailscale.com/admin/machines) (`--purge` signs it out already).
+
+## Troubleshooting
+
+**On a Mac**
+
+- **“Hypernova is damaged and can't be opened.”** The download was changed on the way or the
+  quarantine flag is stuck. Check the file with `shasum -a 256 -c --ignore-missing SHA256SUMS.txt`,
+  then run `xattr -dr com.apple.quarantine /Applications/Hypernova.app`.
+- **Setup can't find Claude Code or Codex.** Open a new Terminal window and run
+  `command -v claude` (or `codex`). If it prints nothing, the command isn't on your PATH: install
+  it with one of the lines above, then click **Check again**.
+- **Codex: "needs an update".** `codex update`, then **Check again**.
+- **The service isn't answering.** Setup → **Background service** → **Start it again**. **Show
+  log** opens `~/Library/Logs/Hypernova/daemon.log`.
+- **`claude` in a terminal doesn't show up as shared.** Open a new tab after Connect Claude Code.
+- **See what Setup sees**, without changing anything:
+
+  ```sh
+  /Applications/Hypernova.app/Contents/MacOS/Hypernova --selftest
+  ```
+
+**On Linux**
+
+- `hypernova doctor` first: each problem comes with the command that fixes it. Then
+  `hypernova logs`.
+- *"Building the terminal module needs make, g++, python3"*: `sudo apt-get install -y
+  build-essential python3`, then `hypernova setup`.
+- *"systemd's user manager isn't running"*: `sudo loginctl enable-linger $USER`, or log in over
+  SSH, then `hypernova setup`.
+- *"Tailscale lets only root or its operator change serve"* (with the Tailscale app):
+  `sudo tailscale set --operator=$USER`, then `hypernova pair`.
+- **Codex isn't found.** `command -v codex` in a new login shell must print its path; then
+  `hypernova codex`.
+
+**Anywhere**
+
+- **The phone can't reach the computer.** On the same Wi‑Fi it should just work: check that the
+  computer is awake and the phone is on that Wi‑Fi (not a guest network that keeps devices apart).
+  Away from it (and always for a VPS), the phone and the computer must be signed in to the same
+  Tailscale account, and the computer's key must not have expired.
+
+Still stuck? Open an issue with what `--selftest` or `hypernova doctor` printed (it names your
+folders, so look it over first) and the last lines of `daemon.log`. Security problems: see
+[SECURITY.md](../SECURITY.md).
+
+## Build it yourself
+
+**The Mac app.** You need Command Line Tools (`xcode-select --install`), Node.js 22.18 or newer
+with npm, and for the built-in Tailscale, Go. Then:
+
+```sh
+cd daemon && npm ci && cd ..
+mac/build.sh --open                  # dist/Hypernova.app
+mac/build.sh --release && mac/dmg.sh # dist/Hypernova.dmg, as released
+```
+
+`--release` stops rather than leave something out: it wants a release-signed APK in `dist/` and
+the Tailscale helper (built with Go).
+
+**Linux.** From a checkout on the server, `scripts/install-linux.sh` installs from it directly.
+`scripts/pack-linux.sh` makes the package (`dist/linux/hypernova-<version>.tar.gz`, with the
+built-in Tailscale when Go is around).
+
+**The Android app** needs the JDK that comes with Android Studio:
+
+```sh
+cd android
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug
+```
+
+[CONTRIBUTING.md](../CONTRIBUTING.md) has the rest.

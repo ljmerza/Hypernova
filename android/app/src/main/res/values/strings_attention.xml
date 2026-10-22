@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Pop-ups (ui/components/Glass.kt): details a card keeps behind a quiet toggle. -->
+    <string name="more">More</string>
+    <string name="why_it_matters">Why it matters</string>
+
+    <!-- Attention cards (ui/components/Attention.kt): swiped right, they leave an Undo for a few seconds. -->
+    <string name="attention_dismiss">Dismiss</string>
+    <string name="attention_hidden">Hidden</string>
+    <string name="attention_undo">Undo</string>
+</resources>

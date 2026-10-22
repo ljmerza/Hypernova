@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Other providers (OpenRouter, custom endpoints) and carrying on after a limit
+     (docs/PROTOCOL.md, "Providers", "Auto-continue"). -->
+<resources>
+    <!-- A provider's trouble, in a chip, a status line or after its name. -->
+    <string name="provider_state_no_credit">Out of credits</string>
+    <string name="provider_state_budget">Budget reached</string>
+    <string name="provider_state_bad_key">Key refused</string>
+    <string name="provider_state_limited">Rate limited</string>
+    <string name="provider_state_down">Not answering</string>
+    <string name="provider_state_other">Can\'t reply</string>
+    <!-- The status line's word over a session on another provider. -->
+    <string name="state_out_of_credits">Out of credits</string>
+    <string name="state_key_refused">Key refused</string>
+    <string name="state_rate_limited">Rate limited</string>
+    <string name="state_not_answering">Not answering</string>
+
+    <!-- A provider's trouble as a sentence (ProviderWords.sentence): its card's title, a session's line,
+         an automation's skipped run. The others are Home's card headings (strings_sky.xml). -->
+    <string name="provider_is_bad_key">%1$s refused its key</string>
+    <string name="provider_back_title">%1$s is back</string>
+    <string name="provider_credit_back_title">%1$s has credit again</string>
+
+    <!-- What's left: the trail of a provider's row, and the card's mono line. -->
+    <string name="balance_left">%1$s left</string>
+    <string name="balance_today">%1$s today</string>
+    <string name="balance_free">%1$d of %2$d free today</string>
+    <string name="balance_key_works">Key works. %1$s.</string>
+    <string name="balance_key_works_plain">Key works</string>
+    <!-- TalkBack, for a provider's models drawn as chips: "Models: openai/gpt-5 and anthropic/claude-sonnet-4.5." -->
+    <string name="provider_models_said">Models: %1$s.</string>
+    <string name="provider_limited_back">Rate limited until %1$s</string>
+    <string name="provider_check">Check</string>
+    <string name="provider_checking">Checking…</string>
+
+    <!-- The blocked card on another provider. -->
+    <string name="provider_no_reset">It didn\'t say for how long.</string>
+    <string name="provider_down_line">It stopped answering. Try again in a moment.</string>
+    <string name="provider_key_line">Fix the key in Settings, or carry on elsewhere.</string>
+    <string name="provider_fix_key">Fix the key</string>
+
+    <!-- Carrying on by itself after a limit. -->
+    <string name="resume_carries_on">Continues by itself %1$s</string>
+    <string name="resume_carries_on_soon">Continues by itself in a moment</string>
+    <string name="resume_dont">Don\'t</string>
+    <string name="resume_turning_off">Turning off…</string>
+    <string name="resume_turning_on">Turning on…</string>
+    <string name="resume_arm">Continue automatically %1$s</string>
+    <string name="resume_arm_plain">Continue automatically</string>
+    <string name="resume_back">Back %1$s</string>
+    <string name="resume_in_terminal">%1$s, in the terminal</string>
+    <string name="resume_continue">Continue</string>
+    <string name="resume_failed">Didn\'t go through. Open the terminal to check.</string>
+    <!-- The ready card: the cause is over and it didn't carry on by itself. -->
+    <string name="resume_ready_limit">The limit has reset</string>
+    <string name="resume_ready_slept">The limit reset while your Mac slept</string>
+    <string name="resume_ready_dropped">It didn\'t carry on by itself</string>
+    <string name="resume_ready_line">Waiting for you since %1$s</string>
+    <string name="resume_why_far">Over a day away: it won\'t carry on by itself</string>
+    <string name="resume_why_repeated">Hit the limit again and again: it waits for you</string>
+    <string name="resume_why_setting">Carrying on by itself is off in Claude Code</string>
+    <string name="resume_why_exited">Claude Code closed while it waited</string>
+
+    <!-- A session card's activity line: a short phrase, never "·"-joined fields. -->
+    <string name="activity_provider_auto">%1$s carries on by itself at %2$s</string>
+    <string name="activity_provider_ready">%1$s is ready to continue</string>
+    <string name="activity_limit_ready">%1$s over, ready to continue</string>
+
+    <!-- Notifications, once per provider episode. -->
+    <string name="notice_provider_no_credit_title">%1$s is out of credits</string>
+    <plurals name="notice_provider_no_credit">
+        <item quantity="one">%1$d session paused. Add credits or continue on another provider.</item>
+        <item quantity="other">%1$d sessions paused. Add credits or continue on another provider.</item>
+    </plurals>
+    <string name="notice_provider_no_credit_none">Add credits or continue on another provider.</string>
+    <string name="notice_provider_budget_title">%1$s reached its budget</string>
+    <string name="notice_provider_bad_key_title">%1$s refused its key</string>
+    <string name="notice_provider_bad_key">Fix the key in Settings → Providers.</string>
+    <string name="notice_provider_limited_title">%1$s rate limit</string>
+    <string name="notice_provider_limited">Continues by itself %1$s.</string>
+    <string name="notice_provider_limited_unknown">It didn\'t say for how long.</string>
+    <string name="notice_provider_back_title">%1$s has credit again</string>
+    <string name="notice_provider_answering_title">%1$s is answering again</string>
+    <string name="notice_provider_back">Paused sessions can carry on.</string>
+
+    <!-- The companion star in the sky: sessions on other providers orbit it. -->
+    <string name="companion_providers">%1$d providers</string>
+</resources>

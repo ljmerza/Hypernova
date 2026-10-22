@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Speaking: the pulsar wave at rest, five bars tallest in the middle, as a status bar icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M4,10.5L4,13.5M8,8L8,16M12,4.5L12,19.5M16,8L16,16M20,10.5L20,13.5" />
+</vector>

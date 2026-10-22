@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sky and Home's usage cards with two agents (data/AgentLead.kt; docs/DESIGN.md, "Codex's star").
+     A Mac with Claude Code alone shows none of these. -->
+<resources>
+    <!-- Codex's star's second line while Codex is signed out on the Mac. -->
+    <string name="cx_star_signed_out">signed out</string>
+    <!-- TalkBack: Codex's star after the sky's own sentence. %1$s is its window's sentence (usage_said_*). -->
+    <plurals name="a11y_codex_star">
+        <item quantity="one">%1$s One Codex session in orbit.</item>
+        <item quantity="other">%1$s %2$d Codex sessions in orbit.</item>
+    </plurals>
+    <string name="a11y_codex_signed_out">Codex is signed out on your Mac.</string>
+    <!-- The ongoing notification's title where Codex is the only agent and can't reply. -->
+    <string name="notif_codex_signed_out">Codex is signed out on %1$s</string>
+    <string name="notif_codex_limited">Codex’s usage limit is reached</string>
+    <string name="a11y_codex_waiting">Codex: waiting for its first numbers.</string>
+    <string name="a11y_codex_usage">Show Codex’s usage</string>
+
+    <!-- Home's usage cards while both agents are in use: each says whose it is. -->
+    <string name="usage_claude">Claude usage</string>
+    <string name="usage_name_five_claude">Claude 5-hour window</string>
+    <string name="usage_name_seven_claude">Claude weekly window</string>
+    <!-- Where Codex leads (no Claude Code on the Mac), its usage card before Codex is turned on. -->
+    <string name="cx_usage_off">Your first Codex session turns Codex on. Its limits show after that.</string>
+</resources>

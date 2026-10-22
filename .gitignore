@@ -1,0 +1,11 @@
+dist/
+.DS_Store
+.claude/
+# Built by daemon/tsnet/build.sh (the Tailscale helper) and android/tsnet/build.sh (its AAR)
+daemon/bin/
+android/app/libs/tsnet.aar
+android/app/libs/tsnet-sources.jar
+# Signing keys and their passwords live outside the repo (docs/RELEASING.md); never commit a stray one.
+*.jks
+*.keystore
+keystore.properties

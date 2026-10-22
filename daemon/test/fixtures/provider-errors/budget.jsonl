@@ -1,0 +1,1 @@
+{"type": "assistant", "timestamp": "2026-10-16T05:00:00.000Z", "isApiErrorMessage": true, "error": "authentication_failed", "apiErrorStatus": 403, "message": {"model": "<synthetic>", "role": "assistant", "content": [{"type": "text", "text": "Failed to authenticate. API Error: 403 Key limit exceeded"}]}}

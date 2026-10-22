@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Allow: the primary pill, a mint fill with a brighter rim. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#3314110E">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="100dp" />
+            <solid android:color="@color/widget_accent" />
+            <stroke
+                android:width="1dp"
+                android:color="#80B6FFC9" />
+        </shape>
+    </item>
+</ripple>

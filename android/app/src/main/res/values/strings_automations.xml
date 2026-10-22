@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Automations: "When … → Do …" that run on the Mac (ui/automations/, data/Automations.kt;
+  docs/specs/spec-automations.md §5–§6). Times of day are the Mac's.
+-->
+<resources>
+    <!-- The tab and its bottom pill. -->
+    <string name="au_tab">Automations</string>
+    <string name="au_new">New automation</string>
+    <string name="au_intro">Let Claude work on a schedule, or when something happens on your Mac. They run on the Mac, so your phone can be off.</string>
+    <string name="au_old_daemon">Update Hypernova on the Mac to use automations.</string>
+    <string name="au_offline">Your automations show here once the Mac can be reached. They keep running there.</string>
+    <string name="au_start_from">Start from</string>
+    <!-- The tab's header trail: "3 on, next 9:00", or "Paused". -->
+    <string name="au_trail_on">%1$d on</string>
+    <string name="au_trail_on_next">%1$d on, next %2$s</string>
+    <string name="au_trail_off">All off</string>
+    <string name="au_paused">Paused</string>
+    <string name="au_pause_all">Pause all</string>
+    <string name="au_resume">Resume</string>
+    <string name="au_paused_toast">Automations paused. Runs already working carry on.</string>
+    <string name="au_resumed_toast">Automations resumed</string>
+
+    <!-- The summary sentence: trigger phrase + ", " + action phrase + "." + then phrase. -->
+    <string name="au_sum_join">%1$s, %2$s</string>
+    <string name="au_sum_then_notify">Notify me when it\'s done.</string>
+    <string name="au_sum_then_say">Read the result aloud on my glasses.</string>
+    <string name="au_sum_daily">Every day at %1$s</string>
+    <string name="au_sum_weekdays">Every weekday at %1$s</string>
+    <string name="au_sum_weekend">Every weekend at %1$s</string>
+    <string name="au_sum_days">Every %1$s at %2$s</string>
+    <string name="au_sum_once_today">Today at %1$s</string>
+    <string name="au_sum_once_tomorrow">Tomorrow at %1$s</string>
+    <string name="au_sum_once_date">On %1$s at %2$s</string>
+    <plurals name="au_sum_every">
+        <item quantity="one">Every hour</item>
+        <item quantity="other">Every %d hours</item>
+    </plurals>
+    <!-- Appended to "Every 2 hours" (note the leading space or comma). -->
+    <string name="au_sum_every_between">", %1$s–%2$s"</string>
+    <string name="au_sum_every_from">" from %1$s"</string>
+    <string name="au_sum_on_weekdays">" on weekdays"</string>
+    <string name="au_sum_on_weekends">" on weekends"</string>
+    <string name="au_sum_on_days">" on %1$s"</string>
+    <string name="au_sum_reset_after">When my %1$s limit resets after I hit it</string>
+    <string name="au_sum_reset_any">Whenever my %1$s window resets</string>
+    <string name="au_sum_reset_between">" between %1$s and %2$s"</string>
+    <string name="au_sum_window_five">5-hour</string>
+    <string name="au_sum_window_week">weekly</string>
+    <string name="au_sum_limit_hit">When I hit my %1$s limit</string>
+    <string name="au_sum_event_finished">finishes</string>
+    <string name="au_sum_event_needs">needs me</string>
+    <string name="au_sum_session_mine_in">When a session in %1$s %2$s</string>
+    <string name="au_sum_session_mine_any">When any session %1$s</string>
+    <string name="au_sum_session_auto_in">When an automated session in %1$s %2$s</string>
+    <string name="au_sum_session_auto_any">When any automated session %1$s</string>
+    <string name="au_sum_session_all_in">When any session in %1$s, automated ones too, %2$s</string>
+    <string name="au_sum_session_all_any">When any session, automated ones too, %1$s</string>
+    <string name="au_sum_plugged">When the Mac is plugged in</string>
+    <string name="au_sum_battery">When the Mac\'s battery drops to %1$d%%</string>
+    <string name="au_sum_unknown_trigger">When something this app doesn\'t know yet happens</string>
+    <string name="au_sum_only_once">%1$s (next time only)</string>
+    <string name="au_sum_start_empty">in %1$s, start a session</string>
+    <string name="au_sum_skill">in %1$s, run %2$s</string>
+    <string name="au_sum_start_verb">in %1$s, ask Claude to %2$s</string>
+    <string name="au_sum_start_quote">in %1$s, ask Claude: “%2$s”</string>
+    <string name="au_sum_target_trigger">that session</string>
+    <string name="au_sum_target_working">every working session</string>
+    <string name="au_sum_target_limited">every session the limit stopped</string>
+    <string name="au_sum_target_named">“%1$s”</string>
+    <string name="au_sum_target_gone">a session that\'s gone</string>
+    <string name="au_sum_continue_empty">carry on %1$s</string>
+    <string name="au_sum_continue_verb">ask %1$s to %2$s</string>
+    <string name="au_sum_continue_quote">ask %1$s: “%2$s”</string>
+    <string name="au_sum_continue_on">carry on %1$s on %2$s, which costs money</string>
+    <string name="au_sum_continue_on_quote">carry on %1$s on %2$s, which costs money: “%3$s”</string>
+    <string name="au_sum_notify">notify me: “%1$s”</string>
+    <string name="au_sum_notify_empty">notify me</string>
+    <string name="au_sum_notify_glasses">notify me, and read it aloud on my glasses: “%1$s”</string>
+    <string name="au_sum_notify_glasses_empty">notify me, and read it aloud on my glasses</string>
+    <string name="au_sum_say">read aloud on my glasses: “%1$s”</string>
+    <string name="au_sum_say_empty">read aloud on my glasses</string>
+    <string name="au_sum_unknown_action">do something this app doesn\'t know yet</string>
+    <!-- "Mon, Wed and Fri"; also names in a folded notification. -->
+    <string name="au_and">%1$s and %2$s</string>
+    <string-array name="au_day_short">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+    <!-- The day chips' letters, and what TalkBack reads for them. -->
+    <string-array name="au_day_narrow">
+        <item>M</item>
+        <item>T</item>
+        <item>W</item>
+        <item>T</item>
+        <item>F</item>
+        <item>S</item>
+        <item>S</item>
+    </string-array>
+    <string-array name="au_day_long">
+        <item>Monday</item>
+        <item>Tuesday</item>
+        <item>Wednesday</item>
+        <item>Thursday</item>
+        <item>Friday</item>
+        <item>Saturday</item>
+        <item>Sunday</item>
+    </string-array>
+
+    <!-- When: clock words, on the Mac's calendar ("Today 9:00", "Mon 9:42", "17 Oct 9:00"). -->
+    <string name="au_when_today">Today %1$s</string>
+    <string name="au_when_day">%1$s %2$s</string>
+    <string name="au_next">Next %1$s</string>
+    <!-- Durations: "45s", "2m 14s", "1h 03m". -->
+    <string name="au_dur_s">%1$ds</string>
+    <string name="au_dur_ms">%1$dm %2$02ds</string>
+    <string name="au_dur_hm">%1$dh %2$02dm</string>
+
+    <!-- A card's status line and the run rows (spec §6, "Run rows and card status lines"): a mark,
+         when and how long drawn, then what it came to as a short sentence, never "·"-joined. -->
+    <string name="au_state_running">Running</string>
+    <string name="au_state_needs">Needs you</string>
+    <string name="au_run_running">Running for %1$s</string>
+    <string name="au_run_needs">Needs you: %1$s</string>
+    <plurals name="au_sessions">
+        <item quantity="one">%d session</item>
+        <item quantity="other">%d sessions</item>
+    </plurals>
+    <string name="au_run_queued">Waiting for a free slot</string>
+    <string name="au_run_waiting_limit">Waiting out your limit until %1$s</string>
+    <string name="au_run_waiting_limit_plain">Waiting for your limit</string>
+    <string name="au_run_waiting_busy">Waiting for the session to be free</string>
+    <string name="au_run_done">Done</string>
+    <string name="au_run_nothing_new">Nothing new</string>
+    <string name="au_run_late">Ran late: the Mac was asleep at %1$s</string>
+    <string name="au_run_late_down">Ran late: Hypernova wasn\'t running at %1$s</string>
+    <string name="au_run_missed">Missed while the Mac was asleep at %1$s</string>
+    <string name="au_run_missed_down">Missed while Hypernova wasn\'t running at %1$s</string>
+    <plurals name="au_run_missed_times">
+        <item quantity="one">Missed while the Mac was asleep</item>
+        <item quantity="other">Missed %d times while the Mac was asleep</item>
+    </plurals>
+    <plurals name="au_run_missed_times_down">
+        <item quantity="one">Missed while Hypernova wasn\'t running</item>
+        <item quantity="other">Missed %d times while Hypernova wasn\'t running</item>
+    </plurals>
+    <string name="au_run_overlap">Skipped: the last run was still going</string>
+    <string name="au_run_queue_full">Skipped: too many runs were waiting</string>
+    <string name="au_run_stale">Skipped after waiting over 6 hours for a free slot</string>
+    <string name="au_run_daily_cap">Skipped: 24 runs a day is the most</string>
+    <string name="au_run_limited">Skipped for the usage limit, until %1$s</string>
+    <string name="au_run_limited_plain">Skipped for the usage limit</string>
+    <string name="au_run_signed_out">Skipped: Claude Code is signed out on the Mac</string>
+    <string name="au_run_no_plan">Skipped: there\'s no Claude plan on the Mac</string>
+    <string name="au_run_on_hold">Skipped: the account is on hold</string>
+    <string name="au_run_no_credit">Skipped: out of usage credits</string>
+    <string name="au_run_provider">Skipped: %1$s</string>
+    <string name="au_run_provider_plain">Skipped: the provider had a problem</string>
+    <string name="au_run_no_project">Failed: the project folder is gone</string>
+    <string name="au_run_no_session">Failed: that session no longer exists</string>
+    <string name="au_run_no_provider">Failed: that provider was removed</string>
+    <string name="au_run_target_busy">Skipped: the session was waiting for you</string>
+    <string name="au_run_loop">Skipped: it would have started a loop</string>
+    <string name="au_run_start_failed">Failed: Claude Code didn\'t start</string>
+    <string name="au_run_error">Failed: %1$s</string>
+    <string name="au_run_blocked">Stopped: something blocked its session</string>
+    <string name="au_run_away">Stopped after 10 minutes without an answer</string>
+    <string name="au_run_timeout">Stopped watching after 12 hours</string>
+    <string name="au_run_by_user">Stopped by you</string>
+    <string name="au_run_skipped">Skipped</string>
+    <string name="au_run_failed">Failed</string>
+    <string name="au_run_stopped">Stopped</string>
+    <!-- A problem in place of "Next …", in amber. -->
+    <string name="au_problem_no_battery">This Mac has no battery.</string>
+    <string name="au_problem_no_project">The project folder is gone.</string>
+    <string name="au_problem_no_session">That session no longer exists.</string>
+    <string name="au_problem_no_provider">That provider was removed.</string>
+    <string name="au_problem_no_glasses">Pair your glasses to read aloud.</string>
+    <string name="au_problem_mode">Auto isn\'t available; it ran in %1$s</string>
+    <!-- The mode chip on a card, for anything but "Allowed only". -->
+    <string name="au_chip_asks">Asks me</string>
+    <string name="au_chip_edits">Edits</string>
+    <string name="au_chip_auto">Auto</string>
+    <string name="au_chip_no_asking">No asking</string>
+    <!-- The chip on an automated session's card, and its line on the session screen. -->
+    <string name="au_session_chip">Auto</string>
+    <!-- TalkBack, for the session screen's line with the AUTO chip and its name: "Started by Morning brief". -->
+    <string name="au_session_line_said">Started by %1$s</string>
+    <string name="au_open_automation">Open its automation</string>
+    <string name="au_open_run">Open its session</string>
+    <!-- History: an automation's ended sessions, folded into one row. -->
+    <plurals name="au_history_runs">
+        <item quantity="one">%d run</item>
+        <item quantity="other">%d runs</item>
+    </plurals>
+    <!-- Sessions in "Allowed only" (Claude Code's dontAsk) on their cards. -->
+    <string name="mode_label_dont_ask">allowed only</string>
+
+    <!-- Templates: the limit ones lead (owner, 2026-10-15). -->
+    <string name="au_t_carry_on">Carry on after the limit</string>
+    <string name="au_t_carry_on_blurb">Pick up every session the 5-hour limit stopped, the moment it resets</string>
+    <string name="au_t_reset">Do it when I have budget again</string>
+    <string name="au_t_reset_blurb">Park a task for when your limit comes back</string>
+    <string name="au_t_reset_hint">What should it pick up when your limit is back?</string>
+    <string name="au_t_switch">Switch provider at the limit</string>
+    <string name="au_t_switch_blurb">Carry working sessions on with another provider. This costs money.</string>
+    <string name="au_t_night">Night shift</string>
+    <string name="au_t_night_blurb">When your limit resets overnight, put the fresh budget to work</string>
+    <string name="au_t_night_hint">What should it work on overnight?</string>
+    <string name="au_t_debrief">Weekly debrief</string>
+    <string name="au_t_debrief_blurb">Your week from Statistics, when the weekly window resets</string>
+    <string name="au_t_brief">Morning brief</string>
+    <string name="au_t_brief_blurb">Every weekday at 9:00, what changed in a project</string>
+    <string name="au_t_brief_prompt">Summarise what changed in this project since yesterday: commits, branches, open work, anything failing. Then say what\'s worth doing next. Don\'t change anything.</string>
+    <string name="au_t_prs">Pull request watch</string>
+    <string name="au_t_prs_blurb">Every 2 hours, what needs you on your pull requests</string>
+    <string name="au_t_prs_prompt">Check my open pull requests with gh: new review comments, failing checks, merge conflicts. Say what needs me, newest first.</string>
+    <string name="au_t_plugged">Tests when plugged in</string>
+    <string name="au_t_plugged_blurb">Run the tests when you plug the Mac in</string>
+    <string name="au_t_plugged_prompt">Run this project\'s tests. If anything fails, find the cause and tell me in a few lines. Don\'t change code.</string>
+    <string name="au_t_battery">Wrap up on low battery</string>
+    <string name="au_t_battery_blurb">Sessions save their work before the Mac runs out</string>
+    <string name="au_t_battery_prompt">The Mac\'s battery is at {battery}. Finish the step you\'re on, commit or save your work in progress, write down what\'s left, and stop.</string>
+    <string name="au_t_costs">Costs money</string>
+
+    <!-- The editor. -->
+    <string name="au_edit_new">New automation</string>
+    <string name="au_edit">Edit</string>
+    <string name="au_run_now">Run now</string>
+    <string name="au_save">Save</string>
+    <string name="au_saving">Saving…</string>
+    <string name="au_started">Started</string>
+    <string name="au_saved">Saved</string>
+    <string name="au_when">When</string>
+    <string name="au_do">Do</string>
+    <string name="au_permissions">Permissions</string>
+    <string name="au_name">Name</string>
+    <string name="au_runs">Runs</string>
+    <string name="au_change">Change</string>
+    <string name="au_pick_when">When should it run?</string>
+    <string name="au_pick_do">What should it do?</string>
+    <!-- WHEN's tiles. -->
+    <string name="au_w_time">At a time</string>
+    <string name="au_w_every">Every few hours</string>
+    <string name="au_w_reset">My limit resets</string>
+    <string name="au_w_limit">I hit my limit</string>
+    <string name="au_w_finished">A session finishes</string>
+    <string name="au_w_needs">A session needs me</string>
+    <string name="au_w_plugged">The Mac is plugged in</string>
+    <string name="au_w_battery">The Mac\'s battery is low</string>
+    <string name="au_w_no_battery">This Mac has no battery</string>
+    <!-- DO's tiles. -->
+    <string name="au_d_start">Start a session</string>
+    <string name="au_d_skill">Run a skill or command</string>
+    <string name="au_d_continue">Continue a session</string>
+    <string name="au_d_notify">Notify me</string>
+    <string name="au_d_say">Read aloud on my glasses</string>
+    <string name="au_d_no_glasses">Pair your glasses first</string>
+    <!-- At a time. -->
+    <string name="au_once">Once</string>
+    <string name="au_time">Time</string>
+    <string name="au_mac_time">%1$s on the Mac (%2$s)</string>
+    <string name="au_time_note">Runs while the Mac is awake. If it\'s asleep at %1$s, it runs when it wakes, up to 6 hours late.</string>
+    <string name="au_pick_time">Pick a time</string>
+    <string name="au_done">Done</string>
+    <string name="au_am">AM</string>
+    <string name="au_pm">PM</string>
+    <!-- Every few hours. -->
+    <string name="au_every_label">Every</string>
+    <string name="au_from">From %1$s</string>
+    <string name="au_to">To %1$s</string>
+    <string name="au_around">Around the clock</string>
+    <!-- My limit resets / I hit my limit. -->
+    <string name="au_window_five">5-hour</string>
+    <string name="au_window_week">Weekly</string>
+    <string name="au_reset_after">Only after I hit it</string>
+    <string name="au_reset_after_body">Not every window, only one you used up.</string>
+    <string name="au_reset_night">Only between two times</string>
+    <string name="au_limit_note">Fires when Claude Code stops at this limit on the Mac.</string>
+    <!-- A session finishes / needs me. -->
+    <string name="au_any_project">Any project</string>
+    <string name="au_from_mine">Mine</string>
+    <string name="au_from_auto">Automated</string>
+    <string name="au_from_any">Any</string>
+    <string name="au_sessions_from">Sessions</string>
+    <!-- Battery. -->
+    <string name="au_battery_at">At %1$d%%</string>
+    <string name="au_only_next">Only the next time</string>
+    <string name="au_only_next_body">Then it turns itself off.</string>
+    <!-- Start a session / Run a skill. -->
+    <string name="au_project">Project</string>
+    <string name="au_no_projects">No projects on the Mac yet.</string>
+    <string name="au_prompt">Prompt</string>
+    <string name="au_prompt_hint">What should Claude do?</string>
+    <string name="au_skill_hint">/command and what it takes</string>
+    <string name="au_model">Model</string>
+    <string name="au_when_done">When it\'s done</string>
+    <string name="au_then_notify">Notify me</string>
+    <string name="au_then_say">Read aloud</string>
+    <string name="au_then_none">Nothing</string>
+    <!-- Continue a session. -->
+    <string name="au_session">Session</string>
+    <string name="au_t_trigger">The session that fired it</string>
+    <string name="au_t_working">Every working session</string>
+    <string name="au_t_limited">Every session the limit stopped</string>
+    <string name="au_pick_session">Which session?</string>
+    <string name="au_live_sessions">Live</string>
+    <string name="au_past_sessions">Last 7 days</string>
+    <string name="au_own_mode">Runs in the session\'s own permission mode.</string>
+    <string name="au_continue_hint">What should it do next? Leave it empty to carry on.</string>
+    <string name="au_on_provider">Carry on with</string>
+    <string name="au_own_provider">Its own provider</string>
+    <string name="au_costs_money">Carrying on with %1$s costs money: that provider bills it, not your subscription.</string>
+    <!-- Notify me / Read aloud. -->
+    <string name="au_text">Text</string>
+    <string name="au_text_hint">What should it say?</string>
+    <string name="au_notify_glasses">Also read it aloud on my glasses</string>
+    <string name="au_notify_glasses_body">When they\'re connected.</string>
+    <!-- Saving an automation that runs on another provider: it costs money, so it asks once per save. -->
+    <string name="au_paid_q">This costs money</string>
+    <string name="au_paid_body">It runs on %1$s, which bills its own credit, not your Claude subscription.</string>
+    <string name="au_paid_ok">Save anyway</string>
+    <string name="au_placeholders">Filled in when it runs</string>
+    <string name="au_insert">Insert %1$s</string>
+    <!-- Permissions: title and one line each (spec §6, "Modes"). -->
+    <string name="au_mode_allowed">Allowed only</string>
+    <string name="au_mode_allowed_body">Runs only what your Claude Code settings and this list allow. Anything else is skipped, never asked.</string>
+    <string name="au_mode_ask">Ask me</string>
+    <string name="au_mode_ask_body">Waits for your answer before edits and commands. Unanswered for 10 minutes, the run stops.</string>
+    <string name="au_mode_edits">Edits on its own</string>
+    <string name="au_mode_edits_body">Edits files without asking. Commands wait for your answer.</string>
+    <string name="au_mode_auto">Auto</string>
+    <string name="au_mode_auto_body">Claude Code decides what\'s safe.</string>
+    <string name="au_mode_no_asking">No asking</string>
+    <string name="au_mode_no_asking_body">Nothing waits for you.</string>
+    <string name="au_warn_auto">Runs commands and edits files without asking you. Claude Code holds back only what looks risky to it, and nobody is watching this run.</string>
+    <string name="au_warn_no_asking">Runs any command and changes any file without asking, with nobody watching. A page it reads could talk it into deleting or sending things. Use it only in a project you can afford to lose.</string>
+    <string name="au_rule_hint">Bash(npm test)</string>
+    <string name="au_rule_add">Add a rule</string>
+    <string name="au_rule_remove">Remove %1$s</string>
+    <string name="au_rules_note">Claude Code\'s own rules: Bash(git log:*) allows every git log.</string>
+    <!-- The fingerprint check before saving "No asking". -->
+    <string name="au_bypass_title">Let an automation run without asking</string>
+    <string name="au_bypass_needed">Set up a screen lock on this phone first: “No asking” needs it.</string>
+    <!-- Name. -->
+    <string name="au_name_hint">Morning brief</string>
+    <!-- Runs. -->
+    <plurals name="au_runs_skipped">
+        <item quantity="one">%d skipped</item>
+        <item quantity="other">%d skipped</item>
+    </plurals>
+    <string name="au_runs_none">No runs yet. Run now to try it.</string>
+    <string name="au_load_more">Load more</string>
+    <string name="au_stop">Stop</string>
+    <string name="blocked_run_at_reset">Run this at the reset</string>
+    <string name="au_allow_next">Allow next time:</string>
+    <string name="au_allow_rule">Allow %1$s</string>
+    <string name="au_allowed_toast">Allowed for this automation</string>
+    <string name="au_transcript_gone">That session isn\'t on your Mac\'s list any more.</string>
+    <!-- Delete, and leaving with changes. -->
+    <string name="au_delete">Delete</string>
+    <string name="au_delete_q">Delete “%1$s”?</string>
+    <string name="au_delete_body">Its run history goes too. Sessions it started stay in History.</string>
+    <string name="au_discard_q">Discard changes?</string>
+    <string name="au_discard_body">Your changes to this automation aren\'t saved yet.</string>
+    <string name="au_discard">Discard</string>
+    <string name="au_keep_editing">Keep editing</string>
+    <string name="au_unknown_note">This automation uses something this app doesn\'t know yet. Update the app on your phone to edit it.</string>
+    <string name="au_demo_note">In the demo, runs only pretend.</string>
+
+    <!-- The daemon's refusals, in the app's words. -->
+    <string name="au_err_name">Give it a name, up to 60 characters.</string>
+    <string name="au_err_trigger">The Mac didn\'t accept this trigger. Update Hypernova on the Mac.</string>
+    <string name="au_err_time">Pick a valid time.</string>
+    <string name="au_err_days">Pick at least one day.</string>
+    <string name="au_err_past">Pick a time in the future.</string>
+    <string name="au_err_action">The Mac didn\'t accept this action. Update Hypernova on the Mac.</string>
+    <string name="au_err_prompt">Write what Claude should do.</string>
+    <string name="au_err_project">That project folder isn\'t on the Mac.</string>
+    <string name="au_err_session">That session no longer exists.</string>
+    <string name="au_err_provider">That provider isn\'t set up on the Mac.</string>
+    <string name="au_err_mode">The Mac didn\'t accept this permission mode.</string>
+    <string name="au_err_confirm">“No asking” needs your fingerprint or screen lock first.</string>
+    <string name="au_err_rule">A rule looks like Bash(npm test) or Read.</string>
+    <string name="au_err_rule_broad">That rule would allow everything. Name the command, like Bash(npm test).</string>
+    <string name="au_err_battery">This Mac has no battery.</string>
+    <string name="au_err_glasses">Pair your glasses first.</string>
+    <string name="au_err_too_many">50 automations is the most. Delete one first.</string>
+    <string name="au_err_paid">It runs on another provider, which costs money: save it again and agree to that.</string>
+    <string name="au_err_template">The Mac didn\'t know this template. Update Hypernova on the Mac.</string>
+    <string name="au_err_gone">This automation was deleted.</string>
+    <string name="au_err_no_run">That run is already over.</string>
+    <string name="au_err_running">It\'s running already.</string>
+    <string name="au_err_runs">Couldn\'t load its runs.</string>
+    <string name="au_err_save">Couldn\'t save the automation.</string>
+    <string name="au_err_delete">Couldn\'t delete the automation.</string>
+    <string name="au_err_run">Couldn\'t start it.</string>
+    <string name="au_err_stop">Couldn\'t stop the run.</string>
+    <string name="au_err_pause">Couldn\'t change that on the Mac.</string>
+    <string name="au_err_project_needed">Pick a project.</string>
+    <string name="au_err_provider_needed">Pick a provider to carry on with.</string>
+    <string name="au_err_text">Write what it should say.</string>
+
+    <!-- Notifications. -->
+    <string name="au_channel">Automations</string>
+    <string name="au_channel_desc">What your automations found, and runs that couldn\'t start.</string>
+    <string name="au_notice_label">Automation</string>
+    <plurals name="au_away_title">
+        <item quantity="one">%d automation ran while you were away</item>
+        <item quantity="other">%d automations ran while you were away</item>
+    </plurals>
+</resources>

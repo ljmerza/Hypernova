@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The in-app update (data/AppUpdater.kt, ui/update/UpdateUi.kt): the banner and the Settings card. -->
+<resources>
+    <string name="update_downloading">Downloading the update</string>
+    <string name="update_checking">Checking the update</string>
+    <string name="update_permission">Allow Hypernova to install its update</string>
+    <string name="update_permission_body">Android asks once: turn on Allow from this source for Hypernova, then come back here and the update carries on.</string>
+    <string name="update_allow">Allow</string>
+    <string name="update_allow_installs">Allow installs</string>
+    <string name="update_not_now">Not now</string>
+    <string name="update_ready">Ready to install</string>
+    <string name="update_ready_body">Downloaded and checked. Android asks you to confirm, then Hypernova restarts as the new version.</string>
+    <string name="update_confirming">Confirm the update in Android\'s dialog</string>
+    <string name="update_install">Install</string>
+    <string name="update_open_browser">Open in browser</string>
+    <string name="update_size">%1$s of %2$s</string>
+    <string name="update_mb">%1$.1f MB</string>
+    <string name="update_percent">%1$d%%</string>
+    <string name="update_said_progress">Downloading the update, %1$d percent</string>
+    <string name="update_failed">Update stopped</string>
+    <string name="update_fail_network">The download broke off. Check that your Mac is reachable, then try again.</string>
+    <string name="update_fail_missing">Your Mac has no Android app to hand out right now.</string>
+    <string name="update_fail_damaged">The downloaded file isn\'t an app Android can read. Try again.</string>
+    <string name="update_fail_other_app">The file from your Mac isn\'t Hypernova, so it wasn\'t installed.</string>
+    <string name="update_fail_not_newer">The app on your Mac is no newer than this one.</string>
+    <string name="update_fail_storage">Not enough free space on this phone for the update.</string>
+    <string name="update_fail_other_key">Android refused it: this update is signed with another key than the app on this phone. Uninstall Hypernova, then install it from your Mac.</string>
+    <string name="update_fail_blocked">Android blocked the install on this phone.</string>
+    <string name="update_fail_install">Android couldn\'t install the update.</string>
+    <string name="update_done_title">Hypernova is updated</string>
+    <string name="update_done_body">Version %1$s, build %2$d. Tap to open it.</string>
+</resources>

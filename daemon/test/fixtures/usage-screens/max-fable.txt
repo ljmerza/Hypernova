@@ -1,0 +1,50 @@
+╭─── Claude Code v2.1.302 ─────────────────────────────────────────────────────────────────────────╮
+│                                                  │ Tips for getting started                      │
+│                  Welcome back!                   │ Run /init to create a CLAUDE.md file with ins… │
+│                                                  │ ───────────────────────────────────────────── │
+│                      ▐▛███▜▌                     │ Recent activity                               │
+│                     ▝▜█████▛▘                    │ No recent activity                            │
+│                       ▘▘ ▝▝                      │                                               │
+│       Fable 5.1 · Claude Max · Organization      │                                               │
+│      ~/Library/Application Support/Hypernova/usage-probe                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+> /usage
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  Settings:  Status   Config   Usage   Stats  (←/→ or tab to cycle)
+
+  Current session
+  ███████████▌                                       23% used
+  Resets 7pm (Europe/Moscow)
+
+  Current week (all models)
+  ███████████████████████████████                    62% used
+  Resets Oct 21, 10am (Europe/Moscow)
+
+  Current week (Sonnet only)
+  █▌                                                 3% used
+  Resets Oct 21, 10am (Europe/Moscow)
+
+  Current week (Fable)
+  ████████████████████▌                              41% used
+  Resets Oct 20, 8pm (Europe/Moscow)
+
+  Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

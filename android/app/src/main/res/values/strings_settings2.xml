@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings (ui/settings/Settings.kt): the testing checklist's switch and the background connection's battery exemption. -->
+<resources>
+    <string name="st_checklist_unlocked">Testing checklist on</string>
+    <string name="st_battery_line">Android may stop the background connection to save battery, and then approvals wait until you open the app.</string>
+    <string name="st_battery_allow">Allow in background</string>
+</resources>

@@ -1,0 +1,1 @@
+{"type": "assistant", "timestamp": "2026-10-16T05:00:00.000Z", "isApiErrorMessage": true, "error": "rate_limit", "apiErrorStatus": 429, "apiErrorIsTransient": false, "message": {"model": "<synthetic>", "role": "assistant", "content": [{"type": "text", "text": "API Error: Request rejected (429) \u00b7 Rate limit exceeded: free-models-per-min."}]}}

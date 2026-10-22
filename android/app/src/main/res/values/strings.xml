@@ -1,0 +1,796 @@
+<resources>
+    <string name="app_name">Hypernova</string>
+
+    <!-- Home -->
+    <string name="sessions">Sessions</string>
+    <string name="history">History</string>
+    <string name="settings">Settings</string>
+    <string name="new_session">New session</string>
+    <string name="open_session">Open session</string>
+    <!-- The SESSIONS seam with nothing live (otherwise its counts: notif_needs_you, notif_working, as marks). -->
+    <string name="home_quiet">all quiet</string>
+    <string name="usage">Usage</string>
+    <string name="percent">%1$d%%</string>
+    <string name="time_warp_hint">drag to time-warp</string>
+    <string name="resets_in">resets in %1$s</string>
+    <!-- Under the quiet disk while a limit holds: through the 5-hour wait the stream refills it until the
+         reset; through the week's low state the disk refills when the stream returns at the week's reset. -->
+    <string name="refills_in">refills in %1$s</string>
+    <!-- Under the sun's empty ring before the Mac's first numbers; TalkBack's is sun_unknown_said. -->
+    <string name="sun_unknown">waiting for numbers</string>
+    <string name="sun_unknown_said">Usage: waiting for the first numbers from your Mac.</string>
+    <string name="show_all">show all</string>
+    <string name="a11y_sky">%1$s. %2$d projects in orbit, %3$d need you.</string>
+    <string name="a11y_limit">5-hour limit reached, resets in %1$s</string>
+    <string name="a11y_week_limit">Weekly limit reached, resets in %1$s</string>
+    <string name="a11y_show_only">Show only %1$s</string>
+    <string name="a11y_jump_usage">Jump to usage</string>
+    <plurals name="sessions_count">
+        <item quantity="one">%d session</item>
+        <item quantity="other">%d sessions</item>
+    </plurals>
+    <string name="dur_s">%1$d:%2$02d</string>
+    <string name="dur_m">%1$dm</string>
+    <string name="dur_hm">%1$dh %2$dm</string>
+    <string name="dur_dh">%1$dd %2$dh</string>
+    <string name="five_hours">5 hours</string>
+    <string name="seven_days">7 days</string>
+    <string name="ago_now">now</string>
+    <string name="ago_minutes">%1$dm</string>
+    <string name="ago_hours">%1$dh</string>
+    <string name="ago_days">%1$dd</string>
+
+    <!-- New session sheet -->
+    <string name="project">Project</string>
+    <string name="model">Model</string>
+    <string name="mode">Permission mode</string>
+    <string name="start">Start</string>
+    <string name="close">Close</string>
+
+    <!-- Session -->
+    <string name="state_working">Working</string>
+    <string name="state_needs_you">Needs you</string>
+    <string name="state_idle">Idle</string>
+    <string name="jump_latest">Jump to latest</string>
+    <string name="prompt_hint">Message this session…</string>
+    <string name="send">Send</string>
+    <string name="back">Back</string>
+    <string name="you">You</string>
+    <string name="claude">Claude</string>
+    <string name="bash">Bash</string>
+    <string name="edit">Edit</string>
+    <!-- TalkBack, on the stopwatch in a terminal's or a card's seam. -->
+    <string name="running_for">Running for %1$s</string>
+    <string name="ran_for">Ran for %1$s</string>
+    <string name="exit_code">exit %1$d</string>
+    <string name="collapse">collapse</string>
+    <string name="elapsed_secs">%1$.1fs</string>
+    <string name="elapsed_min_secs">%1$dm %2$ds</string>
+    <!-- The banner when an agent the main agent started asks: "implement:fix asks: npm test". -->
+    <string name="notice_agent_asks">%1$s asks: %2$s</string>
+    <plurals name="more_lines">
+        <item quantity="one">%d more line</item>
+        <item quantity="other">%d more lines</item>
+    </plurals>
+    <plurals name="lines">
+        <item quantity="one">%d line</item>
+        <item quantity="other">%d lines</item>
+    </plurals>
+    <!-- A table in a reply: what TalkBack says for a cell ("Tokens: 3.2k"), and an action on its rows. -->
+    <string name="table_cell">%1$s: %2$s</string>
+    <string name="copy_table">Copy table</string>
+
+    <!-- Approvals -->
+    <string name="deny">Deny</string>
+    <string name="always">Always</string>
+    <string name="allow">Allow</string>
+    <string name="allowed">Allowed</string>
+    <string name="always_allowed">Always allowed for %1$s</string>
+    <string name="denied">Denied</string>
+
+    <!-- Connection -->
+    <string name="link_connected">Connected</string>
+    <string name="link_connected_to">Connected to %1$s</string>
+    <string name="link_connecting">Connecting</string>
+    <string name="link_reconnecting">Reconnecting</string>
+    <string name="link_offline">Offline</string>
+    <string name="link_unpaired">Unpaired</string>
+    <string name="link_demo">Demo</string>
+    <!-- The Mac's battery beside its name in the connection chip, after a small drawn battery ("MacBook Air ▭ 62%"); a Mac without one shows nothing. -->
+    <string name="link_battery">%1$d%%</string>
+    <!-- What TalkBack hears: "Connected to MacBook Air, battery 62%, charging". -->
+    <string name="link_said_battery">%1$s, battery %2$d%%</string>
+    <string name="link_said_charging">%1$s, battery %2$d%%, charging</string>
+    <!-- The route is a glyph at the chip's end (Wi-Fi's fan, a globe); TalkBack hears it in a word. -->
+    <string name="link_said_via">%1$s, over %2$s</string>
+    <!-- How the app reaches the Mac: its own address on this network, or through Tailscale. -->
+    <string name="route_local">Local</string>
+    <string name="route_tailscale">Tailscale</string>
+    <string name="route_remote">Remote</string>
+    <!-- Tailscale built in (data/Tsnet.kt): the sign-in screen and Settings. -->
+    <string name="ts_sign_in_title">Sign in to connect your devices</string>
+    <string name="ts_sign_in_body">Hypernova carries Tailscale, a private network between your own devices, so your phone reaches your computer from anywhere. Sign in with the account your computer uses.</string>
+    <string name="ts_sign_in_as">Sign in as %1$s.</string>
+    <string name="ts_sign_in">Sign in</string>
+    <string name="ts_sign_out">Sign out</string>
+    <string name="ts_starting">Starting Tailscale…</string>
+    <string name="ts_label">Tailscale</string>
+    <string name="ts_unavailable">This build has no built-in Tailscale.</string>
+    <string name="ts_control">Control server: %1$s</string>
+    <string name="ts_control_title">This computer uses its own Tailscale server.</string>
+    <string name="ts_control_body">%1$s connects through %2$s instead of tailscale.com. If you use it, this phone\'s Tailscale node signs in there, sends it this phone\'s name and addresses, and lets it ask the node for its diagnostics, as any Tailscale server can. Only go on if that server is yours or one you trust.</string>
+    <string name="ts_control_plain">The connection to it is plain http (a private address).</string>
+    <string name="ts_control_use">Use %1$s</string>
+    <string name="cant_reach">Can\'t reach %1$s.</string>
+    <string name="retrying_in">Trying again in %1$s.</string>
+    <string name="retrying_now">Trying again now…</string>
+    <string name="retry_now">Retry now</string>
+    <string name="open_tailscale">Open Tailscale</string>
+    <string name="connecting_to">Connecting to %1$s…</string>
+    <string name="problem_no_network">This phone is offline. Connect to Wi‑Fi or mobile data.</string>
+    <string name="problem_no_tailscale">Can\'t find your Mac. Sign in to Tailscale in this app (or turn on the Tailscale app), with the same account as your Mac.</string>
+    <string name="problem_unreachable">Your Mac isn\'t answering. Check that it\'s awake and that Tailscale is on, on both devices.</string>
+    <string name="problem_not_running">Hypernova isn\'t running on your Mac. Open it from the menu bar.</string>
+    <string name="problem_tls">The secure connection to your Mac failed. Open Hypernova on your Mac and finish the Tailscale setup.</string>
+    <string name="problem_cleartext">This link uses plain http, which only development builds allow.</string>
+    <string name="problem_unpaired">This phone was unpaired. Pair it again from your Mac.</string>
+    <string name="problem_code_expired">Codes work once and last 10 minutes. On your Mac, choose Pair a phone again and scan the new code.</string>
+    <string name="problem_server">Your Mac couldn\'t do that. Try again.</string>
+
+    <!-- Errors (toasts) -->
+    <string name="err_history">Couldn\'t load this conversation.</string>
+    <string name="err_send">Couldn\'t send. Your message is back in the box.</string>
+    <string name="err_interrupt">Couldn\'t interrupt the session.</string>
+    <string name="err_continue">Couldn\'t continue the session.</string>
+    <string name="err_answer">Couldn\'t send your answer. Try again.</string>
+    <string name="err_already_answered">Already answered somewhere else.</string>
+    <string name="err_start">Couldn\'t start the session.</string>
+    <string name="err_files">Couldn\'t open this folder.</string>
+    <string name="err_file">Couldn\'t open this file.</string>
+    <string name="err_download">Couldn\'t download this file.</string>
+    <string name="err_preview">Couldn\'t open the preview.</string>
+    <string name="err_provider_save">Couldn\'t save the provider.</string>
+    <string name="err_provider_delete">Couldn\'t delete the provider.</string>
+    <string name="err_checklist">Couldn\'t open the checklist.</string>
+    <string name="err_generic">That didn\'t work. Try again.</string>
+
+    <!-- Session activity lines (live) -->
+    <string name="activity_needs_you">waiting for your answer</string>
+    <string name="activity_paused_away">paused after 10 minutes without an answer</string>
+    <string name="activity_starting">starting…</string>
+    <string name="activity_working">working…</string>
+    <string name="activity_error">stopped with an error</string>
+    <string name="activity_ended">ended</string>
+    <string name="activity_waiting">waiting for your next prompt</string>
+    <string name="model_default">default model</string>
+    <string name="mode_label_default">ask first</string>
+    <string name="mode_label_accept">accept edits</string>
+    <string name="mode_label_plan">plan</string>
+    <string name="mode_label_auto">auto</string>
+    <string name="mode_label_bypass">bypass</string>
+    <string name="untitled_session">Untitled session</string>
+    <string name="plan_keep_message">Not yet. Keep planning: the user wants to refine the plan before you start.</string>
+    <string name="continue_prompt">I\'m back. Please continue where you left off.</string>
+    <string name="provider_builtin_name">Claude (your subscription)</string>
+    <string name="demo_mac">demo</string>
+    <string name="demo_needs_mac">Pair your Mac to open files and previews. Demo mode has none.</string>
+    <!-- Demo: a session moved to another provider ("Continue on OpenRouter"). -->
+    <string name="demo_moved_to">Continues on %1$s from here.</string>
+
+    <!-- Onboarding -->
+    <string name="onb_title">Connect your computer.</string>
+    <string name="onb_intro">See the Claude Code or Codex sessions on your Mac or server, live, and answer them from here. Three steps, about a minute.</string>
+    <string name="onb_step1_title">Tailscale is built in</string>
+    <string name="onb_step1_body">Your phone reaches your computer over Tailscale, a private network between your own devices, from anywhere. Nothing to install: after you scan the code, sign in with the account your computer uses. The Tailscale app works too, if you have it.</string>
+    <string name="onb_step2_title">Show the pairing code</string>
+    <string name="onb_step2_body">On a Mac, click the Hypernova icon in the menu bar and choose Pair a phone. On a Linux server or PC, run hypernova pair.</string>
+    <string name="onb_step3_title">Scan the code with your camera</string>
+    <string name="onb_step3_body">Point this phone\'s camera at the QR code. It opens Hypernova and pairs on its own.</string>
+    <string name="onb_step">Step %1$d</string>
+    <string name="onb_paste">Paste pairing link</string>
+    <string name="onb_paste_hint">https://hypernova.observer/pair#…</string>
+    <string name="onb_paste_help">No link on the clipboard. On a Mac, choose Pair a phone, then Copy link; on a server, hypernova pair prints the link. Copy it and paste it here.</string>
+    <string name="onb_pair">Pair</string>
+    <string name="onb_demo">Explore with demo data</string>
+    <string name="onb_or">Or</string>
+
+    <!-- Pairing -->
+    <string name="try_again">Try again</string>
+    <string name="pair_working">Pairing with %1$s…</string>
+    <string name="pair_working_body">Talking to your computer…</string>
+    <string name="pair_done">Paired with %1$s.</string>
+    <string name="pair_done_body">Your sessions are on their way. You can answer approvals, start sessions and follow along from here.</string>
+    <string name="pair_open">Open Hypernova</string>
+    <string name="pair_failed">Couldn\'t pair with %1$s.</string>
+    <string name="pair_expired">This code has expired.</string>
+    <string name="pair_closed">Your computer isn\'t showing a code.</string>
+    <string name="pair_closed_body">On the local network your computer takes a code only while it shows one. Show it again (Pair a phone on a Mac, hypernova pair on a server) and scan it.</string>
+    <string name="pair_too_many">Too many wrong codes.</string>
+    <plurals name="pair_too_many_body">
+        <item quantity="one">Your computer has stopped taking codes from this network for now. Try again in %d minute.</item>
+        <item quantity="other">Your computer has stopped taking codes from this network for now. Try again in %d minutes.</item>
+    </plurals>
+    <string name="pair_bad_link">That link didn\'t work.</string>
+    <string name="pair_bad_link_body">It isn\'t a Hypernova pairing link. Show the code again (Pair a phone on a Mac, hypernova pair on a server) and scan it.</string>
+    <string name="pair_back">Back</string>
+    <string name="pair_label">Pairing</string>
+
+    <!-- Unpaired -->
+    <string name="unpaired_title">This phone was unpaired.</string>
+    <string name="unpaired_body">%1$s no longer accepts this phone. To pair again, open Hypernova on your Mac, choose Pair a phone and scan the code.</string>
+    <string name="unpaired_pair">Pair again</string>
+
+    <!-- Home (live) -->
+    <string name="empty_title">No sessions yet.</string>
+    <string name="empty_body">Start one here, or run claude in a terminal on your Mac. It shows up here on its own.</string>
+    <string name="usage_official">official</string>
+    <string name="usage_waiting">no numbers yet</string>
+    <string name="usage_unknown_note">Usage appears after Claude Code\'s next reply on your Mac.</string>
+    <string name="browse_files">Browse files</string>
+    <string name="history_empty">Sessions that have ended show up here.</string>
+    <string name="history_trail">%1$d ended</string>
+
+    <!-- Session (live) -->
+    <string name="state_starting">Starting</string>
+    <string name="state_error">Error</string>
+    <string name="state_ended">Ended</string>
+    <string name="continue_session">Continue</string>
+    <string name="paused_title">Paused while you were away</string>
+    <string name="paused_body">Nobody answered for 10 minutes, so the request was denied and %1$s stopped. Continue tells it you\'re back.</string>
+    <string name="queued">%1$d queued</string>
+    <string name="files">Files</string>
+    <string name="files_changed">Files changed</string>
+    <string name="open_preview">Open preview</string>
+    <string name="open_preview_port">Open preview on :%1$d</string>
+    <string name="loading_conversation">Loading the conversation…</string>
+    <string name="empty_conversation">Nothing here yet.</string>
+    <string name="thinking">Thinking</string>
+    <string name="thought_chars">Thought in %1$s characters</string>
+    <string name="result_done">Done</string>
+    <string name="result_failed">Stopped with an error</string>
+    <plurals name="turns">
+        <item quantity="one">%d turn</item>
+        <item quantity="other">%d turns</item>
+    </plurals>
+    <string name="cost">$%1$.2f</string>
+    <!-- TalkBack, for the end of a turn: "Done. 4 turns, took 1m 12s, cost $0.42." -->
+    <string name="result_said">%1$s. %2$s.</string>
+    <string name="result_took">took %1$s</string>
+    <string name="result_cost">cost %1$s</string>
+    <string name="sending">Sending…</string>
+    <string name="terminal_session_note">Started in a terminal. While it\'s open there, messages continue it as a new session.</string>
+    <string name="err_commands">Couldn\'t get the commands from your Mac.</string>
+    <string name="commands_yours">Your skills and commands</string>
+    <string name="commands_builtin">Claude Code</string>
+    <string name="commands_loading">Asking Claude Code for its commands…</string>
+    <string name="commands_none">No command starts with that.</string>
+    <!-- A command in the transcript: its eyebrow, and what TalkBack says for it. -->
+    <string name="command_label">Command</string>
+    <string name="skill_label">Skill</string>
+    <string name="shell_label">Shell</string>
+    <string name="command_desc">Command %1$s</string>
+    <string name="command_desc_args">Command %1$s: %2$s</string>
+    <string name="skill_desc">Skill %1$s</string>
+    <string name="skill_desc_args">Skill %1$s: %2$s</string>
+    <string name="shell_desc">Shell command %1$s</string>
+    <string name="menu_in_terminal">In the terminal</string>
+    <string name="menu_more">More options in the terminal</string>
+    <string name="menu_open_terminal">Terminal</string>
+    <string name="waiting_terminal_title">%1$s is waiting in the terminal</string>
+    <string name="waiting_terminal_body">It\'s asking something only the terminal shows. Open it to answer.</string>
+    <!-- Shared terminal -->
+    <string name="terminal">Terminal</string>
+    <string name="open_terminal">Open the live terminal</string>
+    <string name="open_on_mac">Open on the Mac</string>
+    <string name="opened_on_mac">Opened in %1$s on your Mac.</string>
+    <string name="already_on_mac">It\'s open in %1$s on your Mac. Brought it to the front.</string>
+    <string name="terminal_connecting">Connecting to the terminal…</string>
+    <string name="terminal_lost">The connection to the terminal dropped.</string>
+    <string name="terminal_reconnect">Reconnect</string>
+    <string name="terminal_ended">This session has ended.</string>
+    <string name="terminal_size">%1$d × %2$d</string>
+    <string name="terminal_also_mac">Also open on your Mac</string>
+    <!-- The terminal's subtitle while it's open on the Mac as well: "120 × 40, also open on your Mac". -->
+    <string name="terminal_subtitle_mac">%1$s, also open on your Mac</string>
+    <string name="terminal_hint">Pinch to change the text size. Tap the screen to type.</string>
+    <string name="key_esc">esc</string>
+    <string name="key_tab">tab</string>
+    <string name="key_stab">⇧tab</string>
+    <string name="key_ctrlc">^C</string>
+    <string name="key_enter">⏎</string>
+    <string name="key_paste">paste</string>
+    <string name="key_keyboard">Keyboard</string>
+    <string name="key_up">Up</string>
+    <string name="key_down">Down</string>
+    <string name="key_left">Left</string>
+    <string name="key_right">Right</string>
+    <string name="err_terminal">Couldn\'t open the terminal.</string>
+    <string name="err_open_on_mac">Couldn\'t open it on the Mac.</string>
+
+    <!-- Approvals (live) -->
+    <string name="question">Question</string>
+    <string name="plan">Plan</string>
+    <string name="send_answer">Send answer</string>
+    <string name="send_answers">Send answers</string>
+    <string name="skip">Skip</string>
+    <string name="other">Other…</string>
+    <string name="other_hint">Type your answer</string>
+    <string name="pick_many">Pick any</string>
+    <string name="pick_one">Pick one</string>
+    <string name="approve_plan">Approve plan</string>
+    <string name="keep_planning">Keep planning</string>
+    <string name="auto_deny_in">auto-deny in %1$s</string>
+    <string name="approval_loading">Details are on their way. You can still answer.</string>
+    <string name="denied_timeout">Denied after 10 minutes</string>
+    <string name="answered">Answered</string>
+    <string name="plan_approved">Plan approved</string>
+    <string name="kept_planning">Kept planning</string>
+    <string name="always_allowed_short">Always allowed</string>
+    <string name="by_mac">on your Mac</string>
+    <string name="by_terminal">in the terminal</string>
+
+    <!-- New session (live) -->
+    <string name="prompt">Prompt</string>
+    <string name="prompt_new_hint">What should Claude do?</string>
+    <string name="new_project">New project</string>
+    <string name="new_project_hint">project-name</string>
+    <string name="new_project_creates">Creates %1$s</string>
+    <string name="new_project_invalid">Use letters, numbers, dots, dashes or underscores.</string>
+    <string name="starting">Starting…</string>
+    <string name="model_label_default">Default</string>
+    <string name="mode_default">Ask</string>
+    <string name="mode_accept">Edits</string>
+    <string name="mode_plan">Plan</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_default_desc">Asks you before it edits files or runs commands.</string>
+    <string name="mode_accept_desc">Edits files on its own; asks before running commands.</string>
+    <string name="mode_plan_desc">Plans first and shows you the plan. Nothing changes until you approve.</string>
+    <string name="mode_auto_desc">Decides on its own and asks only when something looks risky.</string>
+    <string name="mode_bypass">Bypass</string>
+    <string name="mode_bypass_desc">Never asks, not even before risky commands. Only for throwaway work.</string>
+    <string name="mode_bypass_unavailable">Bypass is off here: this session started in a terminal without it. Start a new session from the phone to use it.</string>
+    <string name="mode_bypass_next_turn">Bypass starts with Claude\u2019s next turn.</string>
+    <!-- Think-twice card, shown before Auto or Bypass -->
+    <string name="think_kicker_auto">Before you let it run on its own</string>
+    <string name="think_kicker_bypass">Before you switch every check off</string>
+    <string name="think_story">Read the story</string>
+    <string name="think_story_desc">Read the story: %1$s, opens in the browser</string>
+    <string name="think_ai_mistakes">AI makes mistakes. Never rely on it as on something that can\u2019t.</string>
+    <string name="think_keep">Keep asking</string>
+    <string name="think_use_auto">Use Auto anyway</string>
+    <string name="think_use_bypass">Use Bypass anyway</string>
+
+    <!-- Files -->
+    <string name="folder_empty">This folder is empty.</string>
+    <string name="file_too_big">This file is too big to show here.</string>
+    <string name="open_as_page">Open as a web page</string>
+    <string name="loading">Loading…</string>
+    <string name="size_b">%1$d B</string>
+    <string name="size_kb">%1$.1f KB</string>
+    <string name="size_mb">%1$.1f MB</string>
+    <string name="up_one">Up one folder</string>
+    <string name="image_zoom_hint">Pinch to zoom, double-tap to reset</string>
+
+    <!-- Web -->
+    <string name="open_in_browser">Open in browser</string>
+    <string name="reload">Reload</string>
+    <string name="page_failed">Couldn\'t load the page.</string>
+    <string name="testing_checklist">Testing checklist</string>
+
+    <!-- Providers -->
+    <string name="providers">Agents &amp; providers</string>
+    <string name="providers_intro">Sessions can run Claude Code through other Anthropic-compatible providers. Keys stay on your Mac and never come back to this phone.</string>
+    <string name="add_openrouter">Add OpenRouter</string>
+    <string name="add_custom">Add custom</string>
+    <string name="built_in">Built in</string>
+    <string name="key_saved">Key saved</string>
+    <string name="no_key">No key</string>
+    <string name="provider_name">Name</string>
+    <string name="provider_base_url">Base URL</string>
+    <string name="provider_api_key">API key</string>
+    <string name="provider_key_keep">Saved. Leave empty to keep it.</string>
+    <string name="provider_key_hint">Paste the key</string>
+    <string name="provider_models">Models</string>
+    <string name="provider_model_default">Default model</string>
+    <string name="provider_model_opus">Opus slot</string>
+    <string name="provider_model_sonnet">Sonnet slot</string>
+    <string name="provider_model_haiku">Haiku slot</string>
+    <string name="provider_models_help">Pick one from its list, or type an id as the provider names it, like openai/gpt-5. The slots stand in for Opus, Sonnet and Haiku when Claude Code asks for them.</string>
+    <string name="provider_model_hint_default">openai/gpt-5</string>
+    <string name="provider_model_hint_sonnet">anthropic/claude-sonnet-4.5</string>
+    <string name="provider_model_hint_any">optional</string>
+    <string name="provider_builtin_desc">Your normal Claude Code login on the Mac. Claude Code’s usage meters follow this one.</string>
+    <string name="provider_new_openrouter">New OpenRouter provider.</string>
+    <string name="provider_new_custom">New custom provider.</string>
+    <string name="provider_edit_title">Edit %1$s.</string>
+    <string name="provider_custom_help">Any Anthropic-compatible endpoint: LiteLLM, a local gateway, or another vendor\'s Anthropic API.</string>
+    <string name="provider_needs_name">Give it a name.</string>
+    <string name="provider_needs_url">Add the base URL (https://…).</string>
+    <string name="provider_needs_key">Add the API key.</string>
+    <string name="save">Save</string>
+    <string name="saving">Saving…</string>
+    <string name="delete">Delete</string>
+    <string name="delete_provider_q">Delete %1$s?</string>
+    <string name="delete_provider_body">Sessions already running keep it until they finish.</string>
+    <string name="cancel">Cancel</string>
+    <string name="kind_openrouter">OpenRouter</string>
+    <string name="kind_custom">Custom</string>
+    <string name="kind_anthropic">Anthropic</string>
+
+    <!-- Settings -->
+    <string name="mac">Mac</string>
+    <string name="mac_address">Address</string>
+    <string name="mac_route">Connection</string>
+    <!-- Settings' Mac card: the battery of a MacBook (a desktop Mac has no row). -->
+    <string name="mac_battery">Battery</string>
+    <!-- The battery row: how it's powered beside a drawn battery and its percentage; TalkBack: "Battery 62%, charging." -->
+    <string name="mac_battery_charging">charging</string>
+    <string name="mac_battery_on_power">on power</string>
+    <string name="mac_battery_left">%1$s left</string>
+    <string name="mac_battery_draining">on battery</string>
+    <string name="mac_battery_said">Battery %1$d%%, %2$s.</string>
+    <string name="mac_battery_said_short">%1$s, battery %2$d%%</string>
+    <string name="forget_mac">Forget this Mac</string>
+    <string name="forget_q">Forget %1$s?</string>
+    <string name="forget_body">This phone stops seeing its sessions. To pair again, scan a new code from Hypernova on your Mac.</string>
+    <string name="forget">Forget</string>
+    <string name="forgot_offline">Forgotten on this phone. Your Mac still lists it until you remove it there.</string>
+    <string name="not_paired">Not paired with a Mac.</string>
+    <string name="pair_with_mac">Pair with your Mac</string>
+    <string name="demo_mode">Demo mode</string>
+    <string name="demo_mode_desc">Made-up sessions that move, to explore the app. Your Mac stays paired.</string>
+    <string name="demo_mode_desc_unpaired">Made-up sessions that move, to explore the app.</string>
+    <string name="providers_desc">%1$d set up. Run sessions through OpenRouter or any Anthropic-compatible API.</string>
+    <string name="checklist_desc">The owner\'s test list for this build, served by your Mac.</string>
+    <string name="about">About</string>
+    <string name="about_app">App</string>
+    <string name="about_daemon">Daemon</string>
+    <string name="about_claude">Claude Code</string>
+    <string name="unknown">unknown</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel">Approvals</string>
+    <string name="notif_channel_desc">When a session needs your answer while Hypernova is in the background.</string>
+    <!-- An approval's notification title, a phrase (a notification can't draw): "0stems needs you". -->
+    <string name="notif_tool">%1$s needs you</string>
+    <string name="notif_tool_plain">A session needs you</string>
+    <string name="notif_question">A question from %1$s</string>
+    <string name="notif_question_plain">A question for you</string>
+    <string name="notif_plan">A plan to review in %1$s</string>
+    <string name="notif_plan_plain">A plan to review</string>
+    <!-- A session's notification title: "cosmos renderer finished". -->
+    <string name="notice_title_finished">%1$s finished</string>
+    <string name="notice_title_waiting">%1$s is waiting for you</string>
+    <string name="notice_title_error">%1$s stopped on an error</string>
+    <string name="notice_title_needs_you">%1$s needs you</string>
+    <string name="notice_title_backpack">Backpack mode on %1$s</string>
+    <!-- Between the last two of a list said as a phrase ("2 working and 1 needs you"). -->
+    <string name="list_and">" and "</string>
+
+    <!-- Background connection -->
+    <string name="notif_connection_channel">Connection</string>
+    <string name="notif_connection_channel_desc">The quiet notification that keeps Hypernova connected to your Mac in the background.</string>
+    <string name="notif_disconnect">Disconnect</string>
+    <string name="notif_connecting">Connecting to your Mac…</string>
+    <string name="notif_reconnecting">Reconnecting…</string>
+    <string name="notif_offline">Offline and trying again</string>
+    <string name="notif_no_network">Offline until there\'s a network</string>
+    <string name="notif_quiet">Connected and all quiet</string>
+    <plurals name="notif_working">
+        <item quantity="one">%d working</item>
+        <item quantity="other">%d working</item>
+    </plurals>
+    <plurals name="notif_needs_you">
+        <item quantity="one">%d needs you</item>
+        <item quantity="other">%d need you</item>
+    </plurals>
+    <string name="bg_title">Stay connected in the background</string>
+    <string name="bg_desc">Approvals reach you at once, even with the app closed. A quiet notification shows while it\'s on.</string>
+    <string name="notifications">Notifications</string>
+    <string name="notif_off">Notifications are off, so approvals can\'t reach you while Hypernova is closed.</string>
+    <string name="notif_allow">Allow notifications</string>
+    <string name="pair_done_notif">Next, allow notifications so approvals reach you when Hypernova is in the background.</string>
+    <string name="answered_on_mac">Answered on the Mac</string>
+    <string name="approval_closed">No longer waiting</string>
+    <string name="queued_label">Queued</string>
+    <!-- Under a prompt that waits until Claude can take it: Claude Code's queue (a shared or terminal session), or an SDK session's. -->
+    <string name="queued_hint_step">Claude reads it when this step finishes</string>
+    <string name="queued_hint_reply">Waits for the current reply to finish</string>
+    <!-- A queued prompt from this phone didn't reach Claude; its text is back in the message box. -->
+    <string name="queued_returned">Your queued message went back to the terminal\'s input box. It\'s in yours too.</string>
+    <string name="queued_dropped">Your queued message wasn\'t sent. It\'s back in your message box.</string>
+    <string name="tool_stopped">stopped</string>
+
+    <!-- Attachments -->
+    <string name="attach">Attach files</string>
+    <string name="attach_close">Close attachments</string>
+    <string name="attach_photos">Photos</string>
+    <string name="attach_camera">Camera</string>
+    <string name="attach_files">Files</string>
+    <string name="attach_remove">Remove %1$s</string>
+    <string name="attach_open">Open %1$s</string>
+    <string name="attach_limit">Up to %1$d files per message.</string>
+    <string name="attach_too_big">That file is too big to attach (30 MB at most).</string>
+    <string name="attach_unreadable">Couldn\'t read that file.</string>
+    <string name="attach_no_camera">There\'s no camera app on this phone.</string>
+    <string name="attach_subtitle">Attached from your phone</string>
+    <string name="err_upload">Couldn\'t send the file to your Mac.</string>
+
+    <!-- Banners and notifications -->
+    <string name="notice_finished">Finished.</string>
+    <string name="notice_waiting">Waiting for you in the terminal.</string>
+    <string name="notice_kind_needs_you">Needs you</string>
+    <string name="notice_kind_question">A question</string>
+    <string name="notice_kind_plan">A plan</string>
+    <string name="notice_kind_waiting">Waiting</string>
+    <string name="notice_kind_finished">Finished</string>
+    <string name="notice_kind_error">Error</string>
+    <string name="notif_sessions_channel">Session updates</string>
+    <string name="notif_sessions_channel_desc">When a session finishes, waits for you in its terminal, or stops with an error while Hypernova is in the background.</string>
+    <string name="update_title">Update</string>
+    <string name="update_body">Hypernova %1$s is ready on your Mac. Tap to get it.</string>
+    <string name="update_heading">A newer Hypernova is on your Mac.</string>
+    <string name="update_detail">Version %1$s, build %2$d (this phone has build %3$d). Updating keeps your pairing.</string>
+    <string name="update_get">Get the update</string>
+    <string name="about_app_build">%1$s (build %2$d)</string>
+    <string name="mode_change">Change the permission mode</string>
+    <string name="busy_title">Unsent text in the terminal</string>
+    <string name="busy_body">Your message didn\'t go, so nothing was typed over it. Replace it with your message, or open the terminal.</string>
+    <string name="busy_replace">Replace and send</string>
+    <string name="state_sending">Sending</string>
+    <string name="allow_session">Allow all %1$s this session</string>
+    <string name="session_allowed">All %1$s allowed for this session</string>
+    <string name="session_tool_fetch">web pages</string>
+    <string name="session_tool_search">web searches</string>
+    <string name="session_tool_read">file reads</string>
+    <!-- Agents a session's main agent starts, and workflows of them (docs/PROTOCOL.md, "Agents and workflows"). -->
+    <string name="agent_label">Agent</string>
+    <!-- A card's tracked label: "EXPLORE AGENT"; a workflow's is "WORKFLOW", its name under it. -->
+    <string name="agent_kind">%1$s agent</string>
+    <!-- A workflow's trail while it runs: "2 of 5 running". -->
+    <string name="workflow_running_of">%1$d of %2$d running</string>
+    <!-- TalkBack, after an agent's state: "Ran for 2m 14s, 8.4k tokens, 12 tool calls." -->
+    <plurals name="agent_tool_calls">
+        <item quantity="one">%d tool call</item>
+        <item quantity="other">%d tool calls</item>
+    </plurals>
+    <string name="workflow_label">Workflow</string>
+    <string name="agent_open">Open agent</string>
+    <string name="agent_starting">Starting…</string>
+    <string name="agent_asking">Waiting for your answer</string>
+    <string name="agent_running_doing">Working: %1$s</string>
+    <string name="agent_done">Done</string>
+    <string name="agent_failed">Failed.</string>
+    <string name="agent_failed_short">failed</string>
+    <string name="agent_stopped">Stopped before it finished.</string>
+    <string name="agent_state_done">Done</string>
+    <string name="agent_state_failed">Failed</string>
+    <string name="agent_state_stopped">Stopped</string>
+    <string name="agent_task">Task</string>
+    <!-- TalkBack, for the line under an agent's name on its screen ("EXPLORE AGENT  agent cards"). -->
+    <string name="agent_subtitle_said">%1$s, in the session %2$s</string>
+    <string name="agent_empty">Nothing yet.</string>
+    <string name="err_agent">Couldn\'t load this agent\'s transcript.</string>
+    <!-- The session's status line while only its agents work: "AGENTS · 3 running". -->
+    <string name="agents_label">Agents</string>
+    <string name="agents_running">%1$d running</string>
+    <plurals name="agents_count">
+        <item quantity="one">%d agent</item>
+        <item quantity="other">%d agents</item>
+    </plurals>
+    <!-- A finished workflow phase, folded: "+4 done". -->
+    <plurals name="phase_done">
+        <item quantity="one">+%d done</item>
+        <item quantity="other">+%d done</item>
+    </plurals>
+    <string name="clock_secs">%1$ds</string>
+    <string name="clock_hours">%1$dh %2$dm</string>
+    <!-- An approval notification from an agent: the agent, beside the app's name ("From implement:fix"). -->
+    <string name="notif_from_agent">From %1$s</string>
+    <string name="notif_from_an_agent">From an agent</string>
+
+    <!-- Account (docs/PROTOCOL.md, "Account"): Claude Code's subscription on the Mac, at a limit or stopped. -->
+    <string name="at_clock">at %1$s</string>
+    <string name="your_mac">your Mac</string>
+    <string name="limit_session">Session limit</string>
+    <string name="limit_weekly">Weekly limit</string>
+    <string name="limit_model">Model limit</string>
+    <string name="limit_credits">Usage credit limit</string>
+    <!-- Home: the account card. Its seam says what it is; a heading and one line say what it means. -->
+    <string name="account_seam_credits">Usage credits</string>
+    <string name="account_seam_signed_out">Signed out</string>
+    <string name="account_seam_no_plan">No plan</string>
+    <string name="account_seam_on_hold">On hold</string>
+    <string name="account_seam_unknown">Account</string>
+    <string name="account_returns_in">returns in %1$s</string>
+    <string name="account_rest_title">Claude is resting until %1$s</string>
+    <string name="account_rest_body_auto">Your 5-hour limit is used up. Waiting sessions carry on by themselves %1$s.</string>
+    <string name="account_rest_body">Your 5-hour limit is used up, so sessions on your subscription can\'t reply until then.</string>
+    <string name="account_week_title">The week\'s budget is spent</string>
+    <string name="account_week_body">Claude is back %1$s. Until then, sessions can run on another provider.</string>
+    <string name="account_model_title">%1$s rests until %2$s</string>
+    <string name="account_model_title_plain">%1$s reached</string>
+    <string name="account_model_body">Other models still work.</string>
+    <string name="account_credits_limit_body">Your extra usage is spent for now, so sessions on your subscription can\'t reply until then.</string>
+    <string name="account_on_credits_title">Claude is on usage credits</string>
+    <string name="account_on_credits_body">The limit is used up, so replies come out of your extra usage until %1$s.</string>
+    <string name="account_credits_title">Out of usage credits</string>
+    <string name="account_credits_body">Your plan\'s limit and your extra usage are both spent.</string>
+    <string name="account_credits_body_cap">Your spend limit is reached.</string>
+    <string name="account_credits_body_api">The API credit balance is too low.</string>
+    <string name="account_signed_out_title">Claude Code is signed out on %1$s</string>
+    <string name="account_signed_out_expired">Its login expired, so sessions on your subscription can\'t reply.</string>
+    <string name="account_signed_out_revoked">Its login was revoked, so sessions on your subscription can\'t reply.</string>
+    <string name="account_signed_out_body">Sessions on your subscription can\'t reply until it signs in again.</string>
+    <!-- A login the server turned down: a lost login and an ended plan look the same, so say both. -->
+    <string name="account_signed_out_rejected">Its login was turned down. Signing in again may fix it, or the plan may have ended.</string>
+    <string name="account_no_plan_ended">Your Claude plan has ended</string>
+    <string name="account_no_plan_maybe">Your Claude plan may have ended</string>
+    <string name="account_no_plan_cover">Your plan doesn\'t cover this</string>
+    <string name="account_no_plan_body">Renew Pro or Max on claude.ai, then sign in again. Until then, sessions can run on another provider.</string>
+    <string name="account_no_plan_org">Your organization has turned off Claude Code for its plan. Sessions can run on another provider.</string>
+    <string name="account_on_hold_title">Anthropic has put your account on hold</string>
+    <string name="account_on_hold_body">Claude Code can\'t run on it until that\'s resolved.</string>
+    <string name="account_unknown_title">Claude Code reported an account problem</string>
+    <string name="account_continue_on">Continue on %1$s</string>
+    <string name="account_continue_subscription">Continue on your subscription</string>
+    <string name="account_new_on">New session on %1$s</string>
+    <string name="account_add_provider">Add a provider</string>
+    <!-- A ghost pill with a globe beside "Continue on …": short, so the two share a row. -->
+    <string name="account_usage_link">Usage</string>
+    <string name="a11y_account_usage_link">Usage on claude.ai</string>
+    <string name="account_switch_model">Switch to %1$s</string>
+    <string name="account_add_funds">Add funds</string>
+    <string name="account_renew">Renew on claude.ai</string>
+    <!-- The pill itself (a globe beside it, like Usage), short so it shares a row with Continue on …; account_renew is what TalkBack says. -->
+    <string name="account_renew_short">Renew</string>
+    <string name="account_sign_in">Sign in</string>
+    <string name="account_sign_in_mac">Sign in on the Mac</string>
+    <string name="account_sign_in_again">Sign in again</string>
+    <string name="account_view_details">View details</string>
+    <string name="account_check">Check again</string>
+    <!-- Signing Claude Code in from the phone: the page opens here, its code goes back to the Mac. -->
+    <string name="signin_starting">Starting the sign-in on %1$s…</string>
+    <string name="signin_steps">Sign in on the page, then paste the code it shows.</string>
+    <string name="signin_open_page">Open sign-in page</string>
+    <string name="signin_code_hint">Paste the code</string>
+    <string name="signin_paste">Paste</string>
+    <string name="signin_nothing_to_paste">Nothing to paste yet. Copy the code from the sign-in page.</string>
+    <string name="signin_code_refused">That code didn\'t work. Copy it again from the sign-in page.</string>
+    <string name="signin_on_mac">Finish in the terminal that opened on your Mac.</string>
+    <string name="signin_finishing">Signing in…</string>
+    <string name="signin_failed">The sign-in didn\'t finish.</string>
+    <string name="signin_gone">That sign-in has ended. Start it again.</string>
+    <!-- A session stopped by the account: its chip on Home, its line in mono, the card above its composer. -->
+    <string name="state_paused">Paused</string>
+    <string name="state_signed_out">Signed out</string>
+    <string name="state_no_plan">No plan</string>
+    <string name="state_on_hold">On hold</string>
+    <string name="state_no_credit">No credit</string>
+    <!-- A model the plan doesn't include, or one that needs usage credits: not paused, there's no reset to wait for. -->
+    <string name="state_unavailable">Unavailable</string>
+    <!-- "session limit until 2:00, then carries on", "session limit until Fri 10:00", "paused at the session limit". -->
+    <string name="activity_limit_auto">%1$s until %2$s, then carries on</string>
+    <string name="activity_limit">%1$s until %2$s</string>
+    <string name="activity_limit_paused">paused at the %1$s</string>
+    <!-- A model this plan can't use, or one that needs usage credits: nothing to wait for. -->
+    <string name="activity_model_unavailable">this model isn\'t available</string>
+    <string name="activity_signed_out">signed out on the Mac</string>
+    <string name="activity_no_plan">can\'t reply without a Claude plan</string>
+    <string name="activity_on_hold">account on hold</string>
+    <string name="activity_no_credit">out of usage credits</string>
+    <string name="activity_provider">%1$s can\'t reply</string>
+    <string name="blocked_limit">%1$s reached</string>
+    <string name="blocked_model_unavailable">This model isn\'t available</string>
+    <!-- Under it, short: Claude Code's own words are in the notice just above the card. -->
+    <string name="blocked_model_not_on_plan">Not on this plan. Other models still work.</string>
+    <string name="blocked_model_needs_credits">Needs usage credits. Other models still work.</string>
+    <string name="blocked_model_at_limit">At its limit for now. Other models still work.</string>
+    <string name="blocked_signed_out">Claude Code is signed out</string>
+    <string name="blocked_no_plan">Your Claude plan may have ended</string>
+    <string name="blocked_on_hold">The account is on hold</string>
+    <string name="blocked_no_credit">Out of usage credits</string>
+    <string name="blocked_provider">%1$s can\'t reply</string>
+    <string name="blocked_carries_on">Continues by itself %1$s</string>
+    <string name="blocked_back">Back %1$s</string>
+    <string name="hint_blocked_until">Claude can\'t reply until %1$s</string>
+    <string name="hint_blocked_model">%1$s can\'t reply until %2$s</string>
+    <string name="hint_blocked_limit">Claude can\'t reply until the limit resets</string>
+    <string name="hint_blocked_model_any">Claude can\'t reply with this model</string>
+    <string name="hint_blocked_sign_in">Claude can\'t reply until Claude Code signs in</string>
+    <string name="hint_blocked_plan">Claude can\'t reply on this plan</string>
+    <string name="hint_blocked_hold">Claude can\'t reply while the account is on hold</string>
+    <string name="hint_blocked_credits">Claude can\'t reply without usage credits</string>
+    <string name="hint_blocked_provider">%1$s can\'t reply right now</string>
+    <!-- Banners and notifications: one per account episode, never one per session. -->
+    <string name="notice_kind_limit">Limit</string>
+    <string name="notice_kind_account">Account</string>
+    <!-- "Session limit reached. Claude carries on by itself at 2:00." -->
+    <string name="notice_limit_auto">%1$s reached. Claude carries on by itself %2$s.</string>
+    <string name="notice_limit">%1$s reached. Claude is back %2$s.</string>
+    <string name="notice_model">%1$s reached, back %2$s. Other models still work.</string>
+    <string name="notice_signed_out">Claude Code is signed out, so sessions can\'t reply.</string>
+    <string name="notice_no_plan">Your Claude plan may have ended. Sessions on it can\'t reply.</string>
+    <string name="notice_on_hold">Anthropic has put the account on hold.</string>
+    <string name="notice_no_credit">Out of usage credits. Sessions on your subscription can\'t reply.</string>
+    <!-- Once per discharge, at 20% unplugged: the Mac sleeps when it runs out, and its sessions stop. -->
+    <string name="notice_mac_battery">Your Mac is at %1$d%% — plug it in or its sessions will stop</string>
+    <!-- The permanent notification's first line while Claude can't reply (owner's item 14). -->
+    <string name="headline_limit">%1$s until %2$s</string>
+    <string name="headline_signed_out">Signed out on %1$s</string>
+    <string name="headline_no_plan">No Claude plan</string>
+    <string name="headline_on_hold">Account on hold</string>
+    <string name="headline_no_credit">Out of usage credits</string>
+    <!-- Under the eclipsed sun (it draws them in capitals), and what TalkBack says about it. -->
+    <string name="eclipse_signed_out">signed out</string>
+    <string name="eclipse_no_plan">no plan</string>
+    <string name="eclipse_on_hold">on hold</string>
+    <string name="a11y_eclipse">%1$s: usage isn\'t measured</string>
+    <!-- Usage card while the account is signed out or stopped: the last numbers, not measured. -->
+    <string name="usage_stale_trail">not measured</string>
+    <string name="usage_dash">—</string>
+    <string name="usage_stale_signed_out">Not measured while signed out.</string>
+    <string name="usage_stale_no_plan">Not measured while there\'s no plan.</string>
+    <string name="usage_stale_on_hold">Not measured while the account is on hold.</string>
+    <string name="usage_stale">Not measured right now.</string>
+    <!-- New session sheet, when the subscription can't take it: why, and where it goes instead. -->
+    <string name="why_limit">Your subscription rests until %1$s</string>
+    <string name="why_week">Your weekly limit is used up until %1$s</string>
+    <string name="why_signed_out">Claude Code is signed out on %1$s</string>
+    <string name="why_no_plan">Your Claude plan may have ended</string>
+    <string name="why_on_hold">Your account is on hold</string>
+    <string name="why_credits">You\'re out of usage credits</string>
+    <string name="new_session_runs_on">%1$s, so this one starts on %2$s.</string>
+    <string name="new_session_why">%1$s.</string>
+    <string name="new_session_add_provider">%1$s. Add a provider to keep going.</string>
+    <!-- Settings › Providers: a provider's trouble. -->
+    <string name="provider_status_other">Trouble</string>
+    <string name="provider_status_resting">At its limit</string>
+    <string name="provider_add_credits">Add credits</string>
+    <string name="provider_edit_key">Edit the key</string>
+    <!-- Account errors (toasts). -->
+    <string name="err_check_account">Couldn\'t check the account.</string>
+    <string name="err_sign_in">Couldn\'t start the sign-in.</string>
+    <string name="err_sign_in_code">Couldn\'t send the code.</string>
+    <string name="err_switch_provider">Couldn\'t move this session.</string>
+    <!-- The new-session sheet: prompt first, the choices as chips, each with its picker (ui/home/NewSessionSheet.kt). -->
+    <string name="ns_change">Change</string>
+    <string name="ns_project_said">Project: %1$s, in %2$s.</string>
+    <string name="ns_new_project_said">New project: %1$s, in %2$s.</string>
+    <string name="ns_new_project_unnamed_said">New project, not named yet.</string>
+    <string name="ns_no_project">Pick a project</string>
+    <string name="ns_model_said">Model: %1$s.</string>
+    <string name="ns_model_on_said">Model: %1$s, on %2$s.</string>
+    <string name="ns_mode_said">Permission mode: %1$s.</string>
+    <string name="ns_name_it">Name the new project</string>
+    <string name="ns_search_projects">Search projects</string>
+    <string name="ns_search_models">Search models</string>
+    <string name="ns_recent">Recent</string>
+    <string name="ns_nebula">Nebula</string>
+    <string name="ns_worktrees">Worktrees of %1$s</string>
+    <string name="ns_no_match">Nothing matches %1$s.</string>
+    <string name="ns_new_project_in">In %1$s</string>
+    <string name="ns_use_name">Use this name</string>
+    <string name="ns_earlier">Earlier versions</string>
+    <string name="ns_own_models">Your models</string>
+    <string name="ns_all_models">All models</string>
+    <string name="ns_loading_models">Asking your Mac for its models…</string>
+    <string name="ns_models_partial">Your Mac couldn\u2019t list them all just now.</string>
+    <string name="ns_free">free</string>
+    <string name="ns_row_said">%1$s.</string>
+    <string name="ns_context_said">%1$s tokens of context.</string>
+    <string name="ns_price_said">%1$s per million tokens in, %2$s out.</string>
+    <string name="ns_free_said">Free.</string>
+    <string name="ns_week_said">Its own week is %1$d%% used.</string>
+    <string name="ns_runs_said">Runs %1$s.</string>
+    <string name="mode_title_default">Ask first</string>
+    <string name="mode_title_accept">Accept edits</string>
+    <string name="mode_title_plan">Plan first</string>
+    <string name="mode_title_auto">Auto</string>
+    <string name="mode_title_bypass">Bypass</string>
+    <string name="err_models">Couldn\'t get the models from your Mac.</string>
+    <plurals name="ns_models_count">
+        <item quantity="one">%d model</item>
+        <item quantity="other">%d models</item>
+    </plurals>
+</resources>
