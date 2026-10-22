@@ -14,7 +14,7 @@
 # without .git, tests and development packages, plus the Android app from ../dist for "Get the
 # app": the newest release-signed APK when there is one, else the newest debug one, with a warning,
 # since a phone that installs a debug build can't update to a release one without uninstalling and
-# pairing again).
+# pairing again). It never carries Claude Code's Agent SDK: Setup fetches that from npm.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -112,13 +112,30 @@ if [ -f "$ROOT/daemon/src/main.ts" ]; then
     need "no npm here to leave the daemon's development packages (TypeScript, types) out of the bundle"
   fi
   # Left out as well: node-pty's Windows and Intel builds and its C++ sources (this app is arm64
-  # only), the files only a developer reads, and the Agent SDK's own Claude Code binaries
-  # (claude-agent-sdk-<platform>, about 230 MB, Anthropic's and not ours to hand out): the daemon
-  # always runs the claude installed on the Mac (pathToClaudeCodeExecutable, runner.ts, commands.ts).
-  rsync -a --delete --exclude '/package-lock.json' --exclude '/tsconfig.json' --exclude '/.gitignore' \
+  # only), the files only a developer reads, and Claude Code's Agent SDK. Its JavaScript package
+  # (@anthropic-ai/claude-agent-sdk) is Anthropic's ("All rights reserved") and not ours to hand
+  # out, so Setup fetches the version the lockfile pins from npm, on the user's Mac, into the
+  # installed daemon (Core/ClaudeSDK.swift; the daemon runs without it until then, daemon/src/sdk.ts).
+  # Its own Claude Code binaries (claude-agent-sdk-<platform>, about 230 MB) are never needed: the
+  # daemon always runs the claude installed on the Mac (pathToClaudeCodeExecutable). The lockfile
+  # ships, so that fetch takes exactly the pinned package and checks it against the lock's
+  # integrity; npm's record of the tree it built (node_modules/.package-lock.json, which lists the
+  # SDK) doesn't.
+  rsync -a --delete --exclude '/tsconfig.json' --exclude '/.gitignore' --exclude '/node_modules/.package-lock.json' \
     --exclude 'node-pty/prebuilds/win32-*' --exclude 'node-pty/prebuilds/darwin-x64' --exclude 'node-pty/deps' --exclude 'node-pty/third_party' --exclude 'node-pty/src' \
-    --exclude '@anthropic-ai/claude-agent-sdk-*' \
+    --exclude '/node_modules/@anthropic-ai/claude-agent-sdk/' --exclude '@anthropic-ai/claude-agent-sdk-*' \
     "$WORK/daemon/" "$RES/daemon/"
+  # Nothing of the SDK may be in the app, whatever the build.
+  SDK_LEAK="$(find "$RES/daemon" -path '*claude-agent-sdk*' -print -quit)"
+  if [ -n "$SDK_LEAK" ]; then echo "build stopped: Claude Code's Agent SDK is in the bundle ($SDK_LEAK); it must stay out (Setup fetches it)." >&2; exit 1; fi
+  # The SDK version Setup fetches, from the lockfile, as one line (ClaudeSDK.swift and sdk.ts read it).
+  SDK_VERSION="$(awk -v k='"node_modules/@anthropic-ai/claude-agent-sdk":' 'index($0, k) { f = 1; next } f && /"version"/ { sub(/.*"version": *"/, ""); sub(/".*/, ""); print; exit }' "$ROOT/daemon/package-lock.json" 2>/dev/null || true)"
+  if [ -n "$SDK_VERSION" ]; then
+    echo "$SDK_VERSION" > "$RES/daemon/sdk-version"
+    say "Left out Claude Code's SDK $SDK_VERSION: Setup fetches it from npm"
+  else
+    need "no @anthropic-ai/claude-agent-sdk in daemon/package-lock.json: Setup won't know which SDK to fetch"
+  fi
   # Shared terminals start claude through node-pty's helper; npm doesn't always keep it executable.
   chmod +x "$RES/daemon/node_modules/node-pty/prebuilds/"darwin-*/spawn-helper 2>/dev/null || true
   # A release-signed APK first; a debug one only when there's none (and never for a release).
