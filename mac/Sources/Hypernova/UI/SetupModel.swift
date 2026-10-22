@@ -56,6 +56,11 @@ final class SetupModel: ObservableObject {
     @Published var servicePhase: ServicePhase = .checking
     @Published var serviceLogTail: [String] = []
     @Published var health: Health?
+    /// Claude Code's SDK in the installed service (ClaudeSDK): fetched on every Mac, shown only with Claude Code.
+    @Published var sdk: ClaudeSDK.State?
+    @Published var sdkFetching = false
+    /// Why the last fetch didn't bring it.
+    @Published var sdkProblem: String?
 
     // d–f read the daemon's status.
     @Published var status: LocalStatus?
@@ -99,6 +104,11 @@ final class SetupModel: ObservableObject {
     // MARK: Derived
 
     var daemonUp: Bool { health != nil }
+    /// The service runs without the SDK this copy of it pins, on a Mac with Claude Code: Fetch again.
+    /// With Codex alone nothing uses it, so nothing says so.
+    var sdkNeedsFetch: Bool {
+        claude.path != nil && (servicePhase == .running || servicePhase == .needsUpdate) && sdk.map { !$0.current } == true
+    }
     var tailscaleAction: TailscaleAction? { status?.tailscale.map { TailscaleStepLogic.action($0, tsnet: status?.tsnet) } }
     /// The Tailscale app's serve address, or the built-in node's (the daemon's tsnet.ts).
     var phoneBaseURL: String? { status?.tailscale?.baseURL ?? status?.tsnet?.url }
@@ -250,7 +260,7 @@ final class SetupModel: ObservableObject {
     func isBusy(_ s: Step) -> Bool {
         switch s {
         case .claude: return claudePhase == .installing || claudePhase == .checking
-        case .service: if case .installing = servicePhase { return true } else { return false }
+        case .service: if case .installing = servicePhase { return true } else { return sdkFetching }
         case .connect: return connectBusy
         case .tailscale: return serveBusy
         case .voice: return voice.saving || voice.testing
@@ -262,7 +272,7 @@ final class SetupModel: ObservableObject {
     func needsAttention(_ s: Step) -> Bool {
         switch s {
         case .claude: if case .installFailed = claudePhase { return true } else { return false }
-        case .service: if case .failed = servicePhase { return true } else { return servicePhase == .notAnswering }
+        case .service: if case .failed = servicePhase { return true } else { return servicePhase == .notAnswering || (sdkNeedsFetch && !sdkFetching) }
         case .connect: return connectError != nil
         case .tailscale: return serveError != nil || (status?.tailscale.flatMap { TailscaleStepLogic.expiringSoon($0, tsnet: status?.tsnet) } != nil)
         case .voice: return voice.stt?.error != nil
@@ -293,9 +303,10 @@ final class SetupModel: ObservableObject {
             case .needsUpdate: return "update ready"
             case .installing(.gettingNode(let f?)): return "Node.js \(Int(f * 100))%"
             case .installing(.gettingNode): return "getting Node.js"
+            case .installing(.fetchingSDK): return "getting the SDK"
             case .installing: return "starting"
             case .failed: return "failed"
-            case .running: return "running"
+            case .running: return sdkFetching ? "getting the SDK" : sdkNeedsFetch ? "no SDK yet" : "running"
             }
         case .connect:
             if !daemonUp { return "waiting" }
@@ -571,8 +582,9 @@ final class SetupModel: ObservableObject {
     func refreshService() async {
         if case .installing = servicePhase { return }
         let h = health
-        let st = await Task.detached { ServiceInstaller.detect(health: h) }.value
+        let (st, sdkNow) = await Task.detached { (ServiceInstaller.detect(health: h), ClaudeSDK.state()) }.value
         if case .installing = servicePhase { return }
+        if !sdkFetching, sdkNow != sdk { sdk = sdkNow }
         if case .failed = servicePhase, !st.healthy { return }   // keep the error on screen
         if st.healthy {
             servicePhase = !st.plistExists ? .unmanaged : st.updateAvailable ? .needsUpdate : .running
@@ -591,6 +603,8 @@ final class SetupModel: ObservableObject {
                 }
                 health = h
                 servicePhase = .running
+                sdk = await Task.detached { ClaudeSDK.state() }.value
+                sdkProblem = ClaudeSDK.lastProblem
                 applyNode(await Task.detached { NodeDetector.forService() }.value.use)
                 status = try? await DaemonClient.shared.status()
                 applyPendingCodex()
@@ -600,6 +614,20 @@ final class SetupModel: ObservableObject {
                 servicePhase = .failed(error.localizedDescription)
                 serviceLogTail = ServiceInstaller.logTail(14)
             }
+        }
+    }
+
+    /// Fetch again: Claude Code's SDK into the running service (it uses it from the next ask on).
+    func fetchSDK() {
+        guard !sdkFetching else { return }
+        sdkFetching = true
+        sdkProblem = nil
+        Task {
+            let o = await SetupActions.fetchClaudeSDK()
+            sdk = await Task.detached { ClaudeSDK.state() }.value
+            sdkProblem = o.problem
+            sdkFetching = false
+            await AppModel.shared.refresh()
         }
     }
 

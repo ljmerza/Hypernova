@@ -3,6 +3,13 @@ import SwiftUI
 
 /// Hidden developer flags (not part of the product UI).
 ///   --selftest-node-download <dir>   downloads + verifies + unpacks the Node LTS into <dir>
+///   --selftest-sdk-fetch [<daemon dir>] [--node <path>]
+///                                    the Background service step's Claude Code SDK part (ClaudeSDK), without launchd:
+///                                    with no folder, the step's own copy of the bundled daemon into this test copy's
+///                                    <support>/app/daemon (an SDK already there carried over), then the fetch; with
+///                                    one, the fetch into it. Then the daemon's own loader (src/sdk.ts) imports it.
+///                                    Only a test copy isolated by the full rule (HYPERNOVA_SUPPORT and both ports set,
+///                                    off 47321/47322). npm_config_registry=http://127.0.0.1:9 tries the offline path.
 ///   --snapshots <dir>                renders the windows offscreen to PNGs (real data where available)
 ///   --render-popover <dir> [--live]  the menu bar popover and icon on sample data (App/PopoverRender.swift)
 ///   --popover-selftest <dir>         the real status item and popover on sample data, with checks and CPU
@@ -44,6 +51,53 @@ enum DevTools {
         }
         sem.wait()
         return box.code
+    }
+
+    /// `--selftest-sdk-fetch [<daemon dir>] [--node <path>]`: exit 0 when the SDK is there and the
+    /// daemon's loader imports it; 1 with the reason (the service step's words) when it isn't.
+    static func sdkFetch(into given: URL?, node: String?) -> Int32 {
+        guard Paths.isolatedTestCopy else {
+            print("FAILED: run this as a test copy with a folder and ports of its own (HYPERNOVA_SUPPORT, HYPERNOVA_API_PORT, HYPERNOVA_LOCAL_PORT), so nothing of the real install is touched.")
+            return 1
+        }
+        if given == nil {
+            print("copying the bundled daemon → \(Paths.installedDaemon.path) (the service step's copy)")
+            let had = ClaudeSDK.installedVersion(in: Paths.installedDaemon)
+            do { try ServiceInstaller.copyDaemon() } catch { print("FAILED: \(error.localizedDescription)"); return 1 }
+            if let had { print("carried  \(had) over from the copy it replaced: \(ClaudeSDK.installedVersion(in: Paths.installedDaemon) == had ? "yes" : "NO")") }
+        }
+        let dir = (given ?? Paths.installedDaemon).standardizedFileURL
+        guard FileManager.default.fileExists(atPath: dir.appendingPathComponent("src/main.ts").path) else { print("FAILED: \(dir.path) isn't a daemon folder (no src/main.ts)"); return 1 }
+        guard let node = node ?? NodeDetector.find().chosen?.path else { print("FAILED: no Node.js \(NodeVersion.minimum) or newer found"); return 1 }
+        let before = ClaudeSDK.state(daemon: dir)
+        print("daemon   \(dir.path)")
+        print("node     \(node)")
+        print("npm      \(ClaudeSDK.npmCommand(node: node).map { ([$0.exe] + $0.prefix).joined(separator: " ") } ?? "none")")
+        print("registry \(ProcessInfo.processInfo.environment["npm_config_registry"] ?? "npm's own (registry.npmjs.org unless an .npmrc says otherwise)")")
+        print("pinned   \(before.wanted ?? "none said")")
+        print("before   \(before.installed ?? "not there")")
+        print(before.current ? "fetching nothing: the pinned SDK is there" : "fetching Claude Code’s SDK from npm (\(ClaudeSDK.downloadSize))…")
+        fflush(stdout)
+        final class Box: @unchecked Sendable { var outcome: ClaudeSDK.Outcome = .failed("didn't run"); var seconds = 0.0 }
+        let box = Box(), sem = DispatchSemaphore(value: 0)
+        Task.detached {
+            let t0 = Date()
+            box.outcome = await ClaudeSDK.ensure(in: dir, nodePath: node)
+            box.seconds = Date().timeIntervalSince(t0)
+            sem.signal()
+        }
+        sem.wait()
+        let after = ClaudeSDK.state(daemon: dir)
+        print("after    \(after.installed ?? "not there") (\(String(format: "%.1f", box.seconds)) s)")
+        if case .failed(let why) = box.outcome {
+            print("NOT FETCHED (the service would start without it): \(why)")
+            return 1
+        }
+        // The daemon's own loader, as the service would ask it.
+        let probe = "const s = await import(\(String(reflecting: dir.appendingPathComponent("src/sdk.ts").absoluteString))); const m = await s.claudeSdk(); console.log(JSON.stringify({ query: typeof m.query, forkSession: typeof m.forkSession, state: s.sdkState() }))"
+        let r = Shell.run(node, ["--input-type=module", "-e", probe], timeout: 60, env: ClaudeSDK.environment(node: node), cwd: dir)
+        print("loads    \(r.ok ? r.stdout : "NO: \(r.combined)")")
+        return r.ok && r.stdout.contains("\"query\":\"function\"") ? 0 : 1
     }
 
     /// `--selftest-stream`: StreamingProcess with a child that keeps the pipe open.
@@ -110,6 +164,16 @@ enum DevTools {
         setup.node = real.2
         setup.servicePhase = .installing(.starting)
         render("variant-service-installing", size, SetupView().environmentObject(setup))
+        // Claude Code's SDK on its way, and one that didn't come (offline): only with Claude Code here.
+        let realSDK = (setup.claude, setup.sdk, setup.sdkProblem)
+        if setup.claude.path == nil { setup.claude.path = "/usr/local/bin/claude" }
+        setup.servicePhase = .installing(.fetchingSDK)
+        render("variant-service-getting-sdk", size, SetupView().environmentObject(setup))
+        setup.servicePhase = .running
+        setup.sdk = ClaudeSDK.State(wanted: "0.3.296", installed: nil)
+        setup.sdkProblem = ClaudeSDK.explain(ShellResult(status: 1, stdout: "", stderr: "npm error code ENOTFOUND"), after: setup.sdk!)
+        render("variant-service-sdk-missing", size, SetupView().environmentObject(setup))
+        (setup.claude, setup.sdk, setup.sdkProblem) = realSDK
         (setup.claudePhase, setup.claudeLog, setup.node, setup.servicePhase) = real
 
         setup.current = .phone

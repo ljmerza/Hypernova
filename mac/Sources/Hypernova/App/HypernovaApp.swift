@@ -19,6 +19,11 @@ enum Main {
         if let i = args.firstIndex(of: "--selftest-node-download"), i + 1 < args.count {
             exit(DevTools.nodeDownload(into: URL(fileURLWithPath: args[i + 1])))
         }
+        if let i = args.firstIndex(of: "--selftest-sdk-fetch") {
+            let node = args.firstIndex(of: "--node").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+            let dir = i + 1 < args.count && !args[i + 1].hasPrefix("--") ? URL(fileURLWithPath: args[i + 1]) : nil
+            exit(DevTools.sdkFetch(into: dir, node: node))
+        }
         if args.contains("--selftest-stream") { exit(DevTools.streamTest()) }
         if args.contains("--backpack-scripts") { exit(BackpackSetup.printScripts()) }
         if args.contains("--window-capture-selftest") { exit(DevTools.windowCaptureSelfTest()) }

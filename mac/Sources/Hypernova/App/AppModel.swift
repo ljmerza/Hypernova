@@ -55,6 +55,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var serviceNodeGone: String?
     /// Repair is under way (Node.js, the plist, the start), with the phase it's in.
     @Published private(set) var repairing: ServiceInstaller.Progress?
+    /// Claude Code's SDK in the installed service (ClaudeSDK), read with the status; nil until then.
+    @Published private(set) var claudeSDK: ClaudeSDK.State?
+    /// Fetch again is under way.
+    @Published private(set) var fetchingSDK = false
     /// A question floating above the popover (Forget a phone, Uninstall), or the word after it.
     @Published var dialog: GlassDialog?
     /// The dialog's primary action is under way.
@@ -211,6 +215,9 @@ final class AppModel: ObservableObject {
     var accountNeedsYou: Bool { accountTrouble != nil }
     /// Claude Code's own account needs you (Sign in, Renew): only where Claude Code is installed.
     var claudeAccountNeedsYou: Bool { daemonUp && claudeAvailable && account?.needsYou == true }
+    /// The service runs without the Claude Code SDK it pins, on a Mac with Claude Code: Fetch again.
+    /// With Codex alone nothing uses it, so this stays false.
+    var sdkNeedsFetch: Bool { daemonUp && serviceInstalled && claudeAvailable && claudeSDK.map { !$0.current } == true }
     /// This Mac's battery when it's low and not charging (the header says so); nil otherwise, on a
     /// Mac without a battery, and while the service is down (its last word may be old by then).
     var lowBattery: Battery? {
@@ -476,8 +483,9 @@ final class AppModel: ObservableObject {
                 if counted != feedLive { wake(read: true, status: true) }
             }
             if withStatus {
-                let update = await Task.detached { ServiceInstaller.updateAvailable() }.value
+                let (update, sdk) = await Task.detached { (ServiceInstaller.updateAvailable(), ClaudeSDK.state()) }.value
                 if update != serviceUpdate { serviceUpdate = update }
+                if !fetchingSDK, sdk != claudeSDK { claudeSDK = sdk }
             }
         } else {
             if snapshot != nil { snapshot = nil }
@@ -838,6 +846,20 @@ final class AppModel: ObservableObject {
             }
             repairing = nil
             await refresh()
+        }
+    }
+
+    /// Fetch again: Claude Code's SDK into the running service (ClaudeSDK), said in a line when it fails.
+    func fetchSDK() {
+        guard !fetchingSDK else { return }
+        fetchingSDK = true
+        Task {
+            let o = await SetupActions.fetchClaudeSDK()
+            claudeSDK = await Task.detached { ClaudeSDK.state() }.value
+            fetchingSDK = false
+            if let why = o.problem { show("Claude Code’s SDK didn’t download. \(why)") }
+            SetupModel.shared.sdk = claudeSDK
+            SetupModel.shared.sdkProblem = o.problem
         }
     }
 

@@ -456,10 +456,13 @@ struct ServiceStep: View {
                         InfoLine(key: "Mac", value: m.health?.name ?? "this Mac", mono: false)
                         InfoLine(key: "Version", value: m.status?.daemonVersion ?? "—")
                         if let n = m.node { InfoLine(key: "Node.js", value: "\(n.version ?? "") \(Paths.tilde(n.path))") }
+                        // Claude Code's SDK (ClaudeSDK): only a Mac with Claude Code hears of it.
+                        if m.claude.path != nil, let s = m.sdk, s.current, let v = s.installed { InfoLine(key: "SDK", value: "Claude Code’s, \(v)") }
                         InfoLine(key: "Folder", value: Paths.tilde(Paths.support.path))
                         if m.servicePhase == .needsUpdate {
                             Text("This copy of Hypernova has a newer service. Updating takes a few seconds.").font(HNFont.small).foregroundStyle(Color.hnAmber)
                         }
+                        if m.sdkNeedsFetch { sdkNote }
                     }
                 }
             case .notInstalled, .unmanaged, .notAnswering, .installing:
@@ -469,10 +472,15 @@ struct ServiceStep: View {
                         // Node.js is the service's first part: the one it runs on, or Hypernova's own copy.
                         CheckLine(state: lineState(.gettingNode(nil)), title: nodeTitle, detail: nodeDetail)
                         CheckLine(state: lineState(.copying), title: "Copy the service into Hypernova's folder", detail: Paths.tilde(Paths.installedDaemon.path))
+                        // Fetched on every Mac, said only with Claude Code (with Codex alone nothing uses it).
+                        if m.claude.path != nil {
+                            CheckLine(state: lineState(.fetchingSDK), title: "Get Claude Code’s SDK", detail: "From npm, \(ClaudeSDK.downloadSize), the first time only. The service starts without it if it can’t")
+                        }
                         CheckLine(state: lineState(.writing), title: "Add it to your login items", detail: "A launch agent, so it starts with your Mac")
                         CheckLine(state: lineState(.starting), title: "Start it")
                         CheckLine(state: lineState(.waiting), title: "Check that it answers")
                         if case .installing(.gettingNode(let f?)) = m.servicePhase { ProgressLine(fraction: f) }
+                        if case .installing(.fetchingSDK) = m.servicePhase, m.claude.path != nil { ProgressLine(fraction: nil) }
                         if m.servicePhase == .unmanaged {
                             note("A copy of the service is already running, but not as a background service, so it won't start with your Mac.", .hnMuted)
                         }
@@ -494,6 +502,11 @@ struct ServiceStep: View {
                 }
             }
             Spacer()
+            if m.sdkNeedsFetch {
+                CompactPill(title: m.sdkFetching ? "Fetching…" : "Fetch again", kind: .outline) { m.fetchSDK() }
+                    .disabled(m.sdkFetching)
+                    .help("Fetches Claude Code’s SDK from npm into the service, \(ClaudeSDK.downloadSize). The service keeps running.")
+            }
             switch m.servicePhase {
             case .checking: EmptyView()
             case .running: ActionPill(title: "Continue") { m.next() }
@@ -503,6 +516,7 @@ struct ServiceStep: View {
             case .notInstalled, .unmanaged: ActionPill(title: "Start background service") { m.installService() }
             case .notAnswering: ActionPill(title: "Start it again") { m.installService() }
             case .installing(.gettingNode): ActionPill(title: "Getting Node.js…", busy: true) {}
+            case .installing(.fetchingSDK) where m.claude.path != nil: ActionPill(title: "Getting the SDK…", busy: true) {}
             case .installing: ActionPill(title: "Starting…", busy: true) {}
             case .failed: ActionPill(title: "Try again") { m.installService() }
             }
@@ -527,6 +541,31 @@ struct ServiceStep: View {
             Text(text).font(HNFont.sans(12)).foregroundStyle(color).fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 2)
+    }
+
+    /// The service runs without the SDK it pins: what waits for it, why the fetch didn't bring it,
+    /// or the fetch under way.
+    @ViewBuilder private var sdkNote: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Rectangle().fill(Color.hnLine).frame(height: 1)
+            if m.sdkFetching {
+                Text("Getting Claude Code’s SDK from npm (\(ClaudeSDK.downloadSize))…").font(HNFont.sans(12)).foregroundStyle(Color.hnMuted)
+                ProgressLine(fraction: nil)
+            } else {
+                Text(sdkLine).font(HNFont.sans(12)).foregroundStyle(Color.hnAmber).fixedSize(horizontal: false, vertical: true)
+                if let p = m.sdkProblem {
+                    Text(p).font(HNFont.sans(12)).foregroundStyle(Color.hnDim).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private var sdkLine: String {
+        if let s = m.sdk, let have = s.installed, let want = s.wanted {
+            return "Claude Code’s SDK is \(have); this version of Hypernova uses \(want). It works meanwhile; Fetch again brings the new one."
+        }
+        return "Claude Code’s SDK isn’t here yet. The service runs without it; the sessions it runs itself, the “/” list and Rewind wait for it."
     }
 
     private var activity: Activity {

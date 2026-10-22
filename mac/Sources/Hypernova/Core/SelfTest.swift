@@ -93,6 +93,25 @@ enum SelfTest {
             would("nothing (\(why))")
         } else {
             would("copy \(Paths.bundledDaemon?.path ?? "<bundled daemon>") → \(Paths.tilde(Paths.installedDaemon.path)) (atomic replace)")
+            // Claude Code's SDK (ClaudeSDK): after the copy, before the start, never fatal.
+            let pinned = Paths.bundledDaemon.flatMap { ClaudeSDK.pinned(in: $0) }
+            let installed = ClaudeSDK.installedVersion(in: Paths.installedDaemon)
+            let bundled = Paths.bundledDaemon.flatMap { ClaudeSDK.installedVersion(in: $0) }
+            item("sdk pinned", pinned.map { "Claude Code’s SDK \($0) (the bundled daemon’s \(ClaudeSDK.versionFile)), from npm, not in the app" } ?? "none said (a bundle from before the fetch carries the SDK itself)")
+            item("sdk in app", bundled.map { "\($0): IN THE APP (build.sh should have left it out)" } ?? "no (as it should be)")
+            item("sdk here", installed.map { "\($0) in \(Paths.tilde(ClaudeSDK.packageDir(in: Paths.installedDaemon).path))" } ?? "not there")
+            let npm = node.use.flatMap { ClaudeSDK.npmCommand(node: $0.path) }
+            item("npm", npm.map { ([$0.exe] + $0.prefix).map(Paths.tilde).joined(separator: " ") } ?? (node.use == nil ? "the npm of the Node.js downloaded above" : "NONE next to \(nodeForPlist): the fetch would fail, the service would start without it"))
+            item("sdk shown", claude.path != nil ? "Claude Code is here: a missing SDK shows in this step, Agents & providers and the popover, with Fetch again"
+                                                 : "no Claude Code here: fetched all the same, quietly; a failure is never shown")
+            if let pinned, installed == pinned {
+                would("keep Claude Code’s SDK \(pinned): carried over into the new copy, nothing fetched")
+            } else if pinned == nil, bundled != nil {
+                would("nothing for Claude Code’s SDK (this bundle carries it)")
+            } else {
+                if let installed { would("carry SDK \(installed) over into the new copy, then fetch \(pinned ?? "the pinned one") over it (if that fails, \(installed) keeps working)") }
+                would("run in \(Paths.tilde(Paths.installedDaemon.path)): npm \(ClaudeSDK.arguments(cache: ClaudeSDK.cache).map(Paths.tilde).joined(separator: " ")) (\(ClaudeSDK.downloadSize), at most \(Int(ClaudeSDK.timeout)) s); offline or on an npm error, start the service anyway and say what’s missing")
+            }
             would("write \(Paths.tilde(Paths.launchAgent.path)):")
             for line in ServiceInstaller.plistXML(nodePath: nodeForPlist).split(separator: "\n") { p("        \(line)") }
             for c in ServiceInstaller.launchctlCommands { would(c) }

@@ -397,6 +397,13 @@ struct MainPage: View {
             out.append(Notice(id: "update", tone: .accent, title: "A newer service is ready", line: "Updating takes a few seconds. Shared terminals keep running.",
                               action: model.updatingService ? "Updating…" : "Update", busy: model.updatingService, key: "update") { model.updateService() })
         }
+        // Claude Code's SDK didn't come with the service (offline at setup, say): only with Claude Code here.
+        if model.sdkNeedsFetch {
+            out.append(Notice(id: "sdk", tone: .amber, title: model.claudeSDK?.missing == false ? "Claude Code’s SDK is out of date" : "Claude Code’s SDK isn’t here yet",
+                              line: "Sessions the service runs itself, the “/” list and Rewind need it (\(ClaudeSDK.downloadSize) from npm).",
+                              action: model.fetchingSDK ? "Fetching…" : "Fetch again", busy: model.fetchingSDK,
+                              help: ClaudeSDK.lastProblem ?? "Fetches it from npm into the background service, which keeps running.", key: model.claudeSDK?.wanted ?? "sdk") { model.fetchSDK() })
+        }
         if let step = model.setupNext {
             switch step {
             case .phone:

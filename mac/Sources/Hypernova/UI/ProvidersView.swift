@@ -379,6 +379,14 @@ private struct ClaudeAgentCard: View {
                 }
                 if installed {
                     AgentRow(key: "Account") { account }
+                    if let s = app.claudeSDK, app.serviceInstalled { AgentRow(key: "SDK") { sdk(s) } }
+                    if app.sdkNeedsFetch {
+                        Text("Sessions the service runs itself, the “/” list and Rewind need Claude Code’s SDK, fetched from npm (\(ClaudeSDK.downloadSize)).")
+                            .font(HNFont.sans(12)).foregroundStyle(Color.hnMuted).fixedSize(horizontal: false, vertical: true)
+                        if let why = ClaudeSDK.lastProblem {
+                            Text(why).font(HNFont.sans(12)).foregroundStyle(Color.hnDim).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                        }
+                    }
                     if let p = app.status?.claude?.path { InfoLine(key: "Path", value: Paths.tilde(p)) }
                     Text("Its sessions can run on the providers below.").font(HNFont.sans(12)).foregroundStyle(Color.hnDim)
                 } else {
@@ -389,6 +397,23 @@ private struct ClaudeAgentCard: View {
                         CompactPill(title: "Open setup", kind: .outline) { WindowManager.shared.showSetup(startAt: .claude) }
                     }
                 }
+            }
+        }
+    }
+
+    /// Claude Code's SDK in the service (ClaudeSDK): its version, or Fetch again.
+    @ViewBuilder private func sdk(_ s: ClaudeSDK.State) -> some View {
+        if s.current {
+            HStack(spacing: 6) {
+                CheckIcon(size: 11)
+                Text(s.installed ?? "installed").font(HNFont.monoS).foregroundStyle(Color.hnInk)
+            }
+        } else {
+            HStack(spacing: 10) {
+                StatusChip(text: s.missing ? "Not here yet" : "Out of date", color: .hnAmber)
+                CompactPill(title: app.fetchingSDK ? "Fetching…" : "Fetch again", kind: .outline) { app.fetchSDK() }
+                    .disabled(app.fetchingSDK)
+                    .help("Fetches Claude Code’s SDK from npm into the background service, \(ClaudeSDK.downloadSize). The service keeps running.")
             }
         }
     }

@@ -1,9 +1,10 @@
 import Foundation
 
 /// Installs the daemon as a per-user LaunchAgent: copies the bundled daemon into
-/// <support>/app/daemon, writes ~/Library/LaunchAgents/com.prudnikweb.hypernova.daemon.plist,
-/// (re)loads it with launchctl and waits for /v1/health. A test copy (Paths.testCopy) does the
-/// same under its own label, with the plist in its test folder.
+/// <support>/app/daemon, fetches Claude Code's SDK into it (ClaudeSDK: never fatal), writes
+/// ~/Library/LaunchAgents/com.prudnikweb.hypernova.daemon.plist, (re)loads it with launchctl and
+/// waits for /v1/health. A test copy (Paths.testCopy) does the same under its own label, with the
+/// plist in its test folder.
 enum ServiceInstaller {
     struct State: Equatable {
         var plistExists: Bool
@@ -99,6 +100,9 @@ enum ServiceInstaller {
         // keeps it: Gatekeeper would then stop the service's own helpers (node-pty's, the Tailscale
         // node) the first time Node runs them, after the app itself was already allowed to open.
         _ = Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", staging.path], timeout: 30)
+        // The bundle has no Claude Code SDK (ClaudeSDK): the one the copy being replaced has goes on
+        // in the new one, so an update never loses it, offline or not.
+        ClaudeSDK.carryOver(from: Paths.installedDaemon, to: staging)
         if fm.fileExists(atPath: Paths.installedDaemon.path) {
             _ = try fm.replaceItemAt(Paths.installedDaemon, withItemAt: staging, backupItemName: nil, options: [])
         } else {
@@ -168,20 +172,26 @@ enum ServiceInstaller {
         /// Downloading Hypernova's own Node.js (the fraction while it downloads), when there's no
         /// stable one to run on.
         case gettingNode(Double?)
-        case copying, writing, starting, waiting
+        case copying
+        /// Fetching Claude Code's SDK from npm into the copy (ClaudeSDK), when it isn't there yet.
+        case fetchingSDK
+        case writing, starting, waiting
         /// Its place in the order the steps run.
         var rank: Int {
             switch self {
             case .gettingNode: return 0
             case .copying: return 1
-            case .writing: return 2
-            case .starting: return 3
-            case .waiting: return 4
+            case .fetchingSDK: return 2
+            case .writing: return 3
+            case .starting: return 4
+            case .waiting: return 5
             }
         }
     }
 
-    /// The whole step c. Blocking parts run off the main thread.
+    /// The whole step c. Blocking parts run off the main thread. Claude Code's SDK comes after the
+    /// copy and before the start, and whatever becomes of it the service starts (ClaudeSDK says why
+    /// it's missing, where that matters).
     static func install(nodePath: String, progress: @escaping @Sendable (Progress) -> Void) async throws -> Health {
         if let why = Paths.serviceBlocked { throw err(why) }
         progress(.copying)
@@ -189,6 +199,8 @@ enum ServiceInstaller {
             try copyDaemon()
             try NodeDetector.record(nodePath)
         }.value
+        if !ClaudeSDK.state().current { progress(.fetchingSDK) }
+        _ = await ClaudeSDK.ensure(in: Paths.installedDaemon, nodePath: nodePath)
         progress(.writing)
         try await Task.detached { try writePlist(nodePath: nodePath) }.value
         progress(.starting)

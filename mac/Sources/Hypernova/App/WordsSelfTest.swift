@@ -203,5 +203,16 @@ enum WordsSelfTest {
         check(!NodeDetector.isStable(Paths.home.appendingPathComponent(".nvm/versions/node/v25.9.0/bin/node").path), "an nvm Node.js isn't stable")
         check(NodeDetector.isStable("/opt/homebrew/bin/node") && NodeDetector.isStable(Paths.nodeDir.appendingPathComponent("v24.11.1/bin/node").path), "Homebrew's and Hypernova's own are")
         check(ServiceInstaller.Progress.gettingNode(nil).rank < ServiceInstaller.Progress.copying.rank, "Node.js comes first in the service's steps")
+        // Claude Code's SDK (ClaudeSDK): fetched after the copy, before the start; offline in words, never npm's stack.
+        check(ServiceInstaller.Progress.copying.rank < ServiceInstaller.Progress.fetchingSDK.rank && ServiceInstaller.Progress.fetchingSDK.rank < ServiceInstaller.Progress.writing.rank,
+              "Claude Code's SDK comes after the copy and before the start")
+        check(ClaudeSDK.State(wanted: "0.3.296", installed: nil).missing && !ClaudeSDK.State(wanted: "0.3.296", installed: "0.3.290").current
+              && ClaudeSDK.State(wanted: nil, installed: "0.3.290").current, "an SDK is current at the pinned version, or any one when nothing is pinned")
+        let offline = ClaudeSDK.explain(ShellResult(status: 1, stdout: "", stderr: "npm error code ECONNREFUSED\nnpm error syscall connect"), after: .init(wanted: "1.0.0", installed: nil))
+        check(offline.contains("offline") && !offline.contains("syscall"), "an npm that can't reach the registry says offline: \"\(offline)\"")
+        let other = ClaudeSDK.explain(ShellResult(status: 1, stdout: "", stderr: "npm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/x"), after: .init(wanted: "1.0.0", installed: nil))
+        check(other.contains("E404: 404 Not Found"), "another npm error quotes its code and line: \"\(other)\"")
+        check(ClaudeSDK.arguments(cache: URL(fileURLWithPath: "/tmp/c")).starts(with: ["install", "--no-save", "--ignore-scripts"])
+              && ClaudeSDK.arguments(cache: URL(fileURLWithPath: "/tmp/c")).contains("--omit=optional"), "npm installs from the lock, saves nothing, runs no scripts, leaves the SDK's binaries out")
     }
 }

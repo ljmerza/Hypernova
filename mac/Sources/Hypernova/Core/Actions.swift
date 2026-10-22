@@ -43,6 +43,22 @@ enum SetupActions {
         return health
     }
 
+    /// Fetch again: Claude Code's SDK into the installed service now (ClaudeSDK), with the Node.js the
+    /// service runs on. The service keeps running meanwhile and uses it once it's there.
+    static func fetchClaudeSDK() async -> ClaudeSDK.Outcome {
+        // A test copy that isn't isolated would write into the owner's installed service.
+        if let why = Paths.serviceBlocked { return .failed(why) }
+        guard FileManager.default.fileExists(atPath: Paths.daemonMain.path) else {
+            return .failed("The background service isn’t installed yet. Start it in Setup first: it fetches Claude Code’s SDK on the way.")
+        }
+        let node: String? = await Task.detached {
+            if let p = ServiceInstaller.plistNodePath(), FileManager.default.isExecutableFile(atPath: p) { return p }
+            return NodeDetector.forService().use?.path
+        }.value
+        guard let node else { return .failed("There’s no Node.js for the service to fetch Claude Code’s SDK with. Repair the service in Setup first.") }
+        return await ClaudeSDK.fetch(into: Paths.installedDaemon, nodePath: node)
+    }
+
     /// Step d: hooks and the status line tap, through the daemon. Returns the fresh status.
     static func connectClaudeCode() async throws -> LocalStatus {
         // The hooks and the status line live in Claude Code's own settings (and the shell function
@@ -156,12 +172,16 @@ enum RunStep {
                         switch step {
                         case .gettingNode(let f): if f == nil { p("  getting Node.js (no stable one on this Mac)") }
                         case .copying: p("  copying the daemon")
+                        case .fetchingSDK: p("  fetching Claude Code’s SDK from npm (\(ClaudeSDK.downloadSize))")
                         case .writing: p("  writing the launch agent")
                         case .starting: p("  launchctl bootout + bootstrap")
                         case .waiting: p("  waiting for \(Endpoints.health.absoluteString)")
                         }
                     }
                     p("OK: running as \(h.name ?? "?") (protocol \(h.protocol.map(String.init) ?? "?"))")
+                    // Never fatal: said, and the service runs without it.
+                    let sdk = ClaudeSDK.state()
+                    p(sdk.current ? "  Claude Code’s SDK \(sdk.installed ?? "") is there" : "  note: Claude Code’s SDK isn’t there: \(ClaudeSDK.lastProblem ?? "not fetched")")
                 case "integration":
                     p("Connecting Claude Code (POST /local/integration/install)…")
                     let s = try await SetupActions.connectClaudeCode()
