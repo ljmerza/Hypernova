@@ -1,0 +1,4 @@
+# Shell scripts and the Dockerfile run in Linux, also from a Windows checkout (WSL, Docker Desktop:
+# docs/INSTALL.md, "Windows (experimental)"), where Git may turn line endings into CRLF. Keep them LF.
+*.sh text eol=lf
+Dockerfile text eol=lf
