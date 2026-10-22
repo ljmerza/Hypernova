@@ -47,6 +47,8 @@ const { privateAddress, lanAddresses, resetPairLimits, lanLimits, lanInfo, setLa
 const { serverIdentity, TLS_DIR } = await import('../src/tls.ts')
 const { startServers, startPairing } = await import('../src/http.ts')
 const { addDevice, adminToken, getDevice, setDeviceCert, settings } = await import('../src/store.ts')
+// On, as the owner can say: unset, it's off in a container and on a cloud VM such as a CI runner (platform.ts lanByDefault).
+settings.lanAccess = true
 
 const TOKEN_A = 'lan-test-token-a-0123456789abcdef'
 const TOKEN_B = 'lan-test-token-b-0123456789abcdef'

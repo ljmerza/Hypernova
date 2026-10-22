@@ -18,7 +18,16 @@ process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude-config')
 process.env.HOME = join(scratch, 'home')
 process.env.FAKE_USAGE_STATE = join(scratch, 'state')
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
-process.env.FAKE_USAGE_SCREEN = join(fixtures, 'usage-screens', 'max-fable.txt')
+// The recorded screen with its weeks' resets moved to days from now: a week past its reset reads 0%
+// (hub.ts), and the recording's own dates (Oct 20 and 21, 2026) have passed.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const daysAhead = (n: number) => {
+  const d = new Date(Date.now() + n * 24 * 3600_000)
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()},`
+}
+const SCREEN = join(scratch, 'max-fable.txt')
+writeFileSync(SCREEN, readFileSync(join(fixtures, 'usage-screens', 'max-fable.txt'), 'utf8').replace(/Resets Oct 21,/g, `Resets ${daysAhead(3)}`).replace(/Resets Oct 20,/g, `Resets ${daysAhead(2)}`))
+process.env.FAKE_USAGE_SCREEN = SCREEN
 for (const d of [process.env.HOME, process.env.FAKE_USAGE_STATE, process.env.CLAUDE_CONFIG_DIR]) mkdirSync(d, { recursive: true })
 // Claude Code, as the probe finds it (util.ts findClaude reads CLAUDE_BIN first).
 const bin = join(scratch, 'claude')
@@ -128,7 +137,7 @@ for (const name of ['breakdown-unavailable.txt', 'partial.txt']) {
     try {
       assert.equal(await probe.probeUsage('test'), true)
     } finally {
-      process.env.FAKE_USAGE_SCREEN = join(fixtures, 'usage-screens', 'max-fable.txt')
+      process.env.FAKE_USAGE_SCREEN = SCREEN
     }
     const u = hub.getUsage()
     assert.deepEqual(u.models, good)

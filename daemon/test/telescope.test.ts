@@ -474,7 +474,7 @@ test('Mac app windows: a process that only names itself after the session’s pr
   }
 })
 
-test('a window: asked of the Mac app on its feed alone, answered on the local route', async () => {
+test('a window: asked of the Mac app on its feed alone, answered on the local route', { skip: process.platform !== 'darwin' && 'app windows are a Mac’s' }, async () => {
   const cwd = project('macapp2')
   const targets = { pids: [202], names: ['Demo'], roots: [cwd] }
   // No Mac app listening.
@@ -626,7 +626,7 @@ test('telescope image: a PDF at the page the session read, or the page asked for
   await assert.rejects(telescope(session(project('route3b')), [], { source: 'image' }), (e: any) => e.code === 'no_picture')
 })
 
-test('telescope simulator: the Simulator’s screen, or plainly why not', async () => {
+test('telescope simulator: the Simulator’s screen, or plainly why not', { skip: process.platform !== 'darwin' && 'the iOS Simulator is a Mac’s' }, async () => {
   const s = session(project('route4'))
   process.env.FAKE_SIMCTL = 'clt'
   await assert.rejects(telescope(s, [], { source: 'simulator' }), (e: any) => e.status === 501 && e.message === 'The iOS Simulator needs Xcode on the Mac.')

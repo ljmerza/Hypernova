@@ -782,7 +782,7 @@ const until = async (ok: () => boolean, ms = 4000) => {
   return ok()
 }
 
-test('the API: GET and POST /v1/mac/awake, the snapshot, the awake message, and Backpack through sudo', async () => {
+test('the API: GET and POST /v1/mac/awake, the snapshot, the awake message, and Backpack through sudo', { skip: process.platform !== 'darwin' && 'Stay awake is a Mac’s' }, async () => {
   const close = startServers()
   const sent: any[] = []
   const remove = hub.addClient({ send: (s: string) => sent.push(JSON.parse(s)) })
@@ -838,7 +838,9 @@ test('the API: GET and POST /v1/mac/awake, the snapshot, the awake message, and 
 })
 
 test('a Mac where SleepDisabled was never set (no line in pmset -g): Backpack sets 1 and puts 0 back', async () => {
-  // The rule is in place from the test above; the stand-ins answer as such a Mac would.
+  // The rule is in place (the test above puts it there too, on a Mac only); the stand-ins answer as such a Mac would.
+  mkdirSync(join(scratch, 'sudoers.d'), { recursive: true })
+  writeFileSync(rule, '# stand-in\n')
   writeFileSync(sleepFile, 'none')
   writeFileSync(sudoLog, '')
   const file = join(scratch, 'fresh', 'awake.json')
@@ -862,7 +864,10 @@ test('a Mac where SleepDisabled was never set (no line in pmset -g): Backpack se
 test('Backpack is ready when sudo already allows its command (Amphetamine’s rule), without Hypernova’s own', async () => {
   rmSync(rule)
   assert.equal(awake.realIO.ruleInstalled(), false, 'the file just went: believed at once')
-  assert.ok(await until(() => !awake.realIO.ruleInstalled() && existsSync(rule) === false), 'sudo agrees')
+  // sudo's answer comes in a moment, and sudo isn't asked again until it has: waited for, or a quick
+  // stand-in's "no" (from before the other rule below is there) is the answer that stays.
+  await new Promise((r) => setTimeout(r, 500))
+  assert.ok(!awake.realIO.ruleInstalled() && existsSync(rule) === false, 'sudo agrees')
   writeFileSync(otherRule, '# stand-in\n')
   // sudo is asked again after a while, or as soon as Hypernova's file comes or goes.
   writeFileSync(rule, '# stand-in\n')

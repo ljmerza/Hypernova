@@ -4,7 +4,7 @@
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { tmpdir, userInfo } from 'node:os'
 import { join } from 'node:path'
 
 const scratch = mkdtempSync(join(tmpdir(), 'hn-cxu-'))
@@ -120,8 +120,11 @@ test('a switch’s text reaches the other agent as background, and nothing for n
   assert.match(f, /<previous_conversation>\nUser: hi\nCodex: hello\n<\/previous_conversation>$/)
 })
 
-test('the shell block: a stale `codex` function goes, and Codex on brings Hypernova’s own', async () => {
-  const rc = join(process.env.ZDOTDIR!, '.zshrc')
+// The file the block goes in, for this machine's login shell: ~/.zshrc for zsh, ~/.bashrc for bash on Linux.
+const { PLATFORM, shellRc } = await import('../src/platform.ts')
+const shell = shellRc(PLATFORM, userInfo().shell, process.env, process.env.HOME!)
+test('the shell block: a stale `codex` function goes, and Codex on brings Hypernova’s own', { skip: !shell && 'the login shell is neither zsh nor bash' }, async () => {
+  const rc = shell!.path
   // As another tool left it: a codex function of its own inside Hypernova's markers.
   writeFileSync(rc, `export A=1\n\n# >>> hypernova shared terminals (lets your phone see and type into claude sessions; safe to delete) hn:sep=1\nfunction claude { command claude "$@"; }\nfunction codex {\n  "$HOME/x/hn" run-codex "$@"\n}\n# <<< hypernova shared terminals\n`)
   const hooks = await import('../src/hooks.ts')
@@ -136,7 +139,8 @@ test('the shell block: a stale `codex` function goes, and Codex on brings Hypern
   hooks.installIntegration()
   text = readFileSync(rc, 'utf8')
   assert.match(text, /function codex \{\n  if \[\[ -t 0 && -t 1 && -z "\$HYPERNOVA_TERM" && -z "\$HYPERNOVA_OFF"/)
-  assert.match(text, /HYPERNOVA_CODEX="\$\{commands\[codex\]\}" .* run-codex "\$@"/)
+  // The codex this shell would run: zsh's $commands, bash's `type -P`.
+  assert.match(text, shell!.kind === 'zsh' ? /HYPERNOVA_CODEX="\$\{commands\[codex\]\}" .* run-codex "\$@"/ : /HYPERNOVA_CODEX="\$\(type -P codex\)" .* run-codex "\$@"/)
   assert.match(text, /command codex "\$@"/)
   assert.equal(text.split('# >>> hypernova shared terminals').length, 2, 'one block')
 })

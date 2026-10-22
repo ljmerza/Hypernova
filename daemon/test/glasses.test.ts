@@ -252,7 +252,8 @@ test('what the phone guards with a fingerprint is the phone’s alone: the glass
   assert.equal(off.json.files.browseOutsideProjects, false)
 })
 
-test('read aloud: the glasses’ own phone plays it, and only the glasses hear how it goes', async () => {
+// With no Soniox key the Mac’s voice makes the play: elsewhere it fails at once, before the phone plays.
+test('read aloud: the glasses’ own phone plays it, and only the glasses hear how it goes', { skip: process.platform !== 'darwin' && 'the Mac’s voice is a Mac’s' }, async () => {
   const phone = new Feed('/v1/ws', PHONE)
   const phone2 = new Feed('/v1/ws', PHONE2)
   const glasses = new Feed('/v1/ws', PHONE, VIA)

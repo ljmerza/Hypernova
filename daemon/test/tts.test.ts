@@ -372,7 +372,10 @@ test('a whole clip with Soniox: WAV of its PCM; brackets made text, the language
   assert.equal(seen.length, n)
 })
 
-test('Soniox refusing the key: the Mac’s voice reads, and the setting says so in one line', async () => {
+/** The Mac’s voice is the real `say`: the tests where it reads run on a Mac only. */
+const macVoice = { skip: process.platform !== 'darwin' && 'the Mac’s voice is a Mac’s' }
+
+test('Soniox refusing the key: the Mac’s voice reads, and the setting says so in one line', macVoice, async () => {
   const feed = new Feed(LENS)
   await feed.open
   process.env.HYPERNOVA_SONIOX_TTS_WS = `ws://127.0.0.1:${TTS}/elsewhere`
@@ -389,7 +392,7 @@ test('Soniox refusing the key: the Mac’s voice reads, and the setting says so 
   feed.close()
 })
 
-test('Soniox out of reach, and failing mid-reply: the Mac carries on from where it got to', async () => {
+test('Soniox out of reach, and failing mid-reply: the Mac carries on from where it got to', macVoice, async () => {
   process.env.HYPERNOVA_SONIOX_TTS_WS = `ws://127.0.0.1:${CLOSED}/tts-websocket`
   const off = await send('POST', '/v1/speech', LENS, { text: 'Nobody home.' })
   assert.equal(off.headers['x-speech-engine'], 'mac')
@@ -404,7 +407,7 @@ test('Soniox out of reach, and failing mid-reply: the Mac carries on from where 
   assert.equal(seen.at(-1)!.texts.length, 2)
 })
 
-test('Soniox hanging after the connection: the Mac’s voice takes over within the first-audio limit, and the note says so', async () => {
+test('Soniox hanging after the connection: the Mac’s voice takes over within the first-audio limit, and the note says so', macVoice, async () => {
   const feed = new Feed(LENS)
   await feed.open
   Object.assign(ttsLimits, { firstAudioMs: 300 })
@@ -418,7 +421,7 @@ test('Soniox hanging after the connection: the Mac’s voice takes over within t
   feed.close()
 })
 
-test('Soniox going quiet mid-piece is an idle timeout, and the Mac carries on', async () => {
+test('Soniox going quiet mid-piece is an idle timeout, and the Mac carries on', macVoice, async () => {
   Object.assign(ttsLimits, { idleMs: 300 })
   fake.hang = 'mid'
   const r = await send('POST', '/v1/speech', LENS, { text: 'It starts and then it stops.' })
@@ -436,7 +439,7 @@ test('a piece longer than any fixed limit is fine while frames keep coming', asy
   assert.equal((await send('GET', '/v1/speech/settings')).body.speech.note, null)
 })
 
-test('a piece Soniox cut off at its 2 minutes is not read whole: the Mac reads the rest', async () => {
+test('a piece Soniox cut off at its 2 minutes is not read whole: the Mac reads the rest', macVoice, async () => {
   fake.truncate = true
   const r = await send('POST', '/v1/speech', LENS, { text: 'Cut off by the limit.' })
   assert.equal(r.status, 200)
@@ -564,7 +567,7 @@ test('the phone on the glasses’ own phone plays them, when the tailnet says wh
   for (const f of [a, b]) f.close()
 })
 
-test('the phone’s own Read aloud plays on it; the Mac’s voice when chosen, as the same PCM', async () => {
+test('the phone’s own Read aloud plays on it; the Mac’s voice when chosen, as the same PCM', macVoice, async () => {
   const mac = new Feed('', undefined, true)
   await mac.open
   await send('POST', '/v1/speech/settings', LENS, { engine: 'mac' })

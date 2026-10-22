@@ -73,6 +73,8 @@ const { startServers, startPairing, apkInfo } = await import('../src/http.ts')
 const { lanInfo } = await import('../src/lan.ts')
 const { request: httpsRequest } = await import('node:https')
 const { adminToken, settings } = await import('../src/store.ts')
+// The LAN listener on, as the owner can say: unset, it's off in a container and on a cloud VM such as a CI runner (platform.ts lanByDefault).
+settings.lanAccess = true
 const { statSync } = await import('node:fs')
 
 function local(method: string, path: string, body?: string): Promise<{ status: number; json: any }> {
@@ -156,6 +158,9 @@ test('the Tailscale app running and signed in but not serving: Hypernova turns s
   assert.equal(st2.mode, 'builtIn')
   assert.equal(readFileSync(tsMode, 'utf8'), 'idle')
   await stopTsnet()
+  // The re-checks still under way (150 ms apart here, each a run or two of the stand-in) end first:
+  // one ending later would show the app, for 15 s, to the tests below that have none.
+  await sleep(1000)
   writeFileSync(tsMode, 'idle')
   process.env.HYPERNOVA_TAILSCALE = noTs
 })

@@ -149,14 +149,15 @@ test('the LAN listener starts by itself on a Mac and a home PC, not on a VPS wit
   const vps = { lo: [nic('127.0.0.1', true)], eth0: [nic('64.226.10.20')], eth1: [nic('10.114.0.2')], tailscale0: [nic('100.101.1.2')] }
   const docker = { lo: [nic('127.0.0.1', true)], eth0: [nic('172.17.0.2')] }
   const proxied = { eth0: [nic('192.168.1.20')], utun: [nic('198.18.0.1')] }
-  assert.equal(lanByDefault('linux', home), true)
+  // `{}`: neither a container nor a cloud VM, whatever runs the test (a CI runner is a cloud VM).
+  assert.equal(lanByDefault('linux', home, {}), true)
   // A Docker bridge address is private, yet no phone is on that network: off in a container, and on a cloud VM.
   assert.equal(lanByDefault('linux', docker, {}), true)
   assert.equal(lanByDefault('linux', docker, { container: true }), false)
   assert.equal(lanByDefault('linux', home, { cloud: true }), false)
   assert.equal(lanByDefault('darwin', home, { container: true }), true)
-  assert.equal(lanByDefault('linux', proxied), true)
-  assert.equal(lanByDefault('linux', vps), false)
+  assert.equal(lanByDefault('linux', proxied, {}), true)
+  assert.equal(lanByDefault('linux', vps, {}), false)
   // A public address on a Mac changes nothing there.
   assert.equal(lanByDefault('darwin', vps), true)
   // A public IPv6 address alone doesn't count: only IPv4 is checked (the listener filters by source anyway).
