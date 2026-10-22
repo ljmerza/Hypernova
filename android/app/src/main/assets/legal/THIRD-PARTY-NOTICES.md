@@ -23,7 +23,7 @@ Go's module cache) and in `third_party/`.
 | node-pty (Microsoft) | MIT |
 | ws | MIT |
 | @xterm/headless and @xterm/addon-serialize | MIT |
-| @anthropic-ai/claude-agent-sdk (the JavaScript client the daemon uses to run Claude Code; the Mac app bundles it, the Linux install fetches it from npm) | Anthropic's terms: "© Anthropic PBC. All rights reserved. Use is subject to Anthropic's Legal Agreements" |
+| @anthropic-ai/claude-agent-sdk (the JavaScript client the daemon uses to run Claude Code; **not bundled**: the Mac app's Setup fetches it from npm onto your Mac, the Linux install with `npm ci`) | Anthropic's terms: "© Anthropic PBC. All rights reserved. Use is subject to Anthropic's Legal Agreements" |
 | zod and the other packages of the daemon's `node_modules` | MIT, ISC or Apache-2.0: see each package's own LICENSE file, which stays in the bundle |
 | Node.js (downloaded at first use from nodejs.org, not bundled) | MIT and others: https://github.com/nodejs/node/blob/main/LICENSE |
 | The built-in Tailscale helper (`hypernova-tsnet`) | BSD-3-Clause, as above |

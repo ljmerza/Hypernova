@@ -200,7 +200,8 @@ The whole guide, with the first launch on each macOS version and every Linux ste
    **Open**).
 4. Setup walks you through seven steps: **Claude Code**, **Background service**, **Connect Claude
    Code**, **Tailscale**, **Voice**, **Codex** and **Your phone**. With Codex alone, **Use Codex only**
-   skips Claude Code's two.
+   skips Claude Code's two. The app doesn't carry Claude Code's SDK (it's Anthropic's): **Background
+   service** downloads it from npm, about 2 MB.
 5. Install the app on your phone (or scan **Get the app** in Setup), then scan the pairing code. Later,
    **Pair a phone** in the menu bar pairs another.
 
@@ -222,7 +223,8 @@ volume for its state, then `docker exec -it hypernova hypernova pair` (the exact
 **Build from source:**
 
 ```bash
-# 1. The Mac app, with the daemon bundled (needs daemon/node_modules: cd daemon && npm ci).
+# 1. The Mac app, with the daemon bundled (needs daemon/node_modules: cd daemon && npm ci). Claude
+#    Code's SDK stays out of the app: Setup fetches it on the Mac that runs it.
 mac/build.sh --open                     # dist/Hypernova.app
 mac/build.sh --release && mac/dmg.sh    # dist/Hypernova.dmg, as released
 

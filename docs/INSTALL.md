@@ -38,7 +38,8 @@ app. The Mac's menu bar is a second control room, on that Mac only.
 - Optional: Even Realities G2 glasses (see [Hypernova Lens](../lens/README.md)), and a
   [Soniox](https://soniox.com) API key for voice.
 
-Nothing else: Hypernova brings its own Node.js and its own Tailscale.
+Nothing else: Hypernova brings its own Node.js and its own Tailscale. On a Mac, Setup also
+downloads Claude Code's SDK from npm (about 2 MB; see [Background service](#2-background-service)).
 
 ## 1. Download
 
@@ -146,9 +147,17 @@ Setup looks for `claude` (see [How Hypernova finds your agents](#how-hypernova-f
    current Node.js LTS from nodejs.org, checks it against nodejs.org's published checksums, and
    keeps it in its own folder.
 2. **Copy the service** into `~/Library/Application Support/Hypernova`.
-3. **Add it to your login items**: a launch agent, so it starts with your Mac and restarts itself.
+3. **Get Claude Code's SDK.** The service drives Claude Code through Anthropic's Agent SDK
+   (`@anthropic-ai/claude-agent-sdk`). It's Anthropic's to hand out, not ours, so the app doesn't
+   carry it: Setup downloads it from npm once, about 2 MB, with that Node.js's own npm, at the exact
+   version the service was built with (checked against the service's package lock). If your Mac is
+   offline, or npm fails, the service starts all the same and the step says what's missing:
+   **Fetch again** gets it later (also in **Agents & providers** and the menu bar). Until then the
+   "/" list, Rewind and the sessions the service runs itself wait for it; everything else works.
+   With Codex only, nothing needs it, and Setup never mentions it.
+4. **Add it to your login items**: a launch agent, so it starts with your Mac and restarts itself.
    Hypernova also turns on **Open at login** for the menu bar app (the first time only).
-4. **Start it**, and check that it answers.
+5. **Start it**, and check that it answers.
 
 macOS may show a *Background Items Added* notice. Both items appear in **System Settings → General
 → Login Items & Extensions**; leave them on.
@@ -455,7 +464,7 @@ again and says how to remove the block yourself.
 | Where | What |
 | --- | --- |
 | `/Applications/Hypernova.app` | The menu bar app, with the service inside |
-| `~/Library/Application Support/Hypernova` | The service, its Node.js, paired phones, settings and keys (private to your user) |
+| `~/Library/Application Support/Hypernova` | The service (with Claude Code's SDK, from npm), its Node.js, npm's cache for that download, paired phones, settings and keys (private to your user) |
 | `~/Library/Logs/Hypernova/daemon.log` | The service's log |
 | `~/Library/LaunchAgents/com.prudnikweb.hypernova.daemon.plist` | Starts the service at login |
 | Login items | Hypernova itself (**Open at login**) |
@@ -492,7 +501,8 @@ macOS may also ask, later and only when a feature needs it:
 **The Mac app.** Download the new `Hypernova.dmg`, quit Hypernova (menu bar → **Quit**), drag the
 new one onto Applications and replace the old one, then open it. macOS may ask as on the first
 launch. The menu bar then says *A newer service is ready*: click **Update**. Shared terminals keep
-running.
+running, and Claude Code's SDK carries over (when the new service wants another version of it, that
+one is downloaded, and the one you had keeps working if it can't be).
 
 **Linux.** Download the new `Hypernova-linux.tar.gz` and run the install script from it again, as
 the first time. The new daemon is prepared beside the old one and swapped in once it works; open
@@ -551,6 +561,10 @@ remove `hypernova-<name>` from your tailnet in the
 - **Codex: "needs an update".** `codex update`, then **Check again**.
 - **The service isn't answering.** Setup → **Background service** → **Start it again**. **Show
   log** opens `~/Library/Logs/Hypernova/daemon.log`.
+- **“Claude Code’s SDK isn’t installed”** (on the phone, for the "/" list, Rewind or a new
+  session). The Mac was offline during Setup, or npm couldn't reach its registry (a proxy?). Setup →
+  **Background service** → **Fetch again**, or the same button in the menu bar or **Agents &
+  providers**. The service keeps running and uses it as soon as it's there.
 - **`claude` in a terminal doesn't show up as shared.** Open a new tab after Connect Claude Code.
 - **See what Setup sees**, without changing anything:
 
@@ -594,7 +608,8 @@ mac/build.sh --release && mac/dmg.sh # dist/Hypernova.dmg, as released
 ```
 
 `--release` stops rather than leave something out: it wants a release-signed APK in `dist/` and
-the Tailscale helper (built with Go).
+the Tailscale helper (built with Go). Claude Code's SDK is never in the app (Setup downloads it on
+the Mac that runs it); `npm ci` above puts it in your checkout for development.
 
 **Linux.** From a checkout on the server, `scripts/install-linux.sh` installs from it directly.
 `scripts/pack-linux.sh` makes the package (`dist/linux/hypernova-<version>.tar.gz`, with the

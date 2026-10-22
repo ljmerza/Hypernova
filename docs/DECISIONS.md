@@ -1531,8 +1531,9 @@ repo, and that Linux is told as a way to run Hypernova, not only Android and Mac
    repository in `~/.hypernova-signing/` and backed up by the owner. The debug build is for
    development only. Phones with the debug build reinstall once.
 5. **The Mac app is ad-hoc signed and not notarized** until there's a Developer ID (L6). The DMG says
-   how to allow it. It bundles no Anthropic binary: the Agent SDK's own Claude Code binaries are left
-   out, the daemon always runs the user's installed `claude`.
+   how to allow it. It bundles nothing of Anthropic's: the Agent SDK's own Claude Code binaries are
+   left out (the daemon always runs the user's installed `claude`), and its JavaScript package is
+   fetched at setup (9).
 6. **Node.js: 22.18 or newer, and 24 (LTS) is what the installers fetch** (L64 closed). Node 25 is an
    odd line past its end of life; the Mac already took the newest LTS, and the Linux installer now
    takes the same line.
@@ -1540,4 +1541,15 @@ repo, and that Linux is told as a way to run Hypernova, not only Android and Mac
    alone as a complete install.
 8. **Found, not bought**: a project site with guides for the words people search, a sitemap,
    structured data, `llms.txt` and an IndexNow submission; no paid promotion, no accounts made for us.
+9. **Claude Code's SDK is fetched at setup, not bundled** (owner, 2026-10-22). Its JavaScript package
+   (`@anthropic-ai/claude-agent-sdk`) is "© Anthropic PBC. All rights reserved", not ours to
+   redistribute, so the DMG doesn't carry it: the Background service step downloads the version the
+   daemon's lockfile pins from npm (about 2 MB), once, with the service's own Node.js and its npm,
+   into the installed daemon, checked against the lock's integrity; an app update carries it over.
+   Never fatal: offline or on an npm error the service starts, and only the "/" list, Rewind and the
+   sessions the daemon runs itself wait for it (409 `sdk_missing`, the way to get it as the message),
+   with **Fetch again** in Setup, Agents & providers and the popover. It's shown only where Claude
+   Code is installed: with Codex alone nothing uses it, so it's fetched quietly and never mentioned.
+   The Linux package already left it to `npm ci`. Its peer packages (`@anthropic-ai/sdk`, MIT; the
+   MCP SDK, zod and their dependencies) still ship: L91.
 

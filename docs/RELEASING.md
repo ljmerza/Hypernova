@@ -147,11 +147,17 @@ mac/dmg.sh                  # dist/Hypernova.dmg: the app, an Applications link,
 its production packages only), Go with its module cache or a network (the Tailscale helper) and the
 Command Line Tools. What goes into the bundle, and what stays out:
 
-- The daemon's sources and production `node_modules`, the Tailscale helper, the fonts, the APK and its
-  version note (the "Get the app" page serves them).
-- **Not** the Agent SDK's own Claude Code binaries (`@anthropic-ai/claude-agent-sdk-<platform>`,
-  about 230 MB, Anthropic's and not ours to hand out: the daemon always runs the `claude` installed
-  on the Mac), nor development packages, tests, Windows or Intel builds of node-pty.
+- The daemon's sources and production `node_modules`, its package lock and `sdk-version` (what
+  Setup fetches, below), the Tailscale helper, the fonts, the APK and its version note (the "Get the
+  app" page serves them).
+- **Not** Claude Code's Agent SDK, none of it. Its JavaScript package
+  (`@anthropic-ai/claude-agent-sdk`) is "© Anthropic PBC. All rights reserved", not ours to
+  redistribute: Setup's Background service step downloads the version the lockfile pins from npm on
+  the user's Mac (about 2 MB; `mac/Sources/Hypernova/Core/ClaudeSDK.swift`), and the daemon runs
+  without it until then (`daemon/src/sdk.ts`). Its own Claude Code binaries
+  (`@anthropic-ai/claude-agent-sdk-<platform>`, about 230 MB) are never needed: the daemon always
+  runs the `claude` installed on the Mac. `build.sh` stops if any file of the SDK reaches the bundle.
+- Nor development packages, tests, Windows or Intel builds of node-pty.
 - Symbols are stripped and the sources' paths are remapped, so the builder's folders aren't in the
   binary.
 
@@ -160,7 +166,8 @@ Check what you built:
 ```bash
 codesign --verify --deep --strict dist/Hypernova.app && echo sealed
 LC_ALL=C grep -a -c "$HOME" dist/Hypernova.app/Contents/MacOS/Hypernova      # 0
-du -sh dist/Hypernova.app dist/Hypernova.dmg                                 # about 90 MB and 25 MB
+find dist/Hypernova.app -path '*claude-agent-sdk*'                           # nothing
+du -sh dist/Hypernova.app dist/Hypernova.dmg                                 # about 85 MB and 23 MB
 ```
 
 `mac/dmg.sh` attaches the finished image read-only, verifies the app's seal inside it and prints its
