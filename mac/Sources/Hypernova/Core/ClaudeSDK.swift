@@ -47,10 +47,23 @@ enum ClaudeSDK {
         return s?.isEmpty == false ? s : nil
     }
 
+    /// Its version when it's all there: its package.json, and the file the daemon loads (as sdk.ts
+    /// finds it). One cut short (a fetch stopped halfway) isn't.
     static func installedVersion(in daemon: URL) -> String? {
-        guard let data = try? Data(contentsOf: packageDir(in: daemon).appendingPathComponent("package.json")),
-              let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any], j["name"] as? String == package else { return nil }
+        let dir = packageDir(in: daemon)
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent("package.json")),
+              let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any], j["name"] as? String == package,
+              FileManager.default.fileExists(atPath: dir.appendingPathComponent(entry(j)).path) else { return nil }
         return j["version"] as? String
+    }
+
+    /// The file its "." export names (an ESM `default`), else `main`, else index.js: the daemon's rule.
+    private static func entry(_ j: [String: Any]) -> String {
+        let exports = j["exports"]
+        let dot: Any? = exports is String ? exports : (exports as? [String: Any])?["."]
+        if let s = dot as? String { return s }
+        if let d = dot as? [String: Any], let s = (d["import"] ?? d["node"] ?? d["default"]) as? String { return s }
+        return j["main"] as? String ?? "index.js"
     }
 
     /// Two small file reads: cheap enough for every status round.
@@ -141,6 +154,9 @@ enum ClaudeSDK {
             return .failed("There’s no npm next to the Node.js the service runs on (\(Paths.tilde(node))), so Claude Code’s SDK couldn’t be fetched.")
         }
         try? fm.createDirectory(at: cache, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        // A copy cut short has its package.json, so npm would take it as installed: it goes first.
+        let dir = packageDir(in: daemon)
+        if installedVersion(in: daemon) == nil, fm.fileExists(atPath: dir.path) { try? fm.removeItem(at: dir) }
         let r = Shell.run(npm.exe, npm.prefix + arguments(cache: cache), timeout: timeout, env: environment(node: node), cwd: daemon)
         let after = state(daemon: daemon)
         if r.ok, after.current, let v = after.installed { return .ready(v) }
