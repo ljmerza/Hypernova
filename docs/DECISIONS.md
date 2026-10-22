@@ -1552,4 +1552,14 @@ repo, and that Linux is told as a way to run Hypernova, not only Android and Mac
    Code is installed: with Codex alone nothing uses it, so it's fetched quietly and never mentioned.
    The Linux package already left it to `npm ci`. Its peer packages (`@anthropic-ai/sdk`, MIT; the
    MCP SDK, zod and their dependencies) still ship: L91.
-
+10. **Windows through WSL 2 or Docker Desktop, experimental.** The owner asked why Windows isn't
+   included. There is no native Windows host yet (PLATFORMS.md; LATER L92), but a Windows PC runs the
+   Linux host unchanged inside WSL 2 (Ubuntu) or a Docker Desktop container, and the phone pairs with
+   it over the built-in Tailscale node. So Windows is documented now (INSTALL.md, "5. Windows
+   (experimental)"; a guide on the site) and labelled **experimental** everywhere, because nobody
+   has run it on a Windows PC (LATER L93): it is checked on Linux and by unit tests that simulate
+   WSL, and its Windows-side settings come from Microsoft's own pages. The daemon knows it is in WSL
+   (`platform.ts`): behind WSL's NAT the local route stays off and its unreachable 172.x addresses
+   never go into a pairing link; `hypernova doctor` and `pair` say what to set on Windows (systemd,
+   `instanceIdleTimeout=-1`, mirrored networking with its firewall rule). No Windows badge in the
+   README, and no text claims native support.

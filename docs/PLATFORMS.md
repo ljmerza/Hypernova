@@ -255,8 +255,8 @@ The daemon knows when it runs in WSL (`isWsl()` and the networking mode from `ws
 are never advertised, so the phone comes in over the built-in Tailscale node; `hypernova doctor`,
 `pair`, `lan` and `setup` explain systemd, keeping WSL running and mirrored networking
 (`daemon/src/cli/wsl.ts`). Verified only on Linux and by unit tests that simulate WSL; nobody has
-tried it on a real Windows PC (LATER L92). The native Windows host and its tray app below are still
-only this plan (LATER L91).
+tried it on a real Windows PC (LATER L93). The native Windows host and its tray app below are still
+only this plan (LATER L92).
 
 **The idea.** Let the daemon run on a Linux or Windows computer, and give those computers a
 small tray app like the Mac's menu bar app. Claude Code itself already runs on both
