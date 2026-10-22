@@ -11,6 +11,7 @@ import { tilde, type Cli, UNIT } from './context.ts'
 import { claudeSignedIn, claudeVersionOf, findClaudeBin, isDaemonDir, missingBuildTools, ptyWorks, BUILD_TOOLS } from './install.ts'
 import { NODE_MAJOR, majorOf, recordedNode, versionOf } from './node.ts'
 import { hasUserSystemd, lingering, serviceState } from './service.ts'
+import { sdkAt } from '../sdk.ts'
 
 export type Check = { name: string; mark: 'ok' | 'warn' | 'fail' | 'info'; text: string; fix?: string }
 
@@ -244,6 +245,14 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
     const auth = v ? await claudeSignedIn(cli, claude) : null
     if (auth && !auth.loggedIn) add({ name: 'login', mark: 'fail', text: 'Claude Code isn’t signed in.', fix: 'Run claude once on this server and follow its sign-in.' })
     else if (auth) add({ name: 'login', mark: 'ok', text: `Claude Code signed in${auth.plan ? ` (${auth.plan})` : ''}` })
+    // Claude Code's SDK in the daemon's packages (sdk.ts): the "/" list, Rewind and the sessions the
+    // daemon runs itself go through it. `npm ci` puts it there; only a hand-made copy lacks it.
+    if (installed) {
+      const sdk = sdkAt(cli.daemonDir)
+      add(sdk.installed
+        ? { name: 'sdk', mark: 'ok', text: `Claude Code’s SDK ${sdk.version ?? ''} in the daemon’s packages`.replace('  ', ' ') }
+        : { name: 'sdk', mark: 'warn', text: 'Claude Code’s SDK isn’t in the daemon’s packages: the “/” list, Rewind and the sessions the daemon runs itself won’t work.', fix: 'hypernova setup (it installs the daemon’s packages with npm)' })
+    }
   }
   if (status && !codexAlone) {
     const hooks = status.hooks?.installed, shell = status.shell

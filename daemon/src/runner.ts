@@ -1,6 +1,7 @@
 // Sessions Hypernova drives itself, through the Agent SDK: one claude process per prompt,
 // resumed by session id, so they survive daemon restarts and stay normal Claude Code sessions.
-import { query, type Query } from '@anthropic-ai/claude-agent-sdk'
+// The SDK is loaded when a prompt first runs (sdk.ts): without it a prompt isn't sent, and says why.
+import type { Query } from '@anthropic-ai/claude-agent-sdk'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { findClaude, log, trimText } from './util.ts'
@@ -32,6 +33,7 @@ import { isBuiltinCommand } from './commands.ts'
 import { noteDenied } from './denied.ts'
 import { noteHookEvent } from './hookevents.ts'
 import type { AutomationStart } from './terms.ts'
+import { SdkMissingError, claudeSdk, type ClaudeSdk } from './sdk.ts'
 
 /**
  * One session's runs: the query running now, and the prompts waiting behind it ([queue], shaped
@@ -220,6 +222,18 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
     // Claude login); the session says why and waits to be moved to another provider.
     putEvent(id, { id: `e:${randomUUID()}`, kind: 'notice', ts: started, text: `Not sent. ${REMOVED_TEXT}`, tone: 'error', blocker: 'provider' })
     setBlocked(id, { kind: 'provider', text: REMOVED_TEXT, resetsAt: null, autoResumeAt: null }, started)
+    setState(id, 'idle', null)
+    return
+  }
+  // Claude Code's SDK isn't on this Mac (Setup fetches it): the prompt isn't sent, and the notice
+  // says how to get it, as for a removed provider.
+  let query: ClaudeSdk['query']
+  try {
+    query = (await claudeSdk()).query
+  } catch (e) {
+    if (!(e instanceof SdkMissingError)) throw e
+    log('prompt not sent:', id.slice(0, 8), 'has no SDK to run on', e.cause ?? '')
+    putEvent(id, { id: `e:${randomUUID()}`, kind: 'notice', ts: started, text: `Not sent. ${e.message}`, tone: 'error' })
     setState(id, 'idle', null)
     return
   }

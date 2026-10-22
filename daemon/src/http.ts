@@ -55,6 +55,7 @@ import { listModels } from './models.ts'
 import { sessionUsage } from './session-usage.ts'
 import { todosOf } from './todos.ts'
 import { RewindError, rewindTo } from './rewind.ts'
+import { SdkMissingError, claudeSdk, sdkState } from './sdk.ts'
 import { AutomationError, FIRE_BODY_MAX, automations, lensConnected, useSessionOps } from './automations.ts'
 import { systemZone } from './schedule.ts'
 import { PLATFORM, RELEASES, UNAVAILABLE, bypassBlockedByRoot, has, unavailable } from './platform.ts'
@@ -87,6 +88,18 @@ const fromGlasses = (c: Ctx): boolean => !!c.lens || (!!c.deviceId && getDevice(
 const phoneOnly = () => new HttpError(403, 'needs_phone', 'Do this on your phone: it asks for your fingerprint or screen lock first.')
 /** What only Claude Code sessions do (rewind, providers, auto-continue, terminal menus): docs/PROTOCOL.md, "Codex". */
 const notForCodex = () => new HttpError(409, 'unsupported_for_agent', 'Codex sessions can’t do this.')
+/**
+ * Before a prompt goes to a session the daemon runs itself: Claude Code's SDK must be here (sdk.ts),
+ * else 409 `sdk_missing`, said before anything is made or queued.
+ */
+async function needSdk(): Promise<void> {
+  try {
+    await claudeSdk()
+  } catch (e) {
+    if (e instanceof SdkMissingError) throw new HttpError(e.status, e.code, e.message)
+    throw e
+  }
+}
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   const s = JSON.stringify(body)
@@ -350,7 +363,8 @@ function snapshot(deviceId: string | null) {
     // The local route (lan.ts): null while the listener is off.
     lan: lanSnapshot(deviceId),
     // The agents (docs/PROTOCOL.md, "Codex"): Claude Code here or not, and Codex (null: not installed).
-    claude: { available: claudeHere(), version: claudeVersion() },
+    // `sdk`: Claude Code's SDK is here (sdk.ts); without it what the daemon runs through it answers `sdk_missing`.
+    claude: { available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed },
     codex: codexState(),
   }
 }
@@ -663,7 +677,9 @@ async function api(c: Ctx): Promise<void> {
     // Claude Code won't run bypass mode as root (it would exit at once): said now, with the way out.
     if (b.permissionMode === 'bypassPermissions' && bypassBlockedByRoot()) throw new HttpError(409, 'bypass_root', 'Claude Code won’t skip permissions as root. Run Hypernova as a normal user (see docs/LINUX.md), or pick another mode.')
     const opts = { cwd: full, providerId: b.providerId, model: b.model, permissionMode: b.permissionMode, prompt: withAttachments(String(b.prompt ?? ''), files) }
-    const id = (await shared()) ? createSharedSession(opts) : createSession(opts)
+    const inTerminal = await shared()
+    if (!inTerminal) await needSdk()
+    const id = inTerminal ? createSharedSession(opts) : createSession(opts)
     notePrompt(c.deviceId, c.local, b.via)
     return json(res, 200, { session: listSessions().find((s) => s.id === id) })
   }
@@ -1148,14 +1164,16 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
     return { id, queued: r.queued === true }
   }
   if (isSdk(id)) {
+    await needSdk()
     upsertSession(id, { stoppedForAway: false })
     return { id, queued: sendPrompt(id, text, undefined, o.clientId) }
   }
   // A session with no shared terminal: fork it while it's open somewhere else, continue it in place once it has ended.
   const live = isLiveTerminal(id)
   if (live && o.noFork) throw new HttpError(409, 'no_terminal', 'This session runs in a terminal Hypernova doesn’t hold.')
-  upsertSession(id, { stoppedForAway: false })
   const useShared = await shared()
+  if (!useShared) await needSdk()
+  upsertSession(id, { stoppedForAway: false })
   const newId = live
     ? useShared
       ? createSharedSession({ cwd: rec.cwd, prompt: text, forkFrom: id })
@@ -1425,7 +1443,7 @@ async function local(c: Ctx): Promise<void> {
     return json(res, 200, {
       daemonVersion: VERSION,
       apiPort: API_PORT,
-      claude: { path: claudeCached(), version: claudeVersion() },
+      claude: { path: claudeCached(), version: claudeVersion(), sdk: sdkState() },
       // Codex as a second agent: installed, on, connected, signed in (null when it isn't installed).
       codex: codexState(),
       tailscale: await tailscaleStatus(url.searchParams.has('fresh')),

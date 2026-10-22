@@ -13,6 +13,7 @@ import { getBattery } from '../battery.ts'
 import { keepAwake } from '../awake.ts'
 import { createSharedSession, endTerm, pressKeys, sharedTerminalsAvailable, termOf } from '../terms.ts'
 import { createSession, interrupt } from '../runner.ts'
+import { claudeSdk } from '../sdk.ts'
 import { integrationStatus } from '../hooks.ts'
 import { codexState, codexModels } from '../codex/account.ts'
 import { isCodex } from '../codex/threads.ts'
@@ -83,6 +84,8 @@ function daemonIO(): AutoIO {
       const opts = { cwd: o.cwd, providerId: o.providerId, model: o.model, permissionMode: o.permissionMode, prompt: o.prompt, title: o.name, automation: o.automation, allowedTools: o.allowedTools, appendSystemPrompt: o.appendSystemPrompt }
       // A shared terminal when the Mac can (as a phone's new session), else the SDK.
       const shared = (await sharedTerminalsAvailable()) && integrationStatus().hooks.installed
+      // The SDK's run needs Claude Code's SDK (sdk.ts): without it the step fails at its start, saying why.
+      if (!shared) await claudeSdk()
       return shared ? createSharedSession({ ...opts, settingsFile: HOOK_FILE }) : createSession(opts)
     },
     async prompt(id, text, afterLimit) {

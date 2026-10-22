@@ -6,8 +6,8 @@
 // SDK copies the transcript up to the message before it into a new one (no claude process runs,
 // nothing is typed into a terminal), so a session that's working, or open in a terminal on the
 // Mac, is never touched, and nothing is lost: the original stays as it was. Claude Code's own
-// /rewind in a terminal can also put files back; this doesn't, and the phone says so.
-import { forkSession } from '@anthropic-ai/claude-agent-sdk'
+// /rewind in a terminal can also put files back; this doesn't, and the phone says so. Without
+// Claude Code's SDK (Setup fetches it, sdk.ts) a rewind answers 409 `sdk_missing`.
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { ensureParsed, getSession, transcriptPathFor, upsertSession, view, type Session } from './hub.ts'
@@ -15,6 +15,7 @@ import { parseTranscript, squash, type Ev } from './normalize.ts'
 import { getManaged, getProvider, saveManaged } from './store.ts'
 import { log, trimText } from './util.ts'
 import type { Attachment } from './attachments.ts'
+import { SdkMissingError, claudeSdk, type ClaudeSdk } from './sdk.ts'
 
 export class RewindError extends Error {
   status: number
@@ -72,6 +73,13 @@ export async function rewindTo(rec: Rec, eventId: string, shared: boolean): Prom
   if (parent === null) throw new RewindError(409, 'first_message', 'That’s where the conversation starts. Start a new session instead.')
 
   const title = trimText(`${rec.title} (rewound)`, 80) ?? 'Rewound session'
+  let forkSession: ClaudeSdk['forkSession']
+  try {
+    forkSession = (await claudeSdk()).forkSession
+  } catch (e) {
+    if (e instanceof SdkMissingError) throw new RewindError(e.status, e.code, e.message)
+    throw e
+  }
   let id: string
   try {
     id = (await forkSession(rec.id, { dir: rec.cwd, upToMessageId: parent, title })).sessionId

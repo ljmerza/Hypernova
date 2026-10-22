@@ -3,12 +3,14 @@
 // knows (Claude Code's own, the user's and the project's commands and skills, plugins', MCP
 // prompts), with descriptions and argument hints. No prompt is sent and its hooks are off, so it
 // costs no tokens and no session shows up anywhere. A list is cached per folder for a few
-// minutes; an older one is served while a fresh one is fetched.
-import { query, type SDKControlInitializeResponse } from '@anthropic-ai/claude-agent-sdk'
+// minutes; an older one is served while a fresh one is fetched. Without Claude Code's SDK (Setup
+// fetches it, sdk.ts) the ask answers 409 `sdk_missing`, and the model list keeps its built-in one.
+import type { SDKControlInitializeResponse } from '@anthropic-ai/claude-agent-sdk'
 import { findClaude, log } from './util.ts'
 import { getProvider, providerEnv } from './store.ts'
 import { childEnv } from './runner.ts'
 import { notePlan } from './account.ts'
+import { claudeSdk } from './sdk.ts'
 
 export type Command = { name: string; description: string; argumentHint: string; aliases: string[]; builtin: boolean }
 
@@ -65,6 +67,8 @@ export function onClaudeInit(f: (init: SDKControlInitializeResponse) => void): v
 async function fetchCommands(cwd: string): Promise<Command[]> {
   const claude = findClaude()
   if (!claude) throw Object.assign(new Error('Claude Code isn’t installed on this Mac.'), { status: 409 })
+  // 409 `sdk_missing` (SdkMissingError) while Claude Code's SDK isn't here.
+  const { query } = await claudeSdk()
   let release = () => {}
   const idle = (async function* () {
     await new Promise<void>((r) => (release = r))
