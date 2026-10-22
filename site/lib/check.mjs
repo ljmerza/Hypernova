@@ -62,7 +62,8 @@ export function check({ dist, site, installMd, linuxMd, caddyfile, csp }) {
   const warn = (f, m) => warns.push(`${f}: ${m}`);
   const files = walk(dist).filter((f) => !/\.(br|gz)$/.test(f));
   const rel = (f) => '/' + path.relative(dist, f).split(path.sep).join('/');
-  const htmlFiles = files.filter((f) => f.endsWith('.html'));
+  // A webmaster tool's verification file (google1234abcd.html, yandex_1234abcd.html) is not a page.
+  const htmlFiles = files.filter((f) => f.endsWith('.html') && !/^(google[0-9a-f]+|yandex_[0-9a-f]+)\.html$/.test(path.basename(f)));
   const pages = new Map();
   const titles = new Map(), descs = new Map();
   const external = new Set();
