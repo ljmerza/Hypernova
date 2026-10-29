@@ -628,13 +628,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                         }
                     }
                 }
-                // What changed: git's summary ("3 files +91 −8 ›") where there is one, else the files
-                // this session wrote as chips (one row, not both, on a small phone).
-                com.prudnikweb.hypernova.ui.changes.ChangesEntry(hub, session, Modifier.padding(start = 12.dp, top = 6.dp)) {
-                    if (changed.isNotEmpty() && openFile != null && session.browsable) {
-                        FilesChanged(changed, openFile, Modifier.padding(start = 12.dp, top = 6.dp))
-                    }
-                }
+                // Fork: no "what changed" row (git summary / written files) in the header; the room
+                // goes to the chat.
             }
         }
 

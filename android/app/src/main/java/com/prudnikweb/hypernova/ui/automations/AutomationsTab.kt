@@ -111,7 +111,7 @@ fun AutomationsTab(
 
     LazyColumn(
         Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = sourceKey),
-        contentPadding = PaddingValues(top = top + 84.dp, bottom = bottom + 196.dp),
+        contentPadding = PaddingValues(top = top + 84.dp, bottom = bottom + 84.dp), // fork: the bottom bar is tabs only
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item(key = "seam") { Header(st, w, ctx, now, enabled = !offline, onPause = { p ->

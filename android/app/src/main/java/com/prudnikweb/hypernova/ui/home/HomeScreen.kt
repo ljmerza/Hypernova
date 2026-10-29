@@ -377,7 +377,7 @@ fun HomeScreen(
             Tab.Sessions -> LazyColumn(
                 Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = HOME_SOURCE),
                 state = list,
-                contentPadding = PaddingValues(bottom = bottom + 196.dp), // the last card clears the bottom bar
+                contentPadding = PaddingValues(bottom = bottom + 84.dp), // the last card clears the bottom bar (fork: tabs only)
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // The sky: an open window onto the cosmos. Planets filter the list; the sun jumps to usage.
@@ -542,28 +542,25 @@ fun HomeScreen(
                 Spacer(Modifier.width(10.dp))
                 Wordmark()
                 Spacer(Modifier.weight(1f))
+                // Fork: the new-session (and new-automation) pill sits up here, small, instead of
+                // over the tabs, so the bottom bar is just the tabs.
+                if (tab == Tab.Sessions) {
+                    Pill(stringResource(R.string.new_session), onNewSession, kind = PillKind.Glass, height = 36.dp, leading = Glyph.Plus)
+                    Spacer(Modifier.width(8.dp))
+                }
+                // A Mac with automations: a new one from here (an old Mac's tab only says to update).
+                if (tab == Tab.Automations && hub.automations.state != null) {
+                    Pill(stringResource(R.string.au_new), { onAutomation(null, null, false) }, kind = PillKind.Glass, height = 36.dp, leading = Glyph.Plus)
+                    Spacer(Modifier.width(8.dp))
+                }
                 LinkChip(hub, onClick = { tab = Tab.Settings })
             }
         }
 
-        // Bottom: new-session pill and the text tabs (Hyperscribe's bottom nav).
-        BlurredBottom(haze, HOME_SOURCE, Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth().padding(top = 36.dp, bottom = bottom + 6.dp)) {
-                if (tab == Tab.Sessions) {
-                    Pill(
-                        stringResource(R.string.new_session), onNewSession,
-                        Modifier.align(Alignment.End).padding(end = 16.dp), kind = PillKind.Glass, height = 48.dp, leading = Glyph.Plus,
-                    )
-                    Spacer(Modifier.height(14.dp))
-                }
-                // A Mac with automations: a new one from here (an old Mac's tab only says to update).
-                if (tab == Tab.Automations && hub.automations.state != null) {
-                    Pill(
-                        stringResource(R.string.au_new), { onAutomation(null, null, false) },
-                        Modifier.align(Alignment.End).padding(end = 16.dp), kind = PillKind.Glass, height = 48.dp, leading = Glyph.Plus,
-                    )
-                    Spacer(Modifier.height(14.dp))
-                }
+        // Bottom: the text tabs (Hyperscribe's bottom nav). Fork: no pill over them (it's in the top
+        // bar) and a short fade, so more of the list shows.
+        BlurredBottom(haze, HOME_SOURCE, Modifier.align(Alignment.BottomCenter).fillMaxWidth(), fade = 14.dp) {
+            Column(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = bottom + 6.dp)) {
                 HomeTabBar(
                     Tab.entries.map { t ->
                         when (t) {
