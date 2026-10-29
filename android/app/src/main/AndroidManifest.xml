@@ -26,6 +26,10 @@
     <!-- Onboarding opens Tailscale when it's installed, and the Play Store listing when it isn't. -->
     <queries>
         <package android:name="com.tailscale.ipn" />
+        <!-- Fork: the phone's own speech recognizer (data/PhoneDictation.kt), when the Mac offers no voice. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="market" />

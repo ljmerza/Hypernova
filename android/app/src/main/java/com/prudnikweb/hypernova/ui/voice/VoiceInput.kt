@@ -98,9 +98,18 @@ class VoiceInput internal constructor(private val hub: Hub, private val prefs: V
     /** Let go, and nothing heard yet: the button turns a small planet until the words come. */
     val settlingEmpty: Boolean get() = current != null && !listening && (state as? DictationState.Settling)?.text.isNullOrEmpty()
 
-    /** The Mac offers voice (Soniox ready, or the Companion). */
-    val available: Boolean get() = hub.voice.route != VoiceRoute.None
-    val linked: Boolean get() = hub.isDemo || hub.link.state == LinkState.Connected
+    /**
+     * Fork: this phone can dictate by itself (an on-device recognizer, PhoneDictation.kt), used when
+     * the Mac offers no voice. Set by [rememberVoiceInput].
+     */
+    internal var phoneVoice by mutableStateOf(false)
+    internal var phoneDictate: () -> Dictation? = { null }
+    /** The words come from this phone, not the Mac: no link is needed to dictate. */
+    private val onPhone: Boolean get() = hub.voice.route == VoiceRoute.None && phoneVoice
+
+    /** The Mac offers voice (Soniox ready, or the Companion), or (fork) this phone does. */
+    val available: Boolean get() = hub.voice.route != VoiceRoute.None || phoneVoice
+    val linked: Boolean get() = hub.isDemo || hub.link.state == LinkState.Connected || onPhone
 
     private var collector: Job? = null
     private var hintJob: Job? = null
@@ -139,7 +148,7 @@ class VoiceInput internal constructor(private val hub: Hub, private val prefs: V
         detach()
         cancelled = false
         hint = null
-        val d = hub.dictate(prefs.language, prefs.headset)
+        val d = if (onPhone) phoneDictate() else hub.dictate(prefs.language, prefs.headset)
         if (d == null) {
             gesture = MicState.Idle
             show(VoiceHint.Problem(VoiceProblem.Offline))
@@ -281,6 +290,8 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
     val scope = rememberCoroutineScope()
     val prefs = remember { VoicePrefs.of(context) }
     val voice = remember(hub) { VoiceInput(hub, prefs, scope) }
+    // Asked once per box (it reads the system's recognizer setup), not on every recomposition.
+    val phoneVoice = remember(hub) { !hub.isDemo && com.prudnikweb.hypernova.data.PhoneDictation.available(context) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) voice.show(VoiceHint.First)
         else voice.show(VoiceHint.Permission(forGood = !rationale(context)))
@@ -297,6 +308,9 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
                 ask.launch(Manifest.permission.RECORD_AUDIO)
             } else voice.show(VoiceHint.Permission(forGood = !rationale(context)))
         }
+        // Fork: dictation on this phone when the Mac has none (never in the demo, which has its own).
+        voice.phoneVoice = phoneVoice
+        voice.phoneDictate = { com.prudnikweb.hypernova.data.PhoneDictation.start(context) }
         voice.haptic = { view.buzz(it) }
         voice.announce = { words -> view.announce(context.getString(R.string.voice_a11y_ready, words)) }
     }
