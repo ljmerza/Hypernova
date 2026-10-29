@@ -31,12 +31,13 @@ FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 # What the install script would ask sudo for: curl, openssl, git, build tools for node-pty, ps and
-# lsof for Telescope. Installed here as root, so the script finds them all and needs no sudo. tini
+# lsof for Telescope (fork: and ssh, so git can push over SSH from inside). Installed here as root,
+# so the script finds them all and needs no sudo. tini
 # is the container's first process: it reaps the shared terminals' holders that end after their
 # starter did (they're handed to process 1), which Node as process 1 wouldn't.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl tar gzip xz-utils openssl git \
-      build-essential python3 procps lsof less nano tini \
+      build-essential python3 procps lsof less nano tini openssh-client \
  && rm -rf /var/lib/apt/lists/*
 
 # Claude Code and the daemon belong to a normal user, never root. UID/GID match the host user who
