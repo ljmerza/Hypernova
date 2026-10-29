@@ -1,17 +1,23 @@
 name: android-release
-# The signed APK for the phone: built with the fork's own release key (repo secrets), attached to
-# each published release, and kept as a run artifact for manual runs. The key must never change:
-# Android only installs an update signed with the key the installed app has.
+# The signed APK for the phone, built with the fork's own release key (repo secrets). Every push to
+# main that touches the app (and a manual run) builds it and publishes the next v<version>-ljm.<n>
+# release with the APK attached, so releases/latest/download/hypernova.apk is always the newest. A
+# release published by hand gets its APK attached too. The key must never change: Android only
+# installs an update signed with the key the installed app has.
 #
 # Secrets: HYPERNOVA_KEYSTORE_B64 (base64 of the .jks), HYPERNOVA_KEYSTORE_PASSWORD,
 # HYPERNOVA_KEY_ALIAS, HYPERNOVA_KEY_PASSWORD.
 on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android-release.yml']
   release:
     types: [published]
   workflow_dispatch:
+# One at a time, never cancelled: each run publishes a numbered release.
 concurrency:
-  group: android-release-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-release
+  cancel-in-progress: false
 permissions:
   contents: write
 jobs:
@@ -76,3 +82,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" ../dist/hypernova.apk --clobber
+      # A push or a manual run: the next v<appVersion>-ljm.<n> after the newest fork release, with
+      # the APK on it. (A release made with the workflow token starts no other workflows.)
+      - name: Publish the next release
+        if: github.event_name != 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          base=$(sed -n 's/^val appVersion = "\(.*\)"/\1/p' app/build.gradle.kts)
+          last=$(gh release list -L 100 --json tagName -q '.[].tagName' | sed -n "s/^v$base-ljm\.\([0-9]*\)$/\1/p" | sort -n | tail -1)
+          tag="v$base-ljm.$(( ${last:-0} + 1 ))"
+          gh release create "$tag" ../dist/hypernova.apk --target "$GITHUB_SHA" --title "$tag" \
+            --notes "Built from ${GITHUB_SHA::7}: $(git log -1 --format=%s "$GITHUB_SHA")"
