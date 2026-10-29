@@ -285,7 +285,12 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
             },
             web = { url, title -> nav.push(Route.Web(url, title)) },
             terminal = { nav.push(Route.Terminal(it)) },
-            agent = { sessionId, agentId -> nav.push(Route.Agent(sessionId, agentId)) },
+            // Fork: an agent opened from another agent's screen takes its place rather than stacking
+            // on it, so Back always lands on the session, where its agents are chosen.
+            agent = { sessionId, agentId ->
+                val r = Route.Agent(sessionId, agentId)
+                if (nav.top is Route.Agent) nav.replaceTop(r) else nav.push(r)
+            },
             providers = {
                 sheet = false
                 nav.push(Route.Providers)
