@@ -337,7 +337,9 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
     // Fork: the list's rows (ToolRuns.kt): runs of three or more tool calls fold into one line, and
     // only the first reply after each message carries Claude's name. A run opens on a tap; the run
     // Claude is working in stays open by itself until it's tapped shut.
-    val rows = ToolRuns.rows(items)
+    // Fork: a tool's permission card goes once it's answered, as in Claude Code's terminal; only a
+    // denial stays (worth seeing later). Questions and plans stay: their answers are the content.
+    val rows = ToolRuns.rows(items.filterNot { it is Item.Approval && it.kind == com.prudnikweb.hypernova.data.ApprovalKind.Tool && it.resolved != null && it.resolved != com.prudnikweb.hypernova.data.Resolution.Denied })
     val labelled = ToolRuns.labelled(items)
     val runOpen = remember(sessionId) { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
     val liveRowKey = items.getOrNull(liveAt)?.let { live -> rows.lastOrNull { it.has(live.key) } }?.key
