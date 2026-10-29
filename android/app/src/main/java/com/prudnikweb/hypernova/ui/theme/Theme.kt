@@ -103,8 +103,12 @@ fun HypernovaTheme(content: @Composable () -> Unit) {
             }
         }
     }
+    // Fork: the app's text size (TextSize.kt) on top of the system's font scale.
+    val textScale by remember { TextSize.state(context) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
     CompositionLocalProvider(
         LocalMotion provides prefs,
+        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, density.fontScale * textScale),
         // Mint selection handles in text fields instead of stock blue.
         LocalTextSelectionColors provides SelectionColors,
         content = content,

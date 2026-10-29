@@ -76,6 +76,19 @@
         <item quantity="one">%d line</item>
         <item quantity="other">%d lines</item>
     </plurals>
+    <!-- Fork: a folded run of tool calls in the chat (ui/session/ToolRunRow.kt). -->
+    <plurals name="run_calls">
+        <item quantity="one">%d tool</item>
+        <item quantity="other">%d tools</item>
+    </plurals>
+    <string name="run_failed">%1$d failed</string>
+    <!-- Fork: Settings → Display (text size for the whole app). -->
+    <string name="st_display">Display</string>
+    <string name="st_text_size">Text size</string>
+    <string name="st_text_size_desc">Smaller text fits more of a session on the screen.</string>
+    <string name="st_text_small">Small</string>
+    <string name="st_text_default">Default</string>
+    <string name="st_text_large">Large</string>
     <!-- A table in a reply: what TalkBack says for a cell ("Tokens: 3.2k"), and an action on its rows. -->
     <string name="table_cell">%1$s: %2$s</string>
     <string name="copy_table">Copy table</string>

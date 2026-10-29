@@ -334,6 +334,13 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
     // item above them.
     val liveAt = items.indexOfLast { !(it is Item.User && (it.queued || it.waiting)) }
     val tailKey = listOfNotNull(items.getOrNull(liveAt)?.let(::tailOf), items.lastOrNull()?.takeIf { items.lastIndex != liveAt }?.let(::tailOf)).joinToString("|")
+    // Fork: the list's rows (ToolRuns.kt): runs of three or more tool calls fold into one line, and
+    // only the first reply after each message carries Claude's name. A run opens on a tap; the run
+    // Claude is working in stays open by itself until it's tapped shut.
+    val rows = ToolRuns.rows(items)
+    val labelled = ToolRuns.labelled(items)
+    val runOpen = remember(sessionId) { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    val liveRowKey = items.getOrNull(liveAt)?.let { live -> rows.lastOrNull { it.has(live.key) } }?.key
     // Claude at work: the status line's string vibrates and says what it's doing, so a sent
     // prompt never meets silence. "Sending" lasts only while the prompt is on its way: a command
     // the transcript never logs settles after a few seconds instead of sending forever, and one
@@ -378,7 +385,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
     var earlierAnchor by remember(sessionId) { mutableStateOf<String?>(null) }
     LaunchedEffect(items.size) {
         val k = earlierAnchor ?: return@LaunchedEffect
-        val i = items.indexOfFirst { it.key == k }
+        // The anchor's row: its own, or the folded run it's in.
+        val i = rows.indexOfFirst { it.has(k) }
         if (i > 0) {
             earlierAnchor = null
             // The "Show earlier" row (if still there) is the list's first item.
@@ -395,7 +403,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
         if (last is Item.Approval && last.resolved == null) {
             // A new question or plan can be taller than the screen: show where it starts.
             withFrameNanos { }
-            list.animateScrollToItem(liveAt)
+            // An approval is never folded: its own row in the list.
+            list.animateScrollToItem(rows.indexOfFirst { it.has(last.key) }.coerceAtLeast(0))
         } else {
             followTail(list, glideFps, motion.reduced)
         }
@@ -406,7 +415,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
             Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = sourceKey),
             state = list,
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            // Fork: 10dp between rows (was 18), so more of a session fits on the screen.
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (items.isEmpty()) {
                 item(key = "empty") {
@@ -433,14 +443,23 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                     }
                 }
             }
-            items(items, key = { it.key }) { item ->
+            items(rows, key = { it.key }) { row ->
                 // New items fade in, and nothing else moves by itself: with the list's default
                 // placement spring, a card under one that grows (a command's output streaming in)
                 // glided after it and was drawn over it, and an item that left (a run replaced,
                 // a prompt delivered, an approval that moved to its own event) faded out where it
                 // was while its successor slid over it: the same Bash card, "exit 0" and all,
                 // drawn twice, a little apart, while the tail followed Claude's output.
-                TranscriptItem(hub, sessionId, item, Modifier.fillMaxWidth().animateItem(fadeInSpec = ItemFadeIn, placementSpec = null, fadeOutSpec = null), known = known, onMenu = { menuKey = it.key })
+                val rowModifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = ItemFadeIn, placementSpec = null, fadeOutSpec = null)
+                when (row) {
+                    is ChatRow.One -> TranscriptItem(hub, sessionId, row.item, rowModifier, known = known, onMenu = { menuKey = it.key }, named = row.item.key in labelled)
+                    is ChatRow.Run -> {
+                        val open = runOpen[row.key] ?: (row.running || (working && row.key == liveRowKey))
+                        ToolRunRow(row, open, onToggle = { runOpen[row.key] = !open }, modifier = rowModifier) { member ->
+                            TranscriptItem(hub, sessionId, member, Modifier.fillMaxWidth(), known = known, onMenu = { menuKey = it.key })
+                        }
+                    }
+                }
             }
         }
 
@@ -769,7 +788,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
  * and previews open in the app; an agent's card opens that agent.
  */
 @Composable
-internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: Modifier, known: List<com.prudnikweb.hypernova.data.SlashCommand>? = null, onMenu: ((Item) -> Unit)? = null) {
+internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: Modifier, known: List<com.prudnikweb.hypernova.data.SlashCommand>? = null, onMenu: ((Item) -> Unit)? = null, named: Boolean = true) {
     val opener = LocalOpener.current
     val preview: (Int) -> Unit = { port -> opener.preview(null, port, "localhost:$port") }
     // Read rows and diff cards open their file only where the Mac lets the phone browse the folder.
@@ -788,7 +807,7 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
                 files = { SentFiles(item.files, hub, if (hub.isDemo) null else opener.file) },
             )
         }
-        is Item.Assistant -> WithMessageMenu(item, onMenu) { menu -> AssistantMessage(item, modifier.then(menu), onPreview = preview, codex = hub.session(sessionId)?.codex == true) }
+        is Item.Assistant -> WithMessageMenu(item, onMenu) { menu -> AssistantMessage(item, modifier.then(menu), onPreview = preview, codex = hub.session(sessionId)?.codex == true, named = named) }
         is Item.Tool -> ToolRow(item, modifier, onOpen = openFile, onPreview = preview)
         is Item.Terminal -> MiniTerminal(item, modifier, onPreview = preview)
         is Item.Diff -> DiffCard(item, modifier, onOpen = openFile, onPreviewFile = if (hub.isDemo) null else ({ path -> opener.preview(path, null, path.substringAfterLast('/')) }))

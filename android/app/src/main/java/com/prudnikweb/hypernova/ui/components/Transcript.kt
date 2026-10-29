@@ -420,20 +420,26 @@ private fun outputText(src: String, color: Color, tone: Tone): AnnotatedString =
     }
 }
 
-/** A reply: CLAUDE over it, or CODEX in a Codex session ([codex]; data/Codex.kt). */
+/**
+ * A reply: CLAUDE over it, or CODEX in a Codex session ([codex]; data/Codex.kt). Fork: [named] false
+ * leaves the name off a reply that follows another of Claude's (the chat names the first after each
+ * message); a streaming reply keeps the line, for its planet.
+ */
 @Composable
-fun AssistantMessage(item: Item.Assistant, modifier: Modifier = Modifier, onPreview: (Int) -> Unit = {}, codex: Boolean = false) {
+fun AssistantMessage(item: Item.Assistant, modifier: Modifier = Modifier, onPreview: (Int) -> Unit = {}, codex: Boolean = false, named: Boolean = true) {
     Column(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            NovaMark(size = 12.dp)
-            Spacer(Modifier.width(6.dp))
-            HText(stringResource(if (codex) R.string.cx_agent_codex else R.string.claude).uppercase(), style = Type.label, color = HN.accentDim)
-            if (item.streaming) {
-                Spacer(Modifier.width(8.dp))
-                Planet(Activity.Live)
+        if (named || item.streaming) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                NovaMark(size = 12.dp)
+                Spacer(Modifier.width(6.dp))
+                HText(stringResource(if (codex) R.string.cx_agent_codex else R.string.claude).uppercase(), style = Type.label, color = HN.accentDim)
+                if (item.streaming) {
+                    Spacer(Modifier.width(8.dp))
+                    Planet(Activity.Live)
+                }
             }
+            Spacer(Modifier.height(6.dp))
         }
-        Spacer(Modifier.height(6.dp))
         // Long-press to select and copy (in a session's chat, its menu instead).
         Selectable { Markdown(item.text, streaming = item.streaming) }
         PreviewPills(item.ports, onPreview)
@@ -728,6 +734,8 @@ private fun BlockerRow(item: Item.Notice, modifier: Modifier) {
 // ─── Mini terminal ─────────────────────────────────────────────────────────
 
 private const val COLLAPSED_LINES = 7
+/** Fork: how many lines a diff card shows before "N more lines". */
+private const val DIFF_COLLAPSED_LINES = 8
 private val RunningWash = Brush.verticalGradient(listOf(HN.accent.copy(alpha = 0.06f), Color.Transparent))
 private val TopFadeMask = Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black, 1f to Color.Black)
 
@@ -1323,7 +1331,21 @@ fun DiffCard(item: Item.Diff, modifier: Modifier = Modifier, onOpen: ((String) -
                 HText("−${item.removed}", style = Type.monoSmall, color = HN.danger)
             }
             Spacer(Modifier.height(10.dp))
-            DiffLines(item.lines)
+            // Fork: a long diff shows its first lines and opens on a tap, as the mini terminal does.
+            var expanded by rememberSaveable(item.key) { mutableStateOf(false) }
+            val long = item.lines.size > DIFF_COLLAPSED_LINES
+            DiffLines(if (expanded || !long) item.lines else item.lines.take(DIFF_COLLAPSED_LINES))
+            if (long) {
+                val more = item.lines.size - DIFF_COLLAPSED_LINES
+                HText(
+                    if (expanded) stringResource(R.string.collapse) else pluralStringResource(R.plurals.more_lines, more, more),
+                    style = Type.monoSmall, color = HN.accentDim, maxLines = 1,
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { expanded = !expanded }
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                )
+            }
         }
         if (path != null && onPreviewFile != null && isWebPage(path)) {
             Spacer(Modifier.height(10.dp))

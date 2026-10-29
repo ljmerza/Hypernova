@@ -301,6 +301,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                 }
             }
         }
+        // Fork: Display, the app's text size (DisplaySection below), kept on this phone.
+        item(key = "display") {
+            Spacer(Modifier.height(10.dp))
+            DisplaySection()
+        }
         if (live != null) {
             item(key = "background") {
                 Spacer(Modifier.height(10.dp))
@@ -431,6 +436,30 @@ private fun BatteryExemption() {
  * keys stay locked whatever it says. One calm line, "Why it matters" behind a quiet toggle. Turning it
  * on asks for the fingerprint or the screen lock first (OwnerCheck); turning it off asks nothing.
  */
+@Composable
+private fun DisplaySection() {
+    val context = LocalContext.current
+    val scale by remember { com.prudnikweb.hypernova.ui.theme.TextSize.state(context) }
+    Seam(stringResource(R.string.st_display), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            HText(stringResource(R.string.st_text_size), style = Type.body, color = HN.ink)
+            Spacer(Modifier.height(4.dp))
+            HText(stringResource(R.string.st_text_size_desc), style = Type.small, color = HN.inkMuted)
+            Spacer(Modifier.height(12.dp))
+            com.prudnikweb.hypernova.ui.components.Segmented(
+                listOf(
+                    com.prudnikweb.hypernova.ui.theme.TextSize.SMALL to stringResource(R.string.st_text_small),
+                    com.prudnikweb.hypernova.ui.theme.TextSize.DEFAULT to stringResource(R.string.st_text_default),
+                    com.prudnikweb.hypernova.ui.theme.TextSize.LARGE to stringResource(R.string.st_text_large),
+                ),
+                scale,
+                { com.prudnikweb.hypernova.ui.theme.TextSize.set(context, it) },
+            )
+        }
+    }
+}
+
 @Composable
 private fun FilesSection(hub: com.prudnikweb.hypernova.data.Hub) {
     val context = LocalContext.current
