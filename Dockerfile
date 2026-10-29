@@ -31,22 +31,16 @@ FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 # What the install script would ask sudo for: curl, openssl, git, build tools for node-pty, ps and
-# lsof for Telescope (fork: and ssh, so git can push over SSH from inside). Installed here as root,
-# so the script finds them all and needs no sudo. tini
+# lsof for Telescope. Installed here as root, so the script finds them all and needs no sudo. tini
 # is the container's first process: it reaps the shared terminals' holders that end after their
 # starter did (they're handed to process 1), which Node as process 1 wouldn't.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl tar gzip xz-utils openssl git \
-      build-essential python3 procps lsof less nano tini openssh-client \
+      build-essential python3 procps lsof less nano tini \
  && rm -rf /var/lib/apt/lists/*
 
-# Claude Code and the daemon belong to a normal user, never root. UID/GID match the host user who
-# owns the bind-mounted folders (1000 by default, which ubuntu:24.04's own `ubuntu` user holds).
-ARG UID=1000
-ARG GID=1000
-RUN (userdel -r ubuntu 2>/dev/null || true) \
- && groupadd --gid "$GID" hypernova \
- && useradd --create-home --shell /bin/bash --uid "$UID" --gid "$GID" hypernova \
+# Claude Code and the daemon belong to a normal user, never root.
+RUN useradd --create-home --shell /bin/bash hypernova \
  && mkdir -p /opt/hypernova/bin && chown -R hypernova:hypernova /opt/hypernova
 USER hypernova
 WORKDIR /home/hypernova
