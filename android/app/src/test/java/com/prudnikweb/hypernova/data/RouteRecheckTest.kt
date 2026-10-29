@@ -41,10 +41,10 @@ class RouteRecheckTest {
         assertTrue(b.due(10 * min + 2, listOf("192.168.43.1"), Any()))
     }
 
-    @Test fun mobileDataWithoutAHotspotNeverSweepsWhateverIsDue() {
+    @Test fun noNetworkNeverSweepsWhateverIsDue() {
         val b = RecheckBackoff(0)
         val c = RouteChooser("https://mac.example.ts.net", 47323)
         assertTrue(b.due(10 * 60_000L, emptyList(), null))
-        assertFalse(c.wantsRecheck(NetKind.Mobile, hotspot = false, known = listOf("192.168.1.20"), hotspotGateways = emptyList()))
+        assertFalse(c.wantsRecheck(NetKind.None, hotspot = false, known = listOf("192.168.1.20"), hotspotGateways = emptyList()))
     }
 }

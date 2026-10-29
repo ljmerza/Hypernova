@@ -111,8 +111,9 @@ class LanRouteTest {
         val c = RouteChooser("https://mac.ts.net:47321", 47323)
         assertEquals(RouteKind.Remote, c.kind)
         assertEquals("https://mac.ts.net:47321", c.base)
-        // On mobile data with nothing to try, no re-check.
-        assertFalse(c.wantsRecheck(NetKind.Mobile, false, listOf("192.168.1.20"), emptyList()))
+        // Fork: on mobile data a known address is still worth a re-check (a VPN may reach it); with no network, none.
+        assertTrue(c.wantsRecheck(NetKind.Mobile, false, listOf("192.168.1.20"), emptyList()))
+        assertFalse(c.wantsRecheck(NetKind.None, false, listOf("192.168.1.20"), emptyList()))
         // On Wi-Fi with an address to try, yes, every 2 minutes while remote.
         assertTrue(c.wantsRecheck(NetKind.Wifi, false, listOf("192.168.1.20"), emptyList()))
         assertFalse(c.wantsRecheck(NetKind.Wifi, false, emptyList(), emptyList()))
