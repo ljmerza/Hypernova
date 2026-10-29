@@ -54,6 +54,12 @@ export type Settings = {
   nameServiceUrl?: string
   /** Where the name's certificate comes from: "staging", "production" or an ACME directory URL (names.ts); HYPERNOVA_ACME_DIRECTORY wins. */
   acmeDirectory?: string
+  /**
+   * Sessions live in Claude Code's own background daemon (`claude agents`): the phone types into
+   * one through `claude attach` in a shared terminal (the same conversation, never a fork), and a
+   * new session from the phone starts with `claude --bg`, so it shows in `claude agents`. Unset: off.
+   */
+  claudeAgents?: boolean
   /** Settings → Browse outside projects (files.ts): sessions' folders in the home folder open to the phone, read-only. Unset: off. */
   browseOutsideProjects?: boolean
   /**

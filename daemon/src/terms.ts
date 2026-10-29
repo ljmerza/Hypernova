@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import type { WebSocket } from 'ws'
 import { CLAUDE_DIR, HOME, SUPPORT, findClaude, log, randomToken, readJson, trimText, writeText } from './util.ts'
 import { getManaged, getProvider, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
-import { ensureParsed, forgetPaste, getSession, isCodexRec, listSessionRecs, notePaste, upsertSession, view } from './hub.ts'
+import { ensureParsed, forgetPaste, getSession, isCodexRec, listSessionRecs, notePaste, sessionOfAgentJob, upsertSession, view } from './hub.ts'
 import { promptTitle, typedCommand } from './normalize.ts'
 import { trialEnded } from './blockers.ts'
 import { noteTrialEnded } from './account.ts'
@@ -638,6 +638,80 @@ export async function openCodexTerminal(id: string): Promise<string> {
   if (!(await waitForTerm(tid))) throw new CodexError(409, 'terminal_busy', 'The terminal didn’t start. Try again in a moment.')
   link()
   return tid
+}
+
+/**
+ * A `claude agents` session (Claude Code's background daemon, settings.claudeAgents) in a shared
+ * terminal: `claude attach <job>` in a holder, so the phone types into that same conversation
+ * rather than a fork of it. Closing the holder only detaches; the session runs on in the daemon.
+ * Resolves with the holder's id once its screen shows Claude Code's input box; null if it never does.
+ */
+export async function attachAgentsTerm(sessionId: string, cwd: string, job: string, ms = 15_000): Promise<string | null> {
+  const have = termOf(sessionId)
+  if (have && terms.has(have)) return have
+  const file = findClaude()
+  if (!file) throw Object.assign(new Error('Claude Code isn’t installed on this computer.'), { status: 409 })
+  const id = newTermId()
+  spawnHolder({
+    id,
+    cwd,
+    file,
+    args: ['attach', job],
+    env: sessionEnv(process.env, id, {}),
+    cols: 100,
+    rows: 34,
+    origin: 'terminal',
+    sessionId,
+    terminal: { app: settings.terminalApp ?? null },
+    waitForTty: false,
+    autoTrust: false,
+  })
+  log('attached shared terminal', id, 'to claude agents job', job, 'for', sessionId.slice(0, 8))
+  if (!(await waitForTerm(id))) return null
+  link()
+  const t0 = Date.now()
+  while (Date.now() - t0 < ms) {
+    // `claude attach` gave up (a job that's gone): its holder has ended and taken its files.
+    if (!existsSync(metaPath(id))) return null
+    const screen = await screenOf(id)
+    if (screen && boxLines(screen.split('\n'))) return id
+    await sleep(250)
+  }
+  return null
+}
+
+/**
+ * A new session from the phone in Claude Code's background daemon (settings.claudeAgents):
+ * `claude --bg`, so it shows in `claude agents` like one started there. Claude Code picks the
+ * session id itself (--bg passes over --session-id), so it's read from the registry by the job id
+ * --bg prints. Returns the session id.
+ */
+export async function createAgentsSession(o: { cwd: string; model?: string | null; permissionMode?: string; prompt?: string }): Promise<string> {
+  const file = findClaude()
+  if (!file) throw Object.assign(new Error('Claude Code isn’t installed on this computer.'), { status: 409 })
+  const args = ['--bg']
+  if (o.model) args.push('--model', o.model)
+  if (o.permissionMode) args.push('--permission-mode', o.permissionMode)
+  if (o.permissionMode !== 'bypassPermissions' && !bypassBlockedByRoot()) args.push('--allow-dangerously-skip-permissions')
+  if (o.prompt?.trim()) args.push('--', o.prompt)
+  const out = await new Promise<string>((ok) => execFile(file, args, { cwd: o.cwd, timeout: 30_000 }, (_e, so, se) => ok(`${so}\n${se}`)))
+  const job = /backgrounded\s*·\s*([0-9a-f]{8})/.exec(out)?.[1]
+  if (!job) {
+    log('claude --bg started nothing:', trimText(out.trim(), 300))
+    throw Object.assign(new Error('Claude Code didn’t start the session in the background.'), { status: 409 })
+  }
+  let sid: string | null = null
+  const t0 = Date.now()
+  while (!sid && Date.now() - t0 < 15_000) {
+    sid = sessionOfAgentJob(job)
+    if (!sid) await sleep(250)
+  }
+  if (!sid) throw Object.assign(new Error('The background session didn’t start. Look in claude agents.'), { status: 409 })
+  const title = trimText(o.prompt ? promptTitle(o.prompt) : null, 80) ?? 'New session'
+  const r = upsertSession(sid, { cwd: o.cwd, origin: 'terminal', state: 'starting', activity: null, stoppedForAway: false, lastActivityAt: Date.now(), title, model: o.model || null, permissionMode: o.permissionMode ?? 'default', createdAt: Date.now() })
+  ensureParsed(r)
+  log('started claude agents job', job, 'for', sid.slice(0, 8), 'in', o.cwd)
+  return sid
 }
 
 /**

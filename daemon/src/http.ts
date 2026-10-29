@@ -20,9 +20,9 @@ import { nameKick, nameStatus, namedOrigin, releaseName, setNameService, setName
 import { allowGlasses, dropGlasses, glassesEntries, glassesSeen, isGlassesFeed, lensWho, phoneOfGlassesId, removeGlasses, trackGlasses, viaLens } from './glasses.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { recheckSystem, setBuiltInTailscale, setControlUrl, tailnetHints, tailnetNow, tsnetBaseUrl, tsnetLogin, tsnetLogout, tsnetState } from './tsnet.ts'
-import { addClient, answerApproval, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
+import { addClient, agentJobOf, answerApproval, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setMode } from './runner.ts'
-import { answerMenu, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
+import { answerMenu, attachAgentsTerm, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
 import { codexModels, codexSessionUsage, codexState, refreshCodexAccount } from './codex/account.ts'
 import { isCodex, isCodexMode } from './codex/threads.ts'
@@ -679,7 +679,10 @@ async function api(c: Ctx): Promise<void> {
     const opts = { cwd: full, providerId: b.providerId, model: b.model, permissionMode: b.permissionMode, prompt: withAttachments(String(b.prompt ?? ''), files) }
     const inTerminal = await shared()
     if (!inTerminal) await needSdk()
-    const id = inTerminal ? createSharedSession(opts) : createSession(opts)
+    // settings.claudeAgents: in Claude Code's background daemon, so it shows in `claude agents`
+    // (on the subscription only: another provider's environment is the holder's to give).
+    const agents = inTerminal && settings.claudeAgents === true && (b.providerId == null || b.providerId === 'anthropic')
+    const id = agents ? await createAgentsSession(opts) : inTerminal ? createSharedSession(opts) : createSession(opts)
     notePrompt(c.deviceId, c.local, b.via)
     return json(res, 200, { session: listSessions().find((s) => s.id === id) })
   }
@@ -777,7 +780,10 @@ async function api(c: Ctx): Promise<void> {
     const [, id, action] = s
     const rec = getSession(id!)
     if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
-    const tid = termOf(id!)
+    let tid = termOf(id!)
+    // A `claude agents` session gets a shared terminal when one is needed: `claude attach` (terms.ts).
+    const agentsJob = settings.claudeAgents === true && !tid && ['terminal', 'interrupt', 'menu', 'mode'].includes(action!) && isLiveTerminal(id!) ? agentJobOf(id!) : null
+    if (agentsJob) tid = await attachAgentsTerm(id!, rec.cwd, agentsJob)
     const noTerm = () => new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
     const codex = isCodex(id!)
     if (codex && (action === 'provider' || action === 'menu')) throw notForCodex()
@@ -1139,7 +1145,13 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
     upsertSession(id, { stoppedForAway: false })
     return { id, queued: (await promptCodex(id, text, o.clientId)).queued }
   }
-  const tid = termOf(id)
+  let tid = termOf(id)
+  // A `claude agents` session: typed in through `claude attach` (the same conversation), never forked.
+  const job = settings.claudeAgents === true && !tid && isLiveTerminal(id) ? agentJobOf(id) : null
+  if (job) {
+    tid = await attachAgentsTerm(id, rec.cwd, job)
+    if (!tid) throw new HttpError(409, 'terminal_busy', 'The background session didn’t open. Try again in a moment.')
+  }
   if (tid) {
     // Typed into the live terminal, only into Claude Code's empty input box (never a dialog).
     // While Claude works, Claude Code queues it: `queued` says so.

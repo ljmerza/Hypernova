@@ -7,7 +7,7 @@ import { CLAUDE_DIR, log, projectNameOf, projectSlug, trimText, tail } from './u
 import { fallbackTitle, feedLine, flushAbsorbed, isLauncher, newParseState, newToolEvent, queueNow, queueView, squash, type Claim, type Ev, type ParseState, type QueuedPrompt, type ToolEv } from './normalize.ts'
 import { recordReading, rateFor, type Rate } from './usage-rate.ts'
 import { applyLinks, backgroundRunning, endSessionAgents, launchedInBackground } from './agents.ts'
-import { getManaged, isSdk, isSubscription, managedSessions, listDevices } from './store.ts'
+import { getManaged, isSdk, isSubscription, managedSessions, listDevices, settings } from './store.ts'
 import type { TermView } from './terms.ts'
 import { registryBusy, type Menu } from './term/shared.ts'
 import { isHiddenCwd } from './term/hidden.ts'
@@ -1180,6 +1180,23 @@ function replacedProcess(id: string, pid: number | null): boolean {
   return old != null && old === pid
 }
 
+/** `claude agents` sessions (Claude Code's background daemon): session id → the job id `claude attach` takes. */
+const agentJobs = new Map<string, string>()
+export const agentJobOf = (id: string): string | null => agentJobs.get(id) ?? null
+
+/** The session id of `claude agents` job [job], from Claude Code's registry; null until it registers. */
+export function sessionOfAgentJob(job: string): string | null {
+  const dir = join(CLAUDE_DIR, 'sessions')
+  for (const f of safeReaddir(dir)) {
+    if (!f.endsWith('.json')) continue
+    try {
+      const o = JSON.parse(readFileSync(join(dir, f), 'utf8'))
+      if (o?.kind === 'bg' && o.jobId === job && o.sessionId) return o.sessionId
+    } catch {}
+  }
+  return null
+}
+
 /** Live interactive sessions from Claude Code's registry (~/.claude/sessions/<pid>.json). */
 export function pollRegistry(): void {
   const dir = join(CLAUDE_DIR, 'sessions')
@@ -1192,7 +1209,9 @@ export function pollRegistry(): void {
     } catch {
       continue
     }
-    if (!o?.sessionId || !o.pid || o.kind !== 'interactive' || isSdk(o.sessionId)) continue
+    // With settings.claudeAgents, `claude agents` sessions count too (their job id kept for `claude attach`).
+    const agents = settings.claudeAgents === true && o?.kind === 'bg' && typeof o.jobId === 'string'
+    if (!o?.sessionId || !o.pid || (o.kind !== 'interactive' && !agents) || isSdk(o.sessionId)) continue
     // The daemon's own Claude Code (the usage probe), in a folder marked hidden (term/hidden.ts).
     if (isHiddenCwd(o.cwd)) continue
     // Left from before the Mac last booted: its pid is some other process's now, and the
@@ -1206,6 +1225,7 @@ export function pollRegistry(): void {
     // The old claude of a restart, still on its way out: not the session's process any more.
     if (replacedProcess(o.sessionId, o.pid)) continue
     live.add(o.sessionId)
+    if (agents) agentJobs.set(o.sessionId, o.jobId)
     const r = sessions.get(o.sessionId) ?? upsertSession(o.sessionId, { cwd: o.cwd, origin: 'terminal', lastActivityAt: Number(o.statusUpdatedAt ?? o.updatedAt) || Date.now() })
     // Before the first read: whether Claude Code is busy says whether a queue read from the file still holds.
     r.pid = o.pid
