@@ -371,7 +371,9 @@ object RoutePolicy {
      */
     const val SWEEP_CONNECT_MS = 1_500L
 
-    fun shouldProbe(net: NetKind, hotspot: Boolean): Boolean = net == NetKind.Wifi || hotspot
+    // Fork: any network, mobile data included. The phone's own routing (a VPN into the Mac's network)
+    // decides whether a known address answers; the pinned certificate makes trying it safe.
+    fun shouldProbe(net: NetKind, hotspot: Boolean): Boolean = net != NetKind.None || hotspot
 
     /** How long the re-check waits after [tries] periodic tries since the network last changed: 2, 4, 8, 16, then 30 minutes. */
     fun recheckDelayMs(tries: Int): Long =

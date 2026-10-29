@@ -14,13 +14,14 @@ class RouteRecheckTest {
         assertEquals(RoutePolicy.RECHECK_MS, RoutePolicy.recheckDelayMs(-1))
     }
 
-    @Test fun mobileDataAloneIsNeverProbed() {
-        assertFalse(RoutePolicy.shouldProbe(NetKind.Mobile, hotspot = false))
+    @Test fun mobileDataIsProbedNoNetworkIsNot() {
+        assertTrue(RoutePolicy.shouldProbe(NetKind.Mobile, hotspot = false))
         assertFalse(RoutePolicy.shouldProbe(NetKind.None, hotspot = false))
         assertTrue(RoutePolicy.shouldProbe(NetKind.Wifi, hotspot = false))
         assertTrue(RoutePolicy.shouldProbe(NetKind.Mobile, hotspot = true))
         val c = RouteChooser("https://mac.example.ts.net", 47323)
-        assertFalse(c.wantsRecheck(NetKind.Mobile, hotspot = false, known = listOf("192.168.1.20"), hotspotGateways = emptyList()))
+        assertTrue(c.wantsRecheck(NetKind.Mobile, hotspot = false, known = listOf("192.168.1.20"), hotspotGateways = emptyList()))
+        assertFalse(c.wantsRecheck(NetKind.None, hotspot = false, known = listOf("192.168.1.20"), hotspotGateways = emptyList()))
     }
 
     @Test fun aHotspotAppearingStartsTheBackOffOver() {

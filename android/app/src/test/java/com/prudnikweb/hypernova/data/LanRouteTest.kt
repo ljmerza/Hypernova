@@ -67,10 +67,10 @@ class LanRouteTest {
         } catch (_: CertificateException) {}
     }
 
-    @Test fun probesOnWifiOrAHotspotNotOnMobile() {
+    @Test fun probesOnAnyNetworkNotWithoutOne() {
         assertTrue(RoutePolicy.shouldProbe(NetKind.Wifi, hotspot = false))
         assertTrue(RoutePolicy.shouldProbe(NetKind.Mobile, hotspot = true))
-        assertFalse(RoutePolicy.shouldProbe(NetKind.Mobile, hotspot = false))
+        assertTrue(RoutePolicy.shouldProbe(NetKind.Mobile, hotspot = false))
         assertFalse(RoutePolicy.shouldProbe(NetKind.None, hotspot = false))
     }
 
