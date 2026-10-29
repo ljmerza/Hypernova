@@ -644,7 +644,9 @@ export async function openCodexTerminal(id: string): Promise<string> {
  * A `claude agents` session (Claude Code's background daemon, settings.claudeAgents) in a shared
  * terminal: `claude attach <job>` in a holder, so the phone types into that same conversation
  * rather than a fork of it. Closing the holder only detaches; the session runs on in the daemon.
- * Resolves with the holder's id once its screen shows Claude Code's input box; null if it never does.
+ * Resolves with the holder's id once its screen shows Claude Code's input box, or once it shows
+ * anything else (a question, a permission, a menu: Claude waits on the owner, which typing into it
+ * then says rather than "didn't open"); null only if `claude attach` ended or never drew a screen.
  */
 export async function attachAgentsTerm(sessionId: string, cwd: string, job: string, ms = 15_000): Promise<string | null> {
   const have = termOf(sessionId)
@@ -670,14 +672,25 @@ export async function attachAgentsTerm(sessionId: string, cwd: string, job: stri
   if (!(await waitForTerm(id))) return null
   link()
   const t0 = Date.now()
+  let drawn = false
   while (Date.now() - t0 < ms) {
     // `claude attach` gave up (a job that's gone): its holder has ended and taken its files.
     if (!existsSync(metaPath(id))) return null
     const screen = await screenOf(id)
     if (screen && boxLines(screen.split('\n'))) return id
+    drawn ||= !!screen?.trim()
+    // Claude Code's registry says it waits on the owner: no input box is coming.
+    if (drawn && registryWaiting(getSession(sessionId)?.pid)) return id
     await sleep(250)
   }
+  if (drawn && existsSync(metaPath(id))) return id
   return null
+}
+
+/** Claude Code's registry says session process [pid] waits on the owner (a question, a permission). */
+function registryWaiting(pid: number | null | undefined): boolean {
+  if (!pid) return false
+  return readJson<{ status?: string } | null>(join(CLAUDE_DIR, 'sessions', `${pid}.json`), null)?.status === 'waiting'
 }
 
 /**

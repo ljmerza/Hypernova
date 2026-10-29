@@ -9,6 +9,7 @@ import { refreshHooks, refreshShell } from './hooks.ts'
 import { startAccount } from './account.ts'
 import { reapAttachments } from './attachments.ts'
 import { pollAgents } from './agents.ts'
+import { pollClaudeAgents } from './claude-agents.ts'
 import { reapShots } from './shots.ts'
 import { cleanSpeechTemp } from './speech.ts'
 import { startStats } from './stats.ts'
@@ -42,6 +43,7 @@ discover()
 restoreCodex()
 scanTerms()
 pollRegistry()
+pollClaudeAgents()
 pollStatusLine()
 startServers()
 // Codex's shared app-server, only when the owner uses Codex (codex/client.ts).
@@ -68,6 +70,7 @@ void startAutomations()
 setInterval(pollRegistry, 2000)
 setInterval(pollTranscripts, 700)
 setInterval(pollAgents, 2000)
+setInterval(pollClaudeAgents, 5000) // settings.claudeAgents: the whole `claude agents` list, finished jobs too
 setInterval(pollStatusLine, 3000)
 setInterval(tickUsage, 3000) // a window that resets with nothing running is announced then
 setInterval(tickCodex, 3000) // and Codex's

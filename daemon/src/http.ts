@@ -1146,9 +1146,11 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
     return { id, queued: (await promptCodex(id, text, o.clientId)).queued }
   }
   let tid = termOf(id)
-  // A `claude agents` session: typed in through `claude attach` (the same conversation), never forked.
-  const job = settings.claudeAgents === true && !tid && isLiveTerminal(id) ? agentJobOf(id) : null
+  // A `claude agents` session: typed in through `claude attach` (the same conversation), never
+  // forked; a stopped or finished job too (attach wakes it, as answering it in `claude agents` does).
+  const job = settings.claudeAgents === true && !tid ? agentJobOf(id) : null
   if (job) {
+    if (pendingApprovals().some((a) => a.sessionId === id)) throw new HttpError(409, 'needs_answer', 'Claude is waiting for your answer above. Answer it first.')
     tid = await attachAgentsTerm(id, rec.cwd, job)
     if (!tid) throw new HttpError(409, 'terminal_busy', 'The background session didn’t open. Try again in a moment.')
   }

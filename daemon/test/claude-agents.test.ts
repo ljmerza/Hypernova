@@ -35,6 +35,7 @@ case "$1" in
   attach)
     echo "$2" > "$S/attached"
     if [ "$2" = "gone0000" ]; then echo "No background session $2" >&2; exit 1; fi
+    if [ "$2" = "ask00000" ]; then printf '\\n Do you want to proceed?\\n ❯ 1. Yes\\n   2. No\\n'; exec sleep 30; fi
     printf '\\n────────────────────\\n❯ \\n────────────────────\\n'
     exec sleep 30
     ;;
@@ -48,6 +49,7 @@ process.env.CLAUDE_BIN = fake
 const hub = await import('../src/hub.ts')
 const { settings } = await import('../src/store.ts')
 const { attachAgentsTerm, createAgentsSession, scanTerms, termOf } = await import('../src/terms.ts')
+const { parseAgentList } = await import('../src/claude-agents.ts')
 const { promptSession } = await import('../src/http.ts')
 
 const procs: ChildProcess[] = []
@@ -67,10 +69,10 @@ after(() => {
 })
 
 /** A `claude agents` job for session [id], registered as Claude Code registers a background one. */
-function job(id: string, jobId: string): number {
+function job(id: string, jobId: string, status = 'idle'): number {
   const p = spawn('sleep', ['30'], { stdio: 'ignore' })
   procs.push(p)
-  writeFileSync(join(registry, `${p.pid}.json`), JSON.stringify({ pid: p.pid, sessionId: id, cwd: scratch, kind: 'bg', jobId, status: 'idle', updatedAt: Date.now() }))
+  writeFileSync(join(registry, `${p.pid}.json`), JSON.stringify({ pid: p.pid, sessionId: id, cwd: scratch, kind: 'bg', jobId, status, updatedAt: Date.now() }))
   return p.pid!
 }
 
@@ -131,4 +133,66 @@ test('createAgentsSession: `claude --bg` with the phone’s choices, the session
   assert.match(args, /-- Tidy the README$/)
   assert.equal(hub.getSession(sid)?.title, 'Tidy the README')
   assert.equal(hub.getSession(sid)?.cwd, scratch)
+})
+
+test('attachAgentsTerm: Claude asking something (no input box) is still an open terminal, so typing says why', async () => {
+  settings.claudeAgents = true
+  job('agents-ask-1', 'ask00000', 'waiting')
+  hub.pollRegistry()
+  const t0 = Date.now()
+  const tid = await attachAgentsTerm('agents-ask-1', scratch, 'ask00000')
+  assert.ok(tid, 'the holder, not null ("didn’t open")')
+  assert.ok(Date.now() - t0 < 8000, `waited ${Date.now() - t0} ms for a box that isn’t coming`)
+})
+
+test('attachAgentsTerm: a screen with no box and no word from the registry is kept once the wait is over', async () => {
+  settings.claudeAgents = true
+  const tid = await attachAgentsTerm('agents-ask-2', scratch, 'ask00000', 1500)
+  assert.ok(tid)
+})
+
+test('parseAgentList: the background jobs of claude agents --json --all, nothing else', () => {
+  const out = JSON.stringify([
+    { id: 'dddd0001', cwd: '/w', kind: 'background', sessionId: 'agents-list-1', name: 'One', state: 'done' },
+    { cwd: '/w', kind: 'interactive', sessionId: 'not-a-job', status: 'idle' },
+    { id: 'dddd0002', kind: 'background', sessionId: 'no-cwd' },
+  ])
+  assert.deepEqual(parseAgentList(out)?.map((j) => j.id), ['dddd0001'])
+  assert.equal(parseAgentList('not json'), null)
+  assert.equal(parseAgentList('{}'), null)
+})
+
+test('applyAgentList: every job is a session, finished and stopped ones too, with its job id; a job gone from the list ends', () => {
+  settings.claudeAgents = true
+  hub.applyAgentList([
+    { id: 'eeee0001', sessionId: 'agents-done-1', cwd: scratch, name: 'Finished one', state: 'done', startedAt: 1000 },
+    { id: 'eeee0002', sessionId: 'agents-blocked-1', cwd: scratch, name: 'Stopped on a question', state: 'blocked', startedAt: 1000 },
+  ])
+  const done = hub.getSession('agents-done-1')
+  assert.equal(done?.state, 'idle', 'on Home (done), not History (ended)')
+  assert.equal(done?.title, 'Finished one')
+  assert.equal(hub.agentJobOf('agents-done-1'), 'eeee0001')
+  assert.equal(hub.getSession('agents-blocked-1')?.state, 'needs_you')
+  hub.applyAgentList([{ id: 'eeee0002', sessionId: 'agents-blocked-1', cwd: scratch, state: 'blocked' }])
+  assert.equal(hub.getSession('agents-done-1')?.state, 'ended')
+  assert.equal(hub.agentJobOf('agents-done-1'), null)
+})
+
+test('a running job claude agents shows as blocked waits on the owner, though the registry says idle', () => {
+  settings.claudeAgents = true
+  job('agents-blocked-2', 'eeee0003', 'idle')
+  hub.applyAgentList([{ id: 'eeee0003', sessionId: 'agents-blocked-2', cwd: scratch, state: 'blocked' }])
+  hub.pollRegistry()
+  assert.equal(hub.getSession('agents-blocked-2')?.state, 'needs_you')
+})
+
+test('promptSession: a finished job (no process) is typed into through claude attach, never resumed as a copy', async () => {
+  settings.claudeAgents = true
+  hub.applyAgentList([{ id: 'ffff0001', sessionId: 'agents-wake-1', cwd: scratch, state: 'done' }])
+  const before = hub.listSessions().length
+  // The stand-in's box never empties on Enter, so the send itself comes back "not sent": what
+  // counts here is where it went.
+  await promptSession('agents-wake-1', 'and one more thing').catch((e) => assert.ok(['not_sent', 'not_seen'].includes(e.code), e.message))
+  assert.equal(readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'attached'), 'utf8').trim(), 'ffff0001')
+  assert.equal(hub.listSessions().length, before, 'no fork, no resume')
 })

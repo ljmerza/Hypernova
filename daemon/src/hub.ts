@@ -1197,6 +1197,52 @@ export function sessionOfAgentJob(job: string): string | null {
   return null
 }
 
+/** A `claude agents` job as `claude agents --json --all` lists it (claude-agents.ts). */
+export type AgentJob = { id: string; sessionId: string; cwd: string; name?: string | null; state?: string | null; startedAt?: number | null }
+
+/** Each listed job's state there ("working", "blocked", "done"), by session id: the list `claude agents` shows. */
+const agentStates = new Map<string, string>()
+/** `claude agents` shows the job as blocked: it waits on the owner, whatever its process says. */
+const agentBlocked = (id: string) => agentStates.get(id) === 'blocked'
+
+/**
+ * The whole `claude agents` list (settings.claudeAgents): every job is a session here, whether or
+ * not its process still runs, so a finished one stays on Home (at the bottom, done) rather than
+ * going to History, and one stopped on a question stays at the top. Each keeps its job id, so typing
+ * into it goes through `claude attach` (the same conversation, which wakes a stopped job) rather
+ * than a `--resume` copy. A job no longer listed (deleted there) ends here once its process is gone.
+ */
+export function applyAgentList(list: AgentJob[]): void {
+  const seen = new Set<string>()
+  for (const j of list) {
+    if (!j?.id || !j.sessionId || !j.cwd || isSdk(j.sessionId) || isHiddenCwd(j.cwd)) continue
+    seen.add(j.sessionId)
+    agentJobs.set(j.sessionId, j.id)
+    agentStates.set(j.sessionId, String(j.state ?? ''))
+    let r = sessions.get(j.sessionId)
+    if (!r) {
+      // Older than History reaches back (discover): last active when its transcript was last written.
+      let mtime = 0
+      try {
+        mtime = statSync(transcriptPathFor(j.cwd, j.sessionId)).mtimeMs
+      } catch {}
+      r = upsertSession(j.sessionId, { cwd: j.cwd, origin: 'terminal', state: 'ended', lastActivityAt: mtime || Number(j.startedAt) || Date.now(), createdAt: Number(j.startedAt) || Date.now() })
+    }
+    if (j.name && r.title === 'New session') upsertSession(r.id, { title: trimText(j.name, 80) ?? r.title })
+    // Its process runs: the registry has its state (pollRegistry). Stopped: the list's.
+    if (r.pid) continue
+    const state: SessionState = j.state === 'blocked' ? 'needs_you' : j.state === 'working' ? 'starting' : 'idle'
+    if (r.state !== state) upsertSession(r.id, { state, activity: null })
+  }
+  for (const [id] of agentJobs) {
+    if (seen.has(id)) continue
+    agentJobs.delete(id)
+    agentStates.delete(id)
+    const r = sessions.get(id)
+    if (r && !r.pid && r.state !== 'ended') upsertSession(id, { state: 'ended', activity: null })
+  }
+}
+
 /** Live interactive sessions from Claude Code's registry (~/.claude/sessions/<pid>.json). */
 export function pollRegistry(): void {
   const dir = join(CLAUDE_DIR, 'sessions')
@@ -1234,7 +1280,8 @@ export function pollRegistry(): void {
     // Claude Code stays busy while agents run in the background after the main turn's Stop: the
     // main agent is idle then, and the session says so (its agents say they're at work).
     const busy = o.status === 'busy' && !(mainIdle.has(r.id) && backgroundRunning(r.id))
-    const state: SessionState = hasPending ? 'needs_you' : busy ? 'working' : o.status === 'waiting' ? 'needs_you' : 'idle'
+    // A `claude agents` job blocked on the owner can sit idle in the registry: its list says it waits.
+    const state: SessionState = hasPending ? 'needs_you' : busy ? 'working' : o.status === 'waiting' || (agents && agentBlocked(o.sessionId)) ? 'needs_you' : 'idle'
     const patch: Partial<Rec> = { pid: o.pid }
     // Claude Code stamps status changes; use that rather than "now" (a daemon restart isn't activity).
     const at = Number(o.statusUpdatedAt ?? o.updatedAt) || r.lastActivityAt
