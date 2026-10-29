@@ -53,20 +53,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Android App Links: the Mac shows a QR code of https://hypernova.observer/pair#v=1&u=…&c=…
-                 (the details after the #, never sent to the site), and /glasses opens Settings → Glasses.
-                 Android opens them here once it has verified the domain's assetlinks.json
-                 (names/src/links.ts); before that, or without the app, the site's page hands over with
-                 an intent:// link to hypernova://. -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" />
-                <data android:host="hypernova.observer" />
-                <data android:path="/pair" />
-                <data android:path="/glasses" />
-            </intent-filter>
+            <!-- Fork: no https://hypernova.observer App Link. Its autoVerify makes Android fetch the
+                 site's assetlinks.json at install, and that file names upstream's signing key, not
+                 this fork's; pairing uses hypernova://pair (HYPERNOVA_PAIR_APPLINK=1 on the daemon). -->
+
             <!-- The app link with the same parameters, hypernova://pair?v=1&u=…&c=…&n=…: the pages' hand-over, Paste link, adb. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

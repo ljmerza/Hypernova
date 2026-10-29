@@ -388,7 +388,9 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
   // The daemon's link for the QR code: https://hypernova.observer/pair with the app link's details
   // (the local addresses, the certificate's fingerprint, the tailnet hints) after its `#`, which the
   // phone opens in the app whatever the way in (docs/PROTOCOL.md, "Pairing").
-  const link = p.link
+  // Fork: HYPERNOVA_PAIR_APPLINK=1 puts the app's own hypernova://pair link in the QR code and the
+  // text, so pairing never opens hypernova.observer in a browser (local-only setups).
+  const link = process.env.HYPERNOVA_PAIR_APPLINK === '1' ? p.appLink : p.link
   const lan = /[?&]lan=([^&]+)/.exec(p.appLink)?.[1]
   cli.sys.say()
   // WSL on a Windows PC (cli/wsl.ts): behind its NAT the Wi-Fi is no way in, so Tailscale is the only one.
