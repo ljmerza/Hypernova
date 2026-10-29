@@ -39,8 +39,13 @@ RUN apt-get update \
       build-essential python3 procps lsof less nano tini \
  && rm -rf /var/lib/apt/lists/*
 
-# Claude Code and the daemon belong to a normal user, never root.
-RUN useradd --create-home --shell /bin/bash hypernova \
+# Claude Code and the daemon belong to a normal user, never root. UID/GID match the host user who
+# owns the bind-mounted folders (1000 by default, which ubuntu:24.04's own `ubuntu` user holds).
+ARG UID=1000
+ARG GID=1000
+RUN (userdel -r ubuntu 2>/dev/null || true) \
+ && groupadd --gid "$GID" hypernova \
+ && useradd --create-home --shell /bin/bash --uid "$UID" --gid "$GID" hypernova \
  && mkdir -p /opt/hypernova/bin && chown -R hypernova:hypernova /opt/hypernova
 USER hypernova
 WORKDIR /home/hypernova
