@@ -723,7 +723,17 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                         )
                     }
                 }
-                // Fork: no "Started in a terminal…" note over the box; the room goes to the chat.
+                // A shared terminal needs no note (what you send is typed there); a terminal session
+                // that isn't shared forks when you write, which is worth saying.
+                val note = when {
+                    session.term != null -> null
+                    session.origin == "terminal" && session.phase != Phase.Ended -> R.string.terminal_session_note
+                    else -> null
+                }
+                if (note != null) {
+                    Spacer(Modifier.height(8.dp))
+                    HText(stringResource(note), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 6.dp))
+                }
                 Spacer(Modifier.height(10.dp))
                 // "/" opens the commands and skills Claude Code has in this project.
                 // (Claude Code's: a Codex session has none of them.)
