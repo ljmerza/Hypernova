@@ -444,8 +444,9 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
             }
         }
 
-        BlurredTop(haze, sourceKey, Modifier.fillMaxWidth().onSizeChanged { topPx = it.height }) {
-            Column(Modifier.fillMaxWidth().padding(top = top + 4.dp, start = 8.dp, end = 12.dp, bottom = 30.dp)) {
+        // Fork: a shorter header (less padding and fade under it) leaves more of the chat in view.
+        BlurredTop(haze, sourceKey, Modifier.fillMaxWidth().onSizeChanged { topPx = it.height }, fade = 16.dp) {
+            Column(Modifier.fillMaxWidth().padding(top = top + 4.dp, start = 8.dp, end = 12.dp, bottom = 14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     GlyphButton(Glyph.Back, stringResource(R.string.back), onBack)
                     Spacer(Modifier.width(8.dp))
@@ -468,8 +469,20 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                         GlyphButton(Glyph.Folder, stringResource(R.string.files), { opener.files(cwd, session.project) }, color = if (session.browsable) HN.ink else HN.inkDim)
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(6.dp))
                 val canMode = canChange(hub, session)
+                // Fork: a tap on the mode tag steps Ask → Plan → Auto (ModeCycle.kt); Auto still opens
+                // the think-twice card first, and the full picker stays a tap on the rest of the line.
+                val cycleTo = if (canMode) com.prudnikweb.hypernova.ui.components.ModeCycle.next(session.mode, session.codex) else null
+                val cycleLabel = cycleTo?.let { stringResource(R.string.mode_cycle, com.prudnikweb.hypernova.ui.home.modeLabel(it)) }
+                val cycleNextTurn = cycleTo?.let { stringResource(R.string.mode_next_turn, com.prudnikweb.hypernova.ui.home.modeTitle(it)) }
+                val cycleMode = com.prudnikweb.hypernova.ui.components.rememberModeCycle { m ->
+                    appScope.launch {
+                        hub.setMode(sessionId, m)
+                            .onSuccess { nextTurn -> if (nextTurn) toast(if (session.codex) codexNextTurn else cycleNextTurn.orEmpty()) }
+                            .onFailure { toast(it.message.orEmpty()) }
+                    }
+                }
                 // While Claude works: what it's doing ("Bash: npm run build" → BASH), and for how long.
                 var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
                 LaunchedEffect(working) {
@@ -504,17 +517,24 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                     after = if (working && !statusBar.visible) elapsedText(now - workingSince) else null,
                     // "Thinking" is the daemon's word for Claude between tools: the label breathes.
                     thinking = !statusBar.visible && working && sending.not() && session.phase == Phase.Working && session.activity.substringBefore(':') == "Thinking",
-                    // Its agents and queued prompts in words, then the model as a chip and the
-                    // permission mode as its glyph and words (not "2 agents · opus · ask first").
+                    // Its agents and queued prompts in words, the permission mode as its glyph and
+                    // words (not "2 agents · ask first"), then (fork) the usage strip in the rest of the
+                    // row: one line instead of two, and the strip's chip is the only model shown.
                     trailContent = {
-                        StatusTrail(
-                            listOfNotNull(
-                                if (agentsOnly) stringResource(R.string.agents_running, session.agentsRunning)
-                                else session.agentsRunning.takeIf { it > 0 && session.phase != Phase.Ended }?.let { pluralStringResource(R.plurals.agents_count, it, it) },
-                                session.queued.takeIf { it > 0 }?.let { stringResource(R.string.queued, it) },
-                            ),
-                            session.model, session.mode,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusTrail(
+                                listOfNotNull(
+                                    if (agentsOnly) stringResource(R.string.agents_running, session.agentsRunning)
+                                    else session.agentsRunning.takeIf { it > 0 && session.phase != Phase.Ended }?.let { pluralStringResource(R.plurals.agents_count, it, it) },
+                                    session.queued.takeIf { it > 0 }?.let { stringResource(R.string.queued, it) },
+                                ),
+                                session.mode,
+                                onCycle = cycleTo?.let { next -> { cycleMode(next) } },
+                                cycleLabel = cycleLabel,
+                            )
+                            // The session's usage: context, cost, tokens, the 5-hour window (UsageStrip.kt).
+                            ChatUsage(hub, session, tailKey, working, onCompact = { quickSend("/compact") }, Modifier.weight(1f).padding(start = 10.dp))
+                        }
                     },
                     activity = when {
                         !linked -> Activity.Rest
@@ -589,13 +609,11 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                         }
                     }
                 }
-                // The session's usage: context, cost, tokens, the 5-hour window (UsageStrip.kt).
-                ChatUsage(hub, session, tailKey, working, onCompact = { quickSend("/compact") }, Modifier.padding(start = 12.dp, top = 10.dp))
                 // What changed: git's summary ("3 files +91 −8 ›") where there is one, else the files
                 // this session wrote as chips (one row, not both, on a small phone).
-                com.prudnikweb.hypernova.ui.changes.ChangesEntry(hub, session, Modifier.padding(start = 12.dp, top = 10.dp)) {
+                com.prudnikweb.hypernova.ui.changes.ChangesEntry(hub, session, Modifier.padding(start = 12.dp, top = 6.dp)) {
                     if (changed.isNotEmpty() && openFile != null && session.browsable) {
-                        FilesChanged(changed, openFile, Modifier.padding(start = 12.dp, top = 10.dp))
+                        FilesChanged(changed, openFile, Modifier.padding(start = 12.dp, top = 6.dp))
                     }
                 }
             }
@@ -689,17 +707,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                         )
                     }
                 }
-                // A shared terminal needs no note (what you send is typed there); a terminal session
-                // that isn't shared forks when you write, which is worth saying.
-                val note = when {
-                    session.term != null -> null
-                    session.origin == "terminal" && session.phase != Phase.Ended -> R.string.terminal_session_note
-                    else -> null
-                }
-                if (note != null) {
-                    Spacer(Modifier.height(8.dp))
-                    HText(stringResource(note), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 6.dp))
-                }
+                // Fork: no "Started in a terminal…" note over the box; the room goes to the chat.
                 Spacer(Modifier.height(10.dp))
                 // "/" opens the commands and skills Claude Code has in this project.
                 // (Claude Code's: a Codex session has none of them.)
@@ -721,11 +729,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                 ) {
                     AttachTray(pickers, Modifier.padding(start = 4.dp, bottom = 10.dp), onPicked = { tray = false })
                 }
-                // Quick prompts as chips, only over an empty box while Claude isn't at work (QuickPrompts.kt).
-                // Not while the session works by the one rule (Claude, or any of its agents), as the
-                // status bar above says it does, and not while the Mac is away.
-                val busyHere = working || session.busy
-                ChatQuickPrompts(linked && draft.isEmpty() && attach.files.isEmpty() && !busyHere && session.state != SessionState.NeedsYou && block == null && cmdQuery == null && !tray, quickSend)
+                // Fork: no quick-prompt chips over the box (fixed defaults, rarely the reply wanted).
                 // Voice: a one-line note (why it stopped, a tip, the microphone), and the capsule
                 // while listening, both added above the box so it never moves under the finger.
                 VoiceHintHost(voice.hint, voice::dismissHint, onAllow = { askAgain(voice) }, onSettings = { openAppSettings(context) })
@@ -1485,23 +1489,25 @@ private fun TerminalTextCard(pending: String, onReplace: () -> Unit, onOpen: () 
 }
 
 /**
- * The status line's trail: [counts] in words (agents, queued prompts), then the model as a chip and
- * the permission mode as its glyph and words. Short of room the mode keeps its glyph, the chip goes,
- * then the counts. TalkBack hears one sentence.
+ * The status line's trail: [counts] in words (agents, queued prompts), then the permission mode as
+ * its glyph and words. Short of room the mode keeps its glyph, then the counts go. TalkBack hears
+ * one sentence. Fork: no model chip here (the usage strip beside it names the model), and the mode
+ * tag steps to the next mode on a tap when [onCycle] is given (ModeCycle.kt).
  */
 @Composable
-private fun StatusTrail(counts: List<String>, model: String, mode: String) {
+private fun StatusTrail(counts: List<String>, mode: String, onCycle: (() -> Unit)? = null, cycleLabel: String? = null) {
     val res = LocalContext.current.resources
     val words = com.prudnikweb.hypernova.ui.home.modeLabel(mode)
-    val name = com.prudnikweb.hypernova.data.ModelNames.chip(model)
-    val said = (counts.map { "$it." } + com.prudnikweb.hypernova.ui.components.modelModeSaid(res, name, words)).joinToString(" ")
+    val said = (counts.map { "$it." } + res.getString(R.string.meta_mode_said, words)).joinToString(" ")
     val countStyle = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.5f)
     val parts: List<List<@Composable () -> Unit>> = counts.map { c -> listOf<@Composable () -> Unit> { HText(c, style = countStyle, color = HN.inkDim, maxLines = 1) } } + listOf(
-        listOf { com.prudnikweb.hypernova.ui.components.ModelChip(name) },
-        listOf({ com.prudnikweb.hypernova.ui.components.ModeTag(mode, words) }, { com.prudnikweb.hypernova.ui.components.ModeTag(mode, null) }),
+        listOf(
+            { com.prudnikweb.hypernova.ui.components.ModeCycleTag(mode, words, onCycle, cycleLabel) },
+            { com.prudnikweb.hypernova.ui.components.ModeCycleTag(mode, null, onCycle, cycleLabel) },
+        ),
     )
     val n = counts.size
-    // The mode's words, the chip, the queued and agents counts (last first), then the mode's glyph.
-    val giveWay = intArrayOf(n + 1, n) + (n - 1 downTo 0).toList().toIntArray() + intArrayOf(n + 1)
+    // The mode's words, the queued and agents counts (last first), then the mode's glyph.
+    val giveWay = intArrayOf(n) + (n - 1 downTo 0).toList().toIntArray() + intArrayOf(n)
     com.prudnikweb.hypernova.ui.components.FitRow(parts, giveWay, Modifier.clearAndSetSemantics { contentDescription = said })
 }
