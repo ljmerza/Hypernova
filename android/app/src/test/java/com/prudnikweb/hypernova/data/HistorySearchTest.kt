@@ -46,6 +46,44 @@ class HistorySearchTest {
         assertEquals(2, HistorySearch.projects(ended, max = 2).size)
     }
 
+    private fun hits(vararg ids: String, partial: Boolean = false) = TextHits(ids.map { TextHit(it, "…", emptyList(), true, 1) }, partial)
+
+    @Test fun fullTextFromThreeCharacters() {
+        assertTrue(!HistorySearch.wantsFullText(" pi "))
+        assertTrue(HistorySearch.wantsFullText("pia"))
+    }
+
+    @Test fun theMacsHitsJoinTheLocalOnesOnceMostRecentFirst() {
+        val local = HistorySearch.find(ended, "widget")
+        // A hit on one found already counts once; one on a session History doesn't list is left out.
+        val merged = HistorySearch.merge(ended, local, hits("Weather in Lisbon", "Fix the widget crash", "on home"))
+        assertEquals(listOf("Fix the widget crash", "Weather in Lisbon"), merged.map { it.name })
+        // Narrowed to a project, the Mac's hits are too.
+        assertEquals(listOf("agent cards"), HistorySearch.merge(ended, emptyList(), hits("agent cards", "Weather in Lisbon"), "hypernova").map { it.name })
+        // No answer (an older Mac, offline): the phone's own finds as they were.
+        assertEquals(local, HistorySearch.merge(ended, local, null))
+    }
+
+    @Test fun marksStayInsideTheSnippetInOrder() {
+        val snippet = "the PIA port"
+        assertEquals(listOf(4 until 7, 8 until 12), HistorySearch.marks(snippet, listOf(8 to 12, 4 to 7)))
+        // Out of range is cut to the snippet, empty and overlapping ones dropped.
+        assertEquals(listOf(8 until 12), HistorySearch.marks(snippet, listOf(8 to 40, 9 to 11, 5 to 5, -3 to 0)))
+    }
+
+    @Test fun readsTheMacsAnswer() {
+        val o = org.json.JSONObject(
+            """{"results":[{"id":"a1","snippet":"…we fixed the PIA port…","marks":[{"start":14,"end":17},{"start":18,"end":22}],"role":"assistant","matches":5},{"snippet":"no id"}],"partial":true}""",
+        )
+        val r = HistorySearch.wire(o)
+        assertTrue(r.partial)
+        assertEquals(1, r.hits.size)
+        val h = r.of("a1")!!
+        assertEquals(listOf("PIA", "port"), h.marks.map { h.snippet.substring(it.first, it.last + 1) })
+        assertTrue(h.fromClaude)
+        assertEquals(5, h.matches)
+    }
+
     @Test fun daysReadAsTodayYesterdayOrTheDate() {
         val today = LocalDate.of(2026, 10, 18)
         assertEquals("Today", HistorySearch.label(today, today, "Today", "Yesterday", Locale.UK))

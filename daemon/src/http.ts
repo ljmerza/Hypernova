@@ -47,6 +47,7 @@ import { checkProvider, type ProviderCheck } from './providers-check.ts'
 import { listModels } from './models.ts'
 import { sessionUsage } from './session-usage.ts'
 import { todosOf } from './todos.ts'
+import { searchHistory } from './search.ts'
 import { RewindError, rewindTo } from './rewind.ts'
 import { SdkMissingError, claudeSdk, sdkState } from './sdk.ts'
 import { AutomationError, FIRE_BODY_MAX, automations, useSessionOps } from './automations.ts'
@@ -362,6 +363,9 @@ function baseUrlOf(req: IncomingMessage): string {
 
 const QA_KEY = sha256('qa:' + adminToken).slice(0, 32)
 
+/** Each asker's latest History search: an older one still running stops (GET /v1/history/search). */
+const searchSeq = new Map<string, number>()
+
 // ── The phone API (also usable locally with the admin token) ────────────
 async function api(c: Ctx): Promise<void> {
   const { req, res, url } = c
@@ -521,6 +525,18 @@ async function api(c: Ctx): Promise<void> {
     const range = parseRange(url.searchParams.get('range') ?? 'week')
     if (!range) throw new HttpError(400, 'bad_range', 'Ask for today, week, month or all.')
     return json(res, 200, await getStats(range))
+  }
+  if (path === '/v1/history/search' && m === 'GET') {
+    // Full-text search for History (search.ts): the words inside the conversations.
+    const q = url.searchParams.get('q') ?? ''
+    if (q.trim().length < 2 || q.length > 200) throw new HttpError(400, 'bad_query', 'Ask for 2 to 200 characters.')
+    // A newer search from the same phone (the next keystroke) ends this one, as does the phone hanging up.
+    const asker = c.deviceId ?? 'mac'
+    const mine = (searchSeq.get(asker) ?? 0) + 1
+    searchSeq.set(asker, mine)
+    let gone = false
+    res.once('close', () => (gone = true))
+    return json(res, 200, await searchHistory(q, () => gone || searchSeq.get(asker) !== mine))
   }
   if (path === '/v1/projects' && m === 'GET') return json(res, 200, { projects: listProjects(), root: settings.projectsRoot })
   if (path === '/v1/projects' && m === 'POST') {
