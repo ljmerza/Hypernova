@@ -872,4 +872,11 @@
         <item quantity="one">%d agent at work.</item>
         <item quantity="other">%d agents at work.</item>
     </plurals>
+    <!-- Fork: a ```mermaid block drawn as a diagram in the chat (ui/components/Mermaid.kt). -->
+    <string name="mermaid_diagram">Diagram</string>
+    <string name="mermaid_open">Open full screen</string>
+    <string name="mermaid_tap_expand">Tap to expand</string>
+    <string name="mermaid_show_code">Show the code</string>
+    <string name="mermaid_show_diagram">Show the diagram</string>
+    <string name="mermaid_close">Close</string>
 </resources>

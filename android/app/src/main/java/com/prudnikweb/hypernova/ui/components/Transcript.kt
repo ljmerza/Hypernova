@@ -484,16 +484,22 @@ fun markdownLite(src: String): AnnotatedString = buildAnnotatedString {
     }
 }
 
-private sealed interface Block {
+internal sealed interface Block {
     data class Para(val text: String) : Block
     data class Heading(val text: String, val level: Int) : Block
     data class Bullet(val text: String, val mark: String, val indent: Int) : Block
     data class Code(val text: String) : Block
+    /** A ```mermaid block whose closing fence has arrived: drawn as a diagram (Mermaid.kt). */
+    data class Mermaid(val source: String) : Block
     data class Table(val table: MarkdownTable) : Block
     data object Rule : Block
 }
 
-private fun blocks(src: String, streaming: Boolean = false): List<Block> {
+/** A fence's language, the first word after its backticks ("```Mermaid title" is "mermaid"); null for none. */
+internal fun fenceLanguage(line: String): String? =
+    line.trimStart().trimStart('`').trim().substringBefore(' ').lowercase(Locale.ROOT).takeIf { it.isNotEmpty() }
+
+internal fun blocks(src: String, streaming: Boolean = false): List<Block> {
     val out = ArrayList<Block>()
     val para = StringBuilder()
     fun flush() { if (para.isNotBlank()) out += Block.Para(para.toString().trim()); para.clear() }
@@ -508,10 +514,13 @@ private fun blocks(src: String, streaming: Boolean = false): List<Block> {
         when {
             t.startsWith("```") -> {
                 flush()
+                val lang = fenceLanguage(t)
                 val code = StringBuilder()
                 i++
                 while (i < lines.size && !lines[i].trimStart().startsWith("```")) { code.appendLine(lines[i]); i++ }
-                out += Block.Code(code.toString().trimEnd())
+                // A diagram only once its closing fence is in: until then it's still being written.
+                val closed = i < lines.size
+                out += if (lang == "mermaid" && closed && code.isNotBlank()) Block.Mermaid(code.toString().trimEnd()) else Block.Code(code.toString().trimEnd())
             }
             // It may follow a sentence with no blank line between. One only just begun ("|")
             // draws nothing yet.
@@ -568,21 +577,28 @@ fun Markdown(text: String, modifier: Modifier = Modifier, color: Color = HN.inkM
                     HText(b.mark, style = Type.body, color = HN.accentDim, modifier = Modifier.width(if (b.mark.length > 1) 24.dp else 16.dp))
                     HText(markdownLite(b.text), style = Type.body, color = color, modifier = Modifier.weight(1f))
                 }
-                is Block.Code -> Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(HN.bg950.copy(alpha = 0.86f))
-                        .border(1.dp, HN.line, RoundedCornerShape(10.dp))
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                ) {
-                    HText(b.text, style = Type.monoSmall, color = HN.inkMuted, overflow = TextOverflow.Clip)
-                }
+                is Block.Code -> CodeBlock(b.text)
+                is Block.Mermaid -> MermaidBlock(b.source)
                 is Block.Table -> MdTable(b.table, color)
                 Block.Rule -> MdRule()
             }
         }
+    }
+}
+
+/** A fenced code block: mono on the terminal's dark, scrolling sideways. [endPad] leaves room for a control over its corner. */
+@Composable
+internal fun CodeBlock(text: String, modifier: Modifier = Modifier, endPad: androidx.compose.ui.unit.Dp = 12.dp) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(HN.bg950.copy(alpha = 0.86f))
+            .border(1.dp, HN.line, RoundedCornerShape(10.dp))
+            .horizontalScroll(rememberScrollState())
+            .padding(start = 12.dp, end = endPad, top = 10.dp, bottom = 10.dp),
+    ) {
+        HText(text, style = Type.monoSmall, color = HN.inkMuted, overflow = TextOverflow.Clip)
     }
 }
 

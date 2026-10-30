@@ -1605,3 +1605,25 @@ run and which mode the session is in; the usage card stays, and a tap on it open
    tap the session's status line" (2026-10-14).
 3. **Nothing new from the Mac**: the sheet shows what the session already carries. The phone knows no
    allow rules, so the sheet shows none.
+
+## Mermaid diagrams in the chat (2026-10-30)
+
+The owner: "Add mermaid diagram render support in the chat." He chose to bundle mermaid.js in the
+APK and draw each ```` ```mermaid ```` block in a small offline WebView, themed to the app's dark
+colours, with a tap to open it full screen with pinch-zoom, a way to see the code, and the normal code
+block when it can't be drawn. Nothing leaves the phone.
+
+1. **Mermaid 11.17.2 is bundled** (`third_party/mermaid`, `assets/mermaid`; about 1.2 MB more APK).
+   Its page loads only its own files: a content security policy allows scripts from itself alone, the
+   app answers every other request with a 404, navigation is blocked, and mermaid runs with
+   `securityLevel: 'strict'`. The source goes in as a JSON string, never as markup.
+2. **One hidden WebView draws, the chat shows pictures.** A chat can hold many diagrams, so there is
+   no WebView per diagram: one shared page (1 px and clear in the window, made with the first diagram,
+   closed after a minute idle) draws each source once and hands back its SVG and a PNG, kept by a
+   hash of the source (32 MB, least recently used first). The chat shows the PNG as an image; full
+   screen shows the SVG in a WebView with JavaScript off.
+3. **Labels are SVG text** (`htmlLabels: false`, off mermaid's default): a canvas that drew an SVG
+   with HTML inside (a `foreignObject`) is tainted and can't be read back as a picture.
+4. **Only a finished block is drawn:** while its closing fence hasn't arrived (a reply streaming
+   in), it's code.
+
