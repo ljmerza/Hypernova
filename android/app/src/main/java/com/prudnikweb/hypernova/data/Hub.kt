@@ -49,6 +49,7 @@ data class NewSessionRequest(
      * [providerId] isn't sent.
      */
     val agent: String = AgentKind.CLAUDE,
+    /** The reasoning effort: Codex's (above), or one of Claude Code's [ClaudeEffort.LEVELS]; null: the agent's own default. */
     val effort: String? = null,
 )
 
@@ -158,6 +159,12 @@ interface Hub {
      * and when it applies; fails with [PaidModel] when the Mac wants that agreement first.
      */
     suspend fun setModel(sessionId: String, model: String?, confirmPaid: Boolean = false): Result<ModelSwitch> = Result.failure(UnsupportedOperationException())
+    /**
+     * Change a Claude Code session's reasoning effort to one of [ClaudeEffort.LEVELS] (the Mac types
+     * `/effort` into its terminal; docs/PROTOCOL.md, "A session's effort"). Succeeds with true when
+     * it only applies from the session's next turn.
+     */
+    suspend fun setEffort(sessionId: String, effort: String): Result<Boolean> = Result.failure(UnsupportedOperationException())
     /** Banners for the open app: a session needs you, finished, failed; a newer app on the Mac. */
     val notices: kotlinx.coroutines.flow.Flow<Notice> get() = kotlinx.coroutines.flow.emptyFlow()
     /** The Mac has a newer Android app than this one (null when this one is current). */

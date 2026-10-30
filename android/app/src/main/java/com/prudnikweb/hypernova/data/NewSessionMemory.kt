@@ -3,11 +3,11 @@ package com.prudnikweb.hypernova.data
 import android.content.Context
 
 /**
- * What the new-session sheet starts with next time: the project, provider and model the last
- * session was started with, kept on the phone. Fork: Claude's mode isn't the last one used but the
- * one chosen in Settings → New sessions ([NewSessionMemory.startMode]; Ask until one is), every time.
- * With Codex (data/Codex.kt): which agent, and Codex's own model, reasoning effort and mode, kept
- * apart from Claude's.
+ * What the new-session sheet starts with next time: the project, provider, model and Claude Code's
+ * effort the last session was started with, kept on the phone. Fork: Claude's mode isn't the last
+ * one used but the one chosen in Settings → New sessions ([NewSessionMemory.startMode]; Ask until
+ * one is), every time. With Codex (data/Codex.kt): which agent, and Codex's own model, reasoning
+ * effort and mode, kept apart from Claude's.
  */
 data class Remembered(
     val project: String?,
@@ -20,6 +20,8 @@ data class Remembered(
     val codexMode: String = AgentKind.READ_ONLY,
     /** An agent was saved ([agent] is the last one used); false before the first session from here. */
     val agentSaved: Boolean = false,
+    /** Claude Code's effort last started with (data/Effort.kt); null: its own default. */
+    val effort: String? = null,
 ) {
     /** The model last used on [providerId]; null (the default) when none was. */
     fun model(providerId: String?): String? = providerId?.let { models[it] }
@@ -42,6 +44,7 @@ object NewSessionMemory {
     private const val CODEX_MODEL = "newSession.codex.model"
     private const val CODEX_EFFORT = "newSession.codex.effort"
     private const val CODEX_MODE = "newSession.codex.mode"
+    private const val EFFORT = "newSession.effort"
 
     /**
      * Fork: the modes a new Claude session can start in (owner, 2026-10-30): Ask, Accept edits, Plan
@@ -86,20 +89,22 @@ object NewSessionMemory {
             codexEffort = p.getString(CODEX_EFFORT, null)?.ifEmpty { null },
             codexMode = keptCodexMode(p.getString(CODEX_MODE, null)),
             agentSaved = p.contains(AGENT),
+            effort = ClaudeEffort.known(p.getString(EFFORT, null)),
         )
     }
 
     /**
      * A session started on these: the sheet opens on them next time. [project] null: a new one, which
-     * isn't a path yet. Its mode isn't kept (Fork: [startMode]).
+     * isn't a path yet. Its mode isn't kept (Fork: [startMode]); its [effort] is (null: the default).
      */
-    fun save(context: Context, project: String?, provider: String?, model: String?) {
+    fun save(context: Context, project: String?, provider: String?, model: String?, effort: String?) {
         val e = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
         if (project != null) e.putString(PROJECT, project)
         if (provider != null) {
             e.putString(PROVIDER, provider)
             e.putString(MODEL + provider, model.orEmpty())
         }
+        e.putString(EFFORT, ClaudeEffort.known(effort).orEmpty())
         e.putString(AGENT, AgentKind.CLAUDE)
         e.apply()
     }

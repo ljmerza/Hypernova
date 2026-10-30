@@ -344,7 +344,7 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
             projects = listOf(Project("$projectsRoot/$project", project, now, 0)) + projects
         }
         val id = start(project, req.model ?: "default", req.permissionMode)
-        sessions = sessions.map { if (it.id == id) it.copy(name = req.prompt.trim().lineSequence().first().take(48)) else it }
+        sessions = sessions.map { if (it.id == id) it.copy(name = req.prompt.trim().lineSequence().first().take(48), effort = ClaudeEffort.known(req.effort)) else it }
         sendNow(id, req.prompt)
         return Result.success(id)
     }
@@ -447,6 +447,18 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
         // "Switch to Sonnet" on an Opus limit: the session can go on.
         update(sessionId) { if (block?.kind == Blocked.MODEL) it.copy(model = name, blocked = null, activity = res.getString(R.string.activity_waiting), updatedAt = now) else it.copy(model = name, updatedAt = now) }
         return Result.success(ModelSwitch(name, nextTurn = s.state == SessionState.Working))
+    }
+    /** As a shared terminal does: Claude Code's /effort, its line in the transcript, the session's effort at once. */
+    override suspend fun setEffort(sessionId: String, effort: String): Result<Boolean> {
+        val s = session(sessionId) ?: return Result.failure(demoOnly())
+        delay(300)
+        val typed = "/effort $effort"
+        slot(sessionId).value = slot(sessionId).value + Item.User(
+            key("u"), typed, command = CommandRun.typed(typed),
+            output = listOf(CommandOutput(key("o"), "Set effort level to $effort", Tone.Info)),
+        )
+        update(sessionId) { it.copy(effort = effort, updatedAt = now) }
+        return Result.success(s.state == SessionState.Working)
     }
     override suspend fun preview(path: String?, port: Int?): Result<String> = Result.failure(demoOnly())
     override suspend fun checklist(): Result<String> = Result.failure(demoOnly())

@@ -1012,6 +1012,7 @@ class LiveHub(
             model = model,
             mode = w.permissionMode,
             bypassAvailable = w.bypassAvailable,
+            effort = w.effort,
             // One plain line: markdown marks would show up literally in mono.
             activity = blockedLine ?: readableLine(activity).orEmpty(),
             updatedAt = w.lastActivityAt,
@@ -2025,6 +2026,12 @@ class LiveHub(
         }
     }
 
+    override suspend fun setEffort(sessionId: String, effort: String): Result<Boolean> = try {
+        val r = api.post("/v1/sessions/$sessionId/effort", JSONObject().put("effort", effort))
+        applySession(r)
+        Result.success(r.str("applies") == "next_turn")
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_effort)) }
+
     override fun answer(sessionId: String, item: Item.Approval, answer: Answer) {
         answerAsync(item.approvalId ?: return, answer)
     }
@@ -2112,7 +2119,11 @@ class LiveHub(
         if (req.agent == AgentKind.CODEX) {
             body.put("agent", AgentKind.CODEX)
             req.effort?.let { body.put("effort", it) }
-        } else req.providerId?.let { body.put("providerId", it) }
+        } else {
+            req.providerId?.let { body.put("providerId", it) }
+            // Claude Code's effort (`--effort`); none: its own default.
+            req.effort?.let { body.put("effort", it) }
+        }
         req.model?.let { body.put("model", it) }
         if (req.files.isNotEmpty()) body.put("attachments", JSONArray(req.files.map { it.path }))
         val s = applySession(api.post("/v1/sessions", body)) ?: throw ApiException(Problem.Server, 200, "no_session")

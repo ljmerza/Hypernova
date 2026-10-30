@@ -512,6 +512,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `POST /v1/speech/plays/{id}/stop` | `{}` → `{ok, state}`: the phone playing it, or the Mac app. 404 `no_play` |
 | `POST /v1/sessions/{id}/mode` | `{permissionMode}` (`default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) → `{session, applies?}`. A session the daemon runs takes it from its next turn while a turn runs (the running query can't change its mode): `applies: "next_turn"`, else `"now"`, and the phone says so. A shared terminal switches by Shift+Tab (409 `waiting` with a dialog open, `mode_unavailable` for a mode it can't reach: Bypass when `session.bypassAvailable` is false, answered without pressing any key). A `claude agents` job (`agentJob`) without one gets one first: `claude attach <job>` (which wakes a stopped one), or the attach holder it has unless that drifted to another job or the agent list; 409 `terminal_busy` when the attach doesn't open or shows another session, with no key pressed. The phone offers the mode picker for such a job, not the model one |
 | `POST /v1/sessions/{id}/model` | `{model: string \| null, confirmPaid?: true}` → `{model, session, applies: "now" \| "next_turn"}`: switches the session's model (see A session's model). 400 `unknown_model`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_model` (a terminal Hypernova doesn't hold: type /model there), `confirm_paid` |
+| `POST /v1/sessions/{id}/effort` | `{effort}` (`low`, `medium`, `high`, `xhigh`, `max`) → `{effort, session, applies: "now" \| "next_turn"}`: Claude Code's reasoning effort, `/effort <level>` typed into its terminal (see A session's effort). 400 `unknown_effort`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_effort` (a terminal Hypernova doesn't hold: type /effort there), `not_open` (it has ended), `unsupported_for_agent` (Codex: its effort goes with `…/model`) |
 | `POST /v1/approvals/{id}` | `ApprovalAnswer` → `{ok}` (409 if already resolved) |
 | `GET /v1/history/search?q=<words>` | → `{results: SearchHit[], partial: boolean}`: the sessions whose conversations have every word of `q` inside, newest first, 50 at most (see History search). 400 `bad_query` (fewer than 2 or more than 200 characters). An older daemon answers 404, and the phone filters on its own |
 | `GET /v1/projects` | → `{projects: Project[], root}` |
@@ -659,6 +660,9 @@ Session = {
   model: string | null,       // the model it uses now (see A session's model): its last reply's id, a /model
                               // since, the status line's (with "[1m]" when on the 1M window), or the one asked
                               // for until the first reply ("opus"); null before any is known
+  effort: string | null,      // Claude Code's reasoning effort ("low" … "max", see A session's effort): its status
+                              // line's, else what it was started with or last set to from the phone; null when
+                              // not known yet (its own default) and for Codex
   permissionMode: "default" | "acceptEdits" | "plan" | "bypassPermissions" | "auto" | "dontAsk"
                 | "read-only" | "workspace-write",
                               // dontAsk: runs only what's allowed, skips the rest without asking (automations);
@@ -859,6 +863,8 @@ NewSession = { projectPath?: string, newProject?: {name, git?: boolean},
                agent?: "claude" | "codex",   // Codex (see Codex): its model a CodexModel.value, its permissionMode
                effort?: string, clientId?: string }   // read-only (the default) or workspace-write, effort one of the
                                                       // model's; providerId is ignored. clientId: the first send's name
+                                                      // Claude Code: effort one of low, medium, high, xhigh, max
+                                                      // (`--effort`; none: its own default; 400 unknown_effort)
 
 Attachment = { path: string, name: string, mime: string | null, size: number }
 
@@ -1136,6 +1142,33 @@ option's id when known) and broadcasts it, then:
 
 A session on a provider other than the subscription costs money: the switch needs `confirmPaid:
 true` (409 `confirm_paid` otherwise), as automations ask, unless the model is free (price 0).
+
+## A session's effort
+
+Claude Code's reasoning effort, `low`, `medium`, `high`, `xhigh` or `max` (`claude --help` of
+2.1.314). Codex's is its models' own and goes with `…/model` (see Codex).
+
+**Starting with one:** `NewSession.effort`. A shared terminal and a `claude agents` job get
+`--effort <level>`; a session the daemon runs passes it as the Agent SDK's `effort` with every query.
+None: nothing is passed, Claude Code's own default. Anything else is 400 `unknown_effort`, before
+anything starts. The phone remembers the last one started with, as it does the model.
+
+**`Session.effort`** is what Claude Code's status line last said (`effort.level`, read every 3 s
+with the model; it reports the default too, and a /effort typed in the terminal), else what the
+session was started with or last set to from the phone. A status line written before the phone's
+last change doesn't take it back. Null until one is known, and for Codex.
+
+**Changing it:** `POST /v1/sessions/{id}/effort {effort}`. The session shows it at once, then:
+- **a shared terminal**: `/effort <level>` is typed into it as `/model` is (see A session's model):
+  `applies: "next_turn"` while it is working or starting, else `"now"`; the same 409 `busy` reasons;
+- **a `claude agents` job** (`agentJob`): through `claude attach <job>`, as the mode route does (a
+  stopped job wakes); never typed into an attach holder that shows another job or the agent list
+  (`attachDrifted`): a fresh attach takes over, and one that shows another session too is 409 `busy`
+  with `reason: "terminal_busy"`, nothing typed;
+- **a session the daemon runs**: its next query takes it (`applies: "next_turn"` while a turn runs);
+- **a terminal Hypernova doesn't hold**: 409 `terminal_effort`; **an ended session**: 409 `not_open`.
+
+There is no way back to "default" from here: the phone offers the five levels.
 
 ## Account
 

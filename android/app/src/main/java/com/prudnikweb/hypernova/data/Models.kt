@@ -88,6 +88,8 @@ data class Session(
     val question: String? = null,
     /** Calls refused without the owner, not yet retried or dismissed: its blocked calls (data/Blocked.kt). */
     val blockedCalls: Int = 0,
+    /** Claude Code's reasoning effort (data/Effort.kt); null: not known yet (its default), or Codex's session. */
+    val effort: String? = null,
 ) {
     /** A Codex session: no rewind, no other provider, no carrying on by itself, Codex's two modes. */
     val codex: Boolean get() = agent == AgentKind.CODEX

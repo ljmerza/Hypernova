@@ -146,6 +146,11 @@ internal fun SessionSheet(
                     SheetTab.Overview -> {
                         SheetSeam(stringResource(R.string.model))
                         ModelPart(hub, session, usage, change, onModel, onSwitchAgent)
+                        // Claude Code's effort (EffortPart.kt); Codex's goes with its model.
+                        if (!session.codex) {
+                            SheetSeam(stringResource(R.string.effort))
+                            EffortPart(hub, session)
+                        }
                         // Only the plan's windows: none for another provider, nor while they're unknown.
                         if (planShown(hub, session)) {
                             SheetSeam(stringResource(R.string.session_sheet_usage))

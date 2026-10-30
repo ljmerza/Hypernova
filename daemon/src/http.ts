@@ -10,12 +10,12 @@ import { createHash } from 'node:crypto'
 import { API_PORT, LOCAL_PORT, PROTOCOL, SUPPORT, VERSION, claudeCached, claudeVersion, findClaude, log, macName, randomToken, readJson, sha256, safeEqual, tail } from './util.ts'
 import type { Ev } from './normalize.ts'
 import { speechFeed, speechRoute, speechState } from './readaloud.ts'
-import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider } from './store.ts'
+import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider, isClaudeEffort } from './store.ts'
 import { lanDevice, lanInfo, lanNamed, lanNamedHost, lanOrigin, pairAllowed, pairFailed, pairingAddresses, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
 import { nameKick, nameStatus, namedOrigin, releaseName, setNameService, setNameTermsShown, wantName } from './names.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
-import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
-import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setMode } from './runner.ts'
+import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
+import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort, setMode } from './runner.ts'
 import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
 import { agentJobCommand } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
@@ -657,7 +657,10 @@ async function api(c: Ctx): Promise<void> {
     }
     // Claude Code won't run bypass mode as root (it would exit at once): said now, with the way out.
     if (b.permissionMode === 'bypassPermissions' && bypassBlockedByRoot()) throw new HttpError(409, 'bypass_root', 'Claude Code won’t skip permissions as root. Run Hypernova as a normal user (see docs/LINUX.md), or pick another mode.')
-    const opts = { cwd: full, providerId: b.providerId, model: b.model, permissionMode: b.permissionMode, prompt: withAttachments(String(b.prompt ?? ''), files) }
+    // Claude Code's reasoning effort for this session (`--effort`); none: its own default.
+    const effort = b.effort == null || b.effort === '' ? null : b.effort
+    if (effort !== null && !isClaudeEffort(effort)) throw new HttpError(400, 'unknown_effort', 'Claude Code’s effort is low, medium, high, xhigh or max.')
+    const opts = { cwd: full, providerId: b.providerId, model: b.model, permissionMode: b.permissionMode, effort, prompt: withAttachments(String(b.prompt ?? ''), files) }
     const inTerminal = await shared()
     if (!inTerminal) await needSdk()
     // settings.claudeAgents: in Claude Code's background daemon, so it shows in `claude agents`
@@ -836,15 +839,15 @@ async function api(c: Ctx): Promise<void> {
     if (done === 'sending') throw new HttpError(409, 'sending', 'That message is being sent right now.')
     return json(res, 200, { session: listSessions().find((x) => x.id === id) })
   }
-  const s = /^\/v1\/sessions\/([\w-]+)\/(events|prompt|interrupt|continue|mode|terminal|open|menu|provider|model)$/.exec(path)
+  const s = /^\/v1\/sessions\/([\w-]+)\/(events|prompt|interrupt|continue|mode|effort|terminal|open|menu|provider|model)$/.exec(path)
   if (s) {
     const [, id, action] = s
     const rec = getSession(id!)
     if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
     let tid = termOf(id!)
     // A `claude agents` session gets a shared terminal when one is needed: `claude attach` (terms.ts).
-    // Its mode, a stopped or finished job's too (attach wakes it, as a prompt does).
-    const agentsJob = settings.claudeAgents === true && (!tid || attachDrifted(tid, id!)) && (['terminal', 'interrupt', 'menu'].includes(action!) ? isLiveTerminal(id!) : action === 'mode') ? agentJobOf(id!) : null
+    // Its mode and effort, a stopped or finished job's too (attach wakes it, as a prompt does).
+    const agentsJob = settings.claudeAgents === true && (!tid || attachDrifted(tid, id!)) && (['terminal', 'interrupt', 'menu'].includes(action!) ? isLiveTerminal(id!) : action === 'mode' || action === 'effort') ? agentJobOf(id!) : null
     if (agentsJob) tid = await attachAgentsTerm(id!, rec.cwd, agentsJob)
     const noTerm = () => new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
     const codex = isCodex(id!)
@@ -855,6 +858,12 @@ async function api(c: Ctx): Promise<void> {
     if (action === 'model') {
       if (m !== 'POST') throw new HttpError(405, 'method', 'Change the model with POST.')
       return json(res, 200, await setSessionModel(id!, await readJsonBody(req)))
+    }
+    if (action === 'effort') {
+      if (m !== 'POST') throw new HttpError(405, 'method', 'Change the effort with POST.')
+      // Codex's effort goes with its model (the model route).
+      if (codex) throw notForCodex()
+      return json(res, 200, await setSessionEffort(id!, (await readJsonBody(req))?.effort, tid, !!agentsJob))
     }
     if (action === 'provider') {
       if (m !== 'POST') throw new HttpError(405, 'method', 'Switch providers with POST.')
@@ -1367,6 +1376,47 @@ export async function setSessionModel(id: string, b: any): Promise<{ model: stri
   }
   upsertSession(id, { model: shown })
   return { model: shown, session: listSessions().find((x) => x.id === id), applies }
+}
+
+/**
+ * Session [id]'s reasoning effort, as `POST /v1/sessions/{id}/effort {effort}`: one of Claude Code's
+ * levels. Its shared terminal [tid] gets `/effort <level>` typed, as the model route types `/model`
+ * (a `claude agents` job's through `claude attach`, [agentsJob]; never into a holder that shows
+ * another session); a session the daemon runs takes it from its next turn. A terminal Hypernova
+ * doesn't hold, or an ended session, can't take it from here. Shown at once; Claude Code's status
+ * line has the last word (hub.ts, noteStatusEffort).
+ */
+async function setSessionEffort(id: string, raw: unknown, tid: string | null, agentsJob: boolean): Promise<{ effort: string; session: ReturnType<typeof listSessions>[number] | undefined; applies: 'now' | 'next_turn' }> {
+  const rec = getSession(id)
+  if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+  if (!isClaudeEffort(raw)) throw new HttpError(400, 'unknown_effort', 'Claude Code’s effort is low, medium, high, xhigh or max.')
+  const effort = raw
+  const busy = (reason: string, message: string, extra?: Record<string, unknown>) => new HttpError(409, 'busy', message, { reason, ...(extra ?? {}) })
+  let applies: 'now' | 'next_turn'
+  // A `claude agents` job whose `claude attach` didn't open, or a holder showing another job or the
+  // agent list: /effort there would change another session's effort.
+  if (agentsJob && !tid) throw busy('terminal_busy', 'The background session didn’t open. Try again in a moment.')
+  if (tid && attachDrifted(tid, id)) throw busy('terminal_busy', 'The terminal shows another session. Try again in a moment.')
+  if (tid) {
+    if (pendingApprovals().some((a) => a.sessionId === id)) throw busy('needs_answer', 'Claude is waiting for your answer. Answer it first, then change the effort.')
+    const r = await typeInto(tid, `/effort ${effort}`)
+    if (!r.ok) {
+      if (r.reason === 'no_input') throw busy('waiting', 'Claude is showing something in the terminal (a question or a menu). Answer it first, then change the effort.')
+      if (r.reason === 'busy_input') throw busy('typing', 'There’s unsent text in this session’s terminal on the Mac. Send or clear it there first.', r.text ? { pending: r.text } : undefined)
+      if (r.reason === 'not_started') throw busy('starting', 'The session is still starting. Try again in a moment.')
+      throw busy('terminal_busy', 'The terminal didn’t answer. Try again in a moment.')
+    }
+    const m = getManaged(id)
+    if (m && m.effort !== effort) saveManaged({ ...m, effort })
+    applies = rec.state === 'working' || rec.state === 'starting' ? 'next_turn' : 'now'
+    upsertSession(id, { effort })
+  } else if (isSdk(id)) {
+    applies = setEffort(id, effort)
+  } else if (isLiveTerminal(id)) {
+    throw new HttpError(409, 'terminal_effort', 'This session runs in a terminal Hypernova doesn’t hold. Type /effort there on the Mac.')
+  } else throw new HttpError(409, 'not_open', 'Only an open session’s effort can be changed.')
+  noteEffortSet(id)
+  return { effort, session: listSessions().find((x) => x.id === id), applies }
 }
 
 /** A shared terminal Hypernova started for this session itself (the phone's), which it may restart. */

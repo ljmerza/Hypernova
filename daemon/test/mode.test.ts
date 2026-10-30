@@ -108,3 +108,30 @@ test('bypass is allowed in a terminal only by the flags that allow it', () => {
   // A holder that never said how it started: try, and let the switch report.
   assert.equal(bypassAllowed(undefined), true)
 })
+
+// The effort route (docs/PROTOCOL.md, "A session's effort"); a shared terminal's is in claude-agents.test.ts.
+test('a session the daemon runs takes its effort with the next query, and keeps it', async () => {
+  const id = 'sdk-effort'
+  saveManaged({ id, cwd: scratch, providerId: 'anthropic', model: null, permissionMode: 'default', createdAt: Date.now() })
+  upsertSession(id, { cwd: scratch, origin: 'hypernova' })
+  assert.equal(listSessions().find((s) => s.id === id)?.effort, null, 'Claude Code’s default until said')
+  const r = await post(`/v1/sessions/${id}/effort`, { effort: 'high' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.effort, 'high')
+  assert.equal(r.json.session.effort, 'high')
+  assert.equal(r.json.applies, 'now') // no turn is running
+  assert.equal(getManaged(id)?.effort, 'high')
+  const bad = await post(`/v1/sessions/${id}/effort`, { effort: 'auto' })
+  assert.equal(bad.status, 400)
+  assert.equal(bad.json.error.code, 'unknown_effort')
+  assert.equal(getManaged(id)?.effort, 'high')
+})
+
+test('an ended session’s effort isn’t changed from here: 409 not_open', async () => {
+  const id = 'ended-effort'
+  upsertSession(id, { cwd: scratch, origin: 'terminal', state: 'ended' })
+  const r = await post(`/v1/sessions/${id}/effort`, { effort: 'low' })
+  assert.equal(r.status, 409)
+  assert.equal(r.json.error.code, 'not_open')
+  assert.equal(getSession(id)?.effort, null)
+})

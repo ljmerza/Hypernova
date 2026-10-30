@@ -67,6 +67,15 @@ case "$1" in
       done
       exit 0 ;;
     esac
+    # eff*: an input box that takes a typed line (echoed into it) and empties on Enter; each line
+    # lands in typed-<job>. effstuk0 shows another session (its title) on every attach.
+    case "$2" in eff*)
+      t=Mine; [ "$2" = effstuk0 ] && t='Some other session'
+      draw() { printf '\\033[2J\\033[H\\033]0;%s\\007\\n────────────────────\\n❯ \\n────────────────────\\n\\033[3;3H' "$t"; }
+      stty echo icanon 2>/dev/null; draw
+      while IFS= read -r l; do echo "$l" >> "$S/typed-$2"; draw; done
+      exit 0 ;;
+    esac
     printf '\\n────────────────────\\n❯ \\n────────────────────\\n'
     exec sleep 30
     ;;
@@ -101,7 +110,7 @@ process.env.HYPERNOVA_LAN_PORT = '0'
 
 const hub = await import('../src/hub.ts')
 const { addDevice, settings } = await import('../src/store.ts')
-const { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
+const { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
 const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
 const { heldReady, promptSession, startServers } = await import('../src/http.ts')
 const { askAside } = await import('../src/aside.ts')
@@ -676,4 +685,101 @@ test('the respawn route: Claude Code’s words when it refuses; a session that i
   const plain = await post('/v1/sessions/agents-plain-1/respawn', {})
   assert.equal(plain.status, 409)
   assert.equal(plain.json.error.code, 'not_agents')
+})
+
+// ── Effort (docs/PROTOCOL.md, "A session's effort") ──────────────────────
+
+/** The lines the stand-in took in job [jobId]'s input box. */
+const typed = (jobId: string): string[] => {
+  const f = join(process.env.FAKE_AGENTS_DIR!, `typed-${jobId}`)
+  return existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean) : []
+}
+
+test('createAgentsSession with an effort: `claude --bg --effort`, and the session says it; without one, none (Claude Code’s default)', async () => {
+  settings.claudeAgents = true
+  const bgArgs = () => readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'bg-args'), 'utf8').trim()
+  const sid = await createAgentsSession({ cwd: scratch, model: 'opus', effort: 'xhigh', prompt: 'Think hard about the parser' })
+  assert.match(bgArgs(), /^--bg --model opus --effort xhigh -- Think hard about the parser$/)
+  assert.equal(hub.listSessions().find((s) => s.id === sid)?.effort, 'xhigh')
+  await createAgentsSession({ cwd: scratch, prompt: 'Plain one' })
+  assert.equal(bgArgs(), '--bg -- Plain one')
+})
+
+test('a new session with an effort Claude Code doesn’t have is refused before anything starts', async () => {
+  settings.claudeAgents = true
+  const before = hub.listSessions().length
+  const bad = await post('/v1/sessions', { projectPath: scratch, prompt: 'Too much', effort: 'ultracode' })
+  assert.equal(bad.status, 400)
+  assert.equal(bad.json.error.code, 'unknown_effort')
+  assert.equal(hub.listSessions().length, before)
+})
+
+test('createSharedSession: --effort among a shared terminal’s arguments, kept with the session', async () => {
+  const id = createSharedSession({ cwd: scratch, effort: 'low', prompt: 'Quick one' })
+  const dir = join(process.env.HYPERNOVA_SUPPORT!, 'terms')
+  let args = null as string[] | null
+  const t0 = Date.now()
+  while (!args && Date.now() - t0 < 5000) {
+    for (const f of existsSync(dir) ? readdirSync(dir) : []) {
+      if (!f.endsWith('.json')) continue
+      try {
+        const meta = JSON.parse(readFileSync(join(dir, f), 'utf8'))
+        if (meta.sessionId === id) args = meta.args
+      } catch {}
+    }
+    if (!args) await new Promise((ok) => setTimeout(ok, 100))
+  }
+  assert.ok(args, 'its holder')
+  const at = args!.indexOf('--effort')
+  assert.ok(at > 0 && args![at + 1] === 'low', JSON.stringify(args))
+  assert.ok(at < args!.indexOf('--'), 'before the prompt')
+  assert.equal(hub.getSession(id)?.effort, 'low')
+})
+
+test('the effort route on a claude agents job: claude attach, then /effort typed into its box', async () => {
+  settings.claudeAgents = true
+  job('agents-effort-1', 'eff00000', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  assert.equal(termOf('agents-effort-1'), null)
+  const r = await post('/v1/sessions/agents-effort-1/effort', { effort: 'max' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.effort, 'max')
+  assert.equal(r.json.session.effort, 'max')
+  assert.equal(r.json.applies, 'now')
+  assert.deepEqual(typed('eff00000'), ['/effort max'])
+  // A level Claude Code doesn't have: nothing typed.
+  const bad = await post('/v1/sessions/agents-effort-1/effort', { effort: 'extreme' })
+  assert.equal(bad.status, 400)
+  assert.equal(bad.json.error.code, 'unknown_effort')
+  assert.deepEqual(typed('eff00000'), ['/effort max'])
+})
+
+test('the effort route never types into a claude attach that shows another session', async () => {
+  settings.claudeAgents = true
+  job('agents-effort-2', 'effstuk0', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  const r = await post('/v1/sessions/agents-effort-2/effort', { effort: 'high' })
+  assert.equal(r.status, 409, JSON.stringify(r.json))
+  assert.equal(r.json.error.code, 'busy')
+  assert.equal(r.json.error.reason, 'terminal_busy')
+  assert.deepEqual(typed('effstuk0'), [])
+  assert.equal(hub.getSession('agents-effort-2')?.effort ?? null, null)
+})
+
+test('the status line’s effort is the session’s, unless the phone set one after it was written', () => {
+  settings.claudeAgents = true
+  job('agents-effort-3', 'eff00003', 'idle')
+  hub.pollRegistry()
+  hub.noteStatusEffort('agents-effort-3', 'high', Date.now())
+  assert.equal(hub.getSession('agents-effort-3')?.effort, 'high')
+  // Set from the phone just now: an older line doesn't take it back, a newer one has the last word.
+  hub.upsertSession('agents-effort-3', { effort: 'low' })
+  hub.noteEffortSet('agents-effort-3', 2000)
+  hub.noteStatusEffort('agents-effort-3', 'high', 1000)
+  assert.equal(hub.getSession('agents-effort-3')?.effort, 'low')
+  hub.noteStatusEffort('agents-effort-3', 'medium', 3000)
+  assert.equal(hub.getSession('agents-effort-3')?.effort, 'medium')
+  // Not an effort: nothing.
+  hub.noteStatusEffort('agents-effort-3', { level: 'max' }, 4000)
+  assert.equal(hub.getSession('agents-effort-3')?.effort, 'medium')
 })

@@ -65,7 +65,7 @@ export function childEnv(extra: Record<string, string>): Record<string, string> 
  * A new session the daemon runs itself. An automation's run (automations.ts) names it (`title`)
  * and adds its badge, allow rules and appended system prompt, as a shared terminal would take them.
  */
-export function createSession(opts: { cwd: string; providerId?: string; model?: string | null; permissionMode?: string; prompt?: string; forkFrom?: string; title?: string; context?: string } & Omit<AutomationStart, 'settingsFile'>): string {
+export function createSession(opts: { cwd: string; providerId?: string; model?: string | null; permissionMode?: string; effort?: string | null; prompt?: string; forkFrom?: string; title?: string; context?: string } & Omit<AutomationStart, 'settingsFile'>): string {
   // A provider deleted since the phone listed it: 404, never the subscription instead.
   const provider = useProvider(opts.providerId)
   const id = randomUUID()
@@ -79,9 +79,10 @@ export function createSession(opts: { cwd: string; providerId?: string; model?: 
     title: trimText(opts.title ?? promptTitle(opts.prompt ?? ''), 80) ?? 'New session',
     ...(opts.automation ? { automation: opts.automation, allowedTools: opts.allowedTools ?? [], appendSystemPrompt: opts.appendSystemPrompt } : {}),
     ...(opts.context ? { context: opts.context } : {}),
+    ...(opts.effort ? { effort: opts.effort } : {}),
   }
   saveManaged(m)
-  upsertSession(id, { cwd: m.cwd, origin: 'hypernova', state: 'starting', title: m.title ?? 'New session', providerId: m.providerId, model: m.model, permissionMode: m.permissionMode, createdAt: m.createdAt, lastActivityAt: Date.now(), automation: m.automation ?? null })
+  upsertSession(id, { cwd: m.cwd, origin: 'hypernova', state: 'starting', title: m.title ?? 'New session', providerId: m.providerId, model: m.model, effort: m.effort ?? null, permissionMode: m.permissionMode, createdAt: m.createdAt, lastActivityAt: Date.now(), automation: m.automation ?? null })
   ensureParsed(getSession(id)!)
   if (opts.forkFrom) seedFrom(id, opts.forkFrom)
   // A switch's session waits for its first prompt, with the context it carried over.
@@ -155,6 +156,17 @@ export async function setMode(id: string, mode: string): Promise<'now' | 'next_t
     } catch {}
   }
   return 'next_turn'
+}
+
+/**
+ * Change a session's reasoning effort: each turn is its own query, so it goes with the next one
+ * ("next_turn" while one runs).
+ */
+export function setEffort(id: string, effort: string): 'now' | 'next_turn' {
+  const m = getManaged(id)
+  if (m && m.effort !== effort) saveManaged({ ...m, effort })
+  upsertSession(id, { effort })
+  return runs.get(id)?.running ? 'next_turn' : 'now'
 }
 
 async function drain(id: string, forkFrom?: string): Promise<void> {
@@ -251,6 +263,8 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
       cwd: m.cwd,
       ...sessionOpts,
       model: m.model ?? undefined,
+      // The effort chosen on the phone, with every query (each turn is one): none, Claude Code's default.
+      ...(m.effort ? { effort: m.effort as never } : {}),
       permissionMode: m.permissionMode as never,
       // An automation's run: its allow rules, what it tells Claude, and its name on the first query.
       ...(m.automation

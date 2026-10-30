@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Claude Code's reasoning effort (data/Effort.kt): the new-session sheet's Effort chip and picker, and the session sheet's Overview. -->
+    <string name="effort">Effort</string>
+    <string name="effort_default">Default</string>
+    <string name="effort_default_desc">Claude Code’s own, from its settings. Nothing is passed.</string>
+    <string name="effort_low_desc">Thinks the least. Quickest replies.</string>
+    <string name="effort_medium_desc">Thinks less than High.</string>
+    <string name="effort_high_desc">Thinks things through.</string>
+    <string name="effort_xhigh_desc">Thinks longer on hard problems.</string>
+    <string name="effort_max_desc">Thinks the most. Slowest, and heaviest on your plan.</string>
+    <!-- TalkBack, the new-session sheet's chip: "Effort: High." -->
+    <string name="ns_effort_said">Effort: %1$s.</string>
+    <!-- The session sheet: no level known yet. -->
+    <string name="session_sheet_effort_unknown">Claude Code hasn’t said yet: its own default until it does.</string>
+    <string name="effort_next_turn">The new effort starts with Claude’s next turn.</string>
+    <string name="err_effort">Couldn’t change the effort. Try again.</string>
+</resources>
