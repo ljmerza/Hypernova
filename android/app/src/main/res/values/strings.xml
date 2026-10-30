@@ -7,8 +7,12 @@
     <string name="settings">Settings</string>
     <string name="new_session">New session</string>
     <string name="open_session">Open session</string>
-    <!-- The SESSIONS seam with nothing live (otherwise its counts: notif_needs_you, notif_working, as marks). -->
-    <string name="home_quiet">all quiet</string>
+    <!-- Home's sessions in three groups, as claude agents lists them, each a seam with its count. -->
+    <string name="group_needs">Needs input</string>
+    <string name="group_working">Working</string>
+    <string name="group_done">Completed</string>
+    <!-- TalkBack on a group's seam: "Working, 3 sessions." (the count is sessions_count). -->
+    <string name="group_said">%1$s, %2$s.</string>
     <string name="usage">Usage</string>
     <string name="percent">%1$d%%</string>
     <string name="time_warp_hint">drag to time-warp</string>

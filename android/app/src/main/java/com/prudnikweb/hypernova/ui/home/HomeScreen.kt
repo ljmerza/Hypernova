@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -138,9 +139,7 @@ import com.prudnikweb.hypernova.ui.components.frostedGlass
 import com.prudnikweb.hypernova.ui.components.FitRow
 import com.prudnikweb.hypernova.ui.components.CountMark
 import com.prudnikweb.hypernova.ui.components.EclipseMark
-import com.prudnikweb.hypernova.ui.components.NoPart
 import com.prudnikweb.hypernova.ui.components.SeamWords
-import com.prudnikweb.hypernova.ui.components.fitPart
 import com.prudnikweb.hypernova.ui.components.ModeTag
 import com.prudnikweb.hypernova.ui.components.ModelChip
 import com.prudnikweb.hypernova.ui.components.SessionStamp
@@ -298,9 +297,7 @@ fun HomeScreen(
     // A provider in trouble: a card that says what's wrong and how to fix it (not words in the sky).
     val troubled = remember(hub.providers, hub.sessions) { troubledProviders(hub.providers, hub.sessions) }
     val opener = LocalOpener.current
-    // One rule for "working" (Session.busy): Claude at work or agents it started still running;
-    // needing you outranks it. The sky, this seam, the cards and the notification agree.
-    val working = sessions.count { it.busy }
+    // Who needs you here and elsewhere: the filter chip says how many wait outside it.
     val waiting = sessions.count { it.state == SessionState.NeedsYou }
     val waitingAll = all.count { it.state == SessionState.NeedsYou }
     // Claude Code's account: only where it's installed (a Mac where Codex leads has no Claude account to fix).
@@ -424,27 +421,10 @@ fun HomeScreen(
                         }
                     }
                 }
-                item(key = "seam") {
-                    Seam(
-                        label = stringResource(R.string.sessions),
-                        // Who needs you and who works, each after its state's point, a gap apart
-                        // (never "2 needs you · 5 live"); nothing live, "all quiet".
-                        trailContent = { SessionCounts(waiting, working) },
-                        activity = when {
-                            waiting > 0 -> Activity.Alert
-                            working > 0 -> Activity.Live
-                            else -> Activity.Rest
-                        },
-                        modifier = Modifier
-                            .animateItem()
-                            .padding(horizontal = 20.dp)
-                            .padding(top = 12.dp, bottom = if (filter != null) 10.dp else 16.dp),
-                    )
-                }
                 // What the list shows, when it isn't everything: a chip that undoes it.
                 if (filter != null) {
                     item(key = "filter") {
-                        FilterRow(filter, quiet.size, elsewhere = waitingAll - waiting, onClear = { onFilter(null) }, modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp).animateItem())
+                        FilterRow(filter, quiet.size, elsewhere = waitingAll - waiting, onClear = { onFilter(null) }, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 8.dp).animateItem())
                     }
                 }
                 // Honest connection state: what's wrong and what to do, above the (stale) list.
@@ -506,15 +486,26 @@ fun HomeScreen(
                         EmptyCard(hub, onHistory = { tab = Tab.History }, modifier = Modifier.animateItem().padding(horizontal = 16.dp))
                     }
                 }
-                items(sessions.sortedBy { order(it) }, key = { it.id }) { s ->
-                    SessionCard(
-                        s, now = now, scramble = remember(s.id) { hub.consumeReveal(s) },
-                        onClick = { onOpen(s.id) },
-                        modifier = Modifier.padding(horizontal = 16.dp).animateItem(),
-                        block = s.activeBlock(account, hub.providers, now),
-                        waiting = hub.waitingCount(s.id),
-                        codex = codexOn && s.codex,
-                    )
+                // The sessions in three groups, as `claude agents` lists them (owner, 2026-10-29): needs
+                // input, working, completed, each under its own seam with how many it holds. An empty
+                // group has no seam. A card moves only when its group changes (homeGroups).
+                for ((group, members) in homeGroups(sessions)) {
+                    item(key = group.key) {
+                        GroupSeam(
+                            group, members.size,
+                            Modifier.animateItem().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 4.dp),
+                        )
+                    }
+                    items(members, key = { it.id }) { s ->
+                        SessionCard(
+                            s, now = now, scramble = remember(s.id) { hub.consumeReveal(s) },
+                            onClick = { onOpen(s.id) },
+                            modifier = Modifier.padding(horizontal = 16.dp).animateItem(),
+                            block = s.activeBlock(account, hub.providers, now),
+                            waiting = hub.waitingCount(s.id),
+                            codex = codexOn && s.codex,
+                        )
+                    }
                 }
                 // The usage cards (UsageCards.kt): Claude's, Codex's, or both, each saying whose it is only when both show.
                 if (usageCards.claude) item(key = "usage") { UsageCard(hub, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp)) }
@@ -601,10 +592,10 @@ private fun markSunHintDone(c: Context) {
 }
 
 /**
- * Where the account card is in Home's list: after the sky and the seam, then the filter chip and
- * the offline card when they're there.
+ * Where the account card is in Home's list: after the sky, then the filter chip and the offline
+ * card when they're there. The groups' seams come later, with their sessions.
  */
-internal fun homeHeadIndex(filter: Boolean, offline: Boolean): Int = 2 + (if (filter) 1 else 0) + (if (offline) 1 else 0)
+internal fun homeHeadIndex(filter: Boolean, offline: Boolean): Int = 1 + (if (filter) 1 else 0) + (if (offline) 1 else 0)
 
 /**
  * The index of a usage card ([codex]: Codex's, else the sun's), wherever the list has put it: they
@@ -616,13 +607,25 @@ private fun usageIndex(list: androidx.compose.foundation.lazy.LazyListState, cod
     return (last - back).coerceAtLeast(0)
 }
 
-internal fun order(s: Session) = when {
-    s.state == SessionState.NeedsYou -> 0
+/** Home's groups, in the list's order, each with its seam's item key. */
+internal enum class HomeGroup(val key: String) { NeedsInput("group-needs"), Working("group-working"), Completed("group-done") }
+
+internal fun homeGroup(s: Session) = when {
+    s.state == SessionState.NeedsYou -> HomeGroup.NeedsInput
     // Working by the one rule: its agents count, though its main agent is idle.
-    s.busy -> 1
-    // Ended by a restart of the Mac: after the ones running, most recent first.
-    s.cutByRestart -> 3
-    else -> 2
+    s.busy -> HomeGroup.Working
+    // Idle or done, and what a restart of the Mac cut short.
+    else -> HomeGroup.Completed
+}
+
+/**
+ * Home's sessions by group, empty groups left out. Within a group by name, A to Z (then by id), not
+ * by activity: the owner saw cards "keep swapping back and forth", so one moves only when its group
+ * changes.
+ */
+internal fun homeGroups(sessions: List<Session>): List<Pair<HomeGroup, List<Session>>> {
+    val byName = sessions.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, Session::name).thenBy { it.id })
+    return HomeGroup.entries.mapNotNull { g -> byName.filter { homeGroup(it) == g }.takeIf { it.isNotEmpty() }?.let { g to it } }
 }
 
 @Composable
@@ -856,28 +859,34 @@ fun SessionCard(s: Session, now: Long, scramble: Boolean, onClick: () -> Unit, m
 }
 
 /**
- * The SESSIONS seam's trail: "● 2 need you" in amber and "● 3 working" in mint, as count marks a gap
- * apart; short of room each keeps only its number, working first. Nothing live: "all quiet".
- * TalkBack: "2 need you, 3 working."
+ * A group's seam on Home: its planet (amber for needs input, turning while working, still once
+ * done), its name, a hairline, and how many it holds as a count mark in its colour (`● 2`).
+ * TalkBack: "Working, 3 sessions."
  */
 @Composable
-private fun SessionCounts(needs: Int, working: Int) {
-    val res = LocalContext.current.resources
-    if (needs == 0 && working == 0) {
-        SeamWords(stringResource(R.string.home_quiet))
-        return
+private fun GroupSeam(group: HomeGroup, count: Int, modifier: Modifier = Modifier) {
+    val label = stringResource(
+        when (group) {
+            HomeGroup.NeedsInput -> R.string.group_needs
+            HomeGroup.Working -> R.string.group_working
+            HomeGroup.Completed -> R.string.group_done
+        },
+    )
+    val color = when (group) {
+        HomeGroup.NeedsInput -> HN.amber
+        HomeGroup.Working -> HN.accent
+        HomeGroup.Completed -> HN.inkDim
     }
-    val needsWords = res.getQuantityString(R.plurals.notif_needs_you, needs, needs)
-    val workingWords = res.getQuantityString(R.plurals.notif_working, working, working)
-    val said = listOfNotNull(needsWords.takeIf { needs > 0 }, workingWords.takeIf { working > 0 }).joinToString(", ") + "."
-    FitRow(
-        parts = listOf(
-            if (needs > 0) fitPart({ CountMark(needsWords, HN.amber) }, { CountMark(needs.toString(), HN.amber) }) else NoPart,
-            if (working > 0) fitPart({ CountMark(workingWords, HN.accent) }, { CountMark(working.toString(), HN.accent) }) else NoPart,
-        ),
-        giveWay = intArrayOf(1, 0),
-        gap = 12.dp,
-        modifier = Modifier.clearAndSetSemantics { contentDescription = said },
+    val said = stringResource(R.string.group_said, label, pluralStringResource(R.plurals.sessions_count, count, count))
+    Seam(
+        label = label,
+        trailContent = { CountMark(count.toString(), color) },
+        activity = when (group) {
+            HomeGroup.NeedsInput -> Activity.Alert
+            HomeGroup.Working -> Activity.Live
+            HomeGroup.Completed -> Activity.Rest
+        },
+        modifier = modifier.clearAndSetSemantics { contentDescription = said; heading() },
     )
 }
 
