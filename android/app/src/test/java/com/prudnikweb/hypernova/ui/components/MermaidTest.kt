@@ -65,6 +65,42 @@ class MermaidTest {
         assertFalse(f.cut)
     }
 
+    private val host = "appassets.androidplatform.net"
+
+    @Test fun theDrawingPageGetsItsOwnFilesOnly() {
+        assertEquals("index.html", mermaidFile("https", host, "/mermaid/index.html", viewer = false))
+        assertEquals("mermaid.min.js", mermaidFile("https", host, "/mermaid/mermaid.min.js", viewer = false))
+        assertEquals("Manrope.ttf", mermaidFile("https", host, "/mermaid/Manrope.ttf", viewer = false))
+        assertNull(mermaidFile("https", host, "/mermaid/view.html", viewer = false))
+        assertNull(mermaidFile("https", host, "/mermaid/", viewer = false))
+        assertNull(mermaidFile("https", host, "/index.html", viewer = false))
+        assertNull(mermaidFile("http", host, "/mermaid/index.html", viewer = false))
+        assertNull(mermaidFile("https", "example.com", "/mermaid/index.html", viewer = false))
+    }
+
+    @Test fun theFullScreenViewGetsItsPageAndTheFontOnly() {
+        assertEquals("view.html", mermaidFile("https", host, "/mermaid/view.html", viewer = true))
+        assertEquals("Manrope.ttf", mermaidFile("https", host, "/mermaid/Manrope.ttf", viewer = true))
+        // Not mermaid's scripts: the view has no JavaScript and needs none.
+        assertNull(mermaidFile("https", host, "/mermaid/index.html", viewer = true))
+        assertNull(mermaidFile("https", host, "/mermaid/mermaid.min.js", viewer = true))
+        assertNull(mermaidFile("https", host, "/mermaid/", viewer = true))
+        assertNull(mermaidFile("https", host, null, viewer = true))
+        assertNull(mermaidFile("http", host, "/mermaid/view.html", viewer = true))
+        assertNull(mermaidFile("https", "example.com", "/mermaid/view.html", viewer = true))
+    }
+
+    @Test fun theFullScreenPageHoldsTheSvgAndNoScripts() {
+        val svg = """<svg id="m1" width="10" height="10"><style>#m1 .node rect{fill:#221F1B;}</style><rect style="stroke:red"/></svg>"""
+        val page = viewerPage(svg)
+        assertTrue(page.contains("<body>$svg</body>"))
+        val csp = Regex("Content-Security-Policy\" content=\"([^\"]*)\"").find(page)!!.groupValues[1]
+        assertTrue(csp.startsWith("default-src 'none'"))
+        assertFalse(csp.contains("script-src"))
+        // The SVG's own <style> and style attributes.
+        assertTrue(csp.contains("style-src 'unsafe-inline'"))
+    }
+
     @Test fun aTallOneIsCutAtTheMost() {
         val f = diagramFit(300f, 1200f, column = 360f, max = 400f)
         assertEquals(300f, f.width)

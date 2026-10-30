@@ -95,6 +95,19 @@ private const val HOST = "appassets.androidplatform.net"
 private const val PAGE = "https://$HOST/mermaid/index.html"
 /** The page's files, and the only requests answered: everything else gets a 404. */
 private val FILES = setOf("index.html", "frames.js", "mermaid.min.js", "render.js", "Manrope.ttf")
+/**
+ * The full-screen view's page, made by the app for the one diagram it shows and loaded by its URL,
+ * as the drawing page is (a page given as data, with a base URL, showed "not found" on the owner's
+ * phone). Its files: the page and Manrope.
+ */
+private const val VIEW = "view.html"
+private val VIEW_FILES = setOf(VIEW, "Manrope.ttf")
+
+/** The file a request is answered with ([viewer]: the full-screen view's), or null for a 404. */
+internal fun mermaidFile(scheme: String?, host: String?, path: String?, viewer: Boolean): String? {
+    if (scheme != "https" || host != HOST) return null
+    return path?.removePrefix("/mermaid/")?.takeIf { it in if (viewer) VIEW_FILES else FILES }
+}
 
 /** Raised when the page draws differently (its theme, its sizes), so diagrams already drawn are drawn again. */
 private const val DRAWING = 1
@@ -238,16 +251,21 @@ internal object MermaidRenderer {
 
 /**
  * Serves the page's own files from the app (assets/mermaid, and Manrope from res/font) and answers
- * every other request with a 404, so nothing reaches the network; no navigation. [onGone]: the
+ * every other request with a 404, so nothing reaches the network; no navigation. With a [page], it
+ * serves the full-screen view instead: that page as view.html, and Manrope. [onGone]: the
  * WebView's renderer died (handled, so the app lives on).
  */
-private class AssetsOnly(private val ctx: Context, private val onGone: (WebView) -> Unit) : WebViewClient() {
+private class AssetsOnly(
+    private val ctx: Context,
+    private val page: String? = null,
+    private val onGone: (WebView) -> Unit,
+) : WebViewClient() {
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse {
         val u = request.url
-        if (u.scheme != "https" || u.host != HOST) return notFound()
-        val name = u.path?.removePrefix("/mermaid/")?.takeIf { it in FILES } ?: return notFound()
+        val name = mermaidFile(u.scheme, u.host, u.path, viewer = page != null) ?: return notFound()
         return try {
             if (name == "Manrope.ttf") WebResourceResponse("font/ttf", null, ctx.resources.openRawResource(R.font.manrope))
+            else if (name == VIEW) WebResourceResponse("text/html", "utf-8", ByteArrayInputStream(checkNotNull(page).toByteArray(Charsets.UTF_8)))
             else WebResourceResponse(
                 when (name.substringAfterLast('.')) { "html" -> "text/html"; else -> "text/javascript" },
                 "utf-8",
@@ -406,15 +424,18 @@ private fun viewer(ctx: Context, svg: String, onGone: () -> Unit): WebView = Web
     settings.useWideViewPort = true
     settings.loadWithOverviewMode = true
     settings.textZoom = 100
-    webViewClient = AssetsOnly(ctx) { onGone() }
-    loadDataWithBaseURL("https://$HOST/mermaid/", viewerPage(svg), "text/html", "utf-8", null)
+    webViewClient = AssetsOnly(ctx, viewerPage(svg)) { onGone() }
+    loadUrl("https://$HOST/mermaid/$VIEW")
 }
 
-/** The full-screen page: the SVG fitted to the width (never past its own size), centred on the app's dark. */
-private fun viewerPage(svg: String) = """<!doctype html>
+/**
+ * The full-screen page: the SVG fitted to the width (never past its own size), centred on the app's
+ * dark. No scripts; the SVG keeps its own styles, and any picture it carries as data.
+ */
+internal fun viewerPage(svg: String) = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=8, user-scalable=yes">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src https://$HOST">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src https://$HOST; img-src data:">
 <style>
 @font-face { font-family: "Manrope"; src: url("Manrope.ttf") format("truetype"); font-weight: 200 800; }
 html, body { margin: 0; background: #14110E; }
