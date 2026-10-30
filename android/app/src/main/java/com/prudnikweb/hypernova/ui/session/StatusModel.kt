@@ -1,15 +1,17 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.AgentState
 import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.WorkflowView
 
 /*
  * What the status bar above the composer says, as plain data with nothing of Compose in it
  * (unit-tested): which state the turn is in, what Claude is doing in words (a [Say] the screen
- * turns into a string resource), how far the to-dos are, and how a time reads. The bar itself is
- * in StatusBar.kt.
+ * turns into a string resource), how far the to-dos or a running workflow are, and how a time
+ * reads. The bar itself is in StatusBar.kt.
  */
 
 /** How the bar looks: mint while Claude works, amber when it needs you, red when it stopped on an error. */
@@ -19,10 +21,11 @@ internal enum class BarTone { Working, NeedsYou, Error }
 internal enum class SayKind {
     Starting, Sending, Thinking, Writing, Retrying, Working,
     Reading, ReadingMany, Searching, Editing, Creating, Running, Fetching, SearchingWeb, Agents, Planning, Tool,
+    Workflow,
     WaitApprove, WaitAnswer, WaitPlan, WaitYou, Failed,
 }
 
-/** [arg]: the file, command or tool the sentence is about; [n]: a count (files read, agents working). */
+/** [arg]: the file, command, tool or workflow the sentence is about; [n]: a count (files read, agents working). */
 internal data class Say(val kind: SayKind, val arg: String = "", val n: Int = 0)
 
 /** What the model needs from a session; [trailingReads] comes from [trailingReads]. */
@@ -38,6 +41,8 @@ internal data class BarInput(
     val pending: Item.Approval? = null,
     val todos: List<Todo> = emptyList(),
     val trailingReads: Int = 0,
+    /** The session's running workflow ([runningWorkflow]): while it runs, the bar counts its agents instead of the to-dos. */
+    val workflow: WorkflowView? = null,
     /** Stop can reach it: a shared terminal or a session the Mac runs (not one it only watches). */
     val stoppable: Boolean = true,
 )
@@ -49,10 +54,16 @@ internal data class BarModel(
     val total: Int,
     /** Stop works only while the main agent runs (not for agents alone, not when it needs you). */
     val canStop: Boolean,
+    /** The running workflow [done] and [total] count the agents of, by name; null when they count the to-dos. */
+    val workflow: String? = null,
 ) {
-    val hasTodos: Boolean get() = total > 0
+    val hasTodos: Boolean get() = total > 0 && workflow == null
+    val hasWorkflow: Boolean get() = workflow != null
 
-    /** The share of to-dos done, or null when there's no list: the line then has no end to fill toward. */
+    /** There's a tally to show ("3/7"): to-dos, or the agents a workflow has started so far. */
+    val counted: Boolean get() = total > 0
+
+    /** The share done, or null when there's nothing to count: the line then has no end to fill toward. */
     val progress: Float? get() = progress(done, total)
 }
 
@@ -68,18 +79,23 @@ internal fun progress(done: Int, total: Int): Float? =
 /** The bar for a session, or null when no turn runs (it folds away). */
 internal fun statusBar(i: BarInput): BarModel? {
     if (i.phase == Phase.Ended) return null
-    val done = i.todos.count { it.status == TodoStatus.Done }
-    val total = i.todos.size
-    fun model(tone: BarTone, say: Say, stop: Boolean) = BarModel(tone, say, done, total, stop)
+    // A running workflow wins over the to-dos (owner, 2026-10-29): its agents done over those it has
+    // started so far, a total that grows while it starts more.
+    val wf = i.workflow?.takeIf { it.state == AgentState.Running }
+    val done = wf?.done ?: i.todos.count { it.status == TodoStatus.Done }
+    val total = wf?.agentCount ?: i.todos.size
+    fun model(tone: BarTone, say: Say, stop: Boolean) = BarModel(tone, say, done, total, stop, wf?.name)
     return when {
         i.phase == Phase.Error -> model(BarTone.Error, Say(SayKind.Failed), false)
         i.pending != null || i.state == SessionState.NeedsYou || i.phase == Phase.NeedsYou ->
             model(BarTone.NeedsYou, waitSay(i.pending, i.activity), false)
         // The one rule for "working" (Session.busy): Claude works or is starting; its agents below.
         i.state == SessionState.Working || i.phase == Phase.Starting || i.sending ->
-            model(BarTone.Working, workSay(i), i.stoppable)
+            model(BarTone.Working, wf?.let { Say(SayKind.Workflow, it.name) } ?: workSay(i), i.stoppable)
         // The main agent is done for now but agents it started carry on: still a turn, as the user sees it.
-        i.agentsRunning > 0 -> model(BarTone.Working, Say(SayKind.Agents, n = i.agentsRunning), false)
+        // A workflow keeps it too between its phases, when none of its agents is at work.
+        i.agentsRunning > 0 || wf != null ->
+            model(BarTone.Working, wf?.let { Say(SayKind.Workflow, it.name) } ?: Say(SayKind.Agents, n = i.agentsRunning), false)
         else -> null
     }
 }
@@ -128,6 +144,15 @@ private fun workSay(i: BarInput): Say {
         "TodoWrite", "TaskCreate", "TaskUpdate" -> Say(SayKind.Planning)
         else -> Say(SayKind.Tool, toolName(name))
     }
+}
+
+/** The session's newest workflow that still runs, from its cards (a run not yet under its call is a card too, last). */
+internal fun runningWorkflow(items: List<Item>): WorkflowView? {
+    for (k in items.indices.reversed()) {
+        val w = (items[k] as? Item.WorkflowCard)?.workflow ?: continue
+        if (w.state == AgentState.Running) return w
+    }
+    return null
 }
 
 /** "mcp__github__create_issue" → "create issue". */

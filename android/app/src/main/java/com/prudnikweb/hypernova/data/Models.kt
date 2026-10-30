@@ -522,6 +522,8 @@ data class WorkflowView(
     val agentCount: Int,
     val running: Int,
     val phases: List<PhaseView>,
+    /** Its agents that are done (not failed or stopped); a retried step's earlier attempts count in neither this nor [agentCount]. */
+    val done: Int = 0,
     /** Agents whose phase isn't one of [phases] (an older daemon, a script with none). */
     val loose: List<AgentView> = emptyList(),
 )

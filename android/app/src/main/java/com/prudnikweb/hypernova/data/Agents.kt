@@ -82,6 +82,7 @@ fun AgentBoard.workflowView(w: WWorkflow, asking: Set<String>): WorkflowView {
         agentCount = maxOf(w.agentCount, mine.size),
         running = mine.count { it.running },
         phases = phases,
+        done = maxOf(w.done, mine.count { it.status == "done" }),
         loose = mine.filter { it.phase == null || it.phase !in titles }.map { it.view(it.id in asking) },
     )
 }
