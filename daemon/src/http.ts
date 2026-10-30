@@ -60,6 +60,9 @@ import { SdkMissingError, claudeSdk, sdkState } from './sdk.ts'
 import { AutomationError, FIRE_BODY_MAX, automations, lensConnected, useSessionOps } from './automations.ts'
 import { systemZone } from './schedule.ts'
 import { PLATFORM, RELEASES, UNAVAILABLE, bypassBlockedByRoot, has, unavailable } from './platform.ts'
+import { randomUUID } from 'node:crypto'
+import { putEvent, tapBroadcast } from './hub.ts'
+import { editHeld, heldOf, hold, kickHeld, removeHeld, useHeldOps, type HeldReady } from './held.ts'
 
 /**
  * `lan`: came in on the LAN listener (lan.ts), where the admin token counts for nothing and pairing
@@ -806,6 +809,21 @@ async function api(c: Ctx): Promise<void> {
     forgetSession(id!)
     return json(res, 200, { ok: true })
   }
+  // Fork: a held prompt's new words, or taken back (docs/PROTOCOL.md, "Held prompts").
+  const hp = /^\/v1\/sessions\/([\w-]+)\/held\/([\w-]+)$/.exec(path)
+  if (hp && (m === 'PUT' || m === 'DELETE')) {
+    const [, id, heldId] = hp
+    if (!getSession(id!)) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    let done: 'ok' | 'gone' | 'sending'
+    if (m === 'PUT') {
+      const text = String((await readJsonBody(req))?.text ?? '').trim()
+      if (!text) throw new HttpError(400, 'empty', 'Write something first.')
+      done = editHeld(id!, heldId!, text)
+    } else done = removeHeld(id!, heldId!)
+    if (done === 'gone') throw new HttpError(404, 'no_held', 'That message isn’t held any more: it was sent or removed.')
+    if (done === 'sending') throw new HttpError(409, 'sending', 'That message is being sent right now.')
+    return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+  }
   const s = /^\/v1\/sessions\/([\w-]+)\/(events|prompt|interrupt|continue|mode|terminal|open|menu|screenshot|telescope|provider|model)$/.exec(path)
   if (s) {
     const [, id, action] = s
@@ -915,9 +933,11 @@ async function api(c: Ctx): Promise<void> {
     const clientId = typeof b.clientId === 'string' && /^[\w-]{1,64}$/.test(b.clientId) ? b.clientId : undefined
     // The same clientId for the same session within the window is one send: an answer that got lost
     // on the way (a phone sending again when the Mac came back) doesn't type the prompt twice.
-    const r = await dedupSend(id!, clientId, () => promptSession(id!, text, { afterLimit, replace: b.replace === true, clientId }))
+    // Fork: `hold: true` (the phone app): held while Claude waits on the owner, not refused (held.ts).
+    const holdIt = action === 'prompt' && b.hold === true && b.replace !== true
+    const r = await dedupSend(id!, clientId, () => (holdIt ? promptOrHold(id!, text, clientId) : promptSession(id!, text, { afterLimit, replace: b.replace === true, clientId })))
     if (action === 'prompt') notePrompt(c.deviceId, c.local, b.via)
-    return json(res, 200, { session: listSessions().find((x) => x.id === r.id), ...(r.forked === undefined ? {} : { forked: r.forked }), queued: r.queued })
+    return json(res, 200, { session: listSessions().find((x) => x.id === r.id), ...(r.forked === undefined ? {} : { forked: r.forked }), queued: r.queued, ...('heldId' in r && r.heldId ? { held: true, heldId: r.heldId } : {}) })
   }
   const ap = /^\/v1\/approvals\/([\w-]+)$/.exec(path)
   if (ap && m === 'POST') {
@@ -1165,7 +1185,7 @@ export async function dedupSend<T extends { id: string; queued: boolean; forked?
  * (with `pending`), `starting`, `not_seen`, `not_sent`, `terminal_busy`; with [noFork], 409
  * `no_terminal` rather than a fork (an automation never copies a session open in a plain terminal).
  */
-export async function promptSession(id: string, text: string, o: { afterLimit?: boolean; replace?: boolean; clientId?: string; noFork?: boolean } = {}): Promise<{ id: string; queued: boolean; forked?: boolean }> {
+export async function promptSession(id: string, text: string, o: { afterLimit?: boolean; replace?: boolean; clientId?: string; noFork?: boolean; typeOnly?: boolean } = {}): Promise<{ id: string; queued: boolean; forked?: boolean }> {
   const rec = getSession(id)
   if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
   // A conversation that switched agents goes on in its new session (switch.ts).
@@ -1208,6 +1228,8 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
     upsertSession(id, { stoppedForAway: false })
     return { id, queued: r.queued === true }
   }
+  // Fork: a held prompt only ever goes into a terminal, never into a fork or a resume (held.ts).
+  if (o.typeOnly) throw new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
   if (isSdk(id)) {
     await needSdk()
     upsertSession(id, { stoppedForAway: false })
@@ -1392,6 +1414,52 @@ useSessionOps({
   async moveSession(id, providerId) {
     return (await moveSession(id, providerId, { noFork: true })).id
   },
+})
+
+// ── Fork: held prompts (held.ts; docs/PROTOCOL.md, "Held prompts") ──────────
+/**
+ * A prompt from the phone app (`hold: true`): sent as [promptSession] sends it, or, when Claude
+ * waits on the owner (`needs_answer`: an approval, a question or a plan; `waiting`: a dialog or
+ * menu instead of the input box), held for the session and typed in once the box is back. Behind
+ * prompts already held for an open session, it's held too, so they go in order.
+ */
+export async function promptOrHold(id: string, text: string, clientId?: string): Promise<{ id: string; queued: boolean; forked?: boolean; heldId?: string }> {
+  const held = () => ({ id, queued: true, heldId: hold(id, text, clientId ?? null).id })
+  if (heldOf(id).length && heldReady(id) !== 'ended') return held()
+  try {
+    return await promptSession(id, text, { clientId })
+  } catch (e) {
+    if (e instanceof HttpError && (e.code === 'needs_answer' || e.code === 'waiting')) return held()
+    throw e
+  }
+}
+
+/**
+ * Whether session [id]'s input box could be back: nothing waits on the owner there (no approval,
+ * no menu, not needs_you) and it isn't starting, and it has a terminal Hypernova holds, or is a
+ * `claude agents` job `claude attach` reaches. Typing then says for sure (`no_input` otherwise).
+ */
+export function heldReady(id: string): HeldReady {
+  const r = getSession(id)
+  if (!r || r.state === 'ended') return 'ended'
+  if (pendingApprovals().some((a) => a.sessionId === id)) return 'wait'
+  if (r.menu || r.state === 'needs_you' || r.state === 'starting') return 'wait'
+  if (!termOf(id) && !(settings.claudeAgents === true && agentJobOf(id))) return 'wait'
+  return 'ready'
+}
+
+useHeldOps({
+  ready: heldReady,
+  async send(id, prompt, clientId) {
+    await promptSession(id, prompt, { clientId: clientId ?? undefined, noFork: true, typeOnly: true })
+  },
+  changed: (id) => void (getSession(id) && upsertSession(id, {})),
+  unsent: (id, u) => putEvent(id, { id: `n:${randomUUID()}`, kind: 'notice', ts: Date.now(), text: u.text, tone: u.reason === 'returned' ? 'warn' : 'info', unsent: { reason: u.reason, prompts: u.prompts } }),
+})
+// What may bring a session's input box back: an ask answered, its state or its menu changing.
+tapBroadcast((msg: any) => {
+  if (msg.t === 'approval.resolved') kickHeld(msg.sessionId)
+  else if (msg.t === 'session') kickHeld(msg.session?.id)
 })
 
 /** After a restart onto another provider, how long the old claude's end is still expected (its hook, its registry entry). */

@@ -1082,6 +1082,7 @@ one already is the glasses), so the marker gives no device anything it didn't ha
 | `POST /v1/sessions/{id}/switch/preview` | `{to: "claude" \| "codex", context?: "recent" \| "all" \| "none"}` → `{text, messages, bytes, maxBytes}`: what a switch to the other agent would carry over, for the owner to read and edit (see Switching agents). 400 `bad_agent`, `bad_context`; 409 `same_agent` |
 | `POST /v1/sessions/{id}/switch` | `{to, text, model?, effort?, permissionMode?}` → `{session}`: the conversation goes on with the other agent in a new session (see Switching agents). 409 `busy`, `switched` (with `to`), `terminal_session`, `same_agent`, `no_codex`; 413 `context_too_large` (with `maxBytes`) |
 | `POST /v1/sessions/{id}/prompt` | `{text, attachments?: string[], replace?: boolean, clientId?: string}` → `{session, queued: boolean}` (`text` may be empty when files are attached). `clientId` (up to 64 letters, digits, `_` and `-`, made by the phone) names this send: the queue entry and the `user` event it becomes carry it back. The same `clientId` to the same session within 10 minutes is one send: a repeat is answered with the first send's answer and types nothing (a send that failed is forgotten, so it can go again). This is what lets the phone's offline queue send a prompt again when it never saw the answer ("The offline queue", in DESIGN.md). `queued`: Claude was working, so the prompt waits in `session.queue` until Claude can take it rather than starting a turn now; in a shared terminal a slash command answers `false` (Claude Code runs many at once even while Claude works: /cost, /model and other panels open over the spinner), and one Claude Code does queue shows in `session.queue` all the same. In a shared terminal it is typed into the live session; 409 with `needs_answer` (an approval is open), `waiting` (a dialog or menu in the terminal), `typing` (unsent text there), `starting`, `not_seen`, `not_sent` (Enter didn't send it) or `terminal_busy`; `typing` carries `pending`, the text in the box, and `replace: true` clears it and sends; a session the daemon runs itself (or would, to go on with one that ended) answers 409 `sdk_missing` without Claude Code's SDK, before anything is queued (see Claude Code's SDK); 410 `attachment_gone` |
+| `PUT /v1/sessions/{id}/held/{heldId}`, `DELETE …` | Fork: `{text}` → `{session}`: a held prompt's new words (its files kept), or (DELETE) taken back, never sent. 400 `empty`; 404 `no_session`, `no_held` (sent or removed already); 409 `sending` (being typed right now). See Held prompts |
 | `POST /v1/attachments?name=<file name>` | the file's bytes (any Content-Type, max 30 MB) → `{attachment: Attachment}` (see Attachments) |
 | `POST /v1/sessions/{id}/interrupt` | `{}` → `{ok}` (Esc in a shared terminal) |
 | `POST /v1/sessions/{id}/menu` | `{menuId, choice: number, alt?: boolean}` or `{menuId, cancel: true}` → `{ok}`: answers `session.menu` in its shared terminal (arrow keys to the option, then Enter, or the footer's `alt.key`; `cancel` presses Esc). 409 `menu_gone` (that menu isn't on screen any more), `menu_moved` (the cursor didn't reach the option), `no_terminal` |
@@ -1301,6 +1302,9 @@ Session = {
                               // "!" line the phone sent with its "!"; clientId: the phone send it came
                               // from, null when typed on the Mac
   queued: number,             // queue.length
+  held?: [{id, text, files?: Attachment[], at, clientId: string | null}],
+                              // Fork: prompts held until Claude Code's input box is back, oldest first
+                              // (see Held prompts); text whole, files apart; absent when none
   term: {id, mac: number, phone: number} | null  // its shared terminal; mac/phone = how many have it open
   agentsRunning: number,      // agents its main agent started that run now (see Agents and workflows); with
                               // state, the working rule: working = state working/starting or agentsRunning > 0,
@@ -4172,6 +4176,34 @@ Stats = {
   6-hourly look keeps them even if nobody opens the statistics). A day whose files are gone (it adds
   up to less than the kept copy) is answered from the copy, so `all` keeps growing. Files edited on
   such days are counted per day, not as distinct files.
+
+## Held prompts
+
+Fork. The phone's message box can always send: a prompt sent while Claude waits on the owner is held
+on the daemon and typed in once Claude Code's input box is back (`daemon/src/held.ts`).
+
+- **Asked for**: `POST /v1/sessions/{id}/prompt` with `hold: true` (the phone app; not with `replace`).
+  Where it would be 409 `needs_answer` (an approval, a question or a plan is open for the session) or
+  `waiting` (a dialog or menu in the terminal instead of the input box), it's held: 200 `{session,
+  queued: true, held: true, heldId}`. A prompt sent while others are held for an open session is held
+  behind them, so they go in order. Without `hold` (an older app, Lens, whose decided answer to
+  `needs_answer` is to offer the words as the deny reason) nothing changes. `clientId` works as for
+  any send: a repeat gets the first answer, and the `user` event or queue entry it becomes carries it.
+- **Shown**: `session.held` (absent when none), and a `session` message whenever it changes.
+- **Sent** oldest first, one at a time, as soon as the session is ready: no approval open for it, no
+  `menu`, not `needs_you` or `starting`, and a shared terminal Hypernova holds (or a `claude agents`
+  job, through `claude attach`). How the ask was answered doesn't matter (the phone, a notification,
+  the terminal, the 10-minute auto-deny). The daemon looks when an approval is resolved or the session
+  changes, and every 3 s. It's typed the way a prompt is (Shared terminals, "Typing a prompt"): while
+  Claude works, Claude Code queues it (`session.queue`). Never a fork or a resume.
+- **Not taken** (Claude asks again, unsent text in the box, the terminal busy or starting): it stays
+  first in line and is tried again 1.5 s later at the soonest. In the box but not sent (`not_seen`,
+  `not_sent`): it leaves the line with a notice, `unsent.reason: "returned"`. The conversation went
+  on in another session, or the session has been `ended` for 30 s (it may be resumed at once): every
+  held prompt goes, with a notice, `unsent.reason: "dropped"`, naming them so the phone takes their
+  text back. A session that no longer exists drops them silently.
+- **Kept** in `<support>/held.json` (0600) across daemon restarts: `{sessionId: [{id, prompt, at,
+  clientId}]}`, `prompt` as Claude Code gets it (attachments as @-mentions first).
 
 ## Shared terminals
 
