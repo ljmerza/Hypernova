@@ -3,6 +3,10 @@
     <string name="meta_model_said">Model: %1$s.</string>
     <string name="meta_mode_said">Permission mode: %1$s.</string>
     <string name="meta_session_said">Session %1$s, active %2$s.</string>
+    <!-- A Completed card: "Session c7, finished 5 minutes ago." (the time in meta_ago_*, or done_ago_yesterday). -->
+    <string name="meta_finished_said">Session %1$s, finished %2$s.</string>
+    <!-- The dot before a Completed card's title: its latest reply came after it was last opened on this phone. -->
+    <string name="unread_said">Unread reply</string>
     <string name="meta_ago_now">just now</string>
     <plurals name="meta_ago_minutes">
         <item quantity="one">%d minute ago</item>

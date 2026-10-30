@@ -21,8 +21,8 @@ class HomeCardTest {
         JSONObject("""{"id":"ap1","sessionId":"s1","kind":"$kind","toolName":"$tool","summary":"$tool: …","input":$input}"""),
     )
 
-    private fun session(state: SessionState, phase: Phase, job: String?, agent: String = AgentKind.CLAUDE) =
-        Session("s1", "s1", "t", "alpha", state, "opus", "default", "", 0L, phase = phase, agentJob = job, agent = agent)
+    private fun session(state: SessionState, phase: Phase, job: String?, agent: String = AgentKind.CLAUDE, running: Boolean? = null) =
+        Session("s1", "s1", "t", "alpha", state, "opus", "default", "", 0L, phase = phase, agentJob = job, agent = agent, agentRunning = running)
 
     @Test fun aWholeCommandCanBeAllowedOnTheCard() {
         assertEquals(CardAsk.Exact("ap1", "Bash", "git push origin main"), CardAsk.of(ask("tool", "Bash", """{"command":"git push origin main"}""")))
@@ -47,8 +47,14 @@ class HomeCardTest {
         // A claude agents job at work: all three.
         assertEquals(MenuOffer(rename = true, stop = true, delete = true), MenuOffer.of(session(SessionState.Working, Phase.Working, "j1")))
         assertTrue(MenuOffer.of(session(SessionState.NeedsYou, Phase.NeedsYou, "j1")).stop)
-        // Finished: nothing to stop, still deleted from here.
-        assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Idle, "j1")))
+        // Idle with its process still running: Stop too (owner, 2026-10-30), and the rest.
+        assertEquals(MenuOffer(rename = true, stop = true, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Idle, "j1", running = true)))
+        // Done or stopped already (no process): nothing to stop, still deleted from here.
+        assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Idle, "j1", running = false)))
+        // An older Mac doesn't say: idle offers no Stop, as before.
+        assertFalse(MenuOffer.of(session(SessionState.Idle, Phase.Idle, "j1")).stop)
+        // Ended: never, whatever it says.
+        assertFalse(MenuOffer.of(session(SessionState.Idle, Phase.Ended, "j1", running = true)).stop)
         // Not a claude agents job: only a rename.
         assertEquals(MenuOffer(rename = true, stop = false, delete = false), MenuOffer.of(session(SessionState.Working, Phase.Working, null)))
         // Codex's sessions: nothing, so no long-press.
@@ -60,5 +66,8 @@ class HomeCardTest {
         assertEquals("j1", wire(""","agentJob":"j1"""").agentJob)
         assertNull(wire("").agentJob)
         assertNull(wire(""","agentJob":""""").agentJob)
+        assertEquals(true, wire(""","agentJob":"j1","agentRunning":true""").agentRunning)
+        assertEquals(false, wire(""","agentJob":"j1","agentRunning":false""").agentRunning)
+        assertNull(wire(""","agentJob":"j1"""").agentRunning)
     }
 }

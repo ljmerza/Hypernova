@@ -43,6 +43,12 @@
     <string name="ago_minutes">%1$dm</string>
     <string name="ago_hours">%1$dh</string>
     <string name="ago_days">%1$dd</string>
+    <!-- A Completed card's stamp: when it finished (data/Unread.kt, Finished). -->
+    <string name="done_ago_now">just now</string>
+    <string name="done_ago_minutes">%1$dm ago</string>
+    <string name="done_ago_hours">%1$dh ago</string>
+    <string name="done_ago_yesterday">yesterday</string>
+    <string name="done_ago_days">%1$dd ago</string>
 
     <!-- New session sheet -->
     <string name="project">Project</string>

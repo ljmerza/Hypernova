@@ -1037,6 +1037,7 @@ class LiveHub(
             switchedFrom = w.switchedFrom,
             switchedTo = w.switchedTo,
             agentJob = w.agentJob,
+            agentRunning = w.agentRunning,
             question = w.question,
             blockedCalls = w.blockedCalls,
         )

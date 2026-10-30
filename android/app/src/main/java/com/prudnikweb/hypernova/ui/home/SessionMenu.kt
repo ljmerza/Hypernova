@@ -41,7 +41,9 @@ import kotlinx.coroutines.launch
 /**
  * What a Home card's long-press menu offers for [Session] (docs/PROTOCOL.md, "Session menu"): Rename
  * for any session but Codex's; Stop and Delete only for a `claude agents` job ([Session.agentJob]),
- * Stop only while it works or waits on the owner.
+ * Stop while it works or waits on the owner, or idles with its process still running
+ * ([Session.agentRunning]; owner, 2026-10-30: idle jobs couldn't be stopped). Not for one stopped or
+ * done already, nor, from an older Mac that doesn't say, for an idle one.
  */
 data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean) {
     val any: Boolean get() = rename || stop || delete
@@ -49,7 +51,7 @@ data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean
     companion object {
         fun of(s: Session): MenuOffer {
             val job = s.agentJob != null
-            val live = s.state != SessionState.Idle && s.phase != Phase.Ended
+            val live = s.phase != Phase.Ended && (s.state != SessionState.Idle || s.agentRunning == true)
             return MenuOffer(rename = !s.codex, stop = job && live, delete = job)
         }
     }

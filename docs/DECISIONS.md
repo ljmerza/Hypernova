@@ -1847,3 +1847,25 @@ the owner had its one long scroll put in tabs first.
    mark. The open tab is kept while the sheet is; the next time it opens on Overview again.
 4. **Nothing changes on the session's own screen.** The strip and the status line still open the
    sheet; every action in it does what it did.
+
+## Unread and finished on Completed cards (2026-10-30)
+
+Home, idea HM6: with many `claude agents` jobs the owner couldn't tell which finished replies he
+hadn't read.
+
+1. **An unread reply is a mint dot before a Completed card's title**, nothing more (no chip, no new
+   row). Unread: its last activity (`lastActivityAt`, the card's time) is later than when he last had
+   its chat on screen. Opening it, or having it open while replies come in, marks it read.
+2. **Kept on the phone, per server** (`data/Unread.kt`, a preferences file per paired computer), no
+   daemon change: each phone keeps its own. The demo keeps none.
+3. **First run:** a session never opened on this phone counts from when the phone first kept track
+   for that server, so every old job is read and only what finishes after is unread.
+4. **Completed cards say when they finished** in their stamp, short: `just now`, `5m ago`, `2h ago`,
+   `yesterday`, `3d ago` (hours under a day, then by the calendar). Needs input and Working keep
+   `1m`. TalkBack: "Session c7, finished 5 minutes ago."
+5. **Completed is newest first** (owner, the same day), by that time, the same time by name. Needs
+   input and Working stay A to Z, so their cards hold still; unread doesn't change the order.
+6. **Stop for idle `claude agents` jobs** (owner, the same day: he couldn't stop an idle one, only
+   Rename and Delete showed). The card's menu offers Stop for any job whose process still runs, idle
+   included (`claude stop`, the conversation kept); not for one done or stopped already (the session's
+   `agentRunning`, docs/PROTOCOL.md, "Session menu"). An older Mac doesn't say: idle offers no Stop.

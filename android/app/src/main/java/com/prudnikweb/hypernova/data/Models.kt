@@ -77,6 +77,8 @@ data class Session(
     val switchedTo: String? = null,
     /** Its `claude agents` job id (docs/PROTOCOL.md, "Session menu"): the Home card's menu can stop or delete it. */
     val agentJob: String? = null,
+    /** Its `claude agents` job's process runs (an idle one too): Stop is offered; false once it's stopped or done; null from an older Mac. */
+    val agentRunning: Boolean? = null,
     /** A `claude agents` job asked the owner something in words (docs/PROTOCOL.md, "Session menu"): a reply in the box answers it. */
     val question: String? = null,
     /** Calls refused without the owner, not yet retried or dismissed: its blocked calls (data/Blocked.kt). */

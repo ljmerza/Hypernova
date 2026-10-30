@@ -81,6 +81,11 @@ export type Session = {
   switchedTo?: string
   /** A `claude agents` job's id (settings.claudeAgents): the phone can stop or delete it there. Absent otherwise. */
   agentJob?: string
+  /**
+   * With [agentJob]: its process runs (Claude Code's registry has it), idle or not, so `claude stop`
+   * has something to stop. False for a job that's done or stopped (only `claude agents`' list has it).
+   */
+  agentRunning?: boolean
   /** Calls refused without the owner that he hasn't retried or dismissed (blocked.ts): its Blocked tab. */
   blockedCalls: number
   /**
@@ -92,7 +97,7 @@ export type Session = {
   /** Fork: prompts held until Claude Code's input box is back (held.ts), oldest first. Absent when none. */
   held?: HeldView[]
 }
-type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
+type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'agentRunning' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
 export const isCodexRec = (r: { agent?: string }) => r.agent === 'codex'
 
@@ -205,7 +210,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id) } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id) }
+  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id) }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
