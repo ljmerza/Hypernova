@@ -45,6 +45,8 @@
     <string name="chat_menu_title">Message</string>
     <string name="chat_copy">Copy</string>
     <string name="chat_copied">Copied</string>
+    <!-- A code block in the chat: long-press (or TalkBack's action) copies it whole. -->
+    <string name="copy_code">Copy code</string>
     <string name="chat_quote">Quote</string>
     <string name="chat_read">Read aloud</string>
     <string name="chat_read_hint">your Mac\'s voice</string>

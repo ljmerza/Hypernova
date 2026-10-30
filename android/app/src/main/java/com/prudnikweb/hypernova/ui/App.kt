@@ -431,9 +431,12 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                         else -> null
                     },
                 )
+                // On Home the cards already say what a session's banner would (owner, 2026-10-30):
+                // its banners wait for another screen; the app's own (an update, the account) still show.
+                val atHome by androidx.compose.runtime.rememberUpdatedState(route == Route.Home)
                 LaunchedEffect(hub) {
                     hub?.notices?.collect { n ->
-                        if (n.sessionId == null || n.sessionId != onScreen) {
+                        if (n.sessionId == null || (n.sessionId != onScreen && !atHome)) {
                             if (!vm.showNotice(n)) return@collect
                             if (n.kind != Notice.Kind.Finished && n.kind != Notice.Kind.Update) view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.KEYBOARD_TAP)
                         }
@@ -446,8 +449,9 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                         vm.showNotice(com.prudnikweb.hypernova.data.updateNotice(context, update))
                     }
                 }
-                // Opening that session (or the chat it's in) takes the banner away.
+                // Opening that session (or the chat it's in) takes the banner away; so does Home, for any session's.
                 LaunchedEffect(onScreen) { if (onScreen != null && vm.notice?.sessionId == onScreen) vm.dismissNotice() }
+                LaunchedEffect(atHome) { if (atHome && vm.notice?.sessionId != null) vm.dismissNotice() }
                 NoticeHost(
                     vm.notice,
                     onOpen = { n ->

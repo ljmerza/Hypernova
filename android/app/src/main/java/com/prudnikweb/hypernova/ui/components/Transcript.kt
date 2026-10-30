@@ -54,6 +54,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -589,10 +593,24 @@ fun Markdown(text: String, modifier: Modifier = Modifier, color: Color = HN.inkM
 /** A fenced code block: mono on the terminal's dark, scrolling sideways. [endPad] leaves room for a control over its corner. */
 @Composable
 internal fun CodeBlock(text: String, modifier: Modifier = Modifier, endPad: androidx.compose.ui.unit.Dp = 12.dp) {
+    // A long press copies the block whole (the owner, 2026-10-30), and is the block's own: the
+    // message's menu doesn't open over it. TalkBack has it as an action.
+    val context = LocalContext.current
+    val view = LocalView.current
+    val copyLabel = stringResource(R.string.copy_code)
+    val copied = stringResource(R.string.chat_copied)
+    val copy = {
+        context.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText(copyLabel, text))
+        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        // Android 13 and newer show their own "copied" preview.
+        if (android.os.Build.VERSION.SDK_INT < 33) android.widget.Toast.makeText(context, copied, android.widget.Toast.LENGTH_SHORT).show()
+    }
     Box(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
+            .pointerInput(text) { detectTapGestures(onLongPress = { copy() }) }
+            .semantics { customActions = listOf(CustomAccessibilityAction(copyLabel) { copy(); true }) }
             .background(HN.bg950.copy(alpha = 0.86f))
             .border(1.dp, HN.line, RoundedCornerShape(10.dp))
             .horizontalScroll(rememberScrollState())
