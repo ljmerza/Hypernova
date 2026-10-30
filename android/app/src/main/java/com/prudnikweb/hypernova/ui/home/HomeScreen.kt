@@ -128,7 +128,6 @@ import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.StatusChip
-import com.prudnikweb.hypernova.ui.components.Wordmark
 import com.prudnikweb.hypernova.ui.components.Z
 import com.prudnikweb.hypernova.ui.fx.CosmosHit
 import com.prudnikweb.hypernova.ui.fx.CosmosState
@@ -534,9 +533,8 @@ fun HomeScreen(
                 Modifier.fillMaxWidth().padding(top = top + 10.dp, start = 20.dp, end = 16.dp, bottom = 28.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Fork: the mark alone (owner, 2026-10-30); the word "hypernova" made the bar crowded.
                 NovaMark(size = 22.dp)
-                Spacer(Modifier.width(10.dp))
-                Wordmark()
                 Spacer(Modifier.weight(1f))
                 // Fork: the new-session (and new-automation) pill sits up here, small, instead of
                 // over the tabs, so the bottom bar is just the tabs.
@@ -1141,7 +1139,8 @@ private fun LinkChip(hub: Hub, onClick: () -> Unit) {
             .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.settings), onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        ConnectionChip(hub.link.state, name = hub.mac.name, battery = hub.mac.battery, awake = hub.mac.awake, via = hub.mac.via)
+        // As tall as the New session pill beside it (36dp), not the chip's own 30.
+        ConnectionChip(hub.link.state, Modifier.height(36.dp), name = hub.mac.name, battery = hub.mac.battery, awake = hub.mac.awake, via = hub.mac.via)
     }
 }
 
