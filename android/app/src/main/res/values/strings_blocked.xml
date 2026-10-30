@@ -1,0 +1,28 @@
+<resources>
+    <!-- A session's Blocked tab (ui/session/BlockedTab.kt; docs/PROTOCOL.md, "Blocked calls"): calls refused without the owner. -->
+
+    <!-- The switch at the top of the chat. -->
+    <string name="blocked_tab_chat">Chat</string>
+    <string name="blocked_tab">Blocked (%1$d)</string>
+
+    <!-- The list. -->
+    <string name="blocked_loading">Loading blocked calls…</string>
+    <string name="blocked_empty">Nothing is blocked in this session.</string>
+    <string name="blocked_intro">Calls refused without you. Allow &amp; retry tells Claude you approve exactly this one and to run it again.</string>
+    <string name="blocked_reason_auto">Auto mode blocked it</string>
+    <string name="blocked_reason_auto_why">Auto mode blocked it: %1$s</string>
+    <string name="blocked_reason_away">Nobody answered for 10 minutes</string>
+    <string name="blocked_retry">Allow &amp; retry</string>
+    <string name="blocked_dismiss">Dismiss</string>
+    <string name="blocked_retried">Sent. Claude will run it again.</string>
+
+    <!-- When the Mac says no without a reason of its own. -->
+    <string name="blocked_err_load">Couldn’t load the blocked calls.</string>
+    <string name="blocked_err_retry">Couldn’t send the approval.</string>
+    <string name="blocked_err_dismiss">Couldn’t dismiss it.</string>
+    <!-- The Home card's chip: calls refused without the owner (ui/home/HomeScreen.kt). -->
+    <plurals name="blocked_chip">
+        <item quantity="one">%d blocked</item>
+        <item quantity="other">%d blocked</item>
+    </plurals>
+</resources>

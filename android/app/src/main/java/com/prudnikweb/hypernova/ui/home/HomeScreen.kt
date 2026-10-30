@@ -846,6 +846,11 @@ fun SessionCard(
                 // With an ask, its pills keep their room and the chips give way.
                 Row(if (ask != null) Modifier.weight(1f) else Modifier, verticalAlignment = Alignment.CenterVertically) {
                     PhaseChip(s, block)
+                    // Calls refused without the owner (the session's Blocked tab): how many wait for him.
+                    if (s.blockedCalls > 0) {
+                        Spacer(Modifier.width(6.dp))
+                        StatusChip(pluralStringResource(R.plurals.blocked_chip, s.blockedCalls, s.blockedCalls), HN.amber)
+                    }
                     // Prompts typed while the Mac was away, waiting on this phone to be sent.
                     if (waiting > 0) {
                         val said = stringResource(R.string.waiting_a11y, waiting)

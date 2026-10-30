@@ -64,6 +64,7 @@ function newSession(id: string, patch: Partial<Session> = {}): Session {
     automation: null,
     browsable: true,
     outsideProjects: false,
+    blockedCalls: 0,
     ...patch,
   }
 }

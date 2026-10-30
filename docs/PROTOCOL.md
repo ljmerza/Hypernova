@@ -1294,6 +1294,7 @@ Session = {
   activity: string | null,    // what it's doing now, e.g. "Bash: ./gradlew build"
   pendingApprovalIds: string[],
   stoppedForAway: boolean,    // auto-denied after 10 min → show the Continue button
+  blockedCalls: number,       // calls refused without the owner, not yet retried or dismissed: its Blocked tab (see Blocked calls)
   contextPct: number | null, costUsd: number | null,
   queue: [{id, text, files?: Attachment[], at, clientId: string | null}],
                               // prompts waiting until Claude can take them, oldest first: Claude Code's
@@ -1620,6 +1621,45 @@ shows, finished ones too (`idle`, on Home rather than History; one blocked on th
 - `DELETE /v1/sessions/{id}`: `claude rm <job>`, then `session.removed`. `{ok: true}`.
 - Both: 409 `not_agents` for a session with no `agentJob`; 409 `agents_refused` with Claude Code's
   own words when it refuses (`rm` keeps a worktree with unpushed work).
+
+## Blocked calls
+
+A session's Blocked tab: calls refused without the owner. `auto_mode`: Claude Code's auto mode
+classifier refused it (its PermissionDenied hook, see Hooks, or the tool result "Permission for this
+action was denied by the Claude Code auto mode classifier. Reason: …" in the transcript, which stays
+the fallback; one row for both). `away`: nobody answered its approval for 10 minutes (see
+Approvals). Don't ask mode, deny rules and the owner's own no aren't listed (a retry can't get past
+them). The same call refused again is one row, the newest refusal's; a call that runs later leaves
+the list by itself; refusals more than a day old read from a transcript aren't listed; 20 per
+session at most. `Session.blockedCalls` counts them, and a `{t:"session"}` goes out when it changes.
+
+- `GET /v1/sessions/{id}/blocked` → `{blocked: BlockedCall[]}`, newest first.
+- `POST /v1/sessions/{id}/blocked/{bid}/retry`: Allow & retry. The owner's approval is typed into
+  the session the prompt route's way (never a fork: 409 `no_terminal` for one open in a terminal
+  Hypernova doesn't hold), naming the call whole, so auto mode's classifier takes it as his
+  consent: "I approve this call that auto mode blocked. Run it again now, exactly as it was:" (an
+  `away` one: "I'm back, and I approve the call you were waiting on. …"), then `<tool>: <target>`.
+  If Claude Code asks about the same call within 10 minutes, the daemon answers yes once without
+  asking. → `{session, queued, blocked}`; the prompt route's 409s (the row stays), 404 `no_blocked`,
+  409 `retrying` while one is on its way.
+- `DELETE /v1/sessions/{id}/blocked/{bid}`: Dismiss. → `{blocked}`; 404 `no_blocked`.
+
+Both keep the call's tool_use ids in `<support>/blocked-settled.json`, so reading the transcript
+again (after a restart) doesn't bring it back.
+
+```
+BlockedCall = {
+  id, sessionId,
+  tool: string,               // "Bash", "Edit", "WebFetch", an MCP tool's full name
+  target: string,             // what it would touch: the command, the file, the address, the query
+                              // (another tool's input as JSON, 300 characters); keys masked as titles are
+  input: object,              // its input as the chat's tool event has it, keys masked
+  reason: "auto_mode" | "away",
+  why: string | null,         // the classifier's reason, at most 200 characters
+  at: number,                 // epoch ms, the newest refusal
+  toolUseId: string | null
+}
+```
 
 ## A session's model
 
@@ -4338,7 +4378,8 @@ The admin token is in `<support>/admin-token` (0600); the Mac app reads it.
 Global `http` hooks in `~/.claude/settings.json`, all pointing at
 `http://127.0.0.1:47322/hooks/<secret>`: PermissionRequest (timeout 660),
 PreToolUse, PostToolUse, PostToolUseFailure, UserPromptSubmit, Stop,
-Notification, SessionStart, SessionEnd (timeout 10), and StopFailure, SubagentStop and PreCompact (timeout 10).
+Notification, SessionStart, SessionEnd (timeout 10), and StopFailure, SubagentStop, PreCompact and
+PermissionDenied (timeout 10).
 Each entry is
 recognised by the URL prefix, so uninstall removes exactly those. StopFailure (Claude Code fires
 it in place of Stop when an API error ended the turn: its `error`, `error_details`,
@@ -4349,7 +4390,9 @@ never looks unconnected. It stops the session `idle` with `blocked` (see Account
 Claude Code's error, so `lastText` stays as it was. SubagentStop (an agent finished: `agent_id`,
 `last_assistant_message`) is optional the same way; it ends that agent (see Agents and workflows).
 PreCompact (the context is about to be compacted) is optional the same way; only automations' hook
-triggers listen (see Automations, "Workflows"). Stop, StopFailure, PostToolUseFailure, PreCompact
+triggers listen (see Automations, "Workflows"). PermissionDenied (matcher `*`; auto mode's classifier
+refused a call: `tool_name`, `tool_input`, `tool_use_id`, `reason`) is optional the same way; the call
+goes on the session's Blocked tab (see Blocked calls), and the daemon answers `{}`. Stop, StopFailure, PostToolUseFailure, PreCompact
 and SessionEnd are handed to those triggers (for a session the daemon runs, the SDK's turn ends and
 failed tool results stand in for them). The daemon ignores hook calls
 for sessions it drives through the SDK (it knows their ids), because the SDK

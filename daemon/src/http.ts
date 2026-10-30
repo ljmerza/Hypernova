@@ -49,6 +49,7 @@ import { notesApi } from './notes.ts'
 import { ChangeError, changesOf, diffOf } from './changes.ts'
 import { toolPath } from './normalize.ts'
 import { ResumeError, setAutoContinue, typeContinue } from './resume.ts'
+import { BlockedError, blockedList, dismissBlocked, retryBlocked } from './blocked.ts'
 import { CONTINUE_TEXT } from './blockers.ts'
 import { checkBalance, hasBalance, providerSaved } from './balance.ts'
 import { checkProvider, type ProviderCheck } from './providers-check.ts'
@@ -775,6 +776,25 @@ async function api(c: Ctx): Promise<void> {
       throw e
     }
     return json(res, 200, { session: listSessions().find((x) => x.id === ac[1]) })
+  }
+  // Its Blocked tab (docs/PROTOCOL.md, "Blocked calls"; blocked.ts): calls refused without the owner,
+  // Allow & retry (his approval typed in, the prompt route's own way, never a fork) and Dismiss.
+  const bl = /^\/v1\/sessions\/([\w-]+)\/blocked(?:\/([\w-]+)(\/retry)?)?$/.exec(path)
+  if (bl && ((!bl[2] && m === 'GET') || (bl[3] && m === 'POST') || (bl[2] && !bl[3] && m === 'DELETE'))) {
+    const [, id, bid, retry] = bl
+    if (!getSession(id!)) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    if (!bid) return json(res, 200, { blocked: blockedList(id!) })
+    try {
+      if (retry) {
+        const r = await retryBlocked(id!, bid, (sid, text) => promptSession(sid, text, { noFork: true }))
+        return json(res, 200, { session: listSessions().find((x) => x.id === r.id), queued: r.queued, blocked: blockedList(id!) })
+      }
+    } catch (e) {
+      if (e instanceof BlockedError) throw new HttpError(e.status, e.code, e.message)
+      throw e
+    }
+    if (!dismissBlocked(id!, bid)) throw new HttpError(404, 'no_blocked', 'That call isn’t blocked any more.')
+    return json(res, 200, { blocked: blockedList(id!) })
   }
   // The Home card's long-press menu (docs/PROTOCOL.md, "Session menu"): rename it (Claude Code's
   // /rename, typed in, so it shows in `claude agents` and the transcript keeps it), and for a

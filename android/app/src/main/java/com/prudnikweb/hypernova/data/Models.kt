@@ -77,6 +77,8 @@ data class Session(
     val switchedTo: String? = null,
     /** Its `claude agents` job id (docs/PROTOCOL.md, "Session menu"): the Home card's menu can stop or delete it. */
     val agentJob: String? = null,
+    /** Calls refused without the owner, not yet retried or dismissed: its Blocked tab (data/Blocked.kt). */
+    val blockedCalls: Int = 0,
 ) {
     /** A Codex session: no rewind, no other provider, no carrying on by itself, Codex's two modes. */
     val codex: Boolean get() = agent == AgentKind.CODEX

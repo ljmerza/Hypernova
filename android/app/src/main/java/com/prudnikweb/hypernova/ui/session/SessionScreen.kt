@@ -199,6 +199,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     var modeOpen by rememberSaveable { mutableStateOf(false) }
     // The model picker, opened from the status line's panel (the Start sheet's, this provider's models).
     var modelOpen by rememberSaveable { mutableStateOf(false) }
+    // Its Blocked tab open in the chat's place (BlockedTab.kt).
+    var blockedOpen by rememberSaveable(sessionId) { mutableStateOf(false) }
     // The switch to the other agent, open ([AgentKind.CLAUDE] or [AgentKind.CODEX]), from the same panel.
     var switching by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     val codexNextTurn = stringResource(R.string.cx_mode_next_turn)
@@ -440,7 +442,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = sourceKey),
+            Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = sourceKey).underBlockedTab(blockedOpen),
             state = list,
             contentPadding = contentPadding,
             // Fork: 10dp between rows (was 18), so more of a session fits on the screen.
@@ -491,6 +493,9 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 }
             }
         }
+
+        // The Blocked tab in the chat's place (BlockedTab.kt); after Allow & retry, back to the chat.
+        if (blockedOpen) BlockedTab(hub, session, contentPadding, onChat = { blockedOpen = false; follow = true }, Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = sourceKey))
 
         // Fork: a shorter header (less padding and fade under it) leaves more of the chat in view.
         BlurredTop(haze, sourceKey, Modifier.fillMaxWidth().onSizeChanged { topPx = it.height }, fade = 16.dp) {
@@ -608,6 +613,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 )
                 // Its reply being read aloud (here, or the glasses' speech played here): the speaking wave.
                 com.prudnikweb.hypernova.ui.voice.SpeakingStatus(session.id, Modifier.padding(start = 12.dp))
+                // "Chat | Blocked (n)" while calls were refused without the owner (BlockedTab.kt).
+                BlockedSwitch(session.blockedCalls, blockedOpen, { blockedOpen = it }, Modifier.padding(start = 12.dp, top = 8.dp))
                 // Tap the status line: the model and the permission mode, as in the new-session sheet.
                 AnimatedVisibility(
                     modeOpen && canMode,
