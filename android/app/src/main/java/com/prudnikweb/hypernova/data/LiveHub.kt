@@ -1088,6 +1088,7 @@ class LiveHub(
             agent = w.agent,
             switchedFrom = w.switchedFrom,
             switchedTo = w.switchedTo,
+            blockedCalls = w.blockedCalls,
         )
     }
 
@@ -2228,6 +2229,22 @@ class LiveHub(
         val s = applySession(api.post("/v1/sessions/$sessionId/provider", JSONObject().put("providerId", providerId)))
         Result.success(s?.id ?: sessionId)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_switch_provider)) }
+
+    // ─── A session's Blocked tab (data/Blocked.kt) ───────────────────────
+
+    override suspend fun blocked(sessionId: String): Result<List<BlockedCall>> = try {
+        Result.success(BlockedWire.list(api.get("/v1/sessions/$sessionId/blocked")))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.blocked_err_load)) }
+
+    override suspend fun retryBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = try {
+        val r = api.post("/v1/sessions/$sessionId/blocked/$id/retry")
+        applySession(r)
+        Result.success(BlockedWire.list(r))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.blocked_err_retry)) }
+
+    override suspend fun dismissBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = try {
+        Result.success(BlockedWire.list(api.delete("/v1/sessions/$sessionId/blocked/$id")))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.blocked_err_dismiss)) }
 
     // ─── Carrying on after a limit, other providers (data/Providers.kt) ───
 

@@ -280,6 +280,13 @@ interface Hub {
      */
     suspend fun switchAgent(sessionId: String, to: String, text: String, model: String?, effort: String?, mode: String?): Result<String> = Result.failure(UnsupportedOperationException())
 
+    /** A session's calls refused without the owner (data/Blocked.kt), newest first. */
+    suspend fun blocked(sessionId: String): Result<List<BlockedCall>> = Result.success(emptyList())
+    /** Allow & retry: the owner's approval of that call typed into the session. The list as it's left. */
+    suspend fun retryBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = Result.failure(HubException("Not in the demo."))
+    /** Dismiss: off the list. The list as it's left. */
+    suspend fun dismissBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = Result.failure(HubException("Not in the demo."))
+
     /** Try to reconnect now instead of waiting for the backoff. */
     fun retry() {}
     /** The app came to the foreground (true) or left it (false). */

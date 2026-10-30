@@ -94,6 +94,8 @@ data class WSession(
     /** It switched agents: the session it came from, and the one it went on in (docs/PROTOCOL.md, "Switching agents"). */
     val switchedFrom: String? = null,
     val switchedTo: String? = null,
+    /** Calls refused without the owner (docs/PROTOCOL.md, "Blocked calls"); an older Mac doesn't say: none. */
+    val blockedCalls: Int = 0,
 )
 
 /**
@@ -612,6 +614,7 @@ object Wire {
             agent = o.str("agent")?.takeIf { it.isNotBlank() } ?: AgentKind.CLAUDE,
             switchedFrom = o.str("switchedFrom")?.takeIf { it.isNotBlank() },
             switchedTo = o.str("switchedTo")?.takeIf { it.isNotBlank() },
+            blockedCalls = o.int("blockedCalls") ?: 0,
         )
     }
 
