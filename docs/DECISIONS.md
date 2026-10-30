@@ -1587,3 +1587,20 @@ and a folder picked that wasn't one of them fell back to the most recent.
    read-only): with it on, the names of any folder outside the key places now reach the phone too. A
    session could already start in any existing folder (`POST /v1/sessions`); only the names are new.
    The file browser's rules don't change.
+
+## The session sheet (2026-10-29)
+
+The owner, about the chat's header: no spinning planet under it and no line saying how many agents
+run and which mode the session is in; the usage card stays, and a tap on it opens a Session sheet:
+"it's not just usage, it's all the information about this session and what you can change."
+
+1. **The status line keeps its words only** (IDLE, ENDED, PAUSED, where the Mac is), then the usage
+   strip. Its trail (the agents and queued counts, the mode tag with its one-tap cycle) is gone; the
+   strip's TalkBack sentence says them instead.
+2. **A tap on the strip or the line opens the session sheet**, which replaces the line's panel and
+   the strip's breakdown: usage, the model (and the other agent), the permissions (the mode; the
+   Blocked tab while calls wait), the agents at work and each running workflow's agents done of
+   started, where it runs, and the Home card's menu. This supersedes "Permission mode from the phone:
+   tap the session's status line" (2026-10-14).
+3. **Nothing new from the Mac**: the sheet shows what the session already carries. The phone knows no
+   allow rules, so the sheet shows none.
