@@ -94,7 +94,6 @@ val Trigger.timed: Boolean get() = this is Trigger.Time || this is Trigger.Once 
 object Then {
     const val NONE = "none"
     const val NOTIFY = "notify"
-    const val SAY = "say"
 }
 
 /** "Do …": what an automation does. */
@@ -133,10 +132,8 @@ sealed interface Action {
         }
     }
 
-    /** A notification on the phone; [glasses]: also read aloud on them when they're connected. */
-    @Immutable data class Notify(val text: String, val glasses: Boolean = false) : Action
-    /** Read aloud on the glasses (on the phone when they aren't connected). */
-    @Immutable data class Say(val text: String) : Action
+    /** A notification on the phone. */
+    @Immutable data class Notify(val text: String) : Action
     /**
      * A workflow's pause for a person: [question] with two or three [answers]; [default] (one of
      * them) is taken after [timeoutMin] minutes. Its answer is the step's output.
@@ -182,7 +179,7 @@ data class Automation(
     /** Every run, skips and misses included. */
     val runCount: Int = 0,
     /**
-     * "no_battery", "no_project", "no_session", "no_provider", "no_glasses", "outside_projects" (its
+     * "no_battery", "no_project", "no_session", "no_provider", "outside_projects" (its
      * folder is outside the projects folder), "no_model" (its model is no longer offered),
      * "bad_definition" (what the Mac kept doesn't read as one: off until saved again), or
      * "mode_unavailable" (its last run ran in another mode than asked); null when fine.
@@ -274,11 +271,11 @@ data class Run(
     }
 }
 
-/** A notification an automation sent (`to` "phone" or "glasses"); [ask]: an ask step's question, with its answers. */
+/** A notification an automation sent (`to` "phone"); [ask]: an ask step's question, with its answers. */
 @Immutable
 data class AutomationNote(val id: String, val automationId: String?, val runId: String?, val name: String, val text: String, val to: String, val at: Long, val ask: RunAsk? = null) {
     companion object {
-        /** Where a note goes: the phone shows "phone" notes, Lens "glasses" ones. */
+        /** Where a note goes: the phone shows "phone" notes. */
         const val PHONE = "phone"
         /** Notes older than this aren't shown on reconnect (the Mac keeps 12 hours). */
         const val KEPT = 12 * 3_600_000L
@@ -292,8 +289,6 @@ data class AutomationsState(
     val list: List<Automation>,
     /** The last 12 hours of notes, newest first. */
     val notes: List<AutomationNote> = emptyList(),
-    /** A Lens device is paired: "Read aloud on my glasses" can be chosen. */
-    val glasses: Boolean = false,
     /** The Mac's time zone (Snapshot.mac.tz), which every time of day is in; null: the phone's. */
     val tz: String? = null,
     /** Power triggers can work here: false on a Mac without a battery; null while the Mac doesn't know yet (or doesn't say). */
@@ -579,8 +574,7 @@ object AutomationWire {
                 then = o.str("then") ?: Then.NONE,
             )
             "continue" -> Action.Continue(o.str("target") ?: Action.Continue.WORKING, o.str("prompt").orEmpty(), o.str("then") ?: Then.NONE, o.str("providerId"))
-            "notify" -> Action.Notify(o.str("text").orEmpty(), o.bool("glasses"))
-            "say" -> Action.Say(o.str("text").orEmpty())
+            "notify" -> Action.Notify(o.str("text").orEmpty())
             "ask" -> {
                 val answers = o.arr("answers").strings().ifEmpty { WorkflowShape.ASK_DEFAULT_ANSWERS }
                 Action.Ask(o.str("question").orEmpty(), answers, o.str("default")?.takeIf { it in answers } ?: answers.last(), o.int("timeoutMin") ?: WorkflowShape.ASK_TIMEOUT_MIN)
@@ -659,7 +653,6 @@ object AutomationWire {
             paused = o.bool("paused"),
             list = o.arr("list").mapObjects(::automation),
             notes = o.arr("notes").mapObjects(::note),
-            glasses = o.bool("glasses"),
             tz = snapshot.obj("mac")?.str("tz")?.takeIf { it.isNotBlank() },
             hasBattery = if (o.has("hasBattery") && !o.isNull("hasBattery")) o.optBoolean("hasBattery") else null,
             features = WorkflowWire.features(o),
@@ -710,8 +703,7 @@ object AutomationWire {
             .put("allowedTools", JSONArray(a.allowedTools)).put("then", a.then)
         is Action.Continue -> JSONObject().put("kind", "continue").put("target", a.target).put("prompt", a.prompt).put("then", a.then)
             .put("providerId", a.providerId ?: JSONObject.NULL)
-        is Action.Notify -> JSONObject().put("kind", "notify").put("text", a.text).put("glasses", a.glasses)
-        is Action.Say -> JSONObject().put("kind", "say").put("text", a.text)
+        is Action.Notify -> JSONObject().put("kind", "notify").put("text", a.text)
         is Action.Ask -> JSONObject().put("kind", "ask").put("question", a.question).put("answers", JSONArray(a.answers)).put("default", a.default).put("timeoutMin", a.timeoutMin)
         is Action.Shell -> JSONObject().put("kind", "shell").put("projectPath", a.projectPath).put("command", a.command).put("timeoutSec", a.timeoutSec)
         is Action.Unknown -> runCatching { JSONObject(a.json) }.getOrElse { JSONObject().put("kind", a.kind) }

@@ -645,7 +645,7 @@ fun routeWord(via: String): String? = when (via) {
     Mac.VIA_LOCAL -> stringResource(R.string.route_local)
     // The built-in node and the Tailscale app both say "Tailscale" here; Settings tells them apart.
     Mac.VIA_TAILSCALE, Mac.VIA_BUILT_IN -> stringResource(R.string.route_tailscale)
-    // A plain remote address: what the bridge tells Lens too ("remote"), never "Tailscale".
+    // A plain remote address, never "Tailscale".
     Mac.VIA_REMOTE -> stringResource(R.string.route_remote)
     else -> null
 }

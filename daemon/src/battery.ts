@@ -1,4 +1,4 @@
-// The Mac's own battery, for the phone and the glasses (docs/PROTOCOL.md, "Battery"): `pmset -g
+// The Mac's own battery, for the phone (docs/PROTOCOL.md, "Battery"): `pmset -g
 // batt` and the battery's own time estimate from `ioreg` (averaged over five minutes) at start and
 // once a minute, run without blocking. A Mac without one (Mac mini, iMac, Mac Studio, Mac Pro) has none, `null`, and the
 // clients show nothing for it. Clients hear of a change they'd show ({t:"battery"}): the

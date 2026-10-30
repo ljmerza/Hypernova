@@ -82,7 +82,7 @@ object ReadAloud {
         }
     }
 
-    /** Stops this phone's own reading (the glasses' speech, played here too, goes on). */
+    /** Stops this phone's own reading. */
     fun stop() {
         job?.cancel()
         job = null

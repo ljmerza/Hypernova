@@ -44,11 +44,6 @@ android {
         targetSdk = 36
         versionCode = buildMinute
         versionName = appVersion
-        // The phone bridge (bridge/LensBridge.kt) takes pages from a private network address (a Lens
-        // dev server the Even App opens by its LAN address) only in a build made with
-        // -Phypernova.lensDevServer=true. Never in the APK the Mac hands out, debug as it is: there a
-        // captive portal's or a router's page could ask for the glasses' access.
-        buildConfigField("boolean", "BRIDGE_DEV_ORIGINS", (providers.gradleProperty("hypernova.lensDevServer").orNull == "true").toString())
         // Phones are arm64: the embedded Tailscale node (19 MB a copy) ships for arm64 only, in
         // every build the Mac hands out (the debug APK too). An x86_64 emulator on an Intel host
         // builds with -Phypernova.allAbis=true.

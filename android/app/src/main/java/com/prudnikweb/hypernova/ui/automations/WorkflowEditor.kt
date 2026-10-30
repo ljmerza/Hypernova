@@ -97,7 +97,6 @@ internal fun StepsSection(
     d: AutomationInput,
     features: Set<String>,
     errors: Map<String, FieldError>,
-    glasses: Boolean,
     template: String?,
     editable: Boolean,
     open: String?,
@@ -120,7 +119,7 @@ internal fun StepsSection(
         steps.forEachIndexed { i, s ->
             if (i > 0) Rail()
             StepCard(
-                hub, d, i, s, features, errors[FieldPath.step(i)], glasses, template, editable,
+                hub, d, i, s, features, errors[FieldPath.step(i)], template, editable,
                 open = steps.size == 1 || open == s.id,
                 lone = steps.size == 1,
                 onToggle = { onOpen(if (open == s.id) null else s.id) },
@@ -139,11 +138,10 @@ internal fun StepsSection(
         }
     }
     if (adding || changing != null) {
-        val pair = stringResource(R.string.au_d_no_glasses)
         val current = changing?.let { id -> steps.firstOrNull { it.id == id } }
         TilesSheet(
             stringResource(R.string.wf_pick_step),
-            DoKind.entries.filter { it.feature == null || it.feature in features }.map { k -> Tile(k, doGlyph.getValue(k), doTitle(k), reason = if (k == DoKind.Say && !glasses && !hub.isDemo) pair else null) },
+            DoKind.entries.filter { it.feature == null || it.feature in features }.map { k -> Tile(k, doGlyph.getValue(k), doTitle(k)) },
             current?.action?.kind,
             onPick = { k ->
                 val target = current
@@ -203,7 +201,6 @@ private fun StepCard(
     s: Step,
     features: Set<String>,
     error: FieldError?,
-    glasses: Boolean,
     template: String?,
     editable: Boolean,
     open: Boolean,
@@ -255,7 +252,7 @@ private fun StepCard(
                 Column {
                     if (editable) {
                         if (i > 0 && Features.STEPS in features) GuardRow(features, steps, i, s, error?.sub == "if") { g -> onChange(s.copy(guard = g)) }
-                        StepForm(hub, d, i, s, glasses, template, error?.sub, features) { a -> onChange(s.copy(action = a)) }
+                        StepForm(hub, d, i, s, template, error?.sub, features) { a -> onChange(s.copy(action = a)) }
                     }
                     if (error != null) {
                         Spacer(Modifier.height(8.dp))
@@ -348,26 +345,24 @@ private fun GuardRow(features: Set<String>, steps: List<Step>, i: Int, s: Step, 
 
 /** A step's own compact form, by its kind. */
 @Composable
-private fun StepForm(hub: Hub, d: AutomationInput, i: Int, s: Step, glasses: Boolean, template: String?, sub: String?, features: Set<String>, onChange: (Action) -> Unit) {
+private fun StepForm(hub: Hub, d: AutomationInput, i: Int, s: Step, template: String?, sub: String?, features: Set<String>, onChange: (Action) -> Unit) {
     val steps = d.steps.orEmpty()
     when (val a = s.action) {
         is Action.Start -> {
             val chips = Placeholders.offered(d.trigger, steps, i, Placeholders.Where.Prompt, bypass = a.permissionMode == AutoMode.NO_ASKING, features = features)
-            StartParams(hub, a, template.takeIf { i == 0 }, glasses, onChange, withThen = false, chips = chips, errorField = sub)
+            StartParams(hub, a, template.takeIf { i == 0 }, onChange, withThen = false, chips = chips, errorField = sub)
             StepPermissions(a, sub, onChange)
         }
         is Action.Continue -> {
             val earlier = steps.take(i).mapIndexedNotNull { k, b -> if (b.action is Action.Start || b.action is Action.Continue) b.id to (k + 1) else null }
-            ContinueParams(hub, a, d.trigger, glasses, onChange, withThen = false, earlier = earlier, chips = Placeholders.offered(d.trigger, steps, i, Placeholders.Where.Prompt, features = features), errorField = sub)
+            ContinueParams(hub, a, d.trigger, onChange, withThen = false, earlier = earlier, chips = Placeholders.offered(d.trigger, steps, i, Placeholders.Where.Prompt, features = features), errorField = sub)
         }
         is Action.Ask -> AskParams(a, Placeholders.offered(d.trigger, steps, i, Placeholders.Where.Question, features = features), sub, onChange)
         is Action.Shell -> ShellParams(hub, a, Placeholders.offered(d.trigger, steps, i, Placeholders.Where.Shell), Placeholders.env(steps, i, features), sub, onChange)
         is Action.Notify -> {
             TextParams(a.text, d.trigger, offered = Placeholders.offered(d.trigger, steps, i, Placeholders.Where.Text, features = features), error = sub == "text") { onChange(a.copy(text = it)) }
-            if (glasses || a.glasses) ToggleRow(stringResource(R.string.au_notify_glasses), stringResource(R.string.au_notify_glasses_body), a.glasses, { onChange(a.copy(glasses = it)) })
             NotifyBlocked()
         }
-        is Action.Say -> TextParams(a.text, d.trigger, offered = Placeholders.offered(d.trigger, steps, i, Placeholders.Where.Text, features = features), error = sub == "text") { onChange(Action.Say(it)) }
         is Action.Unknown -> Unit
     }
 }
@@ -554,21 +549,20 @@ internal fun ChipsText(
 
 // ─── Tell: the outputs ─────────────────────────────────────────────────────
 
-/** The output kinds TELL offers: the phone and glasses always; a webhook and a file as the Mac lists them. */
-private enum class OutKind(val feature: String? = null) { Notify, Say, Webhook(Features.O_WEBHOOK), File(Features.O_FILE) }
+/** The output kinds TELL offers: the phone always; a webhook and a file as the Mac lists them. */
+private enum class OutKind(val feature: String? = null) { Notify, Webhook(Features.O_WEBHOOK), File(Features.O_FILE) }
 
 private fun Output.outKind(): OutKind? = when (this) {
     is Output.Notify -> OutKind.Notify
-    is Output.Say -> OutKind.Say
     is Output.Webhook -> OutKind.Webhook
     is Output.File -> OutKind.File
     is Output.Unknown -> null
 }
 
-private val outGlyph = mapOf(OutKind.Notify to AutoGlyph.Bell, OutKind.Say to AutoGlyph.Glasses, OutKind.Webhook to AutoGlyph.Webhook, OutKind.File to AutoGlyph.Page)
+private val outGlyph = mapOf(OutKind.Notify to AutoGlyph.Bell, OutKind.Webhook to AutoGlyph.Webhook, OutKind.File to AutoGlyph.Page)
 
 /**
- * TELL: where the result goes when a run ends done (0 to 2): notify, read aloud, a webhook (ntfy,
+ * TELL: where the result goes when a run ends done (0 to 2): notify, a webhook (ntfy,
  * Slack, Discord, Telegram or a plain POST; its secret typed once, then only its host and last
  * four characters), or a line in a file inside the project.
  */
@@ -578,7 +572,6 @@ internal fun OutputsSection(
     d: AutomationInput,
     features: Set<String>,
     errors: Map<String, FieldError>,
-    glasses: Boolean,
     editable: Boolean,
     open: String?,
     onOpen: (String?) -> Unit,
@@ -595,7 +588,7 @@ internal fun OutputsSection(
         outputs.forEachIndexed { i, o ->
             if (i > 0) Spacer(Modifier.height(10.dp))
             OutputCard(
-                hub, d, o, errors[FieldPath.output(i)], glasses, editable, open == o.id, w, features,
+                hub, d, o, errors[FieldPath.output(i)], editable, open == o.id, w, features,
                 onToggle = { onOpen(if (open == o.id) null else o.id) },
                 onChange = { n -> onOutputs(outputs.toMutableList().also { it[i] = n }) },
                 onRemove = { onOutputs(outputs.filterIndexed { k, _ -> k != i }) },
@@ -607,21 +600,19 @@ internal fun OutputsSection(
         }
     }
     if (adding) {
-        val pair = stringResource(R.string.au_d_no_glasses)
         val titles = mapOf(
-            OutKind.Notify to stringResource(R.string.wf_ot_notify), OutKind.Say to stringResource(R.string.wf_ot_say),
+            OutKind.Notify to stringResource(R.string.wf_ot_notify),
             OutKind.Webhook to stringResource(R.string.wf_ot_webhook), OutKind.File to stringResource(R.string.wf_ot_file),
         )
         TilesSheet(
             stringResource(R.string.wf_pick_output),
-            OutKind.entries.filter { it.feature == null || it.feature in features }.map { k -> Tile(k, outGlyph.getValue(k), titles.getValue(k), reason = if (k == OutKind.Say && !glasses && !hub.isDemo) pair else null) },
+            OutKind.entries.filter { it.feature == null || it.feature in features }.map { k -> Tile(k, outGlyph.getValue(k), titles.getValue(k)) },
             null,
             onPick = { k ->
                 adding = false
                 val id = WorkflowShape.newId("ou_", outputs.map { it.id })
                 val o = when (k) {
                     OutKind.Notify -> Output.Notify(id)
-                    OutKind.Say -> Output.Say(id)
                     OutKind.Webhook -> Output.Webhook(id, preset = Output.SLACK)
                     OutKind.File -> Output.File(id, path = project?.let { "${it.trimEnd('/')}/${w.s(R.string.wf_t_digest_file)}" }.orEmpty())
                 }
@@ -639,7 +630,6 @@ private fun OutputCard(
     d: AutomationInput,
     o: Output,
     error: FieldError?,
-    glasses: Boolean,
     editable: Boolean,
     open: Boolean,
     w: Words,
@@ -675,7 +665,7 @@ private fun OutputCard(
             }
             AnimatedVisibility(open, enter = fadeIn(tween(Motion.FAST)) + expandVertically(tween(Motion.DIALOG, easing = Motion.Expo)), exit = fadeOut(tween(Motion.FAST)) + shrinkVertically(tween(Motion.DIALOG))) {
                 Column {
-                    if (editable) OutputForm(hub, d, o, glasses, error?.sub, features, onChange)
+                    if (editable) OutputForm(hub, d, o, error?.sub, features, onChange)
                     if (error != null) {
                         Spacer(Modifier.height(8.dp))
                         HText(error.text, style = Type.small, color = HN.amber)
@@ -711,17 +701,15 @@ private fun SecretLine(o: Output.Webhook) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OutputForm(hub: Hub, d: AutomationInput, o: Output, glasses: Boolean, sub: String?, features: Set<String>, onChange: (Output) -> Unit) {
+private fun OutputForm(hub: Hub, d: AutomationInput, o: Output, sub: String?, features: Set<String>, onChange: (Output) -> Unit) {
     val steps = d.steps.orEmpty()
     val chips = Placeholders.offered(d.trigger, steps, steps.size, Placeholders.Where.Output, features = features)
     fun text(t: String): String? = t.takeIf { it.isNotBlank() }?.take(WorkflowShape.OUTPUT_TEXT_MAX)
     when (o) {
         is Output.Notify -> {
             ChipsText(o.text.orEmpty(), { onChange(o.copy(text = text(it))) }, chips, placeholder = stringResource(R.string.wf_o_text_hint), label = stringResource(R.string.au_text), error = sub == "text")
-            if (glasses || o.glasses) ToggleRow(stringResource(R.string.wf_glasses_too), stringResource(R.string.au_notify_glasses_body), o.glasses, { onChange(o.copy(glasses = it)) })
             NotifyBlocked()
         }
-        is Output.Say -> ChipsText(o.text.orEmpty(), { onChange(o.copy(text = text(it))) }, chips, placeholder = stringResource(R.string.wf_o_text_hint), label = stringResource(R.string.au_text), error = sub == "text")
         is Output.Webhook -> {
             ParamLabel(stringResource(R.string.wf_service))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {

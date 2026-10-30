@@ -178,11 +178,6 @@ terms() { as_ada "$HN" status 2>&1 | sed -n 's/^ *Sessions *//p'; }
 found=""
 for _ in $(seq 1 20); do found="$(terms)"; printf '%s' "$found" | grep -q '1 in shared terminals' && break; sleep 0.5; done
 expect "the daemon lists the session in its shared terminal" "$found" '1 in shared terminals'
-# Telescope's terminal source, drawn without AppKit: JetBrains Mono from the install, PNG in TypeScript.
-shot="$(docker exec "$NAME" curl -sS --max-time 30 -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"source":"terminal"}' "http://127.0.0.1:47321/v1/sessions/$sid/telescope" 2>&1 || true)"
-expect "Telescope draws the session's terminal" "$(printf '%s' "$shot" | json "' '.join([d['shot']['source'], str(d['shot']['width']), d['shot']['url']])" 2>&1)" '^terminal [0-9]+ /v1/shots/[0-9a-f]+\.png$'
-shot_url="$(printf '%s' "$shot" | json "d['shot']['url']" 2>/dev/null || true)"
-expect "and serves it as a PNG" "$(docker exec "$NAME" sh -c "curl -sS --max-time 10 'http://127.0.0.1:47321$shot_url' | head -c 8 | od -An -tx1" 2>&1 || true)" '89 50 4e 47'
 
 user_systemctl restart hypernova.service
 wait_health 30 || true

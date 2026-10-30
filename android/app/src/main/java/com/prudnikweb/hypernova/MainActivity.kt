@@ -80,19 +80,13 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
-    /** A pairing link (camera or another app), a link to the glasses' settings, or a tap on a notification. */
+    /** A pairing link (camera or another app), or a tap on a notification. */
     private fun handle(intent: Intent?) {
         if (intent == null) return
         // Reopened from Recents: the old pairing link or notification was handled already.
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         val link = if (intent.action == Intent.ACTION_VIEW) com.prudnikweb.hypernova.data.PairLinks.kind(intent.dataString) else null
         when {
-            // https://hypernova.observer/glasses, hypernova://glasses, and "Tap to open Hypernova" (Lens's
-            // "Open Hypernova", bridge/BridgeOpen.kt): Settings → Glasses (an ask to connect waiting shows over it).
-            link == com.prudnikweb.hypernova.data.PairLinks.Kind.Glasses || intent.action == ACTION_OPEN_GLASSES -> {
-                vm.nav.reset()
-                com.prudnikweb.hypernova.bridge.BridgeOpen.showGlasses()
-            }
             // The Mac's QR code, https://hypernova.observer/pair#… (the details in the fragment), or the
             // app link hypernova://pair?… with the same parameters: data/Pairing.kt, PairLinks.
             link == com.prudnikweb.hypernova.data.PairLinks.Kind.Pair -> vm.handleLink(intent.dataString)
@@ -142,8 +136,6 @@ class MainActivity : ComponentActivity() {
         const val ACTION_OPEN_SESSION = "com.prudnikweb.hypernova.OPEN_SESSION"
         const val ACTION_UPDATE = "com.prudnikweb.hypernova.UPDATE"
         const val ACTION_EXTEND = "com.prudnikweb.hypernova.EXTEND_BACKPACK"
-        /** Settings → Glasses: "Tap to open Hypernova" (bridge/BridgeNotice.kt), or Lens's ask with the app on screen. */
-        const val ACTION_OPEN_GLASSES = "com.prudnikweb.hypernova.OPEN_GLASSES"
         const val EXTRA_SESSION = "session"
     }
 }

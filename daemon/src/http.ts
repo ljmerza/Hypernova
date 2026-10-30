@@ -11,13 +11,9 @@ import { API_PORT, LOCAL_PORT, PROTOCOL, SUPPORT, VERSION, claudeCached, claudeV
 import type { Ev } from './normalize.ts'
 import { companionUrl } from './speech.ts'
 import { speechFeed, speechRoute, speechState } from './readaloud.ts'
-import { screenshot, shotPath } from './shots.ts'
-import { telescope } from './telescope/index.ts'
-import { windowAnswer } from './telescope/window.ts'
 import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider } from './store.ts'
 import { lanDevice, lanInfo, lanNamed, lanNamedHost, pairAllowed, pairFailed, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
 import { nameKick, nameStatus, namedOrigin, releaseName, setNameService, setNameTermsShown, wantName } from './names.ts'
-import { allowGlasses, dropGlasses, glassesEntries, glassesSeen, isGlassesFeed, lensWho, phoneOfGlassesId, removeGlasses, trackGlasses, viaLens } from './glasses.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { recheckSystem, setBuiltInTailscale, setControlUrl, tailnetHints, tailnetNow, tsnetBaseUrl, tsnetLogin, tsnetLogout, tsnetState } from './tsnet.ts'
 import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
@@ -43,9 +39,7 @@ import { getBattery } from './battery.ts'
 import { refreshUsage } from './usage-probe.ts'
 import { awakeClient, awakeState, setAwake } from './awake.ts'
 import { sttApi, sttState, sttUpgrade } from './stt.ts'
-import { guideApi, guideState, lensPaired, macFeed } from './guide.ts'
-import { createNebulaProject, nebulaApi } from './nebula.ts'
-import { notesApi } from './notes.ts'
+import { macFeed } from './mac-feed.ts'
 import { ChangeError, changesOf, diffOf } from './changes.ts'
 import { toolPath } from './normalize.ts'
 import { ResumeError, setAutoContinue, typeContinue } from './resume.ts'
@@ -58,7 +52,7 @@ import { sessionUsage } from './session-usage.ts'
 import { todosOf } from './todos.ts'
 import { RewindError, rewindTo } from './rewind.ts'
 import { SdkMissingError, claudeSdk, sdkState } from './sdk.ts'
-import { AutomationError, FIRE_BODY_MAX, automations, lensConnected, useSessionOps } from './automations.ts'
+import { AutomationError, FIRE_BODY_MAX, automations, useSessionOps } from './automations.ts'
 import { systemZone } from './schedule.ts'
 import { PLATFORM, RELEASES, UNAVAILABLE, bypassBlockedByRoot, has, unavailable } from './platform.ts'
 import { randomUUID } from 'node:crypto'
@@ -67,9 +61,9 @@ import { editHeld, heldOf, hold, kickHeld, removeHeld, useHeldOps, type HeldRead
 
 /**
  * `lan`: came in on the LAN listener (lan.ts), where the admin token counts for nothing and pairing
- * is limited. `lens`: the glasses, through the phone app whose token this is (glasses.ts).
+ * is limited.
  */
-type Ctx = { req: IncomingMessage; res: ServerResponse; url: URL; local: boolean; deviceId: string | null; lan: boolean; lens?: boolean }
+type Ctx = { req: IncomingMessage; res: ServerResponse; url: URL; local: boolean; deviceId: string | null; lan: boolean }
 class HttpError extends Error {
   status: number
   code: string
@@ -83,14 +77,6 @@ class HttpError extends Error {
   }
 }
 
-/**
- * The glasses: through a phone (`X-Hypernova-Via: lens`, glasses.ts) or paired as Lens in a private
- * build. They can't check a fingerprint, so what the phone guards with one is the phone's alone
- * (docs/PROTOCOL.md, "Only on the phone"): "Always", Bypass (a switch, a session started in it, an
- * automation's No asking) and Browse outside projects turned on.
- */
-const fromGlasses = (c: Ctx): boolean => !!c.lens || (!!c.deviceId && getDevice(c.deviceId)?.client === 'lens')
-const phoneOnly = () => new HttpError(403, 'needs_phone', 'Do this on your phone: it asks for your fingerprint or screen lock first.')
 /** What only Claude Code sessions do (rewind, providers, auto-continue, terminal menus): docs/PROTOCOL.md, "Codex". */
 const notForCodex = () => new HttpError(409, 'unsupported_for_agent', 'Codex sessions can’t do this.')
 /**
@@ -157,20 +143,12 @@ async function readJsonBody(req: IncomingMessage): Promise<any> {
 }
 
 /**
- * A session's events as asked: the last `limit`; with `turn=last`, only from its last prompt on;
- * with `output=<n>`, tool outputs cut to their last n characters (the glasses app reads the last
- * turn over a phone connection, and a build log's head is rarely what it shows).
+ * A session's events as asked: the last `limit`; with `output=<n>`, tool outputs cut to their last
+ * n characters (a build log's head is rarely what matters).
  */
 function eventsView(rec: Parameters<typeof ensureParsed>[0], q: URLSearchParams): Ev[] {
   const all = ensureParsed(rec).events
-  let from = 0
-  if (q.get('turn') === 'last') {
-    for (let i = all.length - 1; i >= 0; i--) if (all[i]!.kind === 'user') {
-      from = i
-      break
-    }
-  }
-  let events = all.slice(from).slice(-Number(q.get('limit') ?? 300))
+  let events = all.slice(-Number(q.get('limit') ?? 300))
   const cut = Number(q.get('output'))
   if (q.has('output') && Number.isFinite(cut)) {
     const n = Math.min(64 * 1024, Math.max(256, Math.round(cut)))
@@ -349,7 +327,7 @@ function snapshot(deviceId: string | null) {
       // switched between the Tailscale app and the built-in node follows it.
       tailnet: tailnetNow(),
       // The server's system, and the Mac features it lacks with the reason to show (platform.ts):
-      // empty on a Mac; on Linux the battery, Stay awake, the Mac's voice, windows, the Simulator.
+      // empty on a Mac; on Linux the battery, Stay awake, the Mac's voice, opening a window.
       platform: PLATFORM, unavailable: UNAVAILABLE,
     },
     usage: getUsage(),
@@ -358,11 +336,10 @@ function snapshot(deviceId: string | null) {
     projects: listProjects(),
     providers: listProviders(),
     account: getAccount(),
-    // Speech to text (stt.ts) and the Lens guide's place (guide.ts).
+    // Speech to text (stt.ts).
     stt: sttState(),
-    // Read aloud: Soniox's voices or the Mac's, and whether a phone plays the glasses' speech (readaloud.ts).
+    // Read aloud: Soniox's voices or the Mac's (readaloud.ts).
     speech: speechState(),
-    guide: guideState(),
     // "When … → Do …" on the Mac (automations.ts).
     automations: automations().snapshot(),
     // The local route (lan.ts): null while the listener is off.
@@ -410,23 +387,21 @@ async function api(c: Ctx): Promise<void> {
     pairCodes.delete(h)
     const token = randomToken(32)
     const deviceId = randomToken(8)
-    // Which app paired ("lens": the glasses app), so the Mac's device list can say so.
+    // Which app paired, so the Mac's device list can say so.
     const client = typeof b.client === 'string' && /^[a-z][a-z0-9-]{0,23}$/.test(b.client) ? b.client : undefined
     const appVersion = typeof b.appVersion === 'string' ? b.appVersion.slice(0, 40) : undefined
     // The same install of the app pairing again (its token lost, the app's data cleared, a new
-    // code scanned): it takes its old place rather than add a twin to the device list. Its
-    // glasses stay allowed; its old token and feeds end.
+    // code scanned): it takes its old place rather than add a twin to the device list. Its old
+    // token and feeds end.
     const installId = typeof b.installId === 'string' && /^[\w-]{8,64}$/.test(b.installId) ? b.installId : undefined
     const before = installId ? listDevices().filter((d) => d.installId === installId && (d.client ?? null) === (client ?? null)) : []
     for (const d of before) {
       removeDevice(d.id)
       dropDevice(d.id)
     }
-    const glasses = before.find((d) => d.glasses)?.glasses
-    addDevice({ id: deviceId, name: String(b.deviceName ?? 'Phone').slice(0, 60), model: String(b.model ?? '').slice(0, 60), createdAt: Date.now(), lastSeenAt: Date.now(), appVersion, ...(client ? { client } : {}), ...(installId ? { installId } : {}), ...(glasses ? { glasses } : {}) }, token)
+    addDevice({ id: deviceId, name: String(b.deviceName ?? 'Phone').slice(0, 60), model: String(b.model ?? '').slice(0, 60), createdAt: Date.now(), lastSeenAt: Date.now(), appVersion, ...(client ? { client } : {}), ...(installId ? { installId } : {}) }, token)
     log('paired', b.deviceName, b.model, client ?? '', before.length ? `(in place of ${before.length})` : '')
     broadcast({ t: 'devices' })
-    if (client === 'lens') lensPaired()
     return json(res, 200, { token, deviceId, mac: { id: identity.id, name: macName() } })
   }
   // A page first (a bare APK link just starts a download, which looks like nothing happened).
@@ -452,16 +427,6 @@ async function api(c: Ctx): Promise<void> {
     if (servePreview(req, res, p[1]!, (p[2] ?? '') + url.search, true)) return
     throw new HttpError(404, 'preview_expired', 'This preview link has expired. Open it again from the app.')
   }
-  // A screenshot ("show me"): its unguessable name is the key, as an <img> or a canvas can't send
-  // the bearer header. Under /v1, so it has CORS, which a canvas needs to read its pixels.
-  const shot = /^\/v1\/shots\/([^/]+)\.png$/.exec(path)
-  if (shot && (m === 'GET' || m === 'HEAD')) {
-    const file = shotPath(shot[1]!)
-    if (!file) throw new HttpError(404, 'shot_expired', 'This screenshot has expired. Ask for a new one.')
-    const bytes = readFileSync(file)
-    res.writeHead(200, { 'content-type': 'image/png', 'content-length': bytes.length, 'cache-control': 'private, max-age=43200', 'x-content-type-options': 'nosniff' })
-    return void res.end(m === 'HEAD' ? undefined : bytes)
-  }
 
   // Everything below needs a paired device (or the Mac app's admin token).
   if (!c.local && !c.deviceId) {
@@ -469,13 +434,6 @@ async function api(c: Ctx): Promise<void> {
     const ck = /(?:^|;\s*)hn_preview=([\w-]+)/.exec(req.headers.cookie ?? '')
     if (ck && !path.startsWith('/v1/') && servePreview(req, res, ck[1]!, path.slice(1) + url.search, false)) return
     throw new HttpError(401, 'unauthorized', 'This phone is not paired with this Mac.')
-  }
-  // The glasses through a phone (glasses.ts) may do what the glasses did as a device of their own,
-  // but never manage the phone: forget it, take its certificate, or speak for its glasses.
-  if (c.lens) {
-    if (path.startsWith('/v1/devices/') || path.startsWith('/v1/device/')) throw new HttpError(403, 'not_for_glasses', 'The glasses can’t change this phone’s pairing.')
-    const phone = getDevice(c.deviceId!)
-    if (phone && glassesSeen(phone, req) === 'removed') throw new HttpError(403, 'glasses_removed', 'These glasses were removed on your Mac. Allow them again in Hypernova on your phone.')
   }
 
   if (path === '/v1/snapshot') return json(res, 200, snapshot(c.deviceId))
@@ -499,14 +457,9 @@ async function api(c: Ctx): Promise<void> {
   if (fired && m === 'POST') return fireAutomation(res, req, fired[1]!, null)
   if (path === '/v1/automations' || path.startsWith('/v1/automations/')) {
     try {
-      // No asking and shell steps need the fingerprint the glasses can't give.
-      const body = () => readJsonBody(req).then((b) => {
-        if ((b?.confirmBypass === true || b?.confirmShell === true) && fromGlasses(c)) throw phoneOnly()
-        return b
-      })
-      // Who answers an ask step: the Mac app (its admin token), the glasses, or a phone.
-      const who = c.local ? 'mac' : fromGlasses(c) ? 'glasses' : 'phone'
-      return json(res, 200, await automations().api(path, m, url.searchParams, body, who))
+      // Who answers an ask step: the Mac app (its admin token) or a phone.
+      const who = c.local ? 'mac' : 'phone'
+      return json(res, 200, await automations().api(path, m, url.searchParams, () => readJsonBody(req), who))
     } catch (e) {
       if (e instanceof AutomationError) throw new HttpError(e.status, e.code, e.message, e.extra)
       throw e
@@ -515,11 +468,10 @@ async function api(c: Ctx): Promise<void> {
   if (path === '/v1/usage') return json(res, 200, getUsage())
   // Codex (codex/account.ts): its state, a fresh look at its account and limits, its models.
   if (path === '/v1/codex' && m === 'GET') return json(res, 200, { codex: codexState() })
-  // Codex on or off for Hypernova from the phone (Settings → Agents & providers); never the glasses.
+  // Codex on or off for Hypernova from the phone (Settings → Agents & providers).
   if (path === '/v1/codex' && m === 'POST') {
     const b = await readJsonBody(req)
     if (typeof b?.enabled !== 'boolean') throw new HttpError(400, 'bad_value', 'Say enabled: true or false.')
-    if (fromGlasses(c)) throw new HttpError(403, 'needs_phone', 'Turn Codex on or off from your phone or the Mac.')
     if (b.enabled && !codexBinary().ok) throw new HttpError(409, 'no_codex', 'Codex isn’t installed on this computer, or it’s too old for Hypernova.')
     setCodexEnabled(b.enabled)
     return json(res, 200, { codex: codexState() })
@@ -536,12 +488,11 @@ async function api(c: Ctx): Promise<void> {
     return json(res, 200, { awake: r.awake })
   }
   // Browse outside projects (files.ts): sessions' folders in the home folder, read-only. The phone
-  // asks for the fingerprint before it turns it on; the glasses can't.
+  // asks for the fingerprint before it turns it on.
   if (path === '/v1/mac/files' && m === 'GET') return json(res, 200, { files: filesState() })
   if (path === '/v1/mac/files' && m === 'POST') {
     const b = await readJsonBody(req)
     if (typeof b?.browseOutsideProjects !== 'boolean') throw new HttpError(400, 'bad_value', 'Say browseOutsideProjects: true or false.')
-    if (b.browseOutsideProjects && fromGlasses(c)) throw phoneOnly()
     setBrowseOutside(b.browseOutsideProjects)
     return json(res, 200, { files: filesState() })
   }
@@ -554,26 +505,18 @@ async function api(c: Ctx): Promise<void> {
   if (path === '/v1/projects' && m === 'GET') return json(res, 200, { projects: listProjects(), root: settings.projectsRoot })
   if (path === '/v1/projects' && m === 'POST') {
     const b = await readJsonBody(req)
-    // `nebula: true`: a new project of its own in Nebula (nebula.ts), its name made unique.
-    return json(res, 200, { project: b.nebula === true ? createNebulaProject(String(b.name ?? '')) : createProject(String(b.name ?? ''), b.git !== false) })
+    return json(res, 200, { project: createProject(String(b.name ?? ''), b.git !== false) })
   }
   if (path === '/v1/providers' && m === 'GET') return json(res, 200, { providers: listProviders() })
   // The models each provider offers, for the new-session sheet (models.ts): Claude Code's own list,
   // OpenRouter's catalogue, the providers' settings.
   if (path === '/v1/models' && m === 'GET') return json(res, 200, { providers: await listModels(url.searchParams.get('provider')) })
-  // Read aloud: Soniox's voices or the Mac's, whole clips for the glasses' own player, and plays the
-  // phone app streams (readaloud.ts).
-  // The glasses through a phone ask as themselves (glasses.ts): their plays go to that phone, and
-  // its progress comes back to them, not to the phone app.
-  const speaker = c.lens && c.deviceId ? lensWho(c.deviceId) : (c.deviceId ?? 'mac')
+  // Read aloud: Soniox's voices or the Mac's, whole clips, and plays the phone app streams (readaloud.ts).
+  const speaker = c.deviceId ?? 'mac'
   if (path.startsWith('/v1/speech') && path !== '/v1/speech/companion' && (await speechRoute(path, m, req, res, speaker, () => readJsonBody(req)))) return
   if (path === '/v1/speech/companion' && m === 'GET') return json(res, 200, { url: await companionUrl() })
-  // Speech to text through Soniox (stt.ts) and the Lens guide (guide.ts).
+  // Speech to text through Soniox (stt.ts).
   if (path === '/v1/stt' || path.startsWith('/v1/stt/')) return json(res, 200, await sttApi(path, m, () => readJsonBody(req)))
-  if (path === '/v1/guide' || path.startsWith('/v1/guide/')) return json(res, 200, await guideApi(path, m, () => readJsonBody(req)))
-  // Nebula, where new sessions from the glasses are born (nebula.ts), and the notes said to them (notes.ts).
-  if (path === '/v1/nebula') return json(res, 200, await nebulaApi(m, () => readJsonBody(req)))
-  if (path === '/v1/nebula/notes') return json(res, 200, await notesApi(m, () => readJsonBody(req)))
   if (path === '/v1/commands' && m === 'GET') {
     // The "/" list: Claude Code's commands and skills in a project.
     const p = url.searchParams.get('project') ?? ''
@@ -661,7 +604,7 @@ async function api(c: Ctx): Promise<void> {
     const codex = b.agent === 'codex' || (b.agent == null && !claudeHere() && codexBinary().ok)
     if (!String(b.prompt ?? '').trim() && !files.length) throw new HttpError(400, 'no_prompt', `Write what you want ${codex ? 'Codex' : 'Claude'} to do.`)
     let cwd = b.projectPath as string | undefined
-    if (b.newProject?.name) cwd = (b.newProject.nebula === true ? createNebulaProject(String(b.newProject.name)) : createProject(String(b.newProject.name), b.newProject.git !== false)).path
+    if (b.newProject?.name) cwd = createProject(String(b.newProject.name), b.newProject.git !== false).path
     if (!cwd) throw new HttpError(400, 'no_project', 'Pick a project for the session.')
     const full = allowedPath(cwd) ?? (existsSync(cwd) ? cwd : null)
     if (!full) throw new HttpError(400, 'bad_project', 'That project folder doesn’t exist.')
@@ -678,7 +621,6 @@ async function api(c: Ctx): Promise<void> {
       notePrompt(c.deviceId, c.local, b.via)
       return json(res, 200, { session: listSessions().find((s) => s.id === id) })
     }
-    if (b.permissionMode === 'bypassPermissions' && fromGlasses(c)) throw phoneOnly()
     // Claude Code won't run bypass mode as root (it would exit at once): said now, with the way out.
     if (b.permissionMode === 'bypassPermissions' && bypassBlockedByRoot()) throw new HttpError(409, 'bypass_root', 'Claude Code won’t skip permissions as root. Run Hypernova as a normal user (see docs/LINUX.md), or pick another mode.')
     const opts = { cwd: full, providerId: b.providerId, model: b.model, permissionMode: b.permissionMode, prompt: withAttachments(String(b.prompt ?? ''), files) }
@@ -759,7 +701,6 @@ async function api(c: Ctx): Promise<void> {
         if (!['recent', 'all', 'none'].includes(choice)) throw new HttpError(400, 'bad_context', 'Carry over recent, all or none.')
         return json(res, 200, await previewSwitch(sw[1]!, b.to, choice))
       }
-      if (b.permissionMode === 'bypassPermissions' && fromGlasses(c)) throw phoneOnly()
       return json(res, 200, { session: await commitSwitch(sw[1]!, b) })
     } catch (e) {
       if (e instanceof SwitchError) throw new HttpError(e.status, e.code, e.message, e.extra)
@@ -844,7 +785,7 @@ async function api(c: Ctx): Promise<void> {
     if (done === 'sending') throw new HttpError(409, 'sending', 'That message is being sent right now.')
     return json(res, 200, { session: listSessions().find((x) => x.id === id) })
   }
-  const s = /^\/v1\/sessions\/([\w-]+)\/(events|prompt|interrupt|continue|mode|terminal|open|menu|screenshot|telescope|provider|model)$/.exec(path)
+  const s = /^\/v1\/sessions\/([\w-]+)\/(events|prompt|interrupt|continue|mode|terminal|open|menu|provider|model)$/.exec(path)
   if (s) {
     const [, id, action] = s
     const rec = getSession(id!)
@@ -859,18 +800,6 @@ async function api(c: Ctx): Promise<void> {
     // A Codex session's history is Codex's own: read once, when it's first opened.
     if (action === 'events' && codex) await ensureCodexHistory(id!)
     if (action === 'events') return json(res, 200, { events: eventsView(rec, url.searchParams) })
-    if (action === 'screenshot') {
-      if (m !== 'POST') throw new HttpError(405, 'method', 'Ask for a screenshot with POST.')
-      const b = await readJsonBody(req)
-      return json(res, 200, { shot: await screenshot(rec, ensureParsed(rec).events, b) })
-    }
-    if (action === 'telescope') {
-      // What the session builds, as a picture: its page, emulator, simulator, terminal, a file it
-      // made, or its Mac app's window (telescope/index.ts).
-      if (m !== 'POST') throw new HttpError(405, 'method', 'Point the telescope with POST.')
-      const b = await readJsonBody(req)
-      return json(res, 200, { shot: await telescope({ ...rec, term: rec.term ?? (tid ? { id: tid } : null) }, ensureParsed(rec).events, b) })
-    }
     if (action === 'model') {
       if (m !== 'POST') throw new HttpError(405, 'method', 'Change the model with POST.')
       return json(res, 200, await setSessionModel(id!, await readJsonBody(req)))
@@ -921,7 +850,6 @@ async function api(c: Ctx): Promise<void> {
       const b = await readJsonBody(req)
       const mode = String(b.permissionMode ?? 'default')
       if (!['default', 'acceptEdits', 'plan', 'auto', 'bypassPermissions'].includes(mode)) throw new HttpError(400, 'bad_mode', 'That isn’t a permission mode.')
-      if (mode === 'bypassPermissions' && fromGlasses(c)) throw phoneOnly()
       if (tid) {
         // Bypass in a terminal that wasn't started with it allowed: Shift+Tab never gets there, so
         // don't press it (the phone knows beforehand from session.bypassAvailable).
@@ -964,7 +892,6 @@ async function api(c: Ctx): Promise<void> {
     const b = await readJsonBody(req)
     if (!['allow', 'deny', 'always', 'session'].includes(b?.decision)) throw new HttpError(400, 'bad_decision', 'Answer with allow, deny, always or session.')
     const decision = b.decision as 'allow' | 'deny' | 'always' | 'session'
-    if (decision === 'always' && fromGlasses(c)) throw phoneOnly()
     const ok = answerApproval(ap[1]!, { decision, message: b.message, answers: b.answers }, c.local ? 'mac' : 'phone')
     if (!ok) throw new HttpError(409, 'resolved', 'This was already answered.')
     noteApproval(c.deviceId, c.local)
@@ -1001,13 +928,6 @@ async function api(c: Ctx): Promise<void> {
       dropDevice(c.deviceId)
     }
     return json(res, 200, { ok: true })
-  }
-  // The glasses through this phone (glasses.ts): the phone app says its owner allowed Lens on it, or
-  // disconnected the last one. Only a phone app itself, never the glasses through it (refused above).
-  if (path === '/v1/devices/me/glasses' && (m === 'PUT' || m === 'DELETE')) {
-    if (!c.deviceId || getDevice(c.deviceId)?.client === 'lens') throw new HttpError(403, 'not_a_phone', 'Only the Hypernova app on a phone carries glasses.')
-    if (m === 'DELETE') return json(res, 200, { ok: dropGlasses(c.deviceId) })
-    return json(res, 200, { glasses: allowGlasses(c.deviceId, await readJsonBody(req)) })
   }
   throw new HttpError(404, 'not_found', 'Unknown endpoint.')
 }
@@ -1636,20 +1556,8 @@ async function local(c: Ctx): Promise<void> {
   }
   if (path === '/local/integration/install' && m === 'POST') return json(res, 200, installIntegration())
   if (path === '/local/integration/uninstall' && m === 'POST') return json(res, 200, uninstallIntegration())
-  // Telescope: the Mac app hands back the window it was asked to capture (telescope/window.ts).
-  const tw = /^\/local\/telescope\/([0-9a-f]{24})$/.exec(path)
-  if (tw && m === 'POST') return json(res, 200, { ok: windowAnswer(tw[1]!, await readBody(req, 64 * 1024 * 1024)) })
-  // The glasses that come through a phone are listed as a device of their own (glasses.ts).
-  if (path === '/local/devices') return json(res, 200, { devices: [...listDevices(), ...glassesEntries()] })
+  if (path === '/local/devices') return json(res, 200, { devices: listDevices() })
   const dev = /^\/local\/devices\/([\w-]+)$/.exec(path)
-  // "Forget" on a phone's glasses: refused from now on, and the phone app is told, so it drops its
-  // Lens connections too; the phone itself stays paired.
-  const glassesOf = dev && m === 'DELETE' ? phoneOfGlassesId(dev[1]!) : null
-  if (glassesOf) {
-    const ok = removeGlasses(glassesOf)
-    toPhoneApp(glassesOf, { t: 'glasses.removed' })
-    return json(res, 200, { ok })
-  }
   if (dev && m === 'DELETE') {
     const ok = removeDevice(dev[1]!)
     dropDevice(dev[1]!)
@@ -1696,12 +1604,12 @@ async function local(c: Ctx): Promise<void> {
 /**
  * On the LAN listener (lan.ts), what a connection without a certified device may still reach: a
  * health check, pairing, and the certificate route itself (a bearer token is the way to a first
- * certificate). A browser's preflight carries nothing either way.
+ * certificate).
  */
 function openOnLan(method: string, path: string): boolean {
   // The download page and the APK: a phone without a tailnet gets the app here (the pairing page
-  // isn't served at an address: the built-in route's code carries the app link itself). A /v1
-  // preflight is answered before this; no other OPTIONS reaches a route.
+  // isn't served at an address: the built-in route's code carries the app link itself). No OPTIONS
+  // reaches a route.
   if (method === 'GET' && (path === '/download/android' || path === '/download/android/Hypernova.apk')) return true
   return (method === 'GET' && path === '/v1/health') || (method === 'POST' && (path === '/v1/pair' || path === '/v1/device/cert'))
 }
@@ -1723,22 +1631,14 @@ function handler(isLocal: boolean, lan = false) {
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
     const device = token ? deviceForToken(token) : null
     const adminLocal = direct && token !== '' && safeEqual(token, adminToken)
-    const c: Ctx = { req, res, url, local: adminLocal, deviceId: device?.id ?? null, lan, lens: viaLens(req, device) }
+    const c: Ctx = { req, res, url, local: adminLocal, deviceId: device?.id ?? null, lan }
     const viaName = lan && lanNamed(req.socket)
-    // A web client (the glasses app runs in the Even App's WebView, which enforces CORS) may call
-    // the phone API from any origin: every route but health and pairing needs the bearer token,
-    // which only a paired client has. No credentials mode, so a browser never sends cookies.
-    // Never through the name, which serves browser pages only.
-    if (!isLocal && !viaName && url.pathname.startsWith('/v1/')) {
-      res.setHeader('access-control-allow-origin', '*')
-      if (req.method === 'OPTIONS') return preflight(req, res)
-    }
     try {
       if (viaName) {
         if (!openByName(req.method ?? 'GET', url.pathname)) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
       } else if (lan) {
-        // On the local network OPTIONS is a /v1 preflight only (answered above): it never reaches a
-        // route, whose handlers don't look at the method (a preview, the download page).
+        // On the local network OPTIONS never reaches a route, whose handlers don't look at the
+        // method (a preview, the download page).
         if (req.method === 'OPTIONS') throw new HttpError(404, 'not_found', 'Unknown endpoint.')
         // Mutual TLS: the phone's device certificate names it; the bearer token must agree.
         const certified = lanDevice(req.socket)
@@ -1757,23 +1657,6 @@ function handler(isLocal: boolean, lan = false) {
   }
 }
 
-/**
- * A browser's preflight for a /v1 call (it asks before sending Authorization or a JSON body):
- * any of the API's methods with those headers, remembered for 2 hours (Chromium's most), so a
- * web client pays for it once, not on every call. No token: browsers never send one here.
- */
-function preflight(req: IncomingMessage, res: ServerResponse): void {
-  const headers: Record<string, string> = {
-    'access-control-allow-methods': 'GET, POST, PUT, DELETE',
-    'access-control-allow-headers': 'Authorization, Content-Type',
-    'access-control-max-age': '7200',
-  }
-  // Chromium also asks before a public page reaches a private address (the tailnet's 100.x).
-  if (req.headers['access-control-request-private-network'] === 'true') headers['access-control-allow-private-network'] = 'true'
-  res.writeHead(204, headers)
-  res.end()
-}
-
 // Open sockets per paired phone, so forgetting a phone cuts it off at once (its live terminal too),
 // and the device certificate each one came in with over the LAN listener.
 const byDevice = new Map<string, Set<import('ws').WebSocket>>()
@@ -1789,11 +1672,6 @@ function track(device: string | null, ws: import('ws').WebSocket, cert?: string)
 function dropDevice(device: string): void {
   for (const ws of byDevice.get(device) ?? []) ws.close(4001, 'unpaired')
   byDevice.delete(device)
-}
-/** A message for a phone app's own live feeds, never the glasses' feeds through it (glasses.ts). */
-function toPhoneApp(device: string, msg: object): void {
-  const s = JSON.stringify(msg)
-  for (const ws of byDevice.get(device) ?? []) if (ws.readyState === ws.OPEN && !isGlassesFeed(ws)) ws.send(s)
 }
 /** A new device certificate: the sockets opened with an older one close (the app comes back with the new one). */
 function dropOldCert(device: string, fingerprint: string): void {
@@ -1840,21 +1718,9 @@ export function startServers(): () => Promise<void> {
     // The certificate and the token must be one device's.
     if (certified && device && certified.id !== device.id) device = null
     const admin = !device && direct && !!token && safeEqual(token, adminToken)
-    // The glasses through a phone app (glasses.ts): refused once the Mac removed them; their feeds
-    // are kept apart from the phone's own, so removing them closes theirs alone.
-    const glasses = viaLens(req, device)
-    if (glasses && device && glassesSeen(device, req) === 'removed') {
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
-      socket.destroy()
-      return
-    }
-    const keep = (ws: import('ws').WebSocket) => {
-      track(device?.id ?? null, ws, certified?.certFingerprint)
-      if (glasses && device) trackGlasses(device.id, ws)
-    }
-    // Speech to text: the glasses' microphone, relayed to Soniox (stt.ts). One stream per device, the
-    // glasses through a phone counting apart from the phone's own microphone.
-    if (url.pathname === '/v1/stt/ws' && (device || admin)) return sttUpgrade(req, socket, head, device ? (glasses ? lensWho(device.id) : device.id) : 'mac', keep)
+    const keep = (ws: import('ws').WebSocket) => track(device?.id ?? null, ws, certified?.certFingerprint)
+    // Speech to text: the phone's microphone, relayed to Soniox (stt.ts). One stream per device.
+    if (url.pathname === '/v1/stt/ws' && (device || admin)) return sttUpgrade(req, socket, head, device ? device.id : 'mac', keep)
     const ok = url.pathname === '/v1/ws' && token && (device || admin)
     if (!ok) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
@@ -1863,26 +1729,23 @@ export function startServers(): () => Promise<void> {
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
       keep(ws)
-      // The Mac app's own feed: it brings the Lens guide forward when asked (guide.ts).
+      // The Mac app's own feed: what's for it alone, such as who is speaking (mac-feed.ts).
       if (admin && url.searchParams.get('client') === 'mac') macFeed(ws)
       const remove = addClient({ send: (s) => ws.readyState === ws.OPEN && ws.send(s), phone: !!device })
       ws.send(JSON.stringify({ t: 'snapshot', snapshot: snapshot(device?.id ?? null) }))
-      // A phone or the glasses on the live feed keep the Mac awake While working (the Mac app's own
-      // feed doesn't). After the snapshot, which is always a client's first message.
+      // A phone on the live feed keeps the Mac awake While working (the Mac app's own feed doesn't).
+      // After the snapshot, which is always a client's first message.
       const awake = device ? awakeClient() : null
-      // The glasses on the live feed: an automation's read-aloud goes to them, else to the phone.
-      const lens = device?.client === 'lens' || glasses ? lensConnected() : null
       const ping = setInterval(() => ws.readyState === ws.OPEN && ws.send('{"t":"ping"}'), 25_000)
       ws.on('close', () => {
         clearInterval(ping)
         remove()
         awake?.()
-        lens?.()
       })
       ws.on('error', () => {})
       ws.on('message', () => {})
-      // A phone app offers to play the glasses' speech on it, and says how a play goes (readaloud.ts).
-      speechFeed(device ? (glasses ? lensWho(device.id) : device.id) : null, ws, req)
+      // A phone app says how a play goes (readaloud.ts).
+      speechFeed(device?.id ?? null, ws)
     })
   }
   apiServer.on('upgrade', onUpgrade(false))

@@ -118,8 +118,8 @@ class LiveHub(
     private val companionLookup = CompanionLookup()
     private var companionUrl by mutableStateOf<String?>(null)
     override val voice: Voice get() = Voice(voiceRoute(macStt, companionUrl), macStt)
-    /** Read aloud: the Mac's voice setting, this phone's own reads, and the glasses' speech played here (SpeechLink.kt). */
-    override val speech = PhoneSpeech(context, pairing, api, send = { ws?.send(it) == true }, labelOf = { id -> id?.let { i -> sessions.firstOrNull { it.id == i }?.project } })
+    /** Read aloud: the Mac's voice setting and this phone's own reads (SpeechLink.kt). */
+    override val speech = PhoneSpeech(pairing, api, send = { ws?.send(it) == true }, labelOf = { id -> id?.let { i -> sessions.firstOrNull { it.id == i }?.project } })
 
     private val noticeFlow = MutableSharedFlow<Notice>(extraBufferCapacity = 16)
     override val notices: SharedFlow<Notice> = noticeFlow
@@ -549,8 +549,6 @@ class LiveHub(
                     // Prompts typed while the Mac was away go now, in order.
                     flushOffline()
                     startWatchdog(webSocket)
-                    // Offer to play the glasses' speech on this phone (or say it won't).
-                    speech.connected()
                 }
             }
 
@@ -628,7 +626,7 @@ class LiveHub(
         class SleepSoonMsg(val s: SleepSoon) : Msg
         class BackpackEndingMsg(val s: BackpackEnding) : Msg
         class SttMsg(val s: Stt?) : Msg
-        /** Read aloud: the setting, a play for the glasses, a stop (SpeechLink.kt). */
+        /** Read aloud: the setting, a stop (SpeechLink.kt). */
         class SpeechMsg(val o: JSONObject) : Msg
         /** An automation, a run, a note, the counts (data/Automations.kt). */
         class AutoMsgs(val m: AutoMsg) : Msg
@@ -665,13 +663,11 @@ class LiveHub(
         "mac_sleep_soon" -> SleepSoon.parse(o)?.let { Msg.SleepSoonMsg(it) }
         "mac_backpack_ending" -> BackpackEnding.parse(o)?.let { Msg.BackpackEndingMsg(it) }
         "stt" -> Msg.SttMsg(o.obj("stt")?.let(Wire::stt))
-        "speech", "speech.play", "speech.stop" -> Msg.SpeechMsg(o)
+        "speech", "speech.stop" -> Msg.SpeechMsg(o)
         "automation", "automation.removed", "automations", "run", "note" -> AutomationWire.message(o)?.let { Msg.AutoMsgs(it) }
         "ping" -> Msg.Ping
         "lan" -> Msg.LanMsg(LanInfo.parse(o.obj("lan")))
         "tsnet" -> Msg.TailnetMsg(TailnetHint.parse(o.obj("tailnet")), o.obj("tsnet")?.str("mode"), o.obj("tsnet")?.obj("helper")?.str("state"))
-        // The Mac forgot the glasses that come through this phone: every Lens here lets go (bridge/LensBridge.kt).
-        "glasses.removed" -> { com.prudnikweb.hypernova.bridge.LensBridge.macRemovedGlasses(); null }
         else -> null
     }
 
@@ -2096,7 +2092,7 @@ class LiveHub(
             } catch (e: Throwable) {
                 val ex = Net.classify(e)
                 if (ex.status == 409) {
-                    // Someone else (the Mac, the terminal, the glasses, the timeout) answered first:
+                    // Someone else (the Mac, the terminal, the timeout) answered first:
                     // a neutral line until the Mac's own word on how arrives (it replaces this).
                     answered = answered - id
                     approvals = approvals - id

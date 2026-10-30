@@ -24,7 +24,6 @@
     <!-- The summary sentence: trigger phrase + ", " + action phrase + "." + then phrase. -->
     <string name="au_sum_join">%1$s, %2$s</string>
     <string name="au_sum_then_notify">Notify me when it\'s done.</string>
-    <string name="au_sum_then_say">Read the result aloud on my glasses.</string>
     <string name="au_sum_daily">Every day at %1$s</string>
     <string name="au_sum_weekdays">Every weekday at %1$s</string>
     <string name="au_sum_weekend">Every weekend at %1$s</string>
@@ -76,10 +75,6 @@
     <string name="au_sum_continue_on_quote">carry on %1$s on %2$s, which costs money: “%3$s”</string>
     <string name="au_sum_notify">notify me: “%1$s”</string>
     <string name="au_sum_notify_empty">notify me</string>
-    <string name="au_sum_notify_glasses">notify me, and read it aloud on my glasses: “%1$s”</string>
-    <string name="au_sum_notify_glasses_empty">notify me, and read it aloud on my glasses</string>
-    <string name="au_sum_say">read aloud on my glasses: “%1$s”</string>
-    <string name="au_sum_say_empty">read aloud on my glasses</string>
     <string name="au_sum_unknown_action">do something this app doesn\'t know yet</string>
     <!-- "Mon, Wed and Fri"; also names in a folded notification. -->
     <string name="au_and">%1$s and %2$s</string>
@@ -180,7 +175,6 @@
     <string name="au_problem_no_project">The project folder is gone.</string>
     <string name="au_problem_no_session">That session no longer exists.</string>
     <string name="au_problem_no_provider">That provider was removed.</string>
-    <string name="au_problem_no_glasses">Pair your glasses to read aloud.</string>
     <string name="au_problem_mode">Auto isn\'t available; it ran in %1$s</string>
     <!-- The mode chip on a card, for anything but "Allowed only". -->
     <string name="au_chip_asks">Asks me</string>
@@ -259,8 +253,6 @@
     <string name="au_d_skill">Run a skill or command</string>
     <string name="au_d_continue">Continue a session</string>
     <string name="au_d_notify">Notify me</string>
-    <string name="au_d_say">Read aloud on my glasses</string>
-    <string name="au_d_no_glasses">Pair your glasses first</string>
     <!-- At a time. -->
     <string name="au_once">Once</string>
     <string name="au_time">Time</string>
@@ -301,7 +293,6 @@
     <string name="au_model">Model</string>
     <string name="au_when_done">When it\'s done</string>
     <string name="au_then_notify">Notify me</string>
-    <string name="au_then_say">Read aloud</string>
     <string name="au_then_none">Nothing</string>
     <!-- Continue a session. -->
     <string name="au_session">Session</string>
@@ -319,8 +310,6 @@
     <!-- Notify me / Read aloud. -->
     <string name="au_text">Text</string>
     <string name="au_text_hint">What should it say?</string>
-    <string name="au_notify_glasses">Also read it aloud on my glasses</string>
-    <string name="au_notify_glasses_body">When they\'re connected.</string>
     <!-- Saving an automation that runs on another provider: it costs money, so it asks once per save. -->
     <string name="au_paid_q">This costs money</string>
     <string name="au_paid_body">It runs on %1$s, which bills its own credit, not your Claude subscription.</string>
@@ -389,7 +378,6 @@
     <string name="au_err_rule">A rule looks like Bash(npm test) or Read.</string>
     <string name="au_err_rule_broad">That rule would allow everything. Name the command, like Bash(npm test).</string>
     <string name="au_err_battery">This Mac has no battery.</string>
-    <string name="au_err_glasses">Pair your glasses first.</string>
     <string name="au_err_too_many">50 automations is the most. Delete one first.</string>
     <string name="au_err_paid">It runs on another provider, which costs money: save it again and agree to that.</string>
     <string name="au_err_template">The Mac didn\'t know this template. Update Hypernova on the Mac.</string>

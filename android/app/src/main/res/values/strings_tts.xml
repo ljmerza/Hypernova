@@ -1,16 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Read aloud: Soniox or the Mac's voice, played on this phone (and the glasses' speech), and the
+<!-- Read aloud: Soniox or the Mac's voice, played on this phone, and the
      speaking wave (data/Speech*.kt, ui/voice/Speaking.kt, ui/settings/ReadAloudSection.kt). -->
 <resources>
     <!-- The speaking wave, the bar and the notification. -->
     <string name="speaking_label">Speaking</string>
-    <string name="speaking_glasses">Speaking for your glasses</string>
     <string name="speaking_starting">Starting to speak</string>
     <string name="speaking_stop">Stop</string>
     <string name="speaking_status">Speaking</string>
-    <string name="speaking_status_glasses">Speaking on your glasses</string>
     <string name="speaking_reading">Reading aloud</string>
-    <string name="speaking_for_glasses">Reading aloud for your glasses</string>
     <string name="speaking_channel">Reading aloud</string>
     <string name="speaking_channel_desc">While a reply is read aloud, with Stop.</string>
 
@@ -27,9 +24,7 @@
     <string name="read_aloud_voice">Voice</string>
     <string name="read_aloud_voices_loading">Asking for the voices…</string>
     <string name="read_aloud_speed">Speed</string>
-    <string name="read_aloud_glasses">Glasses speak through this phone</string>
-    <string name="read_aloud_glasses_body">Replies read on your glasses play here, through your headphones, with the screen off.</string>
     <string name="read_aloud_test">Test</string>
-    <string name="read_aloud_sample">This is how Hypernova reads replies aloud, here and on your glasses.</string>
+    <string name="read_aloud_sample">This is how Hypernova reads replies aloud.</string>
     <string name="read_aloud_hint_soniox">%1$s on Soniox</string>
 </resources>

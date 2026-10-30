@@ -6,9 +6,8 @@ import { LOCAL_PORT, SUPPORT, log, readJson, writeJson } from '../util.ts'
 import { systemZone } from '../schedule.ts'
 import { broadcast, eventsFor, getSession, getUsage, listSessions, pendingApprovals, tapBroadcast, view } from '../hub.ts'
 import { getAccount, providerStatus } from '../account.ts'
-import { findProvider, hookSecret, isSdk, listDevices, settings } from '../store.ts'
+import { findProvider, hookSecret, isSdk, settings } from '../store.ts'
 import { knownModels, modelsNow } from '../models.ts'
-import { anyGlasses } from '../glasses.ts'
 import { getBattery } from '../battery.ts'
 import { keepAwake } from '../awake.ts'
 import { createSharedSession, endTerm, pressKeys, sharedTerminalsAvailable, termOf } from '../terms.ts'
@@ -48,16 +47,6 @@ export type SessionOps = {
 let ops: SessionOps | null = null
 export function useSessionOps(o: SessionOps): void {
   ops = o
-}
-let lensSockets = 0
-/** A Lens device joined the live feed; call what it returns when it leaves. */
-export function lensConnected(): () => void {
-  lensSockets++
-  let gone = false
-  return () => {
-    if (!gone) lensSockets--
-    gone = true
-  }
 }
 
 /** Claude Code's words for a call it refused without asking (don't ask mode, a deny rule). */
@@ -179,9 +168,6 @@ function daemonIO(): AutoIO {
       }
       return null
     },
-    // Glasses paired as a device of their own, or coming through a phone app (glasses.ts).
-    lensPaired: () => listDevices().some((d) => d.client === 'lens') || anyGlasses(),
-    lensOnline: () => lensSockets > 0,
     week: async () => weekText(await getStats('week')),
     send: broadcast,
     keepAwake,

@@ -2,7 +2,7 @@
 // awake while there is something to stay awake for, and is let go when there's a reason to.
 //
 // - While working (the default): held while sessions or their agents work, an automation asks for
-//   it, or a phone or the glasses are connected, and for 3 minutes after the last of those. The
+//   it, or a phone is connected, and for 3 minutes after the last of those. The
 //   grace is there because macOS sleeps the moment an assertion goes if the Mac has been idle long
 //   enough: a phone's socket blinking during a network change would otherwise put it to sleep.
 // - Backpack: held whatever happens, with the lid closed too, for 8 hours at most.
@@ -490,7 +490,7 @@ export class AwakeKeeper {
     return this.mode === 'backpack' && this.until != null && this.until - now <= WARN_MS && this.readings.lid === true
   }
 
-  /** A phone or the glasses connected; the function returned is its disconnect. */
+  /** A phone connected; the function returned is its disconnect. */
   clientConnected(): () => void {
     this.clients++
     this.activeAt = this.inputs.now()
@@ -631,7 +631,7 @@ export class AwakeKeeper {
     } else if (hold) this.io.hold(true)
     this.switchBackpack(this.mode === 'backpack' && hold)
     this.announce()
-    // Ten minutes out, said once per end (after the awake message that says `extendable`) so a phone, the Mac and the glasses can offer "+2 h".
+    // Ten minutes out, said once per end (after the awake message that says `extendable`) so a phone and the Mac can offer "+2 h".
     if (this.mode === 'backpack' && this.until != null && this.extendable(now) && this.endingTold !== this.until) {
       this.endingTold = this.until
       this.inputs.send({ t: 'mac_backpack_ending', inSeconds: Math.max(0, Math.round((this.until - now) / 1000)), until: this.until, extendBy: EXTEND_BY_MS / 1000 })
@@ -792,7 +792,7 @@ const NOT_HERE: Awake = { mode: 'off', holding: false, lidClosedOk: false, backp
 
 /** `Snapshot.mac.awake`. */
 export const awakeState = (): Awake => (has('awake') ? daemonKeeper().state() : { ...NOT_HERE })
-/** A phone or the glasses connected to the live feed; call what it returns when it disconnects. */
+/** A phone connected to the live feed; call what it returns when it disconnects. */
 export const awakeClient = (): (() => void) => (has('awake') ? daemonKeeper().clientConnected() : () => {})
 /** For automations: keep the Mac awake while [key] runs (While working). */
 export const keepAwake = (key: string, on: boolean): void => {

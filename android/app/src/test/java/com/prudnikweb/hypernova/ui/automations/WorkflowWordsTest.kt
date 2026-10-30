@@ -52,8 +52,8 @@ class WorkflowWordsTest {
             say(gh, steps, listOf(Output.Webhook("o", null, Output.SLACK), Output.File("f", null, "$hyper/log.md"))),
         )
         assertEquals(
-            "When a script or a webhook fires it, in hypernova, run “npm run build”. When it's done, notify me and my glasses.",
-            say(Trigger.Webhook(), listOf(Step("a", null, Action.Shell(hyper, "npm run build"))), listOf(Output.Notify("o", null, glasses = true))),
+            "When a script or a webhook fires it, in hypernova, run “npm run build”. When it's done, notify me and add it to log.md.",
+            say(Trigger.Webhook(), listOf(Step("a", null, Action.Shell(hyper, "npm run build"))), listOf(Output.Notify("o", null), Output.File("f", null, "$hyper/log.md"))),
         )
         assertEquals("On the schedule “*/15 9-18 * * 1-5”, ask me “Ship it?”", say(Trigger.Cron("*/15 9-18 * * 1-5"), listOf(Step("a", null, Action.Ask("Ship it?")))))
     }
@@ -91,7 +91,6 @@ class WorkflowWordsTest {
         assertEquals(RunLine("Working for 2m 00s", RunTone.Active), line(RunStep("a", Step.START, Run.RUNNING, startedAt = now - 120_000)))
         assertEquals(RunLine("Waiting for your answer", RunTone.Alert), line(RunStep("b", Step.ASK, Run.NEEDS_YOU)))
         assertEquals(RunLine("Answered Approve", RunTone.Ok), line(RunStep("b", Step.ASK, Run.DONE, answer = StepAnswer("Approve", "phone", now))))
-        assertEquals("Answered Skip on your glasses", line(RunStep("b", Step.ASK, Run.DONE, answer = StepAnswer("Skip", "glasses", now))).text)
         assertEquals("Answered Skip on the Mac", line(RunStep("b", Step.ASK, Run.DONE, answer = StepAnswer("Skip", "mac", now))).text)
         assertEquals("Nobody answered: taken as Skip", line(RunStep("b", Step.ASK, Run.DONE, answer = StepAnswer("Skip", StepAnswer.TIMEOUT, now))).text)
         assertEquals(RunLine("Exited 0: ✓ built in 41.2s", RunTone.Ok), line(RunStep("c", Step.SHELL, Run.DONE, exit = 0, result = "building…\n✓ built in 41.2s\n")))

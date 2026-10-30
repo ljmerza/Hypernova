@@ -126,7 +126,7 @@ fun GlassDialog(
     warm: Boolean = false,
     moreLabel: String? = null,
     more: (@Composable ColumnScope.() -> Unit)? = null,
-    /** What the choice shows besides words (the glasses' code), between [line] and More. */
+    /** What the choice shows besides words, between [line] and More. */
     body: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     GlassWindow(onDismiss, pane = eyebrow ?: title, tint = if (warm) tint else null) { shown ->

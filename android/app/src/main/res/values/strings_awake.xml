@@ -5,7 +5,7 @@
     <string name="awake_mode_working">While working</string>
     <string name="awake_mode_backpack">Backpack</string>
     <string name="awake_mode_off">Off</string>
-    <string name="awake_help_working">Awake while sessions, agents or automations run, or this phone or the glasses are connected. It sleeps as usual after.</string>
+    <string name="awake_help_working">Awake while sessions, agents or automations run, or this phone is connected. It sleeps as usual after.</string>
     <string name="awake_help_backpack">Awake with the lid closed, on battery, for up to 8 hours: Claude keeps working in your bag.</string>
     <string name="awake_help_off">Hypernova never keeps your Mac awake.</string>
 

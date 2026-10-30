@@ -8,8 +8,8 @@ import com.prudnikweb.hypernova.data.Core
 
 /**
  * "Stay connected in the background" after the phone restarts, or after this app is updated: the
- * background connection comes back without the app being opened first, so approvals, the widgets
- * and Lens's bridge work again. Both broadcasts let an app start a foreground service from the
+ * background connection comes back without the app being opened first, so approvals and the
+ * widgets work again. Both broadcasts let an app start a foreground service from the
  * background, and a specialUse one is allowed from boot (Android 15 limits only dataSync, media,
  * camera, microphone and phone calls there). Only while a computer is paired and the switch is on.
  */

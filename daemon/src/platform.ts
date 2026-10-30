@@ -74,15 +74,13 @@ export const userBinDir = (home: string): string => join(home, '.local', 'bin')
  * may show its sentence (Snapshot.mac.unavailable, docs/PROTOCOL.md); the rest of the API answers
  * 501 `unavailable` with the same sentence when asked anyway.
  */
-export type Feature = 'battery' | 'awake' | 'macVoice' | 'openWindow' | 'appWindow' | 'simulator'
+export type Feature = 'battery' | 'awake' | 'macVoice' | 'openWindow'
 
 export const LINUX_REASONS: Record<Feature, string> = {
   battery: 'Hypernova shows the battery of a Mac only.',
   awake: 'Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings.',
   macVoice: 'The Mac’s voice isn’t on Linux. Add a Soniox key to read aloud from this server.',
   openWindow: 'This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH.',
-  appWindow: 'App windows can be shown from a Mac only.',
-  simulator: 'The iOS Simulator runs on a Mac only.',
 }
 
 /** Under WSL on a Windows PC, the reasons that would point at a server's ways (cli/wsl.ts). */
@@ -153,32 +151,6 @@ export function tailscaleCandidates(platform: Platform): string[] {
   return platform === 'darwin'
     ? ['/Applications/Tailscale.app/Contents/MacOS/Tailscale', '/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale']
     : ['/usr/bin/tailscale', '/usr/local/bin/tailscale', '/usr/sbin/tailscale']
-}
-
-/**
- * adb: the SDK the environment names, Android Studio's default SDK, then a package's. On Linux
- * Android Studio puts the SDK in ~/Android/Sdk, and Debian's `adb` package in /usr/bin (with the
- * SDK pieces under /usr/lib/android-sdk).
- */
-export function adbCandidates(platform: Platform, env: NodeJS.ProcessEnv, home: string): string[] {
-  const sdks = platform === 'darwin'
-    ? [env.ANDROID_HOME, env.ANDROID_SDK_ROOT, join(home, 'Library/Android/sdk')]
-    : [env.ANDROID_HOME, env.ANDROID_SDK_ROOT, join(home, 'Android/Sdk'), '/usr/lib/android-sdk']
-  const fromSdk = sdks.map((d) => (d ? join(d, 'platform-tools', 'adb') : '')).filter(Boolean)
-  return platform === 'darwin' ? [...fromSdk, '/opt/homebrew/bin/adb', '/usr/local/bin/adb'] : [...fromSdk, '/usr/bin/adb', '/usr/local/bin/adb']
-}
-
-/**
- * Headless Chrome for Telescope's web pages: Google Chrome, else Chromium. On Linux, Google's
- * package, then the distributions' Chromium (Debian's `chromium`, older Ubuntus' `chromium-browser`,
- * the snap).
- */
-export function chromeCandidates(platform: Platform, home: string): string[] {
-  if (platform === 'darwin') {
-    const apps = ['Google Chrome.app/Contents/MacOS/Google Chrome', 'Chromium.app/Contents/MacOS/Chromium']
-    return apps.flatMap((a) => ['/Applications', join(home, 'Applications')].map((d) => join(d, a)))
-  }
-  return ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/opt/google/chrome/chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium']
 }
 
 // ── The shell ─────────────────────────────────────────────────────────────

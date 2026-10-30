@@ -17,7 +17,7 @@
 //
 // When: while any client is connected, every 2 minutes while a session on the subscription or its
 // agents work (what Usage.rate goes by: three looks in four minutes make a pace; sessions on other
-// providers don't spend the subscription's windows); idle, every 15 while a phone (or the glasses)
+// providers don't spend the subscription's windows); idle, every 15 while a phone
 // is connected, else hourly (the Mac app's own feed is always connected, and every look starts
 // Claude Code); backing off while it can't read the screen; when a client asks (POST
 // /v1/usage/refresh); right after a limit is hit.
@@ -44,7 +44,7 @@ export const PROBE_DIR = join(SUPPORT, 'usage-probe')
 export const PROBE_ARGS = ['--settings', '{"disableAllHooks":true}', '--strict-mcp-config']
 
 const EVERY_MS = 15 * 60_000
-/** Idle with no phone or glasses connected (only the Mac app's feed, which is always there). */
+/** Idle with no phone connected (only the Mac app's feed, which is always there). */
 const UNWATCHED_MS = 60 * 60_000
 /** Looks in a row that couldn't read the screen before the per-model weeks are said to be stale. */
 const FAILS_STALE = 3

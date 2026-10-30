@@ -27,7 +27,7 @@ internal object WidgetSamples {
         val codexLeads = which == "codex"
         val rows = listOfNotNull(
             WidgetModel.Row("c7", "release landing copy", "0stems", "Bash: npm run deploy", SessionState.NeedsYou),
-            WidgetModel.Row("d2", "lens settings sync", "hypernova", "Edit: lens/src/settings.ts", SessionState.Working, codex = true).takeIf { both },
+            WidgetModel.Row("d2", "settings sync", "hypernova", "Edit: daemon/src/store.ts", SessionState.Working, codex = true).takeIf { both },
             WidgetModel.Row("a3", "cosmos renderer", "hypernova", "Bash: ./gradlew assembleDebug", SessionState.Working).takeIf { working },
             WidgetModel.Row("b8", "haze edges", "hypernova", "Done: edges blur under the bars", SessionState.Idle),
             WidgetModel.Row("1f", "work strip card", "prudnikov-site", "Waiting for your next message", SessionState.Idle),

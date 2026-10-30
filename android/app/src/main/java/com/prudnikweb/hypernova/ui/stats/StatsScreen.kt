@@ -616,7 +616,6 @@ private fun Work(s: Stats) {
                 Row(Modifier.fillMaxWidth()) {
                     val from = listOfNotNull(
                         s.fromPhone.takeIf { it > 0 }?.let { stringResource(R.string.stats_from_phone) to grouped(it.toLong()) },
-                        s.fromGlasses.takeIf { it > 0 }?.let { stringResource(R.string.stats_from_glasses) to grouped(it.toLong()) },
                         s.byVoice.takeIf { it > 0 }?.let { stringResource(R.string.stats_by_voice) to grouped(it.toLong()) },
                     )
                     Tile(stringResource(R.string.stats_prompts), grouped(s.prompts.toLong()), null, Modifier.weight(1f), from)
@@ -630,7 +629,6 @@ private fun Work(s: Stats) {
                     Spacer(Modifier.width(14.dp))
                     val ap = listOfNotNull(
                         s.approvalsPhone.takeIf { it > 0 }?.let { stringResource(R.string.stats_ap_phone) to grouped(it.toLong()) },
-                        s.approvalsGlasses.takeIf { it > 0 }?.let { stringResource(R.string.stats_ap_glasses) to grouped(it.toLong()) },
                         s.approvalsMac.takeIf { it > 0 }?.let { stringResource(R.string.stats_ap_mac) to grouped(it.toLong()) },
                     )
                     // Only the Mac knows these, and only since it started counting.
@@ -665,7 +663,7 @@ private fun TokenPart(value: String, label: String, modifier: Modifier = Modifie
 
 /**
  * What a number is made of, as a small table: each part's name on the left and its count on the
- * right in mono ("phone ··· 31"), a row each, never "phone 31 · glasses 8 · spoken 12".
+ * right in mono ("phone ··· 31"), a row each, never "phone 31 · spoken 12".
  */
 @Composable
 private fun Breakdown(rows: List<Pair<String, String>>, modifier: Modifier = Modifier) {

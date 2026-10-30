@@ -94,14 +94,14 @@ fun SpeakingWave(modifier: Modifier = Modifier, color: Color = HN.accent, height
 }
 
 /**
- * "Speaking · Stop": a slim glass capsule with the wave, what speaks (the glasses' speech, or this
- * phone's Read aloud) and Stop. [onStop] stops it.
+ * "Speaking · Stop": a slim glass capsule with the wave, what speaks (this phone's Read aloud) and
+ * Stop. [onStop] stops it.
  */
 @Composable
 fun SpeakingBar(speaking: Speaking, modifier: Modifier = Modifier, onStop: () -> Unit = { Speaker.stop("phone") }) {
     val view = LocalView.current
     val reduced = LocalMotion.current.reduced
-    val what = stringResource(if (speaking.play.forGlasses) R.string.speaking_glasses else R.string.speaking_label)
+    val what = stringResource(R.string.speaking_label)
     val stop = stringResource(R.string.speaking_stop)
     Row(
         modifier
@@ -140,7 +140,7 @@ fun SpeakingBar(speaking: Speaking, modifier: Modifier = Modifier, onStop: () ->
 
 /**
  * The app's own bar while anything speaks and no screen shows one of its own: under the status
- * bar, centred, over whatever is there. The glasses' speech played here shows it too.
+ * bar, centred, over whatever is there.
  */
 @Composable
 fun SpeakingBarHost(hidden: Boolean, modifier: Modifier = Modifier) {
@@ -162,8 +162,8 @@ fun SpeakingBarHost(hidden: Boolean, modifier: Modifier = Modifier) {
 }
 
 /**
- * Under a session's status line while it's being spoken (its reply on this phone, or on the
- * glasses through this phone): the wave and "Speaking", in the status line's own type.
+ * Under a session's status line while it's being spoken (its reply on this phone): the wave and
+ * "Speaking", in the status line's own type.
  */
 @Composable
 fun SpeakingStatus(sessionId: String, modifier: Modifier = Modifier) {
@@ -174,13 +174,12 @@ fun SpeakingStatus(sessionId: String, modifier: Modifier = Modifier) {
         enter = fadeIn(tween(Motion.FAST)) + expandVertically(tween(Motion.DIALOG, easing = Motion.Expo)),
         exit = fadeOut(tween(Motion.FAST)) + shrinkVertically(tween(Motion.DIALOG, easing = Motion.Expo)),
     ) {
-        val forGlasses = speaking?.play?.forGlasses == true
         Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(12.dp), contentAlignment = Alignment.Center) {
                 SpeakingWave(height = 12.dp, bar = 2.dp, gap = 0.5.dp, live = speaking?.started == true)
             }
             Spacer(Modifier.width(10.dp))
-            HText(stringResource(if (forGlasses) R.string.speaking_status_glasses else R.string.speaking_status).uppercase(), style = Type.label, color = HN.accentDim, maxLines = 1)
+            HText(stringResource(R.string.speaking_status).uppercase(), style = Type.label, color = HN.accentDim, maxLines = 1)
         }
     }
 }

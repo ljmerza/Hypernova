@@ -18,9 +18,9 @@ class ProjectPickTest {
         p("/Users/me/Programming/0stems", agoH = 1),
         p("/Users/me/Documents/programming/even_realities/g2-local-stt", "Hyperscribe", agoH = 2),
         p("/Users/me/Programming/hypernova/.claude/worktrees/new-session", agoH = 3),
-        p("/Users/me/Programming/Nebula/lens-route-glow", agoH = 4),
+        p("/Users/me/Programming/Sandbox/route-glow", agoH = 4),
         // Not among the five most recent: grouped by folder.
-        p("/Users/me/Programming/Nebula/weather-glance", agoH = 300),
+        p("/Users/me/Programming/Sandbox/weather-glance", agoH = 300),
         p("/Users/me/Programming/budget-tracker", agoH = 500),
         p("/Users/me/Programming/accessibility-audit", agoH = 400),
         p("/Users/me/Programming/hypernova/.claude/worktrees/drawn-ui", agoH = 30),
@@ -41,10 +41,10 @@ class ProjectPickTest {
     @Test fun theMostRecentLeadThenTheRestByFolder() {
         val g = ProjectPick.groups(all, root)
         assertEquals(ProjectPick.Kind.Recent, g[0].kind)
-        assertEquals(listOf("hypernova", "0stems", "Hyperscribe", "new-session", "lens-route-glow"), g[0].projects.map { it.name })
-        // The projects folder first, then Nebula, then the others, the most recently active first.
+        assertEquals(listOf("hypernova", "0stems", "Hyperscribe", "new-session", "route-glow"), g[0].projects.map { it.name })
+        // The projects folder first, then the others, the most recently active first.
         assertEquals(
-            listOf(ProjectPick.Kind.Root to "~/Programming", ProjectPick.Kind.Nebula to null, ProjectPick.Kind.Worktrees to "hypernova", ProjectPick.Kind.Folder to "~", ProjectPick.Kind.Folder to "~/Documents/programming/even_realities"),
+            listOf(ProjectPick.Kind.Root to "~/Programming", ProjectPick.Kind.Worktrees to "hypernova", ProjectPick.Kind.Folder to "~", ProjectPick.Kind.Folder to "~/Documents/programming/even_realities", ProjectPick.Kind.Folder to "~/Programming/Sandbox"),
             g.drop(1).map { it.kind to it.label },
         )
         // Inside a folder, by name; a project never run from here is listed too.
@@ -68,7 +68,7 @@ class ProjectPickTest {
         assertEquals(setOf("Hyperscribe", "Hypertasks"), ProjectPick.search(all, "even").map { it.name }.toSet())
         // Every word must be found: in the path or the name.
         assertEquals(setOf("Hyperscribe", "Hypertasks"), ProjectPick.search(all, "even hyp").take(2).map { it.name }.toSet())
-        assertEquals(listOf("lens-route-glow", "weather-glance"), ProjectPick.search(all, "nebula").map { it.name })
+        assertEquals(listOf("route-glow", "weather-glance"), ProjectPick.search(all, "sandbox").map { it.name })
         assertTrue(ProjectPick.search(all, "zzz").isEmpty())
         assertTrue(ProjectPick.search(all, "  ").isEmpty())
         // The name counts more than the same letters in a path: "drawn" is a worktree's name.

@@ -192,8 +192,6 @@ export function listProjects(): Project[] {
     for (const d of readdirSync(settings.projectsRoot, { withFileTypes: true })) {
       if (!d.isDirectory() || d.name.startsWith('.')) continue
       const path = join(settings.projectsRoot, d.name)
-      // Nebula holds projects (nebula.ts, whose default this is); it isn't one itself.
-      if (path === (settings.nebula || join(settings.projectsRoot, 'Nebula'))) continue
       if (!out.has(path)) {
         let m: number | null = null
         try {
@@ -273,8 +271,7 @@ type Preview = { kind: 'dir'; root: string; entry: string } | { kind: 'port'; po
 const previews = new Map<string, { p: Preview; exp: number }>()
 /**
  * A preview of a file or a dev server. [allowed]: where a file may be, the phone's browsing rule
- * (files.ts allowedPath) unless the caller is the daemon's own (Show me's capture of a page its
- * session wrote goes by where sessions work, workPath, whatever Browse outside projects says).
+ * (files.ts allowedPath) unless the caller says otherwise.
  */
 export function createPreview(body: { path?: string; port?: number }, base: string, allowed: (p: string) => string | null = allowedPath): { url: string } {
   const token = randomToken(18)

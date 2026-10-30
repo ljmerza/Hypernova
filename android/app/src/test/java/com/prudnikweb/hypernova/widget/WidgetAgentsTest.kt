@@ -70,7 +70,7 @@ class WidgetAgentsTest {
     @Test fun bothAgentsRoundTrip() {
         val m = oldModel.copy(
             conn = WidgetModel.Conn.Live,
-            rows = oldModel.rows + WidgetModel.Row("d2", "lens settings sync", "hypernova", "Edit: lens/src/settings.ts", SessionState.Working, codex = true),
+            rows = oldModel.rows + WidgetModel.Row("d2", "settings sync", "hypernova", "Edit: daemon/src/store.ts", SessionState.Working, codex = true),
             other = WidgetModel.Other(AgentKind.CODEX, used = 0.61f, resetAt = now + 3 * hour, limited = false),
         )
         assertEquals(m, WidgetModel.fromJson(JSONObject(m.toJson().toString())))

@@ -1,6 +1,0 @@
-node_modules/
-dist/
-*.ehpk
-shots/
-.DS_Store
-app.local.json

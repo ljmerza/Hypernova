@@ -416,8 +416,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
 
                 ToastHost(vm.toast, onDismiss = vm::dismissToast)
 
-                // "Speaking · Stop" while anything is read aloud on this phone (the glasses' speech
-                // too); a session's chat shows its own beside Interrupt (ui/voice/Speaking.kt).
+                // "Speaking · Stop" while anything is read aloud on this phone; a session's chat shows
+                // its own beside Interrupt (ui/voice/Speaking.kt).
                 if (hub != null && !covered) com.prudnikweb.hypernova.ui.voice.SpeakingBarHost(hidden = route is Route.Session)
 
                 // Banners for what happens elsewhere: not for the session that's on screen.
@@ -491,8 +491,6 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 com.prudnikweb.hypernova.ui.update.UpdateBannerHost(covered = vm.notice != null)
 
                 Grain(Modifier.fillMaxSize())
-                // "Allow Hypernova Lens to connect?" over everything while the app is open (ui/glasses).
-                com.prudnikweb.hypernova.ui.glasses.BridgePromptHost()
             }
         }
     }

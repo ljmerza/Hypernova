@@ -10,8 +10,6 @@
     </plurals>
     <string name="wf_sum_outputs">When it\'s done, %1$s.</string>
     <string name="wf_told_notify">notify me</string>
-    <string name="wf_told_notify_glasses">notify me and my glasses</string>
-    <string name="wf_told_say">read it aloud on my glasses</string>
     <string name="wf_told_webhook">post it to %1$s</string>
     <string name="wf_told_file">add it to %1$s</string>
     <string name="wf_preset_ntfy">ntfy</string>
@@ -106,7 +104,7 @@
         <item quantity="other">%d rules</item>
     </plurals>
     <string name="wf_minutes">%1$d min</string>
-    <string name="wf_ask_note">Your phone and glasses ask; the first answer counts. The run keeps its slot while it waits.</string>
+    <string name="wf_ask_note">Your phone asks; the first answer counts. The run keeps its slot while it waits.</string>
 
     <!-- Run a shell command. -->
     <string name="wf_command">Command</string>
@@ -149,12 +147,9 @@
 
     <!-- Outputs. -->
     <string name="wf_o_notify">Notify me</string>
-    <string name="wf_o_notify_glasses">Notify me and my glasses</string>
-    <string name="wf_o_say">Read aloud</string>
     <string name="wf_o_webhook">A webhook</string>
     <string name="wf_o_file">A file</string>
     <string name="wf_ot_notify">Notify me</string>
-    <string name="wf_ot_say">Read aloud on my glasses</string>
     <string name="wf_ot_webhook">Post to a webhook</string>
     <string name="wf_ot_file">Add to a file</string>
     <string name="wf_o_result">The run\'s result</string>
@@ -181,7 +176,6 @@
     <string name="wf_file">File</string>
     <string name="wf_file_hint">notes/briefs.md</string>
     <string name="wf_file_note">Each run adds one line: the date, its name and what it said.</string>
-    <string name="wf_glasses_too">Also on my glasses</string>
 
     <!-- Budget. -->
     <string name="wf_budget_on">Limit each run</string>
@@ -269,7 +263,6 @@
     <string name="wf_rs_not_reached">Not reached</string>
     <string name="wf_rs_reused">From the run it retried</string>
     <string name="wf_rs_answer">Answered %1$s</string>
-    <string name="wf_rs_answer_glasses">Answered %1$s on your glasses</string>
     <string name="wf_rs_answer_mac">Answered %1$s on the Mac</string>
     <string name="wf_rs_answer_timeout">Nobody answered: taken as %1$s</string>
     <string name="wf_ro_sent">Sent</string>

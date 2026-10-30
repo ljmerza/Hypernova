@@ -72,7 +72,7 @@ object PairLinks {
     /**
      * The domain whose https links open this app (Android App Links: the manifest's autoVerify
      * filter, and `names/src/links.ts`, which serves its assetlinks.json and the pages a browser
-     * shows). Only `/pair` and `/glasses` there; it's never a Mac's address.
+     * shows). Only `/pair` there; it's never a Mac's address.
      */
     const val LINK_HOST = "hypernova.observer"
     private val UNIVERSAL = Regex("""https://hypernova\.observer/pair#\S*""", RegexOption.IGNORE_CASE)
@@ -80,12 +80,11 @@ object PairLinks {
     private val ORIGIN = Regex("""^([a-z][a-z0-9+.-]*)://([^/?#]+)""", RegexOption.IGNORE_CASE)
 
     /** What a link that opened the app asks for. */
-    enum class Kind { Pair, Glasses }
+    enum class Kind { Pair }
 
     /**
      * Which of the app's own links [uri] is: `hypernova://pair` and `https://hypernova.observer/pair`
-     * pair (their details then go to [parse]); `hypernova://glasses` and
-     * `https://hypernova.observer/glasses` open Settings → Glasses. Null for anything else.
+     * pair (their details then go to [parse]). Null for anything else.
      */
     fun kind(uri: String?): Kind? {
         val m = ORIGIN.find(uri?.trim() ?: return null) ?: return null
@@ -94,9 +93,7 @@ object PairLinks {
         val path = uri.trim().substring(m.range.last + 1).substringBefore('?').substringBefore('#').trimEnd('/')
         return when {
             scheme == "hypernova" && host == "pair" && path.isEmpty() -> Kind.Pair
-            scheme == "hypernova" && host == "glasses" && path.isEmpty() -> Kind.Glasses
             scheme == "https" && host == LINK_HOST && path == "/pair" -> Kind.Pair
-            scheme == "https" && host == LINK_HOST && path == "/glasses" -> Kind.Glasses
             else -> null
         }
     }

@@ -210,9 +210,9 @@ test('the listener speaks TLS with the pinned certificate, and without a device 
   assert.equal(s.json.error.message.includes('certificate'), true)
   const a = await lan(LAN, 'GET', '/v1/health', { headers: { 'access-control-request-method': 'GET' } })
   assert.equal(a.status, 200)
-  // A browser's preflight is fine (nothing in it).
+  // A browser's preflight gets nothing.
   const o = await lan(LAN, 'OPTIONS', '/v1/snapshot', { headers: { origin: 'https://plugin.example', 'access-control-request-method': 'GET' } })
-  assert.equal(o.status, 204)
+  assert.equal(o.status, 404)
   // The Mac app's local API is not here.
   const l = await lan(LAN, 'GET', '/local/status', { token: adminToken })
   assert.equal(l.status, 401)

@@ -190,8 +190,7 @@ export function allowedPath(p: string): string | null {
 
 /**
  * Where sessions work, for the daemon's own uses: automations' folders (automations.ts; an owner
- * decision of its own, LATER L73) and Show me's capture of a page a session wrote (shots.ts). The
- * projects folder and each session's own folder that isn't too broad, as before the browsing
+ * decision of its own, LATER L73). The projects folder and each session's own folder that isn't too broad, as before the browsing
  * setting, whatever it says; never a key place. The phone's browsing goes by [allowedPath].
  */
 export function workPath(p: string): string | null {

@@ -219,7 +219,7 @@ interface Hub {
     suspend fun sttInfo(): Result<SttInfo> = Result.failure(HubException("Not in the demo."))
     /** [apiKey] null removes the key. Failures carry the daemon's words. */
     suspend fun setSttKey(apiKey: String?): Result<SttInfo> = Result.failure(HubException("Not in the demo."))
-    /** Read aloud with the Mac's voices, played here (and the glasses' speech); null in the demo (SpeechLink.kt). */
+    /** Read aloud with the Mac's voices, played here; null in the demo (SpeechLink.kt). */
     val speech: PhoneSpeech? get() = null
 
     // ─── Account (docs/PROTOCOL.md, "Account") ───────────────────────────────

@@ -588,7 +588,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                         .padding(start = 12.dp)
                         .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.session_sheet_open), role = Role.Button) { sheetAtBlocked = false; sheetOpen = true },
                 )
-                // Its reply being read aloud (here, or the glasses' speech played here): the speaking wave.
+                // Its reply being read aloud here: the speaking wave.
                 com.prudnikweb.hypernova.ui.voice.SpeakingStatus(session.id, Modifier.padding(start = 12.dp))
                 // Fork: no "what changed" row (git summary / written files) in the header; the room
                 // goes to the chat.

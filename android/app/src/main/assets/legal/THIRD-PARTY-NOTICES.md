@@ -31,7 +31,3 @@ Go's module cache) and in `third_party/`.
 | Manrope and JetBrains Mono | SIL Open Font License 1.1 (`Fonts/OFL-*.txt`) |
 
 Hypernova does **not** include Claude Code, Codex or any other agent: it runs the copy you installed.
-
-## Shipped in Hypernova Lens (`Hypernova-Lens.ehpk`)
-
-See `lens/public/licenses.txt` (the Even Hub SDK, Vite's preload helper: MIT; the fonts: OFL).

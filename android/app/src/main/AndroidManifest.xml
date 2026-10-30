@@ -14,7 +14,7 @@
          MODIFY_AUDIO_SETTINGS lets a dictation use a Bluetooth headset's microphone when that's on. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <!-- Read aloud: the CPU stays up while the phone plays a reply (the glasses' too) with the screen off, for that play only. -->
+    <!-- Read aloud: the CPU stays up while the phone plays a reply with the screen off, for that play only. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The in-app update (data/AppUpdater.kt): the APK the paired computer hands out, installed with
          PackageInstaller after Android's own "Update this app?" (and, once, "Install unknown apps"). -->
@@ -67,13 +67,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="hypernova" android:host="pair" />
-            </intent-filter>
-            <!-- hypernova://glasses: Settings → Glasses, where the glasses' access and settings are. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="hypernova" android:host="glasses" />
             </intent-filter>
             <!-- Long-press on the icon: New session and the latest projects (ui/share/LauncherShortcuts). -->
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
@@ -183,11 +176,6 @@
              reached only through the notifications' own PendingIntents, after the phone is unlocked. -->
         <receiver
             android:name=".data.NotifyActions"
-            android:exported="false" />
-        <!-- Allow and Deny on "Allow Hypernova Lens to connect?" (bridge/BridgeNotice.kt): reached only
-             through the notification's own PendingIntents. -->
-        <receiver
-            android:name=".bridge.BridgeActions"
             android:exported="false" />
     </application>
 </manifest>

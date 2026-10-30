@@ -47,7 +47,6 @@ import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Radio
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.StatusChip
-import com.prudnikweb.hypernova.ui.components.ToggleRow
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Motion
@@ -58,9 +57,7 @@ import kotlinx.coroutines.launch
 /**
  * Settings → Voice, its read-aloud half (docs/PROTOCOL.md, "Read aloud"): read aloud with Soniox
  * (natural voices, Russian too) or the Mac's own voices, which voice, how fast, a Test that plays
- * here, and whether the glasses speak through this phone. The engine, voice and speed are the
- * Mac's (one setting for the phone and the glasses); the glasses switch is this phone's. Only from
- * a Mac that reads aloud this way.
+ * here. The engine, voice and speed are the Mac's. Only from a Mac that reads aloud this way.
  */
 @Composable
 fun ReadAloudSection(hub: Hub) {
@@ -137,8 +134,6 @@ fun ReadAloudSection(hub: Hub) {
             }
             Spacer(Modifier.height(4.dp))
             Hairline(Modifier.fillMaxWidth().padding(top = 8.dp))
-            ToggleRow(stringResource(R.string.read_aloud_glasses), stringResource(R.string.read_aloud_glasses_body), speech.glasses, { speech.glassesSpeakHere(it) })
-            Hairline(Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
             val testing = Speaker.now?.key == TEST_KEY
             val sample = stringResource(R.string.read_aloud_sample)

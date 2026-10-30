@@ -9,7 +9,7 @@ this page has a bug, so please tell us.
 
 ## What you are trusting it with
 
-Pairing a phone (or a pair of glasses) with your computer gives that device **the same power over
+Pairing a phone with your computer gives that device **the same power over
 Claude Code (and Codex, once you turn it on for Hypernova) that you have at the keyboard**:
 
 - it can start sessions in any project folder, send prompts, and answer approvals
@@ -45,7 +45,7 @@ with your own key; provider keys go only to their own provider.
 
 Details that matter:
 
-- **Phone API.** Every `/v1` route except `GET /v1/health`, `POST /v1/pair`, a Telescope picture
+- **Phone API.** Every `/v1` route except `GET /v1/health`, `POST /v1/pair`
   and a terminal's WebSocket (which carries a short-lived ticket) needs the device's bearer token.
   Requests that arrive through `tailscale serve` are recognised by their forwarding header and are
   never treated as local.

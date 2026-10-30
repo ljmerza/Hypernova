@@ -431,7 +431,6 @@ fun problemText(a: Automation): String? {
         "no_project" -> stringResource(R.string.au_problem_no_project)
         "no_session" -> stringResource(R.string.au_problem_no_session)
         "no_provider" -> stringResource(R.string.au_problem_no_provider)
-        "no_glasses" -> stringResource(R.string.au_problem_no_glasses)
         "mode_unavailable" -> stringResource(R.string.au_problem_mode, modeTitle(ranIn ?: AutoMode.ASK))
         "no_gh" -> stringResource(R.string.wf_problem_no_gh)
         "no_hooks" -> stringResource(R.string.wf_problem_no_hooks)

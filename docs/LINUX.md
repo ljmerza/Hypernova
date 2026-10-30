@@ -44,7 +44,7 @@ What it does:
 
 1. **System packages** it lacks, with `apt-get`: curl, tar, openssl, git, build tools (`make`,
    `g++`, `python3`: node-pty, which runs the shared terminals, has no prebuilt Linux binary and is
-   built on the server), and `ps` and `lsof` for Telescope.
+   built on the server), and `ps` and `lsof`.
 2. **Node.js 24** from nodejs.org, checked against nodejs.org's `SHASUMS256.txt`, unpacked into
    Hypernova's own folder (`~/.local/share/hypernova/node`). A system Node 24 or newer is used
    instead when there is one. Nothing outside Hypernova's folder is touched.
@@ -109,7 +109,7 @@ docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped 
 | What | Where |
 |---|---|
 | State: identity, admin token, paired devices, settings, shared terminals' files | `~/.local/share/hypernova` (`$XDG_DATA_HOME/hypernova`) |
-| The daemon itself, and the font Telescope draws the terminal with | `~/.local/share/hypernova/app` |
+| The daemon itself, and JetBrains Mono beside it | `~/.local/share/hypernova/app` |
 | Node.js, when Hypernova downloaded it | `~/.local/share/hypernova/node`, named in `~/.local/share/hypernova/node-path` |
 | The log | `~/.local/state/hypernova/logs/daemon.log` (`$XDG_STATE_HOME/hypernova/logs`) |
 | The command | `~/.local/bin/hypernova` (on PATH in Ubuntu's and Debian's default `~/.profile`; Claude Code's installer puts `claude` there too) |
@@ -200,7 +200,6 @@ sentence (docs/PROTOCOL.md, "Types", "Mac-only features").
 | Stay awake | Off; a server stays on by itself. |
 | The Mac's voice (`say`) | None; Soniox reads aloud on the phone. |
 | Opening a terminal window ("Open on Mac", signing in "on the Mac") | None: no screen. `hn attach` over SSH. |
-| Telescope: app windows, the iOS Simulator | None. |
 
 What keeps working on Linux:
 
@@ -209,12 +208,6 @@ What keeps working on Linux:
   there) or `~/.zshrc` for zsh, the same marked block as on the Mac (`# >>> hypernova shared
   terminals` … `# <<< hypernova shared terminals`), so `claude` typed over SSH is a session the
   phone can see and type into; `hn ls`, `hn attach`. Another login shell leaves `claude` plain.
-- **Telescope:** the session's **terminal** (drawn in TypeScript with JetBrains Mono, no AppKit),
-  **web pages** (headless Chrome or Chromium when installed: `google-chrome-stable`, `chromium`,
-  `chromium-browser`, the snap; run as root it starts without its sandbox), the **Android
-  emulator or a phone** (`adb` from `$ANDROID_HOME`, `$ANDROID_SDK_ROOT`, `~/Android/Sdk`, or
-  Debian's `adb` package), and **pictures** the session made, PNG for now (a JPEG, SVG or PDF says
-  it needs a Mac).
 - **Codex**, as on a Mac: found in the same places (`~/.local/bin`, `/usr/local/bin`, `/usr/bin`,
   npm's, Volta's, Bun's, pnpm's and nvm's folders, then the login shell), 0.163.0 or later, used only
   while it's on (`hypernova codex on`, or the phone), its `codex` function in `~/.bashrc` beside
@@ -246,7 +239,7 @@ then the service restarts; open sessions keep running. (Docker: see "Updating th
 
 - Unit: `cd daemon && npm test` includes `test/platform.test.ts` (where things live, what exists
   on each system), `test/linux-cli.test.ts` (the command's pieces and commands against a stand-in
-  daemon and system) and `test/linux-telescope.test.ts` (PNG and the terminal drawn without AppKit).
+  daemon and system).
 - End to end, in Docker: `scripts/test-linux-docker.sh` builds the image, starts the daemon, and
   checks `status`, `doctor`, `pair`, the API's health, pairing a stand-in phone, the Mac-only
   features answering 501, the LAN listener asking for device certificates, a shared terminal
@@ -256,5 +249,5 @@ then the service restarts; open sessions keep running. (Docker: see "Updating th
   privileged container, publishing nothing), installs from a tarball as a user with sudo and no
   login session, and checks lingering, the unit, `status` and `doctor`, systemd starting the daemon
   again after `kill -9`, a session the daemon started (a stand-in Claude Code) kept through a service
-  restart and an update and found again, Telescope drawing its terminal, the daemon back after a
+  restart and an update and found again, the daemon back after a
   reboot with nobody logged in, and `uninstall`.

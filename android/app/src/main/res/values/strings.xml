@@ -783,7 +783,6 @@
     <string name="ns_search_projects">Search projects</string>
     <string name="ns_search_models">Search models</string>
     <string name="ns_recent">Recent</string>
-    <string name="ns_nebula">Nebula</string>
     <string name="ns_worktrees">Worktrees of %1$s</string>
     <string name="ns_no_match">Nothing matches %1$s.</string>
     <string name="ns_new_project_in">In %1$s</string>

@@ -58,7 +58,7 @@ data class Stats(
     val to: Long,
     /** The first day with any work on the Mac (null: none yet). */
     val since: Long?,
-    /** When the Mac started counting what only it sees (prompts from the phone or the glasses, approvals). */
+    /** When the Mac started counting what only it sees (prompts from the phone, approvals). */
     val countingSince: Long,
     /** Each session's busy time, added up. */
     val claudeMs: Long,
@@ -70,7 +70,6 @@ data class Stats(
     val sessions: Int,
     val prompts: Int,
     val fromPhone: Int,
-    val fromGlasses: Int,
     val byVoice: Int,
     val toolCalls: Int,
     val tools: List<StatTool>,
@@ -78,7 +77,6 @@ data class Stats(
     val agents: Int,
     val approvals: Int,
     val approvalsPhone: Int,
-    val approvalsGlasses: Int,
     val approvalsMac: Int,
     /** Usage limits reached that began in the range: the 5-hour window, the week, a model's own. */
     val limitsFiveHour: Int,
@@ -145,7 +143,6 @@ object StatsWire {
             sessions = o.int("sessions") ?: 0,
             prompts = o.int("prompts") ?: 0,
             fromPhone = from?.int("phone") ?: 0,
-            fromGlasses = from?.int("glasses") ?: 0,
             byVoice = from?.int("voice") ?: 0,
             toolCalls = o.int("toolCalls") ?: 0,
             tools = buildList {
@@ -159,7 +156,6 @@ object StatsWire {
             agents = o.int("agents") ?: 0,
             approvals = ap?.int("total") ?: 0,
             approvalsPhone = ap?.int("phone") ?: 0,
-            approvalsGlasses = ap?.int("glasses") ?: 0,
             approvalsMac = ap?.int("mac") ?: 0,
             limitsFiveHour = lim?.int("fiveHour") ?: 0,
             limitsWeek = lim?.int("sevenDay") ?: 0,

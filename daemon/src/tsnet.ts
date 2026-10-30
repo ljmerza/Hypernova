@@ -263,7 +263,7 @@ function spawnHelper(bin: string): void {
     if (next.state === 'Running' && next.listening) log(`tsnet serving ${next.listening} (${next.tls}, ${next.dnsName ?? '?'}, ${next.account ?? '?'})`)
     else if (next.state === 'NeedsLogin' && next.loginUrl) log('tsnet needs a sign-in')
     // The Mac app's feed follows this (it reads the sign-in link from /local/status itself; the
-    // broadcast reaches every phone and the glasses too, so the link stays out of it).
+    // broadcast reaches every phone too, so the link stays out of it).
     broadcast({ t: 'tsnet', tsnet: publicState(), tailnet: tailnetNow() })
     // A node that has run for a minute has earned a fresh restart budget.
     if (next.state === 'Running') healthyTimer ??= setTimeout(() => { restarts = 0; healthyTimer = null }, 60_000)

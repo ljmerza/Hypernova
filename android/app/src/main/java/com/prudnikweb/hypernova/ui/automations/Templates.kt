@@ -95,9 +95,9 @@ object Templates {
 
     /**
      * The template filled in: [project] is the most recently active one (null: none yet, the editor
-     * asks); another provider for Switch; Read aloud for the debrief when glasses are paired.
+     * asks); another provider for Switch.
      */
-    fun input(id: String, res: Resources, project: String?, providers: List<Provider>, glasses: Boolean): AutomationInput? {
+    fun input(id: String, res: Resources, project: String?, providers: List<Provider>): AutomationInput? {
         val t = byId(id) ?: return null
         val name = res.getString(t.name)
         val builtIn = providers.firstOrNull { it.builtIn }?.id ?: "anthropic"
@@ -112,8 +112,8 @@ object Templates {
                 false,
             )
             NIGHT -> Triple(Trigger.Reset(Trigger.FIVE_HOUR, afterLimit = false, from = "00:00", to = "07:00"), start("", AutoMode.ALLOWED), false)
-            // On the phone, and read aloud on the glasses too when they're on.
-            DEBRIEF -> Triple(Trigger.Reset(Trigger.SEVEN_DAY, afterLimit = false), Action.Notify(WEEK, glasses = glasses), false)
+            // On the phone.
+            DEBRIEF -> Triple(Trigger.Reset(Trigger.SEVEN_DAY, afterLimit = false), Action.Notify(WEEK), false)
             BRIEF -> Triple(Trigger.Time("09:00", Trigger.WEEKDAYS), start(res.getString(R.string.au_t_brief_prompt), AutoMode.ALLOWED, GIT_READ), false)
             PRS -> Triple(Trigger.Every(2, "09:00", "19:00", Trigger.WEEKDAYS), start(res.getString(R.string.au_t_prs_prompt), AutoMode.ALLOWED, GH_READ), false)
             PLUGGED -> Triple(Trigger.Plugged, start(res.getString(R.string.au_t_plugged_prompt), AutoMode.ASK), false)
@@ -151,7 +151,7 @@ object Templates {
             DIGEST -> input(
                 Trigger.Time("09:00", Trigger.WEEKDAYS),
                 listOf(Step("st_dig1", null, start(res.getString(R.string.au_t_brief_prompt), GIT_READ))),
-                listOf(Output.Notify("ou_dig1", null, glasses = false), Output.File("ou_dig2", null, if (path.isEmpty()) "" else "${path.trimEnd('/')}/${res.getString(R.string.wf_t_digest_file)}")),
+                listOf(Output.Notify("ou_dig1", null), Output.File("ou_dig2", null, if (path.isEmpty()) "" else "${path.trimEnd('/')}/${res.getString(R.string.wf_t_digest_file)}")),
             )
             // A session still needs me after 10 minutes: the phone, and Slack (its address is the owner's to paste).
             TEAM -> input(

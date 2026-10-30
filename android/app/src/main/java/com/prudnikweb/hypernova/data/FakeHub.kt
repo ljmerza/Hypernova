@@ -39,15 +39,15 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
             Project("~/dotfiles", "dotfiles", System.currentTimeMillis() - 6 * 86_400_000L, 1),
             Project("~/Programming/home-server", "home-server", System.currentTimeMillis() - 9 * 86_400_000L, 1),
             // A Mac of many projects, for the new-session sheet's picker (search, recent, by folder):
-            // the glasses' Nebula, a project's worktrees, other folders, some never run from here.
+            // a project's worktrees, other folders, some never run from here.
             Project("~/Programming/hypernova/.claude/worktrees/new-session", "new-session", System.currentTimeMillis() - 3 * 3_600_000L, 2),
             Project("~/Programming/hypernova/.claude/worktrees/drawn-ui", "drawn-ui", System.currentTimeMillis() - 26 * 3_600_000L, 3),
             Project("~/Programming/hypernova/.claude/worktrees/phone-update", "phone-update", System.currentTimeMillis() - 2 * 86_400_000L, 1),
             Project("~/Documents/programming/even_realities/hypernavigate", "Hypernavigate", System.currentTimeMillis() - 30 * 3_600_000L, 4),
             Project("~/Documents/programming/even_realities/hypertasks", "Hypertasks", System.currentTimeMillis() - 8 * 86_400_000L, 2),
-            Project("~/Programming/Nebula/lens-route-glow", "lens-route-glow", System.currentTimeMillis() - 20 * 3_600_000L, 1),
-            Project("~/Programming/Nebula/note-to-self", "note-to-self", System.currentTimeMillis() - 4 * 86_400_000L, 1),
-            Project("~/Programming/Nebula/weather-glance", "weather-glance", System.currentTimeMillis() - 12 * 86_400_000L, 1),
+            Project("~/Programming/Sandbox/route-glow", "route-glow", System.currentTimeMillis() - 20 * 3_600_000L, 1),
+            Project("~/Programming/Sandbox/note-to-self", "note-to-self", System.currentTimeMillis() - 4 * 86_400_000L, 1),
+            Project("~/Programming/Sandbox/weather-glance", "weather-glance", System.currentTimeMillis() - 12 * 86_400_000L, 1),
             Project("~/Programming/0stems-site", "0stems-site", System.currentTimeMillis() - 14 * 86_400_000L, 2),
             Project("~/Programming/budget-tracker", "budget-tracker", System.currentTimeMillis() - 20 * 86_400_000L, 1),
             Project("~/Programming/kotlin-playground", "kotlin-playground", System.currentTimeMillis() - 30 * 86_400_000L, 0),
@@ -703,7 +703,7 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
         sessions = listOf(
             Session("6d", CX_WORK, "tidy the release notes", "0stems", if (limited) SessionState.Idle else SessionState.Working, "gpt-5-codex", AgentKind.CAN_EDIT,
                 if (limited) res.getString(R.string.activity_waiting) else "$ npm test", t - 40_000, providerId = AgentKind.CODEX_PROVIDER, createdAt = t - 25 * MIN, agent = AgentKind.CODEX),
-            Session("3a", CX_IDLE, "review the Lens bridge", "hypernova", SessionState.Idle, "gpt-5-codex", AgentKind.READ_ONLY,
+            Session("3a", CX_IDLE, "review the pairing flow", "hypernova", SessionState.Idle, "gpt-5-codex", AgentKind.READ_ONLY,
                 res.getString(R.string.activity_waiting), t - 7 * MIN, providerId = AgentKind.CODEX_PROVIDER, createdAt = t - 50 * MIN, agent = AgentKind.CODEX),
         ) + sessions
     }

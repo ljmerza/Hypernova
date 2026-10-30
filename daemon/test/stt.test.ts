@@ -550,46 +550,6 @@ test('a key Soniox takes but whose account has no balance is kept, and says so',
   await send(API, 'DELETE', '/v1/stt/key', AUTH)
 })
 
-// ── The Lens guide ───────────────────────────────────────────────────────
-test('the guide: one place for both screens, glasses pairing opens it on the Mac, and "Show on my Mac"', async () => {
-  const snap = (await send(API, 'GET', '/v1/snapshot', AUTH)).body
-  assert.deepEqual(snap.guide, { step: 'about', seen: false, done: false })
-  // The Mac app's live feed (admin token, client=mac) and a phone's.
-  const mac = new WebSocket(`ws://127.0.0.1:${API}/v1/ws?token=${adminToken}&client=mac`)
-  const macGot: any[] = []
-  mac.onmessage = (m) => macGot.push(JSON.parse(String(m.data)))
-  await new Promise((r) => (mac.onopen = r))
-
-  const moved = await send(API, 'POST', '/v1/guide', AUTH, { step: 'gestures', seen: true })
-  assert.deepEqual(moved.body.guide, { step: 'gestures', seen: true, done: false })
-  assert.equal((await send(API, 'POST', '/v1/guide', AUTH, { step: 'nowhere' })).body.error.code, 'bad_step')
-  const shown = await send(API, 'POST', '/v1/guide/show', AUTH, { step: 'voice' })
-  assert.equal(shown.body.macs, 1)
-  assert.equal(shown.body.guide.step, 'voice')
-
-  // Glasses pairing asks the Mac to open it; a phone pairing doesn't.
-  const pair = async (client?: string) => {
-    const { code } = (await send(LOCAL, 'POST', '/local/pair/start?dev', { authorization: `Bearer ${adminToken}` })).body
-    return send(API, 'POST', '/v1/pair', {}, { code, deviceName: 'Even G2 · Lens', model: 'Even G2 · Hypernova Lens', client })
-  }
-  await pair(undefined)
-  await pair('lens')
-  await sleep(80)
-  assert.deepEqual(macGot.filter((m) => m.t === 'guide').map((m) => m.guide.step), ['gestures', 'voice'])
-  assert.deepEqual(macGot.filter((m) => m.t === 'guide.show').map((m) => m.reason), ['phone', 'paired'])
-  // Finished: a later pairing leaves it closed; opening it again starts at the top.
-  await send(API, 'POST', '/v1/guide', AUTH, { done: true })
-  await pair('lens')
-  await sleep(80)
-  assert.equal(macGot.filter((m) => m.t === 'guide.show').length, 2)
-  assert.deepEqual((await send(API, 'POST', '/v1/guide', AUTH, { done: false })).body.guide, { step: 'about', seen: true, done: false })
-  mac.close()
-  await sleep(50)
-  assert.equal((await send(API, 'POST', '/v1/guide/show', AUTH, {})).body.macs, 0)
-  // Kept across restarts.
-  assert.deepEqual(JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'guide.json'), 'utf8')), { step: 'about', seen: true, done: false })
-})
-
 test('a key saved while Soniox is busy is kept, checked, with Soniox\u2019s words; one it can\u2019t reach is kept unchecked', async () => {
   fake.failWith = { code: 429, type: 'max_concurrent_connections_reached' }
   const busy = await send(API, 'POST', '/v1/stt/key', AUTH, { apiKey: GOOD })

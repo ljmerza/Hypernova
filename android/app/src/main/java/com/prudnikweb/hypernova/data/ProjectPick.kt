@@ -3,7 +3,7 @@ package com.prudnikweb.hypernova.data
 /**
  * The new-session sheet's project picker, without the screen: the projects found by a few typed
  * letters (name or path), and the list unsearched: the most recent first, then the rest by the
- * folder they live in (the projects folder, Nebula, a project's worktrees, any other folder). Pure,
+ * folder they live in (the projects folder, a project's worktrees, any other folder). Pure,
  * unit-tested.
  */
 object ProjectPick {
@@ -18,8 +18,6 @@ object ProjectPick {
         Recent,
         /** Directly in the projects folder ([Group.label]: it, as `~/Programming`). */
         Root,
-        /** New sessions from the glasses (a folder named Nebula). */
-        Nebula,
         /** A project's worktrees (`<project>/.claude/worktrees/…`; [Group.label]: the project's name). */
         Worktrees,
         /** Any other folder ([Group.label]: it, as `~/Documents/programming`). */
@@ -41,8 +39,8 @@ object ProjectPick {
 
     /**
      * The list before anything is typed: the [RECENT] most recently active (that have been active at
-     * all), then the rest in groups, each by name: the projects folder [root] first, then Nebula,
-     * then the others, the most recently active group first.
+     * all), then the rest in groups, each by name: the projects folder [root] first, then the
+     * others, the most recently active group first.
      */
     fun groups(projects: List<Project>, root: String?): List<Group> {
         val recent = projects.filter { it.lastActivityAt != null }.sortedByDescending { it.lastActivityAt }.take(RECENT)
@@ -56,16 +54,15 @@ object ProjectPick {
             val key = when {
                 t.contains(WORKTREES) -> Kind.Worktrees to t.substringBefore(WORKTREES).substringAfterLast('/')
                 rootT != null && parent == rootT -> Kind.Root to rootT
-                parent.substringAfterLast('/') == "Nebula" -> Kind.Nebula to parent
                 else -> Kind.Folder to parent.ifEmpty { "/" }
             }
             byKey.getOrPut(key) { ArrayList() } += p
         }
-        val rank = { k: Kind -> when (k) { Kind.Root -> 0; Kind.Nebula -> 1; else -> 2 } }
+        val rank = { k: Kind -> when (k) { Kind.Root -> 0; else -> 1 } }
         val latest = { list: List<Project> -> list.maxOfOrNull { it.lastActivityAt ?: 0L } ?: 0L }
         val rest = byKey.entries
             .sortedWith(compareBy<Map.Entry<Pair<Kind, String>, MutableList<Project>>> { rank(it.key.first) }.thenByDescending { latest(it.value) }.thenBy { it.key.second })
-            .map { (k, list) -> Group(k.first, if (k.first == Kind.Nebula) null else k.second, list.sortedWith(compareBy<Project> { it.name.lowercase() }.thenBy { it.path })) }
+            .map { (k, list) -> Group(k.first, k.second, list.sortedWith(compareBy<Project> { it.name.lowercase() }.thenBy { it.path })) }
         return (if (recent.isEmpty()) emptyList() else listOf(Group(Kind.Recent, null, recent))) + rest
     }
 

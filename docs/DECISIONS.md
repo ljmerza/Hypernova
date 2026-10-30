@@ -1636,3 +1636,24 @@ block when it can't be drawn. Nothing leaves the phone.
 4. **Only a finished block is drawn:** while its closing fence hasn't arrived (a reply streaming
    in), it's code.
 
+## The glasses are removed (2026-10-30)
+
+The owner removed the Even Realities G2 glasses feature, Hypernova Lens, entirely. The entries above
+about Lens, the glasses and what was built for them stay as history; none of it is in the code any
+more.
+
+1. **Gone:** `lens/` and its release workflow; the phone bridge (`android/.../bridge/`, Settings →
+   Glasses, the "Allow Hypernova Lens" prompt, "Glasses speak through this phone"); on the daemon the
+   glasses through a phone (`X-Hypernova-Via: lens`, `/v1/devices/me/glasses`, glasses in the Mac's
+   device list), the Lens guide (`/v1/guide*`), Nebula and its notes, Telescope and "Show me"
+   (`/v1/sessions/{id}/telescope` and `/screenshot`, `/v1/shots/*`, `/local/telescope/*`),
+   `turn=last` on events, and the CORS headers the glasses' WebView needed.
+2. **Automations** lose the `say` kind ("Read aloud on my glasses"), notify's `glasses` flag and the
+   `no_glasses` problem. A saved automation that still uses `say` no longer reads, and is turned off
+   with its card saying so. Statistics lose their glasses counts.
+3. **The Mac app is left as it is** (out of scope: it isn't built here and the owner doesn't use it).
+   It may still call the routes above, which now answer 404, and still show a Lens guide entry.
+4. **What only the glasses guarded is gone with them:** the daemon no longer refuses Bypass, "Always"
+   or Browse outside projects to a "glasses" device, as there are none. A device that paired as Lens
+   in a private build is now an ordinary device: forget it on the Mac.
+

@@ -39,7 +39,6 @@ object WorkflowWords {
             is Action.Ask -> R.string.wf_d_ask
             is Action.Shell -> R.string.wf_d_shell
             is Action.Notify -> R.string.au_d_notify
-            is Action.Say -> R.string.au_d_say
             is Action.Unknown -> R.string.wf_d_unknown
         },
     )
@@ -52,14 +51,12 @@ object WorkflowWords {
             Step.ASK -> R.string.wf_d_ask
             Step.SHELL -> R.string.wf_d_shell
             Step.NOTIFY -> R.string.au_d_notify
-            Step.SAY -> R.string.au_d_say
             else -> R.string.wf_d_unknown
         },
     )
 
     /**
-     * What a step does, on one line: its prompt, question or command cut short; a notify or say its
-     * kind. Under its title on a step row, and as its name on a run's timeline.
+     * What a step does, on one line: its prompt, question or command cut short; a notify its kind. Under its title on a step row, and as its name on a run's timeline.
      */
     fun detail(w: Words, a: Action, sessionName: (String) -> String? = { null }): String? = when (a) {
         is Action.Start -> Summary.cut(a.prompt).ifEmpty { null }
@@ -77,7 +74,6 @@ object WorkflowWords {
         is Action.Ask -> Summary.cut(a.question).ifEmpty { null }
         is Action.Shell -> a.command.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
         is Action.Notify -> Summary.cut(a.text).ifEmpty { null }
-        is Action.Say -> Summary.cut(a.text).ifEmpty { null }
         is Action.Unknown -> null
     }
 
@@ -85,7 +81,7 @@ object WorkflowWords {
     fun stepName(w: Words, s: RunStep, def: Step?): String {
         val a = def?.action ?: return kindTitle(w, s.kind)
         return when (a) {
-            is Action.Notify, is Action.Say -> kindTitle(w, a)
+            is Action.Notify -> kindTitle(w, a)
             else -> detail(w, a)?.let { cutTo(it, 56) } ?: kindTitle(w, a)
         }
     }
@@ -108,7 +104,7 @@ object WorkflowWords {
                 s.answer != null -> RunLine(answered(w, s.answer), RunTone.Ok)
                 s.kind == Step.SHELL -> RunLine(s.result?.let(::lastLine)?.let { w.s(R.string.wf_rs_exit_said, s.exit ?: 0, it) } ?: w.s(R.string.wf_rs_exit, s.exit ?: 0), if (s.quiet) RunTone.Quiet else RunTone.Ok)
                 s.quiet -> RunLine(w.s(R.string.au_run_nothing_new), RunTone.Quiet)
-                s.kind == Step.NOTIFY || s.kind == Step.SAY -> RunLine(w.s(R.string.wf_rs_told), RunTone.Ok)
+                s.kind == Step.NOTIFY -> RunLine(w.s(R.string.wf_rs_told), RunTone.Ok)
                 else -> RunLine(s.result ?: w.s(R.string.au_run_done), RunTone.Ok)
             }
             Run.FAILED -> when {
@@ -139,10 +135,9 @@ object WorkflowWords {
         return RunWords.line(w, r, now, ZoneId.systemDefault(), codex = codex)
     }
 
-    /** "Approve", "Approve, on your glasses", "Nobody answered: taken as Skip". */
+    /** "Approve", "Approve on the Mac", "Nobody answered: taken as Skip". */
     fun answered(w: Words, a: StepAnswer): String = when (a.by) {
         StepAnswer.TIMEOUT -> w.s(R.string.wf_rs_answer_timeout, a.text)
-        "glasses" -> w.s(R.string.wf_rs_answer_glasses, a.text)
         "mac" -> w.s(R.string.wf_rs_answer_mac, a.text)
         else -> w.s(R.string.wf_rs_answer, a.text)
     }
@@ -151,15 +146,13 @@ object WorkflowWords {
 
     /** An output's name on its row and in the run's TOLD lines: "Notify me", "Slack", "briefs.md". */
     fun outputName(w: Words, o: Output?, kind: String): String = when (o) {
-        is Output.Notify -> w.s(if (o.glasses) R.string.wf_o_notify_glasses else R.string.wf_o_notify)
-        is Output.Say -> w.s(R.string.wf_o_say)
+        is Output.Notify -> w.s(R.string.wf_o_notify)
         is Output.Webhook -> Summary.presetName(w, o.preset).replaceFirstChar { it.uppercaseChar() }
         is Output.File -> o.path.trimEnd('/').substringAfterLast('/').ifEmpty { w.s(R.string.wf_o_file) }
         is Output.Unknown -> o.kind
         null -> w.s(
             when (kind) {
                 "notify" -> R.string.wf_o_notify
-                "say" -> R.string.wf_o_say
                 "webhook" -> R.string.wf_o_webhook
                 "file" -> R.string.wf_o_file
                 else -> R.string.wf_d_unknown

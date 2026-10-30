@@ -7,7 +7,7 @@ import kotlin.math.exp
 /*
  * Read aloud on the phone (docs/PROTOCOL.md, "Read aloud"): which voice reads (Soniox's natural
  * voices, or the Mac's own), the plays the phone app streams and plays natively (its own Read
- * aloud, and the glasses' speech), and the wave that shows it speaking. This file has no Android
+ * aloud), and the wave that shows it speaking. This file has no Android
  * audio in it, so its logic runs in JVM tests; SpeechPlayer.kt plays, SpeechLink.kt talks to the Mac.
  */
 
@@ -26,8 +26,6 @@ data class SpeechOut(
     val soniox: Boolean,
     /** Why the Mac's voice reads although Soniox was chosen, in one line. */
     val note: String?,
-    /** A phone app plays the glasses' speech right now. */
-    val phone: Boolean,
 ) {
     companion object {
         const val ENGINE_SONIOX = "soniox"
@@ -45,7 +43,6 @@ data class SpeechOut(
                 model = o.str("model"),
                 soniox = o.bool("soniox"),
                 note = o.str("note")?.takeIf { it.isNotBlank() },
-                phone = o.bool("phone"),
             )
         }
     }
@@ -62,20 +59,18 @@ data class SpeechVoice(val id: String, val name: String, val lang: String, val g
     }
 }
 
-/** One play: speech the Mac makes and this phone plays (`speech.play`, or the answer to `POST /v1/speech/play`). */
+/** One play: speech the Mac makes and this phone plays (the answer to `POST /v1/speech/play`). */
 @Immutable
 data class PlayInfo(
     val id: String,
     val sessionId: String?,
-    /** "glasses": the glasses' speech; "phone": this phone's own Read aloud. */
+    /** "phone": this phone's own Read aloud. */
     val source: String,
     val engine: String,
     val sampleRate: Int,
     /** How long the text is, in characters. */
     val of: Int,
 ) {
-    val forGlasses: Boolean get() = source == "glasses"
-
     companion object {
         fun parse(o: JSONObject?): PlayInfo? {
             if (o == null) return null
@@ -84,7 +79,7 @@ data class PlayInfo(
             if ((o.str("format") ?: "pcm_s16le") != "pcm_s16le") return null
             val rate = o.int("sampleRate") ?: 24_000
             if (rate !in 8_000..48_000) return null
-            return PlayInfo(id, o.str("sessionId"), o.str("source") ?: "glasses", o.str("engine") ?: SpeechOut.ENGINE_SONIOX, rate, o.int("of") ?: 0)
+            return PlayInfo(id, o.str("sessionId"), o.str("source") ?: "phone", o.str("engine") ?: SpeechOut.ENGINE_SONIOX, rate, o.int("of") ?: 0)
         }
     }
 }
@@ -112,9 +107,6 @@ fun progressMessage(id: String, state: PlayState, ms: Long, level: Float, why: S
         .put("level", (level.coerceIn(0f, 1f) * 100).toInt() / 100.0)
         .apply { if (why != null) put("why", why) }
         .toString()
-
-/** "Glasses speak through this phone": offered to the Mac on each connect and each change. */
-fun playerMessage(on: Boolean): String = JSONObject().put("t", "speech.player").put("on", on).toString()
 
 /**
  * The speeds Settings offers: what the Mac's voice takes (0.5–2) and Soniox reads within its own

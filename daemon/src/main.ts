@@ -10,7 +10,6 @@ import { startAccount } from './account.ts'
 import { reapAttachments } from './attachments.ts'
 import { pollAgents } from './agents.ts'
 import { pollClaudeAgents } from './claude-agents.ts'
-import { reapShots } from './shots.ts'
 import { cleanSpeechTemp } from './speech.ts'
 import { startStats } from './stats.ts'
 import { startBattery } from './battery.ts'
@@ -57,7 +56,6 @@ startAccount()
 if (has('battery')) startBattery()
 startAwake()
 reapAttachments()
-reapShots()
 cleanSpeechTemp()
 startStats()
 // The per-model weeks (Fable, Sonnet) only Claude Code's /usage screen shows, and readings of the
@@ -77,7 +75,6 @@ setInterval(tickCodex, 3000) // and Codex's
 setInterval(scanTerms, 1500)
 setInterval(watchMenus, 800)
 setInterval(reapAttachments, 6 * 3600_000)
-setInterval(reapShots, 3600_000)
 
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => {

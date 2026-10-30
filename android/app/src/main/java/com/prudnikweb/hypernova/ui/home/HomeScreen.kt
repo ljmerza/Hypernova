@@ -343,14 +343,6 @@ fun HomeScreen(
             list.animateScrollToItem(at, underBar)
         }
     }
-    // Settings → Glasses was asked for (a hypernova.observer/glasses link, Lens's "Open Hypernova"):
-    // the Settings tab, which scrolls to it (bridge/BridgeOpen.kt).
-    val glassesAsked = com.prudnikweb.hypernova.bridge.BridgeOpen.glassesAsked
-    LaunchedEffect(glassesAsked) {
-        if (!com.prudnikweb.hypernova.bridge.BridgeOpen.glassesWanted()) return@LaunchedEffect
-        tab = Tab.Settings
-        statsOpen = false
-    }
     // Another part of Settings was asked for ("Turn on in Settings" on a folder outside the projects folder).
     val settingsAsked = com.prudnikweb.hypernova.ui.settings.SettingsJump.asked
     LaunchedEffect(settingsAsked) {

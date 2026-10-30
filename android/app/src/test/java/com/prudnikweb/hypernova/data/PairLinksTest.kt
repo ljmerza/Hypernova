@@ -77,11 +77,8 @@ class PairLinksTest {
         assertEquals(PairLinks.Kind.Pair, PairLinks.kind("hypernova://pair?v=1&u=x&c=y"))
         assertEquals(PairLinks.Kind.Pair, PairLinks.kind("https://hypernova.observer/pair#v=1&u=x&c=y"))
         assertEquals(PairLinks.Kind.Pair, PairLinks.kind("HTTPS://Hypernova.Observer/pair"))
-        assertEquals(PairLinks.Kind.Glasses, PairLinks.kind("hypernova://glasses"))
-        assertEquals(PairLinks.Kind.Glasses, PairLinks.kind("https://hypernova.observer/glasses"))
-        assertEquals(PairLinks.Kind.Glasses, PairLinks.kind("https://hypernova.observer/glasses#get"))
         for (other in listOf(null, "", "hypernova://other", "hypernova://pair/x", "https://hypernova.observer/", "https://hypernova.observer/pairing",
-            "https://evil.example/pair#v=1&u=x&c=y", "http://hypernova.observer/pair", "https://hypernova.observer.evil.example/glasses", "https://api.hypernova.observer/pair")) {
+            "https://evil.example/pair#v=1&u=x&c=y", "http://hypernova.observer/pair", "https://hypernova.observer.evil.example/pair", "https://api.hypernova.observer/pair")) {
             assertNull(other, PairLinks.kind(other))
         }
     }

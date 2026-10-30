@@ -53,8 +53,6 @@ class World {
   usage: Usage = { fiveHour: null, sevenDay: null, source: 'official', observedAt: null }
   replies = new Map<string, string>()
   projects = new Set([PROJECT, OTHER])
-  lensPaired = false
-  lensOnline = false
   sent: any[] = []
   started: import('../src/automations.ts').StartSpec[] = []
   prompts: { id: string; text: string }[] = []
@@ -105,8 +103,6 @@ class World {
       refused: () => [],
       project: (p) => (this.projects.has(p) ? p : null),
       outside: (p) => p === '/etc',
-      lensPaired: () => this.lensPaired,
-      lensOnline: () => this.lensOnline,
       week: async () => null,
       send: (m) => void this.sent.push(m),
       keepAwake: () => {},
@@ -250,14 +246,14 @@ test('firing: as the event would (paused, off, overlap), never Run now; other tr
   assert.equal((await errA(() => e.fireWebhook(timed.id, '', token)))?.code, 'bad_token')
   assert.equal(err(() => e.newToken(timed.id))?.code, 'not_webhook')
   // The payload is 8 KB at most.
-  const big = e.create(base({ trigger: { kind: 'webhook' }, steps: [{ kind: 'notify', text: '{payload}', glasses: false }] }))
+  const big = e.create(base({ trigger: { kind: 'webhook' }, steps: [{ kind: 'notify', text: '{payload}' }] }))
   await e.fireWebhook(big.id, 'x'.repeat(20_000), null)
   assert.equal(w.notes().at(-1).text.length, 8 * 1024)
 })
 
 test('firing with a token tells nothing without the right one; ten fires a minute, then 429 with nothing recorded', async () => {
   const { w, e } = setup()
-  const a = e.create(base({ trigger: { kind: 'webhook' }, steps: [{ kind: 'notify', text: '{payload}', glasses: false }] }))
+  const a = e.create(base({ trigger: { kind: 'webhook' }, steps: [{ kind: 'notify', text: '{payload}' }] }))
   const token = e.takeToken()!
   const timed = e.create(base({ steps: [start()] }))
   for (const [id, t] of [[a.id, 'hnf_' + 'f'.repeat(32)], ['au_nothere00', token], [timed.id, token], [a.id, '']] as const) {
@@ -287,7 +283,7 @@ test('outputs: webhook secrets checked, kept apart from automations.json, never 
   assert.deepEqual(c([{ kind: 'webhook', preset: 'telegram', botToken: 'nope', chatId: '1' }])?.field, 'outputs[0].botToken')
   assert.deepEqual(c([{ kind: 'webhook', preset: 'telegram', botToken: '123456789:AAbbccddeeffgghhiijjkkllmmnnooppqq', chatId: 'me' }])?.field, 'outputs[0].chatId')
   assert.deepEqual(c([{ kind: 'webhook', preset: 'pigeon', url: 'https://x.example' }])?.field, 'outputs[0].preset')
-  assert.deepEqual(c([{ kind: 'notify' }, { kind: 'say' }, { kind: 'notify' }])?.code, 'bad_outputs')
+  assert.deepEqual(c([{ kind: 'notify' }, { kind: 'notify' }, { kind: 'notify' }])?.code, 'bad_outputs')
   assert.deepEqual(c([{ kind: 'notify', text: 'x'.repeat(501) }])?.field, 'outputs[0].text')
   assert.deepEqual(c([{ kind: 'file', path: '/etc/hosts' }]), { code: 'outside_projects', field: 'outputs[0].path', status: 400 })
   assert.deepEqual(c([{ kind: 'file', path: `${PROJECT}/.env` }])?.code, 'secret_file')
@@ -308,7 +304,6 @@ test('outputs: webhook secrets checked, kept apart from automations.json, never 
 
 test('outputs go when a run ends done, not quiet: notes, a file line, each preset’s request; a 5xx is tried once more', async () => {
   const { w, e } = setup()
-  w.lensOnline = true
   const outputs = [
     { kind: 'webhook', preset: 'slack', url: 'https://hooks.slack.com/services/T/B/x' },
     { kind: 'file', path: `${PROJECT}/log.md`, text: 'Brief: {prev}' },
@@ -387,7 +382,7 @@ test('a webhook never goes to this computer, the local network, the tailnet or a
   w.postAnswer = async () => {
     throw Object.assign(new Error('private'), { code: 'private_address' })
   }
-  const a = e.create(base({ steps: [{ kind: 'notify', text: 'Hi', glasses: false }], outputs: [{ kind: 'webhook', preset: 'ntfy', url: 'https://ntfy.home.lan/t' }] }))
+  const a = e.create(base({ steps: [{ kind: 'notify', text: 'Hi' }], outputs: [{ kind: 'webhook', preset: 'ntfy', url: 'https://ntfy.home.lan/t' }] }))
   await e.runNow(a.id)
   await later(w, e, 31 * SEC)
   const o = e.list()[0]!.lastRun!.outputs[0]!
@@ -408,10 +403,10 @@ test('old clients: a simple one reads and saves as before; a workflow reads as a
   const a = e.create(old)
   assert.deepEqual(a.action, { ...start(), then: 'notify' })
   assert.deepEqual(a.steps, [{ id: 'st_0', if: null, ...start() }])
-  assert.deepEqual(a.outputs, [{ id: 'ou_0', text: null, kind: 'notify', glasses: false }])
+  assert.deepEqual(a.outputs, [{ id: 'ou_0', text: null, kind: 'notify' }])
   // Saved again the old way (a new prompt): the step keeps its id.
-  const b = e.replace(a.id, { ...old, action: { ...start({ prompt: 'Other.' }), then: 'say' } })
-  assert.deepEqual([b.steps[0]!.id, b.outputs[0]!.kind], ['st_0', 'say'])
+  const b = e.replace(a.id, { ...old, action: { ...start({ prompt: 'Other.' }), then: 'none' } })
+  assert.deepEqual([b.steps[0]!.id, b.outputs.length], ['st_0', 0])
   // With a webhook output it is a workflow: old clients see a kind they don't know…
   const w2 = e.create(base({ steps: [start()], outputs: [{ kind: 'webhook', preset: 'post', url: 'https://x.example/h' }] }))
   assert.deepEqual(w2.action, { kind: 'workflow', steps: 1 })
@@ -453,7 +448,7 @@ test('words from outside never reach a session that acts without asking: "${payl
   await e.runNow(c.id)
   assert.deepEqual(w.prompts.at(-1), { id: 's-bypass', text: 'Carry on.' })
   // An old client's save of a workflow with a No asking start keeps its steps: confirmed every time all the same.
-  const nb = e.create({ ...base({ steps: [start({ permissionMode: 'bypassPermissions' }), { kind: 'notify', text: 'Done.', glasses: false }] }), confirmBypass: true })
+  const nb = e.create({ ...base({ steps: [start({ permissionMode: 'bypassPermissions' }), { kind: 'notify', text: 'Done.' }] }), confirmBypass: true })
   assert.deepEqual(err(() => e.replace(nb.id, { ...base({ trigger: { kind: 'webhook' } }), action: { kind: 'workflow', steps: 2 } })), { code: 'confirm_bypass', field: 'action', status: 400 })
   assert.equal(e.replace(nb.id, { ...base({ name: 'Renamed' }), action: { kind: 'workflow', steps: 2 }, confirmBypass: true }).name, 'Renamed')
   assert.deepEqual(err(() => e.replace(nb.id, base({ name: 'Again', steps: nb.steps })))?.code, 'confirm_bypass')
@@ -535,25 +530,24 @@ test('steps: validated in order, each on its own field; defaults filled', () => 
 
 test('start, ask, answer, then carry on in that session: the run needs you while it asks, a note asks too', async () => {
   const { w, e } = setup()
-  w.lensOnline = true
-  const a = e.create(base({ steps: [{ id: 'st_a', ...start() }, { id: 'st_q', ...ask() }, { id: 'st_c', kind: 'continue', target: 'step:st_a', prompt: 'Post it: {answer}', if: { on: 'answer', text: 'Approve' } }, { id: 'st_n', kind: 'notify', text: 'Posted: {prev}', glasses: false, if: { on: 'ok' } }] }))
+  const a = e.create(base({ steps: [{ id: 'st_a', ...start() }, { id: 'st_q', ...ask() }, { id: 'st_c', kind: 'continue', target: 'step:st_a', prompt: 'Post it: {answer}', if: { on: 'answer', text: 'Approve' } }, { id: 'st_n', kind: 'notify', text: 'Posted: {prev}', if: { on: 'ok' } }] }))
   const r0 = await e.runNow(a.id)
   assert.deepEqual([r0.state, r0.step, r0.steps.map((x) => x.state)], ['running', 0, ['running', 'pending', 'pending', 'pending']])
   const sid = lastSid(w)
   await finish(w, e, sid, 'Two comments, both nits. Ready to merge.')
-  // Asking: needs you, its question with the step before's output, a note to the phone and the glasses.
+  // Asking: needs you, its question with the step before's output, a note to the phone.
   let run = e.list()[0]!.lastRun!
   assert.deepEqual([run.state, run.step, run.ask?.stepId, run.ask?.question], ['needs_you', 1, 'st_q', 'Post this review? Two comments, both nits. Ready to merge.'])
   assert.equal(run.ask!.until, run.steps[1]!.startedAt! + 10 * MIN)
   const asks = w.notes().filter((n) => n.ask)
-  assert.deepEqual(asks.map((n) => n.to), ['phone', 'glasses'])
+  assert.deepEqual(asks.map((n) => n.to), ['phone'])
   assert.deepEqual(asks[0].ask, { ...run.ask, runId: run.id })
   assert.equal(asks[0].text, run.ask!.question)
   // Answers: not one of its, another step, then the first counts.
   assert.equal((await errA(() => e.answer(run.id, { stepId: 'st_q', answer: 'Maybe' }, 'phone')))?.code, 'bad_answer')
   assert.equal((await errA(() => e.answer(run.id, { stepId: 'st_a', answer: 'Approve' }, 'phone')))?.field, 'stepId')
-  const answered = await e.answer(run.id, { stepId: 'st_q', answer: 'approve' }, 'glasses')
-  assert.deepEqual(answered.steps[1]!.answer, { text: 'Approve', by: 'glasses', at: w.now })
+  const answered = await e.answer(run.id, { stepId: 'st_q', answer: 'approve' }, 'phone')
+  assert.deepEqual(answered.steps[1]!.answer, { text: 'Approve', by: 'phone', at: w.now })
   const late = await errA(() => e.answer(run.id, { stepId: 'st_q', answer: 'Skip' }, 'phone'))
   assert.deepEqual([late?.code, late?.status, (late?.extra?.run as any)?.id], ['not_asking', 409, run.id])
   // The continue went to the start step's session, quoting the answer; then the notify.
@@ -569,7 +563,7 @@ test('start, ask, answer, then carry on in that session: the run needs you while
 
 test('an ask nobody answers takes its default after its time, says so, and the guard on it follows', async () => {
   const { w, e } = setup()
-  const a = e.create(base({ steps: [{ id: 'st_q', ...ask({ question: 'Deploy?', answers: ['Deploy', 'Not now'], timeoutMin: 5 }) }, { id: 'st_n', kind: 'notify', text: 'Deploying.', glasses: false, if: { on: 'answer', text: 'Deploy' } }] }))
+  const a = e.create(base({ steps: [{ id: 'st_q', ...ask({ question: 'Deploy?', answers: ['Deploy', 'Not now'], timeoutMin: 5 }) }, { id: 'st_n', kind: 'notify', text: 'Deploying.', if: { on: 'answer', text: 'Deploy' } }] }))
   await e.runNow(a.id)
   assert.equal(e.list()[0]!.lastRun!.state, 'needs_you')
   await later(w, e, 4 * MIN)
@@ -584,7 +578,7 @@ test('an ask nobody answers takes its default after its time, says so, and the g
 test('guards: a failure handled only by a step guarded for it; notifications don’t count as the step before', async () => {
   const { w, e } = setup()
   // The first step's folder goes before it runs: with a step guarded "failed" after it, the run goes on to it.
-  const a = e.create(base({ steps: [{ id: 'st_a', ...start({ projectPath: OTHER }) }, { id: 'st_t', kind: 'notify', text: 'Starting.', glasses: false }, { id: 'st_c', kind: 'continue', target: 'working', prompt: 'x' }, { id: 'st_f', kind: 'notify', text: 'It failed: {prev}', glasses: false, if: { on: 'failed' } }] }))
+  const a = e.create(base({ steps: [{ id: 'st_a', ...start({ projectPath: OTHER }) }, { id: 'st_t', kind: 'notify', text: 'Starting.' }, { id: 'st_c', kind: 'continue', target: 'working', prompt: 'x' }, { id: 'st_f', kind: 'notify', text: 'It failed: {prev}', if: { on: 'failed' } }] }))
   w.projects.delete(OTHER)
   await e.runNow(a.id)
   const run = e.list()[0]!.lastRun!
@@ -604,10 +598,10 @@ test('guards: quiet, not quiet, contains (the whole reply), ok; a notify between
   const a = e.create(base({
     steps: [
       { id: 'st_a', ...start() },
-      { id: 'st_t', kind: 'notify', text: 'Checked.', glasses: false },
-      { id: 'st_q', kind: 'notify', text: 'Quiet', glasses: false, if: { on: 'quiet' } },
-      { id: 'st_c', kind: 'notify', text: 'Found FAIL', glasses: false, if: { on: 'contains', text: 'fail' } },
-      { id: 'st_k', kind: 'notify', text: 'Ok: {prev}', glasses: false, if: { on: 'ok' } },
+      { id: 'st_t', kind: 'notify', text: 'Checked.' },
+      { id: 'st_q', kind: 'notify', text: 'Quiet', if: { on: 'quiet' } },
+      { id: 'st_c', kind: 'notify', text: 'Found FAIL', if: { on: 'contains', text: 'fail' } },
+      { id: 'st_k', kind: 'notify', text: 'Ok: {prev}', if: { on: 'ok' } },
     ],
   }))
   await e.runNow(a.id)
@@ -624,7 +618,7 @@ test('guards: quiet, not quiet, contains (the whole reply), ok; a notify between
 
 test('Retry from a step: the steps before it taken over, the placeholders they gave kept; refused when the steps changed', async () => {
   const { w, e } = setup()
-  const def = (extra: unknown[] = []) => base({ steps: [{ id: 'st_a', ...start() }, { id: 'st_q', ...ask() }, { id: 'st_n', kind: 'notify', text: 'Approved ({prev}): {result}', glasses: false, if: { on: 'answer', text: 'Approve' } }, ...extra] })
+  const def = (extra: unknown[] = []) => base({ steps: [{ id: 'st_a', ...start() }, { id: 'st_q', ...ask() }, { id: 'st_n', kind: 'notify', text: 'Approved ({prev}): {result}', if: { on: 'answer', text: 'Approve' } }, ...extra] })
   const a = e.create(def())
   await e.runNow(a.id)
   const sid = lastSid(w)
@@ -698,9 +692,9 @@ test('a cron trigger: checked at save (and by the check route, with its next thr
   assert.deepEqual((await e.checkTrigger({ trigger: { kind: 'webhook' } })), { trigger: { kind: 'webhook' }, next: [] })
   assert.equal((await errA(() => e.checkTrigger({ trigger: { kind: 'cron', expr: 'nope' } })))?.field, 'trigger.expr')
   // A monthly one has a next time weeks away; it fires on its minute, as a time trigger does.
-  const monthly = e.create(base({ trigger: { kind: 'cron', expr: '0 9 1 * *' }, steps: [{ kind: 'notify', text: 'First of the month.', glasses: false }] }))
+  const monthly = e.create(base({ trigger: { kind: 'cron', expr: '0 9 1 * *' }, steps: [{ kind: 'notify', text: 'First of the month.' }] }))
   assert.equal(monthly.nextAt, msk('2026-11-01T09:00'))
-  const a = e.create(base({ trigger: { kind: 'cron', expr: '*/15 9-18 * * 1-5' }, steps: [{ kind: 'notify', text: 'At {time}', glasses: false }] }))
+  const a = e.create(base({ trigger: { kind: 'cron', expr: '*/15 9-18 * * 1-5' }, steps: [{ kind: 'notify', text: 'At {time}' }] }))
   assert.equal(a.nextAt, msk('2026-10-16T09:00'))
   await at(w, e, msk('2026-10-16T09:00') + 10 * SEC)
   await at(w, e, msk('2026-10-16T09:15') + 10 * SEC)
@@ -752,7 +746,7 @@ test('a file watch: fires once, 10 s after the folder goes quiet, with what chan
   await e.tick()
   assert.equal(w.watchers.size, 0)
   // A flood (a checkout touching 5,000 files) is counted, not all kept; the payload names 50.
-  const b = e.create(base({ trigger: { kind: 'file', path: PROJECT, glob: null, event: 'created' }, steps: [{ kind: 'notify', text: '{payload}', glasses: false }] }))
+  const b = e.create(base({ trigger: { kind: 'file', path: PROJECT, glob: null, event: 'created' }, steps: [{ kind: 'notify', text: '{payload}' }] }))
   await e.tick()
   const flood = w.watchers.get(PROJECT)!
   for (let i = 0; i < 5000; i++) flood(`gen/f${String(i).padStart(5, '0')}.js`, 'created')
@@ -930,8 +924,8 @@ test('a shell step runs in its folder; its exit decides the guard; a failure is 
       steps: [
         { id: 'st_a', ...start() },
         { id: 'st_s', kind: 'shell', projectPath: PROJECT, command: 'npm test -- {project}', timeoutSec: 30 },
-        { id: 'st_ok', kind: 'notify', text: 'Green: {output}', glasses: false, if: { on: 'ok' } },
-        { id: 'st_bad', kind: 'notify', text: 'Exit {exit}: {prev}', glasses: false, if: { on: 'failed' } },
+        { id: 'st_ok', kind: 'notify', text: 'Green: {output}', if: { on: 'ok' } },
+        { id: 'st_bad', kind: 'notify', text: 'Exit {exit}: {prev}', if: { on: 'failed' } },
       ],
     }),
     confirmShell: true,
@@ -1128,10 +1122,10 @@ test('{step:<id>}: an earlier step with a result, checked on its field; outside 
   const c = (st: unknown[], o: Record<string, unknown> = {}) => err(() => e.create({ ...base({ steps: st, ...o }), confirmShell: true, confirmBypass: true }))
   const a = { id: 'st_a', ...start() }
   // Not a step before it, a later one, itself, a notification: refused on its own field.
-  assert.deepEqual(c([a, { kind: 'notify', text: 'Got {step:st_zz}', glasses: false }]), { code: 'bad_placeholder', field: 'steps[1].text', status: 400 })
+  assert.deepEqual(c([a, { kind: 'notify', text: 'Got {step:st_zz}' }]), { code: 'bad_placeholder', field: 'steps[1].text', status: 400 })
   assert.equal(c([{ ...a, prompt: 'Again {step:st_b}' }, { id: 'st_b', ...start() }])?.field, 'steps[0].prompt')
   assert.equal(c([a, { id: 'st_b', ...start({ prompt: 'Me: {step:st_b}' }) }])?.field, 'steps[1].prompt')
-  assert.equal(c([a, { id: 'st_n', kind: 'notify', text: 'Hi', glasses: false }, { ...ask({ question: 'Ok? {step:st_n}' }) }])?.field, 'steps[2].question')
+  assert.equal(c([a, { id: 'st_n', kind: 'notify', text: 'Hi' }, { ...ask({ question: 'Ok? {step:st_n}' }) }])?.field, 'steps[2].question')
   assert.equal(c([a], { outputs: [{ kind: 'notify', text: 'Out: {step:st_q}' }] })?.field, 'outputs[0].text')
   // A command reads it from its environment, never its text; No asking never takes it.
   const sh = c([a, { kind: 'shell', projectPath: PROJECT, command: 'echo {step:st_a}' }])
@@ -1141,7 +1135,7 @@ test('{step:<id>}: an earlier step with a result, checked on its field; outside 
   // An old client's one step has none before it.
   assert.deepEqual(err(() => e.create({ ...base(), action: { kind: 'notify', text: 'x {step:st_0}' } })), { code: 'bad_placeholder', field: 'action.text', status: 400 })
   // Fine: an earlier start, ask or shell step; any step in an output.
-  const ok = e.create({ ...base({ steps: [a, { id: 'st_q', ...ask() }, { kind: 'notify', text: 'Review: {step:st_a} Answer: {step:st_q}', glasses: false }] }), outputs: [{ kind: 'notify', text: '{step:st_a}' }] })
+  const ok = e.create({ ...base({ steps: [a, { id: 'st_q', ...ask() }, { kind: 'notify', text: 'Review: {step:st_a} Answer: {step:st_q}' }] }), outputs: [{ kind: 'notify', text: '{step:st_a}' }] })
   assert.equal(ok.steps.length, 3)
   assert.ok(e.features().includes('step.output'))
 })
@@ -1157,7 +1151,7 @@ test('{step:<id>}: filled with that step’s output (quoted in a prompt), and a 
         { id: 'st_q', ...ask({ question: 'Post it? {step:st_rev-1}' }) },
         { id: 'st_c', kind: 'continue', target: 'step:st_rev-1', prompt: 'Your review said {step:st_rev-1}', if: { on: 'answer', text: 'Approve' } },
         { id: 'st_sh', kind: 'shell', projectPath: PROJECT, command: 'gh pr review "$n" --comment --body "$HYPERNOVA_STEP_st_rev_1"', if: { on: 'ok' } },
-        { id: 'st_n', kind: 'notify', text: 'Posted after {step:st_q}: {step:st_sh}', glasses: false },
+        { id: 'st_n', kind: 'notify', text: 'Posted after {step:st_q}: {step:st_sh}' },
       ],
     }),
     confirmShell: true,
@@ -1200,7 +1194,7 @@ test('an ask’s filled question is cut to 200 characters between words; the run
   assert.equal(capQuestion('x'.repeat(300), 200), 'x'.repeat(199) + '…')
   const { w, e } = setup()
   const long = `${'All the parser tests pass now and the docs are updated to match the new grammar, '.repeat(2)}see below. ${'Detail '.repeat(30)}`
-  const a = e.create(base({ steps: [{ id: 'st_a', ...start() }, { id: 'st_q', ...ask() }, { id: 'st_n', kind: 'notify', text: 'Whole: {step:st_a}', glasses: false }] }))
+  const a = e.create(base({ steps: [{ id: 'st_a', ...start() }, { id: 'st_q', ...ask() }, { id: 'st_n', kind: 'notify', text: 'Whole: {step:st_a}' }] }))
   await e.runNow(a.id)
   await finish(w, e, lastSid(w), long)
   const run = e.list()[0]!.lastRun!
@@ -1217,7 +1211,7 @@ test('an ask’s filled question is cut to 200 characters between words; the run
 test('a session trigger’s “after”: needs_you only, 1 to 120 minutes; absent keeps what it had, null clears it', () => {
   const { e } = setup()
   const trig = (o: Record<string, unknown>) => ({ kind: 'session', event: 'needs_you', projectPath: null, from: 'mine', ...o })
-  const note = [{ kind: 'notify', text: '{session} still waits: {ask}', glasses: false }]
+  const note = [{ kind: 'notify', text: '{session} still waits: {ask}' }]
   const c = (o: Record<string, unknown>) => err(() => e.create(base({ trigger: trig(o), steps: note })))
   assert.deepEqual(c({ event: 'finished', after: 10 }), { code: 'bad_trigger', field: 'trigger.after', status: 400 })
   assert.equal(c({ after: 0 })?.field, 'trigger.after')
@@ -1235,7 +1229,7 @@ test('a session trigger’s “after”: needs_you only, 1 to 120 minutes; absen
 
 test('a session trigger’s “after”: it fires only if the session still needs you then; answered meanwhile, never', async () => {
   const { w, e } = setup()
-  const a = e.create(base({ trigger: { kind: 'session', event: 'needs_you', projectPath: null, from: 'any', after: 10 }, steps: [{ kind: 'notify', text: '{session} still waits: {ask}', glasses: false }] }))
+  const a = e.create(base({ trigger: { kind: 'session', event: 'needs_you', projectPath: null, from: 'any', after: 10 }, steps: [{ kind: 'notify', text: '{session} still waits: {ask}' }] }))
   const ap = (id: string): Approval => ({ id, sessionId: 's1', createdAt: w.now, expiresAt: w.now + 10 * MIN, kind: 'tool', toolName: 'Bash', summary: 'Bash: git push', input: {}, reason: null, canAlways: true, canSession: false, questions: null, plan: null, agentId: null, agentLabel: null })
   w.sessions.set('s1', newSession('s1'))
   const runs = () => e.runsPage(a.id, null, 10).length
@@ -1315,11 +1309,11 @@ test('an output with no text: the run’s result; the last notification’s text
   const slack = { kind: 'webhook', preset: 'slack', url: 'https://hooks.slack.com/services/T/B/x' }
   // Only notifications: the last one's text, whole (not cut to two sentences).
   const told = 'Parser refactor needs you. It asks to push. Answer on the phone.'
-  const a = e.create(base({ name: 'Tell my team', steps: [{ kind: 'notify', text: 'First.', glasses: false }, { kind: 'notify', text: told, glasses: false }], outputs: [slack] }))
+  const a = e.create(base({ name: 'Tell my team', steps: [{ kind: 'notify', text: 'First.' }, { kind: 'notify', text: told }], outputs: [slack] }))
   await e.runNow(a.id)
   assert.deepEqual(JSON.parse(w.posts.at(-1)!.body), { text: `Tell my team: ${told}` })
   // A session that said nothing, then a notification: that notification.
-  const b = e.create(base({ name: 'Quiet one', steps: [start(), { kind: 'notify', text: 'Checked.', glasses: false }], outputs: [slack] }))
+  const b = e.create(base({ name: 'Quiet one', steps: [start(), { kind: 'notify', text: 'Checked.' }], outputs: [slack] }))
   await e.runNow(b.id)
   await finish(w, e, lastSid(w), null)
   assert.deepEqual(JSON.parse(w.posts.at(-1)!.body), { text: 'Quiet one: Checked.' })
@@ -1330,7 +1324,7 @@ test('an output with no text: the run’s result; the last notification’s text
   assert.deepEqual(JSON.parse(w.posts.at(-1)!.body), { text: 'Silent: Done.' })
   assert.deepEqual([w.notes().at(-1).name, w.notes().at(-1).text], ['Silent', 'Done.'])
   // A step's result comes first: a session's reply.
-  const d = e.create(base({ name: 'Brief', steps: [start(), { kind: 'notify', text: 'Sent.', glasses: false }], outputs: [slack] }))
+  const d = e.create(base({ name: 'Brief', steps: [start(), { kind: 'notify', text: 'Sent.' }], outputs: [slack] }))
   await e.runNow(d.id)
   await finish(w, e, lastSid(w), 'Three PRs merged. Tests pass. More later.')
   assert.deepEqual(JSON.parse(w.posts.at(-1)!.body), { text: 'Brief: Three PRs merged. Tests pass.' })

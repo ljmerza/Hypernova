@@ -2,13 +2,6 @@
 // or the Mac's own, and plays: speech made here and played by the Hypernova app on the phone,
 // natively, through whatever the phone plays to (Bluetooth headphones too), screen off or not.
 //
-// Why the phone app: the glasses app lives in the Even App's WebView, which only makes sound after
-// a touch on the phone's screen, so with the phone in a pocket the glasses stayed silent. Now the
-// glasses ask for a play, the phone app that offered to play for them gets it, streams the audio
-// from here and says how far it got; that goes back to the glasses, so their text keeps in step
-// with the voice, a tap there stops it, and a risky command counts as heard only when the phone
-// played it to the end. With no phone app to play, the glasses play it themselves, as before.
-//
 // The text is in memory only, never logged or written down; the log has one line a play (who, the
 // engine, how long, how it ended).
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -17,9 +10,8 @@ import { join } from 'node:path'
 import { WebSocket, type RawData } from 'ws'
 import { SUPPORT, log, readJson, writeJson } from './util.ts'
 import { broadcast } from './hub.ts'
-import { toMacApps } from './guide.ts'
+import { toMacApps } from './mac-feed.ts'
 import { listDevices } from './store.ts'
-import { phoneOfWho } from './glasses.ts'
 import { onSttChange, sttState } from './stt.ts'
 import { MAX_SPEECH, listVoices, sayPcm, speak } from './speech.ts'
 import { BYTES_PER_MS, TTS_RATE, sonioxSpeak, sonioxVoiceFor, sonioxVoices, ttsModel, ttsPieces, wav, type Mark } from './tts.ts'
@@ -64,8 +56,6 @@ export type SpeechState = {
   soniox: boolean
   /** Why the Mac's voice reads although Soniox was chosen, in one line; else null. */
   note: string | null
-  /** A phone app plays the glasses' speech right now. */
-  phone: boolean
 }
 
 export function speechState(): SpeechState {
@@ -78,7 +68,7 @@ export function speechState(): SpeechState {
     : !stt.provider ? 'No Soniox key on this Mac, so the Mac’s voice reads.'
     : !soniox ? `${stt.error ?? 'Soniox isn’t taking the key'} Until then the Mac’s voice reads.`
     : fallbackNote
-  return { engine, using, voice: sonioxVoiceFor(saved.voice), macVoice: saved.macVoice ?? null, rate: saved.rate ?? 1, model: ttsModel(), soniox, note, phone: playerFor(null) !== null }
+  return { engine, using, voice: sonioxVoiceFor(saved.voice), macVoice: saved.macVoice ?? null, rate: saved.rate ?? 1, model: ttsModel(), soniox, note }
 }
 
 let lastSent = ''
@@ -121,7 +111,7 @@ export async function saveSpeech(b: any): Promise<SpeechState> {
   return speechState()
 }
 
-/** `GET /v1/speech/voices?engine=`: the Mac's voices (as before, for older glasses), or Soniox's. */
+/** `GET /v1/speech/voices?engine=`: the Mac's voices, or Soniox's. */
 export async function voicesFor(engine: string | null): Promise<unknown> {
   if (engine === 'soniox') {
     const { model, voices } = await sonioxVoices()
@@ -228,51 +218,11 @@ async function make(text: string, s: SpeechState, out: Sink, signal: AbortSignal
   return { engine: from > 0 ? 'soniox' : 'mac', whole: from === 0 }
 }
 
-/** How much of the text the voice has read at [ms]: between marks, in step with the audio. */
-export function charsAt(marks: Mark[], ms: number, of: number): number {
-  if (!marks.length) return 0
-  let lo = 0
-  let hi = marks.length - 1
-  if (ms <= marks[0]!.ms) return Math.max(0, Math.min(of, marks[0]!.at))
-  if (ms >= marks[hi]!.ms) return Math.min(of, marks[hi]!.at + 1)
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1
-    if (marks[mid]!.ms <= ms) lo = mid
-    else hi = mid
-  }
-  const a = marks[lo]!
-  const b = marks[hi]!
-  const f = b.ms > a.ms ? (ms - a.ms) / (b.ms - a.ms) : 0
-  return Math.max(0, Math.min(of, Math.round(a.at + f * (b.at - a.at))))
-}
-
 // ── The phone apps that play ────────────────────────────────────────────
 
-/** A phone's or the glasses' live feed (`/v1/ws`): plays go to it, progress comes from it. */
-type Feed = { ws: WebSocket; device: string; ip: string | null; player: boolean; at: number }
+/** A phone's live feed (`/v1/ws`): its plays' stops go to it, their progress comes from it. */
+type Feed = { ws: WebSocket; device: string }
 const feeds = new Set<Feed>()
-
-const forwardedIp = (req: IncomingMessage) => String(req.headers['x-forwarded-for'] ?? '').split(',')[0]!.trim() || null
-const isPhoneApp = (device: string) => {
-  const d = listDevices().find((x) => x.id === device)
-  return !!d && (d.client ?? 'android') !== 'lens'
-}
-
-/**
- * Where the glasses' speech plays: the Hypernova app that offered to (`speech.player`). First the
- * phone the glasses came through ([phone]: they reach the Mac through that app, glasses.ts), then
- * one on the same phone as the glasses when the tailnet says so (its address), else the one that
- * offered last.
- */
-function playerFor(ip: string | null, phone: string | null = null): Feed | null {
-  let best: Feed | null = null
-  const rank = (x: Feed) => (phone && x.device === phone ? 2 : 0) + (ip && x.ip === ip ? 1 : 0)
-  for (const f of feeds) {
-    if (!f.player || f.ws.readyState !== WebSocket.OPEN || !isPhoneApp(f.device)) continue
-    if (!best || rank(f) > rank(best) || (rank(f) === rank(best) && f.at > best.at)) best = f
-  }
-  return best
-}
 
 function toDevice(device: string, msg: object): number {
   const s = JSON.stringify(msg)
@@ -288,12 +238,12 @@ function toDevice(device: string, msg: object): number {
 }
 
 /**
- * Called by http.ts for every live feed of a paired device: it may offer to play the glasses'
- * speech (`{t:"speech.player", on}`) and reports how a play goes (`{t:"speech.progress", …}`).
+ * Called by http.ts for every live feed of a paired device: it reports how a play goes
+ * (`{t:"speech.progress", …}`).
  */
-export function speechFeed(device: string | null, ws: WebSocket, req: IncomingMessage): void {
+export function speechFeed(device: string | null, ws: WebSocket): void {
   if (!device) return
-  const f: Feed = { ws, device, ip: forwardedIp(req), player: false, at: Date.now() }
+  const f: Feed = { ws, device }
   feeds.add(f)
   ws.on('message', (data: RawData, binary: boolean) => {
     if (binary) return
@@ -305,15 +255,10 @@ export function speechFeed(device: string | null, ws: WebSocket, req: IncomingMe
     } catch {
       return
     }
-    if (m?.t === 'speech.player') {
-      f.player = m.on === true
-      f.at = Date.now()
-      changed()
-    } else if (m?.t === 'speech.progress' && typeof m.id === 'string') plays.get(m.id)?.report(device, m)
+    if (m?.t === 'speech.progress' && typeof m.id === 'string') plays.get(m.id)?.report(device, m)
   })
   ws.on('close', () => {
     feeds.delete(f)
-    changed()
     // A phone gone mid-play (the app killed, the network lost): nobody hears the rest. A feed that
     // only reconnects comes back within moments, and the audio's own stream plays on meanwhile.
     const at = Date.now()
@@ -329,16 +274,15 @@ export function speechFeed(device: string | null, ws: WebSocket, req: IncomingMe
 type PlayState = 'making' | 'playing' | 'ended' | 'stopped' | 'failed'
 const plays = new Map<string, Play>()
 /** Mutable only so the tests can shorten them. */
-export const playLimits = { startMs: 12_000, silentMs: 15_000, lostMs: 4_000, keepMs: 60_000, relayMs: 250, macMs: 120 }
+export const playLimits = { startMs: 12_000, silentMs: 15_000, lostMs: 4_000, keepMs: 60_000, macMs: 120 }
 /** The most one play may read: a long reply with its facts. */
 export const MAX_PLAY = 40_000
 
 class Play {
   readonly id = randomBytes(9).toString('base64url')
-  readonly asker: string
   readonly target: string
   readonly sessionId: string | null
-  readonly source: 'glasses' | 'phone' | 'mac'
+  readonly source = 'phone'
   readonly of: number
   engine: Engine
   pcm: Buffer[] = []
@@ -355,16 +299,13 @@ class Play {
   readonly createdAt = Date.now()
   private firstAudioAt: number | null = null
   private heardAt = Date.now()
-  private relayedAt = 0
   private macAt = 0
   private waiters = new Set<() => void>()
   private tick: ReturnType<typeof setInterval>
 
-  constructor(o: { asker: string; target: string; sessionId: string | null; source: Play['source']; of: number; engine: Engine }) {
-    this.asker = o.asker
+  constructor(o: { target: string; sessionId: string | null; of: number; engine: Engine }) {
     this.target = o.target
     this.sessionId = o.sessionId
-    this.source = o.source
     this.of = o.of
     this.engine = o.engine
     this.tick = setInterval(() => this.check(), 1000)
@@ -457,14 +398,9 @@ class Play {
     }
   }
 
-  /** The asker hears how far it got (a few times a second at most), and the Mac app shows it speaking. */
+  /** The Mac app shows it speaking (a few times a second at most). */
   private relay(now: boolean): void {
     const t = Date.now()
-    if (this.asker !== this.target && (now || t - this.relayedAt >= playLimits.relayMs)) {
-      this.relayedAt = t
-      const chars = this.state === 'ended' ? this.of : charsAt(this.marks, this.ms, this.of)
-      toDevice(this.asker, { t: 'speech.progress', progress: { id: this.id, state: this.state, ms: Math.round(this.ms), chars, of: this.of, level: Math.round(this.level * 100) / 100, engine: this.engine, why: this.why } })
-    }
     if (now || t - this.macAt >= playLimits.macMs) {
       this.macAt = t
       toMacApps({ t: 'speaking', speaking: { id: this.id, sessionId: this.sessionId, source: this.source, state: this.state, level: Math.round(this.level * 100) / 100, engine: this.engine } })
@@ -502,33 +438,22 @@ class Play {
 }
 
 /**
- * `POST /v1/speech/play`: [who] asks for [text] to be read; `to: "me"` plays it on the asker (the
- * phone's own Read aloud), else on the phone app playing the glasses' speech (409 `no_player`
- * without one: the glasses then play it themselves).
+ * `POST /v1/speech/play`: [who] asks for [text] to be read, and plays it itself (`to: "me"`, the
+ * phone's own Read aloud).
  */
-export async function startPlay(b: any, who: string, ip: string | null): Promise<{ play: ReturnType<Play['view']> & { to: { id: string; name: string } } }> {
+export async function startPlay(b: any, who: string): Promise<{ play: ReturnType<Play['view']> & { to: { id: string; name: string } } }> {
   const text = typeof b?.text === 'string' ? b.text : ''
   if (!text.trim()) throw fail(400, 'empty', 'There’s nothing to read.')
   if (text.length > MAX_PLAY) throw fail(413, 'too_long', `At most ${MAX_PLAY} characters at a time.`)
-  const me = b?.to === 'me'
-  let target: string
-  if (me) {
-    if (who === 'mac') throw fail(400, 'bad_target', 'The Mac app doesn’t play speech.')
-    target = who
-  } else {
-    const f = playerFor(ip, phoneOfWho(who))
-    if (!f) throw fail(409, 'no_player', 'No phone app is playing the glasses’ speech.')
-    target = f.device
-  }
+  if (who === 'mac') throw fail(400, 'bad_target', 'The Mac app doesn’t play speech.')
+  const target = who
   const s = speechState()
   const sessionId = typeof b?.sessionId === 'string' && /^[\w-]{1,80}$/.test(b.sessionId) ? b.sessionId : null
-  const source: Play['source'] = me ? 'phone' : who === 'mac' ? 'mac' : 'glasses'
-  // One play at a time for each phone, and for each asker.
-  for (const p of plays.values()) if (p.live && (p.target === target || p.asker === who)) p.end('stopped', 'replaced')
-  const play = new Play({ asker: who, target, sessionId, source, of: text.length, engine: s.using })
+  // One play at a time for each phone.
+  for (const p of plays.values()) if (p.live && p.target === target) p.end('stopped', 'replaced')
+  const play = new Play({ target, sessionId, of: text.length, engine: s.using })
   plays.set(play.id, play)
   void produce(play, text, s)
-  if (!me) toDevice(target, { t: 'speech.play', play: play.view() })
   const name = listDevices().find((d) => d.id === target)?.name ?? 'Phone'
   return { play: { ...play.view(), to: { id: target, name } } }
 }
@@ -565,15 +490,15 @@ async function streamPlay(id: string, who: string, res: ServerResponse): Promise
   p.stream(res)
 }
 
-/** `POST /v1/speech/plays/<id>/stop`: the asker, the phone playing it, or the Mac app. */
+/** `POST /v1/speech/plays/<id>/stop`: the phone playing it, or the Mac app. */
 function stopPlay(id: string, who: string): { ok: true; state: PlayState } {
   const p = plays.get(id)
-  if (!p || (who !== p.asker && who !== p.target && who !== 'mac')) throw fail(404, 'no_play', 'That reading is over.')
+  if (!p || (who !== p.target && who !== 'mac')) throw fail(404, 'no_play', 'That reading is over.')
   p.end('stopped', who === p.target ? 'phone' : 'asked')
   return { ok: true, state: p.state }
 }
 
-// ── A whole clip (the glasses' own player, and older clients) ─────────
+// ── A whole clip (the phone's older way) ──────────────────────────────
 
 const clipping = new Map<string, AbortController>()
 
@@ -631,7 +556,7 @@ export async function speechRoute(path: string, method: string, req: IncomingMes
   }
   if (path === '/v1/speech/settings' && method === 'GET') return json(200, { speech: speechState() })
   if (path === '/v1/speech/settings' && method === 'POST') return json(200, { speech: await saveSpeech(await body()) })
-  if (path === '/v1/speech/play' && method === 'POST') return json(200, await startPlay(await body(), who, forwardedIp(req)))
+  if (path === '/v1/speech/play' && method === 'POST') return json(200, await startPlay(await body(), who))
   const m = /^\/v1\/speech\/plays\/([\w-]{1,40})\/(audio|stop)$/.exec(path)
   if (m && m[2] === 'audio' && method === 'GET') {
     await streamPlay(m[1]!, who, res)

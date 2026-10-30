@@ -1,5 +1,4 @@
-// Read aloud with Soniox, and plays the phone app streams for the glasses (docs/PROTOCOL.md, "Read
-// aloud"). Soniox is a stand-in on free ports that speaks its TTS protocol as documented: the key as
+// Read aloud with Soniox, and plays the phone app streams (docs/PROTOCOL.md, "Read aloud"). Soniox is a stand-in on free ports that speaks its TTS protocol as documented: the key as
 // the Authorization header on the upgrade, a config then text (text_end) per stream_id, base64 PCM
 // with per-character timestamps, audio_end, terminated, error frames, cancel; and the models list
 // (GET /v1/tts-models). The Mac's voice is the real `say`, which renders to a file and plays nothing.
@@ -146,12 +145,10 @@ api.listen(SXAPI, '127.0.0.1')
 
 const { startServers } = await import('../src/http.ts')
 const { addDevice, adminToken } = await import('../src/store.ts')
-const { charsAt, playLimits, livePlays } = await import('../src/readaloud.ts')
+const { playLimits } = await import('../src/readaloud.ts')
 const { pickModel, speechLanguage, ttsPieces, ttsText, ttsLimits } = await import('../src/tts.ts')
-const LENS = 'test-lens-token-0123456789abcdef'
 const PHONE = 'test-phone-token-0123456789abcdef'
 const PHONE2 = 'test-phone2-token-0123456789abcdef'
-addDevice({ id: 'glasses', name: 'Glasses', model: 'G2', createdAt: Date.now(), lastSeenAt: Date.now(), client: 'lens' }, LENS)
 addDevice({ id: 'phone', name: 'Pixel', model: 'P3', createdAt: Date.now(), lastSeenAt: Date.now() }, PHONE)
 addDevice({ id: 'phone2', name: 'Other phone', model: 'P4', createdAt: Date.now(), lastSeenAt: Date.now() }, PHONE2)
 const LIMITS = { ...playLimits }
@@ -181,12 +178,12 @@ beforeEach(async () => {
   process.env.HYPERNOVA_SONIOX_TTS_WS = TTS_URL
   seen.length = 0
   // Each test starts from Soniox and its default voice at normal speed.
-  await send('POST', '/v1/speech/settings', LENS, { engine: 'soniox', voice: 'Adrian', rate: 1 })
+  await send('POST', '/v1/speech/settings', PHONE, { engine: 'soniox', voice: 'Adrian', rate: 1 })
 })
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 type Reply = { status: number; body: any; bytes: Buffer; headers: Record<string, any> }
-function send(method: string, path: string, token: string | null = LENS, body?: unknown, extra: Record<string, string> = {}): Promise<Reply> {
+function send(method: string, path: string, token: string | null = PHONE, body?: unknown, extra: Record<string, string> = {}): Promise<Reply> {
   return new Promise((resolve, reject) => {
     const data = body === undefined ? undefined : JSON.stringify(body)
     const headers: Record<string, string> = { host: `127.0.0.1:${API}`, ...(data ? { 'content-type': 'application/json' } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}), ...extra }
@@ -238,15 +235,6 @@ class Feed {
   }
 }
 
-/** The phone app: offers to play, then plays each play it gets, as the Android player does. */
-async function phoneApp(token = PHONE, ip?: string) {
-  const f = new Feed(token, ip)
-  await f.open
-  await f.until((m) => m.t === 'snapshot')
-  f.json({ t: 'speech.player', on: true })
-  return f
-}
-
 // ── Pure parts ─────────────────────────────────────────────────────────
 
 test('pieces cut after sentences, the first one short, and keep where each starts', () => {
@@ -282,19 +270,6 @@ test('the live model: v2 when listed, else the newest real-time one', () => {
   assert.deepEqual(pickModel([{ id: 'tts-rt-v2', voices: [{ id: 'Maya', gender: 'female', description: 'Bright' }, { id: 'Maya' }] }])!.voices, [{ id: 'Maya', name: 'Maya', lang: '*', gender: 'female', description: 'Bright' }])
 })
 
-test('characters read by a point in the audio: between marks, never past the text', () => {
-  const marks = [
-    { at: 0, ms: 0 },
-    { at: 10, ms: 1000 },
-    { at: 20, ms: 3000 },
-  ]
-  assert.equal(charsAt(marks, 500, 30), 5)
-  assert.equal(charsAt(marks, 2000, 30), 15)
-  assert.equal(charsAt(marks, 9000, 30), 21)
-  assert.equal(charsAt(marks, 9000, 20), 20)
-  assert.equal(charsAt([], 500, 30), 0)
-})
-
 // ── The setting ────────────────────────────────────────────────────────
 
 test('Soniox reads by default once a key is there; the snapshot and settings never carry the key', async () => {
@@ -302,7 +277,6 @@ test('Soniox reads by default once a key is there; the snapshot and settings nev
   assert.equal(snap.body.speech.engine, 'soniox')
   assert.equal(snap.body.speech.using, 'soniox')
   assert.equal(snap.body.speech.soniox, true)
-  assert.equal(snap.body.speech.phone, false)
   const s = await send('GET', '/v1/speech/settings')
   assert.equal(s.body.speech.model, 'tts-rt-v2')
   assert.ok(!JSON.stringify(snap.body).includes(GOOD))
@@ -325,16 +299,16 @@ test('voices: the Mac’s as before, Soniox’s when asked, from the live model'
 })
 
 test('settings: checked, kept, and told to every client', async () => {
-  const feed = new Feed(LENS)
+  const feed = new Feed(PHONE)
   await feed.open
-  assert.equal((await send('POST', '/v1/speech/settings', LENS, { engine: 'bluetooth' })).body.error.code, 'bad_engine')
-  assert.equal((await send('POST', '/v1/speech/settings', LENS, { voice: 'Nobody' })).body.error.code, 'bad_voice')
-  assert.equal((await send('POST', '/v1/speech/settings', LENS, { rate: 'fast' })).body.error.code, 'bad_rate')
-  const r = await send('POST', '/v1/speech/settings', LENS, { voice: 'Maya', rate: 9 })
+  assert.equal((await send('POST', '/v1/speech/settings', PHONE, { engine: 'bluetooth' })).body.error.code, 'bad_engine')
+  assert.equal((await send('POST', '/v1/speech/settings', PHONE, { voice: 'Nobody' })).body.error.code, 'bad_voice')
+  assert.equal((await send('POST', '/v1/speech/settings', PHONE, { rate: 'fast' })).body.error.code, 'bad_rate')
+  const r = await send('POST', '/v1/speech/settings', PHONE, { voice: 'Maya', rate: 9 })
   assert.equal(r.body.speech.voice, 'Maya')
   assert.equal(r.body.speech.rate, 2)
   await feed.until((m) => m.t === 'speech' && m.speech.voice === 'Maya')
-  const m = await send('POST', '/v1/speech/settings', LENS, { engine: 'mac' })
+  const m = await send('POST', '/v1/speech/settings', PHONE, { engine: 'mac' })
   assert.equal(m.body.speech.using, 'mac')
   assert.equal(m.body.speech.note, null)
   const saved = JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'speech.json'), 'utf8'))
@@ -342,11 +316,11 @@ test('settings: checked, kept, and told to every client', async () => {
   feed.close()
 })
 
-// ── Whole clips (the glasses' own player) ──────────────────────────────
+// ── Whole clips ────────────────────────────────────────────────────────
 
 test('a whole clip with Soniox: WAV of its PCM; brackets made text, the language from the letters', async () => {
   const text = 'Привет. Сборка прошла [1].'
-  const r = await send('POST', '/v1/speech', LENS, { text })
+  const r = await send('POST', '/v1/speech', PHONE, { text })
   assert.equal(r.status, 200)
   assert.equal(r.headers['content-type'], 'audio/wav')
   assert.equal(r.headers['x-speech-engine'], 'soniox')
@@ -367,7 +341,7 @@ test('a whole clip with Soniox: WAV of its PCM; brackets made text, the language
   assert.equal(s.texts[0].text_end, true)
   // Read again: from memory, Soniox isn't asked.
   const n = seen.length
-  const again = await send('POST', '/v1/speech', LENS, { text })
+  const again = await send('POST', '/v1/speech', PHONE, { text })
   assert.deepEqual(again.bytes, r.bytes)
   assert.equal(seen.length, n)
 })
@@ -376,10 +350,10 @@ test('a whole clip with Soniox: WAV of its PCM; brackets made text, the language
 const macVoice = { skip: process.platform !== 'darwin' && 'the Mac’s voice is a Mac’s' }
 
 test('Soniox refusing the key: the Mac’s voice reads, and the setting says so in one line', macVoice, async () => {
-  const feed = new Feed(LENS)
+  const feed = new Feed(PHONE)
   await feed.open
   process.env.HYPERNOVA_SONIOX_TTS_WS = `ws://127.0.0.1:${TTS}/elsewhere`
-  const r = await send('POST', '/v1/speech', LENS, { text: 'A fallback, please.' })
+  const r = await send('POST', '/v1/speech', PHONE, { text: 'A fallback, please.' })
   assert.equal(r.status, 200)
   assert.equal(r.headers['x-speech-engine'], 'mac')
   assert.equal(r.bytes.toString('ascii', 0, 4), 'RIFF')
@@ -387,19 +361,19 @@ test('Soniox refusing the key: the Mac’s voice reads, and the setting says so 
   assert.match(note.speech.note, /Mac’s voice did/)
   assert.equal(note.speech.using, 'soniox', 'still chosen: the next read tries Soniox again')
   process.env.HYPERNOVA_SONIOX_TTS_WS = TTS_URL
-  await send('POST', '/v1/speech', LENS, { text: 'Back to Soniox.' })
+  await send('POST', '/v1/speech', PHONE, { text: 'Back to Soniox.' })
   await feed.until((m) => m.t === 'speech' && m.speech.note === null)
   feed.close()
 })
 
 test('Soniox out of reach, and failing mid-reply: the Mac carries on from where it got to', macVoice, async () => {
   process.env.HYPERNOVA_SONIOX_TTS_WS = `ws://127.0.0.1:${CLOSED}/tts-websocket`
-  const off = await send('POST', '/v1/speech', LENS, { text: 'Nobody home.' })
+  const off = await send('POST', '/v1/speech', PHONE, { text: 'Nobody home.' })
   assert.equal(off.headers['x-speech-engine'], 'mac')
   process.env.HYPERNOVA_SONIOX_TTS_WS = TTS_URL
   fake.failOn = { piece: 1, code: 503, type: 'service_unavailable' }
   const text = 'First part is read by Soniox. '.repeat(12) + 'The rest by the Mac.'
-  const r = await send('POST', '/v1/speech', LENS, { text })
+  const r = await send('POST', '/v1/speech', PHONE, { text })
   assert.equal(r.status, 200)
   // Soniox's first piece, then the Mac's voice: longer than Soniox's piece alone.
   const first = ttsPieces(ttsText(text))[0]!
@@ -408,12 +382,12 @@ test('Soniox out of reach, and failing mid-reply: the Mac carries on from where 
 })
 
 test('Soniox hanging after the connection: the Mac’s voice takes over within the first-audio limit, and the note says so', macVoice, async () => {
-  const feed = new Feed(LENS)
+  const feed = new Feed(PHONE)
   await feed.open
   Object.assign(ttsLimits, { firstAudioMs: 300 })
   fake.hang = 'first'
   const t0 = Date.now()
-  const r = await send('POST', '/v1/speech', LENS, { text: 'Nothing will come back.' })
+  const r = await send('POST', '/v1/speech', PHONE, { text: 'Nothing will come back.' })
   assert.equal(r.headers['x-speech-engine'], 'mac')
   assert.ok(Date.now() - t0 < 5000)
   const note = await feed.until((m) => m.t === 'speech' && m.speech.note)
@@ -424,7 +398,7 @@ test('Soniox hanging after the connection: the Mac’s voice takes over within t
 test('Soniox going quiet mid-piece is an idle timeout, and the Mac carries on', macVoice, async () => {
   Object.assign(ttsLimits, { idleMs: 300 })
   fake.hang = 'mid'
-  const r = await send('POST', '/v1/speech', LENS, { text: 'It starts and then it stops.' })
+  const r = await send('POST', '/v1/speech', PHONE, { text: 'It starts and then it stops.' })
   assert.equal(r.headers['x-speech-engine'], 'mac', 'the Mac read what Soniox didn’t')
   assert.ok(r.bytes.length > 44)
   assert.match((await send('GET', '/v1/speech/settings')).body.speech.note, /stopped in the middle/)
@@ -434,143 +408,37 @@ test('a piece longer than any fixed limit is fine while frames keep coming', asy
   // Two frames 200 ms apart: 400 ms in all, over the 300 ms of idleness allowed, but never idle that long.
   Object.assign(ttsLimits, { idleMs: 300, firstAudioMs: 300 })
   fake.slowMs = 200
-  const r = await send('POST', '/v1/speech', LENS, { text: 'A long piece, made slowly.' })
+  const r = await send('POST', '/v1/speech', PHONE, { text: 'A long piece, made slowly.' })
   assert.equal(r.headers['x-speech-engine'], 'soniox')
   assert.equal((await send('GET', '/v1/speech/settings')).body.speech.note, null)
 })
 
 test('a piece Soniox cut off at its 2 minutes is not read whole: the Mac reads the rest', macVoice, async () => {
   fake.truncate = true
-  const r = await send('POST', '/v1/speech', LENS, { text: 'Cut off by the limit.' })
+  const r = await send('POST', '/v1/speech', PHONE, { text: 'Cut off by the limit.' })
   assert.equal(r.status, 200)
   assert.match((await send('GET', '/v1/speech/settings')).body.speech.note, /cut that short/)
 })
 
 // ── Plays on the phone app ─────────────────────────────────────────────
 
-test('no phone app playing: the glasses are told to play it themselves', async () => {
-  const r = await send('POST', '/v1/speech/play', LENS, { text: 'Hello.' })
-  assert.equal(r.status, 409)
-  assert.equal(r.body.error.code, 'no_player')
-})
-
-test('a glasses play goes to the phone app, which streams it; progress, level and the end go back', async () => {
-  const lens = new Feed(LENS)
-  const mac = new Feed('', undefined, true)
-  await Promise.all([lens.open, mac.open])
-  const phone = await phoneApp()
-  await lens.until((m) => m.t === 'speech' && m.speech.phone === true)
-  const text = 'The build passed. Twelve tests, no failures.'
-  const r = await send('POST', '/v1/speech/play', LENS, { text, sessionId: 'sess-1' })
+test('a play is the asking phone’s: only it may fetch or stop it, besides the Mac app', async () => {
+  const r = await send('POST', '/v1/speech/play', PHONE, { text: 'Read on this phone.', to: 'me' })
   assert.equal(r.status, 200)
-  const id = r.body.play.id
-  assert.equal(r.body.play.to.name, 'Pixel')
-  assert.equal(r.body.play.sampleRate, RATE)
-  assert.equal(r.body.play.of, text.length)
-  const got = await phone.until((m) => m.t === 'speech.play')
-  assert.equal(got.play.id, id)
-  assert.equal(got.play.sessionId, 'sess-1')
-  assert.equal(got.play.format, 'pcm_s16le')
-  // Only the phone playing it may fetch it.
-  assert.equal((await send('GET', `/v1/speech/plays/${id}/audio`, LENS)).status, 404)
-  const audio = await send('GET', `/v1/speech/plays/${id}/audio`, PHONE)
-  assert.equal(audio.status, 200)
-  assert.equal(audio.headers['x-sample-rate'], String(RATE))
-  assert.equal(audio.bytes.length, pcmFor([...text].length).length)
-  const total = audio.bytes.length / 48
-  phone.json({ t: 'speech.progress', id, state: 'started', ms: 0, level: 0.1 })
-  await lens.until((m) => m.t === 'speech.progress' && m.progress.state === 'playing')
-  phone.json({ t: 'speech.progress', id, state: 'playing', ms: total / 2, level: 0.8 })
-  await sleep(300)
-  phone.json({ t: 'speech.progress', id, state: 'playing', ms: total / 2 + 1, level: 0.7 })
-  const half = await lens.until((m) => m.t === 'speech.progress' && m.progress.ms >= total / 2)
-  // In step with the voice: about half the characters, from Soniox's timings.
-  assert.ok(Math.abs(half.progress.chars - text.length / 2) <= 2, `chars ${half.progress.chars}`)
-  assert.ok(half.progress.level >= 0.7)
-  assert.equal(half.progress.of, text.length)
-  const speaking = await mac.until((m) => m.t === 'speaking' && m.speaking.state === 'playing')
-  assert.equal(speaking.speaking.sessionId, 'sess-1')
-  assert.equal(speaking.speaking.source, 'glasses')
-  phone.json({ t: 'speech.progress', id, state: 'ended', ms: total })
-  const end = await lens.until((m) => m.t === 'speech.progress' && m.progress.state === 'ended')
-  assert.equal(end.progress.chars, text.length)
-  await mac.until((m) => m.t === 'speaking' && m.speaking.state === 'ended')
-  // The phone's own feed doesn't get the relay meant for the glasses.
-  assert.equal(phone.of('speech.progress').length, 0)
-  assert.equal(livePlays(), 0)
-  for (const f of [lens, mac, phone]) f.close()
-})
-
-test('a tap on the glasses stops the phone; the phone stopping it isn’t heard to the end', async () => {
-  const lens = new Feed(LENS)
-  await lens.open
-  const phone = await phoneApp()
-  await lens.until((m) => m.t === 'speech' && m.speech.phone === true)
-  const a = await send('POST', '/v1/speech/play', LENS, { text: 'Approve push to main? It can’t be taken back.' })
-  phone.json({ t: 'speech.progress', id: a.body.play.id, state: 'started', ms: 0, level: 0.2 })
-  const stop = await send('POST', `/v1/speech/plays/${a.body.play.id}/stop`, LENS)
-  assert.equal(stop.body.state, 'stopped')
-  await phone.until((m) => m.t === 'speech.stop' && m.id === a.body.play.id)
-  const st = await lens.until((m) => m.t === 'speech.progress' && m.progress.id === a.body.play.id && m.progress.state === 'stopped')
-  assert.equal(st.progress.why, 'asked')
-  // The phone's Stop (or a call taking the audio): stopped, not ended, so a risky command isn't "heard".
-  const b = await send('POST', '/v1/speech/play', LENS, { text: 'Delete the branch?' })
-  phone.json({ t: 'speech.progress', id: b.body.play.id, state: 'started', ms: 0 })
-  phone.json({ t: 'speech.progress', id: b.body.play.id, state: 'stopped', ms: 300, why: 'phone' })
-  const st2 = await lens.until((m) => m.t === 'speech.progress' && m.progress.id === b.body.play.id && m.progress.state === 'stopped')
-  assert.equal(st2.progress.why, 'phone')
-  assert.ok(!lens.got.some((m) => m.t === 'speech.progress' && m.progress.id === b.body.play.id && m.progress.state === 'ended'))
-  // Another device can't stop a play that isn't its.
-  const c = await send('POST', '/v1/speech/play', LENS, { text: 'Third.' })
-  assert.equal((await send('POST', `/v1/speech/plays/${c.body.play.id}/stop`, PHONE2)).status, 404)
-  for (const f of [lens, phone]) f.close()
-})
-
-test('a phone that never starts, or leaves mid-play: the glasses hear it failed or stopped', async () => {
-  playLimits.startMs = 300
-  playLimits.lostMs = 200
-  const lens = new Feed(LENS)
-  await lens.open
-  let phone = await phoneApp()
-  await lens.until((m) => m.t === 'speech' && m.speech.phone === true)
-  const a = await send('POST', '/v1/speech/play', LENS, { text: 'Nobody plays this.' })
-  const f = await lens.until((m) => m.t === 'speech.progress' && m.progress.id === a.body.play.id, 4000)
-  assert.equal(f.progress.state, 'failed')
-  assert.equal(f.progress.why, 'no_start')
-  await phone.until((m) => m.t === 'speech.stop' && m.id === a.body.play.id)
-  const b = await send('POST', '/v1/speech/play', LENS, { text: 'The phone goes away.' })
-  phone.json({ t: 'speech.progress', id: b.body.play.id, state: 'started', ms: 0 })
-  await lens.until((m) => m.t === 'speech.progress' && m.progress.id === b.body.play.id && m.progress.state === 'playing')
-  phone.close()
-  const lost = await lens.until((m) => m.t === 'speech.progress' && m.progress.id === b.body.play.id && m.progress.state === 'stopped')
-  assert.equal(lost.progress.why, 'lost')
-  await lens.until((m) => m.t === 'speech' && m.speech.phone === false)
-  // An app that turned "Glasses speak through this phone" off isn't asked.
-  phone = await phoneApp()
-  phone.json({ t: 'speech.player', on: false })
-  await lens.until((m) => m.t === 'speech' && m.speech.phone === false && lens.of('speech').indexOf(m) > 0)
-  assert.equal((await send('POST', '/v1/speech/play', LENS, { text: 'x' })).status, 409)
-  for (const x of [lens, phone]) x.close()
-})
-
-test('the phone on the glasses’ own phone plays them, when the tailnet says which that is', async () => {
-  const a = await phoneApp(PHONE, '100.64.0.1')
-  const b = await phoneApp(PHONE2, '100.64.0.2')
-  await sleep(50)
-  // Both offered; b offered last, but the glasses are on a's phone.
-  const r = await send('POST', '/v1/speech/play', LENS, { text: 'Which phone?' }, { 'x-forwarded-for': '100.64.0.1' })
   assert.equal(r.body.play.to.id, 'phone')
-  await a.until((m) => m.t === 'speech.play')
-  // From anywhere else: the one that offered last.
-  const r2 = await send('POST', '/v1/speech/play', LENS, { text: 'And now?' }, { 'x-forwarded-for': '100.64.9.9' })
-  assert.equal(r2.body.play.to.id, 'phone2')
-  for (const f of [a, b]) f.close()
+  assert.equal(r.body.play.source, 'phone')
+  const id = r.body.play.id
+  assert.equal((await send('GET', `/v1/speech/plays/${id}/audio`, PHONE2)).status, 404)
+  assert.equal((await send('POST', `/v1/speech/plays/${id}/stop`, PHONE2)).status, 404)
+  assert.equal((await send('POST', '/v1/speech/play', null, { text: 'x', to: 'me' })).status, 401)
+  const stop = await send('POST', `/v1/speech/plays/${id}/stop`, PHONE)
+  assert.equal(stop.body.state, 'stopped')
 })
 
 test('the phone’s own Read aloud plays on it; the Mac’s voice when chosen, as the same PCM', macVoice, async () => {
   const mac = new Feed('', undefined, true)
   await mac.open
-  await send('POST', '/v1/speech/settings', LENS, { engine: 'mac' })
+  await send('POST', '/v1/speech/settings', PHONE, { engine: 'mac' })
   const r = await send('POST', '/v1/speech/play', PHONE, { text: 'Read on the phone itself.', to: 'me', sessionId: 's2' })
   assert.equal(r.status, 200)
   assert.equal(r.body.play.to.id, 'phone')
@@ -612,7 +480,7 @@ test('a play whose Soniox stream is slow starts streaming before it is all made'
 })
 
 test('the key and the text never reach the log', async () => {
-  await send('POST', '/v1/speech', LENS, { text: 'A secret plan for Thursday.' })
+  await send('POST', '/v1/speech', PHONE, { text: 'A secret plan for Thursday.' })
   const logText = readFileSync(join(process.env.HYPERNOVA_LOGS!, 'daemon.log'), 'utf8')
   assert.ok(!logText.includes(GOOD))
   assert.ok(!logText.includes('secret plan'))

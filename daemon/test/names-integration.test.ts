@@ -283,12 +283,12 @@ if (typeof stack === 'string') {
       assert.equal(r.headers['access-control-allow-private-network'], undefined, `${method} ${path}`)
       assert.ok(!r.body.includes('protocol'), 'the Mac’s name isn’t told')
     }
-    // At the address, as before: health and the preflight answer (the glasses' WebView needs CORS there).
+    // At the address, health answers, with no CORS either.
     const health = await lan('/v1/health', { headers: evil })
     assert.equal(health.status, 200)
-    assert.equal(health.headers['access-control-allow-origin'], '*')
-    assert.equal((await lan('/v1/snapshot', { method: 'OPTIONS', headers: evil })).status, 204)
-    // But OPTIONS elsewhere at the address reaches no route (a route's handler doesn't check the method).
+    assert.equal(health.headers['access-control-allow-origin'], undefined)
+    assert.equal((await lan('/v1/snapshot', { method: 'OPTIONS', headers: evil })).status, 404)
+    // OPTIONS at the address reaches no route (a route's handler doesn't check the method).
     for (const path of ['/download/android', '/download/android/Hypernova.apk', '/p/0123456789abcdef0123/', '/pair', '/qa']) {
       const r = await lan(path, { method: 'OPTIONS' })
       assert.equal(r.status, 404, `OPTIONS ${path}: ${r.status}`)

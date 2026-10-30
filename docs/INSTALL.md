@@ -1,8 +1,7 @@
 # Install Hypernova
 
 Hypernova is a control room for Claude Code and Codex. A small service runs on a computer you own,
-next to your agents, and you reach it from your phone (the Android app), from your glasses
-(Hypernova Lens, through the phone) and, on a Mac, from the menu bar. Your phone reaches that
+next to your agents, and you reach it from your phone (the Android app) and, on a Mac, from the menu bar. Your phone reaches that
 computer over your Wi‑Fi, or from anywhere through your own Tailscale network. There is no
 Hypernova server in between.
 
@@ -22,8 +21,7 @@ This is the whole install guide. Setup, in the Mac app, uses the same step names
 [5. Windows (experimental)](#5-windows-experimental-wsl2-or-docker-desktop).
 
 Whichever you choose, the phone side is the same: **the Android app** (Android 10 or later) pairs
-with the computer by a code, and **Hypernova Lens** on Even Realities G2 glasses goes through the
-app. The Mac's menu bar is a second control room, on that Mac only.
+with the computer by a code. The Mac's menu bar is a second control room, on that Mac only.
 
 ## What you need
 
@@ -39,8 +37,7 @@ app. The Mac's menu bar is a second control room, on that Mac only.
 - **An Android phone** on **Android 10 or later**.
 - Optional: a [Tailscale](https://tailscale.com) account, to reach the computer when the phone isn't
   on its network (always, for a VPS). On the same Wi‑Fi you don't need one.
-- Optional: Even Realities G2 glasses (see [Hypernova Lens](../lens/README.md)), and a
-  [Soniox](https://soniox.com) API key for voice.
+- Optional: a [Soniox](https://soniox.com) API key for voice.
 
 Nothing else: Hypernova brings its own Node.js and its own Tailscale. On a Mac, Setup also
 downloads Claude Code's SDK from npm (about 2 MB; see [Background service](#2-background-service)).
@@ -53,7 +50,6 @@ you need:
 - `Hypernova.dmg`: the Mac app
 - `Hypernova-linux.tar.gz`: the Linux package
 - `Hypernova.apk`: the Android app (a Mac can also hand it to your phone during Setup)
-- `Hypernova-Lens.ehpk`: the glasses app for Even Realities G2 (see [Hypernova Lens](../lens/README.md))
 - `SHA256SUMS.txt`: their checksums
 
 To check the downloads, run this in the folder you saved them to. Each file you downloaded should
@@ -346,7 +342,7 @@ systemctl --user status hypernova
   server's ⋯ menu and choose **Disable key expiry**, so your phone doesn't lose it.
 
 [docs/LINUX.md](LINUX.md) has every command and flag, where things live, and what a server doesn't
-have (battery, Stay awake, the Mac's voice, app windows in Telescope).
+have (battery, Stay awake, the Mac's voice).
 
 ## 4. In Docker
 
@@ -392,7 +388,7 @@ Linux machine.
 
 **What works**, as on any Linux (tested on Linux and in Linux containers, not on Windows): the
 service, Claude Code and Codex sessions, approvals, usage, shared terminals (`claude` typed in an
-Ubuntu terminal), Telescope's terminal and web pages, the built-in Tailscale and pairing.
+Ubuntu terminal), the built-in Tailscale and pairing.
 `hypernova doctor` and `hypernova pair` know when they run in WSL and say what differs.
 
 **What doesn't:**
@@ -401,7 +397,7 @@ Ubuntu terminal), Telescope's terminal and web pages, the built-in Tailscale and
   that WSL's shell finds through Windows' PATH is ignored). Sessions you run in PowerShell, Command
   Prompt or a Windows app are outside WSL: Hypernova doesn't see them.
 - What a Linux server lacks ([LINUX.md](LINUX.md), "What a Linux server doesn't have"): battery,
-  Stay awake, the Mac's voice, app windows in Telescope, opening a terminal window from the phone.
+  Stay awake, the Mac's voice, opening a terminal window from the phone.
 - No tray app and no Setup window: everything is the `hypernova` command in an Ubuntu terminal.
 - WSL's default network (NAT) keeps the PC off your phone's Wi‑Fi: the phone comes in over
   **Tailscale**, which is built in. A direct route on the Wi‑Fi needs mirrored networking (below).
@@ -560,8 +556,6 @@ The Android app is the same for every computer, and pairs with one at a time.
   which opens Hypernova; the details after the `#` never reach that site. **Paste pairing link** in
   the app takes the same link.
 - **Notifications**: allow them when the app asks, so approvals reach you with the app closed.
-- **The glasses**: Hypernova Lens goes through the app on the same phone; you allow it once in the
-  app by comparing a six-digit code ([lens/README.md](../lens/README.md)).
 
 ## Claude Code and Codex
 
@@ -665,7 +659,6 @@ macOS may also ask, later and only when a feature needs it:
 
 - **Files and Folders** (Documents, Desktop, iCloud Drive) for `node`, when your phone opens a
   project there. Allow it, or keep projects elsewhere.
-- **Screen Recording**, the first time Telescope shows a Mac window on your phone or glasses.
 - **Incoming connections** for `node`, if the macOS firewall is on: allow it, or phones on your
   Wi‑Fi can't connect.
 - Your **password**, if you choose Backpack mode (keep the Mac awake with its lid closed).

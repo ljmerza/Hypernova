@@ -1,7 +1,5 @@
-// Read aloud for Hypernova Lens (docs/PROTOCOL.md, "Read aloud"): the Mac's voices speak a reply
-// into the earbuds. The glasses app runs in the Even App's WebView, and Android's WebView has no
-// speechSynthesis, so the Mac renders the clip with `say` and the phone plays the bytes. Also the
-// speech companion's address, so the phone pairs once, not twice.
+// The Mac's voices (docs/PROTOCOL.md, "Read aloud"): the Mac renders a reply with `say` and the
+// phone plays the bytes. Also the speech companion's address, so the phone pairs once, not twice.
 import { execFile, type ChildProcess } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs'
@@ -14,7 +12,7 @@ const SAY = '/usr/bin/say'
 /** Why there's no voice: a Mac without `say`, or a Linux server, which never has the Mac's voice. */
 const noVoice = () => (has('macVoice') ? 'This Mac can’t read aloud.' : LINUX_REASONS.macVoice)
 const TMP = join(SUPPORT, 'tmp')
-/** The most one request may carry; Lens sends a longer reply in pieces, cut between paragraphs. */
+/** The most one request may carry. */
 export const MAX_SPEECH = 8000
 /** `say -r` takes words per minute; this is its usual pace, rate 1. */
 const WPM = 185

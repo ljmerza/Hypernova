@@ -623,7 +623,6 @@ test('doctor: each check with its fix; a missing login is a problem, a missing T
   assert.match(text, /✓ Phone API and local API on loopback only/)
   assert.match(text, /✗ Claude Code isn’t signed in\.\n {6}Run claude once on this server/)
   assert.match(text, /! Tailscale isn’t installed[^\n]*\n {6}curl -fsSL https:\/\/tailscale\.com\/install\.sh \| sh/)
-  assert.match(text, /· Telescope web pages/)
   assert.match(text, /1 problem to fix, \d+ worth a look\./)
   // A port forward on all addresses: a problem, named.
   const open = fakeSys(claudeAnswers(true))
@@ -670,7 +669,7 @@ test('setup then uninstall: Node, the daemon, the command, the service with ling
   const text = sys.out.join('\n')
   // Node: this test's own (24 or newer), recorded for the service.
   assert.equal(readFileSync(c.nodePathFile, 'utf8').trim(), process.execPath)
-  // The daemon copied in whole, with the font Telescope draws the terminal with.
+  // The daemon copied in whole, with JetBrains Mono beside it.
   assert.ok(existsSync(join(c.daemonDir, 'src', 'main.ts')))
   assert.ok(existsSync(join(c.daemonDir, 'src', 'cli', 'integration.ts')))
   assert.ok(existsSync(join(c.appDir, 'Fonts', 'JetBrainsMono.ttf')))

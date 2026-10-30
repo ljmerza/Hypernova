@@ -26,7 +26,7 @@ import kotlin.math.sin
  * font carries them, and a system fallback would come in at the wrong weight).
  */
 enum class AutoGlyph {
-    Clock, Repeat, Reset, Limit, Finished, NeedsMe, Plug, Battery, Start, Skill, Continue, Bell, Glasses, Moon, Week, Switch,
+    Clock, Repeat, Reset, Limit, Finished, NeedsMe, Plug, Battery, Start, Skill, Continue, Bell, Moon, Week, Switch,
     /** Workflows: a clock with its quarter ticks (cron), a hook catching a line (webhook), a page with a ripple (file watch), a branch (GitHub), a hook shape (Claude Code hooks), a speech bubble (ask), a prompt (shell), a page (a file output). */
     Cron, Webhook, FileWatch, Branch, Hook, Ask, Shell, Page,
 }
@@ -126,13 +126,6 @@ fun AutoIcon(glyph: AutoGlyph, modifier: Modifier = Modifier, size: Dp = 18.dp, 
                     color, style = st,
                 )
                 drawCircle(color, .05f * w, p(.5f, .8f))
-            }
-            AutoGlyph.Glasses -> {
-                drawCircle(color, .16f * w, p(.3f, .56f), style = st)
-                drawCircle(color, .16f * w, p(.7f, .56f), style = st)
-                drawArc(color, 200f, 140f, false, topLeft = p(.42f, .44f), size = Size(.16f * w, .16f * h), style = st)
-                line(.14f, .52f, .08f, .38f)
-                line(.86f, .52f, .92f, .38f)
             }
             AutoGlyph.Moon -> {
                 val outer = Path().apply { addOval(Rect(.16f * w, .16f * h, .84f * w, .84f * h)) }

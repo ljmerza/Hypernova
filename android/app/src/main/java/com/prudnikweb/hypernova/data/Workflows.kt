@@ -66,7 +66,6 @@ data class Step(val id: String, val guard: Guard?, val action: Action) {
         const val ASK = "ask"
         const val SHELL = "shell"
         const val NOTIFY = "notify"
-        const val SAY = "say"
 
         fun kindOf(a: Action): String = when (a) {
             is Action.Start -> START
@@ -74,12 +73,11 @@ data class Step(val id: String, val guard: Guard?, val action: Action) {
             is Action.Ask -> ASK
             is Action.Shell -> SHELL
             is Action.Notify -> NOTIFY
-            is Action.Say -> SAY
             is Action.Unknown -> a.kind
         }
 
-        /** Notify and say only tell: guards and `{prev}` look past them. */
-        fun tells(a: Action): Boolean = a is Action.Notify || a is Action.Say
+        /** Notify only tells: guards and `{prev}` look past it. */
+        fun tells(a: Action): Boolean = a is Action.Notify
     }
 }
 
@@ -88,8 +86,7 @@ sealed interface Output {
     val id: String
     val text: String?
 
-    @Immutable data class Notify(override val id: String, override val text: String? = null, val glasses: Boolean = false) : Output
-    @Immutable data class Say(override val id: String, override val text: String? = null) : Output
+    @Immutable data class Notify(override val id: String, override val text: String? = null) : Output
 
     /**
      * A POST to Slack, Discord, Telegram, ntfy or any https address ([preset]). [host] and [last4] are
@@ -136,7 +133,7 @@ data class Budget(val minutes: Int?, val windowPct: Int?) {
     val any: Boolean get() = minutes != null || windowPct != null
 }
 
-/** An ask step's answer, and who gave it ("phone", "glasses", "mac", or "timeout": its default). */
+/** An ask step's answer, and who gave it ("phone", "mac", or "timeout": its default). */
 @Immutable
 data class StepAnswer(val text: String, val by: String, val at: Long) {
     companion object {
@@ -238,10 +235,9 @@ object WorkflowShape {
         }
     }
 
-    /** `then` as outputs: "notify" a plain notify, "say" a plain say, "none" nothing. */
+    /** `then` as outputs: "notify" a plain notify, "none" nothing. */
     fun outputsOfThen(then: String): List<Output> = when (then) {
-        Then.NOTIFY -> listOf(Output.Notify(FIRST_OUTPUT, null, glasses = false))
-        Then.SAY -> listOf(Output.Say(FIRST_OUTPUT, null))
+        Then.NOTIFY -> listOf(Output.Notify(FIRST_OUTPUT, null))
         else -> emptyList()
     }
 
@@ -252,22 +248,21 @@ object WorkflowShape {
         else -> Step(id, null, a) to emptyList()
     }
 
-    /** The `then` that says [outputs], or null when it can't (more than one, a webhook, a file, a text or glasses of its own). */
+    /** The `then` that says [outputs], or null when it can't (more than one, a webhook, a file, a text of its own). */
     fun thenOf(outputs: List<Output>): String? {
         if (outputs.isEmpty()) return Then.NONE
         val o = outputs[0]
         if (outputs.size > 1 || o.text != null) return null
         return when {
-            o is Output.Notify && !o.glasses -> Then.NOTIFY
-            o is Output.Say -> Then.SAY
+            o is Output.Notify -> Then.NOTIFY
             else -> null
         }
     }
 
     /**
      * The action an old client reads ([mirrorAction] in the contract): the one step as an Action
-     * when it shows the automation exactly (start, continue but not `step:…`, notify or say; no
-     * guard; outputs `then` can say, none at all for notify and say); null when it can't, the
+     * when it shows the automation exactly (start, continue but not `step:…`, notify; no
+     * guard; outputs `then` can say, none at all for notify); null when it can't, the
      * daemon's `{kind: "workflow"}`. The phone also uses it to say a simple one as today's sentence.
      */
     fun mirror(steps: List<Step>, outputs: List<Output>): Action? {
@@ -277,7 +272,7 @@ object WorkflowShape {
         return when (val a = s.action) {
             is Action.Start -> then?.let { a.copy(then = it) }
             is Action.Continue -> if (then == null || a.target.startsWith(Action.Continue.STEP)) null else a.copy(then = then)
-            is Action.Notify, is Action.Say -> a.takeIf { outputs.isEmpty() }
+            is Action.Notify -> a.takeIf { outputs.isEmpty() }
             else -> null
         }
     }
@@ -347,8 +342,7 @@ object WorkflowWire {
         val id = o.str("id") ?: return null
         val text = o.str("text")?.takeIf { it.isNotEmpty() }
         return when (val kind = o.str("kind").orEmpty()) {
-            "notify" -> Output.Notify(id, text, o.bool("glasses"))
-            "say" -> Output.Say(id, text)
+            "notify" -> Output.Notify(id, text)
             "webhook" -> Output.Webhook(id, text, o.str("preset") ?: Output.POST, o.str("host").orEmpty(), o.str("last4").orEmpty())
             "file" -> Output.File(id, text, o.str("path").orEmpty())
             else -> Output.Unknown(id, kind, o.toString())
@@ -360,8 +354,7 @@ object WorkflowWire {
      * the editor's saved draft, which never keeps one); its host and last4 are the Mac's, not sent.
      */
     fun json(out: Output, secrets: Boolean = true): JSONObject = when (out) {
-        is Output.Notify -> JSONObject().put("kind", "notify").put("glasses", out.glasses)
-        is Output.Say -> JSONObject().put("kind", "say")
+        is Output.Notify -> JSONObject().put("kind", "notify")
         is Output.Webhook -> JSONObject().put("kind", "webhook").put("preset", out.preset).apply {
             if (!secrets) {
                 // The draft's own copy: what the card shows, never the secret.

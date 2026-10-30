@@ -261,16 +261,13 @@ test('answers are reused for a moment rather than reading the files on every ask
   assert.ok(c.computedAt > a.computedAt)
 })
 
-test('what only the daemon counts: prompts from the phone and the glasses, spoken ones, approvals, limits', async () => {
+test('what only the daemon counts: prompts from the phone, spoken ones, approvals, limits', async () => {
   addDevice({ id: 'phone1', name: 'Phone', model: 'NP3', createdAt: 0, lastSeenAt: 0 }, 'phone-token-0123456789abcdef0123')
-  addDevice({ id: 'lens1', name: 'Glasses', model: 'G2', createdAt: 0, lastSeenAt: 0, client: 'lens' }, 'lens-token-0123456789abcdef01234')
   stats.notePrompt('phone1', false)
   stats.notePrompt('phone1', false, 'voice')
-  stats.notePrompt('lens1', false, 'voice')
   // The Mac app's own prompts are in the transcripts already.
   stats.notePrompt(null, true)
   stats.noteApproval('phone1', false)
-  stats.noteApproval('lens1', false)
   stats.noteApproval(null, true)
   // Ten minutes ago, but never before midnight: run just after it, that would be yesterday.
   assert.equal(stats.recordLimitHit('five_hour', Math.max(Date.now() - 10 * MIN, new Date().setUTCHours(0, 0, 0, 0))), true)
@@ -280,14 +277,14 @@ test('what only the daemon counts: prompts from the phone and the glasses, spoke
   // Credit running out isn't a limit reached.
   assert.equal(stats.recordLimitHit('credits', Date.now()), false)
   const s = await stats.getStats('today')
-  assert.deepEqual(s.promptsFrom, { phone: 2, glasses: 1, voice: 2 })
-  assert.deepEqual(s.approvals, { total: 3, phone: 1, glasses: 1, mac: 1 })
+  assert.deepEqual(s.promptsFrom, { phone: 2, voice: 1 })
+  assert.deepEqual(s.approvals, { total: 2, phone: 1, mac: 1 })
   assert.deepEqual(s.limitsHit, { fiveHour: 1, sevenDay: 1, model: 0 })
   // Kept across a restart.
   stats.flushStatsForTest()
   stats.reloadStatsForTest()
   const again = await stats.getStats('today')
-  assert.deepEqual(again.promptsFrom, { phone: 2, glasses: 1, voice: 2 })
+  assert.deepEqual(again.promptsFrom, { phone: 2, voice: 1 })
   assert.ok(again.countingSince <= Date.now())
 })
 

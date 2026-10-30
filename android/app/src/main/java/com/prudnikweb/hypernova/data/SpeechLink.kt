@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,15 +11,11 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Read aloud, as this phone takes part (docs/PROTOCOL.md, "Read aloud"): the Mac's setting (Soniox
- * or the Mac's voice, the voice, the speed), this phone's own Read aloud played natively, and the
- * glasses' speech while "Glasses speak through this phone" is on (the default): the Even App's web
- * view only makes sound after a touch on the screen, so the glasses ask the Mac, the Mac asks this
- * app, and it plays them through the headphones with the screen off.
+ * or the Mac's voice, the voice, the speed), and this phone's own Read aloud played natively.
  *
  * One per connection to a Mac ([LiveHub] owns it); [send] goes over its live feed.
  */
 class PhoneSpeech(
-    context: Context,
     private val pairing: Pairing,
     private val api: Api,
     /** A message on the live feed; false while it's down. */
@@ -28,44 +23,19 @@ class PhoneSpeech(
     /** A session's project, for the notification. */
     private val labelOf: (String?) -> String?,
 ) {
-    private val prefs = context.applicationContext.getSharedPreferences("speech", Context.MODE_PRIVATE)
-
     /** The Mac's setting; null until it says, or from a Mac too old to read aloud this way. */
     var settings by mutableStateOf<SpeechOut?>(null)
         private set
-
-    /** "Glasses speak through this phone" (this phone's own choice; on by default). */
-    var glasses by mutableStateOf(prefs.getBoolean(KEY_GLASSES, true))
-        private set
-
-    fun glassesSpeakHere(on: Boolean) {
-        glasses = on
-        prefs.edit().putBoolean(KEY_GLASSES, on).apply()
-        send(playerMessage(on))
-        // Turned off mid-way: the glasses' speech stops here (they play their own after this).
-        if (!on && Speaker.now?.play?.forGlasses == true) Speaker.stop("phone")
-    }
-
-    /** The live feed is up: offer to play the glasses' speech, or say this phone won't. */
-    fun connected() {
-        send(playerMessage(glasses))
-    }
 
     /** The snapshot's `speech` (null from an older Mac: no native read aloud, no section in Settings). */
     fun snapshot(o: JSONObject?) {
         settings = SpeechOut.parse(o)
     }
 
-    /** `{t:"speech"}`, `{t:"speech.play"}`, `{t:"speech.stop"}` from the live feed. */
+    /** `{t:"speech"}`, `{t:"speech.stop"}` from the live feed. */
     fun message(o: JSONObject) {
         when (o.str("t")) {
             "speech" -> SpeechOut.parse(o.obj("speech"))?.let { settings = it }
-            "speech.play" -> {
-                val play = PlayInfo.parse(o.obj("play")) ?: return
-                // Offered before it was turned off: say so at once, so the glasses play it themselves.
-                if (!glasses) send(progressMessage(play.id, PlayState.Failed, 0, 0f, "off"))
-                else start(play, null)
-            }
             "speech.stop" -> o.str("id")?.let(Speaker::stopPlay)
         }
     }
@@ -117,8 +87,6 @@ class PhoneSpeech(
     }
 
     companion object {
-        private const val KEY_GLASSES = "glasses"
-
         /** Audio comes as it's made: a quiet minute is a link that died, not a slow voice. */
         private fun streamOf(route: NetRoute): OkHttpClient = route.client.newBuilder().readTimeout(60, TimeUnit.SECONDS).pingInterval(0, TimeUnit.SECONDS).build()
     }

@@ -1,6 +1,6 @@
 // Statistics (docs/PROTOCOL.md, "Statistics"): how long Claude worked on this Mac, the tokens it
 // used, sessions, prompts, tools, files, agents and usage limits reached, read from Claude Code's
-// own transcripts, plus what only the daemon sees (prompts from the phone or the glasses, approvals
+// own transcripts, plus what only the daemon sees (prompts from the phone, approvals
 // answered, limits the account reports).
 //
 // Cheap by design: each transcript is read once, then only the bytes added since (its size and
@@ -14,7 +14,7 @@ import { open, readdir, stat } from 'node:fs/promises'
 import { basename, join, sep } from 'node:path'
 import { CLAUDE_DIR, SUPPORT, log, readJson, writeJson } from './util.ts'
 import { classifyUserText, maskSecrets, promptTitle } from './normalize.ts'
-import { listDevices, settings } from './store.ts'
+import { settings } from './store.ts'
 import { codexDays, type CodexDay } from './codex/stats.ts'
 
 export type StatsRange = 'today' | 'week' | 'month' | 'all'
@@ -59,12 +59,12 @@ export type Stats = {
   tokens: Tokens
   sessions: number
   prompts: number
-  promptsFrom: { phone: number; glasses: number; voice: number }
+  promptsFrom: { phone: number; voice: number }
   toolCalls: number
   tools: { name: string; count: number }[]
   filesEdited: number
   agents: number
-  approvals: { total: number; phone: number; glasses: number; mac: number }
+  approvals: { total: number; phone: number; mac: number }
   limitsHit: LimitCounts
   busiestDay: { day: string; claudeMs: number; tokens: number } | null
   longestSession: SessionRecord | null
@@ -490,7 +490,7 @@ async function findTranscripts(): Promise<Found[]> {
 }
 
 // ── What the daemon counts itself, and finished days (<support>/stats.json) ─
-type Counts = { phone?: number; glasses?: number; voice?: number; apPhone?: number; apGlasses?: number; apMac?: number }
+type Counts = { phone?: number; voice?: number; apPhone?: number; apMac?: number }
 type Saved = {
   v: 1
   /** When the daemon started counting what only it sees. */
@@ -542,11 +542,6 @@ function bump(field: keyof Counts, at = Date.now()): void {
   saveSoon()
 }
 
-/** Which app a paired device is: the glasses (Lens), else a phone. */
-function deviceKind(deviceId: string | null): 'glasses' | 'phone' {
-  return deviceId && listDevices().find((d) => d.id === deviceId)?.client === 'lens' ? 'glasses' : 'phone'
-}
-
 /**
  * A prompt went to a session from a paired device (or the Mac app, which isn't counted: the
  * transcripts count every prompt). `via: "voice"` from a client that dictated it counts it as
@@ -554,14 +549,14 @@ function deviceKind(deviceId: string | null): 'glasses' | 'phone' {
  */
 export function notePrompt(deviceId: string | null, local: boolean, via?: unknown): void {
   if (local && !deviceId) return
-  bump(deviceKind(deviceId))
+  bump('phone')
   if (via === 'voice') bump('voice')
 }
 
-/** An approval answered through Hypernova: on a phone, the glasses, or the Mac app. */
+/** An approval answered through Hypernova: on a phone, or the Mac app. */
 export function noteApproval(deviceId: string | null, local: boolean): void {
   if (local && !deviceId) return bump('apMac')
-  bump(deviceKind(deviceId) === 'glasses' ? 'apGlasses' : 'apPhone')
+  bump('apPhone')
 }
 
 const WINDOWS = new Set<unknown>(['five_hour', 'seven_day', 'model'])
@@ -957,18 +952,16 @@ export async function getStats(range: StatsRange, now = Date.now(), opts: { fres
   if (range === 'all' && s.longest && (!longest || s.longest.claudeMs > longest.claudeMs)) longest = s.longest
 
   // What only the daemon counts.
-  const promptsFrom = { phone: 0, glasses: 0, voice: 0 }
-  const approvals = { total: 0, phone: 0, glasses: 0, mac: 0 }
+  const promptsFrom = { phone: 0, voice: 0 }
+  const approvals = { total: 0, phone: 0, mac: 0 }
   for (const [k, c] of Object.entries(s.counts)) {
     if (!inRange(k)) continue
     promptsFrom.phone += c.phone ?? 0
-    promptsFrom.glasses += c.glasses ?? 0
     promptsFrom.voice += c.voice ?? 0
     approvals.phone += c.apPhone ?? 0
-    approvals.glasses += c.apGlasses ?? 0
     approvals.mac += c.apMac ?? 0
   }
-  approvals.total = approvals.phone + approvals.glasses + approvals.mac
+  approvals.total = approvals.phone + approvals.mac
 
   // Days in a row with work, up to today (or yesterday, while today hasn't started yet).
   const worked = (k: string) => (merged.get(k)?.d.claudeMs ?? 0) >= 60_000

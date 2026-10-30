@@ -251,7 +251,6 @@ object WorkflowRules {
                 if (features?.contains(Features.SHELL) != true) out += Issue(key, "bad_step")
             }
             is Action.Notify -> if (a.text.isBlank()) out += Issue(key, "text_needed", "text") else if (Placeholders.badStep(a.text, earlier)) out += Issue(key, "bad_placeholder", "text")
-            is Action.Say -> if (a.text.isBlank()) out += Issue(key, "text_needed", "text") else if (Placeholders.badStep(a.text, earlier)) out += Issue(key, "bad_placeholder", "text")
             is Action.Unknown -> Unit
         }
         return out

@@ -23,7 +23,7 @@ export type V1Trigger =
   | { kind: 'session'; event: 'finished' | 'needs_you'; projectPath: string | null; from: SessionsFrom; after?: number | null }
   | { kind: 'power'; event: 'plugged_in' }
   | { kind: 'power'; event: 'low'; below: number }
-export type Then = 'none' | 'notify' | 'say'
+export type Then = 'none' | 'notify'
 /** Claude Code's modes, and Codex's sandboxes (a start step on [CODEX], which asks nobody). */
 export type Mode = 'dontAsk' | 'default' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'read-only' | 'workspace-write'
 /**
@@ -35,8 +35,7 @@ export const CODEX_MODES: readonly Mode[] = ['read-only', 'workspace-write']
 export type Action =
   | { kind: 'start'; projectPath: string; prompt: string; providerId: string; model: string | null; permissionMode: Mode; allowedTools: string[]; then: Then }
   | { kind: 'continue'; target: string; prompt: string; providerId: string | null; then: Then }
-  | { kind: 'notify'; text: string; glasses: boolean }
-  | { kind: 'say'; text: string }
+  | { kind: 'notify'; text: string }
 /**
  * `outside_projects`: its folder is there but outside the projects folder (the daemon's path rule).
  * `no_model`: the model it names is no longer on its provider's list. `bad_definition`: what was
@@ -44,7 +43,7 @@ export type Action =
  * gh missing or signed out. `no_hooks`: a hook trigger without Claude Code's hooks installed.
  * `output_lost`: a webhook output's secret is gone from the Mac.
  */
-export type Problem = null | 'no_battery' | 'no_project' | 'outside_projects' | 'no_session' | 'no_provider' | 'no_model' | 'no_glasses' | 'mode_unavailable' | 'bad_definition' | 'no_gh' | 'no_hooks' | 'output_lost'
+export type Problem = null | 'no_battery' | 'no_project' | 'outside_projects' | 'no_session' | 'no_provider' | 'no_model' | 'mode_unavailable' | 'bad_definition' | 'no_gh' | 'no_hooks' | 'output_lost'
 export type RunState = 'queued' | 'waiting' | 'running' | 'needs_you' | 'done' | 'failed' | 'skipped' | 'stopped'
 /** `budget`: stopped at its budget; `exit`: a shell step's command exited non-zero. */
 export type RunReason =
@@ -85,7 +84,7 @@ export type Run = {
   retryFrom: string | null
   budgetUsed: { minutes: number; windowPct: number | null } | null
 }
-export type Note = { id: string; automationId: string | null; runId: string | null; name: string; text: string; to: 'phone' | 'glasses'; at: number; ask: NoteAsk | null }
+export type Note = { id: string; automationId: string | null; runId: string | null; name: string; text: string; to: 'phone'; at: number; ask: NoteAsk | null }
 export type Automation = {
   id: string
   name: string
@@ -115,7 +114,7 @@ export type Automation = {
 /**
  * What a daemon can do of workflows: `GET /v1/automations` and `Snapshot.automations` list them. A
  * daemon that sends `features` (even empty) sends `steps`, `outputs` and `budget` and takes them;
- * one plain step and outputs notify and say (today's action and `then`) need no feature. "steps":
+ * one plain step and a notify output (today's action and `then`) need no feature. "steps":
  * more than one step, guards, `step:<id>` targets, Retry from a step. "step.output": `{step:<id>}`
  * and `HYPERNOVA_STEP_<id>`. "trigger.after": the session trigger's `after`.
  */
@@ -150,8 +149,8 @@ export type WorkflowTrigger = Trigger
 export type KeptTrigger = V1Trigger | WebhookTriggerKept | CronTrigger | FileTrigger | GithubTrigger | HookTrigger
 
 /**
- * About "the step before": the nearest earlier step that ran (not skipped) and isn't a notify or
- * say. `contains`: its output, plain text, ignoring case. `answer`: an ask answered `text`.
+ * About "the step before": the nearest earlier step that ran (not skipped) and isn't a notify.
+ * `contains`: its output, plain text, ignoring case. `answer`: an ask answered `text`.
  */
 export type Guard = { on: 'ok' | 'failed' | 'quiet' | 'not_quiet' | 'contains' | 'answer'; text?: string }
 /** `id`: [STEP_ID], unique in the automation, kept across edits; `if`: null on the first step. */
@@ -159,13 +158,12 @@ export type StepBase = { id: string; if: Guard | null }
 export type StartStep = StepBase & Omit<Extract<Action, { kind: 'start' }>, 'then'>
 /** `target` also `step:<id>`: the sessions an earlier start or continue step of the same run worked in. */
 export type ContinueStep = StepBase & Omit<Extract<Action, { kind: 'continue' }>, 'then'>
-/** A pause for a person: answered on the phone, the glasses or the Mac, else [default] after [timeoutMin]. */
+/** A pause for a person: answered on the phone or the Mac, else [default] after [timeoutMin]. */
 export type AskStep = StepBase & { kind: 'ask'; question: string; answers: string[]; default: string; timeoutMin: number }
 /** `/bin/sh -c` in [projectPath], no TTY, a timeout; outside words only through the environment ([SHELL_ENV]). */
 export type ShellStep = StepBase & { kind: 'shell'; projectPath: string; command: string; timeoutSec: number }
 export type NotifyStep = StepBase & Extract<Action, { kind: 'notify' }>
-export type SayStep = StepBase & Extract<Action, { kind: 'say' }>
-export type Step = StartStep | ContinueStep | AskStep | ShellStep | NotifyStep | SayStep
+export type Step = StartStep | ContinueStep | AskStep | ShellStep | NotifyStep
 export type StepKind = Step['kind']
 
 export type WebhookPreset = 'ntfy' | 'slack' | 'discord' | 'telegram' | 'post'
@@ -173,8 +171,7 @@ export type WebhookPreset = 'ntfy' | 'slack' | 'discord' | 'telegram' | 'post'
 export type OutputBase = { id: string; text: string | null }
 export type Output = OutputBase &
   (
-    | { kind: 'notify'; glasses: boolean }
-    | { kind: 'say' }
+    | { kind: 'notify' }
     /** As clients see it: [host] and the secret's [last4], never the secret. */
     | { kind: 'webhook'; preset: WebhookPreset; host: string; last4: string }
     | { kind: 'file'; path: string }
@@ -239,7 +236,7 @@ export type RunStep = {
   /** Retry from a later step: taken over from the run it retries. */
   reused: boolean
 }
-export type AnswerBy = 'phone' | 'glasses' | 'mac' | 'timeout'
+export type AnswerBy = 'phone' | 'mac' | 'timeout'
 /** The question a run waits on (state needs_you); [until]: when its default is taken. */
 export type RunAsk = { stepId: string; question: string; answers: string[]; default: string; until: number }
 export type NoteAsk = RunAsk & { runId: string }
@@ -258,7 +255,7 @@ export const ERROR_CODES = {
   400: [
     'bad_name', 'bad_template', 'bad_trigger', 'bad_time', 'bad_days', 'past_time', 'no_battery', 'bad_cron', 'too_often', 'not_github', 'no_gh',
     'bad_action', 'bad_steps', 'bad_step', 'bad_guard', 'no_prompt', 'no_project', 'outside_projects', 'no_session', 'no_provider', 'no_model',
-    'bad_mode', 'confirm_bypass', 'confirm_paid', 'confirm_shell', 'bad_rule', 'rule_too_broad', 'bad_placeholder', 'bad_target', 'no_glasses',
+    'bad_mode', 'confirm_bypass', 'confirm_paid', 'confirm_shell', 'bad_rule', 'rule_too_broad', 'bad_placeholder', 'bad_target',
     'bad_question', 'bad_answers', 'bad_timeout', 'no_command', 'bad_outputs', 'bad_output', 'bad_text', 'bad_url', 'insecure_url', 'bad_bot_token',
     'bad_chat', 'bad_path', 'secret_file', 'bad_budget', 'too_many', 'bad_enabled', 'bad_paused', 'bad_answer',
   ],
@@ -352,10 +349,9 @@ export const SHELL_ENV = {
   payload: 'HYPERNOVA_PAYLOAD',
 } as const
 
-/** `then` as outputs: "notify" is a plain notify, "say" a plain say, "none" nothing. */
+/** `then` as outputs: "notify" is a plain notify, "none" nothing. */
 export function outputsOfThen(then: Then): Output[] {
-  if (then === 'notify') return [{ id: FIRST_OUTPUT_ID, text: null, kind: 'notify', glasses: false }]
-  if (then === 'say') return [{ id: FIRST_OUTPUT_ID, text: null, kind: 'say' }]
+  if (then === 'notify') return [{ id: FIRST_OUTPUT_ID, text: null, kind: 'notify' }]
   return []
 }
 /** An old client's action as one step (with [id]) and the outputs its `then` says. */
@@ -366,19 +362,18 @@ export function stepOfAction(a: Action, id: string = FIRST_STEP_ID): { step: Ste
   }
   return { step: { id, if: null, ...a }, outputs: [] }
 }
-/** The `then` that says [outputs], or null when `then` can't (more than one, a webhook, a file, a text or glasses of its own). */
+/** The `then` that says [outputs], or null when `then` can't (more than one, a webhook, a file, a text of its own). */
 function thenOf(outputs: Output[]): Then | null {
   if (!outputs.length) return 'none'
   const o = outputs[0]!
   if (outputs.length > 1 || o.text != null) return null
-  if (o.kind === 'notify' && !o.glasses) return 'notify'
-  if (o.kind === 'say') return 'say'
+  if (o.kind === 'notify') return 'notify'
   return null
 }
 /**
  * `action` as a client without steps reads it: steps[0] as an Action when it shows the automation
- * exactly (one step of kind start, continue but not `step:…`, notify or say, no guard, outputs
- * `then` can say: none at all for notify and say), else `{kind: "workflow", steps}`, a kind it
+ * exactly (one step of kind start, continue but not `step:…`, or notify, no guard, outputs
+ * `then` can say: none at all for notify), else `{kind: "workflow", steps}`, a kind it
  * doesn't know, so it shows it without editing it.
  */
 export function mirrorAction(steps: Step[], outputs: Output[]): Action | ActionMirror {
@@ -397,8 +392,7 @@ export function mirrorAction(steps: Step[], outputs: Output[]): Action | ActionM
       const { id: _i, if: _g, ...a } = s
       return { ...a, then }
     }
-    case 'notify':
-    case 'say': {
+    case 'notify': {
       if (outputs.length) return mirror
       const { id: _i, if: _g, ...a } = s
       return a
@@ -530,8 +524,6 @@ export type AutoIO = {
   modelKnown?(providerId: string, model: string): boolean | null
   /** [providerId]'s models, read now if need be (null: couldn't): checked when one is saved. */
   models?(providerId: string): Promise<string[] | null>
-  lensPaired(): boolean
-  lensOnline(): boolean
   /** "This week Claude worked …", from Statistics. */
   week(): Promise<string | null>
   send(msg: object): void

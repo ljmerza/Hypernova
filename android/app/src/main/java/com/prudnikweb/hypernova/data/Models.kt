@@ -291,7 +291,7 @@ data class Mac(
         const val VIA_LOCAL = "local"
         /** [via]: the paired base URL as it is (the Tailscale app on the phone, or a public address). */
         const val VIA_TAILSCALE = "tailscale"
-        /** A plain remote base URL (no Tailscale of either kind), as the bridge says "remote" to Lens. */
+        /** A plain remote base URL (no Tailscale of either kind). */
         const val VIA_REMOTE = "remote"
         /** [via]: the app's own Tailscale node (data/Tsnet.kt). */
         const val VIA_BUILT_IN = "tsnet"
@@ -312,7 +312,7 @@ data class MacBattery(
     /** Running on the battery: it only goes down from here. */
     val draining: Boolean get() = !charging && !onAC
 
-    /** At 20% or less and draining: worth a glance (amber). The one low-battery rule on the Mac, the phone and the glasses. */
+    /** At 20% or less and draining: worth a glance (amber). The one low-battery rule on the Mac and the phone. */
     val low: Boolean get() = draining && percent <= 20
 
     /** Under 10% and draining: the Mac may sleep soon, and its sessions with it (red). */
@@ -547,7 +547,7 @@ enum class Resolution {
     Allowed, AllowedAlways, AllowedSession, Denied, TimedOut, Answered, PlanApproved, KeptPlanning,
     /** Answered in the terminal on the Mac; the daemon can't tell how. */
     AnsweredOnMac,
-    /** Answered first on another device (the Mac, the glasses, another phone); how isn't known yet. */
+    /** Answered first on another device (the Mac, another phone); how isn't known yet. */
     AnsweredElsewhere,
     /** No longer pending, but we never heard how it ended (e.g. the daemon restarted). */
     Closed,

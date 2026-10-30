@@ -16,14 +16,13 @@ class SpeechTest {
     @Test
     fun `the Mac's setting, and nothing from an older Mac`() {
         val s = SpeechOut.parse(
-            JSONObject("""{"engine":"soniox","using":"mac","voice":"Maya","macVoice":null,"rate":9,"model":"tts-rt-v2","soniox":false,"note":"No Soniox key on this Mac, so the Mac’s voice reads.","phone":true}"""),
+            JSONObject("""{"engine":"soniox","using":"mac","voice":"Maya","macVoice":null,"rate":9,"model":"tts-rt-v2","soniox":false,"note":"No Soniox key on this Mac, so the Mac’s voice reads."}"""),
         )!!
         assertEquals("soniox", s.engine)
         assertEquals("mac", s.using)
         assertEquals("Maya", s.voice)
         assertNull(s.macVoice)
         assertEquals(2f, s.rate)
-        assertTrue(s.phone)
         assertTrue(s.note!!.startsWith("No Soniox key"))
         assertNull(SpeechOut.parse(null))
         assertNull(SpeechOut.parse(JSONObject("{}")))
@@ -31,14 +30,13 @@ class SpeechTest {
 
     @Test
     fun `a play is taken only as PCM this phone can play`() {
-        val p = PlayInfo.parse(JSONObject("""{"id":"ab_C-9","sessionId":"s1","source":"glasses","engine":"soniox","sampleRate":24000,"format":"pcm_s16le","of":120}"""))!!
-        assertTrue(p.forGlasses)
+        val p = PlayInfo.parse(JSONObject("""{"id":"ab_C-9","sessionId":"s1","source":"phone","engine":"soniox","sampleRate":24000,"format":"pcm_s16le","of":120}"""))!!
+        assertEquals("phone", p.source)
         assertEquals(24_000, p.sampleRate)
         assertEquals(120, p.of)
         assertNull(PlayInfo.parse(JSONObject("""{"id":"x","format":"mp3"}""")))
         assertNull(PlayInfo.parse(JSONObject("""{"id":"x","sampleRate":96000}""")))
         assertNull(PlayInfo.parse(JSONObject("""{"id":"../etc"}""")))
-        assertFalse(PlayInfo.parse(JSONObject("""{"id":"me","source":"phone"}"""))!!.forGlasses)
     }
 
     @Test
@@ -54,9 +52,6 @@ class SpeechTest {
         assertEquals(0, stopped.getLong("ms"))
         assertEquals(1.0, stopped.getDouble("level"), 1e-9)
         assertEquals("unplugged", stopped.getString("why"))
-        val offer = JSONObject(playerMessage(false))
-        assertEquals("speech.player", offer.getString("t"))
-        assertFalse(offer.getBoolean("on"))
     }
 
     @Test

@@ -45,7 +45,7 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
     private val asking = HashMap<String, CompletableDeferred<StepAnswer>>()
 
     init {
-        current = AutomationsState(paused = false, list = seed(), glasses = true, hasBattery = true, features = Features.ALL)
+        current = AutomationsState(paused = false, list = seed(), hasBattery = true, features = Features.ALL)
         // The review waits at its question: answered from its card, or its default once the time runs out.
         current?.byId(REVIEW)?.let { a -> a.lastRun?.let { r -> go(a, r, 1) } }
     }
@@ -91,7 +91,7 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
             null,
             "Two branches are ready to merge. Nothing is failing.",
             "The widget branch is 14 commits ahead; its build is green.",
-            "Nothing failing. The lens scrolling work is half done on its branch.",
+            "Nothing failing. The chat scrolling work is half done on its branch.",
             "One test flakes on the daemon's restart path; worth a look.",
             "Quiet day: one commit, docs only.",
             "Main is green. Statistics landed; the sun's tap opens it.",
@@ -128,10 +128,10 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
             Run(runId(), NIGHT, "Nightly tests", "schedule", nightFired - 2 * DAY, null, Run.SKIPPED, "missed", null, emptyList(), null, nightFired - 2 * DAY, lateWhy = "asleep"),
         )
 
-        // Lens build check: its project folder is gone.
-        val lensFired = at(today.minusDays(if (at(today, 7, 30) > t) 1 else 0), 7, 30)
-        val lens = Run(runId(), LENS, "Lens build check", "schedule", lensFired, null, Run.FAILED, "no_project", null, emptyList(), null, lensFired)
-        history[LENS] = listOf(lens)
+        // Site build check: its project folder is gone.
+        val siteFired = at(today.minusDays(if (at(today, 7, 30) > t) 1 else 0), 7, 30)
+        val oldSite = Run(runId(), SITE, "Site build check", "schedule", siteFired, null, Run.FAILED, "no_project", null, emptyList(), null, siteFired)
+        history[SITE] = listOf(oldSite)
 
         val brief = Automation(
             BRIEF, briefName(), true, false, Trigger.Time("09:00", Trigger.WEEKDAYS),
@@ -165,9 +165,9 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
                 null, lastRun = night, runCount = 3,
             ),
             Automation(
-                LENS, "Lens build check", true, false, Trigger.Time("07:30", Trigger.ALL_DAYS),
-                Action.Start("~/Programming/old-lens", "Build the lens app and tell me if anything fails.", "anthropic", null, AutoMode.ALLOWED, listOf("Bash(npm run build)"), Then.NOTIFY),
-                null, lastRun = lens, runCount = 9, problem = "no_project",
+                SITE, "Site build check", true, false, Trigger.Time("07:30", Trigger.ALL_DAYS),
+                Action.Start("~/Programming/old-site", "Build the site and tell me if anything fails.", "anthropic", null, AutoMode.ALLOWED, listOf("Bash(npm run build)"), Then.NOTIFY),
+                null, lastRun = oldSite, runCount = 9, problem = "no_project",
             ),
             Automation(
                 BATTERY, res.getString(R.string.au_t_battery), false, false, Trigger.BatteryLow(15),
@@ -222,7 +222,7 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
         // Fix the tests while I sleep: last night it fixed them, so nobody was told.
         val fixSteps = listOf(
             Step("st_fx1", null, Action.Start(hyper, res.getString(R.string.wf_t_fix_prompt), "anthropic", null, AutoMode.ALLOWED, listOf("Bash(npm test:*)", "Edit(src/**)"), Then.NONE)),
-            Step("st_fx2", Guard(Guard.FAILED), Action.Notify(res.getString(R.string.wf_t_fix_notify), glasses = false)),
+            Step("st_fx2", Guard(Guard.FAILED), Action.Notify(res.getString(R.string.wf_t_fix_notify))),
         )
         val fixFired = at(today.minusDays(if (at(today, 3, 12) > t) 1 else 0), 3, 12)
         val fix = Run(
@@ -240,7 +240,7 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
         val shipSteps = listOf(
             Step("st_sh1", null, Action.Shell(hyper, "npm run build", 300)),
             Step("st_sh2", null, Action.Start(hyper, "Write release notes for what CI just built: {payload}. Keep them to five lines.", "anthropic", null, AutoMode.ALLOWED, listOf("Bash(git log:*)"), Then.NONE)),
-            Step("st_sh3", Guard(Guard.NOT_QUIET), Action.Say("Release notes are ready.")),
+            Step("st_sh3", Guard(Guard.NOT_QUIET), Action.Notify("Release notes are ready.")),
         )
         val shipOutputs = listOf<Output>(
             Output.Webhook("ou_sh1", null, Output.SLACK, "hooks.slack.com", "Xq7Z"),
@@ -253,7 +253,7 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
             steps = listOf(
                 RunStep("st_sh1", Step.SHELL, Run.DONE, startedAt = shipFired + 1_000, endedAt = shipFired + 42_000, result = "vite v6.4.1 building for production...\n✓ built in 41.2s", exit = 0),
                 RunStep("st_sh2", Step.START, Run.FAILED, "error", startedAt = shipFired + 42_000, endedAt = shipFired + 3 * MIN, result = "API Error: 529 overloaded_error", sessionIds = listOf("s-auto-ship")),
-                RunStep("st_sh3", Step.SAY, Run.SKIPPED, RunStep.FAILED_BEFORE),
+                RunStep("st_sh3", Step.NOTIFY, Run.SKIPPED, RunStep.FAILED_BEFORE),
             ),
             step = 1,
             outputs = listOf(RunOutput("ou_sh1", "webhook", RunOutput.SKIPPED), RunOutput("ou_sh2", "file", RunOutput.SKIPPED)),
@@ -261,11 +261,11 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
         )
         val shipBefore = Run(
             runId(), SHIP, "Ship when CI is green", "webhook", shipFired - DAY, null, Run.DONE, null, null, listOf("s-auto-ship-1"), shipFired - DAY + 1_000, shipFired - DAY + 4 * MIN,
-            result = "v0.42: Statistics, the lens guide and a calmer sky.", firedDetail = "main at 2a41f, CI green",
+            result = "v0.42: Statistics, the session sheet and a calmer sky.", firedDetail = "main at 2a41f, CI green",
             steps = listOf(
                 RunStep("st_sh1", Step.SHELL, Run.DONE, startedAt = shipFired - DAY + 1_000, endedAt = shipFired - DAY + 40_000, result = "✓ built in 39.8s", exit = 0),
-                RunStep("st_sh2", Step.START, Run.DONE, startedAt = shipFired - DAY + 40_000, endedAt = shipFired - DAY + 4 * MIN, result = "v0.42: Statistics, the lens guide and a calmer sky."),
-                RunStep("st_sh3", Step.SAY, Run.DONE, startedAt = shipFired - DAY + 4 * MIN, endedAt = shipFired - DAY + 4 * MIN, result = "Release notes are ready."),
+                RunStep("st_sh2", Step.START, Run.DONE, startedAt = shipFired - DAY + 40_000, endedAt = shipFired - DAY + 4 * MIN, result = "v0.42: Statistics, the session sheet and a calmer sky."),
+                RunStep("st_sh3", Step.NOTIFY, Run.DONE, startedAt = shipFired - DAY + 4 * MIN, endedAt = shipFired - DAY + 4 * MIN, result = "Release notes are ready."),
             ),
             step = 2,
             outputs = listOf(RunOutput("ou_sh1", "webhook", RunOutput.SENT, at = shipFired - DAY + 4 * MIN), RunOutput("ou_sh2", "file", RunOutput.FAILED, "That file holds secrets.", shipFired - DAY + 4 * MIN)),
@@ -301,12 +301,12 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
                 Action.Start(hyper, "Check the docs that changed ({payload}) for broken links and stale examples.", "anthropic", null, AutoMode.ALLOWED, emptyList(), Then.NOTIFY),
                 null, lastRun = docs, runCount = 11,
                 steps = listOf(Step("st_dc1", null, Action.Start(hyper, "Check the docs that changed ({payload}) for broken links and stale examples.", "anthropic", null, AutoMode.ALLOWED, emptyList(), Then.NONE))),
-                outputs = listOf(Output.Notify("ou_dc1", null, glasses = false)),
+                outputs = listOf(Output.Notify("ou_dc1", null)),
             ),
             Automation(
                 HOOK, "When a Bash call fails", true, false, Trigger.Hook(Trigger.H_TOOL_FAILURE, "Bash", hyper, Trigger.MINE),
-                Action.Notify("{session}: {payload}", glasses = true), null, runCount = 0,
-                steps = listOf(Step("st_hk1", null, Action.Notify("{session}: {payload}", glasses = true))),
+                Action.Notify("{session}: {payload}"), null, runCount = 0,
+                steps = listOf(Step("st_hk1", null, Action.Notify("{session}: {payload}"))),
             ),
             // Tell my team: a session still waiting for me after 10 minutes, to Slack too.
             Automation(
@@ -512,7 +512,7 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
 
     /**
      * The demo's engine: each step from [from] on, by the contract's rules (the step before is the
-     * nearest earlier one that ran and isn't a notify or say; no guard runs unless it failed; a
+     * nearest earlier one that ran and isn't a notify; no guard runs unless it failed; a
      * guard runs when it holds), a few seconds each; an ask waits for its answer or its time; at
      * the end the outputs go when the run is done and not quiet.
      */
@@ -558,9 +558,9 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
                         r = step(r, i) { it.copy(state = Run.DONE, endedAt = now, exit = 0, result = "$ ${act.command.lineSequence().first()}\nA demo command: nothing really ran.") }
                         put(r)
                     }
-                    is Action.Notify, is Action.Say -> {
+                    is Action.Notify -> {
                         delay(400)
-                        val text = fill((act as? Action.Notify)?.text ?: (act as Action.Say).text, prev)
+                        val text = fill(act.text, prev)
                         noticeFlow.tryEmit(Notice("note:demo${seq++}", Notice.Kind.Automation, null, a.name, text, automationId = a.id))
                         r = step(r, i) { it.copy(state = Run.DONE, endedAt = now, result = text) }
                         put(r)
@@ -580,7 +580,7 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
             val outs = a.outputs.map { o ->
                 if (!done || quiet) RunOutput(o.id, kindOf(o), RunOutput.SKIPPED)
                 else {
-                    if (o is Output.Notify || o is Output.Say) noticeFlow.tryEmit(Notice("note:demo${seq++}", Notice.Kind.Automation, null, a.name, o.text ?: last?.result ?: DEMO_RESULT, automationId = a.id))
+                    if (o is Output.Notify) noticeFlow.tryEmit(Notice("note:demo${seq++}", Notice.Kind.Automation, null, a.name, o.text ?: last?.result ?: DEMO_RESULT, automationId = a.id))
                     RunOutput(o.id, kindOf(o), RunOutput.SENT, at = now)
                 }
             }
@@ -596,7 +596,6 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
 
     private fun kindOf(o: Output): String = when (o) {
         is Output.Notify -> "notify"
-        is Output.Say -> "say"
         is Output.Webhook -> "webhook"
         is Output.File -> "file"
         is Output.Unknown -> o.kind
@@ -672,7 +671,7 @@ class DemoAutomations(private val scope: CoroutineScope, private val res: Resour
         const val RELEASE = "au_demo_release"
         const val BRIEF = "au_demo_brief"
         const val CARRY = "au_demo_carry"
-        const val LENS = "au_demo_lens"
+        const val SITE = "au_demo_site"
         const val NIGHT = "au_demo_night"
         const val BATTERY = "au_demo_battery"
         const val REVIEW = "au_demo_review"
