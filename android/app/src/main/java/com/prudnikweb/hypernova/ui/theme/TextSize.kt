@@ -29,8 +29,9 @@ object TextSize {
 
     private fun holder(context: Context): MutableState<Float> = current ?: mutableStateOf(read(context)).also { current = it }
 
+    // Fork: Small until the owner picks another (owner, 2026-10-30); a size he picked stays.
     private fun read(context: Context): Float {
-        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getFloat(KEY, DEFAULT)
-        return if (saved in SCALES) saved else DEFAULT
+        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getFloat(KEY, SMALL)
+        return if (saved in SCALES) saved else SMALL
     }
 }
