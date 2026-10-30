@@ -69,6 +69,7 @@ import com.prudnikweb.hypernova.data.ModelNames
 import com.prudnikweb.hypernova.data.ModelOption
 import com.prudnikweb.hypernova.data.NewSessionMemory
 import com.prudnikweb.hypernova.data.NewSessionRequest
+import com.prudnikweb.hypernova.data.FolderPick
 import com.prudnikweb.hypernova.data.ProjectPick
 import com.prudnikweb.hypernova.data.Provider
 import com.prudnikweb.hypernova.data.ProviderWords
@@ -148,6 +149,8 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     val memory = remember { NewSessionMemory.load(context) }
     var project by rememberSaveable { mutableStateOf(ProjectPick.initial(projects, initialProject, memory.project) ?: NEW_PROJECT) }
     var newName by rememberSaveable { mutableStateOf("") }
+    // A folder chosen in the folder browser that isn't a project (yet): kept though the list doesn't have it.
+    var picked by rememberSaveable { mutableStateOf<String?>(null) }
     // While the subscription can't take a session (a limit, signed out), start on a provider
     // that can; the owner can still pick another.
     val account = hub.account
@@ -227,7 +230,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     val files = attach.files
     // Nothing can start while the Mac is away; the draft is kept (NewSessionMemory) and the sheet says so.
     val away = com.prudnikweb.hypernova.ui.session.macAway(hub)
-    if (project != NEW_PROJECT && projects.none { it.path == project }) project = ProjectPick.initial(projects, null, null) ?: NEW_PROJECT
+    if (project != NEW_PROJECT && project != picked && projects.none { it.path == project }) project = ProjectPick.initial(projects, null, null) ?: NEW_PROJECT
     val provider = providers.firstOrNull { it.id == providerId } ?: providers.firstOrNull()
     val options = remember(provider, lists) { provider?.let { ModelCatalog.of(it, lists) } ?: ModelCatalog.CLAUDE }
     // What's shown is what's sent: a remembered model the list no longer has is the default again
@@ -457,9 +460,10 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     when (picking) {
         Picking.Project -> ProjectPicker(
             projects, hub.projectsRoot, project, newName, opened,
-            onPick = { project = it; picking = null },
+            onPick = { project = it; picked = it; picking = null },
             onNew = { newName = it; project = NEW_PROJECT; picking = null },
             onDismiss = { picking = null },
+            folders = { path, hidden -> hub.folders(path, hidden) },
         )
         Picking.Model -> if (onCodex) CodexModelSheet(
             codexModels, codexNote, codexModel, codexEffort, withEffort = true,
@@ -532,10 +536,13 @@ private fun SheetChips(
         p != null -> p.name
         isNew && newName.isNotEmpty() -> newName
         isNew -> stringResource(R.string.new_project)
+        // A folder from the folder browser: its own name.
+        project.isNotBlank() -> FolderPick.name(project)
         else -> stringResource(R.string.ns_no_project)
     }
     val projectSaid = when {
         p != null -> stringResource(R.string.ns_project_said, p.name, ProjectPick.parent(p.path))
+        !isNew && project.isNotBlank() -> stringResource(R.string.ns_project_said, FolderPick.name(project), ProjectPick.parent(project).ifEmpty { "/" })
         isNew && newName.isNotEmpty() -> stringResource(R.string.ns_new_project_said, newName, rootT)
         else -> stringResource(R.string.ns_new_project_unnamed_said)
     }

@@ -7,9 +7,12 @@
 // never the home folder's key places (secretfiles.ts: keys, keychains, mail, browsers' profiles, the
 // daemon's state and Claude Code's), and never a file with keys wherever it is. Links are followed
 // (realpath) before any of this is decided.
+//
+// The new-session sheet's folder picker sees less and further ([listFolders]): only folders' names,
+// anywhere while that setting is on, so a session can start in any folder the owner picks.
 import { constants, existsSync, mkdirSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { open, readdir, stat } from 'node:fs/promises'
-import { basename, dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { CLAUDE_DIR, HOME, SUPPORT, log } from './util.ts'
 import { settings, saveSettings } from './store.ts'
@@ -397,6 +400,69 @@ async function entryOf(dir: string, d: import('node:fs').Dirent): Promise<FileEn
   if (c && !c.ok && c.code === 'outside_projects') e.locked = 'outside'
   else if ((c && !c.ok) || keyPlace(real) || keys(path) || keys(real)) e.locked = isDir ? 'folder' : 'secret'
   return e
+}
+
+/** A folder in the new-session sheet's folder picker: its name, and its path in the folder listed. */
+export type FolderEntry = { name: string; path: string }
+/** A folder's own folders ([listFolders]): [parent] null at `/`; [home] says where `~` is, as a real path. */
+export type Folders = { path: string; parent: string | null; home: string; folders: FolderEntry[]; truncated: boolean; total: number }
+
+/**
+ * The folders directly in [p], for the new-session sheet's folder picker (docs/PROTOCOL.md,
+ * "Folders"): names only, never a file, by name. [p]: a full path, `~` or `~/…` (none: the home
+ * folder). In the projects folder always; anywhere else while "Browse outside projects" is on (owner,
+ * 2026-10-29: "choose a folder anywhere"). Never a key place or a folder of keys, asked for or as a
+ * row. Dot-folders only with [hidden]. At most [MAX_ENTRIES].
+ */
+export async function listFolders(p: string | null, hidden = false): Promise<Folders> {
+  const asked = !p || p === '~' ? HOME : p.startsWith('~/') ? join(HOME, p.slice(2)) : p
+  if (!isAbsolute(asked)) throw new FileError(400, 'bad_path', 'Type a full path, starting with / or ~.')
+  let full: string
+  try {
+    full = realpathSync.native(asked)
+    if (!statSync(full).isDirectory()) throw new FileError(400, 'not_a_dir', 'That’s a file, not a folder.')
+  } catch (e) {
+    if (e instanceof FileError) throw e
+    if ((e as any)?.code === 'ENOENT') throw new FileError(404, 'not_found', 'There’s no folder there.')
+    throw fsError(e, 'folder')
+  }
+  if (keyPlace(full) || isSecretFile(join(full, '_'))) throw lockedFolder()
+  if (reach(full) !== 'projects' && !browseOutside()) {
+    throw new FileError(403, 'outside_projects', 'Folders outside your projects folder show once Browse outside projects is on in Settings.', {
+      projectsRoot: settings.projectsRoot,
+      setting: 'browseOutsideProjects',
+    })
+  }
+  let dirents
+  try {
+    dirents = await readdir(full, { withFileTypes: true })
+  } catch (e) {
+    throw fsError(e, 'folder')
+  }
+  const named = dirents.filter((d) => (hidden || !d.name.startsWith('.')) && (d.isDirectory() || d.isSymbolicLink()))
+  const kept: FolderEntry[] = []
+  for (let i = 0; i < named.length; i += 64) {
+    const batch = await Promise.all(
+      named.slice(i, i + 64).map(async (d) => {
+        const path = join(full, d.name)
+        // A link is a folder when it leads to one, and judged by where it leads too.
+        let real = path
+        if (d.isSymbolicLink()) {
+          try {
+            if (!(await stat(path)).isDirectory()) return null
+          } catch {
+            return null
+          }
+          real = realOr(path)
+        }
+        const keys = (x: string) => keyPlace(x) || isSecretFile(join(x, '_'))
+        return keys(path) || keys(real) ? null : { name: d.name, path }
+      }),
+    )
+    for (const f of batch) if (f) kept.push(f)
+  }
+  kept.sort((a, b) => collator.compare(a.name, b.name))
+  return { path: full, parent: full === sep ? null : dirname(full), home: realCached(HOME), folders: kept.slice(0, MAX_ENTRIES), truncated: kept.length > MAX_ENTRIES, total: kept.length }
 }
 
 /**

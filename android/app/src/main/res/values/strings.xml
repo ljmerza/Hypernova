@@ -822,4 +822,19 @@
     <string name="asks_bring_forward">Bring forward</string>
     <!-- Fork: the × on the in-app banner (ui/components/Banner.kt). -->
     <string name="notice_dismiss">Dismiss</string>
+    <string name="ns_browse">Choose a folder</string>
+    <string name="ns_browse_sub">Anywhere: from ~, or type a path</string>
+    <string name="ns_browse_inside">Folders in %1$s</string>
+    <string name="ns_part_open">Open</string>
+    <string name="ns_part_closed">Closed</string>
+    <string name="ns_part_show">Show</string>
+    <string name="ns_part_hide">Hide</string>
+    <string name="ns_folder_title">Folder</string>
+    <string name="ns_folder_path">Path, such as ~/Programming</string>
+    <string name="ns_folder_hidden">Hidden</string>
+    <string name="ns_folder_hidden_said">Show hidden folders</string>
+    <string name="ns_folder_empty">No folders in here.</string>
+    <string name="ns_folder_truncated">The first %1$d of %2$d folders.</string>
+    <string name="ns_use_folder">Use %1$s</string>
+    <string name="ns_use_this_folder">Use this folder</string>
 </resources>

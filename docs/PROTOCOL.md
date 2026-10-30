@@ -1125,6 +1125,7 @@ one already is the glasses), so the marker gives no device anything it didn't ha
 | `PUT /v1/providers/{id}` | `ProviderInput` → `{provider, check, keyDropped}`: the same checks as `POST`; 404 `no_provider` for an unknown id. `keyDropped`: the address moved to another host without a new key, so the saved key was dropped ("Paste the key for the new address") |
 | `DELETE /v1/providers/{id}` | → `{ok}` (the built-in `anthropic` can't be deleted: 400 `cannot_delete`; 404 `no_provider`) |
 | `GET /v1/files?path=<abs dir>` | → `Listing` (no `path`: the projects folder). See Files for what may be browsed and the error codes |
+| `GET /v1/folders?path=<abs dir, ~ or ~/…>&hidden=1` | → `Folders`: a folder's own folders, names only, for the new-session sheet's folder browser (no `path`: the home folder). See Files, The folder browser |
 | `GET /v1/file?path=<abs file>` | → the file's bytes to view: its Content-Type, max 20 MB (an attachment of the phone's own 30 MB), `Accept-Ranges`. `HEAD` too. See Files |
 | `GET /v1/file?path=<abs file>&download=1` | → the file to save, streamed: `Content-Disposition: attachment` with its name (RFC 5987 `filename*`), max 500 MB, `Range: bytes=…` → 206 (a dropped download carries on; `If-Range` with its `ETag` or `Last-Modified`), 416 for a range past its end. `HEAD` too. See Files |
 | `POST /v1/preview` | `{path}` or `{port}` → `{url}` (see Artifacts) |
@@ -3063,6 +3064,19 @@ The phone browses folders (`GET /v1/files`), views a file (`GET /v1/file`) and s
   Only a failure to reach the Mac (no network, a timeout, a 5xx) is worth a "Try again".
   `POST /v1/sessions` checks its folder first the same way: 409 `mac_privacy` (also when the look
   doesn't come back within 3 s: macOS is asking on the Mac) or `unreadable`, before anything starts.
+- **The folder browser** (`GET /v1/folders?path=&hidden=1`; `daemon/src/files.ts`, `listFolders`): the
+  new-session sheet's way to pick any folder for a session. `path` is a full path, `~` or `~/…` (none:
+  the home folder); it answers `{path, parent, home, folders: [{name, path}], truncated, total}`:
+  `path` the folder's real path, `parent` null at `/`, `home` the home folder's real path (for `~`),
+  the folders directly in it by name, at most 2,000 (`truncated`, `total`). Names only: never a file,
+  a size or a date. Inside the projects folder always; anywhere else, `/` included, while Browse
+  outside projects is on (DECISIONS, "Choosing a session's folder anywhere"). Never a key place or a
+  folder of keys (`.ssh` and the like), asked for (403 `locked_folder`) or as a row (left out); a
+  link is a row when it leads to a folder, judged by where it leads. Dot-folders only with
+  `hidden=1`. Errors: 400 `bad_path` (not a full path), 404 `not_found`, 400 `not_a_dir`, 403
+  `outside_projects` (with `projectsRoot` and `setting: "browseOutsideProjects"`), `locked_folder`,
+  `mac_privacy`, `unreadable`. A session can start in any existing folder the browser picks
+  (`POST /v1/sessions {projectPath}`), as it always could.
 - **The projects folder on first run**: when it's the default `~/Projects` and that doesn't exist, the
   daemon picks the usual folder with the most git repositories (`~/Developer`, `~/Programming`,
   `~/code`, `~/src`, `~/dev`, `~/repos`, `~/GitHub`…; never one macOS guards, such as Documents), else

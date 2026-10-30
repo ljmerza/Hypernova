@@ -34,7 +34,7 @@ import { boxLines, boxText } from './term/shared.ts'
 import { cancelLogin, clearProviderStatus, getAccount, noteProviderRemoved, providerKeyRefused, requestCheck, sendLoginCode, startLogin } from './account.ts'
 import { handleHook, hookPathOk, installIntegration, integrationStatus, uninstallIntegration } from './hooks.ts'
 import { createPreview, createProject, enableServe, listProjects, publicBaseUrl, sendFile, servePreview, tailscaleStatus } from './services.ts'
-import { DOWNLOAD_MAX, allowedPath, fileFor, filesState, folderOpens, listDir, sendChecked, setBrowseOutside } from './files.ts'
+import { DOWNLOAD_MAX, allowedPath, fileFor, filesState, folderOpens, listDir, listFolders, sendChecked, setBrowseOutside } from './files.ts'
 import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
 import { agentEvents, endSessionAgents, listAgents, validAgentId } from './agents.ts'
@@ -939,6 +939,8 @@ async function api(c: Ctx): Promise<void> {
   // Files (files.ts): a folder's entries, and a file to view or (`download=1`) to save, streamed,
   // with ranges. Errors carry codes the phone acts on (docs/PROTOCOL.md, "Files").
   if (path === '/v1/files' && m === 'GET') return json(res, 200, await listDir(url.searchParams.get('path') || settings.projectsRoot))
+  // The new-session sheet's folder picker: a folder's own folders, names only (files.ts listFolders).
+  if (path === '/v1/folders' && m === 'GET') return json(res, 200, await listFolders(url.searchParams.get('path'), url.searchParams.get('hidden') === '1'))
   if (path === '/v1/file' && (m === 'GET' || m === 'HEAD')) {
     const download = url.searchParams.get('download') === '1'
     const f = await fileFor(url.searchParams.get('path') ?? '', download ? DOWNLOAD_MAX : null)

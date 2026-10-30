@@ -4,6 +4,7 @@ import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +28,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -59,15 +62,20 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentKind
+import com.prudnikweb.hypernova.data.Folder
+import com.prudnikweb.hypernova.data.FolderPick
+import com.prudnikweb.hypernova.data.Folders
 import com.prudnikweb.hypernova.data.ModelCatalog
 import com.prudnikweb.hypernova.data.ModelList
 import com.prudnikweb.hypernova.data.ModelOption
@@ -80,6 +88,7 @@ import com.prudnikweb.hypernova.data.ProviderWords
 import com.prudnikweb.hypernova.data.UsageProjection
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.Glyph
+import com.prudnikweb.hypernova.ui.components.GlyphButton
 import com.prudnikweb.hypernova.ui.components.GlyphFigure
 import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.Icon
@@ -99,6 +108,7 @@ import com.prudnikweb.hypernova.ui.session.ChatSheet
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
+import kotlinx.coroutines.delay
 
 // The new-session sheet's choices (owner, 2026-10-18: "not all models are there… and projects, just
 // an endless list"): each a chip under the prompt, each opening its picker as a sheet over it. The
@@ -316,8 +326,10 @@ private fun listBottom(): PaddingValues = PaddingValues(bottom = 14.dp)
 
 /**
  * The project picker: search (name or path, a few letters do), the most recent first, then the rest
- * by folder; "New project" first of all, which names a new folder in the projects folder. [selected]
- * is a path, or [NEW_PROJECT] with [newName].
+ * by folder, each part opening and closing (only Recent and the chosen one's part open at first);
+ * "New project" first of all, which names a new folder in the projects folder, then "Choose a folder",
+ * the folder browser ([folders]) for any folder at all (owner, 2026-10-29: "a better way to choose a
+ * folder"). [selected] is a path, or [NEW_PROJECT] with [newName].
  */
 @Composable
 internal fun ProjectPicker(
@@ -329,33 +341,45 @@ internal fun ProjectPicker(
     onPick: (String) -> Unit,
     onNew: (String) -> Unit,
     onDismiss: () -> Unit,
+    folders: suspend (path: String, hidden: Boolean) -> Result<Folders>,
 ) {
     val title = stringResource(R.string.project)
     var query by rememberSaveable { mutableStateOf("") }
     var naming by rememberSaveable { mutableStateOf(selected == NEW_PROJECT && newName.isEmpty()) }
+    // The folder browser, while it's open: where it opened, as typed.
+    var browsing by rememberSaveable { mutableStateOf<String?>(null) }
     val rootT = root?.let(ProjectPick::tilde) ?: "~"
     val groups = remember(projects, root) { ProjectPick.groups(projects, root) }
     val found = remember(projects, query) { ProjectPick.search(projects, query) }
-    // Opening starts at the one chosen (under its heading, after "New project"); a new search at
-    // the top of what it found.
+    // Recent and the part holding the chosen one start open, the rest closed; [flipped] holds the
+    // parts the owner opened or closed since (their keys, a line each).
+    val startsOpen = { g: ProjectPick.Group -> g.kind == ProjectPick.Kind.Recent || g.projects.any { it.path == selected } }
+    var flipped by rememberSaveable { mutableStateOf("") }
+    val flips = flipped.split('\n').filter { it.isNotEmpty() }.toSet()
+    // Opening starts at the one chosen (under its heading, after "New project" and "Choose a
+    // folder"); a new search at the top of what it found.
     val chosenAt = remember(groups) {
-        var i = 1
+        var i = 2
         var at = 0
         for (g in groups) {
             val k = g.projects.indexOfFirst { it.path == selected }
             if (k >= 0) { at = i + k; break }
-            i += 1 + g.projects.size
+            i += 1 + if (startsOpen(g)) g.projects.size else 0
         }
         at
     }
-    // Recent fills the first screen (rows 2 to 6): only one further down is scrolled to, the row above it showing.
-    val list = rememberLazyListState(initialFirstVisibleItemIndex = if (chosenAt > 2 + ProjectPick.RECENT) chosenAt - 1 else 0)
+    // Recent fills the first screen (rows 3 to 7): only one further down is scrolled to, the row above it showing.
+    val list = rememberLazyListState(initialFirstVisibleItemIndex = if (chosenAt > 3 + ProjectPick.RECENT) chosenAt - 1 else 0)
     var searched by remember { mutableStateOf(false) }
     LaunchedEffect(query) {
         if (searched) list.scrollToItem(0)
         searched = true
     }
     ChatSheet(title, onDismiss, height = 640.dp, scroll = false) {
+        browsing?.let { from ->
+            FolderBrowser(from, selected, folders, onUse = onPick, onBack = { browsing = null })
+            return@ChatSheet
+        }
         HText(title, style = Type.title, color = HN.ink)
         Spacer(Modifier.height(12.dp))
         if (!naming) {
@@ -384,20 +408,30 @@ internal fun ProjectPicker(
                 )
             }
             if (query.isBlank() || found.isEmpty()) item(key = "new") { newRow() }
+            // The folder browser: at the chosen folder, so its own folders are a tap away; a typed path, there.
+            val typedPath = query.trim().takeIf { it.startsWith("/") || it.startsWith("~") }
+            if (query.isBlank() || typedPath != null) item(key = "browse") {
+                BrowseRow(typedPath ?: stringResource(R.string.ns_browse_sub)) {
+                    browsing = typedPath ?: selected?.takeIf { it != NEW_PROJECT }?.let { it.trimEnd('/') + "/" } ?: "~/"
+                }
+            }
             if (query.isBlank()) {
                 for (g in groups) {
-                    item(key = "h:${g.kind}:${g.label}") {
+                    val key = "${g.kind}:${g.label}"
+                    val open = startsOpen(g) != (key in flips)
+                    item(key = "h:$key") {
                         val (label, mono) = when (g.kind) {
                             ProjectPick.Kind.Recent -> stringResource(R.string.ns_recent) to false
                             ProjectPick.Kind.Nebula -> stringResource(R.string.ns_nebula) to false
                             ProjectPick.Kind.Worktrees -> stringResource(R.string.ns_worktrees, g.label.orEmpty()) to false
                             else -> g.label.orEmpty() to true
                         }
-                        PartHeader(label, mono = mono, trail = g.projects.size.toString())
+                        FoldHeader(label, mono, g.projects.size, open) { flipped = (if (key in flips) flips - key else flips + key).joinToString("\n") }
                     }
+                    if (!open) continue
                     val recent = g.kind == ProjectPick.Kind.Recent
                     items(g.projects, key = { "p:${g.kind}:${it.path}" }) { p ->
-                        if (recent) ProjectRow(p, p.path == selected, now, showAge = true) { onPick(p.path) }
+                        if (recent) ProjectRow(p, p.path == selected, now, showAge = true, onBrowse = { browsing = p.path.trimEnd('/') + "/" }) { onPick(p.path) }
                         else ProjectLine(p, p.path == selected) { onPick(p.path) }
                     }
                 }
@@ -414,9 +448,12 @@ internal fun ProjectPicker(
     }
 }
 
-/** A project: its name, and where it is in mono under it; the recent ones say when they were last at work. */
+/**
+ * A project: its name, and where it is in mono under it; the recent ones say when they were last at
+ * work, and with [onBrowse] end in a chevron that opens the folder browser in it.
+ */
 @Composable
-private fun ProjectRow(p: Project, selected: Boolean, now: Long, showAge: Boolean, onClick: () -> Unit) {
+private fun ProjectRow(p: Project, selected: Boolean, now: Long, showAge: Boolean, onBrowse: (() -> Unit)? = null, onClick: () -> Unit) {
     val path = ProjectPick.tilde(p.path)
     val age = p.lastActivityAt?.takeIf { showAge }?.let { ago(it, now) }
     val said = listOfNotNull(p.name, path, age).joinToString(", ")
@@ -430,6 +467,16 @@ private fun ProjectRow(p: Project, selected: Boolean, now: Long, showAge: Boolea
             Stamp(Glyph.Clock, age, Modifier.clearAndSetSemantics { })
         }
         ChosenMark(selected)
+        if (onBrowse != null) {
+            val inside = stringResource(R.string.ns_browse_inside, p.name)
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = inside, onClick = onBrowse)
+                    .semantics { contentDescription = inside },
+                contentAlignment = Alignment.CenterEnd,
+            ) { Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim) }
+        }
     }
 }
 
@@ -500,6 +547,231 @@ private fun NewProjectForm(initial: String, root: String, onUse: (String) -> Uni
             Pill(stringResource(R.string.ns_use_name), { if (valid) onUse(name.trim()) }, Modifier.weight(1f), kind = PillKind.Primary, height = 44.dp, enabled = valid)
             Pill(stringResource(R.string.cancel), onCancel, kind = PillKind.Ghost, height = 44.dp)
         }
+    }
+}
+
+/** A part of the project list that opens and closes: its header, and a chevron that turns down while it's open. */
+@Composable
+private fun FoldHeader(label: String, mono: Boolean, count: Int, open: Boolean, onToggle: () -> Unit) {
+    val view = LocalView.current
+    val state = stringResource(if (open) R.string.ns_part_open else R.string.ns_part_closed)
+    val action = stringResource(if (open) R.string.ns_part_hide else R.string.ns_part_show)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = action) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onToggle()
+            }
+            .semantics { stateDescription = state },
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        PartHeader(label, mono = mono, trail = count.toString(), modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(10.dp))
+        Icon(Glyph.Chevron, Modifier.padding(bottom = 8.dp).rotate(if (open) 90f else 0f), size = 10.dp, color = HN.inkDim, stroke = 1.3.dp)
+    }
+}
+
+/** "Choose a folder": a folder in mint glass, and where it starts (or the path typed). */
+@Composable
+private fun BrowseRow(sub: String, onClick: () -> Unit) {
+    val title = stringResource(R.string.ns_browse)
+    Row(Modifier.pickRow(false, "$title, $sub", onClick), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(28.dp).clip(CircleShape).frostedGlass(HN.accent, glowX = 14.dp, dense = true), contentAlignment = Alignment.Center) {
+            Icon(Glyph.Folder, size = 14.dp, color = HN.accent, stroke = 1.3.dp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f).clearAndSetSemantics { }) {
+            HText(title, style = Type.body, color = HN.accent, maxLines = 1)
+            HText(sub, style = Type.monoSmall, color = HN.inkDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+        }
+        Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)
+    }
+}
+
+/**
+ * The folder browser (owner, 2026-10-29: "start from my home folder or manually type in a path, and
+ * then start showing the folders from that path"): the path in a field to type or paste into (`~` is
+ * the home folder; a name typed after the last slash finds it among the folders there), crumbs to
+ * any folder above, the folders in it to go into, and Use for the one it's on. [from]: where it
+ * opens, as typed. [selected]: the folder chosen now, washed where it shows.
+ */
+@Composable
+private fun ColumnScope.FolderBrowser(from: String, selected: String?, load: suspend (String, Boolean) -> Result<Folders>, onUse: (String) -> Unit, onBack: () -> Unit) {
+    var typed by rememberSaveable { mutableStateOf(from) }
+    var hidden by rememberSaveable { mutableStateOf(false) }
+    // The last folder listed, and the folder as typed it answers: an answer to an older one is never used.
+    var listed by remember { mutableStateOf<Folders?>(null) }
+    var listedFor by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var jump by remember { mutableStateOf(true) }
+    val (dir, start) = FolderPick.split(typed)
+    LaunchedEffect(dir, hidden) {
+        // Typing waits a moment, so not every letter asks the computer; a tap goes at once.
+        if (!jump) delay(250)
+        jump = false
+        load(dir, hidden)
+            .onSuccess { listed = it; listedFor = dir; error = null }
+            .onFailure { listedFor = null; error = it.message }
+    }
+    val home = listed?.home
+    val current = listed?.takeIf { listedFor == dir && error == null }
+    val shown = current?.let { FolderPick.matching(it.folders, start) }.orEmpty()
+    val chosen = current?.let { FolderPick.chosen(it, start) }
+    val go = { path: String -> jump = true; typed = FolderPick.field(path, home) }
+    val list = rememberLazyListState()
+    LaunchedEffect(current?.path) { list.scrollToItem(0) }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        GlyphButton(Glyph.Back, stringResource(R.string.back), onBack)
+        Spacer(Modifier.width(4.dp))
+        HText(stringResource(R.string.ns_folder_title), style = Type.title, color = HN.ink, modifier = Modifier.weight(1f))
+        // Dot-folders, for when one is wanted.
+        val said = stringResource(R.string.ns_folder_hidden_said)
+        Box(
+            Modifier
+                .heightIn(min = 48.dp)
+                .toggleable(hidden, remember { MutableInteractionSource() }, indication = null, role = Role.Switch) { jump = true; hidden = it }
+                .semantics { contentDescription = said },
+            contentAlignment = Alignment.Center,
+        ) {
+            HText(
+                stringResource(R.string.ns_folder_hidden), style = Type.small, color = if (hidden) HN.accent else HN.inkMuted,
+                modifier = Modifier.clip(RoundedCornerShape(14.dp)).glassChoice(hidden, 14.dp).padding(horizontal = 12.dp, vertical = 7.dp),
+            )
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    PathField(typed, { typed = it }, onGo = { chosen?.let(onUse) })
+    error?.let {
+        Spacer(Modifier.height(6.dp))
+        HText(it, style = Type.small, color = HN.danger, modifier = Modifier.padding(horizontal = 4.dp))
+    }
+    listed?.let { l -> FolderCrumbs(FolderPick.crumbs(l.path, l.home), go) }
+    LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = listBottom()) {
+        if (current == null) {
+            if (error == null) item(key = "loading") { LoadingLine(stringResource(R.string.loading), Modifier.padding(horizontal = 10.dp, vertical = 14.dp)) }
+            return@LazyColumn
+        }
+        val parent = current.parent
+        if (parent != null && start.isEmpty()) item(key = "up") {
+            FolderLine(stringResource(R.string.up_one), FolderPick.tilde(parent, home), Glyph.Up, selected = false) { go(parent) }
+        }
+        items(shown, key = { it.path }) { f -> FolderLine(f.name, null, Glyph.Folder, selected = f.path == selected) { go(f.path) } }
+        if (shown.isEmpty()) item(key = "none") {
+            HText(
+                if (start.isEmpty()) stringResource(R.string.ns_folder_empty) else stringResource(R.string.ns_no_match, start),
+                style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp),
+            )
+        }
+        if (current.truncated) item(key = "cut") {
+            HText(stringResource(R.string.ns_folder_truncated, current.folders.size, current.total), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
+        }
+    }
+    // Use, for the folder it's on (or the one whose whole name is typed), its path above it.
+    Spacer(Modifier.height(6.dp))
+    HText(chosen?.let { FolderPick.tilde(it, home) } ?: " ", style = Type.monoSmall, color = HN.inkDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.padding(horizontal = 4.dp))
+    Spacer(Modifier.height(6.dp))
+    Pill(
+        chosen?.let { stringResource(R.string.ns_use_folder, FolderPick.name(it)) } ?: stringResource(R.string.ns_use_this_folder),
+        { chosen?.let(onUse) }, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 44.dp, enabled = chosen != null,
+    )
+    Spacer(Modifier.height(12.dp))
+}
+
+/** The browser's path: the house field's well in mono, a folder before it, a cross to clear it. */
+@Composable
+private fun PathField(value: String, onChange: (String) -> Unit, onGo: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    val label = stringResource(R.string.ns_folder_path)
+    val clear = stringResource(R.string.close)
+    BasicTextField(
+        value, onChange,
+        singleLine = true,
+        textStyle = Type.mono.copy(color = HN.ink),
+        cursorBrush = SolidColor(HN.accent),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+        keyboardActions = KeyboardActions(onGo = { onGo() }),
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+        decorationBox = { inner ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(shape)
+                    .background(HN.bg800.copy(alpha = 0.6f))
+                    .border(1.dp, HN.ink.copy(alpha = 0.10f), shape)
+                    .padding(start = 12.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Glyph.Folder, size = 16.dp, color = HN.inkDim, stroke = 1.4.dp)
+                Spacer(Modifier.width(10.dp))
+                Box(Modifier.weight(1f).padding(vertical = 11.dp)) {
+                    if (value.isEmpty()) HText(label, style = Type.mono, color = HN.inkGhost, maxLines = 1)
+                    inner()
+                }
+                if (value.isNotEmpty()) {
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = clear) { onChange("") }
+                            .semantics { contentDescription = clear },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Glyph.Cross, size = 12.dp, color = HN.inkMuted) }
+                } else Spacer(Modifier.width(8.dp))
+            }
+        },
+    )
+}
+
+/** The folders above the one listed, from `~` or `/`, each a tap away; the last is the one listed. Scrolled to its end. */
+@Composable
+private fun FolderCrumbs(crumbs: List<Pair<String, String>>, onGo: (String) -> Unit) {
+    val scroll = rememberScrollState()
+    LaunchedEffect(crumbs) { scroll.scrollTo(scroll.maxValue) }
+    Row(Modifier.fillMaxWidth().horizontalScroll(scroll).padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        crumbs.forEachIndexed { i, (name, path) ->
+            val last = i == crumbs.lastIndex
+            if (i > 0) Icon(Glyph.Chevron, size = 8.dp, color = HN.inkGhost)
+            Box(
+                Modifier
+                    .heightIn(min = 44.dp)
+                    .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !last, role = Role.Button) { onGo(path) }
+                    .semantics { contentDescription = path }
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) { HText(name, style = Type.monoSmall, color = if (last) HN.ink else HN.inkMuted, maxLines = 1) }
+        }
+    }
+}
+
+/** A folder to go into (or Up): its glyph, its name (and [sub] in mono), a chevron; the chosen one on a faint mint wash. */
+@Composable
+private fun FolderLine(name: String, sub: String?, glyph: Glyph, selected: Boolean, onClick: () -> Unit) {
+    val view = LocalView.current
+    val said = if (glyph == Glyph.Folder) stringResource(R.string.fl_row_folder, name) else listOfNotNull(name, sub).joinToString(", ")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .then(if (selected) Modifier.glassChoice(true, 12.dp) else Modifier)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onClick()
+            }
+            .semantics(mergeDescendants = true) { contentDescription = said }
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(glyph, Modifier.clearAndSetSemantics { }, size = 18.dp, color = if (glyph == Glyph.Folder) HN.accent else HN.inkMuted)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f).clearAndSetSemantics { }) {
+            HText(name, style = Type.body, color = HN.ink, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+            if (sub != null) HText(sub, style = Type.monoSmall, color = HN.inkDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+        }
+        if (glyph == Glyph.Folder) Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)
     }
 }
 
