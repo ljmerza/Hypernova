@@ -1563,3 +1563,27 @@ repo, and that Linux is told as a way to run Hypernova, not only Android and Mac
    never go into a pairing link; `hypernova doctor` and `pair` say what to set on Windows (systemd,
    `instanceIdleTimeout=-1`, mirrored networking with its firewall rule). No Windows badge in the
    README, and no text claims native support.
+
+## Choosing a session's folder anywhere (2026-10-29)
+
+The owner, about the new-session sheet's project picker: "I should be able to collapse each of those
+sections when choosing a folder. Really I just want a better way to choose a folder… start from my
+home folder or manually type in a path, and then start showing the folders from that path… from
+anywhere, whether it's my home directory or somewhere random." Before this, the part under a folder
+listed only the folders the daemon already knew (sessions' folders and the projects folder's own),
+and a folder picked that wasn't one of them fell back to the most recent.
+
+1. **The picker keeps Recent first; every part opens and closes.** Recent and the part holding the
+   chosen project start open, the others closed.
+2. **"Choose a folder" opens a folder browser** at the chosen folder (so its own folders are one tap
+   away), with crumbs back to `~` or `/`, Up, a path field (`~` works; a name typed after the last
+   slash finds it among the folders there), Hidden for dot-folders, and **Use** for the folder it's
+   on. A chevron on each Recent row opens the browser in that folder. Folders are by name, A to Z:
+   the recent ones are already at the top of the picker.
+3. **What the browser may see** (`GET /v1/folders`, docs/PROTOCOL.md "Files"): folders' names only,
+   never a file and never a key place or a folder of keys. Inside the projects folder always;
+   anywhere else, `/` included, only while **Browse outside projects** is on. This widens that setting
+   (owner, 2026-10-18, "The owner's morning answers", 4: sessions' folders in the home folder,
+   read-only): with it on, the names of any folder outside the key places now reach the phone too. A
+   session could already start in any existing folder (`POST /v1/sessions`); only the names are new.
+   The file browser's rules don't change.

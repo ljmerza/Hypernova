@@ -358,6 +358,11 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
     private fun demoOnly(): HubException = HubException(res.getString(R.string.demo_needs_mac))
     override suspend fun files(path: String): Result<Listing> = FilesDemo.listing(path)
     override suspend fun file(path: String): Result<FileBytes> = FilesDemo.file(path)
+    /** The demo's folders are its files' (FilesDemo), the folders alone. */
+    override suspend fun folders(path: String?, hidden: Boolean): Result<Folders> =
+        FilesDemo.listing(path?.takeIf { it != "~" } ?: projectsRoot).map { l ->
+            Folders(l.path, l.path.substringBeforeLast('/', "").ifEmpty { null }, "~", l.entries.filter { it.isDir }.map { Folder(it.name, it.path) })
+        }
     override suspend fun download(source: String, target: java.io.File, resume: DownloadResume?, onStart: (String?) -> Unit, onProgress: (Long, Long) -> Unit): Result<Downloaded> =
         FilesDemo.download(source, target, resume, onStart, onProgress)
     override suspend fun upload(file: Upload): Result<Attachment> = Result.failure(demoOnly())

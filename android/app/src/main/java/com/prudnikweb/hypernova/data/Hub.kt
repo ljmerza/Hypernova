@@ -163,6 +163,11 @@ interface Hub {
      */
     suspend fun models(): Result<List<ModelList>> = Result.success(emptyList())
     suspend fun files(path: String): Result<Listing>
+    /**
+     * A folder's own folders, for the new-session sheet's folder browser (`GET /v1/folders`): [path] a
+     * full path, `~` or `~/…` (null: the home folder); dot-folders with [hidden]. Failures are [FileFailure]s.
+     */
+    suspend fun folders(path: String?, hidden: Boolean = false): Result<Folders> = Result.failure(HubException("Not in the demo."))
     suspend fun file(path: String): Result<FileBytes>
     /**
      * Streams a file ([source]: a Mac path, or a full page URL the Mac handed out) into [target], carrying on from

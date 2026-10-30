@@ -2263,6 +2263,11 @@ class LiveHub(
         Result.success(Listing(o.str("path") ?: path, entries, o.optBoolean("truncated"), o.optInt("total", entries.size)))
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, R.string.err_files)) }
 
+    override suspend fun folders(path: String?, hidden: Boolean): Result<Folders> = try {
+        val q = listOfNotNull(path?.let { "path=${Api.q(it)}" }, "hidden=1".takeIf { hidden }).joinToString("&")
+        Result.success(FolderPick.wire(api.get("/v1/folders" + if (q.isEmpty()) "" else "?$q")))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, R.string.err_files)) }
+
     override suspend fun file(path: String): Result<FileBytes> = try {
         // Attachments can be up to 30 MB.
         Result.success(api.bytes("/v1/file?path=${Api.q(path)}", max = 32L * 1024 * 1024))
