@@ -18,7 +18,7 @@ only on purpose, and log the change here.
 ## Sessions
 - **PTY model (4b):** `hc` runs `claude` inside a pseudo-terminal owned by the daemon. The phone and the Mac terminal share the *same* live session. The phone sends prompts and Esc (interrupt) into the PTY, and approvals come through hooks. The phone's chat is rendered natively from the transcript JSONL. Sessions started from the phone run headless, and `hc attach` brings one into a terminal.
 - **Mini terminals (5a):** Bash tool calls inside a session render as small live terminal cards.
-- **Approvals are answered from the phone** (and later also from the Mac menu bar app: done 2026-10-15, see "The Mac mini app"). If nobody answers within **10 minutes**, the request is denied automatically with a message to Claude: the user didn't respond in time and is probably away, so it shouldn't retry or work around it, and should stop and wait for them to come back. In the app, a session stopped this way shows a **Continue** button that tells it the user is back (milestone 3). Decided 2026-10-13.
+- **Approvals are answered from the phone** (and later also from the Mac menu bar app: done 2026-10-15, see "The Mac mini app"). If nobody answers within **10 minutes**, the request is denied automatically (**for Codex only since 2026-10-30**: Claude Code's goes back to its own dialog in the terminal, see "Never auto-deny") with a message to Claude: the user didn't respond in time and is probably away, so it shouldn't retry or work around it, and should stop and wait for them to come back. In the app, a session stopped this way shows a **Continue** button that tells it the user is back (milestone 3). Decided 2026-10-13.
 - **`claude` starts through `hc`.** A marked block in `~/.zshrc` aliases `claude` to `hc`, so every interactive session can be controlled from the phone without changing habits. `hc` hands non-interactive uses (`-p`, subcommands like `mcp` or `update`, pipes) straight to the real `claude`, and falls back to plain `claude` if the daemon isn't running. `hc uninstall` removes the alias. Sessions started any other way still show up with live transcripts and approvals through the hooks; they just can't be typed into from the phone. The owner left this choice to us; decided 2026-10-13 for the best everyday UX.
 - **Usage numbers are the official ones**: the 5-hour and 7-day `rate_limits` (used % and reset time) that Claude Code passes to the status line. The daemon chains into the existing status line script rather than replacing it. Estimates from transcripts are only a fallback, and the app labels them "estimated". Decided 2026-10-13.
 - **Daemon runtime until milestone 5:** the system Node (nvm), run by launchd. Bundling Node inside the Mac app comes with milestone 5.
@@ -486,8 +486,8 @@ up to four sessions and Allow / Deny on the widget.
   follow the Mac with no screen of the app open.
 - **Stale never looks fresh**: a picture is live only while the app is on screen or the background
   connection runs. Otherwise it says "Last updated 14:05" (a weekday or date when older), or "Not
-  connected to your Mac". An approval past the Mac's 10-minute auto-deny loses its buttons when the
-  widget isn't live, and a reset time that has passed draws as a fresh window, not as a future time.
+  connected to your Mac". An approval past the Mac's 10 minutes (Claude Code's goes back to its terminal then,
+  Codex's is denied) loses its buttons when the widget isn't live, and a reset time that has passed draws as a fresh window, not as a future time.
 - **Cheap**: no update period (it would wake the phone every half hour to redraw what's known), no
   timer of its own, and no redraws while the screen is off: the newest state is drawn when it comes
   on. Changes you'd act on (who's working, who needs you, an approval, the connection) redraw within
@@ -529,7 +529,7 @@ popover with the sessions, approvals answerable there, usage and quick actions.
   - USAGE: the 5-hour and weekly meters with their reset times;
   - quick actions: Pair a phone, Checklist, Settings; Quit in the footer.
 - **Approvals are answered there**: the tool, project and title, Claude Code's reason, the exact
-  command (up to 12 lines, as on the phone), the time left before the auto-deny, then Deny, Always
+  command (up to 12 lines, as on the phone), the time left of the Mac's 10 minutes, then Deny, Always
   and Allow, and "Allow all web pages this session" where the daemon offers it. An answered card
   folds to one line ("Allowed · git push") for 1.6 s, then goes. Questions and plans show one line,
   "Open terminal" and "or answer on your phone".
@@ -1783,3 +1783,32 @@ completely local only."
    from the fragment, without fetching anything.
 5. **The link's `lan` is the IPv4 addresses** whenever there is one (a smaller QR code); the
    snapshot still says them all.
+
+## Never auto-deny (2026-10-30)
+
+The owner: Hypernova never says no for him. The 10-minute auto-deny (Sessions, "Approvals are
+answered from the phone", 2026-10-13) stays as history for Claude Code; Codex keeps it.
+
+1. **An ask nobody answers goes back to Claude Code.** After 10 minutes the PermissionRequest hook
+   answers with no decision (`hooks.ts`, `timeout` → `{}`), so Claude Code asks in its own dialog
+   in the session's terminal, and the session waits there. No "no" to Claude, no `stoppedForAway`,
+   no `away` row in Blocked calls; the approval resolves as `terminal` and a notice says the question
+   is in the terminal now.
+2. **Codex keeps the stop.** Its approvals have no terminal dialog to fall back to: after 10 minutes
+   its ask is cancelled, `stoppedForAway`, an `away` blocked call and Continue, as before.
+3. **The phone can always answer Claude Code's own dialog.** Wherever the session's terminal is
+   shared (a holder, or a `claude agents` job through `claude attach`), the daemon reads the dialog
+   off the screen (`menu.permission`: the tool, the command whole, its question) and the session
+   needs you while it shows, whatever Claude Code's registry says (a `claude agents` job's stays
+   "busy"). The chat shows it where the asks go, as an approval card: the command, Deny and Allow,
+   and the dialog's other options as it words them; the Home card has Deny and Allow. A tap presses
+   that option in the terminal (the menu route), so the same dialog shows there before and after.
+   It also comes without the 10 minutes: an ask rule over auto mode ("Ask rule Bash(python:*)
+   overrides auto mode for this command") brings it up with no hook asking first. Seen on the
+   owner's phone the same day: the Arc session's dialog had no card at all, the session read
+   "working", and his three replies sat held behind it.
+4. **Never another job's dialog.** A `claude attach` holder that shows another job or the agent list
+   (it drifted) has no menu for the session; answering goes through a fresh `claude attach`. Two
+   dialogs for different commands are different menus, so an Allow never lands on the next one.
+5. **Left as it is:** automation runs still get Esc on a terminal menu that waits 10 minutes with no
+   approval behind it (Automations, "Following"), so a run never needs you all night.

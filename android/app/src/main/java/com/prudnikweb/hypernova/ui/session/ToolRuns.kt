@@ -40,6 +40,16 @@ internal sealed interface ChatRow {
         override val key: String get() = "asks"
         override fun has(itemKey: String) = asks.any { it.key == itemKey }
     }
+
+    /**
+     * Fork: Claude Code's own permission dialog in the session's terminal, where the asks go (the
+     * last row), as an approval card (TerminalAskCard.kt). Only with no approval waiting: one
+     * that is answers the same dialog.
+     */
+    data class TermAsk(val ask: com.prudnikweb.hypernova.data.TerminalAsk) : ChatRow {
+        override val key: String get() = "term-ask"
+        override fun has(itemKey: String) = false
+    }
 }
 
 /** Pure, unit-tested. */

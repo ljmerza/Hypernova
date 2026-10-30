@@ -298,6 +298,9 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
 export function setState(id: string, state: SessionState, activity?: string | null): void {
   const r = sessions.get(id)
   if (!r) return
+  // Claude Code's own permission dialog is on its screen (terms.ts, watchMenus): it needs you
+  // until that closes, whatever another agent's tool call says meanwhile.
+  if (state === 'working' && r.menu?.permission && r.state === 'needs_you') return
   const patch: Partial<Rec> = { state, lastActivityAt: Date.now() }
   if (activity !== undefined) patch.activity = activity
   if (state === 'idle' || state === 'ended') patch.activity = null
@@ -1381,7 +1384,8 @@ export function pollRegistry(): void {
     // Before the first read: whether Claude Code is busy says whether a queue read from the file still holds.
     r.pid = o.pid
     ensureParsed(r)
-    const hasPending = [...pending.values()].some((p) => p.approval.sessionId === r.id)
+    // Claude Code's own permission dialog on its screen (terms.ts) waits on the owner like an approval.
+    const hasPending = [...pending.values()].some((p) => p.approval.sessionId === r.id) || !!r.menu?.permission
     // Claude Code stays busy while agents run in the background after the main turn's Stop: the
     // main agent is idle then, and the session says so (its agents say they're at work).
     const busy = o.status === 'busy' && !(mainIdle.has(r.id) && backgroundRunning(r.id))

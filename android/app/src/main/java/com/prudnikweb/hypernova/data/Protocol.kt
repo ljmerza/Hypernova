@@ -175,7 +175,8 @@ data class TermLink(val id: String, val mac: Int, val phone: Int)
  * A menu Claude Code shows in a shared terminal (the /model picker, a dialog with no card here),
  * read off its screen. [cursor] is the option Enter picks there; [more] means it scrolls past
  * what the screen shows; [cancel] means Esc closes it; [alt] is the footer's second way to pick
- * ("s to use this session only").
+ * ("s to use this session only"). [permission]: it's Claude Code's own permission dialog (an ask
+ * rule over auto mode, or an ask its hook handed back), drawn as an approval card ([TerminalAsk]).
  */
 @Immutable
 data class TermMenu(
@@ -187,9 +188,12 @@ data class TermMenu(
     val more: Boolean,
     val cancel: Boolean,
     val alt: Alt?,
+    val permission: Permission? = null,
 ) {
     @Immutable data class Option(val label: String, val detail: String?, val current: Boolean)
     @Immutable data class Alt(val enter: String, val key: String, val label: String)
+    /** [tool]: the dialog's title ("Bash command"); [command]: what it would run, as the screen shows it. */
+    @Immutable data class Permission(val tool: String?, val command: String?, val question: String)
 }
 
 @Immutable
@@ -727,6 +731,10 @@ object Wire {
             alt = o.obj("alt")?.let { a ->
                 val enter = a.str("enter"); val key = a.str("key"); val label = a.str("label")
                 if (enter != null && key != null && label != null) TermMenu.Alt(enter, key, label) else null
+            },
+            // An older daemon sends none: the menu card as before.
+            permission = o.obj("permission")?.let { p ->
+                p.str("question")?.let { q -> TermMenu.Permission(p.str("tool"), p.str("command")?.takeIf { it.isNotBlank() }, q) }
             },
         )
     }
