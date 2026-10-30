@@ -30,9 +30,11 @@ class LiveAutomations(
     private val fail: (Throwable, Int) -> HubException,
     /** A session the phone knows, to open a note's run from it. */
     private val sessionOf: (String) -> Session?,
+    /** The paired computer these are on (data/Servers.kt): its notifications open and answer there. */
+    server: String? = null,
 ) : AutomationBook(), Automations {
     private val res = context.resources
-    private val notes = AutomationNotes(context.applicationContext)
+    private val notes = AutomationNotes(context.applicationContext, server)
 
     override val state: AutomationsState? get() = current
     override fun runs(id: String): RunPage? = page(id)
@@ -327,7 +329,7 @@ object AutomationErrors {
  * runs that couldn't start"), a tap that opens the run's session or the automation, and the notes
  * already shown (the last 50 ids, remembered), so a reconnect or a restart never repeats one.
  */
-class AutomationNotes(private val context: Context) {
+class AutomationNotes(private val context: Context, private val server: String? = null) {
     private val nm = context.getSystemService(NotificationManager::class.java)
     private val prefs = context.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
 
@@ -363,7 +365,8 @@ class AutomationNotes(private val context: Context) {
             sessionId != null -> i.setAction(MainActivity.ACTION_OPEN_SESSION).putExtra(MainActivity.EXTRA_SESSION, sessionId)
             automationId != null -> i.setAction(ACTION_OPEN).putExtra(EXTRA_ID, automationId)
         }
-        val open = PendingIntent.getActivity(context, ("auto:$key").hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
+        val open = PendingIntent.getActivity(context, ("auto:${server.orEmpty()}:$key").hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(0xFF7FFFA0.toInt())
@@ -375,7 +378,7 @@ class AutomationNotes(private val context: Context) {
             .setContentIntent(open)
             .build()
         // One per automation: its next note takes the place of the last.
-        runCatching { nm.notify(("automation:${automationId ?: key}").hashCode(), n) }
+        runCatching { nm.notify(("automation:${scope()}${automationId ?: key}").hashCode(), n) }
     }
 
     /**
@@ -387,6 +390,7 @@ class AutomationNotes(private val context: Context) {
         if (!canPost() || nm == null) return
         val i = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             .setAction(ACTION_OPEN).putExtra(EXTRA_ID, automationId.orEmpty())
+        if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
         val open = PendingIntent.getActivity(context, ("ask:$runId").hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val until = context.getString(R.string.wf_ask_notif_default, ask.default)
         val b = NotificationCompat.Builder(context, CHANNEL)
@@ -403,6 +407,7 @@ class AutomationNotes(private val context: Context) {
         for ((k, answer) in ask.answers.take(3).withIndex()) {
             val act = Intent(context, NotifyActions::class.java).setAction(NotifyActions.ACTION_ANSWER)
                 .putExtra(NotifyActions.EXTRA_RUN, runId).putExtra(NotifyActions.EXTRA_STEP, ask.stepId).putExtra(NotifyActions.EXTRA_ANSWER, answer)
+            if (server != null) act.putExtra(NotifyActions.EXTRA_SERVER, server)
             val pi = PendingIntent.getBroadcast(context, ("ask:$runId:$k").hashCode(), act, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             b.addAction(NotificationCompat.Action.Builder(0, answer, pi).setAuthenticationRequired(true).build())
         }
@@ -414,6 +419,9 @@ class AutomationNotes(private val context: Context) {
     }
 
     private fun askKey(runId: String) = ("ask:$runId").hashCode()
+
+    /** Another computer's automation (not the first one's) gets notifications of its own: "<id>:". */
+    private fun scope(): String = server?.takeIf { it != Servers.LEGACY_ID }?.let { "$it:" }.orEmpty()
 
     companion object {
         const val CHANNEL = "automations"

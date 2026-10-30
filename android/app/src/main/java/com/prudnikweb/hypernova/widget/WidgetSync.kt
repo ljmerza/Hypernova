@@ -423,11 +423,12 @@ internal object WidgetSync {
      * "Allowing…" at once, then goes when the Mac has it, or says it didn't get through.
      * [finished] runs once the widget shows how it went, or after 8 seconds, whichever is first:
      * a broadcast can't hold the process for longer. [onResult]: whether the Mac took it (a
-     * notification's Allow and Deny go this way too, data/NotifyActions.kt).
+     * notification's Allow and Deny go this way too, data/NotifyActions.kt). It goes to the computer
+     * [server] names (a notification's), else the one the approval waits on (data/Servers.kt).
      */
-    fun answer(ctx: Context, approvalId: String, allow: Boolean, onResult: (Boolean) -> Unit = {}, finished: () -> Unit) {
+    fun answer(ctx: Context, approvalId: String, allow: Boolean, server: String? = null, onResult: (Boolean) -> Unit = {}, finished: () -> Unit) {
         start(ctx.applicationContext as Application)
-        val live = Core.live
+        val live = Core.hubForApproval(server, approvalId)
         if (live == null) { onResult(false); finished(); return }
         Core.scope.launch {
             var released = false

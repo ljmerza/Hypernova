@@ -75,13 +75,22 @@ class LiveHub(
     private val heldOpen: () -> Boolean = { true },
     /** The computer serves the phone API elsewhere on its tailnet now: the pairing to keep instead ([TailnetFollow]). */
     private val onTailnetMoved: (Pairing) -> Unit = {},
+    /** Which paired computer this is (data/Servers.kt): its offline queue, certificate and notifications are its own. */
+    val serverId: String = Servers.LEGACY_ID,
+    /**
+     * True while the app is on screen, whichever computer it shows: how soon a failed attempt goes
+     * again. [isVisible] is whether it shows this one (banners, not notifications; approvals seen).
+     */
+    private val onScreen: () -> Boolean = isVisible,
+    /** This is the computer the screens show (not one watched in the background): the app's words follow it. */
+    private val isActive: () -> Boolean = { true },
 ) : Hub {
     private val app = context.applicationContext
     private val res = app.resources
     private val api = Api(pairing.baseUrl, pairing.token)
     private val now get() = System.currentTimeMillis()
     /** This phone's device certificate for the Mac's local listener (data/DeviceCert.kt). */
-    private val certs = DeviceCertStore(context)
+    private val certs = DeviceCertStore(context, serverId)
     /**
      * The route to the Mac (data/LanRoute.kt): its own address on this network, or the base URL.
      * A change of route reconnects: the socket is bound to the old one.
@@ -124,7 +133,7 @@ class LiveHub(
     private val noticeFlow = MutableSharedFlow<Notice>(extraBufferCapacity = 16)
     override val notices: SharedFlow<Notice> = noticeFlow
     /** Automations (data/AutomationsLive.kt): the snapshot's, then the socket's; their notes as banners or notifications. */
-    override val automations = LiveAutomations(context, api, isVisible, banner = { noticeFlow.tryEmit(it) }, fail = { e, r -> handle(e, r) }, sessionOf = { session(it) })
+    override val automations = LiveAutomations(context, api, isVisible, banner = { noticeFlow.tryEmit(it) }, fail = { e, r -> handle(e, r) }, sessionOf = { session(it) }, server = serverId)
     override val appUpdate: AppUpdate?
         get() {
             val m = macInfo ?: return null
@@ -209,7 +218,7 @@ class LiveHub(
     val synced: Boolean get() = settled
     private val itemCaches = HashMap<String, Items.Cache>()
     /** Prompts typed while the Mac was away (data/OfflineQueue.kt), kept across restarts. */
-    private val offline = OfflineQueue(PrefsQueueStore(app.getSharedPreferences("hypernova", Context.MODE_PRIVATE)))
+    private val offline = OfflineQueue(PrefsQueueStore(app.getSharedPreferences("hypernova", Context.MODE_PRIVATE), Servers.scoped("offlineQueue", serverId)))
     private var flushing = false
     private var knownIds: Set<String>? = null
     private val revealed = HashSet<String>()
@@ -347,8 +356,9 @@ class LiveHub(
             // 25 s) is probably dead even if nobody noticed yet. Reconnect now, not in 70 s.
             link.state == LinkState.Connected && now - lastMessageAt > 30_000 -> { attempt = 0; connect("the app is back and the socket was silent") }
         }
-        // On screen, every pending approval counts as seen: no notification for it later.
-        seenApprovals.addAll(approvals.keys)
+        // On screen, every pending approval counts as seen: no notification for it later. Only this
+        // computer's, when the screens show it: one watched in the background still notifies.
+        if (isVisible()) seenApprovals.addAll(approvals.keys)
     }
 
     /** "Disconnect" from the background notification: close the socket until the app opens again. */
@@ -371,7 +381,7 @@ class LiveHub(
      * comes after a second.
      */
     private fun networkChanged() {
-        if (closed || paused || !(isVisible() || heldOpen())) return
+        if (closed || paused || !(onScreen() || heldOpen())) return
         if (link.state != LinkState.Offline && link.state != LinkState.Reconnecting) return
         attempt = 0
         if (!freshTry()) connect("the network changed")
@@ -462,7 +472,7 @@ class LiveHub(
         val problem = if (online) e.problem else Problem.NoNetwork
         // No network at all: nothing to try until one comes ([NetWatch]). Off screen without the
         // background service ([heldOpen]): the app tries again when it opens.
-        if (!online || !(isVisible() || heldOpen())) {
+        if (!online || !(onScreen() || heldOpen())) {
             link = Link(LinkState.Offline, problem, tried = router.report?.takeIf { noRoute }, failedOver = over.takeIf { !noRoute })
             ConnLog.add(ConnKind.Wait, ConnResult.Info, text = if (!online) "no network: waiting for one" else "off screen without the background connection: trying again when the app opens")
             return
@@ -499,7 +509,7 @@ class LiveHub(
      * waits before it's denied.
      */
     private fun backoff(): Long {
-        val cap = if (isVisible()) RETRY_CAP_ON_SCREEN else RETRY_CAP
+        val cap = if (onScreen()) RETRY_CAP_ON_SCREEN else RETRY_CAP
         val base = min(cap, RETRY_FIRST shl min(attempt - 1, 10))
         val jitter = if (base >= cap) Random.nextDouble(0.8, 1.0) else Random.nextDouble(0.8, 1.2)
         return min(cap, (base * jitter).toLong())
@@ -864,8 +874,9 @@ class LiveHub(
 
     private fun applySnapshot(s: Snapshot) {
         macInfo = s.mac
-        // A Linux server's words instead of a Mac's, on every screen (data/ComputerWords.kt).
-        ComputerWords.set(app, s.mac.platform)
+        // A Linux server's words instead of a Mac's, on every screen (data/ComputerWords.kt): the
+        // active computer's (Core says the next one's when the switcher changes it).
+        if (isActive()) ComputerWords.set(app, s.mac.platform)
         setBattery(s.mac.battery)
         macAwake = s.mac.awake
         macBrowse = s.mac.browseOutsideProjects
@@ -980,13 +991,15 @@ class LiveHub(
         macBattery = b
         if (b == null) return
         val prefs = app.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
-        val warned = prefs.getBoolean(BATTERY_WARNED, false)
+        // Each computer's battery its own (data/Servers.kt).
+        val key = Servers.scoped(BATTERY_WARNED, serverId)
+        val warned = prefs.getBoolean(key, false)
         if (!b.draining || b.percent > BATTERY_REARM) {
-            if (warned) prefs.edit().remove(BATTERY_WARNED).apply()
+            if (warned) prefs.edit().remove(key).apply()
             return
         }
         if (warned || b.percent > BATTERY_WARN) return
-        prefs.edit().putBoolean(BATTERY_WARNED, true).apply()
+        prefs.edit().putBoolean(key, true).apply()
         // Amber and "Needs you", as an approval: only the owner can plug it in.
         notice(Notice("battery", Notice.Kind.Approval, null, mac.name, res.getString(R.string.notice_mac_battery, b.percent)))
     }

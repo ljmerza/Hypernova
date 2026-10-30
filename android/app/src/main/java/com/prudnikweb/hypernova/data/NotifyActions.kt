@@ -15,24 +15,27 @@ import kotlinx.coroutines.withTimeoutOrNull
  * requires authentication). Allow and Deny on an approval go the widget's way
  * ([WidgetSync.answer]: one path, one rule, and the widget says "Allowing…" too); the notification
  * goes once the Mac has the answer, or says it didn't get through. Reply on a finished or waiting
- * session sends the words as a prompt, as its composer would. Reached only through the
+ * session sends the words as a prompt, as its composer would. Each goes to the computer the
+ * notification came from ([EXTRA_SERVER], data/Servers.kt; the active one for a notification from
+ * before there were several), whichever one the app shows. Reached only through the
  * notifications' own PendingIntents (not exported).
  */
 class NotifyActions : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Core.init(context.applicationContext as Application)
+        val server = intent.getStringExtra(EXTRA_SERVER)
         when (intent.action) {
             ACTION_SAMPLE -> if (com.prudnikweb.hypernova.BuildConfig.DEBUG) sample()
             ACTION_ALLOW, ACTION_DENY -> {
                 val id = intent.getStringExtra(EXTRA_APPROVAL) ?: return
                 val async = goAsync()
-                WidgetSync.answer(context, id, intent.action == ACTION_ALLOW, finished = { async.finish() }, onResult = { ok ->
+                WidgetSync.answer(context, id, intent.action == ACTION_ALLOW, server = server, finished = { async.finish() }, onResult = { ok ->
                     if (ok) Core.notifier.answered(id)
                     else {
                         // Still waiting on the Mac: shown again, saying the answer didn't get through.
-                        val live = Core.live
+                        val live = Core.hub(server)
                         val a = live?.pendingApprovals?.firstOrNull { it.id == id }
-                        if (a != null) Core.notifier.approval(a, live.session(a.sessionId), failed = true)
+                        if (a != null) Core.notifier.approval(a, live.session(a.sessionId), failed = true, server = live.serverId)
                     }
                 })
             }
@@ -44,7 +47,7 @@ class NotifyActions : BroadcastReceiver() {
                 val answer = intent.getStringExtra(EXTRA_ANSWER) ?: return
                 val notes = AutomationNotes(context.applicationContext)
                 // No connection to the Mac: the notification stays, so the answer can be given again.
-                val live = Core.live ?: return
+                val live = Core.hub(server) ?: return
                 val async = goAsync()
                 Core.scope.launch {
                     try {
@@ -60,11 +63,11 @@ class NotifyActions : BroadcastReceiver() {
             ACTION_REPLY -> {
                 val sessionId = intent.getStringExtra(EXTRA_SESSION) ?: return
                 val text = RemoteInput.getResultsFromIntent(intent)?.getCharSequence(KEY_REPLY)?.toString()?.trim().orEmpty()
-                val live = Core.live
+                val live = Core.hub(server)
                 val title = live?.session(sessionId)?.name ?: context.getString(R.string.app_name)
-                if (text.isEmpty()) { Core.notifier.replied(sessionId); return }
+                if (text.isEmpty()) { Core.notifier.replied(sessionId, server); return }
                 if (live == null) {
-                    Core.notifier.replyFailed(sessionId, title, context.getString(R.string.notif_reply_failed))
+                    Core.notifier.replyFailed(sessionId, title, context.getString(R.string.notif_reply_failed), server)
                     return
                 }
                 val async = goAsync()
@@ -72,8 +75,8 @@ class NotifyActions : BroadcastReceiver() {
                     try {
                         // A broadcast can't hold the process for long: what hasn't landed by then is said as not sent.
                         val sent = withTimeoutOrNull(9_000L) { live.send(sessionId, text) }
-                        if (sent?.isSuccess == true) Core.notifier.replied(sessionId)
-                        else Core.notifier.replyFailed(sessionId, title, sent?.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.notif_reply_failed))
+                        if (sent?.isSuccess == true) Core.notifier.replied(sessionId, server)
+                        else Core.notifier.replyFailed(sessionId, title, sent?.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.notif_reply_failed), server)
                     } finally {
                         async.finish()
                     }
@@ -116,6 +119,8 @@ class NotifyActions : BroadcastReceiver() {
         const val EXTRA_ANSWER = "answer"
         const val EXTRA_APPROVAL = "approval"
         const val EXTRA_SESSION = "session"
+        /** The paired computer the notification came from (data/Servers.kt): the answer goes there. */
+        const val EXTRA_SERVER = "server"
         const val KEY_REPLY = "reply"
     }
 }

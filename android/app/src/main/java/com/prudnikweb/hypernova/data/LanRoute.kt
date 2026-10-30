@@ -846,6 +846,7 @@ class LanRouter(
     fun close() {
         closed = true
         ActiveRoutes.unregister(pairing.baseUrl, this)
+        NodeDestinations.drop(this)
         unwatchNode?.invoke()
         runCatching { connectivity?.unregisterNetworkCallback(watch) }
         round?.job?.cancel(); ticker?.cancel()
@@ -914,7 +915,8 @@ class LanRouter(
         // The node must be the one for this pairing's control server.
         if (!Tsnet.serves(pairing.controlUrl)) return null
         // The allowlist is set every time (a pairing under way may have added to it), the client kept per proxy (port and secret).
-        t.hostPort?.let { Tsnet.setAllowed(listOf(it)) }
+        // With the other paired computers' destinations next to this one's (data/Servers.kt, NodeDestinations).
+        t.hostPort?.let { NodeDestinations.want(this, it) }
         val key = "${node.proxyPort}/${node.proxyToken}"
         viaNode?.takeIf { it.first == key }?.let { return it.second }
         val fp = t.fingerprint ?: fingerprint()

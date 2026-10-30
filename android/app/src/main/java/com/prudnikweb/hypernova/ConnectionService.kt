@@ -72,9 +72,13 @@ class ConnectionService : Service() {
 
     /** What the notification says, from the live state. Null when there's nothing to hold. */
     private fun summary(): Summary? {
-        val live = Core.live ?: return null
+        // The active computer's link; one that forgot this phone gives way to another still paired.
+        val hubs = Core.allHubs
+        val live = Core.live?.takeIf { it.link.state != LinkState.Unpaired } ?: hubs.firstOrNull { it.link.state != LinkState.Unpaired } ?: return null
         val link = live.link
-        val title = live.mac.name
+        // One notification for all: the others are watched under it ("z2 · +1 watched").
+        val watched = hubs.count { it !== live && it.link.state != LinkState.Unpaired }
+        val title = if (watched > 0) getString(R.string.notif_title_watched, live.mac.name, watched) else live.mac.name
         val text = when (link.state) {
             LinkState.Unpaired -> return null
             LinkState.Connecting, LinkState.Demo -> getString(R.string.notif_connecting)

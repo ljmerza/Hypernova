@@ -15,7 +15,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** Where you are. The stack lives in the ViewModel, so it survives rotation and recreation. */
 sealed interface Route {
@@ -113,9 +112,26 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
 
     private val store get() = Core.store
 
-    /** The paired Mac, if any (process-wide, see [Core]). */
+    /** The active paired Mac, if any (process-wide, see [Core]). */
     val pairing: Pairing? get() = Core.pairing
     val live: LiveHub? get() = Core.live
+
+    /** Every paired computer for the switcher, the active one first (data/Servers.kt). */
+    val servers: List<ServerStatus> get() = Core.statuses
+
+    /** The switcher: another paired computer on screen, out of demo mode. */
+    fun switchServer(id: String) {
+        if (demo) setDemoInternal(false)
+        if (id == Core.activeId) return
+        Core.switchTo(id)
+        nav.reset()
+        notice = null
+    }
+
+    /** "Pair another Mac" (the switcher): the pairing steps over the app, the computers paired kept. */
+    var addingServer by mutableStateOf(false)
+        private set
+    fun addServer(on: Boolean) { addingServer = on }
     var demo by mutableStateOf(Core.store.demo)
         private set
     private var fakeHub: FakeHub? = null
@@ -198,18 +214,9 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
             pairFlow = PairFlow.Failed(null, null, null)
             return
         }
-        // Another computer's code while this phone is paired (audit P12): asked first, as it ends
-        // the first pairing (one computer at a time until there's a switcher).
-        val current = Core.pairing
-        if (current != null && replacesAnother(current, link)) {
-            confirm = Confirm(
-                title = app.getString(R.string.pair_replace_q, current.macName, link.macName),
-                body = app.getString(R.string.pair_replace_body, current.macName),
-                action = app.getString(R.string.pair_replace),
-                danger = true,
-            ) { pair(link) }
-            return
-        }
+        // Another computer's code while this phone is paired: it joins the ones paired (data/Servers.kt),
+        // nothing is replaced, so nothing is asked first (audit P12 asked while one was all there was).
+        addingServer = false
         pair(link)
     }
 
@@ -229,11 +236,8 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         pairJob = viewModelScope.launch {
             try {
                 val p = Pairer.pair(app, link).let { it.copy(controlConfirmed = it.controlUrl == null || it.controlUrl == confirmedControl) }
-                // Replacing another computer: it lets this phone go first (as Forget does), so it
-                // doesn't keep a phone that no longer listens in its list. Best effort: it may be away.
-                val before = Core.pairing
-                val old = Core.live
-                if (before != null && old != null && replacesAnother(before, link)) withTimeoutOrNull(5_000L) { old.forget() }
+                // Added next to the computers paired already (or in the place of the same one paired
+                // before), and on screen.
                 Core.paired(p)
                 setDemoInternal(false)
                 nav.reset()
@@ -259,22 +263,39 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-    /** Forget this Mac here and (if it can be reached) on the Mac too. */
+    /**
+     * Forget this Mac (the one on screen) here and (if it can be reached) on the Mac too; only this
+     * one, even if the switcher shows another meanwhile. The next one paired comes on screen.
+     */
     fun forget(onDone: (reachedMac: Boolean) -> Unit = {}) {
         val l = live
+        val id = Core.activeId
         viewModelScope.launch {
             val ok = l?.forget()?.isSuccess ?: true
             confirmedControl = null
-            clearPairing()
+            if (id != null) Core.forget(id)
+            nav.reset()
             onDone(ok)
         }
     }
 
-    /** After "This phone was unpaired": drop the dead token and start over. */
+    /**
+     * Forget the computer on screen here (Forget, or after "This phone was unpaired": the dead token).
+     * Another computer still paired comes on screen in its place.
+     */
     fun clearPairing() {
         confirmedControl = null
         Core.clear()
         nav.reset()
+    }
+
+    /**
+     * "Pair again" after "This phone was unpaired": the dead pairing goes, and the pairing steps show
+     * (over the next computer while another is paired; the onboarding otherwise).
+     */
+    fun pairAgain() {
+        clearPairing()
+        if (Core.servers.isNotEmpty()) addingServer = true
     }
 
     fun switchDemo(on: Boolean) {

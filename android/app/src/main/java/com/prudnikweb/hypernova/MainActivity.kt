@@ -86,6 +86,9 @@ class MainActivity : ComponentActivity() {
         // Reopened from Recents: the old pairing link or notification was handled already.
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         val link = if (intent.action == Intent.ACTION_VIEW) com.prudnikweb.hypernova.data.PairLinks.kind(intent.dataString) else null
+        // A notification from a computer the app doesn't show now: that one comes on screen first
+        // (data/Servers.kt), then what the notification opens, there.
+        intent.getStringExtra(EXTRA_SERVER)?.let { vm.switchServer(it) }
         when {
             // https://hypernova.observer/glasses, hypernova://glasses, and "Tap to open Hypernova" (Lens's
             // "Open Hypernova", bridge/BridgeOpen.kt): Settings → Glasses (an ask to connect waiting shows over it).
@@ -114,6 +117,7 @@ class MainActivity : ComponentActivity() {
         intent.data = null
         intent.action = Intent.ACTION_MAIN
         intent.removeExtra(EXTRA_SESSION)
+        intent.removeExtra(EXTRA_SERVER)
         intent.removeExtra(com.prudnikweb.hypernova.data.AutomationNotes.EXTRA_ID)
         setIntent(intent)
     }
@@ -145,5 +149,7 @@ class MainActivity : ComponentActivity() {
         /** Settings → Glasses: "Tap to open Hypernova" (bridge/BridgeNotice.kt), or Lens's ask with the app on screen. */
         const val ACTION_OPEN_GLASSES = "com.prudnikweb.hypernova.OPEN_GLASSES"
         const val EXTRA_SESSION = "session"
+        /** The paired computer a notification came from (data/Servers.kt): a tap switches to it. */
+        const val EXTRA_SERVER = "server"
     }
 }
