@@ -394,8 +394,6 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                         flow = flow,
                         onRetry = vm::pair,
                         onClose = vm::closePairFlow,
-                        confirmedControl = vm.confirmedControl,
-                        onConfirmControl = vm::confirmControl,
                         onDone = {
                             vm.closePairFlow()
                             askNotifications()

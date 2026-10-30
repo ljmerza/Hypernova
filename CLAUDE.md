@@ -21,7 +21,9 @@ skill, for reuse in other apps). `docs/PROTOCOL.md` is the contract between them
 
 Daemon: `cd daemon && node src/main.ts` (Node from nvm). Typecheck with `npx tsc -p .`.
 State lives in `~/Library/Application Support/Hypernova`, logs in
-`~/Library/Logs/Hypernova/daemon.log`. Ports 47321 (phone API, behind `tailscale serve`)
+`~/Library/Logs/Hypernova/daemon.log`. Ports 47321 (phone API on loopback), 47323 (the phones'
+local route: mutual TLS on the network, the only way phones come in; Tailscale was removed
+2026-10-30, docs/DECISIONS.md)
 and 47322 (Mac app, hooks, testing checklist at http://127.0.0.1:47322/qa). The owner's
 checklist results land in `~/Library/Application Support/Hypernova/qa/`: read them
 first when he says he has tested.
@@ -53,7 +55,8 @@ Mac app: `mac/build.sh` builds `dist/Hypernova.app` (SwiftPM + Command Line Tool
 bundles the daemon plus the newest `dist/*.apk`; `--release` stops instead of warning, and
 `mac/dmg.sh` packs `dist/Hypernova.dmg` (`HYPERNOVA_DIST=<dir>` and `mac/dmg.sh <app> <dmg>` build
 into a scratch folder instead). `Hypernova --selftest` dry-runs setup;
-`Hypernova --run-step <service|integration|tailscale|uninstall-service>` runs one setup step.
+`Hypernova --run-step <service|integration|tailscale|uninstall-service>` runs one setup step (the
+Mac app is upstream's and isn't built here; its `tailscale` step reaches routes that are gone).
 
 Mac app developer flags (more at the top of `mac/Sources/Hypernova/App/DevTools.swift`):
 - `--render-popover <dir> [--live]`: the popover in its nine states on sample data, plus the menu

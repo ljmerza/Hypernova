@@ -54,9 +54,9 @@ import javax.net.ssl.X509TrustManager
  * The local network route (docs/PROTOCOL.md, "Local network (direct HTTPS)"): the daemon listens
  * on the Mac's own addresses with a self-signed certificate the pairing code vouched for, and asks
  * this phone for its device certificate. On Wi-Fi, or while this phone is the hotspot the Mac sits
- * on, the app tries those addresses and prefers the first good mutual-TLS handshake; otherwise, or
- * when none answers, it uses the paired base URL (Tailscale). Nothing here opens anything to the
- * internet.
+ * on, or over a VPN into the Mac's network, the app tries those addresses and prefers the first
+ * good mutual-TLS handshake; otherwise, or when none answers, it uses the paired base URL as it is.
+ * Nothing here opens anything to the internet.
  */
 
 /** The daemon's local listener as the snapshot (or a `{t:"lan"}` message) describes it. */
@@ -87,11 +87,10 @@ data class LanInfo(
 }
 
 /**
- * How the app reaches the computer right now: its own network, the app's built-in Tailscale node
- * (data/Tsnet.kt), or the paired base URL as it is (the Tailscale app on the phone, or a public
- * address). Preferred in that order.
+ * How the app reaches the computer right now: its own network (or a VPN into it), or the paired
+ * base URL as it is. Preferred in that order.
  */
-enum class RouteKind { Local, Tailscale, Remote }
+enum class RouteKind { Local, Remote }
 
 /**
  * Where requests go: a base URL and the client that fits it (pinned for the local route, with the
@@ -106,34 +105,6 @@ class NetRoute(val base: String, val kind: RouteKind, val client: OkHttpClient, 
 
     companion object {
         fun remote(base: String) = NetRoute(base, RouteKind.Remote, Net.client)
-    }
-}
-
-/** The built-in Tailscale node's view of the computer: where to dial it, and how. */
-data class TailnetTarget(
-    /** `https://<tailnet name>:port`, or `https://<tailnet address>:port` when the tailnet has no HTTPS certificates. */
-    val base: String,
-    /** The computer's own certificate, pinned, for the address form. */
-    val fingerprint: String?,
-) {
-    /** "host:port" (an IPv6 address in brackets), what the proxy is allowed to tunnel to. */
-    val hostPort: String? get() = RoutePolicy.originOf(base)?.let { "${if (it.host.contains(':')) "[${it.host}]" else it.host}:${it.port}" }
-
-    companion object {
-        /**
-         * The target a pairing names: its base URL when it is on the tailnet, else the tailnet name
-         * or address from the pairing link; null when the pairing says nothing about a tailnet.
-         */
-        fun of(p: Pairing): TailnetTarget? {
-            // Where the computer said it serves now (TailnetFollow), when it moved since the pairing.
-            p.tailnetUrl?.let { u -> if (RoutePolicy.originOf(u)?.scheme == "https") return TailnetTarget(u, p.fingerprint) }
-            val o = RoutePolicy.originOf(p.baseUrl) ?: return null
-            val name = p.tailnetName?.lowercase()
-            val ip = p.tailnetIp
-            if (o.scheme == "https" && (o.host == name || o.host == ip)) return TailnetTarget(p.baseUrl, p.fingerprint)
-            if (name != null) return TailnetTarget("https://$name:${o.port}", p.fingerprint)
-            return null
-        }
     }
 }
 
@@ -274,14 +245,12 @@ object RoutePolicy {
     const val RECHECK_MAX_MS = 30 * 60_000L
     /** How long one address gets to answer. */
     const val PROBE_TIMEOUT_MS = 4_000L
-    /** How long the computer gets to answer through the built-in node (a first dial includes finding it). */
-    const val NODE_PROBE_MS = 12_000L
-    /** How long the paired base URL, as it is, gets to answer (a tailnet name with no Tailscale app fails at once). */
+    /** How long the paired base URL, as it is, gets to answer. */
     const val BASE_PROBE_MS = 8_000L
     /**
      * How long a route that fails in use again and again (within minutes of the last failure) is
      * tried after the others: 8 s, then 16, 32… up to 2 minutes. Only that route's: Local is never
-     * held back by the tailnet failing, nor the other way round ([RouteChooser.failedInUse]).
+     * held back by the base URL failing, nor the other way round ([RouteChooser.failedInUse]).
      */
     const val FAILED_RECHECK_MS = 8_000L
 
@@ -328,8 +297,8 @@ object RoutePolicy {
 
     /**
      * What a failed probe or request says about the route (unit-tested): refused, no answer, no
-     * such name, a certificate that isn't the paired one, the built-in node unable to reach the
-     * Mac (its proxy's 502)… and a short detail where the verdict alone doesn't say enough.
+     * such name, a certificate that isn't the paired one… and a short detail where the verdict
+     * alone doesn't say enough.
      */
     fun classify(e: Throwable): Pair<ConnResult, String?> {
         val chain = generateSequence(e) { c -> c.cause?.takeIf { it !== c } }.take(8).toList()
@@ -341,10 +310,6 @@ object RoutePolicy {
                 else -> null
             }
         }?.let { return it to null }
-        val connect = Regex("""Unexpected response code for CONNECT: (\d{3})""")
-        chain.firstNotNullOfOrNull { c -> c.message?.let { connect.find(it) }?.groupValues?.get(1)?.toIntOrNull() }?.let { code ->
-            return (if (code == 502) ConnResult.NoPeer else ConnResult.ProxyRefused) to "proxy $code"
-        }
         val words = chain.mapNotNull { it.message?.lowercase() }
         return when {
             chain.any { it is java.net.UnknownHostException } -> ConnResult.NoName to null
@@ -361,7 +326,7 @@ object RoutePolicy {
 
     /** The most telling of several failures (a wrong certificate says more than a timeout). */
     fun worst(results: Collection<ConnResult>): ConnResult? =
-        listOf(ConnResult.PinWrong, ConnResult.PinExpired, ConnResult.Refused, ConnResult.Tls, ConnResult.Http, ConnResult.NoPeer, ConnResult.ProxyRefused, ConnResult.Unreachable, ConnResult.Timeout, ConnResult.NoName, ConnResult.Failed)
+        listOf(ConnResult.PinWrong, ConnResult.PinExpired, ConnResult.Refused, ConnResult.Tls, ConnResult.Http, ConnResult.Unreachable, ConnResult.Timeout, ConnResult.NoName, ConnResult.Failed)
             .firstOrNull { it in results }
     /** At most this many probes at once (OkHttp gives each a thread): a /24 goes in two waves. */
     const val PARALLEL = 128
@@ -471,7 +436,7 @@ object RoutePolicy {
  * A route chooser's clock-free core, so the policy around re-checks is testable: which route to
  * hold given the network, the known addresses and the last probe's outcome.
  */
-class RouteChooser(private val remoteBase: String, private val port: Int, private val tailnet: TailnetTarget? = null) {
+class RouteChooser(private val remoteBase: String, private val port: Int) {
     var kind: RouteKind = RouteKind.Remote
         private set
     var localBase: String? = null
@@ -480,25 +445,19 @@ class RouteChooser(private val remoteBase: String, private val port: Int, privat
     var lastWinner: String? = null
         private set
 
-    /**
-     * The result of a probe round: a winning local address, or none; and whether the computer
-     * answered through the built-in Tailscale node. Local first, then Tailscale, then the base URL.
-     */
-    fun settle(winner: String?, tailscale: Boolean = false, lanPort: Int = port) {
-        when {
-            // The port the winner answered on: the Mac's latest word (its snapshot), not only the pairing link's.
-            winner != null -> { kind = RouteKind.Local; localBase = RoutePolicy.baseOf(winner, lanPort); lastWinner = winner }
-            tailscale && tailnet != null -> { kind = RouteKind.Tailscale; localBase = null }
-            else -> { kind = RouteKind.Remote; localBase = null }
-        }
+    /** The result of a probe round: a winning local address, or none (then the base URL). */
+    fun settle(winner: String?, lanPort: Int = port) {
+        // The port the winner answered on: the Mac's latest word (its snapshot), not only the pairing link's.
+        if (winner != null) { kind = RouteKind.Local; localBase = RoutePolicy.baseOf(winner, lanPort); lastWinner = winner }
+        else { kind = RouteKind.Remote; localBase = null }
     }
 
     /** The addresses the Mac is known by, the last one to answer first. */
     fun known(reported: List<String>): List<String> = listOfNotNull(lastWinner) + reported
 
     /**
-     * The route in use failed (the Mac moved, the Wi-Fi went, the node lost the tailnet): back to
-     * the base URL until the next probe.
+     * The route in use failed (the Mac moved, the Wi-Fi or the VPN went): back to the base URL
+     * until the next probe.
      */
     fun localFailed() { kind = RouteKind.Remote; localBase = null }
 
@@ -532,19 +491,16 @@ class RouteChooser(private val remoteBase: String, private val port: Int, privat
 
     val base: String get() = when (kind) {
         RouteKind.Local -> localBase ?: remoteBase
-        RouteKind.Tailscale -> tailnet?.base ?: remoteBase
         RouteKind.Remote -> remoteBase
     }
 
     /**
      * Whether a periodic re-check is due: not on the local route (the best there is), and only with
-     * something to try: local addresses on a network they could be on, or the tailnet while the
-     * node runs and the route isn't it yet.
+     * something to try: local addresses on a network they could be on.
      */
-    fun wantsRecheck(net: NetKind, hotspot: Boolean, known: List<String>, hotspotGateways: List<String>, nodeRunning: Boolean = false): Boolean {
+    fun wantsRecheck(net: NetKind, hotspot: Boolean, known: List<String>, hotspotGateways: List<String>): Boolean {
         if (kind == RouteKind.Local) return false
-        val local = RoutePolicy.shouldProbe(net, hotspot) && RoutePolicy.candidates(this.known(known), hotspotGateways).isNotEmpty()
-        return local || (kind == RouteKind.Remote && nodeRunning && tailnet != null)
+        return RoutePolicy.shouldProbe(net, hotspot) && RoutePolicy.candidates(this.known(known), hotspotGateways).isNotEmpty()
     }
 
     companion object {
@@ -606,7 +562,7 @@ data class RouteReport(
 
 /**
  * When a probe round may settle, and on what (unit-tested). Every route is tried at once; the
- * order of preference is Local, the built-in node, the base URL, with a route that keeps failing in
+ * order of preference is Local, then the base URL, with a route that keeps failing in
  * use ([demoted]) after the others. A round settles on the best route that answered as soon as
  * nothing better is still being tried, with one exception each way:
  * - Local still being tried holds the round up only where it's likely to answer ([waitForLocal]:
@@ -616,7 +572,7 @@ data class RouteReport(
  * - A held-back route that answered waits for the others still being tried.
  */
 class RoundJudge(private val waitForLocal: Boolean, private val demoted: Set<RouteKind> = emptySet()) {
-    private val order = listOf(RouteKind.Local, RouteKind.Tailscale, RouteKind.Remote)
+    private val order = listOf(RouteKind.Local, RouteKind.Remote)
     private fun rank(k: RouteKind) = order.indexOf(k) + if (k in demoted) order.size else 0
 
     /** The route to settle on now, given the routes that [answered] and those still [pending]; null: wait. */
@@ -638,12 +594,8 @@ class RoundJudge(private val waitForLocal: Boolean, private val demoted: Set<Rou
 
 /** What the offline card says about the routes, from the last round (unit-tested). */
 enum class RouteProblem {
-    /** Tried Local and the tailnet: neither answered. */
-    Both,
-    /** Tried Local; the tailnet wasn't tried (no node running, or no tailnet in the pairing). */
+    /** Tried Local: it didn't answer (nor did the base URL). */
     LocalOnly,
-    /** Local wasn't tried (not on Wi-Fi); the tailnet was and didn't answer. */
-    TailnetOnly,
     /** Local answered with a certificate that isn't the paired one, and nothing else answered. */
     WrongMac,
 }
@@ -659,8 +611,6 @@ object RouteWords {
         ConnResult.PinWrong -> "another certificate"
         ConnResult.PinExpired -> "certificate out of date"
         ConnResult.Tls -> "TLS failed"
-        ConnResult.NoPeer -> "not reachable on the tailnet"
-        ConnResult.ProxyRefused -> "the node's proxy refused"
         ConnResult.Http -> "an error status"
         ConnResult.Closed -> "closed"
         ConnResult.Failed -> "failed"
@@ -668,16 +618,15 @@ object RouteWords {
         ConnResult.Info -> "noted"
     }
 
-    /** Why a round chose what it did, for the log: "the built-in node answered; Local refused". */
+    /** Why a round chose what it did, for the log: "the base URL answered as it is; Local refused". */
     fun summary(rep: RouteReport, upgrade: Boolean): String {
         fun part(k: RouteKind, name: String): String? = rep.of(k)?.takeIf { k != rep.winner }?.let { t ->
             if (t.tried) "$name ${result(t.result)}" else "$name not tried (${t.why ?: "nothing to try"})"
         }
-        val others = listOfNotNull(part(RouteKind.Local, "Local"), part(RouteKind.Tailscale, "tailnet"), part(RouteKind.Remote, "base URL")).joinToString(", ")
+        val others = listOfNotNull(part(RouteKind.Local, "Local"), part(RouteKind.Remote, "base URL")).joinToString(", ")
         fun and(s: String) = if (others.isEmpty()) s else "$s; $others"
         return when (rep.winner) {
             RouteKind.Local -> if (upgrade) and("Local answered after all: moving to it") else and("Local answered")
-            RouteKind.Tailscale -> and("the built-in node answered")
             RouteKind.Remote -> and("the base URL answered as it is")
             null -> "nothing answered${if (others.isEmpty()) "" else ": $others"}; the base URL is the fallback"
         }
@@ -686,15 +635,8 @@ object RouteWords {
     /** Which sentence fits [r] when the link failed; null: none of these (the problem's own words serve). */
     fun problem(r: RouteReport?): RouteProblem? {
         if (r == null || r.winner != null) return null
-        val local = r.of(RouteKind.Local)?.takeIf { it.tried }
-        val tail = r.of(RouteKind.Tailscale)?.takeIf { it.tried }
-        return when {
-            local?.result == ConnResult.PinWrong && tail?.result?.ok != true -> RouteProblem.WrongMac
-            local != null && tail != null -> RouteProblem.Both
-            local != null -> RouteProblem.LocalOnly
-            tail != null -> RouteProblem.TailnetOnly
-            else -> null
-        }
+        val local = r.of(RouteKind.Local)?.takeIf { it.tried } ?: return null
+        return if (local.result == ConnResult.PinWrong) RouteProblem.WrongMac else RouteProblem.LocalOnly
     }
 }
 
@@ -702,11 +644,10 @@ object RouteWords {
 
 /**
  * Chooses the route for one paired Mac and keeps it current, Local first, always. A probe round
- * tries every route at once (the Mac's local addresses with the pinned client, the tailnet through
- * the built-in node, the base URL as it is) and settles as [RoundJudge] says: on Local whenever it
- * answers. Rounds run before every attempt to connect ([prepare], joining one under way), on every
- * change of network (the default network, its kind, its addresses), when the built-in node starts
- * or stops, when the Mac reports new addresses, and now and then while not on Local with local
+ * tries every route at once (the Mac's local addresses with the pinned client, the base URL as it
+ * is) and settles as [RoundJudge] says: on Local whenever it answers. Rounds run before every
+ * attempt to connect ([prepare], joining one under way), on every change of network (the default
+ * network, its kind, its addresses), when the Mac reports new addresses, and now and then while not on Local with local
  * addresses worth trying ([RecheckBackoff]: every 30 s to 2 minutes in the same subnet as the Mac,
  * 2 to 30 minutes elsewhere). [onRoute] hears every change of route a round makes by itself (the
  * hub reconnects through it). Registered in [ActiveRoutes], so every [Api] for this base follows
@@ -721,9 +662,7 @@ class LanRouter(
 ) {
     private val app = context.applicationContext
     private val connectivity = app.getSystemService(ConnectivityManager::class.java)
-    /** The computer on the tailnet, as the pairing names it (null: the pairing says nothing about one). */
-    private val tailnet = TailnetTarget.of(pairing)
-    private val chooser = RouteChooser(pairing.baseUrl, pairing.lanPort, tailnet)
+    private val chooser = RouteChooser(pairing.baseUrl, pairing.lanPort)
 
     /** The Mac's latest word on its listener; null until a snapshot says (then the pairing link's addresses serve). */
     var lan: LanInfo? = null
@@ -759,10 +698,6 @@ class LanRouter(
     private var failedAt = Long.MIN_VALUE / 2
     @Volatile private var ticker: Job? = null
     private var closed = false
-    /** Stops hearing the built-in node. */
-    private var unwatchNode: (() -> Unit)? = null
-    /** The client through the built-in node, for the proxy (port and secret) it was built for. */
-    private var viaNode: Pair<String, OkHttpClient>? = null
     /** The clients built for the current pin and device certificate (rebuilt when either changes). */
     private var pinned: Pinned? = null
 
@@ -802,18 +737,6 @@ class LanRouter(
 
     fun start() {
         ActiveRoutes.register(pairing.baseUrl, this)
-        // The built-in node coming up (or going) is a reason to look again, like a network change.
-        if (tailnet != null) {
-            var last: String? = null
-            unwatchNode = Tsnet.watch { s ->
-                val k = "${s.state}/${s.running}"
-                if (k != last) {
-                    last = k
-                    ConnLog.add(ConnKind.Node, if (s.running) ConnResult.Ok else ConnResult.Info, RouteKind.Tailscale, text = "the built-in node is ${nodeState(s)}${s.error?.let { ": $it" } ?: ""}")
-                    recheck("the built-in node is ${nodeState(s)}")
-                }
-            }
-        }
         // The watch reports the current network at once, which is the first probe round; without
         // one (no network) a round says so.
         if (runCatching { connectivity?.registerDefaultNetworkCallback(watch) }.isFailure) recheck("start")
@@ -836,7 +759,7 @@ class LanRouter(
                 val (net, gateways, look) = withContext(Dispatchers.IO) { Triple(netKind(), hotspotGateways(), connectivity?.activeNetwork to phoneSubnets()) }
                 val known = knownAddresses()
                 val near = net == NetKind.Wifi && RoutePolicy.sameSubnet(look.second, chooser.known(known))
-                if (backoff.due(elapsed(), gateways, look.first, near) && chooser.wantsRecheck(net, gateways.isNotEmpty(), known, gateways, Tsnet.status.running)) {
+                if (backoff.due(elapsed(), gateways, look.first, near) && chooser.wantsRecheck(net, gateways.isNotEmpty(), known, gateways)) {
                     recheck(if (near) "looking for Local again (same subnet as the Mac)" else "periodic re-check")
                 }
             }
@@ -846,8 +769,6 @@ class LanRouter(
     fun close() {
         closed = true
         ActiveRoutes.unregister(pairing.baseUrl, this)
-        NodeDestinations.drop(this)
-        unwatchNode?.invoke()
         runCatching { connectivity?.unregisterNetworkCallback(watch) }
         round?.job?.cancel(); ticker?.cancel()
     }
@@ -856,7 +777,7 @@ class LanRouter(
      * A request over [kind] failed in use (the snapshot, the socket): the route falls back to the
      * base URL until the next round, which the hub's next attempt runs, Local first ([prepare]). A
      * route that keeps failing is tried after the others for a while ([RouteChooser.failedInUse]),
-     * that route only: the tailnet failing never holds Local back. Not announced through [onRoute]:
+     * that route only: the base URL failing never holds Local back. Not announced through [onRoute]:
      * the caller is handling the failure (and its retry).
      */
     fun failed(kind: RouteKind) {
@@ -902,25 +823,6 @@ class LanRouter(
         if (have != null && have.fingerprint == fp) return have
         val identity = certs.identity()
         return Pinned(fp, identity, PinnedTls.client(fp, identity)).also { pinned = it }
-    }
-
-    /**
-     * The client through the built-in node's proxy, while the node runs: rebuilt when the proxy's
-     * port changes (the node restarted). The proxy is told the computer's name and port, which is
-     * all it will tunnel to.
-     */
-    private fun nodeClient(): OkHttpClient? {
-        val t = tailnet ?: return null
-        val node = Tsnet.status.takeIf { it.running } ?: return null
-        // The node must be the one for this pairing's control server.
-        if (!Tsnet.serves(pairing.controlUrl)) return null
-        // The allowlist is set every time (a pairing under way may have added to it), the client kept per proxy (port and secret).
-        // With the other paired computers' destinations next to this one's (data/Servers.kt, NodeDestinations).
-        t.hostPort?.let { NodeDestinations.want(this, it) }
-        val key = "${node.proxyPort}/${node.proxyToken}"
-        viaNode?.takeIf { it.first == key }?.let { return it.second }
-        val fp = t.fingerprint ?: fingerprint()
-        return TsnetTls.client(t.base, node.proxyPort, node.proxyToken, fp, certs.identity()).also { viaNode = key to it }
     }
 
     /** A round now, replacing one under way ([reason] goes to the log). */
@@ -1000,18 +902,6 @@ class LanRouter(
             !RoutePolicy.shouldProbe(env.net, hotspot) -> skip(RouteKind.Local, "on mobile data: the Mac can't be next door")
             candidates.isEmpty() -> skip(RouteKind.Local, "no local address known")
         }
-        val target = tailnet
-        val node = if (target != null) withContext(Dispatchers.IO) { nodeClient() } else null
-        if (target != null && node == null) {
-            skip(
-                RouteKind.Tailscale,
-                when {
-                    !Tsnet.available -> "no built-in Tailscale in this build"
-                    Tsnet.status.running && !Tsnet.serves(pairing.controlUrl) -> "the built-in node serves another control server"
-                    else -> "the built-in node is ${nodeState(Tsnet.status)}"
-                },
-            )
-        }
         val judge = RoundJudge(waitForLocal = near || hotspot, demoted = chooser.demoted(t0))
         val results = Channel<RouteTry>(Channel.UNLIMITED)
         val pending = mutableSetOf<RouteKind>()
@@ -1022,10 +912,6 @@ class LanRouter(
             if (pin != null && candidates.isNotEmpty()) {
                 pending += RouteKind.Local
                 launch { results.send(local(pin, candidates, known, p) { localWinner = it }) }
-            }
-            if (node != null && target != null) {
-                pending += RouteKind.Tailscale
-                launch { results.send(throughNode(node, target.base)) }
             }
             pending += RouteKind.Remote
             launch { results.send(asIs(pairing.baseUrl)) }
@@ -1053,7 +939,7 @@ class LanRouter(
 
     private fun decide(r: Round, pick: RouteKind?, localWinner: String?, port: Int, tries: List<RouteTry>, net: NetKind, near: Boolean, t0: Long, upgrade: Boolean) {
         if (round !== r || closed) return
-        chooser.settle(if (pick == RouteKind.Local) localWinner else null, tailscale = pick == RouteKind.Tailscale, lanPort = port)
+        chooser.settle(if (pick == RouteKind.Local) localWinner else null, lanPort = port)
         val rep = RouteReport(System.currentTimeMillis(), net, near, tries.toList(), pick)
         report = rep
         decidedAt = elapsed()
@@ -1095,16 +981,7 @@ class LanRouter(
         return RouteTry(RouteKind.Local, worst, at?.key?.let { ConnScrub.hostPort(RoutePolicy.baseOf(it, port)) }, at?.value?.ms, at?.value?.detail)
     }
 
-    /** The computer on the tailnet through the built-in node's proxy. */
-    private suspend fun throughNode(node: OkHttpClient, base: String): RouteTry {
-        val t0 = elapsed()
-        val res = withTimeoutOrNull(RoutePolicy.NODE_PROBE_MS) { probe(node, base) }
-            ?: Probed(ConnResult.Timeout, "no answer in ${RoutePolicy.NODE_PROBE_MS / 1000}s", elapsed() - t0)
-        ConnLog.add(ConnKind.Probe, res.result, RouteKind.Tailscale, ConnScrub.hostPort(base), listOfNotNull("through the built-in node", res.detail).joinToString(": "), res.ms)
-        return RouteTry(RouteKind.Tailscale, res.result, ConnScrub.hostPort(base), res.ms, res.detail)
-    }
-
-    /** The paired base URL as it is (the Tailscale app on this phone, or an address on the internet). */
+    /** The paired base URL as it is (an address the phone reaches without the local route). */
     private suspend fun asIs(base: String): RouteTry {
         val t0 = elapsed()
         val res = withTimeoutOrNull(RoutePolicy.BASE_PROBE_MS) { probe(Net.client, base) }
@@ -1115,10 +992,8 @@ class LanRouter(
 
     private fun publish(notify: Boolean = true) {
         val pin = if (chooser.kind == RouteKind.Local) pinnedClient() else null
-        val node = if (chooser.kind == RouteKind.Tailscale) nodeClient() else null
         val next = when {
             chooser.kind == RouteKind.Local && pin != null -> NetRoute(chooser.base, RouteKind.Local, pin.client, pin.fingerprint, pin.identity)
-            chooser.kind == RouteKind.Tailscale && node != null -> NetRoute(chooser.base, RouteKind.Tailscale, node, tailnet?.fingerprint, certs.identity())
             else -> NetRoute.remote(pairing.baseUrl)
         }
         if (next.base == route.base && next.kind == route.kind && next.client === route.client) return
@@ -1186,15 +1061,6 @@ class LanRouter(
             val vpn = caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
             val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             return (if (vpn) "a VPN over $under" else under) + if (validated) "" else ", not validated yet"
-        }
-
-        /** The built-in node's state in the log's words. */
-        fun nodeState(s: TsnetStatus): String = when {
-            s.running -> "running"
-            s.needsLogin -> "signed out (NeedsLogin)"
-            s.needsApproval -> "waiting for approval"
-            s.state == "Running" -> "joining (no proxy yet)"
-            else -> s.state.lowercase()
         }
 
         /** This phone's IPv4 addresses with their prefix lengths (Wi-Fi's, a hotspot's), for [RoutePolicy.sameSubnet]. */

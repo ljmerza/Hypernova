@@ -7,9 +7,8 @@ must ignore unknown fields and unknown enum values (show them generically).
 ## Architecture in one picture
 
 ```
- Android app ──https (tailscale serve, ts.net cert)──▶ daemon API  127.0.0.1:47321
- Android app ──https over the tailnet, built-in nodes─▶ hypernova-tsnet (Go) ──▶ daemon API 127.0.0.1:47321
- Android app ──https, pinned + device cert (same Wi-Fi)▶ daemon LAN  0.0.0.0:47323 (the same API)
+ Android app ──https, pinned + device cert (Wi-Fi/VPN)▶ daemon LAN  0.0.0.0:47323 (the same API)
+ (development: the emulator ──http 10.0.2.2──────────▶ daemon API  127.0.0.1:47321)
  Mac menu bar app ──http loopback + admin token──────▶ daemon local 127.0.0.1:47322
  Claude Code hooks (http hooks) ─────────────────────▶ daemon local /hooks/*
  Status line tee (marked block) ─▶ files in <support>/statusline/ ◀── daemon watches
@@ -41,15 +40,13 @@ must ignore unknown fields and unknown enum values (show them generically).
 
 ## Transport and auth
 
-- Phone base URL: `https://<computer's tailnet name>:47321`, served either by the Tailscale app's
-  `tailscale serve` or by the daemon's own node (see Tailscale built in; without HTTPS
-  certificates on the tailnet it is `https://<tailnet address>:47321` with the daemon's
-  certificate pinned). Development: `http://10.0.2.2:47321` from the
-  emulator (the debug build allows cleartext to 10.0.2.2 only). On the same network the app
-  prefers `https://<the Mac's private address>:47323`, the daemon's own certificate pinned and
-  the phone's device certificate presented (see Local network (direct HTTPS)); the API is the
-  same there, and the base URL in use is the one everything else is built from. The app's route
-  order is Local, then its built-in Tailscale node, then the base URL as it is.
+- Phones use the local route: `https://<the computer's private address>:47323`, the daemon's own
+  certificate pinned and the phone's device certificate presented (see Local network (direct
+  HTTPS)), on the same Wi-Fi or over the owner's own VPN into that network. The pairing link's
+  base URL `u` is `http://10.0.2.2:47321`: the emulator's address for this computer in
+  development (the debug build allows cleartext to 10.0.2.2 only), and on a real phone a fallback
+  that fails at once. The API is the same on both, and the base URL in use is the one everything
+  else is built from. The app's route order is Local, then the base URL as it is (see The route).
 - Every `/v1` request except `GET /v1/health`, `POST /v1/pair` and a terminal's WebSocket (a
   ticket instead, see Shared terminals) carries `Authorization: Bearer <deviceToken>`. 401 → the app shows
   "Unpaired" and stops retrying. WebSocket: same header on the upgrade request, or
@@ -70,14 +67,12 @@ must ignore unknown fields and unknown enum values (show them generically).
    minutes, or until the Mac stops showing it: `POST /local/pair/cancel {code?}` → `{ok,
    cancelled}` ends that code (without one, every live code); the menu bar calls it when its Pair
    page closes and when a fresh code replaces the old one. Both links also carry `fp=<fingerprint>&lan=<addr1>,<addr2>&lp=<port>` while the LAN
-   listener is on, so a phone with no tailnet pairs over the local network (see Local network
-   (direct HTTPS)), and `ts=<tailnet name>&ti=<tailnet address>&ta=<account>&tc=<control URL>`
-   when the computer is on a tailnet (see Tailscale built in; `ta` and `tc` only when known; `tc`
-   only for a control server other than tailscale.com).
+   listener is on, so the phone pairs over the local network (see Local network (direct HTTPS)).
+   (Links from a daemon before 2026-10-30 may also carry the tailnet hints `ts`, `ti`, `ta` and
+   `tc`; the app ignores them.)
 
    Why that link: phone cameras and Google Lens open https links, never a custom scheme from a QR
-   code, and a page on the computer opens only once the phone can reach it (not before it's on the
-   tailnet). Android opens `https://hypernova.observer/pair` straight in the app
+   code, and a page on the computer opens only once the phone can reach it. Android opens `https://hypernova.observer/pair` straight in the app
    (Android App Links: the manifest's `autoVerify` filter, and the domain's
    `/.well-known/assetlinks.json` from the name service's Worker, `names/src/links.ts`, naming the
    package and its signing keys). **The pairing details are in the fragment, which a browser never
@@ -110,7 +105,7 @@ must ignore unknown fields and unknown enum values (show them generically).
 4. `DELETE /v1/devices/me` forgets this phone on the Mac.
 
 The daemon also serves the app, to install or update it: `GET /download/android`
-(no auth, only through the tailnet) is a page with the version, a Download button and
+(no auth; on the local listener too, see Local network (direct HTTPS)) is a page with the version, a Download button and
 the install steps; the APK itself is `GET /download/android/Hypernova.apk`. The Mac app
 shows a "Get the app" QR code pointing at `<u>/download/android`.
 
@@ -120,16 +115,14 @@ The snapshot's `mac.app` names the APK the computer hands out (`{versionCode, ve
 higher `versionCode` than the running app's is an update (a banner once per version, a
 notification while the app is closed, a card in Settings). "Get the update" happens in the app
 (`data/AppUpdater.kt`, its rules in `data/UpdatePolicy.kt`), never in a browser: a browser can't
-reach a computer that only the app's own Tailscale node reaches, nor check the local listener's
-own certificate, which only the app pins.
+check the local listener's own certificate, which only the app pins.
 
 1. **Allowed to install, once.** Without "Install unknown apps" for Hypernova
    (`canRequestPackageInstalls`; the app declares `REQUEST_INSTALL_PACKAGES`), the banner and the
    card say so and open the system page for it; back in the app, the update carries on by itself.
 2. **The download, over the app's own route.** `GET <route base>/download/android/Hypernova.apk`
    with the route's own client: the local listener's address with the pinned certificate and the
-   device certificate (Local), the computer's tailnet address through the built-in node's proxy
-   (Tailscale), or the paired base URL (the Tailscale app, or a public address). The path is open
+   device certificate (Local), or the paired base URL as it is (Remote). The path is open
    on every listener without a token (before the auth check; `openOnLan` on the local listener).
    Into the app's cache (`cache/update/`), with its progress (whole percents) in the banner and the
    card; a body shorter than its `Content-Length` is a failure, never an APK to try.
@@ -149,14 +142,13 @@ own certificate, which only the app pins.
    abandoned.
 
 "Open in browser" stays on the card only where a browser could open the computer's page: an
-`https://` name (never an address, whose certificate only the app pins), and a tailnet name only
-while the app itself reaches the base URL as it is (the Tailscale app on the phone).
+`https://` name (never an address, whose certificate only the app pins).
 
 ## Local network (direct HTTPS)
 
 The phone reaches the daemon directly when both are on one network (the same Wi-Fi, or the Mac
-on the phone's hotspot), with no Tailscale, and falls back to the ts.net base URL when the local
-route isn't there. Nothing is opened to the internet. `daemon/src/lan.ts` (the listener, the
+on the phone's hotspot, or a VPN into the Mac's network), and falls back to the base URL as it is
+when the local route isn't there (see The route). Nothing is opened to the internet. `daemon/src/lan.ts` (the listener, the
 source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the certificates).
 
 - **The LAN listener:** HTTPS on port 47323 (`HYPERNOVA_LAN_PORT`; `0` takes a free port, for
@@ -201,7 +193,7 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   or `DELETE /local/devices/{id}` from the Mac) revokes its certificate at once: the record is
   gone, so the next request, even on a connection already open, is 401. The daemon keeps only each
   certificate's fingerprint with its device (`devices.json`), never a key of the phone's.
-- **`POST /v1/device/cert`** (bearer token; over any route: ts.net, the LAN listener or
+- **`POST /v1/device/cert`** (bearer token; over any route: the LAN listener or
   loopback): `{"csr": "<base64 DER PKCS#10>"}`, made on the phone with an EC P-256 key (kept in
   AndroidKeyStore) and the subject exactly `CN=<deviceId>` → `{"cert": "<base64 DER>", "ca":
   "<base64 DER>", "fingerprint"}`: the device's certificate (CN the deviceId, valid 2 years,
@@ -214,8 +206,9 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   the key isn't EC P-256; 503 `no_tls` when the daemon has no certificates (openssl missing).
 - **The snapshot** gains `lan: {port, addresses: string[], fingerprint, deviceCert: boolean} |
   null`: the listener's port, the Mac's private addresses right now (IPv4 in 10/8, 172.16/12 and
-  192.168/16, then IPv6 ULA; never loopback, link-local or the tailnet's own 100.64/10 and
-  fd7a:115c:a1e0::/48, however the interface writes them; in the order to try), the server
+  192.168/16, then IPv6 ULA; never loopback, link-local or Tailscale's 100.64/10 and
+  fd7a:115c:a1e0::/48 (a Tailscale the owner runs on the machine for something else), however the
+  interface writes them; in the order to try), the server
   certificate's fingerprint, and whether this device holds an active certificate that hasn't run
   out (`false` for the Mac app, for none, and once its 2 years are up; the app then asks for a new
   one, as it does on a 401 `device_cert_required` while presenting one). `null` while the listener
@@ -232,30 +225,30 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   `pairing_closed`), and allows at most 5 wrong codes per source address per 10 minutes (429
   `too_many_tries`, with `retryAfterSeconds`); a right code counts for nothing. There is no limit
   across sources, so one peer can't lock everyone else out: the code is 16 random bytes, which no
-  number of tries guesses (the daemon remembers the latest 1024 sources). The ts.net route keeps
-  today's rules.
-- **Route choice (the app), Local first, always:** on Wi-Fi, or while hosting a hotspot, try the
-  LAN addresses (the last snapshot's, the pairing link's, and the phone's own hotspot subnet probed
-  on the port, a /24 at most, short timeouts, in parallel) and prefer the first good mutual-TLS
-  handshake; otherwise the tailnet (see "Tailscale built in") or the base URL. Every attempt to
-  connect runs a probe round first, as does every network change; see "The route" under Tailscale
-  built in for the round, the back-off and the connection log.
+  number of tries guesses (the daemon remembers the latest 1024 sources). The loopback phone API
+  keeps today's rules.
+- **Route choice (the app), Local first, always:** on any network (Wi-Fi, a VPN), or while
+  hosting a hotspot, try the LAN addresses (the last snapshot's, the pairing link's, and the
+  phone's own hotspot subnet probed on the port, a /24 at most, short timeouts, in parallel) and
+  prefer the first good mutual-TLS handshake; otherwise the base URL. Every attempt to connect runs
+  a probe round first, as does every network change; see The route for the round, the back-off
+  and the connection log.
   Everything the app builds from the base URL (terminal tickets and their sockets, attachments, downloads, previews) follows the active route; the daemon builds the URLs
   it hands out (a preview's, the checklist's) from the request's own host and scheme. The Link chip
-  and Settings show the route: "Local" or "Tailscale".
+  and Settings show the route: "Local" or "Remote".
 - **The terminal on the local route:** the terminal page's own WebSocket can't trust the pinned
   certificate (a WebView never asks the app about a socket's certificate) nor show the device
   certificate, so there the app opens the ticket's socket itself, `wss://<the Mac's private
   address>:47323/v1/terms/{termId}/ws?ticket=…`, with the same pin and device certificate as its
   other requests, and passes the frames both ways between it and the page, unchanged (binary stays
-  binary, text stays text). Over Tailscale the page opens the socket itself, as before.
+  binary, text stays text). On the base URL the page opens the socket itself, as before.
 - **Previews and the checklist on the local route:** asked for over the LAN listener, `POST
   /v1/preview` and `GET /v1/qa` return `https://<the Mac's private address>:47323/p/<token>/…` and
   `…/qa?k=<key>`. They open in the app's own WebView, which pins the daemon's certificate and
   presents the device certificate as the app's other requests do (no bearer token: the link is the
   key, and a preview's page asks for its own files, with its cookie, the same way). An external
   browser can do neither (it would refuse the certificate, and the listener would answer 401
-  `device_cert_required`), so links that leave the app use the ts.net route: the same path and
+  `device_cert_required`), so links that leave the app use the base URL: the same path and
   query on the paired base URL `u` (preview tokens and the checklist's key aren't bound to a
   host).
 
@@ -333,13 +326,11 @@ device certificate exactly as above. `daemon/src/names.ts` (the name), `daemon/s
   endpoint's wrong-code tries. The pairing page's links go to the name and port, never to a host
   the request names.
 - **The pages and links:** whenever the name works, `download` (`POST /local/pair/start`) and
-  `downloadUrl` (`/local/status`) are `https://l-<name>.<domain>:<port>/download/android`, with
-  the built-in node or the Tailscale app serving alike: a brand-new phone on the same Wi-Fi opens
-  it with no app and no Tailscale. `downloadAnywhere` is then the tailnet's own download page, for
-  a phone that already has Tailscale (only when a browser can check its certificate: the Tailscale
-  app's serve, or the built-in node with the tailnet's HTTPS certificates; else null). While the
-  built-in node is the way in, `webLink` is the pairing page through the name; that page hands
-  the app the code's usual route: `u` is the base URL, never the name, plus `fp`, `lan` and `lp`.
+  `downloadUrl` (`/local/status`) are `https://l-<name>.<domain>:<port>/download/android`:
+  a brand-new phone on the same Wi-Fi opens it with no app yet. `downloadAnywhere` is then an
+  https base URL's own download page (null with the usual `http://10.0.2.2` base). `webLink` is the
+  pairing page through the name whenever it works; that page hands the app the code's usual route:
+  `u` is the base URL, never the name, plus `fp`, `lan` and `lp`.
   The download page through the name has no checksum warning (the Mac still shows the checksum,
   quietly). The pairing QR (`link`) never uses the name: it's `https://hypernova.observer/pair#…`
   (see Pairing). `downloadTrusted` is false for a plain-http base too.
@@ -403,241 +394,54 @@ device certificate exactly as above. `daemon/src/names.ts` (the name), `daemon/s
   public address of its own the listener is off by default, so no name is registered; a public
   name for a VPS (`<name>` → its own address, direct HTTPS) is for later (LATER L59).
 
-## Tailscale built in
+## The route
 
-Neither end needs the Tailscale app: the daemon and the Android app each carry their own
-Tailscale node (`tsnet`), and the user signs in with their own Tailscale account once on the
-computer and once on the phone. The phone then reaches the computer from anywhere through the
-tailnet, with no server of ours and nothing opened to the internet. (docs/DECISIONS.md,
-"Direction"; this is the main route from outside, as the network tests showed.)
-`daemon/tsnet/` (the computer's helper, Go), `daemon/src/tsnet.ts` (its supervisor),
-`android/tsnet/` (the phone's node, Go, bound with gomobile) and `android/.../data/Tsnet.kt`.
+(Until 2026-10-30 this place described "Tailscale built in": the daemon's and the app's own
+Tailscale nodes, `tailscale serve` for the phone API, the pairing link's tailnet hints and the
+`Tailscale` route. All of it was removed: docs/DECISIONS.md, "Tailscale is removed". The phone
+reaches the computer on its own network, or over the owner's own VPN into that network.)
 
-- **The computer's helper, `hypernova-tsnet`:** a small Go program on `tailscale.com/tsnet`,
-  started and supervised by the daemon (restarted with a growing pause when it dies, stopped with
-  the daemon). It joins the tailnet as `hypernova-<host>` (lowercase, DNS letters) with its state
-  (the node key) in `<support>/tsnet/` (0700), and serves the phone API over the tailnet on the
-  API port: a reverse proxy to `127.0.0.1:47321` that adds what `tailscale serve` adds
-  (`X-Forwarded-For`, `X-Forwarded-Proto: https`, `Tailscale-User-Login`), keeps the `Host` the
-  phone sent (the daemon builds a preview's or the checklist's links from it) and passes
-  WebSockets through. It listens only inside the tailnet, never on a public interface.
-  - **HTTPS:** when the tailnet issues HTTPS certificates for the node's name (`CertDomains`),
-    `ListenTLS` serves `https://hypernova-<host>.<tailnet>.ts.net:47321` with the tailnet's
-    certificate (publicly trusted). When the tailnet hasn't enabled HTTPS certificates (the
-    admin console's DNS page, or Headscale), the helper says exactly that (`tls: "pinned"`) and
-    serves `https://<tailnet IPv4>:47321` with the daemon's own certificate from the Local route
-    (`<support>/tls/server.crt`), which the phone pins by the pairing code's `fp`.
-  - **It speaks JSON lines:** on stdout, one `{"t":"status", …}` whole each time something
-    changes: `state` (`NeedsLogin`, `Starting`, `Running`, `Stopped`, `NoState`), `loginUrl` and
-    `qr` (the link as a terminal QR code) while it needs a sign-in, then `dnsName`, `ips`,
-    `account` (the login the node signed in with), `tailnet`, `controlUrl`, `https`, `listening`
-    (the base URL it serves), `tls` (`tailscale` or `pinned`) and `error`. On stdin, one-word
-    commands `{"c": "login" | "logout" | "status"}`; `logout` drops the node key and asks for a
-    new link (another account, or a fresh start). Flags: `--state`, `--hostname`, `--port`,
-    `--target`, `--control` (a Headscale URL; empty for tailscale.com), `--authkey` (a pre-auth
-    key: tests and Headscale), `--cert`, `--key`.
-  - **Where it is:** `daemon/bin/hypernova-tsnet-<os>-<arch>` (`darwin-arm64`, `linux-amd64`,
-    `linux-arm64`, built by `daemon/tsnet/build.sh`; `mac/build.sh` builds and bundles the Mac
-    one), or `HYPERNOVA_TSNET` (tests point it at a stand-in). Without a binary the daemon says
-    so and falls back to the Tailscale app. The daemon hands it a minimal environment (`PATH`,
-    `HOME`, `TS_NO_LOGS_NO_SUPPORT`, `TS_LOGS_DIR`); a pre-auth key goes in a variable named by
-    `--authkey-env`, read once and dropped, never on the command line. Leaving `Running` (a
-    logout, an expired key) closes the listener, so the next sign-in serves again. The proxy drops
-    any `X-Forwarded-*`, `Forwarded` and `Tailscale-User-*` a client sent and sets its own.
-- **One node per machine (the daemon's choice, reported):** at start (with 20 s of grace for a
-  Tailscale app that is installed but still coming up), whenever the setting changes, every minute
-  while the helper runs, and right after `POST /local/tailscale/serve`, the daemon looks at the
-  Tailscale app. If it is running, signed in and serving the phone API (`tailscale serve` on the
-  API port), the helper stays off, or stops: `mode: "system"`, with the reason. Otherwise, when the setting `builtInTailscale` (default on; `POST /local/settings
-  {builtInTailscale}`) allows and the binary is there, the helper runs: `mode: "builtIn"`. Off, or
-  no binary: `mode: "off"`. `GET /local/tsnet` and the `tsnet` field of `GET /local/status`:
-  `{mode, reason, available, enabled, helper: <the helper's last status> | null, url, controlUrl}`.
-  `POST /local/tsnet/login` and `POST /local/tsnet/logout` pass the commands on. Every feed hears
-  `{t:"tsnet", tsnet, tailnet}` on a change, without `loginUrl` and `qr` (phones hear it too; the
-  Mac app reads the link from `/local/status`). `tailnet` (also the snapshot's
-  `mac.tailnet`) is where the phone API is on the tailnet right now: `{name, ip, url, control}` from
-  the helper while it serves, else from the Tailscale app's serve as last read; null when neither
-  serves. `publicBaseUrl` (the pairing link's `u`)
-  is the Tailscale app's serve address when it is on, else the helper's `listening`. A control
-  server (`tailscaleControlUrl`) must be `https://`, or plain `http://` to a private address only
-  (400 `bad_control_url` otherwise).
-- **The sign-in link on the computer:** the Mac app's Tailscale step shows it as a QR code ("Sign
-  in to connect your devices") and opens it; `hn tailscale` prints the state and the QR code in
-  the terminal (Linux servers), `hn tailscale login | logout` the commands. The user scans or
-  opens it, signs in with Google, GitHub, Apple or Microsoft, and the node is on the tailnet; the
-  daemon's log and the Mac app say when it serves.
-- **The pairing link's tailnet hints:** `ts=<the computer's tailnet name>`, `ti=<its tailnet
-  IPv4>`, `ta=<the account it signed in with>` (so the phone says "sign in as you@…"; in the app
-  link and the QR code's fragment, which the page there takes out of the address bar once read,
-  never in the computer's own web link, which ends up in a browser's history) and `tc=<control URL>`
-  (only for a control server other than tailscale.com). From the helper while it runs, else from
-  the Tailscale app's status (a phone with the built-in node reaches a computer that uses the
-  Tailscale app just the same). `fp` is in the link whenever the daemon has its certificate, with
-  or without the LAN listener. The pairing page (`GET /pair`) builds its app link from the
-  daemon's own hints at request time, never from its query.
-  - **Which link the code shows:** `POST /local/pair/start` returns `link` (what the QR carries),
-    `appLink` (`hypernova://…`), `webLink` (`<base>/pair?…`) and `download` (where the phone gets
-    the app). `link` is always `https://hypernova.observer/pair#<the app link's parameters>` (see
-    Pairing): the camera opens the app directly whatever the way in, even on a phone that hasn't
-    signed in to the tailnet yet, and the app's "Paste link" takes it too. While the built-in node
-    is the only tailnet route, `download` is the LAN listener's
-    `https://<private address>:47323/download/android` (the browser warns once about the
-    computer's own certificate). The LAN listener serves `GET /pair`,
-    `/download/android` and `/download/android/Hypernova.apk` to anyone on the network for that,
-    like the health check. `GET /local/status` carries the same `downloadUrl`.
-- **The phone's node:** the app carries `tsnet` in userspace (`app/libs/tsnet.aar`, built by
-  `android/tsnet/build.sh` with gomobile: `arm64-v8a` and `x86_64`), with no `VpnService`, so the
-  user's own VPN keeps working and Hypernova never takes the VPN slot. Its state lives in the
-  app's private `files/tsnet/`; its name is `hypernova-<make-model>`. Android denies apps the
-  netlink calls Go would use to list interfaces, so the app reads them with Java and hands them to
-  the node, at start and on every network change, with the default network's interface and
-  gateway. The node starts only when the route needs it: from the pairing screen when the
-  computer is on a tailnet and couldn't be reached otherwise, from Settings, or at start when it
-  signed in before (its state is on disk); a phone that reaches the computer through the Tailscale
-  app or locally never starts a second node. It stops when the computer is forgotten. One state
-  folder per control server (`files/tsnet/default`, `files/tsnet/<hash of the URL>`), so a link
-  naming another server never gets the keys made for tailscale.com, and forgetting a computer with
-  its own server deletes that folder.
-  - **A computer's own control server (`tc`) needs the user's yes first:** the pairing screen (or
-    Settings, for a pairing made over the local network) shows "This computer uses its own
-    Tailscale server: <host>" with what that means, and nothing talks to that server until the user
-    taps "Use <host>"; the choice is kept with the pairing (`controlConfirmed`). `tc` must be
-    `https://`, or plain `http://` to a private address only; anything else is dropped from the
-    link. The card names the server in every state. A sign-in link opens in the browser only when
-    it is `https://login.tailscale.com/…` or on the control server's own host (http only for a
-    private http control URL). With a computer's own server the pairing is not retried by itself
-    after the sign-in; the user taps Try again.
-  - **The sign-in on the phone:** one card (`ui/onboarding/TailscaleSignIn.kt`): on the pairing
-    screen when the computer is on a tailnet and couldn't be reached otherwise (the node starts,
-    the card opens the link in the browser, and the pairing goes again by itself once the node
-    runs), and in Settings whenever the pairing names a tailnet. Its seam carries the node's state
-    as a chip, and every state says what is going on and what to do (`TsnetPolicy.phase`, unit
-    tested):
-    - **Off** (never signed in on this phone): Sign in. In Settings while the computer is reached
-      another way, a line and a quiet Sign in, not a call to action.
-    - **Starting**, or NeedsLogin before the link came ("Getting a sign-in link…").
-    - **Not signed in** (NeedsLogin with a link): "Sign in to connect your devices", Sign in.
-    - **Sign-in open**: back from the browser with the node still waiting on the very link it
-      opened. Tailscale's page ends with Connect for this device, and closing the tab before that
-      leaves the node where it was: "Finish signing in", Open the sign-in again.
-    - **Sign in again**: a link was opened, but the node has a new one. The link the browser
-      finishes is bound to a key the node holds in memory only, so if Android ended the app while
-      the browser had the sign-in, the node that starts next has a new key and a new link, and the
-      finished sign-in belongs to a node that's gone. The opened link is kept on the phone for an
-      hour (cleared once running, on Sign out, and on a stop), so the card says why it asks again.
-    - **Waiting for approval** (NeedsMachineAuth, a tailnet with device approval): the account and
-      this phone's name, "Approve this phone" and Open admin console (tailscale.com's Machines page;
-      a computer's own server approves its own way).
-    - **Connecting** (signed in, joining: Starting with its name known, or Running before the
-      proxy): a turning planet and "Signed in. Joining your tailnet…".
-    - **Connected** (Running with the proxy up): the account after a person glyph and this phone's
-      tailnet name after a phone glyph, as chips, and Sign out. On the pairing screen the card
-      leaves instead.
-    - **Didn't start**: the node's error, or Tailscale's own message for a node it stopped
-      (`ErrMessage`, such as a tailnet that needs flow logs), and Try again.
-    The link opens with `ACTION_VIEW` and the Custom Tabs extra; the app reads the node's state
-    again whenever it comes back on screen. Settings' Mac card draws the route in use as a chip:
-    Local (the home network's arcs), Tailscale with BUILT IN (the node), Tailscale app (the base URL
-    on the tailnet, reached as it is), or Remote (a globe). While the node runs and the computer
-    still can't be reached, the offline card says that ("Tailscale is on in this app, but your Mac
-    doesn't answer on the tailnet…"), not "sign in to Tailscale in this app".
-  - **Sign out:** Tailscale's logout deletes the node's profile, and the one after it starts from
-    Tailscale's defaults (tailscale.com, no name, not running), so the node (`android/tsnet`
-    `Logout`) starts over as the app started it and asks for a link on its own control server.
-    Off the main thread (the logout waits for the control server, up to 10 s).
-  - **The sign-in link is asked for once:** tsnet asks itself when it starts at NeedsLogin; the node
-    asks again only when, 3 s on, there still is no link (asking while one is on its way starts the
-    sign-in over with a new key).
-  - **The computer moved on its tailnet:** a phone paired while the Tailscale app served the phone
-    API has that node's name as its target; once the app is quit and the built-in node serves (a
-    different node, `hypernova-<host>`), the phone's node would dial a machine that's gone and the
-    app would stay offline away from home. So the app follows `mac.tailnet` (the snapshot) and
-    `{t:"tsnet", tailnet}` over the route it already trusts (`TailnetFollow`): the pairing keeps the
-    new name, address and URL (`tailnetUrl`), and the link starts over with them. Only on the same
-    control server (another needs the user's consent, which a new pairing asks for), and only a URL
-    that is the named computer itself, over https; the proxy dials tailnet peers only either way.
-  - **How the app's traffic gets in:** the node runs a small HTTP `CONNECT` proxy on loopback
-    (`127.0.0.1:<random port>`, reported as `proxyPort`) with a secret made at each start
-    (`proxyToken`; `Proxy-Authorization: Basic hypernova:<token>`, 407 without it), which tunnels
-    only to the destinations the app allowed (the paired computer's `name:port` or
-    `[address]:port`, 403 otherwise) and only to a peer of the tailnet: a name is resolved from
-    the node's own peer list to that peer's tailnet address, an address must be a tailnet address
-    the node knows (`WhoIs`); never system DNS, never the internet (502). At most 64 tunnels at
-    once (503). So another app on the phone can't borrow the tailnet, and the tunnel can't leave
-    it. The built-in route's OkHttp client uses that proxy with the secret; for a tailnet-address
-    base (no HTTPS certificates on the tailnet) it pins `fp`, for a name it trusts the system's
-    roots. The device certificate is presented where the server asks for one.
-  - **The APK:** the node adds about 19 MB per ABI (stored compressed); a release build ships
-    `arm64-v8a` only, a debug build `x86_64` too for the emulator. The AAR's Java package is the
-    node's own (`com.prudnikweb.hypernova.go.tsnet`), so its keep rule leaves R8 free for the app.
-    Backups are off and `dataExtractionRules` keeps `files/tsnet` out of a device-to-device
-    transfer: a new phone is a new node.
-  - **The route:** `RouteKind.Tailscale`, between `Local` and `Remote`. Local first, always
-    (`data/LanRoute.kt`): a **probe round** tries every route at once, each `GET /v1/health`: the
-    Mac's local addresses with the pinned client (4 s each; on Wi-Fi or a hotspot, never on mobile
-    data alone), the tailnet target through the node's proxy (12 s, while the node runs), and the
-    base URL as it is (8 s; the Tailscale app on the phone, or a public address). It settles on
-    Local the moment Local answers; on the tailnet or the base URL only once Local has failed, except
-    that off the Mac's subnet (the phone's Wi-Fi address and a Mac address not in one IPv4 subnet)
-    Local timing out doesn't hold the round up: it settles on what answered and moves to Local if
-    Local answers later. Nothing answering at all fails the attempt at once with what was tried.
-    **Rounds run** before every attempt to connect (joining one under way, or taking one settled
-    under 3 s ago with no failure since), on every network change (the default network, its kind,
-    its addresses), when the node starts or stops, when the Mac reports new addresses, and, while
-    not on Local with local addresses worth trying, after 30 s, 1 minute, then every 2 minutes in
-    the Mac's subnet, or after 2, 4, 8, 16, then every 30 minutes elsewhere (a network change or a
-    hotspot appearing starts over). So a reconnect after any failure, on any route, tries Local
-    first. **A route that fails in use** (the snapshot or the socket over it) falls back to the base
-    URL until the next round; failing again within 5 minutes of its last failure, it is tried after
-    the others for 8 s, then 16, 32… up to 2 minutes, still tried, and still used when nothing else
-    answers. Each route counts its own failures: the tailnet failing never holds Local back. Local
-    that answers while the Mac won't take this phone's device certificate there is tried after the
-    others for a minute (a 401 `device_cert_required` after the certificate was asked for this
-    connection is never an unpairing). A local winner is settled on the port it answered on (the
-    snapshot's `lan.port`, not only the pairing link's). **The offline card** names what the last
-    round tried when nothing answered ("Can't reach your Mac on Wi‑Fi or over Tailscale", "Your Mac
-    doesn't answer on this Wi‑Fi", "This phone isn't on Wi‑Fi, and your Mac doesn't answer over
-    Tailscale", "Another device answers at your Mac's address"), draws each route's answer as a tag
-    (`LOCAL  REFUSED`, `TAILSCALE  NO ANSWER`), blames the tailnet only for a failure that came over
-    it, and links to the **connection log** (`data/ConnLog.kt`; Settings → Mac → Connection log): the
-    network each round saw, every probe and its answer (OK, refused, no answer, unreachable, no such
-    name, another certificate, the node unable to reach the Mac: its proxy's 502…), the route chosen
-    and why, the socket opening and closing (with the close code), the waits, this phone's node and
-    what the Mac says about its own (`{t:"tsnet"}`). The last 600 entries in memory, the newest 250
-    on disk (`files/connlog.jsonl`), logcat (`HypernovaConn`) in debug builds; Copy puts it on the
-    clipboard as text. Never a token, key, code, proxy secret or URL: a host and port at most.
-    Everything built from the base URL follows the route through
-    `ActiveRoutes`, as on the Local route; the terminal's socket is opened by the app with the
-    route's client on this route too (a page's own socket can't use the proxy). The Link chip says
-    "Local" or "Tailscale"; Settings draws the route as a chip (see the sign-in above). `Mac.via` is
-    `"tsnet"` here, `"tailscale"` for the base URL when it is on the tailnet (the Tailscale app),
-    `"remote"` otherwise. Not yet on this route: in-app pages (previews, the checklist) in the WebView,
-    which can't use the proxy; they take the Local route or the base URL.
-- **tailscale.com (the default) and Headscale:** with nothing set, both nodes use tailscale.com's
-  coordination server and the user's own account (a free plan is enough). A self-hoster points
-  both ends at Headscale: the computer with the setting `tailscaleControlUrl` (`POST
-  /local/settings {tailscaleControlUrl: "https://headscale.example"}`; `""` means tailscale.com
-  again; or `HYPERNOVA_TSNET_CONTROL`), and the phone learns it from the pairing link's `tc`.
-  Headscale issues no HTTPS certificates, so the helper serves the pinned certificate on the
-  tailnet address, and the phone pins it. Pre-auth keys skip the browser sign-in:
-  `HYPERNOVA_TSNET_AUTHKEY` for the daemon (passed to the helper through its environment), and for
-  the app a debug build with `HYPERNOVA_TSNET_AUTHKEY` set (a debug build also reads
-  `/data/local/tmp/hypernova-tsnet-authkey` on the device); a release build refuses to carry one.
-  A tailnet with network flow logs on turns a no-logs node away: the sign-in then fails with
-  Tailscale's own message, and the Tailscale app is the way for that tailnet.
-- **The end-to-end test here** (no real Tailscale account needed): Headscale in Docker on this
-  Mac (`headscale/headscale:0.26`, `server_url` the Mac's LAN address on port 49508, the embedded
-  DERP on), a user and a reusable pre-auth key, a scratch daemon with `HYPERNOVA_TSNET_CONTROL`
-  and `HYPERNOVA_TSNET_AUTHKEY` (its LAN listener off, so the only way in is the tailnet), the
-  key pushed to the emulator, and the app paired with the daemon's link: the app's node joins
-  Headscale, the route is Tailscale, and the live feed runs through it.
-- **Tests:** `daemon/test/tsnet.test.ts` (the helper's lifecycle with the stand-in
-  `test/fixtures/fake-tsnet.mjs`: the choice between the Tailscale app and the built-in node, the
-  pairing link, the local endpoints, a crash and restart, a helper that ignores SIGTERM, the
-  pinned fallback, a control server, the app starting to serve later, the pair page's own hints),
-  `daemon/tsnet/main_test.go` (the proxy's headers, 502 with the daemon down, serving again after
-  a logout), `android/tsnet/node_test.go` (the CONNECT proxy: secret, allowlist, peers only, the
-  cap), and on Android `TailscaleRouteTest` and `PairLinksTest`.
+- **Two routes:** `RouteKind.Local` (the computer's local listener, see Local network (direct
+  HTTPS)) and `RouteKind.Remote` (the paired base URL as it is: a public address, or the
+  emulator's `http://10.0.2.2:47321`). Local first, always (`data/LanRoute.kt`).
+- **A probe round** tries both at once, each `GET /v1/health`: the computer's local addresses with
+  the pinned client (4 s each; on any network, Wi-Fi, a VPN or this phone's hotspot) and the base
+  URL as it is (8 s). It settles on Local the moment Local answers; on the base URL only once
+  Local has failed, except that off the computer's subnet (the phone's Wi-Fi address and the
+  computer's not in one IPv4 subnet) Local timing out doesn't hold the round up: it settles on what
+  answered and moves to Local if Local answers later. Nothing answering at all fails the attempt at
+  once with what was tried.
+- **Rounds run** before every attempt to connect (joining one under way, or taking one settled
+  under 3 s ago with no failure since), on every network change (the default network, its kind,
+  its addresses), when the computer reports new addresses, and, while not on Local with local
+  addresses worth trying, after 30 s, 1 minute, then every 2 minutes in the computer's subnet, or
+  after 2, 4, 8, 16, then every 30 minutes elsewhere (a network change or a hotspot appearing
+  starts over). So a reconnect after any failure tries Local first.
+- **A route that fails in use** (the snapshot or the socket over it) falls back to the base URL
+  until the next round; failing again within 5 minutes of its last failure, it is tried after the
+  other for 8 s, then 16, 32… up to 2 minutes, still tried, and still used when nothing else
+  answers. Each route counts its own failures. Local that answers while the computer won't take
+  this phone's device certificate there is tried after the other for a minute (a 401
+  `device_cert_required` after the certificate was asked for this connection is never an
+  unpairing). A local winner is settled on the port it answered on (the snapshot's `lan.port`, not
+  only the pairing link's).
+- **The offline card** names what the last round tried when nothing answered ("Your Mac doesn't
+  answer on this Wi‑Fi", "Another device answers at your Mac's address"), draws each route's answer
+  as a tag (`LOCAL  REFUSED`), and links to the **connection log** (`data/ConnLog.kt`; Settings →
+  Mac → Connection log): the network each round saw, every probe and its answer (OK, refused, no
+  answer, unreachable, no such name, another certificate…), the route chosen and why, the socket
+  opening and closing (with the close code) and the waits. The last 600 entries in memory, the
+  newest 250 on disk (`files/connlog.jsonl`), logcat (`HypernovaConn`) in debug builds; Copy puts
+  it on the clipboard as text. Never a token, key or code: a host and port at most.
+- Everything built from the base URL follows the route through `ActiveRoutes`. The Link chip says
+  "Local" or "Remote"; Settings draws the route as a chip. `Mac.via` is `"local"` or `"remote"`.
+- **What a computer or a phone kept from before** is left alone and not read: the daemon's
+  `builtInTailscale` and `tailscaleControlUrl` settings, its `<support>/tsnet/` folder, the app's
+  stored `tailnet*` and `controlUrl` fields (they go with the next save of the list of computers),
+  and its `files/tsnet` folder. A pairing link that still carries `ts`, `ti`, `ta` or `tc` pairs as
+  before, without them.
+- **Tests:** on Android `LanRouteTest`, `LocalFirstTest`, `RouteRecheckTest`, `PairLinksTest` and
+  `ServersTest`; in the daemon `test/lan.test.ts` and `test/linux-cli.test.ts`.
 
 ## REST
 
@@ -773,8 +577,6 @@ objects with a `t` field:
 - `{t:"devices"}` a phone paired (nothing else in it).
 - `{t:"lan", lan: {port, addresses, fingerprint} | null}`: the Mac's private addresses changed, or
   the LAN listener was turned on or off (see Local network (direct HTTPS)).
-- `{t:"tsnet", tsnet, tailnet: {name, ip, url, control} | null}`: which Tailscale serves the phone
-  API changed, or its state (see Tailscale built in); a phone follows `tailnet`.
 - `{t:"speech", speech: Speech}`: the Mac's voice or speed changed. `{t:"speech.stop", id}` to the phone app that plays a play; the phone sends
   `{t:"speech.progress", …}` about its own plays; `{t:"speaking", speaking}` to the Mac app's feed
   alone. See Read aloud, "Plays".
@@ -792,7 +594,6 @@ objects with a `t` field:
 ```ts
 Snapshot = { mac: {id, name, daemonVersion, claudeVersion, projectsRoot,
                     app: {versionCode, versionName} | null,    // the Android app it hands out (see The app update)
-                    tailnet: {name, ip, url, control} | null,  // the phone API on the tailnet now (Tailscale built in)
                     battery: Battery | null,                   // null: no battery (see Battery)
                     awake: Awake,                              // see Stay awake
                     files: {browseOutsideProjects: boolean},   // see Files, The setting
@@ -2269,7 +2070,7 @@ Trigger +=
     token>` (the admin token works too): the one `/local` route that takes another token than the
     admin one. For git hooks, cron and CI on the same machine.
   - `POST /v1/automations/{id}/fire` with a paired device's token, on any port a device reaches
-    (the tailnet, the LAN listener). Never on a public address.
+    (the LAN listener, loopback). Never on a public address.
   - The body is anything up to 64 KB (413 `too_large`), UTF-8 text (415 `not_text`); its first
     8 KB are `{payload}`. → 200 `{run}`: the run it made, through the gates as a fired run, not as
     Run now (so it may be `queued`, `waiting`, or `skipped` with `overlap` or `daily_cap`). 409
@@ -3450,19 +3251,16 @@ The admin token is in `<support>/admin-token` (0600); the Mac app reads it.
 
 | Method & path | Purpose |
 |---|---|
-| `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, tailscale: TailscaleStatus, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, downloadAnywhere, apk, name}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`, `downloadAnywhere` and `name`: see A name on the local network) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started); `?fresh` asks Tailscale again rather than using an answer from the last 15 s |
-| `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download, tailnet}` (see Pairing; `link`, what the QR code carries, is `https://hypernova.observer/pair#<appLink's parameters>`; `url` is the base URL). `?dev`: the emulator's base URL. `?name`: the code is shown where its download link may use the private name (Setup, `hypernova pair`), so it counts for the name until it expires (see A name on the local network); the menu bar's code leaves it out |
+| `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, downloadAnywhere, apk, name}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`, `downloadAnywhere` and `name`: see A name on the local network) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started) |
+| `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download}` (see Pairing; `link`, what the QR code carries, is `https://hypernova.observer/pair#<appLink's parameters>`; `url` is the base URL). `?dev`: the emulator's base URL. `?name`: the code is shown where its download link may use the private name (Setup, `hypernova pair`), so it counts for the name until it expires (see A name on the local network); the menu bar's code leaves it out |
 | `POST /local/automations/{id}/fire` | the payload (≤ 64 KB, text) → `{run}`: fires an automation's webhook trigger. Takes `Authorization: Bearer <that automation's fire token>` (or the admin token): the one `/local` route that does. 401 `bad_token`; 409 `paused`, `off`, `not_webhook`; 413, 415 (see Automations, "Workflows") |
 | `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, nameService?: boolean, acmeDirectory?: "staging" \| "production" \| url \| null, browseOutsideProjects?: boolean, codex?: boolean}` (`projectsRoot` kept only when that folder exists; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `nameService` and `acmeDirectory`, see A name on the local network; `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex) → the settings |
 | `GET /local/name`, `POST /local/name/release` | the name's state (as `/local/status`'s `name`); giving it up before an uninstall → `{released, name, waited?}` (see A name on the local network). `GET /local/status?qr=1`: a download or pairing code is on screen |
-| `POST /local/tailscale/serve` | turns on `tailscale serve` for port 47321 → `TailscaleStatus` |
 | `POST /local/integration/install` / `uninstall` | hooks + status line tee + the `claude` shell function (reversible, marked) |
 | `GET /local/devices`, `DELETE /local/devices/{id}` | paired phones: `{id, name, model, createdAt, lastSeenAt, appVersion?, client?, certFingerprint?, certExpiresAt?}` (`certFingerprint`: its device certificate's, once it has one, and `certExpiresAt` when that runs out, epoch ms). Deleting one revokes its certificate too |
 | `/v1/*` | the whole phone API is also available with the admin token |
 | `GET /v1/ws?client=mac` (port 47321) | the Mac app's live feed: the admin token over loopback; in `connectedClients` like any client; the only feed that hears `speaking` |
 | `GET /qa` | the testing checklist page. It and the routes it calls (`/qa/state`, `/qa/save`, `/qa/shot`) need its key `?k=` (from `GET /v1/qa`; the page passes it on to its own requests) or the admin token, on either port. The menu's link opens the bare page in a browser: on this port that is redirected to the page with its key, but only for a page opened by hand or by an app (`Sec-Fetch-Site` `none` or `same-origin`, or a browser that sends none), with Host `127.0.0.1` or `localhost`, never for another site's request |
-
-`TailscaleStatus = {installed, cliPath, running, loggedIn, dnsName, ip, httpsEnabled, serveOn, url, keyExpiry}`
 
 ## Hooks (installed by the integration step)
 

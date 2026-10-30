@@ -289,12 +289,8 @@ data class Mac(
 
         /** [via]: the Mac's own address on this network (data/LanRoute.kt). */
         const val VIA_LOCAL = "local"
-        /** [via]: the paired base URL as it is (the Tailscale app on the phone, or a public address). */
-        const val VIA_TAILSCALE = "tailscale"
-        /** A plain remote base URL (no Tailscale of either kind). */
+        /** [via]: the paired base URL as it is (a plain remote address, or one reached over the owner's VPN). */
         const val VIA_REMOTE = "remote"
-        /** [via]: the app's own Tailscale node (data/Tsnet.kt). */
-        const val VIA_BUILT_IN = "tsnet"
     }
 }
 

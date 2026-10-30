@@ -19,7 +19,7 @@ class RouteRecheckTest {
         assertFalse(RoutePolicy.shouldProbe(NetKind.None, hotspot = false))
         assertTrue(RoutePolicy.shouldProbe(NetKind.Wifi, hotspot = false))
         assertTrue(RoutePolicy.shouldProbe(NetKind.Mobile, hotspot = true))
-        val c = RouteChooser("https://mac.example.ts.net", 47323)
+        val c = RouteChooser("https://mac.example.com", 47323)
         assertTrue(c.wantsRecheck(NetKind.Mobile, hotspot = false, known = listOf("192.168.1.20"), hotspotGateways = emptyList()))
         assertFalse(c.wantsRecheck(NetKind.None, hotspot = false, known = listOf("192.168.1.20"), hotspotGateways = emptyList()))
     }
@@ -43,7 +43,7 @@ class RouteRecheckTest {
 
     @Test fun noNetworkNeverSweepsWhateverIsDue() {
         val b = RecheckBackoff(0)
-        val c = RouteChooser("https://mac.example.ts.net", 47323)
+        val c = RouteChooser("https://mac.example.com", 47323)
         assertTrue(b.due(10 * 60_000L, emptyList(), null))
         assertFalse(c.wantsRecheck(NetKind.None, hotspot = false, known = listOf("192.168.1.20"), hotspotGateways = emptyList()))
     }

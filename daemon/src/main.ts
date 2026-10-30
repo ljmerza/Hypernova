@@ -15,7 +15,6 @@ import { startStats } from './stats.ts'
 import { startBattery } from './battery.ts'
 import { startAwake } from './awake.ts'
 import { startAutomations } from './automations.ts'
-import { startTsnet, stopTsnet } from './tsnet.ts'
 import { startNames } from './names.ts'
 import { startUsageProbe } from './usage-probe.ts'
 import { PLATFORM, has } from './platform.ts'
@@ -47,8 +46,6 @@ pollStatusLine()
 startServers()
 // Codex's shared app-server, only when the owner uses Codex (codex/client.ts).
 startCodex()
-// Tailscale built in (tsnet.ts): after the servers, which the node forwards to.
-void startTsnet()
 // A name under hypernova.observer and its certificate for the LAN listener's pages (names.ts).
 startNames()
 startAccount()
@@ -79,7 +76,6 @@ setInterval(reapAttachments, 6 * 3600_000)
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => {
     log(`stopping (${sig})`)
-    // The helper is a child: it dies with us, but politely first.
-    void stopTsnet().finally(() => process.exit(0))
+    process.exit(0)
   })
 }

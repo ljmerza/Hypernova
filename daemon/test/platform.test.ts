@@ -21,7 +21,6 @@ import {
   publicIPv4,
   shellRc,
   systemdUserDir,
-  tailscaleCandidates,
   unavailableOn,
   userBinDir,
 } from '../src/platform.ts'
@@ -94,15 +93,13 @@ test('an agent installed with npm is looked for in nvm’s Nodes (newest first),
   assert.ok(c.indexOf('/Users/ada/.nvm/versions/node/v25.9.0/bin/claude') > c.indexOf('/usr/local/bin/claude'))
 })
 
-test('Claude Code, the login shell and Tailscale are looked for where each system puts them', () => {
+test('Claude Code and the login shell are looked for where each system puts them', () => {
   assert.equal(claudeCandidates('linux', HOME)[0], '/home/ada/.local/bin/claude')
   assert.ok(!claudeCandidates('linux', HOME).some((p) => p.includes('homebrew')))
   assert.ok(claudeCandidates('darwin', '/Users/ada').includes('/opt/homebrew/bin/claude'))
   assert.equal(loginShell('darwin', () => false), '/bin/zsh')
   assert.equal(loginShell('linux', (p) => p === '/bin/bash'), '/bin/bash')
   assert.equal(loginShell('linux', () => false), '/bin/sh')
-  assert.ok(tailscaleCandidates('linux').includes('/usr/bin/tailscale'))
-  assert.ok(tailscaleCandidates('darwin')[0]!.includes('Tailscale.app'))
 })
 
 test('the shell file: zsh’s on both systems (ZDOTDIR honoured), bash’s on Linux only, else none', () => {

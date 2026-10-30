@@ -1,6 +1,6 @@
 // The machine the daemon runs on: a Mac (with the menu bar app) or a Linux server or PC (WSL on a
-// Windows PC too, experimental), run from the command line only (docs/DECISIONS.md, "Direction: open source, self-hosted, Tailscale
-// inside"; docs/LINUX.md). Where state and logs live, which of the Mac's features exist here and
+// Windows PC too, experimental), run from the command line only (docs/DECISIONS.md, "Direction: open source, self-hosted";
+// docs/LINUX.md). Where state and logs live, which of the Mac's features exist here and
 // why not, and where the programs the daemon runs are found.
 //
 // Everything here is a pure function of the platform, the environment and the home folder, so the
@@ -146,13 +146,6 @@ export function packageBinDirs(home: string, readdir: (p: string) => string[] = 
 export const loginShell = (platform: Platform, exists: (p: string) => boolean = existsSync): string =>
   platform === 'darwin' ? '/bin/zsh' : exists('/bin/bash') ? '/bin/bash' : '/bin/sh'
 
-/** Tailscale's command line: the Mac app's, Homebrew's; on Linux the package's. */
-export function tailscaleCandidates(platform: Platform): string[] {
-  return platform === 'darwin'
-    ? ['/Applications/Tailscale.app/Contents/MacOS/Tailscale', '/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale']
-    : ['/usr/bin/tailscale', '/usr/local/bin/tailscale', '/usr/sbin/tailscale']
-}
-
 // ── The shell ─────────────────────────────────────────────────────────────
 
 export type ShellRc = { kind: 'zsh' | 'bash'; path: string; name: string }
@@ -195,7 +188,7 @@ export function publicIPv4(ip: string): boolean {
  * A Mac: yes. Linux: yes, unless the machine has a public IPv4 address of its own, as a VPS does.
  * The phone is never on such a server's network, so the local route can't help there, and its port
  * would face the internet (the listener drops strangers at accept, but a scan still finds a port).
- * Such a server is reached through the tailnet only; `lanAccess: true` turns the listener on anyway.
+ * `lanAccess: true` turns the listener on anyway (a VPN into that network, say).
  */
 export function lanByDefault(platform: Platform, ifaces: NodeJS.Dict<NetworkInterfaceInfo[]>, where: { container?: boolean; cloud?: boolean; wslNat?: boolean } = { container: inContainer(), cloud: onCloudVm(), wslNat: wslBehindNatHere() }): boolean {
   if (platform === 'darwin') return true
@@ -233,7 +226,7 @@ export function onCloudVm(read: (f: string) => string = (f) => { try { return re
 // Windows Subsystem for Linux: a Linux on a Windows PC, where Hypernova runs as on any Linux
 // (experimental: docs/INSTALL.md, "Windows (experimental)"). What differs is the network. Under WSL
 // 2's default NAT this Linux sits behind Windows on a network of its own (172.x, or another private
-// range), which no phone can reach: the phone comes in through the built-in Tailscale node. With
+// range), which no phone can reach, so the local route is off there. With
 // mirrored networking (Windows 11 22H2 and later, `networkingMode=mirrored` in .wslconfig) it has
 // Windows' own addresses, and WSL 1 shares Windows' network outright.
 

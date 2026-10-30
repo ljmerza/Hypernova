@@ -14,8 +14,6 @@ process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
 process.env.HOME = join(scratch, 'home')
 process.env.ZDOTDIR = join(scratch, 'zdot')
-// Never this Mac's Tailscale.
-process.env.HYPERNOVA_TAILSCALE = join(scratch, 'no-tailscale')
 mkdirSync(process.env.HOME, { recursive: true })
 const fakeClaude = join(scratch, 'claude-bin')
 writeFileSync(fakeClaude, '#!/bin/sh\necho "9.9.9 (Claude Code)"\n')

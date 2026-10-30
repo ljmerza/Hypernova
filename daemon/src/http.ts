@@ -1,5 +1,5 @@
-// Two HTTP servers on loopback: the phone API (exposed through `tailscale serve`) and the
-// local API for the Mac app, Claude Code hooks and the testing checklist.
+// Two HTTP servers on loopback: the phone API (phones reach the same routes through the LAN
+// listener, lan.ts) and the local API for the Mac app, Claude Code hooks and the testing checklist.
 import { listCommands } from './commands.ts'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { existsSync, statSync, readdirSync, readFileSync } from 'node:fs'
@@ -14,7 +14,6 @@ import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cl
 import { lanDevice, lanInfo, lanNamed, lanNamedHost, pairAllowed, pairFailed, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
 import { nameKick, nameStatus, namedOrigin, releaseName, setNameService, setNameTermsShown, wantName } from './names.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
-import { recheckSystem, setBuiltInTailscale, setControlUrl, tailnetHints, tailnetNow, tsnetBaseUrl, tsnetLogin, tsnetLogout, tsnetState } from './tsnet.ts'
 import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setMode } from './runner.ts'
 import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
@@ -28,7 +27,7 @@ import { linkOf } from './switch-links.ts'
 import { boxLines, boxText } from './term/shared.ts'
 import { cancelLogin, clearProviderStatus, getAccount, noteProviderRemoved, providerKeyRefused, requestCheck, sendLoginCode, startLogin } from './account.ts'
 import { handleHook, hookPathOk, installIntegration, integrationStatus, uninstallIntegration } from './hooks.ts'
-import { createPreview, createProject, enableServe, listProjects, publicBaseUrl, sendFile, servePreview, tailscaleStatus } from './services.ts'
+import { createPreview, createProject, listProjects, sendFile, servePreview } from './services.ts'
 import { DOWNLOAD_MAX, allowedPath, fileFor, filesState, folderOpens, listDir, listFolders, sendChecked, setBrowseOutside } from './files.ts'
 import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
@@ -190,35 +189,35 @@ export async function startPairing(dev = false, forName = false) {
   pairCodes.set(sha256(code), expiresAt)
   // A code on screen until it expires, where its download link uses the name: published meanwhile.
   if (!dev && forName) wantName(expiresAt)
-  const base = dev ? `http://10.0.2.2:${API_PORT}` : (await publicBaseUrl()) ?? `http://10.0.2.2:${API_PORT}`
-  // The local route too (lan.ts): the phone pairs over Wi-Fi with the certificate pinned when the
-  // base URL is out of reach, and the pairing page hands these on to the app unchanged.
-  // `fp` whenever the daemon has its certificate: the built-in Tailscale route pins it too when the
-  // tailnet has no HTTPS certificates (tsnet.ts); `lan` and `lp` only while the listener is on.
+  const base = BASE_URL
+  // The local route (lan.ts): the phone pairs over Wi-Fi (or the owner's VPN) with the certificate
+  // pinned, and the pairing page hands these on to the app unchanged. `fp` whenever the daemon has
+  // its certificate; `lan` and `lp` only while the listener is on.
   const lan = lanInfo()
   const fp = lan?.fingerprint ?? serverIdentity()?.fingerprint
   const lanQuery = (fp ? `&fp=${fp}` : '') + (lan ? `&lan=${lan.addresses.map(encodeURIComponent).join(',')}&lp=${lan.port}` : '')
-  // And the tailnet (tsnet.ts): the computer's name and address there, the account it signed in
-  // with (the phone hints "sign in as you@…") and the control server when it isn't tailscale.com.
-  const hints = await tailnetHints()
-  // The account (`ta`) not in the web link: that page is opened in a browser, whose history keeps it.
-  const tsQuery = (account: boolean) => (hints.name ? `&ts=${encodeURIComponent(hints.name)}${hints.ip ? `&ti=${hints.ip}` : ''}${account && hints.account ? `&ta=${encodeURIComponent(hints.account)}` : ''}${hints.control ? `&tc=${encodeURIComponent(hints.control)}` : ''}` : '')
-  const params = `v=1&u=${encodeURIComponent(base)}&c=${code}&n=${encodeURIComponent(macName())}${lanQuery}${tsQuery(true)}`
+  const params = `v=1&u=${encodeURIComponent(base)}&c=${code}&n=${encodeURIComponent(macName())}${lanQuery}`
   // The app's own link, for Paste link and for adb; and the QR code's: the same parameters after the
   // `#` of https://hypernova.observer/pair. Phone cameras open https links, Android opens this one
   // straight in the app (App Links: names/src/links.ts serves the domain's assetlinks.json), and
   // without the app a browser shows a page there that hands over to it or says how to get it. The
-  // fragment never leaves the phone: nothing of it reaches that site. Unlike a page on this
-  // computer, it opens before the phone can reach the computer at all (no tailnet yet).
+  // fragment never leaves the phone: nothing of it reaches that site.
   const appLink = `hypernova://pair?${params}`
   const link = `${PAIR_LINK}#${params}`
-  // This computer's own pairing page (its name's on the local network while it has one: names.ts),
+  // This computer's own pairing page, on its name on the local network while it has one (names.ts),
   // for links made before; the QR code no longer carries it.
-  const builtIn = !dev && base === tsnetBaseUrl()
-  const pageBase = (builtIn && namedOrigin()) || base
-  const webLink = `${pageBase}/pair?c=${code}&n=${encodeURIComponent(macName())}${lanQuery}${tsQuery(false)}`
-  return { code, link, appLink, webLink, expiresAt, url: base, download: downloadUrl(base), tailnet: { name: hints.name, ip: hints.ip, control: hints.control } }
+  const pageBase = (!dev && namedOrigin()) || base
+  const webLink = `${pageBase}/pair?c=${code}&n=${encodeURIComponent(macName())}${lanQuery}`
+  return { code, link, appLink, webLink, expiresAt, url: base, download: downloadUrl(base) }
 }
+
+/**
+ * The pairing link's `u`: with no other way in (the phone uses the local route, `lan` and `lp`) it
+ * is the emulator's address for this computer, which is also what a development build pairs with.
+ * The app tries it first and falls back to the local addresses, so on a real phone it costs one
+ * quick failure.
+ */
+const BASE_URL = `http://10.0.2.2:${API_PORT}`
 
 /**
  * Where the pairing QR code points (docs/PROTOCOL.md, "Pairing"): the app's verified https link
@@ -228,10 +227,8 @@ export const PAIR_LINK = 'https://hypernova.observer/pair'
 /**
  * Where a phone gets the app: this computer's name on the local network whenever it works
  * (names.ts): a brand-new phone on the same Wi-Fi opens that page with a real certificate, with no
- * app and no Tailscale yet. Otherwise the base URL's download page when a phone can open it (the
- * Tailscale app's serve, or a public address), or, with the built-in node serving or no tailnet at
- * all, the local network's listener at its Wi-Fi address (the browser warns about this Mac's own
- * certificate once).
+ * app yet. Otherwise the local network's listener at its Wi-Fi address (the browser warns about
+ * this computer's own certificate once).
  */
 export function downloadUrl(base: string): string {
   return downloadTarget(base).url
@@ -240,26 +237,20 @@ export function downloadUrl(base: string): string {
  * The download URL; `local`: this daemon's own LAN listener (bundled APK), as opposed to a published
  * release or the base URL's page; `trusted`: a browser can check the page's certificate (false only
  * for the listener's own address, whose certificate is self-signed); `anywhere`: with the link on
- * the local network's name, the tailnet's page too, for a phone that has Tailscale (null when
- * there's none a browser could check).
+ * the local network's name, an https base URL's page too (null when there's none a browser could
+ * check, which without a public base URL is always).
  */
 export function downloadTarget(base: string): { url: string; local: boolean; trusted: boolean; anywhere: string | null } {
   // A published build (a release URL the owner sets) beats anything of ours: it needs no certificate warning.
   if (process.env.HYPERNOVA_APK_URL) return { url: process.env.HYPERNOVA_APK_URL, local: false, trusted: true, anywhere: null }
-  const builtIn = base === tsnetBaseUrl()
   const named = namedOrigin()
-  if (named) {
-    // The tailnet's page has a certificate a browser checks when the Tailscale app serves it, or the
-    // built-in node has the tailnet's own; with the node's pinned one it would warn.
-    const tailnetChecked = /^https:\/\//.test(base) && (!builtIn || tsnetState().helper?.tls === 'tailscale')
-    return { url: `${named}/download/android`, local: true, trusted: true, anywhere: tailnetChecked ? `${base}/download/android` : null }
-  }
+  if (named) return { url: `${named}/download/android`, local: true, trusted: true, anywhere: /^https:\/\//.test(base) ? `${base}/download/android` : null }
   const lan = lanInfo()
-  // The listener too with no tailnet yet (Tailscale left for later): the base is then the emulator's
-  // plain-http address, which no phone on the Wi-Fi can open.
-  const a = (builtIn || !base.startsWith('https://')) && lan ? pickLanAddress(lan.addresses) : null
+  // The listener whenever the base is the emulator's plain-http address, which no phone on the
+  // Wi-Fi can open.
+  const a = !base.startsWith('https://') && lan ? pickLanAddress(lan.addresses) : null
   if (a) return { url: `https://${a.includes(':') ? `[${a}]` : a}:${lan!.port}/download/android`, local: true, trusted: false, anywhere: null }
-  // The tailnet's or a public address's page; a plain-http one (no tailnet: the emulator's address) can't be checked.
+  // An https base's page; a plain-http one (the emulator's address) can't be checked.
   return { url: `${base}/download/android`, local: false, trusted: base.startsWith('https://'), anywhere: null }
 }
 /** Whether [code] is a pairing code being shown now (unused, not expired). */
@@ -274,20 +265,16 @@ function pairingOpen(): boolean {
   return pairCodes.size > 0
 }
 /**
- * What the pairing page's app link carries besides the code: the daemon's own listener and
- * tailnet hints, read here and now (never relayed from the page's query, which anyone can write),
- * and only for a code that is live: without one the page says nothing about this computer (the
- * account, the tailnet name, the control server), so the page alone leaks nothing.
+ * What the pairing page's app link carries besides the code: the daemon's own listener, read here
+ * and now (never relayed from the page's query, which anyone can write), and only for a code that
+ * is live: without one the page says nothing about this computer, so the page alone leaks nothing.
  */
 async function pairPageExtras(code: string): Promise<string> {
   pairingOpen() // forgets expired codes
   if (!code || !pairCodes.has(sha256(code))) return ''
   const lan = lanInfo()
   const fp = lan?.fingerprint ?? serverIdentity()?.fingerprint
-  let out = (fp ? `&fp=${fp}` : '') + (lan ? `&lan=${lan.addresses.map(encodeURIComponent).join(',')}&lp=${lan.port}` : '')
-  const hints = await tailnetHints()
-  if (hints.name) out += `&ts=${encodeURIComponent(hints.name)}${hints.ip ? `&ti=${hints.ip}` : ''}${hints.account ? `&ta=${encodeURIComponent(hints.account)}` : ''}${hints.control ? `&tc=${encodeURIComponent(hints.control)}` : ''}`
-  return out
+  return (fp ? `&fp=${fp}` : '') + (lan ? `&lan=${lan.addresses.map(encodeURIComponent).join(',')}&lp=${lan.port}` : '')
 }
 
 // ── Snapshot ─────────────────────────────────────────────────────────────
@@ -321,9 +308,6 @@ function snapshot(deviceId: string | null) {
       id: identity.id, name: macName(), daemonVersion: VERSION, claudeVersion: claudeVersion(), projectsRoot: settings.projectsRoot, app: appInfo(), battery: getBattery(), awake: awakeState(), tz: systemZone(),
       // Settings → Browse outside projects (files.ts).
       files: filesState(),
-      // Where the phone API is on the tailnet now (tsnet.ts): a phone paired before the computer
-      // switched between the Tailscale app and the built-in node follows it.
-      tailnet: tailnetNow(),
       // The server's system, and the Mac features it lacks with the reason to show (platform.ts):
       // empty on a Mac; on Linux the battery, Stay awake, the Mac's voice, opening a window.
       platform: PLATFORM, unavailable: UNAVAILABLE,
@@ -349,9 +333,9 @@ function snapshot(deviceId: string | null) {
 
 function baseUrlOf(req: IncomingMessage): string {
   const host = req.headers['x-forwarded-host'] ?? req.headers.host ?? `127.0.0.1:${API_PORT}`
-  // The LAN listener speaks TLS itself; tailscale serve ends it before the daemon.
+  // The LAN listener speaks TLS itself; a proxy in front says so in X-Forwarded-Proto.
   const tls = !!(req.socket as { encrypted?: boolean }).encrypted
-  const proto = req.headers['x-forwarded-proto'] ?? (tls || req.headers['tailscale-user-login'] || String(host).includes('.ts.net') ? 'https' : 'http')
+  const proto = req.headers['x-forwarded-proto'] ?? (tls ? 'https' : 'http')
   return `${proto}://${host}`
 }
 
@@ -415,7 +399,7 @@ async function api(c: Ctx): Promise<void> {
     const port = lanInfo()?.port
     const host = lanNamedHost()
     if (!port || !host) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
-    return pairPage(res, (await publicBaseUrl()) ?? `http://10.0.2.2:${API_PORT}`, code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code), `https://${host}:${port}`)
+    return pairPage(res, BASE_URL, code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code), `https://${host}:${port}`)
   }
   if (path === '/qa' || path.startsWith('/qa/')) return qa(c, false)
   const p = /^\/p\/([\w-]+)\/?(.*)$/.exec(path)
@@ -1034,12 +1018,10 @@ async function qa(c: Ctx, macPort: boolean): Promise<void> {
   const sub = url.pathname.replace(/^\/qa\/?/, '')
   const host = String(req.headers.host ?? '')
   const origin = req.headers.origin
-  // tailscale serve adds X-Forwarded-For on the phone port. Nothing does on the Mac's own, so
-  // there it would only be a page on a rebound domain dodging the host check.
-  const viaTailnet = !macPort && !!req.headers['x-forwarded-for']
   // The LAN listener lets only a certified device this far (a browser has neither the pin nor the
-  // device certificate, rebound domain or not), and its host is the Mac's address.
-  const okHost = viaTailnet || c.lan || /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(host)
+  // device certificate, rebound domain or not), and its host is the Mac's address. Anything else
+  // must name loopback, so a page on a rebound domain can't dodge the host check.
+  const okHost = c.lan || /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(host)
   const okOrigin = !origin || origin === 'null' ? true : (() => {
     try {
       return new URL(origin).host === host
@@ -1489,14 +1471,13 @@ async function local(c: Ctx): Promise<void> {
     // Setup shows a download or pairing code while it asks this way: the name is published for it (names.ts).
     if (url.searchParams.has('qr')) wantName()
     const integ = integrationStatus()
-    const dl = downloadTarget((await publicBaseUrl()) ?? `http://10.0.2.2:${API_PORT}`)
+    const dl = downloadTarget(BASE_URL)
     return json(res, 200, {
       daemonVersion: VERSION,
       apiPort: API_PORT,
       claude: { path: claudeCached(), version: claudeVersion(), sdk: sdkState() },
       // Codex as a second agent: installed, on, connected, signed in (null when it isn't installed).
       codex: codexState(),
-      tailscale: await tailscaleStatus(url.searchParams.has('fresh')),
       ...integ,
       devices: listDevices(),
       connectedClients: clientCount(),
@@ -1511,15 +1492,13 @@ async function local(c: Ctx): Promise<void> {
       automations: automations().status(),
       // The local route (lan.ts).
       lan: lanSnapshot(null),
-      // Tailscale built in (tsnet.ts): which Tailscale serves the phone, and the sign-in link while one is needed.
-      tsnet: tsnetState(),
       // Where a phone gets the app right now (the base URL's page, or the local network's), and the APK's checksum to compare.
       downloadUrl: dl.url,
       // true only for this daemon's own LAN listener (bundled APK)…
       downloadLocal: dl.local,
       // …and false when that is its address with the self-signed certificate: then the checksum below is the one to compare.
       downloadTrusted: dl.trusted,
-      // With the link on the local network's name: the tailnet's page too, for a phone that has Tailscale (else null).
+      // With the link on the local network's name: an https base URL's page too (else null).
       downloadAnywhere: dl.anywhere,
       apk: apkInfo(),
       // This computer's name under hypernova.observer and its certificate (names.ts).
@@ -1534,19 +1513,6 @@ async function local(c: Ctx): Promise<void> {
   // The name (names.ts): its state, and giving it up before an uninstall.
   if (path === '/local/name' && m === 'GET') return json(res, 200, nameStatus())
   if (path === '/local/name/release' && m === 'POST') return json(res, 200, await releaseName())
-  if (path === '/local/tsnet' ) return json(res, 200, tsnetState())
-  if (path === '/local/tsnet/login' && m === 'POST') return json(res, 200, { ok: tsnetLogin(), tsnet: tsnetState() })
-  if (path === '/local/tsnet/logout' && m === 'POST') return json(res, 200, { ok: tsnetLogout(), tsnet: tsnetState() })
-  if (path === '/local/tailscale/serve' && m === 'POST') {
-    try {
-      const r = await enableServe()
-      // The app serves now: the built-in node steps aside at once (tsnet.ts).
-      await recheckSystem()
-      return json(res, 200, r)
-    } catch (e: any) {
-      throw new HttpError(500, 'tailscale', e.message)
-    }
-  }
   if (path === '/local/integration/install' && m === 'POST') return json(res, 200, installIntegration())
   if (path === '/local/integration/uninstall' && m === 'POST') return json(res, 200, uninstallIntegration())
   if (path === '/local/devices') return json(res, 200, { devices: listDevices() })
@@ -1580,15 +1546,6 @@ async function local(c: Ctx): Promise<void> {
       saveSettings()
       nameKick()
     }
-    // The built-in Tailscale node too (tsnet.ts); a control URL ("" for tailscale.com) restarts it.
-    if (typeof b.builtInTailscale === 'boolean') await setBuiltInTailscale(b.builtInTailscale)
-    if (typeof b.tailscaleControlUrl === 'string') {
-      try {
-        await setControlUrl(b.tailscaleControlUrl.trim() || null)
-      } catch (e: any) {
-        throw new HttpError(400, 'bad_control_url', e.message)
-      }
-    }
     return json(res, 200, nameRelease ? { ...settings, nameRelease } : settings)
   }
   return api({ ...c, local: true })
@@ -1600,9 +1557,8 @@ async function local(c: Ctx): Promise<void> {
  * certificate).
  */
 function openOnLan(method: string, path: string): boolean {
-  // The download page and the APK: a phone without a tailnet gets the app here (the pairing page
-  // isn't served at an address: the built-in route's code carries the app link itself). No OPTIONS
-  // reaches a route.
+  // The download page and the APK: a phone gets the app here (the pairing page isn't served at an
+  // address: the code carries the app link itself). No OPTIONS reaches a route.
   if (method === 'GET' && (path === '/download/android' || path === '/download/android/Hypernova.apk')) return true
   return (method === 'GET' && path === '/v1/health') || (method === 'POST' && (path === '/v1/pair' || path === '/v1/device/cert'))
 }
@@ -1618,8 +1574,8 @@ const openByName = (method: string, path: string): boolean => method === 'GET' &
 function handler(isLocal: boolean, lan = false) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://x')
-    // Requests through tailscale serve carry X-Forwarded-For; only direct loopback is "local".
-    const direct = !lan && !req.headers['x-forwarded-for'] && !req.headers['tailscale-user-login']
+    // Requests through a proxy carry X-Forwarded-For; only direct loopback is "local".
+    const direct = !lan && !req.headers['x-forwarded-for']
     const auth = String(req.headers.authorization ?? '')
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
     const device = token ? deviceForToken(token) : null

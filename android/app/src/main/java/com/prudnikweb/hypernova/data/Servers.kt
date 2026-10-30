@@ -8,7 +8,7 @@ import java.util.UUID
 
 /*
  * Several paired computers (docs/DECISIONS.md, "One phone can pair with several Macs, with a
- * switcher in the app"). Each keeps its own pairing (token, device id, pin, tailnet), its own
+ * switcher in the app"). Each keeps its own pairing (token, device id, pin), its own
  * device certificate and its own offline queue, under [Server.id]. One is active: the screens,
  * the widgets and the glasses show it, as they showed the one pairing before. The others are
  * watched in the background by a LiveHub of their own, only for their notifications and their
@@ -97,13 +97,12 @@ object Servers {
 
     /**
      * Whether [a] and [b] pair the same computer: the same Mac id when both know one, else the same
-     * name and, when both know one, the same name on the tailnet ([replacesAnother]'s rule). Pairing
+     * name ([replacesAnother]'s rule). Pairing
      * one again (it forgot this phone, say) takes its old place in the list.
      */
     fun sameComputer(a: Pairing, b: Pairing): Boolean {
         if (a.macId != null && b.macId != null) return a.macId == b.macId
-        if (!a.macName.equals(b.macName, ignoreCase = true)) return false
-        return a.tailnetName == null || b.tailnetName == null || a.tailnetName.equals(b.tailnetName, ignoreCase = true)
+        return a.macName.equals(b.macName, ignoreCase = true)
     }
 
     /**
@@ -126,7 +125,7 @@ object Servers {
         return active?.takeIf { it != removed && left.any { s -> s.id == it } } ?: left.firstOrNull()?.id
     }
 
-    /** The order the switcher lists them in, and the built-in node prefers them in: the active one first. */
+    /** The order the switcher lists them in: the active one first. */
     fun activeFirst(list: List<Server>, active: String?): List<Server> =
         list.filter { it.id == active } + list.filter { it.id != active }
 
@@ -157,29 +156,6 @@ object Servers {
     fun elsewhere(statuses: List<ServerStatus>): Int =
         statuses.filter { !it.active && (it.state == LinkState.Connected || it.state == LinkState.Reconnecting) }.sumOf { it.needsYou }
 
-    /** What the built-in Tailscale node should do for the paired computers. */
-    sealed interface NodePlan {
-        /** Run it for [control] (null: tailscale.com). */
-        data class Start(val control: String?) : NodePlan
-        data object Stop : NodePlan
-        /** Leave it as it is (it serves one of them, maybe signing in). */
-        data object Leave : NodePlan
-    }
-
-    /**
-     * One node per phone, for one control server: the first of [pairings] (the active one first) that
-     * names its computer on a tailnet, whose control server the owner agreed to, and whose node signed
-     * in on this phone before ([signedIn]; a first sign-in is only ever asked for on the pairing
-     * screen or in Settings). None: a node that serves one of them anyway ([nodeControl], null for
-     * tailscale.com or none) is left alone, any other stopped. A computer on another control server
-     * than the chosen one goes without the node (Local or its base URL).
-     */
-    fun nodePlan(pairings: List<Pairing>, signedIn: (String?) -> Boolean, nodeControl: String?): NodePlan {
-        pairings.firstOrNull { it.tailnetName != null && (it.controlUrl == null || it.controlConfirmed) && signedIn(it.controlUrl) }
-            ?.let { return NodePlan.Start(it.controlUrl) }
-        return if (pairings.any { it.controlUrl == nodeControl }) NodePlan.Leave else NodePlan.Stop
-    }
-
     fun encode(list: List<Server>): String = JSONArray().apply { for (s in list) put(encode(s)) }.toString()
 
     private fun encode(s: Server): JSONObject {
@@ -190,9 +166,6 @@ object Servers {
             .putOpt("macId", p.macId).putOpt("deviceId", p.deviceId)
             .putOpt("fingerprint", p.fingerprint)
             .put("lan", JSONArray(p.lanAddresses)).put("lanPort", p.lanPort)
-            .putOpt("tailnetName", p.tailnetName).putOpt("tailnetIp", p.tailnetIp).putOpt("tailnetUrl", p.tailnetUrl)
-            .putOpt("tailnetAccount", p.tailnetAccount).putOpt("controlUrl", p.controlUrl)
-            .put("controlConfirmed", p.controlConfirmed)
     }
 
     /** The list as kept; an entry without its id, base URL or token is dropped, a list that isn't one is empty. */
@@ -217,41 +190,9 @@ object Servers {
                     fingerprint = o.str("fingerprint"),
                     lanAddresses = lan,
                     lanPort = o.optInt("lanPort", LanInfo.DEFAULT_PORT),
-                    tailnetName = o.str("tailnetName"),
-                    tailnetIp = o.str("tailnetIp"),
-                    tailnetUrl = o.str("tailnetUrl"),
-                    tailnetAccount = o.str("tailnetAccount"),
-                    controlUrl = o.str("controlUrl"),
-                    controlConfirmed = o.optBoolean("controlConfirmed", false),
                 ),
             )
         }
         return out
     }
-}
-
-/**
- * The destinations the built-in node's proxy may tunnel to, for every computer whose route uses it
- * (data/LanRoute.kt): each router says its own, and the node is told all of them. One router setting
- * only its own would shut the others out.
- */
-object NodeDestinations {
-    private val wanted = LinkedHashMap<Any, String>()
-
-    /** [owner]'s computer is at [hostPort] on the tailnet: the node may tunnel there (and to the others'). */
-    fun want(owner: Any, hostPort: String) {
-        val all = synchronized(wanted) {
-            wanted[owner] = hostPort
-            union(wanted.values)
-        }
-        Tsnet.setAllowed(all)
-    }
-
-    /** [owner] closed (its computer forgotten, its link started over): its destination goes at the next [want]. */
-    fun drop(owner: Any) {
-        synchronized(wanted) { wanted.remove(owner) }
-    }
-
-    /** Each destination once, in the order they were asked for. */
-    fun union(hostPorts: Collection<String>): List<String> = hostPorts.distinct()
 }

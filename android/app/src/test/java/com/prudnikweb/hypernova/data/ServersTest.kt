@@ -21,12 +21,10 @@ class ServersTest {
     }
 
     private val z2 = Pairing(
-        baseUrl = "https://z2.tail.ts.net:47321", token = "tok-z2", macName = "z2", macId = "m-z2", deviceId = "d1",
+        baseUrl = "http://10.0.2.2:47321", token = "tok-z2", macName = "z2", macId = "m-z2", deviceId = "d1",
         fingerprint = "a".repeat(64), lanAddresses = listOf("192.168.1.20", "10.0.0.5"), lanPort = 47323,
-        tailnetName = "z2.tail.ts.net", tailnetIp = "100.64.0.2", tailnetUrl = null, tailnetAccount = "me@x", controlUrl = "https://hs.example",
-        controlConfirmed = true,
     )
-    private val mini = Pairing(baseUrl = "https://mini.tail.ts.net:47321", token = "tok-mini", macName = "mini", macId = "m-mini", deviceId = "d2")
+    private val mini = Pairing(baseUrl = "https://mini.example.com:47321", token = "tok-mini", macName = "mini", macId = "m-mini", deviceId = "d2")
 
     private fun session(id: String, state: SessionState, phase: Phase = Phase.of(state)) =
         Session(hex = id.take(2), id = id, name = id, project = "p", state = state, model = "opus", mode = "default", activity = "", updatedAt = 0L, phase = phase)
@@ -89,6 +87,12 @@ class ServersTest {
         assertEquals("Mac", list[0].pairing.macName)
     }
 
+    @Test fun aListKeptByABuildWithTailscaleStillReadsWithItsTailnetFieldsLeftOut() {
+        // What the phone kept while it carried Tailscale: the same pairing, with fields nothing reads now.
+        val raw = """[{"id":"x","baseUrl":"http://10.0.2.2:47321","token":"tok-z2","macName":"z2","macId":"m-z2","deviceId":"d1","fingerprint":"${"a".repeat(64)}","lan":["192.168.1.20","10.0.0.5"],"lanPort":47323,"tailnetName":"z2.tail.ts.net","tailnetIp":"100.64.0.2","controlUrl":"https://hs.example","controlConfirmed":true}]"""
+        assertEquals(listOf(Server("x", z2)), Servers.decode(raw))
+    }
+
     @Test fun anotherServersKeysAreItsOwn() {
         assertEquals("offlineQueue.abc", Servers.scoped("offlineQueue", "abc"))
         assertEquals("hypernova.cert.abc", Servers.scoped("hypernova.cert", "abc"))
@@ -123,10 +127,9 @@ class ServersTest {
     @Test fun theSameComputerByIdOrByName() {
         assertTrue(Servers.sameComputer(z2, z2.copy(macName = "renamed")))
         assertFalse("another Mac id", Servers.sameComputer(z2, z2.copy(macId = "m-other")))
-        // Without ids (an older daemon): the name, and the tailnet name when both know one.
-        val a = mini.copy(macId = null, tailnetName = "mini")
+        // Without ids (an older daemon): the name.
+        val a = mini.copy(macId = null)
         assertTrue(Servers.sameComputer(a, a.copy(macName = "MINI")))
-        assertFalse(Servers.sameComputer(a, a.copy(tailnetName = "mini-2")))
         assertFalse(Servers.sameComputer(a, a.copy(macName = "studio")))
     }
 
@@ -184,33 +187,5 @@ class ServersTest {
             ServerStatus("d", "old", LinkState.Offline, needsYou = 5, active = false),
         )
         assertEquals(3, Servers.elsewhere(statuses))
-    }
-
-    // ─── The built-in node ─────────────────────────────────────────────────
-
-    @Test fun theNodeRunsForTheActiveServersTailnetFirst() {
-        val other = mini.copy(tailnetName = "mini", controlUrl = null)
-        // Both signed in before: the active one's control server.
-        assertEquals(Servers.NodePlan.Start("https://hs.example"), Servers.nodePlan(listOf(z2, other), { true }, null))
-        assertEquals(Servers.NodePlan.Start(null), Servers.nodePlan(listOf(other, z2), { true }, null))
-        // The active one's node never signed in here: the next one's.
-        assertEquals(Servers.NodePlan.Start(null), Servers.nodePlan(listOf(z2, other), { it == null }, null))
-    }
-
-    @Test fun aControlServerNotAgreedToIsNeverStarted() {
-        val unconfirmed = z2.copy(controlConfirmed = false)
-        assertEquals(Servers.NodePlan.Leave, Servers.nodePlan(listOf(unconfirmed), { true }, "https://hs.example"))
-        assertEquals(Servers.NodePlan.Stop, Servers.nodePlan(listOf(unconfirmed), { true }, "https://other"))
-    }
-
-    @Test fun withoutATailnetANodeForNoneOfThemStops() {
-        // mini names no tailnet and is on tailscale.com: a tailscale.com node may be signing in, so it stays.
-        assertEquals(Servers.NodePlan.Leave, Servers.nodePlan(listOf(mini), { false }, null))
-        assertEquals(Servers.NodePlan.Stop, Servers.nodePlan(listOf(mini), { false }, "https://hs.example"))
-        assertEquals(Servers.NodePlan.Stop, Servers.nodePlan(emptyList(), { true }, null))
-    }
-
-    @Test fun theNodeTunnelsToEveryServersDestination() {
-        assertEquals(listOf("z2:47321", "mini:47321"), NodeDestinations.union(listOf("z2:47321", "mini:47321", "z2:47321")))
     }
 }

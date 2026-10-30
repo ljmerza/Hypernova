@@ -1,6 +1,6 @@
 // Read aloud with the Mac's voices (docs/PROTOCOL.md, "Read aloud"): the setting, whole clips and
 // the phone's own plays; and the small things around them: which app paired, a long tool output cut
-// to its end. Everything runs on free ports with scratch state; Tailscale is a stand-in. The Mac's
+// to its end. Everything runs on free ports with scratch state. The Mac's
 // voice is the real `say`, so the tests where it reads run on a Mac only.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -21,18 +21,6 @@ const fakeClaude = join(scratch, 'claude-bin')
 writeFileSync(fakeClaude, '#!/bin/sh\necho "9.9.9 (Claude Code)"\n')
 chmodSync(fakeClaude, 0o755)
 process.env.CLAUDE_BIN = fakeClaude
-
-// Tailscale: this Mac is "mac.tail.ts.net" and serves whatever FAKE_TS_SERVE says.
-const fakeTs = join(scratch, 'tailscale')
-writeFileSync(
-  fakeTs,
-  `#!${process.execPath}\nconst a = process.argv.slice(2)\nif (a[0] === 'serve') console.log(process.env.FAKE_TS_SERVE || '{}')\nelse console.log(JSON.stringify({ BackendState: 'Running', Self: { DNSName: 'mac.tail.ts.net.', TailscaleIPs: ['100.64.0.1'] }, CertDomains: ['mac.tail.ts.net'] }))\n`,
-)
-chmodSync(fakeTs, 0o755)
-process.env.HYPERNOVA_TAILSCALE = fakeTs
-// The daemon hands Tailscale the environment it started with.
-const SERVING = { TCP: { '7443': { HTTPS: true } }, Web: { 'mac.tail.ts.net:7443': { Handlers: { '/': { Proxy: 'http://127.0.0.1:7443' } } } } }
-process.env.FAKE_TS_SERVE = JSON.stringify(SERVING)
 
 const freePort = () =>
   new Promise<number>((resolve) => {

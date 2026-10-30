@@ -23,24 +23,6 @@ data class Pairing(
     val fingerprint: String? = null,
     val lanAddresses: List<String> = emptyList(),
     val lanPort: Int = LanInfo.DEFAULT_PORT,
-    /** The computer's name on its tailnet (docs/PROTOCOL.md, "Tailscale built in"); null when the link said nothing. */
-    val tailnetName: String? = null,
-    val tailnetIp: String? = null,
-    /**
-     * Where the computer serves the phone API on its tailnet, as it said last (its snapshot): set
-     * when it moved since the pairing (the Tailscale app quit and the built-in node took over, or
-     * the other way round). Null: the base URL or the tailnet name with the base URL's port.
-     */
-    val tailnetUrl: String? = null,
-    /** The account the computer signed in with: the sign-in screen says "sign in as you@…". */
-    val tailnetAccount: String? = null,
-    /** The coordination server when it isn't tailscale.com (Headscale). */
-    val controlUrl: String? = null,
-    /**
-     * The user agreed to that control server ("This computer uses its own Tailscale server: …").
-     * Until then the app's node is never started against it (a pairing link is anyone's to write).
-     */
-    val controlConfirmed: Boolean = false,
 )
 
 /**
@@ -56,16 +38,9 @@ data class PairLink(
     val fingerprint: String? = null,
     val lan: List<String> = emptyList(),
     val lanPort: Int = LanInfo.DEFAULT_PORT,
-    /** `ts`, `ti`, `ta`, `tc`: the computer on its tailnet, for the built-in node. */
-    val tailnetName: String? = null,
-    val tailnetIp: String? = null,
-    val tailnetAccount: String? = null,
-    val controlUrl: String? = null,
 ) {
     /** The link names a local listener this phone could pair through. */
     val hasLan: Boolean get() = fingerprint != null && lan.isNotEmpty()
-    /** The link names the computer on a tailnet, which the built-in node could reach. */
-    val hasTailnet: Boolean get() = tailnetName != null
 }
 
 object PairLinks {
@@ -103,7 +78,7 @@ object PairLinks {
      * Accepts the link the Mac's QR code carries, `https://hypernova.observer/pair#v=1&u=<base>&c=<code>…`
      * (its details in the fragment, read exactly as the app link's query), the app link
      * `hypernova://pair?v=1&u=<base>&c=<code>&n=<name>`, the web link of a Mac's own pairing page
-     * (`https://<mac>.ts.net:47321/pair?c=<code>&n=<name>`, whose base is its own origin), and the
+     * (`https://<mac>:47321/pair?c=<code>&n=<name>`, whose base is its own origin), and the
      * `intent://pair?…#Intent;…` hand-over. Null if there isn't one.
      */
     fun parse(text: String?): PairLink? {
@@ -166,53 +141,15 @@ object PairLinks {
         return withLan(PairLink(base, code, name), q)
     }
 
-    /** `fp`, `lan` and `lp`: only together do they name a listener; a bad fingerprint drops all three. */
+    /**
+     * `fp`, `lan` and `lp`: only together do they name a listener; a bad fingerprint drops all three.
+     * Anything else in the link (an older computer's `ts`, `ti`, `ta`, `tc` tailnet hints) is ignored.
+     */
     private fun withLan(link: PairLink, q: Map<String, String>): PairLink {
-        val withTs = withTailnet(link, q)
-        val fp = q["fp"]?.trim()?.lowercase()?.takeIf { it.length == 64 && it.all { c -> c in '0'..'9' || c in 'a'..'f' } } ?: return withTs
+        val fp = q["fp"]?.trim()?.lowercase()?.takeIf { it.length == 64 && it.all { c -> c in '0'..'9' || c in 'a'..'f' } } ?: return link
         val lan = q["lan"].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
         val port = q["lp"]?.trim()?.toIntOrNull()?.takeIf { it in 1..65535 } ?: LanInfo.DEFAULT_PORT
-        return withTs.copy(fingerprint = fp, lan = lan, lanPort = port)
-    }
-
-    private val DNS_NAME = Regex("""^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$""")
-
-    /** `ts` (a DNS name), with `ti`, `ta` and `tc` when they look right; nothing without a good `ts`. */
-    private fun withTailnet(link: PairLink, q: Map<String, String>): PairLink {
-        val name = q["ts"]?.trim()?.lowercase()?.takeIf { it.length <= 253 && DNS_NAME.matches(it) } ?: return link
-        val ip = q["ti"]?.trim()?.takeIf { it.isNotEmpty() && it.length <= 45 && it.all { c -> c.isDigit() || c == '.' || c == ':' || c in 'a'..'f' || c in 'A'..'F' } }
-        val account = q["ta"]?.trim()?.takeIf { it.isNotEmpty() && it.length <= 120 && it.none { c -> c.isWhitespace() || c in "<>\"'" } }
-        val control = q["tc"]?.trim()?.trimEnd('/')?.takeIf { controlUrlOk(it) }
-        return link.copy(tailnetName = name, tailnetIp = ip, tailnetAccount = account, controlUrl = control)
-    }
-
-    /**
-     * What a control server in a link may be: `https://…`, or plain `http://` only to a private
-     * address (a Headscale on the LAN, a test), never to the internet in the clear. No credentials,
-     * no query, at most 200 characters.
-     */
-    fun controlUrlOk(url: String): Boolean {
-        if (url.length > 200 || url.any { it.isWhitespace() }) return false
-        val u = runCatching { java.net.URI(url) }.getOrNull() ?: return false
-        val host = u.host?.lowercase()?.removePrefix("[")?.removeSuffix("]")?.takeIf { it.isNotEmpty() } ?: return false
-        if (u.userInfo != null || u.rawQuery != null || u.rawFragment != null) return false
-        return when (u.scheme?.lowercase()) {
-            "https" -> true
-            "http" -> privateHost(host)
-            else -> false
-        }
-    }
-
-    /** Loopback, RFC 1918, CGNAT (the tailnet's own) or IPv6 ULA: an address that isn't the open internet. */
-    fun privateHost(host: String): Boolean {
-        if (host == "localhost" || host == "::1") return true
-        // Decimal octets without leading zeros ("010" is octal to some resolvers).
-        val v4 = host.split('.').takeIf { it.size == 4 }?.map { o -> if (!Regex("0|[1-9][0-9]{0,2}").matches(o)) return false; o.toInt() }
-        if (v4 != null) {
-            val (a, b) = v4
-            return a == 127 || a == 10 || (a == 192 && b == 168) || (a == 172 && b in 16..31) || (a == 100 && b in 64..127)
-        }
-        return host.length > 4 && (host.startsWith("fc") || host.startsWith("fd")) && host[4] == ':'
+        return link.copy(fingerprint = fp, lan = lan, lanPort = port)
     }
 }
 
@@ -234,12 +171,6 @@ class PairingStore(context: Context) : LegacyPairing {
             fingerprint = prefs.getString("fingerprint", null),
             lanAddresses = prefs.getString("lan", null).orEmpty().split(',').filter { it.isNotEmpty() },
             lanPort = prefs.getInt("lanPort", LanInfo.DEFAULT_PORT),
-            tailnetName = prefs.getString("tailnetName", null),
-            tailnetIp = prefs.getString("tailnetIp", null),
-            tailnetUrl = prefs.getString("tailnetUrl", null),
-            tailnetAccount = prefs.getString("tailnetAccount", null),
-            controlUrl = prefs.getString("controlUrl", null),
-            controlConfirmed = prefs.getBoolean("controlConfirmed", false),
         )
     }
 
@@ -248,14 +179,13 @@ class PairingStore(context: Context) : LegacyPairing {
             .putString("baseUrl", p.baseUrl).putString("token", p.token).putString("macName", p.macName)
             .putString("macId", p.macId).putString("deviceId", p.deviceId)
             .putString("fingerprint", p.fingerprint).putString("lan", p.lanAddresses.joinToString(",")).putInt("lanPort", p.lanPort)
-            .putString("tailnetName", p.tailnetName).putString("tailnetIp", p.tailnetIp).putString("tailnetUrl", p.tailnetUrl).putString("tailnetAccount", p.tailnetAccount).putString("controlUrl", p.controlUrl)
-            .putBoolean("controlConfirmed", p.controlConfirmed)
             .apply()
     }
 
     override fun clear() {
         prefs.edit().remove("baseUrl").remove("token").remove("macName").remove("macId").remove("deviceId")
             .remove("fingerprint").remove("lan").remove("lanPort")
+            // What an older build kept about the computer's tailnet, which nothing reads any more.
             .remove("tailnetName").remove("tailnetIp").remove("tailnetUrl").remove("tailnetAccount").remove("controlUrl").remove("controlConfirmed").apply()
     }
 
@@ -298,7 +228,7 @@ object Pairer {
      * `POST <u>/v1/pair`. Any 4xx means the code is no good (expired, used, or mistyped). When the
      * base can't be reached and the link names the Mac's local listener, the same request goes to
      * those addresses with the certificate pinned (the first to answer wins): pairing on the same
-     * Wi-Fi, or with the Mac on this phone's hotspot, needs no Tailscale.
+     * Wi-Fi, over a VPN into the Mac's network, or with the Mac on this phone's hotspot.
      */
     suspend fun pair(context: Context, link: PairLink): Pairing {
         val body = JSONObject()
@@ -309,15 +239,12 @@ object Pairer {
             // This install's own id: pairing it again replaces its old device on the computer
             // rather than adding a twin to its list (docs/PROTOCOL.md, Pairing).
             .put("installId", installId(context))
-        if (BuildConfig.DEBUG) android.util.Log.d("Hypernova", "pair: base=${link.baseUrl} lan=${link.hasLan} tailnet=${link.tailnetName} node=${Tsnet.status.state}")
+        if (BuildConfig.DEBUG) android.util.Log.d("Hypernova", "pair: base=${link.baseUrl} lan=${link.hasLan}")
         val res = try {
             post(Api(link.baseUrl, token = null), body)
         } catch (e: ApiException) {
             if (e.problem == Problem.CodeExpired || e.problem == Problem.Server) throw e
-            // The local network first (no account needed), then the built-in node while it runs.
-            (if (link.hasLan) pairOverLan(link, body) else null)
-                ?: (if (link.hasTailnet) pairOverTailnet(link, body) else null)
-                ?: throw e
+            (if (link.hasLan) pairOverLan(link, body) else null) ?: throw e
         }
         val token = res.str("token") ?: throw ApiException(Problem.Server, 200, "no_token")
         val mac = res.obj("mac")
@@ -330,32 +257,7 @@ object Pairer {
             fingerprint = link.fingerprint,
             lanAddresses = link.lan,
             lanPort = link.lanPort,
-            tailnetName = link.tailnetName,
-            tailnetIp = link.tailnetIp,
-            tailnetAccount = link.tailnetAccount,
-            controlUrl = link.controlUrl,
         )
-    }
-
-    /**
-     * The pairing through the built-in Tailscale node (data/Tsnet.kt), when it is signed in: the
-     * same request to the computer's tailnet name through the node's proxy. Null when the node
-     * isn't running or nothing answered there; a refusal is final, as over the local network.
-     */
-    private suspend fun pairOverTailnet(link: PairLink, body: JSONObject): JSONObject? {
-        val node = Tsnet.status.takeIf { it.running } ?: return null
-        // The node must be the one for this link's control server (never another server's node).
-        if (!Tsnet.serves(link.controlUrl)) return null
-        val target = TailnetTarget.of(Pairing(link.baseUrl, "", link.macName, null, null, link.fingerprint, tailnetName = link.tailnetName, tailnetIp = link.tailnetIp)) ?: return null
-        // Added next to the current computer's destination, never in its place: a failed pairing leaves the current route alone.
-        target.hostPort?.let { Tsnet.allow(it) }
-        val client = TsnetTls.client(target.base, node.proxyPort, node.proxyToken, target.fingerprint, identity = null)
-        return try {
-            post(Api(link.baseUrl, token = null, fixed = NetRoute(target.base, RouteKind.Tailscale, client)), body)
-        } catch (e: ApiException) {
-            if (e.problem == Problem.CodeExpired || e.code == "too_many_tries") throw e
-            null
-        }
     }
 
     private suspend fun post(api: Api, body: JSONObject): JSONObject = try {
@@ -390,26 +292,5 @@ object Pairer {
         }
         refused?.let { if (winner == null) throw it }
         return if (winner != null) answer else null
-    }
-}
-
-/**
- * The computer moved on its tailnet (data/Protocol.kt [TailnetHint]): a phone paired while the
- * Tailscale app served the phone API keeps the app's node as its tailnet target, and once the app is
- * quit and Hypernova's own node serves instead, the phone's node would dial a machine that's gone.
- * So the pairing follows what the computer says (its snapshot, `{t:"tsnet"}`), over the route it
- * already trusts. Only on the same control server: another one needs the user's consent, which a
- * new pairing asks for. Null when nothing changes.
- */
-object TailnetFollow {
-    fun next(p: Pairing, h: TailnetHint?): Pairing? {
-        if (h == null || h.control?.trimEnd('/')?.lowercase() != p.controlUrl?.trimEnd('/')?.lowercase()) return null
-        val o = RoutePolicy.originOf(h.url) ?: return null
-        val name = h.name.lowercase()
-        // The URL must be the computer itself on the tailnet: its name or its address there.
-        if (o.scheme != "https" || (o.host != name && o.host != h.ip?.lowercase())) return null
-        val same = p.tailnetName?.trimEnd('.')?.lowercase() == name && p.tailnetIp == h.ip && (p.tailnetUrl ?: p.baseUrl).trimEnd('/') == h.url
-        if (same) return null
-        return p.copy(tailnetName = h.name, tailnetIp = h.ip, tailnetUrl = h.url)
     }
 }

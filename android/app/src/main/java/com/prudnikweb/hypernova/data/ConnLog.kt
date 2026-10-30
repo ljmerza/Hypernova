@@ -20,13 +20,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 /*
  * The connection log (Settings → Mac → Connection log): how the app went about reaching the Mac,
  * as it happened. The network it saw, each probe of a route and its answer (Local by address and
- * port, the tailnet through the built-in node's proxy, the paired base URL), the route each round
- * chose and why, the live socket opening and closing, the waits before the next try, the built-in
- * node's state and what the Mac said about its own. The last [ConnLog.CAPACITY] entries in memory,
+ * port, the paired base URL), the route each round chose and why, the live socket opening and
+ * closing, the waits before the next try and what the Mac said about its own addresses. The last [ConnLog.CAPACITY] entries in memory,
  * a short tail on disk (a phone that lost the Mac overnight still has the story in the morning),
  * and logcat in debug builds.
  *
- * Never a secret: no tokens, keys, pairing codes, proxy secrets or URLs (a host and port at most);
+ * Never a secret: no tokens, keys, pairing codes or URLs (a host and port at most);
  * every entry passes [ConnScrub] on its way in.
  */
 
@@ -44,9 +43,7 @@ enum class ConnKind {
     Socket,
     /** A wait: the next try, a re-check. */
     Wait,
-    /** The built-in Tailscale node on this phone. */
-    Node,
-    /** What the Mac said about itself: its tailnet node, its local addresses. */
+    /** What the Mac said about itself: its local addresses. */
     Mac,
 }
 
@@ -59,7 +56,7 @@ enum class ConnResult {
     Timeout,
     /** No way to the address (no route, the network down). */
     Unreachable,
-    /** The name doesn't resolve (a tailnet name with no Tailscale app on the phone). */
+    /** The name doesn't resolve. */
     NoName,
     /** A server answered with a certificate that isn't the paired one. */
     PinWrong,
@@ -67,10 +64,6 @@ enum class ConnResult {
     PinExpired,
     /** The secure connection failed otherwise. */
     Tls,
-    /** The built-in node couldn't reach the Mac on the tailnet (its proxy said 502). */
-    NoPeer,
-    /** The built-in node's proxy turned the request away (403, 407, 503). */
-    ProxyRefused,
     /** The daemon answered with an error status (the detail says which). */
     Http,
     /** A socket closed. */
@@ -94,7 +87,7 @@ data class ConnEntry(
     val kind: ConnKind,
     val result: ConnResult = ConnResult.Info,
     val route: RouteKind? = null,
-    /** Where: `192.168.0.149:47323`, `mac.tail1234.ts.net:47321`. A host and port, never a URL. */
+    /** Where: `192.168.0.149:47323`, `10.0.2.2:47321`. A host and port, never a URL. */
     val target: String? = null,
     /** A short phrase: what happened, or why. */
     val text: String? = null,
@@ -130,14 +123,14 @@ class ConnRing(private val capacity: Int) {
 
 /**
  * Keeps secrets out of the log: a URL becomes its host and port, bearer and basic credentials, the
- * daemon's and Tailscale's tokens and any long run of key-like characters are cut, and a phrase is
+ * daemon's tokens and any long run of key-like characters are cut, and a phrase is
  * at most [MAX] characters.
  */
 object ConnScrub {
     const val MAX = 200
     private val url = Regex("""\b[a-zA-Z][a-zA-Z0-9+.-]*://(?:[^@/\s?#]*@)?([^/\s?#]+)[^\s]*""")
     private val credential = Regex("""(?i)\b(bearer|basic)\s+\S+""")
-    private val token = Regex("""\b(?:hn[a-z]?_[A-Za-z0-9_-]{4,}|tskey-[A-Za-z0-9-]+)""")
+    private val token = Regex("""\b(?:hn[a-z]?_[A-Za-z0-9_-]{4,})""")
     private val query = Regex("""[?&][A-Za-z0-9_.-]+=[^\s&]*""")
     private val longRun = Regex("""[A-Za-z0-9_+/=-]{32,}""")
 
@@ -179,7 +172,6 @@ object ConnText {
     /** A route's name in the copied text. */
     fun routeName(r: RouteKind?): String = when (r) {
         RouteKind.Local -> "local"
-        RouteKind.Tailscale -> "tailnet"
         RouteKind.Remote -> "base-url"
         null -> "-"
     }

@@ -26,7 +26,7 @@ conversation can switch from one to the other mid-chat.
 
 Everything runs on **a computer of your own**, next to your agents: **a Linux server** (a VPS, a home
 server, a PC: the `hypernova` command), **a Docker container** or, with upstream's app, **a Mac**.
-The phone reaches it directly on your Wi-Fi, or over **your own Tailscale network**
+The phone reaches it directly on your Wi-Fi, or over **your own VPN into that network**
 from anywhere. No Hypernova server sits in between: the only thing upstream hosts is a small name
 service for pairing and a private name (see [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md)).
 **A Windows PC** runs the Linux service inside WSL 2 or Docker Desktop: **experimental**, documented
@@ -61,7 +61,7 @@ but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-wi
   Can edit, asking you for more.
 - **Connect your way.** Pair by scanning a QR code or tapping a link (`https://hypernova.observer/pair#…`
   opens the app). On your Wi-Fi the phone talks to the computer directly over mutual TLS ("Local first, always");
-  away from home it uses Tailscale, the Tailscale app or Hypernova's own built-in node. Settings keeps a
+  away from home it does the same over your own VPN into that network. Settings keeps a
   connection log of every decision.
 - **Notifications you can act on.** Allow and Deny right on an approval's notification (after unlocking),
   a Reply field, and attention cards on Home (a limit, a provider's trouble) you swipe away, with Undo.
@@ -90,7 +90,7 @@ menu bar planet with the same approvals, sessions and usage meters; this fork do
 
 ```mermaid
 flowchart LR
-  phone["Android app"] -- "HTTPS + WebSocket<br/>Wi-Fi (mutual TLS) or your tailnet" --> api
+  phone["Android app"] -- "HTTPS + WebSocket, mutual TLS<br/>Wi-Fi or your VPN :47323" --> api
   subgraph host["Your computer: a Linux server, Docker or a Mac"]
     api["daemon<br/>Node.js · 127.0.0.1:47321"]
     menubar["the hypernova command (Linux)<br/>or the menu bar app (Mac)"] -- "loopback + admin token<br/>:47322" --> api
@@ -107,7 +107,7 @@ flowchart LR
   watches every Claude Code session on the computer through hooks and transcripts, and Codex's
   through Codex's own app server (only while you use Codex). It runs the phone's sessions in
   **shared terminals**: you can take the same live terminal over from the phone or from any
-  terminal on the computer, over SSH too (`hn attach`). It serves the phone API on loopback, exposed only through Tailscale (the app's `tailscale serve` or its own built-in node) and, on your Wi-Fi, a mutual-TLS listener.
+  terminal on the computer, over SSH too (`hn attach`). It serves the phone API on loopback, and to phones only through a mutual-TLS listener on your network (the local route).
 - **The Android app** (`android/`, Kotlin and Jetpack Compose) talks to that API.
 - **The `hypernova` command** (`daemon/src/cli/`) installs the daemon on Linux as a systemd user
   service and runs setup, pairing and checks from a terminal. Upstream's **Mac app** (`mac/`,
@@ -126,9 +126,8 @@ flowchart LR
   [Codex](https://github.com/openai/codex) 0.163.0 or later, or both. Either one alone is enough, and
   Hypernova installs Claude Code for you if you want it.
 - An Android phone running Android 10 or later.
-- Optional: a [Tailscale](https://tailscale.com) account, to reach the computer from anywhere (always,
-  for a VPS; the Tailscale app is optional too: Hypernova carries its own node). On the same Wi-Fi
-  nothing else is needed.
+- Optional: your own VPN into the computer's network (WireGuard, a UniFi VPN…), to reach it from
+  anywhere. On the same Wi-Fi nothing else is needed.
 
 **1. Install the server**, as the user who'll run the agents (not root). Either from the
 [latest release](https://github.com/ljmerza/Hypernova/releases/latest)'s server package,
@@ -173,8 +172,8 @@ volume for its state, then `docker exec -it hypernova hypernova pair` (the exact
 [`docs/INSTALL.md`](docs/INSTALL.md#4-in-docker)).
 
 *On Windows (experimental):* the Linux steps inside WSL 2 (Ubuntu), with Claude Code and Codex
-installed there too, or the Docker steps in Docker Desktop; the phone pairs over the built-in
-Tailscale. Nobody has tried it on a Windows PC yet: [`docs/INSTALL.md`](docs/INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop)
+installed there too, or the Docker steps in Docker Desktop; the phone pairs over the local route,
+which needs WSL's mirrored networking. Nobody has tried it on a Windows PC yet: [`docs/INSTALL.md`](docs/INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop)
 has the steps and what is and isn't verified.
 
 *On a Mac:* upstream's [releases](https://github.com/prudnik-web/Hypernova/releases) have the Mac
@@ -199,10 +198,10 @@ To test alongside a live install, run a second daemon with `HYPERNOVA_SUPPORT`, 
 
 ## Privacy and safety
 
-- **Yours end to end.** The phone API listens on loopback and is reached through your tailnet or by
+- **Yours end to end.** The phone API listens on loopback and is reached only by
   your Wi-Fi's mutual-TLS listener, with a per-device token (and certificate) from pairing; the
   `hypernova` command uses an admin token kept in a `0700` folder. [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) is the
-  full threat model: what runs and is stored where, what Cloudflare, Let's Encrypt and Tailscale see, and
+  full threat model: what runs and is stored where, what Cloudflare and Let's Encrypt see, and
   what is still open.
 - **Keys stay on your computer.** Provider keys are never logged, never sent to the phone, and
   only ever go to their own provider.

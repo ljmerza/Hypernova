@@ -78,8 +78,8 @@ It writes three files to `dist/`:
   build, with `~/Library/Android/sdk/cmdline-tools/latest/bin/retrace dist/hypernova-mapping.txt
   trace.txt`.
 
-`distRelease` refuses to start without the release key (it never publishes a debug-signed APK) or
-while `HYPERNOVA_TSNET_AUTHKEY` is set, and after the build it checks the APK: v2 and v3 signatures,
+`distRelease` refuses to start without the release key (it never publishes a debug-signed APK),
+and after the build it checks the APK: v2 and v3 signatures,
 one signer, and that signer's certificate is the keystore's own (never Android's debug key).
 
 Then `mac/build.sh` bundles `dist/hypernova.apk` and its note into the Mac app (it prefers an APK
@@ -90,11 +90,8 @@ and to the phone's in-app update. `HYPERNOVA_RELEASE=1 mac/build.sh` refuses to 
 with their own debug key, and warns that it must not be handed out; `:app:distRelease` refuses.
 Debug builds (`:app:assembleDebug`, `:app:dist`) are unchanged.
 
-The embedded Tailscale node (`android/tsnet/build.sh`, built into `android/app/libs/tsnet.aar` when
-it is missing) is bound from a copy of its sources in a fresh `/tmp/hypernova-tsnet.XXXXXX` folder:
-gomobile writes the module's folder into the library's Go build info even with `-trimpath`, so a
-build in the checkout would carry the builder's home folder and user name into every APK. To
-rebuild it for a release, delete the AAR first (`rm android/app/libs/tsnet.aar`).
+The app no longer carries a Tailscale node (removed 2026-10-30): no Go, gomobile, NDK or
+`libs/tsnet.aar` is needed to build it.
 
 ### Verify
 
@@ -116,7 +113,6 @@ case-sensitive disk) and count:
 
 ```bash
 LC_ALL=C grep -a -r -c "$USER" <unzipped folder> | grep -v ':0$'     # expect nothing
-go version -m <unzipped folder>/lib/arm64-v8a/libgojni.so | grep '=>' # a /tmp/hypernova-tsnet.… path
 ```
 
 On a phone or emulator: `adb shell run-as com.prudnikweb.hypernova ls` must answer "package not

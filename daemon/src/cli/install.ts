@@ -88,8 +88,7 @@ export async function installDaemon(cli: Cli, node: string, from: string, say: (
   const staging = join(cli.appDir, 'daemon.new')
   rmSync(staging, { recursive: true, force: true })
   mkdirSync(staging, { recursive: true })
-  // `bin` holds the built-in Tailscale helper (hypernova-tsnet-linux-*), when the package has it.
-  for (const f of ['src', 'bin', 'package.json', 'package-lock.json']) if (existsSync(join(src, f))) cpSync(join(src, f), join(staging, f), { recursive: true })
+  for (const f of ['src', 'package.json', 'package-lock.json']) if (existsSync(join(src, f))) cpSync(join(src, f), join(staging, f), { recursive: true })
   // The same lockfile as the copy in place: its packages (node-pty built for this machine) move over.
   const sameLock = (() => {
     try {

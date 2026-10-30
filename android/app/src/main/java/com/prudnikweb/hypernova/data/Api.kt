@@ -33,13 +33,13 @@ import kotlin.coroutines.resumeWithException
 enum class Problem {
     /** The phone itself has no network. */
     NoNetwork,
-    /** The Mac's name doesn't resolve: Tailscale is off on this phone (or not signed in). */
-    NoTailscale,
-    /** Nothing answered: the Mac is asleep, offline, or Tailscale is off on one side. */
+    /** The Mac's name doesn't resolve on this network. */
+    NoName,
+    /** Nothing answered: the Mac is asleep, offline, or this phone isn't on its network (nor its VPN). */
     Unreachable,
     /** The Mac answered but nothing listens on the port: Hypernova isn't running there. */
     NotRunning,
-    /** The secure connection failed (HTTPS isn't set up in Tailscale yet). */
+    /** The secure connection failed. */
     Tls,
     /** A plain-http address in a build that only allows https. */
     Cleartext,
@@ -66,7 +66,7 @@ class ApiException(
 
 private val JSON = "application/json; charset=utf-8".toMediaType()
 
-/** One client for the app: short connect timeout (Tailscale either answers quickly or not at all). */
+/** One client for the app: short connect timeout (a Mac on the phone's own network answers quickly or not at all). */
 object Net {
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -93,7 +93,7 @@ object Net {
 
     fun classify(e: Throwable): ApiException = when (e) {
         is ApiException -> e
-        is UnknownHostException -> ApiException(Problem.NoTailscale, cause = e)
+        is UnknownHostException -> ApiException(Problem.NoName, cause = e)
         is ConnectException -> {
             // "Connection refused" means a machine answered; "timed out"/"unreachable" means nobody did.
             // OkHttp keeps the errno in the cause chain (and in suppressed route attempts).
@@ -108,7 +108,7 @@ object Net {
 }
 
 /**
- * The daemon's REST API for the Mac paired at [base] (e.g. `https://mac.tailnet.ts.net:47321`),
+ * The daemon's REST API for the Mac paired at [base] (e.g. `http://10.0.2.2:47321`),
  * authenticated with the device [token]. Every call is cancellable and throws [ApiException].
  *
  * Each request goes by the route active for that base ([ActiveRoutes]): the Mac's own address on
@@ -255,7 +255,7 @@ class Api(val base: String, private val token: String?, private val fixed: NetRo
             val code = err?.str("code")
             val msg = err?.str("message")
             // Pairing maps its own 4xx to CodeExpired (see Pairing.pair). A gateway error without
-            // the daemon's JSON means tailscale serve answered but Hypernova isn't running behind it.
+            // the daemon's JSON means a proxy in front answered but Hypernova isn't running behind it.
             val problem = when {
                 status == 401 -> Problem.Unauthorized
                 status in 502..504 && err == null -> Problem.NotRunning

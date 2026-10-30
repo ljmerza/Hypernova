@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * The terminal's socket follows the active route (docs/PROTOCOL.md, "Shared terminals"): over
- * Tailscale the page opens it itself, on the local route the app opens it with the pinned client.
+ * the base URL the page opens it itself, on the local route the app opens it with the pinned client.
  */
 class TermTicketTest {
     private val ticket = "/v1/terms/t-1/ws?ticket=abc123"
@@ -21,8 +21,8 @@ class TermTicketTest {
     }
 
     @Test fun remoteRouteLeavesTheSocketToThePage() {
-        val link = TermTicket.of(ticket, NetRoute.remote("https://mac.tail1234.ts.net"))
-        assertEquals("wss://mac.tail1234.ts.net/v1/terms/t-1/ws?ticket=abc123", link.url)
+        val link = TermTicket.of(ticket, NetRoute.remote("https://mac.example.com"))
+        assertEquals("wss://mac.example.com/v1/terms/t-1/ws?ticket=abc123", link.url)
         assertNull(link.client)
     }
 
@@ -33,7 +33,7 @@ class TermTicketTest {
 
     @Test fun aWholeUrlFromTheDaemonMovesToTheRoute() {
         // An older daemon, or one behind a proxy, may hand out a whole URL: the route decides the origin.
-        val link = TermTicket.of("https://mac.tail1234.ts.net/v1/terms/t-1/ws?ticket=abc123", NetRoute("https://10.0.0.7:47323", RouteKind.Local, OkHttpClient()))
+        val link = TermTicket.of("https://mac.example.com/v1/terms/t-1/ws?ticket=abc123", NetRoute("https://10.0.0.7:47323", RouteKind.Local, OkHttpClient()))
         assertEquals("wss://10.0.0.7:47323/v1/terms/t-1/ws?ticket=abc123", link.url)
     }
 

@@ -16,7 +16,7 @@
 
     <!-- A Linux server or PC paired (data/ComputerWords.kt): its own way where a Mac's menu bar is meant. -->
     <string name="problem_not_running_linux">Hypernova isn\'t running on your server. On it, run hypernova doctor: it says what stopped and how to start it.</string>
-    <string name="problem_tls_linux">The secure connection to your server failed. On it, run hypernova doctor to finish the Tailscale setup.</string>
+    <string name="problem_tls_linux">The secure connection to your server failed. On it, run hypernova doctor to see what\'s wrong; if it keeps failing, pair again.</string>
     <string name="unpaired_body_linux">%1$s no longer accepts this phone. To pair again, run hypernova pair on it and scan the code.</string>
     <string name="problem_unpaired_linux">This phone was unpaired. Pair it again: run hypernova pair on your server.</string>
     <string name="problem_code_expired_linux">Codes work once and last 10 minutes. On your server, run hypernova pair again and scan the new code.</string>

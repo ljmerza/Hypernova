@@ -41,22 +41,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      # Same toolchain as android.yml: platform 37, Go + gomobile + an NDK for the tsnet AAR.
+      # Same toolchain as android.yml: platform 37.
       - name: Android SDK platform 37
         run: |
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKM" --licenses > /dev/null || true
           "$SDKM" "platforms;android-37.0" "build-tools;37.0.0" || "$SDKM" "platforms;android-37"
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: android/tsnet/go.mod
-          cache-dependency-path: android/tsnet/go.sum
-      - name: gomobile and the NDK
-        run: |
-          (cd tsnet && go install golang.org/x/mobile/cmd/gomobile && "$(go env GOPATH)/bin/gomobile" init)
-          if ! ls -d "$ANDROID_HOME"/ndk/* > /dev/null 2>&1; then
-            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018" > /dev/null
-          fi
       - uses: gradle/actions/setup-gradle@v4
       - name: Release key
         env:

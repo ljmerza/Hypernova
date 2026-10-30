@@ -1,11 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Backups are off (allowBackup=false); this also keeps the built-in Tailscale node's keys
-     (files/tsnet) out of a device-to-device transfer, so a new phone is a new node. -->
-<data-extraction-rules>
-    <cloud-backup>
-        <exclude domain="file" path="tsnet" />
-    </cloud-backup>
-    <device-transfer>
-        <exclude domain="file" path="tsnet" />
-    </device-transfer>
-</data-extraction-rules>
+<!-- Backups are off (allowBackup=false). Nothing is singled out for a device-to-device transfer:
+     the device certificate's key lives in AndroidKeyStore, which never leaves the phone. -->
+<data-extraction-rules />

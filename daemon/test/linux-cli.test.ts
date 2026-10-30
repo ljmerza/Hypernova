@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { cliContext, realSys, wslHere, type Cli, type Ran, type RunOptions, type Sys, type WslHere } from '../src/cli/context.ts'
-import { doctor, lan, logs, name, pair, parseArgs, setup, status, tailscale, uninstall } from '../src/cli/commands.ts'
+import { doctor, lan, logs, name, pair, parseArgs, setup, status, uninstall } from '../src/cli/commands.ts'
 import { CARRIED, enableLinger, installService, userManager, launcherText, ownLauncher, removeService, serviceState, servicePath, unitText, userBusEnv } from '../src/cli/service.ts'
 import { downloadNode, majorOf, nodeArch, pickRelease, shaFor } from '../src/cli/node.ts'
 import { daemonIn, findClaudeBin, integrationDir, isDaemonDir, setIntegration } from '../src/cli/install.ts'
@@ -58,7 +58,7 @@ function ctx(sys: Sys, o: Partial<Cli> = {}, env: NodeJS.ProcessEnv = {}): Cli {
   return cliContext({
     platform: 'linux',
     home,
-    env: { HOME: home, PATH: '/usr/bin:/bin', HYPERNOVA_TAILSCALE: join(scratch, 'no-tailscale'), ...env },
+    env: { HOME: home, PATH: '/usr/bin:/bin', ...env },
     support: join(home, '.local/share/hypernova'),
     logs: join(home, '.local/state/hypernova/logs'),
     user: 'ada',
@@ -73,7 +73,7 @@ function ctx(sys: Sys, o: Partial<Cli> = {}, env: NodeJS.ProcessEnv = {}): Cli {
 
 // ── A stand-in daemon ─────────────────────────────────────────────────────
 
-type Fake = { api: number; local: number; devices: any[]; status: any; name: any; releaseOk: boolean; requests: string[]; bodies: any[]; pairLink: { link: string; appLink: string; download?: string }; serve: () => { url: string } | { error: string }; close: () => Promise<void> }
+type Fake = { api: number; local: number; devices: any[]; status: any; name: any; releaseOk: boolean; requests: string[]; bodies: any[]; pairLink: { link: string; appLink: string; download?: string }; close: () => Promise<void> }
 async function fakeDaemon(): Promise<Fake> {
   const f: Fake = {
     api: 0,
@@ -83,7 +83,6 @@ async function fakeDaemon(): Promise<Fake> {
     bodies: [],
     status: {
       daemonVersion: '0.2.0',
-      tailscale: { installed: false, loggedIn: false, httpsEnabled: false, serveOn: false, url: null },
       hooks: { installed: true },
       statusLine: { installed: true, supported: true },
       shell: { installed: true, supported: true },
@@ -95,7 +94,6 @@ async function fakeDaemon(): Promise<Fake> {
     pairLink: { link: 'https://hypernova.observer/pair#v=1&u=x&c=CODE&n=box', appLink: 'hypernova://pair?v=1&u=x&c=CODE&n=box' },
     name: { enabled: true, setting: true, termsShown: false, reason: 'Not made yet.', terms: 'https://letsencrypt.org/repository/', host: null },
     releaseOk: true,
-    serve: () => ({ url: 'https://box.tail.ts.net:47321' }),
     close: async () => {},
   }
   const servers: Server[] = []
@@ -108,23 +106,8 @@ async function fakeDaemon(): Promise<Fake> {
     const path = new URL(req.url, 'http://x').pathname
     if (path === '/v1/health') return send({ ok: true, protocol: 1, name: 'box' })
     if (path === '/local/status') return send(f.status)
-    if (path === '/local/tsnet') {
-      // An older daemon has no such route: the command then treats the node as absent.
-      if (!f.status.tsnet) { res.writeHead(404, { 'content-type': 'application/json' }); return res.end('{"error":{"code":"not_found"}}') }
-      return send(f.status.tsnet)
-    }
     if (path === '/local/devices') return send({ devices: f.devices })
     if (path === '/local/pair/start') return send({ ...f.pairLink, expiresAt: Date.now() + 600_000, url: 'x' })
-    if (path === '/local/tailscale/serve') {
-      const r = f.serve()
-      if ('error' in r) {
-        res.writeHead(500, { 'content-type': 'application/json' })
-        return res.end(JSON.stringify({ error: { code: 'tailscale', message: r.error } }))
-      }
-      f.status.tailscale = { ...f.status.tailscale, serveOn: true, url: r.url }
-      return send(f.status.tailscale)
-    }
-    if (path === '/local/tsnet/logout') return send({ ok: true })
     if (path === '/local/name/release') return send({ released: true, name: 'k3x9mq2z7a' })
     if (path === '/local/name') return send(f.name)
     if (path === '/local/settings') {
@@ -485,16 +468,16 @@ const claudeAnswers = (signedIn: boolean) => (cmd: string, args: string[]): Answ
   return {}
 }
 
-test('pair: the QR code and its link when there’s no tailnet, with what to do about it', async () => {
+test('pair: the QR code and its link, and what to do when the local route is off', async () => {
   const sys = fakeSys(() => ({}))
   const c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
   assert.equal(await pair(c, { 'no-wait': true }), 0)
   const text = sys.out.join('\n')
-  assert.match(text, /Tailscale isn’t installed: this code pairs a phone on the same network only/)
+  assert.doesNotMatch(text, /Tailscale/)
   // The pairing link carries no local addresses here: the route is off, and it says so.
-  assert.match(text, /The local network route is off too/)
+  assert.match(text, /The local network route is off, so a phone has no way in yet\.\n {6}hypernova lan on/)
   assert.ok(sys.out.some((l) => /^  [ ▀▄█]{20,}$/.test(l)), 'a QR code')
-  // The same hypernova.observer link as over a tailnet: the app opens it either way.
+  // The hypernova.observer link: the app opens it.
   assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`))
   assert.match(text, /it opens the Hypernova app/)
   assert.match(text, /It works once, for 10 minutes \(until \d\d:\d\d\)\./)
@@ -521,50 +504,24 @@ test('pair waits for the phone and names it', async () => {
   assert.match(text, /Paired with Pixel \(Pixel 9\)\./)
 })
 
-test('pair over the tailnet: tailscale serve turned on through the daemon, the https link in the code', async () => {
-  // A stand-in tailscale command, so the command knows Tailscale is installed; the daemon answers for it.
-  const ts = join(scratch, 'tailscale')
-  writeFileSync(ts, '#!/bin/sh\nexit 0\n', { mode: 0o755 })
-  const saved = structuredClone(daemon.status.tailscale)
+test('pair with the local route on: the link, no warning, and where to get the app when the daemon knows', async () => {
+  // The link carries the local route (the test before left lan= in it).
+  const sys = fakeSys(() => ({}))
+  assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true }), 0)
+  const text = sys.out.join('\n')
+  assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`), text)
+  assert.match(text, /Scan it with the phone’s camera/)
+  assert.doesNotMatch(text, /no way in|Tailscale/)
+  // Where to get the app is said whenever the daemon knows (the page the code opens without the
+  // app points here): one on the local network's name (the daemon's names.ts), or its address.
+  assert.doesNotMatch(text, /The app, if the phone/, 'no download link given, none said')
+  daemon.pairLink = { ...daemon.pairLink, download: 'https://l-k3x9mq2z7a.hypernova.observer:47323/download/android' }
   try {
-    daemon.status.tailscale = { installed: true, loggedIn: true, httpsEnabled: true, serveOn: false, url: null }
-    const sys = fakeSys(() => ({}))
-    assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }, { HYPERNOVA_TAILSCALE: ts }), { 'no-wait': true }), 0)
-    assert.ok(daemon.requests.includes('POST /local/tailscale/serve'))
-    const text = sys.out.join('\n')
-    assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`), text)
-    assert.match(text, /Scan it with the phone’s camera/)
-    assert.doesNotMatch(text, /same network only/)
-    // Where to get the app is said whenever the daemon knows (the page the code opens without the
-    // app points here): the tailnet's page, or one on the local network's name (the daemon's names.ts).
-    assert.doesNotMatch(text, /The app, if the phone/, 'no download link given, none said')
-    daemon.pairLink = { ...daemon.pairLink, download: 'https://l-k3x9mq2z7a.hypernova.observer:47323/download/android' }
     const named = fakeSys(() => ({}))
-    await pair(ctx(named, { apiPort: daemon.api, localPort: daemon.local }, { HYPERNOVA_TAILSCALE: ts }), { 'no-wait': true, 'no-qr': true })
+    await pair(ctx(named, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true, 'no-qr': true })
     assert.match(named.out.join('\n'), /The app, if the phone doesn’t have it yet: https:\/\/l-k3x9mq2z7a\.hypernova\.observer:47323\/download\/android/)
-    delete daemon.pairLink.download
-
-    // Tailscale on Linux lets only root or its operator change serve: the fix names this user.
-    daemon.status.tailscale = { installed: true, loggedIn: true, httpsEnabled: true, serveOn: false, url: null }
-    daemon.serve = () => ({ error: 'Access denied: serve config denied. Use sudo, or set an operator.' })
-    const denied = fakeSys(() => ({}))
-    await pair(ctx(denied, { apiPort: daemon.api, localPort: daemon.local }, { HYPERNOVA_TAILSCALE: ts }), { 'no-wait': true })
-    assert.match(denied.out.join('\n'), /! Tailscale lets only root or its operator change serve\.\n {6}Make yourself its operator once: sudo tailscale set --operator=ada/)
-    // The same link, for the local network now.
-    assert.ok(denied.out.includes(`  ${daemon.pairLink.link}`))
-
-    // Signed out, or a tailnet without HTTPS certificates: said plainly, with where to fix it.
-    daemon.status.tailscale = { installed: true, loggedIn: false, httpsEnabled: false, serveOn: false, url: null }
-    const out = fakeSys(() => ({}))
-    await pair(ctx(out, { apiPort: daemon.api, localPort: daemon.local }, { HYPERNOVA_TAILSCALE: ts }), { 'no-wait': true })
-    assert.match(out.out.join('\n'), /Tailscale is installed but not signed in\.\n {6}sudo tailscale up/)
-    daemon.status.tailscale = { installed: true, loggedIn: true, httpsEnabled: false, serveOn: false, url: null }
-    const nocert = fakeSys(() => ({}))
-    await pair(ctx(nocert, { apiPort: daemon.api, localPort: daemon.local }, { HYPERNOVA_TAILSCALE: ts }), { 'no-wait': true })
-    assert.match(nocert.out.join('\n'), /HTTPS certificates off[^]*login\.tailscale\.com\/admin\/dns/)
   } finally {
-    daemon.status.tailscale = saved
-    daemon.serve = () => ({ url: 'https://box.tail.ts.net:47321' })
+    delete daemon.pairLink.download
   }
 })
 
@@ -588,7 +545,7 @@ test('status: what runs, how phones reach it, Claude Code and the sessions', asy
   const text = sys.out.join('\n')
   assert.match(text, /^Hypernova 0\.2\.0 on box$/m)
   assert.match(text, /Daemon +running/)
-  assert.match(text, new RegExp(`Phone API +127\\.0\\.0\\.1:${daemon.api} \\(no Tailscale yet\\)`))
+  assert.match(text, new RegExp(`Phone API +127\\.0\\.0\\.1:${daemon.api}$`, 'm'))
   assert.match(text, /Local route +port 47323 on 192\.168\.1\.20/)
   assert.match(text, /Claude Code +2\.1\.302, signed in \(max\)/)
   assert.doesNotMatch(text, /never@kept/)
@@ -601,7 +558,7 @@ test('status: what runs, how phones reach it, Claude Code and the sessions', asy
   assert.equal(o.name, 'box')
 })
 
-test('doctor: each check with its fix; a missing login is a problem, a missing Tailscale worth a look', async () => {
+test('doctor: each check with its fix; a missing login is a problem', async () => {
   const sys = fakeSys(claudeAnswers(false), ['openssl', 'make', 'g++', 'python3'])
   const c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local }, { CLAUDE_BIN: '/bin/sh' })
   sys.run = ((orig) => (cmd: string, args: string[], o?: RunOptions) => orig(cmd === '/bin/sh' ? 'claude' : cmd, args, o))(sys.run)
@@ -622,7 +579,6 @@ test('doctor: each check with its fix; a missing login is a problem, a missing T
   assert.match(text, /✓ Daemon answering as “box”/)
   assert.match(text, /✓ Phone API and local API on loopback only/)
   assert.match(text, /✗ Claude Code isn’t signed in\.\n {6}Run claude once on this server/)
-  assert.match(text, /! Tailscale isn’t installed[^\n]*\n {6}curl -fsSL https:\/\/tailscale\.com\/install\.sh \| sh/)
   assert.match(text, /1 problem to fix, \d+ worth a look\./)
   // A port forward on all addresses: a problem, named.
   const open = fakeSys(claudeAnswers(true))
@@ -725,60 +681,6 @@ test('setup stops at a missing build tool with the apt line that fixes it', asyn
   assert.deepEqual(readdirSync(c.appDir).filter((x) => x.startsWith('daemon')), [])
 })
 
-test('the built-in Tailscale node (the daemon\'s tsnet.ts): status, doctor and pair say so, and pair shows its sign-in code first', async () => {
-  const saved = structuredClone(daemon.status)
-  const builtIn = { mode: 'builtIn', reason: 'nothing to install', available: true, enabled: true, helper: { state: 'Running', dnsName: 'hypernova-box.tail.ts.net', account: 'owner@example.com', listening: 'https://100.64.0.2:47321', tls: 'pinned' }, url: 'https://100.64.0.2:47321', controlUrl: null }
-  try {
-    daemon.status.tsnet = builtIn
-    // status: the row names the node and the account.
-    let sys = fakeSys(claudeAnswers(true))
-    await status(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), {})
-    assert.match(sys.out.join('\n'), /Phone API +127\.0\.0\.1:\d+ → https:\/\/100\.64\.0\.2:47321 \(built-in Tailscale, owner@example\.com\)/)
-    // doctor: ok, with the pinned note.
-    sys = fakeSys(claudeAnswers(true), ['openssl', 'make', 'g++', 'python3'])
-    await doctor(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { json: true })
-    const checks = JSON.parse(sys.out.join('\n')) as { name: string; mark: string; text: string }[]
-    const ts = checks.find((c) => c.name === 'tailscale')!
-    assert.equal(ts.mark, 'ok')
-    assert.match(ts.text, /built-in Tailscale, owner@example\.com; no HTTPS certificates/)
-    // pair: the node runs, so straight to the code: the daemon's link (hypernova.observer's, the details after its #).
-    sys = fakeSys(claudeAnswers(true))
-    assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true, 'no-qr': true }), 0)
-    assert.match(sys.out.join('\n'), /https:\/\/hypernova\.observer\/pair#v=1&u=x&c=CODE/)
-    assert.match(sys.out.join('\n'), /it opens the Hypernova app/)
-    assert.doesNotMatch(sys.out.join('\n'), /Tailscale isn’t installed/)
-    // Needing a sign-in: the code is the sign-in link, and pair waits (here: not long).
-    daemon.status.tsnet = { ...builtIn, url: null, helper: { state: 'NeedsLogin', loginUrl: 'https://login.tailscale.com/a/abc123' } }
-    sys = fakeSys(claudeAnswers(true))
-    // --no-wait (or no terminal at all): the sign-in is shown, nothing waits for it, the code comes at once.
-    const t0 = Date.now()
-    assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true, 'no-qr': true }), 0)
-    assert.ok(Date.now() - t0 < 1500)
-    assert.match(sys.out.join('\n'), /Sign in to connect your devices/)
-    assert.match(sys.out.join('\n'), /it opens the Hypernova app/)
-    assert.doesNotMatch(sys.out.join('\n'), /Waiting for the sign-in/)
-    // --local: no Tailscale at all.
-    sys = fakeSys(claudeAnswers(true))
-    assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { local: true, 'no-wait': true, 'no-qr': true }), 0)
-    assert.doesNotMatch(sys.out.join('\n'), /Sign in to connect your devices/)
-    // In a terminal it waits for the sign-in to finish (here: not long).
-    sys = fakeSys(claudeAnswers(true))
-    const c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local, tty: true })
-    const t = setTimeout(() => { daemon.status.tsnet = builtIn }, 2500)
-    assert.equal(await pair(c, { 'no-qr': true, 'no-wait-phone': true }), 0)
-    clearTimeout(t)
-    const text = sys.out.join('\n')
-    assert.match(text, /Sign in to connect your devices/)
-    assert.match(text, /https:\/\/login\.tailscale\.com\/a\/abc123/)
-    assert.match(text, /Signed in as owner@example\.com/)
-    // hypernova tailscale: the state in a line.
-    sys = fakeSys(claudeAnswers(true))
-    assert.equal(await tailscale(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { 'no-qr': true }, []), 0)
-  } finally {
-    daemon.status = saved
-  }
-})
-
 test('the private name: its terms said once, before the first code, and the daemon told; hypernova name on|off', async () => {
   const sys = fakeSys(() => ({}))
   const c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
@@ -816,58 +718,20 @@ test('the private name: its terms said once, before the first code, and the daem
   assert.equal(await name(ctx(fakeSys(() => ({})), { apiPort: daemon.api, localPort: daemon.local }), ['maybe']), 2)
 })
 
-test('uninstall without a terminal and without --yes refuses; --purge signs the built-in node out of the tailnet', async () => {
-  const saved = structuredClone(daemon.status)
-  try {
-    // No terminal (the test run has none): nothing is removed without --yes.
-    let sys = fakeSys(() => ({}))
-    let c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
-    mkdirSync(c.appDir, { recursive: true })
-    assert.equal(await uninstall(c, {}), 1)
-    assert.match(sys.out.join('\n'), /no terminal to ask in[^]*--yes/)
-    assert.ok(existsSync(c.appDir))
-    // --purge --yes with the built-in node running: signed out first, said so.
-    daemon.status.tsnet = { mode: 'builtIn', reason: '', available: true, enabled: true, helper: { state: 'Running', listening: 'https://100.64.0.2:47321' }, url: 'x', controlUrl: null }
-    daemon.requests.length = 0
-    sys = fakeSys(() => ({}))
-    c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
-    assert.equal(await uninstall(c, { yes: true, purge: true }), 0)
-    const i = daemon.requests.indexOf('POST /local/tsnet/logout')
-    assert.ok(i >= 0 && i < daemon.requests.indexOf('POST /local/name/release') + 1, daemon.requests.join(' | '))
-    assert.match(sys.out.join('\n'), /built-in Tailscale node signed out of your tailnet/)
-    // Without --purge the node stays, and the person is told where.
-    mkdirSync(join(c.support, 'tsnet'), { recursive: true })
-    sys = fakeSys(() => ({}))
-    c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
-    mkdirSync(join(c.support, 'tsnet'), { recursive: true })
-    daemon.requests.length = 0
-    await uninstall(c, { yes: true })
-    assert.ok(!daemon.requests.includes('POST /local/tsnet/logout'))
-    assert.match(sys.out.join('\n'), /Tailscale node stays in your tailnet/)
-  } finally {
-    daemon.status = saved
-  }
-})
-
-test('hypernova tailscale on|off|control choose between the Tailscale app and the built-in node, through the settings', async () => {
-  const run = async (rest: string[]) => {
-    const sys = fakeSys(() => ({}))
-    daemon.bodies.length = 0
-    const code = await tailscale(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { 'no-qr': true }, rest)
-    return { code, text: sys.out.join('\n'), body: daemon.bodies[0] }
-  }
-  let r = await run(['off'])
-  assert.deepEqual(r.body, { builtInTailscale: false })
-  assert.match(r.text, /Built-in Tailscale off: use the Tailscale app/)
-  r = await run(['on'])
-  assert.deepEqual(r.body, { builtInTailscale: true })
-  r = await run(['control', 'https://hs.example.com'])
-  assert.deepEqual(r.body, { tailscaleControlUrl: 'https://hs.example.com' })
-  assert.equal(r.code, 0)
-  r = await run(['control', 'none'])
-  assert.deepEqual(r.body, { tailscaleControlUrl: '' })
-  r = await run(['control'])
-  assert.equal(r.code, 2)
+test('uninstall without a terminal and without --yes refuses; --purge --yes gives up the name and says nothing of Tailscale', async () => {
+  // No terminal (the test run has none): nothing is removed without --yes.
+  let sys = fakeSys(() => ({}))
+  let c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
+  mkdirSync(c.appDir, { recursive: true })
+  assert.equal(await uninstall(c, {}), 1)
+  assert.match(sys.out.join('\n'), /no terminal to ask in[^]*--yes/)
+  assert.ok(existsSync(c.appDir))
+  daemon.requests.length = 0
+  sys = fakeSys(() => ({}))
+  c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
+  assert.equal(await uninstall(c, { yes: true, purge: true }), 0)
+  assert.ok(daemon.requests.includes('POST /local/name/release'), daemon.requests.join(' | '))
+  assert.doesNotMatch(sys.out.join('\n'), /Tailscale|tailnet/)
 })
 
 test('hypernova logs --terminals reads the shared terminals’ log', async () => {
@@ -916,7 +780,7 @@ test('WSL is read from the kernel and systemd’s folder: its version, systemd, 
   assert.equal(wslHere({}, () => true, () => 'Linux version 6.8.0-45-generic (buildd@lcy02) (gcc 13.2.0)'), null)
 })
 
-test('doctor under WSL 2’s NAT: experimental, systemd, keeping WSL running, and the phone over Tailscale (not yet connected, then connected)', async () => {
+test('doctor under WSL 2’s NAT: experimental, systemd, keeping WSL running, and no way in for the phone until networking is mirrored', async () => {
   const checks = await checksOf(ctx(wslSys('nat', ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }))
   const by = (n: string) => checks.find((x) => x.name === n)!
   assert.equal(by('wsl').mark, 'info')
@@ -924,27 +788,14 @@ test('doctor under WSL 2’s NAT: experimental, systemd, keeping WSL running, an
   assert.equal(by('wsl-systemd').mark, 'ok')
   assert.match(by('wsl-awake').fix!, /%UserProfile%\\\.wslconfig[^]*\[general\]\n {2}instanceIdleTimeout=-1\nthen wsl --shutdown/)
   assert.match(by('wsl-awake').fix!, /https:\/\/learn\.microsoft\.com\/windows\/wsl\/wsl-config/)
-  // No tailnet in this stand-in: no way in at all, said as a problem worth fixing, with both ways out.
+  // Behind the NAT a phone has no way in: said as a problem worth fixing, with the way out.
   assert.equal(by('wsl-network').mark, 'warn')
-  assert.match(by('wsl-network').text, /WSL’s NAT networking: a phone can’t reach this Linux on the Wi‑Fi, so it comes in over Tailscale, which isn’t connected yet/)
-  assert.match(by('wsl-network').fix!, /^hypernova pair/)
+  assert.match(by('wsl-network').text, /WSL’s NAT networking: a phone can’t reach this Linux on the Wi‑Fi\./)
   assert.match(by('wsl-network').fix!, /networkingMode=mirrored under \[wsl2\]/)
+  assert.ok(!checks.some((x) => /Tailscale/.test(x.text + (x.fix ?? ''))))
   // The daemon's listener on (it was told so): on a network no phone is on.
   assert.equal(by('lan').mark, 'warn')
   assert.match(by('lan').text, /behind WSL’s NAT network no phone can reach it/)
-  // Connected through the built-in node: fine.
-  const saved = structuredClone(daemon.status)
-  try {
-    daemon.status.tsnet = { mode: 'builtIn', available: true, enabled: true, helper: { state: 'Running', listening: 'https://100.64.0.2:47321', account: 'owner@example.com' } }
-    delete daemon.status.lan
-    const up = await checksOf(ctx(wslSys('nat', ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }))
-    const net = up.find((x) => x.name === 'wsl-network')!
-    assert.equal(net.mark, 'ok')
-    assert.match(net.text, /which is connected/)
-    assert.match(up.find((x) => x.name === 'lan')!.text, /Local network route off \(behind WSL’s network the phone comes in over Tailscale\)/)
-  } finally {
-    daemon.status = saved
-  }
   // No wslinfo (a WSL older than 2.0.4): taken as NAT, with how to get it.
   const old = await checksOf(ctx(wslSys(null, ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }))
   assert.match(old.find((x) => x.name === 'wsl-network')!.text, /wslinfo didn’t say: taken as NAT, the default/)
@@ -976,39 +827,27 @@ test('doctor under WSL: mirrored networking needs the Hyper-V firewall rule; no 
   const box = await checksOf(ctx(wslSys(null, ['openssl']), { apiPort: daemon.api, localPort: daemon.local, wsl: { ...WSL2, container: true, systemd: false } }))
   assert.match(box.find((x) => x.name === 'wsl')!.text, /Docker Desktop on Windows/)
   assert.ok(!box.some((x) => x.name === 'wsl-systemd' || x.name === 'wsl-awake'), 'a container has no systemd to turn on')
-  assert.doesNotMatch(box.find((x) => x.name === 'wsl-network')!.fix!, /mirrored/)
+  assert.doesNotMatch(box.find((x) => x.name === 'wsl-network')!.fix ?? '', /mirrored/)
 
   // Not WSL: nothing of it.
   const plain = await checksOf(ctx(fakeSys(claudeAnswers(true), ['openssl']), { apiPort: daemon.api, localPort: daemon.local }))
   assert.ok(!plain.some((x) => x.name.startsWith('wsl')))
 })
 
-test('pair under WSL: the phone comes in over Tailscale, and a code with no tailnet says it has no way in; mirrored pairs on the Wi‑Fi too', async () => {
+test('pair under WSL: behind the NAT a code says it has no way in; mirrored pairs on the Wi‑Fi', async () => {
   let sys = wslSys('nat')
   assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }), { 'no-wait': true, 'no-qr': true }), 0)
   let text = sys.out.join('\n')
-  assert.match(text, /! WSL on Windows: WSL’s NAT network keeps this PC off the phone’s Wi‑Fi, so this code has no way in until Tailscale is signed in\.\n {6}hypernova pair {3}\(without --local; sign in when it asks\)\n {6}or mirrored networking on Windows 11/)
-  // Not the plain Linux words, which would promise the same network.
-  assert.doesNotMatch(text, /same network only|local network route is off too/)
+  assert.match(text, /! WSL on Windows: WSL’s NAT network keeps this PC off the phone’s Wi‑Fi, so this code has no way in\.\n {6}Mirrored networking on Windows 11/)
+  // Not the plain Linux words about the local route.
+  assert.doesNotMatch(text, /local network route is off|Tailscale/)
   assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`))
-
-  const saved = structuredClone(daemon.status)
-  try {
-    daemon.status.tsnet = { mode: 'builtIn', available: true, enabled: true, helper: { state: 'Running', listening: 'https://100.64.0.2:47321', account: 'owner@example.com' } }
-    sys = wslSys('nat')
-    assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }), { 'no-wait': true, 'no-qr': true }), 0)
-    text = sys.out.join('\n')
-    assert.match(text, /· WSL on Windows: the phone reaches this PC over Tailscale \(WSL’s NAT network keeps it off the Wi‑Fi\)\./)
-    assert.doesNotMatch(text, /no way in/)
-  } finally {
-    daemon.status = saved
-  }
 
   sys = wslSys('mirrored')
   await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local, wsl: WSL2 }), { 'no-wait': true, 'no-qr': true })
   text = sys.out.join('\n')
   assert.match(text, /WSL’s mirrored networking: a phone on the same Wi‑Fi can pair directly once Windows’ Hyper-V firewall lets port 47323 in/)
-  assert.match(text, /Tailscale isn’t installed: this code pairs a phone on the same network only/)
+  assert.doesNotMatch(text, /no way in|Tailscale/)
 })
 
 test('hypernova lan on under WSL’s NAT says no phone can reach the port; setup without systemd says how to turn it on and touches no systemctl', async () => {
@@ -1032,7 +871,7 @@ test('hypernova lan on under WSL’s NAT says no phone can reach the port; setup
   assert.ok(!sys.calls.some((x) => x.cmd === 'systemctl' || x.cmd === 'loginctl'), 'no systemd to ask')
   assert.ok(!existsSync(c.unitFile))
   assert.match(text, /Keep WSL running for the phone: instanceIdleTimeout=-1 under \[general\] in %UserProfile%\\\.wslconfig on Windows/)
-  assert.match(text, /Pair your phone: hypernova pair \(over Tailscale: WSL keeps this PC off the Wi‑Fi unless its networking is mirrored\)/)
+  assert.match(text, /Pair your phone: hypernova pair \(WSL keeps this PC off the Wi‑Fi unless its networking is mirrored\)/)
   await uninstall(c, { yes: true, purge: true })
 })
 

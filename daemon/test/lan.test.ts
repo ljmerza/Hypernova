@@ -383,14 +383,14 @@ test('forgetting a device revokes its certificate at once, on the connection it 
 test('pairing over the listener: open while a code is shown, 5 wrong codes per source then a wait, a right code pairs and the links carry fp, lan and lp', async () => {
   resetPairLimits()
   const started = await startPairing(true)
-  // The tailnet hints (ts, ti, ta, tc; tsnet.ts) may follow.
-  assert.match(started.appLink, new RegExp(`&fp=${FP}&lan=[^&]*&lp=${LAN}(&ts=|$)`))
+  // Nothing follows the listener's port (the tailnet hints went with Tailscale).
+  assert.match(started.appLink, new RegExp(`&fp=${FP}&lan=[^&]*&lp=${LAN}$`))
   const link = new URL(started.appLink)
   assert.equal(link.searchParams.get('fp'), FP)
   assert.equal(link.searchParams.get('lp'), String(LAN))
   const advertised = (link.searchParams.get('lan') ?? '').split(',').filter(Boolean)
   assert.deepEqual(advertised, lanAddresses())
-  // The pairing page puts the daemon's own listener (and tailnet hints) in the app link, whatever
+  // The pairing page puts the daemon's own listener in the app link, whatever
   // its query says: the query is anyone's to write.
   const page = await loop(API, 'GET', `/pair?c=${started.code}&n=Mac`)
   assert.equal(page.status, 200)
@@ -408,7 +408,7 @@ test('pairing over the listener: open while a code is shown, 5 wrong codes per s
   assert.equal(sixth.status, 429)
   assert.equal(sixth.json.error.code, 'too_many_tries')
   assert.ok(sixth.json.error.retryAfterSeconds > 0 && sixth.json.error.retryAfterSeconds <= 600)
-  // The ts.net route (loopback here) keeps today's rules: no limit, no "closed".
+  // The loopback phone API keeps today's rules: no limit, no "closed".
   resetPairLimits()
   const paired = await lan(LAN, 'POST', '/v1/pair', { body: JSON.stringify({ code: started.code, deviceName: 'Phone E', model: 'Pixel' }) })
   assert.equal(paired.status, 200, paired.body)
@@ -481,7 +481,7 @@ test('lanAccess off closes the listener and tells the feed {t:"lan", lan: null};
   const s = await loop(API, 'GET', '/v1/snapshot', { authorization: `Bearer ${TOKEN_A}` })
   assert.equal(s.json.lan, null)
   await assert.rejects(lan(LAN, 'GET', '/v1/health'), 'the port is closed')
-  // The link keeps `fp` (the built-in Tailscale route pins the same certificate; tsnet.ts) but names no listener.
+  // The link keeps `fp` (the certificate the phone pins) but names no listener.
   const noLan = await startPairing(true)
   assert.ok(noLan.appLink.includes('&fp='))
   assert.ok(!noLan.appLink.includes('&lan=') && !noLan.appLink.includes('&lp='))
@@ -511,11 +511,11 @@ test('a new device certificate closes the WebSockets opened with the old one (40
       ws.once('error', reject)
     })
   const overLan = await feed(`wss://127.0.0.1:${LAN}/v1/ws?token=${TOKEN_F}`, { rejectUnauthorized: false, key: idF.key, cert: idF.cert })
-  const overTsNet = await feed(`ws://127.0.0.1:${API}/v1/ws?token=${TOKEN_F}`, {})
+  const overLoopback = await feed(`ws://127.0.0.1:${API}/v1/ws?token=${TOKEN_F}`, {})
   const idF2 = await enroll('phoneF', TOKEN_F)
   assert.equal(await Promise.race([overLan.closed, new Promise((r) => setTimeout(() => r('open'), 3000))]), 4002)
-  assert.equal(await Promise.race([overTsNet.closed, new Promise((r) => setTimeout(() => r('open'), 200))]), 'open', 'no certificate there, nothing to replace')
-  overTsNet.ws.close()
+  assert.equal(await Promise.race([overLoopback.closed, new Promise((r) => setTimeout(() => r('open'), 200))]), 'open', 'no certificate there, nothing to replace')
+  overLoopback.ws.close()
   // The new certificate opens one at once.
   const again = await feed(`wss://127.0.0.1:${LAN}/v1/ws?token=${TOKEN_F}`, { rejectUnauthorized: false, key: idF2.key, cert: idF2.cert })
   again.ws.close()
@@ -538,7 +538,7 @@ test('the daemon keeps a device certificate’s expiry: deviceCert is false once
   assert.equal(await snap(), false, 'no expiry on record counts as none')
 })
 
-test('a preview and the checklist asked for over the listener open there with the device certificate (the app’s WebView), and on the ts.net route by the same path (a browser)', async () => {
+test('a preview and the checklist asked for over the listener open there with the device certificate (the app’s WebView), and on the loopback phone API by the same path (a browser behind a proxy)', async () => {
   const TOKEN_H = 'lan-test-token-h-0123456789abcdef'
   addDevice({ id: 'phoneH', name: 'Phone H', model: 'Pixel', createdAt: Date.now(), lastSeenAt: Date.now() }, TOKEN_H)
   const idH = await enroll('phoneH', TOKEN_H)
@@ -559,7 +559,7 @@ test('a preview and the checklist asked for over the listener open there with th
   assert.ok(page.body.includes('Over the LAN'))
   const css = await lan(LAN, 'GET', url.pathname.replace(/index\.html$/, 'app.css'), { identity: idH, headers })
   assert.equal(css.status, 200)
-  // A browser has no device certificate: not here, but the same path on the ts.net route works.
+  // A browser has no device certificate: not here, but the same path on the loopback phone API works.
   const bare = await lan(LAN, 'GET', url.pathname, { headers })
   assert.equal(bare.status, 401)
   assert.equal(bare.json.error.code, 'device_cert_required')

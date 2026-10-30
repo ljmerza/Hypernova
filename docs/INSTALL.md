@@ -2,7 +2,7 @@
 
 Hypernova is a control room for Claude Code and Codex. A small service runs on a computer you own,
 next to your agents, and you reach it from your phone (the Android app) and, on a Mac, from the menu bar. Your phone reaches that
-computer over your Wi‑Fi, or from anywhere through your own Tailscale network. There is no
+computer over your Wi‑Fi, or from anywhere over your own VPN into that network. There is no
 Hypernova server in between.
 
 This is the whole install guide. Setup, in the Mac app, uses the same step names.
@@ -35,10 +35,11 @@ with the computer by a code. The Mac's menu bar is a second control room, on tha
   OpenAI's [Codex](https://github.com/openai/codex) (0.163.0 or later), or both. Either one alone is
   enough. Hypernova can install Claude Code for you; Codex you install yourself.
 - **An Android phone** on **Android 10 or later**.
-- Optional: a [Tailscale](https://tailscale.com) account, to reach the computer when the phone isn't
-  on its network (always, for a VPS). On the same Wi‑Fi you don't need one.
+- Optional: your own VPN into the computer's network (WireGuard, a UniFi VPN…), to reach it when
+  the phone isn't on its Wi‑Fi. On the same Wi‑Fi you don't need one. (Hypernova used to carry
+  Tailscale; this fork removed it.)
 
-Nothing else: Hypernova brings its own Node.js and its own Tailscale. On a Mac, Setup also
+Nothing else: Hypernova brings its own Node.js. On a Mac, Setup also
 downloads Claude Code's SDK from npm (about 2 MB; see [Background service](#2-background-service)).
 
 ## 1. Download
@@ -111,7 +112,7 @@ terminal.
 | 1. **Claude Code** | Finds Claude Code and checks that it's signed in. **Install Claude Code** runs Anthropic's official installer. | Yes, with Codex: **Use Codex only** |
 | 2. **Background service** | Starts the service your phone talks to, so it works with the menu closed. | No |
 | 3. **Connect Claude Code** | Adds Hypernova's hooks, its status line tap and the `claude` shell function. | Skipped with Codex only |
-| 4. **Tailscale** | Lets your phone reach this Mac from anywhere. | **Not now**: the same Wi‑Fi is enough |
+| 4. **Tailscale** | Left over from Tailscale, which was removed: choose **Not now**. | **Not now** |
 | 5. **Voice** | Left over from Soniox, which was removed: choose **Not now**. | **Not now** |
 | 6. **Codex** | Finds Codex and turns on **Use Codex with Hypernova**. | **Not now** |
 | 7. **Your phone** | **Get the app**, then pair it with a code. | No |
@@ -172,22 +173,10 @@ macOS may show a *Background Items Added* notice. Both items appear in **System 
 
 #### 4. Tailscale
 
-On the same Wi‑Fi your phone reaches the Mac directly, encrypted and pinned to this Mac by the
-pairing code. Tailscale is for everywhere else: a private network between your own devices.
-Nothing is opened to the internet. You can do this step later.
-
-- **Built in (the usual case).** Hypernova carries its own Tailscale node, so there's no Tailscale
-  app to install. Scan the code with your phone or click **Open the sign-in link**, and sign in
-  with Google, GitHub, Apple or Microsoft. The Android app carries Tailscale too: sign in there with
-  the same account. Your Mac appears in your tailnet as `hypernova-<your Mac's name>`.
-- **With the Tailscale app.** If the Tailscale app is on your Mac and signed in, Setup can use it
-  instead (**Use the Tailscale app**), and **Turn on phone access** gives Hypernova a private
-  `https` address in your tailnet. That needs HTTPS certificates turned on for your tailnet
-  (Tailscale admin console → DNS → HTTPS Certificates → Enable; **Open DNS settings** goes there).
-- **Key expiry.** Tailscale asks every device to sign in again after a while. In the
-  [admin console](https://login.tailscale.com/admin/machines), open your Mac's ⋯ menu and choose
-  **Disable key expiry**, so your phone doesn't lose it. With the Tailscale app, Setup and the menu
-  bar warn you two weeks ahead.
+Choose **Not now**. On the same Wi‑Fi your phone reaches the Mac directly, encrypted and pinned to
+this Mac by the pairing code; away from it, use your own VPN into that network. The Mac app still
+shows this step, from when Hypernova carried Tailscale, which was removed: its buttons reach routes
+that answer 404 now.
 
 #### 5. Voice
 
@@ -269,7 +258,6 @@ The script, then `hypernova setup` which it runs for you:
    runs at boot with nobody logged in.
 6. **The integration**: hooks and the status line tap in `~/.claude/settings.json`, and the `claude`
    function in `~/.bashrc` (or `~/.zshrc`).
-7. **Tailscale**: the daemon starts its built-in node, signed in later by `hypernova pair`.
 
 It ends with what's left to do. Options: `--no-claude`, `--yes` (no questions). The folder in
 `$tmp` isn't needed afterwards. `hypernova: command not found` right after? Log in again (Ubuntu
@@ -306,11 +294,9 @@ found, and `hypernova codex off` lets go of it.
    hypernova pair
    ```
 
-   The first time, it shows **Tailscale's sign-in** as a QR code and a link: open it and sign in
-   with Google, GitHub, Apple or Microsoft. The Android app signs in to Tailscale itself: use the
-   same account there. Enter skips this (a home server on your own network doesn't need it, and
-   `--local` leaves Tailscale out altogether).
-3. Then the **pairing code**: point the phone's camera at the QR code in the terminal; it opens
+   It shows the **pairing code** as a QR code, and the link under it. The phone pairs over the
+   local route, so it must be on the server's network: the same Wi‑Fi, or your VPN into it.
+3. Point the phone's camera at the QR code in the terminal (or open the link on the phone); it opens
    Hypernova and pairs. Too narrow a window, or no camera? Copy the `https://hypernova.observer/pair#…`
    link under it and use **Paste pairing link** in the app. A code works once and lasts 10 minutes;
    `hypernova pair` again makes a new one.
@@ -327,25 +313,13 @@ systemctl --user status hypernova
 
 ### Remote access
 
-- **Built in (the usual case).** The daemon runs its own Tailscale node, `hypernova-<host>` in your
-  tailnet, and serves the phone API over it: nothing to install, and nothing listens on a public
-  port. `hypernova tailscale` shows who it's signed in as, or its sign-in code; `hypernova tailscale
-  logout` signs it out for another account; `control <url>` points it at a Headscale server.
-- **With the Tailscale app** on the server instead: install it, sign in and let your user change
-  `serve` once, then pair. Your tailnet needs MagicDNS and HTTPS certificates on.
-
-  ```sh
-  curl -fsSL https://tailscale.com/install.sh | sh
-  sudo tailscale up
-  sudo tailscale set --operator=$USER
-  hypernova pair
-  ```
-
-- **On the same network** (a home server, a PC), the phone also has a direct route, encrypted and
-  pinned to this server by the pairing code. It's off on a machine with a public address (a VPS)
-  and in a container: `hypernova lan on|off`.
-- **Key expiry**: in the [admin console](https://login.tailscale.com/admin/machines), open the
-  server's ⋯ menu and choose **Disable key expiry**, so your phone doesn't lose it.
+- **On the same network** (a home server, a PC), the phone reaches the server directly: the local
+  route, port 47323, encrypted and pinned to this server by the pairing code, with the phone's own
+  device certificate. It's off on a machine with a public address (a VPS) and in a container:
+  `hypernova lan on|off`.
+- **Away from home**, use your own VPN into that network (WireGuard, a UniFi VPN…): the phone then
+  takes the same local route. Nothing listens on a public port, and Hypernova carries no Tailscale
+  of its own any more.
 
 [docs/LINUX.md](LINUX.md) has every command and flag, where things live, and what a server doesn't
 have (battery, Stay awake, the Mac's voice).
@@ -360,14 +334,15 @@ docker build -t hypernova .
 docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped \
   --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
 docker exec -it hypernova claude              # sign in to Claude once
-docker exec -it hypernova hypernova pair      # Tailscale's sign-in, then the pairing code
+docker exec -it hypernova hypernova pair      # the pairing code
 docker exec -it hypernova hypernova doctor
 ```
 
 The image is Ubuntu 24.04 with the install script already run in it, as a normal user. Your state
 (paired phones, settings, keys, the agents' logins) lives in the `hypernova-home` volume. Nothing is
-published to the network: the phone reaches the container through the built-in Tailscale node.
-On a Linux host, `--network host` also lets a phone on the same network pair directly.
+published to the network, and the phone reaches Hypernova only over the local route: on a Linux
+host, add `--network host` to `docker run` and turn the route on with `docker exec hypernova
+hypernova lan on`, then a phone on the same network (or your VPN into it) pairs directly.
 `--build-arg CLAUDE=no` builds it without Claude Code.
 
 **Codex in the container**: its npm package needs Node.js on the PATH, which the image doesn't
@@ -394,7 +369,7 @@ Linux machine.
 
 **What works**, as on any Linux (tested on Linux and in Linux containers, not on Windows): the
 service, Claude Code and Codex sessions, approvals, usage, shared terminals (`claude` typed in an
-Ubuntu terminal), the built-in Tailscale and pairing.
+Ubuntu terminal) and pairing.
 `hypernova doctor` and `hypernova pair` know when they run in WSL and say what differs.
 
 **What doesn't:**
@@ -405,8 +380,8 @@ Ubuntu terminal), the built-in Tailscale and pairing.
 - What a Linux server lacks ([LINUX.md](LINUX.md), "What a Linux server doesn't have"): battery,
   Stay awake, the Mac's voice, opening a terminal window from the phone.
 - No tray app and no Setup window: everything is the `hypernova` command in an Ubuntu terminal.
-- WSL's default network (NAT) keeps the PC off your phone's Wi‑Fi: the phone comes in over
-  **Tailscale**, which is built in. A direct route on the Wi‑Fi needs mirrored networking (below).
+- WSL's default network (NAT) keeps the PC off your phone's Wi‑Fi, so the phone has no way in
+  until you turn on mirrored networking (below).
 
 **Not verified on Windows yet:** all of it on real hardware, and in particular WSL stopping and
 starting the service, mirrored networking with the Hyper-V firewall rule, Docker Desktop building
@@ -469,11 +444,11 @@ the image on an x86_64 PC (the image is tested on arm64 so far), and Windows on 
    hypernova pair
    ```
 
-   It shows Tailscale's sign-in first (the built-in node: nothing to install, nothing opened on your
-   network, and it works from anywhere), then the pairing code, as in
-   [Pair your phone](#pair-your-phone). Install `hypernova-<tag>.apk` on the phone first.
+   It shows the pairing code, as in [Pair your phone](#pair-your-phone); with WSL's default NAT it
+   says the phone has no way in until networking is mirrored (below). Install `hypernova-<tag>.apk`
+   on the phone first.
 7. **Check it**: `hypernova doctor` adds WSL's own lines (systemd, keeping WSL running, the network
-   mode, Tailscale), each with what to do.
+   mode), each with what to do.
 
 ### Optional: the phone on the same Wi‑Fi (mirrored networking)
 
@@ -519,13 +494,14 @@ cd Hypernova
 docker build -t hypernova .
 docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
 docker exec -it hypernova claude              # sign in to Claude once
-docker exec -it hypernova hypernova pair      # Tailscale's sign-in, then the pairing code
+docker exec -it hypernova hypernova pair      # the pairing code
 docker exec -it hypernova hypernova doctor
 ```
 
 Everything else is as in [4. In Docker](#4-in-docker): Claude Code is inside the image (Codex can be
-copied in), your state is in the `hypernova-home` volume, nothing is published to the network, and
-the phone comes in through the built-in Tailscale node. Docker Desktop must be running for the
+copied in), your state is in the `hypernova-home` volume and nothing is published to the network.
+Docker Desktop's network keeps the container off the phone's Wi‑Fi, so a phone has no way in yet
+(untested). Docker Desktop must be running for the
 container to run (it has a setting to start when you sign in). The image is tested on arm64; an
 x86_64 PC builds the amd64 image, which nobody has tried yet.
 
@@ -545,8 +521,7 @@ x86_64 PC builds the amd64 image, which nobody has tried yet.
   `wsl --unregister Ubuntu` deletes the whole Ubuntu with everything in it: only if you want that.
 - **Docker Desktop:** `docker rm -f hypernova`, `docker volume rm hypernova-home` (its state) and
   `docker image rm hypernova`.
-- **Then**, as anywhere: uninstall the app on the phone and remove `hypernova-<name>` from your
-  tailnet ([Uninstall](#uninstall)).
+- **Then**, as anywhere: uninstall the app on the phone ([Uninstall](#uninstall)).
 
 ## Your phone
 
@@ -654,7 +629,7 @@ again and says how to remove the block yourself.
 | `~/.claude/settings.json` | Hooks and the status line tap |
 | `~/.bashrc` or `~/.zshrc` | The shell integration block |
 
-The service listens on `127.0.0.1:47321` (the phone API, reached through Tailscale) and
+The service listens on `127.0.0.1:47321` (the phone API, on loopback) and
 `127.0.0.1:47322` (the menu bar app, the `hypernova` command and the hooks), and on port 47323 on
 your Wi‑Fi for paired phones only (mutual TLS; off on a VPS and in a container).
 [docs/SECURITY-MODEL.md](SECURITY-MODEL.md) explains what each one lets in.
@@ -705,19 +680,17 @@ doesn't need to know.
 
 ```sh
 hypernova uninstall            # keeps paired phones and settings, for a reinstall
-hypernova uninstall --purge    # removes them too, and signs the built-in Tailscale node out
+hypernova uninstall --purge    # removes them too, and gives up the private name
 ```
 
-It removes the integration (hooks, status line tap, the shell block), Tailscale's route to the
-daemon, the service, the command, the daemon and the Node.js it downloaded. Claude Code, Codex and
+It removes the integration (hooks, status line tap, the shell block), the
+service, the command, the daemon and the Node.js it downloaded. Claude Code, Codex and
 their logins stay. Lingering stays on too (other services of yours may use it); it says how to
 turn it off.
 
 **In Docker**: `docker rm -f hypernova`, then `docker volume rm hypernova-home` to drop its state.
 
-**Then, anywhere**: uninstall Hypernova on the phone like any app, and with the built-in Tailscale,
-remove `hypernova-<name>` from your tailnet in the
-[admin console](https://login.tailscale.com/admin/machines) (`--purge` signs it out already).
+**Then, anywhere**: uninstall Hypernova on the phone like any app.
 
 ## Troubleshooting
 
@@ -751,8 +724,6 @@ remove `hypernova-<name>` from your tailnet in the
   build-essential python3`, then `hypernova setup`.
 - *"systemd's user manager isn't running"*: `sudo loginctl enable-linger $USER`, or log in over
   SSH, then `hypernova setup`.
-- *"Tailscale lets only root or its operator change serve"* (with the Tailscale app):
-  `sudo tailscale set --operator=$USER`, then `hypernova pair`.
 - **Codex isn't found.** `command -v codex` in a new login shell must print its path; then
   `hypernova codex`.
 
@@ -760,8 +731,8 @@ remove `hypernova-<name>` from your tailnet in the
 
 - **The phone can't reach the computer.** On the same Wi‑Fi it should just work: check that the
   computer is awake and the phone is on that Wi‑Fi (not a guest network that keeps devices apart).
-  Away from it (and always for a VPS), the phone and the computer must be signed in to the same
-  Tailscale account, and the computer's key must not have expired.
+  Away from it (and always for a VPS), the phone must be on your own VPN into the computer's
+  network, and the computer's local route on (`hypernova lan on`).
 
 Still stuck? Open an issue with what `--selftest` or `hypernova doctor` printed (it names your
 folders, so look it over first) and the last lines of `daemon.log`. Security problems: see
@@ -769,23 +740,12 @@ folders, so look it over first) and the last lines of `daemon.log`. Security pro
 
 ## Build it yourself
 
-**The Mac app.** You need Command Line Tools (`xcode-select --install`), Node.js 22.18 or newer
-with npm, and for the built-in Tailscale, Go. Then:
-
-```sh
-cd daemon && npm ci && cd ..
-mac/build.sh --open                  # dist/Hypernova.app
-mac/build.sh --release && mac/dmg.sh # dist/Hypernova.dmg, as released
-```
-
-`--release` stops rather than leave something out: it wants a release-signed APK in `dist/` and
-the Tailscale helper (built with Go). Claude Code's SDK is never in the app (Setup downloads it on
-the Mac that runs it); `npm ci` above puts it in your checkout for development.
+**The Mac app** is upstream's and this fork doesn't build it: its `mac/build.sh` still expects the
+Tailscale helper (`daemon/tsnet`), which was removed here.
 
 **Linux.** From a checkout on the server, `scripts/install-linux.sh` installs from it directly.
-`scripts/pack-linux.sh` makes the package (`dist/linux/hypernova-<version>.tar.gz`, with the
-built-in Tailscale when Go is around); each release attaches it as
-`hypernova-server-<tag>-linux.tar.gz` ([RELEASING.md](RELEASING.md), "This fork's releases").
+`scripts/pack-linux.sh` makes the package (`dist/linux/hypernova-<version>.tar.gz`); each release
+attaches it as `hypernova-server-<tag>-linux.tar.gz` ([RELEASING.md](RELEASING.md), "This fork's releases").
 
 **The Android app** needs the JDK that comes with Android Studio:
 

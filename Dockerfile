@@ -10,23 +10,9 @@
 # Updating: docker build again, remove the container, run it again with the same volume (the new
 # image's daemon runs; your phones and settings stay).
 #
-# The daemon's built-in Tailscale node runs inside the container (its state in the volume): the
-# phone reaches it from anywhere once you sign in (docker exec -it hypernova hypernova tailscale).
-# On a Linux host, --network host lets a phone on the same network pair over the local route
-# (and the host's own Tailscale reach it). --build-arg CLAUDE=no leaves Claude Code out.
-# The built-in Tailscale helper (daemon/tsnet, Go; docs/PROTOCOL.md "Tailscale built in"), so the
-# phone reaches the container from anywhere through the owner's own tailnet, with no Tailscale on
-# the host. Pure Go (CGO off): the stage runs on the builder's own architecture and cross-compiles for
-# the image's (TARGETARCH, which docker build and buildx both set). The Go version matches
-# daemon/tsnet/go.mod; the final image carries only the binary, never Go.
-FROM --platform=$BUILDPLATFORM golang:1.27.1-bookworm AS tsnet
-ARG TARGETARCH
-WORKDIR /src
-COPY daemon/tsnet/go.mod daemon/tsnet/go.sum ./
-RUN go mod download
-COPY daemon/tsnet/ ./
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -trimpath -ldflags="-s -w" -o /out/hypernova-tsnet-linux-${TARGETARCH:-$(go env GOARCH)} .
-
+# The phone reaches the daemon only over the local route (the LAN listener, port 47323), so on a
+# Linux host run it with --network host: a phone on the same network, or on a VPN into it, then
+# pairs and connects directly. --build-arg CLAUDE=no leaves Claude Code out.
 FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -53,7 +39,6 @@ ENV PATH=/opt/hypernova/bin:/home/hypernova/.local/bin:/usr/local/sbin:/usr/loca
 
 COPY --chown=hypernova:hypernova daemon/package.json daemon/package-lock.json /tmp/hypernova/daemon/
 COPY --chown=hypernova:hypernova daemon/src /tmp/hypernova/daemon/src
-COPY --from=tsnet --chown=hypernova:hypernova /out/ /tmp/hypernova/daemon/bin/
 COPY --chown=hypernova:hypernova android/app/src/main/res/font/jetbrains_mono.ttf /tmp/hypernova/Fonts/JetBrainsMono.ttf
 COPY --chown=hypernova:hypernova scripts/install-linux.sh /tmp/hypernova/scripts/install-linux.sh
 COPY --chown=hypernova:hypernova scripts/docker-entrypoint.sh /opt/hypernova/entrypoint.sh

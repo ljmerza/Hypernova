@@ -4,7 +4,6 @@
 //   hn run-codex [args]    what `codex` does there once Codex is on for Hypernova
 //   hn attach [id]         open a shared session in this terminal
 //   hn ls                  list shared sessions
-//   hn tailscale           the built-in Tailscale node: its state, and the sign-in code when it needs one
 //
 // The `claude` function Hypernova adds to ~/.zshrc calls `hn run`. Exit code 97 means
 // "not for me": the function then runs the real claude, so `claude` never breaks.
@@ -333,48 +332,6 @@ async function attachCmd(query: string | undefined): Promise<void> {
   await attach(sock, id, true)
 }
 
-/**
- * `hn tailscale [login|logout]`: what the daemon's built-in Tailscale node is doing (tsnet.ts), by
- * its local API, and the sign-in link as a QR code while it needs one (Linux servers have no Mac
- * app to show it). The admin token is the daemon's own, in its support folder.
- */
-async function tailscale(sub?: string): Promise<void> {
-  const token = existsSync(join(SUPPORT, 'admin-token')) ? readFileSync(join(SUPPORT, 'admin-token'), 'utf8').trim() : ''
-  const port = Number(process.env.HYPERNOVA_LOCAL_PORT ?? 47322)
-  const call = async (method: string, path: string) => {
-    const r = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers: { authorization: `Bearer ${token}` } })
-    if (!r.ok) throw new Error(`${r.status} from the daemon`)
-    return r.json() as Promise<any>
-  }
-  let st: any
-  try {
-    if (sub === 'login' || sub === 'logout') st = (await call('POST', `/local/tsnet/${sub}`)).tsnet
-    else st = await call('GET', '/local/tsnet')
-    // A command's effect shows a moment later.
-    if (sub) {
-      await new Promise((r) => setTimeout(r, 1500))
-      st = await call('GET', '/local/tsnet')
-    }
-  } catch (e: any) {
-    process.stderr.write(`Hypernova isn't running here (${e.message}).\n`)
-    process.exit(1)
-  }
-  const h = st.helper
-  const lines: string[] = []
-  if (st.mode === 'system') lines.push('Tailscale: the Tailscale app on this computer serves the phone API.', st.reason)
-  else if (st.mode === 'off') lines.push('Built-in Tailscale is off.', st.reason)
-  else if (!h) lines.push('Built-in Tailscale is starting…')
-  else if (h.state === 'Running') {
-    lines.push(`Built-in Tailscale: connected as ${h.dnsName ?? '?'}${h.account ? ` (${h.account})` : ''}.`)
-    if (h.listening) lines.push(`Serving the phone API at ${h.listening}${h.tls === 'pinned' ? ' (the tailnet has no HTTPS certificates: the phone pins this computer\'s own)' : ''}.`)
-    else lines.push(h.error ? `Not serving: ${h.error}` : 'Not serving yet.')
-  } else if (h.state === 'NeedsLogin' && h.loginUrl) {
-    lines.push('Sign in to connect your devices: scan this with your phone, or open the link.', '', h.qr ?? '', h.loginUrl, '', 'Use the same account on the phone.')
-  } else lines.push(`Built-in Tailscale: ${h.state}${h.error ? ` (${h.error})` : ''}.`)
-  if (st.controlUrl) lines.push(`Control server: ${st.controlUrl}`)
-  process.stdout.write(lines.join('\n') + '\n')
-}
-
 // Dispatch last: everything above (constants included) is initialized by now.
 const [cmd, ...rest] = process.argv.slice(2)
 switch (cmd) {
@@ -392,17 +349,11 @@ switch (cmd) {
   case 'list':
     list()
     break
-  case 'tailscale':
-  case 'ts':
-    await tailscale(rest[0])
-    break
   default:
     process.stdout.write(`hn: Hypernova's shared terminals
 
   hn ls             list shared sessions
   hn attach [id]    open one in this terminal (id, session id, or project name)
-  hn tailscale      the built-in Tailscale node, and its sign-in code when it needs one
-                    (hn tailscale login | logout: a new sign-in link, or another account)
 
 In your shell, \`claude\` starts a shared session by itself; \`command claude\` skips sharing.
 With Codex on for Hypernova, \`codex\` does the same (\`command codex\` skips it).

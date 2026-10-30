@@ -1716,3 +1716,34 @@ part on the server, then have it make a code you scan or a URL you go to.
    own line under the title. Cancel (or, on first run, the demo) is pinned at the bottom above the
    navigation bar and the keyboard, so it never sits under the system's buttons while the steps
    scroll.
+
+## Tailscale is removed (2026-10-30)
+
+The owner: "remove the Tailscale integration, don't need this". His phone reaches his Linux server
+on the home network (the local route) or over his UniFi VPN, which lands on the same network. The
+entries above about Tailscale, the built-in nodes, `tailscale serve`, Headscale and the tailnet
+hints stay as history; none of it is in the code any more.
+
+1. **One way in: the local route.** The LAN listener (port 47323, the pinned certificate, the
+   device certificate) is how a phone reaches the computer, on the same Wi-Fi or over the owner's
+   own VPN into that network. The phone API stays on loopback (47321). The pairing link carries
+   `fp`, `lan` and `lp`; its base URL `u` is `http://10.0.2.2:47321` (the emulator's, which a real
+   phone tries once and passes over).
+2. **Gone from the daemon:** its Tailscale helper (`daemon/tsnet/`, `daemon/src/tsnet.ts`), the
+   Tailscale app's `tailscale serve` (`/local/tailscale/serve`, `/local/status`'s `tailscale`),
+   `/local/tsnet*`, the snapshot's `mac.tailnet`, `{t:"tsnet"}`, the pairing link's `ts`, `ti`, `ta`
+   and `tc`, `hypernova tailscale` and `hn tailscale`, and every Tailscale line in `setup`, `pair`,
+   `status`, `doctor`, `uninstall`, the install script, the package and the Dockerfile. With the
+   local route off, `pair` and `doctor` now say the phone has no way in (`hypernova lan on`).
+3. **Gone from the app:** its built-in node (`android/tsnet/`, `tsnet.aar` and the gomobile build,
+   `data/Tsnet.kt`), the `Tailscale` route between Local and the base URL, the computers' tailnet
+   in the multi-server list (`Servers.nodePlan`, `NodeDestinations`), the sign-in and control
+   server cards, Settings' Tailscale rows, "Open Tailscale" and following the computer on its
+   tailnet. The routes are Local, then the base URL as it is. The build needs no Go, gomobile or NDK,
+   and CI installs none.
+4. **Kept as they are, unread:** the daemon's `builtInTailscale` and `tailscaleControlUrl` settings
+   and its `<support>/tsnet/` folder; on the phone the stored `tailnet*` and `controlUrl` fields (they
+   drop out at the next save of the list of computers) and `files/tsnet`. Nobody's files are
+   deleted, and a pairing made before keeps working on the local route.
+5. **The Mac app is left as it is** (upstream's, not built here): its Tailscale step and
+   `mac/build.sh`'s Tailscale helper no longer work with this daemon.

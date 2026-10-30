@@ -1,5 +1,5 @@
 // The LAN listener (docs/PROTOCOL.md, "Local network (direct HTTPS)"): the phone API over HTTPS on
-// the local network, with no Tailscale in between. The phone pins the daemon's own certificate and
+// the local network (or the owner's own VPN into it), the phone's only route. The phone pins the daemon's own certificate and
 // presents its device certificate (tls.ts); this file decides which connections get in at all,
 // which device a connection belongs to, what the Mac's private addresses are (for the snapshot and
 // the pairing link), and how often the pairing endpoint may be tried from here.
@@ -29,8 +29,8 @@ export function plainIp(ip: string | undefined): string {
 }
 
 /**
- * Loopback, RFC 1918, link-local, CGNAT (100.64/10, the tailnet's own range) or IPv6 ULA: the
- * addresses a phone on the same network, the hotspot or the tailnet comes from. Anything else is
+ * Loopback, RFC 1918, link-local, CGNAT (100.64/10, which VPNs hand out) or IPv6 ULA: the
+ * addresses a phone on the same network, the hotspot or a VPN comes from. Anything else is
  * the internet, which this listener is not for.
  */
 export function privateAddress(ip: string | undefined): boolean {
@@ -69,8 +69,8 @@ function v6Groups(ip: string): number[] | null {
 /**
  * The Mac's addresses a phone on the same network can reach: private IPv4 first (Wi-Fi, the hotspot
  * bridge, Ethernet), then IPv6 ULA. Never loopback, link-local (useless without a zone) or the
- * tailnet's own 100.64/10 and fd7a:115c:a1e0::/48 (that is the other route, and would be called
- * "Local"), however the interface writes them. [ifaces]: tests.
+ * Tailscale's 100.64/10 and fd7a:115c:a1e0::/48 (a Tailscale the owner runs on this machine for
+ * something else: the phone doesn't come in that way), however the interface writes them. [ifaces]: tests.
  */
 export function lanAddresses(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = networkInterfaces()): string[] {
   const v4: string[] = []
@@ -320,8 +320,8 @@ function listen(): void {
   pinnedServer = pinned
   if (named) namedServer = innerServer(false)
   const L = lanLimits
-  // Dropped at accept, before any TLS: anything but the local network, the hotspot and the tailnet's
-  // own ranges, and a source already holding its share. Then the ClientHello is read (within the
+  // Dropped at accept, before any TLS: anything but the local network, the hotspot and a VPN's
+  // ranges, and a source already holding its share. Then the ClientHello is read (within the
   // handshake's time) for the server name, and the connection handed, unread, to the TLS server
   // for it: the name's when it names the name and there's a certificate, the pinned one otherwise.
   const open = new Map<string, number>()
@@ -410,7 +410,7 @@ export function setLanAccess(on: boolean): void {
 // Anyone on the Wi-Fi can reach /v1/pair here: 5 wrong codes per source address in 10 minutes, then
 // a wait. Nothing across sources, so one peer can't lock everyone out: the code is 16 random bytes,
 // which no number of addresses guesses. The table forgets its oldest sources past MAX_SOURCES, so
-// many addresses can't grow it either. (The ts.net route is the tailnet's own.)
+// many addresses can't grow it either.
 const WINDOW = 10 * 60_000
 const PER_SOURCE = 5
 const MAX_SOURCES = 1024

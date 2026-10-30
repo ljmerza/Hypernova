@@ -547,7 +547,7 @@ private fun Modifier.filledGlass(color: Color): Modifier = drawWithCache {
  *   charges); amber under 20% on battery, red under 10%. Never cut: a long name gives way first. A
  *   Mac without a battery (null) shows nothing about power.
  * - [via]: the route as a glyph at the end: Wi-Fi's fan on the Mac's own network, a globe over the
- *   internet (Tailscale or a remote address). No "· Local".
+ *   internet (the paired base URL as it is). No "· Local".
  * - [awake]: a small crescent at the end while the Mac is kept awake with its lid closed (Stay awake,
  *   in a bag most likely), amber while it's about to be let sleep.
  * The planet's colour and the light in the glass ease together. The glyph reads the clock only while
@@ -571,7 +571,7 @@ fun ConnectionChip(
     // Once linked, the Mac's name says it all; otherwise, the state in a word (with several paired,
     // the name still, so it's clear which one isn't linked).
     val mac = name?.takeIf { (state == LinkState.Connected || (named && state != LinkState.Demo)) && it.isNotBlank() }
-    // The route, in a word, only while linked: "Local" on the Mac's own network, "Tailscale" otherwise.
+    // The route, in a word, only while linked: "Local" on the Mac's own network, "Remote" otherwise.
     val route = via?.takeIf { state == LinkState.Connected }?.let { routeWord(it) }
     val word = when (state) {
         LinkState.Connected -> stringResource(R.string.link_connected)
@@ -683,13 +683,11 @@ private fun ElsewhereCount(n: Int) {
     }
 }
 
-/** [Mac.via] in a word: "Local" or "Tailscale" (anything else, such as the demo's, says nothing). */
+/** [Mac.via] in a word: "Local" or "Remote" (anything else, such as the demo's, says nothing). */
 @Composable
 fun routeWord(via: String): String? = when (via) {
     Mac.VIA_LOCAL -> stringResource(R.string.route_local)
-    // The built-in node and the Tailscale app both say "Tailscale" here; Settings tells them apart.
-    Mac.VIA_TAILSCALE, Mac.VIA_BUILT_IN -> stringResource(R.string.route_tailscale)
-    // A plain remote address, never "Tailscale".
+    // A plain remote address (a public one, or over the owner's VPN).
     Mac.VIA_REMOTE -> stringResource(R.string.route_remote)
     else -> null
 }

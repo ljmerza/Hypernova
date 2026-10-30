@@ -13,32 +13,21 @@ import org.junit.Test
  */
 class UpdatePolicyTest {
     @Test fun theApkComesOverTheRouteInUse() {
-        // The local listener (pinned), the tailnet name through the built-in node, or the base URL.
+        // The local listener (pinned), or the base URL.
         assertEquals("https://192.168.0.149:47323/download/android/Hypernova.apk", UpdatePolicy.apkUrl("https://192.168.0.149:47323"))
-        assertEquals("https://hypernova-mac.tail1234.ts.net:47321/download/android/Hypernova.apk", UpdatePolicy.apkUrl("https://hypernova-mac.tail1234.ts.net:47321/"))
-        assertEquals("https://100.64.0.1:48321/download/android/Hypernova.apk", UpdatePolicy.apkUrl("https://100.64.0.1:48321"))
+        assertEquals("https://hypernova.example.com/download/android/Hypernova.apk", UpdatePolicy.apkUrl("https://hypernova.example.com/"))
     }
 
     @Test fun aBrowserGetsThePageOnlyWhereItCouldOpenIt() {
-        val name = "hypernova-mac.tail1234.ts.net"
-        // A tailnet name only the app's own node reaches: no browser.
-        assertNull(UpdatePolicy.browserPage("https://hypernova-mac.tail1234.ts.net:47321", name, baseInUse = false))
-        // The same name while the app reaches it as it is (the Tailscale app on this phone): the browser can too.
-        assertEquals("https://hypernova-mac.tail1234.ts.net:47321/download/android", UpdatePolicy.browserPage("https://hypernova-mac.tail1234.ts.net:47321", name, baseInUse = true))
-        // A ts.net name the pairing didn't name is still the tailnet's, and so is another name under
-        // the tailnet's own suffix (Headscale's base_domain: the computer's earlier node, after the
-        // pairing followed it to its new one).
-        assertNull(UpdatePolicy.browserPage("https://mac.tail9.ts.net", null, baseInUse = false))
-        assertNull(UpdatePolicy.browserPage("https://macbook-air-old.hn.test:48321", "hypernova-mac.hn.test", baseInUse = false))
-        // An address: the computer's own certificate, which only the app pins (Headscale, the local listener).
-        assertNull(UpdatePolicy.browserPage("https://100.64.0.1:48321", null, baseInUse = true))
-        assertNull(UpdatePolicy.browserPage("https://192.168.0.149:47323", null, baseInUse = true))
-        assertNull(UpdatePolicy.browserPage("https://[fd7a:115c:a1e0::1]:47321", null, baseInUse = true))
-        // Plain http never.
-        assertNull(UpdatePolicy.browserPage("http://hypernova.example.com", null, baseInUse = true))
-        // A public name with a real certificate (a server of one's own): the browser can, whatever the route.
-        assertEquals("https://hypernova.example.com/download/android", UpdatePolicy.browserPage("https://hypernova.example.com/", null, baseInUse = false))
-        assertNull(UpdatePolicy.browserPage("not a url", null, baseInUse = true))
+        // An address: the computer's own certificate, which only the app pins (the local listener).
+        assertNull(UpdatePolicy.browserPage("https://192.168.0.149:47323"))
+        assertNull(UpdatePolicy.browserPage("https://[fd00::5]:47323"))
+        // Plain http never (the daemon's fallback base URL among them).
+        assertNull(UpdatePolicy.browserPage("http://hypernova.example.com"))
+        assertNull(UpdatePolicy.browserPage("http://10.0.2.2:47321"))
+        // A public name with a real certificate (a server of one's own): the browser can.
+        assertEquals("https://hypernova.example.com/download/android", UpdatePolicy.browserPage("https://hypernova.example.com/"))
+        assertNull(UpdatePolicy.browserPage("not a url"))
     }
 
     @Test fun theArchiveMustBeHypernovaAndNewer() {

@@ -88,7 +88,7 @@ doc="$(in_box hypernova doctor 2>&1 || true)"
 expect "hypernova doctor checks every piece, each with its fix" "$doc" \
   '✓ Linux on (x64|arm64)' '✓ Node\.js v[0-9]+\.' '✓ The daemon in /opt/hypernova/app/daemon' '✓ Shared terminals: node-pty works' \
   '! No systemd user service here' '✓ Daemon answering as “hypernova-e2e”' '✓ Phone API and local API on loopback only' \
-  '✓ Hooks and the status line' '✓ `claude` in your shell starts a shared terminal' '(Built-in Tailscale|Tailscale isn’t installed)'
+  '✓ Hooks and the status line' '✓ `claude` in your shell starts a shared terminal' 'Local network route on port 47323'
 if [ "$CLAUDE" = yes ]; then
   expect "doctor: Claude Code installed by Anthropic's installer, not signed in, and how to sign in" "$doc" '✓ Claude Code [0-9]+\.[0-9]+\.[0-9]+ \(~/\.local/bin/claude\)' '✗ Claude Code isn’t signed in\.' 'Run claude once on this server'
 fi
@@ -96,18 +96,10 @@ fi
 pairing="$(in_box hypernova pair --no-wait 2>&1)"
 link="$(printf '%s\n' "$pairing" | grep -oE 'https://hypernova\.observer/pair#[^ ]+' | head -n 1 || true)"
 expect "hypernova pair prints the QR code, the https link with the local route, and when it expires" "$pairing" '█' 'https://hypernova\.observer/pair#v=1&' "lan=$IP" 'It works once, for [0-9]+ minutes \(until [0-9:]+\)'
-# --no-wait must not hang, however Tailscale stands (the built-in node needs a sign-in).
+# --no-wait must not hang.
 start=$SECONDS
 in_box hypernova pair --no-wait >/dev/null 2>&1 || true
 [ $((SECONDS - start)) -lt 60 ] && ok "hypernova pair --no-wait returns at once" || bad "hypernova pair --no-wait took $((SECONDS - start)) s"
-
-# ── The built-in Tailscale helper: present for this architecture, running, waiting for a sign-in ──
-# No auth key and no sign-in here: the node only reports that it needs one, and must not crash-loop.
-ARCH="$(in_box uname -m)"; case "$ARCH" in x86_64) GOARCH=amd64 ;; aarch64) GOARCH=arm64 ;; *) GOARCH="$ARCH" ;; esac
-expect "the Tailscale helper for $GOARCH is in the image and runs" "$(in_box sh -c "ls /opt/hypernova/app/daemon/bin/; pgrep -af hypernova-tsnet" 2>&1)" "hypernova-tsnet-linux-$GOARCH" "hypernova-tsnet-linux-$GOARCH --state"
-sleep 8
-expect "the built-in node waits for a sign-in (no crash loop)" "$(docker logs "$NAME" 2>&1 | grep -i tsnet)" 'tsnet helper started' 'tsnet needs a sign-in'
-[ "$(docker logs "$NAME" 2>&1 | grep -c 'tsnet helper started')" -eq 1 ] && ok "the helper was started once, not restarted" || bad "the helper was started more than once" "$(docker logs "$NAME" 2>&1 | grep -i tsnet)"
 
 # ── A stand-in phone pairs with that code and asks for the Mac-only features ──
 code="$(printf '%s' "$link" | sed -n 's/.*[#&]c=\([^&]*\).*/\1/p')"
