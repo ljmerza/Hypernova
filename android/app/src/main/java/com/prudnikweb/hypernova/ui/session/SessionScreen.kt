@@ -685,9 +685,10 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     }
                 }
                 // A shared terminal needs no note (what you send is typed there); a terminal session
-                // that isn't shared forks when you write, which is worth saying.
+                // that isn't shared forks when you write, which is worth saying, once you start to
+                // (owner, 2026-10-30: not while it only waits on you).
                 val note = when {
-                    session.term != null -> null
+                    session.term != null || draft.isBlank() -> null
                     session.origin == "terminal" && session.phase != Phase.Ended -> R.string.terminal_session_note
                     else -> null
                 }

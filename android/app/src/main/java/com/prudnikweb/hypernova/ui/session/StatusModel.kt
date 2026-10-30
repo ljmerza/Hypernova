@@ -116,8 +116,11 @@ internal fun statusBar(i: BarInput): BarModel? {
     }
     return when {
         i.phase == Phase.Error -> model(BarTone.Error, Say(SayKind.Failed), false)
+        // Only waiting on the owner, nothing else going on: no bar (owner, 2026-10-30); the planet at
+        // the top and the ask itself say it. Agents, a workflow or open to-dos keep it.
         i.pending != null || i.state == SessionState.NeedsYou || i.phase == Phase.NeedsYou ->
-            model(BarTone.NeedsYou, waitSay(i.pending, i.activity), false)
+            if (wf == null && n == 0 && done == total) null
+            else model(BarTone.NeedsYou, waitSay(i.pending, i.activity), false)
         // The one rule for "working" (Session.busy): Claude works or is starting; its agents below.
         i.state == SessionState.Working || i.phase == Phase.Starting || i.sending -> working(workSay(i), i.stoppable)
         // The main agent is done for now but agents it started carry on: still a turn, as the user sees it.

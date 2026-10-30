@@ -313,22 +313,33 @@ class StatusModelTest {
         assertEquals(SpokenTokens(TokenScale.Millions, "2", 2), spokenTokens(1_999_999))
     }
 
+    @Test fun waitingAloneHasNoBarAgentsOrOpenTodosKeepIt() {
+        // Only waiting on the owner: no bar (owner, 2026-10-30); the planet and the ask say it.
+        assertNull(statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "x")))
+        val a = Item.Approval("k", "Bash", "git push origin main", "", kind = ApprovalKind.Tool)
+        assertNull(statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "x", pending = a)))
+        assertNull(statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "x", todos = listOf(todo(1, TodoStatus.Done)))))
+        assertEquals(BarTone.NeedsYou, statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "x", agentsRunning = 1))?.tone)
+        assertEquals(BarTone.NeedsYou, statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "x", todos = listOf(todo(1, TodoStatus.Pending))))?.tone)
+    }
+
+    // The wording when the bar shows while it waits (agents beside it keep the bar).
     @Test fun anApprovalMakesItAmberAndNamesWhatToApprove() {
         val a = Item.Approval("k", "Bash", "git push origin main", "", kind = ApprovalKind.Tool)
-        val m = statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "x", pending = a))!!
+        val m = statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "x", agentsRunning = 1, pending = a))!!
         assertEquals(BarTone.NeedsYou, m.tone)
         assertEquals(Say(SayKind.WaitApprove, "git push origin main"), m.say)
         assertFalse(m.canStop)
         val e = Item.Approval("k", "Edit", "/a/b/Model.kt", "")
-        assertEquals(Say(SayKind.WaitApprove, "Edit Model.kt"), statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "", pending = e))!!.say)
+        assertEquals(Say(SayKind.WaitApprove, "Edit Model.kt"), statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "", agentsRunning = 1, pending = e))!!.say)
         val q = Item.Approval("k", "AskUserQuestion", "", "", kind = ApprovalKind.Question)
-        assertEquals(SayKind.WaitAnswer, statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "", pending = q))!!.say.kind)
+        assertEquals(SayKind.WaitAnswer, statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "", agentsRunning = 1, pending = q))!!.say.kind)
     }
 
     @Test fun needsYouWithoutTheItemUsesTheDaemonsWords() {
-        val m = statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "wants to run git push origin main"))!!
+        val m = statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "wants to run git push origin main", agentsRunning = 1))!!
         assertEquals(Say(SayKind.WaitApprove, "run git push origin main"), m.say)
-        assertEquals(SayKind.WaitYou, statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, ""))!!.say.kind)
+        assertEquals(SayKind.WaitYou, statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "", agentsRunning = 1))!!.say.kind)
     }
 
     @Test fun anErrorIsRed() {
