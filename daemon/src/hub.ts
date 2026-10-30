@@ -82,6 +82,12 @@ export type Session = {
   agentJob?: string
   /** Calls refused without the owner that he hasn't retried or dismissed (blocked.ts): its Blocked tab. */
   blockedCalls: number
+  /**
+   * A `claude agents` job that ended its turn asking the owner something in words (no dialog: its
+   * input box is open): what it asks, as `claude agents` says it. The reply is a prompt like any
+   * other, so the phone shows the question rather than "waiting in the terminal". Null otherwise.
+   */
+  question?: string | null
 }
 type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
@@ -1229,6 +1235,30 @@ const agentStates = new Map<string, string>()
 const agentBlocked = (id: string) => agentStates.get(id) === 'blocked'
 
 /**
+ * What blocked `claude agents` job [job] waits for, in its own words (`needs` in its state file:
+ * "approve Bash: …", "answer: …", or Claude's question). Null when it can't be read.
+ */
+function agentNeeds(job: string | undefined): string | null {
+  if (!job) return null
+  try {
+    const o = JSON.parse(readFileSync(join(CLAUDE_DIR, 'jobs', job, 'state.json'), 'utf8'))
+    return typeof o?.needs === 'string' && o.needs.trim() ? trimText(o.needs.trim(), 300) : null
+  } catch {
+    return null
+  }
+}
+
+/** A dialog's `needs` (a permission, AskUserQuestion's options, a plan): not a question in words. */
+const dialogNeeds = (n: string) => /^(approve |answer: |awaiting input)/.test(n)
+
+/** Blocked [id], its box open (no dialog): the question to show; null for a dialog or when unknown. */
+function questionOf(id: string): string | null {
+  if (!agentBlocked(id)) return null
+  const n = agentNeeds(agentJobs.get(id))
+  return n && !dialogNeeds(n) ? n : null
+}
+
+/**
  * The whole `claude agents` list (settings.claudeAgents): every job is a session here, whether or
  * not its process still runs, so a finished one stays on Home (at the bottom, done) rather than
  * going to History, and one stopped on a question stays at the top. Each keeps its job id, so typing
@@ -1255,7 +1285,9 @@ export function applyAgentList(list: AgentJob[]): void {
     // Its process runs: the registry has its state (pollRegistry). Stopped: the list's.
     if (r.pid) continue
     const state: SessionState = j.state === 'blocked' ? 'needs_you' : j.state === 'working' ? 'starting' : 'idle'
-    if (r.state !== state) upsertSession(r.id, { state, activity: null })
+    // Stopped on the owner: no dialog can show without a process, so what it waits for is a reply.
+    const question = state === 'needs_you' ? (agentNeeds(j.id) ?? null) : null
+    if (r.state !== state || (r.question ?? null) !== question) upsertSession(r.id, { state, activity: question, question })
   }
   for (const [id] of agentJobs) {
     if (seen.has(id)) continue
@@ -1313,7 +1345,10 @@ export function pollRegistry(): void {
     const busy = o.status === 'busy' && !(mainIdle.has(r.id) && backgroundRunning(r.id))
     // A `claude agents` job blocked on the owner can sit idle in the registry: its list says it waits.
     const state: SessionState = hasPending ? 'needs_you' : busy ? 'working' : o.status === 'waiting' || (agents && agentBlocked(o.sessionId)) ? 'needs_you' : 'idle'
-    const patch: Partial<Rec> = { pid: o.pid }
+    // Blocked with no dialog (the registry doesn't say waiting): Claude asked in words.
+    const question = agents && state === 'needs_you' && !hasPending && o.status !== 'waiting' ? questionOf(o.sessionId) : null
+    const patch: Partial<Rec> = { pid: o.pid, question }
+    if (question) patch.activity = question
     // Claude Code stamps status changes; use that rather than "now" (a daemon restart isn't activity).
     const at = Number(o.statusUpdatedAt ?? o.updatedAt) || r.lastActivityAt
     if (r.state !== state) Object.assign(patch, { state, lastActivityAt: Math.max(r.lastActivityAt, at) })

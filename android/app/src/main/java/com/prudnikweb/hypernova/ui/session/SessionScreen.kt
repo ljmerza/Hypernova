@@ -699,7 +699,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                         Spacer(Modifier.height(12.dp))
                     }
                 }
-                val waitingInTerminal = session.term != null && session.state == SessionState.NeedsYou && noCard && menu == null
+                // A question in words isn't a dialog: the reply goes in the composer, not the terminal.
+                val waitingInTerminal = session.term != null && session.state == SessionState.NeedsYou && noCard && menu == null && session.question == null
                 if (waitingInTerminal && !hub.isDemo) {
                     WaitingCard(codex = session.codex, onOpen = { opener.terminal(sessionId) })
                     Spacer(Modifier.height(12.dp))

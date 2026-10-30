@@ -96,6 +96,8 @@ data class WSession(
     val switchedTo: String? = null,
     /** Its `claude agents` job id, when it is one (docs/PROTOCOL.md, "Session menu"): it can be stopped or deleted. */
     val agentJob: String? = null,
+    /** What a `claude agents` job asked in words, when it waits on a reply rather than a dialog. */
+    val question: String? = null,
     /** Calls refused without the owner (docs/PROTOCOL.md, "Blocked calls"); an older Mac doesn't say: none. */
     val blockedCalls: Int = 0,
 )
@@ -617,6 +619,7 @@ object Wire {
             switchedFrom = o.str("switchedFrom")?.takeIf { it.isNotBlank() },
             switchedTo = o.str("switchedTo")?.takeIf { it.isNotBlank() },
             agentJob = o.str("agentJob")?.takeIf { it.isNotBlank() },
+            question = o.str("question")?.takeIf { it.isNotBlank() },
             blockedCalls = o.int("blockedCalls") ?: 0,
         )
     }

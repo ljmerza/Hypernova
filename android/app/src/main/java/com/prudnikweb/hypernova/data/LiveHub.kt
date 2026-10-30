@@ -839,7 +839,8 @@ class LiveHub(
             val name = session(id)?.name ?: s.title
             val text = when (kind) {
                 Notice.Kind.Finished -> s.lastText?.let(::readableLine) ?: res.getString(R.string.notice_finished)
-                else -> s.menu?.title ?: res.getString(R.string.notice_waiting)
+                // A question in words: the question itself, not "waiting in the terminal".
+                else -> s.question ?: s.menu?.title ?: res.getString(R.string.notice_waiting)
             }
             notice(Notice("$kind:$id:${s.lastActivityAt}", kind, id, name, text))
         }
@@ -1089,6 +1090,7 @@ class LiveHub(
             switchedFrom = w.switchedFrom,
             switchedTo = w.switchedTo,
             agentJob = w.agentJob,
+            question = w.question,
             blockedCalls = w.blockedCalls,
         )
     }

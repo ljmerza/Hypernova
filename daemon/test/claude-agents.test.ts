@@ -218,3 +218,35 @@ test('agentJobCommand: claude stop / rm with the job id, and Claude Code’s wor
   assert.match(r.said, /unpushed commits/)
   assert.match(readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'verbs'), 'utf8'), /^stop abab0002\nrm dirty000\n$/)
 })
+
+/** A job's state file as Claude Code writes it, with what it waits for ([needs]). */
+function jobState(job: string, needs: string): void {
+  const dir = join(process.env.CLAUDE_CONFIG_DIR!, 'jobs', job)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'state.json'), JSON.stringify({ state: 'blocked', needs }))
+}
+
+test('a blocked job that asked in words has its question, not "waiting in the terminal"; a dialog has none', () => {
+  settings.claudeAgents = true
+  job('agents-q-1', 'qqqq0001', 'idle')
+  jobState('qqqq0001', 'Say "go" when the bridge is awake')
+  job('agents-q-2', 'qqqq0002', 'waiting')
+  jobState('qqqq0002', 'approve Bash: rm -rf build')
+  hub.applyAgentList([
+    { id: 'qqqq0001', sessionId: 'agents-q-1', cwd: scratch, state: 'blocked' },
+    { id: 'qqqq0002', sessionId: 'agents-q-2', cwd: scratch, state: 'blocked' },
+    { id: 'qqqq0003', sessionId: 'agents-q-3', cwd: scratch, state: 'blocked' },
+  ])
+  jobState('qqqq0003', 'Complete steps 1–3, then tell me')
+  hub.pollRegistry()
+  const asked = hub.listSessions().find((s) => s.id === 'agents-q-1')
+  assert.equal(asked?.state, 'needs_you')
+  assert.equal(asked?.question, 'Say "go" when the bridge is awake')
+  assert.equal(asked?.activity, 'Say "go" when the bridge is awake')
+  const dialog = hub.listSessions().find((s) => s.id === 'agents-q-2')
+  assert.equal(dialog?.state, 'needs_you')
+  assert.equal(dialog?.question ?? null, null)
+  // Stopped (no process): what it waits for is a reply, read on the next list.
+  hub.applyAgentList([{ id: 'qqqq0003', sessionId: 'agents-q-3', cwd: scratch, state: 'blocked' }])
+  assert.equal(hub.getSession('agents-q-3')?.question, 'Complete steps 1–3, then tell me')
+})

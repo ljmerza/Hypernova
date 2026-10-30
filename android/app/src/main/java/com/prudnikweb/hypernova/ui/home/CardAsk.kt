@@ -5,8 +5,8 @@ import com.prudnikweb.hypernova.widget.WidgetModel
 
 /**
  * What a Home card offers for the approval its session waits on, in place of its model and agents.
- * Tool asks only (the owner's choice), by the widget's rule ([WidgetModel.answerable]): Allow
- * promises the exact command, so it shows only when that shows whole.
+ * Tool asks only (the owner's choice). The exact command shows when it fits whole (the widget's
+ * rule, [WidgetModel.answerable]); Allow is there either way (the owner, 2026-10-30).
  */
 sealed interface CardAsk {
     val id: String
@@ -14,7 +14,7 @@ sealed interface CardAsk {
     /** A tool's exact command, whole and as it will run ([text]): Deny and Allow. */
     data class Exact(override val id: String, val tool: String, val text: String) : CardAsk
 
-    /** A tool whose command can't show whole here (too long, masked, odd characters): its summary, Deny and Open. */
+    /** A tool whose command can't show whole here (too long, masked, odd characters): its summary, Deny and Allow. */
     data class Partial(override val id: String) : CardAsk
 
     /** A question or a plan: Answer opens the session. */

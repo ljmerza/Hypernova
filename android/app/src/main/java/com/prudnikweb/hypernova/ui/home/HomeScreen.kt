@@ -931,9 +931,18 @@ private fun AskPills(ask: CardAsk, onAnswer: suspend (id: String, answer: Answer
                     kind = PillKind.Primary, height = 40.dp,
                 )
             }
+            // The owner allows from Home whether or not the whole command fits (2026-10-30): the
+            // card shows its summary, and tapping the card opens the session for the details.
             is CardAsk.Partial -> {
                 Pill(stringResource(R.string.deny), { send(Answer.Deny) }, kind = PillKind.Danger, height = 40.dp)
-                Pill(stringResource(R.string.open_session_short), onOpen, kind = PillKind.Outline, height = 40.dp)
+                Pill(
+                    stringResource(R.string.allow),
+                    {
+                        view.performHapticFeedback(if (android.os.Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
+                        send(Answer.Allow)
+                    },
+                    kind = PillKind.Primary, height = 40.dp,
+                )
             }
             is CardAsk.Open -> Pill(stringResource(R.string.home_answer), onOpen, kind = PillKind.Primary, height = 40.dp)
         }
