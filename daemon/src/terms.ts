@@ -650,7 +650,12 @@ export async function openCodexTerminal(id: string): Promise<string> {
  */
 export async function attachAgentsTerm(sessionId: string, cwd: string, job: string, ms = 15_000): Promise<string | null> {
   const have = termOf(sessionId)
-  if (have && terms.has(have)) return have
+  if (have && terms.has(have)) {
+    if (!attachDrifted(have, sessionId)) return have
+    // It shows another job (or the agent list) now: typing there would reach the wrong session.
+    log('claude attach holder', have, 'drifted off', sessionId.slice(0, 8), '(shows', JSON.stringify(termTitle(have)) + '): attaching afresh')
+    await endTermAndWait(have)
+  }
   const file = findClaude()
   if (!file) throw Object.assign(new Error('Claude Code isn’t installed on this computer.'), { status: 409 })
   const id = newTermId()
@@ -685,6 +690,26 @@ export async function attachAgentsTerm(sessionId: string, cwd: string, job: stri
   }
   if (drawn && existsSync(metaPath(id))) return id
   return null
+}
+
+/** Holder [id]'s title as the program in it last set it ("" when none). */
+const termTitle = (id: string): string => (terms.get(id)?.state?.title ?? terms.get(id)?.meta.title ?? '').trim()
+
+/**
+ * Holder [tid] runs `claude attach` and no longer shows session [sessionId]: ← in it goes back to
+ * the agent view, and from there into any other job. `claude attach` titles its terminal with the
+ * session it shows (its registry name), and the agent view with "… · claude agents", so a title
+ * that's neither the session's name is another view. No title or no name known: not drifted.
+ */
+export function attachDrifted(tid: string, sessionId: string): boolean {
+  const t = terms.get(tid)
+  if (!t || t.meta.args?.[0] !== 'attach') return false
+  const title = termTitle(tid)
+  if (!title) return false
+  if (/·\s*claude agents$/.test(title)) return true
+  const pid = getSession(sessionId)?.pid
+  const name = pid ? readJson<{ name?: string } | null>(join(CLAUDE_DIR, 'sessions', `${pid}.json`), null)?.name?.trim() : null
+  return !!name && title !== name
 }
 
 /** Claude Code's registry says session process [pid] waits on the owner (a question, a permission). */

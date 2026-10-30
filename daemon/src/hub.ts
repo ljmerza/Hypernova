@@ -1322,7 +1322,9 @@ export function pollRegistry(): void {
       continue
     }
     // With settings.claudeAgents, `claude agents` sessions count too (their job id kept for `claude attach`).
-    const agents = settings.claudeAgents === true && o?.kind === 'bg' && typeof o.jobId === 'string'
+    // Only jobs `claude agents` lists (applyAgentList): its pre-started spares (`claude bg-spare`)
+    // register as "bg" with a job id too, though no one ever started them.
+    const agents = settings.claudeAgents === true && o?.kind === 'bg' && typeof o.jobId === 'string' && agentStates.has(o.sessionId)
     if (!o?.sessionId || !o.pid || (o.kind !== 'interactive' && !agents) || isSdk(o.sessionId)) continue
     // The daemon's own Claude Code (the usage probe), in a folder marked hidden (term/hidden.ts).
     if (isHiddenCwd(o.cwd)) continue

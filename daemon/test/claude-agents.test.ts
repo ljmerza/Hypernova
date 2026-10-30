@@ -35,6 +35,7 @@ case "$1" in
   attach)
     echo "$2" > "$S/attached"
     if [ "$2" = "gone0000" ]; then echo "No background session $2" >&2; exit 1; fi
+    if [ "$2" = "drift000" ]; then printf '\\033]0;Some other session\\007\\n────────────────────\\n❯ \\n────────────────────\\n'; exec sleep 30; fi
     if [ "$2" = "ask00000" ]; then printf '\\n Do you want to proceed?\\n ❯ 1. Yes\\n   2. No\\n'; exec sleep 30; fi
     printf '\\n────────────────────\\n❯ \\n────────────────────\\n'
     exec sleep 30
@@ -53,7 +54,7 @@ process.env.CLAUDE_BIN = fake
 
 const hub = await import('../src/hub.ts')
 const { settings } = await import('../src/store.ts')
-const { attachAgentsTerm, createAgentsSession, scanTerms, termOf } = await import('../src/terms.ts')
+const { attachAgentsTerm, attachDrifted, createAgentsSession, scanTerms, termOf } = await import('../src/terms.ts')
 const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
 const { promptSession } = await import('../src/http.ts')
 
@@ -74,10 +75,13 @@ after(() => {
 })
 
 /** A `claude agents` job for session [id], registered as Claude Code registers a background one. */
-function job(id: string, jobId: string, status = 'idle'): number {
+const listed: { id: string; sessionId: string; cwd: string; state: string }[] = []
+function job(id: string, jobId: string, status = 'idle', o: { name?: string; spare?: boolean } = {}): number {
   const p = spawn('sleep', ['30'], { stdio: 'ignore' })
   procs.push(p)
-  writeFileSync(join(registry, `${p.pid}.json`), JSON.stringify({ pid: p.pid, sessionId: id, cwd: scratch, kind: 'bg', jobId, status, updatedAt: Date.now() }))
+  writeFileSync(join(registry, `${p.pid}.json`), JSON.stringify({ pid: p.pid, sessionId: id, cwd: scratch, kind: 'bg', jobId, status, updatedAt: Date.now(), ...(o.name ? { name: o.name } : {}) }))
+  if (!o.spare && !listed.some((j) => j.sessionId === id)) listed.push({ id: jobId, sessionId: id, cwd: scratch, state: 'working' })
+  if (!o.spare && settings.claudeAgents === true) hub.applyAgentList([...listed])
   return p.pid!
 }
 
@@ -249,4 +253,36 @@ test('a blocked job that asked in words has its question, not "waiting in the te
   // Stopped (no process): what it waits for is a reply, read on the next list.
   hub.applyAgentList([{ id: 'qqqq0003', sessionId: 'agents-q-3', cwd: scratch, state: 'blocked' }])
   assert.equal(hub.getSession('agents-q-3')?.question, 'Complete steps 1–3, then tell me')
+})
+
+test('a spare Claude Code started ahead (registered "bg", not listed by claude agents) is no session', () => {
+  settings.claudeAgents = true
+  job('agents-spare-1', 'spar0001', 'idle', { spare: true })
+  hub.pollRegistry()
+  assert.equal(hub.getSession('agents-spare-1'), undefined)
+  assert.equal(hub.agentJobOf('agents-spare-1'), null)
+})
+
+test('a claude attach holder that drifted to another session is replaced, never typed into', async () => {
+  settings.claudeAgents = true
+  job('agents-drift-1', 'drift000', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  const first = await attachAgentsTerm('agents-drift-1', scratch, 'drift000')
+  assert.ok(first)
+  scanTerms()
+  const t0 = Date.now()
+  while (!attachDrifted(first!, 'agents-drift-1') && Date.now() - t0 < 5000) await new Promise((ok) => setTimeout(ok, 100))
+  assert.equal(attachDrifted(first!, 'agents-drift-1'), true, 'its title is another session’s')
+  const second = await attachAgentsTerm('agents-drift-1', scratch, 'drift000')
+  assert.ok(second)
+  assert.notEqual(second, first, 'a fresh claude attach, not the drifted one')
+})
+
+test('attachDrifted: a holder showing its own session (title = its registry name) has not drifted', async () => {
+  settings.claudeAgents = true
+  job('agents-own-1', 'cccc0002', 'idle', { name: 'Own name' })
+  hub.pollRegistry()
+  const tid = await attachAgentsTerm('agents-own-1', scratch, 'cccc0002')
+  assert.ok(tid)
+  assert.equal(attachDrifted(tid!, 'agents-own-1'), false)
 })

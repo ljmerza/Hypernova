@@ -107,10 +107,14 @@ function call(method: string, path: string, body?: object): Promise<{ status: nu
 }
 
 /** A `claude agents` job for session [id], registered as Claude Code registers a background one. */
+const listed: { id: string; sessionId: string; cwd: string; state: string }[] = []
 function job(id: string, jobId: string, status = 'idle'): void {
   const p = spawn('sleep', ['30'], { stdio: 'ignore' })
   procs.push(p)
   writeFileSync(join(registry, `${p.pid}.json`), JSON.stringify({ pid: p.pid, sessionId: id, cwd: scratch, kind: 'bg', jobId, status, updatedAt: Date.now() }))
+  // A job `claude agents` lists (only those count, not its pre-started spares).
+  if (!listed.some((j) => j.sessionId === id)) listed.push({ id: jobId, sessionId: id, cwd: scratch, state: 'working' })
+  hub.applyAgentList([...listed])
   hub.pollRegistry()
 }
 

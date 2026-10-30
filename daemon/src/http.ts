@@ -22,7 +22,7 @@ import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { recheckSystem, setBuiltInTailscale, setControlUrl, tailnetHints, tailnetNow, tsnetBaseUrl, tsnetLogin, tsnetLogout, tsnetState } from './tsnet.ts'
 import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setMode } from './runner.ts'
-import { answerMenu, attachAgentsTerm, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
+import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
 import { agentJobCommand } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
 import { codexModels, codexSessionUsage, codexState, refreshCodexAccount } from './codex/account.ts'
@@ -851,7 +851,7 @@ async function api(c: Ctx): Promise<void> {
     if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
     let tid = termOf(id!)
     // A `claude agents` session gets a shared terminal when one is needed: `claude attach` (terms.ts).
-    const agentsJob = settings.claudeAgents === true && !tid && ['terminal', 'interrupt', 'menu', 'mode'].includes(action!) && isLiveTerminal(id!) ? agentJobOf(id!) : null
+    const agentsJob = settings.claudeAgents === true && (!tid || attachDrifted(tid, id!)) && ['terminal', 'interrupt', 'menu', 'mode'].includes(action!) && isLiveTerminal(id!) ? agentJobOf(id!) : null
     if (agentsJob) tid = await attachAgentsTerm(id!, rec.cwd, agentsJob)
     const noTerm = () => new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
     const codex = isCodex(id!)
@@ -1221,7 +1221,8 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
   let tid = termOf(id)
   // A `claude agents` session: typed in through `claude attach` (the same conversation), never
   // forked; a stopped or finished job too (attach wakes it, as answering it in `claude agents` does).
-  const job = settings.claudeAgents === true && !tid ? agentJobOf(id) : null
+  // A holder that drifted to another job (attachDrifted) is replaced by attachAgentsTerm.
+  const job = settings.claudeAgents === true && (!tid || attachDrifted(tid, id)) ? agentJobOf(id) : null
   if (job) {
     if (pendingApprovals().some((a) => a.sessionId === id)) throw new HttpError(409, 'needs_answer', 'Claude is waiting for your answer above. Answer it first.')
     tid = await attachAgentsTerm(id, rec.cwd, job)
