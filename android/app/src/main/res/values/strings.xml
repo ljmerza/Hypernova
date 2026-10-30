@@ -808,4 +808,14 @@
         <item quantity="one">%d model</item>
         <item quantity="other">%d models</item>
     </plurals>
+    <!-- Fork: the asks still waiting, stacked at the end of the chat (ui/session/AskStack.kt). -->
+    <plurals name="asks_waiting">
+        <item quantity="one">%d waiting</item>
+        <item quantity="other">%d waiting</item>
+    </plurals>
+    <string name="asks_front_said">%1$d of %2$d waiting for you</string>
+    <string name="asks_behind_said">%1$s: %2$s, %3$d of %4$d</string>
+    <string name="asks_bring_forward">Bring forward</string>
+    <!-- Fork: the × on the in-app banner (ui/components/Banner.kt). -->
+    <string name="notice_dismiss">Dismiss</string>
 </resources>

@@ -152,16 +152,27 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
     var notice by mutableStateOf<Notice?>(null)
         private set
 
-    fun showNotice(n: Notice) {
+    private val putAway = PutAway()
+
+    /** False when it isn't shown: one like it was put away a moment ago ([PutAway]). */
+    fun showNotice(n: Notice): Boolean {
+        if (putAway.quiet(n, android.os.SystemClock.elapsedRealtime())) return false
         notice = n
         viewModelScope.launch {
             // Something to answer stays a little longer.
             delay(if (n.kind == Notice.Kind.Finished || n.kind == Notice.Kind.Update) 6000 else 9000)
             if (notice == n) notice = null
         }
+        return true
     }
 
     fun dismissNotice() {
+        notice = null
+    }
+
+    /** Fork: the owner put the banner away (swiped it or tapped ×), not opened it. */
+    fun putAwayNotice() {
+        notice?.let { putAway.put(it, android.os.SystemClock.elapsedRealtime()) }
         notice = null
     }
 

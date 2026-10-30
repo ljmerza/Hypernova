@@ -54,6 +54,8 @@ object Items {
         if (cache != null && (cache.cwd != cwd || cache.active != active)) { cache.byId.clear(); cache.cwd = cwd; cache.active = active }
         val out = ArrayList<Item>(events.size + 2)
         val seenApprovals = HashSet<String>()
+        // Fork: approvals, questions and plans still waiting for an answer, kept for the end.
+        val asks = ArrayList<Item>(1)
         // Agents with an approval waiting: their planet turns amber.
         val asking = if (board.isEmpty()) emptySet() else approvals.values.mapNotNullTo(HashSet()) { a ->
             a.agentId?.takeIf { a.sessionId == sessionId && a.id !in resolved && a.id !in answered }
@@ -97,7 +99,11 @@ object Items {
                 // The daemon sends the event a moment before the approval itself, so only an
                 // old one that isn't pending any more is closed; a fresh one is still arriving.
                 val closed = pendingLooking && settled && now - e.ts > 4000
-                out += approval(e.id, e.approvalId, e.summary, if (closed) "closed" else e.resolution, approvals[e.approvalId], resolved[e.approvalId], answered[e.approvalId])
+                val item = approval(e.id, e.approvalId, e.summary, if (closed) "closed" else e.resolution, approvals[e.approvalId], resolved[e.approvalId], answered[e.approvalId])
+                // Fork: one still waiting goes last, under what came after it (another tool's
+                // output, an agent's card, more text), so it's in view without scrolling up.
+                // Answered, it's back in its place.
+                if (item.resolved == null) asks += item else out += item
                 continue
             }
             // An agent's or a workflow's call: its card, rebuilt as the agent moves on (not cached).
@@ -121,6 +127,7 @@ object Items {
             cache.byId.keys.retainAll(ids)
         }
         if (orphans && !board.isEmpty()) out += unplaced(board, placed, asking, now)
+        out += asks
         // A pending approval whose event hasn't arrived (yet): still answerable, at the end.
         for (a in approvals.values) {
             if (a.sessionId == sessionId && a.id !in seenApprovals) {

@@ -40,6 +40,29 @@ data class Notice(
  * the app downloads and installs the APK itself (data/AppUpdater.kt), the page is only a way round
  * where a browser can open it.
  */
+/**
+ * Fork: banners the owner put away (swiped or ×) a moment ago. Another of the same kind for the
+ * same session within [QUIET_MS] doesn't come back over the screen: parallel agents each asking, say,
+ * were a new banner every few seconds however often it was swiped. Its card is in the session and on
+ * Home either way, and another kind (a question after an approval) still shows.
+ */
+class PutAway {
+    private val at = HashMap<Pair<String, Notice.Kind>, Long>()
+
+    fun put(n: Notice, now: Long) {
+        n.sessionId?.let { at[it to n.kind] = now }
+    }
+
+    fun quiet(n: Notice, now: Long): Boolean {
+        val t = n.sessionId?.let { at[it to n.kind] } ?: return false
+        return now - t < QUIET_MS
+    }
+
+    companion object {
+        const val QUIET_MS = 30_000L
+    }
+}
+
 @Immutable
 data class AppUpdate(val versionName: String, val versionCode: Int, val url: String)
 

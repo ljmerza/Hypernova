@@ -434,7 +434,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 LaunchedEffect(hub) {
                     hub?.notices?.collect { n ->
                         if (n.sessionId == null || n.sessionId != onScreen) {
-                            vm.showNotice(n)
+                            if (!vm.showNotice(n)) return@collect
                             if (n.kind != Notice.Kind.Finished && n.kind != Notice.Kind.Update) view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.KEYBOARD_TAP)
                         }
                     }
@@ -477,7 +477,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                             }
                         }
                     },
-                    onDismiss = vm::dismissNotice,
+                    onDismiss = vm::putAwayNotice,
                     onAction = { n ->
                         vm.dismissNotice()
                         if (n.action == Notice.ACTION_EXTEND) vm.extendBackpack(vm::showToast)
@@ -540,7 +540,8 @@ private fun Screens(
                     toAutomations = toAutomations,
                     onAutomation = { id, template, runs -> nav.push(Route.AutomationEdit(id, template, runs)) },
                 )
-                is Route.Session -> SessionScreen(hub, r.id, onBack = { nav.pop() })
+                // Fork: a new route each time it's opened, so each opening lands at the latest (SessionScreen).
+                is Route.Session -> SessionScreen(hub, r.id, onBack = { nav.pop() }, opening = System.identityHashCode(r))
                 is Route.Files -> FilesScreen(hub, r, onBack = { nav.pop() })
                 is Route.FileView -> FileViewer(hub, r.path, onBack = { nav.pop() })
                 is Route.Web -> WebScreen(r.url, r.title, onBack = { nav.pop() })
