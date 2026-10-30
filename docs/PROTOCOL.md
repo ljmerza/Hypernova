@@ -4314,7 +4314,12 @@ keeps the screen in a headless xterm, so anyone joining gets the current screen.
   from `POST /v1/sessions/{id}/terminal`, on the route the phone is using (on the
   local route the app opens it for the terminal page; see Local network (direct
   HTTPS)). Binary frames are terminal bytes both ways; text frames are the holder's
-  JSON messages (from the phone only `resize` passes). A phone 8 MB behind is closed
+  JSON messages (from the phone only `resize` and `scroll` pass). `{t:"scroll", data}` is the
+  phone's finger scrolling an app that keeps its own history (Claude Code's fullscreen view, in
+  the alternate screen): mouse-wheel turns as SGR reports, PgUp, PgDn or Ctrl+End, and nothing
+  else (anything more is dropped). It reaches the holder as `keys`, so scrolling doesn't take the
+  terminal's size as typing does. In the normal screen the page scrolls its own copy of the
+  history and sends nothing. A phone 8 MB behind is closed
   with 4008 and reconnects. Tickets belong to the phone that asked: forgetting a
   phone (`DELETE /v1/devices/me` or `/local/devices/{id}`) closes its sockets at
   once with 4001, terminals included.

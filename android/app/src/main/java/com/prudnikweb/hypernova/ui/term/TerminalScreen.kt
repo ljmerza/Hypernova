@@ -20,12 +20,14 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,7 +36,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -80,6 +81,7 @@ import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
+import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.Type
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -97,7 +99,8 @@ private data class Info(val cols: Int, val rows: Int, val mac: Int)
  * A session's live terminal: the real Claude Code screen from the Mac, drawn by xterm.js
  * (bundled in the app) over a WebSocket from the daemon. The key bar adds what a phone
  * keyboard lacks. The terminal takes the phone's size while you use it here and goes back to
- * the Mac's when you type there.
+ * the Mac's when you type there. A finger scrolls its history (assets/term/index.html), and
+ * "Jump to latest" brings it back.
  */
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
@@ -126,6 +129,8 @@ fun TerminalScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
     // When this connection first came alive: only one that lasted resets the retry count.
     var liveSince by remember { mutableStateOf(0L) }
     var visible by remember { mutableStateOf(true) }
+    // Scrolled back through the history: "Jump to latest" shows.
+    var away by remember { mutableStateOf(false) }
     val term = session?.term
 
     // On the local route the app holds the socket and passes its frames to the page (AppSocket).
@@ -153,6 +158,7 @@ fun TerminalScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
             },
             onExited = { status = Status.Ended },
             onTapped = { view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK) },
+            onScrolled = { away = it },
         )
     }
 
@@ -272,6 +278,15 @@ fun TerminalScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx -> terminalWebView(ctx, bridge).also { web = it } },
                 )
+                // The plain one: inside the Column, ColumnScope's would be picked.
+                androidx.compose.animation.AnimatedVisibility(
+                    away && status == Status.Live,
+                    Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 8.dp),
+                    enter = fadeIn(tween(Motion.FAST)),
+                    exit = fadeOut(tween(Motion.FAST)),
+                ) {
+                    Pill(stringResource(R.string.jump_latest), { web?.evaluateJavascript("hn.latest()", null) }, kind = PillKind.Outline, height = 40.dp)
+                }
                 when (status) {
                     Status.Connecting -> if (info == null) LoadingLine(stringResource(R.string.terminal_connecting), Modifier.padding(20.dp))
                     Status.Lost -> Notice(problem ?: stringResource(R.string.terminal_lost)) {
@@ -304,20 +319,19 @@ private fun Notice(text: String, action: @Composable () -> Unit) {
 /**
  * What a phone keyboard lacks for Claude Code: Esc, Tab, Shift+Tab (modes), a sticky Ctrl, arrows,
  * ^C, Paste, and Enter. The rest scrolls sideways; Enter and the keyboard stay at the end, always
- * in reach on a narrow phone.
+ * in reach on a narrow phone. The keys are drawn 36dp tall in a 48dp bar, and the bar is all touch
+ * target: a key takes the taps around it up to its neighbours'.
  */
 @Composable
 private fun KeyBar(enabled: Boolean, ctrl: Boolean, onCtrl: () -> Unit, onKey: (String) -> Unit, onKeyboard: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(HN.bg950)
-            .padding(vertical = 8.dp),
+            .background(HN.bg950),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
-            Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(start = 10.dp, end = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(start = 7.dp, end = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Cap(stringResource(R.string.key_esc), null, enabled) { onKey("esc") }
@@ -332,7 +346,7 @@ private fun KeyBar(enabled: Boolean, ctrl: Boolean, onCtrl: () -> Unit, onKey: (
             Cap("/", null, enabled) { onKey("slash") }
             Cap(stringResource(R.string.key_paste), null, enabled) { onKey("paste") }
         }
-        Row(Modifier.padding(end = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(end = 7.dp), verticalAlignment = Alignment.CenterVertically) {
             Cap(stringResource(R.string.key_enter), null, enabled, accent = true) { onKey("enter") }
             Cap(null, stringResource(R.string.key_keyboard), true, glyph = Glyph.Keyboard) { onKeyboard() }
         }
@@ -347,18 +361,26 @@ private fun Cap(text: String?, label: String?, enabled: Boolean, accent: Boolean
         accent -> HN.accent
         else -> HN.ink
     }
+    // The touch target: the bar's whole 48dp height, and half the 6dp gap on each side.
     Box(
         Modifier
-            .heightIn(min = 40.dp)
-            .widthIn(min = 44.dp)
-            .clip(shape)
-            .glassChoice(accent && enabled, 10.dp)
+            .height(48.dp)
             .clickable(remember { MutableInteractionSource() }, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
             .then(if (label != null) Modifier.semantics { contentDescription = label } else Modifier)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 3.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (glyph != null) Icon(glyph, size = 18.dp, color = fg) else HText(text.orEmpty(), style = Type.mono, color = fg, maxLines = 1)
+        Box(
+            Modifier
+                .height(36.dp)
+                .widthIn(min = 38.dp)
+                .clip(shape)
+                .glassChoice(accent && enabled, 10.dp)
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (glyph != null) Icon(glyph, size = 16.dp, color = fg) else HText(text.orEmpty(), style = Type.monoSmall, color = fg, maxLines = 1)
+        }
     }
 }
 
@@ -528,6 +550,7 @@ private class TermBridge(
     private val onClosed: (Int) -> Unit,
     private val onExited: (Int) -> Unit,
     private val onTapped: () -> Unit,
+    private val onScrolled: (Boolean) -> Unit,
 ) {
     private val main = Handler(Looper.getMainLooper())
     @JavascriptInterface fun ready() { main.post(onReady) }
@@ -535,6 +558,7 @@ private class TermBridge(
     @JavascriptInterface fun closed(code: Int) { main.post { onClosed(code) } }
     @JavascriptInterface fun exited(code: Int) { main.post { onExited(code) } }
     @JavascriptInterface fun tapped() { main.post(onTapped) }
+    @JavascriptInterface fun scrolled(away: Boolean) { main.post { onScrolled(away) } }
     @JavascriptInterface fun open(cols: Int, rows: Int): Int = socket.open(cols, rows)
     @JavascriptInterface fun send(id: Int, base64: String) = socket.send(id, base64)
     @JavascriptInterface fun sendText(id: Int, text: String) = socket.sendText(id, text)

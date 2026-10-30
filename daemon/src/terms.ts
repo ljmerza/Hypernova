@@ -905,12 +905,19 @@ export function relayPhone(termId: string, ws: WebSocket, cols: number, rows: nu
     if (isBinary) return void s.write(frame(DATA, buf))
     try {
       const m = JSON.parse(buf.toString('utf8'))
-      // Keystrokes arrive as binary frames; the only message a phone sends is its size.
+      // Keystrokes arrive as binary frames; the messages a phone sends are its size and its scrolling.
       if (m?.t === 'resize') s.write(msg({ t: 'resize', cols: m.cols, rows: m.rows }))
+      // Scrolling isn't using the terminal: it goes in as `keys`, so it doesn't take the size.
+      else if (m?.t === 'scroll' && isScroll(m.data)) s.write(msg({ t: 'keys', data: m.data }))
     } catch {}
   })
   ws.on('close', () => s.destroy())
   ws.on('error', () => s.destroy())
+}
+
+/** What a phone may send as scrolling: mouse-wheel turns (SGR reports), PgUp, PgDn and Ctrl+End. Nothing that types. */
+export function isScroll(data: unknown): data is string {
+  return typeof data === 'string' && data.length > 0 && data.length <= 4096 && /^(?:\x1b\[<(?:6[4-9]|[78]\d|9[0-5]);\d{1,4};\d{1,4}M|\x1b\[[56]~|\x1b\[1;5F)+$/.test(data)
 }
 
 // ── The Mac ──────────────────────────────────────────────────────────────
