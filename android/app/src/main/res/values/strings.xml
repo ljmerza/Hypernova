@@ -877,4 +877,6 @@
     <string name="mermaid_show_code">Show the code</string>
     <string name="mermaid_show_diagram">Show the diagram</string>
     <string name="mermaid_close">Close</string>
+    <!-- The mark in Home's top bar opens Statistics (it did from the sun, before the sky went). -->
+    <string name="stats_open_label">Open Statistics</string>
 </resources>

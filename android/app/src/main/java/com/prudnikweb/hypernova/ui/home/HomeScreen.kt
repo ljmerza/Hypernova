@@ -377,50 +377,8 @@ fun HomeScreen(
                 contentPadding = PaddingValues(bottom = bottom + 84.dp), // the last card clears the bottom bar (fork: tabs only)
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // The sky: an open window onto the cosmos. Planets filter the list; the sun jumps to usage.
-                item(key = "sky") {
-                    SkyWindow(
-                        height = skyH, cosmos = cosmos,
-                        // Time warp: drag the sun sideways to age it (right) or rejuvenate it (left).
-                        usageNow = { hub.usage.fiveHour },
-                        onWarp = if (hub.canWarp) hub::warpFiveHour else null,
-                        onHoldSun = demo?.let { it::nextAccountState },
-                        filter = filter,
-                        a11y = skyDescription(hub, cosmos, quiet.size, sunUsage, eclipsed),
-                        projects = cosmos.projects(),
-                        quiet = quiet.isNotEmpty(),
-                        onFilter = onFilter,
-                        // The usage card, its per-model weeks freshly read off /usage on the Mac (data/UsageRefresh.kt).
-                        onJumpToUsage = { com.prudnikweb.hypernova.data.UsageRefresh.ask(hub); scope.launch { list.animateScrollToItem(usageIndex(list, codex = false, usageCards)) } },
-                        codexStar = codexOn,
-                        onCodexUsage = { scope.launch { list.animateScrollToItem(usageIndex(list, codex = true, usageCards)) } },
-                        onStats = openStats,
-                        // Not while the sun's tap does something else: the account's card, or nothing
-                        // in the dark of a weekly limit. Nor while the disk is quiet and its line
-                        // counts down to the reset.
-                        hint = hint,
-                        visibility = { skyVisibility.floatValue },
-                    ) { hit ->
-                        when (hit) {
-                            is CosmosHit.Project -> onFilter(if (filter == SkyFilter.Project(hit.name)) null else SkyFilter.Project(hit.name))
-                            CosmosHit.Quiet -> onFilter(if (filter == SkyFilter.Quiet) null else SkyFilter.Quiet)
-                            is CosmosHit.Session -> onOpen(hit.id)
-                            CosmosHit.Sun -> when {
-                                // Eclipsed, the sun's story is the account: its card says why and what to do.
-                                showAccount && account.eclipsed -> {
-                                    AttentionStore.undo(ACCOUNT_CARD)
-                                    scope.launch { list.animateScrollToItem(accountIndex(), underBar) }
-                                }
-                                // Codex's sun eclipsed (signed out): its usage card says so, and what to run.
-                                eclipsed && codexLeads -> scope.launch { list.animateScrollToItem(usageIndex(list, codex = true, usageCards)) }
-                                // Otherwise it's the way into Statistics.
-                                else -> openStats()
-                            }
-                            // Codex's star: its usage card.
-                            CosmosHit.CodexStar -> scope.launch { list.animateScrollToItem(usageIndex(list, codex = true, usageCards)) }
-                        }
-                    }
-                }
+                // Fork: no sky (owner, 2026-10-30): Home is the sessions in their groups. Statistics opens
+                // from the mark in the top bar, as it did from the sun.
                 // What the list shows, when it isn't everything: a chip that undoes it.
                 if (filter != null) {
                     item(key = "filter") {
@@ -534,17 +492,23 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Fork: the mark alone (owner, 2026-10-30); the word "hypernova" made the bar crowded.
-                NovaMark(size = 22.dp)
+                // With the sky gone, it's the way into Statistics.
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.stats_open_label), onClick = openStats),
+                    contentAlignment = Alignment.CenterStart,
+                ) { NovaMark(size = 22.dp) }
                 Spacer(Modifier.weight(1f))
                 // Fork: the new-session (and new-automation) pill sits up here, small, instead of
-                // over the tabs, so the bottom bar is just the tabs.
+                // over the tabs, so the bottom bar is just the tabs; 30dp, the Mac's chip's height.
                 if (tab == Tab.Sessions) {
-                    Pill(stringResource(R.string.new_session), onNewSession, kind = PillKind.Glass, height = 36.dp, leading = Glyph.Plus)
+                    Pill(stringResource(R.string.new_session), onNewSession, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
                     Spacer(Modifier.width(8.dp))
                 }
                 // A Mac with automations: a new one from here (an old Mac's tab only says to update).
                 if (tab == Tab.Automations && hub.automations.state != null) {
-                    Pill(stringResource(R.string.au_new), { onAutomation(null, null, false) }, kind = PillKind.Glass, height = 36.dp, leading = Glyph.Plus)
+                    Pill(stringResource(R.string.au_new), { onAutomation(null, null, false) }, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
                     Spacer(Modifier.width(8.dp))
                 }
                 LinkChip(hub, onClick = { tab = Tab.Settings })
@@ -598,7 +562,7 @@ private fun markSunHintDone(c: Context) {
  * Where the account card is in Home's list: after the sky, then the filter chip and the offline
  * card when they're there. The groups' seams come later, with their sessions.
  */
-internal fun homeHeadIndex(filter: Boolean, offline: Boolean): Int = 1 + (if (filter) 1 else 0) + (if (offline) 1 else 0)
+internal fun homeHeadIndex(filter: Boolean, offline: Boolean): Int = (if (filter) 1 else 0) + (if (offline) 1 else 0)
 
 /**
  * The index of a usage card ([codex]: Codex's, else the sun's), wherever the list has put it: they
@@ -1139,8 +1103,7 @@ private fun LinkChip(hub: Hub, onClick: () -> Unit) {
             .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.settings), onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        // As tall as the New session pill beside it (36dp), not the chip's own 30.
-        ConnectionChip(hub.link.state, Modifier.height(36.dp), name = hub.mac.name, battery = hub.mac.battery, awake = hub.mac.awake, via = hub.mac.via)
+        ConnectionChip(hub.link.state, name = hub.mac.name, battery = hub.mac.battery, awake = hub.mac.awake, via = hub.mac.via)
     }
 }
 

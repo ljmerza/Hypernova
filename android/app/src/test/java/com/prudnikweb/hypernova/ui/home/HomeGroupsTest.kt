@@ -75,8 +75,8 @@ class HomeGroupsTest {
         assertEquals(keys.size, keys.toSet().size)
     }
 
-    @Test fun theAccountCardFollowsTheSkyAndWhatsOverIt() {
-        assertEquals(1, homeHeadIndex(filter = false, offline = false))
-        assertEquals(3, homeHeadIndex(filter = true, offline = true))
+    @Test fun theAccountCardFollowsWhatsOverIt() {
+        assertEquals(0, homeHeadIndex(filter = false, offline = false))
+        assertEquals(2, homeHeadIndex(filter = true, offline = true))
     }
 }
