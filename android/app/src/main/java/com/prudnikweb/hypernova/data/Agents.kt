@@ -82,7 +82,9 @@ fun AgentBoard.workflowView(w: WWorkflow, asking: Set<String>): WorkflowView {
         agentCount = maxOf(w.agentCount, mine.size),
         running = mine.count { it.running },
         phases = phases,
-        done = maxOf(w.done, mine.count { it.status == "done" }),
+        // The daemon counts the done and the failed but not the stopped; the board has them (all but
+        // the oldest of a big run's agents, which it only counts).
+        finished = maxOf(w.done + w.failed, mine.count { !it.running }),
         loose = mine.filter { it.phase == null || it.phase !in titles }.map { it.view(it.id in asking) },
     )
 }

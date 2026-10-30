@@ -40,9 +40,9 @@
     <!-- TalkBack: what the bar reads. %1$s is the sentence above, so no full stop of its own. -->
     <string name="status_desc_todos">%1$s. %2$d of %3$d to-dos done. %4$s elapsed</string>
     <string name="status_desc_plain">%1$s. %2$s elapsed</string>
-    <!-- While a workflow runs: its name, then its agents done of those it has started so far. -->
-    <string name="status_desc_workflow_only">Workflow %1$s, %2$d of %3$d agents done. %4$s elapsed</string>
-    <string name="status_desc_workflow">%1$s. Workflow %2$s, %3$d of %4$d agents done. %5$s elapsed</string>
+    <!-- While a workflow runs: its name, then its agents finished (done, failed or stopped) of those it has started so far. -->
+    <string name="status_desc_workflow_only">Workflow %1$s, %2$d of %3$d agents finished. %4$s elapsed</string>
+    <string name="status_desc_workflow">%1$s. Workflow %2$s, %3$d of %4$d agents finished. %5$s elapsed</string>
 
     <!-- The workflow's agents, opened: each agent's state in a word, or what it does now while it runs. -->
     <string name="status_agent_running">running</string>

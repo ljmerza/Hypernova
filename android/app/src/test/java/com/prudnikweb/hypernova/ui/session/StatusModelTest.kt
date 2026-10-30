@@ -24,9 +24,22 @@ class StatusModelTest {
 
     private fun todo(n: Int, s: TodoStatus) = Todo("$n", "t$n", null, s)
 
-    private fun workflow(done: Int, started: Int, state: AgentState = AgentState.Running) = WorkflowView(
-        "wf_1", "review-changes", null, state, 0, null, null, agentCount = started, running = started - done, phases = emptyList(), done = done,
+    private fun workflow(finished: Int, started: Int, state: AgentState = AgentState.Running) = WorkflowView(
+        "wf_1", "review-changes", null, state, 0, null, null, agentCount = started, running = started - finished, phases = emptyList(), finished = finished,
     )
+
+    private fun wfAgent(id: String, status: String) = WAgent(
+        id = id, sessionId = "s", toolUseId = null, parentAgentId = null, workflowId = "wf_1", phase = "Review", label = "review:$id",
+        type = "workflow-subagent", model = null, background = true, status = status, activity = null,
+        startedAt = 0, endedAt = null, lastActivityAt = 0, tokens = null, toolUses = null, result = null,
+    )
+
+    private fun wwf(agentCount: Int, done: Int, failed: Int) = WWorkflow(
+        id = "wf_1", sessionId = "s", toolUseId = null, name = "review-changes", summary = null, status = "running",
+        phases = listOf(WPhase("Review", null)), agentCount = agentCount, done = done, failed = failed, startedAt = 0, endedAt = null, tokens = null, toolUses = null,
+    )
+
+    private fun viewOf(w: WWorkflow, agents: List<WAgent>) = AgentBoard(agents.associateBy { it.id }, mapOf(w.id to w)).workflowView(w, emptySet())
 
     @Test fun aRunningWorkflowShowsItsNameAndItsAgentsDoneOfStarted() {
         // The main agent is idle while the workflow's agents work.
@@ -105,26 +118,28 @@ class StatusModelTest {
         assertNull(runningWorkflow(emptyList()))
     }
 
-    @Test fun aWorkflowCountsItsDoneAgentsAndNotARetrysEarlierAttempt() {
-        fun agent(id: String, status: String) = WAgent(
-            id = id, sessionId = "s", toolUseId = null, parentAgentId = null, workflowId = "wf_1", phase = "Review", label = "review:$id",
-            type = "workflow-subagent", model = null, background = true, status = status, activity = null,
-            startedAt = 0, endedAt = null, lastActivityAt = 0, tokens = null, toolUses = null, result = null,
-        )
+    @Test fun aWorkflowCountsItsAgentsFinishedHoweverTheyEndedAndNotARetrysEarlierAttempt() {
         // The retried step's first attempt is off the board (its `superseded` message), so only these are left.
-        val agents = listOf(agent("a1", "done"), agent("a2", "error"), agent("a3", "running"))
-        val wf = WWorkflow(
-            id = "wf_1", sessionId = "s", toolUseId = null, name = "review-changes", summary = null, status = "running",
-            phases = listOf(WPhase("Review", null)), agentCount = 3, done = 1, failed = 1, startedAt = 0, endedAt = null, tokens = null, toolUses = null,
-        )
-        val v = AgentBoard(agents.associateBy { it.id }, mapOf(wf.id to wf)).workflowView(wf, emptySet())
-        assertEquals(1, v.done)
-        assertEquals(3, v.agentCount)
+        val agents = listOf(wfAgent("a1", "done"), wfAgent("a2", "error"), wfAgent("a3", "stopped"), wfAgent("a4", "running"))
+        // The daemon counts the done and the failed, not the stopped: the board counts those itself.
+        val v = viewOf(wwf(agentCount = 4, done = 1, failed = 1), agents)
+        assertEquals(3, v.finished)
+        assertEquals(4, v.agentCount)
         // The daemon's totals can be ahead of the agents this phone has (older ones only counted there).
-        val ahead = wf.copy(agentCount = 9, done = 6)
-        val w = AgentBoard(agents.associateBy { it.id }, mapOf(wf.id to ahead)).workflowView(ahead, emptySet())
-        assertEquals(6, w.done)
+        val w = viewOf(wwf(agentCount = 9, done = 6, failed = 1), agents)
+        assertEquals(7, w.finished)
         assertEquals(9, w.agentCount)
+    }
+
+    @Test fun aWorkflowWithAFailedAgentStillReachesAllFinished() {
+        // Between phases (or before its summary is written) the run is still running with every agent ended.
+        val agents = listOf(wfAgent("a1", "done"), wfAgent("a2", "error"), wfAgent("a3", "done"), wfAgent("a4", "stopped"))
+        val v = viewOf(wwf(agentCount = 4, done = 2, failed = 1), agents)
+        val m = statusBar(BarInput(Phase.Idle, SessionState.Idle, "", agentsRunning = 1, workflow = v))!!
+        assertEquals(SayKind.Workflow, m.say.kind)
+        assertEquals(4, m.done)
+        assertEquals(4, m.total)
+        assertEquals(1f, m.progress!!, 0f)
     }
 
     @Test fun anIdleSessionHasNoBar() {

@@ -54,7 +54,7 @@ internal data class BarModel(
     val total: Int,
     /** Stop works only while the main agent runs (not for agents alone, not when it needs you). */
     val canStop: Boolean,
-    /** The running workflow [done] and [total] count the agents of, by name; null when they count the to-dos. */
+    /** The running workflow whose agents [done] (finished, however they ended) and [total] count, by name; null for the to-dos. */
     val workflow: String? = null,
 ) {
     val hasTodos: Boolean get() = total > 0 && workflow == null
@@ -79,10 +79,11 @@ internal fun progress(done: Int, total: Int): Float? =
 /** The bar for a session, or null when no turn runs (it folds away). */
 internal fun statusBar(i: BarInput): BarModel? {
     if (i.phase == Phase.Ended) return null
-    // A running workflow wins over the to-dos (owner, 2026-10-29): its agents done over those it has
-    // started so far, a total that grows while it starts more.
+    // A running workflow wins over the to-dos (owner, 2026-10-29): its agents finished (done, failed
+    // or stopped, so a run with a failure still reaches 7/7) over those it has started so far, a
+    // total that grows while it starts more.
     val wf = i.workflow?.takeIf { it.state == AgentState.Running }
-    val done = wf?.done ?: i.todos.count { it.status == TodoStatus.Done }
+    val done = wf?.finished ?: i.todos.count { it.status == TodoStatus.Done }
     val total = wf?.agentCount ?: i.todos.size
     fun model(tone: BarTone, say: Say, stop: Boolean) = BarModel(tone, say, done, total, stop, wf?.name)
     return when {
