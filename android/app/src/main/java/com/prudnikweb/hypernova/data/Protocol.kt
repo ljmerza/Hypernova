@@ -83,6 +83,8 @@ data class WSession(
     val agentJob: String? = null,
     /** Its `claude agents` job's process runs (docs/PROTOCOL.md, "Session menu"); null when the Mac doesn't say. */
     val agentRunning: Boolean? = null,
+    /** Its job runs an older Claude Code than the one installed: both versions; an older Mac doesn't say. */
+    val agentOutdated: OutdatedClaude? = null,
     /** What a `claude agents` job asked in words, when it waits on a reply rather than a dialog. */
     val question: String? = null,
     /** Calls refused without the owner (docs/PROTOCOL.md, "Blocked calls"); an older Mac doesn't say: none. */
@@ -611,6 +613,11 @@ object Wire {
             switchedTo = o.str("switchedTo")?.takeIf { it.isNotBlank() },
             agentJob = o.str("agentJob")?.takeIf { it.isNotBlank() },
             agentRunning = if (o.has("agentRunning")) o.bool("agentRunning") else null,
+            agentOutdated = o.obj("agentOutdated")?.let { v ->
+                val runs = v.str("runs")?.takeIf { it.isNotBlank() }
+                val installed = v.str("installed")?.takeIf { it.isNotBlank() }
+                if (runs != null && installed != null) OutdatedClaude(runs, installed) else null
+            },
             question = o.str("question")?.takeIf { it.isNotBlank() },
             blockedCalls = o.int("blockedCalls") ?: 0,
             held = o.arr("held").mapObjects(::queued),

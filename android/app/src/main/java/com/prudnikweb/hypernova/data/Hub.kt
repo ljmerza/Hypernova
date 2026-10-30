@@ -182,6 +182,8 @@ interface Hub {
     suspend fun stopSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
     /** `claude rm` for a `claude agents` job: gone from claude agents and from Home. */
     suspend fun deleteSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /** `claude respawn` for a job on an older Claude Code ([Session.agentOutdated]): restarted on the installed one. */
+    suspend fun respawnSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
 
     suspend fun start(req: NewSessionRequest): Result<String>
     /**

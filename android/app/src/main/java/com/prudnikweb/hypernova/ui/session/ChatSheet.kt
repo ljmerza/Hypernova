@@ -86,7 +86,7 @@ internal fun SheetAction(glyph: ChatGlyph, label: String, onClick: () -> Unit, h
 }
 
 /** The chat's own hairline glyphs, drawn in the same stroke as the app's (components/Icons.kt). */
-enum class ChatGlyph { Copy, Quote, Speaker, Stop, Rewind, Bookmark, Select, Edit, Remove, NewSession }
+enum class ChatGlyph { Copy, Quote, Speaker, Stop, Rewind, Bookmark, Select, Edit, Remove, NewSession, Restart }
 
 @Composable
 internal fun ChatIcon(glyph: ChatGlyph, modifier: Modifier = Modifier, size: Dp = 18.dp, color: Color = HN.ink, stroke: Dp = 1.5.dp) {
@@ -143,6 +143,11 @@ internal fun ChatIcon(glyph: ChatGlyph, modifier: Modifier = Modifier, size: Dp 
                 line(.50f, .18f, .50f, .82f)
                 line(.36f, .18f, .64f, .18f)
                 line(.36f, .82f, .64f, .82f)
+            }
+            ChatGlyph.Restart -> {
+                // Round again: most of a circle, clockwise, its arrowhead at the top left.
+                drawArc(color, -60f, 300f, false, p(.18f, .18f), Size(.64f * w, .64f * h), style = st)
+                drawPath(Path().apply { moveTo(.27f * w, .38f * h); lineTo(.34f * w, .22f * h); lineTo(.17f * w, .21f * h) }, color, style = st)
             }
         }
     }

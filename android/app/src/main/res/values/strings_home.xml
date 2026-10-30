@@ -61,6 +61,13 @@
     <string name="err_rename">Couldn\'t rename the session. Try again.</string>
     <string name="err_stop_session">Couldn\'t stop the session. Try again.</string>
     <string name="err_delete_session">Couldn\'t delete the session. Try again.</string>
+    <!-- A claude agents job on an older Claude Code than the one installed (docs/PROTOCOL.md, Session.agentOutdated): `claude respawn`. -->
+    <string name="session_restart">Restart</string>
+    <string name="session_restart_q">Restart “%1$s”?</string>
+    <string name="session_restart_body">Claude Code restarts the background session on the version installed now. If it\'s working, what it\'s doing is interrupted.</string>
+    <!-- The session sheet's Session tab, above Restart: the version the job runs, then the installed one. -->
+    <string name="session_outdated">Runs Claude Code %1$s; %2$s is installed.</string>
+    <string name="err_restart_session">Couldn\'t restart the session. Try again.</string>
     <!-- Home, Sessions: the first Back says this; a second within 2 s closes the app. -->
     <string name="home_back_again">Press back again to close</string>
 </resources>

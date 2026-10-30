@@ -1896,3 +1896,21 @@ reaching his commands and skills without typing "/" (SC2, SC5).
    numbered picker (/model, /effort with nothing after) isn't on it, since the phone answers those.
 6. **Left out of the tab:** /btw (it has the field), /logout (one tap would sign Claude Code out on
    the Mac) and /stop (the Session tab's Stop). The "/" list in the session's box is unchanged.
+
+## Restarting jobs on an old Claude Code (2026-10-30)
+
+Claude Code updates itself, but a `claude agents` job keeps the binary it started on until
+`claude respawn` (IDEAS AG4). Seen the same day: the hypernova job ran 2.1.312 with 2.1.314 installed.
+
+1. **The daemon knows each job's version.** Claude Code writes `version` into the job's registry
+   entry (`~/.claude/sessions/<pid>.json`; the process's `/proc/<pid>/exe` agrees, `versions/2.1.312`).
+   The installed one is the file `claude` resolves to (`versions/<version>`), read again as it
+   changes, or `claude --version` once per install for any other. Only a job with a process is
+   compared: a stopped one has none, and says its version again once woken (job processes are
+   `claude bg-spare` processes started ahead, so even a fresh one could be behind).
+2. **The phone says it in the session sheet's Session tab only:** "Runs Claude Code 2.1.312; 2.1.314
+   is installed", quiet, above the actions, with **Restart** first among them. The Home card's
+   long-press menu has Restart too, for such a job only. Nothing on the session's own screen.
+3. **Restart asks first,** saying a job at work is interrupted. The attach holder ends first, as for
+   Stop; Claude Code's own words come back when it refuses.
+4. **One job at a time.** No "restart all" yet: `claude respawn --all` restarts every job, current or not.

@@ -43,10 +43,11 @@ export function parseAgentList(out: string): AgentJob[] | null {
 }
 
 /**
- * `claude stop <job>` or `claude rm <job>` (the Home card's menu): whether it worked, and Claude
- * Code's own words either way (`rm` refuses a worktree with unpushed work, and says so).
+ * `claude stop <job>`, `claude rm <job>` or `claude respawn <job>` (the Home card's menu; respawn
+ * restarts it on the installed Claude Code): whether it worked, and Claude Code's own words either
+ * way (`rm` refuses a worktree with unpushed work, and says so).
  */
-export function agentJobCommand(verb: 'stop' | 'rm', job: string): Promise<{ ok: boolean; said: string }> {
+export function agentJobCommand(verb: 'stop' | 'rm' | 'respawn', job: string): Promise<{ ok: boolean; said: string }> {
   const file = findClaude()
   if (!file) return Promise.resolve({ ok: false, said: 'Claude Code isn’t installed on this computer.' })
   return new Promise((done) =>

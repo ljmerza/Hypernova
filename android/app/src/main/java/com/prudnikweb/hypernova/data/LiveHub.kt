@@ -1038,6 +1038,7 @@ class LiveHub(
             switchedTo = w.switchedTo,
             agentJob = w.agentJob,
             agentRunning = w.agentRunning,
+            agentOutdated = w.agentOutdated,
             question = w.question,
             blockedCalls = w.blockedCalls,
         )
@@ -2089,6 +2090,11 @@ class LiveHub(
         applySession(api.post("/v1/sessions/$sessionId/stop"))
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_stop_session)) }
+
+    override suspend fun respawnSession(sessionId: String): Result<Unit> = try {
+        applySession(api.post("/v1/sessions/$sessionId/respawn"))
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_restart_session)) }
 
     override suspend fun deleteSession(sessionId: String): Result<Unit> = try {
         api.delete("/v1/sessions/$sessionId")

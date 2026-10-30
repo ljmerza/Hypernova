@@ -45,14 +45,14 @@ import kotlinx.coroutines.launch
  * ([Session.agentRunning]; owner, 2026-10-30: idle jobs couldn't be stopped). Not for one stopped or
  * done already, nor, from an older Mac that doesn't say, for an idle one.
  */
-data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean) {
-    val any: Boolean get() = rename || stop || delete
+data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean, val restart: Boolean = false) {
+    val any: Boolean get() = rename || stop || delete || restart
 
     companion object {
         fun of(s: Session): MenuOffer {
             val job = s.agentJob != null
             val live = s.phase != Phase.Ended && (s.state != SessionState.Idle || s.agentRunning == true)
-            return MenuOffer(rename = !s.codex, stop = job && live, delete = job)
+            return MenuOffer(rename = !s.codex, stop = job && live, delete = job, restart = job && s.agentOutdated != null)
         }
     }
 }
@@ -90,10 +90,33 @@ internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit, start: Men
             },
             onDismiss = onDismiss,
         )
+        MenuPage.Restart -> RestartConfirm(hub, s, onDismiss)
     }
 }
 
-internal enum class MenuPage { Actions, Rename, Delete }
+internal enum class MenuPage { Actions, Rename, Delete, Restart }
+
+/**
+ * Restart a `claude agents` job on the installed Claude Code (`claude respawn`), asked first: a job
+ * at work is interrupted, and the dialog says so. The Mac's words come back when it can't.
+ */
+@Composable
+private fun RestartConfirm(hub: Hub, s: Session, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val toast = LocalToast.current
+    val appScope = LocalAppScope.current
+    ConfirmDialog(
+        visible = true,
+        title = stringResource(R.string.session_restart_q, s.name),
+        body = stringResource(R.string.session_restart_body),
+        confirm = stringResource(R.string.session_restart),
+        onConfirm = {
+            onDismiss()
+            appScope.launch { hub.respawnSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_restart_session)) } }
+        },
+        onDismiss = onDismiss,
+    )
+}
 
 /**
  * The menu's actions as [MenuOffer] has them, in a sheet: Rename and Delete go to their page
@@ -105,6 +128,8 @@ internal fun MenuActions(hub: Hub, s: Session, onPage: (MenuPage) -> Unit, onDis
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val offer = MenuOffer.of(s)
+    // First when offered: the job runs an old Claude Code, and the sheet's notice above says so.
+    if (offer.restart) SheetAction(ChatGlyph.Restart, stringResource(R.string.session_restart), { onPage(MenuPage.Restart) })
     if (offer.rename) SheetAction(ChatGlyph.Edit, stringResource(R.string.session_rename), { onPage(MenuPage.Rename) })
     if (offer.stop) {
         SheetAction(ChatGlyph.Stop, stringResource(R.string.session_stop), {
