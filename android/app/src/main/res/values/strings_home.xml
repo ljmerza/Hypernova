@@ -58,4 +58,6 @@
     <string name="err_rename">Couldn\'t rename the session. Try again.</string>
     <string name="err_stop_session">Couldn\'t stop the session. Try again.</string>
     <string name="err_delete_session">Couldn\'t delete the session. Try again.</string>
+    <!-- Home, Sessions: the first Back says this; a second within 2 s closes the app. -->
+    <string name="home_back_again">Press back again to close</string>
 </resources>

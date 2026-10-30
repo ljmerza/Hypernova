@@ -223,6 +223,14 @@ fun HomeScreen(
     val homeShown by remember { derivedStateOf { !statsOpen || statsAnim.value < 1f } }
     val statsShown by remember { derivedStateOf { statsOpen || statsAnim.value > 0f } }
     BackHandler(enabled = statsOpen) { statsOpen = false }
+    // Fork (owner, 2026-10-30): Back from History, Automations or Settings goes to Sessions; on
+    // Sessions it closes the app only when pressed twice, the first press says so.
+    BackHandler(enabled = !statsOpen && tab != Tab.Sessions) { tab = Tab.Sessions }
+    val backToast = LocalToast.current
+    val backAgain = stringResource(R.string.home_back_again)
+    var backArmed by remember { mutableStateOf(false) }
+    LaunchedEffect(backArmed) { if (backArmed) { delay(2_000); backArmed = false } }
+    BackHandler(enabled = !statsOpen && tab == Tab.Sessions && !backArmed) { backArmed = true; backToast(backAgain) }
     // The sun's tap is shown once ("Tap the sun for your statistics"), until Statistics is first opened.
     val context = LocalContext.current
     var sunHinted by remember { mutableStateOf(sunHintDone(context)) }
