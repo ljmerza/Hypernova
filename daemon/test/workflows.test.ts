@@ -39,7 +39,7 @@ function newSession(id: string, patch: Partial<Session> = {}): Session {
   return {
     id, title: 'Parser refactor', cwd: PROJECT, projectName: 'hypernova', origin: 'hypernova', state: 'idle', providerId: 'anthropic', model: null, permissionMode: 'default', bypassAvailable: true,
     createdAt: 0, lastActivityAt: 0, lastText: null, activity: null, pendingApprovalIds: [], stoppedForAway: false, contextPct: null, costUsd: null, queue: [], queued: 0, term: null, menu: null,
-    agentsRunning: 0, blocked: null, endedBy: null, automation: null, browsable: true, outsideProjects: false, ...patch,
+    agentsRunning: 0, blocked: null, endedBy: null, automation: null, browsable: true, outsideProjects: false, blockedCalls: 0, ...patch,
   }
 }
 const OK: Account = { state: 'ok', providerId: 'anthropic', plan: 'max', limit: null, reason: null, text: null, since: null, sessionId: null, checkedAt: null, login: null }

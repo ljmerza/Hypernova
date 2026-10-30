@@ -182,6 +182,34 @@ test("a session's agents, and one agent's own transcript, only by an agent's id 
   assert.equal((await send(API, 'GET', `/v1/sessions/${id}/agents`)).status, 401)
 })
 
+test("a session's Blocked tab: the list, Dismiss, and Allow & retry through the prompt route (its errors keep the row)", async () => {
+  const { upsertSession } = await import('../src/hub.ts')
+  const { noteBlocked } = await import('../src/blocked.ts')
+  const { addLink } = await import('../src/switch-links.ts')
+  const id = 'ffffffff-0000-4000-8000-0000000000b1'
+  upsertSession(id, { cwd: '/tmp/routes', origin: 'terminal', state: 'idle' })
+  noteBlocked(id, { tool: 'Bash', input: { command: 'git push origin main' }, reason: 'auto_mode', why: 'Pushes to the default branch', toolUseId: 'toolu_http1' })
+  noteBlocked(id, { tool: 'WebFetch', input: { url: 'https://example.com' }, reason: 'away', toolUseId: 'toolu_http2' })
+  const auth = { authorization: `Bearer ${TOKEN}` }
+  const snap = JSON.parse((await send(API, 'GET', '/v1/snapshot', auth)).body)
+  assert.equal(snap.sessions.find((x: any) => x.id === id)?.blockedCalls, 2)
+  const list = JSON.parse((await send(API, 'GET', `/v1/sessions/${id}/blocked`, auth)).body).blocked
+  assert.deepEqual(list.map((b: any) => [b.tool, b.target, b.reason].join(' ')).sort(), ['Bash git push origin main auto_mode', 'WebFetch https://example.com away'])
+  const bash = list.find((b: any) => b.tool === 'Bash')
+  // The conversation went on elsewhere: the prompt route's 409, and the row stays.
+  addLink(id, 'ffffffff-0000-4000-8000-0000000000b2')
+  const r = await send(API, 'POST', `/v1/sessions/${id}/blocked/${bash.id}/retry`, auth)
+  assert.equal(r.status, 409)
+  assert.equal(JSON.parse(r.body).error.code, 'switched')
+  const del = await send(API, 'DELETE', `/v1/sessions/${id}/blocked/${bash.id}`, auth)
+  assert.equal(del.status, 200)
+  assert.deepEqual(JSON.parse(del.body).blocked.map((b: any) => b.tool), ['WebFetch'])
+  assert.equal(JSON.parse((await send(API, 'DELETE', `/v1/sessions/${id}/blocked/${bash.id}`, auth)).body).error.code, 'no_blocked')
+  assert.equal(JSON.parse((await send(API, 'POST', `/v1/sessions/${id}/blocked/${bash.id}/retry`, auth)).body).error.code, 'no_blocked')
+  assert.equal((await send(API, 'GET', '/v1/sessions/nope/blocked', auth)).status, 404)
+  assert.equal((await send(API, 'GET', `/v1/sessions/${id}/blocked`)).status, 401)
+})
+
 test('the account is in the snapshot and /local/status; a check runs on demand; signing in only when needed', async () => {
   // /local/status asks Tailscale: not this Mac's.
   process.env.HYPERNOVA_TAILSCALE = join(scratch, 'no-tailscale')

@@ -53,6 +53,7 @@ import { applyToolResult, isLauncher, toolSummary } from './normalize.ts'
 import { agentLabel, endSessionAgents, hookActivity, hookLaunched, hookStop, hookSubagentStop, hookToolDone } from './agents.ts'
 import { attachmentReadInput, readsAttachment } from './attachments.ts'
 import { noteDenied } from './denied.ts'
+import { noteBlocked } from './blocked.ts'
 import { noteHookEvent } from './hookevents.ts'
 
 // PreToolUse → tool_use_id, to pair with PermissionRequest (which has no id).
@@ -179,9 +180,11 @@ export async function handleHook(ev: any, req: IncomingMessage, res: ServerRespo
     case 'PermissionRequest':
       return permission(ev, sid, req, res)
     case 'PermissionDenied':
-      // Only an automation's run passes this hook (its own --settings file): a call "Allowed only"
-      // refused without asking, which the run keeps as a rule to allow next time (automations.ts).
+      // A call refused without asking. An automation's run keeps it as a rule to allow next time
+      // (automations.ts). Auto mode's classifier fires it too: the call goes on the session's
+      // Blocked tab (blocked.ts), as the transcript would put it there a moment later.
       noteDenied(sid, String(ev.tool_name ?? ''), ev.tool_input ?? {})
+      noteBlocked(sid, { tool: String(ev.tool_name ?? ''), input: ev.tool_input ?? {}, reason: 'auto_mode', why: typeof ev.reason === 'string' ? ev.reason : null, toolUseId: typeof ev.tool_use_id === 'string' ? ev.tool_use_id : null })
       return {}
   }
   return {}
@@ -262,8 +265,10 @@ const OPTIONAL_EVENTS: [string, number][] = [
   ['SubagentStop', 10],
   // Automations' hook triggers (docs/PROTOCOL.md, "Automations", "Workflows"): the context is about to be compacted.
   ['PreCompact', 10],
+  // Auto mode's classifier refused a call: the session's Blocked tab (blocked.ts; the transcript stays the fallback).
+  ['PermissionDenied', 10],
 ]
-const TOOL_EVENTS = ['PermissionRequest', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure']
+const TOOL_EVENTS = ['PermissionRequest', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionDenied']
 const BEGIN = '# >>> hypernova'
 const END = '# <<< hypernova'
 const STATUS_DIR = join(SUPPORT, 'statusline')
@@ -455,7 +460,7 @@ export function addOptionalHooks(): boolean {
   if (!missing.length) return false
   backup()
   const url = `${HOOK_URL_PREFIX}${hookSecret}`
-  for (const [event, timeout] of missing) s.hooks[event] = [...(s.hooks[event] ?? []), { hooks: [{ type: 'http', url, timeout }] }]
+  for (const [event, timeout] of missing) s.hooks[event] = [...(s.hooks[event] ?? []), { ...(TOOL_EVENTS.includes(event) ? { matcher: '*' } : {}), hooks: [{ type: 'http', url, timeout }] }]
   writeSettings(s)
   log('hooks: added', missing.map(([e]) => e).join(', '))
   return true

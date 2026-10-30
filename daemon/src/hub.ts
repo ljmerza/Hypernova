@@ -18,6 +18,7 @@ import { getAccount, noteBlocker, noteHealthy, noteLimitNotice, noteLogin, still
 import { folderView } from './files.ts'
 import { bypassBlockedByRoot } from './platform.ts'
 import { linkOf } from './switch-links.ts'
+import { blockedCount, forgetBlocked, noteBlocked, onBlockedChange, sawToolResult, takeRetryGrant } from './blocked.ts'
 
 export type SessionState = 'starting' | 'working' | 'needs_you' | 'idle' | 'error' | 'ended'
 export type Session = {
@@ -79,8 +80,10 @@ export type Session = {
   switchedTo?: string
   /** A `claude agents` job's id (settings.claudeAgents): the phone can stop or delete it there. Absent otherwise. */
   agentJob?: string
+  /** Calls refused without the owner that he hasn't retried or dismissed (blocked.ts): its Blocked tab. */
+  blockedCalls: number
 }
-type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
+type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
 export const isCodexRec = (r: { agent?: string }) => r.agent === 'codex'
 
@@ -193,7 +196,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id) } : {}) }
+  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id) } : {}), blockedCalls: blockedCount(r.id) }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
@@ -217,6 +220,13 @@ export function getSession(id: string): Rec | undefined {
 }
 
 export const listSessionRecs = (): Rec[] => [...sessions.values()]
+
+// Its Blocked tab changed: the session again, for every client (blocked.ts). The count is read as
+// it's sent, so upsertSession would see nothing new.
+onBlockedChange((id) => {
+  const r = sessions.get(id)
+  if (r) broadcast({ t: 'session', session: view(r) })
+})
 
 export function listSessions(): Session[] {
   return [...sessions.values()].map(view).sort((a, b) => b.lastActivityAt - a.lastActivityAt)
@@ -395,6 +405,11 @@ function readNew(r: Rec, quiet = false): Set<string> {
   }
   const st = r.parse
   if (st) {
+    // Calls refused without the owner, and calls that ran after all (blocked.ts).
+    for (const id of touched) {
+      const ev = st.byId.get(id)
+      if (ev?.kind === 'tool') sawToolResult(r.id, ev)
+    }
     // Agents and workflows the lines linked, and task ends (agents.ts).
     if (st.links.length) applyLinks(r.id, st.links.splice(0), quiet)
     // A turn the transcript shows starting after the main agent's Stop: it works again.
@@ -588,6 +603,8 @@ export function emitEvent(sessionId: string, id: string): void {
   const r = sessions.get(sessionId)
   const ev = r?.parse?.byId.get(id)
   if (ev) broadcast({ t: 'event', sessionId, event: ev })
+  // An SDK session's results, and those the hooks bring before the transcript does (blocked.ts).
+  if (ev?.kind === 'tool' && r && !isCodexRec(r)) sawToolResult(sessionId, ev)
 }
 
 export function notice(sessionId: string, text: string, tone: 'info' | 'warn' | 'error' = 'info'): void {
@@ -776,6 +793,8 @@ export const hasPairedDevice = () => listDevices().length > 0
 export function requestApproval(a: ApprovalAsk, toolUseId: string | null, signal?: AbortSignal): Promise<Answer> {
   // Already allowed for this session: no need to ask (a subagent that started before, say).
   if (a.kind === 'tool' && allowedForSession(a.sessionId, a.toolName)) return Promise.resolve({ decision: 'session' })
+  // The owner allowed this very call with Allow & retry a moment ago (blocked.ts).
+  if (a.kind === 'tool' && takeRetryGrant(a.sessionId, a.toolName, a.input)) return Promise.resolve({ decision: 'allow' })
   const id = randomUUID()
   const now = Date.now()
   const approval: Approval = { ...a, agentId: a.agentId ?? null, agentLabel: a.agentLabel ?? null, canSession: a.kind === 'tool' && SESSION_TOOLS.has(a.toolName), id, createdAt: now, expiresAt: now + AWAY_MS }
@@ -842,6 +861,8 @@ function finish(id: string, ans: Answer, by: string): boolean {
   }
   broadcast({ t: 'approval.resolved', id, sessionId: sid, decision, by })
   if (ans.decision === 'timeout') {
+    // The call itself goes on the session's Blocked tab, to allow and retry from there.
+    if (p.approval.kind === 'tool') noteBlocked(sid, { tool: p.approval.toolName, input: p.approval.input, reason: 'away', toolUseId: p.toolUseId })
     upsertSession(sid, { stoppedForAway: true })
     notice(sid, r && isCodexRec(r) ? 'Paused: nobody answered for 10 minutes, so Hypernova said no and stopped Codex until you’re back.' : 'Paused: nobody answered for 10 minutes, so Hypernova said no and asked Claude to wait for you.', 'warn')
   }
@@ -1249,6 +1270,7 @@ export function applyAgentList(list: AgentJob[]): void {
 export function forgetSession(id: string): void {
   agentJobs.delete(id)
   agentStates.delete(id)
+  forgetBlocked(id)
   if (sessions.delete(id)) broadcast({ t: 'session.removed', id })
 }
 
