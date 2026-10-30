@@ -34,7 +34,6 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.SPEECH_RATES
 import com.prudnikweb.hypernova.data.Speaker
-import com.prudnikweb.hypernova.data.SpeechOut
 import com.prudnikweb.hypernova.data.SpeechVoice
 import com.prudnikweb.hypernova.data.nearestRate
 import com.prudnikweb.hypernova.ui.LocalToast
@@ -55,9 +54,10 @@ import com.prudnikweb.hypernova.ui.voice.SpeakingWave
 import kotlinx.coroutines.launch
 
 /**
- * Settings → Voice, its read-aloud half (docs/PROTOCOL.md, "Read aloud"): read aloud with Soniox
- * (natural voices, Russian too) or the Mac's own voices, which voice, how fast, a Test that plays
- * here. The engine, voice and speed are the Mac's. Only from a Mac that reads aloud this way.
+ * Settings → Read aloud (docs/PROTOCOL.md, "Read aloud"): the Mac's own voices, which voice, how
+ * fast, a Test that plays here. The voice and speed are the Mac's. Only from a Mac that reads aloud
+ * this way; a Linux server, which has no voice of its own, says so (the phone then reads with its
+ * own voice).
  */
 @Composable
 fun ReadAloudSection(hub: Hub) {
@@ -67,44 +67,32 @@ fun ReadAloudSection(hub: Hub) {
     val scope = rememberCoroutineScope()
     var voices by remember { mutableStateOf<List<SpeechVoice>?>(null) }
     var voicesOpen by remember { mutableStateOf(false) }
-    val showing = if (s.engine == SpeechOut.ENGINE_SONIOX && s.soniox) SpeechOut.ENGINE_SONIOX else s.using
-    // The picker's list follows the engine; asked for when it opens (Soniox's needs the network).
-    LaunchedEffect(showing, voicesOpen) {
+    // Asked for when the picker opens.
+    LaunchedEffect(voicesOpen) {
         if (!voicesOpen) return@LaunchedEffect
         voices = null
-        speech.voices(showing).onSuccess { voices = it }.onFailure { toast(it.message.orEmpty()); voicesOpen = false }
+        speech.voices().onSuccess { voices = it }.onFailure { toast(it.message.orEmpty()); voicesOpen = false }
     }
-    fun save(engine: String? = null, voice: String? = null, macVoice: String? = null, rate: Float? = null) {
-        scope.launch { speech.save(engine, voice, macVoice, rate).onFailure { toast(it.message.orEmpty()) } }
+    fun save(macVoice: String? = null, rate: Float? = null) {
+        scope.launch { speech.save(macVoice, rate).onFailure { toast(it.message.orEmpty()) } }
     }
+    // A Linux server has no voices of its own (Mac.FEATURE_MAC_VOICE): it says why instead.
+    val macVoice = com.prudnikweb.hypernova.data.Mac.FEATURE_MAC_VOICE
+    val hasVoice = hub.mac.has(macVoice)
 
     Spacer(Modifier.height(10.dp))
     Row(Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Seam(stringResource(R.string.read_aloud), Modifier.weight(1f), color = HN.inkMuted)
         Spacer(Modifier.width(10.dp))
-        StatusChip(stringResource(if (s.using == SpeechOut.ENGINE_SONIOX) R.string.read_aloud_soniox_chip else R.string.read_aloud_mac_chip), if (s.note != null) HN.amber else HN.accent)
+        if (hasVoice) StatusChip(stringResource(R.string.read_aloud_mac_chip), HN.accent)
     }
-    GlassCard(Modifier.fillMaxWidth(), accent = if (s.note != null) HN.amber else null) {
+    GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            FieldLabel(stringResource(R.string.read_aloud_with))
-            EngineRow(stringResource(R.string.read_aloud_soniox), stringResource(R.string.read_aloud_soniox_body), s.engine == SpeechOut.ENGINE_SONIOX) {
-                if (s.engine != SpeechOut.ENGINE_SONIOX) save(engine = SpeechOut.ENGINE_SONIOX)
+            if (!hasVoice) {
+                hub.mac.unavailable[macVoice]?.let { HText(it, style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp)) }
+                return@Column
             }
-            // A Linux server has no voices of its own (Mac.FEATURE_MAC_VOICE): it says why instead.
-            val macVoice = com.prudnikweb.hypernova.data.Mac.FEATURE_MAC_VOICE
-            if (hub.mac.has(macVoice)) {
-                EngineRow(stringResource(R.string.read_aloud_mac), stringResource(R.string.read_aloud_mac_body), s.engine == SpeechOut.ENGINE_MAC) {
-                    if (s.engine != SpeechOut.ENGINE_MAC) save(engine = SpeechOut.ENGINE_MAC)
-                }
-            } else hub.mac.unavailable[macVoice]?.let { HText(it, style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp)) }
-            // Why the Mac's voice reads although Soniox was chosen (no key, offline), in one line.
-            if (s.note != null) {
-                Spacer(Modifier.height(4.dp))
-                HText(s.note, style = Type.small, color = HN.amber)
-            }
-            Spacer(Modifier.height(8.dp))
-            Hairline(Modifier.fillMaxWidth())
-            val current = if (showing == SpeechOut.ENGINE_SONIOX) s.voice else s.macVoice ?: stringResource(R.string.read_aloud_mac_default)
+            val current = s.macVoice ?: stringResource(R.string.read_aloud_mac_default)
             NavRow(stringResource(R.string.read_aloud_voice), null, { voicesOpen = !voicesOpen }, trailing = current)
             AnimatedVisibility(
                 voicesOpen,
@@ -115,10 +103,9 @@ fun ReadAloudSection(hub: Hub) {
                     val list = voices
                     if (list == null) HText(stringResource(R.string.read_aloud_voices_loading), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 12.dp))
                     else for (v in list) {
-                        val picked = if (showing == SpeechOut.ENGINE_SONIOX) v.id == s.voice else v.id == s.macVoice
-                        VoiceRow(v, picked) {
+                        VoiceRow(v, v.id == s.macVoice) {
                             voicesOpen = false
-                            if (showing == SpeechOut.ENGINE_SONIOX) save(voice = v.id) else save(macVoice = v.id)
+                            save(macVoice = v.id)
                         }
                     }
                 }
@@ -158,25 +145,6 @@ fun ReadAloudSection(hub: Hub) {
 private const val TEST_KEY = "settings:test"
 
 private fun rateLabel(r: Float): String = (if (r == r.toInt().toFloat()) r.toInt().toString() else r.toString().trimEnd('0')) + "×"
-
-@Composable
-private fun EngineRow(title: String, body: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = 52.dp)
-            .selectable(selected, interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.RadioButton, onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Radio(selected)
-        Spacer(Modifier.width(12.dp))
-        Column {
-            HText(title, style = Type.body, color = if (selected) HN.ink else HN.inkMuted)
-            HText(body, style = Type.small, color = HN.inkDim)
-        }
-    }
-}
 
 @Composable
 private fun VoiceRow(v: SpeechVoice, picked: Boolean, onClick: () -> Unit) {

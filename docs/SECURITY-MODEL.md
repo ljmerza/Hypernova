@@ -31,7 +31,7 @@ There is no Hypernova account and no Hypernova server that carries sessions.
   token, the fingerprint of its certificate), settings, session records and titles.
 - Attachments the phone uploaded (`attachments/`, kept 30 days).
 - Tokens and keys: the **admin token**, the **hook secret**, TLS keys (`tls/`: the server key and the
-  device CA), Hypernova's own Tailscale node key (`tsnet/`), provider and Soniox keys, the private
+  device CA), Hypernova's own Tailscale node key (`tsnet/`), provider keys, the private
   name's Ed25519 key and its Let's Encrypt account and certificate keys (`names/`), automations'
   **fire tokens** (only their SHA-256, in `automations.json`) and their webhook outputs' addresses
   and bot tokens (`automation-secrets.json`, never logged, never sent back).
@@ -60,7 +60,6 @@ never sends; `/pair` is one static page with no cookies and no analytics).
 | Cloudflare (hosts the Worker, D1 and the DNS zone) | Requests to `api.hypernova.observer` and `hypernova.observer`: the caller's IP address, the name, signed requests, DNS records. | Anything sent to the Mac. Pairing details (fragment). |
 | Let's Encrypt | The private name, the ACME account (no contact address), the challenge. The name is then public for ever in Certificate Transparency logs, with certificate issue times. | Anything else. |
 | Tailscale | The usual coordination data: node keys, addresses, device names, the account. Traffic between the phone and Mac is WireGuard, end to end; a relay sees ciphertext (Tailscale's own documented behaviour, **unverified here**). | Message contents. |
-| Soniox | Audio, only when voice is on with the user's own key. | Anything else. |
 | A provider (OpenRouter, a gateway) | What a session on that provider sends, with its own key. | Other sessions. |
 | nodejs.org, Anthropic's installer, GitHub (setup) | Downloads the user asks for (Node.js is checked against its published checksums). | -- |
 
@@ -141,7 +140,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   never parses a value. A step runs as the owner with `/bin/sh -c`, no TTY, stdin empty, in the
   projects folder or a session's own folder (never a key place, checked again when it runs), with
   the environment sessions get minus Claude Code's and Hypernova's variables (no admin token, hook
-  secret, device tokens or provider and Soniox keys: those live in files, never in the daemon's
+  secret, device tokens or provider keys: those live in files, never in the daemon's
   environment), a timeout, its whole process group killed at the end, its output masked like
   transcripts and cut to 8 KB. Saving one needs the fingerprint every time.
 - **Asks, notifications and outputs** show outside words as they are, as text (the phone's
@@ -172,7 +171,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
 ## 7. What never leaves the Mac
 
 - Claude Code's login and its credentials.
-- Provider and Soniox keys: never logged, never sent to the phone (it sees only "has a key"), and
+- Provider keys: never logged, never sent to the phone (it sees only "has a key"), and
   they go only to their own provider.
 - The admin token, the hook secret, the TLS and name keys, Hypernova's Tailscale node key.
 - Automations' fire tokens (only their hashes are kept) and webhook outputs' addresses and bot

@@ -37,7 +37,6 @@ with the computer by a code. The Mac's menu bar is a second control room, on tha
 - **An Android phone** on **Android 10 or later**.
 - Optional: a [Tailscale](https://tailscale.com) account, to reach the computer when the phone isn't
   on its network (always, for a VPS). On the same Wi‑Fi you don't need one.
-- Optional: a [Soniox](https://soniox.com) API key for voice.
 
 Nothing else: Hypernova brings its own Node.js and its own Tailscale. On a Mac, Setup also
 downloads Claude Code's SDK from npm (about 2 MB; see [Background service](#2-background-service)).
@@ -115,7 +114,7 @@ terminal.
 | 2. **Background service** | Starts the service your phone talks to, so it works with the menu closed. | No |
 | 3. **Connect Claude Code** | Adds Hypernova's hooks, its status line tap and the `claude` shell function. | Skipped with Codex only |
 | 4. **Tailscale** | Lets your phone reach this Mac from anywhere. | **Not now**: the same Wi‑Fi is enough |
-| 5. **Voice** | Speech for the phone and the glasses (Soniox, or Hyperscribe Companion). | **Not now** |
+| 5. **Voice** | Left over from Soniox, which was removed: choose **Not now**. | **Not now** |
 | 6. **Codex** | Finds Codex and turns on **Use Codex with Hypernova**. | **Not now** |
 | 7. **Your phone** | **Get the app**, then pair it with a code. | No |
 
@@ -194,10 +193,10 @@ Nothing is opened to the internet. You can do this step later.
 
 #### 5. Voice
 
-Optional. Hold the mic on your phone or glasses, say what to do, read it, send. Connect
-[Soniox](https://soniox.com) with your own API key (audio goes to Soniox only then), or use
-Hyperscribe Companion if it's on your Mac. **Not now** skips it; **Voice…** in the menu bar's
-settings brings it back.
+Choose **Not now**. Voice needs nothing on the computer any more: hold the mic on your phone, say
+what to do, read it, send; the phone's own on-device recognizer hears you, so the audio never leaves
+the phone (Android 12 or later with an on-device recognizer; without one there's no mic). The Mac
+app still shows this step, from when it connected Soniox, which was removed.
 
 #### 6. Codex
 

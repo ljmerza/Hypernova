@@ -59,7 +59,7 @@ but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-wi
     <td align="center"><img src="docs/images/phone-statistics.jpg" alt="Statistics: hours Claude worked, tokens, sessions, and the last 30 days as a spiral galaxy"></td>
   </tr>
   <tr>
-    <td align="center"><b>Talk to it.</b><br><sub>Real-time speech recognition (Soniox), and replies read aloud through your headphones.</sub></td>
+    <td align="center"><b>Talk to it.</b><br><sub>Dictation with the phone's own on-device recognizer, and replies read aloud through your headphones.</sub></td>
     <td align="center"><b>Start anything.</b><br><sub>Type or say the prompt, then pick a project (found by a few letters), the agent, a model and a mode. Claude Code runs on any provider: Anthropic, OpenRouter or your own gateway.</sub></td>
     <td align="center"><b>Honest statistics.</b><br><sub>Hours, tokens and sessions, both agents' and each one's, not badges. Each day is a star in a galaxy.</sub></td>
   </tr>
@@ -165,7 +165,6 @@ flowchart LR
 - Optional: a [Tailscale](https://tailscale.com) account, to reach the computer from anywhere (always,
   for a VPS; the Tailscale app is optional too: Hypernova carries its own node). On the same Wi-Fi
   nothing else is needed.
-- Optional: a [Soniox](https://soniox.com) API key for voice.
 
 **Install** from the [latest release](../../releases/latest) (`SHA256SUMS.txt` has the checksums).
 The whole guide, with the first launch on each macOS version and every Linux step, is
@@ -238,12 +237,11 @@ To test alongside a live install, run a second daemon with `HYPERNOVA_SUPPORT`, 
   and the `hypernova` command use an admin token kept in a `0700` folder. [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) is the
   full threat model: what runs and is stored where, what Cloudflare, Let's Encrypt and Tailscale see, and
   what is still open.
-- **Keys stay on your computer.** Provider and Soniox keys are never logged, never sent to the phone, and
+- **Keys stay on your computer.** Provider keys are never logged, never sent to the phone, and
   only ever go to their own provider.
-- **Voice is opt-in.** Audio goes to Soniox only when you turn voice on with your own key. On a Mac,
-  its own voices are the fallback for reading aloud.
-- **Guard rails.** Risky commands (force pushes, `rm -rf`, deploys) need their own verb by voice.
-  "Bypass" mode asks you to think twice first. Automations never run on usage credits or another
+- **Voice stays on the phone.** Dictation uses the phone's own on-device recognizer, so the audio never
+  leaves it. Replies are read aloud by the Mac's own voices, or the phone's.
+- **Guard rails.** "Bypass" mode asks you to think twice first. Automations never run on usage credits or another
   paid provider unless you agree, and they never close or copy your own sessions.
 
 ## Repository

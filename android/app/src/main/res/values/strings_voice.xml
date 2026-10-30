@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Voice on the phone: the mic in the composer, the dictation capsule, its hints, and Settings → Voice
-     (docs/specs/spec-voice.md, 3.5). -->
+<!-- Voice on the phone: the mic in the composer, the dictation capsule and its hints
+     (docs/specs/spec-voice.md, 3.5). The words come from the phone's own on-device recognizer. -->
 <resources>
     <string name="voice_mic">Dictate</string>
     <string name="voice_listening">Listening</string>
@@ -18,48 +18,14 @@
     <string name="voice_perm_allow">Allow</string>
     <string name="voice_perm_off">The microphone is off for Hypernova.</string>
     <string name="voice_perm_settings">Settings</string>
-    <string name="voice_err_offline">Not connected to your Mac.</string>
-    <string name="voice_err_no_key">Voice isn\'t set up on your Mac.</string>
-    <string name="voice_err_bad_key">Soniox didn\'t accept the key. Fix it in Settings.</string>
-    <string name="voice_err_no_credit">Your Soniox balance is used up.</string>
-    <string name="voice_err_busy">Soniox is busy. Try again in a moment.</string>
-    <string name="voice_err_unreachable">Your Mac couldn\'t reach Soniox.</string>
-    <string name="voice_err_soniox">Soniox stopped listening. Try again.</string>
+    <string name="voice_err_offline">Dictation isn\'t available on this phone.</string>
     <string name="voice_err_too_long">Two minutes at most at a time.</string>
     <string name="voice_err_mic_busy">Another app is using the microphone.</string>
     <string name="voice_err_mic">The microphone stopped. Try again.</string>
-    <string name="voice_err_companion">Couldn\'t reach Hyperscribe Companion on your Mac.</string>
-    <string name="voice_err_companion_busy">Hyperscribe Companion is busy.</string>
     <string name="voice_a11y_listening">Listening</string>
     <string name="voice_a11y_stop">Stop dictating</string>
     <string name="voice_a11y_cancel">Cancel dictating</string>
     <string name="voice_a11y_more">Dictate more</string>
     <string name="voice_a11y_ready">Ready to send: %1$s</string>
     <string name="voice_a11y_dismiss">Dismiss</string>
-
-    <string name="settings_voice">Voice</string>
-    <string name="settings_voice_ready">Ready</string>
-    <string name="settings_voice_off">Off</string>
-    <string name="settings_voice_found">Found</string>
-    <string name="settings_voice_body">Hold the mic in a session to talk. The key stays on your Mac.</string>
-    <string name="settings_voice_off_body">Talk to your sessions: connect Soniox here or in Hypernova on your Mac.</string>
-    <string name="settings_voice_key">API key</string>
-    <string name="settings_voice_key_hint">Paste your Soniox key</string>
-    <string name="settings_voice_key_new">Paste a new key</string>
-    <string name="settings_voice_connect">Connect</string>
-    <string name="settings_voice_checking">Checking…</string>
-    <string name="settings_voice_get_key">Get a key ↗</string>
-    <string name="settings_voice_remove">Remove key</string>
-    <string name="settings_voice_language">Language</string>
-    <string name="settings_voice_auto">Auto</string>
-    <string name="settings_voice_headset">Headset microphone</string>
-    <string name="settings_voice_headset_body">Uses a Bluetooth headset\'s microphone when one is connected. It takes a moment to switch on.</string>
-    <string name="settings_voice_companion">Hyperscribe Companion on your Mac</string>
-    <string name="settings_voice_soniox_instead">Connect Soniox instead</string>
-    <!-- Not in the spec's table: the confirm before removing, and Soniox's name as the card's heading. -->
-    <string name="settings_voice_soniox">Soniox</string>
-    <string name="settings_voice_remove_q">Remove the Soniox key?</string>
-    <string name="settings_voice_remove_body">Voice stops until you add one, here or on your Mac.</string>
-    <string name="settings_voice_auto_body">English and Russian, and whatever else you say</string>
-    <string name="settings_voice_companion_body">Your phone streams to it while Soniox isn\'t connected.</string>
 </resources>

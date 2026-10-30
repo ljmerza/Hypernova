@@ -198,7 +198,7 @@ sentence (docs/PROTOCOL.md, "Types", "Mac-only features").
 |---|---|
 | Battery | Not shown (`mac.battery` is null). |
 | Stay awake | Off; a server stays on by itself. |
-| The Mac's voice (`say`) | None; Soniox reads aloud on the phone. |
+| The Mac's voice (`say`) | None; the phone reads aloud with its own voice. |
 | Opening a terminal window ("Open on Mac", signing in "on the Mac") | None: no screen. `hn attach` over SSH. |
 
 What keeps working on Linux:
@@ -213,7 +213,7 @@ What keeps working on Linux:
   while it's on (`hypernova codex on`, or the phone), its `codex` function in `~/.bashrc` beside
   `claude`.
 - Everything else the daemon does: sessions, approvals, usage, attachments, automations, agents,
-  statistics, the local route, Soniox speech.
+  statistics, the local route.
 
 ## Updating
 

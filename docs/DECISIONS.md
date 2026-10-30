@@ -1657,3 +1657,21 @@ more.
    or Browse outside projects to a "glasses" device, as there are none. A device that paired as Lens
    in a private build is now an ordinary device: forget it on the Mac.
 
+## Voice stays on the phone: Soniox is removed (2026-10-30)
+
+The owner removed the third-party (cloud) voice, Soniox, and kept the voice that never leaves the
+phone. The entries above about Soniox and Hyperscribe Companion stay as history.
+
+1. **Dictation is the phone's own, always:** the mic uses Android's on-device recognizer
+   (`PhoneDictation.kt`, from 2026-10-29); a phone without one has no mic. Gone: speech to text
+   through the Mac (`stt.ts`, `/v1/stt*`, the snapshot's `stt`, `{t:"stt"}`), the Hyperscribe
+   Companion route (`/v1/speech/companion`), the phone's streaming of its microphone, and Settings →
+   Voice (the Soniox key, Language, Headset microphone).
+2. **Read aloud is the Mac's own voice (`say`), or the phone's own text-to-speech** where the computer
+   has none (a Linux server). Gone: Soniox's voices (`tts.ts`), the engine choice and the fallback
+   note. `Speech` keeps `engine` and `using`, always `"mac"`, for clients that read them.
+3. **Files left alone:** a kept Soniox key (`<support>/stt.json`) is no longer read; its owner deletes
+   it. `speech.json`'s Soniox fields are not read, and go with the next save of the setting.
+4. **The Mac app is left as it is** (out of scope): its Setup Voice step and Settings → Voice… now
+   reach routes that answer 404.
+

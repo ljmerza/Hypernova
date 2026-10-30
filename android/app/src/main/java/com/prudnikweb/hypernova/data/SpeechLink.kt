@@ -10,8 +10,8 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Read aloud, as this phone takes part (docs/PROTOCOL.md, "Read aloud"): the Mac's setting (Soniox
- * or the Mac's voice, the voice, the speed), and this phone's own Read aloud played natively.
+ * Read aloud, as this phone takes part (docs/PROTOCOL.md, "Read aloud"): the Mac's setting (its
+ * voice, the speed), and this phone's own Read aloud played natively.
  *
  * One per connection to a Mac ([LiveHub] owns it); [send] goes over its live feed.
  */
@@ -48,14 +48,12 @@ class PhoneSpeech(
         start(play, key)
     }
 
-    /** Soniox's voices or the Mac's, for the picker. */
-    suspend fun voices(engine: String): Result<List<SpeechVoice>> = call { SpeechVoice.list(api.get("/v1/speech/voices?engine=$engine")) }
+    /** The Mac's voices, for the picker. */
+    suspend fun voices(): Result<List<SpeechVoice>> = call { SpeechVoice.list(api.get("/v1/speech/voices")) }
 
-    /** Saves any of the engine, a voice, the speed; the Mac tells every client. */
-    suspend fun save(engine: String? = null, voice: String? = null, macVoice: String? = null, rate: Float? = null): Result<SpeechOut> = call {
+    /** Saves the Mac's voice or the speed; the Mac tells every client. */
+    suspend fun save(macVoice: String? = null, rate: Float? = null): Result<SpeechOut> = call {
         val body = JSONObject()
-        if (engine != null) body.put("engine", engine)
-        if (voice != null) body.put("voice", voice)
         if (macVoice != null) body.put("macVoice", macVoice)
         if (rate != null) body.put("rate", rate.toDouble())
         val s = SpeechOut.parse(api.post("/v1/speech/settings", body).obj("speech")) ?: throw HubException("bad_settings")

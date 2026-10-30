@@ -1,9 +1,10 @@
-// The Mac's voices (docs/PROTOCOL.md, "Read aloud"), the speech companion's address, and the small
-// things around them: which app paired, a long tool output cut to its end. Everything runs on free
-// ports with scratch state; Tailscale is a stand-in.
+// Read aloud with the Mac's voices (docs/PROTOCOL.md, "Read aloud"): the setting, whole clips and
+// the phone's own plays; and the small things around them: which app paired, a long tool output cut
+// to its end. Everything runs on free ports with scratch state; Tailscale is a stand-in. The Mac's
+// voice is the real `say`, so the tests where it reads run on a Mac only.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -49,9 +50,10 @@ process.env.HYPERNOVA_LOCAL_PORT = String(LOCAL)
 process.env.HYPERNOVA_LAN_PORT = '0'
 
 const { startServers, startPairing } = await import('../src/http.ts')
-const { addDevice, listDevices } = await import('../src/store.ts')
+const { addDevice, adminToken, listDevices } = await import('../src/store.ts')
 const { upsertSession, transcriptPathFor } = await import('../src/hub.ts')
-const { parseVoices, companionAddress, keepClip, recentClip, RECENT_MS } = await import('../src/speech.ts')
+const { parseVoices, keepClip, recentClip, RECENT_MS } = await import('../src/speech.ts')
+const { playLimits, ttsPieces } = await import('../src/readaloud.ts')
 
 const TOKEN = 'test-phone-token-0123456789abcdef'
 const OTHER = 'test-other-token-0123456789abcdef'
@@ -208,28 +210,66 @@ test('read aloud: a kept clip goes 10 minutes after it was made, on a timer that
   for (let i = 1; i <= 7; i++) assert.equal(recentClip(`n${i}`), undefined)
 })
 
-// ── The speech companion ─────────────────────────────────────────────────
-test("the companion's address: its token, over its tailnet https route only", async () => {
-  const serving = SERVING
-  const settings = { port: 7443, token: 'ABCDEFGHJKLMNPQR', tailscale: true }
-  assert.equal(companionAddress(settings, 'mac.tail.ts.net', serving), 'wss://mac.tail.ts.net:7443/ws?token=ABCDEFGHJKLMNPQR')
-  assert.equal(companionAddress({ ...settings, port: 8443 }, 'mac.tail.ts.net', serving), null) // that port isn't routed
-  assert.equal(companionAddress(settings, 'other.tail.ts.net', serving), null)
-  assert.equal(companionAddress(settings, null, serving), null)
-  assert.equal(companionAddress(settings, 'mac.tail.ts.net', {}), null)
-  assert.equal(companionAddress({ ...settings, tailscale: false }, 'mac.tail.ts.net', serving), null)
-  assert.equal(companionAddress({ ...settings, token: '' }, 'mac.tail.ts.net', serving), null)
-  assert.equal(companionAddress({ port: 7443 }, 'mac.tail.ts.net', serving), null)
+test('pieces cut after sentences, the first one short, and keep where each starts', () => {
+  const text = 'One sentence here. '.repeat(40) + 'And the end.'
+  const pieces = ttsPieces(text)
+  assert.ok(pieces.length >= 2)
+  assert.ok(pieces[0]!.text.length <= 320)
+  assert.ok(pieces.every((p) => p.text.length <= 1100))
+  assert.ok(pieces.every((p) => text.slice(p.at, p.at + p.text.length) === p.text))
+  assert.ok(pieces.slice(0, -1).every((p) => /[.!?]\s?$/.test(p.text.trimEnd())), 'cut after a sentence')
+  assert.equal(pieces.map((p) => p.text).join(''), text)
+  // One long word: cut anyway.
+  assert.ok(ttsPieces('x'.repeat(2500)).every((p) => p.text.length <= 1100))
+})
 
-  // Not installed: null. Installed and routed: read from its settings on each request.
-  assert.deepEqual(json(await send('GET', '/v1/speech/companion', AUTH)), { url: null })
-  const file = join(process.env.HOME!, 'Library/Application Support/Hyperscribe Companion/settings.json')
-  mkdirSync(dirname(file), { recursive: true })
-  writeFileSync(file, JSON.stringify(settings))
-  assert.deepEqual(json(await send('GET', '/v1/speech/companion', AUTH)), { url: 'wss://mac.tail.ts.net:7443/ws?token=ABCDEFGHJKLMNPQR' })
-  writeFileSync(file, JSON.stringify({ ...settings, token: 'NEWCODE234567890' }))
-  assert.deepEqual(json(await send('GET', '/v1/speech/companion', AUTH)), { url: 'wss://mac.tail.ts.net:7443/ws?token=NEWCODE234567890' })
-  assert.equal((await send('GET', '/v1/speech/companion')).status, 401)
+test('the setting: the Mac’s voice only, checked and kept; an older Soniox engine is refused', async () => {
+  const snap = json(await send('GET', '/v1/snapshot', AUTH))
+  assert.deepEqual(snap.speech, { engine: 'mac', using: 'mac', macVoice: null, rate: 1 })
+  assert.equal(snap.stt, undefined)
+  assert.equal(errorCode(await send('POST', '/v1/speech/settings', AUTH, { engine: 'soniox' })), 'bad_engine')
+  assert.equal(errorCode(await send('POST', '/v1/speech/settings', AUTH, { rate: 'fast' })), 'bad_rate')
+  const r = json(await send('POST', '/v1/speech/settings', AUTH, { engine: 'mac', rate: 9 }))
+  assert.deepEqual(r.speech, { engine: 'mac', using: 'mac', macVoice: null, rate: 2 })
+  assert.deepEqual(JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'speech.json'), 'utf8')), { rate: 2 })
+  await send('POST', '/v1/speech/settings', AUTH, { rate: 1 })
+  // The routes Soniox had are gone.
+  assert.equal((await send('GET', '/v1/stt', AUTH)).status, 404)
+  assert.equal((await send('GET', '/v1/speech/companion', AUTH)).status, 404)
+  const voices = json(await send('GET', '/v1/speech/voices?engine=soniox', AUTH))
+  assert.equal(voices.engine, 'mac')
+})
+
+test('a play is the asking phone’s: only it may fetch or stop it, besides the Mac app', async () => {
+  const r = await send('POST', '/v1/speech/play', AUTH, { text: 'Read on this phone.', to: 'me' })
+  assert.equal(r.status, 200)
+  const play = json(r).play
+  assert.deepEqual([play.to.id, play.source, play.engine, play.sampleRate, play.format], ['phone', 'phone', 'mac', 24_000, 'pcm_s16le'])
+  const other = { authorization: `Bearer ${OTHER}` }
+  assert.equal((await send('GET', `/v1/speech/plays/${play.id}/audio`, other)).status, 404)
+  assert.equal((await send('POST', `/v1/speech/plays/${play.id}/stop`, other)).status, 404)
+  assert.equal((await send('POST', '/v1/speech/play', {}, { text: 'x', to: 'me' })).status, 401)
+  assert.equal(errorCode(await send('POST', '/v1/speech/play', { authorization: `Bearer ${adminToken}` }, { text: 'x' }, LOCAL)), 'bad_target')
+  assert.equal(errorCode(await send('POST', '/v1/speech/play', AUTH, { text: '  ' })), 'empty')
+  assert.equal((await send('POST', `/v1/speech/plays/${play.id}/stop`, AUTH)).status, 200)
+})
+
+test('the phone’s own Read aloud plays on it in the Mac’s voice, as 24 kHz PCM', { skip: !hasSay && 'no /usr/bin/say' }, async () => {
+  Object.assign(playLimits, { startMs: 12_000 })
+  const r = json(await send('POST', '/v1/speech/play', AUTH, { text: 'Read on the phone itself.', to: 'me', sessionId: 's2' }))
+  const audio = await send('GET', `/v1/speech/plays/${r.play.id}/audio`, AUTH)
+  assert.equal(audio.status, 200)
+  assert.equal(audio.headers['x-speech-engine'], 'mac')
+  assert.equal(audio.headers['x-sample-rate'], '24000')
+  assert.ok(audio.body.length > 24_000, 'about a second of the Mac’s voice at least')
+})
+
+test('the text never reaches the log', async () => {
+  await send('POST', '/v1/speech', AUTH, { text: 'A secret plan for Thursday.' })
+  await send('POST', '/v1/speech/play', AUTH, { text: 'Another secret for Friday.', to: 'me' })
+  const logText = readFileSync(join(process.env.HYPERNOVA_LOGS!, 'daemon.log'), 'utf8')
+  assert.ok(!logText.includes('secret plan') && !logText.includes('Thursday'))
+  assert.ok(!logText.includes('Another secret') && !logText.includes('Friday'))
 })
 
 // ── Small things ─────────────────────────────────────────────────────────

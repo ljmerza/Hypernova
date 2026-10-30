@@ -15,22 +15,17 @@ class SpeechTest {
 
     @Test
     fun `the Mac's setting, and nothing from an older Mac`() {
-        val s = SpeechOut.parse(
-            JSONObject("""{"engine":"soniox","using":"mac","voice":"Maya","macVoice":null,"rate":9,"model":"tts-rt-v2","soniox":false,"note":"No Soniox key on this Mac, so the Mac’s voice reads."}"""),
-        )!!
-        assertEquals("soniox", s.engine)
-        assertEquals("mac", s.using)
-        assertEquals("Maya", s.voice)
+        val s = SpeechOut.parse(JSONObject("""{"engine":"mac","using":"mac","macVoice":null,"rate":9}"""))!!
         assertNull(s.macVoice)
         assertEquals(2f, s.rate)
-        assertTrue(s.note!!.startsWith("No Soniox key"))
+        assertEquals("Samantha", SpeechOut.parse(JSONObject("""{"engine":"mac","macVoice":"Samantha","rate":1}"""))!!.macVoice)
         assertNull(SpeechOut.parse(null))
         assertNull(SpeechOut.parse(JSONObject("{}")))
     }
 
     @Test
     fun `a play is taken only as PCM this phone can play`() {
-        val p = PlayInfo.parse(JSONObject("""{"id":"ab_C-9","sessionId":"s1","source":"phone","engine":"soniox","sampleRate":24000,"format":"pcm_s16le","of":120}"""))!!
+        val p = PlayInfo.parse(JSONObject("""{"id":"ab_C-9","sessionId":"s1","source":"phone","engine":"mac","sampleRate":24000,"format":"pcm_s16le","of":120}"""))!!
         assertEquals("phone", p.source)
         assertEquals(24_000, p.sampleRate)
         assertEquals(120, p.of)

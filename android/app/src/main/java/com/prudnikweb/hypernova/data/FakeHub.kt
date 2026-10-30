@@ -434,12 +434,9 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
     override suspend fun preview(path: String?, port: Int?): Result<String> = Result.failure(demoOnly())
     override suspend fun checklist(): Result<String> = Result.failure(demoOnly())
 
-    // Voice: Soniox "connected", and a dictation that needs no microphone (data/Voice.kt, FakeDictation).
-    private val demoStt = Stt("soniox", ready = true, error = null)
-    override val voice = Voice(VoiceRoute.Soniox, demoStt)
-    override fun dictate(language: String, headset: Boolean): Dictation =
+    // Voice: a dictation that needs no microphone (data/Voice.kt, FakeDictation).
+    override fun dictate(): Dictation =
         FakeDictation(scope, android.os.SystemClock.elapsedRealtime(), android.os.SystemClock::elapsedRealtime)
-    override suspend fun sttInfo(): Result<SttInfo> = Result.success(SttInfo(demoStt, last4 = "a1b2", keysUrl = "https://console.soniox.com"))
 
     override suspend fun saveProvider(id: String?, input: ProviderInput): Result<ProviderSaved> {
         DemoProviders.refusal(res, input.kind, input.baseUrl, input.apiKey)?.let { return Result.failure(it) }

@@ -79,7 +79,7 @@ export type Feature = 'battery' | 'awake' | 'macVoice' | 'openWindow'
 export const LINUX_REASONS: Record<Feature, string> = {
   battery: 'Hypernova shows the battery of a Mac only.',
   awake: 'Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings.',
-  macVoice: 'The Mac’s voice isn’t on Linux. Add a Soniox key to read aloud from this server.',
+  macVoice: 'The Mac’s voice isn’t on Linux. The phone reads aloud with its own voice.',
   openWindow: 'This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH.',
 }
 

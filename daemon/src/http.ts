@@ -9,7 +9,6 @@ import { WebSocketServer } from 'ws'
 import { createHash } from 'node:crypto'
 import { API_PORT, LOCAL_PORT, PROTOCOL, SUPPORT, VERSION, claudeCached, claudeVersion, findClaude, log, macName, randomToken, readJson, sha256, safeEqual, tail } from './util.ts'
 import type { Ev } from './normalize.ts'
-import { companionUrl } from './speech.ts'
 import { speechFeed, speechRoute, speechState } from './readaloud.ts'
 import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider } from './store.ts'
 import { lanDevice, lanInfo, lanNamed, lanNamedHost, pairAllowed, pairFailed, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
@@ -38,7 +37,6 @@ import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
 import { getBattery } from './battery.ts'
 import { refreshUsage } from './usage-probe.ts'
 import { awakeClient, awakeState, setAwake } from './awake.ts'
-import { sttApi, sttState, sttUpgrade } from './stt.ts'
 import { macFeed } from './mac-feed.ts'
 import { ChangeError, changesOf, diffOf } from './changes.ts'
 import { toolPath } from './normalize.ts'
@@ -336,9 +334,7 @@ function snapshot(deviceId: string | null) {
     projects: listProjects(),
     providers: listProviders(),
     account: getAccount(),
-    // Speech to text (stt.ts).
-    stt: sttState(),
-    // Read aloud: Soniox's voices or the Mac's (readaloud.ts).
+    // Read aloud: the Mac's voice (readaloud.ts).
     speech: speechState(),
     // "When … → Do …" on the Mac (automations.ts).
     automations: automations().snapshot(),
@@ -511,12 +507,9 @@ async function api(c: Ctx): Promise<void> {
   // The models each provider offers, for the new-session sheet (models.ts): Claude Code's own list,
   // OpenRouter's catalogue, the providers' settings.
   if (path === '/v1/models' && m === 'GET') return json(res, 200, { providers: await listModels(url.searchParams.get('provider')) })
-  // Read aloud: Soniox's voices or the Mac's, whole clips, and plays the phone app streams (readaloud.ts).
+  // Read aloud: the Mac's voice, whole clips, and plays the phone app streams (readaloud.ts).
   const speaker = c.deviceId ?? 'mac'
-  if (path.startsWith('/v1/speech') && path !== '/v1/speech/companion' && (await speechRoute(path, m, req, res, speaker, () => readJsonBody(req)))) return
-  if (path === '/v1/speech/companion' && m === 'GET') return json(res, 200, { url: await companionUrl() })
-  // Speech to text through Soniox (stt.ts).
-  if (path === '/v1/stt' || path.startsWith('/v1/stt/')) return json(res, 200, await sttApi(path, m, () => readJsonBody(req)))
+  if (path.startsWith('/v1/speech') && (await speechRoute(path, m, req, res, speaker, () => readJsonBody(req)))) return
   if (path === '/v1/commands' && m === 'GET') {
     // The "/" list: Claude Code's commands and skills in a project.
     const p = url.searchParams.get('project') ?? ''
@@ -1719,8 +1712,6 @@ export function startServers(): () => Promise<void> {
     if (certified && device && certified.id !== device.id) device = null
     const admin = !device && direct && !!token && safeEqual(token, adminToken)
     const keep = (ws: import('ws').WebSocket) => track(device?.id ?? null, ws, certified?.certFingerprint)
-    // Speech to text: the phone's microphone, relayed to Soniox (stt.ts). One stream per device.
-    if (url.pathname === '/v1/stt/ws' && (device || admin)) return sttUpgrade(req, socket, head, device ? device.id : 'mac', keep)
     const ok = url.pathname === '/v1/ws' && token && (device || admin)
     if (!ok) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')

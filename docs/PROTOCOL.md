@@ -669,19 +669,13 @@ tailnet, with no server of ours and nothing opened to the internet. (docs/DECISI
 | `POST /v1/sessions/{id}/open` | `{}` → `{app, already}`: opens the shared terminal in a window on the Mac (or brings it forward) |
 | `POST /v1/sessions/{id}/continue` | `{reason?: "away" \| "limit"}` → `{session}`: sends "I'm back. Please continue where you left off." (no reason, or `"away"`); `"limit"` sends the continuation after a limit (see Auto-continue), drawn as a notice row, and the session's ready card goes once its turn starts. Its errors are `prompt`'s |
 | `POST /v1/sessions/{id}/auto-continue` | `{on: boolean}` → `{session}`: the session carries on by itself after its limit, or not (see Auto-continue). 400 `bad_on`; 404 `no_session`; 409 `not_limited` (nothing to carry on from: no `blocked.resume`, or it's `ready`, or Claude is working again), `not_available` (`canArm`/`canCancel` false), `needs_answer` (an approval is open), `waiting` (another menu or dialog in the terminal, or a change already under way), `typing` (unsent text in the terminal; `pending` has it), `not_confirmed` (Claude Code didn't confirm within 4 s; nothing changed), `terminal_busy`, `no_terminal`. Already as asked: 200, nothing done |
-| `GET /v1/speech/voices?engine=` | → `{engine, voices: [{id, name, lang, gender?, description?}], model?}`: the Mac's voices (no `engine`, or `mac`), or Soniox's (`soniox`; 409 `no_key`, 502 when Soniox can't list them). See Read aloud |
-| `GET /v1/speech/settings` | → `{speech: Speech}`: which voice reads (see Read aloud) |
-| `POST /v1/speech/settings` | `{engine?, voice?, macVoice?, rate?}` → `{speech}`. 400 `bad_engine`, `bad_voice`, `bad_rate` |
-| `POST /v1/speech` | `{text, voice?, rate?}` → the whole clip read aloud: `audio/wav` (Soniox) or `audio/mp4` (the Mac's voice), `X-Speech-Engine` says which (see Read aloud) |
+| `GET /v1/speech/voices` | → `{engine: "mac", voices: [{id, name, lang}]}`: the Mac's voices. See Read aloud |
+| `GET /v1/speech/settings` | → `{speech: Speech}`: the Mac's voice and speed (see Read aloud) |
+| `POST /v1/speech/settings` | `{engine?, macVoice?, rate?}` → `{speech}`. 400 `bad_engine`, `bad_voice`, `bad_rate` |
+| `POST /v1/speech` | `{text, voice?, rate?}` → the whole clip read aloud in the Mac's voice, `audio/mp4` (see Read aloud) |
 | `POST /v1/speech/play` | `{text, sessionId?, to?: "me"}` → `{play: Play & {to: {id, name}}}`: read aloud by the Hypernova app on the phone that asks, streamed. 400 `bad_target` (the Mac app), 413 `too_long`, 400 `empty` (see Read aloud, "Plays") |
 | `GET /v1/speech/plays/{id}/audio` | → `audio/pcm`, 24 kHz 16-bit mono as it's made; only the phone playing it. 404 `no_play`, 410 `play_over`, 502 `speech_failed` |
 | `POST /v1/speech/plays/{id}/stop` | `{}` → `{ok, state}`: the phone playing it, or the Mac app. 404 `no_play` |
-| `GET /v1/speech/companion` | → `{url: string \| null}` Hyperscribe Companion's pairing address (see The speech companion) |
-| `GET /v1/stt` | → `SttInfo`: voice through Soniox, never the key (see Speech to text) |
-| `POST /v1/stt/key` | `{provider?: "soniox", apiKey}` → `SttInfo & {checked, problem}`: tried with Soniox, then kept on the Mac (see Speech to text) |
-| `DELETE /v1/stt/key` | → `SttInfo` |
-| `POST /v1/stt/test` | `{}` → `{ok, message} & SttInfo` |
-| `GET /v1/stt/ws` | WebSocket, the device token in `?token=` or the header: the glasses' audio in, words out (see Speech to text) |
 | `POST /v1/sessions/{id}/mode` | `{permissionMode}` (`default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) → `{session, applies?}`. A session the daemon runs takes it from its next turn while a turn runs (the running query can't change its mode): `applies: "next_turn"`, else `"now"`, and the phone says so. A shared terminal switches by Shift+Tab (409 `waiting` with a dialog open, `mode_unavailable` for a mode it can't reach: Bypass when `session.bypassAvailable` is false, answered without pressing any key) |
 | `POST /v1/sessions/{id}/model` | `{model: string \| null, confirmPaid?: true}` → `{model, session, applies: "now" \| "next_turn"}`: switches the session's model (see A session's model). 400 `unknown_model`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_model` (a terminal Hypernova doesn't hold: type /model there), `confirm_paid` |
 | `POST /v1/approvals/{id}` | `ApprovalAnswer` → `{ok}` (409 if already resolved) |
@@ -779,9 +773,7 @@ objects with a `t` field:
   the LAN listener was turned on or off (see Local network (direct HTTPS)).
 - `{t:"tsnet", tsnet, tailnet: {name, ip, url, control} | null}`: which Tailscale serves the phone
   API changed, or its state (see Tailscale built in); a phone follows `tailnet`.
-- `{t:"stt", stt: Stt}` voice through Soniox became ready or not (see Speech to text).
-- `{t:"speech", speech: Speech}`: which voice reads changed (the setting, Soniox ready or not, a
-  fallback note). `{t:"speech.stop", id}` to the phone app that plays a play; the phone sends
+- `{t:"speech", speech: Speech}`: the Mac's voice or speed changed. `{t:"speech.stop", id}` to the phone app that plays a play; the phone sends
   `{t:"speech.progress", …}` about its own plays; `{t:"speaking", speaking}` to the Mac app's feed
   alone. See Read aloud, "Plays".
 - `{t:"automation", automation: Automation}`: an automation was added or changed (its `nextAt` and
@@ -809,7 +801,6 @@ Snapshot = { mac: {id, name, daemonVersion, claudeVersion, projectsRoot,
              usage: Usage, sessions: Session[], approvals: Approval[],
              projects: Project[], providers: Provider[],
              account: Account,                                   // see Account
-             stt: Stt,                                           // see Speech to text
              automations?: Automations,                          // absent: a daemon without automations
              lan: {port, addresses: string[], fingerprint, deviceCert: boolean} | null,
                                                                  // the LAN listener (see Local network); null: off
@@ -1028,11 +1019,6 @@ NewSession = { projectPath?: string, newProject?: {name, git?: boolean},
                                                       // model's; providerId is ignored. clientId: the first send's name
 
 Attachment = { path: string, name: string, mime: string | null, size: number }
-
-Stt = { provider: "soniox" | null,   // a key is kept on the Mac
-        ready: boolean,               // and Soniox hasn't refused it or the account since
-        error: string | null }        // that refusal, or the last account problem, in plain words
-SttInfo = Stt & { last4: string | null, model: "stt-rt-v5", savedAt: number | null, keysUrl }
 
 Agent = { id,                         // "a" and 16 hex digits
           sessionId,
@@ -1586,7 +1572,7 @@ with one sentence a client can show. On a Mac it is `{}` (and older daemons send
 |---|---|---|
 | `battery` | the Mac's battery (`mac.battery` is `null`) | "Hypernova shows the battery of a Mac only." |
 | `awake` | Stay awake (`mac.awake` reads Off, nothing held) | "Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings." |
-| `macVoice` | the Mac's voice (`say`) for read aloud | "The Mac’s voice isn’t on Linux. Add a Soniox key to read aloud from this server." |
+| `macVoice` | the Mac's voice (`say`) for read aloud | "The Mac’s voice isn’t on Linux. The phone reads aloud with its own voice." |
 | `openWindow` | a terminal window on the server's screen | "This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH." |
 
 Clients that know a key hide that feature (or show it disabled with its sentence); a client that
@@ -1595,7 +1581,7 @@ doesn't know the field keeps working, because every route answers plainly when a
 - `POST /v1/mac/awake` → 501 `unavailable` `{feature: "awake"}`; `GET` answers `{awake}` (Off).
 - `POST /v1/sessions/{id}/open` and `POST /v1/account/login {where: "mac"}` → 501 `unavailable`
   `{feature: "openWindow"}`. Signing in "on the phone" works as on a Mac.
-- Read aloud with the Mac's voice → 501 `no_voice` with the `macVoice` sentence; Soniox voices work.
+- Read aloud with the Mac's voice → 501 `no_voice` with the `macVoice` sentence; the phone reads with its own voice.
 
 `unavailable`'s sentences are in English, like the daemon's other messages; a client may use its
 own words for a key it knows.
@@ -2836,61 +2822,29 @@ brings no readings and the spend pace (`Usage.rate`) would go flat; the probe's 
 
 ## Read aloud
 
-Replies read aloud: on the glasses (Lens), and from a message's long-press menu on the phone. The
-Mac makes the voice, with Soniox's natural voices (`daemon/src/tts.ts`, the key kept for speech to
-text) or the Mac's own (`say`); the Hypernova app on the phone plays it natively, and the glasses'
-too when it's connected, since the Even App's WebView only makes sound after a touch on the phone's
-screen. Without a phone app the glasses play a whole clip themselves, as before (`readaloud.ts`).
+Replies read aloud, from a message's long-press menu on the phone. The Mac makes the voice with its
+own voices (`say`); the Hypernova app on the phone plays it natively (`readaloud.ts`). A computer
+without `say` (a Linux server) has no voice of its own (`unavailable.macVoice`): the phone then reads
+with its own text-to-speech. (Soniox's voices were removed on 2026-10-30.)
 
 **Which voice** (`Speech`, in the snapshot as `speech`, and `{t:"speech"}` on each change; kept in
 `<support>/speech.json`):
 
 ```
-Speech = { engine: "soniox" | "mac", using: "soniox" | "mac", voice, macVoice: string | null,
-           rate, model, soniox: boolean, note: string | null, phone: boolean }
+Speech = { engine: "mac", using: "mac", macVoice: string | null, rate }
 ```
 
-- `engine` is chosen: Soniox once a Soniox key is kept, unless the Mac's voice was picked (Settings →
-  Voice on the phone). `using` is what reads now: the Mac's voice while Soniox can't (no key, a key it
-  refused, an account out of credit). `note` says why in one line, or that the last read fell back
-  ("Soniox couldn't read (…), so the Mac's voice did."); the next good Soniox read clears it.
-- `voice` is Soniox's (every one speaks every language), `macVoice` the Mac's (null: the system
-  voice). `rate` 0.5–2; the Mac's voice gets `round(185 × rate)` words a minute, Soniox reads at
-  `rate` clamped to its 0.7–1.3. `phone`: a phone app plays the glasses' speech right now.
-- `POST /v1/speech/settings {engine?, voice?, macVoice?, rate?}`: a Soniox voice is checked against
-  Soniox's list when it can be had (offline, the name is kept and tried later); a Mac voice against
-  `say`'s. 400 `bad_engine`, `bad_voice`, `bad_rate` (not a number; out of range is clamped).
-- `GET /v1/speech/voices` (no `engine`, or `engine=mac`) → `{engine: "mac", voices: [{id, name,
-  lang}]}` from `say -v '?'` (`lang` like `en-US`), listed once per daemon run (a listing that failed
-  is tried again; none without `say`). A line is `Samantha            en_US    # Hello! …`: the
-  language is the last word before `#` and the name is everything before it (long names such as
-  `Eddy (English (US))` have a single space there). `engine=soniox` → `{engine, model, voices: [{id,
-  name, lang: "*", gender, description}]}` from Soniox's `GET https://api.soniox.com/v1/tts-models`
-  (the key as `Authorization: Bearer`), kept six hours.
-
-**Soniox** (`tts.ts`): `wss://tts-rt.soniox.com/tts-websocket`, the key as `Authorization: Bearer`
-on the upgrade (never in a message: Soniox refuses that from 15 January 2027), one connection a
-read, its text in pieces, one stream each, one after another:
-`{stream_id, model, language, voice, audio_format: "pcm_s16le", sample_rate: 24000, speed,
-return_timestamps: true}`, then `{stream_id, text, text_end: true}`; the answer is base64 PCM with
-each character's start time (`timestamps.characters`, `character_start_times_seconds`), then
-`terminated`; `{stream_id, cancel: true}` stops it.
-
-- Model: `tts-rt-v2`, generally available since 11 August 2026 (`tts-rt-v1` was retired on 31
-  August and routes to it). The models list is asked which is live; v2 while it's listed, else the
-  newest real-time one.
-- Pieces are cut after a sentence: the first at most 320 characters, so the voice starts at once,
-  the rest at most 1100 (Soniox makes at most 2 minutes of audio a stream, and takes 5000 characters
-  a message). `language`, which Soniox needs, is each piece's main script (Cyrillic → `ru`, Latin →
-  `en`, and a few more; Latin letters count for less, as code and product names are English).
-- Square brackets become parentheses: v2 takes `[whispering]` or `[laughs]` as stage directions,
-  and a reply's `[1]` is only text. Every character keeps its place, so timings still point into
-  the text as given.
-- Errors as speech to text names them (`bad_key` 401/403, `no_credit` 402, `busy` 429, `soniox`,
-  `unreachable` within 8 s); no first audio within 12 s of a piece's text is `soniox`. Any of them
-  before the end: the Mac's voice reads the rest, from the start of the word Soniox had got to (or
-  the start, if it never spoke), and `note` says so. `max_audio_duration_reached` keeps what came.
-- `HYPERNOVA_SONIOX_TTS_WS` and `HYPERNOVA_SONIOX_API` point the daemon at a stand-in (the tests).
+- `engine` and `using` are always `"mac"` (kept for clients that read them). `macVoice` is the Mac's
+  voice (null: the system voice). `rate` 0.5–2; the Mac's voice gets `round(185 × rate)` words a
+  minute.
+- `POST /v1/speech/settings {engine?, macVoice?, rate?}`: a Mac voice is checked against `say`'s.
+  400 `bad_engine` (anything but `"mac"`), `bad_voice`, `bad_rate` (not a number; out of range is
+  clamped). An older file's Soniox fields are not read, and go with the next save.
+- `GET /v1/speech/voices` → `{engine: "mac", voices: [{id, name, lang}]}` from `say -v '?'` (`lang`
+  like `en-US`), listed once per daemon run (a listing that failed is tried again; none without
+  `say`). A line is `Samantha            en_US    # Hello! …`: the language is the last word before
+  `#` and the name is everything before it (long names such as `Eddy (English (US))` have a single
+  space there).
 
 **The Mac's voice**: `/usr/bin/say [-v <voice>] -r <wpm> -o <support>/tmp/say-<random>.<m4a|wav>`,
 no shell, 40 s at most, renders to the file and plays nothing on the Mac: AAC in M4A for a whole
@@ -2898,17 +2852,15 @@ clip (`--file-format=m4af --data-format=aac`), 24 kHz 16-bit PCM for a play (`--
 --data-format=LEI16@24000`, read from its `data` chunk). The text goes in on its standard input,
 never as an argument, so it doesn't show in the process list; `[[` becomes `[ [` (it opens one of
 `say`'s embedded commands). The temp folder is 0700 and the file is deleted once read (leftovers at
-start-up too).
+start-up too). A play's text is read in pieces cut after a sentence (the first at most 400
+characters, so the voice starts at once, the rest at most 2000).
 
-**A whole clip**, `POST /v1/speech {text, voice?, rate?}` (the glasses' own player, and older
-clients): 200 with the bytes of the whole clip, `X-Speech-Engine: soniox | mac`.
-- Soniox: `audio/wav` (24 kHz 16-bit mono; Web Audio's `decodeAudioData` takes WAV in every WebView).
-  The Mac's voice: `audio/mp4` (AAC in M4A), as before.
+**A whole clip**, `POST /v1/speech {text, voice?, rate?}` (the phone's older way): 200 with the bytes
+of the whole clip, `audio/mp4` (AAC in M4A), `X-Speech-Engine: mac`.
 - `text`: plain text, at most 8000 characters (as JavaScript counts them); longer → 413 `too_long`,
-  blank → 400 `empty`. A longer reply goes in pieces, cut between paragraphs, each asked for while
-  the one before plays (Lens cuts at 1200 while Soniox reads, so each piece is made in moments).
-- `voice`: a Mac voice's `id`, used only while the Mac's voice reads (unknown → the setting's).
-  `rate` other than 1 is used instead of the setting's.
+  blank → 400 `empty`.
+- `voice`: a Mac voice's `id` (unknown → the system voice); `rate` other than 1 is used instead of the
+  setting's.
 - One clip at a time per paired device: a new request stops the one being made, which answers 409
   `replaced`. A client that stops waiting stops it too. Other errors: 502 `speech_failed`, 501
   `no_voice` (no `say`).
@@ -2916,154 +2868,41 @@ clients): 200 with the bytes of the whole clip, `X-Speech-Engine: soniox | mac`.
 **Plays**: speech the Mac makes and the Hypernova app on the phone streams and plays.
 
 ```
-Play = { id, sessionId: string | null, source: "glasses" | "phone" | "mac", engine: "soniox" | "mac",
+Play = { id, sessionId: string | null, source: "phone", engine: "mac",
          sampleRate: 24000, format: "pcm_s16le", of: number }   // of: the text's length
 ```
 
-- **The phone app offers** on its live feed: `{t:"speech.player", on}` as the feed opens and when
-  "Glasses speak through this phone" changes (on by default). `speech.phone` follows.
-- `POST /v1/speech/play {text, sessionId?, to?}`, up to 40,000 characters. `to: "me"`: the asker
-  plays it (the phone's own Read aloud and its Test). Else the phone app that offered: the one on
-  the glasses' own phone when the tailnet says so (the same `X-Forwarded-For` address as the
-  request), else the one that offered last; none → 409 `no_player`, and the glasses play a whole
-  clip themselves. One play at a time per phone and per asker: a new one ends the old (`stopped`,
-  `replaced`). The answer: `{play: Play & {to: {id, name}}}`; the phone gets `{t:"speech.play",
-  play}` on its feed (not for `to: "me"`, which has the answer).
+- `POST /v1/speech/play {text, sessionId?, to?: "me"}`, up to 40,000 characters: the phone that asks
+  plays it (its Read aloud and its Test); the Mac app can't (400 `bad_target`). One play at a time
+  per phone: a new one ends the old (`stopped`, `replaced`). The answer: `{play: Play & {to: {id,
+  name}}}`.
 - `GET /v1/speech/plays/<id>/audio` (the phone playing it, or the Mac app): `audio/pcm`,
-  `X-Sample-Rate: 24000`, `X-Speech-Engine`; what's made so far at once, the rest as Soniox makes it,
-  the end when all is made. It waits for the first audio: a failure before any → 502
-  `speech_failed` (501 `no_voice`); a play already stopped → 410 `play_over`; 404 `no_play`.
+  `X-Sample-Rate: 24000`, `X-Speech-Engine`; what's made so far at once, the rest as it's made, the
+  end when all is made. It waits for the first audio: a failure before any → 502 `speech_failed`
+  (501 `no_voice`); a play already stopped → 410 `play_over`; 404 `no_play`.
 - **The phone reports** on its feed: `{t:"speech.progress", id, state: "started" | "playing" |
   "ended" | "stopped" | "failed", ms, level, why?}`: started when the voice starts, then the position
   (`ms` played) and the loudness of what plays now (`level` 0..1) every 150 ms or so; `ended` once
   the speaker played the last of it; `stopped` (`why`: `phone` for its Stop, the notification or a
   headset's button; `focus` when a call or another player takes the audio; `unplugged` for
-  headphones; `network`); `failed` when it never played (`focus`, `off`, `http_<status>`,
-  `unreachable`). Only the phone playing a play is heard about it.
-- **To the asker** (the glasses), at most every 250 ms while it plays and at once on a change:
-  `{t:"speech.progress", progress: {id, state: "making" | "playing" | "ended" | "stopped" |
-  "failed", ms, chars, of, level, engine, why}}`. `chars` is how much of the text the voice has
-  read, from Soniox's timings at `ms` (between pieces, and for the Mac's voice, spread evenly);
-  `ended` has `chars = of`. A play whose text broke off before its end (both voices failed) is
-  `stopped` `cut`, never `ended`: a risky command counts as heard only when it was played whole.
-- `POST /v1/speech/plays/<id>/stop` (a tap on the glasses): the phone gets `{t:"speech.stop", id}`,
-  the making stops, the asker hears `stopped` `asked`.
+  headphones; `network`); `failed` when it never played (`focus`, `http_<status>`, `unreachable`).
+  Only the phone playing a play is heard about it.
+- `POST /v1/speech/plays/<id>/stop` (the phone playing it, or the Mac app): the phone gets
+  `{t:"speech.stop", id}` unless it stopped it itself, and the making stops.
 - **Watchdogs**: no `started` within 12 s of the first audio (24 s while none is made) → `failed`
-  `no_start` and the phone is told to stop (the glasses then play it themselves); no word from a
-  playing phone for 15 s → `stopped` `lost`; its feed gone and not back within 4 s → `stopped`
-  `lost`. A play is forgotten a minute after it ends.
+  `no_start` and the phone is told to stop; no word from a playing phone for 15 s → `stopped`
+  `lost`; its feed gone and not back within 4 s → `stopped` `lost`. A play is forgotten a minute
+  after it ends.
 - **The Mac app** hears `{t:"speaking", speaking: {id, sessionId, source, state, level, engine}}`
   on its feed alone, every 120 ms at most while a play goes, and draws the speaking wave on that
   session's row; `ended`, `stopped` or `failed` takes it away.
 
 **Privacy**: the text is never logged or written down; the log has one line a play (`speech play
-glasses soniox 9.2s ended`: the source, the engine, how long, how it ended). The key goes to Soniox
-alone, never into an answer, a message or the log. Recent reads stay in memory only, never on disk,
-by a hash of the engine, voice, rate and text, so the same reply read again starts at once: the
-Mac's last 6 whole clips, and the last 6 reads as PCM (Soniox's, and every play), 32 MB at most
-each, the oldest dropped first, every one dropped exactly 10 minutes after it was made, on a timer
-of its own (which never keeps the daemon running).
-
-## The speech companion
-
-One of two ways to recognise speech (the other is Soniox, see Speech to text): Hyperscribe Companion
-on the Mac, to which the phone streams the glasses' microphone straight over Tailscale.
-`GET /v1/speech/companion` hands Lens its pairing address, so the phone pairs once, with Hypernova,
-not twice.
-
-- → `{url: "wss://<mac>.<tailnet>.ts.net:7443/ws?token=…"}`, or `{url: null}` when the companion
-  isn't installed, has no token, has Tailscale turned off, or `tailscale serve` doesn't route its
-  port (`serve status --json`: an https TCP port and a web route for `<name>:<port>`).
-- Read on every request from `~/Library/Application Support/Hyperscribe Companion/settings.json`
-  (`port`, default 7443; `token`; `tailscale`): "New code" in the companion changes the token. The
-  host is this Mac's Tailscale name. Never a LAN address: plain `ws://` would expose the token,
-  the audio and the words.
-- Paired devices only, never logged. The token is the companion's credential; a paired phone
-  already drives Claude Code on this Mac, so it's within the trust it has. The daemon never starts
-  or configures the companion.
-
-## Speech to text
-
-Lens turns the glasses' microphone into text through Soniox's real-time API, relayed by the daemon
-with the owner's key (`daemon/src/stt.ts`), and the Android app does the same with the phone's own
-microphone (the mic in the composer, `android/.../data/Voice.kt`). Hyperscribe Companion (above) is
-the other way: both use Soniox while the snapshot says `stt.ready`, else the Companion.
-
-- **The phone's route**, worked out again on every snapshot and `{t:"stt"}`: `stt.ready` → Soniox
-  (`/v1/stt/ws` with the device token); else `GET /v1/speech/companion` → `{url}` → the Companion
-  (that url, as given); else no mic. The Companion's address is asked for only while `stt.ready` is
-  false, at most once a minute, and kept in memory only (its url carries the Companion's token). A
-  daemon too old to send `stt` gets no mic and no Voice section in the phone's Settings.
-
-- **The key** lives only on the Mac, in `<support>/stt.json` (0600). It is set from the Mac app (Setup's
-  Voice step or the Lens guide, on the Mac's port with the admin token) or from a paired device
-  (Lens' Settings → Speech, the Android app's Settings → Voice), and never sent back: clients get `Stt` in the snapshot, and `GET /v1/stt` adds its last
-  four characters.
-- `POST /v1/stt/key {provider?: "soniox", apiKey}`: the key is trimmed; empty → 400 `no_key`; spaces
-  inside or under 16 printable characters → 400 `bad_key`; another provider → 400 `bad_provider`.
-  Before keeping it, the daemon tries it (one try at a time): a stream to Soniox with a quarter of a
-  second of silence, then the end of the audio. Refused (401, 403) → 400 `bad_key`, nothing kept.
-  Taken, but the account has no balance (402) → kept, `ready: false`, `error` says so. Soniox out of
-  reach → kept unchecked (`checked: false`); the next stream tells. Any other answer (Soniox busy,
-  a problem on its side) → kept, `checked: true`, with Soniox's words in `problem` (null when the try
-  went through). The key removed while it was being tried → 409 `removed`, nothing kept. Open
-  streams end (`replaced`).
-- `DELETE /v1/stt/key` removes the file and ends open streams (`no_key`). `POST /v1/stt/test` tries
-  the kept key the same way → `{ok, message}` with the info (409 `no_key` without one): passing
-  clears a refusal or no balance; failing with either sets it.
-- `Stt.ready`: a key is kept and Soniox hasn't refused it (401, 403) or the account (402) since.
-  `error`: that problem in plain words, else null; a stream that gets words back clears it. Each
-  change goes out as `{t:"stt", stt}`.
-
-**The stream**, `GET /v1/stt/ws` (WebSocket) on the phone port with the device token (`?token=` or
-the header; the admin token over loopback), one per device: a new one ends the device's older
-stream (`error` `replaced`, close 4000). It speaks Hyperscribe Companion's protocol v1, so Lens'
-companion client (`lens/src/companion/client.ts`) works unchanged:
-
-| From | Message |
-|---|---|
-| Mac | `{type:"hello", ok: true, name: "Hypernova", version, model: "stt-rt-v5", modelLabel: "Soniox", languages: "*", busy: false}` on connecting; with no key, `{type:"error", code:"no_key", message}` and the socket closes |
-| phone | `{type:"start", language}` (an ISO code or `"auto"`), within 15 s. It needn't wait for `hello`: the Android app sends it as soon as the socket opens, then the audio it held meanwhile (Lens waits for `hello`) |
-| Mac | `{type:"started"}` once Soniox has the stream |
-| phone | binary frames: 16 kHz 16-bit little-endian mono PCM (the glasses send 40 ms, 1280 bytes), whole samples, at most 64 KB a frame |
-| Mac | `{type:"snapshot", finalText, interimText, finished: false}` as words come and settle |
-| phone | `{type:"stop"}`: Soniox is told the audio ended; its last words come as a `snapshot` with `finished: true` (all of it final), then the socket closes (1000). A stop while Soniox is still being reached waits for it: once it opens, the config, all the audio held so far, then the end, and it finishes as usual (a quick "yes" over a slow link isn't lost); a connection that fails still ends in `unreachable`. Closing the socket without `stop` cancels: nothing more is sent |
-| phone | `{type:"ping"}` → `{type:"pong"}` (Lens pings every 3 s and calls the link dead after 7 s of silence) |
-| Mac | `{type:"error", code, message}`, then close; after `started` it also carries the words so far (`finished: true`, `finalText`, `interimText: ""`), so none are lost |
-
-- **To Soniox**: `wss://stt-rt.soniox.com/transcribe-websocket`, the key as `Authorization: Bearer`
-  on the upgrade (never in the config, where Soniox deprecates it), the config as the first message,
-  `{model: "stt-rt-v5", audio_format: "pcm_s16le", sample_rate: 16000, num_channels: 1,
-  language_hints, context: {terms}}`, then the audio as binary frames, and an empty text frame to
-  end it. `language_hints` are hints, not limits: `en` → `["en"]`, another language → `[it, "en"]`
-  (code and product names are English), `auto` or none → `["en", "ru"]`. `context.terms`: "Claude
-  Code", "Hypernova", then the projects in use (with sessions, or a folder changed in the last 14
-  days), newest first, 20 terms in all; a snake_case or kebab-case name goes as its words
-  (`fuel_charge_statistics` → "fuel charge statistics"), and nothing twice, whatever its case; then
-  Lens's own command words and Telescope's sources ("Telescope", "debrief", "eclipse", "note",
-  "emulator", "simulator", "terminal", "web page", "window", "PDF"; `LENS_TERMS` in `stt.ts`), on top
-  of those 20, so "Telescope terminal" isn't heard as "To the scope terminal". So
-  "in hyperscribe, …" routes, and folders never used with Claude stay on the Mac. A key's test sends
-  no terms. No endpoint detection: letting go of the temple ends the utterance.
-- **Words**: Soniox's final tokens are added once and its non-final ones replace the last set; the
-  `<end>` and `<fin>` markers are dropped. `finalText` is the settled text and `interimText` the
-  rest, split between words (a word Soniox has half settled stays whole in `interimText`), spaces
-  collapsed, so the phone joins the two with a space.
-- **Limits**: 2 minutes of audio a stream (3,840,000 bytes; also at 2 min 15 s of wall time, and when
-  Soniox says `max_duration_reached`): the audio is ended and `error` `too_long` carries the whole
-  text. No `start` within 15 s, or no audio frame for 20 s → `idle`. While frames pause for 8 s the
-  daemon sends Soniox `{"type":"keepalive"}` (it closes a stream after 20 s without audio or one).
-  Soniox not finishing within 5 s of the end: the words so far go out as final.
-- **Errors** (`code`): `no_key`, `bad_key` (401, 403), `no_credit` (402), `busy` (429), `soniox` (408,
-  5xx, and anything else Soniox refuses, in its own words without links or request ids),
-  `unreachable` (no connection within 8 s), `lost` (Soniox closed early), `bad_audio`, `idle`,
-  `too_long`, `replaced`. `bad_key` and `no_credit` also set `Stt.error` and `ready: false`.
-- **Privacy**: audio, words and the key are never logged or written down; the log has one line a
-  stream (`stt stream <device> 3.8s done 240ms`: the audio's length, how it ended, and the time
-  from the phone's `stop` to its last words leaving, the figure a release feels like; no last figure
-  when there was no stop). Forgetting a device closes its stream (4001). `HYPERNOVA_SONIOX_WS` points
-  the daemon at a stand-in (the tests). The phone writes nothing either; a debug build logs only
-  `voice release→ended 243ms`.
+phone mac 9.2s ended`: the source, the engine, how long, how it ended). Recent reads stay in memory
+only, never on disk, by a hash of the voice, rate and text, so the same reply read again starts at
+once: the Mac's last 6 whole clips, and the last 6 plays as PCM, 32 MB at most each, the oldest
+dropped first, every one dropped exactly 10 minutes after it was made, on a timer of its own (which
+never keeps the daemon running).
 
 ## Reading transcripts
 
@@ -3605,7 +3444,7 @@ The admin token is in `<support>/admin-token` (0600); the Mac app reads it.
 | `POST /local/tailscale/serve` | turns on `tailscale serve` for port 47321 → `TailscaleStatus` |
 | `POST /local/integration/install` / `uninstall` | hooks + status line tee + the `claude` shell function (reversible, marked) |
 | `GET /local/devices`, `DELETE /local/devices/{id}` | paired phones: `{id, name, model, createdAt, lastSeenAt, appVersion?, client?, certFingerprint?, certExpiresAt?}` (`certFingerprint`: its device certificate's, once it has one, and `certExpiresAt` when that runs out, epoch ms). Deleting one revokes its certificate too |
-| `/v1/*` | the whole phone API is also available with the admin token (the Soniox key too) |
+| `/v1/*` | the whole phone API is also available with the admin token |
 | `GET /v1/ws?client=mac` (port 47321) | the Mac app's live feed: the admin token over loopback; in `connectedClients` like any client; the only feed that hears `speaking` |
 | `GET /qa` | the testing checklist page. It and the routes it calls (`/qa/state`, `/qa/save`, `/qa/shot`) need its key `?k=` (from `GET /v1/qa`; the page passes it on to its own requests) or the admin token, on either port. The menu's link opens the bare page in a browser: on this port that is redirected to the page with its key, but only for a page opened by hand or by an app (`Sec-Fetch-Site` `none` or `same-origin`, or a browser that sends none), with Host `127.0.0.1` or `localhost`, never for another site's request |
 

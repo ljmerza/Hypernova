@@ -144,8 +144,7 @@ export async function tailscaleStatus(fresh = false): Promise<TailscaleStatus> {
 
 /**
  * What `tailscale serve` routes now (`serve status --json`: `TCP` by port, `Web` by
- * "<name>:<port>"), or null without Tailscale. Cached like the status: the speech companion's
- * address asks on every request.
+ * "<name>:<port>"), or null without Tailscale. Cached like the status.
  */
 let serveCache: { at: number; v: Record<string, any> | null } | null = null
 export async function serveConfig(): Promise<Record<string, any> | null> {

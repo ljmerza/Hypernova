@@ -10,10 +10,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- The background connection comes back after the phone restarts (BootReceiver). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Voice: the mic in the composer, only between a press and the end (asked at the first press).
-         MODIFY_AUDIO_SETTINGS lets a dictation use a Bluetooth headset's microphone when that's on. -->
+    <!-- Voice: the mic in the composer, only between a press and the end (asked at the first press);
+         Android's on-device recognizer hears it, on the phone. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Read aloud: the CPU stays up while the phone plays a reply with the screen off, for that play only. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The in-app update (data/AppUpdater.kt): the APK the paired computer hands out, installed with

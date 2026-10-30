@@ -109,8 +109,7 @@ internal fun MessageMenu(
                 if (reading) ChatGlyph.Stop else ChatGlyph.Speaker,
                 stringResource(if (reading) R.string.chat_read_stop else R.string.chat_read),
                 { ReadAloud.toggle(hub, item.key, text, appScope, toast, sessionId); onDismiss() },
-                hint = if (reading || hub.isDemo) null else hub.speech?.settings?.takeIf { it.using == "soniox" }?.let { stringResource(R.string.read_aloud_hint_soniox, it.voice) }
-                    ?: stringResource(R.string.chat_read_hint),
+                hint = if (reading || hub.isDemo) null else stringResource(R.string.chat_read_hint),
             )
             SheetAction(ChatGlyph.Select, stringResource(R.string.chat_select), { page = Page.Select })
             if (mine) {

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Read aloud: Soniox or the Mac's voice, played on this phone, and the
+<!-- Read aloud: the Mac's voice, played on this phone, and the
      speaking wave (data/Speech*.kt, ui/voice/Speaking.kt, ui/settings/ReadAloudSection.kt). -->
 <resources>
     <!-- The speaking wave, the bar and the notification. -->
@@ -11,20 +11,13 @@
     <string name="speaking_channel">Reading aloud</string>
     <string name="speaking_channel_desc">While a reply is read aloud, with Stop.</string>
 
-    <!-- Settings → Voice, read aloud. -->
+    <!-- Settings → Read aloud. -->
     <string name="read_aloud">Read aloud</string>
-    <string name="read_aloud_soniox_chip">Soniox</string>
     <string name="read_aloud_mac_chip">Mac voice</string>
-    <string name="read_aloud_with">Read aloud with</string>
-    <string name="read_aloud_soniox">Soniox</string>
-    <string name="read_aloud_soniox_body">Natural voices, Russian too. Uses your Soniox key.</string>
-    <string name="read_aloud_mac">Mac voice</string>
-    <string name="read_aloud_mac_body">The voices on your Mac. Works offline.</string>
     <string name="read_aloud_mac_default">System voice</string>
     <string name="read_aloud_voice">Voice</string>
     <string name="read_aloud_voices_loading">Asking for the voices…</string>
     <string name="read_aloud_speed">Speed</string>
     <string name="read_aloud_test">Test</string>
     <string name="read_aloud_sample">This is how Hypernova reads replies aloud.</string>
-    <string name="read_aloud_hint_soniox">%1$s on Soniox</string>
 </resources>

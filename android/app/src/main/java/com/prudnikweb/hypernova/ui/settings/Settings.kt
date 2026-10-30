@@ -270,11 +270,10 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                     )
                 }
             }
-            // Voice (VoiceSection.kt): only from a Mac that knows about it.
-            if (hub.voice.stt != null) {
+            // Read aloud (ReadAloudSection.kt): only from a Mac that reads aloud this way.
+            if (hub.speech?.settings != null) {
                 item(key = "voice") {
-                    Spacer(Modifier.height(10.dp))
-                    VoiceSection(hub)
+                    ReadAloudSection(hub)
                 }
             }
             // Files: Browse outside projects (FilesSection below), from a Mac that has it.

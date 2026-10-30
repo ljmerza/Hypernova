@@ -1,6 +1,6 @@
-// Read aloud (docs/PROTOCOL.md, "Read aloud"): which voice reads replies, Soniox's natural voices
-// or the Mac's own, and plays: speech made here and played by the Hypernova app on the phone,
-// natively, through whatever the phone plays to (Bluetooth headphones too), screen off or not.
+// Read aloud (docs/PROTOCOL.md, "Read aloud"): the Mac's own voice (`say`) reads replies, and plays:
+// speech made here and played by the Hypernova app on the phone, natively, through whatever the
+// phone plays to (Bluetooth headphones too), screen off or not.
 //
 // The text is in memory only, never logged or written down; the log has one line a play (who, the
 // engine, how long, how it ended).
@@ -12,22 +12,24 @@ import { SUPPORT, log, readJson, writeJson } from './util.ts'
 import { broadcast } from './hub.ts'
 import { toMacApps } from './mac-feed.ts'
 import { listDevices } from './store.ts'
-import { onSttChange, sttState } from './stt.ts'
-import { MAX_SPEECH, listVoices, sayPcm, speak } from './speech.ts'
-import { BYTES_PER_MS, TTS_RATE, sonioxSpeak, sonioxVoiceFor, sonioxVoices, ttsModel, ttsPieces, wav, type Mark } from './tts.ts'
+import { listVoices, sayPcm, speak } from './speech.ts'
 
 const fail = (status: number, code: string, message: string) => Object.assign(new Error(message), { status, code })
 
+/** The PCM a play streams: 24 kHz, 16-bit, mono. */
+export const TTS_RATE = 24_000
+export const BYTES_PER_MS = (TTS_RATE * 2) / 1000
+
 // ── The setting ──────────────────────────────────────────────────────────
 
-export type Engine = 'soniox' | 'mac'
-type Saved = { engine?: Engine; voice?: string; macVoice?: string | null; rate?: number }
+/** The one engine left: the Mac's voice (still sent, for clients that read it). */
+export type Engine = 'mac'
+type Saved = { macVoice?: string | null; rate?: number }
 const FILE = join(SUPPORT, 'speech.json')
 let saved: Saved = (() => {
+  // An older file's Soniox fields (`engine`, `voice`) are left alone and not read.
   const s = readJson<any>(FILE, {})
   return {
-    ...(s?.engine === 'soniox' || s?.engine === 'mac' ? { engine: s.engine } : {}),
-    ...(typeof s?.voice === 'string' && s.voice ? { voice: s.voice } : {}),
     ...(typeof s?.macVoice === 'string' && s.macVoice ? { macVoice: s.macVoice } : {}),
     ...(typeof s?.rate === 'number' && Number.isFinite(s.rate) ? { rate: clampRate(s.rate) } : {}),
   }
@@ -37,65 +39,29 @@ function clampRate(r: number): number {
   return Math.round(Math.min(2, Math.max(0.5, r)) * 100) / 100
 }
 
-/** The last time Soniox couldn't read and the Mac's voice did, in one line; the next good read clears it. */
-let fallbackNote: string | null = null
-
 /** What every client sees (the snapshot's `speech`, and `{t:"speech"}` on each change). */
 export type SpeechState = {
-  /** Chosen: Soniox once a key is there, unless the owner picked the Mac's voice. */
+  /** Always the Mac's voice. */
   engine: Engine
-  /** What reads now: the Mac's voice while Soniox can't (no key, a key it refused). */
   using: Engine
-  /** Soniox's voice, and the Mac's (null: the Mac's own default). */
-  voice: string
+  /** The Mac's voice (null: the Mac's own default). */
   macVoice: string | null
-  /** 0.5–2; Soniox reads at 0.7–1.3 of it. */
+  /** 0.5–2. */
   rate: number
-  model: string
-  /** A Soniox key is kept and Soniox takes it. */
-  soniox: boolean
-  /** Why the Mac's voice reads although Soniox was chosen, in one line; else null. */
-  note: string | null
 }
 
 export function speechState(): SpeechState {
-  const stt = sttState()
-  const soniox = stt.provider === 'soniox' && stt.ready
-  const engine: Engine = saved.engine ?? (stt.provider === 'soniox' ? 'soniox' : 'mac')
-  const using: Engine = engine === 'soniox' && soniox ? 'soniox' : 'mac'
-  const note =
-    engine !== 'soniox' ? null
-    : !stt.provider ? 'No Soniox key on this Mac, so the Mac’s voice reads.'
-    : !soniox ? `${stt.error ?? 'Soniox isn’t taking the key'} Until then the Mac’s voice reads.`
-    : fallbackNote
-  return { engine, using, voice: sonioxVoiceFor(saved.voice), macVoice: saved.macVoice ?? null, rate: saved.rate ?? 1, model: ttsModel(), soniox, note }
+  return { engine: 'mac', using: 'mac', macVoice: saved.macVoice ?? null, rate: saved.rate ?? 1 }
 }
 
-let lastSent = ''
 function changed(): void {
-  const now = JSON.stringify(speechState())
-  if (now === lastSent) return
-  lastSent = now
-  broadcast({ t: 'speech', speech: JSON.parse(now) })
+  broadcast({ t: 'speech', speech: speechState() })
 }
-onSttChange(changed)
-setTimeout(() => (lastSent = JSON.stringify(speechState())), 0)
 
-/** `POST /v1/speech/settings`: any of the engine, either voice, the rate. */
+/** `POST /v1/speech/settings`: the Mac's voice, the rate. */
 export async function saveSpeech(b: any): Promise<SpeechState> {
   const next: Saved = { ...saved }
-  if (b?.engine !== undefined) {
-    if (b.engine !== 'soniox' && b.engine !== 'mac') throw fail(400, 'bad_engine', 'Read aloud with Soniox or the Mac’s voice.')
-    next.engine = b.engine
-  }
-  if (b?.voice !== undefined) {
-    const v = typeof b.voice === 'string' ? b.voice.trim() : ''
-    if (!/^[\w .'()-]{1,50}$/.test(v)) throw fail(400, 'bad_voice', 'That isn’t one of Soniox’s voices.')
-    // Checked against Soniox's list when it can be had; offline, the name is kept and tried later.
-    const list = await sonioxVoices().catch(() => null)
-    if (list && !list.voices.some((x) => x.id === v)) throw fail(400, 'bad_voice', 'That isn’t one of Soniox’s voices.')
-    next.voice = v
-  }
+  if (b?.engine !== undefined && b.engine !== 'mac') throw fail(400, 'bad_engine', 'Read aloud with the Mac’s voice.')
   if (b?.macVoice !== undefined) {
     if (b.macVoice === null || b.macVoice === '') delete next.macVoice
     else if (typeof b.macVoice !== 'string' || !(await listVoices()).some((x) => x.id === b.macVoice)) throw fail(400, 'bad_voice', 'That isn’t one of this Mac’s voices.')
@@ -106,18 +72,14 @@ export async function saveSpeech(b: any): Promise<SpeechState> {
     next.rate = clampRate(b.rate)
   }
   saved = next
+  // Whole, so an older file's Soniox fields go with the first change.
   writeJson(FILE, saved)
   changed()
   return speechState()
 }
 
-/** `GET /v1/speech/voices?engine=`: the Mac's voices, or Soniox's. */
-export async function voicesFor(engine: string | null): Promise<unknown> {
-  if (engine === 'soniox') {
-    const { model, voices } = await sonioxVoices()
-    changed()
-    return { engine: 'soniox', model, voices }
-  }
+/** `GET /v1/speech/voices`: the Mac's voices (`?engine=` is no longer read). */
+export async function voicesFor(): Promise<unknown> {
   return { engine: 'mac', voices: await listVoices() }
 }
 
@@ -126,7 +88,7 @@ export async function voicesFor(engine: string | null): Promise<unknown> {
 // once: at most 6 and 32 MB, each dropped 10 minutes after it was made (speech.ts keeps the Mac's
 // whole clips the same way).
 
-type Kept = { pcm: Buffer; marks: Mark[]; engine: Engine; timer: ReturnType<typeof setTimeout> }
+type Kept = { pcm: Buffer; timer: ReturnType<typeof setTimeout> }
 const kept = new Map<string, Kept>()
 const KEEP_MS = 10 * 60_000
 const KEEP_BYTES = 32 * 1024 * 1024
@@ -148,74 +110,43 @@ function keep(key: string, k: Omit<Kept, 'timer'>): void {
   }
 }
 
-const keyOf = (engine: Engine, voice: string | null, rate: number, text: string) => createHash('sha256').update(`${engine}\n${voice ?? ''}\n${rate}\n${text}`).digest('hex')
+const keyOf = (voice: string | null, rate: number, text: string) => createHash('sha256').update(`mac\n${voice ?? ''}\n${rate}\n${text}`).digest('hex')
 
 // ── Making the audio ─────────────────────────────────────────────────────
 
-type Sink = { audio(pcm: Buffer): void; marks(m: Mark[]): void; pieceDone(upTo: number): void; engine(e: Engine): void }
-
-/** Whether a failure is Soniox's (then the Mac's voice takes over), or the read was stopped. */
-const stopped = (e: any, signal: AbortSignal) => signal.aborted || e?.code === 'stopped'
-
 /**
- * The whole [text] as 24 kHz PCM into [sink]: Soniox while it can, else the Mac's voice, from the
- * start or from where Soniox stopped (the sentence it was in). Each fallback leaves a note.
+ * The text in pieces, each cut after a sentence where one ends near the limit (else between words),
+ * the first one short so the voice starts at once. `at` is where each starts in the text.
  */
-async function make(text: string, s: SpeechState, out: Sink, signal: AbortSignal, wantVoice?: string | null): Promise<{ engine: Engine; whole: boolean }> {
-  let from = 0
-  let lastAt = -1
-  // How much audio is made, so the Mac's voice carrying on after Soniox lines its marks up.
-  let madeMs = 0
-  const sink: Sink = { ...out, audio: (b) => ((madeMs += b.length / BYTES_PER_MS), out.audio(b)) }
-  if (s.using === 'soniox') {
-    sink.engine('soniox')
-    let doneUpTo = 0
-    try {
-      await sonioxSpeak(
-        text,
-        { voice: wantVoice ?? s.voice, rate: s.rate },
-        {
-          audio: sink.audio,
-          marks: (m) => {
-            lastAt = m[m.length - 1]!.at
-            sink.marks(m)
-          },
-          pieceDone: (upTo) => {
-            doneUpTo = upTo
-            sink.pieceDone(upTo)
-          },
-        },
-        signal,
-      )
-      if (fallbackNote) {
-        fallbackNote = null
-        changed()
-      }
-      return { engine: 'soniox', whole: true }
-    } catch (e: any) {
-      if (stopped(e, signal)) throw fail(409, 'stopped', 'Stopped.')
-      // Mid-reply: carry on from the start of the word the voice had got to (never back past a
-      // piece that was read whole).
-      from = Math.max(doneUpTo, lastAt >= 0 ? text.lastIndexOf(' ', lastAt) + 1 : 0)
-      fallbackNote = `Soniox couldn’t read (${String(e?.message ?? 'it failed').replace(/\.$/, '')}), so the Mac’s voice did.`
-      log('speech', 'soniox failed, the Mac reads', e?.code ?? '')
-      changed()
+export function ttsPieces(text: string, first = 320, max = 1100): Array<{ text: string; at: number }> {
+  const out: Array<{ text: string; at: number }> = []
+  let at = 0
+  while (at < text.length) {
+    const limit = out.length ? max : first
+    let end = Math.min(text.length, at + limit)
+    if (end < text.length) {
+      const window = text.slice(at, end)
+      const sentence = Math.max(...['. ', '! ', '? ', '… ', '\n', '.\n', '。'].map((m) => window.lastIndexOf(m)))
+      const space = window.lastIndexOf(' ')
+      if (sentence > limit / 3) end = at + sentence + 1
+      else if (space > limit / 3) end = at + space + 1
     }
+    const piece = text.slice(at, end)
+    if (piece.trim()) out.push({ text: piece, at })
+    at = end
   }
-  sink.engine('mac')
-  const rest = text.slice(from)
-  for (const p of ttsPieces(rest, 400, 2000)) {
+  return out
+}
+
+/** The whole [text] as 24 kHz PCM from the Mac's voice, piece by piece into [audio]. */
+async function make(text: string, s: SpeechState, audio: (pcm: Buffer) => void, signal: AbortSignal): Promise<void> {
+  for (const p of ttsPieces(text, 400, 2000)) {
     if (signal.aborted) throw fail(409, 'stopped', 'Stopped.')
     const pcm = await sayPcm(p.text, s.macVoice, s.rate, signal).catch((e) => {
       throw signal.aborted ? fail(409, 'stopped', 'Stopped.') : e
     })
-    // The Mac's voice says nothing of its timing: each piece is spread evenly over its own audio.
-    const start = madeMs
-    sink.marks([{ at: from + p.at, ms: start }, { at: from + p.at + p.text.length, ms: start + pcm.length / BYTES_PER_MS }])
-    sink.audio(pcm)
-    sink.pieceDone(from + p.at + p.text.length)
+    audio(pcm)
   }
-  return { engine: from > 0 ? 'soniox' : 'mac', whole: from === 0 }
 }
 
 // ── The phone apps that play ────────────────────────────────────────────
@@ -284,10 +215,9 @@ class Play {
   readonly sessionId: string | null
   readonly source = 'phone'
   readonly of: number
-  engine: Engine
+  readonly engine: Engine = 'mac'
   pcm: Buffer[] = []
   bytes = 0
-  marks: Mark[] = []
   made = false
   failed: (Error & { code?: string }) | null = null
   state: PlayState = 'making'
@@ -303,11 +233,10 @@ class Play {
   private waiters = new Set<() => void>()
   private tick: ReturnType<typeof setInterval>
 
-  constructor(o: { target: string; sessionId: string | null; of: number; engine: Engine }) {
+  constructor(o: { target: string; sessionId: string | null; of: number }) {
     this.target = o.target
     this.sessionId = o.sessionId
     this.of = o.of
-    this.engine = o.engine
     this.tick = setInterval(() => this.check(), 1000)
     this.tick.unref()
   }
@@ -451,7 +380,7 @@ export async function startPlay(b: any, who: string): Promise<{ play: ReturnType
   const sessionId = typeof b?.sessionId === 'string' && /^[\w-]{1,80}$/.test(b.sessionId) ? b.sessionId : null
   // One play at a time for each phone.
   for (const p of plays.values()) if (p.live && p.target === target) p.end('stopped', 'replaced')
-  const play = new Play({ target, sessionId, of: text.length, engine: s.using })
+  const play = new Play({ target, sessionId, of: text.length })
   plays.set(play.id, play)
   void produce(play, text, s)
   const name = listDevices().find((d) => d.id === target)?.name ?? 'Phone'
@@ -459,19 +388,16 @@ export async function startPlay(b: any, who: string): Promise<{ play: ReturnType
 }
 
 async function produce(p: Play, text: string, s: SpeechState): Promise<void> {
-  const voice = s.using === 'soniox' ? s.voice : s.macVoice
-  const key = keyOf(s.using, voice, s.rate, text)
+  const key = keyOf(s.macVoice, s.rate, text)
   const hit = kept.get(key)
   if (hit) {
-    p.engine = hit.engine
-    p.marks = hit.marks
     p.audio(hit.pcm)
     return p.done()
   }
   try {
-    const r = await make(text, s, { audio: (b) => p.live && p.audio(b), marks: (m) => p.marks.push(...m), pieceDone: () => {}, engine: (e) => (p.engine = e) }, p.abort.signal)
+    await make(text, s, (b) => p.live && p.audio(b), p.abort.signal)
     // A very long play isn't kept: keep() would drop it at once, after a second copy of it was made.
-    if (r.whole && p.live && p.bytes <= KEEP_BYTES) keep(key, { pcm: Buffer.concat(p.pcm), marks: p.marks, engine: r.engine })
+    if (p.live && p.bytes <= KEEP_BYTES) keep(key, { pcm: Buffer.concat(p.pcm) })
     p.done()
   } catch (e: any) {
     if (p.abort.signal.aborted) return p.done()
@@ -500,49 +426,22 @@ function stopPlay(id: string, who: string): { ok: true; state: PlayState } {
 
 // ── A whole clip (the phone's older way) ──────────────────────────────
 
-const clipping = new Map<string, AbortController>()
-
 /**
- * `POST /v1/speech`: the whole clip at once. With Soniox, WAV (decodeAudioData takes it in every
- * WebView); with the Mac's voice, AAC in M4A as before. A Mac voice asked for by an older client
- * only counts while the Mac's voice reads; a rate other than 1 always does.
+ * `POST /v1/speech`: the whole clip at once, AAC in M4A from the Mac's voice. A voice or a rate other
+ * than 1 asked for by the client counts.
  */
 export async function speakClip(b: any, who: string, gone: AbortSignal): Promise<{ bytes: Buffer; type: string; engine: Engine }> {
   const text = typeof b?.text === 'string' ? b.text : ''
   const s = speechState()
   const rate = typeof b?.rate === 'number' && Number.isFinite(b.rate) && b.rate !== 1 ? clampRate(b.rate) : s.rate
-  const mac = async () => ({ bytes: await speak(text, typeof b?.voice === 'string' && b.voice ? b.voice : s.macVoice, rate, who, gone), type: 'audio/mp4', engine: 'mac' as Engine })
-  if (s.using !== 'soniox' || b?.engine === 'mac') return mac()
-  if (!text.trim()) throw fail(400, 'empty', 'There’s nothing to read.')
-  if (text.length > MAX_SPEECH) throw fail(413, 'too_long', `At most ${MAX_SPEECH} characters at a time.`)
-  // One clip at a time per device: a newer request replaces the one being made.
-  clipping.get(who)?.abort()
-  const ac = new AbortController()
-  clipping.set(who, ac)
-  gone.addEventListener('abort', () => ac.abort(), { once: true })
-  const key = keyOf('soniox', s.voice, rate, text)
-  try {
-    const hit = kept.get(key)
-    if (hit) return { bytes: wav(hit.pcm), type: 'audio/wav', engine: hit.engine }
-    const pcm: Buffer[] = []
-    const marks: Mark[] = []
-    let engine: Engine = 'soniox'
-    const r = await make(text, { ...s, rate }, { audio: (x) => pcm.push(x), marks: (m) => marks.push(...m), pieceDone: () => {}, engine: (e) => (engine = e) }, ac.signal).catch((e) => {
-      throw ac.signal.aborted && !gone.aborted ? fail(409, 'replaced', 'A newer request to read aloud replaced this one.') : e
-    })
-    const all = Buffer.concat(pcm)
-    if (r.whole && all.length <= KEEP_BYTES) keep(key, { pcm: all, marks, engine })
-    return { bytes: wav(all), type: 'audio/wav', engine }
-  } finally {
-    if (clipping.get(who) === ac) clipping.delete(who)
-  }
+  return { bytes: await speak(text, typeof b?.voice === 'string' && b.voice ? b.voice : s.macVoice, rate, who, gone), type: 'audio/mp4', engine: 'mac' }
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────
 
 /**
- * Every `/v1/speech…` route but the companion's (speech.ts): true when it answered. [who] is the
- * paired device, or "mac" for the Mac app's admin token.
+ * Every `/v1/speech…` route: true when it answered. [who] is the paired device, or "mac" for the
+ * Mac app's admin token.
  */
 export async function speechRoute(path: string, method: string, req: IncomingMessage, res: ServerResponse, who: string, body: () => Promise<any>): Promise<boolean> {
   const json = (status: number, v: unknown) => {
@@ -550,10 +449,7 @@ export async function speechRoute(path: string, method: string, req: IncomingMes
     res.end(JSON.stringify(v))
     return true
   }
-  if (path === '/v1/speech/voices' && method === 'GET') {
-    const engine = new URL(req.url ?? '/', 'http://x').searchParams.get('engine')
-    return json(200, await voicesFor(engine))
-  }
+  if (path === '/v1/speech/voices' && method === 'GET') return json(200, await voicesFor())
   if (path === '/v1/speech/settings' && method === 'GET') return json(200, { speech: speechState() })
   if (path === '/v1/speech/settings' && method === 'POST') return json(200, { speech: await saveSpeech(await body()) })
   if (path === '/v1/speech/play' && method === 'POST') return json(200, await startPlay(await body(), who))
