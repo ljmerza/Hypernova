@@ -129,9 +129,16 @@ flowchart LR
 - Optional: your own VPN into the computer's network (WireGuard, a UniFi VPN…), to reach it from
   anywhere. On the same Wi-Fi nothing else is needed.
 
-**1. Install the server**, as the user who'll run the agents (not root). Either from the
-[latest release](https://github.com/ljmerza/Hypernova/releases/latest)'s server package,
-`hypernova-server-<tag>-linux.tar.gz` (one package for x86_64 and arm64):
+**1. Install the server**, as the user who'll run the agents (not root), in one line:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/scripts/get.sh | bash
+```
+
+It downloads the [latest release](https://github.com/ljmerza/Hypernova/releases/latest)'s server
+package and runs its install script ([`scripts/get.sh`](scripts/get.sh)); run it again to update.
+Or do the same by hand with the server package, `hypernova-server-<tag>-linux.tar.gz` (one package
+for x86_64 and arm64):
 
 ```bash
 gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the release page

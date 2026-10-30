@@ -23,7 +23,11 @@ Run it as the user who will use Claude Code or Codex, not as root. The script as
 packages only.
 
 ```sh
-# A release's server package (https://github.com/ljmerza/Hypernova/releases/latest:
+# In one line: the latest release's server package, downloaded and installed (scripts/get.sh;
+# HYPERNOVA_TAG=<tag> for another release, `| bash -s -- --yes` for no questions):
+curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/scripts/get.sh | bash
+
+# The same by hand. A release's server package (https://github.com/ljmerza/Hypernova/releases/latest:
 # hypernova-server-<tag>-linux.tar.gz, one package for x86_64 and arm64), on the server:
 gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the page
 tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh

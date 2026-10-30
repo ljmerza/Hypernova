@@ -51,8 +51,10 @@ one is named `v<version>-ljm.<n>` (the tag below) and carries:
   arm64: Node.js and the terminal module are fetched and built for the server at install)
 - `hypernova-<tag>.apk`: the Android app
 
-On the server, `gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'`
-fetches the newest server package; or save it from the release page and copy it over.
+On the server, `curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/scripts/get.sh | bash`
+downloads the newest server package and installs it in one go (`scripts/get.sh`). By hand,
+`gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'` fetches it; or save
+it from the release page and copy it over.
 
 The Mac app (`Hypernova.dmg`) is upstream's and isn't built in this fork: get it from
 [upstream's releases](https://github.com/prudnik-web/Hypernova/releases/latest), which also
