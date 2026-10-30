@@ -103,6 +103,8 @@ import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.problemText
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.data.Finished
+import com.prudnikweb.hypernova.data.ReadState
 import com.prudnikweb.hypernova.data.CodexState
 import com.prudnikweb.hypernova.data.AgentLead
 import com.prudnikweb.hypernova.data.Usage
@@ -436,6 +438,9 @@ fun HomeScreen(
                 // The sessions in three groups, as `claude agents` lists them (owner, 2026-10-29): needs
                 // input, working, completed, each under its own seam with how many it holds. An empty
                 // group has no seam. A card moves only when its group changes (homeGroups).
+                // Completed cards say when they finished and mark a reply not read on this phone
+                // (data/Unread.kt); the demo keeps no marks.
+                val readMarks = ReadState.server(hub)?.let { ReadState.of(context, it) }
                 for ((group, members) in homeGroups(sessions)) {
                     item(key = group.key) {
                         GroupSeam(
@@ -457,6 +462,8 @@ fun HomeScreen(
                             ask = ask,
                             onAnswer = { id, answer -> answerCard(hub, s.id, ask, id, answer) },
                             menu = if (!hub.isDemo && MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
+                            completed = group == HomeGroup.Completed,
+                            unread = group == HomeGroup.Completed && readMarks != null && ReadState.unread(readMarks, s),
                         )
                     }
                 }
@@ -578,13 +585,19 @@ internal fun homeGroup(s: Session) = when {
 }
 
 /**
- * Home's sessions by group, empty groups left out. Within a group by name, A to Z (then by id), not
- * by activity: the owner saw cards "keep swapping back and forth", so one moves only when its group
- * changes.
+ * Home's sessions by group, empty groups left out. Needs input and Working by name, A to Z (then by
+ * id), not by activity: the owner saw cards "keep swapping back and forth", so one moves only when
+ * its group changes. Completed by when it finished, newest first (owner, 2026-10-30), the time its
+ * card says ("5m ago"); the same time by name.
  */
 internal fun homeGroups(sessions: List<Session>): List<Pair<HomeGroup, List<Session>>> {
-    val byName = sessions.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, Session::name).thenBy { it.id })
-    return HomeGroup.entries.mapNotNull { g -> byName.filter { homeGroup(it) == g }.takeIf { it.isNotEmpty() }?.let { g to it } }
+    val byName = compareBy(String.CASE_INSENSITIVE_ORDER, Session::name).thenBy { it.id }
+    val newest = compareByDescending<Session> { it.updatedAt }.then(byName)
+    return HomeGroup.entries.mapNotNull { g ->
+        sessions.filter { homeGroup(it) == g }
+            .sortedWith(if (g == HomeGroup.Completed) newest else byName)
+            .takeIf { it.isNotEmpty() }?.let { g to it }
+    }
 }
 
 @Composable
@@ -752,6 +765,10 @@ fun SessionCard(
     menu: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     /** Fork: prompts the Mac holds until you answer (data/Held.kt). */
     held: Int = 0,
+    /** In Completed: its stamp says when it finished ("5m ago", "yesterday"). */
+    completed: Boolean = false,
+    /** Its latest reply came after it was last opened on this phone (data/Unread.kt): a mint dot before its title. */
+    unread: Boolean = false,
 ) {
     val needs = s.state == SessionState.NeedsYou
     val res = LocalContext.current.resources
@@ -765,8 +782,11 @@ fun SessionCard(
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Seam(
                 label = s.project,
-                // Its short id and age as quiet marks, not "c7 · 1m".
-                trailContent = { SessionStamp(s.hex, ago(s.updatedAt, now), sessionSaid(res, s.hex, s.updatedAt, now)) },
+                // Its short id and age as quiet marks, not "c7 · 1m". Completed: when it finished.
+                trailContent = {
+                    if (completed) SessionStamp(s.hex, finishedAgo(s.updatedAt, now), finishedSaid(res, s.hex, s.updatedAt, now))
+                    else SessionStamp(s.hex, ago(s.updatedAt, now), sessionSaid(res, s.hex, s.updatedAt, now))
+                },
                 activity = when {
                     needs -> Activity.Alert
                     s.busy -> Activity.Live
@@ -774,7 +794,15 @@ fun SessionCard(
                 },
             )
             Spacer(Modifier.height(12.dp))
-            ScrambledName(s.name, scramble)
+            if (unread) {
+                // A reply he hasn't read: a mint point before the title, nothing more.
+                val said = stringResource(R.string.unread_said)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(6.dp).background(HN.accent, androidx.compose.foundation.shape.CircleShape).semantics { contentDescription = said })
+                    Spacer(Modifier.width(8.dp))
+                    ScrambledName(s.name, scramble)
+                }
+            } else ScrambledName(s.name, scramble)
             Spacer(Modifier.height(4.dp))
             if (block != null) {
                 // Stopped by a limit, the account or its provider: the eclipsed sun the chat's line
@@ -1769,4 +1797,26 @@ fun ago(t: Long, now: Long): String {
         s < 86400 -> stringResource(R.string.ago_hours, s / 3600)
         else -> stringResource(R.string.ago_days, s / 86400)
     }
+}
+
+/** A Completed card's stamp: "5m ago", "2h ago", "yesterday" ([Finished]). */
+@Composable
+private fun finishedAgo(t: Long, now: Long): String = when (val f = Finished.of(t, now)) {
+    Finished.Now -> stringResource(R.string.done_ago_now)
+    is Finished.Minutes -> stringResource(R.string.done_ago_minutes, f.n)
+    is Finished.Hours -> stringResource(R.string.done_ago_hours, f.n)
+    Finished.Yesterday -> stringResource(R.string.done_ago_yesterday)
+    is Finished.Days -> stringResource(R.string.done_ago_days, f.n)
+}
+
+/** "Session c7, finished 5 minutes ago." */
+private fun finishedSaid(res: android.content.res.Resources, hex: String, t: Long, now: Long): String {
+    val ago = when (val f = Finished.of(t, now)) {
+        Finished.Now -> res.getString(R.string.meta_ago_now)
+        is Finished.Minutes -> res.getQuantityString(R.plurals.meta_ago_minutes, f.n, f.n)
+        is Finished.Hours -> res.getQuantityString(R.plurals.meta_ago_hours, f.n, f.n)
+        Finished.Yesterday -> res.getString(R.string.done_ago_yesterday)
+        is Finished.Days -> res.getQuantityString(R.plurals.meta_ago_days, f.n, f.n)
+    }
+    return res.getString(R.string.meta_finished_said, hex, ago)
 }

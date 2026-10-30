@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Home's three groups (homeGroups): needs input, working, completed, each A to Z by name. */
+/** Home's three groups (homeGroups): needs input and working A to Z by name, completed newest first. */
 class HomeGroupsTest {
     private fun s(id: String, name: String, state: SessionState, phase: Phase = Phase.of(state), agents: Int = 0, endedBy: String? = null, updatedAt: Long = 0L) =
         Session(hex = id, id = id, name = name, project = "p", state = state, model = "opus", mode = "default", activity = "", updatedAt = updatedAt, phase = phase, agentsRunning = agents, endedBy = endedBy)
@@ -37,31 +37,52 @@ class HomeGroupsTest {
         )
     }
 
-    @Test fun byNameNotActivitySoCardsHoldStill() {
+    @Test fun workingByNameNotActivitySoCardsHoldStill() {
         // The newest activity first in, as the hub has them: the list still reads A to Z, any case.
         val groups = homeGroups(
             listOf(
-                s("1", "zeta", SessionState.Idle, updatedAt = 30),
-                s("2", "Alpha", SessionState.Idle, updatedAt = 20),
-                s("3", "beta", SessionState.Idle, updatedAt = 10),
+                s("1", "zeta", SessionState.Working, updatedAt = 30),
+                s("2", "Alpha", SessionState.Working, updatedAt = 20),
+                s("3", "beta", SessionState.NeedsYou, updatedAt = 10),
+                s("4", "Gamma", SessionState.NeedsYou, updatedAt = 40),
             ),
         )
-        assertEquals(listOf(HomeGroup.Completed to listOf("Alpha", "beta", "zeta")), names(groups))
+        assertEquals(listOf(HomeGroup.NeedsInput to listOf("beta", "Gamma"), HomeGroup.Working to listOf("Alpha", "zeta")), names(groups))
         // A card moves only when its group changes: beta starts working, the others keep their order.
         val after = homeGroups(
             listOf(
-                s("3", "beta", SessionState.Working, updatedAt = 40),
-                s("1", "zeta", SessionState.Idle, updatedAt = 30),
-                s("2", "Alpha", SessionState.Idle, updatedAt = 20),
+                s("3", "beta", SessionState.Working, updatedAt = 50),
+                s("1", "zeta", SessionState.Working, updatedAt = 30),
+                s("2", "Alpha", SessionState.Working, updatedAt = 60),
             ),
         )
-        assertEquals(listOf(HomeGroup.Working to listOf("beta"), HomeGroup.Completed to listOf("Alpha", "zeta")), names(after))
+        assertEquals(listOf(HomeGroup.Working to listOf("Alpha", "beta", "zeta")), names(after))
+    }
+
+    @Test fun completedNewestFirst() {
+        // The owner, 2026-10-30: the one that finished last at the top, by the time its card says.
+        val groups = homeGroups(
+            listOf(
+                s("1", "alpha", SessionState.Idle, updatedAt = 10),
+                s("2", "zeta", SessionState.Idle, updatedAt = 30),
+                s("3", "Beta", SessionState.Idle, updatedAt = 20),
+                s("4", "cut", SessionState.Idle, Phase.Ended, endedBy = MAC_RESTART, updatedAt = 25),
+            ),
+        )
+        assertEquals(listOf(HomeGroup.Completed to listOf("zeta", "cut", "Beta", "alpha")), names(groups))
     }
 
     @Test fun theSameNameFallsBackToTheId() {
-        val list = listOf(s("b", "fix", SessionState.Idle), s("a", "Fix", SessionState.Idle), s("c", "fix", SessionState.Idle))
+        val list = listOf(s("b", "fix", SessionState.Working), s("a", "Fix", SessionState.Working), s("c", "fix", SessionState.Working))
         val ids = homeGroups(list).single().second.map { it.id }
         assertEquals(listOf("a", "b", "c"), ids)
+        assertEquals(ids, homeGroups(list.reversed()).single().second.map { it.id })
+    }
+
+    @Test fun completedAtTheSameTimeByName() {
+        val list = listOf(s("b", "fix", SessionState.Idle, updatedAt = 5), s("z", "Apply", SessionState.Idle, updatedAt = 5), s("a", "Fix", SessionState.Idle, updatedAt = 5))
+        val ids = homeGroups(list).single().second.map { it.id }
+        assertEquals(listOf("z", "a", "b"), ids)
         assertEquals(ids, homeGroups(list.reversed()).single().second.map { it.id })
     }
 

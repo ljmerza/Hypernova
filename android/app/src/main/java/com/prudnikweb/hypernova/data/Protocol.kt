@@ -81,6 +81,8 @@ data class WSession(
     val switchedTo: String? = null,
     /** Its `claude agents` job id, when it is one (docs/PROTOCOL.md, "Session menu"): it can be stopped or deleted. */
     val agentJob: String? = null,
+    /** Its `claude agents` job's process runs (docs/PROTOCOL.md, "Session menu"); null when the Mac doesn't say. */
+    val agentRunning: Boolean? = null,
     /** What a `claude agents` job asked in words, when it waits on a reply rather than a dialog. */
     val question: String? = null,
     /** Calls refused without the owner (docs/PROTOCOL.md, "Blocked calls"); an older Mac doesn't say: none. */
@@ -607,6 +609,7 @@ object Wire {
             switchedFrom = o.str("switchedFrom")?.takeIf { it.isNotBlank() },
             switchedTo = o.str("switchedTo")?.takeIf { it.isNotBlank() },
             agentJob = o.str("agentJob")?.takeIf { it.isNotBlank() },
+            agentRunning = if (o.has("agentRunning")) o.bool("agentRunning") else null,
             question = o.str("question")?.takeIf { it.isNotBlank() },
             blockedCalls = o.int("blockedCalls") ?: 0,
             held = o.arr("held").mapObjects(::queued),

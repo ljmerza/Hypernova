@@ -452,6 +452,14 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 // Opening that session (or the chat it's in) takes the banner away; so does Home, for any session's.
                 LaunchedEffect(onScreen) { if (onScreen != null && vm.notice?.sessionId == onScreen) vm.dismissNotice() }
                 LaunchedEffect(atHome) { if (atHome && vm.notice?.sessionId != null) vm.dismissNotice() }
+                // A session's chat on screen is read up to its last activity, and stays read while
+                // replies come in (data/Unread.kt): its Completed card on Home has no unread dot.
+                val readId = (route as? Route.Session)?.id
+                val readAt = readId?.let { hub?.session(it)?.updatedAt }
+                LaunchedEffect(hub, readId, readAt) {
+                    val server = hub?.let(com.prudnikweb.hypernova.data.ReadState::server)
+                    if (server != null && readId != null && readAt != null) com.prudnikweb.hypernova.data.ReadState.mark(context, server, readId, readAt)
+                }
                 NoticeHost(
                     vm.notice,
                     onOpen = { n ->

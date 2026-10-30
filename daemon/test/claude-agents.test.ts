@@ -154,6 +154,8 @@ test('setting on: a claude agents session is live, with the job id claude attach
   hub.pollRegistry()
   assert.equal(hub.getSession('agents-on-1')?.pid, pid)
   assert.equal(hub.agentJobOf('agents-on-1'), 'bbbb0001')
+  // Idle with its process running: the phone offers Stop.
+  assert.equal(hub.listSessions().find((s) => s.id === 'agents-on-1')?.agentRunning, true)
   assert.equal(hub.isLiveTerminal('agents-on-1'), true)
   assert.equal(hub.sessionOfAgentJob('bbbb0001'), 'agents-on-1')
   assert.equal(hub.sessionOfAgentJob('nope0000'), null)
@@ -265,6 +267,8 @@ test('a claude agents session says its job id to the phone; one forgotten is gon
   settings.claudeAgents = true
   hub.applyAgentList([{ id: 'abab0001', sessionId: 'agents-forget-1', cwd: scratch, state: 'done' }])
   assert.equal(hub.listSessions().find((s) => s.id === 'agents-forget-1')?.agentJob, 'abab0001')
+  // Done, no process: nothing for claude stop, so the phone doesn't offer it.
+  assert.equal(hub.listSessions().find((s) => s.id === 'agents-forget-1')?.agentRunning, false)
   hub.forgetSession('agents-forget-1')
   assert.equal(hub.getSession('agents-forget-1'), undefined)
   assert.equal(hub.agentJobOf('agents-forget-1'), null)
