@@ -1684,7 +1684,7 @@ class LiveHub(
      */
     private fun sameSend(mine: Item.User, e: WEvent.User, known: List<SlashCommand>?): Boolean {
         if (mine.files.map { it.path } != e.files.map { it.path }) return false
-        if (sendText(mine.text) == sendText(e.text)) return true
+        if (sameSentText(mine.text, e.text)) return true
         val a = mine.command?.takeUnless { it.bash } ?: return false
         val b = e.command?.takeUnless { it.bash } ?: return false
         return a.args.trim().replace(SPACES, " ") == b.args.trim().replace(SPACES, " ") && sameCommand(a.name, b.name, known)
@@ -2630,6 +2630,16 @@ class LiveHub(
         private const val BATTERY_WARNED = "macBatteryWarned"
     }
 }
+
+private val WHITESPACE = Regex("\\s+")
+
+/**
+ * Whether the Mac logged [theirs] as the prompt this phone sent as [mine]: the same text with
+ * whitespace not counting at all. The Mac's copy can gain or lose a space on the way: a hook of
+ * Claude Code's that rewrites prompts (a spellcheck plugin made "clip board" "clipboard"), or bash
+ * mode, which logs "! ls" as "!ls".
+ */
+internal fun sameSentText(mine: String, theirs: String): Boolean = mine.replace(WHITESPACE, "") == theirs.replace(WHITESPACE, "")
 
 /**
  * The offline card's sentence for [link]: the routes the last round tried when none answered

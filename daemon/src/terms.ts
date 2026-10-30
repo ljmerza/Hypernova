@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import type { WebSocket } from 'ws'
 import { CLAUDE_DIR, HOME, SUPPORT, findClaude, log, randomToken, readJson, trimText, writeText } from './util.ts'
 import { getManaged, getProvider, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
-import { ensureParsed, forgetPaste, getSession, isCodexRec, listSessionRecs, notePaste, sessionOfAgentJob, upsertSession, view } from './hub.ts'
+import { ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, notePaste, sessionOfAgentJob, upsertSession, view } from './hub.ts'
 import { promptTitle, typedCommand } from './normalize.ts'
 import { trialEnded } from './blockers.ts'
 import { noteTrialEnded } from './account.ts'
@@ -273,6 +273,8 @@ const squash = (s: string) => s.replace(/\s+/g, '').replace(/^!/, '')
 const lastTyped = new Map<string, string>()
 /** How long a queued phone send stays claimable after the holder answered. */
 const QUEUED_CLAIM_MS = 5000
+/** How long a prompt that started a turn stays claimable by its entry, rewritten by a hook (a model call, seconds). */
+const REWRITTEN_CLAIM_MS = 20_000
 
 /**
  * Type a prompt into the live session, as if pasted, and press Enter. The holder only does it
@@ -313,16 +315,22 @@ export async function typeInto(id: string, text: string, replace = false, client
       r = await ask(id, { t: 'paste', text })
     } else if (inBox) r = { ...r, text: inBox.slice(0, 500) }
   }
+  let prompt = false
   if (r.ok) {
     lastTyped.set(id, squash(text))
     const command = typedCommand(text, () => null)
     r.queued = command && command.kind !== 'bash' ? false : (r.queued ?? busy)
+    prompt = !command
   }
   // Not typed, or not queued: no queue entry may claim it, or the same "yes" typed on the Mac a
   // moment later, while Claude works, would take its name. (A command Claude Code did queue then
   // goes unnamed; the phone matches it by its text.) Queued: its entry, logged as Enter went in,
   // is read within a second, so it waits a few for one and no longer.
-  if (clientId) forgetPaste(id, clientId, r.queued ? QUEUED_CLAIM_MS : 0)
+  // A prompt that started a turn: only its own entry, if a hook of Claude Code's rewrote it, may claim it.
+  if (clientId) {
+    if (prompt && !r.queued) keepTyped(id, clientId, REWRITTEN_CLAIM_MS)
+    else forgetPaste(id, clientId, r.queued ? QUEUED_CLAIM_MS : 0)
+  }
   return r
 }
 

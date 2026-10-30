@@ -911,7 +911,7 @@ test('typed into a shared terminal while Claude works: prompts and "!" lines are
   const { createServer } = await import('node:net')
   const { Frames, MSG, msg, metaPath, sockPath } = await import('../src/term/shared.ts')
   const { scanTerms, typeInto } = await import('../src/terms.ts')
-  const { claimPaste } = await import('../src/hub.ts')
+  const { claimPaste, claimRewritten } = await import('../src/hub.ts')
   const tid = 'fa4e0001aa'
   // A holder that says Claude Code queued every prompt but one (Claude was busy).
   let hello = () => {}
@@ -952,6 +952,9 @@ test('typed into a shared terminal while Claude works: prompts and "!" lines are
       Date.now = realNow
     }
     assert.deepEqual(claimPaste(tid, 'and the tests'), { clientId: 'p-1', bash: false, text: 'and the tests' })
+    // The prompt that started a turn waits for its own entry, should a hook rewrite it; no command does.
+    assert.deepEqual(claimRewritten(tid, Date.now()), { clientId: 'p-2', bash: false, text: 'started a turn' })
+    assert.equal(claimRewritten(tid, Date.now()), null)
   } finally {
     for (const s of conns) s.destroy()
     await new Promise<void>((r) => server.close(() => r()))
@@ -1004,6 +1007,47 @@ test('a prompt typed on the Mac as a turn ends, logged without text just before 
   assert.deepEqual(shape(st.events).at(-1), { id: 'u1', kind: 'user', text: 'fix the sky' })
   feed(st, qop('enqueue', { timestamp: iso(Date.now()), content: 'run the tests' }))
   assert.deepEqual(queueTexts(st), [['run the tests', 'phone-40']])
+})
+
+test('a prompt a hook rewrote on its way in (a spellcheck plugin) carries the phone send typed just before it; others claim nothing', async () => {
+  const { claimPaste, claimRewritten, keepTyped, notePaste } = await import('../src/hub.ts')
+  const iso = (ms: number) => new Date(ms).toISOString()
+  const st = newParseState()
+  st.claim = (content, ts) => claimPaste('term-r', content, ts)
+  st.claimRewritten = (ts) => claimRewritten('term-r', ts)
+  const photo = '@"/home/me/.local/share/hypernova/attachments/3a80dfb84087/photo.jpg"\n\n'
+  // The owner's case: typed while Claude was idle as "clip board", logged as "clipboard".
+  notePaste('term-r', 'phone-50', `${photo}should copy to clip board`)
+  keepTyped('term-r', 'phone-50', 20_000)
+  // A queue entry never takes a prompt that started a turn, even one with the same text.
+  assert.equal(claimPaste('term-r', `${photo}should copy to clip board`), null)
+  const t = Date.now()
+  feed(st, user('u1', null, `${photo}should copy to clipboard`, { timestamp: iso(t), promptSource: 'typed', promptRewritten: true }))
+  const names = (n: number) => st.events.slice(-n).map((e) => (e.kind === 'user' ? (e.clientId ?? null) : undefined))
+  assert.deepEqual(names(1), ['phone-50'])
+  // The same words sent again on purpose: two sends, two prompts, each its own name.
+  notePaste('term-r', 'phone-51', 'fix teh sky')
+  keepTyped('term-r', 'phone-51', 20_000)
+  feed(st, user('u2', 'u1', 'fix the sky', { timestamp: iso(t + 1000), promptSource: 'typed', promptRewritten: true }))
+  notePaste('term-r', 'phone-52', 'fix teh sky')
+  keepTyped('term-r', 'phone-52', 20_000)
+  feed(st, user('u3', 'u2', 'fix the sky', { timestamp: iso(t + 2000), promptSource: 'typed', promptRewritten: true }))
+  assert.deepEqual(names(2), ['phone-51', 'phone-52'])
+  // Rewritten but typed on the Mac (no send left), or not rewritten at all: nobody's.
+  feed(st, user('u4', 'u3', 'and the tests', { timestamp: iso(t + 3000), promptSource: 'typed', promptRewritten: true }))
+  notePaste('term-r', 'phone-53', 'and the docs')
+  keepTyped('term-r', 'phone-53', 20_000)
+  feed(st, user('u5', 'u4', 'and the docs', { timestamp: iso(t + 4000), promptSource: 'typed' }))
+  assert.deepEqual(names(2), [null, null])
+  // Never a send typed after the prompt was logged, nor one past its window.
+  assert.equal(claimRewritten('term-r', t - 1), null)
+  const realNow = Date.now
+  Date.now = () => realNow() + 21_000
+  try {
+    assert.equal(claimRewritten('term-r', Date.now()), null)
+  } finally {
+    Date.now = realNow
+  }
 })
 
 test('a task notification queued without text as a phone send is typed gives the send back to its own entry', async () => {

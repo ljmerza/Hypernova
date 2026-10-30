@@ -308,6 +308,7 @@ export function setState(id: string, state: SessionState, activity?: string | nu
 function freshParse(r: Rec): ParseState {
   const st = newParseState()
   st.claim = (content, ts) => claimPaste(r.term?.id, content, ts)
+  st.claimRewritten = (ts) => claimRewritten(r.term?.id, ts)
   return st
 }
 
@@ -653,7 +654,10 @@ export function pollTranscripts(): void {
 // the last minute with the same text (a paste's tags already off, a "!" line's "!" aside). An
 // entry logged without text (queued while no model turn runs) borrows the oldest one noted at or
 // before its own time, and its text, until the send's own entry shows up (normalize.ts, `lent`).
-type Paste = { clientId: string; text: string; raw: string; bash: boolean; at: number; until?: number }
+// A prompt typed while Claude was idle has no queue entry; one a hook of Claude Code's rewrote on
+// the way in (a spellcheck plugin) no longer has the send's text either, so it claims the send
+// typed just before it ([keepTyped], [claimRewritten]).
+type Paste = { clientId: string; text: string; raw: string; bash: boolean; at: number; until?: number; typed?: boolean }
 const pastes = new Map<string, Paste[]>()
 const PASTE_MS = 60_000
 
@@ -680,6 +684,31 @@ export function forgetPaste(termId: string, clientId: string, afterMs = 0): void
 }
 
 /**
+ * It started a turn rather than being queued: no queue entry may claim it, but a prompt Claude
+ * Code logs as rewritten may, for [ms] (a hook may take seconds before the prompt is logged).
+ */
+export function keepTyped(termId: string, clientId: string, ms: number): void {
+  const until = Date.now() + ms
+  for (const p of pastes.get(termId) ?? []) if (p.clientId === clientId) Object.assign(p, { until, typed: true })
+}
+
+/**
+ * The phone send a prompt that a hook of Claude Code's rewrote (logged at [ts]) came from: the
+ * oldest typed into terminal [termId] at or before it that wasn't queued. Null when none (typed on
+ * the Mac).
+ */
+export function claimRewritten(termId: string | null | undefined, ts: number): Claim | null {
+  const list = termId ? pastes.get(termId) : undefined
+  if (!list) return null
+  const now = Date.now()
+  // Typed, or still being typed (the holder hasn't answered yet); not one Claude Code queued.
+  const i = list.findIndex((p) => now - p.at < PASTE_MS && p.at <= ts && (p.typed ? now <= p.until! : p.until === undefined))
+  if (i < 0) return null
+  const p = list.splice(i, 1)[0]!
+  return { clientId: p.clientId, bash: p.bash, text: p.raw }
+}
+
+/**
  * The phone send a prompt just queued (at [ts]) in terminal [termId] came from, taken, whether it
  * was a "!" line (Claude Code queues one without its "!"), and its text; null when none (typed on
  * the Mac). [content] null: Claude Code logged the prompt without its text, so it takes the oldest
@@ -689,7 +718,7 @@ export function claimPaste(termId: string | null | undefined, content: string | 
   const list = termId ? pastes.get(termId) : undefined
   if (!list) return null
   const now = Date.now()
-  const live = (p: Paste) => now - p.at < PASTE_MS && (p.until === undefined || now <= p.until)
+  const live = (p: Paste) => now - p.at < PASTE_MS && !p.typed && (p.until === undefined || now <= p.until)
   const s = content === null ? null : squash(content)
   // Without text, only a send noted at or before the entry's own time. The daemon notes a send
   // before typing it, and Claude Code stamps its entry as Enter goes in, later, on the same
