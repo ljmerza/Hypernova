@@ -85,7 +85,7 @@ internal fun MessageMenu(
     val context = LocalContext.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
-    if (item is Item.User && item.waiting) return WaitingMenu(hub, item, onDismiss)
+    if (item is Item.User && (item.waiting || item.held)) return WaitingMenu(hub, item, onDismiss, sessionId)
     val text = item.menuText() ?: return onDismiss()
     val mine = item is Item.User
     var page by remember(item.key) { mutableStateOf(Page.Actions) }

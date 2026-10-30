@@ -504,6 +504,7 @@ fun HomeScreen(
                             modifier = Modifier.padding(horizontal = 16.dp).animateItem(),
                             block = s.activeBlock(account, hub.providers, now),
                             waiting = hub.waitingCount(s.id),
+                            held = hub.heldCount(s.id),
                             codex = codexOn && s.codex,
                             ask = hub.approval(s.id).let { a -> remember(a) { CardAsk.of(a) } },
                             onAnswer = hub::answerApproval,
@@ -795,6 +796,8 @@ fun SessionCard(
     s: Session, now: Long, scramble: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, block: Blocked? = null, waiting: Int = 0, codex: Boolean = false,
     ask: CardAsk? = null, onAnswer: suspend (id: String, answer: Answer) -> Boolean = { _, _ -> false },
     menu: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
+    /** Fork: prompts the Mac holds until you answer (data/Held.kt). */
+    held: Int = 0,
 ) {
     val needs = s.state == SessionState.NeedsYou
     val res = LocalContext.current.resources
@@ -856,6 +859,11 @@ fun SessionCard(
                         val said = stringResource(R.string.waiting_a11y, waiting)
                         Spacer(Modifier.width(6.dp))
                         StatusChip(stringResource(R.string.waiting_chip, waiting), HN.inkMuted, glyph = Glyph.Laptop, modifier = Modifier.clearAndSetSemantics { contentDescription = said })
+                    }
+                    // Fork: prompts the Mac holds until you answer, sent after.
+                    if (held > 0) {
+                        Spacer(Modifier.width(6.dp))
+                        StatusChip(pluralStringResource(R.plurals.held_count, held, held), HN.inkMuted, glyph = Glyph.Clock)
                     }
                     // Started by an automation: its title already says which and when.
                     if (s.automation != null) {

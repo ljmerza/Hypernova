@@ -37,10 +37,13 @@ import kotlinx.coroutines.launch
 /**
  * A prompt waiting for the Mac (data/OfflineQueue.kt): Edit its words, Remove it, Copy it, and,
  * once its session is gone, Start a new session with it. Reached by a long-press on its bubble.
+ * Fork: a prompt the Mac holds until you answer (data/Held.kt, [sessionId]'s) has the same menu,
+ * its Edit and Remove asked of the Mac.
  */
 @Composable
-internal fun WaitingMenu(hub: Hub, item: Item.User, onDismiss: () -> Unit) {
-    val id = item.waitingId ?: return onDismiss()
+internal fun WaitingMenu(hub: Hub, item: Item.User, onDismiss: () -> Unit, sessionId: String? = null) {
+    val heldIn = sessionId?.takeIf { item.heldId != null }
+    val id = item.waitingId ?: item.heldId?.takeIf { heldIn != null } ?: return onDismiss()
     val context = LocalContext.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
@@ -61,8 +64,13 @@ internal fun WaitingMenu(hub: Hub, item: Item.User, onDismiss: () -> Unit) {
                 Pill(stringResource(R.string.cancel), onDismiss, kind = PillKind.Ghost, height = 44.dp)
                 Pill(
                     stringResource(R.string.waiting_save),
-                    { hub.editWaiting(id, value); onDismiss() },
-                    kind = PillKind.Primary, height = 44.dp, enabled = value.isNotBlank() || item.files.isNotEmpty(),
+                    {
+                        if (heldIn != null) appScope.launch { hub.editHeld(heldIn, id, value.trim()).onFailure { toast(it.message.orEmpty()) } }
+                        else hub.editWaiting(id, value)
+                        onDismiss()
+                    },
+                    // The Mac keeps a held prompt's files but wants words with them.
+                    kind = PillKind.Primary, height = 44.dp, enabled = value.isNotBlank() || (heldIn == null && item.files.isNotEmpty()),
                 )
             }
         }
@@ -85,6 +93,10 @@ internal fun WaitingMenu(hub: Hub, item: Item.User, onDismiss: () -> Unit) {
             if (android.os.Build.VERSION.SDK_INT < 33) toast(context.getString(R.string.chat_copied))
             onDismiss()
         })
-        SheetAction(ChatGlyph.Remove, stringResource(R.string.waiting_remove), { hub.removeWaiting(id); onDismiss() }, color = HN.danger)
+        SheetAction(ChatGlyph.Remove, stringResource(R.string.waiting_remove), {
+            if (heldIn != null) appScope.launch { hub.removeHeld(heldIn, id).onFailure { toast(it.message.orEmpty()) } }
+            else hub.removeWaiting(id)
+            onDismiss()
+        }, color = HN.danger)
     }
 }

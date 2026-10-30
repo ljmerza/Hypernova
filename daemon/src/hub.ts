@@ -19,6 +19,7 @@ import { folderView } from './files.ts'
 import { bypassBlockedByRoot } from './platform.ts'
 import { linkOf } from './switch-links.ts'
 import { blockedCount, forgetBlocked, noteBlocked, onBlockedChange, sawToolResult, takeRetryGrant } from './blocked.ts'
+import { heldView, type HeldView } from './held.ts'
 
 export type SessionState = 'starting' | 'working' | 'needs_you' | 'idle' | 'error' | 'ended'
 export type Session = {
@@ -88,6 +89,8 @@ export type Session = {
    * other, so the phone shows the question rather than "waiting in the terminal". Null otherwise.
    */
   question?: string | null
+  /** Fork: prompts held until Claude Code's input box is back (held.ts), oldest first. Absent when none. */
+  held?: HeldView[]
 }
 type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
@@ -202,7 +205,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id) } : {}), blockedCalls: blockedCount(r.id) }
+  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id) } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id) }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 

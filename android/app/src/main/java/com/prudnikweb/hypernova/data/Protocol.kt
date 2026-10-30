@@ -100,6 +100,8 @@ data class WSession(
     val question: String? = null,
     /** Calls refused without the owner (docs/PROTOCOL.md, "Blocked calls"); an older Mac doesn't say: none. */
     val blockedCalls: Int = 0,
+    /** Fork: prompts the Mac holds until Claude Code's input box is back, oldest first (docs/PROTOCOL.md, "Held prompts"). */
+    val held: List<WQueued> = emptyList(),
 )
 
 /**
@@ -621,6 +623,7 @@ object Wire {
             agentJob = o.str("agentJob")?.takeIf { it.isNotBlank() },
             question = o.str("question")?.takeIf { it.isNotBlank() },
             blockedCalls = o.int("blockedCalls") ?: 0,
+            held = o.arr("held").mapObjects(::queued),
         )
     }
 

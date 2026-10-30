@@ -137,6 +137,7 @@ fun UserMessage(
         SendStatus.QueuedStep, SendStatus.QueuedReply -> stringResource(R.string.queued_label)
         SendStatus.WaitingMac -> stringResource(R.string.waiting_mac_label)
         SendStatus.SessionGone -> stringResource(R.string.waiting_gone_label)
+        SendStatus.Held -> stringResource(R.string.held_label)
         null -> null
     }
     // Claude Code hands a queued prompt to Claude when the step it's on finishes; an SDK session
@@ -147,6 +148,7 @@ fun UserMessage(
         SendStatus.QueuedReply -> stringResource(R.string.queued_hint_reply)
         SendStatus.WaitingMac -> stringResource(R.string.waiting_mac_hint)
         SendStatus.SessionGone -> stringResource(R.string.waiting_gone_hint)
+        SendStatus.Held -> stringResource(R.string.held_hint)
         else -> null
     }
     val attached = files?.takeIf { item.files.isNotEmpty() }

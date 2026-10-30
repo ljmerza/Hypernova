@@ -342,6 +342,8 @@ enum class SendStatus {
     WaitingMac,
     /** The same, but the session it was for is gone: it stays, to start a new session with. */
     SessionGone,
+    /** Fork: held on the Mac while Claude waits for your answer; it sends itself after (data/Held.kt). */
+    Held,
 }
 
 sealed interface Item {
@@ -366,12 +368,16 @@ sealed interface Item {
         val sentAt: Long = 0L,
         /** The offline queue's id for it ([SendStatus.WaitingMac], [SendStatus.SessionGone]): what Edit and Remove act on. */
         val waitingId: String? = null,
+        /** Fork: the Mac's id for it while it's held ([SendStatus.Held]): what Edit and Remove act on. */
+        val heldId: String? = null,
     ) : Item {
         /** Not the Mac's own copy of it yet: drawn quieter. */
         val pending: Boolean get() = status != null
         val queued: Boolean get() = status == SendStatus.QueuedStep || status == SendStatus.QueuedReply
         /** Held on this phone for the Mac (not in the Mac's queue). */
         val waiting: Boolean get() = status == SendStatus.WaitingMac || status == SendStatus.SessionGone
+        /** Fork: held on the Mac until Claude Code's input box is back. */
+        val held: Boolean get() = status == SendStatus.Held
     }
     @Immutable data class Assistant(
         override val key: String,
