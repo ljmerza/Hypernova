@@ -107,17 +107,25 @@ test('the transcript alone (no hook) is enough, also when the session is read wh
   )
 })
 
-test('nobody answered for 10 minutes: the call is blocked; Allow & retry says so, and its next ask is answered yes once', async () => {
-  const sid = 'bl-away-1'
+test('nobody answered for 10 minutes (Claude Code): handed back to its own dialog, not blocked, not paused', async () => {
+  const sid = 'bl-away-0'
   hub.upsertSession(sid, { cwd, origin: 'terminal' })
   mock.timers.enable({ apis: ['setTimeout'] })
   try {
-    const asked = hub.requestApproval({ sessionId: sid, kind: 'tool', toolName: 'Bash', summary: 'Bash: npm publish', input: { command: 'npm publish' }, reason: null, canAlways: false, questions: null, plan: null }, 'toolu_away1')
+    const asked = hub.requestApproval({ sessionId: sid, kind: 'tool', toolName: 'Bash', summary: 'Bash: npm publish', input: { command: 'npm publish' }, reason: null, canAlways: false, questions: null, plan: null }, 'toolu_away0')
     mock.timers.tick(hub.AWAY_MS)
     assert.equal((await asked).decision, 'timeout')
   } finally {
     mock.timers.reset()
   }
+  assert.equal(blocked.blockedCount(sid), 0, 'never a "no", so nothing to retry')
+  assert.equal(hub.getSession(sid)?.stoppedForAway, false)
+})
+
+test('a call refused for want of an answer (Codex): Allow & retry says so, and its next ask is answered yes once', async () => {
+  const sid = 'bl-away-1'
+  hub.upsertSession(sid, { cwd, origin: 'terminal' })
+  blocked.noteBlocked(sid, { tool: 'Bash', input: { command: 'npm publish' }, reason: 'away', toolUseId: 'toolu_away1' })
   const [b] = blocked.blockedList(sid)
   assert.deepEqual([b?.reason, b?.toolUseId, b?.target], ['away', 'toolu_away1', 'npm publish'])
   // The send fails (the terminal had unsent text, say): the row stays, the error is the route's.

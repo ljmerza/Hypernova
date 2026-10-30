@@ -238,26 +238,8 @@ fun HomeScreen(
     val now by produceState(System.currentTimeMillis()) {
         while (true) { delay(30_000); value = System.currentTimeMillis() }
     }
-    // As tall as what's in the sky (the calm sky's band ends under its last row of words), so with
-    // less in it the list starts higher. The window (it's see-through) takes its new height at
-    // once; every item under it glides there together (animateItem), so nothing lags or overlaps.
-    val bandBottom = with(LocalDensity.current) { cosmos.usedBottomPx.toDp() }
-    // Before the sky has drawn once (a fresh start), the band with every place taken: about right.
-    val screenW = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
-    val skyH = if (bandBottom > 0.dp) bandBottom + 4.dp
-    else top + 96.dp + com.prudnikweb.hypernova.ui.fx.SkyLayout.compute(screenW.value, BooleanArray(4) { true }, belt = true, companion = false, hint = false).height.dp + 4.dp
-    val skyPx = with(LocalDensity.current) { skyH.toPx() }
-    // The systems step back as cards scroll over them, and hide away from the Sessions tab and
-    // behind Statistics.
-    val tabAnim = remember { Animatable(if (tab == Tab.Sessions && !statsOpen) 1f else 0f) }
-    LaunchedEffect(tab, statsOpen) { tabAnim.animateTo(if (tab == Tab.Sessions && !statsOpen) 1f else 0f, tween(Motion.SECTION, easing = Motion.Expo)) }
-    LaunchedEffect(list, skyPx) {
-        snapshotFlow {
-            val scrolled = if (list.firstVisibleItemIndex > 0) skyPx else list.firstVisibleItemScrollOffset.toFloat()
-            val k = ((scrolled / skyPx - 0.04f) / (0.42f - 0.04f)).coerceIn(0f, 1f)
-            (1f - k * k * (3f - 2f * k)) * tabAnim.value
-        }.collect { skyVisibility.floatValue = it }
-    }
+    // Fork: no sky on Home (owner, 2026-10-30): its systems stay hidden; only the starfield shows.
+    LaunchedEffect(Unit) { skyVisibility.floatValue = 0f }
     val scope = rememberCoroutineScope()
     // Something happens in the sky while you watch (a limit, the week's low state, the outburst at
     // a reset): bring the sky into view, so it isn't missed behind the cards. Events from before
@@ -381,7 +363,9 @@ fun HomeScreen(
             Tab.Sessions -> LazyColumn(
                 Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = HOME_SOURCE),
                 state = list,
-                contentPadding = PaddingValues(bottom = bottom + 84.dp), // the last card clears the bottom bar (fork: tabs only)
+                // The first card starts under the top bar (fork: no sky above it any more); the last
+                // clears the bottom bar (fork: tabs only).
+                contentPadding = PaddingValues(top = top + 80.dp, bottom = bottom + 84.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // Fork: no sky (owner, 2026-10-30): Home is the sessions in their groups. Statistics opens

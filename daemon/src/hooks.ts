@@ -28,7 +28,6 @@ import { hookSecret, isSdk, isSubscription, settings } from './store.ts'
 import { onCodexChange, onCodexEnabled } from './codex/client.ts'
 import { classifyApiError } from './blockers.ts'
 import {
-  AWAY_MESSAGE,
   blockSession,
   finalRead,
   forgetSessionAllowed,
@@ -224,8 +223,10 @@ async function permission(ev: any, sid: string, req: IncomingMessage, res: Serve
   switch (ans.decision) {
     case 'terminal':
       return {}
+    // Nobody answered before Claude Code stops waiting for this hook (its timeout): no decision, so
+    // Claude Code asks in its own dialog and the session waits there; never a "no" (owner, 2026-10-30).
     case 'timeout':
-      return out({ behavior: 'deny', message: AWAY_MESSAGE })
+      return {}
     case 'deny':
       return out({ behavior: 'deny', message: ans.message || (kind === 'plan' ? 'The user wants to keep planning. Ask what to change.' : 'The user denied this from Hypernova.') })
     case 'always':

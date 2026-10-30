@@ -889,9 +889,11 @@ function finish(id: string, ans: Answer, by: string): boolean {
   clearTimeout(p.timer)
   const sid = p.approval.sessionId
   // "terminal": answered on the Mac (allowed, denied or cancelled; we can't tell which).
-  const decision = ans.decision === 'terminal' ? 'unknown' : ans.decision === 'deny' || ans.decision === 'timeout' ? 'deny' : 'allow'
-  const resolution = ans.decision === 'timeout' ? 'timeout' : ans.decision === 'terminal' ? 'terminal' : (decision as 'allow' | 'deny')
   const r = sessions.get(sid)
+  // A Claude Code ask nobody answered goes back to its own dialog (hooks.ts): handed to the terminal, not denied.
+  const handedBack = ans.decision === 'timeout' && !(r && isCodexRec(r))
+  const decision = ans.decision === 'terminal' || handedBack ? 'unknown' : ans.decision === 'deny' || ans.decision === 'timeout' ? 'deny' : 'allow'
+  const resolution = handedBack ? 'terminal' : ans.decision === 'timeout' ? 'timeout' : ans.decision === 'terminal' ? 'terminal' : (decision as 'allow' | 'deny')
   const ev = r?.parse?.byId.get(`a:${id}`)
   if (ev && ev.kind === 'approval') {
     ev.resolution = resolution
@@ -899,10 +901,16 @@ function finish(id: string, ans: Answer, by: string): boolean {
   }
   broadcast({ t: 'approval.resolved', id, sessionId: sid, decision, by })
   if (ans.decision === 'timeout') {
-    // The call itself goes on the session's Blocked tab, to allow and retry from there.
-    if (p.approval.kind === 'tool') noteBlocked(sid, { tool: p.approval.toolName, input: p.approval.input, reason: 'away', toolUseId: p.toolUseId })
-    upsertSession(sid, { stoppedForAway: true })
-    notice(sid, r && isCodexRec(r) ? 'Paused: nobody answered for 10 minutes, so Hypernova said no and stopped Codex until you’re back.' : 'Paused: nobody answered for 10 minutes, so Hypernova said no and asked Claude to wait for you.', 'warn')
+    if (r && isCodexRec(r)) {
+      // Codex's own approvals have no terminal dialog to fall back to: it stops until you're back.
+      if (p.approval.kind === 'tool') noteBlocked(sid, { tool: p.approval.toolName, input: p.approval.input, reason: 'away', toolUseId: p.toolUseId })
+      upsertSession(sid, { stoppedForAway: true })
+      notice(sid, 'Paused: nobody answered for 10 minutes, so Hypernova said no and stopped Codex until you’re back.', 'warn')
+    } else {
+      // Claude Code: never a "no" (owner, 2026-10-30). Its hook hands the question back (hooks.ts),
+      // and Claude Code asks in its own dialog; the session waits there, needing you, not paused.
+      notice(sid, 'Still waiting for your answer: the question is now in the session’s terminal. Open the terminal to answer it.', 'info')
+    }
   }
   if (r && ![...pending.values()].some((x) => x.approval.sessionId === sid)) {
     // An agent asked while the main agent was idle: it goes back to idle, its agents to work.
