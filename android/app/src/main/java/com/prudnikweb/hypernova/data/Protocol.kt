@@ -96,6 +96,8 @@ data class WSession(
     val switchedTo: String? = null,
     /** Its `claude agents` job id, when it is one (docs/PROTOCOL.md, "Session menu"): it can be stopped or deleted. */
     val agentJob: String? = null,
+    /** Fork: prompts the Mac holds until Claude Code's input box is back, oldest first (docs/PROTOCOL.md, "Held prompts"). */
+    val held: List<WQueued> = emptyList(),
 )
 
 /**
@@ -615,6 +617,7 @@ object Wire {
             switchedFrom = o.str("switchedFrom")?.takeIf { it.isNotBlank() },
             switchedTo = o.str("switchedTo")?.takeIf { it.isNotBlank() },
             agentJob = o.str("agentJob")?.takeIf { it.isNotBlank() },
+            held = o.arr("held").mapObjects(::queued),
         )
     }
 

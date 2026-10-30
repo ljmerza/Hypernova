@@ -688,6 +688,7 @@ class LiveHub(
                 raw = raw + (m.s.id to m.s)
                 publish()
                 if (old != null) changed(old, m.s)
+                if (old != null) heldLeft(old, m.s)
             }
             is Msg.Removed -> { raw = raw - m.id; publish() }
             is Msg.Event -> appendEvent(m.sessionId, m.e)
@@ -1102,7 +1103,7 @@ class LiveHub(
 
     override fun consumeReveal(s: Session): Boolean = s.isNew && revealed.add(s.id)
 
-    private class Cached(val events: List<WEvent>, val pending: List<Sent>, val approvals: Map<String, WApproval>, val resolved: Map<String, Resolved>, val answered: Map<String, Resolution>, val settled: Boolean, val active: Boolean, val shared: Boolean, val queue: List<WQueued>, val step: Boolean, val board: AgentBoard, val waiting: Int, val items: List<Item>)
+    private class Cached(val events: List<WEvent>, val pending: List<Sent>, val approvals: Map<String, WApproval>, val resolved: Map<String, Resolved>, val answered: Map<String, Resolution>, val settled: Boolean, val active: Boolean, val shared: Boolean, val queue: List<WQueued>, val step: Boolean, val board: AgentBoard, val waiting: Int, val items: List<Item>, val held: List<WQueued> = emptyList())
     private val cache = HashMap<String, Cached>()
 
     override fun transcript(id: String): List<Item> {
@@ -1121,15 +1122,18 @@ class LiveHub(
         val step = shared || s?.origin == "terminal"
         val board = boardSlot(id).value
         val waitingNow = offline.version
+        // Fork: prompts the Mac holds until Claude Code's input box is back (data/Held.kt).
+        val held = raw[id]?.held.orEmpty()
         val c = cache[id]
         // The queue compared by value: the session arrives anew with every change of activity.
-        if (c != null && c.events === ev && c.pending === pend && c.approvals === ap && c.resolved === rs && c.answered === an && c.settled == st && c.active == active && c.shared == shared && c.queue == queue && c.step == step && c.board === board && c.waiting == waitingNow) return c.items
+        if (c != null && c.events === ev && c.pending === pend && c.approvals === ap && c.resolved === rs && c.answered === an && c.settled == st && c.active == active && c.shared == shared && c.queue == queue && c.step == step && c.board === board && c.waiting == waitingNow && c.held == held) return c.items
         // Only events that changed (new instances) are converted again; streaming text and
         // 64 KB Bash outputs arrive several times a second.
         val built = Items.build(ev, ap, rs, an, id, raw[id]?.cwd, now, settled = st, cache = itemCaches.getOrPut(id) { Items.Cache() }, active = active, board = board)
         // What waits on this phone for the Mac comes last, under everything.
-        val items = withCopies(built, ev, pend, shared, queue, step) + offline.of(id).map(Waiting::item)
-        cache[id] = Cached(ev, pend, ap, rs, an, st, active, shared, queue, step, board, waitingNow, items)
+        // Fork: held prompts before those, just above the asks waiting at the end (ui/session/AskStack.kt).
+        val items = withCopies(built, ev, pend, shared, queue, step) + Held.items(held, ev, queue) + offline.of(id).map(Waiting::item)
+        cache[id] = Cached(ev, pend, ap, rs, an, st, active, shared, queue, step, board, waitingNow, items, held)
         return items
     }
 
@@ -1754,9 +1758,40 @@ class LiveHub(
 
     private fun applySession(o: JSONObject): WSession? {
         val s = o.obj("session")?.let { runCatching { Wire.session(it) }.getOrNull() } ?: return null
+        val old = raw[s.id]
         raw = raw + (s.id to s)
         publish()
+        if (old != null) heldLeft(old, s)
         return s
+    }
+
+    /** Fork: held prompts this phone took back itself (by the Mac's id): leaving, they aren't sent. */
+    private val heldRemoved = HashSet<String>()
+
+    /**
+     * Fork: held prompts the Mac no longer holds. Each becomes this phone's copy of a sent prompt,
+     * where the chat is now, under the send's own name, so it goes the way any send does: the
+     * Mac's copy replaces it, Claude Code's queue shows it, or the notice that it wasn't sent gives
+     * its text back. One that none of those claims within [HELD_LINGER] goes.
+     */
+    private fun heldLeft(old: WSession, s: WSession) {
+        val gone = Held.left(old.held, s.held, heldRemoved)
+        if (gone.isEmpty()) return
+        val list = slot(s.id).value
+        val p = pendingSlot(s.id)
+        val macAt = maxOf(list.maxOfOrNull { it.ts } ?: 0L, s.lastActivityAt)
+        for (h in gone) {
+            val cid = h.clientId
+            // Its event is in already: nothing to stand in for.
+            if (cid != null && list.asReversed().take(DELIVERED_LOOKBACK).any { (it as? WEvent.User)?.clientId == cid }) continue
+            if (cid != null) sentIds += cid
+            val item = Held.item(h).copy(key = "local-${seq++}", status = SendStatus.Sending, heldId = null, sentAt = now)
+            p.value = p.value + Sent(item, after = list.lastOrNull()?.id, stage = Stage.Posted, macAt = macAt, typed = true, clientId = cid)
+            scope.launch {
+                delay(HELD_LINGER)
+                p.value = p.value.filterNot { it.item.key == item.key && it.stage == Stage.Posted }
+            }
+        }
     }
 
     // ─── Actions ───────────────────────────────────────────────────────────
@@ -1838,6 +1873,25 @@ class LiveHub(
     override fun editWaiting(waitingId: String, text: String): Boolean = offline.edit(waitingId, text)
     override fun removeWaiting(waitingId: String) { offline.remove(waitingId) }
 
+    override fun heldCount(sessionId: String): Int = raw[sessionId]?.held?.size ?: 0
+
+    override suspend fun editHeld(sessionId: String, heldId: String, text: String): Result<Unit> = try {
+        applySession(api.put("/v1/sessions/$sessionId/held/$heldId", JSONObject().put("text", text)))
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.held_err_edit)) }
+
+    override suspend fun removeHeld(sessionId: String, heldId: String): Result<Unit> {
+        // Before the call: the Mac's session update may come over the socket first.
+        heldRemoved += heldId
+        return try {
+            applySession(api.delete("/v1/sessions/$sessionId/held/$heldId"))
+            Result.success(Unit)
+        } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+            heldRemoved -= heldId
+            Result.failure(handle(e, R.string.held_err_remove))
+        }
+    }
+
     override suspend fun startFromWaiting(waitingId: String): Result<String> {
         val w = offline.get(waitingId) ?: return Result.failure(HubException(res.getString(R.string.err_start)))
         val cwd = w.cwd ?: return Result.failure(HubException(res.getString(R.string.waiting_no_folder)))
@@ -1866,11 +1920,15 @@ class LiveHub(
             val body = JSONObject().put("text", t).put("clientId", clientId)
             if (files.isNotEmpty()) body.put("attachments", JSONArray(files.map { it.path }))
             if (replace) body.put("replace", true)
+            // Fork: while Claude waits for an answer the Mac holds it rather than refusing it (data/Held.kt).
+            else body.put("hold", true)
             val o = api.post("/v1/sessions/$sessionId/prompt", body)
             val s = applySession(o)
             ok = true
+            // Held: the session's `held` shows it now, not this copy.
+            if (o.bool("held")) drop()
             // Forked (a terminal session still open): the new session's events carry the prompt.
-            if (s != null && s.id != sessionId) drop() else {
+            else if (s != null && s.id != sessionId) drop() else {
                 val cur = s ?: raw[sessionId]
                 val typed = wasShared || cur?.term != null
                 // An older daemon doesn't say; an SDK session with prompts waiting has queued this one too.
@@ -2531,6 +2589,8 @@ class LiveHub(
         private const val AGENT_ASK_DELAY = 10_000L
         /** How far back a queued prompt's own event may be, among the last events. */
         private const val DELIVERED_LOOKBACK = 20
+        /** Fork: how long a held prompt the Mac just typed in waits, as this phone's copy, for the Mac's own. */
+        private const val HELD_LINGER = 15_000L
         /** How much earlier than its queue entry Claude Code may stamp a queued prompt's own entry. */
         private const val DELIVERED_SLACK = 5_000L
         /**

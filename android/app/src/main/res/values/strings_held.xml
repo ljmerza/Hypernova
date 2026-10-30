@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fork: held prompts (data/Held.kt). A prompt sent while Claude waits for your answer: the Mac holds it and types it in after. -->
+    <string name="held_label">Held</string>
+    <string name="held_hint">Sends after you answer</string>
+    <string name="held_err_edit">Couldn\'t change the held message.</string>
+    <string name="held_err_remove">Couldn\'t remove the held message.</string>
+    <!-- Home's session card: how many prompts the Mac holds for it. -->
+    <plurals name="held_count">
+        <item quantity="one">%d held</item>
+        <item quantity="other">%d held</item>
+    </plurals>
+</resources>

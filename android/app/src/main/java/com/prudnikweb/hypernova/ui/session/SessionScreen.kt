@@ -334,7 +334,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     }
     // Prompts waiting in the queue sit under Claude's live output, so what grows is the last
     // item above them.
-    val liveAt = items.indexOfLast { !(it is Item.User && (it.queued || it.waiting)) }
+    val liveAt = items.indexOfLast { !(it is Item.User && (it.queued || it.waiting || it.held)) }
     val tailKey = listOfNotNull(items.getOrNull(liveAt)?.let(::tailOf), items.lastOrNull()?.takeIf { items.lastIndex != liveAt }?.let(::tailOf)).joinToString("|")
     // Fork: the list's rows (ToolRuns.kt): runs of three or more tool calls fold into one line, and
     // only the first reply after each message carries Claude's name. A run opens on a tap; the run

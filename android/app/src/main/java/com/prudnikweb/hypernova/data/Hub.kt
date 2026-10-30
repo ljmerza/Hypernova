@@ -122,6 +122,13 @@ interface Hub {
     fun removeWaiting(waitingId: String) {}
     /** A waiting prompt as a new session (its session is gone): succeeds with the new session's id. */
     suspend fun startFromWaiting(waitingId: String): Result<String> = Result.failure(UnsupportedOperationException())
+    // Fork: held prompts (data/Held.kt; docs/PROTOCOL.md, "Held prompts"): the Mac holds them while Claude waits for an answer.
+    /** New words for a held prompt ([Item.User.heldId]), its files kept. */
+    suspend fun editHeld(sessionId: String, heldId: String, text: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /** How many prompts the Mac holds for this session. */
+    fun heldCount(sessionId: String): Int = 0
+    /** Takes a held prompt back: it's never sent. */
+    suspend fun removeHeld(sessionId: String, heldId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
 
     /** Puts a picked file on the Mac, to attach to a prompt. */
     suspend fun upload(file: Upload): Result<Attachment>
