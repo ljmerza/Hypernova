@@ -1493,7 +1493,8 @@ Agent = { id,                         // "a" and 16 hex digits
           status: "running" | "done" | "error" | "stopped",
           activity: string | null,    // while running: "Bash: ./gradlew build"
           startedAt: number, endedAt: number | null, lastActivityAt: number,   // epoch ms
-          tokens: number | null, toolUses: number | null,
+          tokens: number | null,      // as Claude Code counts them (Agents and workflows, "Tokens"); null before its first reply
+          toolUses: number | null,
           result: string | null }     // its report, at most 600 characters, keys masked
 
 Workflow = { id,                      // the run id, "wf_…"
@@ -4074,6 +4075,17 @@ them in `daemon/src/agents.ts`; the phone shows each under the call that started
   agent's structured output). An agent whose file goes quiet (10 minutes in a session that is
   going, 2 once it has ended) is done if its last word was its report, else stopped; one waiting on
   a tool or an approval in a live session is still at work (for up to 2 hours).
+- **Tokens** of a running agent are counted from its file as Claude Code 2.1.31x counts them for its
+  own footer (the number beside each agent there): the context its latest reply read
+  (`input_tokens + cache_creation_input_tokens + cache_read_input_tokens`) plus the `output_tokens` of
+  every reply. A reply is logged once per content block with the same `message.id`, so it counts
+  once (its largest output); a line marked `isUnmetered` doesn't count. Claude Code's footer also adds
+  an estimate of the reply streaming now, which the file doesn't have. An agent followed from its
+  last 256 KB counts only the output in them. When it ends, Claude Code's own total (its task
+  notification's `subagent_tokens`, the SDK's `total_tokens`, a run summary's `tokens`) replaces it.
+  How long it has run is the phone's own: now (or `endedAt`) less `startedAt`. A workflow's `tokens`
+  while it runs is the sum of its agents' (sent again only when one of them changes status, so a
+  phone adds up its agents' newer counts itself).
 - **Ends nobody announces.** When Claude Code quits (a SessionEnd for any reason but `clear` or
   `resume`, after which the same process goes on; or its process gone: missing from Claude Code's
   registry and no longer running, so a read that catches its file mid-write ends nothing), the
