@@ -1812,3 +1812,20 @@ answered from the phone", 2026-10-13) stays as history for Claude Code; Codex ke
    dialogs for different commands are different menus, so an Allow never lands on the next one.
 5. **Left as it is:** automation runs still get Esc on a terminal menu that waits 10 minutes with no
    approval behind it (Automations, "Following"), so a run never needs you all night.
+
+## Default mode for new sessions (2026-10-30)
+
+The owner's new sessions kept starting in Ask: the sheet carried over only Accept edits and Plan,
+and he works in Auto. He chose a setting for it.
+
+1. **Settings → New sessions, "New sessions start in": Ask, Edits, Plan or Auto**, kept on the
+   phone (`data/NewSessionMemory.kt`, `newSession.startMode`). Ask until he picks one. Choosing
+   Auto there goes through the think-twice card, as everywhere; a sheet that then opens in Auto
+   shows no card, since it was chosen once already.
+2. **The New session sheet opens on it every time.** The last session's mode isn't remembered any
+   more (this replaces "the mode unless it was Auto or Bypass"). The Mode chip still changes it
+   for that one session, and that never changes the setting.
+3. **Bypass isn't offered** as the default: it waits for the fingerprint or the screen lock each
+   time it's chosen (Bypass mode and the think-twice card; The owner's morning answers, 2).
+4. **Switching a session to Claude Code** (the agent switch sheet) starts in the same mode. Codex's
+   modes are untouched: the sheet still carries Codex's last one over (Read only or Can edit).

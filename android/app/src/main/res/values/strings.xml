@@ -93,6 +93,10 @@
     <string name="st_text_small">Small</string>
     <string name="st_text_default">Medium</string>
     <string name="st_text_large">Large</string>
+    <!-- Fork: Settings → New sessions (the permission mode a new Claude session starts in; data/NewSessionMemory.kt). -->
+    <string name="st_new_sessions">New sessions</string>
+    <string name="st_start_mode">New sessions start in</string>
+    <string name="st_start_mode_desc">The mode the New session sheet opens on. Changing it there is for that session only; Bypass is chosen there each time.</string>
     <!-- A table in a reply: what TalkBack says for a cell ("Tokens: 3.2k"), and an action on its rows. -->
     <string name="table_cell">%1$s: %2$s</string>
     <string name="copy_table">Copy table</string>

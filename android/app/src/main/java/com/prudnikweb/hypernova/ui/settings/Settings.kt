@@ -271,6 +271,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                 }
             }
         }
+        // Fork: New sessions, the mode they start in (NewSessionsSection below), kept on this phone.
+        item(key = "newSessions") {
+            Spacer(Modifier.height(10.dp))
+            NewSessionsSection()
+        }
         // Fork: Display, the app's text size (DisplaySection below), kept on this phone.
         item(key = "display") {
             Spacer(Modifier.height(10.dp))
@@ -425,6 +430,34 @@ private fun DisplaySection() {
                 ),
                 scale,
                 { com.prudnikweb.hypernova.ui.theme.TextSize.set(context, it) },
+            )
+        }
+    }
+}
+
+/**
+ * Fork: Settings → New sessions: the mode the New session sheet opens on every time (Ask, Edits,
+ * Plan or Auto; data/NewSessionMemory.kt). Auto goes through the think-twice card as it's chosen
+ * here, as everywhere; Bypass isn't offered (it waits for the fingerprint, session by session).
+ */
+@Composable
+private fun NewSessionsSection() {
+    val context = LocalContext.current
+    var mode by remember { mutableStateOf(com.prudnikweb.hypernova.data.NewSessionMemory.startMode(context)) }
+    Seam(stringResource(R.string.st_new_sessions), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            HText(stringResource(R.string.st_start_mode), style = Type.body, color = HN.ink)
+            Spacer(Modifier.height(4.dp))
+            HText(stringResource(R.string.st_start_mode_desc), style = Type.small, color = HN.inkMuted)
+            Spacer(Modifier.height(12.dp))
+            com.prudnikweb.hypernova.ui.components.ModePicker(
+                mode,
+                { m ->
+                    com.prudnikweb.hypernova.data.NewSessionMemory.setStartMode(context, m)
+                    mode = com.prudnikweb.hypernova.data.NewSessionMemory.startMode(m)
+                },
+                bypass = false,
             )
         }
     }

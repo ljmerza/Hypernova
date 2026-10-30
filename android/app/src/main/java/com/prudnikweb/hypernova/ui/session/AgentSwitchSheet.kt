@@ -211,7 +211,8 @@ internal fun AgentSwitchSheet(hub: Hub, s: Session, to: String, onSwitched: (Str
     var switchingNow by remember { mutableStateOf(false) }
     // The Mac said it's at work after all: Stop first, then the switch.
     var mustStop by remember { mutableStateOf(false) }
-    // How the other agent starts: as the new-session sheet last started it (never Auto or Bypass).
+    // How the other agent starts: as the new-session sheet would (Codex as it last started; Fork:
+    // Claude in Settings → New sessions' mode, never Bypass).
     var model by rememberSaveable { mutableStateOf(if (toCodex) memory.codexModel else null) }
     var effort by rememberSaveable { mutableStateOf(if (toCodex) memory.codexEffort else null) }
     var mode by rememberSaveable { mutableStateOf(if (toCodex) memory.codexMode else memory.mode) }

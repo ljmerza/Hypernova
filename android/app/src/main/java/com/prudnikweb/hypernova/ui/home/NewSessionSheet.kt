@@ -133,7 +133,8 @@ private enum class Picking { Project, Model, Mode }
  * into, then the choices as three chips (the project, the model with its provider, the permission
  * mode), each opening its picker, and Start always in reach at the foot with the attachments and
  * the mic. It starts on the project it was opened for ([initialProject]: a path or a name), else
- * the last one used, with the last model and mode (never Auto or Bypass). Frosted over the cosmos.
+ * the last one used, with the last model, and in the mode chosen in Settings → New sessions (Fork:
+ * Ask until one is; never Bypass). Frosted over the cosmos.
  */
 @Composable
 fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Unit, launch: Long = 0L) {
@@ -161,6 +162,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
         mutableStateOf(healthy?.id ?: memory.provider?.takeIf { id -> providers.any { it.id == id } } ?: providers.firstOrNull()?.id)
     }
     var model by rememberSaveable { mutableStateOf(memory.model(providerId)) }
+    // Fork: Settings → New sessions' mode each time; changed here, it's this session's only.
     var mode by rememberSaveable { mutableStateOf(memory.mode) }
     // What was typed survives the sheet being put away (the scrim, Back) or a start that failed
     // after it closed: it comes back the next time it opens (P16).
@@ -427,7 +429,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                                     started = true
                                     val kept = path ?: hub.projectsRoot?.let { "${it.trimEnd('/')}/$name" }
                                     if (onCodex) NewSessionMemory.saveCodex(context, kept, codexModel, codexEffort, codexMode)
-                                    else NewSessionMemory.save(context, kept, provider?.id, choice.value, mode)
+                                    else NewSessionMemory.save(context, kept, provider?.id, choice.value)
                                     prompt = ""
                                     newName = ""
                                     starting = null

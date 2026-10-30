@@ -4,14 +4,19 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** What the new-session sheet carries over (data/NewSessionMemory.kt): never Auto or Bypass. */
+/** What the new-session sheet starts with (data/NewSessionMemory.kt). */
 class NewSessionMemoryTest {
-    @Test fun autoAndBypassAreChosenAgainEachTime() {
-        assertEquals("acceptEdits", NewSessionMemory.keptMode("acceptEdits"))
-        assertEquals("plan", NewSessionMemory.keptMode("plan"))
-        assertEquals("default", NewSessionMemory.keptMode("auto"))
-        assertEquals("default", NewSessionMemory.keptMode("bypassPermissions"))
-        assertEquals("default", NewSessionMemory.keptMode(null))
+    /** Fork: Settings → New sessions offers Ask, Edits, Plan and Auto; Bypass, Codex's modes or nothing saved start in Ask. */
+    @Test fun newSessionsStartInTheChosenModeNeverBypass() {
+        assertEquals(listOf("default", "acceptEdits", "plan", "auto"), NewSessionMemory.START_MODES)
+        assertEquals("default", NewSessionMemory.startMode("default"))
+        assertEquals("acceptEdits", NewSessionMemory.startMode("acceptEdits"))
+        assertEquals("plan", NewSessionMemory.startMode("plan"))
+        assertEquals("auto", NewSessionMemory.startMode("auto"))
+        assertEquals("default", NewSessionMemory.startMode("bypassPermissions"))
+        assertEquals("default", NewSessionMemory.startMode(AgentKind.CAN_EDIT))
+        assertEquals("default", NewSessionMemory.startMode(""))
+        assertEquals("default", NewSessionMemory.startMode(null))
     }
 
     @Test fun theModelIsRememberedPerProvider() {
