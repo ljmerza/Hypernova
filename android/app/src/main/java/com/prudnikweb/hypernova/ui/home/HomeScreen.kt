@@ -201,12 +201,19 @@ fun HomeScreen(
     toAutomations: MutableState<Boolean>? = null,
     /** An automation's editor: [id] null for a new one (from a template, or blank); [runs]: at its runs. */
     onAutomation: (id: String?, template: String?, runs: Boolean) -> Unit = { _, _, _ -> },
+    /** The paired computers, for the chip's switcher (data/Servers.kt); null: the chip opens nothing. */
+    servers: ServerChoice? = null,
 ) {
     val haze = LocalHaze.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val screenH = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
     var tab by rememberSaveable { mutableStateOf(Tab.Sessions) }
+    // The chip's switcher (ui/home/ServerSwitcher.kt) is open.
+    var switching by rememberSaveable { mutableStateOf(false) }
+    if (switching && servers != null) {
+        ServerSwitcher(servers.servers, servers.demo, servers.onSwitch, servers.onPair, onDismiss = { switching = false })
+    }
     // Statistics, opened by tapping the sun: a screen of its own over Home, which fades back as it
     // comes forward (the way a session opens), and Back returns. Only what Home draws leaves, so
     // its tab and scroll are where they were.
@@ -511,7 +518,8 @@ fun HomeScreen(
                     Pill(stringResource(R.string.au_new), { onAutomation(null, null, false) }, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
                     Spacer(Modifier.width(8.dp))
                 }
-                LinkChip(hub, onClick = { tab = Tab.Settings })
+                // The switcher (owner, 2026-10-30): Settings is the bottom tab's alone now.
+                LinkChip(hub, servers, onClick = { if (servers != null) switching = true })
             }
         }
 
@@ -1093,17 +1101,22 @@ private fun WarpMeter(label: String, p: UsageProjection, spoken: String, enabled
 
 /**
  * The connection in the brand row: the Mac's planet with this phone as its moon, and the Mac's name
- * once linked (Reconnecting, Offline… otherwise), with a MacBook's battery after it. Tap for Settings.
+ * once linked (Reconnecting, Offline… otherwise; always, with several paired), with a MacBook's
+ * battery after it, and an amber count while another paired computer needs you. Tap for the
+ * switcher (ui/home/ServerSwitcher.kt).
  */
 @Composable
-private fun LinkChip(hub: Hub, onClick: () -> Unit) {
+private fun LinkChip(hub: Hub, servers: ServerChoice?, onClick: () -> Unit) {
     Box(
         Modifier
             .heightIn(min = 48.dp)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.settings), onClick = onClick),
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.servers_chip_label), onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        ConnectionChip(hub.link.state, name = hub.mac.name, battery = hub.mac.battery, awake = hub.mac.awake, via = hub.mac.via)
+        ConnectionChip(
+            hub.link.state, name = hub.mac.name, battery = hub.mac.battery, awake = hub.mac.awake, via = hub.mac.via,
+            named = servers?.several == true, elsewhere = servers?.elsewhere ?: 0,
+        )
     }
 }
 
