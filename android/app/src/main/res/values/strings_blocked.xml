@@ -1,9 +1,5 @@
 <resources>
-    <!-- A session's Blocked tab (ui/session/BlockedTab.kt; docs/PROTOCOL.md, "Blocked calls"): calls refused without the owner. -->
-
-    <!-- The switch at the top of the chat. -->
-    <string name="blocked_tab_chat">Chat</string>
-    <string name="blocked_tab">Blocked (%1$d)</string>
+    <!-- A session's blocked calls, in its session sheet (ui/session/BlockedTab.kt; docs/PROTOCOL.md, "Blocked calls"): calls refused without the owner. -->
 
     <!-- The list. -->
     <string name="blocked_loading">Loading blocked calls…</string>
@@ -25,4 +21,10 @@
         <item quantity="one">%d blocked</item>
         <item quantity="other">%d blocked</item>
     </plurals>
+    <!-- The chat's mark after its usage strip, the same chip: TalkBack's words, and what a tap does. -->
+    <plurals name="blocked_mark_said">
+        <item quantity="one">%d call refused without you.</item>
+        <item quantity="other">%d calls refused without you.</item>
+    </plurals>
+    <string name="blocked_mark_open">Show the blocked calls</string>
 </resources>

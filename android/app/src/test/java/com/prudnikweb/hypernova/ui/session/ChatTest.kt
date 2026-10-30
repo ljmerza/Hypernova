@@ -1,6 +1,8 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.components.RowFit
 import org.json.JSONObject
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -64,5 +66,17 @@ class ChatTest {
         assertEquals("$0.64", money(0.6449))
         assertEquals("$142", money(142.3))
         assertEquals("<$0.01", money(0.004))
+    }
+
+    @Test fun theStripsWindowsGiveWayWeekBarThenCountdownThenWeek() {
+        // The 5-hour meter whole and without its countdown, the week's with and without its bar.
+        val widths = listOf(intArrayOf(130, 86), intArrayOf(77, 39))
+        fun pick(room: Int) = RowFit.choose(widths, 10, room, WINDOWS_GIVE_WAY)
+        assertArrayEquals(intArrayOf(0, 0), pick(300))
+        assertArrayEquals(intArrayOf(0, 1), pick(200))
+        assertArrayEquals(intArrayOf(1, 1), pick(150))
+        assertArrayEquals(intArrayOf(1, -1), pick(100))
+        // The 5-hour meter stays, however narrow.
+        assertArrayEquals(intArrayOf(1, -1), pick(40))
     }
 }

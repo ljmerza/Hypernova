@@ -5,8 +5,8 @@ import org.json.JSONObject
 
 /**
  * A call refused without the owner (docs/PROTOCOL.md, "Blocked calls"): auto mode's classifier said
- * no ([AUTO_MODE]), or nobody answered its approval for 10 minutes ([AWAY]). The session screen's
- * Blocked tab lists them (ui/session/BlockedTab.kt), with Allow & retry and Dismiss.
+ * no ([AUTO_MODE]), or nobody answered its approval for 10 minutes ([AWAY]). The session sheet
+ * lists them (ui/session/BlockedTab.kt), with Allow & retry and Dismiss.
  */
 @Immutable
 data class BlockedCall(

@@ -8,7 +8,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -50,11 +52,20 @@ import kotlinx.coroutines.launch
 /**
  * The usage strip, once the Mac has answered (nothing before, so the header never shows zeros).
  * [usage] is the screen's ([rememberSessionUsage]): the session sheet ([onOpen]) shows it too.
+ * After it, while calls refused without the owner wait, the blocked mark ([onBlocked]), with or
+ * without the strip.
  */
 @Composable
-internal fun ChatUsage(hub: Hub, session: Session, usage: SessionUsage?, onCompact: () -> Unit, onOpen: () -> Unit, more: String, modifier: Modifier = Modifier) {
-    if (usage == null) return
-    UsageStrip(hub, session, usage, onCompact, onOpen, more, modifier)
+internal fun ChatUsage(hub: Hub, session: Session, usage: SessionUsage?, onCompact: () -> Unit, onOpen: () -> Unit, onBlocked: () -> Unit, more: String, modifier: Modifier = Modifier) {
+    val blocked = session.blockedCalls
+    if (usage == null && blocked == 0) return
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (usage != null) UsageStrip(hub, session, usage, onCompact, onOpen, more, Modifier.weight(1f))
+        if (blocked > 0) {
+            if (usage != null) Spacer(Modifier.width(8.dp))
+            BlockedMark(blocked, onBlocked)
+        }
+    }
 }
 
 /** The quick prompts, while there's nothing in the box and Claude isn't at work. */

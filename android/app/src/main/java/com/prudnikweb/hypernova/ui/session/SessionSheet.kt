@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,6 +24,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +40,6 @@ import androidx.compose.ui.unit.sp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.Hub
-import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.ModelNames
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
@@ -45,9 +48,9 @@ import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.Glyph
+import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.InfoRow
-import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.ModeTag
 import com.prudnikweb.hypernova.ui.components.ModelChip
 import com.prudnikweb.hypernova.ui.components.Pill
@@ -69,23 +72,25 @@ import kotlinx.coroutines.launch
 /**
  * The session sheet, a tap on the chat's usage strip or its status line (owner, 2026-10-29: "it's
  * not just usage, it's all the information about this session and what you can change"). Its
- * parts under seams: the usage breakdown, the model, the permissions (the mode, the Blocked tab),
+ * parts under seams: the model, the permissions (the mode, the blocked calls), the plan's windows,
  * the agents at work, where it runs, and the Home card's menu. What changes here, changes at once:
  * the sheet stays open and shows it.
  *
- * [usage]: the screen's, null until the Mac has answered. [onModel] opens the model picker over the
- * sheet, [onSwitchAgent] the switch to the other agent, [onBlocked] the Blocked tab.
+ * [usage]: the screen's, null until the Mac has answered (the model's id). [onModel] opens the
+ * model picker over the sheet, [onSwitchAgent] the switch to the other agent. [atBlocked]: opened
+ * from the strip's blocked mark, so the blocked calls are brought into view. [onRetried]: an Allow &
+ * retry went out (the screen closes the sheet, for the chat).
  */
 @Composable
 internal fun SessionSheet(
     hub: Hub,
     session: Session,
     usage: SessionUsage?,
-    onCompact: () -> Unit,
     onModel: () -> Unit,
     onSwitchAgent: (String) -> Unit,
-    onBlocked: () -> Unit,
+    onRetried: () -> Unit,
     onDismiss: () -> Unit,
+    atBlocked: Boolean = false,
 ) {
     val opener = LocalOpener.current
     val change = canChange(hub, session)
@@ -101,18 +106,18 @@ internal fun SessionSheet(
             HText(session.hex, style = Type.monoSmall.copy(fontSize = 10.sp), color = HN.inkDim.copy(alpha = 0.75f), maxLines = 1)
         }
 
-        SheetSeam(stringResource(R.string.session_sheet_usage))
-        when {
-            usage != null -> UsageDetails(hub, usage, session, builtIn(hub, session), onCompact)
-            hub.isDemo || hub.link.state == LinkState.Connected -> LoadingLine(stringResource(R.string.session_sheet_usage_loading))
-            else -> HText(linkWord(hub.link.state), style = Type.small, color = HN.inkDim)
-        }
-
+        // Owner, 2026-10-30: the model, then the permissions, then the plan's windows.
         SheetSeam(stringResource(R.string.model))
         ModelPart(hub, session, usage, change, onModel, onSwitchAgent)
 
         SheetSeam(stringResource(R.string.session_sheet_permissions))
-        PermissionsPart(hub, session, change, onBlocked)
+        PermissionsPart(hub, session, change, atBlocked, onRetried)
+
+        // Only the plan's windows: none for another provider, nor while they're unknown.
+        if (planShown(hub, session)) {
+            SheetSeam(stringResource(R.string.session_sheet_usage))
+            UsageDetails(hub)
+        }
 
         val agents = sheetAgents(hub.agents(session.id))
         val atWork = agentsAtWork(session, agents)
@@ -171,11 +176,13 @@ private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolea
 /**
  * What it may do: the permission mode, changed here as in the new-session sheet (Codex's two from
  * its next turn while one runs; Auto and Bypass behind the think-twice card, Bypass behind the
- * fingerprint too), or said with why it can't be; then its Blocked tab while calls wait there. The
- * phone knows nothing more of its rules (allow lists are Claude Code's own, on the Mac).
+ * fingerprint too), or said with why it can't be; then the calls refused without the owner, with
+ * Allow & retry and Dismiss, while any wait (and once shown, until the sheet closes, so the last
+ * one dismissed doesn't take the part away under the finger). The phone knows nothing more of its
+ * rules (allow lists are Claude Code's own, on the Mac).
  */
 @Composable
-private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, onBlocked: () -> Unit) {
+private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Boolean, onRetried: () -> Unit) {
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val context = LocalContext.current
@@ -222,11 +229,28 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, onBlocked: ()
             )
         }
     }
-    if (s.blockedCalls > 0) {
-        Spacer(Modifier.height(12.dp))
-        SheetLink(stringResource(R.string.session_sheet_blocked), "${s.blockedCalls}", onBlocked)
-        Spacer(Modifier.height(4.dp))
-        HText(stringResource(R.string.session_sheet_blocked_note), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp))
+    var seen by remember(s.id) { mutableStateOf(s.blockedCalls > 0) }
+    LaunchedEffect(s.blockedCalls) { if (s.blockedCalls > 0) seen = true }
+    if (s.blockedCalls == 0 && !seen) return
+    // Opened from the strip's mark: the calls into view once they're in.
+    val calls = remember { BringIntoViewRequester() }
+    var loaded by remember { mutableStateOf(false) }
+    LaunchedEffect(loaded) {
+        if (atBlocked && loaded) {
+            withFrameNanos { }
+            calls.bringIntoView()
+        }
+    }
+    Column(Modifier.bringIntoViewRequester(calls)) {
+        Spacer(Modifier.height(14.dp))
+        Hairline(Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HText(stringResource(R.string.session_sheet_blocked).uppercase(), style = Type.label, color = HN.inkDim, modifier = Modifier.weight(1f))
+            if (s.blockedCalls > 0) HText("${s.blockedCalls}", style = Type.monoSmall, color = HN.amber, maxLines = 1)
+        }
+        Spacer(Modifier.height(8.dp))
+        BlockedCalls(hub, s, onRetried, onLoaded = { loaded = true })
     }
 }
 

@@ -2,38 +2,16 @@
     <!-- The chat's quick wins: the usage strip, Claude's to-do list, a message's long-press menu and quick prompts (their own file, apart from the app's strings). -->
     <string name="chat_err_mac">Couldn\'t reach your Mac. Check that it\'s online.</string>
     <string name="chat_err_old_mac">Your Mac\'s Hypernova is older than this app. Update it on the Mac.</string>
-    <string name="chat_about">about</string>
     <string name="chat_close">Close</string>
 
     <!-- Usage strip -->
     <string name="chat_usage_open">Show usage</string>
     <string name="chat_compact">Compact</string>
-    <string name="chat_compact_now">Compact now</string>
-    <string name="chat_compact_note">Sends /compact: Claude Code folds the conversation so far into a summary and carries on with room to spare.</string>
     <string name="chat_context_said">Context %1$d%% full.</string>
     <string name="chat_context_about_said">Context about %1$d%% full.</string>
     <string name="chat_context_unknown_said">Context: shows after %1$s\'s next reply.</string>
-    <string name="chat_cost_said">%1$s so far.</string>
-    <string name="chat_cost_about_said">About %1$s so far.</string>
     <string name="chat_tokens_said">%1$s tokens.</string>
     <string name="chat_usage_title">Usage in this session</string>
-    <string name="chat_context_label">Context window</string>
-    <string name="chat_context_of">%1$s of %2$s tokens</string>
-    <string name="chat_context_of_about">%1$s of about %2$s tokens</string>
-    <string name="chat_context_unknown">Shows after %1$s\'s next reply.</string>
-    <string name="chat_context_about_note">About: the window is this model\'s usual size. Claude Code says exactly once its status line has run in this session.</string>
-    <string name="chat_tokens_label">Tokens</string>
-    <string name="chat_tokens_input">Input</string>
-    <string name="chat_tokens_output">Output</string>
-    <string name="chat_tokens_cache_read">Read from cache</string>
-    <string name="chat_tokens_cache_write">Written to cache</string>
-    <string name="chat_tokens_total">All together</string>
-    <string name="chat_tokens_agents">Agents used %1$s of them.</string>
-    <string name="chat_cost_label">Cost</string>
-    <string name="chat_cost_exact_note">Claude Code\'s own count, at API prices.</string>
-    <string name="chat_cost_about_note">Worked out from the tokens at API list prices.</string>
-    <string name="chat_cost_plan_note">Your plan covers it: this is what the same work would cost on the API.</string>
-    <string name="chat_cost_none">Not shown: %1$s bills its own way.</string>
     <string name="chat_plan_note">Your plan\'s windows, shared by every session.</string>
 
     <!-- To-do list -->

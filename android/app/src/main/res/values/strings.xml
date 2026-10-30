@@ -844,7 +844,6 @@
     <string name="session_sheet_agents">Agents</string>
     <string name="session_sheet_where">Where it runs</string>
     <string name="session_sheet_actions">Actions</string>
-    <string name="session_sheet_usage_loading">Asking the Mac</string>
     <string name="session_sheet_no_agents">No agents at work.</string>
     <!-- An agent at work: its label, then what it does now, or this. -->
     <string name="session_sheet_agent_working">working</string>
@@ -857,7 +856,6 @@
     <string name="session_sheet_mode_ended">It has ended. Writing in it resumes it.</string>
     <string name="session_sheet_mode_watched">Change it in its terminal on the Mac: Hypernova only watches that one.</string>
     <string name="session_sheet_blocked">Blocked calls</string>
-    <string name="session_sheet_blocked_note">Calls refused without you. Allow and retry them, or dismiss them.</string>
     <string name="session_sheet_folder">Folder</string>
     <string name="session_sheet_runs_in">Runs in</string>
     <string name="session_sheet_runs_terminal">A shared terminal</string>

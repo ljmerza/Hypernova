@@ -79,18 +79,24 @@ fun ProjectionMeter(label: String, p: UsageProjection, spoken: String, modifier:
 
 /**
  * The compact meter for a single row (the chat's strip): its short label ("5H"), the percentage, a
- * thin projection bar [barWidth] wide and the one tag.
+ * thin projection bar [barWidth] wide and the one tag. Short of room, the strip asks for less:
+ * [bar] false leaves the bar out, [reset] false the reset countdown (the time to the limit, in
+ * red, still shows).
  */
 @Composable
-fun ProjectionMeterCompact(label: String, p: UsageProjection, modifier: Modifier = Modifier, barWidth: Dp = 40.dp) {
+fun ProjectionMeterCompact(label: String, p: UsageProjection, modifier: Modifier = Modifier, barWidth: Dp = 40.dp, bar: Boolean = true, reset: Boolean = true) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         HText(label.uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
         Spacer(Modifier.width(5.dp))
         HText(percent(p.used), style = Type.monoSmall, color = if (p.full) HN.danger else if (p.used >= 0.8f) HN.amber else HN.inkMuted, maxLines = 1)
-        Spacer(Modifier.width(6.dp))
-        ProjectionBar(p, meterColour(p), Modifier.width(barWidth))
-        Spacer(Modifier.width(6.dp))
-        MeterTag(p, null)
+        if (bar) {
+            Spacer(Modifier.width(6.dp))
+            ProjectionBar(p, meterColour(p), Modifier.width(barWidth))
+        }
+        if (reset || p.tag is UsageProjection.Tag.Limit) {
+            Spacer(Modifier.width(6.dp))
+            MeterTag(p, null)
+        }
     }
 }
 
