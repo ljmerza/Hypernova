@@ -367,7 +367,6 @@
     <string name="mode_bypass_desc">Never asks, not even before risky commands. Only for throwaway work.</string>
     <string name="mode_bypass_unavailable">Bypass is off here: this session started in a terminal without it. Start a new session from the phone to use it.</string>
     <string name="mode_bypass_next_turn">Bypass starts with Claude\u2019s next turn.</string>
-    <string name="mode_next_turn">%1$s starts with Claude\u2019s next turn.</string>
     <!-- Think-twice card, shown before Auto or Bypass -->
     <string name="think_kicker_auto">Before you let it run on its own</string>
     <string name="think_kicker_bypass">Before you switch every check off</string>
@@ -552,7 +551,6 @@
     <string name="update_get">Get the update</string>
     <string name="about_app_build">%1$s (build %2$d)</string>
     <string name="mode_change">Change the permission mode</string>
-    <string name="mode_cycle">Switch to %1$s</string>
     <string name="busy_title">Unsent text in the terminal</string>
     <string name="busy_body">Your message didn\'t go, so nothing was typed over it. Replace it with your message, or open the terminal.</string>
     <string name="busy_replace">Replace and send</string>

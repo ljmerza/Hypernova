@@ -1596,7 +1596,8 @@ run and which mode the session is in; the usage card stays, and a tap on it open
 
 1. **The status line keeps its words only** (IDLE, ENDED, PAUSED, where the Mac is), then the usage
    strip. Its trail (the agents and queued counts, the mode tag with its one-tap cycle) is gone; the
-   strip's TalkBack sentence says them instead.
+   strip's TalkBack sentence says them instead. The cycle went with it (owner, 2026-10-30): the
+   sheet's mode picker is the one way to change the mode in the chat.
 2. **A tap on the strip or the line opens the session sheet**, which replaces the line's panel and
    the strip's breakdown: usage, the model (and the other agent), the permissions (the mode; the
    Blocked tab while calls wait), the agents at work and each running workflow's agents done of
