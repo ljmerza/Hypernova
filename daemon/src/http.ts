@@ -20,9 +20,10 @@ import { nameKick, nameStatus, namedOrigin, releaseName, setNameService, setName
 import { allowGlasses, dropGlasses, glassesEntries, glassesSeen, isGlassesFeed, lensWho, phoneOfGlassesId, removeGlasses, trackGlasses, viaLens } from './glasses.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { recheckSystem, setBuiltInTailscale, setControlUrl, tailnetHints, tailnetNow, tsnetBaseUrl, tsnetLogin, tsnetLogout, tsnetState } from './tsnet.ts'
-import { addClient, agentJobOf, answerApproval, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
+import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setMode } from './runner.ts'
 import { answerMenu, attachAgentsTerm, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
+import { agentJobCommand } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
 import { codexModels, codexSessionUsage, codexState, refreshCodexAccount } from './codex/account.ts'
 import { isCodex, isCodexMode } from './codex/threads.ts'
@@ -774,6 +775,34 @@ async function api(c: Ctx): Promise<void> {
       throw e
     }
     return json(res, 200, { session: listSessions().find((x) => x.id === ac[1]) })
+  }
+  // The Home card's long-press menu (docs/PROTOCOL.md, "Session menu"): rename it (Claude Code's
+  // /rename, typed in, so it shows in `claude agents` and the transcript keeps it), and for a
+  // `claude agents` job, stop it or delete it there.
+  const menu = /^\/v1\/sessions\/([\w-]+)(?:\/(rename|stop))?$/.exec(path)
+  if (menu && ((menu[2] && m === 'POST') || (!menu[2] && m === 'DELETE'))) {
+    const [, id, action] = menu
+    const rec = getSession(id!)
+    if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    const job = settings.claudeAgents === true ? agentJobOf(id!) : null
+    if (action === 'rename') {
+      const name = String((await readJsonBody(req))?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
+      if (!name) throw new HttpError(400, 'bad_name', 'Give it a name.')
+      if (isCodex(id!) || isSdk(id!)) throw new HttpError(409, 'no_terminal', 'Only a session in a terminal can be renamed.')
+      // Never a fork: a session open in a terminal Hypernova doesn't hold is a 409.
+      await promptSession(id!, `/rename ${name}`, { noFork: true })
+      upsertSession(id!, { title: name })
+      return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+    }
+    if (!job) throw new HttpError(409, 'not_agents', 'Only a session in claude agents can be stopped or deleted here.')
+    // Its holder (`claude attach`) goes first: it only watched, and would hold the job open.
+    const tid = termOf(id!)
+    if (tid) await endTermAndWait(tid)
+    const r = await agentJobCommand(action === 'stop' ? 'stop' : 'rm', job)
+    if (!r.ok) throw new HttpError(409, 'agents_refused', r.said || 'claude agents didn’t do it.')
+    if (action === 'stop') return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+    forgetSession(id!)
+    return json(res, 200, { ok: true })
   }
   const s = /^\/v1\/sessions\/([\w-]+)\/(events|prompt|interrupt|continue|mode|terminal|open|menu|screenshot|telescope|provider|model)$/.exec(path)
   if (s) {

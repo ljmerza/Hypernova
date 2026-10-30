@@ -1173,8 +1173,8 @@ objects with a `t` field:
 
 - `{t:"snapshot", snapshot: Snapshot}` right after connecting (and after resyncs).
 - `{t:"session", session: Session}` a session was added or changed.
-- `{t:"session.removed", id}`: reserved, the daemon doesn't send it yet (a session that ends comes
-  as `session` with `state: "ended"`).
+- `{t:"session.removed", id}`: a session deleted for good (a `claude agents` job deleted from the
+  Home card's menu, "Session menu"). A session that ends comes as `session` with `state: "ended"`.
 - `{t:"event", sessionId, event: Event}` a new or updated event (same `id`
   replaces the previous version; `assistant` text grows while streaming, and a command
   event comes again with `command.kind: "skill"` once its skill's body is read).
@@ -1604,6 +1604,20 @@ ModelOption = {value: string | null, name, model: string | null, description: st
 - **Any other provider, `source: "settings"`:** the models its settings name, as above.
 - The phone asks when the new-session sheet opens, and shows a model with a week of its own
   (`Usage.models`, "Fable", "Sonnet"; matched by the first word of its name) with that week's meter.
+
+## Session menu
+
+The Home card's long-press menu. A session has `agentJob` (the job id) when it is a `claude agents`
+job (settings.claudeAgents); with that setting the daemon lists every job `claude agents --json --all`
+shows, finished ones too (`idle`, on Home rather than History; one blocked on the owner is `needs_you`).
+
+- `POST /v1/sessions/{id}/rename` `{name}`: Claude Code's `/rename <name>`, typed into its terminal
+  (a `claude agents` job through `claude attach`, which wakes a stopped one). `{session}`; 400
+  `bad_name`; 409 `no_terminal` for a session Hypernova can't type into, and the prompt route's 409s.
+- `POST /v1/sessions/{id}/stop`: `claude stop <job>` (the conversation is kept). `{session}`.
+- `DELETE /v1/sessions/{id}`: `claude rm <job>`, then `session.removed`. `{ok: true}`.
+- Both: 409 `not_agents` for a session with no `agentJob`; 409 `agents_refused` with Claude Code's
+  own words when it refuses (`rm` keeps a worktree with unpushed work).
 
 ## A session's model
 

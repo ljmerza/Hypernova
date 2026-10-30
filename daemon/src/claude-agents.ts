@@ -41,3 +41,19 @@ export function parseAgentList(out: string): AgentJob[] | null {
   if (!Array.isArray(a)) return null
   return a.filter((o) => o && o.kind === 'background' && typeof o.id === 'string' && typeof o.sessionId === 'string' && typeof o.cwd === 'string')
 }
+
+/**
+ * `claude stop <job>` or `claude rm <job>` (the Home card's menu): whether it worked, and Claude
+ * Code's own words either way (`rm` refuses a worktree with unpushed work, and says so).
+ */
+export function agentJobCommand(verb: 'stop' | 'rm', job: string): Promise<{ ok: boolean; said: string }> {
+  const file = findClaude()
+  if (!file) return Promise.resolve({ ok: false, said: 'Claude Code isn’t installed on this computer.' })
+  return new Promise((done) =>
+    execFile(file, [verb, job], { timeout: 30_000 }, (e, out, err) => {
+      const said = trimText(`${out}\n${err}`.trim(), 400) ?? ''
+      log(`claude ${verb}`, job, e ? 'failed:' : 'done:', said)
+      done({ ok: !e, said })
+    }),
+  )
+}

@@ -77,8 +77,10 @@ export type Session = {
   /** The session this conversation came from when it switched agents, and the one it went on in (switch.ts). */
   switchedFrom?: string
   switchedTo?: string
+  /** A `claude agents` job's id (settings.claudeAgents): the phone can stop or delete it there. Absent otherwise. */
+  agentJob?: string
 }
-type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
+type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
 export const isCodexRec = (r: { agent?: string }) => r.agent === 'codex'
 
@@ -191,7 +193,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}) }
+  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id) } : {}) }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
@@ -1241,6 +1243,13 @@ export function applyAgentList(list: AgentJob[]): void {
     const r = sessions.get(id)
     if (r && !r.pid && r.state !== 'ended') upsertSession(id, { state: 'ended', activity: null })
   }
+}
+
+/** A session deleted for good (a `claude agents` job removed with `claude rm`): gone from every list. */
+export function forgetSession(id: string): void {
+  agentJobs.delete(id)
+  agentStates.delete(id)
+  if (sessions.delete(id)) broadcast({ t: 'session.removed', id })
 }
 
 /** Live interactive sessions from Claude Code's registry (~/.claude/sessions/<pid>.json). */

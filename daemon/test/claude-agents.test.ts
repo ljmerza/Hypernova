@@ -39,6 +39,11 @@ case "$1" in
     printf '\\n────────────────────\\n❯ \\n────────────────────\\n'
     exec sleep 30
     ;;
+  stop|rm)
+    echo "$1 $2" >> "$S/verbs"
+    if [ "$2" = "dirty000" ]; then echo "Not deleted: the worktree has unpushed commits" >&2; exit 1; fi
+    echo "Deleted $2"
+    ;;
   *) exec sleep 30 ;;
 esac
 `,
@@ -49,7 +54,7 @@ process.env.CLAUDE_BIN = fake
 const hub = await import('../src/hub.ts')
 const { settings } = await import('../src/store.ts')
 const { attachAgentsTerm, createAgentsSession, scanTerms, termOf } = await import('../src/terms.ts')
-const { parseAgentList } = await import('../src/claude-agents.ts')
+const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
 const { promptSession } = await import('../src/http.ts')
 
 const procs: ChildProcess[] = []
@@ -195,4 +200,21 @@ test('promptSession: a finished job (no process) is typed into through claude at
   await promptSession('agents-wake-1', 'and one more thing').catch((e) => assert.ok(['not_sent', 'not_seen'].includes(e.code), e.message))
   assert.equal(readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'attached'), 'utf8').trim(), 'ffff0001')
   assert.equal(hub.listSessions().length, before, 'no fork, no resume')
+})
+
+test('a claude agents session says its job id to the phone; one forgotten is gone from the list', () => {
+  settings.claudeAgents = true
+  hub.applyAgentList([{ id: 'abab0001', sessionId: 'agents-forget-1', cwd: scratch, state: 'done' }])
+  assert.equal(hub.listSessions().find((s) => s.id === 'agents-forget-1')?.agentJob, 'abab0001')
+  hub.forgetSession('agents-forget-1')
+  assert.equal(hub.getSession('agents-forget-1'), undefined)
+  assert.equal(hub.agentJobOf('agents-forget-1'), null)
+})
+
+test('agentJobCommand: claude stop / rm with the job id, and Claude Code’s words when it refuses', async () => {
+  assert.deepEqual(await agentJobCommand('stop', 'abab0002'), { ok: true, said: 'Deleted abab0002' })
+  const r = await agentJobCommand('rm', 'dirty000')
+  assert.equal(r.ok, false)
+  assert.match(r.said, /unpushed commits/)
+  assert.match(readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'verbs'), 'utf8'), /^stop abab0002\nrm dirty000\n$/)
 })
