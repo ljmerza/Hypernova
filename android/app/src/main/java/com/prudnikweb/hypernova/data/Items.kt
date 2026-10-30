@@ -9,6 +9,7 @@ data class Resolved(val decision: String, val by: String?)
  * from the pending [approvals], and localhost URLs become "Open preview" pills.
  */
 object Items {
+    private val OWN_PORTS = 47321..47323
     private val PORT = Regex("""(?:https?://)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1])(?::(\d{2,5}))""")
     private const val MAX_DIFF_LINES = 120
     private const val MAX_TERMINAL_LINES = 400
@@ -16,7 +17,8 @@ object Items {
     /** Ports of local dev servers mentioned in [text] (e.g. `http://localhost:5173/`). */
     fun ports(text: String?): List<Int> {
         if (text.isNullOrEmpty() || (!text.contains("localhost") && !text.contains("127.0.0.1") && !text.contains("0.0.0.0") && !text.contains("[::1]"))) return emptyList()
-        return PORT.findAll(text).mapNotNull { it.groupValues[1].toIntOrNull() }.filter { it in 1..65535 }.distinct().take(3).toList()
+        // Not Hypernova's own ports (the API, the local API, the local route): the Mac refuses to preview those.
+        return PORT.findAll(text).mapNotNull { it.groupValues[1].toIntOrNull() }.filter { it in 1..65535 && it !in OWN_PORTS }.distinct().take(3).toList()
     }
 
     /** A short path for display: relative to the session folder, or `~/…`. */
