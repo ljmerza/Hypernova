@@ -1,9 +1,16 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.AgentBoard
+import com.prudnikweb.hypernova.data.AgentState
 import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.WAgent
+import com.prudnikweb.hypernova.data.WPhase
+import com.prudnikweb.hypernova.data.WWorkflow
+import com.prudnikweb.hypernova.data.WorkflowView
+import com.prudnikweb.hypernova.data.workflowView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -16,6 +23,124 @@ class StatusModelTest {
         BarInput(Phase.Working, SessionState.Working, activity, agentsRunning = agents, todos = todos, trailingReads = reads)
 
     private fun todo(n: Int, s: TodoStatus) = Todo("$n", "t$n", null, s)
+
+    private fun workflow(finished: Int, started: Int, state: AgentState = AgentState.Running) = WorkflowView(
+        "wf_1", "review-changes", null, state, 0, null, null, agentCount = started, running = started - finished, phases = emptyList(), finished = finished,
+    )
+
+    private fun wfAgent(id: String, status: String) = WAgent(
+        id = id, sessionId = "s", toolUseId = null, parentAgentId = null, workflowId = "wf_1", phase = "Review", label = "review:$id",
+        type = "workflow-subagent", model = null, background = true, status = status, activity = null,
+        startedAt = 0, endedAt = null, lastActivityAt = 0, tokens = null, toolUses = null, result = null,
+    )
+
+    private fun wwf(agentCount: Int, done: Int, failed: Int) = WWorkflow(
+        id = "wf_1", sessionId = "s", toolUseId = null, name = "review-changes", summary = null, status = "running",
+        phases = listOf(WPhase("Review", null)), agentCount = agentCount, done = done, failed = failed, startedAt = 0, endedAt = null, tokens = null, toolUses = null,
+    )
+
+    private fun viewOf(w: WWorkflow, agents: List<WAgent>) = AgentBoard(agents.associateBy { it.id }, mapOf(w.id to w)).workflowView(w, emptySet())
+
+    @Test fun aRunningWorkflowShowsItsNameAndItsAgentsDoneOfStarted() {
+        // The main agent is idle while the workflow's agents work.
+        val alone = statusBar(BarInput(Phase.Idle, SessionState.Idle, "", agentsRunning = 6, workflow = workflow(1, 7)))!!
+        assertEquals(Say(SayKind.Workflow, "review-changes"), alone.say)
+        assertEquals(BarTone.Working, alone.tone)
+        assertEquals("review-changes", alone.workflow)
+        assertTrue(alone.hasWorkflow)
+        assertFalse(alone.hasTodos)
+        assertEquals(1, alone.done)
+        assertEquals(7, alone.total)
+        assertEquals(1f / 7, alone.progress!!, 0.0001f)
+        assertFalse(alone.canStop)
+        // The main agent works too: the workflow still wins the line, and Stop stays for the main agent.
+        val both = statusBar(working("Bash: npm test", agents = 6).copy(workflow = workflow(1, 7)))!!
+        assertEquals(Say(SayKind.Workflow, "review-changes"), both.say)
+        assertTrue(both.canStop)
+        // Between its phases none of its agents runs, and the session is still busy with it.
+        assertEquals(SayKind.Workflow, statusBar(BarInput(Phase.Idle, SessionState.Idle, "", workflow = workflow(3, 3)))!!.say.kind)
+    }
+
+    @Test fun aWorkflowJustStartedHasNoTallyYet() {
+        val m = statusBar(BarInput(Phase.Idle, SessionState.Idle, "", agentsRunning = 1, workflow = workflow(0, 0)))!!
+        assertTrue(m.hasWorkflow)
+        assertFalse(m.counted)
+        assertNull(m.progress)
+    }
+
+    @Test fun noWorkflowLeavesTheBarAsItWas() {
+        val todos = listOf(todo(1, TodoStatus.Done), todo(2, TodoStatus.Active))
+        val m = statusBar(working("Edit: src/App.kt", todos))!!
+        assertEquals(Say(SayKind.Editing, "App.kt"), m.say)
+        assertNull(m.workflow)
+        assertFalse(m.hasWorkflow)
+        assertTrue(m.hasTodos)
+        assertEquals(1, m.done)
+        assertEquals(2, m.total)
+        assertEquals(m, statusBar(working("Edit: src/App.kt", todos).copy(workflow = null)))
+    }
+
+    @Test fun aWorkflowWinsOverTheTodos() {
+        val todos = listOf(todo(1, TodoStatus.Done), todo(2, TodoStatus.Done), todo(3, TodoStatus.Active))
+        val m = statusBar(working("Thinking", todos, agents = 4).copy(workflow = workflow(2, 6)))!!
+        assertEquals(SayKind.Workflow, m.say.kind)
+        assertFalse(m.hasTodos)
+        assertEquals(2, m.done)
+        assertEquals(6, m.total)
+        // Waiting for you still says what it waits on, amber; the tally stays the workflow's.
+        val a = Item.Approval("k", "Bash", "npm test", "", kind = ApprovalKind.Tool)
+        val asking = statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "", agentsRunning = 4, pending = a, todos = todos, workflow = workflow(2, 6)))!!
+        assertEquals(BarTone.NeedsYou, asking.tone)
+        assertEquals(Say(SayKind.WaitApprove, "npm test"), asking.say)
+        assertEquals("review-changes", asking.workflow)
+        assertEquals(6, asking.total)
+    }
+
+    @Test fun aFinishedWorkflowGivesTheBarBack() {
+        for (end in listOf(AgentState.Done, AgentState.Failed, AgentState.Stopped)) {
+            val todos = listOf(todo(1, TodoStatus.Done), todo(2, TodoStatus.Pending))
+            val m = statusBar(working("Thinking", todos).copy(workflow = workflow(7, 7, end)))!!
+            assertEquals(SayKind.Thinking, m.say.kind)
+            assertNull(m.workflow)
+            assertEquals(1, m.done)
+            assertEquals(2, m.total)
+            // Nothing left running and the main agent idle: no bar.
+            assertNull(statusBar(BarInput(Phase.Idle, SessionState.Idle, "", workflow = workflow(7, 7, end))))
+        }
+    }
+
+    @Test fun theRunningWorkflowIsTheNewestCardThatStillRuns() {
+        val old = Item.WorkflowCard("c1", workflow(7, 7, AgentState.Done).copy(id = "wf_old"))
+        val live = Item.WorkflowCard("c2", workflow(1, 3).copy(id = "wf_live"))
+        val later = Item.WorkflowCard("c3", workflow(2, 2, AgentState.Stopped).copy(id = "wf_later"))
+        assertEquals("wf_live", runningWorkflow(listOf(Item.User("u", "go"), old, live, Item.Tool("t", "Read", "a"), later))?.id)
+        assertNull(runningWorkflow(listOf(old, later)))
+        assertNull(runningWorkflow(emptyList()))
+    }
+
+    @Test fun aWorkflowCountsItsAgentsFinishedHoweverTheyEndedAndNotARetrysEarlierAttempt() {
+        // The retried step's first attempt is off the board (its `superseded` message), so only these are left.
+        val agents = listOf(wfAgent("a1", "done"), wfAgent("a2", "error"), wfAgent("a3", "stopped"), wfAgent("a4", "running"))
+        // The daemon counts the done and the failed, not the stopped: the board counts those itself.
+        val v = viewOf(wwf(agentCount = 4, done = 1, failed = 1), agents)
+        assertEquals(3, v.finished)
+        assertEquals(4, v.agentCount)
+        // The daemon's totals can be ahead of the agents this phone has (older ones only counted there).
+        val w = viewOf(wwf(agentCount = 9, done = 6, failed = 1), agents)
+        assertEquals(7, w.finished)
+        assertEquals(9, w.agentCount)
+    }
+
+    @Test fun aWorkflowWithAFailedAgentStillReachesAllFinished() {
+        // Between phases (or before its summary is written) the run is still running with every agent ended.
+        val agents = listOf(wfAgent("a1", "done"), wfAgent("a2", "error"), wfAgent("a3", "done"), wfAgent("a4", "stopped"))
+        val v = viewOf(wwf(agentCount = 4, done = 2, failed = 1), agents)
+        val m = statusBar(BarInput(Phase.Idle, SessionState.Idle, "", agentsRunning = 1, workflow = v))!!
+        assertEquals(SayKind.Workflow, m.say.kind)
+        assertEquals(4, m.done)
+        assertEquals(4, m.total)
+        assertEquals(1f, m.progress!!, 0f)
+    }
 
     @Test fun anIdleSessionHasNoBar() {
         assertNull(statusBar(BarInput(Phase.Idle, SessionState.Idle, "waiting for your next prompt")))

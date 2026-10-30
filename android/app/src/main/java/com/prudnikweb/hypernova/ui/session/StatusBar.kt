@@ -13,8 +13,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -24,6 +26,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -42,6 +48,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -55,12 +62,17 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AgentState
+import com.prudnikweb.hypernova.data.AgentView
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.data.WorkflowView
+import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Icon
+import com.prudnikweb.hypernova.ui.components.Planet
 import com.prudnikweb.hypernova.ui.fx.LocalAmbient
 import com.prudnikweb.hypernova.ui.fx.Pace
 import com.prudnikweb.hypernova.ui.theme.HN
@@ -85,6 +97,8 @@ internal class StatusBarState(
     val onToggle: () -> Unit,
     /** The Mac isn't linked: the link's word, said instead of what Claude was last doing; no Stop, no clock. */
     val away: String? = null,
+    /** The session's running workflow: opened, the bar lists its agents (and the to-dos under them). */
+    val workflow: WorkflowView? = null,
 ) {
     val visible: Boolean get() = model != null
 }
@@ -99,11 +113,12 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     val todos = rememberTodos(hub, session.id, items)
     val pending = remember(items) { items.lastOrNull { it is Item.Approval && it.resolved == null } as? Item.Approval }
     val reads = remember(items) { trailingReads(items) }
+    val workflow = remember(items) { runningWorkflow(items) }
     // Stop sends Esc to a shared terminal or interrupts a session the Mac runs; a terminal session
     // the Mac only watches can't be stopped from here (the Mac answers 409).
     val stoppable = session.term != null || session.origin == "hypernova" || hub.isDemo
     val raw = statusBar(
-        BarInput(session.phase, session.state, session.activity, sending, session.agentsRunning, pending, todos, reads, stoppable = stoppable),
+        BarInput(session.phase, session.state, session.activity, sending, session.agentsRunning, pending, todos, reads, stoppable = stoppable, workflow = workflow),
     )
     val isError = raw?.tone == BarTone.Error
     // Kept out here so the list stays open (or folded) across short gaps between two steps.
@@ -121,14 +136,16 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     return StatusBarState(model, todos, open, {
         open = !open
         if (isError) kept = !kept
-    }, away = away)
+    }, away = away, workflow = workflow)
 }
 
 /**
  * The agent status bar above the prompt box, only while a turn runs (owner, 2026-10-17): one line
  * of what Claude is doing, the to-dos as 3/7, the turn's time and Stop, with a thin progress line
  * along the bottom. It is the to-do panel folded: tap it to open the checklist, tap again to fold
- * it. When the turn ends it folds away; it keeps its last look while it does.
+ * it. When the turn ends it folds away; it keeps its last look while it does. While a workflow
+ * runs it says the workflow's name and counts its agents instead ("review-changes 1/7"), and
+ * opens to them, the to-dos under them.
  */
 @Composable
 internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modifier: Modifier = Modifier) {
@@ -158,7 +175,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
         val shown = model ?: last[0]
         if (shown != null) {
             Column {
-                StatusCard(shown, bar.todos, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex) {
+                StatusCard(shown, bar.todos, bar.workflow, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex) {
                     if (!stopping) {
                         stopping = true
                         hub.interrupt(session.id)
@@ -171,7 +188,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
 }
 
 @Composable
-private fun StatusCard(model: BarModel, todos: List<Todo>, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onStop: () -> Unit) {
+private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowView?, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onStop: () -> Unit) {
     // Ticks once a second while the card is on screen and the Mac is linked; gone with it.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(away == null) {
@@ -183,13 +200,24 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, open: Boolean, onTogg
     val tone by animateColorAsState(if (away != null) HN.inkDim else toneColor(model.tone), tween(300), label = "statusTone")
     val said = away ?: sayText(model.say)
     val time = clockText(now - since)
-    val expandable = model.hasTodos
+    // The workflow's agents, phase by phase as its card has them, then any of no phase.
+    val agents = remember(workflow) { workflow?.let { w -> w.phases.flatMap { it.agents } + w.loose }.orEmpty() }
+    val listsAgents = model.hasWorkflow && agents.isNotEmpty()
+    val expandable = model.hasTodos || listsAgents
     val spoken = when {
+        model.hasWorkflow && away == null && model.say.kind == SayKind.Workflow ->
+            stringResource(R.string.status_desc_workflow_only, model.workflow!!, model.done, model.total, time)
+        model.hasWorkflow -> stringResource(R.string.status_desc_workflow, said, model.workflow!!, model.done, model.total, time)
         model.hasTodos -> stringResource(R.string.status_desc_todos, said, model.done, model.total, time)
         else -> stringResource(R.string.status_desc_plain, said, time)
     }
     val stateWord = stringResource(if (open) R.string.status_open else R.string.status_folded)
-    val label = stringResource(if (open) R.string.status_fold else R.string.status_expand)
+    val label = stringResource(
+        when {
+            listsAgents -> if (open) R.string.status_fold_agents else R.string.status_expand_agents
+            else -> if (open) R.string.status_fold else R.string.status_expand
+        },
+    )
     GlassCard(Modifier.fillMaxWidth().animateContentSize(tween(Motion.DIALOG, easing = Motion.Expo))) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Row(
@@ -213,7 +241,7 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, open: Boolean, onTogg
                 Box(Modifier.size(7.dp).background(tone, RoundedCornerShape(50)))
                 Spacer(Modifier.width(10.dp))
                 HText(said, style = Type.small, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (model.hasTodos) {
+                if (model.counted) {
                     Spacer(Modifier.width(10.dp))
                     HText("${model.done}/${model.total}", style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
                 }
@@ -227,7 +255,11 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, open: Boolean, onTogg
             if (model.canStop && away == null) StopButton(stopping, codex, onStop)
             else Spacer(Modifier.width(8.dp))
         }
-        if (open && expandable) TodoChecklist(todos)
+        if (open && listsAgents) {
+            WorkflowAgents(agents)
+            // The to-dos stay a tap away under the agents, not in the tally.
+            if (todos.isNotEmpty()) TodoChecklist(todos)
+        } else if (open && expandable) TodoChecklist(todos)
         StatusLine(model, tone, Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 10.dp), frozen = away != null)
     }
 }
@@ -262,9 +294,10 @@ private const val STOPPING_MS = 3000L
 
 /**
  * The thin line. Without a to-do list: a soft highlight sweeps along it while Claude works.
- * With one: the share done fills it and the item Claude is on breathes. Still when Claude waits
- * for you or stopped on an error, and under Reduce Motion or battery saver. The clock is read only
- * inside the draw lambda and only when something moves, so a still line asks for no frames.
+ * With one (or a workflow's agents): the share done fills it and the item Claude is on breathes.
+ * Still when Claude waits for you or stopped on an error, and under Reduce Motion or battery saver.
+ * The clock is read only inside the draw lambda and only when something moves, so a still line
+ * asks for no frames.
  */
 @Composable
 private fun StatusLine(model: BarModel, tone: Color, modifier: Modifier = Modifier, frozen: Boolean = false) {
@@ -335,9 +368,75 @@ private fun sayText(s: Say): String = when (s.kind) {
     SayKind.Agents -> pluralStringResource(R.plurals.status_agents, s.n, s.n)
     SayKind.Planning -> stringResource(R.string.status_planning)
     SayKind.Tool -> stringResource(R.string.status_tool, s.arg)
+    SayKind.Workflow -> stringResource(R.string.status_workflow, s.arg)
     SayKind.WaitApprove -> stringResource(R.string.status_wait_approve, s.arg)
     SayKind.WaitAnswer -> stringResource(R.string.status_wait_answer)
     SayKind.WaitPlan -> stringResource(R.string.status_wait_plan)
     SayKind.WaitYou -> stringResource(R.string.status_wait_you)
     SayKind.Failed -> stringResource(R.string.status_failed)
+}
+
+/**
+ * A running workflow's agents inside the opened bar, one line each in the order its card has them:
+ * the agent's label, and its state in a word, or what it does now while it runs. The one it's on
+ * stays in view. No tap through to an agent yet (LATER L95); its card in the chat opens it.
+ */
+@Composable
+private fun WorkflowAgents(agents: List<AgentView>, modifier: Modifier = Modifier) {
+    val list = rememberLazyListState()
+    val at = agents.indexOfFirst { it.running }
+    LaunchedEffect(at) { if (at > 1) list.animateScrollToItem(at - 1) }
+    LazyColumn(
+        modifier.fillMaxWidth().heightIn(max = 164.dp),
+        state = list,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 8.dp),
+    ) {
+        items(agents, key = { it.id }) { WorkflowAgentRow(it) }
+    }
+}
+
+/** One agent: a turning planet while it runs (amber while it asks), a tick once done, a cross when it failed, a ring when stopped. */
+@Composable
+private fun WorkflowAgentRow(a: AgentView) {
+    val state = when (a.state) {
+        AgentState.Running -> a.activity?.takeIf { it.isNotBlank() } ?: stringResource(R.string.status_agent_running)
+        AgentState.Done -> stringResource(R.string.status_agent_done)
+        AgentState.Failed -> stringResource(R.string.agent_failed_short)
+        AgentState.Stopped -> stringResource(R.string.tool_stopped)
+    }
+    val said = if (a.running && a.activity != null) stringResource(R.string.status_agent_said_doing, a.label, a.activity)
+    else stringResource(R.string.status_agent_said, a.label, state)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 30.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (a.running) HN.accent.copy(alpha = 0.07f) else HN.bg.copy(alpha = 0f))
+            .clearAndSetSemantics { contentDescription = said }
+            .padding(horizontal = 6.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+            when (a.state) {
+                AgentState.Running -> Planet(if (a.asking) Activity.Alert else Activity.Live)
+                AgentState.Done -> Icon(Glyph.Check, size = 13.dp, color = HN.accentDim, stroke = 1.6.dp)
+                AgentState.Failed -> Icon(Glyph.Cross, size = 9.dp, color = HN.danger)
+                AgentState.Stopped -> Canvas(Modifier.size(9.dp)) { drawCircle(HN.inkGhost, radius = size.minDimension / 2 - 0.5.dp.toPx(), style = Stroke(1.dp.toPx())) }
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        HText(a.label, style = Type.monoSmall, color = if (a.running) HN.ink else HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(10.dp))
+        HText(
+            state, style = Type.monoSmall,
+            color = when {
+                a.asking -> HN.amber
+                a.state == AgentState.Done -> HN.accentDim
+                a.state == AgentState.Failed -> HN.danger.copy(alpha = 0.85f)
+                else -> HN.inkDim
+            },
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+        )
+    }
 }
