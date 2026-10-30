@@ -746,7 +746,9 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 onModel = { modelOpen = true },
                 onSwitchAgent = { to -> sheetOpen = false; switching = to },
                 // After Allow & retry, to the chat: Claude runs it again there.
-                onRetried = { sheetOpen = false; follow = true },
+                // The sheet stays while blocked calls are left to answer; it goes with the last.
+                onRetried = { follow = true },
+                onEmptied = { sheetOpen = false },
                 onDismiss = { sheetOpen = false },
                 atBlocked = sheetAtBlocked,
             )

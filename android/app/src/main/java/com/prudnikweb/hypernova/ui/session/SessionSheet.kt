@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
  * [usage]: the screen's, null until the Mac has answered (the model's id). [onModel] opens the
  * model picker over the sheet, [onSwitchAgent] the switch to the other agent. [atBlocked]: opened
  * from the strip's blocked mark, so the blocked calls are brought into view. [onRetried]: an Allow &
- * retry went out (the screen closes the sheet, for the chat).
+ * retry went out (the sheet stays for the others; [onEmptied] closes it once none is left).
  */
 @Composable
 internal fun SessionSheet(
@@ -89,6 +89,8 @@ internal fun SessionSheet(
     onModel: () -> Unit,
     onSwitchAgent: (String) -> Unit,
     onRetried: () -> Unit,
+    /** The last blocked call was retried or dismissed: the sheet goes. */
+    onEmptied: () -> Unit = {},
     onDismiss: () -> Unit,
     atBlocked: Boolean = false,
 ) {
@@ -111,7 +113,7 @@ internal fun SessionSheet(
         ModelPart(hub, session, usage, change, onModel, onSwitchAgent)
 
         SheetSeam(stringResource(R.string.session_sheet_permissions))
-        PermissionsPart(hub, session, change, atBlocked, onRetried)
+        PermissionsPart(hub, session, change, atBlocked, onRetried, onEmptied)
 
         // Only the plan's windows: none for another provider, nor while they're unknown.
         if (planShown(hub, session)) {
@@ -182,7 +184,7 @@ private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolea
  * rules (allow lists are Claude Code's own, on the Mac).
  */
 @Composable
-private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Boolean, onRetried: () -> Unit) {
+private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Boolean, onRetried: () -> Unit, onEmptied: () -> Unit) {
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val context = LocalContext.current
@@ -250,7 +252,7 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Bo
             if (s.blockedCalls > 0) HText("${s.blockedCalls}", style = Type.monoSmall, color = HN.amber, maxLines = 1)
         }
         Spacer(Modifier.height(8.dp))
-        BlockedCalls(hub, s, onRetried, onLoaded = { loaded = true })
+        BlockedCalls(hub, s, onRetried, onLoaded = { loaded = true }, onEmptied = onEmptied)
     }
 }
 

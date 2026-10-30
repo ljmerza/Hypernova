@@ -67,9 +67,10 @@ private fun toolTag(tool: String): String = tool.substringAfterLast("__").replac
  * The calls, newest first, in the session sheet (a plain column: the sheet scrolls, and a lazy
  * list can't be measured inside it). [onRetried]: once an Allow & retry went out (Claude runs it
  * again in the chat). [onLoaded]: the first answer is in, so the sheet can bring them into view.
+ * [onEmptied]: the last one was retried or dismissed (the sheet closes then, not before: owner, 2026-10-30).
  */
 @Composable
-internal fun BlockedCalls(hub: Hub, session: Session, onRetried: () -> Unit, onLoaded: () -> Unit = {}) {
+internal fun BlockedCalls(hub: Hub, session: Session, onRetried: () -> Unit, onLoaded: () -> Unit = {}, onEmptied: () -> Unit = {}) {
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val calls = remember(session.id) { mutableStateListOf<BlockedCall>() }
@@ -115,7 +116,7 @@ internal fun BlockedCalls(hub: Hub, session: Session, onRetried: () -> Unit, onL
                     appScope.launch {
                         try {
                             hub.retryBlocked(session.id, call.id)
-                                .onSuccess { show(it); toast(retried); onRetried() }
+                                .onSuccess { show(it); toast(retried); onRetried(); if (it.isEmpty()) onEmptied() }
                                 .onFailure { toast(it.message.orEmpty()) }
                         } finally {
                             busy = null
@@ -127,7 +128,7 @@ internal fun BlockedCalls(hub: Hub, session: Session, onRetried: () -> Unit, onL
                     appScope.launch {
                         try {
                             hub.dismissBlocked(session.id, call.id)
-                                .onSuccess { show(it) }
+                                .onSuccess { show(it); if (it.isEmpty()) onEmptied() }
                                 .onFailure { toast(it.message.orEmpty()) }
                         } finally {
                             busy = null
