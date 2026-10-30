@@ -159,6 +159,10 @@
   // Wheel turns (or pages) sent up to claude, net, since it was last at its latest.
   let up = 0
   let away = false
+  // At the latest until the finger scrolls: opening (or reconnecting) lands at the end, and it stays
+  // there while the screen settles (the WebView's size, the bar above, the keyboard, the Mac's size
+  // and the font each resize the terminal, and a resize can leave xterm.js's viewport off its end).
+  let pinned = true
   // While a wheel turn is made: what xterm.js answers for it.
   let caught = null
 
@@ -171,7 +175,8 @@
   /** Tell the app whether "Jump to latest" shows. */
   function where() {
     const b = term.buffer.active
-    const now = how() === 'lines' ? b.viewportY < b.baseY : up > 0
+    // Pinned, it's at the latest (or about to be, on the next frame).
+    const now = !pinned && (how() === 'lines' ? b.viewportY < b.baseY : up > 0)
     if (now !== away) { away = now; native.scrolled(now) }
   }
   function scrollKeys(seq) {
@@ -238,11 +243,33 @@
   }
   /** Typing goes to the latest, as in a desktop terminal. */
   function live() {
+    pinned = true
     up = 0
     pages = 0
     term.scrollToBottom()
     where()
   }
+  /**
+   * A fresh screen (the snapshot) starts at the latest: the history here at its end and, in Claude
+   * Code's fullscreen view, its own view at its bottom (Ctrl+End, as "Jump to latest" does), since
+   * it may have been left scrolled back, by this phone or on the Mac. The terminal is shared, so
+   * that brings it down on the Mac too, which is fine. Never arrow keys.
+   */
+  function opened() {
+    pinned = true
+    up = 0
+    pages = 0
+    term.scrollToBottom()
+    if (how() === 'wheel') scrollKeys('\x1b[1;5F')
+    where()
+  }
+  // Pinned and left off the end by a resize (xterm.js 6 scrolls by its viewport's own position,
+  // which a resize or a new font size can leave behind): back to the end after the frame is drawn.
+  term.onRender(() => {
+    if (!pinned || drag) return
+    const b = term.buffer.active
+    if (b.viewportY < b.baseY) term.scrollToBottom()
+  })
   document.addEventListener('touchstart', (e) => {
     cancelAnimationFrame(glideId)
     if (e.touches.length !== 1) { drag = null; return }
@@ -259,6 +286,7 @@
       const dy = t.clientY - drag.y
       if (Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(t.clientX - drag.x)) return
       drag.on = true
+      pinned = false
       drag.last = t.clientY
       drag.time = e.timeStamp
       return
@@ -274,8 +302,12 @@
     const d = drag
     drag = null
     if (d && d.on && how() === 'lines' && Math.abs(d.v) > 0.3 && e.timeStamp - d.time < 80) glide(d.v)
+    // Dragged back to the latest: pinned there again.
+    else if (d && d.on && !away) pinned = true
   }, { passive: true, capture: true })
   document.addEventListener('touchcancel', () => { drag = null }, { passive: true, capture: true })
+  // A real mouse wheel (not the turns made above for a drag) scrolls too.
+  document.addEventListener('wheel', (e) => { if (e.isTrusted) pinned = false }, { passive: true, capture: true })
   term.onScroll(() => where())
   term.buffer.onBufferChange(() => { up = 0; pages = 0; where() })
 
@@ -342,6 +374,7 @@
     // [url]: the ticket's WebSocket URL (on the base URL); null when the app holds the socket.
     connect(url) {
       ended = false
+      pinned = true
       if (ws) { try { ws.onclose = null; ws.close() } catch {} }
       refit()
       const sock = url ? new WebSocket(`${url}&cols=${term.cols}&rows=${term.rows}`) : appSocket(term.cols, term.rows)
@@ -353,9 +386,10 @@
         try { m = JSON.parse(ev.data) } catch { return }
         if (m.t === 'snapshot') {
           term.reset()
+          pinned = true
           up = 0
           pages = 0
-          term.write(m.data, () => { term.scrollToBottom(); where() })
+          term.write(m.data, opened)
         } else if (m.t === 'hello' || m.t === 'state') {
           macOpen = m.tty > 0
           if (m.cols && m.rows) follow(m.cols, m.rows)
@@ -414,6 +448,7 @@
         if (way === 'wheel') scrollKeys('\x1b[1;5F')
         else for (let i = 0; i < up; i++) scrollKeys('\x1b[6~')
       }
+      pinned = true
       up = 0
       pages = 0
       where()

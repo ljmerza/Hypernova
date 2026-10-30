@@ -3252,7 +3252,10 @@ keeps the screen in a headless xterm, so anyone joining gets the current screen.
   the alternate screen): mouse-wheel turns as SGR reports, PgUp, PgDn or Ctrl+End, and nothing
   else (anything more is dropped). It reaches the holder as `keys`, so scrolling doesn't take the
   terminal's size as typing does. In the normal screen the page scrolls its own copy of the
-  history and sends nothing. A phone 8 MB behind is closed
+  history and sends nothing. Each snapshot (opening, reconnecting) starts at the latest: the page's
+  history at its end and, when the fullscreen view takes the mouse, one Ctrl+End, which brings
+  Claude Code's own view down on the Mac too (the terminal is shared). It stays there through the
+  resizes that follow until the finger scrolls. A phone 8 MB behind is closed
   with 4008 and reconnects. Tickets belong to the phone that asked: forgetting a
   phone (`DELETE /v1/devices/me` or `/local/devices/{id}`) closes its sockets at
   once with 4001, terminals included.
