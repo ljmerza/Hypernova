@@ -46,7 +46,7 @@ class FileProblemTest {
     }
 
     @Test fun `a connection problem is the only retryable one`() {
-        for (pr in listOf(Problem.NoNetwork, Problem.NoTailscale, Problem.Unreachable, Problem.NotRunning, Problem.Tls)) {
+        for (pr in listOf(Problem.NoNetwork, Problem.NoName, Problem.Unreachable, Problem.NotRunning, Problem.Tls)) {
             val p = FileProblem.of(fail(0, null, pr))
             assertEquals(FileKind.Network, p.kind)
             assertTrue(p.retryable)

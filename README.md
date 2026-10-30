@@ -1,84 +1,57 @@
-<p align="center">
-  <img src="docs/images/hero.jpg" alt="Hypernova: the Mac menu bar popover with an approval, the Android app's sky of sessions with the sun as an accretion disk, and the G2 glasses' glance (the glasses app has since been removed)" width="100%">
-</p>
+# Hypernova
 
-<h3 align="center">A control room for Claude Code and Codex — hosted on your Mac, your Linux server or in Docker, driven from your phone and the Mac's menu bar.</h3>
+**A control room for Claude Code and Codex: hosted on your Linux server, driven from your Android
+phone.**
 
-<p align="center">
-  <img alt="Android 10+" src="https://img.shields.io/badge/Android-10%2B-7FFFA0?style=flat-square&labelColor=14110E">
-  <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-7FFFA0?style=flat-square&labelColor=14110E">
-  <img alt="Linux · Docker" src="https://img.shields.io/badge/Linux-Docker-7FFFA0?style=flat-square&labelColor=14110E">
-  <img alt="Kotlin · Compose" src="https://img.shields.io/badge/Kotlin-Compose-F5F2EB?style=flat-square&labelColor=14110E">
-  <img alt="SwiftUI" src="https://img.shields.io/badge/SwiftUI-menu%20bar-F5F2EB?style=flat-square&labelColor=14110E">
-  <img alt="TypeScript · Node 22.18+" src="https://img.shields.io/badge/TypeScript-Node%2022.18%2B-F5F2EB?style=flat-square&labelColor=14110E">
-</p>
+[Download](https://github.com/ljmerza/Hypernova/releases/latest) ·
+[Install guide](docs/INSTALL.md) ·
+[Linux server](docs/LINUX.md) ·
+[Protocol](docs/PROTOCOL.md)
 
-<p align="center">
-  <a href="https://hypernova.nikbraun.tech"><b>Website</b></a> ·
-  <a href="https://github.com/prudnik-web/Hypernova/releases/latest"><b>Download</b></a> ·
-  <a href="docs/INSTALL.md"><b>Install guide</b></a> ·
-  <a href="https://hypernova.nikbraun.tech/#film-h"><b>Watch the film</b></a>
-</p>
+This is a fork of [prudnik-web/Hypernova](https://github.com/prudnik-web/Hypernova), set up for one
+Linux server and an Android phone. The Mac app (`mac/`) is upstream's: its sources are here, but this
+fork doesn't build or release it.
 
 ---
 
 Claude Code and Codex do their best work when you let them run, and they always need you at the
 worst moment: a command to approve, a question to answer, a limit to wait out. **Hypernova** keeps
-you in the loop wherever you are. Leave the Mac in your backpack, or the agents on a server, and use
-the phone as your window and your voice as the keyboard.
+you in the loop wherever you are. Leave the agents on a server, and use the phone as your window and
+your voice as the keyboard.
 
 Bring either agent, or both. Hypernova works the same with
 [Claude Code](https://docs.claude.com/en/docs/claude-code) alone or with OpenAI's
 [Codex](https://github.com/openai/codex) alone. With both, each has its own usage meters, and a
 conversation can switch from one to the other mid-chat.
 
-Everything runs on **a computer of your own**, next to your agents: **a Mac** (with a menu bar app),
-**a Linux server** (a VPS, a home server, a PC: the `hypernova` command) or **a Docker container**.
-The phone reaches it directly on your Wi-Fi, or over **your own Tailscale network**
-from anywhere. No Hypernova server sits in between: the only thing we host is a small name service
-for pairing and a private name (see [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md)).
+Everything runs on **a computer of your own**, next to your agents: **a Linux server** (a VPS, a home
+server, a PC: the `hypernova` command), **a Docker container** or, with upstream's app, **a Mac**.
+The phone reaches it directly on your Wi-Fi, or over **your own VPN into that network**
+from anywhere. No Hypernova server sits in between: the only thing upstream hosts is a small name
+service for pairing and a private name (see [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md)).
 **A Windows PC** runs the Linux service inside WSL 2 or Docker Desktop: **experimental**, documented
 but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop)).
 
 ## Highlights
 
-<table>
-  <tr>
-    <td width="33%" align="center"><img src="docs/images/phone-home.jpg" alt="Home: the sun is an accretion disk that shows the 5-hour usage, projects orbit as planets, session cards with a NEEDS YOU chip, the model and the mode below"></td>
-    <td width="33%" align="center"><img src="docs/images/phone-chat.jpg" alt="A session: the usage strip, Claude's edits and a build, and a NEEDS YOU card with Deny, Always and Allow"></td>
-    <td width="33%" align="center"><img src="docs/images/phone-automations.jpg" alt="Automations: each card is a plain-English sentence with its state and next run"></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Your sessions as a sky.</b><br><sub>The sun is an accretion disk, and the disk is your 5-hour window: it drains as you spend it, goes dark at the limit and refills when the window resets. Projects orbit it as planets; Codex beside Claude Code is a second star.</sub></td>
-    <td align="center"><b>Approve from anywhere.</b><br><sub>Live output and the real terminal. Allow, deny or answer from the phone; risky commands get a second look.</sub></td>
-    <td align="center"><b>Automations.</b><br><sub>Morning briefs, "carry on after the limit", tests when the Mac is plugged in. Never on paid credits without your yes.</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/images/phone-dictation.jpg" alt="Dictation: the capsule's light curve rises with the voice while the words appear"></td>
-    <td align="center"><img src="docs/images/phone-new-session.jpg" alt="The new-session sheet: a prompt first, then the project, model and permission mode as chips"></td>
-    <td align="center"><img src="docs/images/phone-statistics.jpg" alt="Statistics: hours Claude worked, tokens, sessions, and the last 30 days as a spiral galaxy"></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Talk to it.</b><br><sub>Dictation with the phone's own on-device recognizer, and replies read aloud through your headphones.</sub></td>
-    <td align="center"><b>Start anything.</b><br><sub>Type or say the prompt, then pick a project (found by a few letters), the agent, a model and a mode. Claude Code runs on any provider: Anthropic, OpenRouter or your own gateway.</sub></td>
-    <td align="center"><b>Honest statistics.</b><br><sub>Hours, tokens and sessions, both agents' and each one's, not badges. Each day is a star in a galaxy.</sub></td>
-  </tr>
-</table>
-
-<table>
-  <tr>
-    <td width="25%" align="center"><img src="docs/images/phone-sky-limit.jpg" alt="The sky at the 5-hour limit: the disk is spent, a countdown says when it refills"></td>
-    <td width="25%" align="center"><img src="docs/images/phone-model-picker.jpg" alt="The model picker in a session: every model the provider offers, with each one's own weekly use"></td>
-    <td width="25%" align="center"><img src="docs/images/phone-files.jpg" alt="A file download with its progress, a Cancel button and, when it is done, Share, Save and Open with"></td>
-    <td width="25%" align="center"><img src="docs/images/phone-dialog.jpg" alt="A floating glass pop-up over a blurred scrim: an eyebrow, a title, one line, two pills"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub><b>Limits you can read.</b> The disk empties, then a countdown.</sub></td>
-    <td align="center"><sub><b>Switch models,</b> or agents, in the chat.</sub></td>
-    <td align="center"><sub><b>Files and downloads</b> from your computer.</sub></td>
-    <td align="center"><sub><b>Calm pop-ups,</b> one short line.</sub></td>
-  </tr>
-</table>
+- **Your sessions as a sky.** The sun is an accretion disk, and the disk is your 5-hour window: it
+  drains as you spend it, goes dark at the limit and refills when the window resets. Projects orbit
+  it as planets; Codex beside Claude Code is a second star.
+- **Approve from anywhere.** Live output and the real terminal. Allow, deny or answer from the phone;
+  risky commands get a second look.
+- **Automations.** Morning briefs, "carry on after the limit", scheduled tests. Never on paid credits
+  without your yes.
+- **Talk to it.** Dictation with the phone's own on-device recognizer, and replies read aloud through
+  your headphones.
+- **Start anything.** Type or say the prompt, then pick a project (found by a few letters), the
+  agent, a model and a mode. Claude Code runs on any provider: Anthropic, OpenRouter or your own
+  gateway.
+- **Honest statistics.** Hours, tokens and sessions, both agents' and each one's, not badges. Each
+  day is a star in a galaxy.
+- **Limits you can read.** The disk empties, then a countdown.
+- **Switch models,** or agents, in the chat.
+- **Files and downloads** from your computer.
+- **Calm pop-ups,** one short line.
 
 ### Also on the phone
 
@@ -88,16 +61,17 @@ but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-wi
   Can edit, asking you for more.
 - **Connect your way.** Pair by scanning a QR code or tapping a link (`https://hypernova.observer/pair#…`
   opens the app). On your Wi-Fi the phone talks to the computer directly over mutual TLS ("Local first, always");
-  away from home it uses Tailscale, the Tailscale app or Hypernova's own built-in node. Settings keeps a
+  away from home it does the same over your own VPN into that network. Settings keeps a
   connection log of every decision.
 - **Notifications you can act on.** Allow and Deny right on an approval's notification (after unlocking),
   a Reply field, and attention cards on Home (a limit, a provider's trouble) you swipe away, with Undo.
 - **Files and downloads.** Browse a session's folder, view a file, download it with progress and resume
   and Share, Save or Open with it. Files with keys stay on the computer.
-- **Updates in the app.** A Mac hands the phone a newer app, and the app installs it, signed with the
-  same key or not at all.
-- **Stay awake and Backpack.** Keep a Mac working with its lid closed in a bag, with battery and
-  heat guards. Get "+2 h" before Backpack ends.
+- **Updates in the app.** A Mac running upstream's app hands the phone a newer app, and the app
+  installs it, signed with the same key or not at all. From a Linux server, install the newer APK
+  from the releases over the old one.
+- **Stay awake and Backpack** (on a Mac). Keep a Mac working with its lid closed in a bag, with
+  battery and heat guards. Get "+2 h" before Backpack ends.
 - **Limits that explain themselves.** See when a limit lifts (Claude's and Codex's), a "Continue
   now" button when Claude Code would carry on by itself, and other providers' credit and rate limits.
 - **Everyday tools.** The context ring and session cost, the agent's to-do list, Rewind, quick
@@ -106,30 +80,20 @@ but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-wi
 - **After a restart.** Sessions cut short by a reboot wait on Home with "Resume". History keeps 30
   days.
 
-## In the menu bar
+## On the server
 
-<p align="center">
-  <img src="docs/images/mac-popover.jpg" width="38%" alt="The Mac popover: an approval with Deny, Always and Allow, sessions with their model and mode, projection meters for the 5-hour and weekly usage, Stay awake">
-  &nbsp;&nbsp;
-  <img src="docs/images/mac-automation.jpg" width="38%" alt="The Mac popover while an automation runs: AUTO on its session, the run line under Sessions">
-</p>
-
-A planet in the menu bar spins while anything works and shows a dot when something needs you. The
-popover is the phone's design on the Mac: approvals, sessions in the phone's words, drawn usage meters
-that show where your pace is heading, Stay awake and automations. The Mac app also installs and runs the
-daemon, sets up the `claude` and `codex` shell integration and Tailscale (or Hypernova's own), pairs phones with a
-QR code and lists the ones you trust, so you can forget one at any time. On a Linux server the
-`hypernova` command does those jobs over SSH: `setup`, `pair` (the code right in the terminal),
-`codex on`, `status` and `doctor`.
+On a Linux server the `hypernova` command does the jobs a menu bar app would, over SSH: `setup`,
+`pair` (the code right in the terminal), `codex on`, `status` and `doctor`. Upstream's Mac app is a
+menu bar planet with the same approvals, sessions and usage meters; this fork doesn't build it.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  phone["Android app"] -- "HTTPS + WebSocket<br/>Wi-Fi (mutual TLS) or your tailnet" --> api
-  subgraph host["Your computer: a Mac, a Linux server or Docker"]
+  phone["Android app"] -- "HTTPS + WebSocket, mutual TLS<br/>Wi-Fi or your VPN :47323" --> api
+  subgraph host["Your computer: a Linux server, Docker or a Mac"]
     api["daemon<br/>Node.js · 127.0.0.1:47321"]
-    menubar["Menu bar app (Mac)<br/>or the hypernova command (Linux)"] -- "loopback + admin token<br/>:47322" --> api
+    menubar["the hypernova command (Linux)<br/>or the menu bar app (Mac)"] -- "loopback + admin token<br/>:47322" --> api
     hooks["Claude Code hooks<br/>+ status line"] --> api
     api <--> terms["Shared terminals<br/>(PTY holders)"]
     terms --> cc["claude"]
@@ -143,11 +107,11 @@ flowchart LR
   watches every Claude Code session on the computer through hooks and transcripts, and Codex's
   through Codex's own app server (only while you use Codex). It runs the phone's sessions in
   **shared terminals**: you can take the same live terminal over from the phone or from any
-  terminal on the computer, over SSH too (`hn attach`). It serves the phone API on loopback, exposed only through Tailscale (the app's `tailscale serve` or its own built-in node) and, on your Wi-Fi, a mutual-TLS listener.
+  terminal on the computer, over SSH too (`hn attach`). It serves the phone API on loopback, and to phones only through a mutual-TLS listener on your network (the local route).
 - **The Android app** (`android/`, Kotlin and Jetpack Compose) talks to that API.
-- **The Mac app** (`mac/`, SwiftUI, built with SwiftPM and no Xcode) is the menu bar, the setup and
-  the service manager on a Mac. On Linux, **the `hypernova` command** (`daemon/src/cli/`) installs
-  the daemon as a systemd user service and does the same jobs from a terminal.
+- **The `hypernova` command** (`daemon/src/cli/`) installs the daemon on Linux as a systemd user
+  service and runs setup, pairing and checks from a terminal. Upstream's **Mac app** (`mac/`,
+  SwiftUI) does the same on a Mac.
 
 [`docs/PROTOCOL.md`](docs/PROTOCOL.md) is the full contract between them.
 
@@ -155,92 +119,94 @@ flowchart LR
 
 **You need:**
 
-- A computer to host it: a Mac with Apple silicon on macOS 14 or later, a Linux machine on Ubuntu
-  or Debian (x86_64 or arm64, a VPS or a home server), or Docker. Or, experimentally, a Windows PC
-  with WSL 2 or Docker Desktop.
+- A Linux server on Ubuntu or Debian (x86_64 or arm64, a VPS or a home server) with systemd, sudo
+  for the system packages, and a normal user to run it as. Or Docker. Or, experimentally, a Windows
+  PC with WSL 2 or Docker Desktop.
 - An agent on it, signed in: [Claude Code](https://docs.claude.com/en/docs/claude-code), OpenAI's
   [Codex](https://github.com/openai/codex) 0.163.0 or later, or both. Either one alone is enough, and
   Hypernova installs Claude Code for you if you want it.
 - An Android phone running Android 10 or later.
-- Optional: a [Tailscale](https://tailscale.com) account, to reach the computer from anywhere (always,
-  for a VPS; the Tailscale app is optional too: Hypernova carries its own node). On the same Wi-Fi
-  nothing else is needed.
+- Optional: your own VPN into the computer's network (WireGuard, a UniFi VPN…), to reach it from
+  anywhere. On the same Wi-Fi nothing else is needed.
 
-**Install** from the [latest release](../../releases/latest) (`SHA256SUMS.txt` has the checksums).
-The whole guide, with the first launch on each macOS version and every Linux step, is
-[`docs/INSTALL.md`](docs/INSTALL.md).
-
-*On a Mac:*
-
-1. Download `Hypernova.dmg` and `Hypernova.apk`.
-2. Open the disk image and drag **Hypernova** onto **Applications**.
-3. Open it. Hypernova isn't notarized by Apple, so the first time macOS stops it: in **System Settings
-   → Privacy & Security**, click **Open Anyway** (on macOS 14, Control-click the app and choose
-   **Open**).
-4. Setup walks you through seven steps: **Claude Code**, **Background service**, **Connect Claude
-   Code**, **Tailscale**, **Voice**, **Codex** and **Your phone**. With Codex alone, **Use Codex only**
-   skips Claude Code's two. The app doesn't carry Claude Code's SDK (it's Anthropic's): **Background
-   service** downloads it from npm, about 2 MB.
-5. Install the app on your phone (or scan **Get the app** in Setup), then scan the pairing code. Later,
-   **Pair a phone** in the menu bar pairs another.
-
-*On a Linux server* (as the user who'll run the agents, not root):
+**1. Install the server**, as the user who'll run the agents (not root). Either from the
+[latest release](https://github.com/ljmerza/Hypernova/releases/latest)'s server package,
+`hypernova-server-<tag>-linux.tar.gz` (one package for x86_64 and arm64):
 
 ```bash
-tmp=$(mktemp -d) && tar -xzf Hypernova-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
-claude                  # sign in to Claude Code once (the script installed it; --no-claude: Codex alone)
-hypernova codex on      # optional: Codex, installed and signed in (codex login --device-auth)
-hypernova pair          # Tailscale's sign-in, then the pairing code, right in the terminal
+gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the release page
+tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
 ```
 
-Install `Hypernova.apk` on your phone and scan the code. `hypernova doctor` checks every piece.
+or from a clone of this repository:
+
+```bash
+git clone https://github.com/ljmerza/Hypernova.git && cd Hypernova
+scripts/install-linux.sh    # system packages (with sudo), Node.js 24, the daemon, its service
+```
+
+Then sign in to your agents:
+
+```bash
+claude                      # sign in to Claude Code once (the script installed it; --no-claude: Codex alone)
+hypernova codex on          # optional: Codex, installed and signed in (codex login --device-auth)
+```
+
+The script ends with `hypernova setup`: the daemon as a systemd user service, the `hypernova`
+command, Claude Code's hooks and the `claude` shell function. Every step and option:
+[`docs/LINUX.md`](docs/LINUX.md).
+
+**2. Pair the phone.** Install the app from the
+[latest release](https://github.com/ljmerza/Hypernova/releases/latest) (`hypernova-<tag>.apk`), then
+on the server:
+
+```bash
+hypernova pair          # a QR code and a link, right in the terminal
+```
+
+**3. Scan the code** with the phone's camera, or open the link on the phone (or copy it and use
+**Paste pairing link** in the app). `hypernova doctor` checks every piece.
 
 *In Docker:* `docker build -t hypernova .` from a clone of this repository, `docker run` it with a
 volume for its state, then `docker exec -it hypernova hypernova pair` (the exact commands:
 [`docs/INSTALL.md`](docs/INSTALL.md#4-in-docker)).
 
 *On Windows (experimental):* the Linux steps inside WSL 2 (Ubuntu), with Claude Code and Codex
-installed there too, or the Docker steps in Docker Desktop; the phone pairs over the built-in
-Tailscale. Nobody has tried it on a Windows PC yet: [`docs/INSTALL.md`](docs/INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop)
+installed there too, or the Docker steps in Docker Desktop; the phone pairs over the local route,
+which needs WSL's mirrored networking. Nobody has tried it on a Windows PC yet: [`docs/INSTALL.md`](docs/INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop)
 has the steps and what is and isn't verified.
 
-**Build from source:**
+*On a Mac:* upstream's [releases](https://github.com/prudnik-web/Hypernova/releases) have the Mac
+app; this fork doesn't build it.
+
+**Build the Android app from source** (JDK 21 and the Android SDK):
 
 ```bash
-# 1. The Mac app, with the daemon bundled (needs daemon/node_modules: cd daemon && npm ci). Claude
-#    Code's SDK stays out of the app: Setup fetches it on the Mac that runs it.
-mac/build.sh --open                     # dist/Hypernova.app
-mac/build.sh --release && mac/dmg.sh    # dist/Hypernova.dmg, as released
-
-# 2. The Android app (Android Studio's JDK). The Mac app also bundles the APK and serves it on
-#    its download page.
 cd android
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug
+./gradlew :app:assembleDebug            # app/build/outputs/apk/debug/
 ```
 
 **Develop:**
 
 ```bash
 cd daemon && npx tsc -p . && npm test                  # daemon: typecheck and tests
-cd mac && swift build -c release                       # Mac app
 cd android && ./gradlew :app:testDebugUnitTest         # Android unit tests
 ```
 
 To test alongside a live install, run a second daemon with `HYPERNOVA_SUPPORT`, `HYPERNOVA_LOGS`,
 `HYPERNOVA_API_PORT` and `HYPERNOVA_LOCAL_PORT` (see [`CLAUDE.md`](CLAUDE.md)).
-`Hypernova --render-popover <dir>` renders the menu bar popover on sample data without a daemon.
 
 ## Privacy and safety
 
-- **Yours end to end.** The phone API listens on loopback and is reached through your tailnet or by
-  your Wi-Fi's mutual-TLS listener, with a per-device token (and certificate) from pairing; the Mac app
-  and the `hypernova` command use an admin token kept in a `0700` folder. [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) is the
-  full threat model: what runs and is stored where, what Cloudflare, Let's Encrypt and Tailscale see, and
+- **Yours end to end.** The phone API listens on loopback and is reached only by
+  your Wi-Fi's mutual-TLS listener, with a per-device token (and certificate) from pairing; the
+  `hypernova` command uses an admin token kept in a `0700` folder. [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) is the
+  full threat model: what runs and is stored where, what Cloudflare and Let's Encrypt see, and
   what is still open.
 - **Keys stay on your computer.** Provider keys are never logged, never sent to the phone, and
   only ever go to their own provider.
 - **Voice stays on the phone.** Dictation uses the phone's own on-device recognizer, so the audio never
-  leaves it. Replies are read aloud by the Mac's own voices, or the phone's.
+  leaves it. Replies are read aloud by the phone's voice (or a Mac's own).
 - **Guard rails.** "Bypass" mode asks you to think twice first. Automations never run on usage credits or another
   paid provider unless you agree, and they never close or copy your own sessions.
 
@@ -249,10 +215,11 @@ To test alongside a live install, run a second daemon with `HYPERNOVA_SUPPORT`, 
 | Path | What |
 | --- | --- |
 | [`android/`](android) | The Android app (Kotlin, Jetpack Compose), its widgets and tests |
-| [`mac/`](mac) | The menu bar app (SwiftUI, SwiftPM) with setup, the popover and developer renders |
-| [`daemon/`](daemon) | The daemon (TypeScript on Node.js): sessions, hooks, Codex, shared terminals, automations, speech |
+| [`daemon/`](daemon) | The daemon (TypeScript on Node.js): sessions, hooks, Codex, shared terminals, automations, the `hypernova` command |
+| [`scripts/`](scripts) | The Linux install script and the server package's packer |
+| [`mac/`](mac) | Upstream's menu bar app (SwiftUI, SwiftPM); not built in this fork |
 | [`skills/hyper-cosmos/`](skills/hyper-cosmos) | The "digital cosmos" design language, as a Claude Code skill |
-| [`docs/`](docs) | [Protocol](docs/PROTOCOL.md), [security model](docs/SECURITY-MODEL.md), [decisions](docs/DECISIONS.md), [design](docs/DESIGN.md), [later](docs/LATER.md), [Linux and Docker](docs/LINUX.md), [specs](docs/specs), [releasing](docs/RELEASING.md) |
+| [`docs/`](docs) | [Install](docs/INSTALL.md), [Linux and Docker](docs/LINUX.md), [protocol](docs/PROTOCOL.md), [security model](docs/SECURITY-MODEL.md), [decisions](docs/DECISIONS.md), [design](docs/DESIGN.md), [later](docs/LATER.md), [specs](docs/specs), [releasing](docs/RELEASING.md) |
 | [`names/`](names) | The name service (a Cloudflare Worker): private names, the pairing page |
 | [`third_party/`](third_party) | Fonts (OFL) and xterm.js |
 
@@ -263,13 +230,14 @@ Code and Codex on your computer, so read [`SECURITY.md`](SECURITY.md) and the
 [threat model](docs/SECURITY-MODEL.md) before you pair one. To help, see
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-Hypernova is a personal project in active development. It is used every day and built with Claude
-Code. It isn't in any app store: download it from the releases, or build it yourself. Ideas parked for later are in
-[`docs/LATER.md`](docs/LATER.md).
+Hypernova is a personal project in active development. It isn't in any app store: download it from
+the [releases](https://github.com/ljmerza/Hypernova/releases), or build it yourself. Ideas parked for
+later are in [`docs/LATER.md`](docs/LATER.md).
 
 ## License
 
 Hypernova is licensed under the **Apache License 2.0** (see [`LICENSE`](LICENSE) and
 [`NOTICE`](NOTICE)). Fonts and code in `third_party/` keep their own licenses.
 
-<p align="center"><sub>Claude and Claude Code are products of Anthropic; Codex is a product of OpenAI. Hypernova is an independent project and is not affiliated with Anthropic or OpenAI.</sub></p>
+Claude and Claude Code are products of Anthropic; Codex is a product of OpenAI. Hypernova is an
+independent project and is not affiliated with Anthropic or OpenAI.

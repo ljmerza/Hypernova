@@ -14,8 +14,7 @@ import { request as httpsRequest } from 'node:https'
 import { createServer, type AddressInfo } from 'node:net'
 import { connect as tlsConnect, rootCertificates, type TLSSocket } from 'node:tls'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { X509Certificate } from 'node:crypto'
 import { startNamesStack } from './fixtures/names-stack.ts'
@@ -34,7 +33,6 @@ const fakeClaude = join(scratch, 'claude-bin')
 writeFileSync(fakeClaude, '#!/bin/sh\necho "9.9.9 (Claude Code)"\n')
 chmodSync(fakeClaude, 0o755)
 process.env.CLAUDE_BIN = fakeClaude
-process.env.HYPERNOVA_TAILSCALE = join(scratch, 'no-tailscale')
 process.env.HYPERNOVA_NO_DEV_APK = '1'
 
 const stack = await startNamesStack(join(scratch, 'stack'), realHome)
@@ -61,22 +59,12 @@ if (typeof stack === 'string') {
   process.env.HYPERNOVA_ACME_CA = stack.acmeCaFile
   process.env.HYPERNOVA_NAMES_DNS = stack.dns
   process.env.HYPERNOVA_NAMES_ROOTS = stack.rootsFile
-  // The built-in Tailscale node, played by the fixture tsnet.test.ts uses.
-  const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-tsnet.mjs')
-  const fakeHelper = join(scratch, 'hypernova-tsnet')
-  writeFileSync(fakeHelper, `#!/bin/sh\nexec "${process.execPath}" "${fixture}" "$@"\n`)
-  chmodSync(fakeHelper, 0o755)
-  mkdirSync(SUPPORT, { recursive: true, mode: 0o700 })
-  writeFileSync(join(SUPPORT, 'fake-tsnet-mode'), 'running')
-  process.env.HYPERNOVA_TSNET = fakeHelper
-  process.env.HYPERNOVA_TSNET_GRACE_MS = '50'
 
   const names = await import('../src/names.ts')
   const { startServers, startPairing } = await import('../src/http.ts')
   const { lanInfo } = await import('../src/lan.ts')
   const { serverIdentity } = await import('../src/tls.ts')
   const { addDevice, adminToken, settings } = await import('../src/store.ts')
-  const { startTsnet, stopTsnet, tsnetState, recheckSystem } = await import('../src/tsnet.ts')
   const { NameServiceClient, importServerKey, fromBase64 } = await import('../src/names-client.ts')
 
   const pebbleRoot = readFileSync(stack.rootsFile, 'utf8')
@@ -189,7 +177,6 @@ if (typeof stack === 'string') {
   })
   after(async () => {
     names.stopNames()
-    await stopTsnet()
     await closeServers()
     await stack.close()
   })
@@ -322,67 +309,24 @@ if (typeof stack === 'string') {
     assert.equal((await lan(`/pair?c=${code}`)).status, 401)
   })
 
-  test('with the built-in node serving, the download link and the pairing web link use the name; the app link keeps the pinned route', async () => {
-    await startTsnet()
-    await until('the built-in node', () => tsnetState().helper?.state === 'Running', 10_000)
+  test('the download link and the pairing web link use the name; the app link keeps the pinned route', async () => {
     const host = names.nameStatus().host!
     const port = lanInfo()!.port
     const status = await local('GET', '/local/status')
     assert.equal(status.json.downloadUrl, `https://${host}:${port}/download/android`)
     assert.equal(status.json.downloadLocal, true)
     assert.equal(status.json.downloadTrusted, true)
-    // The node has the tailnet's own certificate here, so its page is offered for a phone with Tailscale.
-    assert.equal(status.json.downloadAnywhere, `https://hypernova-test.tail.ts.net:${API}/download/android`)
+    // No https base URL (the phone's way in is the local route): nothing else to offer.
+    assert.equal(status.json.downloadAnywhere, null)
     assert.equal(status.json.name.inUse, true)
     const p = await startPairing()
     assert.ok(p.webLink.startsWith(`https://${host}:${port}/pair?c=`), p.webLink)
     assert.ok(p.link.startsWith('https://hypernova.observer/pair#v=1&u='), p.link)
     assert.ok(!p.link.includes(host), 'nor does the QR code')
-    assert.ok(p.appLink.includes(`u=${encodeURIComponent('https://hypernova-test.tail.ts.net:' + API)}`))
+    assert.ok(p.appLink.includes(`u=${encodeURIComponent('http://10.0.2.2:' + API)}`))
     assert.ok(p.appLink.includes(`fp=${serverIdentity()!.fingerprint}`) && p.appLink.includes(`&lp=${port}`))
     assert.ok(!p.appLink.includes(host), 'the app never gets the name')
     assert.equal(p.download, status.json.downloadUrl)
-  })
-
-  test('with the Tailscale app serving, the download link is the name too, the tailnet’s page the one from anywhere; pairing as before', async () => {
-    // The Tailscale app, serving the phone API (the stand-in tsnet.test.ts uses, at HYPERNOVA_TAILSCALE).
-    const fakeTs = process.env.HYPERNOVA_TAILSCALE!
-    writeFileSync(
-      fakeTs,
-      `#!${process.execPath}\nconst a = process.argv.slice(2)\nif (a[0] === 'serve') console.log(JSON.stringify({ TCP: { [process.env.HYPERNOVA_API_PORT]: { HTTPS: true } }, Web: { ['mac.tail.ts.net:' + process.env.HYPERNOVA_API_PORT]: { Handlers: { '/': { Proxy: 'http://127.0.0.1:' + process.env.HYPERNOVA_API_PORT } } } } }))\nelse console.log(JSON.stringify({ BackendState: 'Running', Self: { DNSName: 'mac.tail.ts.net.', TailscaleIPs: ['100.64.0.1'] }, CertDomains: ['mac.tail.ts.net'], CurrentTailnet: { Name: 'owner@example.com' } }))\n`,
-    )
-    chmodSync(fakeTs, 0o755)
-    try {
-      await recheckSystem()
-      assert.equal(tsnetState().mode, 'system')
-      const host = names.nameStatus().host!
-      const port = lanInfo()!.port
-      const tailnetPage = `https://mac.tail.ts.net:${API}/download/android`
-      const status = await local('GET', '/local/status')
-      assert.equal(status.json.downloadUrl, `https://${host}:${port}/download/android`)
-      assert.equal(status.json.downloadLocal, true)
-      assert.equal(status.json.downloadTrusted, true)
-      assert.equal(status.json.downloadAnywhere, tailnetPage)
-      const p = await startPairing()
-      assert.equal(p.download, status.json.downloadUrl)
-      // The pairing code is hypernova.observer's link with the details after its `#`; the tailnet's
-      // own page is still there, as before.
-      assert.equal(p.link, `https://hypernova.observer/pair#${p.appLink.slice('hypernova://pair?'.length)}`)
-      assert.ok(p.webLink.startsWith(`https://mac.tail.ts.net:${API}/pair?c=`), p.webLink)
-      // The name not usable (an address not published yet): the tailnet's page, as before.
-      address = '192.168.77.50'
-      const fallback = await local('GET', '/local/status')
-      assert.equal(fallback.json.downloadUrl, tailnetPage)
-      assert.equal(fallback.json.downloadLocal, false)
-      assert.equal(fallback.json.downloadAnywhere, null)
-      address = '192.168.77.7'
-    } finally {
-      // Back to the built-in node for the tests after this one: the app gone, two re-checks in a row.
-      rmSync(fakeTs, { force: true })
-      await recheckSystem()
-      await recheckSystem()
-      await until('the built-in node again', () => tsnetState().mode === 'builtIn' && tsnetState().helper?.state === 'Running', 10_000)
-    }
   })
 
   test('an address change is published after a quiet moment; meanwhile the links fall back to the address', async () => {

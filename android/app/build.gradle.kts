@@ -44,10 +44,6 @@ android {
         targetSdk = 36
         versionCode = buildMinute
         versionName = appVersion
-        // Phones are arm64: the embedded Tailscale node (19 MB a copy) ships for arm64 only, in
-        // every build the Mac hands out (the debug APK too). An x86_64 emulator on an Intel host
-        // builds with -Phypernova.allAbis=true.
-        ndk { abiFilters += "arm64-v8a"; if (project.findProperty("hypernova.allAbis") == "true") abiFilters += "x86_64" }
     }
 
     signingConfigs {
@@ -76,18 +72,7 @@ android {
             // The release key when this machine has it; else the debug key, so a contributor's
             // release build still installs (packageRelease warns, distRelease refuses).
             signingConfig = if (releaseKey != null) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
-            // A pre-auth key is for tests and never for a release (see the guard below).
-            buildConfigField("String", "TSNET_AUTHKEY", "\"\"")
         }
-        debug {
-            // Tests against a local Headscale (docs/PROTOCOL.md, "Tailscale built in"): a pre-auth key
-            // skips the browser sign-in. Empty unless the build machine sets it.
-            buildConfigField("String", "TSNET_AUTHKEY", "\"${System.getenv("HYPERNOVA_TSNET_AUTHKEY") ?: ""}\"")
-        }
-    }
-    packaging {
-        // The node's library is stored compressed in the APK (about half the size on the wire).
-        jniLibs.useLegacyPackaging = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -98,23 +83,6 @@ android {
         buildConfig = true
     }
 }
-
-/**
- * The embedded Tailscale node (../tsnet, Go): built into app/libs/tsnet.aar by gomobile when it's
- * missing (needs Go, gomobile and the NDK; see ../tsnet/build.sh). Without it the build fails with
- * that script's message, since the app's built-in route needs it.
- */
-val tsnetAar: File = layout.projectDirectory.file("libs/tsnet.aar").asFile
-val tsnetScript: String = rootProject.layout.projectDirectory.file("tsnet/build.sh").asFile.absolutePath
-val buildTsnet = tasks.register<Exec>("buildTsnet") {
-    // Plain values only: the configuration cache can't keep script references.
-    val aar = tsnetAar
-    // The Go sources are the inputs, so a changed node rebuilds the AAR (and a missing one is built).
-    inputs.files(fileTree(rootProject.layout.projectDirectory.dir("tsnet")) { include("*.go", "go.mod", "go.sum", "build.sh") })
-    outputs.file(aar)
-    commandLine("bash", tsnetScript)
-}
-tasks.named("preBuild") { dependsOn(buildTsnet) }
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
@@ -130,8 +98,6 @@ dependencies {
     implementation(libs.haze.blur)
     // REST and the live WebSocket to the Mac's daemon. JSON is parsed with the platform's org.json.
     implementation(libs.okhttp)
-    // Tailscale built in: the tsnet node bound with gomobile (built by the buildTsnet task above).
-    implementation(files("libs/tsnet.aar"))
     debugImplementation(libs.androidx.compose.ui.tooling)
     // JVM unit tests: `./gradlew :app:testDebugUnitTest` (voice's logic and gesture, app/src/test).
     testImplementation(libs.junit)
@@ -141,24 +107,15 @@ dependencies {
 
 // `./gradlew :app:dist`: the debug APK in ../dist, with its version in a note next to it. The Mac
 // app bundles both and serves them; the phone compares that version with its own.
-/**
- * A Tailscale pre-auth key (HYPERNOVA_TSNET_AUTHKEY, baked into a debug build for the Headscale
- * test) must never reach an APK anyone else installs: the release packaging and `dist` (the APK
- * the Mac hands out) refuse to run while it is set. Checked when those tasks run, so a plain
- * debug build with the key still works.
- */
-// A provider, copied into each task's own val: the configuration cache can't keep a reference to
+// Plain values, copied into each task's own val: the configuration cache can't keep a reference to
 // the build script itself (a script-level function in doFirst broke :app:dist).
-val testKey = providers.environmentVariable("HYPERNOVA_TSNET_AUTHKEY")
 val hasReleaseKey = releaseKey != null
 val releaseKeyPath: String = keystoreProps.path
 tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.configureEach {
-    val key = testKey
     // Said once, by the task that signs the APK (packageReleaseResources matches too).
     val signed = hasReleaseKey || name != "packageRelease"
     val props = releaseKeyPath
     doFirst {
-        if (!key.orNull.isNullOrEmpty()) throw GradleException("HYPERNOVA_TSNET_AUTHKEY is set: this APK would carry a Tailscale pre-auth key. Unset it for dist and release builds.")
         if (!signed) logger.warn(
             "\nWARNING: no release key at $props (or HYPERNOVA_KEYSTORE_PROPS): this release APK is signed with " +
                 "the DEBUG key. Fine for testing; never hand it out (distRelease refuses). See docs/RELEASING.md.\n",
@@ -168,8 +125,6 @@ tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.
 
 tasks.register("dist") {
     dependsOn("assembleDebug")
-    val key = testKey
-    doFirst { if (!key.orNull.isNullOrEmpty()) throw GradleException("HYPERNOVA_TSNET_AUTHKEY is set: this APK would carry a Tailscale pre-auth key. Unset it for dist and release builds.") }
     val apk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk")
     val out = rootProject.layout.projectDirectory.dir("../dist").asFile
     val note = """{"versionCode": $buildMinute, "versionName": "$appVersion"}""" + "\n"
@@ -187,21 +142,18 @@ tasks.register("dist") {
  * signed with the release key, in ../dist as hypernova.apk with its version note (hypernova.json:
  * mac/build.sh prefers this APK to a -debug one and bundles the note next to it, and the daemon
  * serves both) and R8's mapping (hypernova-mapping.txt: keep it with the release, it turns crash
- * traces back into names). Refuses to start without the release key or with a Tailscale test key
- * set, and checks the signed APK: v2 and v3 signatures, and the release key's certificate (never
- * Android's debug one).
+ * traces back into names). Refuses to start without the release key, and checks the signed APK:
+ * v2 and v3 signatures, and the release key's certificate (never Android's debug one).
  */
 val checkReleaseKey = tasks.register("checkReleaseKey") {
-    val key = testKey
     val signed = hasReleaseKey
     val props = releaseKeyPath
     doFirst {
-        if (!key.orNull.isNullOrEmpty()) throw GradleException("HYPERNOVA_TSNET_AUTHKEY is set: this APK would carry a Tailscale pre-auth key. Unset it for dist and release builds.")
         if (!signed) throw GradleException("distRelease needs the release key, and there is no $props (HYPERNOVA_KEYSTORE_PROPS names another keystore.properties). It never publishes a debug-signed APK: the first public key is the only one that can update the app. See docs/RELEASING.md.")
     }
 }
 // Fail before the long build, not after it.
-tasks.matching { it.name == "preReleaseBuild" || it.name == "buildTsnet" }.configureEach { mustRunAfter(checkReleaseKey) }
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { mustRunAfter(checkReleaseKey) }
 
 tasks.register("distRelease") {
     dependsOn(checkReleaseKey, "assembleRelease")

@@ -1,7 +1,7 @@
 dist/
 .DS_Store
 .claude/
-# Built by daemon/tsnet/build.sh (the Tailscale helper) and android/tsnet/build.sh (its AAR)
+# Left in older checkouts by the Tailscale builds (removed 2026-10-30: docs/DECISIONS.md)
 daemon/bin/
 android/app/libs/tsnet.aar
 android/app/libs/tsnet-sources.jar

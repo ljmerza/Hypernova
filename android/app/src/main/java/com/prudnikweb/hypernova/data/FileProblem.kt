@@ -20,7 +20,7 @@ enum class FileKind {
     Unreadable,
     /** A file asked for as a folder or the other way round. */
     WrongKind,
-    /** The Mac couldn't be reached (no network, a timeout, Tailscale, a 5xx): the only kind worth "Try again". */
+    /** The Mac couldn't be reached (no network, a timeout, a 5xx): the only kind worth "Try again". */
     Network,
     /** Anything else, with the Mac's own words. */
     Other,

@@ -67,21 +67,18 @@ object UpdatePolicy {
 
     /**
      * The APK on the route the app uses right now: the Mac's own address on the local network
-     * (pinned), its tailnet name through the built-in node, or the paired base URL.
+     * (pinned), or the paired base URL.
      */
     fun apkUrl(routeBase: String): String = routeBase.trimEnd('/') + APK_PATH
 
     /**
      * The Mac's download page, when a browser outside the app could open it: an https name with a
-     * certificate a browser checks (a public name, or a ts.net name while this phone reaches it
-     * as it is, through the Tailscale app). Never an address (the computer's own certificate,
-     * which only the app pins), and never a tailnet name only the app's own node reaches.
-     * [baseInUse]: the app reaches the paired base URL itself right now (its route is the base URL).
+     * certificate a browser checks. Never an address (the computer's own certificate, which only
+     * the app pins).
      */
-    fun browserPage(pairedBase: String, tailnetName: String?, baseInUse: Boolean): String? {
+    fun browserPage(pairedBase: String): String? {
         val o = RoutePolicy.originOf(pairedBase) ?: return null
         if (o.scheme != "https" || isAddress(o.host)) return null
-        if (TsnetPolicy.onTailnet(o.host, tailnetName, null) && !baseInUse) return null
         return pairedBase.trimEnd('/') + PAGE_PATH
     }
 

@@ -16,7 +16,7 @@
 #      ~/.local/share/hypernova/node (nothing outside Hypernova's folder);
 #   3. then `hypernova setup`, which installs the daemon, Claude Code (Anthropic's installer), the
 #      hooks, the shell integration and the systemd service.
-# Nothing listens on a public port: the phone API is on 127.0.0.1, behind `tailscale serve`.
+# Nothing listens on a public port: phones use the local route (47323, mutual TLS) on your network.
 set -euo pipefail
 
 FROM=""
@@ -86,8 +86,8 @@ wsl_hint() {
     say "  to /etc/wsl.conf (sudo nano /etc/wsl.conf), run  wsl --shutdown  in PowerShell, open $distro"
     say "  again and run this script again. Installing anyway: until then, start it with  hypernova run"
   fi
-  say "Your phone reaches this PC over Tailscale (hypernova pair signs in the built-in node): WSL's"
-  say "default network keeps it off the Wi-Fi. To keep WSL running with no window open, see the guide."
+  say "WSL's default network (NAT) keeps this PC off your phone's Wi-Fi; mirrored networking lets the"
+  say "phone in. That, and keeping WSL running with no window open, are in the guide."
   echo
 }
 wsl_hint /proc/version /run/systemd/system
@@ -167,7 +167,7 @@ if [ -z "$FROM" ]; then
   if [ -f "$HERE/../daemon/package.json" ]; then
     FROM="$(cd "$HERE/.." && pwd)"
   else
-    die "say where the daemon is: --from <repository folder or tarball> (the release's Hypernova-linux.tar.gz: https://github.com/prudnik-web/Hypernova/releases/latest)."
+    die "say where the daemon is: --from <repository folder or tarball> (a release's hypernova-server-<tag>-linux.tar.gz: https://github.com/ljmerza/Hypernova/releases/latest)."
   fi
 fi
 case "$FROM" in

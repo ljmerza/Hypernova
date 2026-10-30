@@ -20,8 +20,6 @@ process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
 process.env.HOME = join(scratch, 'home')
 process.env.ZDOTDIR = join(scratch, 'zdot')
-process.env.HYPERNOVA_TAILSCALE = join(scratch, 'no-tailscale')
-process.env.HYPERNOVA_TSNET_AUTOSERVE = '0'
 mkdirSync(process.env.HOME, { recursive: true })
 const freePort = () =>
   new Promise<number>((resolve) => {
@@ -152,7 +150,7 @@ test('the install script’s word under WSL: experimental, how to turn systemd o
   }
   let out = run('6.6.87.2-microsoft-standard-WSL2', true)
   assert.match(out, /This is WSL on Windows\. Hypernova's support for it is experimental/)
-  assert.match(out, /Your phone reaches this PC over Tailscale/)
+  assert.match(out, /WSL's default network \(NAT\) keeps this PC off your phone's Wi-Fi/)
   assert.doesNotMatch(out, /systemd=true|WSL 1/)
   out = run('6.6.87.2-microsoft-standard-WSL2', false)
   assert.match(out, /WSL doesn't run systemd here[^]*\[boot\]\n {6}systemd=true\n[^]*wsl --shutdown[^]*Installing anyway: until then, start it with {2}hypernova run/)

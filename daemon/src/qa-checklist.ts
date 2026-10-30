@@ -15,11 +15,11 @@ export const CHECKLIST: { title: string; items: { id: string; title: string; how
   {
     title: 'Phone basics',
     items: [
-      { id: 'ph-onboarding', title: 'The first screens explain what to do', how: 'Before pairing: the guide (Tailscale, Mac, scan). Is anything confusing?' },
+      { id: 'ph-onboarding', title: 'The first screens explain what to do', how: 'Before pairing: the guide (install the server, hypernova pair, scan). Is anything confusing?' },
       { id: 'ph-home', title: 'The home sky shows your real projects and sessions', how: 'Planets are your projects, moons are sessions. Tap a planet to zoom. Sessions lists the live ones, History the ended ones.' },
       { id: 'ph-notify', title: 'Approvals reach you with the app closed or the phone locked', how: 'Allow notifications when asked. A quiet "MacBook Air · 1 working" notification stays while connected. Lock the phone, start something that needs approval: a "Needs you" notification should arrive; tapping it opens the session. Settings → "Stay connected in the background" turns this off.' },
       { id: 'ph-usage', title: 'The sun matches your real usage', how: 'Compare the sun\'s "% · time" with /usage in Claude Code.' },
-      { id: 'ph-connection', title: 'Connection state is honest', how: 'Turn Tailscale off on the phone for a moment, then on. The app should say it is reconnecting, then recover by itself.' },
+      { id: 'ph-connection', title: 'Connection state is honest', how: 'Turn Wi-Fi off on the phone for a moment, then on. The app should say it is reconnecting, then recover by itself.' },
     ],
   },
   {

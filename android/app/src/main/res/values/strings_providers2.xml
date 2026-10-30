@@ -14,7 +14,7 @@
     <string name="pv_check_said">Check: %1$s</string>
 
     <!-- The address, as it's typed: plain http to the internet. -->
-    <string name="pv_insecure_typed">Plain http: the key would travel unencrypted. Use https://, or an address on this network or your tailnet.</string>
+    <string name="pv_insecure_typed">Plain http: the key would travel unencrypted. Use https://, or an address on this network or your VPN.</string>
     <!-- Saved with an address on another host and no new key. -->
     <string name="pv_key_dropped">The address moved to another host, so its saved key was dropped. Paste the key for the new address.</string>
     <string name="pv_saved">Saved</string>

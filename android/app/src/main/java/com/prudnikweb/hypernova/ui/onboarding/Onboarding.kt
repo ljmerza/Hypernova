@@ -25,12 +25,14 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -80,55 +82,34 @@ import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.Type
 import kotlinx.coroutines.delay
 
-private const val TAILSCALE = "com.tailscale.ipn"
-
-fun tailscaleInstalled(context: Context): Boolean =
-    context.packageManager.getLaunchIntentForPackage(TAILSCALE) != null
-
-/** Opens Tailscale if it's installed, otherwise its Play Store listing (or the web page). */
-fun openTailscale(context: Context) {
-    val launch = context.packageManager.getLaunchIntentForPackage(TAILSCALE)
-    val intents = listOfNotNull(
-        launch,
-        Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$TAILSCALE")),
-        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$TAILSCALE")),
-    )
-    for (i in intents) {
-        try {
-            context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            return
-        } catch (_: ActivityNotFoundException) {
-        }
-    }
-}
+/** Where the server package is published (README, "Getting started"): the newest release's. */
+private const val SERVER_RELEASES = "https://github.com/ljmerza/Hypernova/releases/latest"
 
 /**
- * Not paired yet: three short steps (Tailscale, Pair a phone on the Mac, scan the code), a
- * paste fallback for the link, and a way to look around with demo data. With [onClose] (another
- * computer from the switcher, others paired already): the same steps over the app, with Cancel
- * where the demo was, and Back closes them.
+ * Not paired yet: three short steps (install Hypernova on the server, run hypernova pair there, scan
+ * the code or use its link), a paste fallback for the link, and a way to look around with demo data.
+ * With [onClose] ("Add a server" from the switcher, others paired already): the same steps over the
+ * app, titled for adding one, with Cancel where the demo was, and Back closes them. The bottom button
+ * stays put above the navigation bar (and the keyboard) while the steps scroll.
  */
 @Composable
 fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Unit)? = null) {
     if (onClose != null) BackHandler(onBack = onClose)
     val context = LocalContext.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var pasting by rememberSaveable { mutableStateOf(false) }
     var link by rememberSaveable { mutableStateOf("") }
-    // Re-check on return from the Play Store, so the button says "Open" once it's installed.
-    var installed by remember { mutableStateOf(tailscaleInstalled(context)) }
-    LaunchedEffect(Unit) { while (true) { delay(2000); installed = tailscaleInstalled(context) } }
+    val adding = onClose != null
 
     val haze = LocalHaze.current
     Box(Modifier.fillMaxSize().background(HN.bg.copy(alpha = 0.5f))) {
+    Column(Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = ONBOARDING)) {
     Column(
         Modifier
-            .fillMaxSize()
-            .hazeSource(haze, zIndex = Z.CONTENT, key = ONBOARDING)
-            .imePadding()
+            .weight(1f)
+            .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(top = top + 14.dp, bottom = bottom + 24.dp, start = 20.dp, end = 20.dp),
+            .padding(top = top + 14.dp, bottom = 16.dp, start = 20.dp, end = 20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             NovaMark(size = 22.dp)
@@ -136,17 +117,14 @@ fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Un
             Wordmark()
         }
         Spacer(Modifier.height(44.dp))
-        HText(stringResource(R.string.onb_title), style = Type.display, color = HN.ink)
+        HText(stringResource(if (adding) R.string.onb_title_add else R.string.onb_title), style = Type.display, color = HN.ink)
         Spacer(Modifier.height(12.dp))
-        HText(stringResource(R.string.onb_intro), style = Type.body, color = HN.inkMuted)
+        HText(stringResource(if (adding) R.string.onb_intro_add else R.string.onb_intro), style = Type.body, color = HN.inkMuted)
         Spacer(Modifier.height(28.dp))
 
         Step(1, stringResource(R.string.onb_step1_title), stringResource(R.string.onb_step1_body)) {
-            // The Tailscale app is no longer needed (the node is built in): a button only when it's there.
-            if (installed) {
-                Spacer(Modifier.height(14.dp))
-                Pill(stringResource(R.string.open_tailscale), { openTailscale(context) }, kind = PillKind.Outline, height = 44.dp)
-            }
+            Spacer(Modifier.height(14.dp))
+            Pill(stringResource(R.string.onb_step1_link), { openLink(context, SERVER_RELEASES) }, kind = PillKind.Outline, height = 44.dp)
         }
         Spacer(Modifier.height(10.dp))
         Step(2, stringResource(R.string.onb_step2_title), stringResource(R.string.onb_step2_body))
@@ -182,12 +160,29 @@ fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Un
                 )
             }
         }
-        Spacer(Modifier.height(10.dp))
+    }
+    // Cancel (or the demo) never scrolls under the navigation bar: it sits above it, and above the
+    // keyboard while the link is typed in.
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
+            .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 12.dp),
+    ) {
         if (onClose != null) Pill(stringResource(R.string.cancel), onClose, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
         else Pill(stringResource(R.string.onb_demo), onDemo, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
     }
+    }
     // Whatever scrolls under the status bar is blurred, like every other screen.
     BlurredTop(haze, ONBOARDING, Modifier.fillMaxWidth(), fade = 14.dp) { Spacer(Modifier.height(top + 18.dp)) }
+    }
+}
+
+/** Opens [url] in the browser; nothing when the phone has none. */
+private fun openLink(context: Context, url: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: ActivityNotFoundException) {
     }
 }
 
@@ -203,27 +198,6 @@ private fun Step(n: Int, title: String, body: String, extra: @Composable () -> U
             Spacer(Modifier.height(4.dp))
             HText(body, style = Type.small, color = HN.inkMuted)
             extra()
-        }
-    }
-}
-
-/**
- * "This computer uses its own Tailscale server": a pairing link may name any control server, and a
- * node that talks to one sends it this phone's name, addresses and keys, so the user agrees first.
- */
-@Composable
-fun ControlServerCard(controlUrl: String, macName: String, onUse: () -> Unit) {
-    val host = runCatching { java.net.URI(controlUrl) }.getOrNull()?.let { (it.host ?: controlUrl) + (if (it.port > 0) ":${it.port}" else "") } ?: controlUrl
-    val plain = controlUrl.startsWith("http://", ignoreCase = true)
-    GlassCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Seam(stringResource(R.string.ts_label))
-            Spacer(Modifier.height(12.dp))
-            HText(stringResource(R.string.ts_control_title), style = Type.heading, color = HN.ink)
-            Spacer(Modifier.height(4.dp))
-            HText(stringResource(R.string.ts_control_body, macName, host) + if (plain) " " + stringResource(R.string.ts_control_plain) else "", style = Type.small, color = HN.inkMuted)
-            Spacer(Modifier.height(14.dp))
-            Pill(stringResource(R.string.ts_control_use, host), onUse, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 48.dp)
         }
     }
 }
@@ -287,14 +261,9 @@ private fun StateScreen(
 
 /** "Pairing with <Mac>…", then success or a clear error with what to do. */
 @Composable
-fun PairScreen(flow: PairFlow, onRetry: (PairLink) -> Unit, onClose: () -> Unit, onDone: () -> Unit, confirmedControl: String? = null, onConfirmControl: (PairLink) -> Unit = {}) {
+fun PairScreen(flow: PairFlow, onRetry: (PairLink) -> Unit, onClose: () -> Unit, onDone: () -> Unit) {
     val context = LocalContext.current
     BackHandler { if (flow is PairFlow.Done) onDone() else onClose() }
-    // Tailscale built in: once the node comes up after a failure, the pairing goes again by itself,
-    // once per sign-in (a failure that stays is then left to the user's "Try again").
-    val nodeRunning = com.prudnikweb.hypernova.data.Tsnet.status.running
-    var autoTried by remember { mutableStateOf(false) }
-    LaunchedEffect(nodeRunning) { if (!nodeRunning) autoTried = false }
     // Swallow touches so nothing underneath reacts.
     Box(Modifier.fillMaxSize().then(Modifier.background(Color.Transparent)).pointerBlock()) {
         when (flow) {
@@ -344,30 +313,8 @@ fun PairScreen(flow: PairFlow, onRetry: (PairLink) -> Unit, onClose: () -> Unit,
                     title = title, body = body,
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val network = flow.problem == Problem.NoTailscale || flow.problem == Problem.Unreachable || flow.problem == Problem.Tls
-                        // The computer is on a tailnet and this phone's built-in node isn't signed in: the
-                        // way in is the sign-in, and the pairing goes again by itself once the node runs.
-                        val tailnet = network && link != null && link.hasTailnet && com.prudnikweb.hypernova.data.Tsnet.available
-                        // A computer on its own Tailscale server (the link's `tc`): the user must agree to it
-                        // before this phone's node talks to that server at all.
-                        val needsConsent = tailnet && link!!.controlUrl != null && confirmedControl != link.controlUrl
-                        val signIn = tailnet && !needsConsent && (!nodeRunning || !com.prudnikweb.hypernova.data.Tsnet.serves(link!!.controlUrl))
-                        if (needsConsent) {
-                            ControlServerCard(link!!.controlUrl!!, link.macName) { onConfirmControl(link) }
-                        } else if (signIn) {
-                            LaunchedEffect(link) { com.prudnikweb.hypernova.data.Tsnet.start(context, link!!.controlUrl) }
-                            TailscaleSignInCard(link!!.tailnetAccount, link.controlUrl)
-                        }
-                        // The node came up while this failure was on screen: with tailscale.com the pairing
-                        // goes again by itself (outside the card, which leaves the screen the moment the node
-                        // runs); with a computer's own server the user presses Try again.
-                        if (tailnet && link!!.controlUrl == null && nodeRunning && !autoTried) LaunchedEffect(Unit) { autoTried = true; onRetry(link) }
                         if (link != null && flow.problem != Problem.CodeExpired) {
-                            Pill(stringResource(R.string.try_again), { onRetry(link) }, Modifier.fillMaxWidth(), kind = if (signIn) PillKind.Outline else PillKind.Primary, height = 48.dp)
-                        }
-                        // The Tailscale app's button only while the built-in node isn't the way in.
-                        if (network && !signIn && !needsConsent && !(tailnet && nodeRunning)) {
-                            Pill(stringResource(R.string.open_tailscale), { openTailscale(context) }, Modifier.fillMaxWidth(), kind = PillKind.Outline, height = 48.dp)
+                            Pill(stringResource(R.string.try_again), { onRetry(link) }, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 48.dp)
                         }
                         Pill(stringResource(R.string.pair_back), onClose, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
                     }

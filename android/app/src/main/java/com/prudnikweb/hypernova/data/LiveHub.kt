@@ -46,7 +46,7 @@ import kotlin.random.Random
  * - Connects with `GET /v1/snapshot`, then keeps `/v1/ws` open. The socket pushes everything.
  * - Can't reach the Mac: tries again after 1, 2, 4 … s, at most every 30 s while the app is on
  *   screen and every 5 minutes behind it (see [backoff]); at once when the network changes
- *   (Tailscale coming up too), the screen comes on or the app returns, unless a try that has just
+ *   (a VPN coming up too), the screen comes on or the app returns, unless a try that has just
  *   begun is still under way. Never without a network, never off screen without the background
  *   service, and never by waking the phone. [link] says honestly how it stands.
  * - A 401 anywhere means the Mac forgot this phone: [link] becomes Unpaired and retrying stops.
@@ -73,8 +73,6 @@ class LiveHub(
      * app to open instead of trying again: Android soon pauses a process like that anyway.
      */
     private val heldOpen: () -> Boolean = { true },
-    /** The computer serves the phone API elsewhere on its tailnet now: the pairing to keep instead ([TailnetFollow]). */
-    private val onTailnetMoved: (Pairing) -> Unit = {},
     /** Which paired computer this is (data/Servers.kt): its offline queue, certificate and notifications are its own. */
     val serverId: String = Servers.LEGACY_ID,
     /**
@@ -141,9 +139,7 @@ class LiveHub(
             online = link.state == LinkState.Connected,
             via = when (router.kind) {
                 RouteKind.Local -> Mac.VIA_LOCAL
-                RouteKind.Tailscale -> Mac.VIA_BUILT_IN
-                // The base URL as it is: on the tailnet, that's the Tailscale app on this phone.
-                RouteKind.Remote -> if (RoutePolicy.originOf(router.route.base)?.let { TsnetPolicy.onTailnet(it.host, pairing.tailnetName, pairing.tailnetIp) } == true) Mac.VIA_TAILSCALE else Mac.VIA_REMOTE
+                RouteKind.Remote -> Mac.VIA_REMOTE
             },
             url = router.route.base,
             daemonVersion = macInfo?.daemonVersion,
@@ -239,8 +235,6 @@ class LiveHub(
     /** When the Mac was last heard from (epoch ms, 0 if never): "Last updated" on the widget. */
     val lastHeardAt: Long get() = lastMessageAt
     private var closed = false
-    /** The Mac's own Tailscale as last logged ({t:"tsnet"}). */
-    private var macNode: String? = null
     /** Disconnected from the notification: no socket until the app comes back. */
     private var paused = false
     /** A failed attempt's next one is scheduled ([schedule]); nothing is in flight. */
@@ -253,9 +247,9 @@ class LiveHub(
 
     /**
      * Hears a network worth trying again on: a new default network, the same one becoming another
-     * kind or reaching the internet, or a VPN (Tailscale) coming up or moving to another network
-     * under it. Tailscale without an exit node doesn't carry the internet, so it needn't become the
-     * default network: it has a watch of its own. Signal strength and speed estimates change all
+     * kind or reaching the internet, or a VPN coming up or moving to another network under it. A
+     * VPN that carries only the home network's addresses needn't become the default network: it
+     * has a watch of its own. Signal strength and speed estimates change all
      * the time and aren't news, hence the key. A watch's callbacks come one at a time on one
      * thread, which is the only one reading its key.
      */
@@ -368,10 +362,9 @@ class LiveHub(
 
     /**
      * Whatever failed before may work on this network: try at once, the backoff from the start (a
-     * Tailscale that has just come up can take a few seconds to find the Mac). A few small requests
-     * per change, next to all the phone does on one anyway. One switch between wifi and mobile
-     * data is several changes (Tailscale's network follows the one under it, then each is
-     * validated), so a try that has only just begun is left to finish; should it fail, the next
+     * VPN that has just come up can take a few seconds to find the Mac). A few small requests per
+     * change, next to all the phone does on one anyway. One switch between wifi and mobile data is
+     * several changes (a VPN's network follows the one under it, then each is validated), so a try that has only just begun is left to finish; should it fail, the next
      * comes after a second.
      */
     private fun networkChanged() {
@@ -452,7 +445,7 @@ class LiveHub(
                 e = ApiException(Problem.Unreachable, e.status, e.code, cause = e)
             } else { unpaired(); return }
         }
-        // The route in use failed (the Mac moved, the Wi-Fi went, the node lost the tailnet): it
+        // The route in use failed (the Mac moved, the Wi-Fi or the VPN went): it
         // falls back, and the next try runs a round, Local first. A route that keeps failing is
         // tried after the others for a while: that route only.
         if (!noRoute && over != null) router.failed(over)
@@ -481,7 +474,7 @@ class LiveHub(
     /** A failure's verdict for the log. */
     private fun linkResult(e: ApiException): ConnResult = when (e.problem) {
         Problem.NotRunning -> ConnResult.Refused
-        Problem.NoTailscale -> ConnResult.NoName
+        Problem.NoName -> ConnResult.NoName
         Problem.Tls -> ConnResult.Tls
         Problem.Server, Problem.Unauthorized -> ConnResult.Http
         else -> e.cause?.let { RoutePolicy.classify(it).first } ?: ConnResult.Failed
@@ -635,8 +628,6 @@ class LiveHub(
         class AutoMsgs(val m: AutoMsg) : Msg
         /** The Mac's local listener: its addresses changed (null: the listener is off). */
         class LanMsg(val lan: LanInfo?) : Msg
-        /** Where the phone API is on the tailnet now (the built-in node or the Tailscale app took over). */
-        class TailnetMsg(val hint: TailnetHint?, val mode: String?, val state: String?) : Msg
         /** Codex turned on or off, connected or not, its account or its windows (null: not installed). */
         class CodexMsg(val c: CodexState?) : Msg
         data object Ping : Msg
@@ -669,7 +660,6 @@ class LiveHub(
         "automation", "automation.removed", "automations", "run", "note" -> AutomationWire.message(o)?.let { Msg.AutoMsgs(it) }
         "ping" -> Msg.Ping
         "lan" -> Msg.LanMsg(LanInfo.parse(o.obj("lan")))
-        "tsnet" -> Msg.TailnetMsg(TailnetHint.parse(o.obj("tailnet")), o.obj("tsnet")?.str("mode"), o.obj("tsnet")?.obj("helper")?.str("state"))
         else -> null
     }
 
@@ -725,10 +715,6 @@ class LiveHub(
             is Msg.AutoMsgs -> automations.apply(m.m)
             // Addresses only: the message says nothing about the certificate.
             is Msg.LanMsg -> router.lan = m.lan?.copy(deviceCert = router.lan?.deviceCert ?: true)
-            is Msg.TailnetMsg -> {
-                macTailnet(m)
-                follow(m.hint)
-            }
             Msg.Ping -> socket.send("""{"t":"pong"}""")
         }
     }
@@ -891,45 +877,6 @@ class LiveHub(
         // After the sessions, so a note found on reconnect can open its run's session.
         automations.applySnapshot(s.automations)
         setLan(s.lan)
-        follow(s.mac.tailnet)
-    }
-
-    /**
-     * The Mac's own Tailscale, for the connection log: which one serves (its built-in node, the
-     * Tailscale app), its state and whether the phone API is on the tailnet. Its steps on the way
-     * up (starting) aren't news; a sign-out or the serving starting or stopping are.
-     */
-    private fun macTailnet(m: Msg.TailnetMsg) {
-        val who = when (m.mode) {
-            "builtIn" -> "the Mac's built-in node"
-            "system" -> "the Tailscale app on the Mac"
-            else -> "Tailscale on the Mac"
-        }
-        val state = when (m.state) {
-            "Running" -> "running"
-            "NeedsLogin" -> "signed out (NeedsLogin)"
-            "NeedsMachineAuth" -> "waiting for approval"
-            "Stopped" -> "stopped"
-            null -> if (m.mode == "off") "off" else if (m.mode == "system") "running" else "not running"
-            else -> null
-        }
-        val serving = m.hint != null
-        val key = "$who/${state ?: "starting"}/$serving"
-        if (key == macNode) return
-        // On its way up, with the serving as it was: not news.
-        if (state == null && macNode?.endsWith("/$serving") == true) return
-        macNode = key
-        ConnLog.add(
-            ConnKind.Mac, if (serving) ConnResult.Ok else ConnResult.Info, RouteKind.Tailscale, ConnScrub.hostPort(m.hint?.url),
-            "$who is ${state ?: "starting"}, ${if (serving) "serving on the tailnet" else "not serving on the tailnet"}",
-        )
-    }
-
-    /** The computer said where it is on the tailnet: a pairing that knew it elsewhere follows (once, on the main thread). */
-    private fun follow(hint: TailnetHint?) {
-        val next = TailnetFollow.next(pairing, hint) ?: return
-        ConnLog.add(ConnKind.Mac, ConnResult.Info, RouteKind.Tailscale, ConnScrub.hostPort(next.tailnetUrl), "the Mac serves elsewhere on its tailnet now: the link starts over with it")
-        scope.launch { if (!closed) onTailnetMoved(next) }
     }
 
     /**
@@ -2582,39 +2529,31 @@ private val WHITESPACE = Regex("\\s+")
 internal fun sameSentText(mine: String, theirs: String): Boolean = mine.replace(WHITESPACE, "") == theirs.replace(WHITESPACE, "")
 
 /**
- * The offline card's sentence for [link]: the routes the last round tried when none answered
- * ("Can't reach your Mac on Wi‑Fi or over Tailscale"), the route that failed in use when one
- * answered and then failed, else the problem's own words. Never blames the tailnet for what
- * happened on Wi‑Fi.
+ * The offline card's sentence for [link]: what the last round tried when nothing answered ("Your
+ * Mac doesn't answer on this Wi‑Fi"), the route that failed in use when one answered and then
+ * failed, else the problem's own words.
  */
 fun linkProblemText(res: android.content.res.Resources, link: Link): String {
     val p = link.problem
     if (p == Problem.NoNetwork || p == Problem.Unauthorized || p == Problem.Server || p == Problem.Cleartext) return problemText(res, p)
     when (RouteWords.problem(link.tried)) {
-        RouteProblem.Both -> return res.getString(R.string.problem_route_both)
         RouteProblem.LocalOnly -> return res.getString(R.string.problem_route_local)
-        RouteProblem.TailnetOnly -> return res.getString(R.string.problem_route_tailnet)
         RouteProblem.WrongMac -> return res.getString(R.string.problem_route_wrong_mac)
         null -> Unit
     }
     return when (link.failedOver) {
         RouteKind.Local -> res.getString(R.string.problem_route_local)
-        RouteKind.Tailscale -> res.getString(R.string.problem_node_unreachable)
         RouteKind.Remote -> problemWords(res, p)
         null -> problemText(res, p)
     }
 }
 
 /** One sentence per problem, with what to do about it. */
-fun problemText(res: android.content.res.Resources, p: Problem?): String = when {
-    // Signed in here already: "sign in to Tailscale" would send the user round in a circle.
-    (p == Problem.NoTailscale || p == Problem.Unreachable) && Tsnet.status.running -> res.getString(R.string.problem_node_unreachable)
-    else -> problemWords(res, p)
-}
+fun problemText(res: android.content.res.Resources, p: Problem?): String = problemWords(res, p)
 
 private fun problemWords(res: android.content.res.Resources, p: Problem?): String = when (p) {
     Problem.NoNetwork -> res.getString(R.string.problem_no_network)
-    Problem.NoTailscale -> res.getString(R.string.problem_no_tailscale)
+    Problem.NoName -> res.getString(R.string.problem_no_name)
     Problem.Unreachable, null -> res.getString(R.string.problem_unreachable)
     Problem.NotRunning -> res.getString(R.string.problem_not_running)
     Problem.Tls -> res.getString(R.string.problem_tls)

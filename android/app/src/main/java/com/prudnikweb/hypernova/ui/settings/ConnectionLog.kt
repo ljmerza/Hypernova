@@ -54,8 +54,7 @@ import com.prudnikweb.hypernova.ui.components.ScreenScaffold
 import com.prudnikweb.hypernova.ui.components.StatusChip
 import com.prudnikweb.hypernova.ui.components.Stamp
 import com.prudnikweb.hypernova.ui.components.frostedGlass
-import com.prudnikweb.hypernova.ui.onboarding.TsGlyph
-import com.prudnikweb.hypernova.ui.onboarding.TsIcon
+import com.prudnikweb.hypernova.ui.onboarding.HomeNetIcon
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -67,7 +66,7 @@ import java.util.Date
  * Settings → Mac → Connection log (data/ConnLog.kt): what the app tried to reach the Mac, newest
  * first, drawn: each probe round in a glass card of its own (the network it saw at the bottom, the
  * routes' answers, the route chosen on top), each line with its age in mono, the route as a tag
- * (the home network's arcs, the tailnet's points, a globe for the base URL), the answer as a state
+ * (the home network's arcs, a globe for the base URL), the answer as a state
  * chip (mint, red, or quiet) and where and how long in dim mono. Copy puts the whole log on the
  * clipboard as plain text, oldest first, to send.
  */
@@ -194,8 +193,7 @@ fun RouteTag(route: RouteKind, modifier: Modifier = Modifier, trail: String? = n
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when (route) {
-            RouteKind.Local -> TsIcon(TsGlyph.Home, HN.accent)
-            RouteKind.Tailscale -> TsIcon(TsGlyph.Tailnet, HN.accent)
+            RouteKind.Local -> HomeNetIcon(HN.accent)
             RouteKind.Remote -> Icon(Glyph.Globe, size = 12.dp, color = HN.inkDim, stroke = 1.2.dp)
         }
         Spacer(Modifier.width(5.dp))
@@ -210,8 +208,8 @@ fun RouteTag(route: RouteKind, modifier: Modifier = Modifier, trail: String? = n
 
 /**
  * The offline card's row of what the last round tried when nothing answered: a tag per route with
- * its answer after it (`LOCAL  REFUSED`, `TAILSCALE  NO ANSWER`, `TAILSCALE  NOT TRIED`). The base
- * URL only when it isn't the tailnet (a plain address of its own). TalkBack hears one sentence.
+ * its answer after it (`LOCAL  REFUSED`, `LOCAL  NOT TRIED`), and the base URL's when [showBase].
+ * TalkBack hears one sentence.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -240,7 +238,6 @@ private fun kindWord(k: ConnKind): String = stringResource(
         ConnKind.Link -> R.string.connlog_kind_link
         ConnKind.Socket -> R.string.connlog_kind_socket
         ConnKind.Wait -> R.string.connlog_kind_wait
-        ConnKind.Node -> R.string.connlog_kind_node
         ConnKind.Mac -> R.string.connlog_kind_mac
     },
 )
@@ -249,7 +246,6 @@ private fun kindWord(k: ConnKind): String = stringResource(
 private fun routeWord(r: RouteKind): String = stringResource(
     when (r) {
         RouteKind.Local -> R.string.connlog_route_local
-        RouteKind.Tailscale -> R.string.connlog_route_tailnet
         RouteKind.Remote -> R.string.connlog_route_base
     },
 )
@@ -265,8 +261,6 @@ private fun resultWord(r: ConnResult): String? = when (r) {
     ConnResult.PinWrong -> stringResource(R.string.connlog_result_pin_wrong)
     ConnResult.PinExpired -> stringResource(R.string.connlog_result_pin_expired)
     ConnResult.Tls -> stringResource(R.string.connlog_result_tls)
-    ConnResult.NoPeer -> stringResource(R.string.connlog_result_no_peer)
-    ConnResult.ProxyRefused -> stringResource(R.string.connlog_result_proxy)
     ConnResult.Http -> stringResource(R.string.connlog_result_http)
     ConnResult.Closed -> stringResource(R.string.connlog_result_closed)
     ConnResult.Failed -> stringResource(R.string.connlog_result_failed)

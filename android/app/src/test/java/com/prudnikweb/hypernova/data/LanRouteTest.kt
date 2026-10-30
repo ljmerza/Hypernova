@@ -108,9 +108,9 @@ class LanRouteTest {
     }
 
     @Test fun theChooserHoldsTheRouteAndKnowsWhenToLookAgain() {
-        val c = RouteChooser("https://mac.ts.net:47321", 47323)
+        val c = RouteChooser("https://mac.example.com:47321", 47323)
         assertEquals(RouteKind.Remote, c.kind)
-        assertEquals("https://mac.ts.net:47321", c.base)
+        assertEquals("https://mac.example.com:47321", c.base)
         // Fork: on mobile data a known address is still worth a re-check (a VPN may reach it); with no network, none.
         assertTrue(c.wantsRecheck(NetKind.Mobile, false, listOf("192.168.1.20"), emptyList()))
         assertFalse(c.wantsRecheck(NetKind.None, false, listOf("192.168.1.20"), emptyList()))
@@ -129,13 +129,13 @@ class LanRouteTest {
         assertEquals(8_000L, RoutePolicy.failedRecheckMs(0))
         assertEquals(16_000L, RoutePolicy.failedRecheckMs(1))
         assertEquals(RoutePolicy.RECHECK_MS, RoutePolicy.failedRecheckMs(10))
-        val moved = RouteChooser("https://mac.ts.net:47321", 47323)
+        val moved = RouteChooser("https://mac.example.com:47321", 47323)
         moved.settle("192.168.1.20", lanPort = 48323)
         assertEquals("https://192.168.1.20:48323", moved.base)
         // The local route fails in use: back to the base URL, and looking again.
         c.localFailed()
         assertEquals(RouteKind.Remote, c.kind)
-        assertEquals("https://mac.ts.net:47321", c.base)
+        assertEquals("https://mac.example.com:47321", c.base)
         assertTrue(c.wantsRecheck(NetKind.Wifi, false, listOf("192.168.1.20"), emptyList()))
         // A probe with no winner: remote.
         c.settle("192.168.1.20")
@@ -146,7 +146,7 @@ class LanRouteTest {
     // ─── The hotspot sweep ──────────────────────────────────────────────────
 
     @Test fun theLastAddressToAnswerGoesFirstThenTheKnownThenTheSweep() {
-        val c = RouteChooser("https://mac.ts.net:47321", 47323)
+        val c = RouteChooser("https://mac.example.com:47321", 47323)
         assertEquals(listOf("192.168.1.20"), c.known(listOf("192.168.1.20")))
         // The Mac answered on the hotspot at an address it hadn't reported, then the route was lost.
         c.settle("192.168.43.77")
@@ -214,7 +214,7 @@ class LanRouteTest {
     }
 
     @Test fun theWebViewGoesOnOnlyForThePinnedCertificate() {
-        val page = LocalPage("https://192.168.1.20:47323", "https://mac.ts.net:47321", fp, identity)
+        val page = LocalPage("https://192.168.1.20:47323", "https://mac.example.com:47321", fp, identity)
         assertTrue(page.trusts(cert, now))
         // Another certificate, an expired one, or none: refused.
         assertFalse(LocalPage(page.base, page.remoteBase, fp.replaceRange(0, 2, "00"), identity).trusts(cert, now))
@@ -223,14 +223,14 @@ class LanRouteTest {
     }
 
     @Test fun theDeviceCertificateGoesToTheListenerAlone() {
-        val page = LocalPage("https://192.168.1.20:47323", "https://mac.ts.net:47321", fp, identity)
+        val page = LocalPage("https://192.168.1.20:47323", "https://mac.example.com:47321", fp, identity)
         assertSame(identity, page.identityFor("192.168.1.20", 47323))
         assertNull(page.identityFor("192.168.1.21", 47323))
         assertNull(page.identityFor("192.168.1.20", 443))
         assertNull(page.identityFor("example.com", 47323))
         assertNull(page.identityFor(null, 47323))
         // IPv6, with or without brackets.
-        val v6 = LocalPage("https://[fd12:3456::20]:47323", "https://mac.ts.net:47321", fp, identity)
+        val v6 = LocalPage("https://[fd12:3456::20]:47323", "https://mac.example.com:47321", fp, identity)
         assertSame(identity, v6.identityFor("fd12:3456::20", 47323))
         assertSame(identity, v6.identityFor("[FD12:3456::20]", 47323))
         // No certificate yet: nothing to present.
@@ -239,7 +239,7 @@ class LanRouteTest {
 
     @Test fun pagesOpenOnTheActiveRouteAndOutsideByTheBaseUrl() {
         val lan = "https://192.168.1.20:47323"
-        val ts = "https://mac.tailnet.ts.net:47321"
+        val ts = "https://mac.example.com:47321"
         // A preview the Mac built from either origin opens on the active one, path and query intact.
         assertEquals("$lan/p/AbC_9/index%20page.html?x=1#top", RoutePolicy.rebase("$ts/p/AbC_9/index%20page.html?x=1#top", lan))
         assertEquals("$lan/qa?k=0123", RoutePolicy.rebase("$lan/qa?k=0123", "$lan/"))
@@ -254,7 +254,7 @@ class LanRouteTest {
         assertTrue(RoutePolicy.sameOrigin("https://192.168.1.20:47323/p/x", "https://192.168.1.20:47323"))
         assertFalse(RoutePolicy.sameOrigin("https://192.168.1.20:47324/p/x", "https://192.168.1.20:47323"))
         assertFalse(RoutePolicy.sameOrigin("http://192.168.1.20:47323/", "https://192.168.1.20:47323"))
-        assertTrue(RoutePolicy.sameOrigin("https://mac.ts.net/x", "https://MAC.ts.net:443"))
+        assertTrue(RoutePolicy.sameOrigin("https://mac.example.com/x", "https://MAC.example.com:443"))
         // The terminal's ticket is relative: its socket goes by the base URL (LiveHub.terminal).
         assertEquals("$ts/v1/terms/t1/ws?ticket=k", RoutePolicy.rebase("/v1/terms/t1/ws?ticket=k", ts))
     }

@@ -117,7 +117,7 @@ test("the checklist needs its key; the Mac app's bare link is sent on to the pag
   assert.equal((await send(LOCAL, 'GET', '/qa')).status, 302) // a browser that sends no Sec-Fetch-Site
   assert.equal((await send(LOCAL, 'GET', `/qa?k=${key}`)).status, 200)
   // Another site sending the browser there gets nothing, nor does a rebound domain, even one
-  // that claims to come through the tailnet.
+  // that claims to come through a proxy.
   assert.equal((await send(LOCAL, 'GET', '/qa', { 'sec-fetch-site': 'cross-site' })).status, 401)
   assert.equal((await send(LOCAL, 'GET', '/qa', { host: `evil.example:${LOCAL}`, 'sec-fetch-site': 'none' })).status, 403)
   assert.equal((await send(LOCAL, 'GET', '/qa', { host: `evil.example:${LOCAL}`, 'x-forwarded-for': '1.2.3.4' })).status, 403)
@@ -194,8 +194,6 @@ test("a session's Blocked tab: the list, Dismiss, and Allow & retry through the 
 })
 
 test('the account is in the snapshot and /local/status; a check runs on demand; signing in only when needed', async () => {
-  // /local/status asks Tailscale: not this Mac's.
-  process.env.HYPERNOVA_TAILSCALE = join(scratch, 'no-tailscale')
   const auth = { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }
   const snap = JSON.parse((await send(API, 'GET', '/v1/snapshot', auth)).body)
   assert.deepEqual([snap.account.state, snap.account.providerId, snap.account.login], ['ok', 'anthropic', null])
@@ -285,7 +283,6 @@ test('an automation never forks a session to move it, nor restarts one over unse
 })
 
 test('automations: the routes, their errors, and the snapshot’s and the Mac’s status fields', async () => {
-  process.env.HYPERNOVA_TAILSCALE = join(scratch, 'no-tailscale')
   const { settings } = await import('../src/store.ts')
   const project = join(settings.projectsRoot, 'demo')
   mkdirSync(project, { recursive: true })

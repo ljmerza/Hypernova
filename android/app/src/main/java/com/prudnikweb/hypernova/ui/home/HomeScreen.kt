@@ -100,10 +100,8 @@ import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Phase
-import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.problemText
 import com.prudnikweb.hypernova.ui.LocalOpener
-import com.prudnikweb.hypernova.ui.onboarding.openTailscale
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.CodexState
 import com.prudnikweb.hypernova.data.AgentLead
@@ -1158,14 +1156,13 @@ internal fun offlineAttention(link: com.prudnikweb.hypernova.data.Link): String 
 
 /**
  * Can't reach the Mac, as an attention card: why, and when we try again under it; Retry now; the
- * routes tried, drawn; Open Tailscale (where it's the way in) and the connection log as links.
+ * routes tried, drawn; the connection log as a link.
  * Swiped away it stays away until the problem changes (the brand row's chip still says offline).
  */
 @Composable
 private fun OfflineCard(hub: Hub, modifier: Modifier = Modifier) {
     val link = hub.link
     val res = LocalContext.current.resources
-    val context = LocalContext.current
     val now by produceState(System.currentTimeMillis(), link) {
         while (true) { value = System.currentTimeMillis(); delay(1000) }
     }
@@ -1176,9 +1173,6 @@ private fun OfflineCard(hub: Hub, modifier: Modifier = Modifier) {
         link.retryAt != null -> stringResource(R.string.retrying_now)
         else -> null
     }
-    // The Tailscale app only where it's the way in: not while this app's own node is the one.
-    val tailscale = (link.problem == Problem.NoTailscale || link.problem == Problem.Unreachable) && link.tried == null &&
-        link.failedOver != com.prudnikweb.hypernova.data.RouteKind.Local && !com.prudnikweb.hypernova.data.Tsnet.status.running
     AttentionCard(
         id = "offline", state = offlineAttention(link), tone = HN.danger, glyph = Glyph.Unlink,
         title = stringResource(R.string.cant_reach, hub.mac.name),
@@ -1186,12 +1180,11 @@ private fun OfflineCard(hub: Hub, modifier: Modifier = Modifier) {
         stamp = retry,
         action = AttentionAction(stringResource(R.string.retry_now), hub::retry),
         links = listOfNotNull(
-            if (tailscale) AttentionAction(stringResource(R.string.open_tailscale), { openTailscale(context) }) else null,
             AttentionAction(stringResource(R.string.connlog_open), opener.connectionLog),
         ),
         modifier = modifier,
         content = link.tried?.let { tried ->
-            // What the last round tried, drawn (`LOCAL  REFUSED`, `TAILSCALE  NO ANSWER`).
+            // What the last round tried, drawn (`LOCAL  REFUSED`, `REMOTE  NO ANSWER`).
             { com.prudnikweb.hypernova.ui.settings.RouteTriedRow(tried, showBase = hub.mac.via == com.prudnikweb.hypernova.data.Mac.VIA_REMOTE) }
         },
     )

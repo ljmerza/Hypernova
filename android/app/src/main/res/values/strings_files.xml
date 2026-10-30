@@ -76,8 +76,8 @@
     <string name="fv_dl_interrupted">The download stopped at %1$s. It carries on from there.</string>
     <string name="fv_dl_stopped">The download stopped.</string>
     <string name="size_gb">%1$.1f GB</string>
-    <string name="pg_connect">Can\'t reach your Mac. Is it awake, and is Tailscale on?</string>
-    <string name="pg_dns">This phone can\'t find your Mac. Turn Tailscale on.</string>
+    <string name="pg_connect">Can\'t reach your Mac. Is it awake, and is this phone on its network?</string>
+    <string name="pg_dns">This phone can\'t find your Mac. Join its Wi‑Fi or your VPN into it.</string>
     <string name="pg_timeout">Your Mac took too long to answer. Is it awake?</string>
     <string name="pg_ssl">The secure connection to your Mac failed.</string>
     <string name="pg_dev_server">Nothing answers behind this preview. Is the dev server still running on your Mac?</string>

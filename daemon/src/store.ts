@@ -33,10 +33,6 @@ export type Settings = {
   terminalApp?: string | null
   /** The LAN listener (lan.ts): the phone reaches the daemon directly on the local network. Unset: on. */
   lanAccess?: boolean
-  /** Built-in Tailscale (tsnet.ts): the daemon runs its own node when the Tailscale app doesn't serve. Unset: on. */
-  builtInTailscale?: boolean
-  /** A self-hoster's coordination server (Headscale); unset: tailscale.com. */
-  tailscaleControlUrl?: string
   /** A name under hypernova.observer with a real certificate for the local network's pages (names.ts). Unset: on. */
   nameService?: boolean
   /** Setup's phone step (or `hypernova pair`) has shown what that name is and Let's Encrypt's terms; nothing is made before. */

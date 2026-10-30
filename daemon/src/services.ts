@@ -1,7 +1,7 @@
-// Usage feed (status line files), Tailscale, projects, files and artifact previews.
+// Usage feed (status line files), projects, files and artifact previews.
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, statSync, unlinkSync, createReadStream, realpathSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
-import { execFile, execFileSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http'
 import { API_PORT, LOCAL_PORT, SUPPORT, log, randomToken } from './util.ts'
 import { attachmentFile } from './attachments.ts'
@@ -11,8 +11,6 @@ import { FileError, allowedPath, keyPlace, tooBroad } from './files.ts'
 import { isSecretFile } from './secretfiles.ts'
 import { mimeByName, needsSniff, sniff } from './mime.ts'
 import { requestCheck } from './account.ts'
-import { tsnetBaseUrl } from './tsnet.ts'
-import { PLATFORM, tailscaleCandidates } from './platform.ts'
 
 // ── Usage from the status line tap ───────────────────────────────────────
 const STATUS_DIR = join(SUPPORT, 'statusline')
@@ -81,102 +79,6 @@ export function pollStatusLine(): void {
     goneCheckAt = now
     void requestCheck()
   }
-}
-
-// ── Tailscale ────────────────────────────────────────────────────────────
-export type TailscaleStatus = {
-  installed: boolean
-  cliPath: string | null
-  running: boolean
-  loggedIn: boolean
-  dnsName: string | null
-  ip: string | null
-  httpsEnabled: boolean
-  serveOn: boolean
-  url: string | null
-  keyExpiry: string | null
-  /** The account the Tailscale app signed in with ("you@example.com"), for the pairing link's hint. */
-  account?: string | null
-}
-// The Mac app's CLI and Homebrew's; on Linux the package's (platform.ts).
-const TS_PATHS = tailscaleCandidates(PLATFORM)
-// HYPERNOVA_TAILSCALE: tests point it at a stand-in, so they never depend on this Mac's tailnet.
-const tsCli = () => (process.env.HYPERNOVA_TAILSCALE ? (existsSync(process.env.HYPERNOVA_TAILSCALE) ? process.env.HYPERNOVA_TAILSCALE : null) : (TS_PATHS.find((p) => existsSync(p)) ?? null))
-
-// The Mac app's Tailscale binary only behaves as a CLI when TERM is set (launchd doesn't set it);
-// without it, it tries to start the GUI and fails with "CLIError error 3".
-const TS_ENV = { ...process.env, TERM: process.env.TERM || 'xterm-256color' }
-function run(cmd: string, args: string[], timeout = 8000): Promise<string> {
-  return new Promise((res, rej) => execFile(cmd, args, { timeout, encoding: 'utf8', env: TS_ENV }, (e, out, err) => (e ? rej(new Error(err?.trim() || e.message)) : res(out))))
-}
-
-let tsCache: { at: number; v: TailscaleStatus } | null = null
-/** The Tailscale app's status as last read (no new read): for what must answer at once, such as the snapshot. */
-export function tailscaleCached(): TailscaleStatus | null {
-  return tsCache?.v ?? null
-}
-export async function tailscaleStatus(fresh = false): Promise<TailscaleStatus> {
-  if (!fresh && tsCache && Date.now() - tsCache.at < 15_000) return tsCache.v
-  const cli = tsCli()
-  const v: TailscaleStatus = { installed: !!cli, cliPath: cli, running: false, loggedIn: false, dnsName: null, ip: null, httpsEnabled: false, serveOn: false, url: null, keyExpiry: null }
-  if (cli) {
-    try {
-      const st = JSON.parse(await run(cli, ['status', '--json']))
-      v.running = st.BackendState === 'Running'
-      v.loggedIn = st.BackendState !== 'NeedsLogin' && !!st.Self
-      v.dnsName = (st.Self?.DNSName ?? '').replace(/\.$/, '') || null
-      v.ip = st.Self?.TailscaleIPs?.find((x: string) => x.includes('.')) ?? null
-      v.httpsEnabled = Array.isArray(st.CertDomains) && st.CertDomains.length > 0
-      v.keyExpiry = st.Self?.KeyExpiry ?? null
-      v.account = st.CurrentTailnet?.Name ?? null
-    } catch {}
-    try {
-      const serve = await run(cli, ['serve', 'status', '--json'])
-      v.serveOn = serve.includes(`127.0.0.1:${API_PORT}`)
-    } catch {}
-    // Serve's settings outlive the app: quit, it still lists them. A phone can only use the address
-    // while the app runs.
-    if (v.running && v.serveOn && v.dnsName) v.url = `https://${v.dnsName}:${API_PORT}`
-  }
-  tsCache = { at: Date.now(), v }
-  return v
-}
-
-/**
- * What `tailscale serve` routes now (`serve status --json`: `TCP` by port, `Web` by
- * "<name>:<port>"), or null without Tailscale. Cached like the status.
- */
-let serveCache: { at: number; v: Record<string, any> | null } | null = null
-export async function serveConfig(): Promise<Record<string, any> | null> {
-  if (serveCache && Date.now() - serveCache.at < 15_000) return serveCache.v
-  const cli = tsCli()
-  let v: Record<string, any> | null = null
-  if (cli) {
-    try {
-      const o = JSON.parse((await run(cli, ['serve', 'status', '--json'])) || '{}')
-      v = o && typeof o === 'object' && !Array.isArray(o) ? o : null
-    } catch {}
-  }
-  serveCache = { at: Date.now(), v }
-  return v
-}
-
-export async function enableServe(): Promise<TailscaleStatus> {
-  const cli = tsCli()
-  if (!cli) throw new Error('Tailscale is not installed')
-  await run(cli, ['serve', '--bg', `--https=${API_PORT}`, `http://127.0.0.1:${API_PORT}`], 20000)
-  log('tailscale serve enabled')
-  return tailscaleStatus(true)
-}
-
-/**
- * The base URL a phone should use: the Tailscale app's `serve` when it's on, else the built-in
- * node (tsnet.ts) once it serves, else the running Tailscale app's name on the hope that serve
- * comes on (never a quit app's: its name answers nothing).
- */
-export async function publicBaseUrl(): Promise<string | null> {
-  const ts = await tailscaleStatus()
-  return ts.url ?? tsnetBaseUrl() ?? (ts.running && ts.dnsName ? `https://${ts.dnsName}:${API_PORT}` : null)
 }
 
 // ── Projects ─────────────────────────────────────────────────────────────

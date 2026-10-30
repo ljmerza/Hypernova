@@ -49,7 +49,7 @@ internal class AppSocket(
         synchronized(lock) { link = url to client }
     }
 
-    /** The page opens its own socket this time (the Tailscale route): nothing for [open]. */
+    /** The page opens its own socket this time (the base URL's route): nothing for [open]. */
     fun forget() {
         synchronized(lock) { link = null }
     }

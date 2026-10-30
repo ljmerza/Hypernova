@@ -29,10 +29,10 @@ import kotlin.coroutines.coroutineContext
 /**
  * The in-app update (docs/PROTOCOL.md, "The app update"): the app downloads the APK the paired
  * computer hands out over the route it uses itself (the Mac's own address on the local network with
- * the pinned certificate, the built-in Tailscale node's proxy, or the paired base URL through the
- * Tailscale app), checks it is Hypernova and newer, and hands it to Android's PackageInstaller,
- * whose own "Update this app?" dialog finishes it. A browser can't do this when the Mac is reached
- * only through the app's own node or its pinned certificate, which is why it isn't the browser's job.
+ * the pinned certificate, or the paired base URL), checks it is Hypernova and newer, and hands it
+ * to Android's PackageInstaller, whose own "Update this app?" dialog finishes it. A browser can't
+ * do this when the Mac is reached only through its pinned certificate, which is why it isn't the
+ * browser's job.
  * Android refuses an APK signed with another key than the installed app: that is the update's
  * integrity. The downloaded file lives in the app's cache only until the install is decided.
  * The flow's steps are [UpdateFlow]'s (pure, unit-tested).

@@ -343,7 +343,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
 
                 // A full-screen state (pairing, unpaired) replaces the screen instead of covering
                 // it, so nothing underneath can read through; the sky stays.
-                // "Pair another Mac" (the switcher) shows the onboarding's steps in the screen's place.
+                // "Add a server" (the switcher) shows the onboarding's steps in the screen's place.
                 val adding = vm.addingServer && vm.pairFlow == null
                 val covered = vm.pairFlow != null || unpaired || adding
                 if (adding || (!covered && hub == null)) {
@@ -394,8 +394,6 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                         flow = flow,
                         onRetry = vm::pair,
                         onClose = vm::closePairFlow,
-                        confirmedControl = vm.confirmedControl,
-                        onConfirmControl = vm::confirmControl,
                         onDone = {
                             vm.closePairFlow()
                             askNotifications()

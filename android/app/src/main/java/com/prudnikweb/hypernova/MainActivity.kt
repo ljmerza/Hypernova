@@ -70,8 +70,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         vm.setVisible(true)
-        // Back from the browser's Tailscale sign-in, or from "Install unknown apps": the latest word.
-        com.prudnikweb.hypernova.data.Tsnet.refresh()
+        // Back from "Install unknown apps": the update carries on.
         com.prudnikweb.hypernova.data.AppUpdater.resumed(this)
     }
 

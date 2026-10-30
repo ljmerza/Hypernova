@@ -6,18 +6,16 @@ import org.junit.Test
 
 /** Scanning a code while paired: the same computer again, or another one to confirm (audit P12). */
 class ReplacePairingTest {
-    private val current = Pairing(baseUrl = "https://macbook.tail.ts.net", token = "t", macName = "MacBook Air", macId = "m1", deviceId = "d1", tailnetName = "macbook")
+    private val current = Pairing(baseUrl = "http://10.0.2.2:47321", token = "t", macName = "MacBook Air", macId = "m1", deviceId = "d1")
 
-    private fun link(name: String, tailnet: String? = null) = PairLink(baseUrl = "https://x.tail.ts.net", code = "c", macName = name, tailnetName = tailnet)
+    private fun link(name: String) = PairLink(baseUrl = "http://10.0.2.2:47321", code = "c", macName = name)
 
     @Test fun theSameComputerAgainIsNoReplacement() {
         assertFalse(replacesAnother(current, link("MacBook Air")))
-        assertFalse(replacesAnother(current, link("macbook air", tailnet = "macbook")))
+        assertFalse(replacesAnother(current, link("macbook air")))
     }
 
     @Test fun anotherComputerIs() {
         assertTrue(replacesAnother(current, link("vps-hel1")))
-        // Two Macs both called "MacBook Air" still differ on the tailnet.
-        assertTrue(replacesAnother(current, link("MacBook Air", tailnet = "macbook-2")))
     }
 }

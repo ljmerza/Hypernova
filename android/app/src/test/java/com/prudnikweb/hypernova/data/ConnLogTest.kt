@@ -10,14 +10,13 @@ import org.junit.Test
 class ConnLogTest {
     @Test fun aUrlBecomesItsHostAndPortAndNothingSecretGetsIn() {
         assertEquals("192.168.0.149:47323", ConnScrub.text("https://192.168.0.149:47323/v1/health?token=abc"))
-        assertEquals("failed to reach mac.tail1234.ts.net:47321 now", ConnScrub.text("failed to reach https://mac.tail1234.ts.net:47321/v1/ws?ticket=xyz now"))
+        assertEquals("failed to reach 192.168.0.149:47323 now", ConnScrub.text("failed to reach https://192.168.0.149:47323/v1/ws?ticket=xyz now"))
         // A pairing link's code goes with the rest of the link.
-        assertEquals("pair", ConnScrub.text("hypernova://pair?v=1&u=https%3A%2F%2F100.64.0.1&c=SECRETCODE"))
+        assertEquals("pair", ConnScrub.text("hypernova://pair?v=1&u=https%3A%2F%2F192.168.0.149&c=SECRETCODE"))
         // Credentials, tokens and key-like runs are cut.
         assertEquals("Authorization: Bearer …", ConnScrub.text("Authorization: Bearer hn_abcdefghijklmnop"))
-        assertEquals("proxy Basic …", ConnScrub.text("proxy Basic aHlwZXJub3ZhOnNlY3JldA=="))
+        assertEquals("auth Basic …", ConnScrub.text("auth Basic aHlwZXJub3ZhOnNlY3JldA=="))
         assertEquals("token … sent", ConnScrub.text("token hn_0123456789abcdef sent"))
-        assertEquals("key … here", ConnScrub.text("key tskey-auth-kAbCdEf-123456 here"))
         val fp = "b43b818111636406f6a6115a8574b6141a370d6e2c0821f30f183541dea99714"
         assertEquals("pin b43b81…", ConnScrub.text("pin $fp"))
         // A user:password in a URL never survives either.
@@ -30,7 +29,7 @@ class ConnLogTest {
     @Test fun hostPortOfABase() {
         assertEquals("192.168.0.149:47323", ConnScrub.hostPort("https://192.168.0.149:47323"))
         assertEquals("[fd00::5]:47323", ConnScrub.hostPort("https://[fd00::5]:47323"))
-        assertEquals("mac.ts.net:443", ConnScrub.hostPort("https://mac.ts.net/x?y=1"))
+        assertEquals("mac.example.com:443", ConnScrub.hostPort("https://mac.example.com/x?y=1"))
         assertNull(ConnScrub.hostPort(null))
         assertNull(ConnScrub.hostPort("not a url"))
     }
@@ -70,14 +69,14 @@ class ConnLogTest {
         val entries = listOf(
             ConnEntry(3_000L, ConnKind.Route, ConnResult.Ok, RouteKind.Local, "192.168.0.149:47323", "Local answered", 40),
             ConnEntry(1_000L, ConnKind.Network, text = "the network changed: Wi-Fi"),
-            ConnEntry(2_000L, ConnKind.Probe, ConnResult.NoPeer, RouteKind.Tailscale, "mac.ts.net:47321", "through the built-in node: proxy 502", 812),
+            ConnEntry(2_000L, ConnKind.Probe, ConnResult.Timeout, RouteKind.Remote, "10.0.2.2:47321", "the base URL as it is: no answer in 8s", 812),
         ).map(ConnScrub::entry)
         val text = ConnText.copy(entries, "Hypernova connection log") { "t$it" }
         val lines = text.trim().lines()
         assertEquals("Hypernova connection log", lines[0])
         assertTrue(lines[1].startsWith("t1000  network"))
-        assertTrue(lines[2].startsWith("t2000  probe    tailnet   nopeer"))
-        assertTrue(lines[2].contains("mac.ts.net:47321  812ms  through the built-in node: proxy 502"))
+        assertTrue(lines[2].startsWith("t2000  probe    base-url  timeout"))
+        assertTrue(lines[2].contains("10.0.2.2:47321  812ms  the base URL as it is: no answer in 8s"))
         assertTrue(lines[3].contains("local") && lines[3].contains("Local answered"))
         assertFalse(text.contains("·"))
     }

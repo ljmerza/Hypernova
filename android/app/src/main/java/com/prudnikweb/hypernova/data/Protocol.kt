@@ -26,8 +26,6 @@ data class MacInfo(
     val battery: MacBattery? = null,
     /** Stay awake (data/Awake.kt); null from a daemon too old to say. */
     val awake: MacAwake? = null,
-    /** Where the phone API is on the tailnet now (data/TailnetFollow in Pairing.kt); null: nowhere, or an older daemon. */
-    val tailnet: TailnetHint? = null,
     /** The computer's system: [Mac.DARWIN] (also an older daemon, which doesn't say) or [Mac.LINUX]. */
     val platform: String = Mac.DARWIN,
     /** Settings → Browse outside projects (docs/PROTOCOL.md, "Files"); null from a daemon too old to have it. */
@@ -35,19 +33,6 @@ data class MacInfo(
     /** The Mac features this computer lacks, each with its sentence (docs/PROTOCOL.md, "Mac-only features"). */
     val unavailable: Map<String, String> = emptyMap(),
 )
-
-/** The computer's phone API on its tailnet, as it says now: its name and address there, the URL, and its control server (null: tailscale.com). */
-@Immutable
-data class TailnetHint(val name: String, val ip: String?, val url: String, val control: String?) {
-    companion object {
-        fun parse(o: JSONObject?): TailnetHint? {
-            if (o == null) return null
-            val name = o.str("name")?.trim()?.trimEnd('.')?.takeIf { it.isNotEmpty() } ?: return null
-            val url = o.str("url")?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() } ?: return null
-            return TailnetHint(name, o.str("ip")?.trim()?.takeIf { it.isNotEmpty() }, url, o.str("control")?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() })
-        }
-    }
-}
 
 @Immutable
 data class WSession(
@@ -564,7 +549,6 @@ object Wire {
         appVersionName = o.obj("app")?.str("versionName"),
         battery = battery(o.obj("battery")),
         awake = MacAwake.parse(o.obj("awake")),
-        tailnet = TailnetHint.parse(o.obj("tailnet")),
         platform = if (o.str("platform") == Mac.LINUX) Mac.LINUX else Mac.DARWIN,
         browseOutsideProjects = o.obj("files")?.bool("browseOutsideProjects"),
         unavailable = o.obj("unavailable")?.let { u -> u.keys().asSequence().mapNotNull { k -> u.str(k)?.let { k to it } }.toMap() }.orEmpty(),

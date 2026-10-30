@@ -5,7 +5,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.IOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -20,57 +19,56 @@ import javax.net.ssl.SSLHandshakeException
  */
 class LocalFirstTest {
     private val L = RouteKind.Local
-    private val T = RouteKind.Tailscale
     private val R = RouteKind.Remote
 
     // ─── A round ────────────────────────────────────────────────────────────
 
     @Test fun localWinsTheMomentItAnswersWhateverElseIsStillBeingTried() {
         val j = RoundJudge(waitForLocal = true)
-        assertEquals(L, j.settle(answered = setOf(L), pending = setOf(T, R)))
-        assertEquals(L, j.settle(answered = setOf(L, T), pending = emptySet()))
-        assertFalse(j.mayImprove(L, setOf(T, R)))
+        assertEquals(L, j.settle(answered = setOf(L), pending = setOf(R)))
+        assertEquals(L, j.settle(answered = setOf(L, R), pending = emptySet()))
+        assertFalse(j.mayImprove(L, setOf(R)))
     }
 
-    @Test fun inTheMacsSubnetTheTailnetWaitsForLocal() {
-        // The incident: at home on Wi-Fi, the tailnet answering (or not) must not decide before Local has.
+    @Test fun inTheMacsSubnetTheBaseUrlWaitsForLocal() {
+        // At home on Wi-Fi, the base URL answering (or not) must not decide before Local has.
         val j = RoundJudge(waitForLocal = true)
-        assertNull(j.settle(answered = setOf(T), pending = setOf(L, R)))
-        assertEquals(L, j.settle(answered = setOf(T, L), pending = setOf(R)))
-        // Local refused: the tailnet it is.
-        assertEquals(T, j.settle(answered = setOf(T), pending = setOf(R)))
+        assertNull(j.settle(answered = setOf(R), pending = setOf(L)))
+        assertEquals(L, j.settle(answered = setOf(R, L), pending = emptySet()))
+        // Local refused: the base URL it is.
+        assertEquals(R, j.settle(answered = setOf(R), pending = emptySet()))
     }
 
     @Test fun elsewhereTheRoundTakesWhatAnswersAndMovesToLocalIfItAnswersLater() {
         val j = RoundJudge(waitForLocal = false)
-        assertEquals(T, j.settle(answered = setOf(T), pending = setOf(L, R)))
-        assertTrue(j.mayImprove(T, setOf(L, R)))
-        assertTrue(j.upgrade(T, L))
-        assertFalse(j.upgrade(T, R))
+        assertEquals(R, j.settle(answered = setOf(R), pending = setOf(L)))
+        assertTrue(j.mayImprove(R, setOf(L)))
+        assertTrue(j.upgrade(R, L))
+        assertFalse(j.upgrade(L, R))
         assertFalse(j.upgrade(L, L))
         // Nothing yet: wait.
-        assertNull(j.settle(answered = emptySet(), pending = setOf(L, T)))
+        assertNull(j.settle(answered = emptySet(), pending = setOf(L, R)))
     }
 
-    @Test fun theTailnetFailingNeverHoldsLocalBack() {
-        val c = RouteChooser("https://mac.tail1234.ts.net:47321", 47323, TailnetTarget("https://mac.tail1234.ts.net:47321", null))
+    @Test fun theBaseUrlFailingNeverHoldsLocalBack() {
+        val c = RouteChooser("http://10.0.2.2:47321", 47323)
         val min = 60_000L
-        // The Mac's node goes to NeedsLogin and back: the tailnet route fails in use again and again.
+        // The base URL fails in use again and again.
         var t = 10 * min
-        val holds = (1..4).map { c.failedInUse(T, t).also { t += 5_000 } }
+        val holds = (1..4).map { c.failedInUse(R, t).also { t += 5_000 } }
         assertEquals(listOf(0L, 8_000L, 16_000L, 32_000L), holds)
-        assertEquals(setOf(T), c.demoted(t - 5_000))
+        assertEquals(setOf(R), c.demoted(t - 5_000))
         // Local is untouched: tried first, and it wins as soon as it answers.
         val j = RoundJudge(waitForLocal = true, demoted = c.demoted(t - 5_000))
-        assertEquals(L, j.settle(answered = setOf(L), pending = setOf(T, R)))
-        // The held-back tailnet answering doesn't settle a round while Local is still being tried…
-        assertNull(j.settle(answered = setOf(T), pending = setOf(L, R)))
+        assertEquals(L, j.settle(answered = setOf(L), pending = setOf(R)))
+        // The held-back base URL answering doesn't settle a round while Local is still being tried…
+        assertNull(j.settle(answered = setOf(R), pending = setOf(L)))
         // …and is still used when nothing else answers.
-        assertEquals(T, j.settle(answered = setOf(T), pending = emptySet()))
+        assertEquals(R, j.settle(answered = setOf(R), pending = emptySet()))
     }
 
     @Test fun aRouteThatKeepsFailingIsTriedAfterTheOthersForAWhileThenFirstAgain() {
-        val c = RouteChooser("https://mac.ts.net:47321", 47323)
+        val c = RouteChooser("http://10.0.2.2:47321", 47323)
         val t0 = 1_000_000L
         // One failure is a hiccup: tried first again at once.
         assertEquals(0L, c.failedInUse(L, t0))
@@ -85,18 +83,18 @@ class LocalFirstTest {
         assertEquals(RoutePolicy.RECHECK_MS, c.failedInUse(L, t))
         // Quiet for longer than the window: a failure is a hiccup again.
         assertEquals(0L, c.failedInUse(L, t + RouteChooser.HEALTH_WINDOW_MS + 1))
-        // Held back on purpose (no device certificate there): demoted until then, not counted.
-        c.hold(T, t + 60_000)
-        assertTrue(T in c.demoted(t + 59_999))
-        assertFalse(T in c.demoted(t + 60_000))
+        // Held back on purpose: demoted until then, not counted.
+        c.hold(R, t + 60_000)
+        assertTrue(R in c.demoted(t + 59_999))
+        assertFalse(R in c.demoted(t + 60_000))
     }
 
-    @Test fun aHeldBackLocalWaitsForTheTailnetButIsUsedWhenItIsAllThereIs() {
+    @Test fun aHeldBackLocalWaitsForTheBaseUrlButIsUsedWhenItIsAllThereIs() {
         val j = RoundJudge(waitForLocal = true, demoted = setOf(L))
-        assertNull(j.settle(answered = setOf(L), pending = setOf(T, R)))
-        assertEquals(T, j.settle(answered = setOf(L, T), pending = setOf(R)))
+        assertNull(j.settle(answered = setOf(L), pending = setOf(R)))
+        assertEquals(R, j.settle(answered = setOf(L, R), pending = emptySet()))
         assertEquals(L, j.settle(answered = setOf(L), pending = emptySet()))
-        assertFalse(j.upgrade(T, L))
+        assertFalse(j.upgrade(R, L))
     }
 
     // ─── Looking for Local again ────────────────────────────────────────────
@@ -136,7 +134,7 @@ class LocalFirstTest {
         assertEquals(ConnResult.Refused, RoutePolicy.classify(ConnectException("failed to connect to /192.168.0.149 (port 47323) after 3ms: isConnected failed: ECONNREFUSED (Connection refused)")).first)
         assertEquals(ConnResult.Timeout, RoutePolicy.classify(SocketTimeoutException("timeout")).first)
         assertEquals(ConnResult.Timeout, RoutePolicy.classify(SocketTimeoutException("failed to connect to /10.0.0.2 (port 47323) from /10.0.2.16 (port 40000) after 4000ms")).first)
-        assertEquals(ConnResult.NoName, RoutePolicy.classify(UnknownHostException("Unable to resolve host \"mac.tail1234.ts.net\": No address associated with hostname")).first)
+        assertEquals(ConnResult.NoName, RoutePolicy.classify(UnknownHostException("Unable to resolve host \"mac.example.com\": No address associated with hostname")).first)
         assertEquals(ConnResult.Unreachable, RoutePolicy.classify(NoRouteToHostException("No route to host")).first)
         assertEquals(ConnResult.Unreachable, RoutePolicy.classify(ConnectException("failed to connect: ENETUNREACH (Network is unreachable)")).first)
         // The pin: another server at the Mac's address, or the Mac's own certificate out of date.
@@ -145,9 +143,6 @@ class LocalFirstTest {
         val expired = SSLHandshakeException("handshake failed").apply { initCause(CertificateException("pinned certificate: Expired")) }
         assertEquals(ConnResult.PinExpired, RoutePolicy.classify(expired).first)
         assertEquals(ConnResult.Tls, RoutePolicy.classify(SSLHandshakeException("Connection closed by peer")).first)
-        // The built-in node's proxy: 502 is "couldn't reach the Mac on the tailnet", the rest a refusal.
-        assertEquals(ConnResult.NoPeer to "proxy 502", RoutePolicy.classify(IOException("Unexpected response code for CONNECT: 502")))
-        assertEquals(ConnResult.ProxyRefused, RoutePolicy.classify(IOException("Unexpected response code for CONNECT: 403")).first)
         assertEquals(ConnResult.Closed, RoutePolicy.classify(java.net.SocketException("Connection reset")).first)
         assertEquals(ConnResult.Failed, RoutePolicy.classify(IllegalStateException("odd")).first)
         assertEquals(ConnResult.PinWrong, RoutePolicy.worst(listOf(ConnResult.Timeout, ConnResult.PinWrong, ConnResult.Refused)))
@@ -161,26 +156,23 @@ class LocalFirstTest {
 
     @Test fun theCardNamesTheRoutesActuallyTried() {
         val localRefused = RouteTry(L, ConnResult.Refused, "192.168.0.149:47323")
-        val tailNoAnswer = RouteTry(T, ConnResult.NoPeer, "mac.ts.net:47321")
-        val baseNoName = RouteTry(R, ConnResult.NoName, "mac.ts.net:47321")
-        assertEquals(RouteProblem.Both, RouteWords.problem(report(null, localRefused, tailNoAnswer, baseNoName)))
-        assertEquals(RouteProblem.LocalOnly, RouteWords.problem(report(null, localRefused, RouteTry(T, ConnResult.Skipped, why = "the built-in node is signed out"), baseNoName)))
-        // Never "the tailnet doesn't answer" alone when Local was tried; and not on Wi-Fi it says so.
-        assertEquals(RouteProblem.TailnetOnly, RouteWords.problem(report(null, RouteTry(L, ConnResult.Skipped, why = "on mobile data"), tailNoAnswer, baseNoName)))
-        assertEquals(RouteProblem.WrongMac, RouteWords.problem(report(null, RouteTry(L, ConnResult.PinWrong), tailNoAnswer)))
-        // A round that found a way, or that tried neither, has nothing to say here.
+        val baseNoAnswer = RouteTry(R, ConnResult.Timeout, "10.0.2.2:47321")
+        assertEquals(RouteProblem.LocalOnly, RouteWords.problem(report(null, localRefused, baseNoAnswer)))
+        assertEquals(RouteProblem.WrongMac, RouteWords.problem(report(null, RouteTry(L, ConnResult.PinWrong), baseNoAnswer)))
+        // A round that found a way, or that never tried Local, has nothing to say here.
         assertNull(RouteWords.problem(report(L, RouteTry(L, ConnResult.Ok))))
-        assertNull(RouteWords.problem(report(null, baseNoName)))
+        assertNull(RouteWords.problem(report(null, RouteTry(L, ConnResult.Skipped, why = "no network"), baseNoAnswer)))
+        assertNull(RouteWords.problem(report(null, baseNoAnswer)))
         assertNull(RouteWords.problem(null))
     }
 
     @Test fun theLogSaysWhyARoundChoseWhatItDid() {
-        val r = report(T, RouteTry(L, ConnResult.Refused), RouteTry(T, ConnResult.Ok))
-        assertEquals("the built-in node answered; Local refused", RouteWords.summary(r, upgrade = false))
-        assertEquals("Local answered after all: moving to it; tailnet answered", RouteWords.summary(report(L, RouteTry(T, ConnResult.Ok), RouteTry(L, ConnResult.Ok)), upgrade = true))
+        val r = report(R, RouteTry(L, ConnResult.Refused), RouteTry(R, ConnResult.Ok))
+        assertEquals("the base URL answered as it is; Local refused", RouteWords.summary(r, upgrade = false))
+        assertEquals("Local answered after all: moving to it; base URL answered", RouteWords.summary(report(L, RouteTry(R, ConnResult.Ok), RouteTry(L, ConnResult.Ok)), upgrade = true))
         assertEquals(
-            "nothing answered: Local no answer, tailnet not tried (the built-in node is stopped), base URL no such name; the base URL is the fallback",
-            RouteWords.summary(report(null, RouteTry(L, ConnResult.Timeout), RouteTry(T, ConnResult.Skipped, why = "the built-in node is stopped"), RouteTry(R, ConnResult.NoName)), upgrade = false),
+            "nothing answered: Local not tried (no network), base URL no such name; the base URL is the fallback",
+            RouteWords.summary(report(null, RouteTry(L, ConnResult.Skipped, why = "no network"), RouteTry(R, ConnResult.NoName)), upgrade = false),
         )
     }
 }

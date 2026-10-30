@@ -18,11 +18,9 @@
     <string name="connlog_kind_link">Link</string>
     <string name="connlog_kind_socket">Socket</string>
     <string name="connlog_kind_wait">Wait</string>
-    <string name="connlog_kind_node">This phone\'s node</string>
     <string name="connlog_kind_mac">The Mac</string>
 
     <string name="connlog_route_local">Local</string>
-    <string name="connlog_route_tailnet">Tailscale</string>
     <string name="connlog_route_base">Base URL</string>
 
     <string name="connlog_result_ok">OK</string>
@@ -33,16 +31,12 @@
     <string name="connlog_result_pin_wrong">Other certificate</string>
     <string name="connlog_result_pin_expired">Certificate expired</string>
     <string name="connlog_result_tls">TLS failed</string>
-    <string name="connlog_result_no_peer">Not on tailnet</string>
-    <string name="connlog_result_proxy">Proxy refused</string>
     <string name="connlog_result_http">Error</string>
     <string name="connlog_result_closed">Closed</string>
     <string name="connlog_result_failed">Failed</string>
     <string name="connlog_result_skipped">Not tried</string>
 
-    <string name="problem_route_both">Can\'t reach your Mac on Wi‑Fi or over Tailscale. Check that it\'s awake and that Hypernova runs there.</string>
-    <string name="problem_route_local">Your Mac doesn\'t answer on this Wi‑Fi. Check that it\'s awake, on the same network, and that Hypernova runs there.</string>
-    <string name="problem_route_tailnet">This phone isn\'t on Wi‑Fi, and your Mac doesn\'t answer over Tailscale. Check that it\'s awake and that Hypernova runs there, signed in to the same Tailscale account.</string>
-    <string name="problem_route_wrong_mac">Another device answers at your Mac\'s address on this Wi‑Fi, and Tailscale didn\'t reach your Mac. If the Mac was set up again, pair again.</string>
+    <string name="problem_route_local">Your Mac doesn\'t answer on this network. Check that it\'s awake, that this phone is on its Wi‑Fi or your VPN into it, and that Hypernova runs there.</string>
+    <string name="problem_route_wrong_mac">Another device answers at your Mac\'s address on this network. If the Mac was set up again, pair again.</string>
     <string name="route_tried_said">Tried: %1$s.</string>
 </resources>

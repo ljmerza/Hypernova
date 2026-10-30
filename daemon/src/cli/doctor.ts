@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { connect } from 'node:net'
 import { networkInterfaces } from 'node:os'
 import { join } from 'node:path'
-import { publicIPv4, tailscaleCandidates } from '../platform.ts'
+import { publicIPv4 } from '../platform.ts'
 import { health, local } from './api.ts'
 import { tilde, type Cli, UNIT } from './context.ts'
 import { claudeSignedIn, claudeVersionOf, findClaudeBin, isDaemonDir, missingBuildTools, ptyWorks, BUILD_TOOLS } from './install.ts'
@@ -35,13 +35,6 @@ export function ownAddresses(ifaces = networkInterfaces()): string[] {
   const out: string[] = []
   for (const list of Object.values(ifaces)) for (const a of list ?? []) if (!a.internal && a.family === 'IPv4') out.push(a.address)
   return out
-}
-
-/** The Tailscale command line, where the package puts it (HYPERNOVA_TAILSCALE for a stand-in). */
-export function tailscaleBin(cli: Cli): string | null {
-  const env = cli.env.HYPERNOVA_TAILSCALE
-  if (env) return existsSync(env) ? env : null
-  return tailscaleCandidates(cli.platform).find((p) => existsSync(p)) ?? null
 }
 
 // ── Codex ─────────────────────────────────────────────────────────────────
@@ -201,9 +194,9 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   const loc = await health(cli.localPort)
   if (!api || !loc) add({ name: 'health', mark: 'fail', text: `The daemon doesn’t answer on 127.0.0.1:${cli.apiPort} and :${cli.localPort}.`, fix: 'hypernova logs shows why; systemctl --user restart hypernova starts it again.' })
   else add({ name: 'health', mark: 'ok', text: `Daemon answering as “${api.name}” on 127.0.0.1:${cli.apiPort} (phone API) and :${cli.localPort} (local)` })
-  // The phone API and the local API listen on 127.0.0.1 only; tailscale serve carries the phone's
-  // requests in. Anything listening on those ports beyond loopback (a port forward, another program)
-  // would put them on the network.
+  // The phone API and the local API listen on 127.0.0.1 only; phones come in through the LAN
+  // listener, which has its own port and its own checks. Anything listening on those ports beyond
+  // loopback (a port forward, another program) would put them on the network without them.
   const exposed: string[] = []
   const who = o.listeners ?? ((p: number) => listenersOn(p))
   for (const port of [cli.apiPort, cli.localPort]) {
@@ -215,7 +208,7 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
       for (const ip of ownAddresses()) if (await answers(ip, port)) exposed.push(`${ip}:${port}`)
     }
   }
-  if (exposed.length) add({ name: 'exposure', mark: 'fail', text: `Something listens on ${exposed.join(', ')}: Hypernova’s ports must be on loopback only.`, fix: 'Another program (a proxy, a port forward) exposes them. Stop it; the phone reaches the daemon through tailscale serve.' })
+  if (exposed.length) add({ name: 'exposure', mark: 'fail', text: `Something listens on ${exposed.join(', ')}: Hypernova’s ports must be on loopback only.`, fix: 'Another program (a proxy, a port forward) exposes them. Stop it; the phone reaches the daemon through the local network route.' })
   else if (api) add({ name: 'exposure', mark: 'ok', text: 'Phone API and local API on loopback only' })
 
   let status: any = null
@@ -229,7 +222,7 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   } else if (status?.lan) {
     const pub = ownAddresses().filter(publicIPv4)
     add({ name: 'lan', mark: pub.length ? 'warn' : 'ok', text: `Local network route on port ${status.lan.port}${status.lan.addresses?.length ? ` (${status.lan.addresses.join(', ')})` : ''}, device certificates required`, ...(pub.length ? { fix: `This server has a public address (${pub.join(', ')}): turn the local route off unless the phone shares its network:\n  hypernova lan off` } : {}) })
-  } else if (status) add({ name: 'lan', mark: 'info', text: wslNat ? 'Local network route off (behind WSL’s network the phone comes in over Tailscale)' : 'Local network route off (a server with a public address is reached through the tailnet only)' })
+  } else if (status) add({ name: 'lan', mark: 'warn', text: 'Local network route off: it is the phone’s only way in, so no phone can reach this server.', fix: 'hypernova lan on   (only on a network you trust)' })
 
   // The private name (names.ts): a failing name is silent otherwise.
   if (loc) {
@@ -272,28 +265,7 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   // Codex (optional beside Claude Code; the agent here without it). Hypernova never installs it.
   if (status) for (const c of codexChecks(codex, !claude)) add(c)
 
-  // Tailscale: the route from outside. The daemon's built-in node when it runs (nothing to
-  // install); the Tailscale app's serve otherwise.
-  const ts = status?.tailscale
-  const tsBin = tailscaleBin(cli)
-  const tsnet = (status as any)?.tsnet as { mode?: string; available?: boolean; helper?: { state?: string; listening?: string; account?: string; tls?: string; error?: string } | null } | undefined
-  if (tsnet?.mode === 'builtIn') {
-    const h = tsnet.helper
-    if (h?.state === 'Running' && h.listening) add({ name: 'tailscale', mark: 'ok', text: `Phones reach it at ${h.listening} (built-in Tailscale${h.account ? `, ${h.account}` : ''}${h.tls === 'pinned' ? '; no HTTPS certificates on the tailnet, so the phone pins this server’s certificate' : ''})` })
-    else if (h?.state === 'NeedsLogin') add({ name: 'tailscale', mark: 'warn', text: 'Built-in Tailscale needs your sign-in.', fix: 'hypernova tailscale' })
-    else add({ name: 'tailscale', mark: h?.error ? 'warn' : 'info', text: h?.error ? `Built-in Tailscale: ${h.error}` : `Built-in Tailscale is ${h?.state?.toLowerCase() ?? 'starting'}.`, ...(h?.error ? { fix: 'hypernova logs' } : {}) })
-  } else if (!tsBin && tsnet?.available === false) add({ name: 'tailscale', mark: 'warn', text: 'This package has no built-in Tailscale helper, and Tailscale isn’t installed: the phone can reach this server only on the same network.', fix: 'Install a package with daemon/bin/hypernova-tsnet-linux-*, or: curl -fsSL https://tailscale.com/install.sh | sh\nsudo tailscale up\nsudo tailscale set --operator=$USER\nthen hypernova pair' })
-  else if (!tsBin && tsnet?.available) add({ name: 'tailscale', mark: 'info', text: 'Tailscale: the daemon’s built-in node takes over once the daemon runs.' })
-  // An older daemon, or one that can't be asked: the Tailscale app is the way it knows.
-  else if (!tsBin) add({ name: 'tailscale', mark: 'warn', text: 'Tailscale isn’t installed: the phone can reach this server only on the same network.', fix: 'curl -fsSL https://tailscale.com/install.sh | sh\nsudo tailscale up\nsudo tailscale set --operator=$USER\nthen hypernova pair' })
-  else if (ts && !ts.loggedIn) add({ name: 'tailscale', mark: 'warn', text: 'Tailscale is installed but not signed in.', fix: 'sudo tailscale up, then hypernova pair' })
-  else if (ts && !ts.httpsEnabled) add({ name: 'tailscale', mark: 'warn', text: 'Your tailnet has HTTPS certificates off: tailscale serve can’t give the phone https.', fix: 'Turn on MagicDNS and HTTPS Certificates at https://login.tailscale.com/admin/dns' })
-  else if (ts && !ts.serveOn) add({ name: 'tailscale', mark: 'warn', text: `Tailscale is on, but doesn’t serve port ${cli.apiPort} to the tailnet yet.`, fix: 'hypernova pair turns it on (it may ask you to run sudo tailscale set --operator=$USER once).' })
-  else if (ts?.url) add({ name: 'tailscale', mark: 'ok', text: `Phones reach it at ${ts.url} (tailscale serve)` })
-  if (cli.wsl) {
-    const tailnet = (tsnet?.mode === 'builtIn' && tsnet.helper?.state === 'Running' && !!tsnet.helper.listening) || (tsnet?.mode !== 'builtIn' && !!ts?.serveOn && !!ts?.url)
-    add(wslNetworkCheck(cli, cli.wsl, wslNet, tailnet))
-  }
+  if (cli.wsl) add(wslNetworkCheck(cli, cli.wsl, wslNet))
 
   const log = join(cli.logs, 'daemon.log')
   add({ name: 'logs', mark: 'info', text: `Log: ${tilde(cli, log)}${existsSync(log) ? '' : ' (not written yet)'}` })

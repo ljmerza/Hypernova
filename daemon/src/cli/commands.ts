@@ -8,7 +8,7 @@ import { RELEASES, shellRc } from '../platform.ts'
 import { createInterface } from 'node:readline'
 import { ApiError, health, local, localText, waitHealthy } from './api.ts'
 import { bold, line, tilde, type Cli, UNIT } from './context.ts'
-import { CODEX_LOGIN, codexChecks, doctorChecks, tailscaleBin, type CodexState, type DoctorOptions } from './doctor.ts'
+import { CODEX_LOGIN, codexChecks, doctorChecks, type CodexState, type DoctorOptions } from './doctor.ts'
 import { claudeSignedIn, claudeVersionOf, findClaudeBin, installClaude, installDaemon, setIntegration } from './install.ts'
 import { ensureNode, recordedNode } from './node.ts'
 import { encodeQr, qrLines } from './qr.ts'
@@ -43,8 +43,7 @@ const notOnMac = (cli: Cli): number => {
 /**
  * Checks what's there and puts in what's missing: Node.js 24, the daemon (with its terminal module
  * built), the `hypernova` command, Claude Code (Anthropic's installer), the service (systemd, with
- * lingering), the integration, and phone access through Tailscale when it's set up. Never signs in
- * to Claude: that's the owner's, with `claude`.
+ * lingering) and the integration. Never signs in to Claude: that's the owner's, with `claude`.
  */
 export async function setup(cli: Cli, flags: Flags): Promise<number> {
   if (cli.platform === 'darwin') return notOnMac(cli)
@@ -138,33 +137,19 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
     failed = true
   }
 
-  // 6. Tailscale: the phone's way in from outside. Built in (the daemon's own node, nothing to
-  // install) unless the Tailscale app on this server already serves the phone API.
-  const ts = tailscaleBin(cli)
-  const tsnet = running ? await tsnetOf(cli) : null
-  if (tsnet?.mode === 'builtIn') {
-    const l = tsnetLine(tsnet)!
-    line(cli, l.mark, l.text, l.fix)
-  } else if (!ts) line(cli, 'warn', tsnet?.available === false ? 'This package has no built-in Tailscale helper, and Tailscale isn’t installed: the phone can reach this server only on the same network.' : 'Tailscale isn’t running yet: the daemon starts its built-in node once it runs.', tsnet?.available === false ? 'curl -fsSL https://tailscale.com/install.sh | sh\nsudo tailscale up\nsudo tailscale set --operator=$USER' : 'hypernova pair')
-  else if (running) {
-    const r = await serveOn(cli)
-    if (r.ok) line(cli, 'ok', `Tailscale serves the phone API at ${r.url}`)
-    else line(cli, 'warn', r.message, r.fix)
-  }
-
-  // 7. Codex (optional, or the agent here without Claude Code): what the daemon found. Never installed from here.
+  // 6. Codex (optional, or the agent here without Claude Code): what the daemon found. Never installed from here.
   const cx: CodexState | null | undefined = running ? await local(cli, 'GET', '/local/status', undefined, 15_000).then((s) => s.codex, () => undefined) : undefined
   if (cx === null) line(cli, claude ? 'info' : 'warn', claude ? 'Codex isn’t installed (optional).' : 'Neither Claude Code nor Codex is installed.', `For Codex: ${codexChecks(null, false)[0].fix}`)
   else if (cx) for (const c of codexChecks(cx, !claude)) line(cli, c.mark, c.text, c.fix)
 
-  // 8. What's left for the owner.
+  // 7. What's left for the owner.
   cli.sys.say()
   const auth = claude ? await claudeSignedIn(cli, claude) : null
   const next: string[] = []
   if (auth && !auth.loggedIn) next.push('Sign in to Claude: run `claude` once on this server and follow its steps.')
   if (cx?.available && !cx.enabled) next.push('Use Codex too: hypernova codex on')
   if (cli.wsl && !cli.wsl.container) next.push(`Keep WSL running for the phone: instanceIdleTimeout=-1 under [general] in %UserProfile%\\.wslconfig on Windows (${WSL_GUIDE}).`)
-  next.push(cli.wsl ? 'Pair your phone: hypernova pair (over Tailscale: WSL keeps this PC off the Wi‑Fi unless its networking is mirrored)' : 'Pair your phone: hypernova pair')
+  next.push(cli.wsl ? 'Pair your phone: hypernova pair (WSL keeps this PC off the Wi‑Fi unless its networking is mirrored)' : 'Pair your phone: hypernova pair')
   next.push('Check everything: hypernova doctor')
   await nameTermsOnce(cli)
   cli.sys.say(bold(cli, failed ? 'Setup finished with problems (above). Then:' : 'Done. Next:'))
@@ -200,157 +185,13 @@ function hostName(): string {
   }
 }
 
-/**
- * `tailscale serve` for the phone API, through the daemon (as the Mac app does). Linux allows it
- * to root, or to the user root named as Tailscale's operator: when it's refused, that's the fix.
- */
-async function serveOn(cli: Cli): Promise<{ ok: true; url: string } | { ok: false; message: string; fix?: string }> {
-  let st: any
-  try {
-    st = (await local(cli, 'GET', '/local/status?fresh=1', undefined, 20_000)).tailscale
-  } catch (e: any) {
-    return { ok: false, message: `Couldn’t ask the daemon about Tailscale (${e.message}).` }
-  }
-  if (!st?.loggedIn) return { ok: false, message: 'Tailscale is installed but not signed in.', fix: 'sudo tailscale up\nsudo tailscale set --operator=$USER' }
-  if (!st.httpsEnabled) return { ok: false, message: 'Your tailnet has HTTPS certificates off, so tailscale serve can’t give the phone https.', fix: 'Turn on MagicDNS and HTTPS Certificates at https://login.tailscale.com/admin/dns, then hypernova pair' }
-  if (st.serveOn && st.url) return { ok: true, url: st.url }
-  try {
-    const r = await local(cli, 'POST', '/local/tailscale/serve', {}, 30_000)
-    if (r?.url) return { ok: true, url: r.url }
-    return { ok: false, message: 'tailscale serve didn’t take the phone API.', fix: `sudo tailscale serve --bg --https=${cli.apiPort} http://127.0.0.1:${cli.apiPort}` }
-  } catch (e: any) {
-    const denied = /denied|permission|operator|not allowed|root/i.test(e.message)
-    return {
-      ok: false,
-      message: denied ? 'Tailscale lets only root or its operator change serve.' : `tailscale serve failed: ${e.message}`,
-      fix: denied ? `Make yourself its operator once: sudo tailscale set --operator=${cli.user}\nthen run hypernova pair again.` : `sudo tailscale serve --bg --https=${cli.apiPort} http://127.0.0.1:${cli.apiPort}`,
-    }
-  }
-}
-
-// ── Tailscale built in (the daemon's tsnet.ts) ────────────────────────────
-
-type Tsnet = { mode: 'system' | 'builtIn' | 'off'; reason: string; available: boolean; helper: { state?: string; loginUrl?: string; qr?: string; dnsName?: string; account?: string; listening?: string; tls?: string; error?: string } | null; url: string | null; controlUrl: string | null }
-
-/** What the daemon's built-in node is doing; null when the daemon can't be asked. */
-async function tsnetOf(cli: Cli): Promise<Tsnet | null> {
-  try {
-    return await local(cli, 'GET', '/local/tsnet')
-  } catch {
-    return null
-  }
-}
-
-/** One line about the built-in node for setup, status and doctor, or null when it isn't in play. */
-function tsnetLine(t: Tsnet | null): { mark: 'ok' | 'warn' | 'info'; text: string; fix?: string } | null {
-  if (!t || t.mode !== 'builtIn') return null
-  const h = t.helper
-  if (h?.state === 'Running' && h.listening) return { mark: 'ok', text: `Built-in Tailscale serves the phone API at ${h.listening}${h.account ? ` (signed in as ${h.account})` : ''}${h.tls === 'pinned' ? '; the tailnet has no HTTPS certificates, so the phone pins this server’s own' : ''}` }
-  if (h?.state === 'NeedsLogin') return { mark: 'warn', text: 'Built-in Tailscale needs your sign-in: it connects your phone from anywhere, with no Tailscale to install.', fix: 'hypernova tailscale   (shows the sign-in code), or hypernova pair' }
-  if (h?.error) return { mark: 'warn', text: `Built-in Tailscale: ${h.error}`, fix: 'hypernova logs' }
-  return { mark: 'info', text: `Built-in Tailscale is ${h?.state?.toLowerCase() ?? 'starting'}…` }
-}
-
-/**
- * Shows the built-in node's sign-in code and waits (up to [waitMs]) for the sign-in to finish in
- * the browser. True once the node runs and serves; false when it didn't (the caller says what next).
- */
-async function tsnetSignIn(cli: Cli, flags: Flags, waitMs = 10 * 60_000, skip?: { skipped: boolean }): Promise<boolean> {
-  let t = await tsnetOf(cli)
-  if (t?.helper?.state === 'Running' && t.helper.listening) return true
-  if (!t || t.mode !== 'builtIn') return false
-  const t0 = Date.now()
-  // The link can take a few seconds to arrive after the node starts.
-  while (t && t.helper?.state !== 'NeedsLogin' && t.helper?.state !== 'Running' && Date.now() - t0 < 20_000) {
-    await new Promise((r) => setTimeout(r, 1000))
-    t = await tsnetOf(cli)
-  }
-  const url = t?.helper?.loginUrl
-  if (!url) return !!(t?.helper?.state === 'Running' && t.helper.listening)
-  cli.sys.say()
-  cli.sys.say(bold(cli, 'Sign in to connect your devices.'))
-  cli.sys.say('Hypernova carries Tailscale, a private network between your own devices. Scan this with your phone, or open the link, and sign in (Google, GitHub, Apple or Microsoft). Use the same account on the phone.')
-  cli.sys.say()
-  if (!flags['no-qr']) {
-    for (const l of qrLines(encodeQr(url, 'M'), { quiet: 2, ansi: cli.tty })) cli.sys.say('  ' + l)
-    cli.sys.say()
-  }
-  cli.sys.say(`  ${url}`)
-  if (t?.controlUrl) cli.sys.say(`  (control server: ${t.controlUrl})`)
-  cli.sys.say()
-  if (waitMs <= 0) return false
-  cli.sys.say(skip ? 'Waiting for the sign-in… (press Enter to skip it and pair on this network only)' : 'Waiting for the sign-in…')
-  const deadline = Date.now() + waitMs
-  while (Date.now() < deadline && !skip?.skipped) {
-    await new Promise((r) => setTimeout(r, 2000))
-    t = await tsnetOf(cli)
-    if (t?.helper?.state === 'Running' && t.helper.listening) {
-      line(cli, 'ok', `Signed in${t.helper.account ? ` as ${t.helper.account}` : ''}: ${t.helper.dnsName ?? ''} serves the phone API at ${t.helper.listening}`)
-      return true
-    }
-    if (t?.mode !== 'builtIn') return false
-  }
-  if (!skip?.skipped) line(cli, 'warn', 'The sign-in didn’t finish.', 'hypernova tailscale   shows the code again')
-  return false
-}
-
-/** `hypernova tailscale [login|logout]`: the built-in node, its sign-in code, or another account. */
-export async function tailscale(cli: Cli, flags: Flags, rest: string[]): Promise<number> {
-  if (cli.platform === 'darwin') return notOnMac(cli)
-  if (!(await health(cli.localPort, 2000))) {
-    line(cli, 'fail', 'The daemon isn’t running.', 'systemctl --user start hypernova   (or hypernova run)')
-    return 1
-  }
-  const sub = rest[0]
-  if (sub === 'on' || sub === 'off') {
-    // The choice between the Tailscale app on this server and Hypernova's own node (tsnet.ts): off
-    // leaves phones to the Tailscale app (or the local network), on lets the built-in node serve
-    // whenever the app isn't already serving the phone API.
-    await local(cli, 'POST', '/local/settings', { builtInTailscale: sub === 'on' }, 30_000)
-    line(cli, 'ok', sub === 'on' ? 'Built-in Tailscale on: it serves the phone whenever the Tailscale app here isn’t.' : 'Built-in Tailscale off: use the Tailscale app on this server (hypernova pair turns its serve on), or the local network.')
-  } else if (sub === 'control') {
-    const url = (rest[1] ?? '').trim()
-    if (rest.length < 2) {
-      cli.sys.say('hypernova tailscale control <url>|none: the coordination server of a self-hosted Headscale (https, or http on a private address).')
-      return 2
-    }
-    try {
-      await local(cli, 'POST', '/local/settings', { tailscaleControlUrl: url === 'none' ? '' : url }, 30_000)
-    } catch (e: any) {
-      line(cli, 'fail', e.message)
-      return 1
-    }
-    line(cli, 'ok', url === 'none' ? 'Control server: tailscale.com' : `Control server: ${url}`, 'Sign in again with hypernova tailscale login')
-    return 0
-  }
-  if (sub === 'logout' || sub === 'login') {
-    await local(cli, 'POST', `/local/tsnet/${sub}`, {})
-    await new Promise((r) => setTimeout(r, 1500))
-  }
-  const t = await tsnetOf(cli)
-  if (!t) return 1
-  if (t.mode === 'system') {
-    line(cli, 'ok', 'The Tailscale app on this server serves the phone API; the built-in node stays off.', t.reason)
-    return 0
-  }
-  if (t.mode === 'off') {
-    line(cli, 'info', 'Built-in Tailscale is off.', t.reason)
-    return 0
-  }
-  const ok = await tsnetSignIn(cli, flags)
-  if (!ok) {
-    const l = tsnetLine(t)
-    if (l) line(cli, l.mark, l.text, l.fix)
-  }
-  return ok ? 0 : 1
-}
-
 // ── pair ──────────────────────────────────────────────────────────────────
 
 /**
- * The pairing QR code in the terminal: the same link the Mac app shows (the daemon makes it), with
- * the tailnet's way in when Tailscale serves the phone API, else for the local network only. Then
- * waits for the phone (10 minutes, the code's life) unless --no-wait.
+ * The pairing QR code in the terminal: the same link the Mac app shows (the daemon makes it), for
+ * the local network (the LAN listener, reached on the Wi-Fi or over the owner's own VPN). Then
+ * waits for the phone (10 minutes, the code's life) unless --no-wait. `--local` is still accepted
+ * (scripts pass it) but changes nothing: every code is local now.
  */
 export async function pair(cli: Cli, flags: Flags): Promise<number> {
   if (cli.platform === 'darwin') return notOnMac(cli)
@@ -358,20 +199,6 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
     line(cli, 'fail', 'The daemon isn’t running.', 'systemctl --user start hypernova   (or hypernova run), then hypernova pair')
     return 1
   }
-  // The built-in node first (the daemon's tsnet.ts): its sign-in when it needs one. Otherwise the
-  // Tailscale app's serve, as before.
-  // Never blocks for good: --local skips Tailscale, --no-wait (and any run without a terminal) shows
-  // the sign-in but doesn't wait for it, and Enter ends the wait. The code always comes.
-  let tsnet = await tsnetOf(cli)
-  const skip = { skipped: false }
-  if (cli.tty && process.stdin.isTTY && !flags['no-wait']) {
-    process.stdin.once('data', () => (skip.skipped = true))
-    process.stdin.unref?.()
-  }
-  const waitFor = flags.local ? 0 : flags['no-wait'] || !cli.tty ? 0 : 10 * 60_000
-  const builtIn = tsnet?.mode === 'builtIn' && !flags.local ? await tsnetSignIn(cli, flags, waitFor, skip) : false
-  tsnet = await tsnetOf(cli)
-  const ts = !builtIn && tsnet?.mode !== 'builtIn' && !flags.local && tailscaleBin(cli) ? await serveOn(cli) : null
   let p: { code?: string; link: string; appLink: string; webLink?: string; download?: string; expiresAt: number; url: string }
   let before: string[] = []
   // Before the code (which makes the name the first time): what the private name is, once.
@@ -384,24 +211,19 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
     line(cli, 'fail', 'The daemon couldn’t make a pairing code.', e.message)
     return 1
   }
-  const tailnet = builtIn || !!ts?.ok
   // The daemon's link for the QR code: https://hypernova.observer/pair with the app link's details
-  // (the local addresses, the certificate's fingerprint, the tailnet hints) after its `#`, which the
+  // (the local addresses and the certificate's fingerprint) after its `#`, which the
   // phone opens in the app whatever the way in (docs/PROTOCOL.md, "Pairing").
   // Fork: HYPERNOVA_PAIR_APPLINK=1 puts the app's own hypernova://pair link in the QR code and the
   // text, so pairing never opens hypernova.observer in a browser (local-only setups).
   const link = process.env.HYPERNOVA_PAIR_APPLINK === '1' ? p.appLink : p.link
   const lan = /[?&]lan=([^&]+)/.exec(p.appLink)?.[1]
   cli.sys.say()
-  // WSL on a Windows PC (cli/wsl.ts): behind its NAT the Wi-Fi is no way in, so Tailscale is the only one.
-  const wslNote = cli.wsl ? wslPairNote(cli, cli.wsl, await wslNetworkingOf(cli), tailnet) : null
-  if (!tailnet) {
-    const noLocal = wslNote?.mark === 'warn'
-    if (ts && !ts.ok) line(cli, 'warn', ts.message, ts.fix)
-    else if (!noLocal && tsnet?.mode === 'builtIn') line(cli, 'warn', 'Built-in Tailscale isn’t signed in yet: this code pairs a phone on the same network only.', 'hypernova tailscale')
-    else if (!noLocal) line(cli, 'warn', 'Tailscale isn’t installed: this code pairs a phone on the same network only.', 'curl -fsSL https://tailscale.com/install.sh | sh, sudo tailscale up, then hypernova pair')
-    if (noLocal) line(cli, wslNote.mark, wslNote.text, wslNote.fix)
-    else if (!lan) line(cli, 'warn', 'The local network route is off too, so a phone has no way in yet.', 'hypernova lan on   (only on a network you trust), or set up Tailscale')
+  // WSL on a Windows PC (cli/wsl.ts): behind its NAT the Wi-Fi is no way in.
+  const wslNote = cli.wsl ? wslPairNote(cli, cli.wsl, await wslNetworkingOf(cli)) : null
+  if (wslNote?.mark === 'warn' || !lan) {
+    if (wslNote?.mark === 'warn') line(cli, wslNote.mark, wslNote.text, wslNote.fix)
+    else line(cli, 'warn', 'The local network route is off, so a phone has no way in yet.', 'hypernova lan on   (only on a network you trust)')
     cli.sys.say()
   }
   if (wslNote && wslNote.mark !== 'warn') {
@@ -415,7 +237,7 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
   if (p.download) {
     // `apk: null` is the daemon saying it has none; a daemon that doesn't say is taken at its link.
     const noApk = await local(cli, 'GET', '/local/status', undefined, 15_000).then((st) => !!st && 'apk' in st && st.apk == null, () => false)
-    if (noApk) cli.sys.say(`The app, if the phone doesn’t have it yet: Hypernova.apk from ${RELEASES}\n`)
+    if (noApk) cli.sys.say(`The app, if the phone doesn’t have it yet: hypernova-<tag>.apk from ${RELEASES}\n`)
     else if (!/\/\/10\.0\.2\.2[:/]/.test(p.download)) cli.sys.say(`The app, if the phone doesn’t have it yet: ${p.download}\n`)
   }
   if (!flags['no-qr']) {
@@ -528,10 +350,8 @@ export async function status(cli: Cli, flags: Flags): Promise<number> {
     cli.sys.say(`  Start it: systemctl --user start hypernova (or hypernova run). Why it stopped: hypernova logs`)
     return 1
   }
-  const ts = st?.tailscale
-  const tsnet = st?.tsnet as Tsnet | undefined
-  const viaBuiltIn = tsnet?.mode === 'builtIn' ? (tsnet.helper?.listening ? ` → ${tsnet.helper.listening} (built-in Tailscale${tsnet.helper.account ? `, ${tsnet.helper.account}` : ''})` : tsnet.helper?.state === 'NeedsLogin' ? ' (built-in Tailscale needs your sign-in: hypernova tailscale)' : ` (built-in Tailscale ${tsnet.helper?.state?.toLowerCase() ?? 'starting'})`) : null
-  row('Phone API', `127.0.0.1:${cli.apiPort}${viaBuiltIn ?? (ts?.url ? ` → ${ts.url} (tailscale serve)` : ts?.installed ? ' (Tailscale doesn’t serve it yet: hypernova pair)' : ' (no Tailscale yet)')}`)
+  // Loopback only: phones come in through the local route below.
+  row('Phone API', `127.0.0.1:${cli.apiPort}`)
   row('Local route', st?.lan ? `port ${st.lan.port}${st.lan.addresses?.length ? ` on ${st.lan.addresses.join(', ')}` : ''}` : 'off')
   row('Claude Code', claude ? `${st?.claude?.version ?? (await claudeVersionOf(cli, claude)) ?? '?'}${auth ? (auth.loggedIn ? `, signed in${auth.plan ? ` (${auth.plan})` : ''}` : ', not signed in: run claude once') : ''}` : 'not installed (hypernova setup)')
   if (st) {
@@ -625,7 +445,7 @@ export async function lan(cli: Cli, rest: string[]): Promise<number> {
     const st = await local(cli, 'GET', '/local/status')
     line(cli, 'ok', st.lan ? `Local route on, port ${st.lan.port}${st.lan.addresses?.length ? ` on ${st.lan.addresses.join(', ')}` : ''}.` : 'Local route off.')
     // Behind WSL's NAT the port is on, but on a network no phone is on (cli/wsl.ts).
-    if (st.lan && cli.wsl && behindNat(cli.wsl, await wslNetworkingOf(cli))) line(cli, 'warn', `Behind ${cli.wsl.container ? 'the container’s' : 'WSL’s NAT'} network no phone can reach this port, and pairing links leave its addresses out.`, cli.wsl.container ? 'The phone comes in over Tailscale: hypernova pair. hypernova lan off turns the route off again.' : `Mirrored networking makes it reachable (${WSL_GUIDE}); hypernova lan off turns it off again.`)
+    if (st.lan && cli.wsl && behindNat(cli.wsl, await wslNetworkingOf(cli))) line(cli, 'warn', `Behind ${cli.wsl.container ? 'the container’s' : 'WSL’s NAT'} network no phone can reach this port, and pairing links leave its addresses out.`, cli.wsl.container ? 'hypernova lan off turns the route off again.' : `Mirrored networking makes it reachable (${WSL_GUIDE}); hypernova lan off turns it off again.`)
     return 0
   } catch (e: any) {
     line(cli, 'fail', e instanceof ApiError && e.status === 0 ? 'The daemon isn’t running.' : e.message)
@@ -724,7 +544,7 @@ export async function name(cli: Cli, rest: string[]): Promise<number> {
 
 /**
  * Takes out what setup put in: the integration first (only the daemon knows exactly what it
- * added), Tailscale's route to it, the service, the command, the daemon and its Node. The state
+ * added), the service, the command, the daemon and its Node. The state
  * (paired phones, settings) stays unless --purge. Claude Code and its login stay: they're yours.
  */
 export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
@@ -732,7 +552,7 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
     cli.sys.say('On a Mac, uninstall from Hypernova’s menu bar app (its menu, Uninstall…).')
     return 1
   }
-  const taken = flags.purge ? 'Hypernova, its paired phones and settings, its private name and its Tailscale node' : 'Hypernova (its paired phones and settings stay)'
+  const taken = flags.purge ? 'Hypernova, its paired phones and settings and its private name' : 'Hypernova (its paired phones and settings stay)'
   if (!flags.yes) {
     // Without a terminal nobody can answer: refuse rather than remove everything unasked.
     if (!process.stdin.isTTY) {
@@ -746,18 +566,6 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
     }
   }
   const notes: string[] = []
-  // The built-in Tailscale node leaves the tailnet with --purge (its key goes with the data, so a
-  // node left behind would sit there dead, and a reinstall would come back as hypernova-<host>-1).
-  const tsn = flags.purge ? await tsnetOf(cli) : null
-  if (tsn?.mode === 'builtIn' && tsn.helper?.state === 'Running') {
-    try {
-      await local(cli, 'POST', '/local/tsnet/logout', {}, 15_000)
-      await new Promise((r) => setTimeout(r, 2000))
-      line(cli, 'ok', 'The built-in Tailscale node signed out of your tailnet')
-    } catch (e: any) {
-      notes.push(`The built-in Tailscale node couldn’t sign out (${e.message}). Remove it from https://login.tailscale.com/admin/machines.`)
-    }
-  }
   try {
     await setIntegration(cli, false)
     line(cli, 'ok', 'Hooks, status line and the claude function removed')
@@ -773,12 +581,6 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
   } catch (e) {
     // An older daemon has no such route; otherwise say so when there is a name to give up.
     if (!(e instanceof ApiError && e.status === 404) && existsSync(join(cli.support, 'names', 'name.json'))) notes.push(`This server’s name under hypernova.observer couldn’t be confirmed given up (${(e as Error).message}); its records go by themselves after 90 days unused.`)
-  }
-  const ts = tailscaleBin(cli)
-  if (ts) {
-    const r = await cli.sys.run(ts, ['serve', `--https=${cli.apiPort}`, 'off'], { timeout: 20_000 })
-    if (r.code === 0) line(cli, 'ok', `Tailscale no longer serves port ${cli.apiPort}`)
-    else if (!/not found|no serve|nothing/i.test(r.err + r.out)) notes.push(`Tailscale still routes port ${cli.apiPort} here (${(r.err || r.out).trim().split('\n')[0]}). Remove it with: sudo tailscale serve --https=${cli.apiPort} off`)
   }
   notes.push(...(await removeService(cli)))
   line(cli, 'ok', `${UNIT} stopped and removed`)
@@ -796,7 +598,6 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
     line(cli, 'ok', 'Paired phones, settings and logs removed')
   } else {
     line(cli, 'info', `Kept: paired phones and settings in ${tilde(cli, cli.support)} (hypernova uninstall --purge removes them; reinstalling picks them up).`)
-    if (existsSync(join(cli.support, 'tsnet'))) line(cli, 'info', `Its Tailscale node stays in your tailnet as hypernova-<this server's name>; reinstalling picks it up, or remove it at https://login.tailscale.com/admin/machines.`)
   }
   line(cli, 'info', 'Claude Code and its sign-in stay, and so do Codex and its own. Shared sessions still open keep running until you close them.')
   // Setup turned lingering on for the service, but other services of this user may count on it
@@ -822,9 +623,7 @@ export const HELP = `hypernova: a control room for Claude Code and Codex, on thi
 
   hypernova setup       check and install what's missing: Node.js 24, Claude Code, the
                         hooks, the shell integration and the service (--no-claude, --from <dir>)
-  hypernova pair        show the pairing QR code for the Hypernova app (--no-wait, --local: skip Tailscale)
-  hypernova tailscale   the built-in Tailscale node: its sign-in code (login|logout: another account;
-                        on|off: use it or the Tailscale app here; control <url>: a Headscale server)
+  hypernova pair        show the pairing QR code for the Hypernova app (--no-wait)
   hypernova status      what runs, how phones reach it, who's paired (--json)
   hypernova doctor      check everything, each problem with its fix (--json)
   hypernova logs        the daemon's log (-n <lines>, -f to follow, --terminals: the shared terminals')

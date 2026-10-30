@@ -3,7 +3,8 @@
 Hypernova's daemon runs on any always-on Linux machine: a VPS, a home server, a PC, or a Docker
 container. There is no menu bar app there; everything is the `hypernova` command, over SSH. Claude
 Code, Codex or both run on the server beside it, and the phone app pairs with it the same way it
-pairs with a Mac (docs/DECISIONS.md, "Direction: open source, self-hosted, Tailscale inside").
+pairs with a Mac. The phone reaches the server on its own network (the local route, port 47323,
+mutual TLS), or over your own VPN into that network (docs/DECISIONS.md, "Tailscale is removed").
 [INSTALL.md](INSTALL.md) walks a first install through; this page has every command and detail.
 
 Supported: Ubuntu and Debian (other distributions work with their packages installed by hand), on
@@ -14,7 +15,7 @@ x86_64 and arm64.
 PC. The steps, what works and what doesn't, are in
 [INSTALL.md, "5. Windows (experimental)"](INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop);
 under WSL, `hypernova doctor`, `pair`, `lan` and `setup` say what differs there (systemd, keeping
-WSL running, the phone over Tailscale behind WSL's NAT).
+WSL running, no way in for the phone behind WSL's NAT unless its networking is mirrored).
 
 ## Install
 
@@ -22,16 +23,16 @@ Run it as the user who will use Claude Code or Codex, not as root. The script as
 packages only.
 
 ```sh
-# The release's package (https://github.com/prudnik-web/Hypernova/releases/latest, checksums in
-# SHA256SUMS.txt; the guide is at https://hypernova.nikbraun.tech), on the server:
-sha256sum -c --ignore-missing SHA256SUMS.txt
-tmp=$(mktemp -d) && tar -xzf Hypernova-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
+# A release's server package (https://github.com/ljmerza/Hypernova/releases/latest:
+# hypernova-server-<tag>-linux.tar.gz, one package for x86_64 and arm64), on the server:
+gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the page
+tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
 
 # From a checkout of this repository, on the server:
 scripts/install-linux.sh
 
 # A package of your own: on your computer,
-scripts/pack-linux.sh            # writes dist/linux/hypernova-<version>.tar.gz
+scripts/pack-linux.sh            # writes dist/linux/hypernova-<version>.tar.gz (a release renames it)
 scp dist/linux/hypernova-*.tar.gz you@server:
 # then on the server, from an unpacked copy's script or a checkout's:
 scripts/install-linux.sh --from hypernova-<version>.tar.gz
@@ -66,7 +67,7 @@ docker exec -it hypernova hypernova doctor
 The image is Ubuntu 24.04 with the install script already run in it, as a normal user. The daemon
 is the container's command (`hypernova run`); there is no systemd in a container, so no service.
 Nothing is published to the network. On a Linux host, `--network host` lets a phone on the same
-network pair over the local route, and lets the host's own Tailscale reach it.
+network (or on a VPN into it) pair over the local route, the phone's only way in.
 `--build-arg CLAUDE=no` leaves Claude Code out. Codex in a container: its npm package needs a Node.js
 on the PATH, which the image doesn't have, so copy Codex's own Linux build in
 (`docker cp codex hypernova:/home/hypernova/.local/bin/codex`), then `docker exec -it hypernova codex
@@ -91,15 +92,14 @@ docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped 
 
 | Command | What it does |
 |---|---|
-| `hypernova setup` | Checks and installs what's missing: Node.js 24, the daemon (with node-pty built), the `hypernova` command, Claude Code (Anthropic's installer, `curl -fsSL https://claude.ai/install.sh \| bash`, when it's absent), the systemd service with lingering, the hooks and status line in Claude Code's settings, the `claude` shell function, and `tailscale serve` for the phone API when Tailscale is signed in. Safe to run again. Then it asks you to run `claude` once to sign in: Hypernova never signs in, out or reads Claude Code's login. It also says what it found of Codex (see `hypernova codex`). `--from <dir>`, `--no-claude`, `--no-service`. |
-| `hypernova pair` | The pairing QR code, in the terminal, and the link under it: the same `https://hypernova.observer/pair#…` link the Mac shows (the phone's camera opens the app; the details are after the `#` and never reach that site), and where to get the app if the phone has none yet. With the built-in Tailscale node it first shows the Tailscale sign-in code when the node needs one (the app then signs in to the same account); with no tailnet the link carries the local route's addresses, for a phone on the same network. Also prints the code and when it expires. Never blocks on Tailscale: with no terminal, or with `--no-wait`, it shows the sign-in but doesn't wait for it; in a terminal, Enter skips the wait; `--local` skips Tailscale altogether (a home server for the local network). Waits for the phone and names it (`--no-wait`, `--no-qr`). If the window is narrower than the QR code it says so (widen it, or use the link). |
-| `hypernova tailscale` | The built-in Tailscale node: who it is signed in as and where it serves the phone API, or its sign-in code. `hypernova tailscale logout` signs it out for another account. `hypernova tailscale off` turns the built-in node off (use the Tailscale app on this server instead); `on` turns it back on; `control <url>` points it at a Headscale server (`none` returns to tailscale.com). When the Tailscale app here is running and signed in, the daemon turns its `tailscale serve` on for the phone API and starts its own node only if that fails. |
+| `hypernova setup` | Checks and installs what's missing: Node.js 24, the daemon (with node-pty built), the `hypernova` command, Claude Code (Anthropic's installer, `curl -fsSL https://claude.ai/install.sh \| bash`, when it's absent), the systemd service with lingering, the hooks and status line in Claude Code's settings, and the `claude` shell function. Safe to run again. Then it asks you to run `claude` once to sign in: Hypernova never signs in, out or reads Claude Code's login. It also says what it found of Codex (see `hypernova codex`). `--from <dir>`, `--no-claude`, `--no-service`. |
+| `hypernova pair` | The pairing QR code, in the terminal, and the link under it: the same `https://hypernova.observer/pair#…` link the Mac shows (the phone's camera opens the app; the details are after the `#` and never reach that site), and where to get the app if the phone has none yet. The link carries the local route's addresses, for a phone on the same network or on a VPN into it; with the local route off it says so (`hypernova lan on`). Also prints the code and when it expires. Waits for the phone and names it (`--no-wait`, `--no-qr`; `--local` is still accepted and changes nothing). If the window is narrower than the QR code it says so (widen it, or use the link). |
 | `hypernova status` | What runs, how phones reach it, Claude Code and whether it's signed in, Codex (found, on or off, signed in), the integration, paired devices, sessions (`--json`). |
 | `hypernova codex [on\|off]` | OpenAI's Codex for Hypernova: what's found here (path, version against the minimum, 0.163.0), or turning it on or off, as the Mac's Setup switch does. On, the daemon connects to Codex's own app server and the `codex` function joins `claude` in the shell's block; the phone can start Codex sessions. It never installs or signs in Codex: `sudo npm i -g @openai/codex` (or Codex's own Linux build in `~/.local/bin`), then `codex login --device-auth` (a code to enter on any device). |
 | `hypernova doctor` | Every piece checked, each problem with the command that fixes it (`--json`). Exit 1 when something stops Hypernova working. With Codex alone, a missing Claude Code is only noted; with neither agent, it fails. |
 | `hypernova logs` | The daemon's log: the last 100 lines (`-n <lines>`), `-f` to follow, `--terminals` for the shared terminals' log. Both logs roll at 5 MB to `.1`. |
 | `hypernova lan on\|off` | The phone's direct route on the same network (below). |
-| `hypernova uninstall` | Removes the integration, Tailscale's route to it, the service, the command, the daemon and its Node. Paired phones and settings stay for a reinstall unless `--purge`. Claude Code, Codex and their logins stay, and so does lingering (other services of yours may use it; it says how to turn it off). `--purge` also signs the built-in Tailscale node out of your tailnet and gives up the private name; without it the node stays in the tailnet (and is picked up again by a reinstall). With no terminal it refuses unless you pass `--yes`. |
+| `hypernova uninstall` | Removes the integration, the service, the command, the daemon and its Node. Paired phones and settings stay for a reinstall unless `--purge`. Claude Code, Codex and their logins stay, and so does lingering (other services of yours may use it; it says how to turn it off). `--purge` also gives up the private name. With no terminal it refuses unless you pass `--yes`. |
 | `hypernova run` | The daemon in the foreground, its log on the terminal too: what a container runs, and handy for debugging. |
 
 `hn ls` and `hn attach <id>` work as on the Mac (shared terminals, below).
@@ -139,7 +139,7 @@ A systemd **user** service, so the daemon and Claude Code run as you, never as r
 The same as on a Mac (docs/PROTOCOL.md, "Transport and auth", "Local network (direct HTTPS)"):
 
 - The phone API (47321) and the local API (47322) listen on **127.0.0.1 only**. Phones reach the
-  phone API through `tailscale serve` over your tailnet; nothing listens on a public port.
+  same API through the local route below; nothing listens on a public port.
   `hypernova doctor` reads the kernel's socket table and fails if anything listens on those ports
   beyond loopback (a port forward, another program).
 - The **local route** (47323, HTTPS) is for a phone on the same network: connections from
@@ -166,26 +166,11 @@ The same as on a Mac (docs/PROTOCOL.md, "Transport and auth", "Local network (di
   --networking-mode` says) it is off too, and even when turned on its addresses are left out of
   pairing links: none of them is one a phone can reach.
 
-**Tailscale is built in** (docs/PROTOCOL.md, "Tailscale built in"): the daemon runs its own node
-(`daemon/bin/hypernova-tsnet-linux-*`, in the package when it was built with Go), named
-`hypernova-<host>` on your tailnet, and serves the phone API over it. `hypernova pair` shows the
-sign-in code the first time; nothing else to install. Your tailnet's HTTPS certificates give it a
-trusted name; without them (Headscale), the phone pins the server's own certificate from the
-pairing code. A self-hoster points it at Headscale with `tailscaleControlUrl` in the daemon's
-settings (`POST /local/settings`, https, or http on a private address).
-
-**The Tailscale app** instead, if you prefer (the built-in node then stays off when the app
-serves the phone API): install it, sign in,
-and let your user change `serve`, once:
-
-```sh
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-sudo tailscale set --operator=$USER
-hypernova pair        # turns on tailscale serve for the phone API, then shows the code
-```
-
-Your tailnet needs MagicDNS and HTTPS certificates on (https://login.tailscale.com/admin/dns).
+**Away from home**, use your own VPN into the server's network (a WireGuard or UniFi VPN, say):
+the phone then reaches the local route as if it were on the Wi-Fi. Hypernova carries no VPN or
+Tailscale of its own any more (docs/DECISIONS.md, "Tailscale is removed"). A VPS has no home
+network for the phone to join, so it needs `hypernova lan on` and a VPN that puts the phone on the
+server's private network; never open port 47323 to the internet.
 
 ## What a Linux server doesn't have
 
@@ -217,8 +202,9 @@ What keeps working on Linux:
 
 ## Updating
 
-Run the install script again from the new package (the release's `Hypernova-linux.tar.gz`, as at
-the first install), checkout or tarball (or `hypernova setup --from <dir>`).
+Run the install script again from the new package (a newer release's
+`hypernova-server-<tag>-linux.tar.gz`, as at the first install), checkout (`git pull`, then
+`scripts/install-linux.sh`) or tarball (or `hypernova setup --from <dir>`).
 The new daemon is prepared beside the old one and swapped in only once its terminal module works,
 then the service restarts; open sessions keep running. (Docker: see "Updating the container" above.)
 
@@ -230,8 +216,6 @@ then the service restarts; open sessions keep running. (Docker: see "Updating th
   build-essential python3`, then `hypernova setup`.
 - *"systemd's user manager isn't running"*: `sudo loginctl enable-linger $USER`, or log in over
   SSH, then `hypernova setup`.
-- *"Tailscale lets only root or its operator change serve"*: `sudo tailscale set --operator=$USER`,
-  then `hypernova pair`.
 - *`hypernova: command not found`* right after the install: log in again (Ubuntu adds
   `~/.local/bin` to PATH at login), or run `~/.local/bin/hypernova`.
 

@@ -24,6 +24,7 @@ import com.prudnikweb.hypernova.widget.WidgetSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -107,7 +108,6 @@ object Core {
         val (list, active) = store.servers.load()
         servers = list
         activeId = active
-        syncNode()
         for (s in list) startHub(s)
         syncService()
         WidgetSync.start(a)
@@ -136,7 +136,7 @@ object Core {
 
     private fun save() = store.servers.save(servers, activeId)
 
-    /** [s]'s hub, made anew (a new pairing, or the computer moved on its tailnet). */
+    /** [s]'s hub, made anew (a new pairing, or the same computer paired again). */
     private fun startHub(s: Server) {
         hubs.remove(s.id)?.close()
         val id = s.id
@@ -152,51 +152,10 @@ object Core {
             onNotice = { notifier.notice(it, server = id) },
             onAccountFine = { notifier.cancelAccount(id) },
             heldOpen = { ConnectionService.running },
-            onTailnetMoved = { next -> tailnetMoved(id, next) },
             serverId = id,
             onScreen = { visible },
             isActive = active,
         ).also { it.start() }
-    }
-
-    /**
-     * The built-in Tailscale node (Tsnet.kt), for the computers' tailnet: only one this phone signed
-     * in before, for a control server the user agreed to, the active computer's first
-     * ([Servers.nodePlan]). A first sign-in happens on the pairing screen or from Settings, never by
-     * itself (a phone with the Tailscale app needs no second node).
-     */
-    private fun syncNode() {
-        val order = Servers.activeFirst(servers, activeId).map { it.pairing }
-        when (val plan = Servers.nodePlan(order, { Tsnet.signedInBefore(app, it) }, Tsnet.control)) {
-            is Servers.NodePlan.Start -> Tsnet.start(app, plan.control)
-            Servers.NodePlan.Stop -> Tsnet.stop()
-            Servers.NodePlan.Leave -> Unit
-        }
-    }
-
-    /** The user agreed to the active computer's own control server (Settings): kept, and the node may start. */
-    fun confirmControl() {
-        val id = activeId ?: return
-        val p = pairing?.takeIf { it.controlUrl != null && !it.controlConfirmed } ?: return
-        val next = p.copy(controlConfirmed = true)
-        servers = servers.map { if (it.id == id) Server(id, next) else it }
-        save()
-        Tsnet.start(app, next.controlUrl)
-    }
-
-    /**
-     * The computer serves the phone API elsewhere on its tailnet now (TailnetFollow): kept, and its
-     * link starts over with the new target (the route chooser is made for one).
-     */
-    private fun tailnetMoved(id: String, next: Pairing) {
-        val s = servers.firstOrNull { it.id == id } ?: return
-        if (s.pairing.token != next.token) return
-        val moved = Server(id, next)
-        servers = servers.map { if (it.id == id) moved else it }
-        save()
-        syncNode()
-        startHub(moved)
-        syncService()
     }
 
     /**
@@ -209,7 +168,6 @@ object Core {
         activeId = id
         save()
         disconnected = false
-        syncNode()
         startHub(list.first { it.id == id })
         activated(id)
     }
@@ -222,7 +180,6 @@ object Core {
         if (id == activeId || servers.none { it.id == id }) return
         activeId = id
         save()
-        syncNode()
         activated(id)
     }
 
@@ -247,7 +204,7 @@ object Core {
      * next computer left, if any, is shown in its place.
      */
     fun forget(id: String) {
-        val was = servers.firstOrNull { it.id == id } ?: return
+        if (servers.none { it.id == id }) return
         hubs.remove(id)?.close()
         val left = servers.filter { it.id != id }
         val next = Servers.activeAfterRemoval(servers, id, activeId)
@@ -257,11 +214,6 @@ object Core {
         save()
         // The key stays while another computer's certificate is for it.
         DeviceCertStore(app, id).clear(dropKey = left.isEmpty())
-        // A computer's own control server is forgotten with the last computer on it. The tailscale.com
-        // sign-in stays on disk (the user's own account; pairing again needs none).
-        val control = was.pairing.controlUrl
-        if (control != null && left.none { it.pairing.controlUrl == control }) Tsnet.forget(app, control)
-        if (left.isEmpty()) Tsnet.stop() else syncNode()
         notifier.cancelAllApprovals(id)
         if (next == null) {
             // Unpaired: the Mac's words again until the next computer says what it is.

@@ -189,7 +189,7 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                             AwakeStatus(awake, live.mac.battery)
                         }
                         Spacer(Modifier.height(10.dp))
-                        // The route in use, drawn: Local, Tailscale built in, the Tailscale app, or Remote (and its address below).
+                        // The route in use, drawn: Local or Remote (and its address below).
                         if (link.state == LinkState.Connected && routeWord(live.mac.via) != null) {
                             com.prudnikweb.hypernova.ui.onboarding.RouteRow(stringResource(R.string.mac_route), live.mac.via)
                         }
@@ -234,26 +234,13 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                 }
             }
         }
-        // Tailscale built in (data/Tsnet.kt): the node's state in every case, and the sign-in, the
-        // approval or who is signed in, when the pairing names the computer on a tailnet. The card is
-        // the same one the pairing screen shows.
-        if (pairing != null && live != null && com.prudnikweb.hypernova.ui.onboarding.showTailscaleCard(pairing)) {
-            item(key = "tailscale") {
-                Spacer(Modifier.height(10.dp))
-                // A computer on its own control server, agreed to nowhere yet (paired over the local
-                // network, say): the consent comes before any node talks to that server.
-                if (pairing.controlUrl != null && !pairing.controlConfirmed) com.prudnikweb.hypernova.ui.onboarding.ControlServerCard(pairing.controlUrl, pairing.macName) { com.prudnikweb.hypernova.data.Core.confirmControl() }
-                else com.prudnikweb.hypernova.ui.onboarding.TailscaleSignInCard(pairing.tailnetAccount, pairing.controlUrl, quietWhenOff = live.link.state == LinkState.Connected)
-            }
-        }
         // A newer app on the Mac: downloaded and installed in the app, over its own route (ui/update).
         val update = live?.appUpdate
         if (update != null && pairing != null) {
             item(key = "update") {
                 Spacer(Modifier.height(10.dp))
                 // The Mac's page as a way round only where a browser could open it.
-                val baseInUse = live.mac.via == com.prudnikweb.hypernova.data.Mac.VIA_REMOTE || live.mac.via == com.prudnikweb.hypernova.data.Mac.VIA_TAILSCALE
-                com.prudnikweb.hypernova.ui.update.UpdateCard(update, com.prudnikweb.hypernova.data.UpdatePolicy.browserPage(pairing.baseUrl, pairing.tailnetName, baseInUse && live.link.state == LinkState.Connected))
+                com.prudnikweb.hypernova.ui.update.UpdateCard(update, com.prudnikweb.hypernova.data.UpdatePolicy.browserPage(pairing.baseUrl))
             }
         }
         if (hub != null) {

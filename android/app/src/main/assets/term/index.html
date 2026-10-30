@@ -339,7 +339,7 @@
     up: 'A', down: 'B', right: 'C', left: 'D',
   }
   window.hn = {
-    // [url]: the ticket's WebSocket URL (over Tailscale); null when the app holds the socket.
+    // [url]: the ticket's WebSocket URL (on the base URL); null when the app holds the socket.
     connect(url) {
       ended = false
       if (ws) { try { ws.onclose = null; ws.close() } catch {} }

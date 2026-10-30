@@ -116,12 +116,10 @@ class Confirm(val title: String, val body: String, val action: String, val dange
 
 /**
  * Whether pairing with [link] would replace the computer this phone is paired with ([current]) by
- * another one, rather than pair the same one again (after it unpaired this phone, say): another name,
- * or another name on the tailnet.
+ * another one, rather than pair the same one again (after it unpaired this phone, say): another name.
  */
 fun replacesAnother(current: Pairing, link: PairLink): Boolean =
-    !current.macName.equals(link.macName, ignoreCase = true) ||
-        (current.tailnetName != null && link.tailnetName != null && !current.tailnetName.equals(link.tailnetName, ignoreCase = true))
+    !current.macName.equals(link.macName, ignoreCase = true)
 
 /**
  * The app's root state: which hub is active (live, demo, or none → onboarding), the
@@ -156,7 +154,7 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         notice = null
     }
 
-    /** "Pair another Mac" (the switcher): the pairing steps over the app, the computers paired kept. */
+    /** "Add a server" (the switcher): the pairing steps over the app, the computers paired kept. */
     var addingServer by mutableStateOf(false)
         private set
     fun addServer(on: Boolean) { addingServer = on }
@@ -248,22 +246,12 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         pair(link)
     }
 
-    /** The control server (a link's `tc`) the user agreed to on the pairing screen, if any. */
-    var confirmedControl by mutableStateOf<String?>(null)
-        private set
-
-    /** "Use this server": the link's own control server may be used; the node starts against it. */
-    fun confirmControl(link: PairLink) {
-        confirmedControl = link.controlUrl
-        link.controlUrl?.let { Tsnet.start(app, it) }
-    }
-
     fun pair(link: PairLink) {
         pairJob?.cancel()
         pairFlow = PairFlow.Working(link)
         pairJob = viewModelScope.launch {
             try {
-                val p = Pairer.pair(app, link).let { it.copy(controlConfirmed = it.controlUrl == null || it.controlUrl == confirmedControl) }
+                val p = Pairer.pair(app, link)
                 // Added next to the computers paired already (or in the place of the same one paired
                 // before), and on screen.
                 Core.paired(p)
@@ -300,7 +288,6 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         val id = Core.activeId
         viewModelScope.launch {
             val ok = l?.forget()?.isSuccess ?: true
-            confirmedControl = null
             if (id != null) Core.forget(id)
             nav.reset()
             onDone(ok)
@@ -312,7 +299,6 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
      * Another computer still paired comes on screen in its place.
      */
     fun clearPairing() {
-        confirmedControl = null
         Core.clear()
         nav.reset()
     }

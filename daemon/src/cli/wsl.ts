@@ -63,37 +63,33 @@ export function wslMachineChecks(w: WslHere): Check[] {
 }
 
 /**
- * How a phone reaches this WSL: over Tailscale behind the NAT (a problem only while the tailnet
- * isn't connected), or on the Wi-Fi too with mirrored networking, once Windows' Hyper-V firewall
- * lets the local route's port in. [tailnet]: Tailscale serves the phone API now.
+ * How a phone reaches this WSL: not at all behind the NAT (no address of it is on the Wi-Fi), or
+ * on the Wi-Fi with mirrored networking, once Windows' Hyper-V firewall lets the local route's port in.
  */
-export function wslNetworkCheck(cli: Pick<Cli, 'env'>, w: WslHere, networking: string | null, tailnet: boolean): Check {
+export function wslNetworkCheck(cli: Pick<Cli, 'env'>, w: WslHere, networking: string | null): Check {
   if (!behindNat(w, networking)) {
-    const anywhere = tailnet ? ' (and from anywhere over Tailscale)' : ''
-    if (w.version === 1) return { name: 'wsl-network', mark: 'info', text: `WSL 1 shares Windows’ own network: a phone on the same Wi‑Fi can reach it if Windows Firewall lets port ${lanPort(cli)} in${anywhere}.` }
-    if (networking !== 'mirrored') return { name: 'wsl-network', mark: 'info', text: `WSL’s ${networking} networking: this Linux has an address on the Wi‑Fi of its own, so a phone there can reach it directly${anywhere}.` }
-    return { name: 'wsl-network', mark: 'info', text: `WSL’s mirrored networking: this Linux has Windows’ own addresses, so a phone on the same Wi‑Fi can reach it directly once Windows’ Hyper-V firewall lets port ${lanPort(cli)} in${anywhere}.`, fix: firewallFix(cli) }
+    if (w.version === 1) return { name: 'wsl-network', mark: 'info', text: `WSL 1 shares Windows’ own network: a phone on the same Wi‑Fi can reach it if Windows Firewall lets port ${lanPort(cli)} in.` }
+    if (networking !== 'mirrored') return { name: 'wsl-network', mark: 'info', text: `WSL’s ${networking} networking: this Linux has an address on the Wi‑Fi of its own, so a phone there can reach it directly.` }
+    return { name: 'wsl-network', mark: 'info', text: `WSL’s mirrored networking: this Linux has Windows’ own addresses, so a phone on the same Wi‑Fi can reach it directly once Windows’ Hyper-V firewall lets port ${lanPort(cli)} in.`, fix: firewallFix(cli) }
   }
   const mode = w.container ? 'Docker Desktop’s network' : networking ? `WSL’s ${networking === 'nat' ? 'NAT' : networking} networking` : 'WSL’s networking (wslinfo didn’t say: taken as NAT, the default)'
-  const text = `${mode}: a phone can’t reach this Linux on the Wi‑Fi, so it comes in over Tailscale${tailnet ? ', which is connected' : ', which isn’t connected yet'}.`
-  if (tailnet) return { name: 'wsl-network', mark: 'ok', text }
-  const fix = ['hypernova pair   (signs in the built-in Tailscale first)']
-  if (!w.container) fix.push(`Or, on Windows 11 22H2 and later, mirrored networking: networkingMode=mirrored under [wsl2] in %UserProfile%\\.wslconfig, then wsl --shutdown (${WSL_GUIDE}).`)
+  const text = `${mode}: a phone can’t reach this Linux on the Wi‑Fi.`
+  const fix: string[] = []
+  if (!w.container) fix.push(`On Windows 11 22H2 and later, mirrored networking: networkingMode=mirrored under [wsl2] in %UserProfile%\\.wslconfig, then wsl --shutdown (${WSL_GUIDE}).`)
   if (!w.container && !networking) fix.push('wsl --update in PowerShell brings wslinfo, which says the mode.')
-  return { name: 'wsl-network', mark: 'warn', text, fix: fix.join('\n') }
+  return { name: 'wsl-network', mark: 'warn', text, ...(fix.length ? { fix: fix.join('\n') } : {}) }
 }
 
-/** pair's word about WSL, before the code: how the phone gets in, or why it can't yet. */
-export function wslPairNote(cli: Pick<Cli, 'env'>, w: WslHere, networking: string | null, tailnet: boolean): { mark: 'info' | 'warn'; text: string; fix?: string } {
+/** pair's word about WSL, before the code: how the phone gets in, or why it can't. */
+export function wslPairNote(cli: Pick<Cli, 'env'>, w: WslHere, networking: string | null): { mark: 'info' | 'warn'; text: string; fix?: string } {
   if (!behindNat(w, networking)) {
     if (networking === 'mirrored') return { mark: 'info', text: `WSL’s mirrored networking: a phone on the same Wi‑Fi can pair directly once Windows’ Hyper-V firewall lets port ${lanPort(cli)} in (hypernova doctor has the command).` }
     return { mark: 'info', text: `${w.version === 1 ? 'WSL 1 shares Windows’ network' : `WSL’s ${networking} networking`}: a phone on the same Wi‑Fi can pair directly if Windows lets port ${lanPort(cli)} in.` }
   }
   const where = w.container ? 'Docker Desktop on Windows' : 'WSL on Windows'
-  if (tailnet) return { mark: 'info', text: `${where}: the phone reaches this PC over Tailscale (${w.container ? 'the container’s network' : 'WSL’s NAT network'} keeps it off the Wi‑Fi).` }
   return {
     mark: 'warn',
-    text: `${where}: ${w.container ? 'the container’s network' : 'WSL’s NAT network'} keeps this PC off the phone’s Wi‑Fi, so this code has no way in until Tailscale is signed in.`,
-    fix: `hypernova pair   (without --local; sign in when it asks)${w.container ? '' : `\nor mirrored networking on Windows 11 (${WSL_GUIDE})`}`,
+    text: `${where}: ${w.container ? 'the container’s network' : 'WSL’s NAT network'} keeps this PC off the phone’s Wi‑Fi, so this code has no way in.`,
+    ...(w.container ? {} : { fix: `Mirrored networking on Windows 11 (${WSL_GUIDE})` }),
   }
 }

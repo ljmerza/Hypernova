@@ -22,9 +22,7 @@
          projects folder (ui/components/OwnerCheck.kt): without it BiometricPrompt throws. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
-    <!-- Onboarding opens Tailscale when it's installed, and the Play Store listing when it isn't. -->
     <queries>
-        <package android:name="com.tailscale.ipn" />
         <!-- Fork: the phone's own speech recognizer (data/PhoneDictation.kt), when the Mac offers no voice. -->
         <intent>
             <action android:name="android.speech.RecognitionService" />
@@ -119,7 +117,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps a live connection to the user's own Mac (over their private Tailscale network) so that permission requests from coding sessions running there reach the phone immediately and can be answered." />
+                android:value="Keeps a live connection to the user's own Mac (over their home network or their own VPN into it) so that permission requests from coding sessions running there reach the phone immediately and can be answered." />
         </service>
         <!-- Home screen widgets (widget/): the sun, and the sessions with their approvals. Only the
              system sends them updates, so they aren't exported. -->

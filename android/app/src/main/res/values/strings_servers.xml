@@ -5,7 +5,7 @@
     <string name="servers_title">Paired computers</string>
     <string name="servers_switch_label">Switch to %1$s</string>
     <string name="servers_on_screen">On screen</string>
-    <string name="servers_pair_another">Pair another Mac</string>
+    <string name="servers_pair_another">Add a server</string>
     <string name="servers_demo">Demo</string>
     <string name="servers_chip_label">Choose a Mac</string>
     <!-- TalkBack on the chip, named while not linked (several paired): "z2, Offline". -->

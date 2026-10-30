@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Release: HTTPS only. Phones reach the Mac through Tailscale serve (a publicly trusted ts.net certificate). -->
+<!-- Release: HTTPS only. Phones reach the Mac on its local listener, with its certificate pinned (data/LanRoute.kt). -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
 </network-security-config>
