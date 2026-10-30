@@ -497,7 +497,8 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `POST /v1/attachments?name=<file name>` | the file's bytes (any Content-Type, max 30 MB) → `{attachment: Attachment}` (see Attachments) |
 | `POST /v1/sessions/{id}/interrupt` | `{}` → `{ok}` (Esc in a shared terminal) |
 | `POST /v1/sessions/{id}/menu` | `{menuId, choice: number, alt?: boolean}` or `{menuId, cancel: true}` → `{ok}`: answers `session.menu` in its shared terminal (arrow keys to the option, then Enter, or the footer's `alt.key`; `cancel` presses Esc). Claude Code's own permission dialog (`menu.permission`) is answered here too (see Approvals, "In the terminal"). 409 `menu_gone` (that menu isn't on screen any more), `menu_moved` (the cursor didn't reach the option), `no_terminal` |
-| `GET /v1/commands?project=` | → `{commands: [{name, description, argumentHint, aliases: string[], builtin}]}`: the slash commands and skills Claude Code offers in that folder (its own, the owner's, the project's, plugins', MCP prompts), asked of an SDK process started there with hooks off and no prompt; cached 5 minutes per folder. Commands bound to a terminal on the Mac (vim, statusline, …), internal, removed and renamed ones are left out. 409 when Claude Code isn't installed, `sdk_missing` without its SDK (see Claude Code's SDK) |
+| `GET /v1/commands?project=` | → `{commands: [{name, description, argumentHint, aliases: string[], builtin, terminal}]}`: the slash commands and skills Claude Code offers in that folder (its own, the owner's, the project's, plugins', MCP prompts), asked of an SDK process started there with hooks off and no prompt; cached 5 minutes per folder. Commands bound to a terminal on the Mac (vim, statusline, …), internal, removed and renamed ones are left out. `terminal`: one of Claude Code's own that opens a screen of its own in the terminal, which the phone can't work (/config, /permissions, /resume, /mcp, /status…; a list the daemon keeps by hand in `commands.ts`, since Claude Code's list doesn't say how a command draws); a numbered picker such as /model's isn't one (the phone answers it as `session.menu`). 409 when Claude Code isn't installed, `sdk_missing` without its SDK (see Claude Code's SDK) |
+| `POST /v1/sessions/{id}/btw`, `GET …` | `{question}` → `{aside: Aside}`; GET → `{aside: Aside \| null}`: a side question, Claude Code's `/btw`, and its answer (see Side questions) |
 | `POST /v1/sessions/{id}/terminal` | `{}` → `{termId, url}`: a single-use, one-minute WebSocket URL for the live terminal (409 `no_terminal` if it isn't shared) |
 | `POST /v1/sessions/{id}/open` | `{}` → `{app, already}`: opens the shared terminal in a window on the Mac (or brings it forward) |
 | `POST /v1/sessions/{id}/continue` | `{reason?: "away" \| "limit"}` → `{session}`: sends "I'm back. Please continue where you left off." (no reason, or `"away"`); `"limit"` sends the continuation after a limit (see Auto-continue), drawn as a notice row, and the session's ready card goes once its turn starts. Its errors are `prompt`'s |
@@ -1047,6 +1048,55 @@ BlockedCall = {
   toolUseId: string | null
 }
 ```
+
+## Side questions
+
+Claude Code's `/btw <question>` ("Ask a quick side question without interrupting the main
+conversation"), from the session sheet's Commands tab. Claude Code runs it at once, beside a turn
+that's running, and draws the answer in a panel in place of the input box; it keeps the answer in
+memory only, so it never reaches the transcript. The daemon (`aside.ts`) types it, reads the answer
+off the terminal's screen as it reads menus, keeps the last one per session (in memory: a restart
+forgets it), and once it has it closes the panel with Space (never Esc: with the panel already gone,
+Esc would stop Claude's turn), so the box is back for the next prompt.
+
+- `POST /v1/sessions/{id}/btw` `{question}`: typed into the session's shared terminal (a `claude
+  agents` job through `claude attach`, which wakes a stopped one) whether Claude works or not:
+  never held (Held prompts) and never queued, and never a fork or a resume. The question goes on
+  one line, 2000 characters at most. → `{aside}`, `asking`. 400 `empty`, `too_long`; 404
+  `no_session`; 409 `unsupported_for_agent` (Codex), `asking` (the last one is still being
+  answered), `needs_answer`, `no_terminal` (a session the daemon runs itself, one open in a terminal
+  Hypernova doesn't hold, an ended one), `terminal_busy` (`claude attach` didn't open, or its holder
+  shows another session: nothing is typed there), and the prompt route's `waiting`, `typing` (with
+  `pending`), `starting`, `not_sent`.
+- `GET /v1/sessions/{id}/btw` → `{aside}`: the last one as it stands (null when none). The phone
+  asks again every second or so while it's `asking`.
+
+```
+Aside = {
+  id, question: string,
+  state: "asking" | "answered" | "failed" | "unseen",
+  answer: string | null,     // answered: the panel's text, the terminal's line breaks inside
+                             // paragraphs joined back
+  error: string | null,      // failed: Claude Code's own words ("Rate limited")
+  clipped: boolean,          // the answer filled the panel, so it may go on past what the screen
+                             // showed: the terminal has it all
+  askedAt: number, at: number
+}
+```
+
+`unseen`: no answer could be read (the panel never showed with this question in 4 minutes, the
+terminal went, or it showed another session); the phone says to open the terminal.
+
+The panel as the daemon expects it (read from Claude Code 2.1.314's code, not yet from a live
+screen): the earlier questions (`/btw …`, five at most, under `(+N earlier /btw)`), the question
+two columns in, then the answer four in (`Answering…` with a spinner, or `retrying in Ns`, until
+it's there), then a footer of hints ending in `Esc to close`, which offers `c to copy` once there is
+an answer. What a live look must confirm before relying on it: that the panel replaces the input
+box rather than sitting over it (the daemon takes the box's going as "sent"); the footer's words
+and the indents; that `claude attach` draws the panel itself (a thin client: it asks the background
+job with a `side_question` control request); that Space closes it; that the answer isn't written to
+the transcript; and that a terminal Claude Code thinks isn't in front doesn't hold the panel back
+(Claude Code then asks unwatched and reopens the panel later, which the daemon waits for).
 
 ## A session's model
 

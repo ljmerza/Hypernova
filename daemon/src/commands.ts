@@ -12,7 +12,8 @@ import { childEnv } from './runner.ts'
 import { notePlan } from './account.ts'
 import { claudeSdk } from './sdk.ts'
 
-export type Command = { name: string; description: string; argumentHint: string; aliases: string[]; builtin: boolean }
+/** [terminal]: one of Claude Code's own that opens a screen of its own in the terminal (TERMINAL). */
+export type Command = { name: string; description: string; argumentHint: string; aliases: string[]; builtin: boolean; terminal: boolean }
 
 const FRESH_MS = 5 * 60_000
 const cache = new Map<string, { at: number; commands: Command[] }>()
@@ -35,6 +36,19 @@ export function isBuiltinCommand(name: string): boolean {
 
 // Claude Code's own commands that only make sense in a terminal on the Mac, or not at all from a phone.
 const HIDDEN = new Set(['heapdump', 'workflow-launch-exec', 'color', 'focus', 'statusline', 'terminal-setup', 'vim', 'ide', 'exit', 'quit'])
+// Claude Code's own commands that open a screen of their own in the terminal, one the phone can't
+// work (settings with tabs, editors, browsers, sign-ins, managers, wizards): the session sheet's
+// command list marks them "Opens in the terminal" (docs/DECISIONS.md, "Commands in the session
+// sheet"). Read from 2.1.314's command table (its Ink commands, by what each one draws). Commands
+// whose only screen is a numbered picker (/model, /effort with nothing after them) aren't here:
+// the phone answers those as menus. The list says nothing of how a command draws, so this is kept by hand.
+const TERMINAL = new Set([
+  'config', 'settings', 'permissions', 'hooks', 'mcp', 'memory', 'plugin', 'theme', 'resume', 'login', 'privacy-settings',
+  'status', 'usage', 'help', 'tasks', 'workflows', 'skills', 'loops', 'diff', 'export', 'rewind', 'copy', 'feedback', 'bug',
+  'artifacts', 'powerup', 'scroll-speed', 'tui', 'wellbeing', 'import', 'install-github-app', 'setup-bedrock', 'setup-vertex',
+  'web-setup', 'remote-env', 'cloud-plugins', 'daemon', 'design-login', 'rate-limit-options', 'usage-credits', 'upgrade',
+  'passes', 'mobile', 'session', 'desktop', 'remote-control', 'auto-mode-setup', 'skill-doctor', 'background',
+])
 const shown = (c: Command) =>
   !c.name.startsWith('__') && !(c.builtin && HIDDEN.has(c.name)) && !/^\((removed|deprecated)\)/i.test(c.description) && !/^renamed to\b/i.test(c.description)
 
@@ -96,7 +110,7 @@ async function fetchCommands(cwd: string): Promise<Command[]> {
       } catch {}
     }
     const commands = init.commands
-      .map((c) => ({ name: c.name, description: (c.description ?? '').trim(), argumentHint: (c.argumentHint ?? '').trim(), aliases: c.aliases ?? [], builtin: !!c.builtin }))
+      .map((c) => ({ name: c.name, description: (c.description ?? '').trim(), argumentHint: (c.argumentHint ?? '').trim(), aliases: c.aliases ?? [], builtin: !!c.builtin, terminal: !!c.builtin && TERMINAL.has(c.name) }))
       .filter(shown)
     cache.set(cwd, { at: Date.now(), commands })
     // The same process knows the plan, for nothing more: its email and organization are left alone.

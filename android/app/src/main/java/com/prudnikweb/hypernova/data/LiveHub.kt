@@ -1961,6 +1961,15 @@ class LiveHub(
         } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_commands)) }
     }
 
+    override suspend fun askAside(sessionId: String, question: String): Result<Aside> = try {
+        val a = AsideWire.of(api.post("/v1/sessions/$sessionId/btw", JSONObject().put("question", question.trim())))
+        if (a != null) Result.success(a) else Result.failure(HubException(res.getString(R.string.aside_err_ask)))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.aside_err_ask)) }
+
+    override suspend fun aside(sessionId: String): Result<Aside?> = try {
+        Result.success(AsideWire.of(api.get("/v1/sessions/$sessionId/btw")))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.aside_err_read)) }
+
     override suspend fun answerMenu(sessionId: String, menuId: String, choice: Int?, alt: Boolean): Result<Unit> = try {
         // Whatever opened the menu has landed, logged or not (a picker closed with Esc isn't).
         menuAnswered[sessionId] = now

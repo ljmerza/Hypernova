@@ -41,6 +41,7 @@ import { ChangeError, changesOf, diffOf } from './changes.ts'
 import { toolPath } from './normalize.ts'
 import { ResumeError, setAutoContinue, typeContinue } from './resume.ts'
 import { BlockedError, blockedList, dismissBlocked, retryBlocked } from './blocked.ts'
+import { AsideError, askAside, asideOf } from './aside.ts'
 import { CONTINUE_TEXT } from './blockers.ts'
 import { checkBalance, hasBalance, providerSaved } from './balance.ts'
 import { checkProvider, type ProviderCheck } from './providers-check.ts'
@@ -802,6 +803,20 @@ async function api(c: Ctx): Promise<void> {
     if (action === 'stop') return json(res, 200, { session: listSessions().find((x) => x.id === id) })
     forgetSession(id!)
     return json(res, 200, { ok: true })
+  }
+  // A side question (docs/PROTOCOL.md, "Side questions"; aside.ts): Claude Code's /btw, typed in
+  // at once (never held), its answer read off the terminal's screen and asked for with GET.
+  const bt = /^\/v1\/sessions\/([\w-]+)\/btw$/.exec(path)
+  if (bt && (m === 'GET' || m === 'POST')) {
+    const id = bt[1]!
+    if (!getSession(id)) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    if (m === 'GET') return json(res, 200, { aside: asideOf(id) })
+    try {
+      return json(res, 200, { aside: await askAside(id, String((await readJsonBody(req))?.question ?? '')) })
+    } catch (e) {
+      if (e instanceof AsideError) throw new HttpError(e.status, e.code, e.message, e.extra)
+      throw e
+    }
   }
   // Fork: a held prompt's new words, or taken back (docs/PROTOCOL.md, "Held prompts").
   const hp = /^\/v1\/sessions\/([\w-]+)\/held\/([\w-]+)$/.exec(path)
