@@ -444,6 +444,8 @@ fun HomeScreen(
                         )
                     }
                     items(members, key = { it.id }) { s ->
+                        // Its approval, else Claude Code's own permission dialog in its terminal (CardAsk.Terminal).
+                        val ask = hub.approval(s.id).let { a -> remember(a, s) { CardAsk.of(a, s) } }
                         SessionCard(
                             s, now = now, scramble = remember(s.id) { hub.consumeReveal(s) },
                             onClick = { onOpen(s.id) },
@@ -452,8 +454,8 @@ fun HomeScreen(
                             waiting = hub.waitingCount(s.id),
                             held = hub.heldCount(s.id),
                             codex = codexOn && s.codex,
-                            ask = hub.approval(s.id).let { a -> remember(a) { CardAsk.of(a) } },
-                            onAnswer = hub::answerApproval,
+                            ask = ask,
+                            onAnswer = { id, answer -> answerCard(hub, s.id, ask, id, answer) },
                             menu = if (!hub.isDemo && MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
                         )
                     }
@@ -783,6 +785,18 @@ fun SessionCard(
                     Spacer(Modifier.width(7.dp))
                     HText(s.activity, style = Type.monoSmall, color = tone, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+            } else if (ask is CardAsk.Terminal) {
+                // Claude Code's own dialog in the terminal: the tool and what it would run, as the
+                // screen shows them (a long one cut: tapping the card opens it whole in the chat).
+                HText((ask.ask.tool ?: stringResource(R.string.menu_in_terminal)).uppercase(), style = Type.label, color = HN.amber)
+                Spacer(Modifier.height(4.dp))
+                HText(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = HN.amber)) { append(if (ask.ask.isBash) "$ " else "› ") }
+                        append(ask.ask.command ?: ask.ask.lines.lastOrNull().orEmpty())
+                    },
+                    style = Type.monoSmall, color = HN.ink, maxLines = 6, overflow = TextOverflow.Ellipsis,
+                )
             } else if (ask is CardAsk.Exact) {
                 // Allow promises this exact command: the tool, then all of it as it will run, line
                 // breaks and all, never cut (CardAsk, the widget's rule).
@@ -852,6 +866,15 @@ fun SessionCard(
 }
 
 /**
+ * A card's Allow or Deny: an approval's through the approval route, Claude Code's own dialog in the
+ * terminal ([CardAsk.Terminal]) as that dialog's Yes or No, pressed there (the menu route).
+ */
+private suspend fun answerCard(hub: Hub, sessionId: String, ask: CardAsk?, id: String, answer: Answer): Boolean =
+    if (ask is CardAsk.Terminal && ask.id == id) {
+        hub.answerMenu(sessionId, id, if (answer == Answer.Allow) ask.ask.allow else ask.ask.deny).isSuccess
+    } else hub.answerApproval(id, answer)
+
+/**
  * A card's answer to its session's approval ([CardAsk]): Deny and Allow for a tool's exact command,
  * Deny and Open when it can't show whole (no blind Allow), Answer (opens the session) for a question
  * or a plan. While an answer goes, "Allowing…" or "Denying…" in their place; one that didn't get
@@ -893,7 +916,7 @@ private fun AskPills(ask: CardAsk, onAnswer: suspend (id: String, answer: Answer
             }
             // The owner allows from Home whether or not the whole command fits (2026-10-30): the
             // card shows its summary, and tapping the card opens the session for the details.
-            is CardAsk.Partial -> {
+            is CardAsk.Partial, is CardAsk.Terminal -> {
                 Pill(stringResource(R.string.deny), { send(Answer.Deny) }, kind = PillKind.Danger, height = 40.dp)
                 Pill(
                     stringResource(R.string.allow),

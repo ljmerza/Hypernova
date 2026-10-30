@@ -37,6 +37,12 @@ case "$1" in
     if [ "$2" = "gone0000" ]; then echo "No background session $2" >&2; exit 1; fi
     if [ "$2" = "drift000" ]; then printf '\\033]0;Some other session\\007\\n────────────────────\\n❯ \\n────────────────────\\n'; exec sleep 30; fi
     if [ "$2" = "ask00000" ]; then printf '\\n Do you want to proceed?\\n ❯ 1. Yes\\n   2. No\\n'; exec sleep 30; fi
+    # Claude Code's own permission dialog (the Arc screen); keys pressed into it land in a file.
+    # permdrft: the same, under another session's title (the holder drifted to another view).
+    if [ "$2" = "perm0000" ] || [ "$2" = "permdrft" ]; then
+      [ "$2" = "permdrft" ] && printf '\\033]0;Some other session\\007'
+      cat "$S/perm-screen.txt"; stty -echo 2>/dev/null; exec cat > "$S/keys-$2"
+    fi
     printf '\\n────────────────────\\n❯ \\n────────────────────\\n'
     exec sleep 30
     ;;
@@ -54,9 +60,9 @@ process.env.CLAUDE_BIN = fake
 
 const hub = await import('../src/hub.ts')
 const { settings } = await import('../src/store.ts')
-const { attachAgentsTerm, attachDrifted, createAgentsSession, scanTerms, termOf } = await import('../src/terms.ts')
+const { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
 const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
-const { promptSession } = await import('../src/http.ts')
+const { heldReady, promptSession } = await import('../src/http.ts')
 
 const procs: ChildProcess[] = []
 after(() => {
@@ -285,4 +291,62 @@ test('attachDrifted: a holder showing its own session (title = its registry name
   const tid = await attachAgentsTerm('agents-own-1', scratch, 'cccc0002')
   assert.ok(tid)
   assert.equal(attachDrifted(tid!, 'agents-own-1'), false)
+})
+
+/** Look at the terminals until session [id]'s menu (or its absence) holds, as the daemon does every 0.8 s. */
+async function settleMenus(id: string, want: (m: unknown) => boolean): Promise<void> {
+  const t0 = Date.now()
+  while (Date.now() - t0 < 6000) {
+    await watchMenus()
+    if (want(hub.getSession(id)?.menu ?? null)) return
+    await new Promise((ok) => setTimeout(ok, 200))
+  }
+}
+
+test('Claude Code’s own permission dialog through claude attach: a menu with permission, needs you though the registry says busy, Allow presses Enter there', async () => {
+  settings.claudeAgents = true
+  writeFileSync(join(process.env.FAKE_AGENTS_DIR!, 'perm-screen.txt'), readFileSync(join(import.meta.dirname, 'fixtures', 'permission-screens', 'attach-ask-rule.txt')))
+  // The Arc session as it was: a job at work, its registry "busy", no approval open.
+  job('agents-perm-1', 'perm0000', 'busy')
+  hub.pollRegistry()
+  assert.equal(hub.getSession('agents-perm-1')?.state, 'working')
+  const tid = await attachAgentsTerm('agents-perm-1', scratch, 'perm0000', 1500)
+  assert.ok(tid)
+  scanTerms()
+  assert.equal(termOf('agents-perm-1'), tid)
+  await settleMenus('agents-perm-1', (m) => m !== null)
+  const s = hub.getSession('agents-perm-1')!
+  assert.equal(s.menu?.permission?.tool, 'Bash command')
+  assert.match(s.menu?.permission?.command ?? '', /check\.py http:\/\/192\.168\.1\.76:8108 \/healthz/)
+  assert.equal(s.state, 'needs_you')
+  assert.match(s.activity ?? '', /^Bash command: \/media\/cubxi\/docker\/projects\/arc\/\.venv\/bin\/python/)
+  // The registry still says busy, and a tool call elsewhere says working: it still needs you.
+  hub.pollRegistry()
+  hub.setState('agents-perm-1', 'working', 'Read: x')
+  assert.equal(hub.getSession('agents-perm-1')?.state, 'needs_you')
+  // Held prompts wait for it (http.ts, heldReady).
+  assert.equal(heldReady('agents-perm-1'), 'wait')
+  // Allow: option 0, where the cursor already is, so Enter goes in.
+  assert.deepEqual(await answerMenu(tid!, s.menu!.id, { choice: 0 }), { ok: true })
+  const keys = join(process.env.FAKE_AGENTS_DIR!, 'keys-perm0000')
+  const t0 = Date.now()
+  while (!(existsSync(keys) && readFileSync(keys, 'utf8').includes('\n')) && Date.now() - t0 < 3000) await new Promise((ok) => setTimeout(ok, 50))
+  assert.equal(readFileSync(keys, 'utf8'), '\n', 'Enter, nothing else')
+  assert.equal(hub.getSession('agents-perm-1')?.menu, null)
+})
+
+test('a claude attach holder that drifted: its dialog is not the session’s menu', async () => {
+  settings.claudeAgents = true
+  writeFileSync(join(process.env.FAKE_AGENTS_DIR!, 'perm-screen.txt'), readFileSync(join(import.meta.dirname, 'fixtures', 'permission-screens', 'attach-ask-rule.txt')))
+  job('agents-perm-2', 'permdrft', 'busy', { name: 'Mine' })
+  hub.pollRegistry()
+  const tid = await attachAgentsTerm('agents-perm-2', scratch, 'permdrft', 1500)
+  assert.ok(tid)
+  scanTerms()
+  const t0 = Date.now()
+  while (!attachDrifted(tid!, 'agents-perm-2') && Date.now() - t0 < 5000) await new Promise((ok) => setTimeout(ok, 100))
+  assert.equal(attachDrifted(tid!, 'agents-perm-2'), true)
+  for (let i = 0; i < 3; i++) await watchMenus()
+  assert.equal(hub.getSession('agents-perm-2')?.menu, null)
+  assert.equal(hub.getSession('agents-perm-2')?.state, 'working')
 })

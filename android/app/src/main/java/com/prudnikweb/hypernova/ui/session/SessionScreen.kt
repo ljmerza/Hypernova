@@ -7,6 +7,7 @@ import com.prudnikweb.hypernova.ui.components.CommandHighlight
 import com.prudnikweb.hypernova.ui.components.ToggleRow
 import com.prudnikweb.hypernova.ui.components.Planet
 import com.prudnikweb.hypernova.data.TermMenu
+import com.prudnikweb.hypernova.data.TerminalAsk
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -341,7 +342,9 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     // Fork: the asks still waiting are one stack, the last row of all, under prompts waiting in the
     // queue too (AskStack.kt).
     val (chat, asks) = Asks.split(items.filterNot { it is Item.Approval && it.kind == com.prudnikweb.hypernova.data.ApprovalKind.Tool && it.resolved != null && it.resolved != com.prudnikweb.hypernova.data.Resolution.Denied })
-    val rows = ToolRuns.rows(chat).let { if (asks.isEmpty()) it else it + ChatRow.Asks(asks) }
+    // Fork: Claude Code's own permission dialog in its terminal is an ask too, in the asks' place.
+    val termAsk = TerminalAsk.of(session).takeIf { asks.isEmpty() }
+    val rows = ToolRuns.rows(chat).let { if (asks.isEmpty()) it else it + ChatRow.Asks(asks) }.let { if (termAsk == null) it else it + ChatRow.TermAsk(termAsk) }
     val labelled = ToolRuns.labelled(items)
     val runOpen = remember(sessionId) { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
     val liveRowKey = items.getOrNull(liveAt)?.let { live -> rows.lastOrNull { it.has(live.key) } }?.key
@@ -488,6 +491,15 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                         }
                     }
                     is ChatRow.Asks -> AskStack(row.asks, rowModifier) { ask, m -> TranscriptItem(hub, sessionId, ask, m.fillMaxWidth()) }
+                    // Keyed by its menu: the next dialog is a new card, never the last one's buttons.
+                    is ChatRow.TermAsk -> androidx.compose.runtime.key(row.ask.menuId) {
+                        TerminalAskCard(
+                            row.ask,
+                            onPick = { choice -> appScope.launch { hub.answerMenu(sessionId, row.ask.menuId, choice).onFailure { toast(it.message.orEmpty()) } } },
+                            onOpen = { opener.terminal(sessionId) },
+                            modifier = rowModifier,
+                        )
+                    }
                 }
             }
         }
@@ -608,7 +620,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 // A menu or dialog only the terminal shows: its options as buttons here, or (one
                 // that doesn't read as a menu) a way to the terminal.
                 val noCard = items.none { it is Item.Approval && it.resolved == null }
-                val menu = session.menu?.takeIf { noCard && session.term != null && !session.codex }
+                // Claude Code's own permission dialog isn't one of these: it's an ask in the chat (termAsk).
+                val menu = session.menu?.takeIf { noCard && session.term != null && !session.codex && TerminalAsk.of(it) == null }
                 AnimatedVisibility(menu != null, enter = fadeIn(tween(Motion.DIALOG)) + expandVertically(tween(Motion.REVEAL, easing = Motion.Expo)), exit = fadeOut(tween(Motion.DIALOG)) + shrinkVertically(tween(Motion.DIALOG))) {
                     // Keeps the last menu on screen while it folds away.
                     val last = remember { arrayOfNulls<TermMenu>(1) }
@@ -626,7 +639,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     }
                 }
                 // A question in words isn't a dialog: the reply goes in the composer, not the terminal.
-                val waitingInTerminal = session.term != null && session.state == SessionState.NeedsYou && noCard && menu == null && session.question == null
+                val waitingInTerminal = session.term != null && session.state == SessionState.NeedsYou && noCard && menu == null && termAsk == null && session.question == null
                 if (waitingInTerminal && !hub.isDemo) {
                     WaitingCard(codex = session.codex, onOpen = { opener.terminal(sessionId) })
                     Spacer(Modifier.height(12.dp))

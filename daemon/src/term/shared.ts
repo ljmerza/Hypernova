@@ -220,7 +220,19 @@ export type Menu = {
   cancel: boolean
   /** The footer's second way to pick ("Enter to set as default · s to use this session only"). */
   alt: { enter: string; key: string; label: string } | null
+  /** Claude Code's own permission dialog ([Permission]); null for any other menu. */
+  permission: Permission | null
 }
+/**
+ * Claude Code's own permission dialog, the one it shows when no hook answered (an ask rule over
+ * auto mode, a hook that handed it back): its question ("Do you want to proceed?") last above
+ * options that start with Yes and have a No. [tool] is the dialog's title ("Bash command", "Edit
+ * file"); [command] what it would run or change, between its dashed rules, the "│ " margin taken
+ * off and lines the screen wrapped joined again (null when it shows none).
+ */
+export type Permission = { tool: string | null; command: string | null; question: string }
+/** The question over a permission dialog's options. */
+const ASKS = /^Do you want to\b.*\?$/
 const MARKS = ' ❯›↓↑'
 const dashed = (s: string) => /^\s*[╌┄]{8,}\s*$/.test(s)
 const framed = (s: string) => /^\s*[╭╰│┌└]/.test(s)
@@ -328,7 +340,8 @@ export function menuOf(lines: string[]): Menu | null {
   // The title: from the rule that opens the dialog down to the options.
   let top = a - 1
   while (top >= 0 && a - top <= 30 && !rule(lines[top]!)) top--
-  const head = paragraphs(lines.slice(top + 1, a), width)
+  const region = lines.slice(top + 1, a)
+  let head = paragraphs(region, width)
   const title = head[0] && head[0].length <= 80 ? head.shift()! : null
   const options = es.map((e) => {
     let text = e.text.replace(/^\d+[.)]\s+/, '')
@@ -338,7 +351,22 @@ export function menuOf(lines: string[]): Menu | null {
     const detail = [...parts.slice(1), ...e.cont].join(' · ')
     return { label: parts[0] ?? text.trim(), detail: detail || null, current }
   })
-  const id = createHash('sha1').update(JSON.stringify([title, options.map((o) => o.label)])).digest('hex').slice(0, 12)
+  const question = head.length ? head[head.length - 1]! : title
+  let permission: Permission | null = null
+  if (question && ASKS.test(question) && /^yes\b/i.test(options[0]!.label) && options.some((o) => /^no\b/i.test(o.label))) {
+    const block = commandBlock(region, width)
+    permission = { tool: title === question ? null : title, command: block?.text ?? null, question }
+    // What it would run is the command, not the body.
+    if (block) {
+      head = paragraphs([...region.slice(0, block.from), ...region.slice(block.to + 1)], width)
+      if (title !== null && head[0] === title) head.shift()
+    }
+  }
+  // A permission dialog's id names its command too: Allow on the phone never answers the next one.
+  const id = createHash('sha1')
+    .update(JSON.stringify([title, options.map((o) => o.label), ...(permission?.command ? [permission.command] : [])]))
+    .digest('hex')
+    .slice(0, 12)
   return {
     id,
     title,
@@ -348,6 +376,30 @@ export function menuOf(lines: string[]): Menu | null {
     more,
     cancel: /\besc to (cancel|exit|close|go back|dismiss)/i.test(footer),
     alt: enter && key ? { enter, key: key[1]!, label: key[2]! } : null,
+    permission,
   }
+}
+
+/**
+ * The text between the first and the last dashed rule of a dialog's lines (a permission dialog's
+ * command or change): the "│ " margin off, a line the screen wrapped joined to the next with a
+ * space, other lines kept as lines. [from] and [to] are the two rules' indexes. Null without two.
+ */
+function commandBlock(region: string[], width: number): { text: string; from: number; to: number } | null {
+  const from = region.findIndex(dashed)
+  const to = region.findLastIndex(dashed)
+  if (from < 0 || to <= from) return null
+  const raw = region.slice(from + 1, to).filter((l) => !dashed(l) && l.trim())
+  if (!raw.length) return null
+  const bar = raw.every((l) => /^\s*│/.test(l))
+  const texts = raw.map((l) => (bar ? l.replace(/^\s*│ ?/, '') : l).trimEnd())
+  const margin = Math.min(...texts.map((t) => /^\s*/.exec(t)![0].length))
+  let text = ''
+  texts.forEach((t, k) => {
+    if (k === 0) text = t.slice(margin)
+    else if (wraps(raw[k - 1]!, t, width)) text += ' ' + t.trim()
+    else text += '\n' + t.slice(margin)
+  })
+  return { text: text.length > 4000 ? text.slice(0, 3999) + '…' : text, from, to }
 }
 

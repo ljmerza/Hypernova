@@ -469,7 +469,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `PUT /v1/sessions/{id}/held/{heldId}`, `DELETE …` | Fork: `{text}` → `{session}`: a held prompt's new words (its files kept), or (DELETE) taken back, never sent. 400 `empty`; 404 `no_session`, `no_held` (sent or removed already); 409 `sending` (being typed right now). See Held prompts |
 | `POST /v1/attachments?name=<file name>` | the file's bytes (any Content-Type, max 30 MB) → `{attachment: Attachment}` (see Attachments) |
 | `POST /v1/sessions/{id}/interrupt` | `{}` → `{ok}` (Esc in a shared terminal) |
-| `POST /v1/sessions/{id}/menu` | `{menuId, choice: number, alt?: boolean}` or `{menuId, cancel: true}` → `{ok}`: answers `session.menu` in its shared terminal (arrow keys to the option, then Enter, or the footer's `alt.key`; `cancel` presses Esc). 409 `menu_gone` (that menu isn't on screen any more), `menu_moved` (the cursor didn't reach the option), `no_terminal` |
+| `POST /v1/sessions/{id}/menu` | `{menuId, choice: number, alt?: boolean}` or `{menuId, cancel: true}` → `{ok}`: answers `session.menu` in its shared terminal (arrow keys to the option, then Enter, or the footer's `alt.key`; `cancel` presses Esc). Claude Code's own permission dialog (`menu.permission`) is answered here too (see Approvals, "In the terminal"). 409 `menu_gone` (that menu isn't on screen any more), `menu_moved` (the cursor didn't reach the option), `no_terminal` |
 | `GET /v1/commands?project=` | → `{commands: [{name, description, argumentHint, aliases: string[], builtin}]}`: the slash commands and skills Claude Code offers in that folder (its own, the owner's, the project's, plugins', MCP prompts), asked of an SDK process started there with hooks off and no prompt; cached 5 minutes per folder. Commands bound to a terminal on the Mac (vim, statusline, …), internal, removed and renamed ones are left out. 409 when Claude Code isn't installed, `sdk_missing` without its SDK (see Claude Code's SDK) |
 | `POST /v1/sessions/{id}/terminal` | `{}` → `{termId, url}`: a single-use, one-minute WebSocket URL for the live terminal (409 `no_terminal` if it isn't shared) |
 | `POST /v1/sessions/{id}/open` | `{}` → `{app, already}`: opens the shared terminal in a window on the Mac (or brings it forward) |
@@ -646,7 +646,8 @@ Session = {
   lastText: string | null,    // last assistant text, trimmed to 200 chars
   activity: string | null,    // what it's doing now, e.g. "Bash: ./gradlew build"
   pendingApprovalIds: string[],
-  stoppedForAway: boolean,    // auto-denied after 10 min → show the Continue button
+  stoppedForAway: boolean,    // Codex: auto-denied after 10 min → show the Continue button (Claude Code's
+                              // ask goes back to its terminal instead, see Approvals; never set for it)
   blockedCalls: number,       // calls refused without the owner, not yet retried or dismissed: its blocked calls (see Blocked calls)
   contextPct: number | null, costUsd: number | null,
   queue: [{id, text, files?: Attachment[], at, clientId: string | null}],
@@ -679,7 +680,12 @@ Session = {
     cursor: number,            // the option Enter picks now
     more: boolean,             // it scrolls past what the screen shows
     cancel: boolean,           // Esc closes it
-    alt: null | {enter, key, label}  // the footer's second way to pick ("s to use this session only")
+    alt: null | {enter, key, label},  // the footer's second way to pick ("s to use this session only")
+    permission: null | {       // Fork: Claude Code's own permission dialog (see Approvals, "In the terminal")
+      tool: string | null,     // its title: "Bash command", "Edit file"
+      command: string | null,  // what it would run or change, between its dashed rules, whole
+      question: string         // "Do you want to proceed?"; options start with Yes and have a No
+    }
   }
 }
 
@@ -977,8 +983,8 @@ shows, finished ones too (`idle`, on Home rather than History; one blocked on th
 A session's blocked calls (the phone's session sheet): calls refused without the owner. `auto_mode`: Claude Code's auto mode
 classifier refused it (its PermissionDenied hook, see Hooks, or the tool result "Permission for this
 action was denied by the Claude Code auto mode classifier. Reason: …" in the transcript, which stays
-the fallback; one row for both). `away`: nobody answered its approval for 10 minutes (see
-Approvals). Don't ask mode, deny rules and the owner's own no aren't listed (a retry can't get past
+the fallback; one row for both). `away`: nobody answered a Codex approval for 10 minutes (see
+Approvals; Claude Code's goes back to its terminal instead). Don't ask mode, deny rules and the owner's own no aren't listed (a retry can't get past
 them). The same call refused again is one row, the newest refusal's; a call that runs later leaves
 the list by itself; refusals more than a day old read from a transcript aren't listed; 20 per
 session at most. `Session.blockedCalls` counts them, and a `{t:"session"}` goes out when it changes.
@@ -2138,9 +2144,9 @@ Trigger +=
 - **Still needing you.** The session trigger's `after` (needs_you only; 1–120 minutes, a whole
   number; 400 `bad_trigger` on `trigger.after` otherwise): an approval or a terminal menu that needs
   you is looked at again `after` minutes later, and the automation fires then only if the session
-  still needs you for it: the approval still open, or turned away for nobody answering (an approval
-  answers itself "no" after 10 minutes and the session waits for you, `stoppedForAway`), the menu
-  still open. Answered meanwhile (Allow or Deny anywhere, the terminal, the menu closed) or the
+  still needs you for it: the approval still open, or turned away for nobody answering (a Codex approval
+  answers itself "no" after 10 minutes and the session waits for you, `stoppedForAway`; Claude Code's
+  goes back to its terminal, a menu then), the menu still open. Answered meanwhile (Allow or Deny anywhere, the terminal, the menu closed) or the
   session ended: never. Its filters, its own sessions and "once per approval or menu" as at once;
   "at most once a minute per automation per session" when it fires; `fired.at` is the time it was
   looked at again, `{ask}` what it asked. Paused or off then: nothing. Not kept across a restart
@@ -2318,11 +2324,23 @@ session step's whole output 8 KB (its first).
 - For terminal sessions the same request is also on the Mac terminal; the first
   answer wins. When the terminal answers, the daemon sees the tool finish and
   sends `approval.resolved` with `by: "terminal"`.
-- After 10 minutes without an answer the daemon denies with this message to
-  Claude: "The user didn't respond within 10 minutes and is probably away from
-  their phone. Don't retry or work around this. Stop here and wait until they
-  come back." The session gets `stoppedForAway: true`, and the app shows a
-  **Continue** button (`POST /continue`).
+- After 10 minutes without an answer, never a "no" for Claude Code (docs/DECISIONS.md, "Never
+  auto-deny"): its hook answers with no decision, so Claude Code asks in its own dialog in the
+  session's terminal (the approval resolves `terminal`, with an `info` notice saying so). Codex
+  has no dialog to fall back to: its ask is cancelled, the session gets `stoppedForAway: true`,
+  and the app shows a **Continue** button (`POST /continue`). A session the daemon runs through
+  the SDK (`runner.ts`) still gets a no with this message: "The user didn't respond within 10
+  minutes and is probably away from their phone. Don't retry or work around this. Stop here and
+  wait until they come back."
+- **In the terminal** (fork). Claude Code's own permission dialog, after the 10 minutes or brought
+  up with no hook asking (an ask rule over auto mode: "Ask rule Bash(python:*) overrides auto mode
+  for this command"), is the session's `menu` with `permission` wherever its terminal is shared (a
+  holder, or a `claude agents` job's `claude attach`; never one that drifted to another job or the
+  agent list). While it shows the session is `needs_you`, whatever Claude Code's registry says, and
+  held prompts wait. A permission dialog's menu id names its command, so two dialogs are two menus.
+  The phone draws it as an approval card where the asks go (the command, Deny and Allow, the
+  dialog's other options as it words them) and as Deny and Allow on the Home card; a tap answers it
+  through `POST /v1/sessions/{id}/menu`: Allow is its first option (Yes), Deny its last No.
 - `always` allows and adds Claude Code's suggested permission rule for the
   session (`updatedPermissions`). The phone asks for the fingerprint or the screen lock first,
   and notifications and the widget offer Allow and Deny only.
@@ -3103,7 +3121,7 @@ on the daemon and typed in once Claude Code's input box is back (`daemon/src/hel
 - **Sent** oldest first, one at a time, as soon as the session is ready: no approval open for it, no
   `menu`, not `needs_you` or `starting`, and a shared terminal Hypernova holds (or a `claude agents`
   job, through `claude attach`). How the ask was answered doesn't matter (the phone, a notification,
-  the terminal, the 10-minute auto-deny). The daemon looks when an approval is resolved or the session
+  the terminal, a Codex auto-deny). The daemon looks when an approval is resolved or the session
   changes, and every 3 s. It's typed the way a prompt is (Shared terminals, "Typing a prompt"): while
   Claude works, Claude Code queues it (`session.queue`). Never a fork or a resume.
 - **Not taken** (Claude asks again, unsent text in the box, the terminal busy or starting): it stays

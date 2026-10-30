@@ -1,0 +1,22 @@
+╰────────────────╯
+                                        Ran 1 command · last: cd /media/cubxi/docker && bin/dcwra… ●
+● The devices migration applied. Smoke-checking every page:
+                                        Ran 1 command · last: /media/cubxi/docker/projects/arc/.v… ●
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ Bash command
+ Smoke-check all live pages
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ │ /media/cubxi/docker/projects/arc/.venv/bin/python
+ │ /media/cubxi/docker/projects/arc/scratch/deploy/check.py http://192.168.1.76:8108 /healthz /
+ │ /variants/1/ /variants/1/blend/ /compare/?v=1 /accuracy/ /devices/
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ Ask rule Bash(python:*) overrides auto mode for this command.
+ /permissions to let auto mode decide
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. No
+
+ Esc to cancel · Tab to amend
+──────────────────────────────────────────────────────── Arc config reverse engineering Django app ─

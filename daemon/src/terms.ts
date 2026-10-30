@@ -15,7 +15,7 @@ import { promptTitle, typedCommand } from './normalize.ts'
 import { trialEnded } from './blockers.ts'
 import { noteTrialEnded } from './account.ts'
 import { fromBeforeBoot } from './reboot.ts'
-import { DATA, Frames, MSG, TERMS, boxLines, boxText, codexTuiArgs, frame, isWorking, menuOf, metaPath, modeOf, msg, newTermId, registryBusy, sessionEnv, sockPath, spawnHolder, type TermMeta, type TermState } from './term/shared.ts'
+import { DATA, Frames, MSG, TERMS, boxLines, boxText, codexTuiArgs, frame, isWorking, menuOf, metaPath, modeOf, msg, newTermId, registryBusy, sessionEnv, sockPath, spawnHolder, type Permission, type TermMeta, type TermState } from './term/shared.ts'
 import { CodexError, codexBinary, codexSocketPath, rpc } from './codex/client.ts'
 import { getThread } from './codex/threads.ts'
 import { isHiddenCwd } from './term/hidden.ts'
@@ -361,13 +361,23 @@ export async function switchTermMode(id: string, mode: string): Promise<Typed> {
 }
 
 // ── Menus ────────────────────────────────────────────────────────────────
+/** A permission dialog as the session's activity: "Bash command: python check.py …", else its question. */
+function permissionActivity(title: string | null, p: Permission): string {
+  const first = p.command?.split('\n')[0]?.trim()
+  const s = first ? (title ? `${title}: ${first}` : first) : p.question
+  return s.length > 120 ? s.slice(0, 119) + '…' : s
+}
+
 /** The menu each session's terminal showed at the last look: one counts once it holds still. */
 const lastMenu = new Map<string, string | null>()
 let looking = false
 /**
  * Look at each shared session's screen for a menu or dialog (the /model picker, a dialog the
  * hooks never see) and put it on the session, so the phone can show it as buttons. Not while
- * the session has an approval card: that answers the same dialog.
+ * the session has an approval card: that answers the same dialog. Claude Code's own permission
+ * dialog (`menu.permission`) waits on the owner whatever its registry says (a `claude agents`
+ * job's stays "busy"): the session needs you while it shows, and works again once it's gone
+ * (the registry and the hooks say more within seconds).
  */
 export async function watchMenus(): Promise<void> {
   if (looking) return
@@ -381,17 +391,23 @@ export async function watchMenus(): Promise<void> {
           if (r.menu) upsertSession(r.id, { menu: null })
           return
         }
-        const text = await screenOf(r.term.id)
+        // A `claude attach` holder showing another job or the agent list: no menu there is this
+        // session's (answering it would answer another job's dialog).
+        const text = attachDrifted(r.term.id, r.id) ? '' : await screenOf(r.term.id)
         if (text === null) return
         let menu = menuOf(text.split('\n'))
         // Claude Code's "Your Claude Code trial has ended." dialog: the plan is over.
         if (menu && trialEnded(menu.title) && isSubscription(r.providerId)) noteTrialEnded(Date.now(), r.id)
-        if (menu && view(r).pendingApprovalIds.length) menu = null
+        const asked = view(r).pendingApprovalIds.length > 0
+        if (menu && asked) menu = null
         const before = lastMenu.get(r.id) ?? null
         lastMenu.set(r.id, menu?.id ?? null)
         if (!menu) {
-          if (r.menu) upsertSession(r.id, { menu: null })
-        } else if (menu.id === before || menu.id === r.menu?.id) upsertSession(r.id, { menu })
+          if (r.menu) upsertSession(r.id, { menu: null, ...(r.menu.permission && r.state === 'needs_you' && !asked ? { state: 'working' as const, activity: null } : {}) })
+        } else if (menu.id === before || menu.id === r.menu?.id) {
+          const p = menu.permission
+          upsertSession(r.id, { menu, ...(p && r.state !== 'needs_you' ? { state: 'needs_you' as const, activity: permissionActivity(menu.title, p), lastActivityAt: Date.now() } : {}) })
+        }
       }),
     )
   } finally {
