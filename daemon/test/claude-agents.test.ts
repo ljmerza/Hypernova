@@ -3,7 +3,7 @@
 // through `claude attach <job>` in a shared terminal, never a fork; a new one starts with
 // `claude --bg`. A stand-in claude registers a job as Claude Code does and draws an empty input box
 // when attached; a job named "gone0000" refuses to attach, as one that was removed does.
-import { test, after } from 'node:test'
+import { test, after, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -50,6 +50,17 @@ case "$1" in
       [ "$2" = "permdrft" ] && printf '\\033]0;Some other session\\007'
       cat "$S/perm-screen.txt"; stty -echo 2>/dev/null; exec cat > "$S/keys-$2"
     fi
+    # hb*: the dialog of an ask handed back (perm-screen.txt) until a key answers it (that key lands
+    # in keys-<job>-<n>, n counting attaches), then the input box. hbdrift0's first attach shows
+    # another session's title, as a holder that drifted does.
+    case "$2" in hb*)
+      n=$(( $(cat "$S/n-$2" 2>/dev/null || echo 0) + 1 )); echo $n > "$S/n-$2"
+      [ "$2" = hbdrift0 ] && [ $n = 1 ] && printf '\\033]0;Some other session\\007'
+      cat "$S/perm-screen.txt"; stty -echo -icanon min 1 time 0 2>/dev/null
+      dd bs=1 count=1 2>/dev/null > "$S/keys-$2-$n"
+      printf '\\033[2J\\033[H\\n────────────────────\\n❯ \\n────────────────────\\n'
+      exec sleep 30 ;;
+    esac
     # mode*: Claude Code's mode line under the box, Shift+Tab cycling it. Each attach is counted and
     # its Shift+Tabs land in keys-<job>-<n>. modedrft's first attach and every one of modestuk's
     # show another session (its title), as a holder that drifted does.
@@ -433,6 +444,114 @@ const attaches = (jobId: string): number => {
   const f = join(process.env.FAKE_AGENTS_DIR!, `n-${jobId}`)
   return existsSync(f) ? Number(readFileSync(f, 'utf8').trim()) : 0
 }
+
+const hooks = await import('../src/hooks.ts')
+/**
+ * Session [sid] asks to run [command] (a subagent of it when [agent] is given) and nobody answers
+ * on the phone for 10 minutes: its PermissionRequest hook hands the ask back to Claude Code.
+ */
+async function handedBack(sid: string, command: string, agent?: string): Promise<void> {
+  const res = { on() {}, writableEnded: false }
+  let out: Promise<object>
+  mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    out = hooks.handleHook({ session_id: sid, cwd: scratch, hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command }, ...(agent ? { agent_id: agent } : {}) }, {} as never, res as never)
+    mock.timers.tick(hub.AWAY_MS)
+  } finally {
+    mock.timers.reset()
+  }
+  assert.deepEqual(await out, {}, 'no decision: Claude Code asks in its own dialog')
+}
+const handBackNotices = (sid: string) => hub.eventsFor(sid).filter((e) => e.kind === 'notice' && Object.values(hub.HANDED_BACK).includes(e.text))
+const until = async (ok: () => boolean, ms = 6000): Promise<void> => {
+  const t0 = Date.now()
+  while (!ok() && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 100))
+}
+
+test('an ask handed back on a claude agents job with no terminal: claude attach at once, its dialog a card, one notice for every ask, gone once answered', async () => {
+  settings.claudeAgents = true
+  // A subagent's ask, as Claude Code shows it in its session's terminal.
+  writeFileSync(join(process.env.FAKE_AGENTS_DIR!, 'perm-screen.txt'), readFileSync(join(import.meta.dirname, 'fixtures', 'permission-screens', 'subagent-ask.txt')))
+  job('agents-hb-1', 'hb000001', 'busy')
+  hub.pollRegistry()
+  assert.equal(termOf('agents-hb-1'), null, 'nothing attached: nobody reads its dialogs')
+  const feed: any[] = []
+  hub.addClient({ send: (s: string) => feed.push(JSON.parse(s)) })
+  await handedBack('agents-hb-1', 'ls /media/cubxi/docker/projects/hypernova/daemon/test', 'agent-1')
+  await settleMenus('agents-hb-1', (m: any) => !!m?.permission)
+  const s = hub.getSession('agents-hb-1')!
+  assert.ok(termOf('agents-hb-1'), 'a claude attach holder')
+  assert.equal(attaches('hb000001'), 1)
+  assert.equal(s.menu?.permission?.tool, 'Bash command · from the general-purpose agent')
+  assert.equal(s.menu?.permission?.command, 'ls /media/cubxi/docker/projects/hypernova/daemon/test')
+  assert.equal(s.state, 'needs_you')
+  // One notice, and with the card up it says the answer is below, not "open the terminal".
+  let notes = handBackNotices('agents-hb-1')
+  assert.equal(notes.length, 1)
+  assert.equal(notes[0]!.kind === 'notice' && notes[0]!.text, hub.HANDED_BACK.card)
+  const noticeId = notes[0]!.id
+  // Two more asks go back (the main agent's, another agent's): the same holder, still one notice.
+  await handedBack('agents-hb-1', 'npm test')
+  await handedBack('agents-hb-1', 'git status', 'agent-2')
+  await settleMenus('agents-hb-1', (m: any) => !!m?.permission)
+  assert.equal(attaches('hb000001'), 1, 'one attach for every ask')
+  notes = handBackNotices('agents-hb-1')
+  assert.deepEqual(notes.map((e) => e.id), [noticeId])
+  assert.equal(notes[0]!.kind === 'notice' && notes[0]!.text, hub.HANDED_BACK.card)
+  // Allow on the card: Enter in the dialog, which closes; then the notice goes.
+  const menuId = hub.getSession('agents-hb-1')!.menu!.id
+  const r = await post('/v1/sessions/agents-hb-1/menu', { menuId, choice: 0 })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  const keys = join(process.env.FAKE_AGENTS_DIR!, 'keys-hb000001-1')
+  await until(() => existsSync(keys) && readFileSync(keys, 'utf8') === '\n', 3000)
+  assert.equal(readFileSync(keys, 'utf8'), '\n', 'Enter, nothing else')
+  const t0 = Date.now()
+  while (handBackNotices('agents-hb-1').length && Date.now() - t0 < 6000) {
+    await watchMenus()
+    await new Promise((ok) => setTimeout(ok, 200))
+  }
+  assert.equal(handBackNotices('agents-hb-1').length, 0)
+  assert.ok(feed.some((m) => m.t === 'event.removed' && m.sessionId === 'agents-hb-1' && m.id === noticeId), 'clients told it went')
+})
+
+test('an ask handed back while the job’s claude attach shows another session: that holder is never read or answered, a fresh attach is', async () => {
+  settings.claudeAgents = true
+  writeFileSync(join(process.env.FAKE_AGENTS_DIR!, 'perm-screen.txt'), readFileSync(join(import.meta.dirname, 'fixtures', 'permission-screens', 'attach-ask-rule.txt')))
+  job('agents-hb-2', 'hbdrift0', 'busy', { name: 'Mine' })
+  hub.pollRegistry()
+  const first = await attachAgentsTerm('agents-hb-2', scratch, 'hbdrift0', 1500)
+  assert.ok(first)
+  scanTerms()
+  await until(() => attachDrifted(first!, 'agents-hb-2'), 5000)
+  assert.equal(attachDrifted(first!, 'agents-hb-2'), true)
+  for (let i = 0; i < 3; i++) await watchMenus()
+  assert.equal(hub.getSession('agents-hb-2')?.menu, null, 'the drifted holder’s dialog isn’t the session’s')
+  await handedBack('agents-hb-2', 'python check.py')
+  await until(() => !!termOf('agents-hb-2') && termOf('agents-hb-2') !== first)
+  await settleMenus('agents-hb-2', (m: any) => !!m?.permission)
+  assert.notEqual(termOf('agents-hb-2'), first, 'a fresh claude attach')
+  assert.equal(attaches('hbdrift0'), 2)
+  assert.equal(hub.getSession('agents-hb-2')?.menu?.permission?.tool, 'Bash command')
+  assert.equal(readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'keys-hbdrift0-1'), 'utf8'), '', 'nothing pressed in the drifted one')
+  const notes = handBackNotices('agents-hb-2')
+  assert.equal(notes.length, 1)
+  assert.equal(notes[0]!.kind === 'notice' && notes[0]!.text, hub.HANDED_BACK.card)
+})
+
+test('an ask handed back on a job whose terminal is attached already: no second attach', async () => {
+  settings.claudeAgents = true
+  writeFileSync(join(process.env.FAKE_AGENTS_DIR!, 'perm-screen.txt'), readFileSync(join(import.meta.dirname, 'fixtures', 'permission-screens', 'attach-ask-rule.txt')))
+  job('agents-hb-3', 'hb000003', 'busy')
+  hub.pollRegistry()
+  const tid = await attachAgentsTerm('agents-hb-3', scratch, 'hb000003', 1500)
+  assert.ok(tid)
+  scanTerms()
+  await handedBack('agents-hb-3', 'python check.py')
+  await settleMenus('agents-hb-3', (m: any) => !!m?.permission)
+  assert.equal(termOf('agents-hb-3'), tid)
+  assert.equal(attaches('hb000003'), 1)
+})
+
 
 test('the mode route on a claude agents job with no terminal: claude attach, then Shift+Tab until the mode shows', async () => {
   settings.claudeAgents = true

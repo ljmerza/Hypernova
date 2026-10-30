@@ -122,6 +122,40 @@ test('nobody answered for 10 minutes (Claude Code): handed back to its own dialo
   assert.equal(hub.getSession(sid)?.stoppedForAway, false)
 })
 
+test('asks handed back to the terminal: one notice for the session, gone once each was answered there', async () => {
+  const sid = 'bl-away-n'
+  hub.upsertSession(sid, { cwd, origin: 'terminal' })
+  const feed = sent()
+  const notices = () => hub.eventsFor(sid).filter((e) => e.kind === 'notice')
+  const away = async (toolUseId: string, command: string) => {
+    mock.timers.enable({ apis: ['setTimeout'] })
+    try {
+      const asked = hub.requestApproval({ sessionId: sid, kind: 'tool', toolName: 'Bash', summary: `Bash: ${command}`, input: { command }, reason: null, canAlways: false, questions: null, plan: null }, toolUseId)
+      mock.timers.tick(hub.AWAY_MS)
+      assert.equal((await asked).decision, 'timeout')
+    } finally {
+      mock.timers.reset()
+    }
+  }
+  await away('toolu_awayn1', 'npm publish')
+  await away('toolu_awayn2', 'git push')
+  const [n] = notices()
+  assert.equal(notices().length, 1, 'one notice, not one per ask')
+  // No terminal the daemon reads (no card on the phone): it says where the question is.
+  assert.equal(n!.kind === 'notice' && n!.text, hub.HANDED_BACK.terminal)
+  // The first answered in the terminal (its tool finished): one still waits there.
+  hub.resolveByToolUse('toolu_awayn1')
+  assert.equal(notices().length, 1)
+  await hook(sid, { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'git push' }, tool_use_id: 'toolu_awayn2', tool_response: {} })
+  assert.equal(notices().length, 0)
+  assert.ok(feed.some((m) => m.t === 'event.removed' && m.sessionId === sid && m.id === n!.id))
+  // Another later: a new notice. The session ends with it unanswered: it goes too.
+  await away('toolu_awayn3', 'rm -rf build')
+  assert.equal(notices().length, 1)
+  hub.setState(sid, 'ended')
+  assert.equal(notices().length, 0)
+})
+
 test('a call refused for want of an answer (Codex): Allow & retry says so, and its next ask is answered yes once', async () => {
   const sid = 'bl-away-1'
   hub.upsertSession(sid, { cwd, origin: 'terminal' })

@@ -1,0 +1,16 @@
+● Surveying the daemon's tests with an agent.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ Bash command · from the general-purpose agent                                               1 of 3
+ List the daemon's tests
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ │ ls /media/cubxi/docker/projects/hypernova/daemon/test
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don’t ask again for ls commands in /media/cubxi/docker/projects/hypernova
+   3. No
+
+ Esc to cancel · Tab to amend
+──────────────────────────────────────────────────────────────────────────── Hypernova handbacks ─

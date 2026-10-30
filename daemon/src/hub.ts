@@ -304,6 +304,8 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
   Object.assign(r, patch)
   // Running again (a prompt resumed it): no longer one a restart of the Mac cut short.
   if (patch.state && patch.state !== 'ended') runsAgain(id)
+  // Ended: no dialog of its own waits any more.
+  if (patch.state === 'ended') clearHandBack(id)
   if (patch.cwd) {
     r.projectName = projectNameOf(patch.cwd)
     if (!patch.transcriptPath) r.transcriptPath = transcriptPathFor(patch.cwd, id)
@@ -657,6 +659,14 @@ export function notice(sessionId: string, text: string, tone: 'info' | 'warn' | 
   putEvent(sessionId, { id: `n:${randomUUID()}`, kind: 'notice', ts: Date.now(), text, tone })
 }
 
+/** Take an event the daemon made (a notice that no longer holds) out of the session, and tell clients. */
+export function dropEvent(sessionId: string, id: string): void {
+  const st = sessions.get(sessionId)?.parse
+  if (!st?.byId.delete(id)) return
+  st.events = st.events.filter((e) => e.id !== id)
+  broadcast({ t: 'event.removed', sessionId, id })
+}
+
 /**
  * How long a prompt Claude took from the queue waits for its step's lines (as a rule written
  * just after) before it shows from its queue entry.
@@ -905,11 +915,67 @@ export function answerApproval(id: string, ans: Answer, by: 'phone' | 'mac'): bo
  */
 export function resolveSession(sessionId: string, mainOnly = false): void {
   for (const p of [...pending.values()]) if (p.approval.sessionId === sessionId && !(mainOnly && p.approval.agentId)) finish(p.approval.id, { decision: 'terminal' }, 'terminal')
+  settleHandBack(sessionId, (a) => !(mainOnly && a.agentId))
 }
 
 /** A terminal session's tool finished: if we still hold its approval, the terminal answered it. */
 export function resolveByToolUse(toolUseId: string): void {
   for (const p of pending.values()) if (p.toolUseId === toolUseId) finish(p.approval.id, { decision: 'terminal' }, 'terminal')
+  for (const sid of [...handBacks.keys()]) settleHandBack(sid, (a) => a.toolUseId === toolUseId)
+}
+
+// ── Asks handed back to Claude Code's own dialog ─────────────────────────
+// One notice per session however many asks went back (a session's agents ask too), said once
+// where the asks go. It names the phone's card once one shows (terms.ts reads the dialog off a
+// shared terminal: watchMenus, then noteTermDialog), and goes once the asks are answered: their
+// tools finish, the turn or the agent moves on, the session ends, or the dialog it watched closed.
+type HandBackAsk = { toolUseId: string | null; agentId: string | null }
+type HandBack = { noticeId: string; at: number; asks: HandBackAsk[]; card: boolean; seen: boolean; gone: number }
+const handBacks = new Map<string, HandBack>()
+export const HANDED_BACK = {
+  terminal: 'Still waiting for your answer: the question is now in the session’s terminal. Open the terminal to answer it.',
+  card: 'Still waiting for your answer below.',
+}
+
+function handBack(sid: string, ask: HandBackAsk): void {
+  let hb = handBacks.get(sid)
+  if (!hb) handBacks.set(sid, (hb = { noticeId: `n:${randomUUID()}`, at: Date.now(), asks: [], card: false, seen: false, gone: 0 }))
+  hb.asks.push(ask)
+  putHandBack(sid, hb)
+}
+function putHandBack(sid: string, hb: HandBack): void {
+  putEvent(sid, { id: hb.noticeId, kind: 'notice', ts: hb.at, text: hb.card ? HANDED_BACK.card : HANDED_BACK.terminal, tone: 'info' })
+}
+/** The notice goes: nothing handed back waits any more. */
+function clearHandBack(sid: string): void {
+  const hb = handBacks.get(sid)
+  if (!hb) return
+  handBacks.delete(sid)
+  dropEvent(sid, hb.noticeId)
+}
+/** Asks of session [sid] that [answered] says were answered (in its terminal); the notice goes with the last. */
+export function settleHandBack(sid: string, answered: (a: HandBackAsk) => boolean): void {
+  const hb = handBacks.get(sid)
+  if (!hb) return
+  hb.asks = hb.asks.filter((a) => !answered(a))
+  if (!hb.asks.length) clearHandBack(sid)
+}
+/**
+ * What session [sid]'s shared terminal showed at a look (terms.ts, watchMenus; never one that
+ * drifted to another job): Claude Code's permission dialog or not, and whether the phone has it as
+ * a card. A dialog seen, then gone for two looks in a row, was answered.
+ */
+export function noteTermDialog(sid: string, dialog: boolean, card: boolean): void {
+  const hb = handBacks.get(sid)
+  if (!hb) return
+  if (dialog) {
+    hb.seen = true
+    hb.gone = 0
+    if (card && !hb.card) {
+      hb.card = true
+      putHandBack(sid, hb)
+    }
+  } else if (hb.seen && ++hb.gone >= 2) clearHandBack(sid)
 }
 
 const waitStarted = new Map<string, { toolUseId: string | null; at: number }>()
@@ -945,7 +1011,7 @@ function finish(id: string, ans: Answer, by: string): boolean {
     } else {
       // Claude Code: never a "no" (owner, 2026-10-30). Its hook hands the question back (hooks.ts),
       // and Claude Code asks in its own dialog; the session waits there, needing you, not paused.
-      notice(sid, 'Still waiting for your answer: the question is now in the session’s terminal. Open the terminal to answer it.', 'info')
+      handBack(sid, { toolUseId: p.toolUseId, agentId: p.approval.agentId })
     }
   }
   if (r && ![...pending.values()].some((x) => x.approval.sessionId === sid)) {

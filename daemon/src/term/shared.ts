@@ -340,7 +340,11 @@ export function menuOf(lines: string[]): Menu | null {
   // The title: from the rule that opens the dialog down to the options.
   let top = a - 1
   while (top >= 0 && a - top <= 30 && !rule(lines[top]!)) top--
-  const region = lines.slice(top + 1, a)
+  // With several asks open at once, Claude Code counts them at the right of the title row ("1 of
+  // 3"; a subagent's dialog says whose after the title, "Bash command · from the Explore agent"):
+  // not the title's, and a row that full would read as one that wrapped into the next.
+  const lead = lines.slice(top + 1, a).findIndex((l) => l.trim())
+  const region = lines.slice(top + 1, a).map((l, k) => (k === lead ? l.replace(/(\S)\s{2,}\d+ of \d+\s*$/, '$1') : l))
   let head = paragraphs(region, width)
   const title = head[0] && head[0].length <= 80 ? head.shift()! : null
   const options = es.map((e) => {
