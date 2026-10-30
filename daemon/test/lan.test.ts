@@ -45,7 +45,7 @@ process.env.HYPERNOVA_LAN_PORT = '0'
 // Not WSL, whatever machine runs the test: behind WSL's NAT no address is advertised (test/wsl.test.ts).
 process.env.HYPERNOVA_WSL = '0'
 
-const { privateAddress, lanAddresses, resetPairLimits, lanLimits, lanInfo, setLanAccess } = await import('../src/lan.ts')
+const { privateAddress, lanAddresses, pairingAddresses, pickLanAddress, pairAllowed, pairFailed, resetPairLimits, lanLimits, lanInfo, setLanAccess } = await import('../src/lan.ts')
 const { serverIdentity, TLS_DIR } = await import('../src/tls.ts')
 const { startServers, startPairing } = await import('../src/http.ts')
 const { addDevice, adminToken, getDevice, setDeviceCert, settings } = await import('../src/store.ts')
@@ -389,15 +389,18 @@ test('pairing over the listener: open while a code is shown, 5 wrong codes per s
   assert.equal(link.searchParams.get('fp'), FP)
   assert.equal(link.searchParams.get('lp'), String(LAN))
   const advertised = (link.searchParams.get('lan') ?? '').split(',').filter(Boolean)
-  assert.deepEqual(advertised, lanAddresses())
+  assert.deepEqual(advertised, pairingAddresses(lanAddresses()))
+  // As the links write them: an IPv6 ULA's colons percent-encoded. (The page check below compared
+  // the decoded list with the written one, so it failed on any machine with a ULA, such as z2.)
+  const written = `&fp=${FP}&lan=${advertised.map(encodeURIComponent).join(',')}&lp=${LAN}`
   // The pairing page puts the daemon's own listener in the app link, whatever
   // its query says: the query is anyone's to write.
   const page = await loop(API, 'GET', `/pair?c=${started.code}&n=Mac`)
   assert.equal(page.status, 200)
-  assert.ok(page.body.includes(`&fp=${FP}&lan=${advertised.join(',')}&lp=${LAN}`), 'the app link on the page')
+  assert.ok(page.body.includes(written), 'the app link on the page')
   const odd = await loop(API, 'GET', `/pair?c=${started.code}&n=Mac&fp=<script>&lan=x&lp=1`)
   assert.ok(!odd.body.includes('fp=<script>') && !odd.body.includes('fp=&#60;script') && !odd.body.includes('lan=x'), 'the query is ignored')
-  assert.ok(odd.body.includes(`&fp=${FP}&lan=${advertised.join(',')}&lp=${LAN}`), 'the daemon\'s own values instead')
+  assert.ok(odd.body.includes(written), 'the daemon\'s own values instead')
   // Five wrong codes from this source: the sixth waits, right or wrong.
   for (let i = 0; i < 5; i++) {
     const w = await lan(LAN, 'POST', '/v1/pair', { body: JSON.stringify({ code: `wrong${i}`, deviceName: 'P' }) })
@@ -447,6 +450,76 @@ test('no lock across sources: one peer’s wrong codes never hold another back, 
   assert.equal(pairAllowed('fd00::0').ok, true, 'forgotten')
   assert.equal(pairAllowed(`fd00::${(2999).toString(16)}`).ok, false)
   resetPairLimits()
+})
+
+test('a phone on another private subnet (the owner’s VPN, 192.168.2.x, into a server on 192.168.1.x) gets in, with tries of its own', () => {
+  // The accept filter is the private ranges, never "this computer's own subnet": a VPN's clients
+  // come from a subnet of their own, routed to the LAN.
+  for (const vpn of ['192.168.2.37', '::ffff:192.168.2.37', '10.8.0.2', '172.16.5.9', '100.64.10.2', 'fd42::2']) assert.ok(privateAddress(vpn), vpn)
+  resetPairLimits()
+  for (let i = 0; i < 5; i++) pairFailed('192.168.1.30')
+  assert.equal(pairAllowed('192.168.1.30').ok, false)
+  assert.equal(pairAllowed('192.168.2.37').ok, true, 'a VPN client is a source of its own')
+  assert.equal(pairAllowed('::ffff:192.168.2.37').ok, true)
+  resetPairLimits()
+})
+
+test('the addresses a pairing link carries: IPv4 whenever there is one (a smaller QR code), else the ULAs', () => {
+  assert.deepEqual(pairingAddresses(['192.168.1.48', '192.168.1.76', 'fdae:adb2:db54:680a::5', 'fdae:adb2:db54:680a::6']), ['192.168.1.48', '192.168.1.76'])
+  assert.deepEqual(pairingAddresses(['fd12::5']), ['fd12::5'])
+  assert.deepEqual(pairingAddresses([]), [])
+})
+
+test('the pairing links point at this server on the local network (its listener), never hypernova.observer', async () => {
+  const p = await startPairing()
+  assert.ok(!JSON.stringify(p).includes('hypernova.observer'), JSON.stringify(p))
+  const addresses = pairingAddresses(lanAddresses())
+  const at = pickLanAddress(addresses)
+  if (!at) {
+    // No private address on this machine (a bare CI box): the app's own link, for Paste link.
+    assert.equal(p.link, p.appLink)
+    return
+  }
+  const origin = `https://${at.includes(':') ? `[${at}]` : at}:${LAN}`
+  // The QR code and the printed link: this server's own pairing page, with the listener in it.
+  assert.equal(p.link, p.webLink)
+  assert.ok(p.link.startsWith(`${origin}/pair?c=${p.code}&n=`), p.link)
+  const q = new URL(p.link).searchParams
+  assert.equal(q.get('fp'), FP)
+  assert.equal(q.get('lp'), String(LAN))
+  assert.deepEqual(q.get('lan')!.split(','), addresses)
+  // `u` is the listener too, so each server's pairing has its own base URL.
+  assert.equal(new URL(p.appLink).searchParams.get('u'), origin)
+  assert.equal(p.url, origin)
+  assert.ok(p.download?.startsWith(`https://`) && p.download.includes(`:${LAN}/download/android`), p.download)
+  // A development build's code keeps the emulator's address, and the app link.
+  const dev = await startPairing(true)
+  assert.equal(new URL(dev.appLink).searchParams.get('u'), `http://10.0.2.2:${API}`)
+  assert.equal(dev.link, dev.appLink)
+})
+
+test('the pairing page on the listener (what the QR code opens): no device certificate, only for a code being shown, and it hands the app this listener', async () => {
+  resetPairLimits()
+  const p = await startPairing()
+  const page = await lan(LAN, 'GET', `/pair?c=${p.code}&n=Box`)
+  assert.equal(page.status, 200, page.body)
+  assert.equal(page.fingerprint, FP)
+  // The address the browser came in on (here 127.0.0.1), read from the socket.
+  const here = `https://127.0.0.1:${LAN}`
+  assert.ok(page.body.includes(`intent://pair?v=1&u=${encodeURIComponent(here)}&c=${p.code}&n=Box&fp=${FP}&lan=`), page.body)
+  assert.ok(page.body.includes(`S.browser_fallback_url=${encodeURIComponent(`${here}/download/android`)}`), 'falls back to this server’s download page')
+  assert.ok(!page.body.includes('hypernova.observer'))
+  // A Host or X-Forwarded-Host header moves nothing.
+  const moved = await lan(LAN, 'GET', `/pair?c=${p.code}`, { headers: { host: 'evil.example', 'x-forwarded-host': 'evil.example' } })
+  assert.equal(moved.status, 200)
+  assert.ok(!moved.body.includes('evil.example'), 'the socket’s address, not the request’s')
+  // Without a code being shown there is no page.
+  assert.equal((await lan(LAN, 'GET', '/pair?c=nope')).status, 404)
+  assert.equal((await lan(LAN, 'GET', '/pair')).status, 404)
+  // The page spends nothing: the app then pairs with the code, after which the page is gone.
+  const paired = await lan(LAN, 'POST', '/v1/pair', { body: JSON.stringify({ code: p.code, deviceName: 'Phone from the page' }) })
+  assert.equal(paired.status, 200, paired.body)
+  assert.equal((await lan(LAN, 'GET', `/pair?c=${p.code}`)).status, 404)
 })
 
 test('lanAccess off closes the listener and tells the feed {t:"lan", lan: null}; on again, a new {t:"lan"}', async () => {

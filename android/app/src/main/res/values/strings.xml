@@ -194,10 +194,10 @@
     <string name="onb_step2_title">Run hypernova pair on it</string>
     <string name="onb_step2_body">In a terminal on the server, run hypernova pair. It shows a QR code and a link under it.</string>
     <string name="onb_step3_title">Scan the code, or use the link</string>
-    <string name="onb_step3_body">Point this phone\'s camera at the QR code: it opens Hypernova and pairs. Or open the link on this phone, or paste it below.</string>
+    <string name="onb_step3_body">Point this phone\'s camera at the QR code, at home or over your VPN: it opens the server\'s own page (your browser warns once about the server\'s certificate: go on), which opens Hypernova and pairs. Or paste the link below.</string>
     <string name="onb_step">Step %1$d</string>
     <string name="onb_paste">Paste pairing link</string>
-    <string name="onb_paste_hint">https://hypernova.observer/pair#…</string>
+    <string name="onb_paste_hint">https://192.168.1.20:47323/pair?c=…</string>
     <string name="onb_paste_help">No link on the clipboard. On the server, hypernova pair prints the link under the code: copy it and paste it here.</string>
     <string name="onb_pair">Pair</string>
     <string name="onb_demo">Explore with demo data</string>

@@ -43,7 +43,7 @@ class PairLinksTest {
     }
 
     @Test fun readsTheHypernovaObserverLinkFromItsFragmentExactlyAsTheAppLink() {
-        // The Mac's QR code (docs/PROTOCOL.md, "Pairing"): the app link's parameters after the #.
+        // An older computer's QR code (before 2026-10-30): the app link's parameters after the #, read here, never fetched.
         val params = "v=1&u=https%3A%2F%2Fmac.example.com%3A47321&c=abc123&n=MacBook%20Air&fp=$fp&lan=192.168.1.20%2Cfd00%3A%3A1&lp=47323"
         val u = PairLinks.parse("https://hypernova.observer/pair#$params")!!
         assertEquals(PairLinks.parse("hypernova://pair?$params"), u)
@@ -73,12 +73,56 @@ class PairLinksTest {
 
     @Test fun whichLinkOpenedTheApp() {
         assertEquals(PairLinks.Kind.Pair, PairLinks.kind("hypernova://pair?v=1&u=x&c=y"))
-        assertEquals(PairLinks.Kind.Pair, PairLinks.kind("https://hypernova.observer/pair#v=1&u=x&c=y"))
-        assertEquals(PairLinks.Kind.Pair, PairLinks.kind("HTTPS://Hypernova.Observer/pair"))
-        for (other in listOf(null, "", "hypernova://other", "hypernova://pair/x", "https://hypernova.observer/", "https://hypernova.observer/pairing",
-            "https://evil.example/pair#v=1&u=x&c=y", "http://hypernova.observer/pair", "https://hypernova.observer.evil.example/pair", "https://api.hypernova.observer/pair")) {
+        // Only the app link opens the app: hypernova.observer is no link of this app's any more.
+        for (other in listOf(null, "", "hypernova://other", "hypernova://pair/x", "https://hypernova.observer/pair#v=1&u=x&c=y", "HTTPS://Hypernova.Observer/pair",
+            "https://hypernova.observer/", "https://evil.example/pair#v=1&u=x&c=y", "http://hypernova.observer/pair", "https://api.hypernova.observer/pair")) {
             assertNull(other, PairLinks.kind(other))
         }
+    }
+
+    @Test fun theServersOwnPageIsWhatTheQrCodeCarriesAndItPairsAsIs() {
+        // What `hypernova pair` prints and its QR code carries since 2026-10-30: the server's own page.
+        val link = "https://192.168.1.48:47323/pair?c=tt_HXg765lYefvZF-4YGfw&n=z2&fp=$fp&lan=192.168.1.48,192.168.1.76&lp=47323"
+        val l = PairLinks.parse(link)!!
+        assertEquals("https://192.168.1.48:47323", l.baseUrl)
+        assertEquals("tt_HXg765lYefvZF-4YGfw", l.code)
+        assertEquals("z2", l.macName)
+        assertEquals(fp, l.fingerprint)
+        assertEquals(listOf("192.168.1.48", "192.168.1.76"), l.lan)
+        assertEquals(47323, l.lanPort)
+        assertTrue(l.hasLan)
+        // The page's hand-over to the app names the same server the same way.
+        val handed = PairLinks.parse("intent://pair?v=1&u=https%3A%2F%2F192.168.1.48%3A47323&c=tt_HXg765lYefvZF-4YGfw&n=z2&fp=$fp&lan=192.168.1.48,192.168.1.76&lp=47323#Intent;scheme=hypernova;package=com.prudnikweb.hypernova;S.browser_fallback_url=https%3A%2F%2F192.168.1.48%3A47323%2Fdownload%2Fandroid;end")!!
+        assertEquals(l, handed)
+        // The base URL is the listener itself: Local's to try, not a second route.
+        assertTrue(RoutePolicy.isListener(l.baseUrl, l.lan, l.lanPort))
+    }
+
+    @Test fun twoServersPairedTheOldWayStillGetBasesOfTheirOwn() {
+        // Links from before 2026-10-30 all said u=http://10.0.2.2:47321: paired over the listener,
+        // each keeps the address that answered, so their routes never mix (ActiveRoutes goes by base).
+        val a = PairLinks.parse("hypernova://pair?v=1&u=http%3A%2F%2F10.0.2.2%3A47321&c=a&n=z2&fp=$fp&lan=192.168.1.48,192.168.1.76&lp=47323")!!
+        val b = PairLinks.parse("hypernova://pair?v=1&u=http%3A%2F%2F10.0.2.2%3A47321&c=b&n=box&fp=$fp&lan=192.168.1.90&lp=47323")!!
+        assertEquals(a.baseUrl, b.baseUrl)
+        assertEquals("https://192.168.1.76:47323", PairLinks.keptBase(a, "192.168.1.76"))
+        assertEquals("https://192.168.1.90:47323", PairLinks.keptBase(b, "192.168.1.90"))
+        // Not over the listener (an emulator on 10.0.2.2): the link's own base.
+        assertEquals("http://10.0.2.2:47321", PairLinks.keptBase(a, null))
+        // A link whose base is already the server's own (https) keeps it, whichever address answered.
+        val now = PairLinks.parse("https://192.168.1.48:47323/pair?c=x&fp=$fp&lan=192.168.1.48,192.168.1.76&lp=47323")!!
+        assertEquals("https://192.168.1.48:47323", PairLinks.keptBase(now, "192.168.1.76"))
+        assertEquals("https://[fd00::1]:47323", PairLinks.keptBase(a.copy(lan = listOf("fd00::1")), "fd00::1"))
+    }
+
+    @Test fun whichBaseIsTheListenerItself() {
+        val lan = listOf("192.168.1.48", "fd00::1")
+        assertTrue(RoutePolicy.isListener("https://192.168.1.48:47323", lan, 47323))
+        assertTrue(RoutePolicy.isListener("https://[fd00::1]:47323/", lan, 47323))
+        assertFalse(RoutePolicy.isListener("https://192.168.1.48:47321", lan, 47323))
+        assertFalse(RoutePolicy.isListener("http://192.168.1.48:47323", lan, 47323))
+        assertFalse(RoutePolicy.isListener("https://192.168.1.49:47323", lan, 47323))
+        assertFalse(RoutePolicy.isListener("http://10.0.2.2:47321", lan, 47323))
+        assertFalse(RoutePolicy.isListener("https://mac.example.com:47323", lan, 47323))
     }
 
     @Test fun aBadListenerIsLeftOut() {

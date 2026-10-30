@@ -23,7 +23,9 @@
 // Anything failing (the service down, a rate limit, no Wi-Fi address) leaves today's behaviour:
 // the links use the IP address and the self-signed certificate; /local/status says why.
 //
-// A test daemon (HYPERNOVA_SUPPORT) registers nothing unless HYPERNOVA_NAMES_URL says where.
+// Off unless a name service is configured: the `nameServiceUrl` setting or HYPERNOVA_NAMES_URL (none by
+// default since 2026-10-30, docs/DECISIONS.md, "Pairing is local only"); a test daemon
+// (HYPERNOVA_SUPPORT) only through HYPERNOVA_NAMES_URL.
 import { mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { createPrivateKey, X509Certificate } from 'node:crypto'
@@ -35,6 +37,7 @@ import { NameServiceClient, NameServiceError, exportPrivateKey, fromBase64, gene
 import { AcmeClient, AcmeError, LETS_ENCRYPT, certHosts, chainTrusted, httpsTransport, newEcKey, renewAt, splitPem } from './acme.ts'
 import { advertisedAddresses, lanEnabled, lanInfo, onLanChange, pickLanAddress, setNamedCert, type NamedCert } from './lan.ts'
 
+/** Upstream's name service: never used unless configured (the `nameServiceUrl` setting or HYPERNOVA_NAMES_URL). */
 export const DEFAULT_SERVICE = 'https://api.hypernova.observer'
 export const DEFAULT_DOMAIN = 'hypernova.observer'
 /**
@@ -142,7 +145,7 @@ let extraRoots: { path: string; roots: readonly string[] } | null = null
 /** This process's configuration: the environment first, then the settings, then the defaults. */
 export function envConfig(env: NodeJS.ProcessEnv = process.env): NamesConfig {
   const named = env.HYPERNOVA_NAMES_URL
-  const serviceUrl = named !== undefined ? (named && named !== 'off' ? named : null) : env.HYPERNOVA_SUPPORT ? null : settings.nameServiceUrl || DEFAULT_SERVICE
+  const serviceUrl = named !== undefined ? (named && named !== 'off' ? named : null) : env.HYPERNOVA_SUPPORT ? null : settings.nameServiceUrl || null
   const caFile = env.HYPERNOVA_ACME_CA
   const rootsFile = env.HYPERNOVA_NAMES_ROOTS
   if (rootsFile && extraRoots?.path !== rootsFile) extraRoots = { path: rootsFile, roots: [...rootCertificates, ...splitPem(readFileSync(rootsFile, 'utf8'))] }
@@ -462,7 +465,7 @@ export class NameKeeper {
     // First, whatever the setting says: a name still in DNS because its release didn't get through.
     if (this.saved?.pendingRelease) return `Giving the name up: the name service couldn’t be reached, so ${this.saved.lanFqdn} stays in DNS until it can; trying again.`
     if (settings.nameService === false) return 'Turned off.'
-    if (cfg.serviceUrl === null) return 'This daemon has no name service (a test copy without HYPERNOVA_NAMES_URL).'
+    if (cfg.serviceUrl === null) return 'No name service is configured (the nameServiceUrl setting or HYPERNOVA_NAMES_URL), so there is no name: the links use the address.'
     if (this.suspended) return 'Released; the next start registers a new name.'
     if (!this.saved && !this.termsShown()) return 'Not made yet: Setup’s phone step (or hypernova pair) says what the private name is first.'
     if (!lanEnabled()) return 'The local network listener is off, so nothing would use a name.'

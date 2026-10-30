@@ -89,8 +89,8 @@ class MainActivity : ComponentActivity() {
         // (data/Servers.kt), then what the notification opens, there.
         intent.getStringExtra(EXTRA_SERVER)?.let { vm.switchServer(it) }
         when {
-            // The Mac's QR code, https://hypernova.observer/pair#… (the details in the fragment), or the
-            // app link hypernova://pair?… with the same parameters: data/Pairing.kt, PairLinks.
+            // The app link hypernova://pair?…, as the server's pairing page (its QR code) hands it
+            // over, or adb: data/Pairing.kt, PairLinks.
             link == com.prudnikweb.hypernova.data.PairLinks.Kind.Pair -> vm.handleLink(intent.dataString)
             intent.action == ACTION_OPEN_SESSION -> vm.pendingOpen = intent.getStringExtra(EXTRA_SESSION)
             // An automation's note with no session to open: the automation, or the tab for several.

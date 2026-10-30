@@ -1747,3 +1747,39 @@ hints stay as history; none of it is in the code any more.
    deleted, and a pairing made before keeps working on the local route.
 5. **The Mac app is left as it is** (upstream's, not built here): its Tailscale step and
    `mac/build.sh`'s Tailscale helper no longer work with this daemon.
+
+## Pairing is local only (2026-10-30)
+
+The owner: "Pairing isn't working, at least over VPN. And it still references the observer URL
+from the fork. I want the pairing URL to reference the URL of the machine that has the server,
+completely local only."
+
+1. **Why a second server couldn't pair** (read from the code; not seen on the phone).
+   Since Tailscale went (above), every computer's pairing
+   link said `u=http://10.0.2.2:47321`, and the app keeps one route per base URL (`ActiveRoutes`).
+   The app posted a new code to `u` first, through that registry: with a computer already paired
+   and connected, the request went down *that* computer's local route, which answered 403
+   `pairing_closed` (no code shown there), and the app took it as a bad code and never tried the
+   new server's addresses. A second server paired anyway would have shared the first one's base
+   URL, and so its routes. Nothing about it was the VPN: the listener lets in any private source
+   (192.168.2.x into 192.168.1.x included) and the phone tries the local addresses on any network.
+   The daemon logged no refusals then, so nothing showed in its log; it does now.
+2. **The QR code and the printed link are the server's own pairing page**, on the LAN listener at
+   the address a phone's browser is sent to: `https://192.168.1.48:47323/pair?c=…&n=…&fp=…&lan=…&lp=…`.
+   A phone camera opens https links (not a custom scheme), so it works with any camera app; the
+   browser warns once about the server's own certificate, then the page opens the app
+   (`intent://pair?…`, falling back to the server's download page). **Paste pairing link** takes the
+   same link. The page answers only for a code being shown. With the listener off, the link is the
+   app's own `hypernova://pair?…`.
+3. **`u` is that listener too**, so each server's pairing has its own base URL. The app pairs over
+   the listener first, with the pin, and only then tries `u` as it is, on a route of its own (never
+   another computer's). An older link's plain-http `u` is replaced by the address that answered.
+   A base URL that is the listener is not probed as a second route.
+4. **Nothing public:** no `https://hypernova.observer/pair` link and no `HYPERNOVA_PAIR_APPLINK`
+   switch (local is the only behaviour); the name service is off unless one is configured
+   (`nameServiceUrl` or `HYPERNOVA_NAMES_URL`; unset was `https://api.hypernova.observer`), and
+   no pairing link ever uses a name. Its code stays, unused. The app has no App Link for any https
+   domain; it still reads an older computer's `hypernova.observer/pair#…` link pasted into it,
+   from the fragment, without fetching anything.
+5. **The link's `lan` is the IPv4 addresses** whenever there is one (a smaller QR code); the
+   snapshot still says them all.

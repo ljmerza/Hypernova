@@ -211,12 +211,10 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
     line(cli, 'fail', 'The daemon couldn’t make a pairing code.', e.message)
     return 1
   }
-  // The daemon's link for the QR code: https://hypernova.observer/pair with the app link's details
-  // (the local addresses and the certificate's fingerprint) after its `#`, which the
-  // phone opens in the app whatever the way in (docs/PROTOCOL.md, "Pairing").
-  // Fork: HYPERNOVA_PAIR_APPLINK=1 puts the app's own hypernova://pair link in the QR code and the
-  // text, so pairing never opens hypernova.observer in a browser (local-only setups).
-  const link = process.env.HYPERNOVA_PAIR_APPLINK === '1' ? p.appLink : p.link
+  // The daemon's link for the QR code: this server's own pairing page on the local network,
+  // https://<its address>:47323/pair?…, which hands over to the app (docs/PROTOCOL.md, "Pairing").
+  // With the listener off, the app's own hypernova://pair link.
+  const link = p.link
   const lan = /[?&]lan=([^&]+)/.exec(p.appLink)?.[1]
   cli.sys.say()
   // WSL on a Windows PC (cli/wsl.ts): behind its NAT the Wi-Fi is no way in.
@@ -250,7 +248,9 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
       cli.sys.say()
     }
   }
-  cli.sys.say('Scan it with the phone’s camera (it opens the Hypernova app), or paste the link there:')
+  if (link.startsWith('https://')) {
+    cli.sys.say('Scan it with the phone’s camera, on this network or over your VPN into it. The browser warns once about this server’s own certificate: go on (Advanced, then Proceed), and the page opens Hypernova. Or paste the link in Hypernova (Paste pairing link):')
+  } else cli.sys.say('Paste the link in Hypernova (Paste pairing link):')
   cli.sys.say(`  ${link}`)
   if (p.code) cli.sys.say(`Code: ${p.code}`)
   const until = new Date(p.expiresAt)
@@ -500,14 +500,14 @@ export async function codex(cli: Cli, rest: string[]): Promise<number> {
  * daemon) or was already said.
  */
 export async function nameTermsOnce(cli: Cli): Promise<void> {
-  let st: { enabled?: boolean; reason?: string; terms?: string; termsShown?: boolean } | null = null
+  let st: { enabled?: boolean; reason?: string; terms?: string; termsShown?: boolean; service?: string | null } | null = null
   try {
     st = await local(cli, 'GET', '/local/name')
   } catch {
     return
   }
   if (!st?.enabled || st.termsShown !== false || /listener is off/.test(st.reason ?? '')) return
-  line(cli, 'info', `A private name: while a code is shown, this server’s Wi‑Fi address gets a name under hypernova.observer with a free Let’s Encrypt certificate, so a phone’s browser opens the download page without a warning. Hypernova accepts Let’s Encrypt’s terms (${st.terms ?? 'https://letsencrypt.org/repository/'}) for you. The name is public; the address is in DNS only while a code is shown.`, 'hypernova name off   (to do without it)')
+  line(cli, 'info', `A private name: while a code is shown, this server’s Wi‑Fi address gets a name from the name service configured here (${st.service ?? 'the nameServiceUrl setting'}) with a free Let’s Encrypt certificate, so a phone’s browser opens the download page without a warning. Hypernova accepts Let’s Encrypt’s terms (${st.terms ?? 'https://letsencrypt.org/repository/'}) for you. The name is public; the address is in DNS only while a code is shown.`, 'hypernova name off   (to do without it)')
   try {
     await local(cli, 'POST', '/local/settings', { nameTermsShown: true })
   } catch {}
@@ -524,6 +524,11 @@ export async function name(cli: Cli, rest: string[]): Promise<number> {
     const r = await local<{ nameRelease?: { released?: boolean; name?: string | null } }>(cli, 'POST', '/local/settings', { nameService: want === 'on' }, 30_000)
     const st = await local(cli, 'GET', '/local/name')
     if (want === 'on') {
+      // No name service unless one is configured (names.ts): the setting alone makes nothing.
+      if (st.service == null) {
+        line(cli, 'warn', 'Private name on, but no name service is configured, so there is no name: the links use this server’s address.', 'set nameServiceUrl in settings.json (or HYPERNOVA_NAMES_URL) to use one')
+        return 0
+      }
       line(cli, 'ok', `Private name on${st.host ? ` (${st.host})` : ''}: it’s made or published when a code is shown.`)
       return 0
     }

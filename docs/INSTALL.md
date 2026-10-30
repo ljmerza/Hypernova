@@ -206,9 +206,10 @@ the phone.
 2. Android asks before installing from your browser: tap **Settings**, allow installs from this
    source, go back and tap **Install**.
 3. On the Mac, click **I have the app**. A pairing code appears.
-4. Point the phone's camera at the code. The link (`https://hypernova.observer/pair#…`) opens
-   Hypernova and pairs. No camera? Click **Copy link** on the Mac, send it to your phone, and use
-   **Paste pairing link** in the app.
+4. Point the phone's camera at the code. It opens the Mac's own pairing page on your network
+   (`https://<the Mac's address>:47323/pair?…`): your browser warns once about the Mac's own
+   certificate (go on), and the page opens Hypernova, which pairs. No camera? Click **Copy link**
+   on the Mac, send it to your phone, and use **Paste pairing link** in the app.
 5. Allow notifications when the app asks, so approvals reach you.
 
 A code works once and lasts 10 minutes; Setup shows a fresh one by itself. To pair another phone
@@ -296,10 +297,12 @@ found, and `hypernova codex off` lets go of it.
 
    It shows the **pairing code** as a QR code, and the link under it. The phone pairs over the
    local route, so it must be on the server's network: the same Wi‑Fi, or your VPN into it.
-3. Point the phone's camera at the QR code in the terminal (or open the link on the phone); it opens
-   Hypernova and pairs. Too narrow a window, or no camera? Copy the `https://hypernova.observer/pair#…`
-   link under it and use **Paste pairing link** in the app. A code works once and lasts 10 minutes;
-   `hypernova pair` again makes a new one.
+3. Point the phone's camera at the QR code in the terminal (or open the link on the phone). It is
+   the server's own pairing page on your network, `https://<the server's address>:47323/pair?…`:
+   your browser warns once about the server's own certificate (go on: **Advanced**, then
+   **Proceed**), and the page opens Hypernova, which pairs. Nothing outside your network is
+   involved. Too narrow a window, or no camera? Copy the link under it and use **Paste pairing
+   link** in the app. A code works once and lasts 10 minutes; `hypernova pair` again makes a new one.
 4. Allow notifications when the app asks, so approvals reach you.
 
 ### Check it
@@ -531,9 +534,10 @@ The Android app is the same for every computer, and pairs with one at a time.
   Setup. Android asks before installing from your browser or Files: allow installs from that
   source, then tap **Install**.
 - **Pair** by scanning the code (Setup's **Your phone** step or **Pair a phone** in the menu bar on a
-  Mac, `hypernova pair` on Linux). The camera opens the `https://hypernova.observer/pair#…` link,
-  which opens Hypernova; the details after the `#` never reach that site. **Paste pairing link** in
-  the app takes the same link.
+  Mac, `hypernova pair` on Linux). The camera opens the computer's own pairing page on your
+  network (`https://<its address>:47323/pair?…`; the browser warns once about its certificate),
+  which opens Hypernova; nothing outside your network is involved. **Paste pairing link** in the
+  app takes the same link.
 - **Notifications**: allow them when the app asks, so approvals reach you with the app closed.
 
 ## Claude Code and Codex

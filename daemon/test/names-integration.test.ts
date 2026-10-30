@@ -305,11 +305,13 @@ if (typeof stack === 'string') {
     assert.ok(!page.body.includes(`u=${encodeURIComponent(`https://${host}`)}`))
     assert.ok(page.body.includes(`href="https://${host}:${port}/download/android"`))
     assert.ok(page.body.includes(`fp=${serverIdentity()!.fingerprint}`))
-    // At the address the pairing page stays closed, as before.
-    assert.equal((await lan(`/pair?c=${code}`)).status, 401)
+    // At the address the pairing page opens too (the QR code's since 2026-10-30), with the same `u`.
+    const atAddress = await lan(`/pair?c=${code}`)
+    assert.equal(atAddress.status, 200)
+    assert.ok(!atAddress.body.includes(host), 'the address page never names the name')
   })
 
-  test('the download link and the pairing web link use the name; the app link keeps the pinned route', async () => {
+  test('the download link uses the name; the pairing links stay on the address, and the app link keeps the pinned route', async () => {
     const host = names.nameStatus().host!
     const port = lanInfo()!.port
     const status = await local('GET', '/local/status')
@@ -320,10 +322,10 @@ if (typeof stack === 'string') {
     assert.equal(status.json.downloadAnywhere, null)
     assert.equal(status.json.name.inUse, true)
     const p = await startPairing()
-    assert.ok(p.webLink.startsWith(`https://${host}:${port}/pair?c=`), p.webLink)
-    assert.ok(p.link.startsWith('https://hypernova.observer/pair#v=1&u='), p.link)
-    assert.ok(!p.link.includes(host), 'nor does the QR code')
-    assert.ok(p.appLink.includes(`u=${encodeURIComponent('http://10.0.2.2:' + API)}`))
+    // Pairing is local only (2026-10-30): the QR code is the listener's page at its address, never the name.
+    assert.equal(p.link, p.webLink)
+    assert.ok(!p.link.includes(host) && !p.link.includes('hypernova.observer'), p.link)
+    assert.ok(p.appLink.includes(`u=${encodeURIComponent(p.url)}`))
     assert.ok(p.appLink.includes(`fp=${serverIdentity()!.fingerprint}`) && p.appLink.includes(`&lp=${port}`))
     assert.ok(!p.appLink.includes(host), 'the app never gets the name')
     assert.equal(p.download, status.json.downloadUrl)

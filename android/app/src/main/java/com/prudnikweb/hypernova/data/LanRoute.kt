@@ -371,6 +371,16 @@ object RoutePolicy {
     }
 
     /**
+     * Whether [base] is the computer's local listener itself, `https://<one of [addresses]>:<port>`
+     * (a pairing's `u` since 2026-10-30): then it is the Local route, and trying it "as it is" with
+     * the system's trust could only fail on the computer's own certificate.
+     */
+    fun isListener(base: String, addresses: List<String>, port: Int): Boolean {
+        val o = originOf(base) ?: return false
+        return o.scheme == "https" && o.port == port && addresses.any { hostOf(it.substringBefore('%')) == o.host }
+    }
+
+    /**
      * Probes the candidates, [parallel] at a time in their order (the known addresses first; a
      * hotspot's /24 in waves, each probe with [timeoutMs] from its own start, so every address gets
      * its turn within the round), and answers with the first one whose [probe] succeeds, in the
@@ -913,8 +923,12 @@ class LanRouter(
                 pending += RouteKind.Local
                 launch { results.send(local(pin, candidates, known, p) { localWinner = it }) }
             }
-            pending += RouteKind.Remote
-            launch { results.send(asIs(pairing.baseUrl)) }
+            // A base URL that is the listener itself is Local's to try (with the pin), not a route of its own.
+            if (RoutePolicy.isListener(pairing.baseUrl, known, p)) skip(RouteKind.Remote, "the base URL is the local listener")
+            else {
+                pending += RouteKind.Remote
+                launch { results.send(asIs(pairing.baseUrl)) }
+            }
             while (pending.isNotEmpty()) {
                 val t = results.receive()
                 pending -= t.route

@@ -43,10 +43,12 @@ must ignore unknown fields and unknown enum values (show them generically).
 - Phones use the local route: `https://<the computer's private address>:47323`, the daemon's own
   certificate pinned and the phone's device certificate presented (see Local network (direct
   HTTPS)), on the same Wi-Fi or over the owner's own VPN into that network. The pairing link's
-  base URL `u` is `http://10.0.2.2:47321`: the emulator's address for this computer in
-  development (the debug build allows cleartext to 10.0.2.2 only), and on a real phone a fallback
-  that fails at once. The API is the same on both, and the base URL in use is the one everything
-  else is built from. The app's route order is Local, then the base URL as it is (see The route).
+  base URL `u` is that listener at one of the computer's addresses (`https://192.168.1.48:47323`),
+  so each computer's pairing has a base URL of its own; `http://10.0.2.2:47321`, the emulator's
+  address for this computer, only for a development build's code or with the listener off (the
+  debug build allows cleartext to 10.0.2.2 only; a release build refuses it at once). The API is
+  the same on both, and the base URL in use is the one everything else is built from. The app's
+  route order is Local, then the base URL as it is (see The route).
 - Every `/v1` request except `GET /v1/health`, `POST /v1/pair` and a terminal's WebSocket (a
   ticket instead, see Shared terminals) carries `Authorization: Bearer <deviceToken>`. 401 → the app shows
   "Unpaired" and stops retrying. WebSocket: same header on the upgrade request, or
@@ -61,37 +63,46 @@ must ignore unknown fields and unknown enum values (show them generically).
 ## Pairing
 
 1. The Mac app (or `hypernova pair` on Linux) calls `POST /local/pair/start` and shows a QR code
-   of its `link`, **`https://hypernova.observer/pair#v=1&u=<urlencoded base URL>&c=<code>&n=<urlencoded
-   Mac name>…`**: the parameters of the app's own link, `appLink`,
-   `hypernova://pair?v=1&u=…&c=…&n=…`, after the `#`. The code is single-use and valid for 10
+   of its `link`. **Pairing is local only** (since 2026-10-30; docs/DECISIONS.md, "Pairing is local
+   only"): every link points at the computer itself on its own network, nothing public. While the
+   LAN listener is on, `link` is the computer's own pairing page on it, `webLink`,
+   **`https://<address>:<lp>/pair?c=<code>&n=<urlencoded name>&fp=<fingerprint>&lan=<addr1>,<addr2>&lp=<port>`**,
+   at the address a phone's browser is sent to (`pickLanAddress`: IPv4, not a `.1` when there's
+   another); `appLink` is the app's own link with the same details,
+   `hypernova://pair?v=1&u=<urlencoded base URL>&c=…&n=…&fp=…&lan=…&lp=…`, whose `u` is that same
+   `https://<address>:<lp>`. With the listener off (or no address) there is no page a phone could
+   open: `link` is `appLink`, whose `u` is the emulator's `http://10.0.2.2:47321` (and `?dev`, a
+   development build's code, keeps that `u` and the app link whatever the listener). `lan` lists
+   the IPv4 addresses whenever there is one, else the ULAs (`pairingAddresses`: a shorter link is a
+   smaller QR code; the snapshot still says them all). The code is single-use and valid for 10
    minutes, or until the Mac stops showing it: `POST /local/pair/cancel {code?}` → `{ok,
    cancelled}` ends that code (without one, every live code); the menu bar calls it when its Pair
-   page closes and when a fresh code replaces the old one. Both links also carry `fp=<fingerprint>&lan=<addr1>,<addr2>&lp=<port>` while the LAN
-   listener is on, so the phone pairs over the local network (see Local network (direct HTTPS)).
-   (Links from a daemon before 2026-10-30 may also carry the tailnet hints `ts`, `ti`, `ta` and
-   `tc`; the app ignores them.)
+   page closes and when a fresh code replaces the old one. (Links from a daemon before 2026-10-30
+   may carry `u=http://10.0.2.2:47321`, the tailnet hints `ts`, `ti`, `ta` and `tc`, or be
+   `https://hypernova.observer/pair#<the app link's parameters>`; the app still reads them, the
+   last from its fragment, never fetching anything.)
 
    Why that link: phone cameras and Google Lens open https links, never a custom scheme from a QR
-   code, and a page on the computer opens only once the phone can reach it. Android opens `https://hypernova.observer/pair` straight in the app
-   (Android App Links: the manifest's `autoVerify` filter, and the domain's
-   `/.well-known/assetlinks.json` from the name service's Worker, `names/src/links.ts`, naming the
-   package and its signing keys). **The pairing details are in the fragment, which a browser never
-   sends to a server: nothing of them reaches hypernova.observer, its Worker or Cloudflare.**
-   Where the link opens in a browser instead (no app yet, the domain not verified yet, a
-   scanner's own view), the site's `/pair` is one static page, the same for every request (no
-   cookies, no analytics, a CSP with no `connect-src` and nothing loaded): its script reads the
-   fragment in the page, takes it out of the address bar, and offers **Open Hypernova**, an
-   `intent://pair?…#Intent;scheme=hypernova;package=com.prudnikweb.hypernova;S.browser_fallback_url=…`
-   link Chrome hands to the app (it also follows it by itself after a moment), and says how to get
-   the app from the computer when it isn't there (the fallback brings back `/pair#get`). The
-   computer's own page, `webLink` (`<base URL>/pair?c=<code>&n=<name>…`, its LAN name's while it
-   has one: see A name on the local network), still hands over to the app as before, for links
-   made earlier; no QR code carries it any more.
-2. The phone's camera (or the in-app "Paste link" field, which takes any of the three) opens it;
-   the app handles `https://hypernova.observer/pair` (reading its fragment exactly as the app
-   link's query, `data/Pairing.kt` `PairLinks`) and the `hypernova` scheme, host `pair`.
-3. The app calls `POST <u>/v1/pair` with `{"code", "deviceName", "model", "appVersion", "client"?,
-   "installId"?}` and gets `{"token", "deviceId", "mac": {"id", "name"}}`. It stores `u`, the
+   code. The page is on the LAN listener, so a phone on the same Wi-Fi or on the owner's VPN into
+   that network opens it; the browser can't vouch for the computer's own certificate and warns
+   once (and may ask for a client certificate, which the listener asks every connection for:
+   decline it). `GET /pair` on the listener at an address needs no device certificate, answers
+   only for a code being shown (404 otherwise), and hands the app **Open Hypernova**, an
+   `intent://pair?v=1&u=<this listener>&c=…&n=…&fp=…&lan=…&lp=…#Intent;scheme=hypernova;package=com.prudnikweb.hypernova;S.browser_fallback_url=<this listener>/download/android;end`
+   link (followed by itself after a moment on Android). `u` there is the address the browser came
+   in on, read from the socket, never from a header; `fp`, `lan` and `lp` are the daemon's own,
+   never the page's query. Without the app, the fallback is this computer's download page. On the
+   loopback phone API (`127.0.0.1:47321`) `/pair` answers as before (its `u` the request's own origin).
+2. The phone's camera opens the page, which opens the app with the app link; the in-app "Paste
+   pairing link" field takes the page's link, the app link and the intent hand-over alike
+   (`data/Pairing.kt` `PairLinks`). The app handles the `hypernova` scheme, host `pair`; there is no
+   App Link (`autoVerify`) for any https domain.
+3. The app calls `POST /v1/pair` with `{"code", "deviceName", "model", "appVersion", "client"?,
+   "installId"?}` and gets `{"token", "deviceId", "mac": {"id", "name"}}`: first to the `lan`
+   addresses on `lp` with the certificate pinned to `fp`, then (nobody answering there, or no `lan`)
+   to `u` as it is, on a route of its own, never another computer's. It stores `u` (or, for an older
+   link whose `u` is plain http, the listener address that answered: each computer's pairing has
+   its own base URL, which is how the app tells their routes apart), the
    token and the Mac name. One phone can pair with several Macs, each its own device there with its
    own token and device certificate (the app keeps them per computer and shows one at a time, with
    a switcher: docs/DECISIONS.md); nothing in the daemon changes for that.
@@ -185,7 +196,7 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   network). A request is *certified* when its certificate was signed by this CA, is the
   device's active one and the device still exists. Without that, the LAN listener answers only
   `GET /v1/health`, `POST /v1/pair` and `POST /v1/device/cert` (the bearer token's way to a first
-  certificate), `GET /download/android` and its APK (any `OPTIONS` is 404); everything else is 401
+  certificate), `GET /download/android` and its APK, and `GET /pair` for a code being shown (any `OPTIONS` is 404); everything else is 401
   `device_cert_required`, and a WebSocket upgrade is refused with 401. A certified request still carries the bearer token where
   the route needs one, and that token must be the same device's (401 `wrong_device` otherwise);
   the routes that take no token (a terminal ticket's WebSocket, a preview, the checklist) are open
@@ -216,10 +227,16 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   every 5 s, so a change shows within that) or the listener is turned on or off; that `lan` has no
   `deviceCert` (it didn't change). `GET /local/status` carries the same `lan`, for the Mac app.
 - **Pairing over the local network:** `link` and `appLink` carry
-  `fp=<fingerprint>&lan=<addr1>,<addr2>&lp=<port>` (the pairing page passes them on; none while
-  the listener is off). The app tries `u` first; when it isn't reachable it `POST`s `/v1/pair`
-  to each `lan` address on `lp` (in parallel, short timeouts) with the certificate pinned to
-  `fp`, and keeps the address that answered as its local route. Right after pairing, and for an
+  `fp=<fingerprint>&lan=<addr1>,<addr2>&lp=<port>` (the pairing page passes them on; `lan` and `lp`
+  none while the listener is off). The app `POST`s `/v1/pair` to each `lan` address on `lp` first
+  (in parallel, short timeouts) with the certificate pinned to `fp`, and keeps the address that
+  answered as its local route; only when none answers does it try `u` as it is, on a route of its
+  own (until 2026-10-30 it tried `u` first, through the route of any computer already paired
+  under the same `u`, which every computer then shared: see Pairing). A source is any private
+  address, the computer's own subnet or not: a phone on the owner's VPN (192.168.2.x into a
+  192.168.1.x network, say) pairs like one on the Wi-Fi. A pairing turned away on the listener
+  (no code shown, a wrong or used code, too many tries) is logged with its source, at most a line
+  every 10 s (`pairing from <ip> refused: …`). Right after pairing, and for an
   already paired phone once the snapshot says `deviceCert: false`, the app asks for its
   certificate. `/v1/pair` on the LAN listener is **closed** while no code is being shown (403
   `pairing_closed`), and allows at most 5 wrong codes per source address per 10 minutes (429
@@ -252,13 +269,20 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   query on the paired base URL `u` (preview tokens and the checklist's key aren't bound to a
   host).
 
-## A name on the local network (hypernova.observer)
+## A name on the local network (off unless configured)
+
+**Off by default since 2026-10-30** (docs/DECISIONS.md, "Pairing is local only"): there is no name
+service unless one is configured, the `nameServiceUrl` setting or `HYPERNOVA_NAMES_URL`; unset, it
+is no longer `https://api.hypernova.observer`. With none, nothing below runs (`name.state` is `off`,
+its reason says so, `hypernova pair` says nothing about a name), and the links use the address.
+The pairing links never use the name, configured or not. What follows is how it works once
+configured.
 
 A phone's browser can't vouch for the LAN listener's own certificate, so the "Get the app" page
 at `https://192.168.x.y:47323/…` opens behind "Your connection is not private". The daemon
-therefore keeps a private name for itself, `l-<random>.hypernova.observer`, pointing at its
+therefore keeps a private name for itself, `l-<random>.<domain>` under the name service's domain, pointing at its
 Wi-Fi address while a code is shown, with a Let's Encrypt certificate for it; the same page at
-`https://l-<random>.hypernova.observer:47323/download/android` opens with no warning. Only
+`https://l-<random>.<domain>:47323/download/android` opens with no warning. Only
 browser pages use the name: **the phone app never does**; it keeps the pinned IP route and its
 device certificate exactly as above. `daemon/src/names.ts` (the name), `daemon/src/acme.ts`
 (ACME), `names/` (the name service, its API and security model).
@@ -281,7 +305,7 @@ device certificate exactly as above. `daemon/src/names.ts` (the name), `daemon/s
   address again. A round asked for while one runs (a code shown, an address change) follows it
   at once.
 - **The name:** an Ed25519 key made once registers a random name with the name service
-  (`https://api.hypernova.observer`; `nameServiceUrl` setting for a self-hosted one; changing it
+  (the configured `nameServiceUrl` or `HYPERNOVA_NAMES_URL`, none by default; changing it
   gives the old name up with the old service first). The reply is checked: a plain name, under
   the expected domain (`api.<domain>` serves `<domain>`; `HYPERNOVA_NAMES_DOMAIN` otherwise), and
   `<name>.<domain>`, `l-<name>.<domain>` exactly; anything else is refused unstored. The service
@@ -328,12 +352,12 @@ device certificate exactly as above. `daemon/src/names.ts` (the name), `daemon/s
 - **The pages and links:** whenever the name works, `download` (`POST /local/pair/start`) and
   `downloadUrl` (`/local/status`) are `https://l-<name>.<domain>:<port>/download/android`:
   a brand-new phone on the same Wi-Fi opens it with no app yet. `downloadAnywhere` is then an
-  https base URL's own download page (null with the usual `http://10.0.2.2` base). `webLink` is the
-  pairing page through the name whenever it works; that page hands the app the code's usual route:
-  `u` is the base URL, never the name, plus `fp`, `lan` and `lp`.
+  https base URL's own download page (null with the usual base, whose certificate is the
+  computer's own). The pairing page through the name still answers for a code being shown;
+  it hands the app the code's usual route: `u` is the base URL, never the name, plus `fp`, `lan` and `lp`.
   The download page through the name has no checksum warning (the Mac still shows the checksum,
-  quietly). The pairing QR (`link`) never uses the name: it's `https://hypernova.observer/pair#…`
-  (see Pairing). `downloadTrusted` is false for a plain-http base too.
+  quietly). No pairing link (`link`, `webLink`, `appLink`) ever uses the name: they are the
+  listener at its address (see Pairing). `downloadTrusted` is false for a plain-http base too.
 - **Fallbacks:** the service or the CA unreachable, a rate limit, a failed check, no Wi-Fi
   address: the links keep the address, and `/local/status` says why. A `429` waits as long as its
   `Retry-After` says (at least a minute); no answer doubles from a minute (the service) or five
@@ -403,7 +427,10 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 
 - **Two routes:** `RouteKind.Local` (the computer's local listener, see Local network (direct
   HTTPS)) and `RouteKind.Remote` (the paired base URL as it is: a public address, or the
-  emulator's `http://10.0.2.2:47321`). Local first, always (`data/LanRoute.kt`).
+  emulator's `http://10.0.2.2:47321`). Local first, always (`data/LanRoute.kt`). A base URL that is
+  the listener itself (`https://<one of the local addresses>:<lp>`, a pairing's `u` since 2026-10-30)
+  is not a route of its own: the round tries it as Local, with the pin, and logs the base URL as not
+  tried ("the base URL is the local listener").
 - **A probe round** tries both at once, each `GET /v1/health`: the computer's local addresses with
   the pinned client (4 s each; on any network, Wi-Fi, a VPN or this phone's hotspot) and the base
   URL as it is (8 s). It settles on Local the moment Local answers; on the base URL only once
@@ -449,7 +476,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 |---|---|
 | `GET /v1/health` | → `{ok, protocol: 1, name}` |
 | `POST /v1/pair` | see Pairing |
-| `GET /pair?c=<code>&n=<Mac name>` | → HTML, no token: the computer's own pairing page (`webLink`), which hands over to the app; the QR code opens hypernova.observer's instead (see Pairing) |
+| `GET /pair?c=<code>&n=<Mac name>` | → HTML, no token: the computer's own pairing page (`webLink`, what the QR code opens), which hands over to the app. On the LAN listener at an address it needs no device certificate and answers only for a code being shown (404 otherwise), its `u` the address the browser came in on (see Pairing) |
 | `GET /download/android` | → HTML, no token: the app's install page; `GET /download/android/Hypernova.apk` is the APK (see Pairing) |
 | `GET /v1/snapshot` | → `Snapshot` |
 | `GET /v1/sessions/{id}/events?limit=200` | → `{events: Event[]}` its normalized history, the last `limit` events (300 without one), oldest first. Optional: `output=<n>` (tool outputs cut to their last n characters, 256–65536, with "…\n" in front) |
@@ -3252,7 +3279,7 @@ The admin token is in `<support>/admin-token` (0600); the Mac app reads it.
 | Method & path | Purpose |
 |---|---|
 | `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, downloadAnywhere, apk, name}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`, `downloadAnywhere` and `name`: see A name on the local network) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started) |
-| `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download}` (see Pairing; `link`, what the QR code carries, is `https://hypernova.observer/pair#<appLink's parameters>`; `url` is the base URL). `?dev`: the emulator's base URL. `?name`: the code is shown where its download link may use the private name (Setup, `hypernova pair`), so it counts for the name until it expires (see A name on the local network); the menu bar's code leaves it out |
+| `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download}` (see Pairing; `link`, what the QR code carries, is `webLink`, the listener's own pairing page at the computer's address, or `appLink` while the listener is off; `url` is the base URL `u`, that listener). `?dev`: the emulator's base URL and the app link. `?name`: the code is shown where its download link may use the private name (Setup, `hypernova pair`), so it counts for the name until it expires (see A name on the local network); the menu bar's code leaves it out |
 | `POST /local/automations/{id}/fire` | the payload (≤ 64 KB, text) → `{run}`: fires an automation's webhook trigger. Takes `Authorization: Bearer <that automation's fire token>` (or the admin token): the one `/local` route that does. 401 `bad_token`; 409 `paused`, `off`, `not_webhook`; 413, 415 (see Automations, "Workflows") |
 | `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, nameService?: boolean, acmeDirectory?: "staging" \| "production" \| url \| null, browseOutsideProjects?: boolean, codex?: boolean}` (`projectsRoot` kept only when that folder exists; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `nameService` and `acmeDirectory`, see A name on the local network; `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex) → the settings |
 | `GET /local/name`, `POST /local/name/release` | the name's state (as `/local/status`'s `name`); giving it up before an uninstall → `{released, name, waited?}` (see A name on the local network). `GET /local/status?qr=1`: a download or pairing code is on screen |

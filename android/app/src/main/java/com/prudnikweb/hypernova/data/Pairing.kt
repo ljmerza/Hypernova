@@ -26,9 +26,10 @@ data class Pairing(
 )
 
 /**
- * What the QR code carries: `https://hypernova.observer/pair#v=1&u=<base>&c=<code>&n=<mac name>`
- * (or the app link `hypernova://pair?…` with the same parameters), plus, from a Mac with the local
- * listener, `fp=<fingerprint>&lan=<addr1>,<addr2>&lp=<port>`.
+ * What a pairing link carries (docs/PROTOCOL.md, "Pairing"): the computer's own pairing page,
+ * `https://<its address>:47323/pair?c=<code>&n=<name>&fp=…&lan=…&lp=…` (the QR code's, whose base is
+ * that page's origin), or the app link `hypernova://pair?v=1&u=<base>&c=<code>&n=<name>…`; with the
+ * local listener, `fp=<fingerprint>&lan=<addr1>,<addr2>&lp=<port>`.
  */
 @Immutable
 data class PairLink(
@@ -45,9 +46,9 @@ data class PairLink(
 
 object PairLinks {
     /**
-     * The domain whose https links open this app (Android App Links: the manifest's autoVerify
-     * filter, and `names/src/links.ts`, which serves its assetlinks.json and the pages a browser
-     * shows). Only `/pair` there; it's never a Mac's address.
+     * Upstream's link domain. This app never opens it (no App Link in the manifest) and pairing never
+     * reaches it: a pasted `https://hypernova.observer/pair#…` from a computer before 2026-10-30 is
+     * read here, its details from the fragment, and it is never a computer's address.
      */
     const val LINK_HOST = "hypernova.observer"
     private val UNIVERSAL = Regex("""https://hypernova\.observer/pair#\S*""", RegexOption.IGNORE_CASE)
@@ -58,8 +59,8 @@ object PairLinks {
     enum class Kind { Pair }
 
     /**
-     * Which of the app's own links [uri] is: `hypernova://pair` and `https://hypernova.observer/pair`
-     * pair (their details then go to [parse]). Null for anything else.
+     * Which of the app's own links [uri] is: `hypernova://pair` pairs (its details then go to
+     * [parse]); the computer's pairing page hands over with exactly that. Null for anything else.
      */
     fun kind(uri: String?): Kind? {
         val m = ORIGIN.find(uri?.trim() ?: return null) ?: return null
@@ -68,18 +69,18 @@ object PairLinks {
         val path = uri.trim().substring(m.range.last + 1).substringBefore('?').substringBefore('#').trimEnd('/')
         return when {
             scheme == "hypernova" && host == "pair" && path.isEmpty() -> Kind.Pair
-            scheme == "https" && host == LINK_HOST && path == "/pair" -> Kind.Pair
             else -> null
         }
     }
 
     /**
      * Finds a pairing link in [text] (a scanned or pasted link, possibly with words around it).
-     * Accepts the link the Mac's QR code carries, `https://hypernova.observer/pair#v=1&u=<base>&c=<code>…`
-     * (its details in the fragment, read exactly as the app link's query), the app link
-     * `hypernova://pair?v=1&u=<base>&c=<code>&n=<name>`, the web link of a Mac's own pairing page
-     * (`https://<mac>:47321/pair?c=<code>&n=<name>`, whose base is its own origin), and the
-     * `intent://pair?…#Intent;…` hand-over. Null if there isn't one.
+     * Accepts the computer's own pairing page, what its QR code carries
+     * (`https://<address>:47323/pair?c=<code>&n=<name>&fp=…&lan=…&lp=…`, whose base is its own
+     * origin), the app link `hypernova://pair?v=1&u=<base>&c=<code>&n=<name>…`, the
+     * `intent://pair?…#Intent;…` hand-over, and an older computer's
+     * `https://hypernova.observer/pair#…` (its details in the fragment, read exactly as the app
+     * link's query, never fetched). Null if there isn't one.
      */
     fun parse(text: String?): PairLink? {
         if (text == null) return null
@@ -151,6 +152,16 @@ object PairLinks {
         val port = q["lp"]?.trim()?.toIntOrNull()?.takeIf { it in 1..65535 } ?: LanInfo.DEFAULT_PORT
         return link.copy(fingerprint = fp, lan = lan, lanPort = port)
     }
+
+    /**
+     * The base URL a pairing keeps, which is also how the app tells its computers' routes apart
+     * ([ActiveRoutes], the statistics' cache go by it): the link's `u`, the computer's own listener
+     * since 2026-10-30. A plain-http `u` (the emulator's `http://10.0.2.2:47321`, which every
+     * computer's link carried before, so two computers paired that way shared one base) is replaced
+     * by the listener address that answered [winner] when the pairing went over it.
+     */
+    fun keptBase(link: PairLink, winner: String?): String =
+        if (winner != null && !link.baseUrl.startsWith("https://", ignoreCase = true)) RoutePolicy.baseOf(winner, link.lanPort) else link.baseUrl
 }
 
 /**
@@ -225,10 +236,14 @@ object Pairer {
     private val INSTALL_ID = Regex("^[\\w-]{8,64}$")
 
     /**
-     * `POST <u>/v1/pair`. Any 4xx means the code is no good (expired, used, or mistyped). When the
-     * base can't be reached and the link names the Mac's local listener, the same request goes to
-     * those addresses with the certificate pinned (the first to answer wins): pairing on the same
-     * Wi-Fi, over a VPN into the Mac's network, or with the Mac on this phone's hotspot.
+     * `POST /v1/pair`, first to the computer's local listener when the link names it: its addresses
+     * at once, the certificate pinned (the first to answer wins), on the same Wi-Fi, over a VPN into
+     * the computer's network, or with it on this phone's hotspot. Then, when nobody there answered
+     * (or the link names no listener), to the base URL `u` as it is (an emulator's 10.0.2.2), on a
+     * route of its own: never through [ActiveRoutes], which would hand the request to a computer
+     * already paired under the same base (every pairing made before 2026-10-30 had the emulator's)
+     * and have that one turn down a code it never showed. Any 4xx means the code is no good
+     * (expired, used, mistyped, or no code shown).
      */
     suspend fun pair(context: Context, link: PairLink): Pairing {
         val body = JSONObject()
@@ -240,16 +255,22 @@ object Pairer {
             // rather than adding a twin to its list (docs/PROTOCOL.md, Pairing).
             .put("installId", installId(context))
         if (BuildConfig.DEBUG) android.util.Log.d("Hypernova", "pair: base=${link.baseUrl} lan=${link.hasLan}")
-        val res = try {
-            post(Api(link.baseUrl, token = null), body)
-        } catch (e: ApiException) {
-            if (e.problem == Problem.CodeExpired || e.problem == Problem.Server) throw e
-            (if (link.hasLan) pairOverLan(link, body) else null) ?: throw e
+        val local = if (link.hasLan) pairOverLan(link, body) else null
+        val res = local?.first ?: run {
+            // The base URL is the listener itself (the link's own page): nobody answered there already.
+            if (link.hasLan && RoutePolicy.isListener(link.baseUrl, link.lan, link.lanPort)) throw ApiException(Problem.Unreachable)
+            try {
+                post(Api(link.baseUrl, token = null, fixed = NetRoute.remote(link.baseUrl)), body)
+            } catch (e: ApiException) {
+                if (e.problem == Problem.CodeExpired || e.problem == Problem.Server || !link.hasLan) throw e
+                // The listener's silence is the news, not the emulator's address refused as plain http.
+                throw ApiException(Problem.Unreachable, cause = e)
+            }
         }
         val token = res.str("token") ?: throw ApiException(Problem.Server, 200, "no_token")
         val mac = res.obj("mac")
         return Pairing(
-            baseUrl = link.baseUrl,
+            baseUrl = PairLinks.keptBase(link, local?.second),
             token = token,
             macName = mac?.str("name") ?: link.macName,
             macId = mac?.str("id"),
@@ -271,11 +292,11 @@ object Pairer {
 
     /**
      * The pairing over the local listener: one pinned client, every address at once, the first
-     * good answer kept. A refusal from any address is final (the code is spent, no code is being
-     * shown, or too many wrong ones came from this network); nobody answering is null, so the
-     * caller reports the base's failure.
+     * good answer kept, with the address that gave it. A refusal from any address is final (the code
+     * is spent, no code is being shown, or too many wrong ones came from this network); nobody
+     * answering is null, so the caller tries the base URL.
      */
-    private suspend fun pairOverLan(link: PairLink, body: JSONObject): JSONObject? {
+    private suspend fun pairOverLan(link: PairLink, body: JSONObject): Pair<JSONObject, String>? {
         val fp = link.fingerprint ?: return null
         val client = PinnedTls.client(fp, identity = null)
         var answer: JSONObject? = null
@@ -291,6 +312,7 @@ object Pairer {
             }
         }
         refused?.let { if (winner == null) throw it }
-        return if (winner != null) answer else null
+        val a = answer
+        return if (winner != null && a != null) a to winner else null
     }
 }

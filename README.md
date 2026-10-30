@@ -59,8 +59,8 @@ but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-wi
   Claude) carries a conversation over with as much of it as you choose. Each agent has its own
   usage meters ("Claude usage", "Codex usage"), and Codex sessions run in its sandbox, Read only or
   Can edit, asking you for more.
-- **Connect your way.** Pair by scanning a QR code or tapping a link (`https://hypernova.observer/pair#…`
-  opens the app). On your Wi-Fi the phone talks to the computer directly over mutual TLS ("Local first, always");
+- **Connect your way.** Pair by scanning a QR code or tapping a link: the computer's own pairing page on
+  your network (`https://<its address>:47323/pair?…`), which opens the app. Nothing public is involved. On your Wi-Fi the phone talks to the computer directly over mutual TLS ("Local first, always");
   away from home it does the same over your own VPN into that network. Settings keeps a
   connection log of every decision.
 - **Notifications you can act on.** Allow and Deny right on an approval's notification (after unlocking),

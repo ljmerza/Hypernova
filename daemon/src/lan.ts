@@ -104,13 +104,29 @@ export function advertisedAddresses(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> 
 }
 
 /**
- * The one address a phone's browser is sent to (the download link, the name's record): the
+ * The one address a phone's browser is sent to (the pairing and download links, the name's record): the
  * Wi-Fi's rather than a VM bridge's or a VPN's, so IPv4 first, and not a gateway-looking .1 when
  * there is another.
  */
 export function pickLanAddress(addresses: string[]): string | null {
   const v4 = addresses.filter((a) => a.includes('.'))
   return v4.find((x) => !x.endsWith('.1')) ?? v4[0] ?? addresses[0] ?? null
+}
+
+/**
+ * The addresses a pairing link carries (`lan`): the IPv4 ones whenever there is one (the Wi-Fi's,
+ * and what a VPN into the network routes), else the IPv6 ULAs. The snapshot still says them all
+ * once the phone is paired; the link only has to get it in, and a shorter link is a smaller QR code.
+ */
+export function pairingAddresses(addresses: string[]): string[] {
+  const v4 = addresses.filter((a) => a.includes('.'))
+  return v4.length ? v4 : addresses
+}
+
+/** `https://<address>:<port>`, an IPv6 address in brackets: the listener at one of its addresses. */
+export function lanOrigin(address: string, port: number): string {
+  const a = plainIp(address).split('%')[0]!
+  return `https://${a.includes(':') ? `[${a}]` : a}:${port}`
 }
 
 // ── The name's certificate (names.ts) ────────────────────────────────────

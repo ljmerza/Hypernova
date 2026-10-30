@@ -11,7 +11,7 @@ import { API_PORT, LOCAL_PORT, PROTOCOL, SUPPORT, VERSION, claudeCached, claudeV
 import type { Ev } from './normalize.ts'
 import { speechFeed, speechRoute, speechState } from './readaloud.ts'
 import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider } from './store.ts'
-import { lanDevice, lanInfo, lanNamed, lanNamedHost, pairAllowed, pairFailed, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
+import { lanDevice, lanInfo, lanNamed, lanNamedHost, lanOrigin, pairAllowed, pairFailed, pairingAddresses, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
 import { nameKick, nameStatus, namedOrigin, releaseName, setNameService, setNameTermsShown, wantName } from './names.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
@@ -189,41 +189,51 @@ export async function startPairing(dev = false, forName = false) {
   pairCodes.set(sha256(code), expiresAt)
   // A code on screen until it expires, where its download link uses the name: published meanwhile.
   if (!dev && forName) wantName(expiresAt)
-  const base = BASE_URL
-  // The local route (lan.ts): the phone pairs over Wi-Fi (or the owner's VPN) with the certificate
-  // pinned, and the pairing page hands these on to the app unchanged. `fp` whenever the daemon has
-  // its certificate; `lan` and `lp` only while the listener is on.
-  const lan = lanInfo()
-  const fp = lan?.fingerprint ?? serverIdentity()?.fingerprint
-  const lanQuery = (fp ? `&fp=${fp}` : '') + (lan ? `&lan=${lan.addresses.map(encodeURIComponent).join(',')}&lp=${lan.port}` : '')
+  // Local only (docs/PROTOCOL.md, "Pairing"): everything points at this computer on its own
+  // network, the LAN listener at the address a phone's browser is sent to (lan.ts), reached on the
+  // same Wi-Fi or over the owner's VPN into that network. Nothing public is named.
+  const origin = dev ? null : pairOrigin()
+  // `u`: the listener itself, so each computer's pairing has its own base URL (the app tells its
+  // computers' routes apart by it); the emulator's address only for a development build (`dev`) or
+  // with no listener to name.
+  const base = origin ?? BASE_URL
+  const lanQuery = pairQuery()
   const params = `v=1&u=${encodeURIComponent(base)}&c=${code}&n=${encodeURIComponent(macName())}${lanQuery}`
-  // The app's own link, for Paste link and for adb; and the QR code's: the same parameters after the
-  // `#` of https://hypernova.observer/pair. Phone cameras open https links, Android opens this one
-  // straight in the app (App Links: names/src/links.ts serves the domain's assetlinks.json), and
-  // without the app a browser shows a page there that hands over to it or says how to get it. The
-  // fragment never leaves the phone: nothing of it reaches that site.
+  // The app's own link (Paste link, adb).
   const appLink = `hypernova://pair?${params}`
-  const link = `${PAIR_LINK}#${params}`
-  // This computer's own pairing page, on its name on the local network while it has one (names.ts),
-  // for links made before; the QR code no longer carries it.
-  const pageBase = (!dev && namedOrigin()) || base
-  const webLink = `${pageBase}/pair?c=${code}&n=${encodeURIComponent(macName())}${lanQuery}`
-  return { code, link, appLink, webLink, expiresAt, url: base, download: downloadUrl(base) }
+  // This computer's own pairing page on the listener: what the QR code and the printed link carry.
+  // A phone camera opens an https link in the browser (never a custom scheme), the browser warns
+  // once about the computer's own certificate, and the page hands over to the app (an intent://
+  // link, falling back to this computer's download page); pasted into the app, it pairs as is.
+  const webLink = `${origin ?? base}/pair?c=${code}&n=${encodeURIComponent(macName())}${lanQuery}`
+  // Without the listener no browser could open the page: the app link, which Paste link takes.
+  const link = origin ? webLink : appLink
+  return { code, link, appLink, webLink, expiresAt, url: base, download: downloadUrl(BASE_URL) }
+}
+
+/** The listener at the address a phone's browser is sent to (`https://<address>:<port>`), or null while it's off or has no address. */
+function pairOrigin(): string | null {
+  const lan = lanInfo()
+  const at = lan && pickLanAddress(pairingAddresses(lan.addresses))
+  return lan && at ? lanOrigin(at, lan.port) : null
 }
 
 /**
- * The pairing link's `u`: with no other way in (the phone uses the local route, `lan` and `lp`) it
- * is the emulator's address for this computer, which is also what a development build pairs with.
- * The app tries it first and falls back to the local addresses, so on a real phone it costs one
- * quick failure.
+ * The listener as a pairing link names it, read here and now: `fp` whenever the daemon has its
+ * certificate, `lan` (pairingAddresses) and `lp` while the listener is on.
+ */
+function pairQuery(): string {
+  const lan = lanInfo()
+  const fp = lan?.fingerprint ?? serverIdentity()?.fingerprint
+  return (fp ? `&fp=${fp}` : '') + (lan ? `&lan=${pairingAddresses(lan.addresses).map(encodeURIComponent).join(',')}&lp=${lan.port}` : '')
+}
+
+/**
+ * The emulator's address for this computer: a development build's `u` (the debug build allows
+ * cleartext to 10.0.2.2 only), and the base URL a download link is worked out from.
  */
 const BASE_URL = `http://10.0.2.2:${API_PORT}`
 
-/**
- * Where the pairing QR code points (docs/PROTOCOL.md, "Pairing"): the app's verified https link
- * (android/…/AndroidManifest.xml, `autoVerify`), with the pairing details in its fragment.
- */
-export const PAIR_LINK = 'https://hypernova.observer/pair'
 /**
  * Where a phone gets the app: this computer's name on the local network whenever it works
  * (names.ts): a brand-new phone on the same Wi-Fi opens that page with a real certificate, with no
@@ -253,6 +263,19 @@ export function downloadTarget(base: string): { url: string; local: boolean; tru
   // An https base's page; a plain-http one (the emulator's address) can't be checked.
   return { url: `${base}/download/android`, local: false, trusted: base.startsWith('https://'), anywhere: null }
 }
+/**
+ * A pairing over the listener that was turned away, in the log (a phone that "can't pair" then
+ * shows up there, with where it came from): at most one line every 10 s, so a peer on the network
+ * can't fill the log.
+ */
+let pairRefusedAt = 0
+function pairRefused(source: string, why: string): void {
+  const now = Date.now()
+  if (now - pairRefusedAt < 10_000) return
+  pairRefusedAt = now
+  log(`pairing from ${source} refused: ${why}`)
+}
+
 /** Whether [code] is a pairing code being shown now (unused, not expired). */
 function liveCode(code: string): boolean {
   pairingOpen() // forgets expired codes
@@ -272,9 +295,7 @@ function pairingOpen(): boolean {
 async function pairPageExtras(code: string): Promise<string> {
   pairingOpen() // forgets expired codes
   if (!code || !pairCodes.has(sha256(code))) return ''
-  const lan = lanInfo()
-  const fp = lan?.fingerprint ?? serverIdentity()?.fingerprint
-  return (fp ? `&fp=${fp}` : '') + (lan ? `&lan=${lan.addresses.map(encodeURIComponent).join(',')}&lp=${lan.port}` : '')
+  return pairQuery()
 }
 
 // ── Snapshot ─────────────────────────────────────────────────────────────
@@ -353,15 +374,24 @@ async function api(c: Ctx): Promise<void> {
     const source = plainIp(req.socket.remoteAddress)
     if (c.lan) {
       // Anyone on the Wi-Fi can reach this: closed with no code to compare, and few tries each (lan.ts).
-      if (!pairingOpen()) throw new HttpError(403, 'pairing_closed', 'No pairing code is being shown on the Mac.')
+      if (!pairingOpen()) {
+        pairRefused(source, 'no code is being shown')
+        throw new HttpError(403, 'pairing_closed', 'No pairing code is being shown on the Mac.')
+      }
       const gate = pairAllowed(source)
-      if (!gate.ok) throw new HttpError(429, 'too_many_tries', 'Too many wrong codes from this device. Try again later.', { retryAfterSeconds: gate.retryAfterSeconds })
+      if (!gate.ok) {
+        pairRefused(source, 'too many wrong codes')
+        throw new HttpError(429, 'too_many_tries', 'Too many wrong codes from this device. Try again later.', { retryAfterSeconds: gate.retryAfterSeconds })
+      }
     }
     for (const [k, exp] of pairCodes) if (exp < Date.now()) pairCodes.delete(k)
     const h = sha256(String(b.code ?? ''))
     const exp = pairCodes.get(h)
     if (!exp || exp < Date.now()) {
-      if (c.lan) pairFailed(source)
+      if (c.lan) {
+        pairFailed(source)
+        pairRefused(source, 'a wrong or used code')
+      }
       throw new HttpError(403, 'code_expired', 'This pairing code has expired or was already used. Show a new one on your Mac.')
     }
     pairCodes.delete(h)
@@ -391,6 +421,16 @@ async function api(c: Ctx): Promise<void> {
   if (path === '/download/android/Hypernova.apk') return serveApk(req, res)
   if (path === '/pair' && m === 'GET') {
     const code = url.searchParams.get('c') ?? ''
+    // On the listener at an address (what the QR code opens): only for a code being shown, and the
+    // app is handed the address the browser came in on, read from the socket (never a header the
+    // request writes), so the page and its download link stay on this computer.
+    if (c.lan && !viaName) {
+      if (!liveCode(code)) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
+      const here = req.socket.localAddress
+      const port = lanInfo()?.port
+      if (!here || !port) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
+      return pairPage(res, lanOrigin(here, port), code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code))
+    }
     if (!viaName) return pairPage(res, baseUrlOf(req), code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code))
     // Through the name, only for a code being shown on the Mac: the page is this computer's own
     // listener, and the app it hands over to pairs as from that code (the base URL, then the
@@ -399,7 +439,7 @@ async function api(c: Ctx): Promise<void> {
     const port = lanInfo()?.port
     const host = lanNamedHost()
     if (!port || !host) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
-    return pairPage(res, BASE_URL, code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code), `https://${host}:${port}`)
+    return pairPage(res, pairOrigin() ?? BASE_URL, code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code), `https://${host}:${port}`)
   }
   if (path === '/qa' || path.startsWith('/qa/')) return qa(c, false)
   const p = /^\/p\/([\w-]+)\/?(.*)$/.exec(path)
@@ -922,7 +962,7 @@ p{color:#B5B0A6;margin:0 0 24px}a.b{display:block;text-align:center;text-decorat
 .p{background:#7FFFA0;color:#14110E}.g{color:#B5B0A6;box-shadow:inset 0 0 0 1px #2C2823}small{display:block;color:#7A7468;margin-top:18px;font-size:13px;line-height:19px}</style></head>
 <body><main><div class="wm">hypernova<b>/</b></div><h1>Pair with ${esc(name)}.</h1><p>Open Hypernova on this phone to finish pairing.</p>
 <a class="b p" href="${esc(intent)}">Open Hypernova</a><a class="b g" href="${esc(pageBase)}/download/android">Get the app first</a>
-<small>If nothing happens, install the app with the second button, then scan the code on your Mac again.</small></main>
+<small>If nothing happens, install the app with the second button, then scan the code again.</small></main>
 <script>if (/Android/.test(navigator.userAgent)) setTimeout(function(){ location.href = ${JSON.stringify(intent)} }, 300); else document.querySelector('.p').href = ${JSON.stringify(appLink)}</script></body></html>`)
 }
 
@@ -1557,9 +1597,9 @@ async function local(c: Ctx): Promise<void> {
  * certificate).
  */
 function openOnLan(method: string, path: string): boolean {
-  // The download page and the APK: a phone gets the app here (the pairing page isn't served at an
-  // address: the code carries the app link itself). No OPTIONS reaches a route.
-  if (method === 'GET' && (path === '/download/android' || path === '/download/android/Hypernova.apk')) return true
+  // The download page and the APK: a phone gets the app here; and the pairing page the QR code
+  // opens, for a code being shown (checked by the route). No OPTIONS reaches a route.
+  if (method === 'GET' && (path === '/download/android' || path === '/download/android/Hypernova.apk' || path === '/pair')) return true
   return (method === 'GET' && path === '/v1/health') || (method === 'POST' && (path === '/v1/pair' || path === '/v1/device/cert'))
 }
 

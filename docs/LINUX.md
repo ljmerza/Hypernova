@@ -93,7 +93,7 @@ docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped 
 | Command | What it does |
 |---|---|
 | `hypernova setup` | Checks and installs what's missing: Node.js 24, the daemon (with node-pty built), the `hypernova` command, Claude Code (Anthropic's installer, `curl -fsSL https://claude.ai/install.sh \| bash`, when it's absent), the systemd service with lingering, the hooks and status line in Claude Code's settings, and the `claude` shell function. Safe to run again. Then it asks you to run `claude` once to sign in: Hypernova never signs in, out or reads Claude Code's login. It also says what it found of Codex (see `hypernova codex`). `--from <dir>`, `--no-claude`, `--no-service`. |
-| `hypernova pair` | The pairing QR code, in the terminal, and the link under it: the same `https://hypernova.observer/pair#…` link the Mac shows (the phone's camera opens the app; the details are after the `#` and never reach that site), and where to get the app if the phone has none yet. The link carries the local route's addresses, for a phone on the same network or on a VPN into it; with the local route off it says so (`hypernova lan on`). Also prints the code and when it expires. Waits for the phone and names it (`--no-wait`, `--no-qr`; `--local` is still accepted and changes nothing). If the window is narrower than the QR code it says so (widen it, or use the link). |
+| `hypernova pair` | The pairing QR code, in the terminal, and the link under it: this server's own pairing page on the local route, `https://<its address>:47323/pair?…` (the phone's camera opens it in the browser, which warns once about the server's own certificate, and the page opens the app; **Paste pairing link** in the app takes the same link), and where to get the app if the phone has none yet. The link carries the local route's addresses, for a phone on the same network or on a VPN into it; nothing outside your network is named. With the local route off it says so (`hypernova lan on`) and prints the app's own `hypernova://pair?…` link instead. Also prints the code and when it expires. Waits for the phone and names it (`--no-wait`, `--no-qr`; `--local` is still accepted and changes nothing). If the window is narrower than the QR code it says so (widen it, or use the link). |
 | `hypernova status` | What runs, how phones reach it, Claude Code and whether it's signed in, Codex (found, on or off, signed in), the integration, paired devices, sessions (`--json`). |
 | `hypernova codex [on\|off]` | OpenAI's Codex for Hypernova: what's found here (path, version against the minimum, 0.163.0), or turning it on or off, as the Mac's Setup switch does. On, the daemon connects to Codex's own app server and the `codex` function joins `claude` in the shell's block; the phone can start Codex sessions. It never installs or signs in Codex: `sudo npm i -g @openai/codex` (or Codex's own Linux build in `~/.local/bin`), then `codex login --device-auth` (a code to enter on any device). |
 | `hypernova doctor` | Every piece checked, each problem with the command that fixes it (`--json`). Exit 1 when something stops Hypernova working. With Codex alone, a missing Claude Code is only noted; with neither agent, it fails. |
@@ -147,11 +147,11 @@ The same as on a Mac (docs/PROTOCOL.md, "Transport and auth", "Local network (di
   route but health and pairing needs the phone's device certificate. On a Linux machine with a
   **public IPv4 address of its own** (a VPS) it is **off by default**: the phone is never on
   such a server's network, and the port would face the internet. `hypernova lan on` turns it on
-  anyway; `hypernova lan off` turns it off on a PC. While it's on, the daemon keeps a private name under
-  hypernova.observer with a real certificate for the download page in a phone's browser, its
-  Wi-Fi address in DNS only while a code is shown (docs/PROTOCOL.md, "A name on the local
-  network"); `hypernova pair` says so once, `hypernova name off` does without it, and `hypernova
-  uninstall` gives it up.
+  anyway; `hypernova lan off` turns it off on a PC. No public name is used: the private name with a real certificate (docs/PROTOCOL.md, "A name on
+  the local network") is off unless a name service is configured (`nameServiceUrl` in
+  `settings.json`, or `HYPERNOVA_NAMES_URL`); there is none by default, so nothing is registered
+  or published anywhere. Configured, `hypernova pair` says so once, `hypernova name off` does
+  without it, and `hypernova uninstall` gives it up.
 - The admin token (`~/.local/share/hypernova/admin-token`, 0600) is for the local API and the
   `hypernova` command only.
 - Running as root works but `doctor` warns: Claude Code's sessions would have the whole server.

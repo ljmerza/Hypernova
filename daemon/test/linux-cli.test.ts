@@ -91,7 +91,8 @@ async function fakeDaemon(): Promise<Fake> {
       account: { state: 'ok' },
       lan: { port: 47323, addresses: ['192.168.1.20'], fingerprint: 'ab', deviceCert: false },
     },
-    pairLink: { link: 'https://hypernova.observer/pair#v=1&u=x&c=CODE&n=box', appLink: 'hypernova://pair?v=1&u=x&c=CODE&n=box' },
+    // The listener off: the daemon's link is the app's own (no address a browser could open).
+    pairLink: { link: 'hypernova://pair?v=1&u=http%3A%2F%2F10.0.2.2%3A47321&c=CODE&n=box&fp=ab', appLink: 'hypernova://pair?v=1&u=http%3A%2F%2F10.0.2.2%3A47321&c=CODE&n=box&fp=ab' },
     name: { enabled: true, setting: true, termsShown: false, reason: 'Not made yet.', terms: 'https://letsencrypt.org/repository/', host: null },
     releaseOk: true,
     close: async () => {},
@@ -430,7 +431,7 @@ test('the QR code: the smallest version, the finder and timing patterns, the for
   assert.equal(versionFor(2954, 'L'), null)
   assert.throws(() => encodeQr('x'.repeat(3000), 'L'), /too long/)
   // A pairing link of a typical length.
-  const link = 'https://hypernova.observer/pair#v=1&u=https%3A%2F%2Fmy-vps.tail1234.ts.net%3A47321&c=AbCdEfGhIjKlMnOpQrStUv&n=my-vps&fp=' + 'a1'.repeat(32) + '&lan=10.0.0.5&lp=47323&ts=my-vps.tail1234.ts.net&ti=100.64.0.7'
+  const link = 'https://192.168.1.48:47323/pair?c=AbCdEfGhIjKlMnOpQrStUv&n=my-server&fp=' + 'a1'.repeat(32) + '&lan=192.168.1.48,192.168.1.76&lp=47323'
   const qr = encodeQr(link, 'M')
   assert.equal(qr.size, qr.version * 4 + 17)
   const m = qr.modules
@@ -477,9 +478,10 @@ test('pair: the QR code and its link, and what to do when the local route is off
   // The pairing link carries no local addresses here: the route is off, and it says so.
   assert.match(text, /The local network route is off, so a phone has no way in yet\.\n {6}hypernova lan on/)
   assert.ok(sys.out.some((l) => /^  [ ▀▄█]{20,}$/.test(l)), 'a QR code')
-  // The hypernova.observer link: the app opens it.
+  // With no listener the daemon's link is the app's own: pasted in the app, never a site.
   assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`))
-  assert.match(text, /it opens the Hypernova app/)
+  assert.match(text, /Paste the link in Hypernova \(Paste pairing link\):/)
+  assert.doesNotMatch(text, /hypernova\.observer/)
   assert.match(text, /It works once, for 10 minutes \(until \d\d:\d\d\)\./)
   // --no-qr leaves the code out.
   const quiet = fakeSys(() => ({}))
@@ -490,7 +492,11 @@ test('pair: the QR code and its link, and what to do when the local route is off
 test('pair waits for the phone and names it', async () => {
   const sys = fakeSys(() => ({}))
   const c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
-  daemon.pairLink = { link: daemon.pairLink.link, appLink: 'hypernova://pair?v=1&u=x&c=CODE&n=box&fp=ab&lan=192.168.1.20&lp=47323' }
+  // The listener on (the daemon's shape since 2026-10-30): the QR code is this server's own pairing page.
+  daemon.pairLink = {
+    link: 'https://192.168.1.20:47323/pair?c=CODE&n=box&fp=ab&lan=192.168.1.20&lp=47323',
+    appLink: 'hypernova://pair?v=1&u=https%3A%2F%2F192.168.1.20%3A47323&c=CODE&n=box&fp=ab&lan=192.168.1.20&lp=47323',
+  }
   const t = setTimeout(() => daemon.devices.push({ id: 'd1', name: 'Pixel', model: 'Pixel 9' }), 300)
   try {
     assert.equal(await pair(c, {}), 0)
@@ -510,16 +516,16 @@ test('pair with the local route on: the link, no warning, and where to get the a
   assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true }), 0)
   const text = sys.out.join('\n')
   assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`), text)
-  assert.match(text, /Scan it with the phone’s camera/)
-  assert.doesNotMatch(text, /no way in|Tailscale/)
+  assert.match(text, /Scan it with the phone’s camera, on this network or over your VPN into it\. The browser warns once about this server’s own certificate/)
+  assert.doesNotMatch(text, /no way in|Tailscale|hypernova\.observer/)
   // Where to get the app is said whenever the daemon knows (the page the code opens without the
-  // app points here): one on the local network's name (the daemon's names.ts), or its address.
+  // app points here): the listener at this server's address.
   assert.doesNotMatch(text, /The app, if the phone/, 'no download link given, none said')
-  daemon.pairLink = { ...daemon.pairLink, download: 'https://l-k3x9mq2z7a.hypernova.observer:47323/download/android' }
+  daemon.pairLink = { ...daemon.pairLink, download: 'https://192.168.1.20:47323/download/android' }
   try {
-    const named = fakeSys(() => ({}))
-    await pair(ctx(named, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true, 'no-qr': true })
-    assert.match(named.out.join('\n'), /The app, if the phone doesn’t have it yet: https:\/\/l-k3x9mq2z7a\.hypernova\.observer:47323\/download\/android/)
+    const local = fakeSys(() => ({}))
+    await pair(ctx(local, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true, 'no-qr': true })
+    assert.match(local.out.join('\n'), /The app, if the phone doesn’t have it yet: https:\/\/192\.168\.1\.20:47323\/download\/android/)
   } finally {
     delete daemon.pairLink.download
   }
@@ -689,7 +695,7 @@ test('the private name: its terms said once, before the first code, and the daem
   daemon.requests.length = 0
   assert.equal(await pair(c, { 'no-wait': true, 'no-qr': true }), 0)
   const text = sys.out.join('\n')
-  assert.match(text, /A private name: .*hypernova\.observer.*Let’s Encrypt’s terms \(https:\/\/letsencrypt\.org\/repository\/\)/s)
+  assert.match(text, /A private name: .*the name service configured here.*Let’s Encrypt’s terms \(https:\/\/letsencrypt\.org\/repository\/\)/s)
   assert.match(text, /hypernova name off/)
   // Said, then the daemon told so, and only then the code (which counts for the name) asked for.
   const said = daemon.requests.indexOf('POST /local/settings')
@@ -714,7 +720,15 @@ test('the private name: its terms said once, before the first code, and the daem
   const fresh = fakeSys(() => ({}))
   await pair(ctx(fresh, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true, 'no-qr': true })
   assert.doesNotMatch(fresh.out.join('\n'), /A private name/)
-  assert.equal(await name(ctx(fakeSys(() => ({})), { apiPort: daemon.api, localPort: daemon.local }), ['on']), 0)
+  // On with no name service configured (the default since 2026-10-30): said, and nothing to make.
+  const on = fakeSys(() => ({}))
+  assert.equal(await name(ctx(on, { apiPort: daemon.api, localPort: daemon.local }), ['on']), 0)
+  assert.match(on.out.join('\n'), /no name service is configured, so there is no name/)
+  daemon.name = { ...daemon.name, service: 'https://names.example' }
+  const onWith = fakeSys(() => ({}))
+  assert.equal(await name(ctx(onWith, { apiPort: daemon.api, localPort: daemon.local }), ['on']), 0)
+  assert.match(onWith.out.join('\n'), /Private name on: it’s made or published when a code is shown\./)
+  delete daemon.name.service
   assert.equal(await name(ctx(fakeSys(() => ({})), { apiPort: daemon.api, localPort: daemon.local }), ['maybe']), 2)
 })
 

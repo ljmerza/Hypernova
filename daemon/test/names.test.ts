@@ -202,10 +202,13 @@ test('what goes wrong backs off: as long as a limit says, doubling for silence, 
   assert.equal(names.classify(new acme.AcmeError('connection', 'x', 0), 'acme', now).message, 'Couldn’t reach Let’s Encrypt.')
 })
 
-test('the configuration: a test daemon has no name service unless told, production certificates unless said otherwise', () => {
+test('the configuration: no name service unless one is configured (never hypernova.observer by default), production certificates unless said otherwise', () => {
   assert.equal(names.envConfig({ HYPERNOVA_SUPPORT: '/tmp/x' }).serviceUrl, null)
-  assert.equal(names.envConfig({}).serviceUrl, names.DEFAULT_SERVICE)
+  // Since 2026-10-30 an unset nameServiceUrl is no service at all (docs/DECISIONS.md, "Pairing is local only").
+  assert.equal(names.envConfig({}).serviceUrl, null)
+  assert.notEqual(names.envConfig({}).serviceUrl, names.DEFAULT_SERVICE)
   assert.equal(names.envConfig({ HYPERNOVA_NAMES_URL: 'off' }).serviceUrl, null)
+  assert.equal(names.envConfig({ HYPERNOVA_NAMES_URL: 'https://names.example/' }).serviceUrl, 'https://names.example')
   assert.equal(names.envConfig({ HYPERNOVA_SUPPORT: '/tmp/x', HYPERNOVA_NAMES_URL: 'http://127.0.0.1:9/' }).serviceUrl, 'http://127.0.0.1:9')
   assert.equal(names.DEFAULT_DIRECTORY, 'production')
   assert.equal(names.envConfig({}).directoryUrl, acme.LETS_ENCRYPT.production)
