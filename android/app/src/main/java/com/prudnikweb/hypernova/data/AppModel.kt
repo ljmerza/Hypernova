@@ -156,7 +156,7 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         notice = null
     }
 
-    /** "Pair another Mac" (the switcher): the pairing steps over the app, the computers paired kept. */
+    /** "Add a server" (the switcher): the pairing steps over the app, the computers paired kept. */
     var addingServer by mutableStateOf(false)
         private set
     fun addServer(on: Boolean) { addingServer = on }

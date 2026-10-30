@@ -25,12 +25,14 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -102,33 +104,34 @@ fun openTailscale(context: Context) {
     }
 }
 
+/** Where the server package is published (README, "Getting started"): the newest release's. */
+private const val SERVER_RELEASES = "https://github.com/ljmerza/Hypernova/releases/latest"
+
 /**
- * Not paired yet: three short steps (Tailscale, Pair a phone on the Mac, scan the code), a
- * paste fallback for the link, and a way to look around with demo data. With [onClose] (another
- * computer from the switcher, others paired already): the same steps over the app, with Cancel
- * where the demo was, and Back closes them.
+ * Not paired yet: three short steps (install Hypernova on the server, run hypernova pair there, scan
+ * the code or use its link), a paste fallback for the link, and a way to look around with demo data.
+ * With [onClose] ("Add a server" from the switcher, others paired already): the same steps over the
+ * app, titled for adding one, with Cancel where the demo was, and Back closes them. The bottom button
+ * stays put above the navigation bar (and the keyboard) while the steps scroll.
  */
 @Composable
 fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Unit)? = null) {
     if (onClose != null) BackHandler(onBack = onClose)
     val context = LocalContext.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var pasting by rememberSaveable { mutableStateOf(false) }
     var link by rememberSaveable { mutableStateOf("") }
-    // Re-check on return from the Play Store, so the button says "Open" once it's installed.
-    var installed by remember { mutableStateOf(tailscaleInstalled(context)) }
-    LaunchedEffect(Unit) { while (true) { delay(2000); installed = tailscaleInstalled(context) } }
+    val adding = onClose != null
 
     val haze = LocalHaze.current
     Box(Modifier.fillMaxSize().background(HN.bg.copy(alpha = 0.5f))) {
+    Column(Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = ONBOARDING)) {
     Column(
         Modifier
-            .fillMaxSize()
-            .hazeSource(haze, zIndex = Z.CONTENT, key = ONBOARDING)
-            .imePadding()
+            .weight(1f)
+            .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(top = top + 14.dp, bottom = bottom + 24.dp, start = 20.dp, end = 20.dp),
+            .padding(top = top + 14.dp, bottom = 16.dp, start = 20.dp, end = 20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             NovaMark(size = 22.dp)
@@ -136,17 +139,14 @@ fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Un
             Wordmark()
         }
         Spacer(Modifier.height(44.dp))
-        HText(stringResource(R.string.onb_title), style = Type.display, color = HN.ink)
+        HText(stringResource(if (adding) R.string.onb_title_add else R.string.onb_title), style = Type.display, color = HN.ink)
         Spacer(Modifier.height(12.dp))
-        HText(stringResource(R.string.onb_intro), style = Type.body, color = HN.inkMuted)
+        HText(stringResource(if (adding) R.string.onb_intro_add else R.string.onb_intro), style = Type.body, color = HN.inkMuted)
         Spacer(Modifier.height(28.dp))
 
         Step(1, stringResource(R.string.onb_step1_title), stringResource(R.string.onb_step1_body)) {
-            // The Tailscale app is no longer needed (the node is built in): a button only when it's there.
-            if (installed) {
-                Spacer(Modifier.height(14.dp))
-                Pill(stringResource(R.string.open_tailscale), { openTailscale(context) }, kind = PillKind.Outline, height = 44.dp)
-            }
+            Spacer(Modifier.height(14.dp))
+            Pill(stringResource(R.string.onb_step1_link), { openLink(context, SERVER_RELEASES) }, kind = PillKind.Outline, height = 44.dp)
         }
         Spacer(Modifier.height(10.dp))
         Step(2, stringResource(R.string.onb_step2_title), stringResource(R.string.onb_step2_body))
@@ -182,12 +182,29 @@ fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Un
                 )
             }
         }
-        Spacer(Modifier.height(10.dp))
+    }
+    // Cancel (or the demo) never scrolls under the navigation bar: it sits above it, and above the
+    // keyboard while the link is typed in.
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
+            .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 12.dp),
+    ) {
         if (onClose != null) Pill(stringResource(R.string.cancel), onClose, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
         else Pill(stringResource(R.string.onb_demo), onDemo, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
     }
+    }
     // Whatever scrolls under the status bar is blurred, like every other screen.
     BlurredTop(haze, ONBOARDING, Modifier.fillMaxWidth(), fade = 14.dp) { Spacer(Modifier.height(top + 18.dp)) }
+    }
+}
+
+/** Opens [url] in the browser; nothing when the phone has none. */
+private fun openLink(context: Context, url: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: ActivityNotFoundException) {
     }
 }
 

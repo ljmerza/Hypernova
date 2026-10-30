@@ -194,19 +194,22 @@
     <!-- Demo: a session moved to another provider ("Continue on OpenRouter"). -->
     <string name="demo_moved_to">Continues on %1$s from here.</string>
 
-    <!-- Onboarding -->
-    <string name="onb_title">Connect your computer.</string>
-    <string name="onb_intro">See the Claude Code or Codex sessions on your Mac or server, live, and answer them from here. Three steps, about a minute.</string>
-    <string name="onb_step1_title">Tailscale is built in</string>
-    <string name="onb_step1_body">Your phone reaches your computer over Tailscale, a private network between your own devices, from anywhere. Nothing to install: after you scan the code, sign in with the account your computer uses. The Tailscale app works too, if you have it.</string>
-    <string name="onb_step2_title">Show the pairing code</string>
-    <string name="onb_step2_body">On a Mac, click the Hypernova icon in the menu bar and choose Pair a phone. On a Linux server or PC, run hypernova pair.</string>
-    <string name="onb_step3_title">Scan the code with your camera</string>
-    <string name="onb_step3_body">Point this phone\'s camera at the QR code. It opens Hypernova and pairs on its own.</string>
+    <!-- Onboarding: first run, and "Add a server" from the switcher (no "Mac" here: ComputerWords would turn it into "server"). -->
+    <string name="onb_title">Connect your server.</string>
+    <string name="onb_title_add">Add a server.</string>
+    <string name="onb_intro">See the Claude Code or Codex sessions on your server, live, and answer them from here. Three steps.</string>
+    <string name="onb_intro_add">Pair one more server. The ones you paired stay, and Home\'s chip switches between them.</string>
+    <string name="onb_step1_title">Install Hypernova on your server</string>
+    <string name="onb_step1_body">On the computer where Claude Code runs, install the server package from the latest release (hypernova-server-….tar.gz), or clone the repository and run scripts/install-linux.sh. Installed already? Go on.</string>
+    <string name="onb_step1_link">Open the releases</string>
+    <string name="onb_step2_title">Run hypernova pair on it</string>
+    <string name="onb_step2_body">In a terminal on the server, run hypernova pair. It shows a QR code and a link under it.</string>
+    <string name="onb_step3_title">Scan the code, or use the link</string>
+    <string name="onb_step3_body">Point this phone\'s camera at the QR code: it opens Hypernova and pairs. Or open the link on this phone, or paste it below.</string>
     <string name="onb_step">Step %1$d</string>
     <string name="onb_paste">Paste pairing link</string>
     <string name="onb_paste_hint">https://hypernova.observer/pair#…</string>
-    <string name="onb_paste_help">No link on the clipboard. On a Mac, choose Pair a phone, then Copy link; on a server, hypernova pair prints the link. Copy it and paste it here.</string>
+    <string name="onb_paste_help">No link on the clipboard. On the server, hypernova pair prints the link under the code: copy it and paste it here.</string>
     <string name="onb_pair">Pair</string>
     <string name="onb_demo">Explore with demo data</string>
     <string name="onb_or">Or</string>
@@ -221,14 +224,14 @@
     <string name="pair_failed">Couldn\'t pair with %1$s.</string>
     <string name="pair_expired">This code has expired.</string>
     <string name="pair_closed">Your computer isn\'t showing a code.</string>
-    <string name="pair_closed_body">On the local network your computer takes a code only while it shows one. Show it again (Pair a phone on a Mac, hypernova pair on a server) and scan it.</string>
+    <string name="pair_closed_body">On the local network your server takes a code only while it shows one. Run hypernova pair on it again and scan the new code.</string>
     <string name="pair_too_many">Too many wrong codes.</string>
     <plurals name="pair_too_many_body">
         <item quantity="one">Your computer has stopped taking codes from this network for now. Try again in %d minute.</item>
         <item quantity="other">Your computer has stopped taking codes from this network for now. Try again in %d minutes.</item>
     </plurals>
     <string name="pair_bad_link">That link didn\'t work.</string>
-    <string name="pair_bad_link_body">It isn\'t a Hypernova pairing link. Show the code again (Pair a phone on a Mac, hypernova pair on a server) and scan it.</string>
+    <string name="pair_bad_link_body">It isn\'t a Hypernova pairing link. Run hypernova pair on your server again and scan the new code.</string>
     <string name="pair_back">Back</string>
     <string name="pair_label">Pairing</string>
 
