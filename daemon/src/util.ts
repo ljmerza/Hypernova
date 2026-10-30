@@ -1,5 +1,5 @@
 // Paths, logging and small helpers shared by the daemon.
-import { appendFileSync, statSync, closeSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, chmodSync, existsSync } from 'node:fs'
+import { appendFileSync, statSync, closeSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, writeFileSync, chmodSync, existsSync } from 'node:fs'
 import { homedir, hostname } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto'
@@ -151,6 +151,50 @@ export function claudeVersion(): string | null {
     claudeVersionCache = execFileSync(bin, ['--version'], { encoding: 'utf8', timeout: 10000 }).trim().split(' ')[0] ?? null
   } catch {}
   return claudeVersionCache
+}
+
+/** Each Claude Code install's version by its real path and change time: one `--version` per install. */
+const installedVersions = new Map<string, string | null>()
+/**
+ * The Claude Code installed now ([claudeCached]), following its own updates, unlike [claudeVersion]
+ * (read once): `~/.local/bin/claude` then points at the new `versions/<version>`, a file named for its
+ * version, so nothing is run for it. Any other install (npm's) is asked once with `--version`.
+ */
+export function installedClaudeVersion(): string | null {
+  const bin = claudeCached()
+  if (!bin) return null
+  let real = bin
+  let key = bin
+  try {
+    real = realpathSync(bin)
+    key = `${real}:${statSync(real).mtimeMs}`
+  } catch {}
+  if (installedVersions.has(key)) return installedVersions.get(key)!
+  let v = /^\d+\.\d+\.\d+$/.test(basename(real)) ? basename(real) : null
+  if (!v) {
+    try {
+      v = /(\d+\.\d+\.\d+)/.exec(execFileSync(bin, ['--version'], { encoding: 'utf8', timeout: 10_000 }))?.[1] ?? null
+    } catch {}
+  }
+  installedVersions.set(key, v)
+  return v
+}
+
+/**
+ * A `claude agents` job's process on an older Claude Code than [installed] (`claude respawn` puts it
+ * on the installed one): both versions, for the phone. Undefined when it isn't, or either is unknown.
+ * [runs] is its registry entry's `version`, as Claude Code writes it ("2.1.312").
+ */
+export function outdatedClaude(runs: unknown, installed: string | null): { runs: string; installed: string } | undefined {
+  if (typeof runs !== 'string' || !installed) return undefined
+  const parts = (v: string) => /^(\d+)\.(\d+)\.(\d+)/.exec(v.trim())?.slice(1).map(Number) ?? null
+  const [a, b] = [parts(runs), parts(installed)]
+  if (!a || !b) return undefined
+  for (let i = 0; i < 3; i++) {
+    if (a[i]! < b[i]!) return { runs: runs.trim(), installed }
+    if (a[i]! > b[i]!) return undefined
+  }
+  return undefined
 }
 
 export function sleep(ms: number): Promise<void> {

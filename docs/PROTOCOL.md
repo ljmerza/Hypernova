@@ -676,6 +676,10 @@ Session = {
   stoppedForAway: boolean,    // Codex: auto-denied after 10 min → show the Continue button (Claude Code's
                               // ask goes back to its terminal instead, see Approvals; never set for it)
   blockedCalls: number,       // calls refused without the owner, not yet retried or dismissed: its blocked calls (see Blocked calls)
+  agentOutdated?: {runs, installed},  // a `claude agents` job whose process runs an older Claude Code than the one
+                              // installed ("2.1.312", "2.1.314"): `version` in its registry entry against the file
+                              // `claude` resolves to (versions/<version>; else `claude --version`, once per install).
+                              // Absent otherwise and for a job with no process. Restart: see Session menu
   contextPct: number | null, costUsd: number | null,
   queue: [{id, text, files?: Attachment[], at, clientId: string | null}],
                               // prompts waiting until Claude can take them, oldest first: Claude Code's
@@ -1002,7 +1006,11 @@ shows, finished ones too (`idle`, on Home rather than History; one blocked on th
   resumed just for that), `no_terminal` for one Hypernova can't type into, and the prompt route's 409s.
 - `POST /v1/sessions/{id}/stop`: `claude stop <job>` (the conversation is kept). `{session}`.
 - `DELETE /v1/sessions/{id}`: `claude rm <job>`, then `session.removed`. `{ok: true}`.
-- Both: 409 `not_agents` for a session with no `agentJob`; 409 `agents_refused` with Claude Code's
+- `POST /v1/sessions/{id}/respawn`: `claude respawn <job>`, so the job runs the installed Claude Code
+  (Claude Code updates itself; a job keeps its binary until then). Interrupts a job at work. The
+  phone offers it (Restart, asked first) only with `session.agentOutdated`. `{session}`, without
+  `agentOutdated` (the next registry read has the new process).
+- All three: the `claude attach` holder ends first; 409 `not_agents` for a session with no `agentJob`; 409 `agents_refused` with Claude Code's
   own words when it refuses (`rm` keeps a worktree with unpushed work).
 
 ## Blocked calls

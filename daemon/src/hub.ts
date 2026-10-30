@@ -3,7 +3,7 @@
 import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync, fstatSync, lstatSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { CLAUDE_DIR, log, projectNameOf, projectSlug, trimText, tail } from './util.ts'
+import { CLAUDE_DIR, installedClaudeVersion, log, outdatedClaude, projectNameOf, projectSlug, trimText, tail } from './util.ts'
 import { fallbackTitle, feedLine, flushAbsorbed, isLauncher, newParseState, newToolEvent, queueNow, queueView, squash, type Claim, type Ev, type ParseState, type QueuedPrompt, type ToolEv } from './normalize.ts'
 import { recordReading, rateFor, type Rate } from './usage-rate.ts'
 import { applyLinks, backgroundRunning, endSessionAgents, launchedInBackground } from './agents.ts'
@@ -81,6 +81,12 @@ export type Session = {
   switchedTo?: string
   /** A `claude agents` job's id (settings.claudeAgents): the phone can stop or delete it there. Absent otherwise. */
   agentJob?: string
+  /**
+   * A `claude agents` job whose process runs an older Claude Code than the one installed (it
+   * updated itself since): the version it runs (its registry entry's) and the installed one.
+   * `claude respawn` puts it on the new one. Absent otherwise, and for a job with no process.
+   */
+  agentOutdated?: { runs: string; installed: string }
   /** Calls refused without the owner that he hasn't retried or dismissed (blocked.ts): its Blocked tab. */
   blockedCalls: number
   /**
@@ -1353,6 +1359,9 @@ export function forgetSession(id: string): void {
 export function pollRegistry(): void {
   const dir = join(CLAUDE_DIR, 'sessions')
   const live = new Set<string>()
+  // The Claude Code installed now, read once a poll and only when a job asks (claude agents jobs).
+  let installed: string | null | undefined
+  const installedNow = () => (installed === undefined ? (installed = installedClaudeVersion()) : installed)
   for (const f of safeReaddir(dir)) {
     if (!f.endsWith('.json')) continue
     let o: any
@@ -1395,6 +1404,8 @@ export function pollRegistry(): void {
     const question = agents && state === 'needs_you' && !hasPending && o.status !== 'waiting' ? questionOf(o.sessionId) : null
     const patch: Partial<Rec> = { pid: o.pid, question }
     if (question) patch.activity = question
+    // A job keeps the Claude Code it started on until `claude respawn` (AG4).
+    if (agents) patch.agentOutdated = typeof o.version === 'string' ? outdatedClaude(o.version, installedNow()) : undefined
     // Claude Code stamps status changes; use that rather than "now" (a daemon restart isn't activity).
     const at = Number(o.statusUpdatedAt ?? o.updatedAt) || r.lastActivityAt
     if (r.state !== state) Object.assign(patch, { state, lastActivityAt: Math.max(r.lastActivityAt, at) })
@@ -1405,7 +1416,7 @@ export function pollRegistry(): void {
   for (const r of sessions.values()) {
     if (r.pid && !live.has(r.id) && r.state !== 'ended' && !isSdk(r.id) && !replacedProcess(r.id, r.pid)) {
       const pid = r.pid
-      upsertSession(r.id, { state: 'ended', activity: null, pid: null })
+      upsertSession(r.id, { state: 'ended', activity: null, pid: null, agentOutdated: undefined })
       // Its process is gone (quit without a SessionEnd, or crashed): so is its background work. A
       // process still there was only missing from one read (its file caught mid-write): it comes
       // back on the next poll, and its agents never stopped.

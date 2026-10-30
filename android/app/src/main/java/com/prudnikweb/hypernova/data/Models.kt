@@ -77,6 +77,11 @@ data class Session(
     val switchedTo: String? = null,
     /** Its `claude agents` job id (docs/PROTOCOL.md, "Session menu"): the Home card's menu can stop or delete it. */
     val agentJob: String? = null,
+    /**
+     * Its `claude agents` job runs an older Claude Code than the one installed (docs/PROTOCOL.md,
+     * Session.agentOutdated): the session sheet says so, and Restart (`claude respawn`) is offered.
+     */
+    val agentOutdated: OutdatedClaude? = null,
     /** A `claude agents` job asked the owner something in words (docs/PROTOCOL.md, "Session menu"): a reply in the box answers it. */
     val question: String? = null,
     /** Calls refused without the owner, not yet retried or dismissed: its blocked calls (data/Blocked.kt). */
@@ -122,6 +127,10 @@ data class Session(
         }
     }
 }
+
+/** The Claude Code a `claude agents` job's process [runs] ("2.1.312") and the one [installed] since ("2.1.314"). */
+@Immutable
+data class OutdatedClaude(val runs: String, val installed: String)
 
 /**
  * Why a session can't reply (docs/PROTOCOL.md, Session.blocked): [kind] is one of the constants

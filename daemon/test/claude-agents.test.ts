@@ -6,7 +6,7 @@
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -22,7 +22,10 @@ process.env.FAKE_AGENTS_DIR = join(scratch, 'fake')
 for (const d of [process.env.HOME, process.env.ZDOTDIR, process.env.FAKE_AGENTS_DIR]) mkdirSync(d, { recursive: true })
 const registry = join(process.env.CLAUDE_CONFIG_DIR, 'sessions')
 mkdirSync(registry, { recursive: true })
-const fake = join(scratch, 'fake-claude')
+// Laid out as Claude Code's own install is: a file named for its version, `claude` a link to it.
+mkdirSync(join(scratch, 'versions'))
+mkdirSync(join(scratch, 'bin'))
+const fake = join(scratch, 'versions', '2.1.314')
 writeFileSync(
   fake,
   `#!/bin/sh
@@ -65,9 +68,11 @@ case "$1" in
     printf '\\n────────────────────\\n❯ \\n────────────────────\\n'
     exec sleep 30
     ;;
-  stop|rm)
+  --version) echo "2.1.314 (Claude Code)" ;;
+  stop|rm|respawn)
     echo "$1 $2" >> "$S/verbs"
     if [ "$2" = "dirty000" ]; then echo "Not deleted: the worktree has unpushed commits" >&2; exit 1; fi
+    if [ "$2" = "nore0000" ]; then echo "Couldn't respawn nore0000: it isn't running" >&2; exit 1; fi
     echo "Deleted $2"
     ;;
   *) exec sleep 30 ;;
@@ -75,7 +80,9 @@ esac
 `,
 )
 chmodSync(fake, 0o755)
-process.env.CLAUDE_BIN = fake
+const claudeLink = join(scratch, 'bin', 'claude')
+symlinkSync(fake, claudeLink)
+process.env.CLAUDE_BIN = claudeLink
 // The phone API, for the routes (POST /v1/sessions/<id>/mode).
 const freePort = () =>
   new Promise<number>((resolve) => {
@@ -131,10 +138,10 @@ after(async () => {
 
 /** A `claude agents` job for session [id], registered as Claude Code registers a background one. */
 const listed: { id: string; sessionId: string; cwd: string; state: string }[] = []
-function job(id: string, jobId: string, status = 'idle', o: { name?: string; spare?: boolean } = {}): number {
+function job(id: string, jobId: string, status = 'idle', o: { name?: string; spare?: boolean; version?: string } = {}): number {
   const p = spawn('sleep', ['30'], { stdio: 'ignore' })
   procs.push(p)
-  writeFileSync(join(registry, `${p.pid}.json`), JSON.stringify({ pid: p.pid, sessionId: id, cwd: scratch, kind: 'bg', jobId, status, updatedAt: Date.now(), ...(o.name ? { name: o.name } : {}) }))
+  writeFileSync(join(registry, `${p.pid}.json`), JSON.stringify({ pid: p.pid, sessionId: id, cwd: scratch, kind: 'bg', jobId, status, updatedAt: Date.now(), ...(o.name ? { name: o.name } : {}), ...(o.version ? { version: o.version } : {}) }))
   if (!o.spare && !listed.some((j) => j.sessionId === id)) listed.push({ id: jobId, sessionId: id, cwd: scratch, state: 'working' })
   if (!o.spare && settings.claudeAgents === true) hub.applyAgentList([...listed])
   return p.pid!
@@ -463,4 +470,105 @@ test('the mode route refuses a claude attach that shows another session from the
   assert.equal(r.json.error.code, 'terminal_busy')
   assert.ok(attaches('modestuk') >= 1)
   for (let n = 1; n <= attaches('modestuk'); n++) assert.equal(shiftTabs('modestuk', n), 0)
+})
+
+// AG4: a job keeps the Claude Code it started on until `claude respawn`.
+const { installedClaudeVersion, outdatedClaude } = await import('../src/util.ts')
+const { termAlive } = await import('../src/terms.ts')
+
+/** Claude Code updating itself: `claude` now links to versions/[v] (the same stand-in). */
+function installClaude(v: string): void {
+  const file = join(scratch, 'versions', v)
+  if (!existsSync(file)) copyFileSync(fake, file)
+  chmodSync(file, 0o755)
+  const tmp = `${claudeLink}.new`
+  rmSync(tmp, { force: true })
+  symlinkSync(file, tmp)
+  renameSync(tmp, claudeLink)
+}
+
+test('outdatedClaude: older than the installed one, by each number, never newer or unknown', () => {
+  assert.deepEqual(outdatedClaude('2.1.312', '2.1.314'), { runs: '2.1.312', installed: '2.1.314' })
+  assert.deepEqual(outdatedClaude('2.1.99', '2.1.314'), { runs: '2.1.99', installed: '2.1.314' }, 'by number, not text')
+  assert.deepEqual(outdatedClaude('1.9.400', '2.0.0'), { runs: '1.9.400', installed: '2.0.0' })
+  assert.equal(outdatedClaude('2.1.314', '2.1.314'), undefined)
+  assert.equal(outdatedClaude('2.1.315', '2.1.314'), undefined, 'newer than installed: nothing to restart onto')
+  assert.equal(outdatedClaude('2.10.0', '2.9.9'), undefined)
+  assert.equal(outdatedClaude(undefined, '2.1.314'), undefined)
+  assert.equal(outdatedClaude(42, '2.1.314'), undefined)
+  assert.equal(outdatedClaude('next', '2.1.314'), undefined)
+  assert.equal(outdatedClaude('2.1.312', null), undefined)
+})
+
+test('installedClaudeVersion: the version file claude links to, followed when Claude Code updates itself', () => {
+  assert.equal(installedClaudeVersion(), '2.1.314')
+  installClaude('2.1.320')
+  assert.equal(installedClaudeVersion(), '2.1.320')
+  installClaude('2.1.314')
+  assert.equal(installedClaudeVersion(), '2.1.314')
+})
+
+test('a job on an older Claude Code says so, with both versions; one on the installed one, or with no version, doesn’t', async () => {
+  settings.claudeAgents = true
+  const oldPid = job('agents-old-1', 'old00001', 'busy', { version: '2.1.312' })
+  job('agents-new-1', 'new00001', 'idle', { version: '2.1.314' })
+  job('agents-nov-1', 'nov00001', 'idle')
+  hub.pollRegistry()
+  const view = (id: string) => hub.listSessions().find((s) => s.id === id)
+  assert.deepEqual(view('agents-old-1')?.agentOutdated, { runs: '2.1.312', installed: '2.1.314' })
+  assert.equal(view('agents-new-1')?.agentOutdated, undefined)
+  assert.equal(view('agents-nov-1')?.agentOutdated, undefined)
+  assert.ok(!('agentOutdated' in JSON.parse(JSON.stringify(view('agents-new-1')))), 'absent on the wire')
+  // Claude Code updated itself: the job that was current is now behind too.
+  installClaude('2.1.320')
+  try {
+    hub.pollRegistry()
+    assert.deepEqual(view('agents-new-1')?.agentOutdated, { runs: '2.1.314', installed: '2.1.320' })
+    assert.deepEqual(view('agents-old-1')?.agentOutdated, { runs: '2.1.312', installed: '2.1.320' })
+  } finally {
+    installClaude('2.1.314')
+  }
+  hub.pollRegistry()
+  assert.equal(view('agents-new-1')?.agentOutdated, undefined)
+  // Its process gone (stopped): no process runs an old Claude Code, so nothing to restart.
+  const p = procs.find((c) => c.pid === oldPid)!
+  await new Promise((ok) => {
+    p.once('exit', ok)
+    p.kill('SIGKILL')
+  })
+  hub.pollRegistry()
+  assert.equal(view('agents-old-1')?.state, 'ended')
+  assert.equal(view('agents-old-1')?.agentOutdated, undefined)
+})
+
+test('the respawn route: the attach holder ends first, then claude respawn <job>; the session without its notice', async () => {
+  settings.claudeAgents = true
+  job('agents-respawn-1', 'resp0001', 'idle', { version: '2.1.312' })
+  hub.pollRegistry()
+  assert.ok(hub.getSession('agents-respawn-1')?.agentOutdated)
+  const tid = await attachAgentsTerm('agents-respawn-1', scratch, 'resp0001')
+  assert.ok(tid)
+  scanTerms()
+  assert.equal(termOf('agents-respawn-1'), tid)
+  const r = await post('/v1/sessions/agents-respawn-1/respawn', {})
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.id, 'agents-respawn-1')
+  assert.equal(r.json.session.agentOutdated, undefined)
+  assert.equal(termAlive(tid!, null), false, 'its claude attach holder went first')
+  assert.match(readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'verbs'), 'utf8'), /\nrespawn resp0001\n$/)
+})
+
+test('the respawn route: Claude Code’s words when it refuses; a session that is no claude agents job is a 409', async () => {
+  settings.claudeAgents = true
+  job('agents-respawn-2', 'nore0000', 'idle', { version: '2.1.312' })
+  hub.pollRegistry()
+  const r = await post('/v1/sessions/agents-respawn-2/respawn', {})
+  assert.equal(r.status, 409)
+  assert.equal(r.json.error.code, 'agents_refused')
+  assert.match(r.json.error.message, /isn't running/)
+  assert.ok(hub.getSession('agents-respawn-2')?.agentOutdated, 'still on the old one')
+  hub.upsertSession('agents-plain-1', { cwd: scratch, origin: 'terminal' })
+  const plain = await post('/v1/sessions/agents-plain-1/respawn', {})
+  assert.equal(plain.status, 409)
+  assert.equal(plain.json.error.code, 'not_agents')
 })

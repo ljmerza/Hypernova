@@ -759,8 +759,9 @@ async function api(c: Ctx): Promise<void> {
   }
   // The Home card's long-press menu (docs/PROTOCOL.md, "Session menu"): rename it (Claude Code's
   // /rename, typed in, so it shows in `claude agents` and the transcript keeps it), and for a
-  // `claude agents` job, stop it or delete it there.
-  const menu = /^\/v1\/sessions\/([\w-]+)(?:\/(rename|stop))?$/.exec(path)
+  // `claude agents` job, stop it or delete it there, or restart it on the installed Claude Code
+  // (`claude respawn`, for a job on an older one: session.agentOutdated).
+  const menu = /^\/v1\/sessions\/([\w-]+)(?:\/(rename|stop|respawn))?$/.exec(path)
   if (menu && ((menu[2] && m === 'POST') || (!menu[2] && m === 'DELETE'))) {
     const [, id, action] = menu
     const rec = getSession(id!)
@@ -781,9 +782,11 @@ async function api(c: Ctx): Promise<void> {
     // Its holder (`claude attach`) goes first: it only watched, and would hold the job open.
     const tid = termOf(id!)
     if (tid) await endTermAndWait(tid)
-    const r = await agentJobCommand(action === 'stop' ? 'stop' : 'rm', job)
+    const r = await agentJobCommand(action === 'stop' ? 'stop' : action === 'respawn' ? 'respawn' : 'rm', job)
     if (!r.ok) throw new HttpError(409, 'agents_refused', r.said || 'claude agents didn’t do it.')
-    if (action === 'stop') return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+    // Restarted on the installed Claude Code: the next registry read has its new process.
+    if (action === 'respawn') upsertSession(id!, { agentOutdated: undefined })
+    if (action === 'stop' || action === 'respawn') return json(res, 200, { session: listSessions().find((x) => x.id === id) })
     forgetSession(id!)
     return json(res, 200, { ok: true })
   }

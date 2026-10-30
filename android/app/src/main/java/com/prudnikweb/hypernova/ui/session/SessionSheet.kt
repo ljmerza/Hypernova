@@ -53,6 +53,7 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.ModelNames
+import com.prudnikweb.hypernova.data.OutdatedClaude
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.WAgent
@@ -165,6 +166,8 @@ internal fun SessionSheet(
                         // The Home card's long-press menu (not in the demo, as on Home).
                         if (!hub.isDemo && MenuOffer.of(session).any) {
                             SheetSeam(stringResource(R.string.session_sheet_actions))
+                            // Its job runs an older Claude Code: said quietly, above Restart.
+                            session.agentOutdated?.let { OutdatedNotice(it) }
                             MenuActions(hub, session, { menuPage = it }, onDismiss)
                         }
                     }
@@ -499,6 +502,18 @@ private fun WherePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
     }
     s.agentJob?.let { InfoRow(stringResource(R.string.session_sheet_job), it) }
     InfoRow(stringResource(R.string.session_sheet_id), s.id)
+}
+
+/**
+ * A `claude agents` job on an older Claude Code than the one installed (it updated itself since):
+ * "Runs Claude Code 2.1.312; 2.1.314 is installed", quiet, over the actions' Restart.
+ */
+@Composable
+private fun OutdatedNotice(v: OutdatedClaude) {
+    HText(
+        stringResource(R.string.session_outdated, v.runs, v.installed),
+        style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+    )
 }
 
 /** A way somewhere from the sheet, as the model's line: its words, a quiet [trail], a chevron. */
