@@ -1295,7 +1295,7 @@ Session = {
   activity: string | null,    // what it's doing now, e.g. "Bash: ./gradlew build"
   pendingApprovalIds: string[],
   stoppedForAway: boolean,    // auto-denied after 10 min → show the Continue button
-  blockedCalls: number,       // calls refused without the owner, not yet retried or dismissed: its Blocked tab (see Blocked calls)
+  blockedCalls: number,       // calls refused without the owner, not yet retried or dismissed: its blocked calls (see Blocked calls)
   contextPct: number | null, costUsd: number | null,
   queue: [{id, text, files?: Attachment[], at, clientId: string | null}],
                               // prompts waiting until Claude can take them, oldest first: Claude Code's
@@ -1628,7 +1628,7 @@ shows, finished ones too (`idle`, on Home rather than History; one blocked on th
 
 ## Blocked calls
 
-A session's Blocked tab: calls refused without the owner. `auto_mode`: Claude Code's auto mode
+A session's blocked calls (the phone's session sheet): calls refused without the owner. `auto_mode`: Claude Code's auto mode
 classifier refused it (its PermissionDenied hook, see Hooks, or the tool result "Permission for this
 action was denied by the Claude Code auto mode classifier. Reason: …" in the transcript, which stays
 the fallback; one row for both). `away`: nobody answered its approval for 10 minutes (see

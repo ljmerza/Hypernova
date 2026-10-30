@@ -22,4 +22,6 @@
     <string name="usage_name_model">%1$s week</string>
     <!-- The chat strip's compact meter: the 5-hour window's short label. -->
     <string name="usage_five_short">5h</string>
+    <!-- The same strip's weekly window, after the 5-hour one (as "7 days" on Home). -->
+    <string name="usage_seven_short">7d</string>
 </resources>

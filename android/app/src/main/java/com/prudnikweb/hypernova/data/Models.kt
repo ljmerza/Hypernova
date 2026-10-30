@@ -79,7 +79,7 @@ data class Session(
     val agentJob: String? = null,
     /** A `claude agents` job asked the owner something in words (docs/PROTOCOL.md, "Session menu"): a reply in the box answers it. */
     val question: String? = null,
-    /** Calls refused without the owner, not yet retried or dismissed: its Blocked tab (data/Blocked.kt). */
+    /** Calls refused without the owner, not yet retried or dismissed: its blocked calls (data/Blocked.kt). */
     val blockedCalls: Int = 0,
 ) {
     /** A Codex session: no rewind, no other provider, no carrying on by itself, Codex's two modes. */

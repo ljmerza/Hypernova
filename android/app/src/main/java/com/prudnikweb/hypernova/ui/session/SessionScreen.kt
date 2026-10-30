@@ -198,8 +198,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     var sheetOpen by rememberSaveable(sessionId) { mutableStateOf(false) }
     // The model picker, opened from the session sheet (the Start sheet's, this provider's models).
     var modelOpen by rememberSaveable { mutableStateOf(false) }
-    // Its Blocked tab open in the chat's place (BlockedTab.kt).
-    var blockedOpen by rememberSaveable(sessionId) { mutableStateOf(false) }
+    // The sheet opened from the strip's blocked mark: its blocked calls into view.
+    var sheetAtBlocked by rememberSaveable(sessionId) { mutableStateOf(false) }
     // The switch to the other agent, open ([AgentKind.CLAUDE] or [AgentKind.CODEX]), from the same sheet.
     var switching by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -440,7 +440,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = sourceKey).underBlockedTab(blockedOpen),
+            Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = sourceKey),
             state = list,
             contentPadding = contentPadding,
             // Fork: 10dp between rows (was 18), so more of a session fits on the screen.
@@ -492,9 +492,6 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
             }
         }
 
-        // The Blocked tab in the chat's place (BlockedTab.kt); after Allow & retry, back to the chat.
-        if (blockedOpen) BlockedTab(hub, session, contentPadding, onChat = { blockedOpen = false; follow = true }, Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = sourceKey))
-
         // Fork: a shorter header (less padding and fade under it) leaves more of the chat in view.
         BlurredTop(haze, sourceKey, Modifier.fillMaxWidth().onSizeChanged { topPx = it.height }, fade = 16.dp) {
             Column(Modifier.fillMaxWidth().padding(top = top + 4.dp, start = 8.dp, end = 12.dp, bottom = 14.dp)) {
@@ -542,27 +539,42 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 session.automation?.let { auto -> com.prudnikweb.hypernova.ui.automations.AutoLine(auto.name, { opener.automation(auto.id) }, Modifier.padding(start = 12.dp)) }
                 // It switched agents: "CONTINUED FROM CLAUDE ›", a way to the conversation before (or after) it.
                 SwitchLine(hub, session, Modifier.padding(start = 12.dp))
-                // Fork: no planet before the words, and no agents, queue or mode after them (owner,
-                // 2026-10-29): those are the session sheet's, and TalkBack hears them on the strip.
+                // Fork: no agents, queue or mode after the words (owner, 2026-10-29): those are the
+                // session sheet's, and TalkBack hears them on the strip. The planet before them is
+                // back (owner, 2026-10-30): it turns while Claude works, holds amber when it needs you.
                 val more = stripMore(session, agentsAtWork(session, sheetAgents(hub.agents(sessionId))))
+                val words = when {
+                    statusBar.visible -> ""
+                    !linked -> linkWord(hub.link.state)
+                    working -> doing
+                    agentsOnly -> stringResource(R.string.agents_label)
+                    block != null -> blockLabel(block, hub.providers.firstOrNull { it.id == session.providerId }?.status)
+                    else -> phaseLabel(session)
+                }
                 Seam(
                     line = false,
-                    bars = false,
-                    label = when {
-                        statusBar.visible -> ""
-                        !linked -> linkWord(hub.link.state)
-                        working -> doing
-                        agentsOnly -> stringResource(R.string.agents_label)
-                        block != null -> blockLabel(block, hub.providers.firstOrNull { it.id == session.providerId }?.status)
-                        else -> phaseLabel(session)
+                    label = words,
+                    activity = when {
+                        !linked -> Activity.Rest
+                        session.state == SessionState.Working -> Activity.Live
+                        session.state == SessionState.NeedsYou -> Activity.Alert
+                        agentsOnly -> Activity.Live
+                        else -> Activity.Rest
                     },
                     after = if (working && !statusBar.visible) elapsedText(now - workingSince) else null,
                     // "Thinking" is the daemon's word for Claude between tools: the label breathes.
                     thinking = !statusBar.visible && working && sending.not() && session.phase == Phase.Working && session.activity.substringBefore(':') == "Thinking",
-                    // The session's usage in the rest of the row: context, cost, tokens, the 5-hour
-                    // window (UsageStrip.kt); a tap opens the session sheet.
+                    // The session's usage in the rest of the row: context, tokens, the 5-hour and weekly
+                    // windows (UsageStrip.kt); a tap opens the session sheet. Then the blocked mark
+                    // while calls wait, a tap to them in the sheet.
                     trailContent = {
-                        ChatUsage(hub, session, usage, onCompact = { quickSend("/compact") }, onOpen = { sheetOpen = true }, more = more, Modifier.padding(start = 10.dp))
+                        ChatUsage(
+                            hub, session, usage, onCompact = { quickSend("/compact") },
+                            onOpen = { sheetAtBlocked = false; sheetOpen = true },
+                            onBlocked = { sheetAtBlocked = true; sheetOpen = true },
+                            // No words while the status bar shows: the planet's gap is enough.
+                            more = more, Modifier.padding(start = if (words.isEmpty()) 0.dp else 10.dp),
+                        )
                     },
                     color = when {
                         !linked -> HN.inkMuted
@@ -574,12 +586,10 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     },
                     modifier = Modifier
                         .padding(start = 12.dp)
-                        .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.session_sheet_open), role = Role.Button) { sheetOpen = true },
+                        .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.session_sheet_open), role = Role.Button) { sheetAtBlocked = false; sheetOpen = true },
                 )
                 // Its reply being read aloud (here, or the glasses' speech played here): the speaking wave.
                 com.prudnikweb.hypernova.ui.voice.SpeakingStatus(session.id, Modifier.padding(start = 12.dp))
-                // "Chat | Blocked (n)" while calls were refused without the owner (BlockedTab.kt).
-                BlockedSwitch(session.blockedCalls, blockedOpen, { blockedOpen = it }, Modifier.padding(start = 12.dp, top = 8.dp))
                 // Fork: no "what changed" row (git summary / written files) in the header; the room
                 // goes to the chat.
             }
@@ -733,11 +743,12 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
         if (sheetOpen) {
             SessionSheet(
                 hub, session, usage,
-                onCompact = { sheetOpen = false; quickSend("/compact") },
                 onModel = { modelOpen = true },
                 onSwitchAgent = { to -> sheetOpen = false; switching = to },
-                onBlocked = { sheetOpen = false; blockedOpen = true },
+                // After Allow & retry, to the chat: Claude runs it again there.
+                onRetried = { sheetOpen = false; follow = true },
                 onDismiss = { sheetOpen = false },
+                atBlocked = sheetAtBlocked,
             )
         }
         if (modelOpen && canChange(hub, session)) {

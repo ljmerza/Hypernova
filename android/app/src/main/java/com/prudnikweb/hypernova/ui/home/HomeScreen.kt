@@ -849,7 +849,7 @@ fun SessionCard(
                 // With an ask, its pills keep their room and the chips give way.
                 Row(if (ask != null) Modifier.weight(1f) else Modifier, verticalAlignment = Alignment.CenterVertically) {
                     PhaseChip(s, block)
-                    // Calls refused without the owner (the session's Blocked tab): how many wait for him.
+                    // Calls refused without the owner (in the session sheet): how many wait for him.
                     if (s.blockedCalls > 0) {
                         Spacer(Modifier.width(6.dp))
                         StatusChip(pluralStringResource(R.plurals.blocked_chip, s.blockedCalls, s.blockedCalls), HN.amber)

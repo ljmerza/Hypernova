@@ -2319,7 +2319,7 @@ class LiveHub(
         Result.success(s?.id ?: sessionId)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_switch_provider)) }
 
-    // ─── A session's Blocked tab (data/Blocked.kt) ───────────────────────
+    // ─── A session's blocked calls (data/Blocked.kt) ─────────────────────
 
     override suspend fun blocked(sessionId: String): Result<List<BlockedCall>> = try {
         Result.success(BlockedWire.list(api.get("/v1/sessions/$sessionId/blocked")))

@@ -1600,11 +1600,20 @@ run and which mode the session is in; the usage card stays, and a tap on it open
    sheet's mode picker is the one way to change the mode in the chat.
 2. **A tap on the strip or the line opens the session sheet**, which replaces the line's panel and
    the strip's breakdown: usage, the model (and the other agent), the permissions (the mode; the
-   Blocked tab while calls wait), the agents at work and each running workflow's agents done of
+   blocked calls while any wait), the agents at work and each running workflow's agents done of
    started, where it runs, and the Home card's menu. This supersedes "Permission mode from the phone:
    tap the session's status line" (2026-10-14).
 3. **Nothing new from the Mac**: the sheet shows what the session already carries. The phone knows no
    allow rules, so the sheet shows none.
+4. **The owner's next pass (2026-10-30).** "Remove the chat/blocked buttons. The permissions section
+   should live in the session's details menu": no Chat | Blocked switch over the chat and no Blocked
+   tab; the calls, with Allow & retry and Dismiss, are in the sheet's Permissions part, and an amber
+   "n blocked" mark after the strip opens them there (Home's card keeps its chip). "Remove the API
+   cost amount": no cost on the strip, nor in the sheet. "Add weekly limit to the right of the 5 hour
+   window": the strip's `7D` meter after `5H`. The sheet goes model, permissions, then usage, and its
+   usage is the plan's windows only (no context ring, Compact now, tokens table or cost; the strip
+   keeps the context and its Compact chip from 85%). "The status ball back on the left of the usage
+   bar": the status line's planet is back, the agents and mode stay away.
 
 ## Mermaid diagrams in the chat (2026-10-30)
 
