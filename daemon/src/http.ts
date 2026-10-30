@@ -789,6 +789,8 @@ async function api(c: Ctx): Promise<void> {
       const name = String((await readJsonBody(req))?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
       if (!name) throw new HttpError(400, 'bad_name', 'Give it a name.')
       if (isCodex(id!) || isSdk(id!)) throw new HttpError(409, 'no_terminal', 'Only a session in a terminal can be renamed.')
+      // An ended session that isn't a claude agents job would be resumed just to be renamed: not that.
+      if (!job && !termOf(id!) && !isLiveTerminal(id!)) throw new HttpError(409, 'not_open', 'Only an open session can be renamed.')
       // Never a fork: a session open in a terminal Hypernova doesn't hold is a 409.
       await promptSession(id!, `/rename ${name}`, { noFork: true })
       upsertSession(id!, { title: name })

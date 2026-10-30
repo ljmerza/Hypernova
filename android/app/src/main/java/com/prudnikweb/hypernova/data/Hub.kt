@@ -155,6 +155,19 @@ interface Hub {
      */
     suspend fun resume(sessionId: String): Result<String>
     fun answer(sessionId: String, item: Item.Approval, answer: Answer)
+    /** The approval a session waits on, as its Home card answers it (null when none, and in the demo). */
+    fun approval(sessionId: String): WApproval? = null
+    /** [answer] approval [id] from its Home card: true once the Mac has it, false when it didn't get through (said in a toast). */
+    suspend fun answerApproval(id: String, answer: Answer): Boolean = false
+
+    // ─── The Home card's menu (docs/PROTOCOL.md, "Session menu") ───
+
+    /** Claude Code's /rename, typed into the session. Fails with the Mac's words when it can't. */
+    suspend fun renameSession(sessionId: String, name: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /** `claude stop` for a `claude agents` job ([Session.agentJob]); the conversation is kept. */
+    suspend fun stopSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /** `claude rm` for a `claude agents` job: gone from claude agents and from Home. */
+    suspend fun deleteSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
 
     suspend fun start(req: NewSessionRequest): Result<String>
     /**

@@ -1031,7 +1031,7 @@ class LiveHub(
             "ended" -> Phase.Ended
             else -> Phase.Unknown
         }
-        val ask = w.pendingApprovalIds.firstNotNullOfOrNull { approvals[it] } ?: approvals.values.firstOrNull { it.sessionId == w.id }
+        val ask = askOf(w)
         val state = when {
             ask != null || phase == Phase.NeedsYou -> SessionState.NeedsYou
             phase == Phase.Working || phase == Phase.Starting -> SessionState.Working
@@ -1088,8 +1088,15 @@ class LiveHub(
             agent = w.agent,
             switchedFrom = w.switchedFrom,
             switchedTo = w.switchedTo,
+            agentJob = w.agentJob,
         )
     }
+
+    /** The approval [w] waits on: one it names, else any for it (the card, its state and its Home card agree). */
+    private fun askOf(w: WSession): WApproval? =
+        w.pendingApprovalIds.firstNotNullOfOrNull { approvals[it] } ?: approvals.values.firstOrNull { it.sessionId == w.id }
+
+    override fun approval(sessionId: String): WApproval? = raw[sessionId]?.let(::askOf)
 
     override fun session(id: String): Session? = sessions.firstOrNull { it.id == id }
 
@@ -2044,6 +2051,28 @@ class LiveHub(
             }
         }
     }
+
+    override suspend fun answerApproval(id: String, answer: Answer): Boolean = answerAsync(id, answer).await()
+
+    // ─── The Home card's menu (docs/PROTOCOL.md, "Session menu") ───
+
+    override suspend fun renameSession(sessionId: String, name: String): Result<Unit> = try {
+        applySession(api.post("/v1/sessions/$sessionId/rename", JSONObject().put("name", name.trim())))
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_rename)) }
+
+    override suspend fun stopSession(sessionId: String): Result<Unit> = try {
+        applySession(api.post("/v1/sessions/$sessionId/stop"))
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_stop_session)) }
+
+    override suspend fun deleteSession(sessionId: String): Result<Unit> = try {
+        api.delete("/v1/sessions/$sessionId")
+        // The Mac sends session.removed as well; the card goes now, not when that arrives.
+        raw = raw - sessionId
+        publish()
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_delete_session)) }
 
     override suspend fun start(req: NewSessionRequest): Result<String> = try {
         val body = JSONObject().put("prompt", req.prompt.trim()).put("permissionMode", req.permissionMode)

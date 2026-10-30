@@ -1613,7 +1613,8 @@ shows, finished ones too (`idle`, on Home rather than History; one blocked on th
 
 - `POST /v1/sessions/{id}/rename` `{name}`: Claude Code's `/rename <name>`, typed into its terminal
   (a `claude agents` job through `claude attach`, which wakes a stopped one). `{session}`; 400
-  `bad_name`; 409 `no_terminal` for a session Hypernova can't type into, and the prompt route's 409s.
+  `bad_name`; 409 `not_open` for an ended session that isn't a `claude agents` job (it would be
+  resumed just for that), `no_terminal` for one Hypernova can't type into, and the prompt route's 409s.
 - `POST /v1/sessions/{id}/stop`: `claude stop <job>` (the conversation is kept). `{session}`.
 - `DELETE /v1/sessions/{id}`: `claude rm <job>`, then `session.removed`. `{ok: true}`.
 - Both: 409 `not_agents` for a session with no `agentJob`; 409 `agents_refused` with Claude Code's

@@ -75,6 +75,8 @@ data class Session(
     val switchedFrom: String? = null,
     /** The session it went on in: Home leaves this one off, under its successor. */
     val switchedTo: String? = null,
+    /** Its `claude agents` job id (docs/PROTOCOL.md, "Session menu"): the Home card's menu can stop or delete it. */
+    val agentJob: String? = null,
 ) {
     /** A Codex session: no rewind, no other provider, no carrying on by itself, Codex's two modes. */
     val codex: Boolean get() = agent == AgentKind.CODEX
