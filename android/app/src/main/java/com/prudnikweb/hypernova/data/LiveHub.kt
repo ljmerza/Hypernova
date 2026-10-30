@@ -1942,6 +1942,13 @@ class LiveHub(
         }
     }
 
+    override suspend fun searchHistory(query: String): Result<TextHits?> = try {
+        Result.success(HistorySearch.wire(api.get("/v1/history/search?q=${Api.q(query.trim())}")))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+        // An older Mac doesn't know the request: History filters on the phone. Nothing is said either way.
+        if (Net.classify(e).status == 404) Result.success(null) else Result.failure(e)
+    }
+
     private val commandCache = HashMap<String, Pair<Long, List<SlashCommand>>>()
 
     override suspend fun commands(cwd: String?): Result<List<SlashCommand>> {

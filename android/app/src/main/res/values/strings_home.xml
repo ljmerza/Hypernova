@@ -32,6 +32,9 @@
     <string name="history_yesterday">Yesterday</string>
     <string name="history_no_match">Nothing ended matches “%1$s”.</string>
     <string name="history_none_in">Nothing in %1$s has ended lately.</string>
+    <!-- Full-text search: the Mac looks inside the conversations from 3 characters. -->
+    <string name="history_searching">Searching inside conversations…</string>
+    <string name="history_partial">Partial results: your Mac ran out of time before it read every conversation.</string>
 
     <!-- A notification's session that isn't known (ui/App.kt, audit P11). -->
     <string name="open_gone">That session isn\'t on your Mac any more.</string>

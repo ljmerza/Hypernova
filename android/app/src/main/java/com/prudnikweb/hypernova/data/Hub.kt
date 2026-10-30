@@ -308,6 +308,13 @@ interface Hub {
     /** Dismiss: off the list. The list as it's left. */
     suspend fun dismissBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = Result.failure(HubException("Not in the demo."))
 
+    /**
+     * History's full-text search (data/HistorySearch.kt; docs/PROTOCOL.md, "History search"): the
+     * conversations with every word of [query] inside. Succeeds with null when this Mac can't (an
+     * older daemon, the demo): History then filters on the phone alone. Fails quietly when offline.
+     */
+    suspend fun searchHistory(query: String): Result<TextHits?> = Result.success(null)
+
     /** Try to reconnect now instead of waiting for the backoff. */
     fun retry() {}
     /** The app came to the foreground (true) or left it (false). */

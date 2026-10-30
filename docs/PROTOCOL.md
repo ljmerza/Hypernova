@@ -512,6 +512,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `POST /v1/sessions/{id}/mode` | `{permissionMode}` (`default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) → `{session, applies?}`. A session the daemon runs takes it from its next turn while a turn runs (the running query can't change its mode): `applies: "next_turn"`, else `"now"`, and the phone says so. A shared terminal switches by Shift+Tab (409 `waiting` with a dialog open, `mode_unavailable` for a mode it can't reach: Bypass when `session.bypassAvailable` is false, answered without pressing any key). A `claude agents` job (`agentJob`) without one gets one first: `claude attach <job>` (which wakes a stopped one), or the attach holder it has unless that drifted to another job or the agent list; 409 `terminal_busy` when the attach doesn't open or shows another session, with no key pressed. The phone offers the mode picker for such a job, not the model one |
 | `POST /v1/sessions/{id}/model` | `{model: string \| null, confirmPaid?: true}` → `{model, session, applies: "now" \| "next_turn"}`: switches the session's model (see A session's model). 400 `unknown_model`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_model` (a terminal Hypernova doesn't hold: type /model there), `confirm_paid` |
 | `POST /v1/approvals/{id}` | `ApprovalAnswer` → `{ok}` (409 if already resolved) |
+| `GET /v1/history/search?q=<words>` | → `{results: SearchHit[], partial: boolean}`: the sessions whose conversations have every word of `q` inside, newest first, 50 at most (see History search). 400 `bad_query` (fewer than 2 or more than 200 characters). An older daemon answers 404, and the phone filters on its own |
 | `GET /v1/projects` | → `{projects: Project[], root}` |
 | `POST /v1/projects` | `{name, git?: true}` → `{project}` creates `<root>/<name>` |
 | `GET /v1/providers` | → `{providers: Provider[]}` |
@@ -3295,6 +3296,48 @@ once, though nobody ended it (and the daemon itself is often killed without a cl
   the folder.
 - Resuming a session Claude Code never wrote a transcript for (its claude ended before taking a
   prompt) starts it afresh under its id (`--session-id`): `--resume` refuses an unknown id.
+
+## History search
+
+History finds a session by its title, project and last line on the phone alone; from 3 characters,
+once typing has paused for 300 ms, it also asks the current computer for the words inside the
+conversations (`daemon/src/search.ts`, idea HI1), and shows both, each session once, by day as
+before. `GET /v1/history/search?q=<words>` →
+
+```ts
+SearchHit = {
+  id: string,            // the session's id, as in the snapshot
+  snippet: string,       // about 120 characters of the message with the first hit, whitespace squeezed,
+                         // "…" where it was cut; plain text, never HTML
+  marks: {start: number, end: number}[],  // the words in `snippet`: UTF-16 offsets, end exclusive, in order
+  role: "user" | "assistant",             // who wrote that message
+  matches: number,       // how often the words occur in the conversation, all of them counted
+}
+```
+
+- **What matches:** every word of `q` (split on spaces, at most 8 of 64 characters each) somewhere in
+  the conversation, not necessarily in one message; any case. The snippet is from the first
+  message with all the words, else the first with any.
+- **What is searched:** the owner's prompts (a "!" line and a command with its arguments too, as the
+  chat shows them; a prompt queued while Claude worked) and Claude's replies. Never tool calls or
+  their output, a command's output, Claude Code's notes (`<system-reminder>`…), meta entries,
+  compaction summaries, API errors or subagents' lines (they read as `normalize.ts` reads them).
+- **Whose:** the Claude Code sessions the daemon lists (the snapshot's `sessions`, Home and History
+  alike; the phone keeps those in its History), whose transcript is in Claude Code's own `projects`
+  folder; nothing else is read. Codex's sessions aren't searched (no transcript there).
+- **Bounded:** each transcript is read in 1 MB steps, in its first 64 MB only, lines over 8 MB (pictures
+  pasted into a prompt) skipped; tool results and tool-call-only lines are never parsed. A search stops
+  after 2.5 s with `partial: true`, and when the phone hangs up or the same phone asks again. One
+  search runs at a time.
+- **Cache:** the text read from each transcript is kept in memory (24 million characters at most, the
+  least recently searched dropped first) with its size, mtime and inode. A transcript that grew is
+  read on from where it ended; one rewritten or smaller is read afresh. So a search cut short goes
+  further the next time, and typing on searches the text already read.
+- **The phone** shows "Searching inside conversations…" while it waits, a hit's snippet in place of
+  its last line with the words in the accent, and "Partial results…" with `partial`. A 404 (an older
+  daemon) turns the full-text search off for that computer until History is opened again; offline, or any
+  other failure, leaves the phone's own filter alone. Tests: `test/search.test.ts`, Android
+  `HistorySearchTest`.
 
 ## Mac app local API (127.0.0.1:47322, `Authorization: Bearer <admin token>`)
 
