@@ -111,4 +111,63 @@ class SessionSheetTest {
         // A session nobody has named a model for yet: the usage's.
         assertEquals("claude-sonnet-4-5", modelId(u, "Default", "Default"))
     }
+
+    @Test fun theSheetOpensOnPermissionsFromTheBlockedMarkElseOnOverview() {
+        assertEquals(SheetTab.Permissions, openingTab(atBlocked = true))
+        assertEquals(SheetTab.Overview, openingTab(atBlocked = false))
+    }
+
+    @Test fun theTabsAreInTheOwnersOrder() {
+        assertEquals(listOf(SheetTab.Overview, SheetTab.Permissions, SheetTab.Agents, SheetTab.Session), SheetTab.entries.toList())
+    }
+
+    @Test fun theTabsAreAllAsWideAsTheWidestWhenThatFits() {
+        // 4 × 90 = 360 in 400: 100 each.
+        assertEquals(listOf(100, 100, 100, 100), tabWidths(intArrayOf(80, 90, 60, 70), 400).toList())
+        // What doesn't divide goes a px at a time to the first ones.
+        assertEquals(listOf(101, 101, 100), tabWidths(intArrayOf(50, 90, 60), 302).toList())
+    }
+
+    @Test fun theTabsShareWhatsLeftWhenTheWidestDoesntFitFourTimes() {
+        // 4 × 110 = 440 > 400; their own 320 fits: 20 more each.
+        assertEquals(listOf(100, 130, 80, 90), tabWidths(intArrayOf(80, 110, 60, 70), 400).toList())
+    }
+
+    @Test fun theTabsKeepTheirOwnWidthsWhenTheyDontFit() {
+        assertEquals(listOf(80, 110, 60, 70), tabWidths(intArrayOf(80, 110, 60, 70), 300).toList())
+        assertTrue(tabWidths(IntArray(0), 300).isEmpty())
+    }
+
+    private fun summarised(mode: String = "auto", model: String = "claude-opus-5-5", created: Long = 1_000L, updated: Long = 721_000L, agents: Int = 0, blocked: Int = 0) =
+        Session("00", "s", "s", "p", SessionState.Working, model, mode, "", updated, createdAt = created, agentsRunning = agents, blockedCalls = blocked)
+
+    @Test fun theSummarySaysTheModeTheModelAndHowLongItHasRun() {
+        val sum = sheetSummary(summarised(), atWork = 0)
+        assertEquals("auto", sum.mode)
+        assertEquals("Opus 5.5", sum.model)
+        // Start to last activity: 12 minutes.
+        assertEquals(720_000L, sum.ranMs)
+        assertFalse(sum.showsAgents)
+        assertFalse(sum.showsBlocked)
+    }
+
+    @Test fun theSummaryNamesTheModelAsTheStripDoes() {
+        assertEquals("Sonnet 4.5", sheetSummary(summarised(), atWork = 0, model = "Sonnet 4.5").model)
+        assertEquals(null, sheetSummary(summarised(model = ""), atWork = 0).model)
+    }
+
+    @Test fun theSummaryHasNoTimeWhileTheStartIsUnknown() {
+        assertEquals(null, sheetSummary(summarised(created = 0L), atWork = 0).ranMs)
+        // A clock that went back: never less than nothing.
+        assertEquals(0L, sheetSummary(summarised(created = 900_000L), atWork = 0).ranMs)
+    }
+
+    @Test fun theSummaryCountsAgentsAndBlockedCallsOnlyWhenThereAreAny() {
+        val sum = sheetSummary(summarised(blocked = 2), atWork = 3)
+        assertTrue(sum.showsAgents)
+        assertEquals(3, sum.atWork)
+        assertTrue(sum.showsBlocked)
+        assertEquals(2, sum.blocked)
+        assertFalse(sheetSummary(summarised(), atWork = -1).showsAgents)
+    }
 }

@@ -1616,8 +1616,8 @@ run and which mode the session is in; the usage card stays, and a tap on it open
    tab; the calls, with Allow & retry and Dismiss, are in the sheet's Permissions part, and an amber
    "n blocked" mark after the strip opens them there (Home's card keeps its chip). "Remove the API
    cost amount": no cost on the strip, nor in the sheet. "Add weekly limit to the right of the 5 hour
-   window": the strip's `7D` meter after `5H`. The sheet goes model, permissions, then usage, and its
-   usage is the plan's windows only (no context ring, Compact now, tokens table or cost; the strip
+   window": the strip's `7D` meter after `5H`. The sheet's model came first, then the permissions, then
+   the usage (in tabs since the same day: "Session sheet in tabs"), and its usage is the plan's windows only (no context ring, Compact now, tokens table or cost; the strip
    keeps the context and its Compact chip from 85%). "The status ball back on the left of the usage
    bar": the status line's planet is back, the agents and mode stay away.
 
@@ -1829,3 +1829,21 @@ and he works in Auto. He chose a setting for it.
    time it's chosen (Bypass mode and the think-twice card; The owner's morning answers, 2).
 4. **Switching a session to Claude Code** (the agent switch sheet) starts in the same mode. Codex's
    modes are untouched: the sheet still carries Codex's last one over (Read only or Can edit).
+
+## Session sheet in tabs (2026-10-30)
+
+More is about to go in the session sheet (the effort, a command list with /btw, a restart job), so
+the owner had its one long scroll put in tabs first.
+
+1. **The header stays** (the name, the project and short id), and **one summary line under it is
+   always in view**: the mode's glyph and words, the model's chip, how long it has run (start to last
+   activity, after a stopwatch), the agents at work and the calls blocked when there are any. Drawn as
+   the app's metadata is, not "·"-joined (DESIGN.md); short of room, whole parts give way.
+2. **Four tabs: Overview, Permissions, Agents, Session.** Overview has the model and the plan's
+   windows; Permissions the mode and the blocked calls; Agents the agents at work with the running
+   count; Session where it runs and the Home card's menu. Close stays under them. A Commands tab is
+   coming; until then there is none (no empty tab).
+3. **It opens on Overview**, or on Permissions with the blocked calls in view from the strip's blocked
+   mark. The open tab is kept while the sheet is; the next time it opens on Overview again.
+4. **Nothing changes on the session's own screen.** The strip and the status line still open the
+   sheet; every action in it does what it did.

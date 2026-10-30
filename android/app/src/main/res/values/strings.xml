@@ -839,6 +839,8 @@
     <string name="session_sheet_agents">Agents</string>
     <string name="session_sheet_where">Where it runs</string>
     <string name="session_sheet_actions">Actions</string>
+    <!-- The sheet's first tab: the model and the plan's windows (the others are Permissions, Agents and Session). -->
+    <string name="session_sheet_tab_overview">Overview</string>
     <string name="session_sheet_no_agents">No agents at work.</string>
     <!-- An agent at work: its label, then what it does now, or this. -->
     <string name="session_sheet_agent_working">working</string>
