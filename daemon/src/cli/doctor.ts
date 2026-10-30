@@ -1,11 +1,11 @@
 // `hypernova doctor`: every piece a Linux server needs, checked, each with a plain fix. A failure
 // is something that stops Hypernova working (exit 1); a warning is something worth doing; info is
-// for the optional sources of Telescope. The same checks feed `hypernova status`.
+// only worth knowing. The same checks feed `hypernova status`.
 import { existsSync, readFileSync } from 'node:fs'
 import { connect } from 'node:net'
 import { networkInterfaces } from 'node:os'
 import { join } from 'node:path'
-import { chromeCandidates, adbCandidates, publicIPv4, tailscaleCandidates } from '../platform.ts'
+import { publicIPv4, tailscaleCandidates } from '../platform.ts'
 import { health, local } from './api.ts'
 import { tilde, type Cli, UNIT } from './context.ts'
 import { claudeSignedIn, claudeVersionOf, findClaudeBin, isDaemonDir, missingBuildTools, ptyWorks, BUILD_TOOLS } from './install.ts'
@@ -294,12 +294,6 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
     const tailnet = (tsnet?.mode === 'builtIn' && tsnet.helper?.state === 'Running' && !!tsnet.helper.listening) || (tsnet?.mode !== 'builtIn' && !!ts?.serveOn && !!ts?.url)
     add(wslNetworkCheck(cli, cli.wsl, wslNet, tailnet))
   }
-
-  // Telescope's optional sources.
-  const chrome = chromeCandidates(cli.platform, cli.home).find((p) => existsSync(p))
-  add({ name: 'chrome', mark: 'info', text: chrome ? `Telescope web pages: ${chrome}` : 'Telescope web pages need Chrome or Chromium (none found).' })
-  const adb = adbCandidates(cli.platform, cli.env, cli.home).find((p) => existsSync(p))
-  add({ name: 'adb', mark: 'info', text: adb ? `Telescope Android: ${adb}` : 'Telescope Android needs adb (sudo apt-get install -y adb, or the Android SDK).' })
 
   const log = join(cli.logs, 'daemon.log')
   add({ name: 'logs', mark: 'info', text: `Log: ${tilde(cli, log)}${existsSync(log) ? '' : ' (not written yet)'}` })

@@ -49,7 +49,7 @@ class LiveAutomations(
         super.apply(m)
         when (m) {
             is AutoMsg.Note -> arrived(m.note)
-            // Answered (here, on the glasses, on the Mac) or taken as its default: its notification goes.
+            // Answered (here, on the Mac) or taken as its default: its notification goes.
             is AutoMsg.RunChanged -> if (m.run.ask == null) notes.cancelAsk(m.run.id)
             else -> Unit
         }
@@ -255,7 +255,6 @@ object AutomationErrors {
         "bad_rule" -> res.getString(R.string.au_err_rule)
         "rule_too_broad" -> res.getString(R.string.au_err_rule_broad)
         "no_battery" -> res.getString(R.string.au_err_battery)
-        "no_glasses" -> res.getString(R.string.au_err_glasses)
         "too_many" -> res.getString(R.string.au_err_too_many)
         "confirm_paid" -> res.getString(R.string.au_err_paid)
         "bad_template" -> res.getString(R.string.au_err_template)
@@ -317,7 +316,7 @@ object AutomationErrors {
     fun block(code: String?): Block = when (code) {
         "bad_name" -> Block.Name
         "bad_trigger", "bad_time", "bad_days", "past_time", "no_battery", "bad_cron", "too_often", "not_github", "no_gh" -> Block.When
-        "bad_action", "no_prompt", "no_project", "no_session", "no_provider", "no_glasses", "confirm_paid",
+        "bad_action", "no_prompt", "no_project", "no_session", "no_provider", "confirm_paid",
         "outside_projects", "no_model", "bad_placeholder", "bad_target" -> Block.Do
         "bad_mode", "confirm_bypass", "bad_rule", "rule_too_broad" -> Block.Permissions
         else -> Block.Other

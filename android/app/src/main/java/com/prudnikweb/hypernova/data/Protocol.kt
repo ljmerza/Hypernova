@@ -502,8 +502,6 @@ data class Snapshot(
     val providers: List<Provider>,
     /** Claude Code's account on the Mac; null from a daemon that doesn't report it. */
     val account: Account? = null,
-    /** The Mac's speech to text; null from a daemon too old to have it (no mic on the phone then). */
-    val stt: Stt? = null,
     /** Automations (data/Automations.kt); null from a daemon without them. */
     val automations: AutomationsState? = null,
     /** The Mac's local-network listener (data/LanRoute.kt); null when off, or from a daemon without one. */
@@ -916,16 +914,9 @@ object Wire {
         projects = o.arr("projects").mapObjects(::project),
         providers = o.arr("providers").mapObjects(::provider),
         account = o.obj("account")?.let { runCatching { account(it) }.getOrNull() },
-        stt = o.obj("stt")?.let(::stt),
         automations = runCatching { AutomationWire.fromSnapshot(o) }.getOrNull(),
         lan = LanInfo.parse(o.obj("lan")),
         codex = runCatching { CodexWire.state(o.obj("codex")) }.getOrNull(),
         claude = runCatching { ClaudeState.parse(o.obj("claude")) }.getOrNull(),
     )
-
-    /** The snapshot's `stt` and `{t:"stt"}`: whether the Mac can turn speech into text (never its key). */
-    fun stt(o: JSONObject) = Stt(provider = o.str("provider"), ready = o.bool("ready"), error = o.str("error"))
-
-    /** `GET /v1/stt` and the key routes: the state plus the key's last four characters. */
-    fun sttInfo(o: JSONObject) = SttInfo(stt(o), last4 = o.str("last4"), keysUrl = o.str("keysUrl"))
 }

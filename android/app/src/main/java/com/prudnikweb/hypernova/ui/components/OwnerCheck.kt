@@ -16,8 +16,7 @@ import android.os.CancellationSignal
  * the chat's Always, the session's switch to Bypass, the start sheet's Bypass, saving an automation
  * (one check for a start in "No asking" and for a shell step, every save: docs/PROTOCOL.md,
  * "Workflows", The fingerprint), and Settings' Browse outside projects turned on. Notifications
- * and the widget offer Allow and Deny only; the glasses can't check a fingerprint, so the Lens bridge
- * refuses Always and Bypass from them (bridge/BridgeHttp.kt, [phoneOnly][com.prudnikweb.hypernova.bridge.BridgeHttp.phoneOnly]).
+ * and the widget offer Allow and Deny only.
  */
 object OwnerCheck {
     /**

@@ -121,14 +121,8 @@ class LiveHub(
     private var macAwake by mutableStateOf<MacAwake?>(null)
     /** Browse outside projects as last heard (the snapshot, then `{t:"files"}`); null from a Mac too old to have it. */
     private var macBrowse by mutableStateOf<Boolean?>(null)
-    /** The Mac's speech to text as last heard (the snapshot, then `{t:"stt"}`); null from a daemon without it. */
-    private var macStt by mutableStateOf<Stt?>(null)
-    /** Hyperscribe Companion's address on the Mac (with its token: memory only), asked for while Soniox isn't ready. */
-    private val companionLookup = CompanionLookup()
-    private var companionUrl by mutableStateOf<String?>(null)
-    override val voice: Voice get() = Voice(voiceRoute(macStt, companionUrl), macStt)
-    /** Read aloud: the Mac's voice setting, this phone's own reads, and the glasses' speech played here (SpeechLink.kt). */
-    override val speech = PhoneSpeech(context, pairing, api, send = { ws?.send(it) == true }, labelOf = { id -> id?.let { i -> sessions.firstOrNull { it.id == i }?.project } })
+    /** Read aloud: the Mac's voice setting and this phone's own reads (SpeechLink.kt). */
+    override val speech = PhoneSpeech(pairing, api, send = { ws?.send(it) == true }, labelOf = { id -> id?.let { i -> sessions.firstOrNull { it.id == i }?.project } })
 
     private val noticeFlow = MutableSharedFlow<Notice>(extraBufferCapacity = 16)
     override val notices: SharedFlow<Notice> = noticeFlow
@@ -559,8 +553,6 @@ class LiveHub(
                     // Prompts typed while the Mac was away go now, in order.
                     flushOffline()
                     startWatchdog(webSocket)
-                    // Offer to play the glasses' speech on this phone (or say it won't).
-                    speech.connected()
                 }
             }
 
@@ -637,8 +629,7 @@ class LiveHub(
         class FilesMsg(val browseOutsideProjects: Boolean) : Msg
         class SleepSoonMsg(val s: SleepSoon) : Msg
         class BackpackEndingMsg(val s: BackpackEnding) : Msg
-        class SttMsg(val s: Stt?) : Msg
-        /** Read aloud: the setting, a play for the glasses, a stop (SpeechLink.kt). */
+        /** Read aloud: the setting, a stop (SpeechLink.kt). */
         class SpeechMsg(val o: JSONObject) : Msg
         /** An automation, a run, a note, the counts (data/Automations.kt). */
         class AutoMsgs(val m: AutoMsg) : Msg
@@ -674,14 +665,11 @@ class LiveHub(
         "files" -> Msg.FilesMsg(o.obj("files")?.bool("browseOutsideProjects") == true)
         "mac_sleep_soon" -> SleepSoon.parse(o)?.let { Msg.SleepSoonMsg(it) }
         "mac_backpack_ending" -> BackpackEnding.parse(o)?.let { Msg.BackpackEndingMsg(it) }
-        "stt" -> Msg.SttMsg(o.obj("stt")?.let(Wire::stt))
-        "speech", "speech.play", "speech.stop" -> Msg.SpeechMsg(o)
+        "speech", "speech.stop" -> Msg.SpeechMsg(o)
         "automation", "automation.removed", "automations", "run", "note" -> AutomationWire.message(o)?.let { Msg.AutoMsgs(it) }
         "ping" -> Msg.Ping
         "lan" -> Msg.LanMsg(LanInfo.parse(o.obj("lan")))
         "tsnet" -> Msg.TailnetMsg(TailnetHint.parse(o.obj("tailnet")), o.obj("tsnet")?.str("mode"), o.obj("tsnet")?.obj("helper")?.str("state"))
-        // The Mac forgot the glasses that come through this phone: every Lens here lets go (bridge/LensBridge.kt).
-        "glasses.removed" -> { com.prudnikweb.hypernova.bridge.LensBridge.macRemovedGlasses(); null }
         else -> null
     }
 
@@ -733,7 +721,6 @@ class LiveHub(
             is Msg.FilesMsg -> macBrowse = m.browseOutsideProjects
             is Msg.SleepSoonMsg -> sleepSoon(m.s)
             is Msg.BackpackEndingMsg -> backpackEnding(m.s)
-            is Msg.SttMsg -> setStt(m.s)
             is Msg.SpeechMsg -> speech.message(m.o)
             is Msg.AutoMsgs -> automations.apply(m.m)
             // Addresses only: the message says nothing about the certificate.
@@ -880,7 +867,6 @@ class LiveHub(
         setBattery(s.mac.battery)
         macAwake = s.mac.awake
         macBrowse = s.mac.browseOutsideProjects
-        setStt(s.stt)
         raw = s.sessions.associateBy { it.id }
         val before = approvals.keys
         approvals = s.approvals.associateBy { it.id }
@@ -2109,7 +2095,7 @@ class LiveHub(
             } catch (e: Throwable) {
                 val ex = Net.classify(e)
                 if (ex.status == 409) {
-                    // Someone else (the Mac, the terminal, the glasses, the timeout) answered first:
+                    // Someone else (the Mac, the terminal, the timeout) answered first:
                     // a neutral line until the Mac's own word on how arrives (it replaces this).
                     answered = answered - id
                     approvals = approvals - id
@@ -2232,65 +2218,6 @@ class LiveHub(
         if (ex.problem == Problem.Server && ex.code != null) Result.failure(SwitchRefused(err.message.orEmpty(), ex.code, ex.error?.str("to"), ex.error?.int("maxBytes")))
         else Result.failure(err)
     }
-
-    // ─── Voice (docs/PROTOCOL.md, "Speech to text") ─────────────────────────
-
-    /**
-     * The Mac's voice as it stands now. While Soniox isn't ready the Companion's address is asked
-     * for (at most once a minute): the phone then streams straight to it. A failed ask keeps what
-     * was known.
-     */
-    private fun setStt(s: Stt?) {
-        macStt = s
-        if (s == null) {
-            companionLookup.forget()
-            companionUrl = null
-            return
-        }
-        if (!companionLookup.due(s, SystemClock.elapsedRealtime())) return
-        scope.launch {
-            try {
-                val url = api.get("/v1/speech/companion").str("url")?.takeIf { it.startsWith("wss://") || it.startsWith("ws://") }
-                companionLookup.answered(url)
-                companionUrl = url
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Throwable) {}
-        }
-    }
-
-    override fun dictate(language: String, headset: Boolean): Dictation? {
-        val route = voice.route
-        val connector = when (route) {
-            VoiceRoute.None -> return null
-            VoiceRoute.Soniox -> SocketSpeech { l -> api.socket("/v1/stt/ws", l) }
-            VoiceRoute.Companion -> {
-                val url = companionUrl ?: return null
-                SocketSpeech { l -> Net.client.newWebSocket(okhttp3.Request.Builder().url(url).build(), l) }
-            }
-        }
-        return LiveDictation(
-            connector, AudioCapture(app, headset), language, companion = route == VoiceRoute.Companion, scope = scope,
-            startedAt = SystemClock.elapsedRealtime(), clock = SystemClock::elapsedRealtime,
-            // Debug builds only: how long a release takes to settle. Never words or audio.
-            log = { if (BuildConfig.DEBUG) android.util.Log.d("Hypernova", it) },
-        ).also { it.start() }
-    }
-
-    override suspend fun sttInfo(): Result<SttInfo> = try {
-        val info = Wire.sttInfo(api.get("/v1/stt"))
-        setStt(info.stt)
-        Result.success(info)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
-
-    /** The key goes straight to the Mac, which tries it before keeping it; nothing of it stays here. */
-    override suspend fun setSttKey(apiKey: String?): Result<SttInfo> = try {
-        val o = if (apiKey == null) api.delete("/v1/stt/key")
-        else api.post("/v1/stt/key", JSONObject().put("provider", "soniox").put("apiKey", apiKey))
-        val info = Wire.sttInfo(o)
-        setStt(info.stt)
-        Result.success(info)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
 
     // ─── Account ───────────────────────────────────────────────────────────
 

@@ -7,8 +7,6 @@ import assert from 'node:assert/strict'
 import type { NetworkInterfaceInfo } from 'node:os'
 import {
   LINUX_REASONS,
-  adbCandidates,
-  chromeCandidates,
   claudeCandidates,
   packageBinDirs,
   findTool,
@@ -67,7 +65,7 @@ test('the systemd unit folder and the command folder', () => {
 test('a Mac lacks nothing; Linux lacks the Mac-only features, each with a sentence to show', () => {
   assert.deepEqual(unavailableOn('darwin'), {})
   const linux = unavailableOn('linux')
-  assert.deepEqual(Object.keys(linux).sort(), ['appWindow', 'awake', 'battery', 'macVoice', 'openWindow', 'simulator'])
+  assert.deepEqual(Object.keys(linux).sort(), ['awake', 'battery', 'macVoice', 'openWindow'])
   for (const [k, v] of Object.entries(linux)) {
     assert.equal(v, LINUX_REASONS[k as keyof typeof LINUX_REASONS])
     assert.ok(v && v.length > 20 && v.endsWith('.'), `${k}: a whole sentence`)
@@ -105,24 +103,6 @@ test('Claude Code, the login shell and Tailscale are looked for where each syste
   assert.equal(loginShell('linux', () => false), '/bin/sh')
   assert.ok(tailscaleCandidates('linux').includes('/usr/bin/tailscale'))
   assert.ok(tailscaleCandidates('darwin')[0]!.includes('Tailscale.app'))
-})
-
-test('adb: the SDK the environment names first, then Android Studio’s, then the package’s', () => {
-  const linux = adbCandidates('linux', { ANDROID_HOME: '/sdk' }, HOME)
-  assert.equal(linux[0], '/sdk/platform-tools/adb')
-  assert.ok(linux.includes('/home/ada/Android/Sdk/platform-tools/adb'))
-  assert.ok(linux.includes('/usr/bin/adb'))
-  assert.ok(!linux.some((p) => p.includes('Library')))
-  const mac = adbCandidates('darwin', {}, '/Users/ada')
-  assert.equal(mac[0], '/Users/ada/Library/Android/sdk/platform-tools/adb')
-  assert.ok(mac.includes('/opt/homebrew/bin/adb'))
-})
-
-test('headless Chrome: the Mac’s apps, or Linux packages (Google’s, then Chromium’s)', () => {
-  const linux = chromeCandidates('linux', HOME)
-  assert.equal(linux[0], '/usr/bin/google-chrome-stable')
-  assert.ok(linux.includes('/usr/bin/chromium') && linux.includes('/snap/bin/chromium'))
-  assert.ok(chromeCandidates('darwin', '/Users/ada').every((p) => p.endsWith('Google Chrome') || p.endsWith('Chromium')))
 })
 
 test('the shell file: zsh’s on both systems (ZDOTDIR honoured), bash’s on Linux only, else none', () => {

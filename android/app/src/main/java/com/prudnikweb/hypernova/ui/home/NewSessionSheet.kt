@@ -427,11 +427,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                                     started = true
                                     val kept = path ?: hub.projectsRoot?.let { "${it.trimEnd('/')}/$name" }
                                     if (onCodex) NewSessionMemory.saveCodex(context, kept, codexModel, codexEffort, codexMode)
-                                    else {
-                                        NewSessionMemory.save(context, kept, provider?.id, choice.value, mode)
-                                        // New sessions from the glasses start on the same provider and model.
-                                        com.prudnikweb.hypernova.bridge.LensBridge.newSessionChosen(provider?.id, choice.value)
-                                    }
+                                    else NewSessionMemory.save(context, kept, provider?.id, choice.value, mode)
                                     prompt = ""
                                     newName = ""
                                     starting = null

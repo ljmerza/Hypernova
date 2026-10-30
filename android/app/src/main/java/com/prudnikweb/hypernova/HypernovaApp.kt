@@ -15,9 +15,5 @@ class HypernovaApp : Application() {
         Core.init(this)
         // The launcher's long-press menu follows the sessions.
         com.prudnikweb.hypernova.ui.share.LauncherShortcuts.start(this)
-        // Hypernova Lens on the glasses reaches the Mac through this app, over loopback (bridge/LensBridge.kt).
-        val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?"
-        // A switch kept for turning it off again; nothing listens while it's off.
-        if (com.prudnikweb.hypernova.bridge.LensBridge.ENABLED) com.prudnikweb.hypernova.bridge.LensBridge.start(this, version)
     }
 }

@@ -88,8 +88,6 @@
     <!-- Notify me with the phone\'s notifications off. -->
     <string name="au_notify_blocked">Notifications from Hypernova are off on this phone, so this wouldn\'t reach you.</string>
     <string name="au_turn_on">Turn on</string>
-    <!-- Read aloud needs glasses. -->
-    <string name="au_say_needs_glasses">Read aloud needs glasses paired with Hypernova Lens.</string>
 
     <!-- The header with nothing due on the clock: what the next one waits for. -->
     <string name="au_trail_wait_reset">%1$d on, waiting for a reset</string>

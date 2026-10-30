@@ -123,7 +123,7 @@ class SummaryTest {
         // No verb up front: quoted, and a question mark already ends it.
         assertEquals("Every day at 9:00, in hypernova, ask Claude: “What changed overnight?” Notify me when it's done.", say(t, start("What changed overnight?", Then.NOTIFY)))
         assertEquals("Every day at 9:00, in hypernova, ask Claude: “The parser”.", say(t, start("The parser")))
-        assertEquals("Every day at 9:00, in hypernova, run /review. Read the result aloud on my glasses.", say(t, start("/review", Then.SAY)))
+        assertEquals("Every day at 9:00, in hypernova, run /review. Notify me when it's done.", say(t, start("/review", Then.NOTIFY)))
         assertTrue(Summary.sentence(w, t, start("/review"), false, ctx).contains("/\u2060review"))
         assertEquals("Every day at 9:00, in hypernova, run /release-notes 1.2.", say(t, start("/release-notes 1.2")))
         assertEquals("Every day at 9:00, in hypernova, start a session.", say(t, start("   ")))
@@ -143,11 +143,9 @@ class SummaryTest {
         )
     }
 
-    @Test fun notifyAndReadAloud() {
+    @Test fun notifyActions() {
         val t = Trigger.Reset(Trigger.SEVEN_DAY, false)
         assertEquals("Whenever my weekly window resets, notify me: “{week}”.", say(t, Action.Notify("{week}")))
-        assertEquals("Whenever my weekly window resets, notify me, and read it aloud on my glasses: “{week}”.", say(t, Action.Notify("{week}", glasses = true)))
-        assertEquals("Whenever my weekly window resets, read aloud on my glasses: “Time to stretch.”", say(t, Action.Say("Time to stretch.")))
         assertEquals("Whenever my weekly window resets, notify me.", say(t, Action.Notify("")))
         assertEquals("Whenever my weekly window resets, do something this app doesn't know yet.", say(t, Action.Unknown("x", "{}")))
     }
@@ -255,9 +253,9 @@ class SummaryTest {
             Trigger.Limit(Trigger.SEVEN_DAY), Trigger.SessionEvent(Trigger.NEEDS_YOU, hyper, Trigger.ANY), Trigger.Plugged, Trigger.BatteryLow(15),
         )
         val actions = listOf(
-            Action.Start(hyper, "/review", "anthropic", "opus", AutoMode.NO_ASKING, listOf("Bash(git log:*)"), Then.SAY),
+            Action.Start(hyper, "/review", "anthropic", "opus", AutoMode.NO_ASKING, listOf("Bash(git log:*)"), Then.NOTIFY),
             Action.Continue(Action.Continue.LIMITED, "", Then.NONE, "openrouter"), Action.Continue("s1", "Go on", Then.NOTIFY),
-            Action.Notify("{week}", glasses = true), Action.Say("Hi"),
+            Action.Notify("{week}"),
         )
         for (t in triggers) assertEquals(t, AutomationWire.trigger(AutomationWire.json(t)))
         for (a in actions) assertEquals(a, AutomationWire.action(AutomationWire.json(a)))
@@ -282,7 +280,7 @@ class SummaryTest {
 
     @Test fun readsTheSnapshotAndTheSocket() {
         val snap = JSONObject(
-            """{"mac":{"tz":"Europe/Moscow"},"automations":{"paused":true,"running":1,"queued":2,"glasses":true,
+            """{"mac":{"tz":"Europe/Moscow"},"automations":{"paused":true,"running":1,"queued":2,
                "notes":[{"id":"n1","automationId":"au_1","runId":"ru_1","name":"Morning brief","text":"3 PRs merged.","to":"phone","at":5}],
                "list":[{"id":"au_1","name":"Morning brief","enabled":true,"onlyOnce":false,"template":"brief","paid":false,"nextAt":10,"runCount":12,"problem":null,
                  "trigger":{"kind":"time","at":"09:00","days":[1,2,3,4,5]},

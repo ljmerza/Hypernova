@@ -1658,3 +1658,43 @@ session."
    Back returns to it. The session already on screen opened again stays as it is.
 4. **Elsewhere it still goes on top** (an automation's runs): Back returns there. The rule is one
    function, `sessionStack` in `data/AppModel.kt`.
+
+## The glasses are removed (2026-10-30)
+
+The owner removed the Even Realities G2 glasses feature, Hypernova Lens, entirely. The entries above
+about Lens, the glasses and what was built for them stay as history; none of it is in the code any
+more.
+
+1. **Gone:** `lens/` and its release workflow; the phone bridge (`android/.../bridge/`, Settings →
+   Glasses, the "Allow Hypernova Lens" prompt, "Glasses speak through this phone"); on the daemon the
+   glasses through a phone (`X-Hypernova-Via: lens`, `/v1/devices/me/glasses`, glasses in the Mac's
+   device list), the Lens guide (`/v1/guide*`), Nebula and its notes, Telescope and "Show me"
+   (`/v1/sessions/{id}/telescope` and `/screenshot`, `/v1/shots/*`, `/local/telescope/*`),
+   `turn=last` on events, and the CORS headers the glasses' WebView needed.
+2. **Automations** lose the `say` kind ("Read aloud on my glasses"), notify's `glasses` flag and the
+   `no_glasses` problem. A saved automation that still uses `say` no longer reads, and is turned off
+   with its card saying so. Statistics lose their glasses counts.
+3. **The Mac app is left as it is** (out of scope: it isn't built here and the owner doesn't use it).
+   It may still call the routes above, which now answer 404, and still show a Lens guide entry.
+4. **What only the glasses guarded is gone with them:** the daemon no longer refuses Bypass, "Always"
+   or Browse outside projects to a "glasses" device, as there are none. A device that paired as Lens
+   in a private build is now an ordinary device: forget it on the Mac.
+
+## Voice stays on the phone: Soniox is removed (2026-10-30)
+
+The owner removed the third-party (cloud) voice, Soniox, and kept the voice that never leaves the
+phone. The entries above about Soniox and Hyperscribe Companion stay as history.
+
+1. **Dictation is the phone's own, always:** the mic uses Android's on-device recognizer
+   (`PhoneDictation.kt`, from 2026-10-29); a phone without one has no mic. Gone: speech to text
+   through the Mac (`stt.ts`, `/v1/stt*`, the snapshot's `stt`, `{t:"stt"}`), the Hyperscribe
+   Companion route (`/v1/speech/companion`), the phone's streaming of its microphone, and Settings →
+   Voice (the Soniox key, Language, Headset microphone).
+2. **Read aloud is the Mac's own voice (`say`), or the phone's own text-to-speech** where the computer
+   has none (a Linux server). Gone: Soniox's voices (`tts.ts`), the engine choice and the fallback
+   note. `Speech` keeps `engine` and `using`, always `"mac"`, for clients that read them.
+3. **Files left alone:** a kept Soniox key (`<support>/stt.json`) is no longer read; its owner deletes
+   it. `speech.json`'s Soniox fields are not read, and go with the next save of the setting.
+4. **The Mac app is left as it is** (out of scope): its Setup Voice step and Settings → Voice… now
+   reach routes that answer 404.
+

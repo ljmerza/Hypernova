@@ -29,8 +29,7 @@ import kotlin.math.max
  *
  * Audio focus "may duck", so music dips under the voice and comes back after. A call taking the
  * audio, or headphones unplugged, stops it, as any player does. The Mac hears how it goes: started,
- * then the position and loudness a few times a second, then ended (played to the end: a risky
- * command on the glasses counts as heard only then) or stopped.
+ * then the position and loudness a few times a second, then ended (played to the end) or stopped.
  *
  * One play at a time; a new one stops the last. [now] and [level] are what the screens draw.
  */
@@ -58,10 +57,10 @@ object Speaker {
         run.start()
     }
 
-    /** Stop button, notification, a tap on the glasses: stop whatever plays. */
+    /** Stop button, notification: stop whatever plays. */
     fun stop(why: String = "phone") = onMain { current?.stop(why) }
 
-    /** The Mac stopped play [id] (the glasses asked, or a newer one replaced it). */
+    /** The Mac stopped play [id] (a newer one replaced it). */
     fun stopPlay(id: String) = onMain { if (current?.info?.id == id) current?.stop("mac") }
 
     /** At once on the main thread (so a screen never sees a frame without it), else posted there. */
@@ -257,7 +256,7 @@ object Speaker {
                 when {
                     ended -> send(PlayState.Ended)
                     why != null -> if (why != "mac" && why != "replaced") send(PlayState.Stopped, if (why == "phone") "phone" else why)
-                    // Never started: the glasses play it themselves. Broke off mid-way: not heard whole.
+                    // Never started, or broke off mid-way: not heard whole.
                     !started -> send(PlayState.Failed, failure ?: "failed")
                     else -> send(PlayState.Stopped, failure ?: "network")
                 }

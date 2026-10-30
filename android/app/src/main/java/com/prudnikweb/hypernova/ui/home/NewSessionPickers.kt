@@ -422,7 +422,6 @@ internal fun ProjectPicker(
                     item(key = "h:$key") {
                         val (label, mono) = when (g.kind) {
                             ProjectPick.Kind.Recent -> stringResource(R.string.ns_recent) to false
-                            ProjectPick.Kind.Nebula -> stringResource(R.string.ns_nebula) to false
                             ProjectPick.Kind.Worktrees -> stringResource(R.string.ns_worktrees, g.label.orEmpty()) to false
                             else -> g.label.orEmpty() to true
                         }

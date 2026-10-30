@@ -294,7 +294,7 @@ export function applyToolResult(ev: ToolEv, block: any, toolUseResult: any, ts: 
       output = toolUseResult.stdout + (toolUseResult.stderr ? (toolUseResult.stdout ? '\n' : '') + toolUseResult.stderr : '')
       // A command in the background has no output yet; its result names its ID and output file
       // ("Command running in background with ID: b8f…. Output is being written to: /…/b8f….output"),
-      // which is how "show me" (and Lens) find the address a dev server started there printed.
+      // which the output keeps.
       const bg = typeof toolUseResult.backgroundTaskId === 'string' ? toolUseResult.backgroundTaskId : null
       if (bg) {
         const note = said.split('\n').find((l) => l.includes(bg)) ?? `Command running in background with ID: ${bg}.`

@@ -15,10 +15,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Fork: dictation on the phone itself, for when the Mac offers no voice (no Soniox key, no
- * Companion). Android's on-device recognizer only ([SpeechRecognizer.createOnDeviceSpeechRecognizer]):
+ * Fork: dictation on the phone itself, the mic's only way. Android's on-device recognizer only
+ * ([SpeechRecognizer.createOnDeviceSpeechRecognizer]):
  * the audio never leaves the phone, and a phone without one offers no voice rather than a cloud
- * recognizer. The same [Dictation] as the Mac's, so the mic, the capsule and the box don't change.
+ * recognizer. A [Dictation], as the demo's is, so the mic, the capsule and the box are the same.
  * Main thread only, as SpeechRecognizer is.
  */
 @RequiresApi(Build.VERSION_CODES.S)

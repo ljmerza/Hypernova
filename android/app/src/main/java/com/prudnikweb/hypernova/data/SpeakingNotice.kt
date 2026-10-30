@@ -43,7 +43,7 @@ class SpeakingNotice private constructor(private val context: Context, private v
                     setSound(null, null)
                 },
             )
-            val title = context.getString(if (play.forGlasses) R.string.speaking_for_glasses else R.string.speaking_reading)
+            val title = context.getString(R.string.speaking_reading)
             val session = MediaSession(context, "Hypernova speaking").apply {
                 setCallback(
                     object : MediaSession.Callback() {

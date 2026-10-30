@@ -1,7 +1,6 @@
 # Hypernova protocol (v1)
 
-The contract between the Mac daemon and its clients: the Android app, the Mac menu bar app and
-Lens (the Even G2 glasses app, a web page in the Even App on the phone; `lens/`).
+The contract between the Mac daemon and its clients: the Android app and the Mac menu bar app.
 The daemon is the source of truth. All JSON is UTF-8, camelCase, and clients
 must ignore unknown fields and unknown enum values (show them generically).
 
@@ -11,9 +10,6 @@ must ignore unknown fields and unknown enum values (show them generically).
  Android app ──https (tailscale serve, ts.net cert)──▶ daemon API  127.0.0.1:47321
  Android app ──https over the tailnet, built-in nodes─▶ hypernova-tsnet (Go) ──▶ daemon API 127.0.0.1:47321
  Android app ──https, pinned + device cert (same Wi-Fi)▶ daemon LAN  0.0.0.0:47323 (the same API)
- Lens (Even App WebView) ──http loopback, signed and sealed calls─▶ Android app 127.0.0.1:47380 (the phone bridge)
-   └─ the app carries it on its own route, phone token + X-Hypernova-Via: lens ─▶ the same API
- Lens, a private build without the app ──same as the phone, CORS──▶ daemon API  127.0.0.1:47321
  Mac menu bar app ──http loopback + admin token──────▶ daemon local 127.0.0.1:47322
  Claude Code hooks (http hooks) ─────────────────────▶ daemon local /hooks/*
  Status line tee (marked block) ─▶ files in <support>/statusline/ ◀── daemon watches
@@ -54,23 +50,15 @@ must ignore unknown fields and unknown enum values (show them generically).
   the phone's device certificate presented (see Local network (direct HTTPS)); the API is the
   same there, and the base URL in use is the one everything else is built from. The app's route
   order is Local, then its built-in Tailscale node, then the base URL as it is.
-- Every `/v1` request except `GET /v1/health`, `POST /v1/pair`, a Telescope picture
-  (`GET /v1/shots/<token>.png`, see Telescope) and a terminal's WebSocket (a ticket instead, see
-  Shared terminals) carries `Authorization: Bearer <deviceToken>`. 401 → the app shows
+- Every `/v1` request except `GET /v1/health`, `POST /v1/pair` and a terminal's WebSocket (a
+  ticket instead, see Shared terminals) carries `Authorization: Bearer <deviceToken>`. 401 → the app shows
   "Unpaired" and stops retrying. WebSocket: same header on the upgrade request, or
   `?token=<deviceToken>` (a browser can't set headers on a WebSocket). The pages outside `/v1`
   (pairing, download, previews, the checklist) take no bearer token; a preview's or the
   checklist's link carries its own key.
-- Web clients (the glasses app runs in the Even App's WebView, which enforces CORS): every
-  `/v1/*` answer on the phone port, errors included, carries `Access-Control-Allow-Origin: *`,
-  and `OPTIONS /v1/*` answers a browser's preflight with 204, no token needed:
-  `Access-Control-Allow-Methods: GET, POST, PUT, DELETE`, `Access-Control-Allow-Headers:
-  Authorization, Content-Type`, `Access-Control-Max-Age: 7200` (Chromium's most), and
-  `Access-Control-Allow-Private-Network: true` when Chromium asks before a public page reaches
-  the tailnet's private address. Any origin is fine: every route but health and pairing needs
-  the token, and there is no credentials mode (no `Access-Control-Allow-Credentials`), so a
-  browser's cookies never count. Pages outside `/v1` (download, pairing, previews, the
-  checklist) and the Mac app's port send none of this.
+- No CORS: no answer carries `Access-Control-Allow-*` headers and `OPTIONS` reaches no route, so
+  a web page in a browser can't read the API. (Until 2026-10-30 the phone port allowed any
+  origin for the glasses app's WebView; it was removed with the glasses.)
 - Errors: non-2xx with `{"error": {"code": "string", "message": "human text"}}`.
 
 ## Pairing
@@ -89,7 +77,7 @@ must ignore unknown fields and unknown enum values (show them generically).
 
    Why that link: phone cameras and Google Lens open https links, never a custom scheme from a QR
    code, and a page on the computer opens only once the phone can reach it (not before it's on the
-   tailnet). Android opens `https://hypernova.observer/pair` (and `/glasses`) straight in the app
+   tailnet). Android opens `https://hypernova.observer/pair` straight in the app
    (Android App Links: the manifest's `autoVerify` filter, and the domain's
    `/.well-known/assetlinks.json` from the name service's Worker, `names/src/links.ts`, naming the
    package and its signing keys). **The pairing details are in the fragment, which a browser never
@@ -107,7 +95,6 @@ must ignore unknown fields and unknown enum values (show them generically).
 2. The phone's camera (or the in-app "Paste link" field, which takes any of the three) opens it;
    the app handles `https://hypernova.observer/pair` (reading its fragment exactly as the app
    link's query, `data/Pairing.kt` `PairLinks`) and the `hypernova` scheme, host `pair`.
-   `https://hypernova.observer/glasses` and `hypernova://glasses` open Settings → Glasses.
 3. The app calls `POST <u>/v1/pair` with `{"code", "deviceName", "model", "appVersion", "client"?,
    "installId"?}` and gets `{"token", "deviceId", "mac": {"id", "name"}}`. It stores `u`, the
    token and the Mac name. One phone can pair with several Macs, each its own device there with its
@@ -116,15 +103,10 @@ must ignore unknown fields and unknown enum values (show them generically).
    `installId` (8–64 letters, digits, `_` and `-`) is the app install's own stable id, made once and
    kept with the app's data: pairing the same install again (its token lost, a new code scanned)
    replaces its old device (same `installId` and `client`) instead of adding a twin to the device
-   list; the old token stops working, its feeds close (4001), and glasses it allowed stay allowed.
+   list; the old token stops working and its feeds close (4001).
    Without one (an older app), every pairing is a new device.
-   Lens no longer has to pair: through the Hypernova app on the same phone it needs no pairing of its
-   own (see The phone bridge). A Lens that still pairs (a private build, a phone without the app)
-   does it as below.
-   `client` names the app when it isn't the Android one: Lens sends `"lens"` (up to 24 lowercase
-   letters, digits and `-`; anything else is dropped). It's kept with the device, so the Mac app's
-   device list says "Even glasses" (with a glasses glyph), and the Mac opens the Lens guide (see
-   The Lens guide).
+   `client` names the app when it isn't the Android one (up to 24 lowercase letters, digits and
+   `-`; anything else is dropped). It's kept with the device, for the Mac app's device list.
 4. `DELETE /v1/devices/me` forgets this phone on the Mac.
 
 The daemon also serves the app, to install or update it: `GET /download/android`
@@ -211,12 +193,11 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   network). A request is *certified* when its certificate was signed by this CA, is the
   device's active one and the device still exists. Without that, the LAN listener answers only
   `GET /v1/health`, `POST /v1/pair` and `POST /v1/device/cert` (the bearer token's way to a first
-  certificate), `GET /download/android` and its APK, plus `OPTIONS /v1/*` preflights (answered
-  without reaching a route; any other `OPTIONS` is 404); everything else is 401
+  certificate), `GET /download/android` and its APK (any `OPTIONS` is 404); everything else is 401
   `device_cert_required`, and a WebSocket upgrade is refused with 401. A certified request still carries the bearer token where
   the route needs one, and that token must be the same device's (401 `wrong_device` otherwise);
-  the routes that take no token (a Telescope picture, a terminal ticket's WebSocket, a preview,
-  the checklist) are open to the certified device. Forgetting a device (`DELETE /v1/devices/me`,
+  the routes that take no token (a terminal ticket's WebSocket, a preview, the checklist) are open
+  to the certified device. Forgetting a device (`DELETE /v1/devices/me`,
   or `DELETE /local/devices/{id}` from the Mac) revokes its certificate at once: the record is
   gone, so the next request, even on a connection already open, is 401. The daemon keeps only each
   certificate's fingerprint with its device (`devices.json`), never a key of the phone's.
@@ -259,8 +240,7 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   handshake; otherwise the tailnet (see "Tailscale built in") or the base URL. Every attempt to
   connect runs a probe round first, as does every network change; see "The route" under Tailscale
   built in for the round, the back-off and the connection log.
-  Everything the app builds from the base URL (Telescope pictures, terminal tickets and their
-  sockets, attachments, downloads, previews) follows the active route; the daemon builds the URLs
+  Everything the app builds from the base URL (terminal tickets and their sockets, attachments, downloads, previews) follows the active route; the daemon builds the URLs
   it hands out (a preview's, the checklist's) from the request's own host and scheme. The Link chip
   and Settings show the route: "Local" or "Tailscale".
 - **The terminal on the local route:** the terminal page's own WebSocket can't trust the pinned
@@ -413,7 +393,7 @@ device certificate exactly as above. `daemon/src/names.ts` (the name), `daemon/s
   a private address can't be reached from outside the network. What answers on port 47323 to
   anyone on the same network (a café's Wi-Fi, say), with no device certificate: **at the IP
   address**, `GET /download/android` and its APK, `GET /v1/health` (with this computer's name),
-  `OPTIONS /v1/*` preflights (204, nothing read), and the pairing endpoints (`POST /v1/pair`,
+  and the pairing endpoints (`POST /v1/pair`,
   closed while no code is shown and limited to 5 wrong codes per source address, and `POST
   /v1/device/cert`, which needs a paired device's token); **by name**, only the download page,
   the APK and a shown code's pairing page. Every other route needs a paired device's
@@ -473,8 +453,8 @@ tailnet, with no server of ours and nothing opened to the internet. (docs/DECISI
   no binary: `mode: "off"`. `GET /local/tsnet` and the `tsnet` field of `GET /local/status`:
   `{mode, reason, available, enabled, helper: <the helper's last status> | null, url, controlUrl}`.
   `POST /local/tsnet/login` and `POST /local/tsnet/logout` pass the commands on. Every feed hears
-  `{t:"tsnet", tsnet, tailnet}` on a change, without `loginUrl` and `qr` (phones and the glasses
-  hear it too; the Mac app reads the link from `/local/status`). `tailnet` (also the snapshot's
+  `{t:"tsnet", tsnet, tailnet}` on a change, without `loginUrl` and `qr` (phones hear it too; the
+  Mac app reads the link from `/local/status`). `tailnet` (also the snapshot's
   `mac.tailnet`) is where the phone API is on the tailnet right now: `{name, ip, url, control}` from
   the helper while it serves, else from the Tailscale app's serve as last read; null when neither
   serves. `publicBaseUrl` (the pairing link's `u`)
@@ -658,408 +638,6 @@ tailnet, with no server of ours and nothing opened to the internet. (docs/DECISI
   `daemon/tsnet/main_test.go` (the proxy's headers, 502 with the daemon down, serving again after
   a logout), `android/tsnet/node_test.go` (the CONNECT proxy: secret, allowlist, peers only, the
   cap), and on Android `TailscaleRouteTest` and `PairLinksTest`.
-## The phone bridge (Lens through the Hypernova app)
-
-Lens runs in the Even App's web view on the phone, which serves it from `http://127.0.0.1:<port>`.
-The Hypernova Android app on the same phone listens on **`127.0.0.1:47380`** (loopback only) and
-carries Lens's calls to the daemon over the route it uses itself (Local or Tailscale, see Local
-network), with its own token and device certificate. So Lens needs no pairing, token or Mac address
-of its own: one public Lens build works for everyone (its network whitelist is only
-`http://127.0.0.1:47380/` and `ws://127.0.0.1:47380/`), and the glasses keep the app's connection
-through network changes. `android/.../bridge/` (`LensBridge.kt`, `BridgeAccess.kt`, `BridgeHttp.kt`,
-`WsFrames.kt`, `GlassesSettings.kt`) and `lens/src/data/bridge.ts`, `link.ts`.
-
-**Access.** Any app on the phone can reach loopback, and any app can hold the port while the
-Hypernova app doesn't (after a reboot, before its process starts; or after Android ends it), and a
-connection a web view opened while another app held the port stays that app's, relaying, after
-Hypernova has the port back. So until the owner allows a Lens, once, the bridge answers only its
-ping and the ask (and carries only links that are their own key, below); nothing Lens ever sends
-to whoever listens there gives it access (the token is agreed, never sent; every call is signed
-with a key made from it); and nothing it reads there tells it anything (every call's body and
-whole answer, and every WebSocket message, is sealed under a key of that one call's own: 5–6).
-`BridgeCrypto.kt`, `BridgeSeal.kt`, `lens/src/core/crypto.ts` and `lens/src/data/seal.ts` hold
-both sides to the same numbers (RFC 7748's keys; AES-256-GCM from `javax.crypto` and WebCrypto;
-their tests share one set of vectors). base64url means without padding; `‖` joins bytes; each MAC,
-hash and seal starts with its own label, so one made for one purpose is never one for another.
-This is **protocol 4** (Lens 0.1.9 and up; the Android app from this round): the agreement is
-protocol 2's unchanged, the signatures and seals (labelled `hnb3`, the wire formats of protocol 3)
-are protocol 3's, and 4 adds the picture by name (Carrying calls), the empty poll (4) and the
-ask's `bridge` (2); a mismatched pair refuses the other plainly rather than talk down (1, 2, 5): a
-Lens that says less in its ask is told to update before anyone is asked, and Lens signs nothing for
-an app that says less in its ping. (A Lens already allowed under protocol 3 goes on working: its
-grant and formats are the same; only a new ask needs 4.)
-
-1. `GET /bridge/ping[?kid=<key id>&n=<challenge>]` (no signature) → `{ok: true, app: "hypernova",
-   version, bridge: 4, id, proof?}`. `id` is the listener's: new, random, each time the app opens its
-   port. With a key id the app holds (below) and a fresh challenge `n` (16–64 base64url characters),
-   `proof` = base64url(HMAC-SHA-256(key, "hnb3-ping\n" + id + "\n" + n)). Lens tries it first (1.5 s);
-   nothing, or anything else answering, means no app: Lens then uses a pairing of its own if it has
-   one and its build may reach a Mac (a private build), else says "Open Hypernova on your phone" and
-   looks again every 4 s. An app that says `bridge` under 4 is one Lens signs nothing for: "Update
-   Hypernova on your phone", looked at again every 4 s. The ping is unsigned: Lens takes `version`
-   only when it's plainly one (`\d{1,3}(\.\d{1,3}){2}`, else nothing), reads at most 16 KB of it
-   within 1.5 s (a trickling ping is no app), and never shows its words. Lens seals with
-   WebCrypto, which a page has only in a secure context (the Even App's `http://127.0.0.1` is one; a
-   dev server opened by a LAN address isn't): without it Lens says so and goes nowhere.
-2. `POST /bridge/request {name, version, key, commit, bridge}`: `key` is Lens's X25519 public key for
-   this ask (32 bytes, base64url), `commit` = base64url(SHA-256("hnb2-commit\n" ‖ nonce)) for a nonce
-   of 16 bytes Lens keeps to itself for now, and `bridge` the protocol Lens speaks (4) → 202 `{id, key,
-   nonce, expiresInSeconds: 120}`: the app's own X25519 key for this ask and its nonce. No key, or
-   one of small order (it agrees on zero), a `version` that isn't plainly one
-   (`\d{1,3}(\.\d{1,3}){2}`) or is older than 0.1.9, or a `bridge` under the app's (or none: a Lens
-   of protocol 3 or before): 400 `update_lens`. `name` is taken but never shown: the prompt always says
-   "Hypernova Lens" (whatever asks could call itself anything), and the version is shown only in
-   Settings → Glasses once allowed, never near the code, so the code is the only number anywhere on
-   the prompt or the notification. Nothing is shown to the owner yet.
-3. `POST /bridge/request/{id} {nonce}`: Lens shows its nonce, now that it has the app's half. Not the
-   committed one: 400 `bad_commit`, and the ask is over. Both sides now work out, each by itself:
-   - the code: SHA-256("hnb2-code\n" ‖ Lens's key ‖ the app's key ‖ Lens's nonce ‖ the app's nonce),
-     its first four bytes as a big-endian number, modulo 1 000 000, six digits;
-   - the token: "hnb_" + base64url(HMAC-SHA-256(X25519 secret, "hnb2-token\n" ‖ Lens's key ‖ the
-     app's key ‖ Lens's nonce ‖ the app's nonce)). It never travels; the app keeps only its SHA-256,
-     the **key** (and the secret is wiped), and Lens keeps the token in the Even App's storage.
-     Plainly: the key signs, seals and opens everything the token could, so the app's preferences are
-     as much to protect as the token itself; keeping the hash only keeps the token string, Lens's
-     own credential, out of a second place.
-
-   Only now does the app ask "Allow Hypernova Lens to connect?" with the six digits: in the app while
-   it's on screen, else as a notification with Allow and Deny (answered there, the app stays in the
-   background). Allow on the notification asks to unlock the phone first, and a locked phone's lock
-   screen shows neither the code nor the buttons; on Android before 12, which can't ask, Allow on a
-   locked phone only opens the app. Lens shows its own code ("Approve on your phone: Hypernova", `Code
-   392602`). A newer ask replaces one shown, in place: its Allow (in the app) wakes 1.5 s after the
-   code changes, and its notification comes 1.5 s later with buttons of its own (a PendingIntent per
-   ask), so a tap meant for the one before can't allow it.
-
-   **What the code proves**: that the ask the owner allows is the one whose code is on the glasses in
-   front of them, not that it comes from Hypernova Lens. Any page on loopback (another app's local
-   page in a browser) can ask, and a native app can ask with any origin; only the owner comparing the
-   code tells them apart, so the prompt says to allow only the code the glasses show. Something
-   between Lens and the app (another app holding the port that relays the ask) has to agree a key of
-   its own with each side, and must give Lens its half before Lens shows its nonce, so it can't steer
-   the two codes to match: one chance in a million, at each ask, and the owner sees two different
-   codes. Relaying without swapping keys, it learns no secret at all.
-4. `GET /bridge/request/{id}` (Lens, once a second) → `{state: "pending" | "denied" | "expired"}`, or
-   once allowed `{state: "allowed", confirm}` with `confirm` =
-   base64url(HMAC-SHA-256(key, "hnb2-confirm\n" + id)), which must check out (made by the app that
-   worked out the same key). Nothing else is in it: the poll is unsigned and unsealed, anything that
-   knows the id reads it and a relay could rewrite it, so the glasses' settings (which used to ride
-   here) come only once the owner confirmed, by a signed, sealed `GET /bridge/settings` (or the live
-   feed's `bridge.settings`), and Lens checks every field of them (The glasses' settings). Lens reads
-   the ask's answers (2–4) within their deadlines and 16 KB at most, and takes a refusal's `code`
-   only, never its words. Even then Lens keeps the token only once the owner says on the glasses
-   that they allowed it: "Allowed on your phone? Code 392602 · Tap to connect" (or Connect on Lens's
-   phone screen, not where "Connect again" was), for 2 minutes, then `expired`; a tap counts only
-   1.5 s after it shows, so one meant for what was there before isn't taken for it. Whatever holds
-   the port can say "allowed" by itself (it can be the other end of the exchange); it can't make the
-   owner have seen the question in Hypernova. It could show a lookalike question of its own, with
-   the right code (it worked it out too): so the owner allows only in Hypernova's own prompt or
-   notification (Android names the app on a notification; the confirmation on the phone screen
-   says so). The grant is made at the first such poll (one never collected leaves nothing); later
-   polls get the same answer. 404 `no_request` for an id the app doesn't know. An ask unanswered for
-   2 minutes is `expired`, and so is one allowed but not collected within 10 minutes of the Allow (the
-   owner often allows in the app, and the page that asked may be paused until they go back to it).
-   Denied or expired, Lens waits for a tap (on the glasses, or "Ask again" on its phone screen). Once
-   Lens has shown its nonce, nothing makes it ask again by itself (a refusal or a failure after that
-   waits for a tap too): each ask is one try at the code. Asks are limited per page (its `Origin`: 3
-   a minute, 12 an hour) and in all (6 a minute, 30 an hour), and after a Deny nobody may ask for 30 s,
-   twice as long at each further Deny within the hour (10 minutes at most): 429 `too_many_requests`
-   with `retryAfterSeconds` (Lens waits that long, an hour at most whatever it's told, and asks again
-   by itself, when it hasn't shown a nonce yet). A page in a browser can't change its `Origin`, but a
-   native app can send any, so one app making up origins can use up the hour's 30 and hold Lens's
-   asks off until it's over: a denial of service only (such an app could as well hold the port). The
-   app remembers 8 asks; finished ones, then ones never shown, make room first, so other pages' asks
-   can't push out the one being answered or collected. The phone pairing again, or the Mac forgetting
-   the glasses, ends every ask under way too (one shown, one allowed and not yet collected): an Allow
-   given under one pairing never becomes a grant under the next.
-5. **Signed calls.** Every other call, but for the links that are their own key (Carrying calls),
-   carries `Authorization: HNB3 <kid>.<ts>.<nonce>.<body>.<mac>`, or `?hnb=<kid>.<ts>.<nonce>.<body>.<mac>`
-   on a WebSocket (a page can't set headers on one): `kid` = the first 16 characters of
-   base64url(SHA-256("hnb2-kid\n" ‖ key)), `ts` the time in ms, `nonce` 16–64 base64url characters
-   (Lens: 16 random bytes), `body` = base64url(SHA-256(the body as sent: the sealed bytes, below))
-   (`47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU`, the empty one, for a `GET`, a `DELETE` without one
-   and a socket), and `mac` = base64url(HMAC-SHA-256(key, "hnb3\n" + listener id + "\n" + method +
-   "\n" + path + "\n" + query + "\n" + ts + "\n" + nonce + "\n" + body)), with the path and query as
-   sent (the query less empty parts and `hnb`). Good once (the app remembers nonces for the window),
-   for this listener, within 60 s of the app's clock (the same phone's), with that body only. A
-   call without a body (a `GET`, a `DELETE` without one, a socket) signs the empty hash and carries
-   nothing. No signature, or a key the app doesn't know (never allowed, or revoked): 403
-   `bridge_access` (Lens asks again when told to). A known key whose signature isn't good here and
-   now (another listener: the app opened its port again; too old; used before): 401
-   `bridge_signature`: for a `GET`, Lens has the listener prove itself again and, only when it
-   proves to be another listener than the call was signed for, signs the call afresh once (the same
-   listener means the 401 wasn't the app's: a relay that passed the call on and answered itself). A
-   call that changes something (`POST`, `PUT`, `DELETE`) is never sent again by itself, whoever the
-   listener is now: a relay could pass it on (carried, done on the Mac), have the port reopen
-   meanwhile and answer 401, and a resend would have the Mac do it twice. Lens says "That didn't
-   reach Hypernova on this phone. Try again." (its own words), and the owner does; the Mac's
-   routes that matter take a second identical prompt or answer as a new one, so the owner sees
-   what happened in the session. `HNB2 …` (a Lens before sealing): 403
-   `update_lens`. A bearer token opens nothing. A `HEAD` to a signed route is 405 (a sealed answer
-   is a body; the 405 has none). These refusals come unsealed: the app has no key to seal them with.
-   So Lens takes only their `code` (16 KB read at most, within the call's own deadline), never
-   their words: it has fixed words of its own for each, and whatever holds the port can't put a
-   sentence on the lens. A `POST`, `PUT` or `PATCH` without a body is 400 (sealed).
-
-   **Sealed.** Everything a signed call carries, and everything it's answered, is sealed under a key
-   of that one call's own, **call key** = HMAC-SHA-256(key, "hnb3-key\n" + listener id + "\n" + nonce),
-   AES-256-GCM with a 16-byte tag. The 12-byte IV is `dir ‖ 0x000000 ‖ counter` (`dir` one byte, 1 from
-   Lens, 2 from the app; the counter 8 bytes big-endian), each direction counting its own pieces from
-   0, so no IV repeats under a key, and a piece dropped, repeated or reordered doesn't open; the nonce
-   is good once, so a call played again gets nothing. A **body** (a request's, or a whole answer) is a
-   stream of records, each `flag(1) ‖ length(4, big-endian) ‖ ciphertext`, `flag` 0 (more) or 1 (last),
-   with the associated data `"hnb3-body\n" + "more" | "last"`, so the end marker can't be moved: a stream
-   that ends without a `last` record was cut off (a record's plaintext is 1 MB at most; the app cuts
-   an answer into 64 KB pieces as it streams from the Mac). A request's body is one record, the last,
-   its plaintext the JSON Lens would have sent (the app reads it whole, 1 MB at most and never
-   chunked: 413 `too_large`; checks its hash against the signature: 400 `bad_body`; opens it: 400
-   `bad_seal`; and sends it on as `application/json; charset=utf-8`, whatever the request's own
-   content type said). An **answer** is always an outer `200 OK` with `X-Hypernova-Bridge: sealed`,
-   `Content-Type: application/x-hnb3` and `Cache-Control: no-store` (exposed by CORS: nothing else
-   is), its body a stream whose first record is the head, `{"status": <the Mac's or the app's>,
-   "headers": [["content-type", "…"], …]}` (names lowercase; the Mac's headers less the connection's,
-   its cookies and CORS: `X-Speech-Engine`, `X-Sample-Rate`, `Location` and the rest are in here, and
-   nowhere a browser acts on them, so a 3xx is never followed and `Set-Cookie` never set), and the
-   records after it the body, as it comes, then a `last` one (which may be empty). Lens reads the
-   whole stream, opens it, and takes the answer only then, with the status and headers inside; so an
-   answer is whole or nothing, and a relay sees a 200 and some bytes whatever was said. A **WebSocket
-   message** is one piece, associated data `"hnb3-frame"`, its plaintext `kind(1) ‖ payload` (1 text,
-   2 binary, 3 the end: `code(2, big-endian) ‖ reason`), sent as a binary frame; each side counts its
-   own from 0 for that socket (its call key is the one the handshake's `?hnb=` nonce made), and sends
-   the end before it closes, so a close without one was cut off (Lens reports 1006; the Mac's codes,
-   4001 and the app's 4003, reach Lens inside the end marker, which nothing in between can forge). An
-   unsealed message on a socket, or one that doesn't open, ends it at once. Ping and pong frames carry
-   nothing and go as they are.
-
-   The test vectors (`BridgeCryptoTest.kt`, `BridgeSealTest.kt`, `lens/test/bridge.test.ts`, "the
-   protocol's numbers" and "the seal's numbers"), one exchange with RFC 7748's two key pairs: Lens's
-   private key `77076d0a…db92c2a` (public `hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo`), the app's
-   private key `5dab087e…ff88e0eb` (public `3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08`), Lens's
-   nonce `000102…0e0f`, the app's `f0e1d2…1e0f`: the commitment is
-   `NEeFLkoRsuPswHb3YaLUaMF_9L8BmbPiPm3JGMS786s`, the code `392602`, the token
-   `hnb_vrLDd3PSfnZXLwuwgRZfml7XU2EkJBDBm51AldXQf_A`, the **key** (its SHA-256)
-   `ad0b3896686cf715ed395d1379592b6ef2d185dd883b8bf0543c2063705476a0`, the key id `yn8jTX6SL2djsVIw`,
-   the ping proof for `listener-1` and challenge `challenge-nonce-0001`
-   `Kuju7EKcMwhaaNi54Uu-eyynpZ5jZNRCIPuXbc1dCl4`, the confirmation of `req-0001`
-   `0GkXoe0-7WbKDvOm-x652xp9Tkv-x4HCcqhckmy8uZ4`, and the signature of `POST /v1/sessions/s1/prompt`
-   with query `a=1&b=%20x`, time `1800000000000`, nonce `nonce-0001` and body `{"text":"hi"}`
-   `8JgU02H7q1P_pM_K_pusw61MFUbuBvODnwGmr4V5FQU`. With that key, listener `listener-1` and nonce `nonce-0001`, the call key is
-   `b1e7d263d5e495f5b65eacc11d330ea1146cfc736bed7e984fe371dff56256c6`; `{"text":"hi"}` from Lens is
-   `010000001d67f122c41afc2b8316a9f2c6c2a1d2c93d493be450fcc5a647dbe9c15b`; the app's `{"t":"bridge.settings"}`
-   as its first text message is `c4052090f55aff97a6a2e1e812e3f8d7d8a8c45f29b5644026ca6a4c4c00670ab1e2bc3bfdb2487f`.
-6. **The app proves itself.** Lens signs nothing for a listener until it proved it holds the key
-   (the ping's `proof` for Lens's challenge), again after 3 s without a word from it, again right
-   before each WebSocket, and again after any call failed or a feed closed (the app may have gone,
-   and another app may have taken its port). From then on, only the holder of the key can seal an
-   answer or a message under the call's key: an answer that opens is the app's word (and counts as
-   the listener the call was signed for proving itself again), and one that doesn't, or comes
-   unsealed, isn't taken at all. A key that isn't proved (a squatter can only say "I don't know that
-   key") doesn't make Lens forget its token: it says "Disconnected on your phone" (or Hypernova isn't
-   running) and waits for a tap, and the app proves the same key again once it's back.
-
-   **What whatever holds the port, or relays it, can get.** Never the token or the key, a signature
-   it can use anywhere else, a grant (unless the owner allows a code that isn't the one on the
-   glasses and then taps to confirm it), or a byte of what's said to the app: a prompt, a
-   transcript, the glasses' audio, the Mac's answers, their headers, even their statuses (what Lens
-   says to something it paired with by mistake is that thing's to read: the last point below). It can't change any of
-   it undetected (the body is hashed into the signature and sealed; the answer and every message
-   open only whole, in order, under the call's key), can't play a call again (the nonce), and can't
-   pass off a cut answer or feed as a whole one (the end marker). What it does learn: that calls
-   happen, when, how big, and each one's method, path and query (`POST /v1/sessions/<id>/prompt`,
-   `GET /v1/sessions/<id>/events?since=…`: session ids, never their content), the pings and the ask's
-   public halves, and the pages of previews (below). What it can still do, and the rest that stays
-   true, honestly:
-   - **Refuse to carry**, or answer as itself: a denial of service, as holding the port is. Lens
-     never takes such an answer (only, when the app ended within 3 s of its last answer, one call it
-     can't answer). The ping's `version` and `bridge`, and every refusal's `code`, are unsigned: a
-     relay can make Lens say "Update Hypernova on your phone" or "Disconnected on your phone" (with
-     Lens's own words, never its: see 5), or make it prove the app again; nothing more.
-   - **A call carried twice**: never (5): a call that changes something isn't sent again by itself
-     whatever answered, only a `GET` is, and only for a listener that proves to be a new one. What
-     remains is the owner's own second try after "That didn't reach Hypernova on this phone", which
-     the session shows as what it is.
-   - **Previews** (Carrying calls): a preview's token travels in the clear in the iframe's request
-     line (`GET /p/<token>/…`, and the `hn_preview` cookie), so a relay reads it and can open that
-     preview itself: through the bridge (Preview, PreviewFile) for as long as the grant that opened
-     it lasts, and at the Mac (`servePreview`) for the 12 hours the Mac keeps it: every non-dot file
-     under a folder preview, any `GET` path of a port preview. A preview is a page the owner chose
-     to look at on the glasses; nothing else of theirs is behind its token.
-   - **Pictures** (Carrying calls): a Telescope picture's name travels only inside the seal, so
-     nothing on the phone's loopback learns one. The Mac serves `/v1/shots/<name>.png` by its name
-     alone, without a token, on its API (behind `tailscale serve`) and on its LAN listener (47323,
-     for the app's local route): a name is a 12-hour capability for anyone who holds it and reaches
-     the Mac. Nothing in this round changed the daemon; what the sealing closes is the one place a
-     name was readable without reaching the Mac first.
-   - **A pairing with whatever holds the port** (the N9 case): after "Disconnected on your phone"
-     a tap asks again, and if the owner then taps Connect on the glasses without having seen
-     Hypernova's own prompt, Lens pairs with whoever answered the ask (a squatter can play the whole
-     app). From then on that app reads what Lens sends it (prompts, audio) and can answer as it
-     likes; it has nothing of the Mac. Only the owner's care at the two taps prevents it (the lens
-     and the phone say so each time); the app's identity isn't pinned at the first pairing yet.
-
-7. The app keeps at most 4 grants (the least recently used makes room; those of protocol 2 were
-   dropped with it, and Lens asked again), and drops one nobody used for 30 days (its Lens asks
-   again). Settings → Glasses lists them ("Hypernova Lens", the day it was allowed, "Connected now"
-   or when last used; while an Allow waits for the glasses' tap, "Waiting for a tap on the glasses")
-   with **Disconnect**, which revokes that key at once: its
-   previews dropped and their streams cut, its calls under way to the Mac cancelled, its live feeds closed with
-   4003 (one still waiting for the Mac's answer never opens), and when it was the last one the app
-   sends `DELETE /v1/devices/me/glasses`. `DELETE /bridge/access` (signed) is Lens letting go by
-   itself. Grants belong to the pairing they were made under: **Forget**, or pairing the phone again
-   (with this Mac or another), drops them all (everything under way ended the same way) and Lens asks
-   again, so a Lens allowed for one computer never reaches the next one; one allowed before the phone
-   had any pairing goes with its first.
-
-**The port.** When another app holds 47380, the app says so in Settings → Glasses and in a quiet
-notification ("Another app is using the glasses' port") while it lasts, and tries again every 3 s
-(every 15 s after three minutes) for as long as it runs; each opening gets a new listener id.
-
-**Who may call.** Only Lens, as the Even App serves it: an `Origin` must be `http://127.0.0.1:<port>`
-(or `localhost`, `[::1]`), with its port. Refused, with 403 `bridge_origin` and no CORS (the page
-can't read even that): `null` (a sandboxed frame or a `data:` page any site can make, and `file:`
-pages), every other site, and private network addresses (a captive portal, a router's page, a laptop
-on the same Wi-Fi). An Android build made with `-Phypernova.lensDevServer=true` also takes a private
-address, for a Lens dev server the Even App opens by its LAN address; the APK the Mac hands out never
-does. No `Origin` is a native client, or a browser loading a page or a picture (it can't read the
-answer): it may ping, make a signed call, and load a picture or a preview, but not ask, show its
-nonce or poll (a page always sends its Origin). The bridge's own address (a preview's page) may only load that preview's
-files. Lens's origin gets CORS echoed (`Vary: Origin`, no credentials, never `*`), and a preflight
-answers `Authorization, Content-Type` and `GET, POST, PUT, DELETE`, with
-`Access-Control-Allow-Private-Network: true` when Chromium asks. A request whose `Host` isn't
-`127.0.0.1:47380` (or `localhost`, `[::1]`) is refused (403 `bridge_host`: DNS rebinding), and so is a
-target that isn't a path (400 `bad_request`: it starts with one `/`, never `//`, a host or a scheme),
-and a head that sends a header the bridge judges by twice (`Host`, `Origin`, `Content-Length`,
-`Transfer-Encoding`, `Authorization`, `Cookie`, `Upgrade`, `Connection`, `Sec-WebSocket-Key`), or
-both a length and a transfer-encoding (400: judged by one and read by the other, once). All this is
-judged from the request's head before any of its body is read; then the bridge's own routes take 16
-KB at most (413 `too_large`, refused by its `Content-Length` before reading, a chunked one counted
-chunk by chunk so a huge chunk size can't wrap the count; 16 trailer lines at most), and a signed
-call's sealed body 1 MB, never chunked (5). One request per connection; the whole head within 10 s
-however it trickles (and a small body within 10 s more), then at most 15 s between reads of a body.
-Lens fetches with the default cache mode and the app answers everything `Cache-Control: no-store`,
-so the browser keeps only the preflight's answer (two hours) and a call costs one connection. Connections are counted in pools: 16 not yet
-signed (when full, the oldest still sending its request is closed for the newcomer; one that sent
-its request whole is never cut off), 8 unsigned fetches from the Mac (a preview's page or file:
-counted apart, so a slow Mac can't keep them in the open slots), 16 signed calls and 8 live feeds
-(503 `busy` past these); a
-message from Lens on a live feed 1 MB at most. The log names a request by its method and path, never
-its query.
-
-**Carrying calls.** `/v1/*`, signed, goes to the Mac's same path and query (less `hnb=` and
-`token=`), over the app's active route (the URL made from the route's base by a URL builder, never
-joined as text, and refused unless it has that base's scheme, host and port and exactly the path and
-query that were checked: a builder that resolved or re-encoded anything is 400), with only Lens's
-`Accept`, `Accept-Language` and `User-Agent`, and the body opened from its seal as
-`application/json; charset=utf-8` (5., Signed calls): never its signature or `Authorization`,
-cookies, `Origin`, `Referer`, `Host`, the connection's headers, or anything claiming to be the
-bridge or a proxy. Then the app adds `Authorization: Bearer <the phone's token>`, `X-Hypernova-Via:
-lens` and `X-Hypernova-Lens-Version: <the version Lens gave when it asked>`. The Mac's answer comes
-back sealed (5.): its status, its headers less the connection's, cookies and CORS, and its body as it
-streams; a redirect is never followed (it would take the phone's credentials, or a preview's cookie,
-wherever it pointed): a 3xx goes back to Lens inside the seal as it is, `Location` and all, and the
-browser never sees it as one. Never carried (403 `not_for_glasses`): `/v1/pair`, `/v1/devices…`,
-`/v1/device/…`, the phone's own pairing. Nor what the phone guards with a fingerprint (403
-`needs_phone`, sealed, judged on the opened body; see Only on the phone): an approval answered
-`always`, a mode switch or a new session in `bypassPermissions`, an automation saved with
-`confirmBypass`, Browse outside projects turned on. Nor a path with a `.` or `..` segment (also written `%2e`)
-or a backslash (404). A Telescope picture is never an open link here: Lens asks for it by name inside a sealed body,
-`POST /bridge/shot {name}` (signed; the name `[A-Za-z0-9_-]{1,128}`, else 400), and the app fetches
-`GET /v1/shots/<name>.png` from the Mac with the phone's credentials and seals it back (Lens shows it
-from a `blob:` URL of its own). `GET /v1/shots/…` at the bridge is a signed call like any other
-(the fourth review's relay read a name off an unsigned fetch and got the picture from the app's
-former open route, now gone). Only a preview goes without a signature and without the phone's
-credentials, to be looked at only (`GET`, `HEAD`), and in the clear: one that a Lens with a grant opened through the bridge (the app notes
-the token in the Mac's answer to its `POST /v1/preview`, for the 12 hours the Mac keeps it;
-Disconnect drops that Lens's, and Forget all): its page `/p/<token>/…` and, with that preview's
-`hn_preview` cookie, its files by absolute path (as the daemon serves them), the cookie alone passed
-both ways. Any other `/p/` link or preview cookie is 404. Lens opens a preview at the bridge's
-address, the same path and query, in an iframe sandboxed `allow-scripts allow-same-origin
-allow-forms` (no top navigation, no popups): the page can't sign, so it comes in the clear and, if
-Hypernova is gone, from whatever holds its port, and must stay in its box (open question for Even
-Realities: is the Even App's JS bridge main-frame-only and origin-restricted? Lens assumes the worst
-and gives the frame nothing else). A WebSocket (`/v1/ws`, `/v1/stt/ws`) is opened to the Mac first,
-and Lens's handshake gets its 101 only once that socket is up (a refusal reaches Lens as a socket that
-never opened); then every message goes sealed (5.): Lens's opened and sent on as text or binary,
-the Mac's sealed for Lens, and the Mac's close codes (4001) inside the end marker. The app not
-paired: 503 `not_paired`; the Mac not reachable: 502 `mac_unreachable` with `route`.
-
-**The app's own endpoints** (signed and sealed, like everything else):
-- `GET /bridge/status` → `{paired, mac, link: "connected" | "connecting" | "offline" | "unpaired" |
-  "demo", route: "local" | "tailscale" | "remote" | null, app}`: Lens's phone screen shows it
-  ("Connected to Hypernova ✓ · MacBook Air · Local", or what's missing; `remote` is a plain remote
-  base URL, not Tailscale).
-- `GET /bridge/settings` → `{settings}`; `PUT /bridge/settings {settings: {…}}` → `{settings}`.
-- `POST /bridge/open {screen: "glasses"}` → `{shown: "app" | "notification" | "nothing"}`: Lens's
-  **Open Hypernova**. The Even App's web view hands no link of another app's to Android (a
-  `hypernova://` or `intent://` link from a page in it goes nowhere) and the Even Hub SDK has no
-  way to open one, so Lens asks the app (`bridge/BridgeOpen.kt`). Android lets an app start its
-  own screen only while it's on screen, or on a tap on its notification: when it is (`app`), it goes
-  to Settings → Glasses there and then; else (`notification`) a heads-up notification on the
-  glasses' channel, "Tap to open Hypernova", does it on the owner's tap (put up again at most every
-  2 s, gone after a minute or once the app comes to the front); `nothing` when the app's
-  notifications are off. Only `glasses` (else 400 `bad_screen`). Signed and sealed like the rest,
-  under protocol 4's rules (no new protocol: an app from before it answers an unsealed 404, which
-  Lens takes as no answer). Without access (not allowed yet, no app, or that 404) Lens asks
-  nothing and says, in its own words, "Open Hypernova on your phone."
-
-**The glasses' settings** live in the app now (Settings → Glasses), and Lens keeps a copy as a cache:
-`{v: 1, readAloud, blip, textArrives: "all" | "speech", pace (110–260 words a minute), popups: {needs,
-done, stopped, limit, battery, sleep, note}, moving, eclipse, projects: string[] | null, language
-("en", "auto", an ISO code), look: "hypernova" | "native" (the type on the lens: the app's own,
-drawn, or the glasses' built-in font, the default since 2026-10-18; Lens's `lens/look.ts`), guideAsk,
-newSession: {providerId, model: string | null} | null}`. `newSession` is the provider and model the
-phone's Start-a-session sheet last used (never its permission mode; null: none yet): Lens starts its
-own sessions (`POST /v1/sessions` from the glasses) on them while the snapshot still lists that
-provider, else on the Mac's defaults; `providerId` matches `^[A-Za-z0-9][\w.-]{0,63}$` and `model`
-is printable ASCII, at most 200 characters (anything else reads as null). It is the phone's: a `PUT`
-of it from Lens is ignored. The app checks a `PUT` key by key (an unknown key, a wrong
-type or a value out of range is ignored or brought in), so Lens's changes by voice ("mute", "moving",
-eclipse") can't put it in a state it can't show. Lens reads them once the owner confirmed an ask, or when it starts with a token it keeps (a signed,
-sealed `GET /bridge/settings`; never from the unsealed poll), checking every field (a wrong kind or
-range takes its default; `guideAsk` must be a whole epoch ms before 2100), and every live feed it opens through the bridge begins with
-`{t: "bridge.settings", settings}`, sent again to each of its feeds at every change, before or after
-the Mac's own messages. `guideAsk` is when "Practise the gestures on the glasses" was last pressed
-(epoch ms): Lens plays its guide when it moves on while connected (not for an old one on
-reconnecting). The companion's address stays Lens's own. The voice and its speed aren't here:
-through the bridge the phone app plays the glasses' speech with the Mac's voice and speed (Settings →
-Voice → Read aloud, one setting for the phone and the glasses; Settings → Glasses points there).
-Lens's own `voice` and `rate` stay `auto` and 1× in the public build, which means that same Mac
-setting when the glasses read by themselves; only the phone's own voice, Lens's last resort, then
-reads at 1×.
-
-### The glasses through the phone (the daemon)
-
-The daemon tells the glasses through a phone from the phone by `X-Hypernova-Via: lens`
-(`daemon/src/glasses.ts`). It honours the marker only on a request whose token is a paired phone
-app's: never with the Mac app's admin token, never from a device that paired as Lens itself (that
-one already is the glasses), so the marker gives no device anything it didn't have. Such a request
-(and live feed) is the glasses:
-- **The Mac's device list** (`GET /local/devices`) has one more entry per phone that carries glasses:
-  `{id: "lens-<phone id>", name: "Even glasses · <phone>", model, client: "lens", via: <phone id>,
-  createdAt, lastSeenAt, appVersion?}`, so the Mac app says "Even glasses" as before. The first time
-  they come (`Device.glasses` is kept with the phone in `devices.json`), `{t:"devices"}` goes out and
-  the Lens guide opens unless it was finished, as for a Lens that paired on its own.
-- **"Forget"** on that entry (`DELETE /local/devices/lens-<phone id>`) marks the glasses removed
-  rather than deleting them (the next request through the phone would simply bring them back): their
-  requests are 403 `glasses_removed`, their WebSocket upgrades 403, their open feeds close with 4001,
-  and the phone app gets `{t:"glasses.removed"}` and drops every Lens access it gave. The phone itself
-  stays paired. `PUT /v1/devices/me/glasses` from the phone app (sent before the first call it carries
-  after an Allow) takes them back. Forgetting the phone forgets its glasses.
-- **They can't manage the phone:** `/v1/devices/…` and `/v1/device/…` are 403 `not_for_glasses`.
-- **Only on the phone.** The glasses can't check a fingerprint, so what the phone asks one for is
-  the phone's alone: an approval's `always`, a switch to `bypassPermissions` (`POST
-  /v1/sessions/{id}/mode`), a session started in it (`POST /v1/sessions {permissionMode:
-  "bypassPermissions"}`), an automation saved with `confirmBypass` (No asking), and Browse outside
-  projects turned on (`POST /v1/mac/files`). From the glasses, through a phone (the marker) or from a
-  Lens that paired on its own (`client: "lens"`), each is 403 `needs_phone` ("Do this on your phone:
-  it asks for your fingerprint or screen lock first."), before anything else is looked at. Allow,
-  Deny and the other modes stay theirs. The phone's bridge refuses the same calls before they leave
-  the phone (see The phone bridge).
-- **Read aloud** (see Read aloud, "Plays"): the glasses ask as themselves (`<phone id>:lens`), so a
-  play they ask for goes to the app on their own phone first, and its `speech.progress` comes back to
-  the glasses' feed, not the phone app's. Their speech-to-text stream (`/v1/stt/ws`) counts apart from
-  the phone's own microphone, and a live feed through the phone counts as the glasses connected (an
-  automation's `say` goes to them).
 
 ## REST
 
@@ -1070,7 +648,7 @@ one already is the glasses), so the marker gives no device anything it didn't ha
 | `GET /pair?c=<code>&n=<Mac name>` | → HTML, no token: the computer's own pairing page (`webLink`), which hands over to the app; the QR code opens hypernova.observer's instead (see Pairing) |
 | `GET /download/android` | → HTML, no token: the app's install page; `GET /download/android/Hypernova.apk` is the APK (see Pairing) |
 | `GET /v1/snapshot` | → `Snapshot` |
-| `GET /v1/sessions/{id}/events?limit=200` | → `{events: Event[]}` its normalized history, the last `limit` events (300 without one), oldest first. Optional, for a phone connection: `turn=last` (only from the last `user` event on: the last turn) and `output=<n>` (tool outputs cut to their last n characters, 256–65536, with "…\n" in front) |
+| `GET /v1/sessions/{id}/events?limit=200` | → `{events: Event[]}` its normalized history, the last `limit` events (300 without one), oldest first. Optional: `output=<n>` (tool outputs cut to their last n characters, 256–65536, with "…\n" in front) |
 | `GET /v1/sessions/{id}/agents` | → `{agents: Agent[], workflows: Workflow[]}`: the agents its main agent started and the workflows of them, newest first (the 60 most recent agents and any running; older ones only counted in their workflow). See Agents and workflows |
 | `GET /v1/sessions/{id}/agents/{agentId}/events?limit=200&after=<cursor>` | → `{events: Event[], cursor: string, full: boolean}`: that agent's own transcript, read like a session's (its task is the first `user` event, kept first whatever the limit; its report is the last `assistant` one); read-only. `full: true`: the last `limit` events (1–1000), which replace what the client has. With `after` (the `cursor` of an earlier answer): `full: false` and only the events added or changed since then, in transcript order (one with an `id` the client has replaces it, a new one goes at the end; none when nothing changed). A cursor from another read (the file was rewritten, the daemon restarted, the cache dropped it), a malformed one, or more changes than `limit` gets `full: true`. 400 `bad_agent` for an id that isn't an agent's (`a` and 16 hex digits), 404 `no_agent` when the session has no such agent file. The phone sends its cursor while the agent runs, and fetches the transcript whole once more when it ends |
 | `GET /v1/sessions/{id}/usage` | → `{usage: SessionUsage}`: its model, how full its context window is, the tokens it used and what they cost, and the plan's windows (see Session usage, the to-do list and Rewind) |
@@ -1078,7 +656,7 @@ one already is the glasses), so the marker gives no device anything it didn't ha
 | `POST /v1/sessions/{id}/rewind` | `{eventId}` → `{session: Session, text, files: Attachment[]}`: the conversation goes on in a new session from just before that `user` event; `text` and `files` are the message, for the prompt box. 404 `no_message`; 409 `first_message`, `not_found`, `no_transcript`, `fork_failed` (see Session usage, the to-do list and Rewind), `sdk_missing` (see Claude Code's SDK) |
 | `POST /v1/sessions` | `NewSession` → `{session: Session}`. 400 `no_prompt`, `no_project`, `bad_project` (the folder doesn't exist), `bad_agent`, `bad_mode` (a Codex session's mode isn't `read-only` or `workspace-write`); 409 `mac_privacy` (macOS hasn't let the service open that folder, or is asking on the Mac right now: see Files), `unreadable`, `no_codex`, `codex_too_old`, `sdk_missing` (a Claude Code session the daemon would run itself, with no SDK here: see Claude Code's SDK); 503 `codex_unavailable` (see Codex) |
 | `GET /v1/codex` | → `{codex: Codex \| null}` (see Codex) |
-| `POST /v1/codex` | `{enabled: boolean}` → `{codex}`: Codex on or off for Hypernova, from the phone (see Codex). 403 `needs_phone` (the glasses); 409 `no_codex` |
+| `POST /v1/codex` | `{enabled: boolean}` → `{codex}`: Codex on or off for Hypernova, from the phone (see Codex). 409 `no_codex` |
 | `POST /v1/codex/refresh` | `{}` → `{codex}`: Codex's account and limits read now |
 | `GET /v1/codex/models?fresh=1` | → `{models: CodexModel[]}`: Codex's models for the pickers (read at most once an hour; `fresh=1` now). 409 `codex_off`, 503 `codex_unavailable` |
 | `POST /v1/sessions/{id}/switch/preview` | `{to: "claude" \| "codex", context?: "recent" \| "all" \| "none"}` → `{text, messages, bytes, maxBytes}`: what a switch to the other agent would carry over, for the owner to read and edit (see Switching agents). 400 `bad_agent`, `bad_context`; 409 `same_agent` |
@@ -1093,33 +671,18 @@ one already is the glasses), so the marker gives no device anything it didn't ha
 | `POST /v1/sessions/{id}/open` | `{}` → `{app, already}`: opens the shared terminal in a window on the Mac (or brings it forward) |
 | `POST /v1/sessions/{id}/continue` | `{reason?: "away" \| "limit"}` → `{session}`: sends "I'm back. Please continue where you left off." (no reason, or `"away"`); `"limit"` sends the continuation after a limit (see Auto-continue), drawn as a notice row, and the session's ready card goes once its turn starts. Its errors are `prompt`'s |
 | `POST /v1/sessions/{id}/auto-continue` | `{on: boolean}` → `{session}`: the session carries on by itself after its limit, or not (see Auto-continue). 400 `bad_on`; 404 `no_session`; 409 `not_limited` (nothing to carry on from: no `blocked.resume`, or it's `ready`, or Claude is working again), `not_available` (`canArm`/`canCancel` false), `needs_answer` (an approval is open), `waiting` (another menu or dialog in the terminal, or a change already under way), `typing` (unsent text in the terminal; `pending` has it), `not_confirmed` (Claude Code didn't confirm within 4 s; nothing changed), `terminal_busy`, `no_terminal`. Already as asked: 200, nothing done |
-| `POST /v1/sessions/{id}/telescope` | `{source?, url?, device?, prefer?, page?, width?, height?, watch?}` → `{shot: Shot}`: a picture of what the session builds: its page, the emulator, the simulator, its terminal, a picture it made, its Mac app's window (see Telescope) |
-| `POST /v1/sessions/{id}/screenshot` | `{url?, width?, height?}` → `{shot: Shot}`: its page only, as before Telescope (see Telescope, "Show me") |
-| `GET /v1/shots/<token>.png` | → `image/png`, no token needed, `HEAD` too (see Telescope); 404 `shot_expired` |
-| `GET /v1/speech/voices?engine=` | → `{engine, voices: [{id, name, lang, gender?, description?}], model?}`: the Mac's voices (no `engine`, or `mac`), or Soniox's (`soniox`; 409 `no_key`, 502 when Soniox can't list them). See Read aloud |
-| `GET /v1/speech/settings` | → `{speech: Speech}`: which voice reads (see Read aloud) |
-| `POST /v1/speech/settings` | `{engine?, voice?, macVoice?, rate?}` → `{speech}`. 400 `bad_engine`, `bad_voice`, `bad_rate` |
-| `POST /v1/speech` | `{text, voice?, rate?}` → the whole clip read aloud: `audio/wav` (Soniox) or `audio/mp4` (the Mac's voice), `X-Speech-Engine` says which (see Read aloud) |
-| `POST /v1/speech/play` | `{text, sessionId?, to?: "me"}` → `{play: Play & {to: {id, name}}}`: read aloud by the Hypernova app on the phone, streamed. 409 `no_player` (no phone app plays the glasses' speech), 413 `too_long`, 400 `empty` (see Read aloud, "Plays") |
+| `GET /v1/speech/voices` | → `{engine: "mac", voices: [{id, name, lang}]}`: the Mac's voices. See Read aloud |
+| `GET /v1/speech/settings` | → `{speech: Speech}`: the Mac's voice and speed (see Read aloud) |
+| `POST /v1/speech/settings` | `{engine?, macVoice?, rate?}` → `{speech}`. 400 `bad_engine`, `bad_voice`, `bad_rate` |
+| `POST /v1/speech` | `{text, voice?, rate?}` → the whole clip read aloud in the Mac's voice, `audio/mp4` (see Read aloud) |
+| `POST /v1/speech/play` | `{text, sessionId?, to?: "me"}` → `{play: Play & {to: {id, name}}}`: read aloud by the Hypernova app on the phone that asks, streamed. 400 `bad_target` (the Mac app), 413 `too_long`, 400 `empty` (see Read aloud, "Plays") |
 | `GET /v1/speech/plays/{id}/audio` | → `audio/pcm`, 24 kHz 16-bit mono as it's made; only the phone playing it. 404 `no_play`, 410 `play_over`, 502 `speech_failed` |
-| `POST /v1/speech/plays/{id}/stop` | `{}` → `{ok, state}`: the asker, the phone playing it, or the Mac app. 404 `no_play` |
-| `GET /v1/speech/companion` | → `{url: string \| null}` Hyperscribe Companion's pairing address (see The speech companion) |
-| `GET /v1/stt` | → `SttInfo`: voice through Soniox, never the key (see Speech to text) |
-| `POST /v1/stt/key` | `{provider?: "soniox", apiKey}` → `SttInfo & {checked, problem}`: tried with Soniox, then kept on the Mac (see Speech to text) |
-| `DELETE /v1/stt/key` | → `SttInfo` |
-| `POST /v1/stt/test` | `{}` → `{ok, message} & SttInfo` |
-| `GET /v1/stt/ws` | WebSocket, the device token in `?token=` or the header: the glasses' audio in, words out (see Speech to text) |
-| `GET /v1/guide` | → `{guide: Guide}` (see The Lens guide) |
-| `POST /v1/guide` | `{step?, seen?, done?}` → `{guide}` |
-| `POST /v1/guide/show` | `{step?}` → `{guide, macs}`: brings the Mac's guide window forward |
+| `POST /v1/speech/plays/{id}/stop` | `{}` → `{ok, state}`: the phone playing it, or the Mac app. 404 `no_play` |
 | `POST /v1/sessions/{id}/mode` | `{permissionMode}` (`default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) → `{session, applies?}`. A session the daemon runs takes it from its next turn while a turn runs (the running query can't change its mode): `applies: "next_turn"`, else `"now"`, and the phone says so. A shared terminal switches by Shift+Tab (409 `waiting` with a dialog open, `mode_unavailable` for a mode it can't reach: Bypass when `session.bypassAvailable` is false, answered without pressing any key) |
 | `POST /v1/sessions/{id}/model` | `{model: string \| null, confirmPaid?: true}` → `{model, session, applies: "now" \| "next_turn"}`: switches the session's model (see A session's model). 400 `unknown_model`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_model` (a terminal Hypernova doesn't hold: type /model there), `confirm_paid` |
 | `POST /v1/approvals/{id}` | `ApprovalAnswer` → `{ok}` (409 if already resolved) |
 | `GET /v1/projects` | → `{projects: Project[], root}` |
-| `POST /v1/projects` | `{name, git?: true, nebula?: boolean}` → `{project}` creates `<root>/<name>`; with `nebula: true`, a new project of its own in Nebula, its name made unique (see Nebula) |
-| `GET /v1/nebula` | → `{nebula: {path, default, exists}}`: where new sessions from the glasses are born (see Nebula) |
-| `POST /v1/nebula` | `{path}` → `{nebula}`: moves it (a folder inside the home folder; `~/…` works). 400 `bad_path` |
-| `POST /v1/nebula/notes` | `{text, project?}` → `{note: {path, at, line}}`: "Note: …" from the glasses, a line in `<Nebula>/notes.md`; no Claude run. 400 `empty`, 413 `too_long` (see Nebula) |
+| `POST /v1/projects` | `{name, git?: true}` → `{project}` creates `<root>/<name>` |
 | `GET /v1/providers` | → `{providers: Provider[]}` |
 | `GET /v1/models?provider=` | → `{providers: ModelList[]}`: the models each provider offers (only that one with `provider`), in the providers' order, for the new-session sheet (see Models) |
 | `POST /v1/providers/{id}/check` | `{}` → `{provider}`: reads its balance now (OpenRouter; at most once in 10 s, sooner the last reading). 409 `no_balance` for a provider without a balance to read |
@@ -1137,7 +700,7 @@ one already is the glasses), so the marker gives no device anything it didn't ha
 | `POST /v1/usage/refresh` | `{}` → `{usage: Usage}`: a fresh look at Claude Code's /usage screen for the per-model weeks (and a reading of the 5-hour window and the week), answered once it's done (5–30 s; joins a look under way; one started in the last 30 s, or a signed-out account, answers at once with the usage as it is). See Per-model weeks |
 | `GET /v1/mac/awake` | → `{awake: Awake}` (see Stay awake) |
 | `GET /v1/mac/files` | → `{files: {browseOutsideProjects}}` (see Files, The setting) |
-| `POST /v1/mac/files` | `{browseOutsideProjects: boolean}` → `{files}`; goes out as `{t:"files"}` with the sessions it opens or closes. 400 `bad_value`; 403 `needs_phone` turning it on from the glasses (see Only on the phone) |
+| `POST /v1/mac/files` | `{browseOutsideProjects: boolean}` → `{files}`; goes out as `{t:"files"}` with the sessions it opens or closes. 400 `bad_value` |
 | `POST /v1/mac/awake` | `{mode?: "working" \| "backpack" \| "off", minBattery?: 5–50}` or `{extend: true}` (Backpack's "+2 h", in its last 10 minutes; 409 `too_early`, `not_backpack`) → `{awake: Awake}`. Backpack starts its 8 hours again each time it's chosen. 400 `bad_mode`, `bad_battery`; 409 `needs_setup` (Backpack's one-time setup isn't done), `no_battery` (a desktop Mac). See Stay awake |
 | `GET /v1/stats?range=today\|week\|month\|all` | → `Stats`: how long Claude worked, tokens, sessions, prompts, tools, files, agents, records, projects and the last 30 days (see Statistics) |
 | `POST /v1/account/check` | `{}` → `{account: Account}`: asks `claude auth status` now (at most once in 10 s; sooner, the last answer). See Account |
@@ -1146,8 +709,6 @@ one already is the glasses), so the marker gives no device anything it didn't ha
 | `DELETE /v1/account/login` | → `{ok}`: stops the sign-in |
 | `POST /v1/sessions/{id}/provider` | `{providerId}` → `{session, forked: boolean}`: continues the conversation on another configured provider; `forked`: in a new session, which `session` is. 404 `no_session`, `no_provider`; 409 `same_provider`, `busy` (Claude is at work, or waits on an approval or a dialog; Claude Code's own dialog in a session a limit stopped doesn't count; or a move of this session is still under way), `terminal_busy`. See Account |
 | `DELETE /v1/devices/me` | → `{ok}`: forgets this phone, its device certificate with it |
-| `PUT /v1/devices/me/glasses` | `{appVersion?}` → `{glasses: {since, seenAt, appVersion?}}`: the phone app's owner allowed Lens on it, so the glasses through it are this phone's (again, also after the Mac forgot them). 403 `not_a_phone` for a device that paired as Lens itself (see The phone bridge) |
-| `DELETE /v1/devices/me/glasses` | → `{ok}`: the owner disconnected the last Lens on this phone; the glasses leave the Mac's device list and their feeds close (4001) |
 | `POST /v1/device/cert` | `{csr: base64 DER PKCS#10, CN=<deviceId>, EC P-256}` → `{cert: base64 DER, ca: base64 DER, fingerprint}`: this device's certificate for the LAN listener's mutual TLS (2 years; a new one replaces the old). 400 `bad_csr`, 503 `no_tls` (see Local network (direct HTTPS)) |
 | `GET /v1/qa` | → `{url}` a signed URL for the testing checklist page |
 | `GET /v1/automations` | → `{automations: Automation[], paused, features}` (see Automations; `features`: what it can do of Workflows, absent from an older daemon) |
@@ -1209,30 +770,19 @@ objects with a `t` field:
   (`until`, epoch ms; sent once per end, again for an extended one). Offer "+2 h" (`extendBy`,
   seconds): `POST /v1/mac/awake {extend: true}`. See Stay awake.
 - `{t:"projects", projects: Project[]}` and `{t:"providers", providers: Provider[]}`
-- `{t:"devices"}` a phone or the glasses paired (nothing else in it).
-- `{t:"glasses.removed"}`: to a phone app's own feeds alone, never the glasses' through it: "Forget"
-  on the Mac for the glasses that come through this phone. The app drops every Lens access it gave
-  (see The phone bridge).
+- `{t:"devices"}` a phone paired (nothing else in it).
 - `{t:"lan", lan: {port, addresses, fingerprint} | null}`: the Mac's private addresses changed, or
   the LAN listener was turned on or off (see Local network (direct HTTPS)).
 - `{t:"tsnet", tsnet, tailnet: {name, ip, url, control} | null}`: which Tailscale serves the phone
   API changed, or its state (see Tailscale built in); a phone follows `tailnet`.
-- `{t:"telescope.window", job, pids, roots, ask}`: to the Mac app's feed alone, never to phones:
-  take a window of the app a session builds (see Telescope, window).
-- `{t:"stt", stt: Stt}` voice through Soniox became ready or not (see Speech to text).
-- `{t:"speech", speech: Speech}`: which voice reads changed (the setting, Soniox ready or not, a
-  fallback note, a phone app playing the glasses' speech or not). `{t:"speech.play", play}` and
-  `{t:"speech.stop", id}` to the phone app that plays a play; `{t:"speech.progress", progress}` to
-  the device that asked for it; `{t:"speaking", speaking}` to the Mac app's feed alone. See Read
-  aloud, "Plays".
-- `{t:"guide", guide: Guide}` the Lens guide moved; `{t:"guide.show", guide, reason: "paired" | "phone"}`
-  asks the Mac app to bring its guide window forward (see The Lens guide).
+- `{t:"speech", speech: Speech}`: the Mac's voice or speed changed. `{t:"speech.stop", id}` to the phone app that plays a play; the phone sends
+  `{t:"speech.progress", …}` about its own plays; `{t:"speaking", speaking}` to the Mac app's feed
+  alone. See Read aloud, "Plays".
 - `{t:"automation", automation: Automation}`: an automation was added or changed (its `nextAt` and
   `lastRun` moving too); `{t:"automation.removed", id}`; `{t:"automations", paused, running,
   queued}`: paused or resumed, or the counts changed (see Automations).
 - `{t:"run", run: Run}`: an automation's run was created or changed.
-- `{t:"note", note: Note}`: an automation's notification. Phones show `to: "phone"`, Lens
-  `to: "glasses"`. A note with `ask` set asks a question its answers answer (see Automations,
+- `{t:"note", note: Note}`: an automation's notification, `to: "phone"`. A note with `ask` set asks a question its answers answer (see Automations,
   "Workflows", Answering an ask).
 - `{t:"ping"}` every 25 s; the client answers `{t:"pong"}`. Clients reconnect
   with backoff (1, 2, 4 … 30 s) and receive a fresh snapshot.
@@ -1253,7 +803,6 @@ Snapshot = { mac: {id, name, daemonVersion, claudeVersion, projectsRoot,
              usage: Usage, sessions: Session[], approvals: Approval[],
              projects: Project[], providers: Provider[],
              account: Account,                                   // see Account
-             stt: Stt, guide: Guide,                             // see Speech to text, The Lens guide
              automations?: Automations,                          // absent: a daemon without automations
              lan: {port, addresses: string[], fingerprint, deviceCert: boolean} | null,
                                                                  // the LAN listener (see Local network); null: off
@@ -1464,7 +1013,7 @@ ProviderCheck = { state: "ok" | "bad_key" | "no_credit" | "limited" | "not_found
                   balance: Balance | null,      // OpenRouter's, when read
                   checkedAt }
 
-NewSession = { projectPath?: string, newProject?: {name, git?: boolean, nebula?: boolean},   // nebula: see Nebula
+NewSession = { projectPath?: string, newProject?: {name, git?: boolean},
                prompt: string, providerId?: string, model?: string,   // model: a ModelOption.value (see Models)
                permissionMode?: string, attachments?: string[],   // prompt may be empty with attachments
                agent?: "claude" | "codex",   // Codex (see Codex): its model a CodexModel.value, its permissionMode
@@ -1472,13 +1021,6 @@ NewSession = { projectPath?: string, newProject?: {name, git?: boolean, nebula?:
                                                       // model's; providerId is ignored. clientId: the first send's name
 
 Attachment = { path: string, name: string, mime: string | null, size: number }
-
-Stt = { provider: "soniox" | null,   // a key is kept on the Mac
-        ready: boolean,               // and Soniox hasn't refused it or the account since
-        error: string | null }        // that refusal, or the last account problem, in plain words
-SttInfo = Stt & { last4: string | null, model: "stt-rt-v5", savedAt: number | null, keysUrl }
-
-Guide = { step: "about" | "gestures" | "voice", seen: boolean, done: boolean }
 
 Agent = { id,                         // "a" and 16 hex digits
           sessionId,
@@ -1671,7 +1213,7 @@ BlockedCall = {
 ## A session's model
 
 `Session.model` is the model the session uses now, kept current for every client (the chip, the
-usage strip, Lens):
+usage strip):
 - **every reply**: the model of the main agent's latest reply (an alias it started with, `opus`,
   gives way to the id it runs, `claude-opus-5-5`; clients shorten ids for chips);
 - **a /model in the terminal** at once: its output ("Set model to Sonnet 5.5 (claude-sonnet-5-5)"),
@@ -1960,12 +1502,12 @@ CodexModel = { value: string, name: string, description: string | null,
   version` gives its socket; `daemon start` when it isn't running; Hypernova never stops it). It
   connects only while `enabled`, and tries again 1 s, 2 s … up to a minute apart. Turning Codex on or
   off: `POST /local/settings {codex: boolean}` (the Mac app's Setup), or from the phone `POST /v1/codex
-  {enabled: boolean}` → `{codex}` (403 `needs_phone` from the glasses; 409 `no_codex` to turn on a Codex
+  {enabled: boolean}` → `{codex}` (409 `no_codex` to turn on a Codex
   that isn't installed or is too old); the first `POST /v1/sessions` with `agent: "codex"` turns it on
   too. Turning it on also puts the shell's `codex` function in (and the shell block with it, where
   Claude Code's integration never did); off takes it out.
 - **Which agent leads** (the clients' rule, one in every client): Claude Code when `snapshot.claude.available`,
-  else Codex when `codex.available`. The sun, the widget's star and Lens's orrery follow the leading
+  else Codex when `codex.available`. The sun and the widget's star follow the leading
   agent's usage; the other agent, while in use, is a second star with its own sessions. A new session
   with no `agent` goes to Claude Code, or to Codex when Claude Code isn't installed.
 - **A Codex session** is a Codex thread: `Session.agent: "codex"`, `providerId: "codex"`,
@@ -2033,10 +1575,8 @@ with one sentence a client can show. On a Mac it is `{}` (and older daemons send
 |---|---|---|
 | `battery` | the Mac's battery (`mac.battery` is `null`) | "Hypernova shows the battery of a Mac only." |
 | `awake` | Stay awake (`mac.awake` reads Off, nothing held) | "Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings." |
-| `macVoice` | the Mac's voice (`say`) for read aloud | "The Mac’s voice isn’t on Linux. Add a Soniox key to read aloud from this server." |
+| `macVoice` | the Mac's voice (`say`) for read aloud | "The Mac’s voice isn’t on Linux. The phone reads aloud with its own voice." |
 | `openWindow` | a terminal window on the server's screen | "This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH." |
-| `appWindow` | Telescope's app windows | "App windows can be shown from a Mac only." |
-| `simulator` | Telescope's iOS Simulator | "The iOS Simulator runs on a Mac only." |
 
 Clients that know a key hide that feature (or show it disabled with its sentence); a client that
 doesn't know the field keeps working, because every route answers plainly when asked anyway:
@@ -2044,11 +1584,7 @@ doesn't know the field keeps working, because every route answers plainly when a
 - `POST /v1/mac/awake` → 501 `unavailable` `{feature: "awake"}`; `GET` answers `{awake}` (Off).
 - `POST /v1/sessions/{id}/open` and `POST /v1/account/login {where: "mac"}` → 501 `unavailable`
   `{feature: "openWindow"}`. Signing in "on the phone" works as on a Mac.
-- Read aloud with the Mac's voice → 501 `no_voice` with the `macVoice` sentence; Soniox voices work.
-- Telescope: `window` → 501 `unavailable` `{feature: "appWindow"}`; `simulator` → 501
-  `no_simulator` with its sentence. Picking a source passes over both. The `terminal`, `web`
-  (headless Chrome or Chromium, when installed) and `emulator` (`adb`) sources work; `image` shows
-  PNG pictures only (415 `unsupported_picture` for others, passed over when picking).
+- Read aloud with the Mac's voice → 501 `no_voice` with the `macVoice` sentence; the phone reads with its own voice.
 
 `unavailable`'s sentences are in English, like the daemon's other messages; a client may use its
 own words for a key it knows.
@@ -2087,7 +1623,7 @@ terminals, approvals, usage and everything else work.
 
 ## Battery
 
-The Mac's own battery, so the phone (and the glasses) can say when the Mac in the backpack runs
+The Mac's own battery, so the phone can say when the Mac in the backpack runs
 low. `daemon/src/battery.ts`.
 
 ```ts
@@ -2121,40 +1657,11 @@ Battery = { percent: number,             // 0–100
 - **Sent** as `{t:"battery"}` when the percentage changes by 1 or more, `charging` or `onAC`
   changes, or a battery appears or goes; `Snapshot.mac.battery` always has the latest reading.
 
-## Nebula
-
-Where new sessions from the glasses are born: a hold on the glasses' main screen with nothing that
-needs the owner, "new session: …", or "+ New project" in their picker starts a session in a new
-subfolder of Nebula, named after its first prompt and `git init`ed. `daemon/src/nebula.ts`.
-
-- **Where.** `<projectsRoot>/Nebula` (`~/Programming/Nebula` on the owner's Mac) until moved with
-  `POST /v1/nebula {path}` (kept in `<support>/settings.json` as `nebula`; the default path clears
-  it). It must be a folder inside the home folder: not the home folder itself, not in Library or a
-  hidden folder, not a file (400 `bad_path`). Paths come back as `~/…` inside the home folder.
-  `exists` is false until the first project is made there; Nebula is made then (`mkdir -p`).
-- **A project in it** (`POST /v1/projects {name, nebula: true}`, or `POST /v1/sessions` with
-  `newProject: {name, nebula: true}`): the name made plain kebab-case (lowercase letters, digits and
-  dashes, accents dropped, 40 characters at most; `session` if nothing is left), then unique among
-  the folders already there as macOS compares names, ignoring case (`landing-page`,
-  `landing-page-2`…); the folder made and `git init -q`ed (10 s at most; a failure leaves a plain
-  folder), and `{t:"projects"}` sent. The glasses name it from the prompt themselves (short
-  kebab-case, filler words dropped); the daemon's rules keep any name safe. The session starts
-  there as any new session does; with `POST /v1/sessions` nothing is made when the prompt is empty
-  (400 `no_prompt` first). A daemon from before Nebula ignores `nebula` and makes `<root>/<name>`.
-- **Notes** (`POST /v1/nebula/notes {text, project?}`, `daemon/src/notes.ts`): "Note: …" said to
-  the glasses keeps the idea for later, without starting Claude. The daemon appends `- 14:05 ·
-  hypernova · the idea` to `<Nebula>/notes.md`: the Mac's time, the project the glasses had in front
-  of them (one plain line, 80 characters at most; none when not given), the text on one line. Each
-  day gets a `## 2026-10-16` heading when the last one in the file is another day's; a new file
-  starts with `# Notes` and a line saying what it is. Nebula and the file are made if they aren't
-  there. → `{note: {path: "~/Programming/Nebula/notes.md", at, line}}`. 400 `empty` (nothing to
-  note), 413 `too_long` (over 4000 characters), 405 for anything but `POST`.
-
 ## Stay awake
 
 Keeps the Mac awake while there's something to stay awake for, including in a closed backpack, and
-lets it sleep when there's a reason to. `daemon/src/awake.ts`; the Mac popover, the phone's Settings
-and the glasses choose the mode.
+lets it sleep when there's a reason to. `daemon/src/awake.ts`; the Mac popover and the phone's Settings
+choose the mode.
 
 ```ts
 Awake = { mode: "working" | "backpack" | "off",
@@ -2179,7 +1686,7 @@ Clients never say the Mac will sleep while `sleepDisabledBy` is `"other"`: "Hype
 
 - **While working** (the default) holds a sleep assertion while a session is starting, working or
   waiting on an answer mid-turn, its agents run, an automation asks for it (`keepAwake(key, on)` in
-  awake.ts), or a phone or the glasses are on `/v1/ws` (the Mac app's own feed doesn't count), and for
+  awake.ts), or a phone is on `/v1/ws` (the Mac app's own feed doesn't count), and for
   3 minutes after the last of those: macOS sleeps the moment an assertion goes if the Mac has been
   idle long enough, so a socket blinking during a network change would put it to sleep at once.
   **Backpack** holds whatever runs, with the lid closed too, for 8 hours. **Off** holds nothing.
@@ -2189,8 +1696,7 @@ Clients never say the Mac will sleep while `sleepDisabledBy` is `"other"`: "Hype
   409 `too_early` before that, 409 `not_backpack` outside Backpack. The other guards (battery, heat)
   go on applying, so an extended Backpack still lets go when they say so. About ten minutes out
   the daemon sends `{t:"mac_backpack_ending"}` once and `awake.extendable` turns true, for a notice on
-  the phone (with a "+2 h" button), the Mac popover's Stay awake line and a pop-up on the glasses
-  ("extend" by voice, or a tap). It goes away by itself when `until` moves on.
+  the phone (with a "+2 h" button) and the Mac popover's Stay awake line. It goes away by itself when `until` moves on.
 - **The assertion** is `/usr/bin/caffeinate -i -s -w <daemon pid>`, a child of the daemon: it is
   what knows when there's work, it runs whether or not the Mac app does, and `-w` ends the
   assertion with the daemon, so a daemon that dies (even by SIGKILL) never leaves the Mac unable to
@@ -2249,13 +1755,12 @@ Clients never say the Mac will sleep while `sleepDisabledBy` is `"other"`: "Hype
 them, fires them and follows their runs; `daemon/src/schedule.ts` is the time maths. A run that
 starts a session starts an ordinary shared-terminal session, titled `Morning brief, Thu 16 Oct`,
 with `Session.automation` set. Times of day are the Mac's own (`Snapshot.mac.tz`). The phone edits
-them; the Mac app shows a line and a pause switch; Lens shows `to: "glasses"` notes.
+them; the Mac app shows a line and a pause switch.
 
 ```ts
 Automations = { paused: boolean, list: Automation[],
                 running: number, queued: number,     // runs running or needing you; runs waiting for a slot
                 notes: Note[],                       // the last 12 hours, at most 20, newest first
-                glasses: boolean,                    // a Lens device is paired
                 hasBattery: boolean | null,          // power triggers can work here; null: not known yet
                                                      // (the first minute); absent from an older daemon
                 features?: Feature[] }               // what it can do of Workflows (below); absent: none
@@ -2275,7 +1780,7 @@ Automation = {
   paid: boolean,                 // it runs on a provider other than the built-in one: that costs money
                                  // (the one it names, or the one the session it continues is on now),
                                  // unless the owner said that provider costs nothing (Provider.paid)
-  problem: null | "no_battery" | "no_project" | "no_session" | "no_provider" | "no_glasses"
+  problem: null | "no_battery" | "no_project" | "no_session" | "no_provider"
          | "outside_projects"    // its folder is there but outside the projects folder
          | "no_model"            // its model is no longer on its provider's list (as last read)
          | "bad_definition"      // what was kept doesn't read as an automation: it is off until saved again
@@ -2299,7 +1804,7 @@ Trigger =
   | { kind: "power", event: "plugged_in" }
   | { kind: "power", event: "low", below: number }   // 5–50, a multiple of 5
 
-Then = "none" | "notify" | "say"
+Then = "none" | "notify"
 
 Action =
   | { kind: "start", projectPath: string, prompt: string,   // 1–8000 characters; "/name args" runs a skill or command
@@ -2317,8 +1822,7 @@ Action =
       prompt: string,                                       // 0–8000; empty only with "limited" (below)
       providerId: string | null,                            // carry on there (moved as POST /v1/sessions/{id}/provider); null: where it is
       then: Then }
-  | { kind: "notify", text: string, glasses: boolean }      // 1–500; glasses: also read aloud on them when connected
-  | { kind: "say", text: string }                           // 1–500, read aloud on the glasses
+  | { kind: "notify", text: string }                        // 1–500
 
 AutomationInput = { name, enabled, onlyOnce, trigger, action, template?: string | null,
                     confirmBypass?: true,   // required with permissionMode "bypassPermissions"
@@ -2357,7 +1861,7 @@ RunReason = "overlap" | "queue_full" | "daily_cap" | "stale" | "limited" | "sign
                                  // terminal closed, or it ended otherwise while working)
 
 Note = { id: string, automationId: string | null, runId: string | null, name: string, text: string,
-         to: "phone" | "glasses", at: number }
+         to: "phone", at: number }
 ```
 
 - **Placeholders** in prompts and texts, filled when it runs (unknown ones stay as typed; one with
@@ -2383,7 +1887,7 @@ Note = { id: string, automationId: string | null, runId: string | null, name: st
   `Bash`, `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, or `Bash(*)`, `Bash(:*)`, `Write(**/*)`, or a
   shell or interpreter with any arguments: `Bash(bash:*)`, `Bash(sh -c:*)`, `Bash(python3:*)`,
   `Bash(node:*)`, `Bash(env:*)`, `Bash(xargs:*)`), `bad_template`,
-  `no_battery` (a power trigger on a Mac without one), `no_glasses` (`say` with no Lens paired),
+  `no_battery` (a power trigger on a Mac without one),
   `too_many` (50 automations); `bad_enabled`, `bad_paused` (not a boolean). 404 `no_automation`
   ("That automation was deleted."), `no_run`.
 - **Templates** are the phone's; the daemon keeps the id (`[a-z][a-z0-9_]{0,31}`). The limit ones
@@ -2392,7 +1896,7 @@ Note = { id: string, automationId: string | null, runId: string | null, name: st
   start), `switch_provider` (Switch provider at the limit: `limit five_hour` → continue `limited` on
   another provider, empty prompt; `confirmPaid`), `night_shift` (Night shift: `reset five_hour`,
   `from: "00:00"`, `to: "07:00"` → start), `weekly_debrief` (Weekly debrief: `reset seven_day` →
-  notify `{week}`, `glasses: true`); then `brief`, `prs`, `plugged`, `battery`.
+  notify `{week}`); then `brief`, `prs`, `plugged`, `battery`.
 - **Never on paid usage.** A run never carries on past a limit on usage credits: it waits for the
   reset or is skipped, a model's own limit ("Opus limit") included. (The `limit` trigger does fire
   then: that's when money starts being spent, so "tell me" and "switch provider" matter most.) A run at work when the account
@@ -2499,8 +2003,7 @@ Note = { id: string, automationId: string | null, runId: string | null, name: st
   doesn't fire its `PermissionDenied` hook for a dontAsk refusal, `daemon/test/fixtures/
   permission-denied.json`) and from that hook when it does fire (see Hooks), or the SDK's
   `permission_denied` messages. **Then**, unless quiet:
-  `notify` sends a note to the phone, `say` to the glasses (the note's `name` and its `text`, the
-  result; to the phone when no Lens is connected). The terminal of a session a run started is ended
+  `notify` sends a note to the phone (the note's `name` and its `text`, the result). The terminal of a session a run started is ended
   15 minutes after the run is done if nobody has it open; the session stays in History and resumes
   on the next prompt. A session a run only continued is the owner's: its terminal is never ended.
 - **Notes** are sent as `{t:"note"}` and kept 12 hours in `Snapshot.automations.notes`, so a phone
@@ -2536,7 +2039,7 @@ Feature = "steps"            // more than one step, guards, "step:<id>" targets,
 
 Each lands when it is built. A daemon that sends `features` (even empty) sends `steps`, `outputs`
 and `budget` on every automation and `steps` on every run, and takes them in a save: one step of
-kind start, continue, notify or say and outputs notify and say need no feature (they are today's
+kind start, continue or notify and a notify output need no feature (they are today's
 action and `then`). An editor offers only what is listed (a tile that isn't listed isn't shown),
 ignores names it doesn't know, and treats an absent `features` (an older daemon) as none of this:
 it saves `action` as today. A save that uses something not offered is refused (`bad_steps`,
@@ -2588,8 +2091,7 @@ Step = { id: string,             // [A-Za-z0-9_-]{1,24}, unique in the automatio
     | { kind: "shell", projectPath: string,   // the folder it runs in; the same rule as a start's
         command: string,                  // 1–2000 characters, newlines allowed
         timeoutSec: number }              // 1–600, 60 when absent
-    | { kind: "notify", text, glasses }   // as Action "notify"
-    | { kind: "say", text } )             // as Action "say"
+    | { kind: "notify", text } )          // as Action "notify"
 
 Guard = { on: "ok" | "failed" | "quiet" | "not_quiet" | "contains" | "answer",
           text?: string }        // contains: 1–200 characters; answer: one of the nearest earlier ask's answers
@@ -2676,8 +2178,7 @@ the phone with a note, as today. Each is tried once more after 30 s on a network
 Output = { id: string,           // as a step's ("ou_" + 8 hex from the editor)
            text: string | null } // 1–500, placeholders filled, shown as it is; null: the run's result
                                  // (below, "Its text")
-  & ( { kind: "notify", glasses: boolean }   // a note to the phone (glasses: also read aloud on them)
-    | { kind: "say" }                        // read aloud on the glasses; the phone when none is connected
+  & ( { kind: "notify" }                     // a note to the phone
     | { kind: "webhook", preset: "ntfy" | "slack" | "discord" | "telegram" | "post",
         host: string,            // "hooks.slack.com", "api.telegram.org", "ntfy.sh": for the card
         last4: string }          // the secret's last 4 characters; the secret itself is never sent back
@@ -2689,11 +2190,10 @@ OutputInput = Output, except a webhook's:
     botToken?: string, chatId?: string }     // telegram
 ```
 
-- `then` and outputs: `"notify"` is `[{kind: "notify", glasses: false, text: null}]`, `"say"` is
-  `[{kind: "say", text: null}]`, `"none"` is `[]`.
+- `then` and outputs: `"notify"` is `[{kind: "notify", text: null}]`, `"none"` is `[]`.
 - **Its text**: `text` filled; with no `text` (or nothing left once filled), the run's result: the
   output of the step before the end (`Run.result`); when no step gave one (only notifications ran,
-  or a session said nothing), the last notify or say step's text as it was sent; else `Done.`.
+  or a session said nothing), the last notify step's text as it was sent; else `Done.`.
   Every output names the automation beside its text (the note's `name`, ntfy's `Title`, `<name>: `
   in Slack, Discord and Telegram, the file's line), so a run that said nothing reads "Tell my team:
   Done.".
@@ -2877,12 +2377,12 @@ RunStep = {
   quiet: boolean,
   sessionIds: string[],
   exit: number | null,           // shell
-  answer: { text: string, by: "phone" | "glasses" | "mac" | "timeout", at: number } | null,   // ask
+  answer: { text: string, by: "phone" | "mac" | "timeout", at: number } | null,   // ask
   reused: boolean                // Retry from a later step: taken over from the run it retries
 }
 RunAsk = { stepId: string, question: string, answers: string[], default: string,
            until: number }       // when the default is taken
-RunOutput = { id: string, kind: "notify" | "say" | "webhook" | "file",
+RunOutput = { id: string, kind: "notify" | "webhook" | "file",
               state: "pending" | "sent" | "failed" | "skipped",
                                      // pending: a webhook being sent, or waiting 30 s to be tried again
                                      // (its first error then); skipped: the run didn't end done, or was quiet
@@ -2912,7 +2412,7 @@ RunOutput = { id: string, kind: "notify" | "say" | "webhook" | "file",
   start); 409 `active`; Run now's 409s.
 
 **Answering an ask.** When an ask step begins, the run is `needs_you` with `ask` set, the step
-`needs_you`, and a note goes to the phone (and to the glasses when Lens is connected) with the
+`needs_you`, and a note goes to the phone with the
 question as its text and `Note.ask` set. The question is filled, then cut to 200 characters between
 words with "…" (a filled `{prev}` can be 300; the run keeps the placeholders' values whole):
 
@@ -2921,10 +2421,8 @@ Note += { ask: (RunAsk & { runId: string }) | null }
 ```
 
 - The phone shows it as an attention card (from `Automation.lastRun.ask` in the snapshot, and
-  `{t:"run"}` live; gone when `ask` is null) and as a notification whose actions are the answers;
-  the glasses as a card with the answers.
-- `POST /v1/automations/runs/{runId}/answer` `{stepId, answer}` → `{run}`. Any paired device (a
-  phone, Lens) or the Mac app (the admin token) may answer; the first answer counts. `answer` is
+  `{t:"run"}` live; gone when `ask` is null) and as a notification whose actions are the answers.
+- `POST /v1/automations/runs/{runId}/answer` `{stepId, answer}` → `{run}`. Any paired phone or the Mac app (the admin token) may answer; the first answer counts. `answer` is
   one of the step's answers (ignoring case). 400 `bad_answer` (`field: "answer"`), `bad_step`
   (`field: "stepId"`: not an ask step of that run), 404 `no_run`, 409 `not_asking` (answered
   already, taken as its default, or the run stopped; the error carries the run as `run`).
@@ -2938,8 +2436,7 @@ Note += { ask: (RunAsk & { runId: string }) | null }
 `bypassPermissions` (400 `confirm_shell`, `confirm_bypass`, with the step's field), an old client's
 save that keeps the steps as they are (`{kind: "workflow"}`) included (its field `action`): the
 trigger or the name may be what changed. Both are the client's word that it asked: the daemon can't
-see a fingerprint, so it refuses them from the glasses (403 `needs_phone`, see Only on the phone),
-which can't ask for one. The phone asks
+see a fingerprint. The phone asks
 for the fingerprint or the screen lock first (`BiometricPrompt`, `BIOMETRIC_STRONG or
 DEVICE_CREDENTIAL`; "Let an automation run commands" for a shell step, "Let an automation run
 without asking" for No asking, the automation's name under it); the Mac app asks for Touch ID or
@@ -2960,9 +2457,9 @@ logged.
 **Old clients** (a phone or Mac app without steps):
 
 - `action` is `steps[0]` as an Action, with `then` from the outputs, when an old client can show
-  the automation exactly: one step, of kind start, continue (not `step:…`), notify or say, without a
-  guard, and outputs `then` can say (none, one notify with `glasses: false` and `text: null`, or one
-  say with `text: null`; none at all for a notify or say step). Otherwise `action` is
+  the automation exactly: one step, of kind start, continue (not `step:…`) or notify, without a
+  guard, and outputs `then` can say (none, or one notify with `text: null`; none at all for a notify
+  step). Otherwise `action` is
   `{kind: "workflow", steps: <how many>}`, a kind they don't know: today's phone shows "This
   automation uses something this app doesn't know yet. Update the app on your phone to edit it.",
   and can still switch it, run it, retry its runs and delete it. A new trigger kind reads the same
@@ -2995,7 +2492,7 @@ the body it is about, so an editor marks it and shows `message` there:
 | `steps[i].<start or continue field>` | `no_project`, `outside_projects`, `no_prompt`, `no_provider`, `no_model`, `bad_mode`, `confirm_bypass`, `confirm_paid`, `bad_rule`, `rule_too_broad`, `bad_placeholder`, `bad_target` (also `step:<id>` that isn't an earlier start or continue step), `no_session` |
 | `steps[i].question`, `.answers`, `.default`, `.timeoutMin` | `bad_question`, `bad_answers`, `bad_timeout`, `bad_placeholder` (`{step:<id>}`, as for any text: a step before it with an output) |
 | `steps[i].command`, `.projectPath`, `.timeoutSec` | `no_command`, `bad_placeholder`, `confirm_shell`, `no_project`, `outside_projects`, `bad_timeout` |
-| `steps[i].text` | `no_prompt`, `no_glasses`, `bad_placeholder` |
+| `steps[i].text` | `no_prompt`, `bad_placeholder` |
 | `outputs` | `bad_outputs` (not 0–2 outputs) |
 | `outputs[i]…` | `bad_output` (a kind or preset not offered, an id used twice), `bad_text`, `bad_placeholder` (a `{step:<id>}` that isn't one of its steps with an output), `bad_url` (missing, malformed, not that preset's address, or this computer or a private address), `insecure_url`, `bad_bot_token`, `bad_chat`, `bad_path`, `outside_projects`, `secret_file` |
 | `budget…` | `bad_budget` |
@@ -3026,9 +2523,8 @@ session step's whole output 8 KB (its first).
   come back." The session gets `stoppedForAway: true`, and the app shows a
   **Continue** button (`POST /continue`).
 - `always` allows and adds Claude Code's suggested permission rule for the
-  session (`updatedPermissions`). The phone asks for the fingerprint or the screen lock first;
-  the glasses can't give it (403 `needs_phone`, see Only on the phone), and notifications and the
-  widget offer Allow and Deny only.
+  session (`updatedPermissions`). The phone asks for the fingerprint or the screen lock first,
+  and notifications and the widget offer Allow and Deny only.
 - `session` (only where `canSession`) allows that tool for the rest of the session: this
   approval, the same tool's other approvals waiting in that session (they resolve as
   allowed), and later ones, which the daemon answers without asking (subagents included).
@@ -3077,8 +2573,7 @@ The phone browses folders (`GET /v1/files`), views a file (`GET /v1/file`) and s
   `mac.files`, the Mac app's `/local/status` as `files`, and the Mac app changes it with `POST
   /local/settings {browseOutsideProjects}`. A change is saved, goes out at once as `{t:"files",
   files}`, and each session whose `browsable` it changes goes out as `{t:"session"}`. The phone asks for
-  the fingerprint or the screen lock before turning it on (not off); the glasses can't turn it on
-  (403 `needs_phone`, see Only on the phone).
+  the fingerprint or the screen lock before turning it on (not off).
 - **Files with keys stay on the Mac** wherever they are: `.env` (not `.env.example` and the like),
   `.envrc`, `.npmrc`, `.netrc`, `.git-credentials`, `.pgpass`, `.my.cnf`, `.s3cfg`, `.boto`, shells'
   and tools' histories (`.zsh_history`, `.bash_history`, `.psql_history`…), `credentials(.json)`,
@@ -3140,8 +2635,7 @@ token, so it never serves dotfiles (`.env`, `.git`), files with keys or anything
 Files): 404. Every file is judged where it leads (a folder by its `index.html`, a link by its
 target, inside the preview's folder) and sent from the path judged. A preview is made only from a file the phone may open (403 `outside_projects`, 404
 `not_found`, 403 `secret_file` for a key file itself), and never of a folder too broad to share (the
-home folder). Show me's own capture of a page a session wrote goes by where sessions work (the
-projects folder and each session's folder), whatever Browse outside projects says.
+home folder).
 `{port}` proxies `http://127.0.0.1:<port>/` the same way, for dev servers the
 agent started (`npm run dev` on 5173 and so on). Images and text files can also
 be fetched directly with `GET /v1/file`.
@@ -3296,8 +2790,8 @@ brings no readings and the spend pace (`Usage.rate`) would go flat; the probe's 
 - **When:** while any client is connected (the Mac app counts): every 2 minutes while a session on
   the subscription works or its agents run (what `Usage.rate` goes by; sessions on other providers
   don't spend these windows; not at a 5-hour or weekly limit, whose meter stands full with no
-  pace), so three looks in four minutes make a pace; idle, every 15 minutes while a phone or the
-  glasses are connected, else hourly (the Mac app's own feed is always there, and every look starts
+  pace), so three looks in four minutes make a pace; idle, every 15 minutes while a phone is
+  connected, else hourly (the Mac app's own feed is always there, and every look starts
   Claude Code). The wait doubles after each look that couldn't read the screen (up to 4 hours)
   until one does; after 3 in a row `Usage.probe` says so (`ok: false`, `since`) and `modelsStale`
   is true; on
@@ -3331,61 +2825,29 @@ brings no readings and the spend pace (`Usage.rate`) would go flat; the probe's 
 
 ## Read aloud
 
-Replies read aloud: on the glasses (Lens), and from a message's long-press menu on the phone. The
-Mac makes the voice, with Soniox's natural voices (`daemon/src/tts.ts`, the key kept for speech to
-text) or the Mac's own (`say`); the Hypernova app on the phone plays it natively, and the glasses'
-too when it's connected, since the Even App's WebView only makes sound after a touch on the phone's
-screen. Without a phone app the glasses play a whole clip themselves, as before (`readaloud.ts`).
+Replies read aloud, from a message's long-press menu on the phone. The Mac makes the voice with its
+own voices (`say`); the Hypernova app on the phone plays it natively (`readaloud.ts`). A computer
+without `say` (a Linux server) has no voice of its own (`unavailable.macVoice`): the phone then reads
+with its own text-to-speech. (Soniox's voices were removed on 2026-10-30.)
 
 **Which voice** (`Speech`, in the snapshot as `speech`, and `{t:"speech"}` on each change; kept in
 `<support>/speech.json`):
 
 ```
-Speech = { engine: "soniox" | "mac", using: "soniox" | "mac", voice, macVoice: string | null,
-           rate, model, soniox: boolean, note: string | null, phone: boolean }
+Speech = { engine: "mac", using: "mac", macVoice: string | null, rate }
 ```
 
-- `engine` is chosen: Soniox once a Soniox key is kept, unless the Mac's voice was picked (Settings →
-  Voice on the phone). `using` is what reads now: the Mac's voice while Soniox can't (no key, a key it
-  refused, an account out of credit). `note` says why in one line, or that the last read fell back
-  ("Soniox couldn't read (…), so the Mac's voice did."); the next good Soniox read clears it.
-- `voice` is Soniox's (every one speaks every language), `macVoice` the Mac's (null: the system
-  voice). `rate` 0.5–2; the Mac's voice gets `round(185 × rate)` words a minute, Soniox reads at
-  `rate` clamped to its 0.7–1.3. `phone`: a phone app plays the glasses' speech right now.
-- `POST /v1/speech/settings {engine?, voice?, macVoice?, rate?}`: a Soniox voice is checked against
-  Soniox's list when it can be had (offline, the name is kept and tried later); a Mac voice against
-  `say`'s. 400 `bad_engine`, `bad_voice`, `bad_rate` (not a number; out of range is clamped).
-- `GET /v1/speech/voices` (no `engine`, or `engine=mac`) → `{engine: "mac", voices: [{id, name,
-  lang}]}` from `say -v '?'` (`lang` like `en-US`), listed once per daemon run (a listing that failed
-  is tried again; none without `say`). A line is `Samantha            en_US    # Hello! …`: the
-  language is the last word before `#` and the name is everything before it (long names such as
-  `Eddy (English (US))` have a single space there). `engine=soniox` → `{engine, model, voices: [{id,
-  name, lang: "*", gender, description}]}` from Soniox's `GET https://api.soniox.com/v1/tts-models`
-  (the key as `Authorization: Bearer`), kept six hours.
-
-**Soniox** (`tts.ts`): `wss://tts-rt.soniox.com/tts-websocket`, the key as `Authorization: Bearer`
-on the upgrade (never in a message: Soniox refuses that from 15 January 2027), one connection a
-read, its text in pieces, one stream each, one after another:
-`{stream_id, model, language, voice, audio_format: "pcm_s16le", sample_rate: 24000, speed,
-return_timestamps: true}`, then `{stream_id, text, text_end: true}`; the answer is base64 PCM with
-each character's start time (`timestamps.characters`, `character_start_times_seconds`), then
-`terminated`; `{stream_id, cancel: true}` stops it.
-
-- Model: `tts-rt-v2`, generally available since 11 August 2026 (`tts-rt-v1` was retired on 31
-  August and routes to it). The models list is asked which is live; v2 while it's listed, else the
-  newest real-time one.
-- Pieces are cut after a sentence: the first at most 320 characters, so the voice starts at once,
-  the rest at most 1100 (Soniox makes at most 2 minutes of audio a stream, and takes 5000 characters
-  a message). `language`, which Soniox needs, is each piece's main script (Cyrillic → `ru`, Latin →
-  `en`, and a few more; Latin letters count for less, as code and product names are English).
-- Square brackets become parentheses: v2 takes `[whispering]` or `[laughs]` as stage directions,
-  and a reply's `[1]` is only text. Every character keeps its place, so timings still point into
-  the text as given.
-- Errors as speech to text names them (`bad_key` 401/403, `no_credit` 402, `busy` 429, `soniox`,
-  `unreachable` within 8 s); no first audio within 12 s of a piece's text is `soniox`. Any of them
-  before the end: the Mac's voice reads the rest, from the start of the word Soniox had got to (or
-  the start, if it never spoke), and `note` says so. `max_audio_duration_reached` keeps what came.
-- `HYPERNOVA_SONIOX_TTS_WS` and `HYPERNOVA_SONIOX_API` point the daemon at a stand-in (the tests).
+- `engine` and `using` are always `"mac"` (kept for clients that read them). `macVoice` is the Mac's
+  voice (null: the system voice). `rate` 0.5–2; the Mac's voice gets `round(185 × rate)` words a
+  minute.
+- `POST /v1/speech/settings {engine?, macVoice?, rate?}`: a Mac voice is checked against `say`'s.
+  400 `bad_engine` (anything but `"mac"`), `bad_voice`, `bad_rate` (not a number; out of range is
+  clamped). An older file's Soniox fields are not read, and go with the next save.
+- `GET /v1/speech/voices` → `{engine: "mac", voices: [{id, name, lang}]}` from `say -v '?'` (`lang`
+  like `en-US`), listed once per daemon run (a listing that failed is tried again; none without
+  `say`). A line is `Samantha            en_US    # Hello! …`: the language is the last word before
+  `#` and the name is everything before it (long names such as `Eddy (English (US))` have a single
+  space there).
 
 **The Mac's voice**: `/usr/bin/say [-v <voice>] -r <wpm> -o <support>/tmp/say-<random>.<m4a|wav>`,
 no shell, 40 s at most, renders to the file and plays nothing on the Mac: AAC in M4A for a whole
@@ -3393,17 +2855,15 @@ clip (`--file-format=m4af --data-format=aac`), 24 kHz 16-bit PCM for a play (`--
 --data-format=LEI16@24000`, read from its `data` chunk). The text goes in on its standard input,
 never as an argument, so it doesn't show in the process list; `[[` becomes `[ [` (it opens one of
 `say`'s embedded commands). The temp folder is 0700 and the file is deleted once read (leftovers at
-start-up too).
+start-up too). A play's text is read in pieces cut after a sentence (the first at most 400
+characters, so the voice starts at once, the rest at most 2000).
 
-**A whole clip**, `POST /v1/speech {text, voice?, rate?}` (the glasses' own player, and older
-clients): 200 with the bytes of the whole clip, `X-Speech-Engine: soniox | mac`.
-- Soniox: `audio/wav` (24 kHz 16-bit mono; Web Audio's `decodeAudioData` takes WAV in every WebView).
-  The Mac's voice: `audio/mp4` (AAC in M4A), as before.
+**A whole clip**, `POST /v1/speech {text, voice?, rate?}` (the phone's older way): 200 with the bytes
+of the whole clip, `audio/mp4` (AAC in M4A), `X-Speech-Engine: mac`.
 - `text`: plain text, at most 8000 characters (as JavaScript counts them); longer → 413 `too_long`,
-  blank → 400 `empty`. A longer reply goes in pieces, cut between paragraphs, each asked for while
-  the one before plays (Lens cuts at 1200 while Soniox reads, so each piece is made in moments).
-- `voice`: a Mac voice's `id`, used only while the Mac's voice reads (unknown → the setting's).
-  `rate` other than 1 is used instead of the setting's.
+  blank → 400 `empty`.
+- `voice`: a Mac voice's `id` (unknown → the system voice); `rate` other than 1 is used instead of the
+  setting's.
 - One clip at a time per paired device: a new request stops the one being made, which answers 409
   `replaced`. A client that stops waiting stops it too. Other errors: 502 `speech_failed`, 501
   `no_voice` (no `say`).
@@ -3411,459 +2871,41 @@ clients): 200 with the bytes of the whole clip, `X-Speech-Engine: soniox | mac`.
 **Plays**: speech the Mac makes and the Hypernova app on the phone streams and plays.
 
 ```
-Play = { id, sessionId: string | null, source: "glasses" | "phone" | "mac", engine: "soniox" | "mac",
+Play = { id, sessionId: string | null, source: "phone", engine: "mac",
          sampleRate: 24000, format: "pcm_s16le", of: number }   // of: the text's length
 ```
 
-- **The phone app offers** on its live feed: `{t:"speech.player", on}` as the feed opens and when
-  "Glasses speak through this phone" changes (on by default). `speech.phone` follows.
-- `POST /v1/speech/play {text, sessionId?, to?}`, up to 40,000 characters. `to: "me"`: the asker
-  plays it (the phone's own Read aloud and its Test). Else the phone app that offered: the one on
-  the glasses' own phone when the tailnet says so (the same `X-Forwarded-For` address as the
-  request), else the one that offered last; none → 409 `no_player`, and the glasses play a whole
-  clip themselves. One play at a time per phone and per asker: a new one ends the old (`stopped`,
-  `replaced`). The answer: `{play: Play & {to: {id, name}}}`; the phone gets `{t:"speech.play",
-  play}` on its feed (not for `to: "me"`, which has the answer).
+- `POST /v1/speech/play {text, sessionId?, to?: "me"}`, up to 40,000 characters: the phone that asks
+  plays it (its Read aloud and its Test); the Mac app can't (400 `bad_target`). One play at a time
+  per phone: a new one ends the old (`stopped`, `replaced`). The answer: `{play: Play & {to: {id,
+  name}}}`.
 - `GET /v1/speech/plays/<id>/audio` (the phone playing it, or the Mac app): `audio/pcm`,
-  `X-Sample-Rate: 24000`, `X-Speech-Engine`; what's made so far at once, the rest as Soniox makes it,
-  the end when all is made. It waits for the first audio: a failure before any → 502
-  `speech_failed` (501 `no_voice`); a play already stopped → 410 `play_over`; 404 `no_play`.
+  `X-Sample-Rate: 24000`, `X-Speech-Engine`; what's made so far at once, the rest as it's made, the
+  end when all is made. It waits for the first audio: a failure before any → 502 `speech_failed`
+  (501 `no_voice`); a play already stopped → 410 `play_over`; 404 `no_play`.
 - **The phone reports** on its feed: `{t:"speech.progress", id, state: "started" | "playing" |
   "ended" | "stopped" | "failed", ms, level, why?}`: started when the voice starts, then the position
   (`ms` played) and the loudness of what plays now (`level` 0..1) every 150 ms or so; `ended` once
   the speaker played the last of it; `stopped` (`why`: `phone` for its Stop, the notification or a
   headset's button; `focus` when a call or another player takes the audio; `unplugged` for
-  headphones; `network`); `failed` when it never played (`focus`, `off`, `http_<status>`,
-  `unreachable`). Only the phone playing a play is heard about it.
-- **To the asker** (the glasses), at most every 250 ms while it plays and at once on a change:
-  `{t:"speech.progress", progress: {id, state: "making" | "playing" | "ended" | "stopped" |
-  "failed", ms, chars, of, level, engine, why}}`. `chars` is how much of the text the voice has
-  read, from Soniox's timings at `ms` (between pieces, and for the Mac's voice, spread evenly);
-  `ended` has `chars = of`. A play whose text broke off before its end (both voices failed) is
-  `stopped` `cut`, never `ended`: a risky command counts as heard only when it was played whole.
-- `POST /v1/speech/plays/<id>/stop` (a tap on the glasses): the phone gets `{t:"speech.stop", id}`,
-  the making stops, the asker hears `stopped` `asked`.
+  headphones; `network`); `failed` when it never played (`focus`, `http_<status>`, `unreachable`).
+  Only the phone playing a play is heard about it.
+- `POST /v1/speech/plays/<id>/stop` (the phone playing it, or the Mac app): the phone gets
+  `{t:"speech.stop", id}` unless it stopped it itself, and the making stops.
 - **Watchdogs**: no `started` within 12 s of the first audio (24 s while none is made) → `failed`
-  `no_start` and the phone is told to stop (the glasses then play it themselves); no word from a
-  playing phone for 15 s → `stopped` `lost`; its feed gone and not back within 4 s → `stopped`
-  `lost`. A play is forgotten a minute after it ends.
+  `no_start` and the phone is told to stop; no word from a playing phone for 15 s → `stopped`
+  `lost`; its feed gone and not back within 4 s → `stopped` `lost`. A play is forgotten a minute
+  after it ends.
 - **The Mac app** hears `{t:"speaking", speaking: {id, sessionId, source, state, level, engine}}`
   on its feed alone, every 120 ms at most while a play goes, and draws the speaking wave on that
   session's row; `ended`, `stopped` or `failed` takes it away.
 
 **Privacy**: the text is never logged or written down; the log has one line a play (`speech play
-glasses soniox 9.2s ended`: the source, the engine, how long, how it ended). The key goes to Soniox
-alone, never into an answer, a message or the log. Recent reads stay in memory only, never on disk,
-by a hash of the engine, voice, rate and text, so the same reply read again starts at once: the
-Mac's last 6 whole clips, and the last 6 reads as PCM (Soniox's, and every play), 32 MB at most
-each, the oldest dropped first, every one dropped exactly 10 minutes after it was made, on a timer
-of its own (which never keeps the daemon running).
-
-## Telescope
-
-"Telescope" on the lens shows what the session in front of you is building, as a picture that
-fills the glasses: its web page, the Android emulator or a phone, the iOS Simulator, its live
-terminal, the last picture, chart or PDF page it made, or a window of the Mac app it builds. The
-Mac takes the picture (`daemon/src/telescope/`); Lens dithers it for the lens and zooms into it
-(lens/DAEMON.md, 3). It grew out of "Show me", which took pages only: that is now the web source,
-and its old route stays for Lens builds from before Telescope (below).
-
-`POST /v1/sessions/{id}/telescope {source?, url?, device?, prefer?, page?, width?, height?, watch?}` → `{shot: Shot}`
-
-```ts
-Shot = { url: string,            // "/v1/shots/<24 hex>.png", relative to the base URL
-         width, height,          // of the picture, in pixels
-         source: "web" | "emulator" | "simulator" | "terminal" | "image" | "window",
-         title: string,          // what it shows: the page's title, "Android emulator · Pixel 8",
-                                 // "chart.png", "Hypernova · Settings", "Terminal · <project>"
-         label: string,          // where, in a few characters: "localhost:5173/settings", "Pixel 8",
-                                 // "report.pdf · page 2 of 9", "terminal", "Hypernova"
-         pageUrl: string | null, // web: the address captured; null for an HTML file (then `path`)
-         path?: string,          // web: that HTML file; image: the picture's real path
-         page?: number,          // image: the PDF's page shown…
-         pages?: number,         // …of how many
-         device?: string,        // emulator: the adb device id
-         digest: string,         // 24 hex, the picture's fingerprint: the same means unchanged
-         at: number,             // epoch ms: taken, or found unchanged
-         auto: boolean,          // the telescope chose the source itself
-         skipped?: { source, code, message } } // picking, it passed over a source the owner can fix
-```
-
-- **`source`**: `web`, `emulator`, `simulator`, `terminal`, `image` or `window`; absent or
-  `"auto"` lets the telescope pick. Anything else → 400 `bad_source`. `url` (web) is a page on
-  this Mac, as below; with it and no `source`, the web source is used. `device` (emulator) is an
-  adb device id; `prefer` (emulator), `"phone"` or `"emulator"`, the kind of device the owner said
-  (the glasses can't say an id; anything else is ignored). `page` (image) is a PDF's page, 1 and
-  up. `width` and `height` (web) are the viewport, 320–2560, default 1152 × 512. `watch: true`: a
-  watching client's look (see "The picture").
-- **Picking** (no `source`): each source the session's transcript points at, the one it touched
-  last first; then a page served from its folder (rule 2 below: a server may run there without
-  the transcript saying so); then its terminal, which is there for command-line work whenever
-  nothing else is. Only what the session did counts, never what Claude wrote about:
-  - **web**: a `Bash` command that starts a server (the list below), opens a loopback address
-    (`open http://localhost:…`) or runs Flutter on Chrome; a `Write`/`Edit` of an `.html` file.
-  - **emulator**: a `Bash` command that runs `adb` (as the command: at the start, after `;`, `&&`,
-    `|`, `(` or `$(`, maybe behind a variable or by its path; not `grep -r adb`), `emulator -avd|@…`, a Gradle `install…` or
-    `connected…Test` task, `flutter run|install` (not `-d macos|chrome|web-server|edge|ios`),
-    `react-native run-android`, `expo run:android`, `cap run android`, `maestro test`.
-  - **simulator**: `simctl`, `open -a Simulator`, `xcodebuild` for `iphonesimulator` or an
-    `iOS Simulator` destination, `react-native run-ios`, `expo run:ios`, `cap run ios`,
-    `flutter run -d ios|iphone…`.
-  - **window**: `open <something>.app`, `swift run`, a program under `.build/(debug|release)/`,
-    `xcodebuild` for macOS, `flutter run -d macos`, `tauri dev`, `electron` run as the command
-    (`electron .`, `npx electron`, `electron-forge start`; not `npm i electron`).
-  - **image**: a `Write`/`Edit`/`NotebookEdit` of a picture or PDF (`.png .jpg .jpeg .gif .webp
-    .svg .pdf .tif .tiff .bmp .heic .heif`), a `Read` of one (its `pages: "3-5"` names the PDF's
-    page), and picture names in a `Bash` command or the end of its output ("Saved figure to
-    out/sales.png"), relative ones in the session's folder.
-
-  A source that has nothing for this session (no emulator running, no picture in its folder, no
-  shared terminal, no Chrome, no Screen Recording yet…) is passed over for the next. When none
-  has anything, the answer is the newest pointed-at source's own error ("No emulator is running,
-  and no Android phone is connected."), else 404 `nothing_to_show`, "This session hasn't started a
-  page, an app or a picture to show." Any other error (a page that went off the Mac, a capture
-  that failed) is the answer at once. When a source the transcript points at was passed over for
-  something the owner can fix and another source answered, the picture says so in `skipped`
-  (the newest such): `screen_recording` "Say “telescope window” to allow Screen Recording.",
-  `no_mac_app` "Open Hypernova on the Mac to see the app’s window.", `which_device` "Several
-  Android devices: say “telescope phone” or “telescope emulator”." Only what the session did is
-  read, from its newest 600 events.
-- **One look at a time per session** → 409 `busy`. A client that watches asks again only after
-  an answer.
-- **The same picture keeps its link.** When a session's new picture has the same pixels, source
-  and `label` as its last one, and that link still works, the answer is the last `Shot` with a
-  new `at`: a client watching a screen that hasn't changed loads nothing and sends nothing to
-  the glasses.
-
-### The sources
-
-- **web**: the page, captured with headless Chrome as described under "Finding the page" and
-  "Rendering" below, at 1152 × 512 (twice the lens' picture each way: the whole page fills the
-  glasses, and a zoomed quarter is pixel for pixel). `label` is the address without its scheme, or
-  the HTML file's name. Errors as below (`nothing_to_show`, `not_local`, `bad_url`,
-  `shot_failed`, `no_browser`).
-- **emulator**: the Android emulator or a phone (USB or Wi-Fi debugging), through `adb` from
-  Android Studio's SDK (`$ANDROID_HOME`, `$ANDROID_SDK_ROOT`, `~/Library/Android/sdk`) or Homebrew
-  (`/opt/homebrew/bin`, `/usr/local/bin`); on Linux the SDK in `~/Android/Sdk` or
-  `/usr/lib/android-sdk`, or the `adb` package (`/usr/bin`); none → 501 `no_adb`. `adb devices -l` lists them; the
-  device is the one `device` names (it must be listed: 404 `no_device`), else the one the
-  session's commands named (`adb -s <id>`, `ANDROID_SERIAL=<id>`, `flutter run -d <id>`,
-  `--device-id <id>`) if it's connected and of the kind `prefer` says, else the only one of that
-  kind (`emulator-<port>` ids are emulators, the rest phones), else the only one ready, else, with
-  nothing said, the only emulator. None → 404 `no_emulator`, "No emulator is running, and no
-  Android phone is connected." (none of the kind said: `no_emulator` "No emulator is running." or
-  `no_phone` "No Android phone is connected to the Mac."); several and none chosen → 409
-  `which_device` with `devices: [ids]`, "Several Android devices are connected (…). Say “telescope
-  phone” or “telescope emulator”." ("Several phones are connected (…), and the session didn't name
-  one." when the kind was said); one not ready → 409 `device_unauthorized` ("Allow USB debugging on
-  … first.") or `device_offline`. Then `adb -s <id> exec-out screencap -p`: the PNG the device
-  draws, at its own resolution (15 s at most). An emulator is named by its AVD
-  (`adb -s <id> emu avd name`, "Pixel 8 API 35"), a phone by its model.
-- **simulator**: the booted iOS Simulator, `xcrun simctl io booted screenshot --type=png <file>`
-  into a scratch file of the daemon's (`<support>/shots/tmp`, 0700, removed after). A Mac
-  without Xcode (only the Command Line Tools: "unable to find utility simctl") → 501
-  `no_simulator`, "The iOS Simulator needs Xcode on the Mac."; none booted → 404
-  `simulator_off`, "No iOS Simulator is running."
-- **terminal**: the session's shared terminal (see Shared terminals), its screen as the holder
-  keeps it, as plain text: drawn as a picture in Hypernova's terminal look (`#0F0D0A` ground, ink,
-  muted, dim and ghost greys, the mint for Claude's ⏺ and the prompt, the danger red for errors;
-  JetBrains Mono as the Mac app ships it, else Menlo), at 1152 × 512. Blank lines above and below
-  are dropped and the font is as large as fits (14–30 px); a line too wide even at 14 px (a wide
-  terminal) is wrapped at the last space that fits, its continuation hung two columns under its
-  text in the same colour (a line of the input box's frame is only cut), and a screen too long for
-  14 px keeps its newest lines. A glyph the font lacks (⏺, ⎿) is drawn alone at its column, so columns stay
-  true. Drawn by AppKit through `osascript -l JavaScript` with a fixed script, the text going in
-  on its standard input. Not in a shared terminal → 409 `no_terminal`.
-- **image**: the newest picture or PDF the transcript points at that passes every rule: inside
-  the session's folder by real path (so a symbolic link can't lead out; never for a session at
-  `/`; for a session in the home folder or above it, only a picture it wrote itself, as a command
-  there could name any of the owner's pictures), not a file `isSecretFile()` keeps on the Mac (`.ssh/`, `.aws/`, `.env`… whatever its
-  name), not in `<support>` (the screenshots, the phone's attachments), a regular file of at most
-  100 MB, with a picture's name and a picture's first bytes (PNG, JPEG, GIF, WebP, TIFF, BMP,
-  HEIC, PDF, SVG). A file a command only named counts when it was written while the session ran
-  (its modification time, a minute's slack), so an `ls` of old assets doesn't make them the
-  session's; one the session wrote itself always counts. Drawn by AppKit on white (a chart with a
-  transparent background reads as one), as a PNG: a bitmap at its own pixels (2560 on its longer
-  side at most), a drawing (SVG, a PDF page) at 1600 on its longer side. A PDF shows `page`, else
-  the page the session read, else its first (clamped to its pages); one locked with a password →
-  422 `locked_pdf`. Nothing → 404 `no_picture`.
-- **window**: a window of the Mac app the session builds, taken by the Mac app (the daemon, a
-  node process under launchd, can't hold Screen Recording in a way the owner could find and grant
-  in System Settings, and would lose it with each Node update). The app is named by its processes:
-  those running a program from inside the session's folder (`swift run`, `.build/release/X`,
-  `dist/X.app`), or from Xcode's build products of a project in it
-  (`~/Library/Developer/Xcode/DerivedData/<project>-<hash>/Build/Products/`), by the executable's
-  real path, never by the name a process gives itself. `ps -axww -o pid=,comm=` only finds
-  candidates: what it shows is argv[0], which any program sets as it likes (`exec -a`), so a
-  candidate counts only once the program the kernel loaded for it, the first `txt` file of
-  `lsof -a -p <pids> -d txt -Fn`, is in one of those folders too, by real path. (A program started
-  by a relative path is resolved in its process's working folder, `lsof -a -p <pids> -d cwd -Fn`.)
-  Never by bundle id: a folder could hold a bundle claiming any app's id. A copy installed
-  elsewhere (in /Applications) isn't the session's. Never for a session at `/`, in the home folder
-  or above it, or in a folder of the Mac's or of installed apps (`/Applications`, `/System`,
-  `/Library`, `/usr`, `/bin`, `/sbin`, `/opt`, `~/Applications`, `~/Library`, and inside them:
-  every app there would count) → 404 `no_app` when none runs. The daemon sends
-  `{t: "telescope.window", job, pids, roots, ask}` (`roots`: those folders, real paths) on the Mac
-  app's live feed alone (`/v1/ws?client=mac`, never to phones); no Mac app connected → 503
-  `no_mac_app`, "Open Hypernova in your Mac's menu bar first: it takes the pictures of app
-  windows." The Mac app, which holds the Screen Recording grant, doesn't take the list on trust:
-  before anything else (the permission included) it keeps only the pids whose executable
-  (`proc_pidpath`, then its real path) is inside one of `roots`, and only roots that may hold an
-  app being built (the same refusals; under `~/Library` only `DerivedData/<x>/Build/Products`);
-  none left → `{error: "no_app"}` → 404 `no_app`. It looks only at windows those processes own
-  (ScreenCaptureKit, on-screen windows), takes the largest normal one (a menu bar app's panel when
-  it has no other), at most 2560 px on its longer side, without the cursor or shadow, and answers
-  on its local port (`POST /local/telescope/<job>`, below) within 15 s (else 504
-  `capture_failed`). Screen Recording: when not allowed, the Mac app asks macOS for it (macOS shows
-  its own prompt) once ever, and only when the owner named the source himself (`ask: true`): 403
-  `screen_recording`, "Your Mac is asking now: allow Hypernova under Screen Recording, then try
-  again." When it picks by itself the telescope never puts that question on the Mac, and a Mac app
-  without the permission is passed over ("Allow Screen Recording on your Mac first: System
-  Settings, Privacy & Security, Screen Recording, Hypernova."; with the picture another source
-  gave, `skipped` says how). No window of the app open → 404 `no_window`, "No window of Hypernova
-  is open on the Mac." `Hypernova --window-capture-selftest` checks the Mac app's side.
-- Every program runs by full path with fixed arguments, never through a shell; the only words
-  from outside are adb device ids, which must look like one (`[A-Za-z0-9][\w.:-]{0,95}`: no
-  spaces, quotes or leading dash) → else 400 `bad_device`. Pictures larger than 40 MB, or that
-  aren't PNGs, are refused (502 `capture_failed`).
-
-### The web source: finding the page
-
-- **`url`** (optional): the page to capture. Only `http(s)` on this Mac's loopback (`localhost`,
-  `127.0.0.1`, `[::1]`) and never the daemon's own ports (its two, and 47321/47322) → else 403
-  `not_local` (400 `bad_url` when it isn't an address). When nothing answers there: 502
-  `shot_failed`, "Nothing answers at localhost:3000 on the Mac." The same rule holds for every
-  page the capture goes on to, however it was found (see Rendering).
-- **Without `url`**, the page this session started, in this order:
-  1. **A server command it ran**, newest first: a `Bash` event whose command starts a server (the
-     list Lens uses: `npm|pnpm|yarn|bun [run] dev|start|serve|preview`, `vite`, `next dev|start`,
-     `astro dev`, `webpack serve`, `webpack-dev-server`, `python3 -m http.server`, `serve`,
-     `rails s|server`, `flask run`, `uvicorn`, `gunicorn`, `php -S`, `hugo server`,
-     `jekyll serve`), and the loopback address it printed (colour codes stripped; `0.0.0.0` read
-     as `127.0.0.1`, `[::]` as `[::1]`; the last one printed first): in its own output (run in the
-     foreground); else in the output file its background result names ("Command running in
-     background with ID: b8f…. Output is being written to: /private/tmp/…/tasks/b8f….output."),
-     its last 64 KB, read only if its real path is inside the system temp folder, in a `tasks`
-     folder, named `<id>.output`, a regular file of the daemon's user (only addresses are taken
-     from it); else, once Claude Code has removed that file, in a later event that read it (a
-     `Read` of it, a `Bash` command naming it, `BashOutput` or `TaskOutput` with its ID). For this,
-     a background command's event keeps that line of its result as its `output`, and a `Read` of
-     such a file keeps its last 4 KB rather than a line count (see Reading transcripts).
-  2. **A server listening now in the session's folder**, whoever started it (in the background,
-     in a terminal, in an earlier session): `lsof -nP -iTCP -sTCP:LISTEN -Fpn`, listeners on
-     `127.0.0.1`, `[::1]`, `*`, `0.0.0.0` or `[::]`, not the daemon's ports or process nor the
-     speech companion's port; `lsof -a -p <pids> -d cwd -Fn` for their working folders, kept when
-     that is the session's folder or inside it (real paths; never for a session in the home folder
-     or above it, where every process would count); newest process first (`ps -o pid=,lstart=`);
-     3 s for each call. Captured as `http://localhost:<port>/`.
-  3. **The newest `.html` file it wrote or edited** inside its folder that's still there, through
-     a preview (Artifacts and previews) on the daemon's own port, so its relative links work.
-  4. Else 404 `nothing_to_show`, "This session hasn't started a page or app to show."
-
-  In 1 and 2 something must answer on the port now: the daemon connects and asks for `HEAD /`.
-  An HTTP answer, or a server that takes the connection but hasn't answered within 0.8 s (a dev
-  server compiling its first page; for https, taking the connection is enough), counts; a refused
-  connection or something that isn't HTTP (a build daemon's port) doesn't, and in 2 a server
-  answering HTTP comes before one that is quiet. Addresses Claude only mentions or fetches don't
-  count: a transcript that merely mentions `127.0.0.1:47322` must never send the browser to the
-  daemon.
-
-### The web source: rendering
-
-- **Rendering**: Google Chrome (or Chromium) from `/Applications` or `~/Applications`; none → 501
-  `no_browser`, "Install Google Chrome on the Mac to take screenshots." Headless (`--headless=new`)
-  in a profile of its own (`<support>/shots/chrome`: never the owner's cookies; a mock keychain, so
-  no keychain prompt; no first-run pages, sync, extensions or background calls home), one Chrome at
-  a time, driven over the DevTools protocol on a pipe (`--remote-debugging-pipe`, so no port is
-  opened). Each capture runs in a throwaway context of its own
-  (`Target.createBrowserContext {disposeOnDetach: true}`, kept in memory, disposed when the capture
-  ends): no cookie, storage or service worker reaches the next capture (another project on the same
-  port, or the preview cookie on `127.0.0.1`). Downloads are denied
-  (`Browser.setDownloadBehavior deny`), so a page can't save files on the Mac. Every main-frame
-  request is checked before it is sent (`Fetch.enable` on `Document` requests; one that names no
-  frame is checked the same way): the first address, each redirect, and wherever the page's script
-  or a meta refresh sends it must pass the `url` rule above (an HTML file's preview may also move
-  within its own folder, `/p/<token>/`, and nowhere else on the daemon's port); anything else is
-  refused (`Fetch.failRequest BlockedByClient`) and the capture answers 403 `not_local`, "The page
-  went on to example.com; only pages this Mac serves on localhost can be shown.", also when the page
-  tries to leave while the picture is being taken; the address the main frame ends on is checked
-  once more before the picture. Chrome's "Preload pages" is off in the profile
-  (`net.network_prediction_options: 2` in `Default/Preferences`, written before each start and
-  inherited by the throwaway context): a page's speculation rules would otherwise fetch and
-  prerender pages in requests Fetch never sees, and show one without a check. Frames inside the page
-  (iframes) and its images, scripts and other requests may come from anywhere. Nothing clicks, so
-  Chrome's own pop-up blocker keeps `window.open` from opening anything. The viewport is set to
-  width × height at scale 1, the page loaded (at most 8 s, then taken as it is: an image that never
-  arrives), then given until its requests pause for 0.5 s (0.4–3 s) to draw itself, then captured.
-  Chrome's own `--screenshot` isn't used: it never captures a page that holds a request open
-  (webpack's live-reload poll, server-sent events) and captures an app before its script has drawn
-  it. Certificate errors are ignored (a local https dev server with a certificate of its own), as
-  the profile holds nothing to protect and only loopback pages get that far. 20 s in all, then
-  Chrome and its helpers are killed. 502 `shot_failed` when the page doesn't load or Chrome gives no
-  picture.
-
-### The picture
-
-- `<support>/shots/<24 hex>.png`, whatever the source (folder 0700, file 0600), served for 12
-  hours and removed after 24 (Telescope's scratch files after 10 minutes, should the daemon stop
-  mid-capture). Telescope keeps a picture at most 1600 px on its longer side (`/usr/bin/sips -s
-  format png -Z 1600`, by full path with fixed arguments, through scratch files; as it came if
-  sips fails): enough for a zoomed quarter on the lens and for the phone, where a phone's screen at
-  its own 1260 × 2800 would be 2.5 MB a frame. Its `digest` is of the picture as the source gave
-  it. A watching client's looks (`watch: true`) keep only the session's newest two new frames on
-  disk (the one just sent may still be loading); the picture asked for before watching stays. `GET /v1/shots/<token>.png` needs no bearer header (an `<img>` or a canvas can't
-  send one; the name is the key, like a preview's) → `image/png`, `Cache-Control: private,
-  max-age=43200`; being under `/v1`, it has `Access-Control-Allow-Origin: *`, which Lens needs to
-  read its pixels in a canvas (it dithers them for the lens, and cuts a zoomed quarter from them).
-  Unknown, malformed or expired → 404 `shot_expired`.
-
-### Show me: the route before Telescope
-
-`POST /v1/sessions/{id}/screenshot {url?, width?, height?}` → `{shot: Shot}` is the web source
-alone, as Lens called it before Telescope (and still does when the Mac's Hypernova has no
-telescope route): the same page, rules and picture, at 1280 × 800 by default, in the older shape:
-
-```ts
-Shot = { url: string,            // "/v1/shots/<24 hex>.png", relative to the base URL
-         width, height,          // of the picture: 320–2560, default 1280 × 800 (clamped)
-         title: string,          // the page's title (as it shows, set by its script too), else the session's
-         source: "url",          // a page by its address
-         pageUrl: string | null, // the address captured; null for an HTML file (then `path` names it)
-         path?: string,
-         at: number }            // epoch ms
-```
-
-One capture at a time per session → 409 `busy`. Other errors: 404 `no_session`, 405 `method`
-(not a POST); the rest as the web source's.
-
-## The speech companion
-
-One of two ways to recognise speech (the other is Soniox, see Speech to text): Hyperscribe Companion
-on the Mac, to which the phone streams the glasses' microphone straight over Tailscale.
-`GET /v1/speech/companion` hands Lens its pairing address, so the phone pairs once, with Hypernova,
-not twice.
-
-- → `{url: "wss://<mac>.<tailnet>.ts.net:7443/ws?token=…"}`, or `{url: null}` when the companion
-  isn't installed, has no token, has Tailscale turned off, or `tailscale serve` doesn't route its
-  port (`serve status --json`: an https TCP port and a web route for `<name>:<port>`).
-- Read on every request from `~/Library/Application Support/Hyperscribe Companion/settings.json`
-  (`port`, default 7443; `token`; `tailscale`): "New code" in the companion changes the token. The
-  host is this Mac's Tailscale name. Never a LAN address: plain `ws://` would expose the token,
-  the audio and the words.
-- Paired devices only, never logged. The token is the companion's credential; a paired phone
-  already drives Claude Code on this Mac, so it's within the trust it has. The daemon never starts
-  or configures the companion.
-
-## Speech to text
-
-Lens turns the glasses' microphone into text through Soniox's real-time API, relayed by the daemon
-with the owner's key (`daemon/src/stt.ts`), and the Android app does the same with the phone's own
-microphone (the mic in the composer, `android/.../data/Voice.kt`). Hyperscribe Companion (above) is
-the other way: both use Soniox while the snapshot says `stt.ready`, else the Companion.
-
-- **The phone's route**, worked out again on every snapshot and `{t:"stt"}`: `stt.ready` → Soniox
-  (`/v1/stt/ws` with the device token); else `GET /v1/speech/companion` → `{url}` → the Companion
-  (that url, as given); else no mic. The Companion's address is asked for only while `stt.ready` is
-  false, at most once a minute, and kept in memory only (its url carries the Companion's token). A
-  daemon too old to send `stt` gets no mic and no Voice section in the phone's Settings.
-
-- **The key** lives only on the Mac, in `<support>/stt.json` (0600). It is set from the Mac app (Setup's
-  Voice step or the Lens guide, on the Mac's port with the admin token) or from a paired device
-  (Lens' Settings → Speech, the Android app's Settings → Voice), and never sent back: clients get `Stt` in the snapshot, and `GET /v1/stt` adds its last
-  four characters.
-- `POST /v1/stt/key {provider?: "soniox", apiKey}`: the key is trimmed; empty → 400 `no_key`; spaces
-  inside or under 16 printable characters → 400 `bad_key`; another provider → 400 `bad_provider`.
-  Before keeping it, the daemon tries it (one try at a time): a stream to Soniox with a quarter of a
-  second of silence, then the end of the audio. Refused (401, 403) → 400 `bad_key`, nothing kept.
-  Taken, but the account has no balance (402) → kept, `ready: false`, `error` says so. Soniox out of
-  reach → kept unchecked (`checked: false`); the next stream tells. Any other answer (Soniox busy,
-  a problem on its side) → kept, `checked: true`, with Soniox's words in `problem` (null when the try
-  went through). The key removed while it was being tried → 409 `removed`, nothing kept. Open
-  streams end (`replaced`).
-- `DELETE /v1/stt/key` removes the file and ends open streams (`no_key`). `POST /v1/stt/test` tries
-  the kept key the same way → `{ok, message}` with the info (409 `no_key` without one): passing
-  clears a refusal or no balance; failing with either sets it.
-- `Stt.ready`: a key is kept and Soniox hasn't refused it (401, 403) or the account (402) since.
-  `error`: that problem in plain words, else null; a stream that gets words back clears it. Each
-  change goes out as `{t:"stt", stt}`.
-
-**The stream**, `GET /v1/stt/ws` (WebSocket) on the phone port with the device token (`?token=` or
-the header; the admin token over loopback), one per device: a new one ends the device's older
-stream (`error` `replaced`, close 4000). It speaks Hyperscribe Companion's protocol v1, so Lens'
-companion client (`lens/src/companion/client.ts`) works unchanged:
-
-| From | Message |
-|---|---|
-| Mac | `{type:"hello", ok: true, name: "Hypernova", version, model: "stt-rt-v5", modelLabel: "Soniox", languages: "*", busy: false}` on connecting; with no key, `{type:"error", code:"no_key", message}` and the socket closes |
-| phone | `{type:"start", language}` (an ISO code or `"auto"`), within 15 s. It needn't wait for `hello`: the Android app sends it as soon as the socket opens, then the audio it held meanwhile (Lens waits for `hello`) |
-| Mac | `{type:"started"}` once Soniox has the stream |
-| phone | binary frames: 16 kHz 16-bit little-endian mono PCM (the glasses send 40 ms, 1280 bytes), whole samples, at most 64 KB a frame |
-| Mac | `{type:"snapshot", finalText, interimText, finished: false}` as words come and settle |
-| phone | `{type:"stop"}`: Soniox is told the audio ended; its last words come as a `snapshot` with `finished: true` (all of it final), then the socket closes (1000). A stop while Soniox is still being reached waits for it: once it opens, the config, all the audio held so far, then the end, and it finishes as usual (a quick "yes" over a slow link isn't lost); a connection that fails still ends in `unreachable`. Closing the socket without `stop` cancels: nothing more is sent |
-| phone | `{type:"ping"}` → `{type:"pong"}` (Lens pings every 3 s and calls the link dead after 7 s of silence) |
-| Mac | `{type:"error", code, message}`, then close; after `started` it also carries the words so far (`finished: true`, `finalText`, `interimText: ""`), so none are lost |
-
-- **To Soniox**: `wss://stt-rt.soniox.com/transcribe-websocket`, the key as `Authorization: Bearer`
-  on the upgrade (never in the config, where Soniox deprecates it), the config as the first message,
-  `{model: "stt-rt-v5", audio_format: "pcm_s16le", sample_rate: 16000, num_channels: 1,
-  language_hints, context: {terms}}`, then the audio as binary frames, and an empty text frame to
-  end it. `language_hints` are hints, not limits: `en` → `["en"]`, another language → `[it, "en"]`
-  (code and product names are English), `auto` or none → `["en", "ru"]`. `context.terms`: "Claude
-  Code", "Hypernova", then the projects in use (with sessions, or a folder changed in the last 14
-  days), newest first, 20 terms in all; a snake_case or kebab-case name goes as its words
-  (`fuel_charge_statistics` → "fuel charge statistics"), and nothing twice, whatever its case; then
-  Lens's own command words and Telescope's sources ("Telescope", "debrief", "eclipse", "note",
-  "emulator", "simulator", "terminal", "web page", "window", "PDF"; `LENS_TERMS` in `stt.ts`), on top
-  of those 20, so "Telescope terminal" isn't heard as "To the scope terminal". So
-  "in hyperscribe, …" routes, and folders never used with Claude stay on the Mac. A key's test sends
-  no terms. No endpoint detection: letting go of the temple ends the utterance.
-- **Words**: Soniox's final tokens are added once and its non-final ones replace the last set; the
-  `<end>` and `<fin>` markers are dropped. `finalText` is the settled text and `interimText` the
-  rest, split between words (a word Soniox has half settled stays whole in `interimText`), spaces
-  collapsed, so the phone joins the two with a space.
-- **Limits**: 2 minutes of audio a stream (3,840,000 bytes; also at 2 min 15 s of wall time, and when
-  Soniox says `max_duration_reached`): the audio is ended and `error` `too_long` carries the whole
-  text. No `start` within 15 s, or no audio frame for 20 s → `idle`. While frames pause for 8 s the
-  daemon sends Soniox `{"type":"keepalive"}` (it closes a stream after 20 s without audio or one).
-  Soniox not finishing within 5 s of the end: the words so far go out as final.
-- **Errors** (`code`): `no_key`, `bad_key` (401, 403), `no_credit` (402), `busy` (429), `soniox` (408,
-  5xx, and anything else Soniox refuses, in its own words without links or request ids),
-  `unreachable` (no connection within 8 s), `lost` (Soniox closed early), `bad_audio`, `idle`,
-  `too_long`, `replaced`. `bad_key` and `no_credit` also set `Stt.error` and `ready: false`.
-- **Privacy**: audio, words and the key are never logged or written down; the log has one line a
-  stream (`stt stream <device> 3.8s done 240ms`: the audio's length, how it ended, and the time
-  from the phone's `stop` to its last words leaving, the figure a release feels like; no last figure
-  when there was no stop). Forgetting a device closes its stream (4001). `HYPERNOVA_SONIOX_WS` points
-  the daemon at a stand-in (the tests). The phone writes nothing either; a debug build logs only
-  `voice release→ended 243ms`.
-
-## The Lens guide
-
-When glasses pair, the Mac app opens a "Hypernova Lens" window: what Lens is for, its gestures, and
-voice (connect Soniox, or open or set up Hyperscribe Companion). Lens' phone page shows the same
-three steps. The daemon keeps their place (`daemon/src/guide.ts`, `<support>/guide.json`), so a step
-taken on either screen moves the other.
-
-- **Voice already working, no Voice step.** Each screen fixes its steps when the guide opens: with
-  `stt.ready`, or the Companion's address known, it's What it's for and Gestures ("1 of 2"),
-  Gestures ending with Done. If the guide's step is `voice` (asked for from the other screen), Voice
-  is added at the end. The daemon's `Guide` is the same either way.
-
-- `Guide` is in the snapshot, and `GET /v1/guide` → `{guide}`. `seen`: shown at least once, on either
-  screen. `done`: finished with Done, so more glasses pairing don't open it again.
-- `POST /v1/guide {step?, seen?, done?}` → `{guide}` (400 `bad_step`); `{done: false}` alone reopens
-  it at `about`. Each change goes out as `{t:"guide", guide}`.
-- `POST /v1/guide/show {step?}` ("Show on my Mac" on the phone) → `{guide, macs}`: moves to `step`,
-  then sends `{t:"guide.show", guide, reason: "phone"}`. `macs` is how many Mac apps have the live
-  feed open; with 0 the phone says to open Hypernova on the Mac.
-- A device pairing with `client: "lens"` sends `{t:"guide.show", guide, reason: "paired"}`, unless the
-  guide is `done`.
-- The Mac app hears these on its one live feed, `GET /v1/ws?client=mac` with the admin token over
-  loopback (the same connection that keeps its menu bar current; `client=mac` is what `macs`
-  counts). It acts on `guide`, `guide.show` and `stt`, and on `devices` reads its status at once.
-  When the feed comes up (at launch, or after the daemon was away) it reads the guide and voice
-  again, and once a launch, with glasses paired and the guide neither seen nor done, opens the
-  window. Settings → "Lens guide…" opens it any time.
+phone mac 9.2s ended`: the source, the engine, how long, how it ended). Recent reads stay in memory
+only, never on disk, by a hash of the voice, rate and text, so the same reply read again starts at
+once: the Mac's last 6 whole clips, and the last 6 plays as PCM, 32 MB at most each, the oldest
+dropped first, every one dropped exactly 10 minutes after it was made, on a timer of its own (which
+never keeps the daemon running).
 
 ## Reading transcripts
 
@@ -3993,7 +3035,7 @@ its transcript, `~/.claude/projects/<folder>/<session id>.jsonl`. Event ids are 
   `isMeta`) are left out.
 - **Tool output**: a `Read` shows only its line count ("57 lines"), except a read of a background
   command's output file (`…/tasks/<id>.output`), which keeps the last 4 KB of what was read (a dev
-  server's address, for Telescope). A `Bash` command run in the background has no output yet
+  server's address, say). A `Bash` command run in the background has no output yet
   (`toolUseResult.stdout` is empty, `backgroundTaskId` set): its `output` is the line of its result
   naming its ID and output file ("Command running in background with ID: b8f…. Output is being
   written to: …"), after what it printed so far when it was moved there after a timeout.
@@ -4137,15 +3179,12 @@ them in `daemon/src/agents.ts`; the phone shows each under the call that started
   main turn ends; the daemon then keeps the session `idle` (the main agent is) until a
   turn starts again (a prompt, a main-agent tool call, or a task notification starting one).
   **The working rule**, the same in every client (the phone's `Session.busy`, its Home seam, card,
-  sky and notification, the Mac's menu bar and popover, the widget, Lens): a session that hasn't
+  sky and notification, the Mac's menu bar and popover, the widget): a session that hasn't
   ended is *working* when `state` is `working` or `starting`, or `agentsRunning > 0`; `needs_you`
   (an approval open, or a dialog in its terminal) outranks working. So a session whose main agent
   is idle while 2 agents run is working ("2 AGENTS"), not idle, and counts once among the working.
   The phone doesn't notify "Finished" for a turn that ends while agents still run; the
-  turn the last agent's report starts does. Lens shows the session as a working line on the glance
-  ("2 agents at work") and holds its Finished the same way: once, when the turn the last agent's
-  report starts ends, or 5 s after the last agent ends if no turn has started by then (agents that
-  stopped with no report).
+  turn the last agent's report starts does.
 - **Approvals** from an agent carry `agentId` and `agentLabel`. A prompt or the main turn's Stop
   doesn't settle them (they're the agent's, still waiting); the session ending does. The phone
   shows one in its session at once but notifies only if it's still waiting 10 s later (agents
@@ -4177,11 +3216,11 @@ Stats = {
   tokens: {input, output, cacheRead, cacheWrite},
   sessions: number,                  // sessions started in the range
   prompts: number,                   // prompts the owner sent, from anywhere
-  promptsFrom: {phone, glasses, voice},   // of those, sent through Hypernova (voice: dictated)
+  promptsFrom: {phone, voice},   // of those, sent through Hypernova (voice: dictated)
   toolCalls: number, tools: [{name, count}],   // most used first: 8, then "Other"; MCP tools are "MCP"
   filesEdited: number,               // distinct files Edit, Write, MultiEdit and NotebookEdit touched
   agents: number,                    // agents started (workflows' included)
-  approvals: {total, phone, glasses, mac},   // answered through Hypernova
+  approvals: {total, phone, mac},   // answered through Hypernova
   limitsHit: {fiveHour, sevenDay, model},   // usage limits reached, on the day each began (model: an "Opus limit")
   busiestDay: {day, claudeMs, tokens} | null,       // day: "2026-10-14", the Mac's own calendar
   longestSession: {id, title, project, claudeMs, startedAt} | null,   // its busy time in the range
@@ -4221,7 +3260,7 @@ Stats = {
   own; its project is the folder it started in (a worktree under `.claude/worktrees/` counts as its
   repository).
 - **What only the daemon sees**, kept per day in `<support>/stats.json`: a prompt or new session sent
-  from a paired device (Lens's devices, `client: "lens"`, are `glasses`; the Mac app's aren't counted,
+  from a paired device (the Mac app's aren't counted,
   as the transcripts have them) and an approval answered through Hypernova (the Mac app's are `mac`).
   A client that dictated the prompt adds `via: "voice"` to `POST /v1/sessions/{id}/prompt` or `POST
   /v1/sessions`, and it counts as `voice` too.
@@ -4257,8 +3296,7 @@ on the daemon and typed in once Claude Code's input box is back (`daemon/src/hel
   Where it would be 409 `needs_answer` (an approval, a question or a plan is open for the session) or
   `waiting` (a dialog or menu in the terminal instead of the input box), it's held: 200 `{session,
   queued: true, held: true, heldId}`. A prompt sent while others are held for an open session is held
-  behind them, so they go in order. Without `hold` (an older app, Lens, whose decided answer to
-  `needs_answer` is to offer the words as the deny reason) nothing changes. `clientId` works as for
+  behind them, so they go in order. Without `hold` (an older app) nothing changes. `clientId` works as for
   any send: a repeat gets the first answer, and the `user` event or queue entry it becomes carries it.
 - **Shown**: `session.held` (absent when none), and a `session` message whenever it changes.
 - **Sent** oldest first, one at a time, as soon as the session is ready: no approval open for it, no
@@ -4419,10 +3457,9 @@ The admin token is in `<support>/admin-token` (0600); the Mac app reads it.
 | `GET /local/name`, `POST /local/name/release` | the name's state (as `/local/status`'s `name`); giving it up before an uninstall → `{released, name, waited?}` (see A name on the local network). `GET /local/status?qr=1`: a download or pairing code is on screen |
 | `POST /local/tailscale/serve` | turns on `tailscale serve` for port 47321 → `TailscaleStatus` |
 | `POST /local/integration/install` / `uninstall` | hooks + status line tee + the `claude` shell function (reversible, marked) |
-| `GET /local/devices`, `DELETE /local/devices/{id}` | paired phones: `{id, name, model, createdAt, lastSeenAt, appVersion?, client?, certFingerprint?, certExpiresAt?}` (`client: "lens"` for the glasses app; `certFingerprint`: its device certificate's, once it has one, and `certExpiresAt` when that runs out, epoch ms). Deleting one revokes its certificate too |
-| `/v1/*` | the whole phone API is also available with the admin token (the Soniox key and the Lens guide too) |
-| `GET /v1/ws?client=mac` (port 47321) | the Mac app's live feed: the admin token over loopback; counted for `POST /v1/guide/show` (see The Lens guide), and in `connectedClients` like any client; the only feed that hears `telescope.window` |
-| `POST /local/telescope/<job>` | the Mac app's answer to `telescope.window` (24 hex job): `{png: base64, app, title}` or `{error: "no_permission" \| "no_app" \| "no_window" \| "failed", asked?, app?}` → `{ok}` (false when no capture waits for that job) |
+| `GET /local/devices`, `DELETE /local/devices/{id}` | paired phones: `{id, name, model, createdAt, lastSeenAt, appVersion?, client?, certFingerprint?, certExpiresAt?}` (`certFingerprint`: its device certificate's, once it has one, and `certExpiresAt` when that runs out, epoch ms). Deleting one revokes its certificate too |
+| `/v1/*` | the whole phone API is also available with the admin token |
+| `GET /v1/ws?client=mac` (port 47321) | the Mac app's live feed: the admin token over loopback; in `connectedClients` like any client; the only feed that hears `speaking` |
 | `GET /qa` | the testing checklist page. It and the routes it calls (`/qa/state`, `/qa/save`, `/qa/shot`) need its key `?k=` (from `GET /v1/qa`; the page passes it on to its own requests) or the admin token, on either port. The menu's link opens the bare page in a browser: on this port that is redirected to the page with its key, but only for a page opened by hand or by an app (`Sec-Fetch-Site` `none` or `same-origin`, or a browser that sends none), with Host `127.0.0.1` or `localhost`, never for another site's request |
 
 `TailscaleStatus = {installed, cliPath, running, loggedIn, dnsName, ip, httpsEnabled, serveOn, url, keyExpiry}`

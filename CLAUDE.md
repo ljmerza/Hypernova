@@ -16,9 +16,7 @@ in the Hyper* family's "digital cosmos" look.
 
 Layout: `android/` (Gradle, Kotlin, Compose), `daemon/` (TypeScript on Node 22.18 or newer,
 run directly without a build step), `mac/` (SwiftUI menu bar app built with SwiftPM
-and Command Line Tools), `lens/` (Hypernova Lens, the Even Realities G2 glasses app: TypeScript
-and Vite, built with its own `npm` scripts; see `lens/README.md`, and `lens/DAEMON.md` for each daemon call it makes),
-`skills/hyper-cosmos/` (the design language as a Claude Code
+and Command Line Tools), `skills/hyper-cosmos/` (the design language as a Claude Code
 skill, for reuse in other apps). `docs/PROTOCOL.md` is the contract between them.
 
 Daemon: `cd daemon && node src/main.ts` (Node from nvm). Typecheck with `npx tsc -p .`.

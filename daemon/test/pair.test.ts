@@ -66,22 +66,20 @@ const pair = async (body: object) => {
   return r.json as { token: string; deviceId: string }
 }
 
-test('pairing the same install again replaces its device; its old token stops working, its glasses stay', async () => {
+test('pairing the same install again replaces its device; its old token stops working', async () => {
   const install = 'install-0123456789abcdef'
   const first = await pair({ deviceName: 'Pixel', model: 'Pixel 9', installId: install })
-  store.updateDevice(first.deviceId, (d) => (d.glasses = { since: 1, seenAt: 2 }))
   const second = await pair({ deviceName: 'Pixel', model: 'Pixel 9', installId: install })
   const mine = store.listDevices().filter((d) => d.installId === install)
   assert.equal(mine.length, 1)
   assert.equal(mine[0]!.id, second.deviceId)
-  assert.deepEqual(mine[0]!.glasses, { since: 1, seenAt: 2 })
   assert.equal(store.deviceForToken(first.token), null)
   assert.ok(store.deviceForToken(second.token))
   // Another install on another phone, the same name or not: a device of its own.
   await pair({ deviceName: 'Pixel', model: 'Pixel 9', installId: 'install-fedcba9876543210' })
-  // An app that sends none (an older one), and Lens with the same id as the phone app: kept apart.
+  // An app that sends none (an older one), and another app with the same id as the phone app: kept apart.
   await pair({ deviceName: 'Pixel', model: 'Pixel 9' })
-  await pair({ deviceName: 'Pixel', model: 'Pixel 9', installId: install, client: 'lens' })
+  await pair({ deviceName: 'Pixel', model: 'Pixel 9', installId: install, client: 'other-app' })
   assert.equal(store.listDevices().length, 4)
   assert.equal(store.listDevices().filter((d) => d.installId === install).length, 2)
 })

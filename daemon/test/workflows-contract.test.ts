@@ -6,12 +6,11 @@ import assert from 'node:assert/strict'
 import { ERROR_CODES, FIRST_STEP_ID, bad, mirrorAction, outputsOfThen, stepOfAction, type Action, type Output, type Step } from '../src/automations/contract.ts'
 
 const start: Action = { kind: 'start', projectPath: '/p/hypernova', prompt: 'Summarise what changed', providerId: 'anthropic', model: null, permissionMode: 'dontAsk', allowedTools: ['Bash(git log:*)'], then: 'notify' }
-const cont: Action = { kind: 'continue', target: 'working', prompt: 'Wrap up', providerId: null, then: 'say' }
-const notify: Action = { kind: 'notify', text: 'Hello {project}', glasses: true }
-const say: Action = { kind: 'say', text: 'Hello' }
+const cont: Action = { kind: 'continue', target: 'working', prompt: 'Wrap up', providerId: null, then: 'notify' }
+const notify: Action = { kind: 'notify', text: 'Hello {project}' }
 
 test('a one-step automation reads back as the very action an old client saved', () => {
-  for (const a of [start, { ...start, then: 'none' } as Action, { ...start, then: 'say' } as Action, cont, notify, say]) {
+  for (const a of [start, { ...start, then: 'none' } as Action, cont, notify]) {
     const { step, outputs } = stepOfAction(a)
     assert.equal(step.id, FIRST_STEP_ID)
     assert.equal(step.if, null)
@@ -19,9 +18,8 @@ test('a one-step automation reads back as the very action an old client saved', 
   }
 })
 
-test('then as outputs: notify, say, none', () => {
-  assert.deepEqual(outputsOfThen('notify'), [{ id: 'ou_0', text: null, kind: 'notify', glasses: false }])
-  assert.deepEqual(outputsOfThen('say'), [{ id: 'ou_0', text: null, kind: 'say' }])
+test('then as outputs: notify, none', () => {
+  assert.deepEqual(outputsOfThen('notify'), [{ id: 'ou_0', text: null, kind: 'notify' }])
   assert.deepEqual(outputsOfThen('none'), [])
 })
 
@@ -38,11 +36,10 @@ test('anything an old client cannot show exactly reads as a kind it does not kno
   // A guard, a continue of an earlier step's session.
   assert.deepEqual(mirrorAction([{ ...one, if: { on: 'failed' } }], []), workflow(1))
   assert.deepEqual(mirrorAction([{ ...stepOfAction(cont).step, target: 'step:st_a' } as Step], []), workflow(1))
-  // Outputs then can't say: a webhook, two, a text of its own, glasses on a notify, any on a notify step.
+  // Outputs then can't say: a webhook, two, a text of its own, any on a notify step.
   assert.deepEqual(mirrorAction([one], [webhook]), workflow(1))
-  assert.deepEqual(mirrorAction([one], [...outputsOfThen('notify'), { id: 'ou_2', text: null, kind: 'say' }]), workflow(1))
-  assert.deepEqual(mirrorAction([one], [{ id: 'ou_1', text: 'Done: {prev}', kind: 'notify', glasses: false }]), workflow(1))
-  assert.deepEqual(mirrorAction([one], [{ id: 'ou_1', text: null, kind: 'notify', glasses: true }]), workflow(1))
+  assert.deepEqual(mirrorAction([one], [...outputsOfThen('notify'), { id: 'ou_2', text: null, kind: 'notify' }]), workflow(1))
+  assert.deepEqual(mirrorAction([one], [{ id: 'ou_1', text: 'Done: {prev}', kind: 'notify' }]), workflow(1))
   assert.deepEqual(mirrorAction([stepOfAction(notify).step], outputsOfThen('notify')), workflow(1))
 })
 

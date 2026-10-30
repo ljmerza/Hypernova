@@ -31,7 +31,7 @@ FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 # What the install script would ask sudo for: curl, openssl, git, build tools for node-pty, ps and
-# lsof for Telescope. Installed here as root, so the script finds them all and needs no sudo. tini
+# lsof. Installed here as root, so the script finds them all and needs no sudo. tini
 # is the container's first process: it reaps the shared terminals' holders that end after their
 # starter did (they're handed to process 1), which Node as process 1 wouldn't.
 RUN apt-get update \

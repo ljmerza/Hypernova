@@ -20,8 +20,7 @@ class WorkflowsTest {
     // ─── The old-client rules ─────────────────────────────────────────────
 
     @Test fun thenAsOutputs() {
-        assertEquals(listOf(Output.Notify("ou_0", null, false)), WorkflowShape.outputsOfThen(Then.NOTIFY))
-        assertEquals(listOf(Output.Say("ou_0", null)), WorkflowShape.outputsOfThen(Then.SAY))
+        assertEquals(listOf(Output.Notify("ou_0", null)), WorkflowShape.outputsOfThen(Then.NOTIFY))
         assertEquals(emptyList<Output>(), WorkflowShape.outputsOfThen(Then.NONE))
     }
 
@@ -31,14 +30,13 @@ class WorkflowsTest {
         assertNull(step.guard)
         assertEquals(Then.NONE, (step.action as Action.Start).then)
         assertEquals(WorkflowShape.outputsOfThen(Then.NOTIFY), outs)
-        // A notify or say step tells by itself: no outputs.
+        // A notify step tells by itself: no outputs.
         assertEquals(emptyList<Output>(), WorkflowShape.stepOfAction(Action.Notify("hi")).second)
     }
 
     @Test fun mirrorShowsASimpleOneExactly() {
         val one = listOf(Step("st_0", null, start()))
         assertEquals(start(then = Then.NOTIFY), WorkflowShape.mirror(one, WorkflowShape.outputsOfThen(Then.NOTIFY)))
-        assertEquals(start(then = Then.SAY), WorkflowShape.mirror(one, WorkflowShape.outputsOfThen(Then.SAY)))
         assertEquals(start(then = Then.NONE), WorkflowShape.mirror(one, emptyList()))
         val cont = Action.Continue(Action.Continue.WORKING, "go on", Then.NONE)
         assertEquals(cont.copy(then = Then.NOTIFY), WorkflowShape.mirror(listOf(Step("st_0", null, cont)), WorkflowShape.outputsOfThen(Then.NOTIFY)))
@@ -53,8 +51,7 @@ class WorkflowsTest {
         assertNull(WorkflowShape.mirror(listOf(Step("st_0", Guard(Guard.FAILED), start())), emptyList()))
         assertNull(WorkflowShape.mirror(listOf(Step("st_0", null, Action.Continue("step:st_9", "x", Then.NONE))), emptyList()))
         assertNull(WorkflowShape.mirror(one, listOf(Output.Notify("ou_0", "custom text"))))
-        assertNull(WorkflowShape.mirror(one, listOf(Output.Notify("ou_0", null, glasses = true))))
-        assertNull(WorkflowShape.mirror(one, listOf(Output.Notify("ou_0"), Output.Say("ou_1"))))
+        assertNull(WorkflowShape.mirror(one, listOf(Output.Notify("ou_0"), Output.Notify("ou_1"))))
         assertNull(WorkflowShape.mirror(one, listOf(Output.Webhook("ou_0", preset = Output.SLACK))))
         assertNull(WorkflowShape.mirror(one, listOf(Output.File("ou_0", path = "$hyper/log.md"))))
         assertNull(WorkflowShape.mirror(listOf(Step("st_0", null, Action.Notify("x"))), WorkflowShape.outputsOfThen(Then.NOTIFY)))
@@ -261,10 +258,10 @@ class WorkflowsTest {
     }
 
     @Test fun aDraftInTheNewShape() {
-        val old = AutomationInput("x", true, false, Trigger.Time("09:00", Trigger.WEEKDAYS), start(then = Then.SAY), null)
+        val old = AutomationInput("x", true, false, Trigger.Time("09:00", Trigger.WEEKDAYS), start(then = Then.NOTIFY), null)
         val f = old.flow()
         assertEquals(1, f.steps!!.size)
-        assertEquals(listOf(Output.Say("ou_0", null)), f.outputs)
+        assertEquals(listOf(Output.Notify("ou_0", null)), f.outputs)
         assertEquals(f, f.flow())
         assertEquals(f.steps, old.flowSteps)
     }

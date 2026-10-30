@@ -81,9 +81,9 @@ internal fun ChatQuickPrompts(visible: Boolean, onSend: (String) -> Unit) {
 }
 
 /**
- * Beside Interrupt while anything speaks: "Speaking · Stop" with the wave (a message of this chat,
- * or the glasses' speech played on this phone), else "Stop reading" while the older way reads one
- * of this chat's messages. Leaving the chat stops its own reading; the glasses' goes on.
+ * Beside Interrupt while anything speaks: "Speaking · Stop" with the wave (a message of this chat),
+ * else "Stop reading" while the older way reads one of this chat's messages. Leaving the chat stops
+ * its own reading.
  */
 @Composable
 internal fun ReadingPill(items: List<Item>) {

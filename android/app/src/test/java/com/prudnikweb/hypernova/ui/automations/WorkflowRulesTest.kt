@@ -194,7 +194,7 @@ class WorkflowRulesTest {
         assertEquals(emptyList<String>(), out(Output.Webhook("o", null, Output.TELEGRAM, botToken = "123456789:AAbbCCddEEffGGhhIIjjKKll", chatId = "-100123")))
         assertEquals(listOf("outputs[0]:bad_path.path"), out(Output.File("f", null, "$hyper/")))
         assertEquals(listOf("outputs[0]:bad_text.text"), out(Output.Notify("n", "x".repeat(501))))
-        assertEquals(listOf("outputs:bad_outputs"), codes(flow(Step("a", null, start()), outputs = listOf(Output.Notify("1"), Output.Say("2"), Output.Notify("3")))))
+        assertEquals(listOf("outputs:bad_outputs"), codes(flow(Step("a", null, start()), outputs = listOf(Output.Notify("1"), Output.Notify("2"), Output.Notify("3")))))
         assertEquals(listOf("budget:bad_budget"), codes(flow(Step("a", null, start()), budget = Budget(721, null))))
     }
 

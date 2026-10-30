@@ -1,14 +1,13 @@
 <p align="center">
-  <img src="docs/images/hero.jpg" alt="Hypernova: the Mac menu bar popover with an approval, the Android app's sky of sessions with the sun as an accretion disk, and the G2 glasses' glance" width="100%">
+  <img src="docs/images/hero.jpg" alt="Hypernova: the Mac menu bar popover with an approval, the Android app's sky of sessions with the sun as an accretion disk, and the G2 glasses' glance (the glasses app has since been removed)" width="100%">
 </p>
 
-<h3 align="center">A control room for Claude Code and Codex — hosted on your Mac, your Linux server or in Docker, driven from your phone, your glasses and the Mac's menu bar.</h3>
+<h3 align="center">A control room for Claude Code and Codex — hosted on your Mac, your Linux server or in Docker, driven from your phone and the Mac's menu bar.</h3>
 
 <p align="center">
   <img alt="Android 10+" src="https://img.shields.io/badge/Android-10%2B-7FFFA0?style=flat-square&labelColor=14110E">
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-7FFFA0?style=flat-square&labelColor=14110E">
   <img alt="Linux · Docker" src="https://img.shields.io/badge/Linux-Docker-7FFFA0?style=flat-square&labelColor=14110E">
-  <img alt="Even Realities G2" src="https://img.shields.io/badge/Even%20Realities-G2-7FFFA0?style=flat-square&labelColor=14110E">
   <img alt="Kotlin · Compose" src="https://img.shields.io/badge/Kotlin-Compose-F5F2EB?style=flat-square&labelColor=14110E">
   <img alt="SwiftUI" src="https://img.shields.io/badge/SwiftUI-menu%20bar-F5F2EB?style=flat-square&labelColor=14110E">
   <img alt="TypeScript · Node 22.18+" src="https://img.shields.io/badge/TypeScript-Node%2022.18%2B-F5F2EB?style=flat-square&labelColor=14110E">
@@ -26,7 +25,7 @@
 Claude Code and Codex do their best work when you let them run, and they always need you at the
 worst moment: a command to approve, a question to answer, a limit to wait out. **Hypernova** keeps
 you in the loop wherever you are. Leave the Mac in your backpack, or the agents on a server, and use
-the phone as your window, the glasses as your screen and your voice as the keyboard.
+the phone as your window and your voice as the keyboard.
 
 Bring either agent, or both. Hypernova works the same with
 [Claude Code](https://docs.claude.com/en/docs/claude-code) alone or with OpenAI's
@@ -35,7 +34,7 @@ conversation can switch from one to the other mid-chat.
 
 Everything runs on **a computer of your own**, next to your agents: **a Mac** (with a menu bar app),
 **a Linux server** (a VPS, a home server, a PC: the `hypernova` command) or **a Docker container**.
-The phone and the glasses reach it directly on your Wi-Fi, or over **your own Tailscale network**
+The phone reaches it directly on your Wi-Fi, or over **your own Tailscale network**
 from anywhere. No Hypernova server sits in between: the only thing we host is a small name service
 for pairing and a private name (see [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md)).
 **A Windows PC** runs the Linux service inside WSL 2 or Docker Desktop: **experimental**, documented
@@ -60,7 +59,7 @@ but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-wi
     <td align="center"><img src="docs/images/phone-statistics.jpg" alt="Statistics: hours Claude worked, tokens, sessions, and the last 30 days as a spiral galaxy"></td>
   </tr>
   <tr>
-    <td align="center"><b>Talk to it.</b><br><sub>Real-time speech recognition (Soniox), and replies read aloud through your headphones.</sub></td>
+    <td align="center"><b>Talk to it.</b><br><sub>Dictation with the phone's own on-device recognizer, and replies read aloud through your headphones.</sub></td>
     <td align="center"><b>Start anything.</b><br><sub>Type or say the prompt, then pick a project (found by a few letters), the agent, a model and a mode. Claude Code runs on any provider: Anthropic, OpenRouter or your own gateway.</sub></td>
     <td align="center"><b>Honest statistics.</b><br><sub>Hours, tokens and sessions, both agents' and each one's, not badges. Each day is a star in a galaxy.</sub></td>
   </tr>
@@ -97,8 +96,6 @@ but not yet tried on a real Windows PC ([`docs/INSTALL.md`](docs/INSTALL.md#5-wi
   and Share, Save or Open with it. Files with keys stay on the computer.
 - **Updates in the app.** A Mac hands the phone a newer app, and the app installs it, signed with the
   same key or not at all.
-- **Telescope.** See what your agent built: the session's terminal, a local web page, an Android emulator
-  or iOS simulator, a window or an image. Watch it refresh live.
 - **Stay awake and Backpack.** Keep a Mac working with its lid closed in a bag, with battery and
   heat guards. Get "+2 h" before Backpack ends.
 - **Limits that explain themselves.** See when a limit lifts (Claude's and Codex's), a "Continue
@@ -125,30 +122,11 @@ QR code and lists the ones you trust, so you can forget one at any time. On a Li
 `hypernova` command does those jobs over SSH: `setup`, `pair` (the code right in the terminal),
 `codex on`, `status` and `doctor`.
 
-## On your glasses
-
-<p align="center">
-  <img src="lens/docs/lens-glance.png" width="49%" alt="The glance on the G2 in the glasses' own font: hypernova/ and the time, 42% resets in 2h 11m in the corner, one line per session with its project, what it does and its age">
-  <img src="lens/docs/lens-needs-you.png" width="49%" alt="Needs you on the G2: NEEDS YOU 0stems, auto-deny in 8m, wants to run git push origin main, tap allow, double tap deny">
-</p>
-<p align="center">
-  <img src="lens/docs/lens-result.png" width="49%" alt="A result card on the G2: the reply scrolls, with what changed and the tests">
-  <img src="lens/docs/lens-telescope.png" width="49%" alt="Telescope on the G2: the page Claude built, dithered across the lens">
-</p>
-
-**Hypernova Lens** runs on Even Realities G2 glasses. You glance at your sessions, hold the temple
-to talk, approve by tap or by voice ("approve push"), hear results read aloud and look through
-Telescope. It uses the glasses' own text, in the same words as the phone. There are modes for walking
-and cycling, a debrief, and voice notes. Lens connects through the Hypernova app on the same phone:
-you allow it once by comparing a six-digit code. See
-[`lens/README.md`](lens/README.md).
-
 ## How it works
 
 ```mermaid
 flowchart LR
   phone["Android app"] -- "HTTPS + WebSocket<br/>Wi-Fi (mutual TLS) or your tailnet" --> api
-  lens["Lens on G2<br/>(Even app)"] -- "sealed calls through<br/>the Hypernova app" --> phone
   subgraph host["Your computer: a Mac, a Linux server or Docker"]
     api["daemon<br/>Node.js · 127.0.0.1:47321"]
     menubar["Menu bar app (Mac)<br/>or the hypernova command (Linux)"] -- "loopback + admin token<br/>:47322" --> api
@@ -166,8 +144,7 @@ flowchart LR
   through Codex's own app server (only while you use Codex). It runs the phone's sessions in
   **shared terminals**: you can take the same live terminal over from the phone or from any
   terminal on the computer, over SSH too (`hn attach`). It serves the phone API on loopback, exposed only through Tailscale (the app's `tailscale serve` or its own built-in node) and, on your Wi-Fi, a mutual-TLS listener.
-- **The Android app** (`android/`, Kotlin and Jetpack Compose) and **the glasses app** (`lens/`,
-  TypeScript and Vite on the Even Hub SDK) talk to the same API.
+- **The Android app** (`android/`, Kotlin and Jetpack Compose) talks to that API.
 - **The Mac app** (`mac/`, SwiftUI, built with SwiftPM and no Xcode) is the menu bar, the setup and
   the service manager on a Mac. On Linux, **the `hypernova` command** (`daemon/src/cli/`) installs
   the daemon as a systemd user service and does the same jobs from a terminal.
@@ -188,7 +165,6 @@ flowchart LR
 - Optional: a [Tailscale](https://tailscale.com) account, to reach the computer from anywhere (always,
   for a VPS; the Tailscale app is optional too: Hypernova carries its own node). On the same Wi-Fi
   nothing else is needed.
-- Optional: Even Realities G2 glasses, and a [Soniox](https://soniox.com) API key for voice.
 
 **Install** from the [latest release](../../releases/latest) (`SHA256SUMS.txt` has the checksums).
 The whole guide, with the first launch on each macOS version and every Linux step, is
@@ -240,16 +216,12 @@ mac/build.sh --release && mac/dmg.sh    # dist/Hypernova.dmg, as released
 #    its download page.
 cd android
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug
-
-# 3. The glasses app: builds lens/out.ehpk for the Even Hub.
-cd lens && npm install && npm run pack
 ```
 
 **Develop:**
 
 ```bash
 cd daemon && npx tsc -p . && npm test                  # daemon: typecheck and tests
-cd lens && npm test && npx tsc --noEmit -p .           # glasses
 cd mac && swift build -c release                       # Mac app
 cd android && ./gradlew :app:testDebugUnitTest         # Android unit tests
 ```
@@ -265,12 +237,11 @@ To test alongside a live install, run a second daemon with `HYPERNOVA_SUPPORT`, 
   and the `hypernova` command use an admin token kept in a `0700` folder. [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) is the
   full threat model: what runs and is stored where, what Cloudflare, Let's Encrypt and Tailscale see, and
   what is still open.
-- **Keys stay on your computer.** Provider and Soniox keys are never logged, never sent to the phone, and
+- **Keys stay on your computer.** Provider keys are never logged, never sent to the phone, and
   only ever go to their own provider.
-- **Voice is opt-in.** Audio goes to Soniox only when you turn voice on with your own key. On a Mac,
-  its own voices are the fallback for reading aloud.
-- **Guard rails.** Risky commands (force pushes, `rm -rf`, deploys) need their own verb by voice.
-  "Bypass" mode asks you to think twice first. Automations never run on usage credits or another
+- **Voice stays on the phone.** Dictation uses the phone's own on-device recognizer, so the audio never
+  leaves it. Replies are read aloud by the Mac's own voices, or the phone's.
+- **Guard rails.** "Bypass" mode asks you to think twice first. Automations never run on usage credits or another
   paid provider unless you agree, and they never close or copy your own sessions.
 
 ## Repository
@@ -280,7 +251,6 @@ To test alongside a live install, run a second daemon with `HYPERNOVA_SUPPORT`, 
 | [`android/`](android) | The Android app (Kotlin, Jetpack Compose), its widgets and tests |
 | [`mac/`](mac) | The menu bar app (SwiftUI, SwiftPM) with setup, the popover and developer renders |
 | [`daemon/`](daemon) | The daemon (TypeScript on Node.js): sessions, hooks, Codex, shared terminals, automations, speech |
-| [`lens/`](lens) | Hypernova Lens for Even Realities G2 (TypeScript, Vite, Even Hub SDK) |
 | [`skills/hyper-cosmos/`](skills/hyper-cosmos) | The "digital cosmos" design language, as a Claude Code skill |
 | [`docs/`](docs) | [Protocol](docs/PROTOCOL.md), [security model](docs/SECURITY-MODEL.md), [decisions](docs/DECISIONS.md), [design](docs/DESIGN.md), [later](docs/LATER.md), [Linux and Docker](docs/LINUX.md), [specs](docs/specs), [releasing](docs/RELEASING.md) |
 | [`names/`](names) | The name service (a Cloudflare Worker): private names, the pairing page |
@@ -300,8 +270,6 @@ Code. It isn't in any app store: download it from the releases, or build it your
 ## License
 
 Hypernova is licensed under the **Apache License 2.0** (see [`LICENSE`](LICENSE) and
-[`NOTICE`](NOTICE)), **Hypernova Lens** (`lens/`) included (it was AGPL-3.0-or-later up to
-0.1.11, while it carried Hyperscribe Companion's client; see [`lens/LICENSE`](lens/LICENSE) and
-[`lens/NOTICE`](lens/NOTICE)). Fonts and code in `third_party/` keep their own licenses.
+[`NOTICE`](NOTICE)). Fonts and code in `third_party/` keep their own licenses.
 
-<p align="center"><sub>Claude and Claude Code are products of Anthropic; Codex is a product of OpenAI. Hypernova is an independent project and is not affiliated with Anthropic, OpenAI or Even Realities.</sub></p>
+<p align="center"><sub>Claude and Claude Code are products of Anthropic; Codex is a product of OpenAI. Hypernova is an independent project and is not affiliated with Anthropic or OpenAI.</sub></p>

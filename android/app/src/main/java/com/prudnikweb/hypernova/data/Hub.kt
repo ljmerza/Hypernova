@@ -211,15 +211,11 @@ interface Hub {
     /** Open the session's terminal in a window on the Mac: the app's name, and whether it was open already. */
     suspend fun openOnMac(sessionId: String): Result<Pair<String, Boolean>> = Result.failure(HubException("Not in the demo."))
 
-    // ─── Voice (docs/PROTOCOL.md, "Speech to text"; data/VoiceApi.kt) ─────────
+    // ─── Voice (data/VoiceApi.kt) ──────────────────────────────────────────────
 
-    val voice: Voice get() = Voice(VoiceRoute.None)
-    /** Opens the mic now (RECORD_AUDIO must be granted). Null when [voice] has no route. */
-    fun dictate(language: String = "auto", headset: Boolean = false): Dictation? = null
-    suspend fun sttInfo(): Result<SttInfo> = Result.failure(HubException("Not in the demo."))
-    /** [apiKey] null removes the key. Failures carry the daemon's words. */
-    suspend fun setSttKey(apiKey: String?): Result<SttInfo> = Result.failure(HubException("Not in the demo."))
-    /** Read aloud with the Mac's voices, played here (and the glasses' speech); null in the demo (SpeechLink.kt). */
+    /** The demo's dictation; null elsewhere, where the phone dictates itself (PhoneDictation.kt). */
+    fun dictate(): Dictation? = null
+    /** Read aloud with the Mac's voices, played here; null in the demo (SpeechLink.kt). */
     val speech: PhoneSpeech? get() = null
 
     // ─── Account (docs/PROTOCOL.md, "Account") ───────────────────────────────

@@ -82,8 +82,6 @@ class World {
   replies = new Map<string, string>()
   refusedCalls = new Map<string, { tool: string; input: unknown }[]>()
   projects = new Set([PROJECT])
-  lensPaired = false
-  lensOnline = false
   sent: any[] = []
   started: import('../src/automations.ts').StartSpec[] = []
   prompts: { id: string; text: string; afterLimit: boolean }[] = []
@@ -149,8 +147,6 @@ class World {
       providerPaid: (id) => !this.freeProviders.has(id),
       modelKnown: (id, m) => (this.modelLists[id] ? this.modelLists[id]!.includes(m.replace(/\[1m\]$/i, '').toLowerCase()) : null),
       models: async (id) => this.modelLists[id] ?? null,
-      lensPaired: () => this.lensPaired,
-      lensOnline: () => this.lensOnline,
       week: async () => this.week,
       send: (m) => void this.sent.push(m),
       keepAwake: (k, on) => void this.awake.set(k, on),
@@ -271,7 +267,7 @@ test('validation: each refusal has its code', () => {
   assert.equal(c({ action: { kind: 'continue', target: 'nope', prompt: 'go on' } }), 'no_session')
   assert.equal(c({ action: { kind: 'continue', target: 'working', prompt: '' } }), 'no_prompt')
   assert.equal(c({ action: { kind: 'notify', text: '' } }), 'no_prompt')
-  assert.equal(c({ action: { kind: 'say', text: 'Hello' } }), 'no_glasses')
+  assert.equal(c({ action: { kind: 'say', text: 'Hello' } }), 'bad_action')
   assert.equal(c({ trigger: { kind: 'session', event: 'finished', projectPath: '/nowhere', from: 'any' } }), 'no_project')
   // With the confirmations, and the defaults filled in.
   assert.equal(c(start({ permissionMode: 'bypassPermissions' }) as never), 'confirm_bypass')
@@ -873,31 +869,24 @@ test('plugged in: once per 10 minutes; battery low: once per discharge, again af
   assert.equal(e.list().find((x) => x.id === low.id)!.problem, 'no_battery')
 })
 
-// ── Notes, glasses, the snapshot ─────────────────────────────────────────
-test('read aloud goes to the glasses when they are on, else to the phone; notes kept 12 hours; the weekly debrief', async () => {
+// ── Notes, the snapshot ──────────────────────────────────────────────────
+test('a notify goes to the phone; notes kept 12 hours; the weekly debrief', async () => {
   const { w, e } = setup()
-  w.lensPaired = true
-  const say = e.create({ name: 'Say hi', enabled: true, trigger: { kind: 'time', at: '09:00', days: [5] }, action: { kind: 'say', text: 'Good morning at {time}.' } })
+  e.create({ name: 'Say hi', enabled: true, trigger: { kind: 'time', at: '09:00', days: [5] }, action: { kind: 'notify', text: 'Good morning at {time}.' } })
   await at(w, e, msk('2026-10-16T09:00') + SEC)
   assert.deepEqual([w.notes().at(-1).to, w.notes().at(-1).text], ['phone', 'Good morning at 9:00.'])
-  w.lensOnline = true
-  await e.runNow(say.id)
-  assert.equal(w.notes().at(-1).to, 'glasses')
-  // The weekly debrief: Statistics' week, to the phone, and read aloud on the glasses that are on.
-  const weekly = e.create({ name: 'Weekly debrief', template: 'weekly_debrief', enabled: true, trigger: { kind: 'reset', window: 'seven_day', afterLimit: false }, action: { kind: 'notify', text: '{week}', glasses: true } })
+  // The weekly debrief: Statistics' week, to the phone.
+  const weekly = e.create({ name: 'Weekly debrief', template: 'weekly_debrief', enabled: true, trigger: { kind: 'reset', window: 'seven_day', afterLimit: false }, action: { kind: 'notify', text: '{week}' } })
   await e.runNow(weekly.id)
-  const last2 = w.notes().slice(-2)
-  assert.deepEqual(last2.map((n) => [n.to, n.text]), [['phone', w.week], ['glasses', w.week]])
-  // A start whose "then" is read aloud, with no glasses on: the phone.
-  w.lensOnline = false
-  const b = e.create(brief({ action: { ...brief().action, then: 'say' } }))
+  assert.deepEqual([w.notes().at(-1).to, w.notes().at(-1).text], ['phone', w.week])
+  // A start whose "then" is a notify: the result, to the phone.
+  const b = e.create(brief({ action: { ...brief().action, then: 'notify' } }))
   const r = await e.runNow(b.id)
   await finish(w, e, r.sessionIds[0]!, 'All good. Nothing broke.')
   assert.equal(w.notes().at(-1).to, 'phone')
   // The snapshot keeps the last 12 hours' notes, newest first, 20 at most.
   const snap = e.snapshot()
   assert.equal(snap.notes[0]!.text, 'All good. Nothing broke.')
-  assert.equal(snap.glasses, true)
   await later(w, e, 13 * HOUR)
   assert.equal(e.snapshot().notes.length, 0)
 })
@@ -1379,7 +1368,7 @@ test('deleting an automation during a run stops the run first (Esc, the Mac let 
 
 test('a definition kept in a shape that doesn’t read is turned off (bad_definition) while the others fire; a bad clock never stops the tick', async () => {
   const w = new World()
-  const good = { id: 'au_good', name: 'Good', enabled: true, onlyOnce: false, trigger: { kind: 'time', at: '09:00', days: [5] }, action: { kind: 'notify', text: 'Hello', glasses: false }, template: null, createdAt: 0, updatedAt: 0, firedFor: null, firedAt: null, armedAt: msk('2026-10-16T07:00') }
+  const good = { id: 'au_good', name: 'Good', enabled: true, onlyOnce: false, trigger: { kind: 'time', at: '09:00', days: [5] }, action: { kind: 'notify', text: 'Hello' }, template: null, createdAt: 0, updatedAt: 0, firedFor: null, firedAt: null, armedAt: msk('2026-10-16T07:00') }
   const broken = { ...good, id: 'au_bad', name: 'Broken', trigger: { kind: 'time', at: '9am', days: 'weekdays' } }
   const noArm = { ...good, id: 'au_noarm', name: 'No arm', armedAt: undefined }
   w.state = { version: 1, paused: false, automations: [good, broken, noArm] }

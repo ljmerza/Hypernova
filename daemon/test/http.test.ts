@@ -1,5 +1,5 @@
-// The daemon's two HTTP servers, on free ports with scratch state: CORS on the phone API (web
-// clients such as the glasses app, in a WebView that enforces it) and the testing checklist's key.
+// The daemon's two HTTP servers, on free ports with scratch state: no CORS on the phone API, and the
+// testing checklist's key.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -39,7 +39,7 @@ process.env.HYPERNOVA_LAN_PORT = '0'
 const { startServers } = await import('../src/http.ts')
 const { addDevice, adminToken } = await import('../src/store.ts')
 const TOKEN = 'test-device-token-0123456789abcdef'
-addDevice({ id: 'glasses', name: 'Glasses', model: 'G2', createdAt: Date.now(), lastSeenAt: Date.now() }, TOKEN)
+addDevice({ id: 'device', name: 'Pixel', model: 'Pixel 9', createdAt: Date.now(), lastSeenAt: Date.now() }, TOKEN)
 
 let close: () => Promise<void>
 before(async () => {
@@ -73,37 +73,20 @@ function send(port: number, method: string, path: string, headers: Record<string
 
 const ORIGIN = { origin: 'https://plugin.example' }
 
-test('the phone API answers a browser preflight for any /v1 call, without a token', async () => {
-  const r = await send(API, 'OPTIONS', '/v1/sessions/abc/prompt', { ...ORIGIN, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' })
-  assert.equal(r.status, 204)
-  assert.equal(r.headers['access-control-allow-origin'], '*')
-  for (const m of ['GET', 'POST', 'DELETE']) assert.ok(r.headers['access-control-allow-methods']?.includes(m), m)
-  assert.match(r.headers['access-control-allow-headers'] ?? '', /Authorization/)
-  assert.match(r.headers['access-control-allow-headers'] ?? '', /Content-Type/)
-  assert.equal(r.headers['access-control-max-age'], '7200')
-  assert.equal(r.headers['access-control-allow-credentials'], undefined)
-  assert.equal(r.headers['access-control-allow-private-network'], undefined)
-  // Chromium's question before a public page reaches a private address.
+test('no web page may read the phone API: no CORS headers, no preflight answered', async () => {
+  const pre = await send(API, 'OPTIONS', '/v1/sessions/abc/prompt', { ...ORIGIN, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' })
+  assert.notEqual(pre.status, 204)
+  assert.equal(pre.headers['access-control-allow-origin'], undefined)
+  assert.equal(pre.headers['access-control-allow-methods'], undefined)
   const pna = await send(API, 'OPTIONS', '/v1/snapshot', { ...ORIGIN, 'access-control-request-method': 'GET', 'access-control-request-private-network': 'true' })
-  assert.equal(pna.headers['access-control-allow-private-network'], 'true')
-})
-
-test('any origin may read /v1 answers, errors included, but only with the token', async () => {
+  assert.equal(pna.headers['access-control-allow-private-network'], undefined)
   const ok = await send(API, 'GET', '/v1/snapshot', { ...ORIGIN, authorization: `Bearer ${TOKEN}` })
   assert.equal(ok.status, 200)
-  assert.equal(ok.headers['access-control-allow-origin'], '*')
+  assert.equal(ok.headers['access-control-allow-origin'], undefined)
   assert.equal(JSON.parse(ok.body).mac.claudeVersion, '9.9.9')
-  // A web client reads "unpaired" as the app does.
   const no = await send(API, 'GET', '/v1/snapshot', ORIGIN)
   assert.equal(no.status, 401)
-  assert.equal(no.headers['access-control-allow-origin'], '*')
-  assert.equal(JSON.parse(no.body).error.code, 'unauthorized')
-  // Not the Mac app's port, nor pages outside /v1 on the phone's.
-  const local = await send(LOCAL, 'OPTIONS', '/v1/snapshot', { ...ORIGIN, 'access-control-request-method': 'GET' })
-  assert.equal(local.headers['access-control-allow-origin'], undefined)
-  assert.notEqual(local.status, 204)
-  const page = await send(API, 'GET', '/download/android', ORIGIN)
-  assert.equal(page.headers['access-control-allow-origin'], undefined)
+  assert.equal(no.headers['access-control-allow-origin'], undefined)
 })
 
 test('/v1/ws takes the token in its query (a browser cannot set headers on a WebSocket)', async () => {
@@ -301,21 +284,17 @@ test('an automation never forks a session to move it, nor restarts one over unse
   assert.equal(unsentText('no box here'), '')
 })
 
-test('automations: the routes, their errors, CORS, and the snapshot’s and the Mac’s status fields', async () => {
+test('automations: the routes, their errors, and the snapshot’s and the Mac’s status fields', async () => {
   process.env.HYPERNOVA_TAILSCALE = join(scratch, 'no-tailscale')
   const { settings } = await import('../src/store.ts')
   const project = join(settings.projectsRoot, 'demo')
   mkdirSync(project, { recursive: true })
   const auth = { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }
   const call = async (method: string, path: string, body?: unknown) => {
-    const r = await send(API, method, path, { ...auth, ...ORIGIN }, body === undefined ? undefined : JSON.stringify(body))
-    assert.equal(r.headers['access-control-allow-origin'], '*')
+    const r = await send(API, method, path, auth, body === undefined ? undefined : JSON.stringify(body))
     return { status: r.status, body: JSON.parse(r.body) }
   }
-  // A web client's preflight, and no token, no automations.
-  const pre = await send(API, 'OPTIONS', '/v1/automations/au_0123456789/run', { ...ORIGIN, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' })
-  assert.equal(pre.status, 204)
-  assert.ok(pre.headers['access-control-allow-methods']?.includes('PUT'))
+  // No token, no automations.
   assert.equal((await send(API, 'GET', '/v1/automations')).status, 401)
   const { FEATURES } = await import('../src/automations.ts')
   assert.deepEqual((await call('GET', '/v1/automations')).body, { automations: [], paused: false, features: [...FEATURES] })
@@ -353,7 +332,7 @@ test('automations: the routes, their errors, CORS, and the snapshot’s and the 
   assert.deepEqual(snap.automations.list.map((a: any) => a.name).sort(), ['Brief', 'Hello'])
   assert.equal(snap.automations.notes[0].name, 'Hello')
   assert.match(snap.automations.notes[0].text, /^Hello at \d{1,2}:\d{2}$/)
-  assert.deepEqual([snap.automations.running, snap.automations.queued, snap.automations.glasses], [0, 0, false])
+  assert.deepEqual([snap.automations.running, snap.automations.queued], [0, 0])
   const status = JSON.parse((await send(LOCAL, 'GET', '/local/status', { authorization: `Bearer ${adminToken}` })).body)
   assert.deepEqual(status.automations, { paused: true, count: 2, next: null, running: [] })
   await call('POST', '/v1/automations/paused', { paused: false })
@@ -374,7 +353,7 @@ test('workflows: a webhook trigger fired on 127.0.0.1 with its token or by a pai
     return { status: r.status, body: JSON.parse(r.body) }
   }
   // A notify step: it runs without claude.
-  const made = await call('POST', '/v1/automations', { name: 'On deploy', enabled: true, trigger: { kind: 'webhook' }, steps: [{ kind: 'notify', text: 'Deployed: {payload}', glasses: false }] })
+  const made = await call('POST', '/v1/automations', { name: 'On deploy', enabled: true, trigger: { kind: 'webhook' }, steps: [{ kind: 'notify', text: 'Deployed: {payload}' }] })
   assert.equal(made.status, 200)
   const id = made.body.automation.id as string
   const token = made.body.token as string
@@ -433,10 +412,10 @@ test('the local fire route: without its token nothing tells which automations ex
     const r = await send(API, method, path, auth, body === undefined ? undefined : JSON.stringify(body))
     return { status: r.status, body: JSON.parse(r.body) }
   }
-  const made = await call('POST', '/v1/automations', { name: 'Loop', enabled: true, trigger: { kind: 'webhook' }, steps: [{ kind: 'notify', text: 'Got: {payload}', glasses: false }] })
+  const made = await call('POST', '/v1/automations', { name: 'Loop', enabled: true, trigger: { kind: 'webhook' }, steps: [{ kind: 'notify', text: 'Got: {payload}' }] })
   const id = made.body.automation.id as string
   const token = made.body.token as string
-  const timed = await call('POST', '/v1/automations', { name: 'Timed', enabled: true, trigger: { kind: 'time', at: '07:00', days: [7] }, steps: [{ kind: 'notify', text: 'Hi', glasses: false }] })
+  const timed = await call('POST', '/v1/automations', { name: 'Timed', enabled: true, trigger: { kind: 'time', at: '07:00', days: [7] }, steps: [{ kind: 'notify', text: 'Hi' }] })
   const fire = (aid: string, t: string | null, body = '') => send(LOCAL, 'POST', `/local/automations/${aid}/fire`, t ? { authorization: `Bearer ${t}` } : {}, body)
   // An id that's there, one that isn't, one that isn't a webhook's: the same 401 to a wrong token.
   const answers = await Promise.all([fire(id, 'hnf_' + '1'.repeat(32)), fire('au_0000000000', 'hnf_' + '1'.repeat(32)), fire(timed.body.automation.id, token), fire('au_0000000000', token)])
@@ -476,7 +455,7 @@ test('workflows: an ask answered over HTTP (who answered), Retry from a step, an
     const r = await send(port, method, path, headers, body === undefined ? undefined : JSON.stringify(body))
     return { status: r.status, body: JSON.parse(r.body) }
   }
-  const steps = [{ id: 'st_q', kind: 'ask', question: 'Ship it?', answers: ['Ship', 'Wait'] }, { id: 'st_n', kind: 'notify', text: 'Shipping: {answer}', glasses: false, if: { on: 'answer', text: 'Ship' } }]
+  const steps = [{ id: 'st_q', kind: 'ask', question: 'Ship it?', answers: ['Ship', 'Wait'] }, { id: 'st_n', kind: 'notify', text: 'Shipping: {answer}', if: { on: 'answer', text: 'Ship' } }]
   const made = await call(API, 'POST', '/v1/automations', { name: 'Ship', enabled: true, trigger: { kind: 'time', at: '07:00', days: [7] }, steps })
   const id = made.body.automation.id
   const ran = await call(API, 'POST', `/v1/automations/${id}/run`, {})

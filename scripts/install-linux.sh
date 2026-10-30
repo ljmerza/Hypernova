@@ -11,7 +11,7 @@
 #
 # What it does, as the user who will run Claude Code (not root; it asks sudo for packages only):
 #   1. the system packages it needs: curl, tar, openssl, git, and build tools for the terminal
-#      module (node-pty has no prebuilt Linux binary), plus ps and lsof for Telescope;
+#      module (node-pty has no prebuilt Linux binary), plus ps and lsof;
 #   2. Node.js 24 from nodejs.org, checked against nodejs.org's SHASUMS256.txt, into
 #      ~/.local/share/hypernova/node (nothing outside Hypernova's folder);
 #   3. then `hypernova setup`, which installs the daemon, Claude Code (Anthropic's installer), the

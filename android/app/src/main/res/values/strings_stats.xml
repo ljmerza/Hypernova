@@ -86,15 +86,13 @@
     <!-- The work behind it. -->
     <string name="stats_work">Work</string>
     <string name="stats_prompts">Prompts</string>
-    <!-- Of the prompts: sent from the phone, from the glasses, and spoken (on either). -->
+    <!-- Of the prompts: sent from the phone, and spoken. -->
     <string name="stats_from_phone">phone</string>
-    <string name="stats_from_glasses">glasses</string>
     <string name="stats_by_voice">spoken</string>
     <string name="stats_tool_calls">Tool calls</string>
     <string name="stats_files">Files edited</string>
     <string name="stats_approvals">Approvals</string>
     <string name="stats_ap_phone">phone</string>
-    <string name="stats_ap_glasses">glasses</string>
     <string name="stats_ap_mac">Mac</string>
     <string name="stats_counting_since">Counted since %1$s</string>
     <!-- The tokens by kind, under the work. -->

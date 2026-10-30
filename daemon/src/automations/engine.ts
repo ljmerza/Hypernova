@@ -102,7 +102,7 @@ type Follow = {
   retryAt?: Record<string, number>
   /** Each step's whole output while the run works (a session's last reply, a command's 8 KB): `contains` and HYPERNOVA_STEP_<id> look at it. */
   full?: Record<string, string>
-  /** The last notify or say step's text as sent (an output with no text, when no step gave a result). */
+  /** The last notify step's text as sent (an output with no text, when no step gave a result). */
   told?: string
 }
 /** How a run was fired: Run now, the session that fired it, how late, Retry (and from which step), what fired it. */
@@ -150,11 +150,11 @@ const isTimeTrigger = (t: KeptTrigger): t is TimeTrigger & KeptTrigger => t.kind
 const sha = (s: string) => createHash('sha256').update(s).digest('hex')
 const SESSION_STEPS = new Set(['start', 'continue'])
 /** The step kinds that only tell (they don't count as "the step before" and pass gates 1 to 3 only). */
-const TELLS = new Set(['notify', 'say'])
+const TELLS = new Set(['notify'])
 const FILE_EVENTS: FileEvent[] = ['created', 'changed', 'deleted']
 const GH_EVENTS: GithubEvent[] = ['pr_opened', 'review_comment', 'checks_failed']
 const HOOK_EVENTS: HookEvent[] = ['Stop', 'StopFailure', 'PostToolUseFailure', 'PreCompact', 'SessionEnd']
-/** A step as the Action it is (start, continue, notify, say), `then` none: what the session machinery runs. */
+/** A step as the Action it is (start, continue, notify), `then` none: what the session machinery runs. */
 function asAction(st: Step): Action | null {
   switch (st.kind) {
     case 'start':
@@ -162,8 +162,7 @@ function asAction(st: Step): Action | null {
       const { id: _i, if: _g, ...a } = st
       return { ...a, then: 'none' } as Action
     }
-    case 'notify':
-    case 'say': {
+    case 'notify': {
       const { id: _i, if: _g, ...a } = st
       return a as Action
     }
@@ -175,7 +174,7 @@ function keptAction(steps: Step[], outputs: Output[]): Action {
   const m = mirrorAction(steps, outputs)
   if (m.kind !== 'workflow') return m
   const a = asAction(steps[0]!)
-  return a ?? { kind: 'notify', text: 'This automation needs a newer Hypernova.', glasses: false }
+  return a ?? { kind: 'notify', text: 'This automation needs a newer Hypernova.' }
 }
 /** A step that failed before it said anything, in words: {prev} for a step guarded "failed" after it. */
 const STEP_WHY: Partial<Record<RunReason, string>> = {
@@ -378,7 +377,7 @@ function saneStep(a: any): boolean {
     typeof a.id === 'string' &&
     ((a.kind === 'start' && typeof a.projectPath === 'string' && typeof a.prompt === 'string' && typeof a.providerId === 'string' && Array.isArray(a.allowedTools)) ||
       (a.kind === 'continue' && typeof a.target === 'string' && typeof a.prompt === 'string') ||
-      ((a.kind === 'notify' || a.kind === 'say') && typeof a.text === 'string') ||
+      (a.kind === 'notify' && typeof a.text === 'string') ||
       (a.kind === 'ask' && typeof a.question === 'string' && Array.isArray(a.answers) && typeof a.default === 'string' && Number.isFinite(a.timeoutMin)) ||
       (a.kind === 'shell' && typeof a.projectPath === 'string' && typeof a.command === 'string' && Number.isFinite(a.timeoutSec)))
   )
@@ -652,7 +651,6 @@ export class Automations {
       const p = a.kind === 'start' ? a.providerId : a.kind === 'continue' ? a.providerId : null
       if (p && !this.io.providerKind(p)) return 'no_provider'
       if (a.kind === 'start' && a.model && this.io.modelKnown?.(a.providerId, a.model) === false) return 'no_model'
-      if (a.kind === 'say' && !this.io.lensPaired()) return 'no_glasses'
     }
     if (d.outputs.some((o) => o.kind === 'webhook' && !this.secrets[`${d.id}/${o.id}`])) return 'output_lost'
     if (d.modeProblem) return 'mode_unavailable'
@@ -771,7 +769,6 @@ export class Automations {
       list: this.list(),
       ...this.counts(),
       notes: this.notes.filter((n) => now - n.at < NOTES_KEEP_MS).sort((a, b) => b.at - a.at).slice(0, 20),
-      glasses: this.io.lensPaired(),
       // Whether the battery triggers can work here: null while it isn't known yet (the first minute).
       hasBattery: this.io.battery() !== null ? true : this.noBattery() ? false : null,
     }
@@ -956,14 +953,14 @@ export class Automations {
     throw bad('bad_trigger', 'Pick when it runs.', F())
   }
   /**
-   * An action (or a start, continue, notify or say step, sent with `then` none) checked; [at] is
+   * An action (or a start, continue or notify step, sent with `then` none) checked; [at] is
    * its field's path ("action", "steps[2]"), [stepIds] the earlier start and continue steps a
    * continue may name as `step:<id>`.
    */
   private action(v: any, trigger: KeptTrigger, b: any, at = 'action', stepIds: Set<string> | null = null): Action {
     const then = (x: unknown): Then => {
       if (x == null) return 'none'
-      if (x !== 'none' && x !== 'notify' && x !== 'say') throw bad('bad_action', 'Notify, read aloud, or nothing.', `${at}.then`)
+      if (x !== 'none' && x !== 'notify') throw bad('bad_action', 'Notify, or nothing.', `${at}.then`)
       return x
     }
     const provider = (x: unknown): string => {
@@ -1031,13 +1028,7 @@ export class Automations {
       case 'notify': {
         const text = str(v.text).trim()
         if (!text || text.length > 500) throw bad('no_prompt', 'Write the notification (500 characters at most).', `${at}.text`)
-        return { kind: 'notify', text, glasses: v.glasses === true }
-      }
-      case 'say': {
-        const text = str(v.text).trim()
-        if (!text || text.length > 500) throw bad('no_prompt', 'Write what to read aloud (500 characters at most).', `${at}.text`)
-        if (!this.io.lensPaired()) throw bad('no_glasses', 'Pair your glasses first.', `${at}.text`)
-        return { kind: 'say', text }
+        return { kind: 'notify', text }
       }
     }
     throw bad('bad_action', 'Pick what it does.', at === 'action' ? 'action' : `${at}.kind`)
@@ -1065,8 +1056,7 @@ export class Automations {
       switch (v.kind) {
         case 'start':
         case 'continue':
-        case 'notify':
-        case 'say': {
+        case 'notify': {
           const earlier = this.offers('steps') ? new Set(out.filter((x) => SESSION_STEPS.has(x.kind)).map((x) => x.id)) : null
           const { then: _t, ...a } = this.action({ ...v, then: 'none' }, trigger, b, at, earlier) as Action & { then?: Then }
           st = { id, if: guard, ...a } as Step
@@ -1164,10 +1154,7 @@ export class Automations {
       if (text != null && text.length > OUTPUT_TEXT_MAX) throw bad('bad_text', 'At most 500 characters.', `${at}.text`)
       switch (v.kind) {
         case 'notify':
-          outputs.push({ id, text, kind: 'notify', glasses: v.glasses === true })
-          return
-        case 'say':
-          outputs.push({ id, text, kind: 'say' })
+          outputs.push({ id, text, kind: 'notify' })
           return
         case 'webhook': {
           if (!this.offers('output.webhook')) throw bad('bad_output', 'This Mac can’t send webhooks yet: update Hypernova on it.', `${at}.kind`)
@@ -1615,7 +1602,7 @@ export class Automations {
       this.save()
       return this.record(d, by, at, ctx, 'skipped', 'daily_cap', runOpts)
     }
-    // Notify and read aloud pass only those, and finish at once.
+    // Notify steps pass only those, and finish at once.
     if (!this.works(d)) {
       const r = this.newRun(d, by, at, ctx, runOpts)
       await this.begin(r)
@@ -1974,7 +1961,6 @@ export class Automations {
         break
       }
       case 'notify':
-      case 'say':
         await this.sendNotes(r)
         this.stepDone(r, 'done', null)
         break
@@ -2122,7 +2108,7 @@ export class Automations {
   }
 
   // ── Ask and shell steps ─────────────────────────────────────────────────
-  /** An ask step: the run needs you, a note with the question (and its answers) to the phone and the glasses. */
+  /** An ask step: the run needs you, a note with the question (and its answers) to the phone. */
   private beginAsk(r: RunRec): void {
     const st = this.cur(r)
     if (st.kind !== 'ask') return
@@ -2133,7 +2119,6 @@ export class Automations {
     this.setState(r, 'needs_you', null)
     const ask: NoteAsk = { ...r.ask, answers: [...r.ask.answers], runId: r.id }
     this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text: r.ask.question, to: 'phone', ask })
-    if (this.io.lensOnline()) this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text: r.ask.question, to: 'glasses', ask })
     log('automation run', r.id, 'asks', st.id)
   }
   /**
@@ -2553,16 +2538,10 @@ export class Automations {
     for (const o of r.spec.outputs) {
       const ro = r.outputs.find((x) => x.id === o.id)!
       const text = this.outputText(r, o)
-      const online = this.io.lensOnline()
       try {
         switch (o.kind) {
           case 'notify':
             this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: 'phone' })
-            if (o.glasses && online) this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: 'glasses' })
-            break
-          case 'say':
-            // With no Lens connected right now, read-aloud goes to the phone instead.
-            this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: online ? 'glasses' : 'phone' })
             break
           case 'file': {
             if (!this.io.append) throw new Error('This Mac can’t write to files for automations.')
@@ -2693,21 +2672,16 @@ export class Automations {
     }
     return `${name} couldn’t go on.`
   }
-  /** A notify or read-aloud step: its text, placeholders filled, to the phone or the glasses. */
+  /** A notify step: its text, placeholders filled, to the phone. */
   private async sendNotes(r: RunRec): Promise<void> {
     const a = this.cur(r)
-    if (a.kind !== 'notify' && a.kind !== 'say') return
+    if (a.kind !== 'notify') return
     const week = a.text.includes('{week}') ? await this.io.week().catch(() => null) : null
     const text = fill(a.text, { ...r.ctx, week })
     this.rstep(r).result = resultOf(text) ?? text.slice(0, 300)
     // What an output with no text says when no other step gave a result (outputText).
     r.f.told = maskSecrets(text)
-    const online = this.io.lensOnline()
-    if (a.kind === 'say') this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: online ? 'glasses' : 'phone' })
-    else {
-      this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: 'phone' })
-      if (a.glasses && online) this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: 'glasses' })
-    }
+    this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: 'phone' })
   }
   private addNote(n: Omit<Note, 'id' | 'at' | 'ask'> & { ask?: NoteAsk | null }): void {
     const note: Note = { ...n, ask: n.ask ?? null, text: maskSecrets(n.text), id: `no_${hex(5)}`, at: this.io.now() }

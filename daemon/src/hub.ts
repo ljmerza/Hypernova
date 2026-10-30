@@ -160,7 +160,7 @@ export type Usage = { fiveHour: Window | null; sevenDay: Window | null; rate?: R
 export type ProbeHealth = { ok: boolean; since: number | null }
 
 // ── Clients ───────────────────────────────────────────────────────────────
-/** `phone`: a paired device's feed (a phone, the glasses), not the Mac app's own. */
+/** `phone`: a paired device's feed, not the Mac app's own. */
 type Client = { send: (s: string) => void; phone?: boolean }
 const clients = new Set<Client>()
 export function addClient(c: Client): () => void {
@@ -191,7 +191,7 @@ export function broadcast(msg: object): void {
   }
 }
 export const clientCount = () => clients.size
-/** Feeds of paired devices (phones, glasses) connected now; the Mac app's own feed isn't one. */
+/** Feeds of paired devices (phones) connected now; the Mac app's own feed isn't one. */
 export const phoneCount = () => [...clients].filter((c) => c.phone).length
 
 // ── Sessions ──────────────────────────────────────────────────────────────

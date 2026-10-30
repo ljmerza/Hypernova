@@ -129,7 +129,7 @@ internal enum class WhenKind(val feature: String? = null) {
 }
 
 /** What a step (or today's one action) does; Ask and Shell only as a workflow's steps the Mac lists. */
-internal enum class DoKind(val feature: String? = null) { Start, Skill, Continue, Ask(Features.ASK), Shell(Features.SHELL), Notify, Say }
+internal enum class DoKind(val feature: String? = null) { Start, Skill, Continue, Ask(Features.ASK), Shell(Features.SHELL), Notify }
 
 internal val Trigger.kind: WhenKind?
     get() = when (this) {
@@ -155,7 +155,6 @@ internal val Action.kind: DoKind?
         is Action.Ask -> DoKind.Ask
         is Action.Shell -> DoKind.Shell
         is Action.Notify -> DoKind.Notify
-        is Action.Say -> DoKind.Say
         is Action.Unknown -> null
     }
 
@@ -166,7 +165,7 @@ internal val whenGlyph = mapOf(
 )
 internal val doGlyph = mapOf(
     DoKind.Start to AutoGlyph.Start, DoKind.Skill to AutoGlyph.Skill, DoKind.Continue to AutoGlyph.Continue, DoKind.Ask to AutoGlyph.Ask, DoKind.Shell to AutoGlyph.Shell,
-    DoKind.Notify to AutoGlyph.Bell, DoKind.Say to AutoGlyph.Glasses,
+    DoKind.Notify to AutoGlyph.Bell,
 )
 
 @Composable
@@ -197,7 +196,6 @@ internal fun doTitle(k: DoKind): String = stringResource(
         DoKind.Ask -> R.string.wf_d_ask
         DoKind.Shell -> R.string.wf_d_shell
         DoKind.Notify -> R.string.au_d_notify
-        DoKind.Say -> R.string.au_d_say
     },
 )
 
@@ -248,7 +246,6 @@ fun AutomationEditor(
     // installed (data/AgentLead.kt).
     val codexLeads = com.prudnikweb.hypernova.data.AgentLead.codexLeads(hub.claude, hub.codex)
     val startOn = if (codexLeads) AgentKind.CODEX_PROVIDER else builtIn
-    val glasses = st?.glasses == true
     // What the Mac can do of workflows; null: today's one-action editor, exactly as before.
     val features = st?.features
     val flow = features != null
@@ -265,7 +262,7 @@ fun AutomationEditor(
 
     val baseInput = remember(id, template) {
         val i = saved?.input()
-            ?: template?.let { Templates.input(it, res, project, hub.providers, glasses)?.let { t -> if (codexLeads) movedToCodex(t) else t } }
+            ?: template?.let { Templates.input(it, res, project, hub.providers)?.let { t -> if (codexLeads) movedToCodex(t) else t } }
             ?: AutomationInput("", true, false, Trigger.Time("09:00", Trigger.WEEKDAYS), newStart(project.orEmpty(), "", startOn, Then.NOTIFY), null)
         shaped(i, flow)
     }
@@ -464,7 +461,7 @@ fun AutomationEditor(
                 item(key = "then") {
                     CompositionLocalProvider(LocalStepNumbers provides numbers) {
                         StepsSection(
-                            hub, draft, features.orEmpty(), flowErrors, glasses, template, editable, openStep,
+                            hub, draft, features.orEmpty(), flowErrors, template, editable, openStep,
                             onOpen = { openStep = it },
                             onSteps = { steps -> update { it.copy(steps = steps) } },
                             project = project, builtIn = startOn,
@@ -474,7 +471,7 @@ fun AutomationEditor(
                 item(key = "tell") {
                     CompositionLocalProvider(LocalStepNumbers provides numbers) {
                         OutputsSection(
-                            hub, draft, features.orEmpty(), flowErrors, glasses, editable, openOutput,
+                            hub, draft, features.orEmpty(), flowErrors, editable, openOutput,
                             onOpen = { openOutput = it },
                             onOutputs = { outs -> update { it.copy(outputs = outs) } },
                             project = project,
@@ -490,7 +487,7 @@ fun AutomationEditor(
                 item(key = "do") {
                     Column {
                         BlockSeam(stringResource(R.string.au_do))
-                        DoBlock(hub, draft, template, errors[AutomationErrors.Block.Do], glasses, onChange = { a -> update { it.copy(action = a) } }, onKind = { doSheet = true }, editable = editable)
+                        DoBlock(hub, draft, template, errors[AutomationErrors.Block.Do], onChange = { a -> update { it.copy(action = a) } }, onKind = { doSheet = true }, editable = editable)
                     }
                 }
                 val start = draft.action as? Action.Start
@@ -591,11 +588,10 @@ fun AutomationEditor(
         )
     }
     if (doSheet) {
-        val pair = stringResource(R.string.au_d_no_glasses)
         TilesSheet(
             stringResource(R.string.au_pick_do),
             // Skills are Claude Code's: not offered where a new step goes to Codex.
-            DoKind.entries.filter { it.feature == null && !(it == DoKind.Skill && startOn == AgentKind.CODEX_PROVIDER) }.map { k -> Tile(k, doGlyph.getValue(k), doTitle(k), reason = if (k == DoKind.Say && !glasses && !hub.isDemo) pair else null) },
+            DoKind.entries.filter { it.feature == null && !(it == DoKind.Skill && startOn == AgentKind.CODEX_PROVIDER) }.map { k -> Tile(k, doGlyph.getValue(k), doTitle(k)) },
             draft.action.kind,
             onPick = { k ->
                 doSheet = false
@@ -670,7 +666,6 @@ internal fun autoName(a: Action): String {
         is Action.Start -> a.prompt
         is Action.Continue -> a.prompt
         is Action.Notify -> a.text
-        is Action.Say -> a.text
         is Action.Ask -> a.question
         is Action.Shell -> a.command
         is Action.Unknown -> ""
@@ -703,7 +698,6 @@ private fun validate(d: AutomationInput, baseline: AutomationInput, now: Long, z
             a.prompt.isBlank() && a.target != Action.Continue.LIMITED && a.providerId == null -> out[AutomationErrors.Block.Do] = res.getString(R.string.au_err_prompt)
         }
         is Action.Notify -> if (a.text.isBlank()) out[AutomationErrors.Block.Do] = res.getString(R.string.au_err_text)
-        is Action.Say -> if (a.text.isBlank()) out[AutomationErrors.Block.Do] = res.getString(R.string.au_err_text)
         is Action.Ask, is Action.Shell, is Action.Unknown -> Unit
     }
     return out
@@ -758,7 +752,6 @@ internal fun defaultAction(k: DoKind, from: Action, trigger: Trigger, project: S
         is Action.Start -> from.prompt.takeIf { !from.skill }.orEmpty()
         is Action.Continue -> from.prompt
         is Action.Notify -> from.text
-        is Action.Say -> from.text
         is Action.Ask -> from.question
         is Action.Shell -> ""
         is Action.Unknown -> ""
@@ -773,7 +766,6 @@ internal fun defaultAction(k: DoKind, from: Action, trigger: Trigger, project: S
         DoKind.Ask -> Action.Ask(text.take(200))
         DoKind.Shell -> Action.Shell(path, "")
         DoKind.Notify -> Action.Notify(text)
-        DoKind.Say -> Action.Say(text)
     }
 }
 
@@ -951,7 +943,6 @@ private fun DoBlock(
     d: AutomationInput,
     template: String?,
     error: String?,
-    glasses: Boolean,
     onChange: (Action) -> Unit,
     onKind: () -> Unit,
     editable: Boolean,
@@ -961,14 +952,12 @@ private fun DoBlock(
     KindBlock(k?.let { doGlyph.getValue(it) } ?: AutoGlyph.Start, k?.let { doTitle(it) } ?: stringResource(R.string.au_sum_unknown_action), onChange = onKind.takeIf { editable }, error = error) {
         if (!editable) return@KindBlock
         when (a) {
-            is Action.Start -> StartParams(hub, a, template, glasses, onChange)
-            is Action.Continue -> ContinueParams(hub, a, d.trigger, glasses, onChange)
+            is Action.Start -> StartParams(hub, a, template, onChange)
+            is Action.Continue -> ContinueParams(hub, a, d.trigger, onChange)
             is Action.Notify -> {
                 TextParams(a.text, d.trigger) { onChange(a.copy(text = it)) }
-                if (glasses || a.glasses) ToggleRow(stringResource(R.string.au_notify_glasses), stringResource(R.string.au_notify_glasses_body), a.glasses, { onChange(a.copy(glasses = it)) })
                 NotifyBlocked()
             }
-            is Action.Say -> TextParams(a.text, d.trigger) { onChange(Action.Say(it)) }
             is Action.Ask, is Action.Shell, is Action.Unknown -> Unit
         }
     }
@@ -979,7 +968,7 @@ private fun DoBlock(
  * say that instead); [chips]: the placeholders its prompt can hold, as chips under it.
  */
 @Composable
-internal fun StartParams(hub: Hub, a: Action.Start, template: String?, glasses: Boolean, onChange: (Action) -> Unit, withThen: Boolean = true, chips: List<String>? = null, errorField: String? = null) {
+internal fun StartParams(hub: Hub, a: Action.Start, template: String?, onChange: (Action) -> Unit, withThen: Boolean = true, chips: List<String>? = null, errorField: String? = null) {
     var pickProject by remember { mutableStateOf(false) }
     val p = hub.projects.firstOrNull { it.path == a.projectPath }
     PickRow(stringResource(R.string.au_project), p?.name ?: a.projectPath.substringAfterLast('/').ifEmpty { stringResource(R.string.au_err_project_needed) }, { pickProject = true }, sub = a.projectPath.takeIf { it.isNotEmpty() }?.let(::tilde))
@@ -1060,7 +1049,7 @@ internal fun StartParams(hub: Hub, a: Action.Start, template: String?, glasses: 
             WarningBox(stringResource(R.string.au_paid_body, provider.name), HN.amber)
         }
     }
-    if (withThen) ThenParams(a.then, glasses) { onChange(a.copy(then = it)) }
+    if (withThen) ThenParams(a.then) { onChange(a.copy(then = it)) }
     if (pickModel && onCodex) {
         com.prudnikweb.hypernova.ui.home.CodexModelSheet(
             codexModels, codexNote, a.model, null, withEffort = false,
@@ -1089,18 +1078,13 @@ internal fun StartParams(hub: Hub, a: Action.Start, template: String?, glasses: 
 }
 
 @Composable
-private fun ThenParams(then: String, glasses: Boolean, onChange: (String) -> Unit) {
+private fun ThenParams(then: String, onChange: (String) -> Unit) {
     ParamLabel(stringResource(R.string.au_when_done))
     Segmented(
-        listOf(Then.NOTIFY to stringResource(R.string.au_then_notify), Then.SAY to stringResource(R.string.au_then_say), Then.NONE to stringResource(R.string.au_then_none)),
+        listOf(Then.NOTIFY to stringResource(R.string.au_then_notify), Then.NONE to stringResource(R.string.au_then_none)),
         then, onChange,
-        enabled = { it != Then.SAY || glasses || then == Then.SAY },
     )
-    // Why Read aloud is greyed (A17); a note to a phone that blocks them goes nowhere (A16).
-    if (!glasses) {
-        Spacer(Modifier.height(8.dp))
-        HText(stringResource(R.string.au_say_needs_glasses), style = Type.small, color = HN.inkDim)
-    }
+    // A note to a phone that blocks them goes nowhere (A16).
     if (then == Then.NOTIFY) NotifyBlocked()
 }
 
@@ -1135,7 +1119,6 @@ internal fun ContinueParams(
     hub: Hub,
     a: Action.Continue,
     trigger: Trigger,
-    glasses: Boolean,
     onChange: (Action) -> Unit,
     withThen: Boolean = true,
     earlier: List<Pair<String, Int>> = emptyList(),
@@ -1184,7 +1167,7 @@ internal fun ContinueParams(
             Pill(stringResource(R.string.au_add_provider), { opener.providers() }, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Plus)
         }
     }
-    if (withThen) ThenParams(a.then, glasses) { onChange(a.copy(then = it)) }
+    if (withThen) ThenParams(a.then) { onChange(a.copy(then = it)) }
     if (pick) {
         val weekAgo = System.currentTimeMillis() - 7 * 86_400_000L
         val live = stringResource(R.string.au_live_sessions)

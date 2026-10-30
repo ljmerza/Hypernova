@@ -9,8 +9,8 @@ import java.util.Date
 import kotlin.math.roundToInt
 
 /**
- * Stay awake (docs/PROTOCOL.md, "Stay awake"): whether the Mac is kept awake for its sessions, the
- * phone and the glasses, and in Backpack mode with its lid closed in a bag. The Mac decides and
+ * Stay awake (docs/PROTOCOL.md, "Stay awake"): whether the Mac is kept awake for its sessions and
+ * the phone, and in Backpack mode with its lid closed in a bag. The Mac decides and
  * holds; the phone shows it and picks the mode.
  */
 @Immutable

@@ -12,10 +12,9 @@ disagree, the code wins and this page has a bug.
 | --- | --- | --- |
 | Claude Code (`claude`) | the Mac (or Linux box) | Anthropic's program, signed in with the user's own login. Hypernova never reads or copies that login. |
 | Codex (`codex`) and its app server | the same machine, used only while it's on for Hypernova | OpenAI's program, signed in with the user's own login. The daemon is one client of Codex's own app server; it reads whether Codex is signed in and on which plan (the email never leaves the daemon), never the login itself. |
-| The daemon (`daemon/`, Node) | the same machine | Watches Claude Code through hooks and transcripts, runs the phone's sessions in shared terminals, serves the phone API. The only thing the phone and glasses talk to. |
+| The daemon (`daemon/`, Node) | the same machine | Watches Claude Code through hooks and transcripts, runs the phone's sessions in shared terminals, serves the phone API. The only thing the phone talks to. |
 | The Mac app (`mac/`) | the Mac | Menu bar, setup, service manager. Talks to the daemon over loopback with the admin token. |
-| The Android app (`android/`) | the phone | The client. Also carries Lens's calls to the daemon (the bridge, section 5). |
-| Hypernova Lens (`lens/`) | the Even App's web view on the phone; the glasses are its screen and microphone | Talks only to the Hypernova app on the same phone, over loopback. It holds no Mac address and no daemon token. |
+| The Android app (`android/`) | the phone | The client. |
 | The name service (`names/`) | a Cloudflare Worker with a D1 database, at `api.hypernova.observer` and `hypernova.observer` | Hands out random private names and DNS records, publishes the ACME challenge record, and serves one static pairing page. It is not in the path of any session, prompt or file. |
 | Tailscale | the Mac, the phone (its own app or Hypernova's built-in node) | The route from outside the local network. |
 
@@ -32,7 +31,7 @@ There is no Hypernova account and no Hypernova server that carries sessions.
   token, the fingerprint of its certificate), settings, session records and titles.
 - Attachments the phone uploaded (`attachments/`, kept 30 days).
 - Tokens and keys: the **admin token**, the **hook secret**, TLS keys (`tls/`: the server key and the
-  device CA), Hypernova's own Tailscale node key (`tsnet/`), provider and Soniox keys, the private
+  device CA), Hypernova's own Tailscale node key (`tsnet/`), provider keys, the private
   name's Ed25519 key and its Let's Encrypt account and certificate keys (`names/`), automations'
   **fire tokens** (only their SHA-256, in `automations.json`) and their webhook outputs' addresses
   and bot tokens (`automation-secrets.json`, never logged, never sent back).
@@ -44,11 +43,7 @@ sessions' text as the app shows it. The token sits in the app's private preferen
 Keystore (**unverified** beyond reading `data/Pairing.kt`). The device certificate's private key is
 made on the phone and stays in the Android Keystore. Hypernova's own Tailscale node keys are in the
 app's private files, excluded from backup and device transfer (`allowBackup=false`). Downloaded files
-go where the user saves them. The bridge keeps up to 4 Lens grants as hashes (section 5).
-
-**The glasses (Lens).** The glasses show text and small pictures and send audio to the phone while
-the temple is held. Lens keeps its bridge token in the Even App's storage. It holds no session
-history.
+go where the user saves them.
 
 **The name service (Cloudflare Worker and D1).** Per name: the public key it was registered with,
 two timestamps, the DNS records it made (a private `l-<name>` address while a code is shown, and the
@@ -61,11 +56,10 @@ never sends; `/pair` is one static page with no cookies and no analytics).
 
 | Party | Sees | Does not see |
 | --- | --- | --- |
-| Anthropic | What Claude Code sends it, exactly as when the user runs Claude Code in a terminal: prompts (including ones typed on the phone), the files Claude reads, usage. The usage probe runs Claude Code itself to read the subscription's limits (**unverified**: not re-read for this page). | Anything about Hypernova's phone, glasses or pairing. Hypernova makes no calls to Anthropic's API of its own. |
+| Anthropic | What Claude Code sends it, exactly as when the user runs Claude Code in a terminal: prompts (including ones typed on the phone), the files Claude reads, usage. The usage probe runs Claude Code itself to read the subscription's limits (**unverified**: not re-read for this page). | Anything about Hypernova's phone or pairing. Hypernova makes no calls to Anthropic's API of its own. |
 | Cloudflare (hosts the Worker, D1 and the DNS zone) | Requests to `api.hypernova.observer` and `hypernova.observer`: the caller's IP address, the name, signed requests, DNS records. | Anything sent to the Mac. Pairing details (fragment). |
 | Let's Encrypt | The private name, the ACME account (no contact address), the challenge. The name is then public for ever in Certificate Transparency logs, with certificate issue times. | Anything else. |
 | Tailscale | The usual coordination data: node keys, addresses, device names, the account. Traffic between the phone and Mac is WireGuard, end to end; a relay sees ciphertext (Tailscale's own documented behaviour, **unverified here**). | Message contents. |
-| Soniox | Audio, only when voice is on with the user's own key. | Anything else. |
 | A provider (OpenRouter, a gateway) | What a session on that provider sends, with its own key. | Other sessions. |
 | nodejs.org, Anthropic's installer, GitHub (setup) | Downloads the user asks for (Node.js is checked against its published checksums). | -- |
 
@@ -77,52 +71,30 @@ The name is random and says nothing about its owner.
 
 | Channel | Where | Who can connect | How it is protected |
 | --- | --- | --- | --- |
-| Loopback phone API | `127.0.0.1:47321`, plain HTTP | Programs on the machine | Bearer device token on every `/v1` route except `health`, `pair`, a Telescope picture and a terminal's ticketed WebSocket. Requests that came through a proxy are recognised by their forwarding header and never treated as local. |
+| Loopback phone API | `127.0.0.1:47321`, plain HTTP | Programs on the machine | Bearer device token on every `/v1` route except `health`, `pair` and a terminal's ticketed WebSocket. No CORS headers, so a web page can't read it. Requests that came through a proxy are recognised by their forwarding header and never treated as local. |
 | Local API | `127.0.0.1:47322` | Programs on the machine | The **admin token**; hooks use `/hooks/<secret>` (compared in constant time). Never behind the LAN listener or Tailscale. The checklist page has its own key. |
 | The fire route | `POST 127.0.0.1:47322/local/automations/<id>/fire` | Programs on the machine (git hooks, cron, CI, `hypernova automation fire`) | That automation's own **fire token** or the admin token, checked before the body is read. A wrong token is 401 alike whether the automation exists, isn't a webhook's or has another token, so nothing tells which ids exist. 64 KB of text at most; 10 fires a minute per automation, then 429 with nothing recorded. The only `/local` route that takes another token than the admin one. A paired device fires the same way over its own routes. |
-| LAN listener | `0.0.0.0:47323`, HTTPS, mutual TLS | Phones on the same network or hotspot | Sources outside private ranges are dropped before TLS. The phone pins the daemon's self-signed certificate (fingerprint from the pairing link) and presents a device certificate the daemon signed for it (ECDSA P-256, 2 years, revoked at once when the device is forgotten). Without one only `health`, `pair`, `device/cert`, the app's download page and preflights answer. Per-source and total connection caps, handshake and header timeouts; pairing closed unless a code is shown, 5 wrong codes per source per 10 minutes. Can be turned off (`lanAccess`; off by default in containers and on cloud VMs). |
+| LAN listener | `0.0.0.0:47323`, HTTPS, mutual TLS | Phones on the same network or hotspot | Sources outside private ranges are dropped before TLS. The phone pins the daemon's self-signed certificate (fingerprint from the pairing link) and presents a device certificate the daemon signed for it (ECDSA P-256, 2 years, revoked at once when the device is forgotten). Without one only `health`, `pair`, `device/cert` and the app's download page answer. Per-source and total connection caps, handshake and header timeouts; pairing closed unless a code is shown, 5 wrong codes per source per 10 minutes. Can be turned off (`lanAccess`; off by default in containers and on cloud VMs). |
 | The private name | `https://l-<name>.hypernova.observer:47323` | Browsers on the same network | A real Let's Encrypt certificate (production by default), with no client certificate asked. Through the name only the app's download page, its APK and a shown code's pairing page answer; everything else is 404, with no CORS headers. The phone app never uses the name. Only while a code is shown, and only after the user was told what it is and that Let's Encrypt's terms are accepted for it. |
 | Tailscale (the app's `serve`, or Hypernova's built-in node) | `https://<mac>.<tailnet>.ts.net:47321` | Devices in the user's tailnet | Tailscale's WireGuard and ACLs, then the same bearer token. Never Funnel, never a public interface. Without tailnet HTTPS certificates the node serves the daemon's pinned certificate. The helper strips any forwarding headers a client sent. |
 | The pairing link | `https://hypernova.observer/pair#...` (QR) | Anyone who sees the QR code while it is valid | The details are in the fragment, so only the phone's browser or app ever reads them. See codes below. |
-| The Lens bridge | `127.0.0.1:47380` on the phone | Anything on the phone | See section 5. |
 | App update | `GET /download/android/Hypernova.apk` over the app's own route | Anyone who reaches a listener, without a token | The APK is public by design. Android checks it: same package, newer version, same signing key. |
 
 Wi-Fi without a private name or Tailscale still works by address, with the pinned certificate.
 
-## 5. The Lens bridge (the glasses through the phone)
+## 5. (Removed: the Lens bridge)
 
-Any app on the phone can reach loopback, and any app can hold port 47380 when Hypernova does not.
-So the bridge is built to give nothing to whoever listens there:
-
-- Lens asks once; the owner sees a six-digit code on the glasses and the same code in Hypernova's own
-  prompt (or its notification, where Allow asks to unlock the phone first), and allows only if
-  they match. The code is derived from both sides' fresh X25519 keys and nonces, with a commitment
-  made first, so a program in the middle cannot steer the codes to match (one chance in a million per ask).
-- The token is agreed, never sent. The app keeps only its SHA-256 (which still works as the key, so
-  the app's preferences need the same care as the token). Every call is signed (HMAC-SHA-256 over
-  method, path, query, time, a one-use nonce and the body's hash) and everything a call carries or is
-  answered with is sealed with AES-256-GCM under a key of that one call's own. A call plays back
-  nothing; a cut answer is detected.
-- Lens signs nothing for a listener until it proves it holds the key. Revocation: Settings -> Glasses
-  Disconnect, or forgetting the Mac or pairing again, drops every grant and ends calls under way.
-- Rates: asks are limited per page and in all, and after a Deny nobody may ask for 30 s, doubling.
-- The daemon sees the bridge as the phone (its own device token and certificate), with one marker,
-  `X-Hypernova-Via: lens`, honoured only from a phone app's token. The glasses can't check a
-  fingerprint, so what the phone asks one for is refused to them, by the bridge before the call
-  leaves the phone and by the daemon again (403 `needs_phone`): an "Always" answer, Bypass (a switch,
-  a session started in it, an automation's No asking), an automation's shell steps and turning
-  Browse outside projects on.
+The glasses app and its bridge on the phone were removed on 2026-10-30 (docs/DECISIONS.md, "The
+glasses are removed"). The section numbers after it are kept.
 
 ## 6. Who can do what with what
 
 | Credential | Held by | What it opens | Lifetime and revocation |
 | --- | --- | --- | --- |
 | **Admin token** | The Mac app and the CLI, on the Mac | The local API (setup, pairing, settings, forgetting devices, the service) | Per install; anyone who can read the support folder has it. Not valid on the LAN listener or over Tailscale. |
-| **Device token** | One paired phone (or Lens in a private build) | The whole `/v1` phone API: start sessions, prompts, approvals, terminals, files, settings the phone may change | 256 random bits, stored by the daemon as a hash. Forget the device in the Mac app (or `DELETE /v1/devices/me`) and it stops working at once, on open connections too. Pairing the same app install again replaces its old device. |
+| **Device token** | One paired phone | The whole `/v1` phone API: start sessions, prompts, approvals, terminals, files, settings the phone may change | 256 random bits, stored by the daemon as a hash. Forget the device in the Mac app (or `DELETE /v1/devices/me`) and it stops working at once, on open connections too. Pairing the same app install again replaces its old device. |
 | **Device certificate** | One phone, for the LAN listener | The LAN listener at all | Two years; one active per device; revoked with the device. |
-| **Bridge grant** | One Lens, on the phone | Lens's calls through the phone's own device token | Up to 4; Disconnect in the phone's settings; dropped when the Mac is forgotten or the phone pairs again. |
 | **Preview token** | Whoever holds the URL | One folder's files or one dev-server port, no header needed | 12 hours. Never serves dotfiles or key files. |
-| **Telescope picture name** | Whoever holds the URL | One screenshot | 12 hours. |
 | **Terminal ticket** | The phone's terminal view | One terminal's WebSocket | One minute, single use, tied to the phone that asked. |
 | **Pairing code** | Shown as a QR on the Mac | `POST /v1/pair`, once | 16 random bytes, single use, valid 10 minutes, or until the Mac stops showing it (closing the Pair page cancels it, and a fresh code replaces the old). Pairing on the LAN listener is closed while none is shown. A code's QR is a live credential for that time. |
 | **Hook secret** | Claude Code's hooks | `/hooks/<secret>` on the local API | Per install. |
@@ -140,15 +112,13 @@ mail, messages, browsers' profiles, `~/Library/Application Support`, the daemon'
 Code's: `daemon/src/secretfiles.ts`), checked after links are followed (`Session.browsable` says which
 sessions). An "Always" answer, switching to Bypass, starting a session in it and an automation's No
 asking each wait for the fingerprint or the screen lock on the phone; notifications and the widget
-offer Allow and Deny only. Risky commands need their own spoken verb on the glasses, "Bypass" asks the
-user to think twice, and automations never run on credits or a paid provider without the user's yes.
+offer Allow and Deny only. "Bypass" asks the user to think twice, and automations never run on credits or a paid provider without the user's yes.
 
 **The fingerprint is the phone's word, not the daemon's proof.** An "Always" answer, Bypass,
 Browse outside projects, and an automation's `confirmBypass` (No asking) and `confirmShell` (shell
 steps) are asked for on the phone with `BiometricPrompt` (on the Mac app with Touch ID or the Mac's
 password) and then sent as a flag. The daemon can't see a fingerprint and can't check one. The flags
-stop a mistaken tap, a notification's or the widget's quick answer, and the glasses (which can't
-ask for one: the daemon refuses them the flags, 403 `needs_phone`); they don't stop a stolen device
+stop a mistaken tap and a notification's or the widget's quick answer; they don't stop a stolen device
 token, which can send them like the phone does. That is no more than a stolen phone could do anyway
 (start a session in Bypass). The daemon itself asks for them on every save that needs them,
 including a save that keeps the steps as they were.
@@ -170,11 +140,11 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   never parses a value. A step runs as the owner with `/bin/sh -c`, no TTY, stdin empty, in the
   projects folder or a session's own folder (never a key place, checked again when it runs), with
   the environment sessions get minus Claude Code's and Hypernova's variables (no admin token, hook
-  secret, device tokens or provider and Soniox keys: those live in files, never in the daemon's
+  secret, device tokens or provider keys: those live in files, never in the daemon's
   environment), a timeout, its whole process group killed at the end, its output masked like
   transcripts and cut to 8 KB. Saving one needs the fingerprint every time.
-- **Asks, notifications and outputs** show outside words as they are, as text (Lens has no HTML
-  sink; the phone's and the Mac app's note views: **unverified** here). Webhook presets carry them
+- **Asks, notifications and outputs** show outside words as they are, as text (the phone's
+  and the Mac app's note views: **unverified** here). Webhook presets carry them
   as data: JSON; Slack's `&`, `<`, `>` escaped; Discord mentions nobody; Telegram without a parse
   mode.
 - **Webhook outputs** go over https only, never to this computer or a private network: loopback,
@@ -201,7 +171,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
 ## 7. What never leaves the Mac
 
 - Claude Code's login and its credentials.
-- Provider and Soniox keys: never logged, never sent to the phone (it sees only "has a key"), and
+- Provider keys: never logged, never sent to the phone (it sees only "has a key"), and
   they go only to their own provider.
 - The admin token, the hook secret, the TLS and name keys, Hypernova's Tailscale node key.
 - Automations' fire tokens (only their hashes are kept) and webhook outputs' addresses and bot
@@ -212,24 +182,15 @@ another session's reply. All of that is **outside text**, and the daemon treats 
 
 ## 8. Known residual risks
 
-1. **A squatter on the bridge port can pair with Lens.** After "Disconnected on your phone", if the
-   owner taps Connect on the glasses without having seen Hypernova's own prompt, Lens pairs with whatever
-   answered. That program then reads what Lens sends it (prompts, audio) and can answer as it likes. It
-   has nothing of the Mac. Only care at the two taps prevents it; the app's identity is not pinned at the first
-   pairing yet (LATER L58). The code proves the ask matches the glasses, not who asked.
-2. **Preview tokens and Telescope picture names travel in the clear** on the phone's loopback inside a
-   preview's page requests, so a program relaying the bridge can open that preview (while the grant lasts,
-   and at the Mac for 12 hours) or fetch that picture. It sees only what the owner chose to look at on the
-   glasses.
+1. (Removed with the glasses, 2026-10-30: a squatter on the Lens bridge port.)
+2. (Removed with the glasses, 2026-10-30: preview tokens and Telescope picture names on the bridge.)
 3. **The LAN listener's uncertified pages.** Anyone on the same network can reach, without a device
    certificate: the app's download page and APK, `GET /v1/health` (which includes the computer's name),
-   preflights, `POST /v1/pair` (closed when no code is shown, 5 wrong codes per source per 10 minutes) and
+   `POST /v1/pair` (closed when no code is shown, 5 wrong codes per source per 10 minutes) and
    `POST /v1/device/cert` (needs a paired device's token). Through the private name, only the download
    page, the APK and a shown code's pairing page. The download page's certificate is self-signed at the
    IP address (the Mac shows the checksum); the name's is real.
-4. **A relay on the bridge can refuse to carry**, or make Lens say "Update Hypernova on your phone" or
-   "Disconnected on your phone". A denial of service, as holding the port is. One app making up origins can
-   use the ask limits and hold Lens's asks off.
+4. (Removed with the glasses, 2026-10-30: a relay on the Lens bridge.)
 5. **Tokens at rest.** Device tokens on the phone, and the Mac's admin token and provider keys, are
    plain private files or preferences, not the Keychain or Keystore (LATER L30 for the keys). Anyone who
    already runs code as the user on the Mac or the phone has them.
@@ -239,7 +200,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
    outside the network.
 7. **A lost phone is a lost unlocked keyboard** until it is forgotten on the Mac. Tailscale key expiry
    and its ACLs are the user's to set.
-8. **An iframe on a Telescope page** can still show a LAN or internet page in the screenshot (LATER L22).
+8. (Removed with the glasses, 2026-10-30: an iframe on a Telescope page.)
 9. **Approval notifications** show the raw command on the lock screen unless the phone hides sensitive
    notifications (LATER L41).
 10. **Quoting is not a wall.** Outside words in an automation's prompt are quoted as information, but

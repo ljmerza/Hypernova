@@ -15,10 +15,6 @@
     <string name="au_intro_codex">Let Codex work on a schedule, or when something happens on your Mac. They run on the Mac, so your phone can be off.</string>
     <string name="au_intro_both">Let Claude or Codex work on a schedule, or when something happens on your Mac. They run on the Mac, so your phone can be off.</string>
 
-    <!-- Settings → Glasses, text arriving like speech (glasses_text_speech_desc: Claude Code alone). -->
-    <string name="glasses_text_speech_desc_codex">Codex\'s words come a few at a time, with pauses at commas and full stops, in step with the voice when a reply is read aloud. Code and approvals show at once.</string>
-    <string name="glasses_text_speech_desc_both">A reply\'s words come a few at a time, with pauses at commas and full stops, in step with the voice when it is read aloud. Code and approvals show at once.</string>
-
     <!-- Stay awake, Backpack (awake_help_backpack: Claude Code alone). -->
     <string name="awake_help_backpack_codex">Awake with the lid closed, on battery, for up to 8 hours: Codex keeps working in your bag.</string>
     <string name="awake_help_backpack_both">Awake with the lid closed, on battery, for up to 8 hours: Claude and Codex keep working in your bag.</string>

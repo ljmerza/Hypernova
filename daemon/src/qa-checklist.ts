@@ -116,7 +116,6 @@ export const CHECKLIST: { title: string; items: { id: string; title: string; how
   {
     title: 'Voice',
     items: [
-      { id: 'mac-voice', title: 'Setting up voice on the Mac is clear', how: 'Setup\'s Voice step (or Settings → Voice… in the menu bar): paste a Soniox key from console.soniox.com and Connect. It checks the key with a moment of silence and says "Connected. Your phone gets a mic in the composer." Not now skips it; the menu bar then offers it once.' },
       { id: 'ph-voice-hold', title: 'Hold to talk: words appear as you speak and are in the box when you let go', how: 'Open a session with an empty box: the mic sits where Send is. Hold it and say a sentence. The capsule above shows your words as they settle (the newest dim), the rings round its planet move with your voice. Let go: the words are already in the box, Send one tap away. The first time, Android asks for the microphone.' },
       { id: 'ph-voice-free', title: 'Tap for hands-free, then Done', how: 'Tap the mic instead of holding it: it keeps listening (HANDS-FREE) with Cancel and Done. Say something longer, then Done (or tap the check, or Back). Typing in the box meanwhile is kept; the words go after it.' },
       { id: 'ph-voice-cancel', title: 'Sliding away cancels', how: 'Hold the mic and slide your finger up and away: the capsule turns red, LET GO TO CANCEL. Let go: nothing goes in the box. Slide back before letting go: it listens on.' },

@@ -63,7 +63,6 @@ object Summary {
         val end = if (endsSentence(a)) body else body + "."
         val then = when ((action as? Action.Start)?.then ?: (action as? Action.Continue)?.then) {
             Then.NOTIFY -> w.s(R.string.au_sum_then_notify)
-            Then.SAY -> w.s(R.string.au_sum_then_say)
             else -> null
         }
         return if (then == null) end else "$end $then"
@@ -89,8 +88,7 @@ object Summary {
 
     /** One output as the sentence says it: "notify me", "post it to Slack", "add it to briefs.md". */
     fun told(w: Words, o: Output, ctx: SummaryContext): String? = when (o) {
-        is Output.Notify -> w.s(if (o.glasses) R.string.wf_told_notify_glasses else R.string.wf_told_notify)
-        is Output.Say -> w.s(R.string.wf_told_say)
+        is Output.Notify -> w.s(R.string.wf_told_notify)
         is Output.Webhook -> w.s(R.string.wf_told_webhook, presetName(w, o.preset))
         is Output.File -> w.s(R.string.wf_told_file, o.path.trimEnd('/').substringAfterLast('/').ifEmpty { o.path })
         is Output.Unknown -> null
@@ -299,13 +297,10 @@ object Summary {
         }
         is Action.Notify -> cut(a.text).let {
             when {
-                a.glasses && it.isEmpty() -> w.s(R.string.au_sum_notify_glasses_empty)
-                a.glasses -> w.s(R.string.au_sum_notify_glasses, it)
                 it.isEmpty() -> w.s(R.string.au_sum_notify_empty)
                 else -> w.s(R.string.au_sum_notify, it)
             }
         }
-        is Action.Say -> cut(a.text).let { if (it.isEmpty()) w.s(R.string.au_sum_say_empty) else w.s(R.string.au_sum_say, it) }
         is Action.Ask -> cut(a.question).let { if (it.isEmpty()) w.s(R.string.wf_sum_ask_empty) else w.s(R.string.wf_sum_ask, it) }
         is Action.Shell -> {
             // A zero-width non-joiner between dashes, so "--silent" never draws as one long dash.

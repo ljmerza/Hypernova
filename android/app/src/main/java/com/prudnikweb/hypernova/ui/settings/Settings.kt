@@ -146,17 +146,6 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
     var testing by remember { mutableStateOf(TestingTools.unlocked(context)) }
     var taps by remember { mutableStateOf(0) }
     val list = androidx.compose.foundation.lazy.rememberLazyListState()
-    // Settings → Glasses was asked for (bridge/BridgeOpen.kt): scrolled to, once. Marked done only
-    // after (marking it changes this effect's key, which would cancel the scroll on its way).
-    val glassesAsked = com.prudnikweb.hypernova.bridge.BridgeOpen.glassesAsked
-    LaunchedEffect(glassesAsked, hub != null) {
-        if (!com.prudnikweb.hypernova.bridge.BridgeOpen.glassesWanted() || hub == null) return@LaunchedEffect
-        try {
-            scrollToKey(list, "glasses")
-        } finally {
-            if (com.prudnikweb.hypernova.bridge.BridgeOpen.glassesAsked == glassesAsked) com.prudnikweb.hypernova.bridge.BridgeOpen.glassesShown()
-        }
-    }
 
     // Another part was asked for (SettingsJump: "Turn on in Settings"): scrolled to, once.
     val jumpAsked = SettingsJump.asked
@@ -281,17 +270,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                     )
                 }
             }
-            // Voice (VoiceSection.kt): only from a Mac that knows about it.
-            if (hub.voice.stt != null) {
+            // Read aloud (ReadAloudSection.kt): only from a Mac that reads aloud this way.
+            if (hub.speech?.settings != null) {
                 item(key = "voice") {
-                    Spacer(Modifier.height(10.dp))
-                    VoiceSection(hub)
+                    ReadAloudSection(hub)
                 }
-            }
-            // Hypernova Lens on the glasses, through this app (GlassesSection.kt).
-            item(key = "glasses") {
-                Spacer(Modifier.height(10.dp))
-                GlassesSection(hub)
             }
             // Files: Browse outside projects (FilesSection below), from a Mac that has it.
             if (hub.mac.browseOutsideProjects != null) {

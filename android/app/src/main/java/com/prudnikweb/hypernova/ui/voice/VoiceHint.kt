@@ -61,17 +61,9 @@ sealed interface VoiceHint {
 fun voiceProblemText(p: VoiceProblem): String = stringResource(
     when (p) {
         VoiceProblem.Offline -> R.string.voice_err_offline
-        VoiceProblem.NoKey -> R.string.voice_err_no_key
-        VoiceProblem.BadKey -> R.string.voice_err_bad_key
-        VoiceProblem.NoCredit -> R.string.voice_err_no_credit
-        VoiceProblem.Busy -> R.string.voice_err_busy
-        VoiceProblem.Unreachable -> R.string.voice_err_unreachable
-        VoiceProblem.Soniox -> R.string.voice_err_soniox
         VoiceProblem.TooLong -> R.string.voice_err_too_long
         VoiceProblem.MicBusy -> R.string.voice_err_mic_busy
         VoiceProblem.Mic -> R.string.voice_err_mic
-        VoiceProblem.Companion -> R.string.voice_err_companion
-        VoiceProblem.CompanionBusy -> R.string.voice_err_companion_busy
     },
 )
 

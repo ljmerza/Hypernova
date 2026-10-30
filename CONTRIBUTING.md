@@ -4,8 +4,7 @@ Thanks for looking. Hypernova is alpha and moves fast, so for anything bigger th
 open an issue first and say what you want to change. Security problems do not go in issues: see
 [`SECURITY.md`](SECURITY.md).
 
-Licences are in the README. Lens is AGPL-3.0-or-later and must stay separate: don't copy Lens
-code into the other folders. By contributing you agree your change goes under the licence of the
+Licences are in the README. By contributing you agree your change goes under the licence of the
 folder it touches.
 
 ## Layout
@@ -13,7 +12,6 @@ folder it touches.
 | Folder | What | Tools |
 | --- | --- | --- |
 | `daemon/` | The daemon: sessions, hooks, shared terminals, the phone API, automations, speech. TypeScript on Node 22.18 or newer, run directly with no build step | Node 24 or newer, npm |
-| `lens/` | Hypernova Lens for Even Realities G2 glasses. TypeScript and Vite | Node 24 or newer, npm |
 | `android/` | The Android app, Kotlin and Jetpack Compose | JDK 21 (Android Studio's works), Gradle wrapper |
 | `mac/` | The menu bar app, SwiftUI built with SwiftPM (no Xcode project) | Swift 6, macOS 14+ |
 | `names/` | The name service, a Cloudflare Worker (tests run locally, never against Cloudflare) | Node 24 or newer, npm |
@@ -33,10 +31,6 @@ Run the ones for the folder you touched. GitHub Actions runs the same commands
 # daemon (Node 24 or newer)
 cd daemon && npm ci && npx tsc -p . && npm test
 
-# lens (Node 24 or newer)
-cd lens && npm ci && npm test && npx tsc --noEmit -p .
-npm run pack            # also builds out.ehpk; needs a local app.local.json (not committed)
-
 # names (Node 24 or newer)
 cd names && npm ci && npx tsc -p . && npx vitest run
 
@@ -50,7 +44,7 @@ cd mac && swift build -c release
 Tests must not depend on your machine: no real Claude login, no Tailscale, no files in your home
 folder or in the live support folder, no fixed ports of a running install. Use a temporary folder
 and `HYPERNOVA_SUPPORT`, and port `0` where a test needs a port. If a test truly needs something
-only one OS has, skip it on the others with a reason, as the Telescope tests do for macOS.
+only one OS has, skip it on the others with a reason, as the Mac-voice tests do for macOS.
 
 ## Running a second daemon next to a live one
 

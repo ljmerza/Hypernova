@@ -4,20 +4,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { HOME, SUPPORT, randomToken, readJson, sha256, writeJson, writeText, safeEqual } from './util.ts'
 
 /**
- * `client`: which app paired ("lens" for the glasses app; none for the Android app), so the Mac can
- * name it. `certFingerprint`: its active device certificate's (lan.ts, tls.ts), once it asked for
- * one; the fingerprint alone, never a key of the phone's. `certExpiresAt`: when that certificate
- * runs out (epoch ms). `glasses`: Lens on Even glasses reaching the daemon through this phone app
- * (glasses.ts), kept with the phone so forgetting it forgets them too. `installId`: the app install
- * that paired (it sends a stable id of its own), so pairing it again replaces it rather than add a twin.
+ * `client`: which app paired (none for the Android app), so the Mac can name it. `certFingerprint`:
+ * its active device certificate's (lan.ts, tls.ts), once it asked for one; the fingerprint alone,
+ * never a key of the phone's. `certExpiresAt`: when that certificate runs out (epoch ms).
+ * `installId`: the app install that paired (it sends a stable id of its own), so pairing it again
+ * replaces it rather than add a twin.
  */
-export type Device = { id: string; name: string; model: string; createdAt: number; lastSeenAt: number; tokenHash: string; appVersion?: string; client?: string; certFingerprint?: string; certExpiresAt?: number; glasses?: Glasses; installId?: string }
-/**
- * Glasses through a phone (glasses.ts): first seen, last seen (written at most once a minute), Lens'
- * version as the phone app passed it on, and when "Forget" on the Mac removed them (they're refused
- * until the phone allows them again).
- */
-export type Glasses = { since: number; seenAt: number; appVersion?: string; removedAt?: number }
+export type Device = { id: string; name: string; model: string; createdAt: number; lastSeenAt: number; tokenHash: string; appVersion?: string; client?: string; certFingerprint?: string; certExpiresAt?: number; installId?: string }
 export type ProviderKind = 'anthropic' | 'openrouter' | 'custom'
 /**
  * `paid`: running on it costs money (automations ask before they do); unset counts as yes, and only
@@ -38,8 +31,6 @@ export type ProviderRecord = {
 export type Settings = {
   projectsRoot: string
   terminalApp?: string | null
-  /** Where new sessions from the glasses are born (nebula.ts); unset: <projectsRoot>/Nebula. */
-  nebula?: string | null
   /** The LAN listener (lan.ts): the phone reaches the daemon directly on the local network. Unset: on. */
   lanAccess?: boolean
   /** Built-in Tailscale (tsnet.ts): the daemon runs its own node when the Tailscale app doesn't serve. Unset: on. */
@@ -162,14 +153,6 @@ export function setDeviceCert(id: string, fingerprint: string, expiresAt: number
 }
 /** The device holds a certificate that hasn't run out (one recorded without its expiry counts as none). */
 export const hasDeviceCert = (d: Device | null) => !!(d?.certFingerprint && (d.certExpiresAt ?? 0) > Date.now())
-/** Changes a device in place and keeps it (glasses.ts); false when there's no such device. */
-export function updateDevice(id: string, change: (d: Device) => void): boolean {
-  const d = devices.find((x) => x.id === id)
-  if (!d) return false
-  change(d)
-  writeJson(P.devices, devices)
-  return true
-}
 export function removeDevice(id: string): boolean {
   const before = devices.length
   devices = devices.filter((x) => x.id !== id)

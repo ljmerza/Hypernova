@@ -1,20 +1,17 @@
-// Read aloud for Hypernova Lens (docs/PROTOCOL.md, "Read aloud"): the Mac's voices speak a reply
-// into the earbuds. The glasses app runs in the Even App's WebView, and Android's WebView has no
-// speechSynthesis, so the Mac renders the clip with `say` and the phone plays the bytes. Also the
-// speech companion's address, so the phone pairs once, not twice.
+// The Mac's voices (docs/PROTOCOL.md, "Read aloud"): the Mac renders a reply with `say` and the
+// phone plays the bytes.
 import { execFile, type ChildProcess } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { HOME, SUPPORT, readJson } from './util.ts'
-import { serveConfig, tailscaleStatus } from './services.ts'
+import { SUPPORT } from './util.ts'
 import { LINUX_REASONS, has } from './platform.ts'
 
 const SAY = '/usr/bin/say'
 /** Why there's no voice: a Mac without `say`, or a Linux server, which never has the Mac's voice. */
 const noVoice = () => (has('macVoice') ? 'This Mac can’t read aloud.' : LINUX_REASONS.macVoice)
 const TMP = join(SUPPORT, 'tmp')
-/** The most one request may carry; Lens sends a longer reply in pieces, cut between paragraphs. */
+/** The most one request may carry. */
 export const MAX_SPEECH = 8000
 /** `say -r` takes words per minute; this is its usual pace, rate 1. */
 const WPM = 185
@@ -202,40 +199,4 @@ export function cleanSpeechTemp(): void {
   try {
     for (const f of readdirSync(TMP)) if (/^say-[0-9a-f]+\.(m4a|wav)$/.test(f)) rmSync(join(TMP, f), { force: true })
   } catch {}
-}
-
-// ── The speech companion's address ───────────────────────────────────────
-// Hyperscribe Companion recognises speech on this Mac; the phone streams the glasses' microphone
-// straight to it over Tailscale. Its settings name its port and pairing token.
-const COMPANION_SETTINGS = () => join(HOME, 'Library/Application Support/Hyperscribe Companion/settings.json')
-export const COMPANION_PORT = 7443
-
-/** The companion's port from its settings (7443 unless the owner changed it). */
-export function companionPort(): number {
-  const s = readJson<any>(COMPANION_SETTINGS(), null)
-  return Number.isInteger(s?.port) && s.port >= 1024 && s.port <= 65535 ? s.port : COMPANION_PORT
-}
-
-/**
- * The companion's pairing address, from its settings, this Mac's Tailscale name and what
- * `tailscale serve` routes; null when any of them is missing. Only its tailnet https route, never
- * a LAN address: plain ws:// would expose the token, the audio and the words.
- */
-export function companionAddress(settings: any, dnsName: string | null, serve: Record<string, any> | null): string | null {
-  if (!settings || typeof settings !== 'object' || settings.tailscale === false) return null
-  const token = typeof settings.token === 'string' ? settings.token : ''
-  if (!/^[\w-]{1,128}$/.test(token) || !dnsName || !serve) return null
-  const port = Number.isInteger(settings.port) && settings.port >= 1024 && settings.port <= 65535 ? settings.port : COMPANION_PORT
-  // `tailscale serve --https=<port>` shows as an https TCP port and a web route for "<name>:<port>".
-  const web = serve.Web?.[`${dnsName}:${port}`]
-  if (serve.TCP?.[String(port)]?.HTTPS !== true || !web || typeof web.Handlers !== 'object') return null
-  return `wss://${dnsName}:${port}/ws?token=${encodeURIComponent(token)}`
-}
-
-/** Read on every request: "New code" in the companion changes its token. */
-export async function companionUrl(): Promise<string | null> {
-  const settings = readJson<any>(COMPANION_SETTINGS(), null)
-  if (!settings?.token) return null
-  const ts = await tailscaleStatus()
-  return companionAddress(settings, ts.dnsName, ts.dnsName ? await serveConfig() : null)
 }

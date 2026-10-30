@@ -1,20 +1,12 @@
 package com.prudnikweb.hypernova.data
 
-import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.flow.StateFlow
 
-/** The Mac's speech to text (snapshot `stt`). */
-@Immutable data class Stt(val provider: String?, val ready: Boolean, val error: String?)
-/** `GET /v1/stt`: the state plus the key's last four characters. */
-@Immutable data class SttInfo(val stt: Stt, val last4: String?, val keysUrl: String?)
-
-enum class VoiceRoute { None, Soniox, Companion }
-@Immutable data class Voice(val route: VoiceRoute, val stt: Stt? = null)
-
-enum class VoiceProblem { Offline, NoKey, BadKey, NoCredit, Busy, Unreachable, Soniox, TooLong, MicBusy, Mic, Companion, CompanionBusy }
+/** Why a dictation ended early: the phone has no on-device recognizer, the two-minute cap, the microphone busy or failing. */
+enum class VoiceProblem { Offline, TooLong, MicBusy, Mic }
 
 sealed interface DictationState {
-    /** Mic on, link to the Mac opening. */
+    /** Mic on, the recognizer starting. */
     data object Opening : DictationState
     data class Live(val final: String, val interim: String) : DictationState
     /** Released: [text] is everything heard; from [unsettledFrom] on it may still change. */

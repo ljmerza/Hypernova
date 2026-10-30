@@ -9,7 +9,7 @@ this page has a bug, so please tell us.
 
 ## What you are trusting it with
 
-Pairing a phone (or a pair of glasses) with your computer gives that device **the same power over
+Pairing a phone with your computer gives that device **the same power over
 Claude Code (and Codex, once you turn it on for Hypernova) that you have at the keyboard**:
 
 - it can start sessions in any project folder, send prompts, and answer approvals
@@ -32,8 +32,8 @@ Code or Codex safer than they are: approvals, "Bypass" mode, Codex's sandbox and
 rules are the agents' own, with a few extra guard rails (risky commands such as force pushes, `rm -rf` and deploys need their
 own spoken verb; automations never use paid credits without your yes).
 
-There is no Hypernova server. Nothing is sent to us. Audio goes to Soniox only if you turn voice on
-with your own key; provider keys go only to their own provider.
+There is no Hypernova server. Nothing is sent to us. Dictation is done by the phone's own on-device
+recognizer, so the audio never leaves the phone; provider keys go only to their own provider.
 
 ## What listens where
 
@@ -45,7 +45,7 @@ with your own key; provider keys go only to their own provider.
 
 Details that matter:
 
-- **Phone API.** Every `/v1` route except `GET /v1/health`, `POST /v1/pair`, a Telescope picture
+- **Phone API.** Every `/v1` route except `GET /v1/health`, `POST /v1/pair`
   and a terminal's WebSocket (which carries a short-lived ticket) needs the device's bearer token.
   Requests that arrive through `tailscale serve` are recognised by their forwarding header and are
   never treated as local.
@@ -79,11 +79,11 @@ Linux, XDG's data folder), created `0700`, with each secret file `0600`.
 - **Admin token** (`admin-token`) and **hook secret** (`hook-secret`): random, per install, used
   by the Mac app and the hooks. Anyone who can read them can drive the local API, which is why
   the folder is private to your user.
-- **Provider and Soniox keys.** Stored in the support folder, readable by your user only. They are
+- **Provider keys.** Stored in the support folder, readable by your user only. They are
   never sent to the phone (the phone sees only "has a key"), and only go to their own provider.
   They are not in the Keychain today; treat the support folder as secret.
 - **Never logged** (`~/Library/Logs/Hypernova/daemon.log`): tokens, pairing codes, the admin token,
-  provider or Soniox keys, the text read aloud or dictated, Claude sign-in codes, and the output
+  provider keys, the text read aloud, Claude sign-in codes, and the output
   of Claude's account commands. Tests check several of these (for example "the key and the text
   never reach the log"). The log does name devices, projects and what happened, so look through it
   before attaching it to a public issue.

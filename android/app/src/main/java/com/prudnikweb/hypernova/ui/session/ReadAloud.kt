@@ -22,8 +22,7 @@ import java.io.File
 
 /**
  * "Read aloud" for one message at a time. With a Mac that reads aloud this way, it asks the Mac for
- * a play in its voice setting (Soniox's natural voices, or the Mac's own; docs/PROTOCOL.md "Read
- * aloud") and plays it natively as it streams in ([Speaker]: the phone's current output, music
+ * a play in its own voice (docs/PROTOCOL.md "Read aloud") and plays it natively as it streams in ([Speaker]: the phone's current output, music
  * ducked, the screen may go off). Without one, the Mac's whole clip as before; and the phone's own
  * text-to-speech when the Mac can't (the demo, no connection), so it always reads.
  * [reading] is the message being read (or fetched), for its Stop and its wave.
@@ -82,7 +81,7 @@ object ReadAloud {
         }
     }
 
-    /** Stops this phone's own reading (the glasses' speech, played here too, goes on). */
+    /** Stops this phone's own reading. */
     fun stop() {
         job?.cancel()
         job = null
