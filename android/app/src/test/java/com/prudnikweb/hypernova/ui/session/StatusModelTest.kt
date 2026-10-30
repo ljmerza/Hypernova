@@ -179,11 +179,138 @@ class StatusModelTest {
     }
 
     @Test fun agentsAreCountedWhileTheyWorkAndWhenTheyWorkAlone() {
-        assertEquals(Say(SayKind.Agents, n = 2), statusBar(working("Task: review", agents = 2))!!.say)
+        // As Claude Code's footer has it: "main + 2 agents", the main agent's own words for its row.
+        val both = statusBar(working("Task: review", agents = 2))!!
+        assertEquals(Say(SayKind.MainAndAgents, n = 2), both.say)
+        assertEquals(Say(SayKind.MainWaiting), both.main)
+        assertTrue(both.hasAgents)
+        assertEquals(2, both.agents)
         val alone = statusBar(BarInput(Phase.Idle, SessionState.Idle, "", agentsRunning = 2))!!
-        assertEquals(Say(SayKind.Agents, n = 2), alone.say)
+        assertEquals(Say(SayKind.MainAndAgents, n = 2), alone.say)
+        assertEquals(Say(SayKind.MainWaiting), alone.main)
         // Nothing of the main agent to stop.
         assertFalse(alone.canStop)
+    }
+
+    private fun plain(id: String, type: String = "general-purpose", label: String = "Add routing helpers", activity: String? = "Edit: android/Servers.kt", status: String = "running", tokens: Long? = 81_200, workflowId: String? = null, startedAt: Long = 0) = WAgent(
+        id = id, sessionId = "s", toolUseId = null, parentAgentId = null, workflowId = workflowId, phase = null, label = label,
+        type = type, model = null, background = true, status = status, activity = activity,
+        startedAt = startedAt, endedAt = null, lastActivityAt = 0, tokens = tokens, toolUses = null, result = null,
+    )
+
+    @Test fun theMainAgentWorkingWithAgentsKeepsItsOwnWordsForItsRow() {
+        val m = statusBar(working("Edit: src/App.kt", agents = 3))!!
+        assertEquals(Say(SayKind.MainAndAgents, n = 3), m.say)
+        assertEquals(Say(SayKind.Editing, "App.kt"), m.main)
+        assertTrue(m.canStop)
+        // No agents: the line is the main agent's, as it was.
+        val solo = statusBar(working("Edit: src/App.kt"))!!
+        assertEquals(Say(SayKind.Editing, "App.kt"), solo.say)
+        assertFalse(solo.hasAgents)
+    }
+
+    @Test fun theToDosAreNeverCountedAsAgents() {
+        val todos = (1..10).map { todo(it, if (it <= 7) TodoStatus.Done else TodoStatus.Pending) }
+        val m = statusBar(working("Thinking", todos, agents = 3))!!
+        assertEquals(3, m.agents)
+        assertEquals(Say(SayKind.MainAndAgents, n = 3), m.say)
+        assertTrue(m.hasTodos)
+        assertEquals(7, m.done)
+        assertEquals(10, m.total)
+    }
+
+    @Test fun theBoardsAgentsCountWhenItKnowsMoreThanTheSession() {
+        val agents = barAgents(AgentBoard(listOf(plain("a1"), plain("a2"), plain("a3")).associateBy { it.id }, emptyMap()))
+        val m = statusBar(BarInput(Phase.Idle, SessionState.Idle, "", agentsRunning = 1, agents = agents))!!
+        assertEquals(Say(SayKind.MainAndAgents, n = 3), m.say)
+    }
+
+    @Test fun aRunningWorkflowWinsOverPlainAgents() {
+        val agents = barAgents(AgentBoard(mapOf("a1" to plain("a1")), emptyMap()))
+        val m = statusBar(working("Thinking", agents = 4).copy(workflow = workflow(1, 3), agents = agents))!!
+        assertEquals(Say(SayKind.Workflow, "review-changes"), m.say)
+        assertFalse(m.hasAgents)
+        assertEquals(0, m.agents)
+    }
+
+    @Test fun barAgentsListTheAgentsAtWorkOutsideARunningWorkflowAsClaudeCodesFooterDoes() {
+        val board = AgentBoard(
+            listOf(
+                plain("a2", startedAt = 20),
+                plain("a1", type = "Explore", label = "Explore", activity = "Read: src/linux-cli.test.ts", startedAt = 10),
+                plain("a3", status = "done"),
+                plain("a4", type = "", label = "Check the docs", activity = null, tokens = null, startedAt = 30),
+                wfAgent("w1", "running"),
+            ).associateBy { it.id },
+            mapOf("wf_1" to wwf(agentCount = 1, done = 0, failed = 0)),
+        )
+        val list = barAgents(board, asking = setOf("a2"))
+        assertEquals(listOf("a1", "a2", "a4"), list.map { it.id })
+        assertEquals(BarAgent("a1", "Explore", null, Say(SayKind.Reading, "linux-cli.test.ts"), 10, 81_200), list[0])
+        assertEquals("general-purpose", list[1].kind)
+        assertEquals("Add routing helpers", list[1].task)
+        assertEquals(Say(SayKind.Editing, "Servers.kt"), list[1].doing)
+        assertTrue(list[1].asking)
+        // No kind: what it's for stands in, once.
+        assertEquals("Check the docs", list[2].kind)
+        assertNull(list[2].task)
+        assertNull(list[2].doing)
+        assertNull(list[2].tokens)
+    }
+
+    @Test fun anAgentsActivityReadsInWordsOrAsTheMacSaidIt() {
+        assertEquals(Say(SayKind.Running, "./gradlew build"), agentSay("Bash: ./gradlew build"))
+        assertEquals(Say(SayKind.Running, "npm test"), agentSay("$ npm test"))
+        assertEquals(Say(SayKind.Searching, "agentsRunning"), agentSay("Grep: agentsRunning"))
+        assertEquals(Say(SayKind.Raw, "Checking live daemon appInfo state"), agentSay("Checking live daemon appInfo state"))
+        assertEquals(Say(SayKind.Raw, "Agent"), agentSay("Agent: review the parser"))
+    }
+
+    @Test fun askingAgentsComeFromTheChatsCards() {
+        fun view(id: String, asking: Boolean) = com.prudnikweb.hypernova.data.AgentView(id, id, "Explore", AgentState.Running, null, 0, null, null, null, null, asking = asking)
+        val items = listOf(Item.User("u", "go"), Item.AgentCard("c1", view("a1", false), listOf(view("a2", true))), Item.AgentCard("c2", view("a3", true)))
+        assertEquals(setOf("a2", "a3"), askingAgents(items))
+    }
+
+    @Test fun aWorkflowsTokensAreTheSumOverItsAgentsOrTheMacsTotalIfMore() {
+        fun view(id: String, tokens: Long?) = com.prudnikweb.hypernova.data.AgentView(id, id, "workflow-subagent", AgentState.Running, null, 0, null, tokens, null, null)
+        fun wf(tokens: Long?, vararg agents: com.prudnikweb.hypernova.data.AgentView) = WorkflowView(
+            "wf_1", "arc-responsive-ui", null, AgentState.Running, 0, null, tokens, agentCount = agents.size, running = agents.size,
+            phases = listOf(com.prudnikweb.hypernova.data.PhaseView("Build", null, agents.take(1), 0, com.prudnikweb.hypernova.data.PhaseState.Live)),
+            finished = 0, loose = agents.drop(1),
+        )
+        assertEquals(181_100L, workflowTokens(wf(100_000, view("a", 120_000), view("b", 61_100))))
+        assertEquals(500_000L, workflowTokens(wf(500_000, view("a", 120_000))))
+        assertEquals(42L, workflowTokens(wf(null, view("a", 42), view("b", null))))
+        assertNull(workflowTokens(wf(null, view("a", null))))
+    }
+
+    @Test fun timesReadAsClaudeCodesFooterWritesThem() {
+        assertEquals("0s", ccDuration(-3))
+        assertEquals("42s", ccDuration(42_900))
+        assertEquals("4m12s", ccDuration(252_000))
+        assertEquals("19m08s", ccDuration(1_148_000))
+        assertEquals("1h02m", ccDuration(3_725_000))
+        assertEquals("2d03h", ccDuration((51 * 3600 + 59 * 60) * 1000L))
+    }
+
+    @Test fun tokensReadAsClaudeCodesFooterWritesThem() {
+        assertEquals("980", ccTokens(980))
+        assertEquals("1.0k", ccTokens(1_000))
+        assertEquals("8.4k", ccTokens(8_400))
+        assertEquals("81.0k", ccTokens(81_000))
+        assertEquals("81.2k", ccTokens(81_249))
+        assertEquals("181.1k", ccTokens(181_100))
+        assertEquals("1.0m", ccTokens(999_950))
+        assertEquals("1.2m", ccTokens(1_234_567))
+    }
+
+    @Test fun tokensAreSpokenInWholeWords() {
+        assertEquals(SpokenTokens(TokenScale.Units, "980", 980), spokenTokens(980))
+        assertEquals(SpokenTokens(TokenScale.Thousands, "81", 81), spokenTokens(81_200))
+        assertEquals(SpokenTokens(TokenScale.Thousands, "8", 8), spokenTokens(8_400))
+        assertEquals(SpokenTokens(TokenScale.Millions, "1.2", 1), spokenTokens(1_234_567))
+        assertEquals(SpokenTokens(TokenScale.Millions, "2", 2), spokenTokens(1_999_999))
     }
 
     @Test fun anApprovalMakesItAmberAndNamesWhatToApprove() {

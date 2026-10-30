@@ -41,8 +41,43 @@
     <string name="status_desc_todos">%1$s. %2$d of %3$d to-dos done. %4$s elapsed</string>
     <string name="status_desc_plain">%1$s. %2$s elapsed</string>
     <!-- While a workflow runs: its name, then its agents finished (done, failed or stopped) of those it has started so far. -->
-    <string name="status_desc_workflow_only">Workflow %1$s, %2$d of %3$d agents finished. %4$s elapsed</string>
-    <string name="status_desc_workflow">%1$s. Workflow %2$s, %3$d of %4$d agents finished. %5$s elapsed</string>
+    <!-- The last argument is the workflow's time and tokens: "19 minutes elapsed, 181 thousand tokens". -->
+    <string name="status_desc_workflow_only">Workflow %1$s, %2$d of %3$d agents finished. %4$s</string>
+    <string name="status_desc_workflow">%1$s. Workflow %2$s, %3$d of %4$d agents finished. %5$s</string>
+    <string name="status_run_said">%1$s elapsed</string>
+
+    <!-- With no workflow, while the main agent's agents work, as Claude Code's footer lists them:
+         "main + 3 agents" folded; opened, the main agent and a row per agent. -->
+    <plurals name="status_main_agents">
+        <item quantity="one">main + %1$d agent</item>
+        <item quantity="other">main + %1$d agents</item>
+    </plurals>
+    <plurals name="status_main_agents_said">
+        <item quantity="one">Main agent and %1$d agent at work</item>
+        <item quantity="other">Main agent and %1$d agents at work</item>
+    </plurals>
+    <!-- The main agent's own row: its name as Claude Code's footer has it, and what it does while it waits. -->
+    <string name="status_main">main</string>
+    <string name="status_main_waiting">Waiting for its agents</string>
+    <string name="status_expand_main">Show the main agent and its agents</string>
+    <string name="status_fold_main">Fold the agents</string>
+    <!-- Tokens as Claude Code's footer writes them: "↓ 181.1k" folded, "↓ 81.2k tokens" on an agent's row. -->
+    <string name="status_tokens_short">↓ %1$s</string>
+    <string name="status_tokens_figure">↓ %1$s tokens</string>
+    <!-- The to-dos' tally, folded and as a heading over the opened checklist: "TO-DO 7/10" (upper-cased in code). -->
+    <string name="status_todo_label">To-do</string>
+    <string name="status_todo_heading_said">To-do list, %1$d of %2$d done</string>
+    <!-- TalkBack: how long and how many tokens ("4 minutes, 81 thousand tokens"). -->
+    <plurals name="status_seconds_said">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+    <plurals name="status_tokens_said_units">
+        <item quantity="one">%1$d token</item>
+        <item quantity="other">%1$d tokens</item>
+    </plurals>
+    <string name="status_tokens_said_thousands">%1$s thousand tokens</string>
+    <string name="status_tokens_said_millions">%1$s million tokens</string>
 
     <!-- The workflow's agents, opened: each agent's state in a word, or what it does now while it runs. -->
     <string name="status_agent_running">running</string>

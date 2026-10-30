@@ -96,6 +96,15 @@ type AgentRec = Agent & {
   sure: boolean
   /** A workflow ran its step again as a new agent: this attempt doesn't count. */
   retried: boolean
+  /**
+   * Its tokens from its file, as Claude Code's own footer counts a running agent's: the context its
+   * latest reply read ([inTokens]), plus the output of every reply before it ([outTokens]) and of
+   * the latest ([msgOut], reply [msgId]: Claude Code logs a reply once per content block).
+   */
+  inTokens: number
+  outTokens: number
+  msgId: string | null
+  msgOut: number
 }
 type WorkflowRec = Workflow & {
   journalOffset: number
@@ -178,7 +187,7 @@ function newAgent(b: Board, id: string, at: number): AgentRec {
       id, sessionId: b.id, toolUseId: null, parentAgentId: null, workflowId: null, phase: null, label: '', type: '', model: null, background: true,
       status: 'running', activity: null, startedAt: at, endedAt: null, lastActivityAt: at, tokens: null, toolUses: null, result: null,
       file: null, offset: 0, carry: Buffer.alloc(0), whole: false, tools: new Set(), hookTools: 0, hookAt: 0, last: null, text: null, fromFile: false, peeked: false, checkedAt: 0,
-      sure: false, retried: false,
+      sure: false, retried: false, inTokens: 0, outTokens: 0, msgId: null, msgOut: 0,
     }
     b.agents.set(id, a)
   }
@@ -844,12 +853,26 @@ function readSnapshot(b: Board, file: string, runId: string, mtime: number): boo
 
 // ── Following a running agent's own file ──────────────────────────────────
 
-/** Tokens a message's usage stands for: the context it read and what it wrote, as Claude Code counts an agent's. */
-function usageTokens(u: any): number | null {
-  if (!u || typeof u !== 'object') return null
-  const n = (v: unknown) => (typeof v === 'number' ? v : 0)
-  const t = n(u.input_tokens) + n(u.cache_creation_input_tokens) + n(u.cache_read_input_tokens) + n(u.output_tokens)
-  return t > 0 ? t : null
+/**
+ * A reply's usage, counted into the agent's tokens the way Claude Code 2.1.31x counts a running
+ * agent's for its footer: the context the latest reply read (input, cache writes and cache reads)
+ * plus what every reply wrote (output), each reply once. A reply is logged once per content block,
+ * so a line of the reply already counted only updates its output. Followed from its last 256 KB,
+ * an agent's earlier replies' output isn't in it; Claude Code's own total replaces it at its end.
+ */
+function countUsage(a: AgentRec, msgId: string | null, u: any): void {
+  if (!u || typeof u !== 'object') return
+  const n = (v: unknown) => (typeof v === 'number' && v > 0 ? v : 0)
+  const input = n(u.input_tokens) + n(u.cache_creation_input_tokens) + n(u.cache_read_input_tokens)
+  const output = n(u.output_tokens)
+  if (input + output === 0) return
+  if (msgId == null || msgId !== a.msgId) {
+    a.outTokens += a.msgOut
+    a.msgId = msgId
+    a.msgOut = output
+  } else a.msgOut = Math.max(a.msgOut, output)
+  if (input > 0) a.inTokens = input
+  a.tokens = a.inTokens + a.outTokens + a.msgOut
 }
 
 /** One line of an agent's transcript, read lightly: what it does, its tokens, its report. */
@@ -868,7 +891,8 @@ function lightLine(a: AgentRec, o: any): void {
   }
   if (o?.type === 'assistant') {
     const m = o.message
-    a.tokens = usageTokens(m?.usage) ?? a.tokens
+    // An unmetered reply (Claude Code marks it so) isn't counted, as in its footer.
+    if (o.isUnmetered !== true) countUsage(a, typeof m?.id === 'string' ? m.id : null, m?.usage)
     if (typeof m?.model === 'string' && m.model !== '<synthetic>') a.model ??= m.model
     for (const blk of Array.isArray(m?.content) ? m.content : []) {
       if (blk?.type === 'tool_use' && typeof blk.id === 'string') {
@@ -938,6 +962,11 @@ function follow(a: AgentRec): void {
   if (size < a.offset) {
     a.offset = 0
     a.carry = Buffer.alloc(0)
+    // Read afresh: its replies count again from the start.
+    a.inTokens = 0
+    a.outTokens = 0
+    a.msgId = null
+    a.msgOut = 0
   }
   if (size === a.offset) return
   let skip = false

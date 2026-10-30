@@ -361,6 +361,36 @@ test('agents and a workflow come from the transcript and the session folder, fol
   stop()
 })
 
+test('a running agent\'s tokens are counted as Claude Code\'s footer counts them: its latest context plus every reply\'s output, each reply once', () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000011'
+  const { sub } = makeSession(id, [prompt('p1', 'Review the parser'), ...launchAgent('toolu_a1', PLAIN, 'Review the parser', 'general-purpose')])
+  writeMeta(sub, PLAIN, { agentType: 'general-purpose', description: 'Review the parser', toolUseId: 'toolu_a1' })
+  const side = { isSidechain: true, agentId: PLAIN }
+  const reply = (uuid: string, msgId: string, blocks: object[], usage: object, extra: object = {}) =>
+    ({ ...assistant(uuid, blocks, side), message: { id: msgId, role: 'assistant', model: 'claude-test', content: blocks, usage }, ...extra })
+  const file = join(sub, `agent-${PLAIN}.jsonl`)
+  writeFileSync(file, [
+    prompt('t1', 'Review the parser', { ...side, parentUuid: null }),
+    // One reply, logged once per content block: its output counts once, at its largest.
+    reply('t2', 'msg-1', [{ type: 'text', text: 'Reading the parser.' }], { input_tokens: 10, cache_creation_input_tokens: 5000, cache_read_input_tokens: 0, output_tokens: 40 }),
+    reply('t3', 'msg-1', [toolUse('tu-r1', 'Read', { file_path: '/tmp/agents/normalize.ts' })], { input_tokens: 10, cache_creation_input_tokens: 5000, cache_read_input_tokens: 0, output_tokens: 120 }),
+    result('t4', 'tu-r1', 'the file', undefined, side),
+  ].map(line).join(''))
+  agents.pollAgents()
+  let a = agents.listAgents(id).agents.find((x) => x.id === PLAIN)!
+  assert.equal(a.status, 'running')
+  assert.equal(a.tokens, 5010 + 120)
+  // The next reply: its context replaces the last one's, its output adds to theirs. An unmetered one isn't counted.
+  appendFileSync(file, [
+    reply('t5', 'msg-2', [toolUse('tu-b1', 'Bash', { command: 'npm test' })], { input_tokens: 2, cache_creation_input_tokens: 800, cache_read_input_tokens: 5010, output_tokens: 60 }),
+    reply('t6', 'msg-3', [{ type: 'text', text: 'Unmetered.' }], { input_tokens: 9_000_000, output_tokens: 9_000_000 }, { isUnmetered: true }),
+  ].map(line).join(''))
+  agents.pollAgents()
+  a = agents.listAgents(id).agents.find((x) => x.id === PLAIN)!
+  assert.equal(a.tokens, 2 + 800 + 5010 + 120 + 60)
+  assert.equal(a.activity, 'Bash: npm test')
+})
+
 test('an agent\'s transcript is served from its own file, only for an agent of that session', () => {
   const id = 'eeeeeeee-0000-4000-8000-000000000002'
   const { sub } = makeSession(id, [...launchAgent('toolu_a1', PLAIN, 'Review the parser')])

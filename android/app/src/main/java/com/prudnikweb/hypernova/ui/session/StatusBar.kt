@@ -50,12 +50,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -99,6 +101,8 @@ internal class StatusBarState(
     val away: String? = null,
     /** The session's running workflow: opened, the bar lists its agents (and the to-dos under them). */
     val workflow: WorkflowView? = null,
+    /** The agents at work outside a running workflow: opened, the bar lists the main agent and them. */
+    val agents: List<BarAgent> = emptyList(),
 ) {
     val visible: Boolean get() = model != null
 }
@@ -114,11 +118,15 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     val pending = remember(items) { items.lastOrNull { it is Item.Approval && it.resolved == null } as? Item.Approval }
     val reads = remember(items) { trailingReads(items) }
     val workflow = remember(items) { runningWorkflow(items) }
+    // The agents at work beside the main one, from the board (a new board as they change).
+    val board = hub.agents(session.id)
+    val asking = remember(items) { askingAgents(items) }
+    val agents = remember(board, asking) { barAgents(board, asking) }
     // Stop sends Esc to a shared terminal or interrupts a session the Mac runs; a terminal session
     // the Mac only watches can't be stopped from here (the Mac answers 409).
     val stoppable = session.term != null || session.origin == "hypernova" || hub.isDemo
     val raw = statusBar(
-        BarInput(session.phase, session.state, session.activity, sending, session.agentsRunning, pending, todos, reads, stoppable = stoppable, workflow = workflow),
+        BarInput(session.phase, session.state, session.activity, sending, session.agentsRunning, pending, todos, reads, stoppable = stoppable, workflow = workflow, agents = agents),
     )
     val isError = raw?.tone == BarTone.Error
     // Kept out here so the list stays open (or folded) across short gaps between two steps.
@@ -136,7 +144,7 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     return StatusBarState(model, todos, open, {
         open = !open
         if (isError) kept = !kept
-    }, away = away, workflow = workflow)
+    }, away = away, workflow = workflow, agents = agents)
 }
 
 /**
@@ -144,8 +152,11 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
  * of what Claude is doing, the to-dos as 3/7, the turn's time and Stop, with a thin progress line
  * along the bottom. It is the to-do panel folded: tap it to open the checklist, tap again to fold
  * it. When the turn ends it folds away; it keeps its last look while it does. While a workflow
- * runs it says the workflow's name and counts its agents instead ("review-changes 1/7"), and
- * opens to them, the to-dos under them.
+ * runs it says the workflow's name and counts its agents instead, with its own time and tokens
+ * as Claude Code's footer writes them ("review-changes 1/7 · 19m08s · ↓ 181.1k"), and opens to
+ * them, the to-dos under them. With no workflow, while the main agent's agents work, it says
+ * "main + 3 agents" and opens to the main agent and a row for each, as Claude Code's footer lists
+ * them (owner, 2026-10-30). The to-dos keep a labelled tally of their own, never read as agents.
  */
 @Composable
 internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modifier: Modifier = Modifier) {
@@ -175,7 +186,8 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
         val shown = model ?: last[0]
         if (shown != null) {
             Column {
-                StatusCard(shown, bar.todos, bar.workflow, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex) {
+                val opener = com.prudnikweb.hypernova.ui.LocalOpener.current
+                StatusCard(shown, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }) {
                     if (!stopping) {
                         stopping = true
                         hub.interrupt(session.id)
@@ -188,7 +200,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
 }
 
 @Composable
-private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowView?, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onStop: () -> Unit) {
+private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowView?, barAgents: List<BarAgent>, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onOpenAgent: (String) -> Unit, onStop: () -> Unit) {
     // Ticks once a second while the card is on screen and the Mac is linked; gone with it.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(away == null) {
@@ -198,23 +210,39 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowVie
         }
     }
     val tone by animateColorAsState(if (away != null) HN.inkDim else toneColor(model.tone), tween(300), label = "statusTone")
+    val res = LocalContext.current.resources
     val said = away ?: sayText(model.say)
-    val time = clockText(now - since)
+    val turnMs = now - since
+    // A running workflow's own time and tokens, as Claude Code's footer writes them (19m08s,
+    // ↓ 181.1k); otherwise the turn's clock.
+    val run = workflow?.takeIf { model.hasWorkflow }
+    val runMs = run?.let { (now - it.startedAt).coerceAtLeast(0) }
+    val runTokens = run?.let { workflowTokens(it) }
+    val time = if (runMs != null) {
+        listOfNotNull(ccDuration(runMs), runTokens?.let { stringResource(R.string.status_tokens_short, ccTokens(it)) }).joinToString(" · ")
+    } else clockText(turnMs)
+    val timeSaid = if (runMs != null) {
+        listOfNotNull(stringResource(R.string.status_run_said, durationSaid(res, runMs)), runTokens?.let { tokensSaid(res, it) }).joinToString(", ")
+    } else clockText(turnMs)
     // The workflow's agents, phase by phase as its card has them, then any of no phase.
     val agents = remember(workflow) { workflow?.let { w -> w.phases.flatMap { it.agents } + w.loose }.orEmpty() }
     val listsAgents = model.hasWorkflow && agents.isNotEmpty()
-    val expandable = model.hasTodos || listsAgents
+    // No workflow: the main agent and the agents it runs, a row each.
+    val listsMain = model.hasAgents
+    val expandable = model.hasTodos || listsAgents || listsMain
+    val saidAloud = if (away == null && model.say.kind == SayKind.MainAndAgents) pluralStringResource(R.plurals.status_main_agents_said, model.say.n, model.say.n) else said
     val spoken = when {
         model.hasWorkflow && away == null && model.say.kind == SayKind.Workflow ->
-            stringResource(R.string.status_desc_workflow_only, model.workflow!!, model.done, model.total, time)
-        model.hasWorkflow -> stringResource(R.string.status_desc_workflow, said, model.workflow!!, model.done, model.total, time)
-        model.hasTodos -> stringResource(R.string.status_desc_todos, said, model.done, model.total, time)
-        else -> stringResource(R.string.status_desc_plain, said, time)
+            stringResource(R.string.status_desc_workflow_only, model.workflow!!, model.done, model.total, timeSaid)
+        model.hasWorkflow -> stringResource(R.string.status_desc_workflow, said, model.workflow!!, model.done, model.total, timeSaid)
+        model.hasTodos -> stringResource(R.string.status_desc_todos, saidAloud, model.done, model.total, timeSaid)
+        else -> stringResource(R.string.status_desc_plain, saidAloud, timeSaid)
     }
     val stateWord = stringResource(if (open) R.string.status_open else R.string.status_folded)
     val label = stringResource(
         when {
             listsAgents -> if (open) R.string.status_fold_agents else R.string.status_expand_agents
+            listsMain -> if (open) R.string.status_fold_main else R.string.status_expand_main
             else -> if (open) R.string.status_fold else R.string.status_expand
         },
     )
@@ -241,7 +269,11 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowVie
                 Box(Modifier.size(7.dp).background(tone, RoundedCornerShape(50)))
                 Spacer(Modifier.width(10.dp))
                 HText(said, style = Type.small, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (model.counted) {
+                if (model.hasTodos) {
+                    // The to-dos' tally, labelled so it never reads as a count of agents.
+                    Spacer(Modifier.width(10.dp))
+                    TodoTally(model.done, model.total)
+                } else if (model.counted) {
                     Spacer(Modifier.width(10.dp))
                     HText("${model.done}/${model.total}", style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
                 }
@@ -257,8 +289,17 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowVie
         }
         if (open && listsAgents) {
             WorkflowAgents(agents)
-            // The to-dos stay a tap away under the agents, not in the tally.
-            if (todos.isNotEmpty()) TodoChecklist(todos)
+            // The to-dos stay a tap away under the agents, not in the tally, under their own heading.
+            if (todos.isNotEmpty()) {
+                TodoHeading(todos)
+                TodoChecklist(todos)
+            }
+        } else if (open && listsMain) {
+            MainAndAgents(model, turnMs, barAgents, now, onOpenAgent)
+            if (todos.isNotEmpty()) {
+                TodoHeading(todos)
+                TodoChecklist(todos)
+            }
         } else if (open && expandable) TodoChecklist(todos)
         StatusLine(model, tone, Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 10.dp), frozen = away != null)
     }
@@ -369,6 +410,9 @@ private fun sayText(s: Say): String = when (s.kind) {
     SayKind.Planning -> stringResource(R.string.status_planning)
     SayKind.Tool -> stringResource(R.string.status_tool, s.arg)
     SayKind.Workflow -> stringResource(R.string.status_workflow, s.arg)
+    SayKind.MainAndAgents -> pluralStringResource(R.plurals.status_main_agents, s.n, s.n)
+    SayKind.MainWaiting -> stringResource(R.string.status_main_waiting)
+    SayKind.Raw -> s.arg
     SayKind.WaitApprove -> stringResource(R.string.status_wait_approve, s.arg)
     SayKind.WaitAnswer -> stringResource(R.string.status_wait_answer)
     SayKind.WaitPlan -> stringResource(R.string.status_wait_plan)
@@ -438,5 +482,150 @@ private fun WorkflowAgentRow(a: AgentView) {
             },
             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
         )
+    }
+}
+
+/** The folded bar's to-do tally, `TO-DO 7/10`: labelled, so it never reads as a count of agents. */
+@Composable
+private fun TodoTally(done: Int, total: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        HText(stringResource(R.string.status_todo_label).uppercase(), style = Type.label, color = HN.accentDim, maxLines = 1)
+        Spacer(Modifier.width(5.dp))
+        HText("$done/$total", style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
+    }
+}
+
+/** The to-dos' heading in the opened bar, under the agents: `TO-DO 7/10`. TalkBack hears a heading. */
+@Composable
+private fun TodoHeading(todos: List<Todo>) {
+    val done = todos.count { it.status == TodoStatus.Done }
+    val said = stringResource(R.string.status_todo_heading_said, done, todos.size)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics { contentDescription = said; heading() }
+            .padding(start = 20.dp, end = 14.dp, top = 6.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TodoTally(done, todos.size)
+    }
+}
+
+/**
+ * The main agent and the agents it runs, as Claude Code's footer lists them (owner, 2026-10-30):
+ * the main agent's row (what it does, the turn's time), then a row per agent, oldest first. The
+ * newest stays in view.
+ */
+@Composable
+private fun MainAndAgents(model: BarModel, turnMs: Long, agents: List<BarAgent>, now: Long, onOpen: (String) -> Unit) {
+    val list = rememberLazyListState()
+    LaunchedEffect(agents.size) { if (agents.size > 3) list.animateScrollToItem(agents.size) }
+    LazyColumn(
+        Modifier.fillMaxWidth().heightIn(max = 220.dp),
+        state = list,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 8.dp),
+    ) {
+        item(key = "main") { MainRow(model, turnMs) }
+        items(agents, key = { it.id }) { a -> BarAgentRow(a, now, onOpen = { onOpen(a.id) }) }
+    }
+}
+
+/** The main agent: turning while it works, amber when it needs you, still while it waits on its agents. */
+@Composable
+private fun MainRow(model: BarModel, turnMs: Long) {
+    val res = LocalContext.current.resources
+    val doing = sayText(model.main)
+    val name = stringResource(R.string.status_main)
+    val said = listOf(name, doing, durationSaid(res, turnMs)).joinToString(", ")
+    val activity = when {
+        model.tone == BarTone.NeedsYou -> Activity.Alert
+        model.tone == BarTone.Working && model.main.kind != SayKind.MainWaiting -> Activity.Live
+        else -> Activity.Rest
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp)
+            .clearAndSetSemantics { contentDescription = said }
+            .padding(horizontal = 6.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) { Planet(activity) }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HText(name, style = Type.monoSmall, color = HN.ink, maxLines = 1, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                HText(ccDuration(turnMs), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+            }
+            HText(
+                doing, style = Type.small, color = if (model.tone == BarTone.NeedsYou) HN.amber else HN.inkMuted,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        // As wide as the agents' chevron, so the times line up.
+        Spacer(Modifier.width(16.dp))
+    }
+}
+
+/**
+ * One agent at work: its kind in mono, and on the right how long it has run and its tokens as
+ * Claude Code writes them (`4m12s · ↓ 81.2k tokens`); under it what it does now in words, or what
+ * it's for before its first step. Amber while it asks. A tap opens its screen.
+ */
+@Composable
+private fun BarAgentRow(a: BarAgent, now: Long, onOpen: () -> Unit) {
+    val res = LocalContext.current.resources
+    val ms = (now - a.startedAt).coerceAtLeast(0)
+    val doing = when {
+        a.asking -> stringResource(R.string.status_wait_you)
+        else -> a.doing?.let { sayText(it) } ?: a.task
+    }
+    val figures = listOfNotNull(ccDuration(ms), a.tokens?.let { stringResource(R.string.status_tokens_figure, ccTokens(it)) }).joinToString(" · ")
+    val said = listOfNotNull(a.kind, a.task, a.doing?.let { sayText(it) }?.takeIf { it != a.task }, if (a.asking) doing else null, durationSaid(res, ms), a.tokens?.let { tokensSaid(res, it) })
+        .joinToString(", ")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (a.asking) HN.amber.copy(alpha = 0.07f) else HN.accent.copy(alpha = 0.05f))
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.session_sheet_open_agent), onClick = onOpen)
+            .semantics(mergeDescendants = true) { contentDescription = said }
+            .padding(horizontal = 6.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) { Planet(if (a.asking) Activity.Alert else Activity.Live) }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HText(a.kind, style = Type.monoSmall, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                HText(figures, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+            }
+            if (doing != null) {
+                HText(doing, style = Type.small, color = if (a.asking) HN.amber else HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Spacer(Modifier.width(6.dp))
+        Icon(Glyph.Chevron, size = 10.dp, color = HN.inkDim)
+    }
+}
+
+/** How long, for TalkBack: "42 seconds", "4 minutes", "1 hour 12 minutes". */
+internal fun durationSaid(res: android.content.res.Resources, ms: Long): String {
+    val s = (ms / 1000).coerceAtLeast(0).toInt()
+    return if (s < 60) res.getQuantityString(R.plurals.status_seconds_said, s, s)
+    else com.prudnikweb.hypernova.ui.stats.hoursSaid(res, ms)
+}
+
+/** Tokens, for TalkBack: "980 tokens", "81 thousand tokens", "1.2 million tokens". */
+internal fun tokensSaid(res: android.content.res.Resources, n: Long): String {
+    val t = spokenTokens(n)
+    return when (t.scale) {
+        TokenScale.Units -> res.getQuantityString(R.plurals.status_tokens_said_units, t.count, t.count)
+        TokenScale.Thousands -> res.getString(R.string.status_tokens_said_thousands, t.figure)
+        TokenScale.Millions -> res.getString(R.string.status_tokens_said_millions, t.figure)
     }
 }
