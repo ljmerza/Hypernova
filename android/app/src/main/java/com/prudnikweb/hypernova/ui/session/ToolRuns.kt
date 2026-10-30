@@ -34,6 +34,12 @@ internal sealed interface ChatRow {
                 return counts.map { (v, n) -> v to n }
             }
     }
+
+    /** Fork: the asks still waiting for an answer, stacked in one row at the end (AskStack.kt). */
+    data class Asks(val asks: List<Item.Approval>) : ChatRow {
+        override val key: String get() = "asks"
+        override fun has(itemKey: String) = asks.any { it.key == itemKey }
+    }
 }
 
 /** Pure, unit-tested. */

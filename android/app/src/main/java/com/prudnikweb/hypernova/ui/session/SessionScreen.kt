@@ -55,6 +55,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableFloatStateOf
@@ -160,8 +161,9 @@ import kotlinx.coroutines.launch
 
 private val EDIT_TOOLS = setOf("Write", "Edit", "MultiEdit", "NotebookEdit")
 
+/** [opening]: which opening of the session this is (a new one each time it's opened; see below). */
 @Composable
-fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
+fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int = 0) {
     val haze = LocalHaze.current
     val opener = LocalOpener.current
     val toast = LocalToast.current
@@ -339,10 +341,25 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
     // Claude is working in stays open by itself until it's tapped shut.
     // Fork: a tool's permission card goes once it's answered, as in Claude Code's terminal; only a
     // denial stays (worth seeing later). Questions and plans stay: their answers are the content.
-    val rows = ToolRuns.rows(items.filterNot { it is Item.Approval && it.kind == com.prudnikweb.hypernova.data.ApprovalKind.Tool && it.resolved != null && it.resolved != com.prudnikweb.hypernova.data.Resolution.Denied })
+    // Fork: the asks still waiting are one stack, the last row of all, under prompts waiting in the
+    // queue too (AskStack.kt).
+    val (chat, asks) = Asks.split(items.filterNot { it is Item.Approval && it.kind == com.prudnikweb.hypernova.data.ApprovalKind.Tool && it.resolved != null && it.resolved != com.prudnikweb.hypernova.data.Resolution.Denied })
+    val rows = ToolRuns.rows(chat).let { if (asks.isEmpty()) it else it + ChatRow.Asks(asks) }
     val labelled = ToolRuns.labelled(items)
     val runOpen = remember(sessionId) { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
     val liveRowKey = items.getOrNull(liveAt)?.let { live -> rows.lastOrNull { it.has(live.key) } }?.key
+    // Fork: each opening of the session (from Home, a notification, the banner) lands at the latest
+    // and follows it. The app keeps a screen's saved state after it's closed, so the list used to
+    // come back where it was left, not following if it had been scrolled up. Coming back from a
+    // screen opened over it (an agent, a file) still keeps the place: that's the same opening.
+    val openedAs = rememberSaveable { intArrayOf(opening) }
+    if (openedAs[0] != opening) {
+        openedAs[0] = opening
+        follow = true
+        // Rows, plus "Show earlier" above them (or the one "empty" row).
+        val end = if (items.isEmpty()) 0 else (rows.size - 1 + if (hub.hasEarlier(sessionId)) 1 else 0).coerceAtLeast(0)
+        SideEffect { list.requestScrollToItem(end, Int.MAX_VALUE) }
+    }
     // Claude at work: the status line's string vibrates and says what it's doing, so a sent
     // prompt never meets silence. "Sending" lasts only while the prompt is on its way: a command
     // the transcript never logs settles after a few seconds instead of sending forever, and one
@@ -405,8 +422,9 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
         if (last is Item.Approval && last.resolved == null) {
             // A new question or plan can be taller than the screen: show where it starts.
             withFrameNanos { }
-            // An approval is never folded: its own row in the list.
-            list.animateScrollToItem(rows.indexOfFirst { it.has(last.key) }.coerceAtLeast(0))
+            // An approval is never folded: its own row in the list (the stack's, AskStack.kt), after
+            // "Show earlier" when that's there.
+            list.animateScrollToItem(rows.indexOfFirst { it.has(last.key) }.coerceAtLeast(0) + if (hub.hasEarlier(sessionId)) 1 else 0)
         } else {
             followTail(list, glideFps, motion.reduced)
         }
@@ -461,6 +479,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
                             TranscriptItem(hub, sessionId, member, Modifier.fillMaxWidth(), known = known, onMenu = { menuKey = it.key })
                         }
                     }
+                    is ChatRow.Asks -> AskStack(row.asks, rowModifier) { ask, m -> TranscriptItem(hub, sessionId, ask, m.fillMaxWidth()) }
                 }
             }
         }

@@ -8,7 +8,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,17 +26,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
@@ -45,10 +48,12 @@ import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.Type
+import kotlin.math.abs
 
 /**
  * A notice as a banner at the top, over everything: what happened and in which session. Tap
- * it to go there; swipe it up to dismiss. One at a time, the newest replacing the last.
+ * it to go there; swipe it up or sideways, or tap ×, to dismiss. One at a time, the newest
+ * replacing the last.
  */
 @Composable
 fun NoticeHost(notice: Notice?, onOpen: (Notice) -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier, onAction: (Notice) -> Unit = {}) {
@@ -63,21 +68,34 @@ fun NoticeHost(notice: Notice?, onOpen: (Notice) -> Unit, onDismiss: () -> Unit,
             val last = remember { arrayOfNulls<Notice>(1) }
             if (notice != null) last[0] = notice
             val n = last[0] ?: return@AnimatedVisibility
-            var drag by remember(n.id) { mutableFloatStateOf(0f) }
+            var drag by remember(n.id) { mutableStateOf(Offset.Zero) }
             val color = noticeColor(n.kind)
             Row(
                 Modifier
                     .padding(top = top + 8.dp, start = 12.dp, end = 12.dp)
                     .fillMaxWidth()
-                    .graphicsLayer { translationY = drag.coerceAtMost(0f) }
+                    // Fork: the drag is read outside the moving layer (read inside it, the banner's own
+                    // move took back half of each step), and sideways goes too, as Android's own do.
+                    .pointerInput(n.id) {
+                        detectDragGestures(
+                            onDragEnd = { if (drag.y < -40f || abs(drag.x) > size.width * 0.3f) onDismiss() else drag = Offset.Zero },
+                            onDragCancel = { drag = Offset.Zero },
+                        ) { change, d ->
+                            change.consume()
+                            drag += d
+                        }
+                    }
+                    .graphicsLayer {
+                        translationX = drag.x
+                        translationY = drag.y.coerceAtMost(0f)
+                        alpha = 1f - 0.6f * (abs(drag.x) / size.width).coerceIn(0f, 1f)
+                    }
                     // The pop-ups' glass, its colour only a thin edge (owner, 2026-10-18).
                     .popupGlass(null, radius = 18.dp)
                     .accentEdge(color)
-                    .pointerInput(n.id) {
-                        detectVerticalDragGestures(onDragEnd = { if (drag < -40f) onDismiss() else drag = 0f }) { _, dy -> drag += dy }
-                    }
                     .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onOpen(n) }
-                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                    // Fork: less on the right, where the × has its own 48dp.
+                    .padding(start = 16.dp, end = 4.dp, top = 13.dp, bottom = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(color))
@@ -97,6 +115,17 @@ fun NoticeHost(notice: Notice?, onOpen: (Notice) -> Unit, onDismiss: () -> Unit,
                 if (n.action == Notice.ACTION_EXTEND) {
                     Spacer(Modifier.width(12.dp))
                     Pill(stringResource(R.string.notice_extend), { onAction(n) }, kind = PillKind.Primary, height = 36.dp)
+                }
+                // Fork: × puts it away (the owner couldn't swipe it away; a tap is sure, and TalkBack's).
+                val dismiss = stringResource(R.string.notice_dismiss)
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = dismiss, onClick = onDismiss)
+                        .semantics { contentDescription = dismiss },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Glyph.Cross, size = 12.dp, color = HN.inkMuted)
                 }
             }
         }

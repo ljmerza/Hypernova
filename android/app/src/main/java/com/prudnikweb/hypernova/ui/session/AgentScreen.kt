@@ -113,6 +113,8 @@ fun AgentScreen(hub: Hub, sessionId: String, agentId: String, onBack: () -> Unit
     }
     val list = events
     val items = if (list == null) emptyList() else hub.agentTranscript(sessionId, agentId, list)
+    // Fork: its asks still waiting are one stack at the end, as in the session's chat (AskStack.kt).
+    val (chat, asks) = Asks.split(items)
     val state = agent?.let { agentState(it.status) }
     val asking = items.any { it is Item.Approval && it.resolved == null }
     val res = LocalContext.current.resources
@@ -126,7 +128,8 @@ fun AgentScreen(hub: Hub, sessionId: String, agentId: String, onBack: () -> Unit
         }
     }
     LaunchedEffect(items.size, items.lastOrNull()?.key) {
-        if (follow && items.isNotEmpty()) listState.scrollToItem(items.lastIndex, Int.MAX_VALUE)
+        // The list's last row: the stack, when there is one.
+        if (follow && items.isNotEmpty()) listState.scrollToItem(chat.size - if (asks.isEmpty()) 1 else 0, Int.MAX_VALUE)
     }
     val ms by produceState(0L, agent?.startedAt, agent?.endedAt, running) {
         val start = agent?.startedAt ?: return@produceState
@@ -217,11 +220,14 @@ fun AgentScreen(hub: Hub, sessionId: String, agentId: String, onBack: () -> Unit
                     }
                 }
             }
-            itemsIndexed(items, key = { _, it -> it.key }) { i, item ->
+            itemsIndexed(chat, key = { _, it -> it.key }) { i, item ->
                 val m = Modifier.fillMaxWidth().animateItem()
                 // What it was asked comes first: folded, as the task it is rather than a message.
                 if (i == 0 && item is Item.User) TaskBubble(item.key, item.text, m)
                 else TranscriptItem(hub, sessionId, item, m)
+            }
+            if (asks.isNotEmpty()) item(key = "asks") {
+                AskStack(asks, Modifier.fillMaxWidth().animateItem()) { ask, m -> TranscriptItem(hub, sessionId, ask, m.fillMaxWidth()) }
             }
         }
     }
