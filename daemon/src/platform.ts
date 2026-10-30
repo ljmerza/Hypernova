@@ -14,10 +14,10 @@ import type { NetworkInterfaceInfo } from 'node:os'
 export type Platform = 'darwin' | 'linux'
 
 /**
- * Where Hypernova's builds are published (the Mac's disk image, the Linux package, the Android app):
+ * Where this fork's builds are published (the Linux server package and the Android app):
  * a phone gets the app there when this computer has none to hand out (a Linux package carries none).
  */
-export const RELEASES = 'https://github.com/prudnik-web/Hypernova/releases/latest'
+export const RELEASES = 'https://github.com/ljmerza/Hypernova/releases/latest'
 
 /** macOS is the Mac; anything else is treated as Linux, the only other system Hypernova supports. */
 export const platformOf = (os: NodeJS.Platform | string): Platform => (os === 'darwin' ? 'darwin' : 'linux')

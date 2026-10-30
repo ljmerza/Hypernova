@@ -22,16 +22,16 @@ Run it as the user who will use Claude Code or Codex, not as root. The script as
 packages only.
 
 ```sh
-# The release's package (https://github.com/prudnik-web/Hypernova/releases/latest, checksums in
-# SHA256SUMS.txt; the guide is at https://hypernova.nikbraun.tech), on the server:
-sha256sum -c --ignore-missing SHA256SUMS.txt
-tmp=$(mktemp -d) && tar -xzf Hypernova-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
+# A release's server package (https://github.com/ljmerza/Hypernova/releases/latest:
+# hypernova-server-<tag>-linux.tar.gz, one package for x86_64 and arm64), on the server:
+gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the page
+tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
 
 # From a checkout of this repository, on the server:
 scripts/install-linux.sh
 
 # A package of your own: on your computer,
-scripts/pack-linux.sh            # writes dist/linux/hypernova-<version>.tar.gz
+scripts/pack-linux.sh            # writes dist/linux/hypernova-<version>.tar.gz (a release renames it)
 scp dist/linux/hypernova-*.tar.gz you@server:
 # then on the server, from an unpacked copy's script or a checkout's:
 scripts/install-linux.sh --from hypernova-<version>.tar.gz
@@ -217,8 +217,9 @@ What keeps working on Linux:
 
 ## Updating
 
-Run the install script again from the new package (the release's `Hypernova-linux.tar.gz`, as at
-the first install), checkout or tarball (or `hypernova setup --from <dir>`).
+Run the install script again from the new package (a newer release's
+`hypernova-server-<tag>-linux.tar.gz`, as at the first install), checkout (`git pull`, then
+`scripts/install-linux.sh`) or tarball (or `hypernova setup --from <dir>`).
 The new daemon is prepared beside the old one and swapped in only once its terminal module works,
 then the service restarts; open sessions keep running. (Docker: see "Updating the container" above.)
 

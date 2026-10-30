@@ -4,6 +4,7 @@
 # it draws the terminal with, and the install script. Then, on the server:
 #   tar -xzf hypernova-<version>.tar.gz && hypernova-<version>/scripts/install-linux.sh
 # or: scripts/install-linux.sh --from hypernova-<version>.tar.gz   (docs/LINUX.md)
+# A release (.github/workflows/android-release.yml) attaches it as hypernova-server-<tag>-linux.tar.gz.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(sed -n 's/^export const VERSION = .\([0-9.]*\).*/\1/p' "$ROOT/daemon/src/util.ts")"

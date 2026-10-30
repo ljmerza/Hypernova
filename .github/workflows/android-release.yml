@@ -1,16 +1,24 @@
 name: android-release
-# The signed APK for the phone, built with the fork's own release key (repo secrets). Every push to
-# main that touches the app (and a manual run) builds it and publishes the next v<version>-ljm.<n>
-# release with the APK attached as hypernova-<tag>.apk, so a download says which build it is. A
-# release published by hand gets its APK attached too. The key must never change: Android only
-# installs an update signed with the key the installed app has.
+# The fork's releases: the signed APK for the phone, built with the fork's own release key (repo
+# secrets), and the Linux server package (scripts/pack-linux.sh). Every push to main that touches the
+# app, the daemon or the server's install scripts (and a manual run) builds both and publishes the
+# next v<version>-ljm.<n> release with hypernova-<tag>.apk and hypernova-server-<tag>-linux.tar.gz
+# attached, so a download says which build it is. One job, so one push makes one release, and every
+# release has both files (a daemon-only fix rebuilds the same app). A release published by hand gets
+# both attached too. The key must never change: Android only installs an update signed with the key
+# the installed app has.
 #
 # Secrets: HYPERNOVA_KEYSTORE_B64 (base64 of the .jks), HYPERNOVA_KEYSTORE_PASSWORD,
 # HYPERNOVA_KEY_ALIAS, HYPERNOVA_KEY_PASSWORD.
 on:
   push:
     branches: [main]
-    paths: ['android/**', '.github/workflows/android-release.yml']
+    paths:
+      - 'android/**'
+      - 'daemon/**'
+      - 'scripts/pack-linux.sh'
+      - 'scripts/install-linux.sh'
+      - '.github/workflows/android-release.yml'
   release:
     types: [published]
   workflow_dispatch:
@@ -70,6 +78,15 @@ jobs:
           echo "HYPERNOVA_KEYSTORE_PROPS=$dir/keystore.properties" >> "$GITHUB_ENV"
       # distRelease refuses without the release key and verifies the signed APK; output in ../dist.
       - run: ./gradlew :app:distRelease --stacktrace
+      # The Linux server package: the daemon's sources, its lockfile, the font and the install
+      # script (no node_modules, no Node: the install script fetches Node for the server's own
+      # architecture and builds node-pty there, so one package serves x86_64 and arm64). Its path,
+      # dist/linux/hypernova-<version>.tar.gz, is the script's last line.
+      - name: Linux server package
+        run: |
+          tgz=$(../scripts/pack-linux.sh | tail -1)
+          test -s "$tgz"
+          echo "SERVER_TGZ=$tgz" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
         with:
           name: hypernova-apk
@@ -77,6 +94,7 @@ jobs:
             dist/hypernova.apk
             dist/hypernova.json
             dist/hypernova-mapping.txt
+            dist/linux/hypernova-*.tar.gz
       - name: Attach to the release
         if: github.event_name == 'release'
         env:
@@ -84,10 +102,12 @@ jobs:
         run: |
           tag="${{ github.event.release.tag_name }}"
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
-          gh release upload "$tag" "../dist/hypernova-$tag.apk" --clobber
+          cp "$SERVER_TGZ" "../dist/hypernova-server-$tag-linux.tar.gz"
+          gh release upload "$tag" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" --clobber
       # A push or a manual run: the next v<appVersion>-ljm.<n> after the newest fork release, with
-      # the APK on it once, as hypernova-<tag>.apk (a download says which build it is). A release
-      # made with the workflow token starts no other workflows.
+      # the APK on it once, as hypernova-<tag>.apk, and the server as
+      # hypernova-server-<tag>-linux.tar.gz (a download says which build it is). A release made with
+      # the workflow token starts no other workflows.
       - name: Publish the next release
         if: github.event_name != 'release'
         env:
@@ -98,5 +118,7 @@ jobs:
           last=$(gh release list -L 100 --json tagName -q '.[].tagName' | sed -n "s/^v$base-ljm\.\([0-9]*\)$/\1/p" | sort -n | tail -1)
           tag="v$base-ljm.$(( ${last:-0} + 1 ))"
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
-          gh release create "$tag" "../dist/hypernova-$tag.apk" --target "$GITHUB_SHA" --title "$tag" \
+          cp "$SERVER_TGZ" "../dist/hypernova-server-$tag-linux.tar.gz"
+          gh release create "$tag" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" \
+            --target "$GITHUB_SHA" --title "$tag" \
             --notes "Built from ${GITHUB_SHA::7}: $(git log -1 --format=%s "$GITHUB_SHA")"

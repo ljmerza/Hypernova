@@ -415,7 +415,7 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
   if (p.download) {
     // `apk: null` is the daemon saying it has none; a daemon that doesn't say is taken at its link.
     const noApk = await local(cli, 'GET', '/local/status', undefined, 15_000).then((st) => !!st && 'apk' in st && st.apk == null, () => false)
-    if (noApk) cli.sys.say(`The app, if the phone doesn’t have it yet: Hypernova.apk from ${RELEASES}\n`)
+    if (noApk) cli.sys.say(`The app, if the phone doesn’t have it yet: hypernova-<tag>.apk from ${RELEASES}\n`)
     else if (!/\/\/10\.0\.2\.2[:/]/.test(p.download)) cli.sys.say(`The app, if the phone doesn’t have it yet: ${p.download}\n`)
   }
   if (!flags['no-qr']) {

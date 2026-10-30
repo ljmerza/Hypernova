@@ -1004,7 +1004,7 @@ ${trusted ? '' : `<small class="warn">Opened over your own Wi‑Fi, your browser
 <li>Open it from the notification, or from Files → Downloads.</li>
 <li>Tap <b>Install</b>, or <b>Update</b> if Hypernova is already on this phone. The first time, Android asks to let your browser install apps: allow it, then go back.</li></ol>
 <small>Updating keeps your pairing and settings.</small>`
-    : `<p>The Android app isn’t on this computer. Get <b>Hypernova.apk</b> from <a href="${RELEASES}">Hypernova’s latest release</a>.</p>`
+    : `<p>The Android app isn’t on this computer. Get the APK (<b>hypernova-v….apk</b>) from <a href="${RELEASES}">Hypernova’s latest release</a>.</p>`
   res.writeHead(s ? 200 : 404, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
   res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Get Hypernova</title>
 <style>:root{color-scheme:dark}body{margin:0;min-height:100vh;background:#14110E;color:#F5F2EB;font:500 16px/24px system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
@@ -1018,7 +1018,7 @@ p{color:#B5B0A6;margin:0 0 24px;font-family:ui-monospace,monospace;font-size:13p
 /** The APK (48 MB), with ranges: a download cut off on a phone's network carries on. */
 async function serveApk(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const apk = findApk()
-  if (!apk) return json(res, 404, { error: { code: 'no_apk', message: `The Android app isn’t on this computer: get Hypernova.apk from ${RELEASES}` } })
+  if (!apk) return json(res, 404, { error: { code: 'no_apk', message: `The Android app isn’t on this computer: get hypernova-<tag>.apk from ${RELEASES}` } })
   const s = statSync(apk)
   return sendChecked(req, res, { full: apk, size: s.size, mtime: s.mtimeMs, mime: 'application/vnd.android.package-archive' }, true, 'Hypernova.apk')
 }

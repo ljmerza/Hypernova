@@ -3,6 +3,22 @@
 How a public release of Hypernova is made: the Android APK, the Mac app, and the GitHub release
 that carries them. Each section says what to build, how to check it, and what must never leak.
 
+## This fork's releases
+
+The fork (ljmerza/Hypernova) doesn't run `scripts/release.sh` and builds no Mac app.
+`.github/workflows/android-release.yml` cuts every release: each push to `main` that touches
+`android/`, `daemon/`, `scripts/pack-linux.sh` or `scripts/install-linux.sh` (or a manual run)
+publishes the next `v<appVersion>-ljm.<n>` with two files:
+
+| File | What |
+|---|---|
+| `hypernova-<tag>.apk` | the Android app, signed with the fork's release key (repo secrets), `:app:distRelease` |
+| `hypernova-server-<tag>-linux.tar.gz` | the Linux server package, `scripts/pack-linux.sh` renamed: the daemon's sources and lockfile, the font, the install script, `LINUX.md` as its README. No `node_modules` and no Node, so one package serves x86_64 and arm64 (the install fetches Node.js for the server and builds node-pty there) |
+
+One job builds both, so one push makes one release and every release has both, even when only the
+daemon changed. A release published by hand gets both attached. Installing the server package:
+[INSTALL.md](INSTALL.md), "On a Linux server".
+
 ## Android
 
 The APK people install is the **release build**: shrunk and renamed by R8, not debuggable (so

@@ -167,7 +167,7 @@ if [ -z "$FROM" ]; then
   if [ -f "$HERE/../daemon/package.json" ]; then
     FROM="$(cd "$HERE/.." && pwd)"
   else
-    die "say where the daemon is: --from <repository folder or tarball> (the release's Hypernova-linux.tar.gz: https://github.com/prudnik-web/Hypernova/releases/latest)."
+    die "say where the daemon is: --from <repository folder or tarball> (a release's hypernova-server-<tag>-linux.tar.gz: https://github.com/ljmerza/Hypernova/releases/latest)."
   fi
 fi
 case "$FROM" in

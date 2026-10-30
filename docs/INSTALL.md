@@ -12,7 +12,7 @@ This is the whole install guide. Setup, in the Mac app, uses the same step names
 | | **A Mac** | **A Linux server** | **Docker** |
 | --- | --- | --- | --- |
 | For | Your own Mac, at home or in your bag | A VPS, a home server, a Linux PC | Trying it out, or a box that already runs containers |
-| You install | `Hypernova.dmg`: the menu bar app, the service inside | `Hypernova-linux.tar.gz`: the `hypernova` command and the service | The image built from this repository |
+| You install | Upstream's `Hypernova.dmg` (not built in this fork): the menu bar app, the service inside | `hypernova-server-<tag>-linux.tar.gz`: the `hypernova` command and the service | The image built from this repository |
 | You drive it with | Setup and the menu bar | `hypernova` over SSH | `docker exec … hypernova` |
 | Runs | macOS 14 or later, Apple silicon | Ubuntu or Debian, x86_64 or arm64, systemd | Docker (tested on arm64; the image is about 2.7 GB) |
 
@@ -43,21 +43,19 @@ downloads Claude Code's SDK from npm (about 2 MB; see [Background service](#2-ba
 
 ## 1. Download
 
-From the [latest release](https://github.com/prudnik-web/Hypernova/releases/latest), download what
-you need:
+This fork's releases are on [GitHub](https://github.com/ljmerza/Hypernova/releases/latest). Each
+one is named `v<version>-ljm.<n>` (the tag below) and carries:
 
-- `Hypernova.dmg`: the Mac app
-- `Hypernova-linux.tar.gz`: the Linux package
-- `Hypernova.apk`: the Android app (a Mac can also hand it to your phone during Setup)
-- `SHA256SUMS.txt`: their checksums
+- `hypernova-server-<tag>-linux.tar.gz`: the Linux server package (one package for x86_64 and
+  arm64: Node.js and the terminal module are fetched and built for the server at install)
+- `hypernova-<tag>.apk`: the Android app
 
-To check the downloads, run this in the folder you saved them to. Each file you downloaded should
-say `OK`:
+On the server, `gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'`
+fetches the newest server package; or save it from the release page and copy it over.
 
-```sh
-shasum -a 256 -c --ignore-missing SHA256SUMS.txt     # on a Mac
-sha256sum -c --ignore-missing SHA256SUMS.txt         # on Linux
-```
+The Mac app (`Hypernova.dmg`) is upstream's and isn't built in this fork: get it from
+[upstream's releases](https://github.com/prudnik-web/Hypernova/releases/latest), which also
+publish `SHA256SUMS.txt` for their files (`shasum -a 256 -c --ignore-missing SHA256SUMS.txt`).
 
 ## 2. On a Mac
 
@@ -241,10 +239,19 @@ packages only). On a fresh VPS, make that user first: `adduser claude`, then log
 
 ### Install
 
+From a release's server package (see [Download](#1-download)):
+
 ```sh
 tmp=$(mktemp -d)
-tar -xzf Hypernova-linux.tar.gz -C "$tmp"
+tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp"
 "$tmp"/hypernova-*/scripts/install-linux.sh
+```
+
+Or from a clone of this repository:
+
+```sh
+git clone https://github.com/ljmerza/Hypernova.git && cd Hypernova
+scripts/install-linux.sh
 ```
 
 The script, then `hypernova setup` which it runs for you:
@@ -291,7 +298,7 @@ found, and `hypernova codex off` lets go of it.
 
 ### Pair your phone
 
-1. Install `Hypernova.apk` on the phone: open it from the phone's Downloads, and when Android asks,
+1. Install `hypernova-<tag>.apk` (from the [latest release](https://github.com/ljmerza/Hypernova/releases/latest)) on the phone: open it from the phone's Downloads, and when Android asks,
    allow installs from that source. (A Linux server carries no copy of the app to hand out.)
 2. On the server:
 
@@ -348,7 +355,7 @@ have (battery, Stay awake, the Mac's voice).
 The quick way to try it, on a machine with Docker. The image is built from this repository:
 
 ```sh
-git clone https://github.com/prudnik-web/Hypernova.git && cd Hypernova
+git clone https://github.com/ljmerza/Hypernova.git && cd Hypernova
 docker build -t hypernova .
 docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped \
   --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
@@ -382,7 +389,7 @@ Linux machine.
 
 > **Experimental.** These steps are written from Microsoft's and Docker's documentation and from
 > Hypernova's Linux tests. **Nobody has tried them on a real Windows PC yet.** If you do, please
-> [open an issue](https://github.com/prudnik-web/Hypernova/issues) with what worked and what
+> [open an issue](https://github.com/ljmerza/Hypernova/issues) with what worked and what
 > `hypernova doctor` printed (it names your folders: look it over first).
 
 **What works**, as on any Linux (tested on Linux and in Linux containers, not on Windows): the
@@ -433,10 +440,8 @@ the image on an x86_64 PC (the image is tested on arm64 so far), and Windows on 
 
    ```sh
    cd ~
-   curl -fLO https://github.com/prudnik-web/Hypernova/releases/latest/download/Hypernova-linux.tar.gz
-   curl -fLO https://github.com/prudnik-web/Hypernova/releases/latest/download/SHA256SUMS.txt
-   sha256sum -c --ignore-missing SHA256SUMS.txt
-   tmp=$(mktemp -d) && tar -xzf Hypernova-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
+   # hypernova-server-<tag>-linux.tar.gz from https://github.com/ljmerza/Hypernova/releases/latest
+   tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
    ```
 
    The script says it found WSL, and installs Claude Code's Linux build unless you add
@@ -466,7 +471,7 @@ the image on an x86_64 PC (the image is tested on arm64 so far), and Windows on 
 
    It shows Tailscale's sign-in first (the built-in node: nothing to install, nothing opened on your
    network, and it works from anywhere), then the pairing code, as in
-   [Pair your phone](#pair-your-phone). Install `Hypernova.apk` on the phone first.
+   [Pair your phone](#pair-your-phone). Install `hypernova-<tag>.apk` on the phone first.
 7. **Check it**: `hypernova doctor` adds WSL's own lines (systemd, keeping WSL running, the network
    mode, Tailscale), each with what to do.
 
@@ -509,7 +514,7 @@ so build it from a clone of this repository, in PowerShell (with [Git](https://g
 Ubuntu:
 
 ```sh
-git clone https://github.com/prudnik-web/Hypernova.git
+git clone https://github.com/ljmerza/Hypernova.git
 cd Hypernova
 docker build -t hypernova .
 docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
@@ -526,7 +531,7 @@ x86_64 PC builds the amd64 image, which nobody has tried yet.
 
 ### Updating on Windows
 
-- **WSL:** in Ubuntu, download the new `Hypernova-linux.tar.gz` and run its install script again,
+- **WSL:** in Ubuntu, download the new `hypernova-server-<tag>-linux.tar.gz` and run its install script again,
   as in step 3. Open sessions keep running; phones and settings stay. `wsl --update` updates WSL
   itself.
 - **Docker Desktop:** `git pull` in the clone, then build, remove and run again as in
@@ -547,7 +552,7 @@ x86_64 PC builds the amd64 image, which nobody has tried yet.
 
 The Android app is the same for every computer, and pairs with one at a time.
 
-- **Get it** from the release (`Hypernova.apk`), or, from a Mac, by scanning **Get the app** in
+- **Get it** from the [release](https://github.com/ljmerza/Hypernova/releases/latest) (`hypernova-<tag>.apk`), or, from a Mac, by scanning **Get the app** in
   Setup. Android asks before installing from your browser or Files: allow installs from that
   source, then tap **Install**.
 - **Pair** by scanning the code (Setup's **Your phone** step or **Pair a phone** in the menu bar on a
@@ -670,7 +675,7 @@ launch. The menu bar then says *A newer service is ready*: click **Update**. Sha
 running, and Claude Code's SDK carries over (when the new service wants another version of it, that
 one is downloaded, and the one you had keeps working if it can't be).
 
-**Linux.** Download the new `Hypernova-linux.tar.gz` and run the install script from it again, as
+**Linux.** Download the new `hypernova-server-<tag>-linux.tar.gz` and run the install script from it again, as
 the first time. The new daemon is prepared beside the old one and swapped in once it works; open
 sessions keep running, and your phones and settings stay.
 
@@ -679,7 +684,7 @@ the same volume: `docker build -t hypernova . && docker rm -f hypernova`, then t
 `docker run` as before.
 
 **The phone.** A Mac offers the phone the app it carries, and the app updates itself when a newer
-one is signed with the same key. Anywhere, you can install a newer `Hypernova.apk` over the old
+one is signed with the same key. Anywhere, you can install a newer `hypernova-<tag>.apk` over the old
 one; your pairing stays.
 
 **Claude Code and Codex** update themselves or with `claude update` and `codex update`. Hypernova
@@ -779,7 +784,8 @@ the Mac that runs it); `npm ci` above puts it in your checkout for development.
 
 **Linux.** From a checkout on the server, `scripts/install-linux.sh` installs from it directly.
 `scripts/pack-linux.sh` makes the package (`dist/linux/hypernova-<version>.tar.gz`, with the
-built-in Tailscale when Go is around).
+built-in Tailscale when Go is around); each release attaches it as
+`hypernova-server-<tag>-linux.tar.gz` ([RELEASING.md](RELEASING.md), "This fork's releases").
 
 **The Android app** needs the JDK that comes with Android Studio:
 

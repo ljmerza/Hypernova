@@ -130,12 +130,25 @@ flowchart LR
   for a VPS; the Tailscale app is optional too: Hypernova carries its own node). On the same Wi-Fi
   nothing else is needed.
 
-**1. Install the server**, as the user who'll run the agents (not root). From a clone of this
-repository:
+**1. Install the server**, as the user who'll run the agents (not root). Either from the
+[latest release](https://github.com/ljmerza/Hypernova/releases/latest)'s server package,
+`hypernova-server-<tag>-linux.tar.gz` (one package for x86_64 and arm64):
+
+```bash
+gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the release page
+tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
+```
+
+or from a clone of this repository:
 
 ```bash
 git clone https://github.com/ljmerza/Hypernova.git && cd Hypernova
 scripts/install-linux.sh    # system packages (with sudo), Node.js 24, the daemon, its service
+```
+
+Then sign in to your agents:
+
+```bash
 claude                      # sign in to Claude Code once (the script installed it; --no-claude: Codex alone)
 hypernova codex on          # optional: Codex, installed and signed in (codex login --device-auth)
 ```
