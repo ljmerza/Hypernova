@@ -19,7 +19,7 @@ import { DATA, Frames, MSG, TERMS, boxLines, boxText, codexTuiArgs, frame, isWor
 import { CodexError, codexBinary, codexSocketPath, rpc } from './codex/client.ts'
 import { getThread } from './codex/threads.ts'
 import { isHiddenCwd } from './term/hidden.ts'
-import { bypassBlockedByRoot, has, unavailable } from './platform.ts'
+import { has, unavailable } from './platform.ts'
 
 export type TermView = { id: string; mac: number; phone: number }
 type T = {
@@ -754,7 +754,6 @@ export async function createAgentsSession(o: { cwd: string; model?: string | nul
   const args = ['--bg']
   if (o.model) args.push('--model', o.model)
   if (o.permissionMode) args.push('--permission-mode', o.permissionMode)
-  if (o.permissionMode !== 'bypassPermissions' && !bypassBlockedByRoot()) args.push('--allow-dangerously-skip-permissions')
   if (o.prompt?.trim()) args.push('--', o.prompt)
   const out = await new Promise<string>((ok) => execFile(file, args, { cwd: o.cwd, timeout: 30_000 }, (_e, so, se) => ok(`${so}\n${se}`)))
   const job = /backgrounded\s*·\s*([0-9a-f]{8})/.exec(out)?.[1]
@@ -815,9 +814,8 @@ export function createSharedSession(o: { cwd: string; providerId?: string; model
   // hooks report the real mode.
   const mode = o.permissionMode ?? 'default'
   if (o.permissionMode) args.push('--permission-mode', o.permissionMode)
-  // Lets Shift+Tab reach Bypass later (the phone's mode picker); it starts in the chosen mode.
-  // (Not as root: Claude Code refuses the flag there and would exit at once; platform.ts.)
-  if (o.permissionMode !== 'bypassPermissions' && !bypassBlockedByRoot()) args.push('--allow-dangerously-skip-permissions')
+  // No --allow-dangerously-skip-permissions (owner, 2026-10-30: no bypass for agents): Shift+Tab
+  // never reaches Bypass in a session started in another mode, and the phone doesn't offer it.
   if (o.automation) {
     // Checked against `claude --help` of 2.1.301: --allowedTools takes its rules as separate
     // arguments (it reads until the next option), --name names the session in /resume and the

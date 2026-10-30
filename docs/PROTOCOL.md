@@ -1798,7 +1798,7 @@ Note = { id: string, automationId: string | null, runId: string | null, name: st
   oldest first; more than 10 queued, `skipped`, `queue_full`; queued over 6 hours, `skipped`,
   `stale`. `notify` and `say` pass gates 1 to 3 only (200 a day) and finish at once. `continue`
   takes no slot unless it resumes an ended session.
-- **Start** runs `claude --session-id <id> --permission-mode <mode> --allow-dangerously-skip-permissions
+- **Start** runs `claude --session-id <id> --permission-mode <mode>
   --allowedTools <rule>… --name "<name>, Thu 16 Oct" --append-system-prompt <text> --settings
   <support>/automation-hooks.json -- <prompt>` in a shared terminal (checked against 2.1.301's
   `--help`; `--name` also writes the session's custom title), or through the SDK with the same
