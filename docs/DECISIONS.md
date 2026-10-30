@@ -1847,3 +1847,20 @@ the owner had its one long scroll put in tabs first.
    mark. The open tab is kept while the sheet is; the next time it opens on Overview again.
 4. **Nothing changes on the session's own screen.** The strip and the status line still open the
    sheet; every action in it does what it did.
+
+## Effort for Claude Code sessions (2026-10-30)
+
+The phone offered a reasoning effort only for Codex. The owner chose both places for Claude Code's
+(IDEAS.md, NS1 and SS3):
+
+1. **New session: an Effort chip** between the model and the mode, opening a picker of Default, Low,
+   Medium, High, Extra high and Max. Default passes nothing (Claude Code's own); a level starts the
+   session with `--effort`. The last one started with is remembered on the phone, as the model is.
+   Codex's sessions show no such chip: their effort stays on the model chip and in its picker.
+2. **Session sheet, Overview: the effort under the model**, and a tap changes it while the session
+   is open: the Mac types `/effort <level>` into its terminal (a `claude agents` job's through
+   `claude attach`, never into a holder that shows another session). The five levels only: there is
+   no "back to default" from here.
+3. **What it shows** is what Claude Code's status line says (it reports the level, default or not),
+   else what the session was started with or last set to.
+4. **Nothing new on the session's own screen** (owner): not in the chat, not in its header.

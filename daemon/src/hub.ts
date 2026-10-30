@@ -31,6 +31,12 @@ export type Session = {
   state: SessionState
   providerId: string
   model: string | null
+  /**
+   * Claude Code's reasoning effort ("low"…"max"): what its status line last reported, else what it
+   * was started with or last set to from the phone. Null when unknown (Claude Code's default, not
+   * reported yet) and for Codex, whose effort goes with its model.
+   */
+  effort: string | null
   permissionMode: string
   /**
    * The session can switch to Bypass permissions: always for one the daemon runs itself, and for a
@@ -258,6 +264,7 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
       state: 'idle',
       providerId: m?.providerId ?? 'anthropic',
       model: m?.model ?? null,
+      effort: m?.effort ?? null,
       permissionMode: m?.permissionMode ?? 'default',
       bypassAvailable: !!m && m.engine !== 'term' && !bypassBlockedByRoot(),
       createdAt: m?.createdAt ?? Date.now(),
@@ -464,6 +471,21 @@ export function noteStatusModel(id: string, model: unknown, at: number): void {
   statusModels.set(id, model)
   if (prev === model || at < (r.parse?.modelAt ?? 0)) return
   if (model !== r.model && (!sameModel(model, r.model) || /\[1m\]$/i.test(model))) upsertSession(id, { model })
+}
+
+/** When the phone last set each session's effort: a status line written before then is older news. */
+const effortSetAt = new Map<string, number>()
+export const noteEffortSet = (id: string, at = Date.now()): void => void effortSetAt.set(id, at)
+/**
+ * Claude Code's status line says the effort it runs at (`effort.level`, 2.1.314; its own default
+ * too, and a /effort typed in the terminal): the session shows that, unless the phone set one after
+ * the line was written ([at]: the file's time).
+ */
+export function noteStatusEffort(id: string, level: unknown, at: number): void {
+  if (typeof level !== 'string' || !/^[a-z]{2,16}$/.test(level)) return
+  const r = sessions.get(id)
+  if (!r || isCodexRec(r) || r.effort === level || at < (effortSetAt.get(id) ?? 0)) return
+  upsertSession(id, { effort: level })
 }
 
 // ── What stops Claude (docs/PROTOCOL.md, "Account") ──────────────────────

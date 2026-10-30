@@ -87,7 +87,13 @@ export type ManagedSession = {
    * Claude Code with --append-system-prompt each time it starts or resumes, never as a prompt.
    */
   context?: string
+  /** Claude Code's reasoning effort it was started with (`--effort`) or last set to from the phone (`/effort`); none: Claude Code's default. */
+  effort?: string | null
 }
+
+/** Claude Code's reasoning efforts, lowest first (`claude --help` of 2.1.314: `--effort <level>`; `/effort <level>`). */
+export const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+export const isClaudeEffort = (v: unknown): v is string => typeof v === 'string' && (CLAUDE_EFFORTS as readonly string[]).includes(v)
 
 const P = {
   identity: join(SUPPORT, 'daemon.json'),

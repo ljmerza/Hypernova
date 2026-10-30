@@ -87,6 +87,8 @@ data class WSession(
     val blockedCalls: Int = 0,
     /** Fork: prompts the Mac holds until Claude Code's input box is back, oldest first (docs/PROTOCOL.md, "Held prompts"). */
     val held: List<WQueued> = emptyList(),
+    /** Claude Code's reasoning effort ("low"…"max"; docs/PROTOCOL.md, "A session's effort"); null: not known (its default), Codex, or an older Mac. */
+    val effort: String? = null,
 )
 
 /**
@@ -610,6 +612,7 @@ object Wire {
             question = o.str("question")?.takeIf { it.isNotBlank() },
             blockedCalls = o.int("blockedCalls") ?: 0,
             held = o.arr("held").mapObjects(::queued),
+            effort = o.str("effort")?.takeIf { it.isNotBlank() },
         )
     }
 

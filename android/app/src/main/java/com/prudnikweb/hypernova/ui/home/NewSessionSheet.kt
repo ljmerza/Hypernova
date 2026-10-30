@@ -126,15 +126,15 @@ fun SheetScrim(onDismiss: () -> Unit) {
 }
 
 /** Which picker is open over the sheet. */
-private enum class Picking { Project, Model, Mode }
+private enum class Picking { Project, Model, Mode, Effort }
 
 /**
  * New session, prompt first (owner, 2026-10-18): the box for what Claude should do, ready to type
- * into, then the choices as three chips (the project, the model with its provider, the permission
- * mode), each opening its picker, and Start always in reach at the foot with the attachments and
- * the mic. It starts on the project it was opened for ([initialProject]: a path or a name), else
- * the last one used, with the last model, and in the mode chosen in Settings → New sessions (Fork:
- * Ask until one is; never Bypass). Frosted over the cosmos.
+ * into, then the choices as chips (the project, the model with its provider, Claude Code's effort,
+ * the permission mode), each opening its picker, and Start always in reach at the foot with the
+ * attachments and the mic. It starts on the project it was opened for ([initialProject]: a path or
+ * a name), else the last one used, with the last model and effort, and in the mode chosen in
+ * Settings → New sessions (Fork: Ask until one is; never Bypass). Frosted over the cosmos.
  */
 @Composable
 fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Unit, launch: Long = 0L) {
@@ -164,6 +164,8 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     var model by rememberSaveable { mutableStateOf(memory.model(providerId)) }
     // Fork: Settings → New sessions' mode each time; changed here, it's this session's only.
     var mode by rememberSaveable { mutableStateOf(memory.mode) }
+    // Claude Code's effort (data/Effort.kt): the last one started with; null, its own default.
+    var effort by rememberSaveable { mutableStateOf(memory.effort) }
     // What was typed survives the sheet being put away (the scrim, Back) or a start that failed
     // after it closed: it comes back the next time it opens (P16).
     var prompt by rememberSaveable { mutableStateOf(NewSessionMemory.draft) }
@@ -349,6 +351,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                     project = project, newName = newName, projects = projects, root = hub.projectsRoot,
                     provider = provider, choice = choice, options = options, mode = if (onCodex) codexMode else mode,
                     onProject = { open(Picking.Project) }, onModel = { open(Picking.Model) }, onMode = { open(Picking.Mode) },
+                    effort = effort, onEffort = { open(Picking.Effort) },
                     codex = if (!onCodex) null else CodexChips(
                         codexModelName(codexModels, codexModel, stringResource(R.string.model_label_default)),
                         (codexEffort ?: codexChoice?.defaultEffort)?.let { effortTitle(it) },
@@ -424,12 +427,13 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                                         model = choice.value,
                                         permissionMode = mode,
                                         files = sending.mapNotNull { it.attachment },
+                                        effort = effort,
                                     ),
                                 ).onSuccess { id ->
                                     started = true
                                     val kept = path ?: hub.projectsRoot?.let { "${it.trimEnd('/')}/$name" }
                                     if (onCodex) NewSessionMemory.saveCodex(context, kept, codexModel, codexEffort, codexMode)
-                                    else NewSessionMemory.save(context, kept, provider?.id, choice.value)
+                                    else NewSessionMemory.save(context, kept, provider?.id, choice.value, effort)
                                     prompt = ""
                                     newName = ""
                                     starting = null
@@ -499,6 +503,11 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
             },
             onDismiss = { picking = null },
         )
+        Picking.Effort -> EffortSheet(
+            effort,
+            onPick = { e -> effort = e; picking = null },
+            onDismiss = { picking = null },
+        )
         null -> Unit
     }
 }
@@ -507,10 +516,11 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
 private class CodexChips(val model: String, val effort: String?)
 
 /**
- * The three chips: the project (a folder, or a plus for a new one), the model (with its provider's
- * name when it isn't the subscription), the permission mode (its glyph and words; Bypass in red,
- * Auto in amber). They give way whole on a narrow phone (ChipRow). [codex]: a Codex session's
- * model and effort instead of a provider's model (its mode is one of Codex's two).
+ * The chips: the project (a folder, or a plus for a new one), the model (with its provider's name
+ * when it isn't the subscription), Claude Code's [effort] ("EFFORT" and its level, "Default" until
+ * one is picked), the permission mode (its glyph and words; Bypass in red, Auto in amber). They give
+ * way whole on a narrow phone (ChipRow). [codex]: a Codex session's model and effort instead of a
+ * provider's model and Claude's effort (its mode is one of Codex's two).
  */
 @Composable
 private fun SheetChips(
@@ -525,6 +535,8 @@ private fun SheetChips(
     onProject: () -> Unit,
     onModel: () -> Unit,
     onMode: () -> Unit,
+    effort: String?,
+    onEffort: () -> Unit,
     codex: CodexChips? = null,
 ) {
     val p = projects.firstOrNull { it.path == project }
@@ -577,6 +589,20 @@ private fun SheetChips(
             }
         }
     }
+    // Claude Code's effort: its label and level while there's room, then the level alone ("Effort"
+    // for the default, which says nothing alone). Codex's is on its model chip instead.
+    val effortName = claudeEffortTitle(effort)
+    val effortSaid = stringResource(R.string.ns_effort_said, effortName)
+    val effortWord = stringResource(R.string.effort)
+    val effortChip = @Composable { label: Boolean ->
+        PickChip(effortSaid, onEffort) {
+            if (label) {
+                HText(effortWord.uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
+                Spacer(Modifier.width(6.dp))
+            }
+            ChipText(if (label || effort != null) effortName else effortWord)
+        }
+    }
     ChipRow(
         project = {
             PickChip(projectSaid, onProject) {
@@ -588,6 +614,7 @@ private fun SheetChips(
         model = if (other || codex?.effort != null) listOf<@Composable () -> Unit>({ modelChip(true) }, { modelChip(false) }) else listOf<@Composable () -> Unit>({ modelChip(false) }),
         mode = listOf<@Composable () -> Unit>({ modeChip(true) }, { modeChip(false) }),
         modifier = Modifier.fillMaxWidth(),
+        effort = if (codex != null) emptyList() else listOf<@Composable () -> Unit>({ effortChip(true) }, { effortChip(false) }),
     )
 }
 

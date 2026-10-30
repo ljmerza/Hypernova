@@ -6,7 +6,7 @@ import { request as httpRequest, type IncomingMessage, type ServerResponse } fro
 import { API_PORT, LOCAL_PORT, SUPPORT, log, randomToken } from './util.ts'
 import { attachmentFile } from './attachments.ts'
 import { isSubscription, settings } from './store.ts'
-import { broadcast, getSession, noteStatusModel, offerUsage, projectsFromSessions } from './hub.ts'
+import { broadcast, getSession, noteStatusEffort, noteStatusModel, offerUsage, projectsFromSessions } from './hub.ts'
 import { FileError, allowedPath, keyPlace, tooBroad } from './files.ts'
 import { isSecretFile } from './secretfiles.ts'
 import { mimeByName, needsSniff, sniff } from './mime.ts'
@@ -50,6 +50,8 @@ export function pollStatusLine(): void {
       const o = JSON.parse(readFileSync(p, 'utf8'))
       // A /model in the terminal shows here first (hub.ts).
       noteStatusModel(String(o.session_id ?? ''), o.model?.id, s.mtimeMs)
+      // And its effort (its default's level too, and a /effort typed in the terminal).
+      noteStatusEffort(String(o.session_id ?? ''), o.effort?.level, s.mtimeMs)
       const rl = o.rate_limits
       const has = !!(rl && (rl.five_hour || rl.seven_day))
       if (Date.now() - s.mtimeMs < 10 * 60_000 && isSubscription(getSession(String(o.session_id ?? ''))?.providerId)) {

@@ -37,7 +37,7 @@ const OTHER = '/Users/someone/Programming/site'
 
 function newSession(id: string, patch: Partial<Session> = {}): Session {
   return {
-    id, title: 'Parser refactor', cwd: PROJECT, projectName: 'hypernova', origin: 'hypernova', state: 'idle', providerId: 'anthropic', model: null, permissionMode: 'default', bypassAvailable: true,
+    id, title: 'Parser refactor', cwd: PROJECT, projectName: 'hypernova', origin: 'hypernova', state: 'idle', providerId: 'anthropic', model: null, effort: null, permissionMode: 'default', bypassAvailable: true,
     createdAt: 0, lastActivityAt: 0, lastText: null, activity: null, pendingApprovalIds: [], stoppedForAway: false, contextPct: null, costUsd: null, queue: [], queued: 0, term: null, menu: null,
     agentsRunning: 0, blocked: null, endedBy: null, automation: null, browsable: true, outsideProjects: false, blockedCalls: 0, ...patch,
   }

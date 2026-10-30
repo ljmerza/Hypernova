@@ -198,38 +198,59 @@ internal fun ChipText(text: String, color: Color = HN.ink, modifier: Modifier = 
 }
 
 /**
- * The three chips in one row. The project's name comes first: the other two give way whole, never
- * cut, until it fits (or has 60% of the row): the model drops its provider's name (the model's own
- * says enough), then the mode keeps only its glyph. Only then is the project's name cut at its
- * end. [model] and [mode]: their variants, widest first.
+ * The chips in one row: the project, the model, Claude Code's effort when [effort] has any, the
+ * mode. The project's name comes first: the others give way whole, never cut, until it fits (or
+ * has 60% of the row): the model drops its provider's name (the model's own says enough), the
+ * effort its label, then the mode keeps only its glyph ([chipVariants]). Only then is the
+ * project's name cut at its end. [model], [effort] and [mode]: their variants, widest first.
  */
 @Composable
-internal fun ChipRow(project: @Composable () -> Unit, model: List<@Composable () -> Unit>, mode: List<@Composable () -> Unit>, modifier: Modifier = Modifier, gap: Dp = 8.dp) {
-    Layout(content = { project(); model.forEach { it() }; mode.forEach { it() } }, modifier = modifier) { ms, c ->
+internal fun ChipRow(project: @Composable () -> Unit, model: List<@Composable () -> Unit>, mode: List<@Composable () -> Unit>, modifier: Modifier = Modifier, gap: Dp = 8.dp, effort: List<@Composable () -> Unit> = emptyList()) {
+    Layout(content = { project(); model.forEach { it() }; effort.forEach { it() }; mode.forEach { it() } }, modifier = modifier) { ms, c ->
         val loose = Constraints(maxHeight = c.maxHeight)
         val modelP = model.indices.map { ms[1 + it].measure(loose) }
-        val modeP = mode.indices.map { ms[1 + model.size + it].measure(loose) }
+        val effortP = effort.indices.map { ms[1 + model.size + it].measure(loose) }
+        val modeP = mode.indices.map { ms[1 + model.size + effort.size + it].measure(loose) }
         val g = gap.roundToPx()
+        val gaps = (if (effortP.isEmpty()) 2 else 3) * g
         val width = if (c.hasBoundedWidth) c.maxWidth else Int.MAX_VALUE / 2
         // The project's whole name, as far as it can have it: the others give way first.
         val wanted = ms[0].maxIntrinsicWidth(c.maxHeight).coerceIn(112.dp.roundToPx(), (width * 0.6f).toInt())
-        val room = width - wanted - 2 * g
-        var mi = 0
-        var oi = 0
-        while (modelP[mi].width + modeP[oi].width > room) {
-            if (mi < modelP.lastIndex) mi++ else if (oi < modeP.lastIndex) oi++ else break
-        }
+        val (mi, ei, oi) = chipVariants(modelP.map { it.width }, effortP.map { it.width }, modeP.map { it.width }, width - wanted - gaps)
         val m = modelP[mi]
+        val e = effortP.getOrNull(ei)
         val o = modeP[oi]
-        val left = (c.maxWidth - m.width - o.width - 2 * g).coerceAtLeast(0)
+        val left = (c.maxWidth - m.width - (e?.width ?: 0) - o.width - gaps).coerceAtLeast(0)
         val p = ms[0].measure(Constraints(maxWidth = left, maxHeight = c.maxHeight))
-        val h = maxOf(p.height, m.height, o.height)
+        val h = maxOf(p.height, m.height, e?.height ?: 0, o.height)
         layout(c.maxWidth, h) {
-            p.placeRelative(0, (h - p.height) / 2)
-            m.placeRelative(p.width + g, (h - m.height) / 2)
-            o.placeRelative(p.width + g + m.width + g, (h - o.height) / 2)
+            var x = 0
+            p.placeRelative(x, (h - p.height) / 2)
+            x += p.width + g
+            m.placeRelative(x, (h - m.height) / 2)
+            x += m.width + g
+            if (e != null) {
+                e.placeRelative(x, (h - e.height) / 2)
+                x += e.width + g
+            }
+            o.placeRelative(x, (h - o.height) / 2)
         }
     }
+}
+
+/**
+ * Which variant of the model, effort and mode chips [ChipRow] draws (indexes into their widths,
+ * widest first) so they fit in [room]: the model gives way first, then the effort, then the mode;
+ * the narrowest of all when nothing fits. No effort chip ([effort] empty): its index is 0.
+ */
+internal fun chipVariants(model: List<Int>, effort: List<Int>, mode: List<Int>, room: Int): Triple<Int, Int, Int> {
+    var mi = 0
+    var ei = 0
+    var oi = 0
+    while (model[mi] + (effort.getOrNull(ei) ?: 0) + mode[oi] > room) {
+        if (mi < model.lastIndex) mi++ else if (ei < effort.lastIndex) ei++ else if (oi < mode.lastIndex) oi++ else break
+    }
+    return Triple(mi, ei, oi)
 }
 
 // ─── Shared parts of the pickers ───

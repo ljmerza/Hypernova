@@ -44,6 +44,7 @@ function newSession(id: string, patch: Partial<Session> = {}): Session {
     state: 'idle',
     providerId: 'anthropic',
     model: null,
+    effort: null,
     permissionMode: 'default',
     bypassAvailable: true,
     createdAt: 0,

@@ -748,12 +748,13 @@ function registryWaiting(pid: number | null | undefined): boolean {
  * session id itself (--bg passes over --session-id), so it's read from the registry by the job id
  * --bg prints. Returns the session id.
  */
-export async function createAgentsSession(o: { cwd: string; model?: string | null; permissionMode?: string; prompt?: string }): Promise<string> {
+export async function createAgentsSession(o: { cwd: string; model?: string | null; permissionMode?: string; effort?: string | null; prompt?: string }): Promise<string> {
   const file = findClaude()
   if (!file) throw Object.assign(new Error('Claude Code isn’t installed on this computer.'), { status: 409 })
   const args = ['--bg']
   if (o.model) args.push('--model', o.model)
   if (o.permissionMode) args.push('--permission-mode', o.permissionMode)
+  if (o.effort) args.push('--effort', o.effort)
   if (o.prompt?.trim()) args.push('--', o.prompt)
   const out = await new Promise<string>((ok) => execFile(file, args, { cwd: o.cwd, timeout: 30_000 }, (_e, so, se) => ok(`${so}\n${se}`)))
   const job = /backgrounded\s*·\s*([0-9a-f]{8})/.exec(out)?.[1]
@@ -769,7 +770,7 @@ export async function createAgentsSession(o: { cwd: string; model?: string | nul
   }
   if (!sid) throw Object.assign(new Error('The background session didn’t start. Look in claude agents.'), { status: 409 })
   const title = trimText(o.prompt ? promptTitle(o.prompt) : null, 80) ?? 'New session'
-  const r = upsertSession(sid, { cwd: o.cwd, origin: 'terminal', state: 'starting', activity: null, stoppedForAway: false, lastActivityAt: Date.now(), title, model: o.model || null, permissionMode: o.permissionMode ?? 'default', createdAt: Date.now() })
+  const r = upsertSession(sid, { cwd: o.cwd, origin: 'terminal', state: 'starting', activity: null, stoppedForAway: false, lastActivityAt: Date.now(), title, model: o.model || null, ...(o.effort ? { effort: o.effort } : {}), permissionMode: o.permissionMode ?? 'default', createdAt: Date.now() })
   ensureParsed(r)
   log('started claude agents job', job, 'for', sid.slice(0, 8), 'in', o.cwd)
   return sid
@@ -798,7 +799,7 @@ export type AutomationStart = {
  * open elsewhere (`forkFrom`), or one that ended (`resume`). Returns the session id. An
  * automation's run starts one with its name (`title`, also Claude Code's `--name`) and [AutomationStart].
  */
-export function createSharedSession(o: { cwd: string; providerId?: string; model?: string | null; permissionMode?: string; prompt?: string; forkFrom?: string; resume?: string; title?: string; context?: string } & AutomationStart): string {
+export function createSharedSession(o: { cwd: string; providerId?: string; model?: string | null; permissionMode?: string; effort?: string | null; prompt?: string; forkFrom?: string; resume?: string; title?: string; context?: string } & AutomationStart): string {
   const id = o.resume ?? randomUUID()
   const args: string[] = []
   // A conversation Claude Code never wrote down (its claude ended before taking a prompt): it
@@ -814,6 +815,8 @@ export function createSharedSession(o: { cwd: string; providerId?: string; model
   // hooks report the real mode.
   const mode = o.permissionMode ?? 'default'
   if (o.permissionMode) args.push('--permission-mode', o.permissionMode)
+  // The phone's effort, for this session only (Claude Code's own default without one).
+  if (o.effort) args.push('--effort', o.effort)
   // No --allow-dangerously-skip-permissions (owner, 2026-10-30: no bypass for agents): Shift+Tab
   // never reaches Bypass in a session started in another mode, and the phone doesn't offer it.
   if (o.automation) {
@@ -836,7 +839,7 @@ export function createSharedSession(o: { cwd: string; providerId?: string; model
   const existing = getSession(id)
   const title = trimText(o.title ?? (o.prompt && promptTitle(o.prompt)), 80) ?? 'New session'
   if (!o.resume) {
-    saveManaged({ id, cwd: o.cwd, providerId: provider.id, model: o.model || null, permissionMode: mode, createdAt: Date.now(), title, engine: 'term', ...(o.automation ? { automation: o.automation } : {}), ...(o.context ? { context: o.context } : {}) })
+    saveManaged({ id, cwd: o.cwd, providerId: provider.id, model: o.model || null, permissionMode: mode, createdAt: Date.now(), title, engine: 'term', ...(o.effort ? { effort: o.effort } : {}), ...(o.automation ? { automation: o.automation } : {}), ...(o.context ? { context: o.context } : {}) })
   } else if (o.providerId) {
     const m = getManaged(id)
     const moved = { providerAt: Date.now(), providerFrom: m?.providerId ?? existing?.providerId ?? 'anthropic' }
@@ -854,7 +857,7 @@ export function createSharedSession(o: { cwd: string; providerId?: string; model
     // new one registers, the old one's exit would read as the session ending.
     ...(o.resume
       ? { pid: null, ...(o.providerId ? { providerId: provider.id, model: null, blocked: null } : {}) }
-      : { title, providerId: provider.id, model: o.model || null, permissionMode: mode, createdAt: Date.now(), ...(o.automation ? { automation: o.automation } : {}) }),
+      : { title, providerId: provider.id, model: o.model || null, ...(o.effort ? { effort: o.effort } : {}), permissionMode: mode, createdAt: Date.now(), ...(o.automation ? { automation: o.automation } : {}) }),
   })
   ensureParsed(r)
   return id
