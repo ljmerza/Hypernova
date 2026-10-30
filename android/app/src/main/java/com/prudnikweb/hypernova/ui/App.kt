@@ -83,7 +83,7 @@ val LocalToast = staticCompositionLocalOf<(String) -> Unit> { {} }
 /** What screens can ask the app to do: open things, which may need the Mac first. */
 class Opener(
     val session: (String) -> Unit,
-    /** Swap the current session screen for another (a terminal session that forked). */
+    /** Swap the current session screen for another (a terminal session that forked); the same rule as [session]. */
     val switchSession: (String) -> Unit,
     val files: (root: String, title: String) -> Unit,
     val file: (String) -> Unit,
@@ -221,8 +221,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
         val id = pendingOpen ?: return@LaunchedEffect
         if (hub?.session(id) != null) {
             sheet = false
-            nav.reset()
-            nav.push(Route.Session(id))
+            nav.openSession(id, fresh = true)
             vm.pendingOpen = null
         }
     }
@@ -267,8 +266,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     var previewBusy by remember { mutableStateOf(false) }
     val opener = remember(hub, nav) {
         Opener(
-            session = { nav.push(Route.Session(it)) },
-            switchSession = { nav.replaceTop(Route.Session(it)) },
+            session = { nav.openSession(it) },
+            switchSession = { nav.openSession(it) },
             files = { root, title -> nav.push(Route.Files(root, title)) },
             file = { nav.push(Route.FileView(it)) },
             preview = { path, port, title ->
@@ -370,7 +369,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                             onStarted = { id ->
                                 sheet = false
                                 focusProject = null
-                                nav.push(Route.Session(id))
+                                nav.openSession(id)
                             },
                         )
                     }
@@ -470,7 +469,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                             }
                             id != null && hub?.session(id) != null -> {
                                 sheet = false
-                                nav.push(Route.Session(id))
+                                nav.openSession(id)
                             }
                             // An automation's note with no session to open: the automation, or its tab.
                             n.kind == Notice.Kind.Automation -> {

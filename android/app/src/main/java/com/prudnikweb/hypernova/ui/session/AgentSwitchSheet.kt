@@ -102,7 +102,7 @@ private fun atWork(s: Session): Boolean = s.phase != Phase.Ended && (s.state != 
 
 /**
  * Under a switched session's title, in the status line's place for automations: "CONTINUED FROM
- * CLAUDE ›" (the conversation before the switch, opened over this one) or, on the earlier one,
+ * CLAUDE ›" (the conversation before the switch, in this one's place) or, on the earlier one,
  * "CONTINUED IN CODEX ›" (the chat goes on there). Nothing for a session that never switched.
  */
 @Composable

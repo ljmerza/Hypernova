@@ -1636,3 +1636,19 @@ block when it can't be drawn. Nothing leaves the phone.
 4. **Only a finished block is drawn:** while its closing fence hasn't arrived (a reply streaming
    in), it's code.
 
+## Back from a session goes Home (2026-10-30)
+
+The owner: "If you're in a session and you click the notification for another session to go into
+that second session, when you try to go back it puts you back in the first session. I always want
+Back to go back to the main menu that shows all the sessions, so I don't have a session within a
+session."
+
+1. **Never a session over another session.** Opening a session from a session's screens (its chat,
+   its agents, its terminal, or files and pages opened from them) leaves Home and that session: a
+   banner, a notification, "Continued from/in", a forked or moved session. Back lands on Home.
+2. **From outside the app** (a notification, a widget, an automation's note) it is always Home and
+   the session, as before.
+3. **Within one session nothing changes:** its agents, terminal and files still go on top of it, and
+   Back returns to it. The session already on screen opened again stays as it is.
+4. **Elsewhere it still goes on top** (an automation's runs): Back returns there. The rule is one
+   function, `sessionStack` in `data/AppModel.kt`.

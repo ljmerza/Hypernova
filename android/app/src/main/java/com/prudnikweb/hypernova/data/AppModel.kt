@@ -68,6 +68,34 @@ class Nav {
         stack.clear()
         stack.add(Route.Home)
     }
+
+    /** Open session [id] by the one rule, [sessionStack]: every way into a session comes here. */
+    fun openSession(id: String, fresh: Boolean = false) {
+        val now = stack.toList()
+        val next = sessionStack(now, id, fresh)
+        if (next == now) return
+        stack.clear()
+        stack.addAll(next)
+    }
+}
+
+/** A session's own screens: its chat, its agents and its live terminal. */
+private val Route.ofSession: Boolean get() = this is Route.Session || this is Route.Agent || this is Route.Terminal
+
+/**
+ * The stack after opening session [id] on [stack]. Never a session over another session (owner,
+ * 2026-10-30: Back always goes to the list of sessions): over a session's screens (its chat, agents,
+ * terminal, and files or pages opened from them), or from outside the app ([fresh]: a notification,
+ * a widget), it is Home and then the session. Already on it: unchanged. Otherwise (Home, an
+ * automation's runs) it goes on top.
+ */
+fun sessionStack(stack: List<Route>, id: String, fresh: Boolean = false): List<Route> {
+    val r = Route.Session(id)
+    return when {
+        stack.lastOrNull() == r -> stack
+        fresh || stack.any { it.ofSession } -> listOf(Route.Home, r)
+        else -> stack + r
+    }
 }
 
 /** The pairing screen's states. */
