@@ -1,7 +1,7 @@
 name: android-release
 # The signed APK for the phone, built with the fork's own release key (repo secrets). Every push to
 # main that touches the app (and a manual run) builds it and publishes the next v<version>-ljm.<n>
-# release with the APK attached, so releases/latest/download/hypernova.apk is always the newest. A
+# release with the APK attached as hypernova-<tag>.apk, so a download says which build it is. A
 # release published by hand gets its APK attached too. The key must never change: Android only
 # installs an update signed with the key the installed app has.
 #
@@ -84,11 +84,10 @@ jobs:
         run: |
           tag="${{ github.event.release.tag_name }}"
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
-          gh release upload "$tag" "../dist/hypernova-$tag.apk" ../dist/hypernova.apk --clobber
+          gh release upload "$tag" "../dist/hypernova-$tag.apk" --clobber
       # A push or a manual run: the next v<appVersion>-ljm.<n> after the newest fork release, with
-      # the APK on it twice: hypernova-<tag>.apk (a download says which build it is) and
-      # hypernova.apk (releases/latest/download/hypernova.apk stays a fixed link). A release made
-      # with the workflow token starts no other workflows.
+      # the APK on it once, as hypernova-<tag>.apk (a download says which build it is). A release
+      # made with the workflow token starts no other workflows.
       - name: Publish the next release
         if: github.event_name != 'release'
         env:
@@ -99,5 +98,5 @@ jobs:
           last=$(gh release list -L 100 --json tagName -q '.[].tagName' | sed -n "s/^v$base-ljm\.\([0-9]*\)$/\1/p" | sort -n | tail -1)
           tag="v$base-ljm.$(( ${last:-0} + 1 ))"
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
-          gh release create "$tag" "../dist/hypernova-$tag.apk" ../dist/hypernova.apk --target "$GITHUB_SHA" --title "$tag" \
+          gh release create "$tag" "../dist/hypernova-$tag.apk" --target "$GITHUB_SHA" --title "$tag" \
             --notes "Built from ${GITHUB_SHA::7}: $(git log -1 --format=%s "$GITHUB_SHA")"
