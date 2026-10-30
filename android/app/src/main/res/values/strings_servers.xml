@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Several paired computers (data/Servers.kt, ui/home/ServerSwitcher.kt). "Mac" reads "server" on a Linux one (data/ComputerWords.kt). -->
+<resources>
+    <!-- The switcher: the Home chip's sheet. -->
+    <string name="servers_title">Paired computers</string>
+    <string name="servers_switch_label">Switch to %1$s</string>
+    <string name="servers_on_screen">On screen</string>
+    <string name="servers_pair_another">Pair another Mac</string>
+    <string name="servers_demo">Demo</string>
+    <string name="servers_chip_label">Choose a Mac</string>
+    <!-- TalkBack on the chip, named while not linked (several paired): "z2, Offline". -->
+    <string name="link_said_named">%1$s, %2$s</string>
+    <!-- The chip's amber count: sessions on the other computers that need you. -->
+    <plurals name="servers_elsewhere">
+        <item quantity="one">%d needs you on another Mac</item>
+        <item quantity="other">%d need you on another Mac</item>
+    </plurals>
+
+    <!-- A notification from one of several computers: its name under the title (data/Core.kt, Notifier). -->
+    <string name="notif_server_from_agent">%1$s, from %2$s</string>
+    <string name="notif_server_from_an_agent">%1$s, from an agent</string>
+    <!-- The permanent notification's title with others watched under it. -->
+    <string name="notif_title_watched">%1$s · +%2$d watched</string>
+</resources>

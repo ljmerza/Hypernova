@@ -104,10 +104,13 @@ fun openTailscale(context: Context) {
 
 /**
  * Not paired yet: three short steps (Tailscale, Pair a phone on the Mac, scan the code), a
- * paste fallback for the link, and a way to look around with demo data.
+ * paste fallback for the link, and a way to look around with demo data. With [onClose] (another
+ * computer from the switcher, others paired already): the same steps over the app, with Cancel
+ * where the demo was, and Back closes them.
  */
 @Composable
-fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit) {
+fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Unit)? = null) {
+    if (onClose != null) BackHandler(onBack = onClose)
     val context = LocalContext.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -180,7 +183,8 @@ fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit) {
             }
         }
         Spacer(Modifier.height(10.dp))
-        Pill(stringResource(R.string.onb_demo), onDemo, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
+        if (onClose != null) Pill(stringResource(R.string.cancel), onClose, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
+        else Pill(stringResource(R.string.onb_demo), onDemo, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
     }
     // Whatever scrolls under the status bar is blurred, like every other screen.
     BlurredTop(haze, ONBOARDING, Modifier.fillMaxWidth(), fade = 14.dp) { Spacer(Modifier.height(top + 18.dp)) }

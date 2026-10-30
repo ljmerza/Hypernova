@@ -6,7 +6,13 @@ only on purpose, and log the change here.
 ## Product
 - **Name: Hypernova**, part of the Hyper* family (Hyperscribe, Hypernavigate). We don't use "Claude" in the name because of Anthropic's trademark, but describing it as "a control room for Claude Code" is fine.
 - Built to public quality from the start. The repo is local for now (see LATER L4).
-- One phone can pair with **several Macs**, with a switcher in the app.
+- One phone can pair with **several Macs**, with a switcher in the app. Built (owner, 2026-10-30; `android/.../data/Servers.kt`):
+  - **One is active**: Home, sessions, chat, Settings, the widgets and the glasses show it, as they showed the one pairing before.
+  - **The others are watched in the background** (each has its own link): their notifications (needs you, finished, errors, approvals) name the computer, and a tap switches to it and opens the session; their needs-you count shows on the chip and in the switcher. Answers, replies and queued prompts go to the computer they belong to.
+  - **The Home chip opens the switcher** (a glass sheet): each computer with its link and needs-you count, the active one ticked, and "Pair another Mac" last (the pairing steps, the others kept). It no longer opens Settings. With several paired the chip names the active one in every state, with an amber count while another needs you.
+  - **Pairing another computer adds it** (no "Replace?" question any more); pairing one again takes its old place. **Forget** forgets only the active one, and the next comes on screen.
+  - The one pairing from before became the first computer, with its own keys (token, certificate, queued prompts) as they were: nothing to pair again.
+  - One permanent notification for all: "z2 · +1 watched".
 - English only for now (see LATER L5). All strings live in resources.
 
 ## Sessions

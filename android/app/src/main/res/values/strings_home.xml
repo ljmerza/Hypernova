@@ -33,11 +33,6 @@
     <string name="history_no_match">Nothing ended matches “%1$s”.</string>
     <string name="history_none_in">Nothing in %1$s has ended lately.</string>
 
-    <!-- Scanning another computer's code while paired (data/AppModel.kt, audit P12). -->
-    <string name="pair_replace_q">Replace %1$s with %2$s?</string>
-    <string name="pair_replace_body">This phone works with one computer at a time. %1$s stops reaching it.</string>
-    <string name="pair_replace">Replace</string>
-
     <!-- A notification's session that isn't known (ui/App.kt, audit P11). -->
     <string name="open_gone">That session isn\'t on your Mac any more.</string>
     <string name="open_unreachable">Can\'t reach your Mac to open that session.</string>

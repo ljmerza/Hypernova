@@ -102,12 +102,12 @@ class DeviceIdentity(val chain: Array<X509Certificate>, val key: PrivateKey) {
 }
 
 /**
- * The key in AndroidKeyStore and the certificate in app-private storage. One per phone, shared by
- * every Mac this phone pairs with (each signs its own certificate for the same key; the newest Mac's
- * is the one held, as one Mac at a time is paired today).
+ * The key in AndroidKeyStore and the certificates in app-private storage. One key per phone, shared
+ * by every computer this phone pairs with; each signs its own certificate for it, kept per paired
+ * computer ([server], data/Servers.kt: the first one's in the file it always had).
  */
-class DeviceCertStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences("hypernova.cert", Context.MODE_PRIVATE)
+class DeviceCertStore(context: Context, server: String = Servers.LEGACY_ID) {
+    private val prefs = context.applicationContext.getSharedPreferences(Servers.scoped("hypernova.cert", server), Context.MODE_PRIVATE)
 
     private fun keyStore(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
@@ -140,9 +140,10 @@ class DeviceCertStore(context: Context) {
         prefs.edit().putString("cert", certB64).putString("ca", caB64).putString("fp", fingerprint).apply()
     }
 
-    fun clear() {
+    /** This computer's certificate goes; the key too when [dropKey] (no other computer's certificate is for it any more). */
+    fun clear(dropKey: Boolean = true) {
         prefs.edit().clear().apply()
-        runCatching { keyStore().deleteEntry(DeviceIdentity.ALIAS) }
+        if (dropKey) runCatching { keyStore().deleteEntry(DeviceIdentity.ALIAS) }
     }
 
     /** The chain and key to present, or null while the Mac hasn't signed one yet. */

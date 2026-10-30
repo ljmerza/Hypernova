@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.prudnikweb.hypernova.R
 import androidx.compose.ui.semantics.Role
@@ -555,9 +556,21 @@ private fun Modifier.filledGlass(color: Color): Modifier = drawWithCache {
  * battery 62%, charging".
  */
 @Composable
-fun ConnectionChip(state: LinkState, modifier: Modifier = Modifier, name: String? = null, battery: MacBattery? = null, awake: MacAwake? = null, via: String? = null) {
-    // Once linked, the Mac's name says it all; otherwise, the state in a word.
-    val mac = name?.takeIf { state == LinkState.Connected && it.isNotBlank() }
+fun ConnectionChip(
+    state: LinkState,
+    modifier: Modifier = Modifier,
+    name: String? = null,
+    battery: MacBattery? = null,
+    awake: MacAwake? = null,
+    via: String? = null,
+    /** Several computers are paired: the name shows in every state (the moon and its colour say the state). */
+    named: Boolean = false,
+    /** Sessions on the other paired computers that need the owner: a small amber count at the end. */
+    elsewhere: Int = 0,
+) {
+    // Once linked, the Mac's name says it all; otherwise, the state in a word (with several paired,
+    // the name still, so it's clear which one isn't linked).
+    val mac = name?.takeIf { (state == LinkState.Connected || (named && state != LinkState.Demo)) && it.isNotBlank() }
     // The route, in a word, only while linked: "Local" on the Mac's own network, "Tailscale" otherwise.
     val route = via?.takeIf { state == LinkState.Connected }?.let { routeWord(it) }
     val word = when (state) {
@@ -570,7 +583,12 @@ fun ConnectionChip(state: LinkState, modifier: Modifier = Modifier, name: String
     }
     // Only what's current: a Mac that isn't linked may have been plugged in or run down since.
     val power = battery?.takeIf { state == LinkState.Connected || state == LinkState.Demo }
-    val base = if (mac != null) stringResource(R.string.link_connected_to, mac) else word
+    val base = when {
+        mac == null -> word
+        state == LinkState.Connected -> stringResource(R.string.link_connected_to, mac)
+        // Named while not linked (several paired): "z2, Offline".
+        else -> stringResource(R.string.link_said_named, mac, word)
+    }
     val powerSaid = when {
         power == null -> base
         power.charging -> stringResource(R.string.link_said_charging, base, power.percent)
@@ -585,18 +603,21 @@ fun ConnectionChip(state: LinkState, modifier: Modifier = Modifier, name: String
         }
     }
     val routeSaid = if (route != null) stringResource(R.string.link_said_via, powerSaid, route) else powerSaid
-    val said = when {
+    val awakeSaid = when {
         moon == null -> routeSaid
         awake?.sleepAt != null -> stringResource(R.string.link_said_sleep_soon, routeSaid)
         else -> stringResource(R.string.link_said_awake_lid, routeSaid)
     }
+    val said = if (elsewhere > 0) "$awakeSaid. " + pluralStringResource(R.plurals.servers_elsewhere, elsewhere, elsewhere) else awakeSaid
     val target = linkTone(state)
     // Read while drawing, so the 800ms ease redraws the chip without recomposing it. The greys have
     // no light of their own, so the glass's fades out to them.
     val tone = animateColorAsState(target, tween(800), label = "link")
     val glow = animateColorAsState(if (target == HN.inkMuted || target == HN.inkDim) target.copy(alpha = 0f) else target, tween(800), label = "linkGlow")
     val textColor = when {
-        mac != null -> HN.inkMuted
+        mac != null && state == LinkState.Connected -> HN.inkMuted
+        // Named while not linked: in the state's own colour, as its word would be.
+        mac != null -> if (state == LinkState.Connecting) HN.inkMuted else target
         state == LinkState.Connected -> HN.accent
         state == LinkState.Connecting || state == LinkState.Demo -> HN.inkMuted
         else -> target
@@ -636,6 +657,29 @@ fun ConnectionChip(state: LinkState, modifier: Modifier = Modifier, name: String
             Spacer(Modifier.width(5.dp))
             Crescent(moon)
         }
+        if (elsewhere > 0) {
+            Spacer(Modifier.width(7.dp))
+            ElsewhereCount(elsewhere)
+        }
+    }
+}
+
+/**
+ * The connection chip's last mark while another paired computer needs the owner: the count in a
+ * small amber disc (a dot's size for one digit), "9+" past nine.
+ */
+@Composable
+private fun ElsewhereCount(n: Int) {
+    Box(
+        Modifier
+            .heightIn(min = 16.dp)
+            .widthIn(min = 16.dp)
+            .clip(CircleShape)
+            .background(HN.amber)
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        HText(if (n > 9) "9+" else n.toString(), style = Type.label, color = HN.bg, maxLines = 1)
     }
 }
 

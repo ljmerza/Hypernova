@@ -110,7 +110,9 @@ must ignore unknown fields and unknown enum values (show them generically).
    `https://hypernova.observer/glasses` and `hypernova://glasses` open Settings → Glasses.
 3. The app calls `POST <u>/v1/pair` with `{"code", "deviceName", "model", "appVersion", "client"?,
    "installId"?}` and gets `{"token", "deviceId", "mac": {"id", "name"}}`. It stores `u`, the
-   token and the Mac name. One phone can pair with several Macs (switcher later).
+   token and the Mac name. One phone can pair with several Macs, each its own device there with its
+   own token and device certificate (the app keeps them per computer and shows one at a time, with
+   a switcher: docs/DECISIONS.md); nothing in the daemon changes for that.
    `installId` (8–64 letters, digits, `_` and `-`) is the app install's own stable id, made once and
    kept with the app's data: pairing the same install again (its token lost, a new code scanned)
    replaces its old device (same `installId` and `client`) instead of adding a twin to the device

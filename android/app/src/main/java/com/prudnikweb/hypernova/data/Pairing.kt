@@ -219,11 +219,17 @@ object PairLinks {
     }
 }
 
-/** Pairing and app preferences, in app-private storage. */
-class PairingStore(context: Context) {
+/**
+ * Pairing and app preferences, in app-private storage. The single pairing's keys are where the
+ * list of paired computers ([ServerBook]) came from, and still hold the first computer's pairing.
+ */
+class PairingStore(context: Context) : LegacyPairing {
     private val prefs = context.applicationContext.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
 
-    fun load(): Pairing? {
+    /** The paired computers and the active one (data/Servers.kt), kept next to the rest. */
+    val servers = ServerBook(PrefsKeyValue(prefs), this)
+
+    override fun load(): Pairing? {
         val base = prefs.getString("baseUrl", null) ?: return null
         val token = prefs.getString("token", null) ?: return null
         return Pairing(
@@ -240,7 +246,7 @@ class PairingStore(context: Context) {
         )
     }
 
-    fun save(p: Pairing) {
+    override fun save(p: Pairing) {
         prefs.edit()
             .putString("baseUrl", p.baseUrl).putString("token", p.token).putString("macName", p.macName)
             .putString("macId", p.macId).putString("deviceId", p.deviceId)
@@ -250,7 +256,7 @@ class PairingStore(context: Context) {
             .apply()
     }
 
-    fun clear() {
+    override fun clear() {
         prefs.edit().remove("baseUrl").remove("token").remove("macName").remove("macId").remove("deviceId")
             .remove("fingerprint").remove("lan").remove("lanPort")
             .remove("tailnetName").remove("tailnetIp").remove("tailnetUrl").remove("tailnetAccount").remove("controlUrl").remove("controlConfirmed").apply()

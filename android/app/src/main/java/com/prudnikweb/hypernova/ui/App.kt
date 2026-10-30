@@ -179,7 +179,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     val route = nav.top
     val unpaired = !vm.demo && vm.live?.link?.state == LinkState.Unpaired
     // The solar system steps back behind full-screen states, so its labels never sit under their text.
-    val onHome = route == Route.Home && hub != null && vm.pairFlow == null && !unpaired
+    val onHome = route == Route.Home && hub != null && vm.pairFlow == null && !unpaired && !vm.addingServer
     val focus by animateFloatAsState(if (onHome) 1f else 0f, tween(Motion.SECTION, easing = Motion.Expo), label = "focus")
     // Written by the home screen: the solar systems fade as the list scrolls over them,
     // and hide on the History and Settings tabs. Read only while drawing.
@@ -343,11 +343,14 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
 
                 // A full-screen state (pairing, unpaired) replaces the screen instead of covering
                 // it, so nothing underneath can read through; the sky stays.
-                val covered = vm.pairFlow != null || unpaired
-                if (!covered && hub == null) {
+                // "Pair another Mac" (the switcher) shows the onboarding's steps in the screen's place.
+                val adding = vm.addingServer && vm.pairFlow == null
+                val covered = vm.pairFlow != null || unpaired || adding
+                if (adding || (!covered && hub == null)) {
                     Onboarding(
                         onPaste = vm::handleLink,
                         onDemo = { vm.switchDemo(true) },
+                        onClose = if (adding && hub != null) ({ vm.addServer(false) }) else null,
                     )
                 } else if (!covered && hub != null) {
                     Screens(hub, vm, route, nav.depth, screens, cosmos, skyVisibility, filter, onFilter, plan.value, { sheetProject = focusProject; sheet = true }, toAccount, toAutomations)
@@ -377,10 +380,10 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
 
                 // The Mac forgot this phone (401): say so, and offer the way back.
                 val live = vm.live
-                if (unpaired && live != null) {
+                if (unpaired && live != null && !adding) {
                     UnpairedScreen(
                         macName = live.mac.name,
-                        onPairAgain = vm::clearPairing,
+                        onPairAgain = vm::pairAgain,
                         onDemo = { vm.switchDemo(true) },
                     )
                 }
@@ -542,6 +545,7 @@ private fun Screens(
                     toAccount = toAccount,
                     toAutomations = toAutomations,
                     onAutomation = { id, template, runs -> nav.push(Route.AutomationEdit(id, template, runs)) },
+                    servers = com.prudnikweb.hypernova.ui.home.ServerChoice(vm.servers, vm.demo, vm::switchServer, { vm.addServer(true) }),
                 )
                 // Fork: a new route each time it's opened, so each opening lands at the latest (SessionScreen).
                 is Route.Session -> SessionScreen(hub, r.id, onBack = { nav.pop() }, opening = System.identityHashCode(r))
