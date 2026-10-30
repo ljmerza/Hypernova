@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import type { WebSocket } from 'ws'
 import { CLAUDE_DIR, HOME, SUPPORT, findClaude, log, randomToken, readJson, trimText, writeText } from './util.ts'
 import { getManaged, getProvider, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
-import { ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, notePaste, sessionOfAgentJob, upsertSession, view } from './hub.ts'
+import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, notePaste, noteTermDialog, sessionOfAgentJob, upsertSession, view } from './hub.ts'
 import { promptTitle, typedCommand } from './normalize.ts'
 import { trialEnded } from './blockers.ts'
 import { noteTrialEnded } from './account.ts'
@@ -393,9 +393,11 @@ export async function watchMenus(): Promise<void> {
         }
         // A `claude attach` holder showing another job or the agent list: no menu there is this
         // session's (answering it would answer another job's dialog).
-        const text = attachDrifted(r.term.id, r.id) ? '' : await screenOf(r.term.id)
+        const drifted = attachDrifted(r.term.id, r.id)
+        const text = drifted ? '' : await screenOf(r.term.id)
         if (text === null) return
         let menu = menuOf(text.split('\n'))
+        const dialog = !!menu?.permission
         // Claude Code's "Your Claude Code trial has ended." dialog: the plan is over.
         if (menu && trialEnded(menu.title) && isSubscription(r.providerId)) noteTrialEnded(Date.now(), r.id)
         const asked = view(r).pendingApprovalIds.length > 0
@@ -408,6 +410,8 @@ export async function watchMenus(): Promise<void> {
           const p = menu.permission
           upsertSession(r.id, { menu, ...(p && r.state !== 'needs_you' ? { state: 'needs_you' as const, activity: permissionActivity(menu.title, p), lastActivityAt: Date.now() } : {}) })
         }
+        // An ask handed back to this dialog: its notice points at the card, and goes once it's answered.
+        if (!drifted) noteTermDialog(r.id, dialog, !!r.menu?.permission)
       }),
     )
   } finally {
@@ -714,6 +718,32 @@ export async function attachAgentsTerm(sessionId: string, cwd: string, job: stri
   }
   if (drawn && existsSync(metaPath(id))) return id
   return null
+}
+
+/** Sessions a `claude attach` is on its way for, for an ask handed back ([watchHandedBack]). */
+const attachingFor = new Set<string>()
+/**
+ * An ask of session [sessionId] went back to Claude Code's own dialog (nobody answered it for 10
+ * minutes; hooks.ts). The phone gets that dialog as a card only from a shared terminal watchMenus
+ * reads, and a `claude agents` job has none until something attaches: so `claude attach` now (one
+ * that drifted to another job or the agent list is replaced, never read). Once for however many
+ * asks go back: one holder shows each dialog in turn. Nothing for any other session.
+ */
+export async function watchHandedBack(sessionId: string): Promise<void> {
+  if (settings.claudeAgents !== true || attachingFor.has(sessionId)) return
+  const job = agentJobOf(sessionId)
+  const r = getSession(sessionId)
+  if (!job || !r || r.state === 'ended') return
+  const have = termOf(sessionId)
+  if (have && !attachDrifted(have, sessionId)) return
+  attachingFor.add(sessionId)
+  try {
+    if (!(await attachAgentsTerm(sessionId, r.cwd, job))) log('claude attach for a handed-back ask of', sessionId.slice(0, 8), 'didn’t open')
+  } catch (e) {
+    log('claude attach for a handed-back ask failed', e)
+  } finally {
+    attachingFor.delete(sessionId)
+  }
 }
 
 /** Holder [id]'s title as the program in it last set it ("" when none). */

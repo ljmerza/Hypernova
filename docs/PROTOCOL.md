@@ -577,6 +577,9 @@ objects with a `t` field:
 - `{t:"event", sessionId, event: Event}` a new or updated event (same `id`
   replaces the previous version; `assistant` text grows while streaming, and a command
   event comes again with `command.kind: "skill"` once its skill's body is read).
+- `{t:"event.removed", sessionId, id}`: an event the daemon made is taken back (the notice that an
+  ask is waiting in the terminal, once it's answered; see Approvals). Gone from `events` too. A
+  client that doesn't know it keeps the event until it loads the session again.
 - `{t:"agent", agent: Agent}` and `{t:"workflow", workflow: Workflow}`: an agent or workflow
   started or changed (same `id` replaces). A status change comes at once; what an agent does now
   and its tokens at most once a second per session. Clients that don't know them ignore them.
@@ -2448,7 +2451,13 @@ session step's whole output 8 KB (its first).
   sends `approval.resolved` with `by: "terminal"`.
 - After 10 minutes without an answer, never a "no" for Claude Code (docs/DECISIONS.md, "Never
   auto-deny"): its hook answers with no decision, so Claude Code asks in its own dialog in the
-  session's terminal (the approval resolves `terminal`, with an `info` notice saying so). Codex
+  session's terminal (the approval resolves `terminal`, with an `info` notice saying so: one per
+  session however many asks go back, its agents' included, updated in place. It says "Still waiting
+  for your answer below." once the phone has the dialog as a card (below), else that the question is
+  in the terminal; it goes, with `event.removed`, once they are answered: their tools finish, the
+  turn or the asking agent moves on, the session ends, or the dialog the daemon watched closed). A
+  `claude agents` job with no shared terminal on it, or one that drifted, gets `claude attach` at
+  the first ask handed back (one holder for all of them), so its dialog comes as a card. Codex
   has no dialog to fall back to: its ask is cancelled, the session gets `stoppedForAway: true`,
   and the app shows a **Continue** button (`POST /continue`). A session the daemon runs through
   the SDK (`runner.ts`) still gets a no with this message: "The user didn't respond within 10
@@ -2460,6 +2469,9 @@ session step's whole output 8 KB (its first).
   holder, or a `claude agents` job's `claude attach`; never one that drifted to another job or the
   agent list). While it shows the session is `needs_you`, whatever Claude Code's registry says, and
   held prompts wait. A permission dialog's menu id names its command, so two dialogs are two menus.
+  A subagent's ask shows in its session's terminal as the same dialog, its title saying whose
+  ("Bash command · from the Explore agent", kept in `permission.tool`); the "1 of 3" Claude Code
+  puts at the title's right while several asks are open is left out.
   The phone draws it as an approval card where the asks go (the command, Deny and Allow, the
   dialog's other options as it words them) and as Deny and Allow on the Home card; a tap answers it
   through `POST /v1/sessions/{id}/menu`: Allow is its first option (Yes), Deny its last No.

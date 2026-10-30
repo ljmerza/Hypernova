@@ -197,6 +197,8 @@ class LiveHub(
     private val earlier = mutableStateMapOf<String, Boolean>()
     private val loadingMore = mutableStateMapOf<String, Boolean>()
     private val buffered = HashMap<String, MutableList<WEvent>>()
+    /** Events the Mac took back while a session's history loaded: not in it once it lands. */
+    private val goneWhileLoading = HashMap<String, MutableSet<String>>()
     private val loaded = HashSet<String>()
     private var openId: String? = null
     private val loadErrors = mutableStateMapOf<String, String>()
@@ -607,6 +609,8 @@ class LiveHub(
         class SessionMsg(val s: WSession) : Msg
         class Removed(val id: String) : Msg
         class Event(val sessionId: String, val e: WEvent) : Msg
+        /** An event the Mac took back (a notice that no longer holds). */
+        class EventRemoved(val sessionId: String, val id: String) : Msg
         class Approval(val a: WApproval) : Msg
         class ApprovalResolved(val id: String, val sessionId: String?, val decision: String, val by: String?) : Msg
         class UsageMsg(val u: WUsage?) : Msg
@@ -642,6 +646,7 @@ class LiveHub(
             val ev = o.obj("event")
             if (sid != null && ev != null) Msg.Event(sid, Wire.event(ev)) else null
         }
+        "event.removed" -> removedEvent(o)?.let { (sid, id) -> Msg.EventRemoved(sid, id) }
         "approval" -> o.obj("approval")?.let { Msg.Approval(Wire.approval(it)) }
         "approval.resolved" -> o.str("id")?.let { Msg.ApprovalResolved(it, o.str("sessionId"), o.str("decision") ?: "deny", o.str("by")) }
         "usage" -> Msg.UsageMsg(Wire.usage(o.obj("usage")))
@@ -680,6 +685,7 @@ class LiveHub(
             }
             is Msg.Removed -> { raw = raw - m.id; publish() }
             is Msg.Event -> appendEvent(m.sessionId, m.e)
+            is Msg.EventRemoved -> dropEvent(m.sessionId, m.id)
             is Msg.Approval -> {
                 approvals = approvals + (m.a.id to m.a)
                 publish()
@@ -1419,6 +1425,7 @@ class LiveHub(
         if (loading[id] == true) return
         loading[id] = true
         buffered[id] = mutableListOf()
+        goneWhileLoading[id] = HashSet()
         loadAgents(id)
         scope.launch {
             try {
@@ -1430,6 +1437,7 @@ class LiveHub(
                 earlier[id] = history.size >= limit
                 var list = history
                 buffered.remove(id)?.forEach { list = upsert(list, it) }
+                goneWhileLoading.remove(id)?.let { list = withoutEvents(list, it) }
                 slot(id).value = list
                 loaded += id
                 loadErrors.remove(id)
@@ -1451,6 +1459,7 @@ class LiveHub(
                 throw e
             } catch (e: Throwable) {
                 buffered.remove(id)
+                goneWhileLoading.remove(id)
                 val ex = Net.classify(e)
                 if (ex.problem == Problem.Unauthorized) unpaired()
                 else {
@@ -1502,6 +1511,14 @@ class LiveHub(
                 loadingMore.remove(id)
             }
         }
+    }
+
+    /** The Mac took event [id] back: off the session's list, and off a history still on its way. */
+    private fun dropEvent(sessionId: String, id: String) {
+        goneWhileLoading[sessionId]?.add(id)
+        val s = events[sessionId] ?: return
+        val next = withoutEvents(s.value, listOf(id))
+        if (next !== s.value) s.value = next
     }
 
     private fun appendEvent(sessionId: String, e: WEvent) {
@@ -2561,6 +2578,17 @@ private val WHITESPACE = Regex("\\s+")
  * mode, which logs "! ls" as "!ls".
  */
 internal fun sameSentText(mine: String, theirs: String): Boolean = mine.replace(WHITESPACE, "") == theirs.replace(WHITESPACE, "")
+
+/** `{t:"event.removed", sessionId, id}`: the session and the event the Mac took back; null when either is missing. */
+internal fun removedEvent(o: JSONObject): Pair<String, String>? {
+    val sid = o.str("sessionId")?.takeIf { it.isNotBlank() } ?: return null
+    val id = o.str("id")?.takeIf { it.isNotBlank() } ?: return null
+    return sid to id
+}
+
+/** [list] without the events the Mac took back ([gone], by id): a notice that no longer holds. */
+internal fun withoutEvents(list: List<WEvent>, gone: Collection<String>): List<WEvent> =
+    if (gone.isEmpty() || list.none { it.id in gone }) list else list.filterNot { it.id in gone }
 
 /**
  * The offline card's sentence for [link]: what the last round tried when nothing answered ("Your

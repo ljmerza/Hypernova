@@ -67,6 +67,24 @@ test('a command without the │ margin, lines kept as lines; more options than Y
   assert.deepEqual(m.body, ['Create the perm-ok file in /tmp/hn-tests', 'Do you want to proceed?'])
 })
 
+test('a subagent’s dialog in its session’s terminal: whose it is stays in the tool, the count of open asks doesn’t', () => {
+  // Laid out from Claude Code 2.1.314's code (the title row: title, "· from the <name> agent", and
+  // "1 of 3" at its right while several asks are open), not captured from a real screen.
+  const lines = screen('permission-screens/subagent-ask.txt')
+  const m = menuOf(lines)
+  assert.ok(m?.permission, 'a permission dialog')
+  assert.equal(m.title, 'Bash command · from the general-purpose agent')
+  assert.deepEqual(m.permission, {
+    tool: 'Bash command · from the general-purpose agent',
+    command: 'ls /media/cubxi/docker/projects/hypernova/daemon/test',
+    question: 'Do you want to proceed?',
+  })
+  assert.deepEqual(m.body, ["List the daemon's tests", 'Do you want to proceed?'])
+  assert.deepEqual(m.options.map((o) => o.label), ['Yes', 'Yes, and don’t ask again for ls commands in /media/cubxi/docker/projects/hypernova', 'No'])
+  // The next ask's turn ("2 of 3") is the same dialog for the same command.
+  assert.equal(menuOf(lines.map((l) => l.replace('1 of 3', '2 of 3')))!.id, m.id)
+})
+
 test('a menu that isn’t a permission dialog keeps permission null', () => {
   const m = menuOf(screen('limit-screens/menu-arm.txt'))
   assert.ok(m)

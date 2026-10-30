@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { userInfo } from 'node:os'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { CLAUDE_DIR, HOME, LOCAL_PORT, SUPPORT, claudeCached, log, readJson, safeEqual, writeJson, writeText, trimText } from './util.ts'
-import { HN_BIN } from './terms.ts'
+import { HN_BIN, watchHandedBack } from './terms.ts'
 import { ON_MAC, PLATFORM, shellRc } from './platform.ts'
 
 /** Read settings.json, refusing to continue if it exists but isn't valid JSON (we'd wipe it). */
@@ -40,6 +40,7 @@ import {
   requestApproval,
   resolveByToolUse,
   setState,
+  settleHandBack,
   startTool,
   toolRunning,
   upsertSession,
@@ -152,7 +153,11 @@ export async function handleHook(ev: any, req: IncomingMessage, res: ServerRespo
     case 'SubagentStop':
       // An agent the main agent started has finished: its count goes down now, not when a
       // notification (that may never come) says so.
-      if (typeof ev.agent_id === 'string' && ev.agent_id) hookSubagentStop(sid, ev.agent_id, ev.last_assistant_message)
+      if (typeof ev.agent_id === 'string' && ev.agent_id) {
+        hookSubagentStop(sid, ev.agent_id, ev.last_assistant_message)
+        // Its asks handed back to the terminal were answered there: it couldn't finish otherwise.
+        settleHandBack(sid, (a) => a.agentId === ev.agent_id)
+      }
       return {}
     case 'StopFailure': {
       // In place of Stop when an API error ended the turn (a usage limit, signed out…), at once,
@@ -225,7 +230,9 @@ async function permission(ev: any, sid: string, req: IncomingMessage, res: Serve
       return {}
     // Nobody answered before Claude Code stops waiting for this hook (its timeout): no decision, so
     // Claude Code asks in its own dialog and the session waits there; never a "no" (owner, 2026-10-30).
+    // A `claude agents` job gets a terminal attached for it, so the phone has that dialog as a card.
     case 'timeout':
+      void watchHandedBack(sid)
       return {}
     case 'deny':
       return out({ behavior: 'deny', message: ans.message || (kind === 'plan' ? 'The user wants to keep planning. Ask what to change.' : 'The user denied this from Hypernova.') })

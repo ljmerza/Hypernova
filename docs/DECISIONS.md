@@ -1810,7 +1810,13 @@ answered from the phone", 2026-10-13) stays as history for Claude Code; Codex ke
 4. **Never another job's dialog.** A `claude attach` holder that shows another job or the agent list
    (it drifted) has no menu for the session; answering goes through a fresh `claude attach`. Two
    dialogs for different commands are different menus, so an Allow never lands on the next one.
-5. **Left as it is:** automation runs still get Esc on a terminal menu that waits 10 minutes with no
+5. **A handed-back ask comes back as a card, with one notice.** Seen on the owner's phone the same
+   day: a `claude agents` job with no `claude attach` on it gave four stacked "open the terminal"
+   notices (one per ask, its agents' too), no card, and they stayed after he answered. Now the
+   first ask handed back on such a job attaches it (never reading a holder that drifted), so the
+   dialog becomes the card; the session has one notice, "Still waiting for your answer below."
+   while the card shows, removed once the asks are answered.
+6. **Left as it is:** automation runs still get Esc on a terminal menu that waits 10 minutes with no
    approval behind it (Automations, "Following"), so a run never needs you all night.
 
 ## Default mode for new sessions (2026-10-30)
