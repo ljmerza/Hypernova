@@ -23,7 +23,7 @@
 <script src="addon-fit.js"></script>
 <script>
 (() => {
-  const native = window.HN || { ready() {}, state() {}, closed() {}, exited() {}, tapped() {}, open() { return -1 }, send() {}, sendText() {}, shut() {}, took() {} }
+  const native = window.HN || { ready() {}, state() {}, closed() {}, exited() {}, tapped() {}, scrolled() {}, open() { return -1 }, send() {}, sendText() {}, shut() {}, took() {} }
   const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } }
   // The owner's text size. While a Mac window sets the terminal's size, the screen is shown
   // whole at a smaller size ("following"); typing here takes the size back.
@@ -59,6 +59,8 @@
   // Mac's terminal is attached, it answers those; a second answer would reach claude as typing.
   const REPLY = /^(\x1b\[\??[\d;]*[cRn]|\x1b\[\?[\d;]*\$y|\x1b\][\d;]*;rgb:[^\x07\x1b]*(\x07|\x1b\\)|\x1bP[\s\S]*\x1b\\)$/
   term.onData((d) => {
+    // A wheel turn of the finger's scroll (wheel below): it goes as scrolling, not as typing.
+    if (caught !== null) { caught += d; return }
     if (!ws || ws.readyState !== 1) return
     if (macOpen && REPLY.test(d)) return
     // Focus reports would make this phone "the one in use" just by being open.
@@ -148,6 +150,135 @@
     if (pinch && e.touches.length < 2) { pinch = null; store.set('fontSize', String(userFont)) }
   }, { passive: true, capture: true })
 
+  // A finger's drag scrolls the history (xterm.js 6 has no touch scrolling of its own). In the
+  // normal screen that's the history kept here, and nothing reaches claude. Claude Code's
+  // fullscreen view (the alternate screen) has no history here: it keeps its own, so the drag goes
+  // to it as mouse-wheel turns, as a desktop terminal's wheel does, or as PgUp/PgDn when it doesn't
+  // take the mouse. Never as arrow keys, which would move through the input box's history.
+  let drag = null, at = null, rest = 0, pages = 0, glideId = 0
+  // Wheel turns (or pages) sent up to claude, net, since it was last at its latest.
+  let up = 0
+  let away = false
+  // While a wheel turn is made: what xterm.js answers for it.
+  let caught = null
+
+  /** How a drag scrolls now: "lines" of the history here, "wheel" turns or "pages" to claude. */
+  function how() {
+    const m = term.modes.mouseTrackingMode
+    if (m !== 'none' && m !== 'x10') return 'wheel'
+    return term.buffer.active.type === 'normal' ? 'lines' : 'pages'
+  }
+  /** Tell the app whether "Jump to latest" shows. */
+  function where() {
+    const b = term.buffer.active
+    const now = how() === 'lines' ? b.viewportY < b.baseY : up > 0
+    if (now !== away) { away = now; native.scrolled(now) }
+  }
+  function scrollKeys(seq) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'scroll', data: seq }))
+  }
+  /** One wheel turn where the finger is ([dy] -1 up, 1 down), encoded by xterm.js as claude asked. */
+  function wheel(dy) {
+    const r = term.element.querySelector('.xterm-screen').getBoundingClientRect()
+    const x = Math.min(r.right - 1, Math.max(r.left + 1, at ? at.x : r.left + r.width / 2))
+    const y = Math.min(r.bottom - 1, Math.max(r.top + 1, at ? at.y : r.top + r.height / 2))
+    caught = ''
+    try {
+      term.element.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: WheelEvent.DOM_DELTA_LINE, clientX: x, clientY: y, bubbles: true, cancelable: true }))
+    } finally {
+      const d = caught
+      caught = null
+      if (d) scrollKeys(d)
+    }
+  }
+  /** The finger moved [px] (down is toward older lines). False when there's nothing more that way. */
+  function pull(px) {
+    if (!term.element) return false
+    const cell = term.element.querySelector('.xterm-screen').getBoundingClientRect().height / term.rows
+    if (!cell) return false
+    rest += px
+    const n = Math.trunc(rest / cell)
+    if (!n) return true
+    rest -= n * cell
+    const way = how()
+    if (way === 'lines') {
+      const before = term.buffer.active.viewportY
+      term.scrollLines(-n)
+      where()
+      return term.buffer.active.viewportY !== before
+    }
+    if (!ws || ws.readyState !== 1) return false
+    if (way === 'wheel') {
+      for (let i = 0; i < Math.abs(n); i++) wheel(n > 0 ? -1 : 1)
+      up = Math.max(0, up + n)
+    } else {
+      pages += n
+      const page = Math.max(1, term.rows - 2)
+      while (Math.abs(pages) >= page) {
+        const k = pages > 0 ? 1 : -1
+        pages -= k * page
+        scrollKeys(k > 0 ? '\x1b[5~' : '\x1b[6~')
+        up = Math.max(0, up + k)
+      }
+    }
+    where()
+    return true
+  }
+  /** A fling goes on for a moment after the finger lifts (only through the history here). */
+  function glide(v) {
+    let last = performance.now()
+    const step = (now) => {
+      const dt = now - last
+      last = now
+      v *= Math.pow(0.995, dt)
+      if (Math.abs(v) < 0.05 || !pull(v * dt)) return
+      glideId = requestAnimationFrame(step)
+    }
+    glideId = requestAnimationFrame(step)
+  }
+  /** Typing goes to the latest, as in a desktop terminal. */
+  function live() {
+    up = 0
+    pages = 0
+    term.scrollToBottom()
+    where()
+  }
+  document.addEventListener('touchstart', (e) => {
+    cancelAnimationFrame(glideId)
+    if (e.touches.length !== 1) { drag = null; return }
+    const t = e.touches[0]
+    drag = { x: t.clientX, y: t.clientY, last: t.clientY, time: e.timeStamp, v: 0, on: false }
+    at = { x: t.clientX, y: t.clientY }
+    rest = 0
+  }, { passive: true, capture: true })
+  document.addEventListener('touchmove', (e) => {
+    if (!drag || e.touches.length !== 1) return
+    const t = e.touches[0]
+    if (!drag.on) {
+      // A tap that wobbles is still a tap; a sideways drag isn't a scroll.
+      const dy = t.clientY - drag.y
+      if (Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(t.clientX - drag.x)) return
+      drag.on = true
+      drag.last = t.clientY
+      drag.time = e.timeStamp
+      return
+    }
+    e.preventDefault()
+    const dy = t.clientY - drag.last
+    drag.v = 0.8 * (dy / Math.max(1, e.timeStamp - drag.time)) + 0.2 * drag.v
+    drag.last = t.clientY
+    drag.time = e.timeStamp
+    pull(dy)
+  }, { passive: false, capture: true })
+  document.addEventListener('touchend', (e) => {
+    const d = drag
+    drag = null
+    if (d && d.on && how() === 'lines' && Math.abs(d.v) > 0.3 && e.timeStamp - d.time < 80) glide(d.v)
+  }, { passive: true, capture: true })
+  document.addEventListener('touchcancel', () => { drag = null }, { passive: true, capture: true })
+  term.onScroll(() => where())
+  term.buffer.onBufferChange(() => { up = 0; pages = 0; where() })
+
   // On the local route the app opens the socket (this page's own WebSocket can't trust the Mac's
   // pinned certificate or show the phone's device certificate) and this stands in for it, with the
   // face hn.connect expects of a WebSocket: readyState, send, close, onmessage, onclose. What
@@ -222,7 +353,9 @@
         try { m = JSON.parse(ev.data) } catch { return }
         if (m.t === 'snapshot') {
           term.reset()
-          term.write(m.data, () => term.scrollToBottom())
+          up = 0
+          pages = 0
+          term.write(m.data, () => { term.scrollToBottom(); where() })
         } else if (m.t === 'hello' || m.t === 'state') {
           macOpen = m.tty > 0
           if (m.cols && m.rows) follow(m.cols, m.rows)
@@ -251,23 +384,40 @@
       takeOver()
       let seq = KEYS[name]
       if (!seq) return
+      live()
       if (seq.length === 1 && /[A-D]/.test(seq)) seq = (term.modes.applicationCursorKeysMode ? '\x1bO' : '\x1b[') + seq
       ws.send(enc.encode(seq))
     },
     text(s) {
       if (!ws || ws.readyState !== 1 || !s) return
       takeOver()
+      live()
       ws.send(enc.encode(s))
     },
     // Pasted the way a terminal pastes (bracketed when claude asks for it), so newlines don't submit.
     paste(s) {
       if (!ws || ws.readyState !== 1 || !s) return
       takeOver()
+      live()
       term.paste(s)
     },
     focus() { term.focus() },
     blur() { term.blur() },
     bottom() { term.scrollToBottom() },
+    // "Jump to latest": the history here goes to its end; claude's own view is scrolled back
+    // (Ctrl+End is Claude Code's "scroll to the bottom" in its fullscreen view).
+    latest() {
+      cancelAnimationFrame(glideId)
+      const way = how()
+      if (way === 'lines') term.scrollToBottom()
+      else if (up > 0) {
+        if (way === 'wheel') scrollKeys('\x1b[1;5F')
+        else for (let i = 0; i < up; i++) scrollKeys('\x1b[6~')
+      }
+      up = 0
+      pages = 0
+      where()
+    },
   }
 
   const el = document.getElementById('t')

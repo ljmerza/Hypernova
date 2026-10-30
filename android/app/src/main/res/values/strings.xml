@@ -309,7 +309,7 @@
     <string name="terminal_also_mac">Also open on your Mac</string>
     <!-- The terminal's subtitle while it's open on the Mac as well: "120 × 40, also open on your Mac". -->
     <string name="terminal_subtitle_mac">%1$s, also open on your Mac</string>
-    <string name="terminal_hint">Pinch to change the text size. Tap the screen to type.</string>
+    <string name="terminal_hint">Pinch to change the text size. Drag to scroll back. Tap the screen to type.</string>
     <string name="key_esc">esc</string>
     <string name="key_tab">tab</string>
     <string name="key_stab">⇧tab</string>
