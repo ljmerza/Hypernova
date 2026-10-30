@@ -353,9 +353,12 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     // come back where it was left, not following if it had been scrolled up. Coming back from a
     // screen opened over it (an agent, a file) still keeps the place: that's the same opening.
     val openedAs = rememberSaveable { intArrayOf(opening) }
+    // Fork: the ask whose start the list last scrolled to (AskStack.kt, Asks.toShow).
+    var shownAsk by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     if (openedAs[0] != opening) {
         openedAs[0] = opening
         follow = true
+        shownAsk = null
         // Rows, plus "Show earlier" above them (or the one "empty" row).
         val end = if (items.isEmpty()) 0 else (rows.size - 1 + if (hub.hasEarlier(sessionId)) 1 else 0).coerceAtLeast(0)
         SideEffect { list.requestScrollToItem(end, Int.MAX_VALUE) }
@@ -419,7 +422,12 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     LaunchedEffect(tailKey, barPx, items.size, working) {
         if (!follow || items.isEmpty()) return@LaunchedEffect
         val last = items.getOrNull(liveAt)
-        if (last is Item.Approval && last.resolved == null) {
+        // Fork: only once for each ask. Every run of this (the bar's height changing as "Jump to
+        // latest" folds away, say) went back to the ask's start, so scrolling past the bottom of a
+        // tall one jumped the list back up. After that it follows the end like anything else.
+        val ask = Asks.toShow(last, shownAsk)
+        if (last is Item.Approval && ask != null) {
+            shownAsk = ask
             // A new question or plan can be taller than the screen: show where it starts.
             withFrameNanos { }
             // An approval is never folded: its own row in the list (the stack's, AskStack.kt), after

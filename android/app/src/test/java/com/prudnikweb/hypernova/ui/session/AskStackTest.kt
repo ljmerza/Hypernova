@@ -4,6 +4,7 @@ import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Resolution
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,6 +34,20 @@ class AskStackTest {
         assertEquals("c", Asks.front(asks, "c").key)
         // Answered (gone from the stack): the first again.
         assertEquals("a", Asks.front(asks.dropLast(1), "c").key)
+    }
+
+    @Test fun anAsksStartIsShownOnceThenTheChatFollowsItsEnd() {
+        val a = Item.Approval("approval-ap1", "Bash", "ls", "", approvalId = "ap1")
+        assertEquals("ap1", Asks.toShow(a, null))
+        // Shown already (the list ran again: the bar's height, a tick): no jump back to its start.
+        assertNull(Asks.toShow(a, "ap1"))
+        // Its event arriving changes its key, not the ask.
+        assertNull(Asks.toShow(a.copy(key = "e1"), "ap1"))
+        // Another ask is shown, once.
+        assertEquals("ap2", Asks.toShow(a.copy(key = "e2", approvalId = "ap2"), "ap1"))
+        // Answered, or not an ask: nothing to show.
+        assertNull(Asks.toShow(a.copy(resolved = Resolution.Allowed), null))
+        assertNull(Asks.toShow(Item.Assistant("r", "ok"), null))
     }
 
     @Test fun theStackIsTheLastRowAndHasEachOfItsAsks() {

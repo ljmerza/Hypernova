@@ -50,6 +50,17 @@ internal object Asks {
         return rest to asks.map { it as Item.Approval }.sortedBy { it.expiresAt ?: Long.MAX_VALUE }
     }
 
+    /**
+     * The ask the chat scrolls to the start of, once: [last] (the newest thing in the chat) if it's
+     * an ask still waiting that isn't [shown] already (by its approval's id, so its event arriving
+     * after the approval itself isn't a new one). Null otherwise: the chat just follows its end.
+     */
+    fun toShow(last: Item?, shown: String?): String? {
+        val a = last as? Item.Approval ?: return null
+        if (a.resolved != null) return null
+        return (a.approvalId ?: a.key).takeIf { it != shown }
+    }
+
     /** The ask in front: the one brought forward ([chosen]) while it still waits, else the first. */
     fun front(asks: List<Item.Approval>, chosen: String?): Item.Approval =
         asks.firstOrNull { it.key == chosen } ?: asks.first()
