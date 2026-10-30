@@ -84,6 +84,7 @@ import com.prudnikweb.hypernova.ui.stats.StatsScreen
 import kotlin.math.roundToInt
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Account
+import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.AccountWords
 import com.prudnikweb.hypernova.data.Blocked
 import com.prudnikweb.hypernova.data.FakeHub
@@ -142,13 +143,13 @@ import com.prudnikweb.hypernova.ui.components.NoPart
 import com.prudnikweb.hypernova.ui.components.SeamWords
 import com.prudnikweb.hypernova.ui.components.fitPart
 import com.prudnikweb.hypernova.ui.components.ModeTag
-import com.prudnikweb.hypernova.ui.components.ModelChip
 import com.prudnikweb.hypernova.ui.components.SessionStamp
-import com.prudnikweb.hypernova.ui.components.modelModeSaid
 import com.prudnikweb.hypernova.ui.components.sessionSaid
-import com.prudnikweb.hypernova.data.ModelNames
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.layout.size
 import com.prudnikweb.hypernova.ui.fx.formatDuration
 import com.prudnikweb.hypernova.ui.fx.rememberCountdownNow
@@ -514,6 +515,9 @@ fun HomeScreen(
                         block = s.activeBlock(account, hub.providers, now),
                         waiting = hub.waitingCount(s.id),
                         codex = codexOn && s.codex,
+                        ask = hub.approval(s.id).let { a -> remember(a) { CardAsk.of(a) } },
+                        onAnswer = hub::answerApproval,
+                        menu = if (!hub.isDemo && MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
                     )
                 }
                 // The usage cards (UsageCards.kt): Claude's, Codex's, or both, each saying whose it is only when both show.
@@ -778,16 +782,25 @@ private fun skyDescription(hub: Hub, cosmos: CosmosState, quiet: Int, u: Usage, 
     return "$sky $starSaid"
 }
 
-/** [block]: what stops it replying now (a limit, signed out), shown as its chip. [codex]: a CODEX chip (only while Codex is in use here). */
+/**
+ * [block]: what stops it replying now (a limit, signed out), shown as its chip. [codex]: a CODEX chip (only while Codex is in use here).
+ * [ask]: the approval it waits on, answered right on the card ([onAnswer]; [CardAsk]). [menu]: what a
+ * long-press opens ([SessionMenu]), closed by the call it's given.
+ */
 @Composable
-fun SessionCard(s: Session, now: Long, scramble: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, block: Blocked? = null, waiting: Int = 0, codex: Boolean = false) {
+fun SessionCard(
+    s: Session, now: Long, scramble: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, block: Blocked? = null, waiting: Int = 0, codex: Boolean = false,
+    ask: CardAsk? = null, onAnswer: suspend (id: String, answer: Answer) -> Boolean = { _, _ -> false },
+    menu: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
+) {
     val needs = s.state == SessionState.NeedsYou
-    // Agents its main agent started, still at work: the session isn't done, even with its main agent idle.
-    val agents = if (s.phase == Phase.Ended) 0 else s.agentsRunning
     val res = LocalContext.current.resources
+    var menuOpen by rememberSaveable(s.id) { mutableStateOf(false) }
+    if (menuOpen && menu != null) menu { menuOpen = false }
     GlassCard(
         modifier.fillMaxWidth(), accent = if (needs) HN.amber else null,
         onClick = onClick, onClickLabel = stringResource(R.string.open_session),
+        onLongClick = if (menu != null) { { menuOpen = true } } else null, onLongClickLabel = stringResource(R.string.session_menu),
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Seam(
@@ -812,45 +825,109 @@ fun SessionCard(s: Session, now: Long, scramble: Boolean, onClick: () -> Unit, m
                     Spacer(Modifier.width(7.dp))
                     HText(s.activity, style = Type.monoSmall, color = tone, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+            } else if (ask is CardAsk.Exact) {
+                // Allow promises this exact command: the tool, then all of it as it will run, line
+                // breaks and all, never cut (CardAsk, the widget's rule).
+                HText(ask.tool.uppercase(), style = Type.label, color = HN.amber)
+                Spacer(Modifier.height(4.dp))
+                HText(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = HN.amber)) { append(if (ask.tool == "Bash") "$ " else "› ") }
+                        append(ask.text)
+                    },
+                    style = Type.monoSmall, color = HN.ink,
+                )
             } else HText(s.activity, style = Type.monoSmall, color = if (needs) HN.amber else HN.inkMuted, maxLines = 1)
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                PhaseChip(s, block)
-                if (agents > 0) {
-                    Spacer(Modifier.width(6.dp))
-                    StatusChip(pluralStringResource(R.plurals.agents_count, agents, agents), HN.accentDim, live = true)
+                // With an ask, its pills keep their room and the chips give way.
+                Row(if (ask != null) Modifier.weight(1f) else Modifier, verticalAlignment = Alignment.CenterVertically) {
+                    PhaseChip(s, block)
+                    // Prompts typed while the Mac was away, waiting on this phone to be sent.
+                    if (waiting > 0) {
+                        val said = stringResource(R.string.waiting_a11y, waiting)
+                        Spacer(Modifier.width(6.dp))
+                        StatusChip(stringResource(R.string.waiting_chip, waiting), HN.inkMuted, glyph = Glyph.Laptop, modifier = Modifier.clearAndSetSemantics { contentDescription = said })
+                    }
+                    // Started by an automation: its title already says which and when.
+                    if (s.automation != null) {
+                        Spacer(Modifier.width(6.dp))
+                        com.prudnikweb.hypernova.ui.automations.AutoChip()
+                    }
+                    // Codex runs it (data/Codex.kt): a quiet outline chip, as AUTO is; Claude's cards have none.
+                    if (codex) {
+                        Spacer(Modifier.width(6.dp))
+                        com.prudnikweb.hypernova.ui.automations.OutlineChip(stringResource(R.string.cx_agent_codex), HN.inkMuted)
+                    }
                 }
-                // Prompts typed while the Mac was away, waiting on this phone to be sent.
-                if (waiting > 0) {
-                    val said = stringResource(R.string.waiting_a11y, waiting)
-                    Spacer(Modifier.width(6.dp))
-                    StatusChip(stringResource(R.string.waiting_chip, waiting), HN.inkMuted, glyph = Glyph.Laptop, modifier = Modifier.clearAndSetSemantics { contentDescription = said })
+                if (ask != null) {
+                    Spacer(Modifier.width(8.dp))
+                    AskPills(ask, onAnswer, onOpen = onClick)
+                } else {
+                    // The permission mode as its glyph and words (no model chip or agents count: the
+                    // owner found them no use on the card). Short of room it keeps only its glyph.
+                    Spacer(Modifier.width(8.dp))
+                    val mode = modeLabel(s.mode)
+                    val said = res.getString(R.string.meta_mode_said, mode)
+                    FitRow(
+                        parts = listOf(
+                            listOf({ ModeTag(s.mode, mode) }, { ModeTag(s.mode, null) }),
+                        ),
+                        giveWay = intArrayOf(0, 0),
+                        modifier = Modifier.weight(1f).clearAndSetSemantics { contentDescription = said },
+                        end = true,
+                    )
                 }
-                // Started by an automation: its title already says which and when.
-                if (s.automation != null) {
-                    Spacer(Modifier.width(6.dp))
-                    com.prudnikweb.hypernova.ui.automations.AutoChip()
-                }
-                // Codex runs it (data/Codex.kt): a quiet outline chip, as AUTO is; Claude's cards have none.
-                if (codex) {
-                    Spacer(Modifier.width(6.dp))
-                    com.prudnikweb.hypernova.ui.automations.OutlineChip(stringResource(R.string.cx_agent_codex), HN.inkMuted)
-                }
-                // The model as a chip and the permission mode as its glyph and words, not "opus · ask
-                // first". Short of room the mode keeps only its glyph, then the chip goes.
-                Spacer(Modifier.width(8.dp))
-                val mode = modeLabel(s.mode)
-                val said = modelModeSaid(res, ModelNames.chip(s.model), mode)
-                FitRow(
-                    parts = listOf(
-                        listOf { ModelChip(ModelNames.chip(s.model)) },
-                        listOf({ ModeTag(s.mode, mode) }, { ModeTag(s.mode, null) }),
-                    ),
-                    giveWay = intArrayOf(1, 0, 1),
-                    modifier = Modifier.weight(1f).clearAndSetSemantics { contentDescription = said },
-                    end = true,
+            }
+        }
+    }
+}
+
+/**
+ * A card's answer to its session's approval ([CardAsk]): Deny and Allow for a tool's exact command,
+ * Deny and Open when it can't show whole (no blind Allow), Answer (opens the session) for a question
+ * or a plan. While an answer goes, "Allowing…" or "Denying…" in their place; one that didn't get
+ * through brings them back (the toast says why).
+ */
+@Composable
+private fun AskPills(ask: CardAsk, onAnswer: suspend (id: String, answer: Answer) -> Boolean, onOpen: () -> Unit) {
+    val view = LocalView.current
+    val appScope = LocalAppScope.current
+    var answering by remember(ask.id) { mutableStateOf<Answer?>(null) }
+    fun send(answer: Answer) {
+        if (answering != null) return
+        answering = answer
+        appScope.launch { if (!onAnswer(ask.id, answer)) answering = null }
+    }
+    val going = answering
+    if (going != null) {
+        Box(Modifier.heightIn(min = 40.dp), contentAlignment = Alignment.CenterEnd) {
+            HText(
+                stringResource(if (going == Answer.Allow) R.string.widget_allowing else R.string.widget_denying),
+                style = Type.small, color = if (going == Answer.Allow) HN.accent else HN.inkMuted, maxLines = 1,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        return
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        when (ask) {
+            is CardAsk.Exact -> {
+                Pill(stringResource(R.string.deny), { send(Answer.Deny) }, kind = PillKind.Danger, height = 40.dp)
+                Pill(
+                    stringResource(R.string.allow),
+                    {
+                        view.performHapticFeedback(if (android.os.Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
+                        send(Answer.Allow)
+                    },
+                    kind = PillKind.Primary, height = 40.dp,
                 )
             }
+            is CardAsk.Partial -> {
+                Pill(stringResource(R.string.deny), { send(Answer.Deny) }, kind = PillKind.Danger, height = 40.dp)
+                Pill(stringResource(R.string.open_session_short), onOpen, kind = PillKind.Outline, height = 40.dp)
+            }
+            is CardAsk.Open -> Pill(stringResource(R.string.home_answer), onOpen, kind = PillKind.Primary, height = 40.dp)
         }
     }
 }

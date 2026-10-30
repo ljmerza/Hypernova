@@ -17,6 +17,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -231,6 +232,9 @@ private val BottomHighlight = Brush.horizontalGradient(listOf(Color.Transparent,
  * accent, never a tinted card): a thin edge of light down its left side, a soft glow beside it,
  * and the ring a little warmer. [accent] is kept for the cards that used to be tinted; the two
  * mean the same.
+ *
+ * [onLongClick] (with [onClick]): a long-press does it too, with a haptic tick; TalkBack offers it
+ * as the card's long-press action, [onLongClickLabel].
  */
 @Composable
 fun GlassCard(
@@ -240,8 +244,11 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     onClickLabel: String? = null,
     edge: Color? = accent,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val view = LocalView.current
     val ring = edge?.copy(alpha = 0.12f) ?: HN.ink.copy(alpha = 0.08f)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -260,7 +267,17 @@ fun GlassCard(
             }
             .border(1.dp, ring, shape)
             .then(
-                if (onClick != null) {
+                if (onClick != null && onLongClick != null) {
+                    Modifier.combinedClickable(
+                        interaction, indication = null, onClickLabel = onClickLabel, role = Role.Button,
+                        onLongClickLabel = onLongClickLabel,
+                        onLongClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            onLongClick()
+                        },
+                        onClick = onClick,
+                    )
+                } else if (onClick != null) {
                     Modifier.clickable(interaction, indication = null, onClickLabel = onClickLabel, role = Role.Button, onClick = onClick)
                 } else Modifier,
             ),

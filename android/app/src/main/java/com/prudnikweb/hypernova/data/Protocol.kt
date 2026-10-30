@@ -94,6 +94,8 @@ data class WSession(
     /** It switched agents: the session it came from, and the one it went on in (docs/PROTOCOL.md, "Switching agents"). */
     val switchedFrom: String? = null,
     val switchedTo: String? = null,
+    /** Its `claude agents` job id, when it is one (docs/PROTOCOL.md, "Session menu"): it can be stopped or deleted. */
+    val agentJob: String? = null,
 )
 
 /**
@@ -612,6 +614,7 @@ object Wire {
             agent = o.str("agent")?.takeIf { it.isNotBlank() } ?: AgentKind.CLAUDE,
             switchedFrom = o.str("switchedFrom")?.takeIf { it.isNotBlank() },
             switchedTo = o.str("switchedTo")?.takeIf { it.isNotBlank() },
+            agentJob = o.str("agentJob")?.takeIf { it.isNotBlank() },
         )
     }
 
