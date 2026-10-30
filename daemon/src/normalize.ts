@@ -859,6 +859,8 @@ export type ParseState = {
    * Mac). [content] null: Claude Code logged the prompt without its text.
    */
   claim: ((content: string | null, ts: number) => Claim | null) | null
+  /** Which phone send a prompt that started a turn at [ts], rewritten by a hook of Claude Code's, came from. */
+  claimRewritten: ((ts: number) => Claim | null) | null
   /**
    * An agent's own transcript (agents.ts reads one for the phone): its entries are all marked
    * isSidechain, and how it hands its report back is its last word.
@@ -915,7 +917,7 @@ export type AccountNote =
 export function newParseState(sidechain = false): ParseState {
   return {
     events: [], byId: new Map(), changed: new Set(), title: null, firstPrompt: null, firstCommand: null, lastText: null, cwd: null, model: null, modelAt: 0, lastTs: 0,
-    queue: [], queueChanged: false, queueSeq: 0, drained: 0, absorbed: new Map(), claim: null,
+    queue: [], queueChanged: false, queueSeq: 0, drained: 0, absorbed: new Map(), claim: null, claimRewritten: null,
     sidechain, links: [], taskSeen: new Map(), scripts: new Map(), turnAt: 0,
     builtIn: true, movedAt: 0, builtInBefore: true, inherited: false, blocker: null, account: [], askedAt: 0,
   }
@@ -1441,7 +1443,10 @@ export function feedLine(st: ParseState, o: any): void {
       const taken = untake(st, id)
       const fresh = !taken && u.kind !== 'output' && !st.byId.has(id)
       const q = fresh ? dequeue(st, u.kind === 'prompt' ? u.text : commandText(u.command), o.promptSource, drain(st)) : null
-      feedUserText(st, id, o.parentUuid, ts, u, taken?.clientId ?? q?.clientId)
+      // Typed while Claude was idle, and changed by a hook of Claude Code's on the way in (a
+      // spellcheck plugin): the phone can't tell it by its text any more, so it carries the send's name.
+      const rewritten = fresh && !q && u.kind === 'prompt' && o.promptRewritten === true ? st.claimRewritten?.(ts) : null
+      feedUserText(st, id, o.parentUuid, ts, u, taken?.clientId ?? q?.clientId ?? rewritten?.clientId)
       return
     }
     case 'attachment': {

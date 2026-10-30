@@ -3971,9 +3971,12 @@ its transcript, `~/.claude/projects/<folder>/<session id>.jsonl`. Event ids are 
   and a leading "!" aside), or, for an entry without text, the oldest one noted at or before the
   entry's own time (the daemon notes a send before typing it, and Claude Code stamps the entry
   as Enter goes in, on the same clock), which lends that entry its text and `clientId`. A send
-  that started a turn, ran at once or failed is forgotten, and a queued one can be claimed only
+  that ran at once or failed is forgotten, and a queued one can be claimed only
   for 5 s after the holder answered (its entry is logged as Enter goes in), so a prompt typed on
-  the Mac later never takes its name. A loan is a guess: when the send's own entry is then
+  the Mac later never takes its name. A prompt that started a turn is no queue entry's: only its
+  own user entry claims it, within 20 s, and only one Claude Code marks `promptRewritten` (a hook
+  of its own changed the text on the way in, such as a spellcheck plugin's "clip board" to
+  "clipboard", so the phone can't match it by its text): the oldest typed at or before it. A loan is a guess: when the send's own entry is then
   logged with its text (another prompt was queued without text as it was typed, a task
   notification say, and started a turn), the text and `clientId` move to it, and the borrower
   is an entry without text again, unseen. Either way each prompt leaves by its text, so the
