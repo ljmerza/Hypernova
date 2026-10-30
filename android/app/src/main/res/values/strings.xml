@@ -837,4 +837,11 @@
     <string name="ns_folder_truncated">The first %1$d of %2$d folders.</string>
     <string name="ns_use_folder">Use %1$s</string>
     <string name="ns_use_this_folder">Use this folder</string>
+    <!-- Fork: a ```mermaid block drawn as a diagram in the chat (ui/components/Mermaid.kt). -->
+    <string name="mermaid_diagram">Diagram</string>
+    <string name="mermaid_open">Open full screen</string>
+    <string name="mermaid_tap_expand">Tap to expand</string>
+    <string name="mermaid_show_code">Show the code</string>
+    <string name="mermaid_show_diagram">Show the diagram</string>
+    <string name="mermaid_close">Close</string>
 </resources>

@@ -14,6 +14,7 @@ Go's module cache) and in `third_party/`.
 | Kotlin standard library and kotlinx.coroutines (JetBrains) | Apache-2.0 |
 | The built-in Tailscale node: `tailscale.com/tsnet` and its Go dependencies, the Go runtime, gomobile | BSD-3-Clause (Tailscale Inc., The Go Authors) and the licences of its Go modules |
 | xterm.js and its fit addon (the terminal view, `third_party/xterm`) | MIT |
+| Mermaid 11.17.2 (the chat's diagrams, `third_party/mermaid`), with the libraries its `mermaid.min.js` bundles: D3, dagre-d3-es, cytoscape, KaTeX, marked, lodash-es, Langium, Chevrotain, DOMPurify and others (the notices the bundle kept are at its end) | MIT; D3 ISC, d3-sankey BSD-3-Clause, Chevrotain Apache-2.0, DOMPurify MPL-2.0 or Apache-2.0 |
 | Manrope and JetBrains Mono (`third_party/fonts`) | SIL Open Font License 1.1 |
 
 ## Shipped in the Mac app (`Hypernova.dmg`) and the Linux package (`Hypernova-linux.tar.gz`)

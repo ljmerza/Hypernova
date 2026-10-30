@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Scripts from this folder only and nothing from the network: the app answers any other request with a 404 too. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'">
+<title>Diagrams</title>
+<style>
+  /* Hypernova's mermaid diagrams: the chat's ```mermaid blocks, drawn here and shown as pictures. */
+  @font-face { font-family: "Manrope"; src: url("Manrope.ttf") format("truetype"); font-weight: 200 800; }
+  html, body { margin: 0; background: #0F0D0A; }
+  /* About a phone's chat column: diagrams that take their width from the page (gantt, pie) are drawn for it. */
+  body { width: 400px; font-family: Manrope, sans-serif; }
+</style>
+</head>
+<body>
+<div id="box"></div>
+<script src="frames.js"></script>
+<script src="mermaid.min.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
