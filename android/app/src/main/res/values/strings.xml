@@ -367,7 +367,6 @@
     <string name="mode_bypass_desc">Never asks, not even before risky commands. Only for throwaway work.</string>
     <string name="mode_bypass_unavailable">Bypass is off here: this session started in a terminal without it. Start a new session from the phone to use it.</string>
     <string name="mode_bypass_next_turn">Bypass starts with Claude\u2019s next turn.</string>
-    <string name="mode_next_turn">%1$s starts with Claude\u2019s next turn.</string>
     <!-- Think-twice card, shown before Auto or Bypass -->
     <string name="think_kicker_auto">Before you let it run on its own</string>
     <string name="think_kicker_bypass">Before you switch every check off</string>
@@ -552,7 +551,6 @@
     <string name="update_get">Get the update</string>
     <string name="about_app_build">%1$s (build %2$d)</string>
     <string name="mode_change">Change the permission mode</string>
-    <string name="mode_cycle">Switch to %1$s</string>
     <string name="busy_title">Unsent text in the terminal</string>
     <string name="busy_body">Your message didn\'t go, so nothing was typed over it. Replace it with your message, or open the terminal.</string>
     <string name="busy_replace">Replace and send</string>
@@ -837,4 +835,41 @@
     <string name="ns_folder_truncated">The first %1$d of %2$d folders.</string>
     <string name="ns_use_folder">Use %1$s</string>
     <string name="ns_use_this_folder">Use this folder</string>
+
+    <!-- The session sheet (ui/session/SessionSheet.kt), opened from the chat's usage strip. -->
+    <string name="session_sheet_title">Session</string>
+    <string name="session_sheet_open">Show the session</string>
+    <string name="session_sheet_usage">Usage</string>
+    <string name="session_sheet_permissions">Permissions</string>
+    <string name="session_sheet_agents">Agents</string>
+    <string name="session_sheet_where">Where it runs</string>
+    <string name="session_sheet_actions">Actions</string>
+    <string name="session_sheet_usage_loading">Asking the Mac</string>
+    <string name="session_sheet_no_agents">No agents at work.</string>
+    <!-- An agent at work: its label, then what it does now, or this. -->
+    <string name="session_sheet_agent_working">working</string>
+    <!-- TalkBack, one agent: "Explore: the daemon's routes, Bash: npm test, 1:12". -->
+    <string name="session_sheet_agent_said">%1$s, %2$s, %3$s</string>
+    <!-- A running workflow: its name, then its agents done of those it has started so far ("1/7"). -->
+    <string name="session_sheet_workflow_said">Workflow %1$s, %2$d of %3$d agents done</string>
+    <string name="session_sheet_open_agent">Open the agent</string>
+    <!-- The mode can't be changed from the phone: why. -->
+    <string name="session_sheet_mode_ended">It has ended. Writing in it resumes it.</string>
+    <string name="session_sheet_mode_watched">Change it in its terminal on the Mac: Hypernova only watches that one.</string>
+    <string name="session_sheet_blocked">Blocked calls</string>
+    <string name="session_sheet_blocked_note">Calls refused without you. Allow and retry them, or dismiss them.</string>
+    <string name="session_sheet_folder">Folder</string>
+    <string name="session_sheet_runs_in">Runs in</string>
+    <string name="session_sheet_runs_terminal">A shared terminal</string>
+    <string name="session_sheet_runs_mac">Hypernova, on the Mac</string>
+    <string name="session_sheet_runs_watched">A terminal on the Mac</string>
+    <string name="session_sheet_agent">Agent</string>
+    <string name="session_sheet_provider">Provider</string>
+    <string name="session_sheet_job">claude agents job</string>
+    <string name="session_sheet_id">Session id</string>
+    <!-- TalkBack, after the usage strip's sentences: the agents at work, the queue and the mode. -->
+    <plurals name="session_sheet_agents_said">
+        <item quantity="one">%d agent at work.</item>
+        <item quantity="other">%d agents at work.</item>
+    </plurals>
 </resources>

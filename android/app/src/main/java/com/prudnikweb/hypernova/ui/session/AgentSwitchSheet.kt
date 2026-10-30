@@ -157,12 +157,12 @@ internal fun AgentLine(codex: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * A Codex session's model and reasoning effort, from its panel: Codex's own list (the one it runs
- * marked), its effort under it, and Done switches it ([Hub.setCodexModel]; from its next turn while
- * one runs). [onPicked] folds the panel it was opened from.
+ * A Codex session's model and reasoning effort, from the session sheet: Codex's own list (the one it
+ * runs marked), its effort under it, and Done switches it ([Hub.setCodexModel]; from its next turn
+ * while one runs).
  */
 @Composable
-internal fun CodexModelPicker(hub: Hub, s: Session, onPicked: () -> Unit, onDismiss: () -> Unit) {
+internal fun CodexModelPicker(hub: Hub, s: Session, onDismiss: () -> Unit) {
     val appScope = LocalAppScope.current
     val toast = LocalToast.current
     val res = LocalContext.current.resources
@@ -174,7 +174,6 @@ internal fun CodexModelPicker(hub: Hub, s: Session, onPicked: () -> Unit, onDism
         onDone = { m, e ->
             onDismiss()
             if (m != s.model || e != null) {
-                onPicked()
                 val name = codexModelName(models, m, res.getString(R.string.model_label_default))
                 appScope.launch {
                     hub.setCodexModel(s.id, m, e)

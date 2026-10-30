@@ -9,7 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,12 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -103,20 +99,21 @@ internal fun rememberSessionUsage(hub: Hub, sessionId: String, key: String): Ses
  * the model, what the session has cost and used, and the plan's 5-hour window as a compact
  * projection meter (ui/components/ProjectionMeter.kt: what's used, where the pace leads, one tag).
  * "≈" marks what's worked out rather than Claude Code's own number. From [COMPACT_AT]% a Compact
- * chip offers /compact; a tap on the strip opens the breakdown.
+ * chip offers /compact; a tap on the strip opens the session sheet ([onOpen], SessionSheet.kt).
+ * TalkBack hears [more] after its own sentences: what the header's line used to say (the agents at
+ * work, the queue, the mode).
  */
 @Composable
-internal fun UsageStrip(hub: Hub, session: Session, usage: SessionUsage, onCompact: () -> Unit, modifier: Modifier = Modifier) {
+internal fun UsageStrip(hub: Hub, session: Session, usage: SessionUsage, onCompact: () -> Unit, onOpen: () -> Unit, more: String, modifier: Modifier = Modifier) {
     val res = LocalContext.current.resources
-    var open by rememberSaveable(session.id) { mutableStateOf(false) }
     val pct = usage.contextPct
-    val builtIn = hub.providers.firstOrNull { it.id == (session.providerId ?: "anthropic") }?.builtIn ?: (session.providerId == null || session.providerId == "anthropic")
+    val builtIn = builtIn(hub, session)
     val u = hub.usage
     // Moves when "resets in" would read differently, in step with Home's countdowns (ui/fx/Countdown.kt).
     val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(u.fiveHourResetAt)
     val showFive = builtIn && u.known && !u.stale
     val five = if (showFive) UsageProjection.fiveHour(u, now) else null
-    val said = stripDescription(res, usage, session, five)
+    val said = stripDescription(res, usage, session, five) + more
     val shape = RoundedCornerShape(12.dp)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(
@@ -125,7 +122,7 @@ internal fun UsageStrip(hub: Hub, session: Session, usage: SessionUsage, onCompa
                 .heightIn(min = 40.dp)
                 .clip(shape)
                 .glassChoice(false, 12.dp)
-                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.chat_usage_open)) { open = true }
+                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.session_sheet_open), onClick = onOpen)
                 .clearAndSetSemantics { contentDescription = said }
                 .padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -154,8 +151,11 @@ internal fun UsageStrip(hub: Hub, session: Session, usage: SessionUsage, onCompa
             CompactChip(onCompact)
         }
     }
-    if (open) UsageBreakdown(hub, usage, session, builtIn, onCompact = { open = false; onCompact() }, onDismiss = { open = false })
 }
+
+/** The session runs on the subscription's own provider: the plan's windows are about it. */
+internal fun builtIn(hub: Hub, session: Session): Boolean =
+    hub.providers.firstOrNull { it.id == (session.providerId ?: "anthropic") }?.builtIn ?: (session.providerId == null || session.providerId == "anthropic")
 
 /**
  * The strip's parts after the ring, for [FitRow]: the model's chip (whole, then just its family),
@@ -259,113 +259,102 @@ private fun stripDescription(res: Resources, u: SessionUsage, s: Session, five: 
 }
 
 /**
- * The strip's breakdown: the context in tokens, the tokens by kind, what the cost is and isn't,
- * and the plan's windows. Each estimate says so, in words.
+ * The model's full id when it says more than its chip (not "Opus 5.5 · claude-opus-5-5"): the
+ * usage's while it is about the model the session runs, else the session's. Null when the chip is it.
+ */
+internal fun modelId(u: SessionUsage?, sessionModel: String, unknown: String): String? {
+    val name = if (u == null) sessionModel else stripModel(u, sessionModel, unknown)
+    return (if (name == sessionModel) sessionModel else u?.model ?: sessionModel).takeIf { ModelNames.chip(it) != it }
+}
+
+/**
+ * The strip's breakdown, the session sheet's Usage part: the context in tokens, the tokens by
+ * kind, what the cost is and isn't, and the plan's windows. Each estimate says so, in words. (The
+ * model is the sheet's Model part.)
  */
 @Composable
-private fun UsageBreakdown(hub: Hub, u: SessionUsage, s: Session, builtIn: Boolean, onCompact: () -> Unit, onDismiss: () -> Unit) {
+internal fun UsageDetails(hub: Hub, u: SessionUsage, s: Session, builtIn: Boolean, onCompact: () -> Unit) {
     val res = LocalContext.current.resources
     // The plan's per-model weeks below are read off /usage every 15 minutes: a fresh look now (data/UsageRefresh.kt).
     LaunchedEffect(builtIn) { if (builtIn) com.prudnikweb.hypernova.data.UsageRefresh.ask(hub) }
-    ChatSheet(stringResource(R.string.chat_usage_title), onDismiss) {
-        HText(stringResource(R.string.chat_usage_title), style = Type.title, color = HN.ink)
-        Spacer(Modifier.height(2.dp))
-        // The model's chip, and its full id after it in mono when that says more (not "Opus 5.5 · claude-opus-5-5").
-        val name = stripModel(u, s.model, res.getString(R.string.model_default))
-        val id = (if (name == s.model) s.model else u.model ?: s.model).takeIf { ModelNames.chip(it) != it }
-        val modelSaid = res.getString(R.string.meta_model_said, listOfNotNull(name, id).joinToString(", "))
-        Row(Modifier.clearAndSetSemantics { contentDescription = modelSaid }, verticalAlignment = Alignment.CenterVertically) {
-            ModelChip(ModelNames.chip(name))
-            if (id != null) {
-                Spacer(Modifier.width(8.dp))
-                HText(id, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
-            }
+    // Context
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(contentAlignment = Alignment.Center) {
+            ContextRing(u.contextPct, size = 56.dp, stroke = 3.dp)
+            HText(u.contextPct?.let { res.getString(R.string.percent, it) } ?: "—", style = Type.mono, color = HN.ink)
         }
-        Spacer(Modifier.height(18.dp))
-
-        // Context
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(contentAlignment = Alignment.Center) {
-                ContextRing(u.contextPct, size = 56.dp, stroke = 3.dp)
-                HText(u.contextPct?.let { res.getString(R.string.percent, it) } ?: "—", style = Type.mono, color = HN.ink)
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                HText(stringResource(R.string.chat_context_label).uppercase(), style = Type.label, color = HN.inkDim)
-                Spacer(Modifier.height(4.dp))
-                val used = u.contextUsed
-                val window = u.contextWindow
-                HText(
-                    if (used != null && window != null) stringResource(if (u.contextExact) R.string.chat_context_of else R.string.chat_context_of_about, grouped(used), grouped(window))
-                    else stringResource(R.string.chat_context_unknown, com.prudnikweb.hypernova.ui.components.agentName(s.codex)),
-                    style = Type.small, color = HN.ink,
-                )
-                // Claude Code's status line makes it exact; Codex has none, so no promise of it there.
-                if (used != null && !u.contextExact && !s.codex) {
-                    Spacer(Modifier.height(2.dp))
-                    HText(stringResource(R.string.chat_context_about_note), style = Type.small, color = HN.inkDim)
-                }
-            }
-        }
-        if ((u.contextPct ?: 0) >= 50 && !s.codex) {
-            Spacer(Modifier.height(12.dp))
-            Pill(stringResource(R.string.chat_compact_now), onCompact, Modifier.fillMaxWidth(), kind = if ((u.contextPct ?: 0) >= COMPACT_AT) PillKind.Primary else PillKind.Outline, height = 44.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            HText(stringResource(R.string.chat_context_label).uppercase(), style = Type.label, color = HN.inkDim)
             Spacer(Modifier.height(4.dp))
-            HText(stringResource(R.string.chat_compact_note), style = Type.small, color = HN.inkDim)
+            val used = u.contextUsed
+            val window = u.contextWindow
+            HText(
+                if (used != null && window != null) stringResource(if (u.contextExact) R.string.chat_context_of else R.string.chat_context_of_about, grouped(used), grouped(window))
+                else stringResource(R.string.chat_context_unknown, com.prudnikweb.hypernova.ui.components.agentName(s.codex)),
+                style = Type.small, color = HN.ink,
+            )
+            // Claude Code's status line makes it exact; Codex has none, so no promise of it there.
+            if (used != null && !u.contextExact && !s.codex) {
+                Spacer(Modifier.height(2.dp))
+                HText(stringResource(R.string.chat_context_about_note), style = Type.small, color = HN.inkDim)
+            }
         }
-        Spacer(Modifier.height(16.dp))
-        Hairline(Modifier.fillMaxWidth())
-        Spacer(Modifier.height(10.dp))
-
-        // Tokens
-        HText(stringResource(R.string.chat_tokens_label).uppercase(), style = Type.label, color = HN.inkDim)
+    }
+    if ((u.contextPct ?: 0) >= 50 && !s.codex) {
+        Spacer(Modifier.height(12.dp))
+        Pill(stringResource(R.string.chat_compact_now), onCompact, Modifier.fillMaxWidth(), kind = if ((u.contextPct ?: 0) >= COMPACT_AT) PillKind.Primary else PillKind.Outline, height = 44.dp)
         Spacer(Modifier.height(4.dp))
-        InfoRow(stringResource(R.string.chat_tokens_input), grouped(u.input))
-        InfoRow(stringResource(R.string.chat_tokens_output), grouped(u.output))
-        InfoRow(stringResource(R.string.chat_tokens_cache_read), grouped(u.cacheRead))
-        InfoRow(stringResource(R.string.chat_tokens_cache_write), grouped(u.cacheWrite))
-        InfoRow(stringResource(R.string.chat_tokens_total), grouped(u.tokens), valueColor = HN.ink)
-        if (u.agentTokens > 0) HText(stringResource(R.string.chat_tokens_agents, grouped(u.agentTokens)), style = Type.small, color = HN.inkDim)
+        HText(stringResource(R.string.chat_compact_note), style = Type.small, color = HN.inkDim)
+    }
+    Spacer(Modifier.height(16.dp))
+    Hairline(Modifier.fillMaxWidth())
+    Spacer(Modifier.height(10.dp))
+
+    // Tokens
+    HText(stringResource(R.string.chat_tokens_label).uppercase(), style = Type.label, color = HN.inkDim)
+    Spacer(Modifier.height(4.dp))
+    InfoRow(stringResource(R.string.chat_tokens_input), grouped(u.input))
+    InfoRow(stringResource(R.string.chat_tokens_output), grouped(u.output))
+    InfoRow(stringResource(R.string.chat_tokens_cache_read), grouped(u.cacheRead))
+    InfoRow(stringResource(R.string.chat_tokens_cache_write), grouped(u.cacheWrite))
+    InfoRow(stringResource(R.string.chat_tokens_total), grouped(u.tokens), valueColor = HN.ink)
+    if (u.agentTokens > 0) HText(stringResource(R.string.chat_tokens_agents, grouped(u.agentTokens)), style = Type.small, color = HN.inkDim)
+    Spacer(Modifier.height(14.dp))
+    Hairline(Modifier.fillMaxWidth())
+    Spacer(Modifier.height(10.dp))
+
+    // Cost
+    HText(stringResource(R.string.chat_cost_label).uppercase(), style = Type.label, color = HN.inkDim)
+    Spacer(Modifier.height(6.dp))
+    val provider = hub.providers.firstOrNull { it.id == (s.providerId ?: "anthropic") }
+    val c = u.costUsd
+    if (c == null) {
+        HText(stringResource(R.string.chat_cost_none, provider?.name ?: s.model), style = Type.small, color = HN.inkMuted)
+    } else {
+        HText((if (u.costExact) "" else stringResource(R.string.chat_about) + " ") + money(c), style = Type.title, color = HN.ink)
+        Spacer(Modifier.height(4.dp))
+        HText(stringResource(if (u.costExact) R.string.chat_cost_exact_note else R.string.chat_cost_about_note), style = Type.small, color = HN.inkDim)
+        if (builtIn) {
+            Spacer(Modifier.height(2.dp))
+            HText(stringResource(R.string.chat_cost_plan_note), style = Type.small, color = HN.inkDim)
+        }
+    }
+
+    // The plan's windows, as on Home.
+    if (builtIn && hub.usage.known && !hub.usage.stale) {
         Spacer(Modifier.height(14.dp))
         Hairline(Modifier.fillMaxWidth())
-        Spacer(Modifier.height(10.dp))
-
-        // Cost
-        HText(stringResource(R.string.chat_cost_label).uppercase(), style = Type.label, color = HN.inkDim)
+        Spacer(Modifier.height(12.dp))
+        val usage = hub.usage
+        val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(usage.fiveHourResetAt, usage.sevenDayResetAt)
+        val five = UsageProjection.fiveHour(usage, now)
+        ProjectionMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(R.string.usage_name_five), five))
+        Spacer(Modifier.height(12.dp))
+        val seven = UsageProjection.sevenDay(usage, now)
+        ProjectionMeter(stringResource(R.string.seven_days), seven, projectionSaid(stringResource(R.string.usage_name_seven), seven))
+        com.prudnikweb.hypernova.ui.home.ModelWeekMeters(usage.models, now, gap = 12.dp)
         Spacer(Modifier.height(6.dp))
-        val provider = hub.providers.firstOrNull { it.id == (s.providerId ?: "anthropic") }
-        val c = u.costUsd
-        if (c == null) {
-            HText(stringResource(R.string.chat_cost_none, provider?.name ?: s.model), style = Type.small, color = HN.inkMuted)
-        } else {
-            HText((if (u.costExact) "" else stringResource(R.string.chat_about) + " ") + money(c), style = Type.title, color = HN.ink)
-            Spacer(Modifier.height(4.dp))
-            HText(stringResource(if (u.costExact) R.string.chat_cost_exact_note else R.string.chat_cost_about_note), style = Type.small, color = HN.inkDim)
-            if (builtIn) {
-                Spacer(Modifier.height(2.dp))
-                HText(stringResource(R.string.chat_cost_plan_note), style = Type.small, color = HN.inkDim)
-            }
-        }
-
-        // The plan's windows, as on Home.
-        if (builtIn && hub.usage.known && !hub.usage.stale) {
-            Spacer(Modifier.height(14.dp))
-            Hairline(Modifier.fillMaxWidth())
-            Spacer(Modifier.height(12.dp))
-            val usage = hub.usage
-            val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(usage.fiveHourResetAt, usage.sevenDayResetAt)
-            val five = UsageProjection.fiveHour(usage, now)
-            ProjectionMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(R.string.usage_name_five), five))
-            Spacer(Modifier.height(12.dp))
-            val seven = UsageProjection.sevenDay(usage, now)
-            ProjectionMeter(stringResource(R.string.seven_days), seven, projectionSaid(stringResource(R.string.usage_name_seven), seven))
-            com.prudnikweb.hypernova.ui.home.ModelWeekMeters(usage.models, now, gap = 12.dp)
-            Spacer(Modifier.height(6.dp))
-            HText(stringResource(R.string.chat_plan_note), style = Type.small, color = HN.inkDim)
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Pill(stringResource(R.string.chat_close), onDismiss, kind = PillKind.Ghost, height = 44.dp)
-        }
+        HText(stringResource(R.string.chat_plan_note), style = Type.small, color = HN.inkDim)
     }
 }

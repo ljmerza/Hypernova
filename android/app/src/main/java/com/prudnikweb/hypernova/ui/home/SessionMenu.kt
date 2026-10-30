@@ -58,29 +58,22 @@ data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean
 /**
  * A Home card's long-press menu: Rename (Claude Code's /rename, so claude agents shows it too),
  * Stop and Delete a `claude agents` job. Delete asks first. The Mac's own words come back when it
- * can't (Claude Code keeps a worktree with unpushed work).
+ * can't (Claude Code keeps a worktree with unpushed work). [start]: the page it opens on (the chat's
+ * session sheet lists the actions itself, then opens Rename or Delete here).
  */
 @Composable
-internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit) {
+internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit, start: MenuPage = MenuPage.Actions) {
     val context = LocalContext.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
-    val offer = MenuOffer.of(s)
-    var page by rememberSaveable(s.id) { mutableStateOf(MenuPage.Actions) }
+    var page by rememberSaveable(s.id) { mutableStateOf(start) }
     when (page) {
         MenuPage.Actions -> GlassSheet(s.name, onDismiss) {
             HText(s.project.uppercase(), style = Type.label, color = HN.inkDim)
             Spacer(Modifier.height(6.dp))
             HText(s.name, style = Type.small, color = HN.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(12.dp))
-            if (offer.rename) SheetAction(ChatGlyph.Edit, stringResource(R.string.session_rename), { page = MenuPage.Rename })
-            if (offer.stop) {
-                SheetAction(ChatGlyph.Stop, stringResource(R.string.session_stop), {
-                    onDismiss()
-                    appScope.launch { hub.stopSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_stop_session)) } }
-                })
-            }
-            if (offer.delete) SheetAction(ChatGlyph.Remove, stringResource(R.string.delete), { page = MenuPage.Delete }, color = HN.danger)
+            MenuActions(hub, s, { page = it }, onDismiss)
         }
         MenuPage.Rename -> RenameSheet(hub, s, onDismiss)
         MenuPage.Delete -> ConfirmDialog(
@@ -98,7 +91,27 @@ internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit) {
     }
 }
 
-private enum class MenuPage { Actions, Rename, Delete }
+internal enum class MenuPage { Actions, Rename, Delete }
+
+/**
+ * The menu's actions as [MenuOffer] has them, in a sheet: Rename and Delete go to their page
+ * ([onPage]), Stop goes at once and closes the sheet ([onDismiss]).
+ */
+@Composable
+internal fun MenuActions(hub: Hub, s: Session, onPage: (MenuPage) -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val toast = LocalToast.current
+    val appScope = LocalAppScope.current
+    val offer = MenuOffer.of(s)
+    if (offer.rename) SheetAction(ChatGlyph.Edit, stringResource(R.string.session_rename), { onPage(MenuPage.Rename) })
+    if (offer.stop) {
+        SheetAction(ChatGlyph.Stop, stringResource(R.string.session_stop), {
+            onDismiss()
+            appScope.launch { hub.stopSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_stop_session)) } }
+        })
+    }
+    if (offer.delete) SheetAction(ChatGlyph.Remove, stringResource(R.string.delete), { onPage(MenuPage.Delete) }, color = HN.danger)
+}
 
 /** The new name, prefilled with the old one. It stays open while the Mac renames it, and says why when it can't. */
 @Composable

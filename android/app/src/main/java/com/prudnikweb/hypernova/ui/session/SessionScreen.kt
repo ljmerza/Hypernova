@@ -76,11 +76,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -196,17 +194,14 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     // Claude Code's own or as the owner's before the Mac's copy arrives.
     val known = knownCommands(cwd)
     var tray by rememberSaveable { mutableStateOf(false) }
-    var modeOpen by rememberSaveable { mutableStateOf(false) }
-    // The model picker, opened from the status line's panel (the Start sheet's, this provider's models).
+    // The session sheet (SessionSheet.kt): a tap on the usage strip or the status line.
+    var sheetOpen by rememberSaveable(sessionId) { mutableStateOf(false) }
+    // The model picker, opened from the session sheet (the Start sheet's, this provider's models).
     var modelOpen by rememberSaveable { mutableStateOf(false) }
     // Its Blocked tab open in the chat's place (BlockedTab.kt).
     var blockedOpen by rememberSaveable(sessionId) { mutableStateOf(false) }
-    // The switch to the other agent, open ([AgentKind.CLAUDE] or [AgentKind.CODEX]), from the same panel.
+    // The switch to the other agent, open ([AgentKind.CLAUDE] or [AgentKind.CODEX]), from the same sheet.
     var switching by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
-    val codexNextTurn = stringResource(R.string.cx_mode_next_turn)
-    val bypassNextTurn = stringResource(R.string.mode_bypass_next_turn)
-    val bypassTitle = stringResource(R.string.check_bypass_title)
-    val noLock = stringResource(R.string.check_no_lock)
     val context = LocalContext.current
     // The prompt being written, and text that's waiting unsent in the session's terminal (it
     // stopped the last send; the card above the composer shows it and offers to replace it).
@@ -378,6 +373,9 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     // The status bar above the composer: while it shows, the header line below doesn't repeat it.
     val statusBar = rememberStatusBar(hub, session, items, sending, away = if (linked) null else linkWord(hub.link.state))
     val workingSince = remember(sessionId, working) { System.currentTimeMillis() }
+    // The session's usage, for the strip and the sheet: asked again as the transcript settles, and
+    // when the session's model changes (/model).
+    val usage = rememberSessionUsage(hub, sessionId, "$tailKey|$working|${session.model}")
     // A limit, a sign-out or the provider stopped it: the card above the composer and its hint say so.
     val block = activeBlock(hub, session)
     // The chat's quick wins (ChatExtras.kt): which message's long-press menu is open, and a quick
@@ -523,19 +521,6 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                val canMode = canChange(hub, session)
-                // Fork: a tap on the mode tag steps Ask → Plan → Auto (ModeCycle.kt); Auto still opens
-                // the think-twice card first, and the full picker stays a tap on the rest of the line.
-                val cycleTo = if (canMode) com.prudnikweb.hypernova.ui.components.ModeCycle.next(session.mode, session.codex) else null
-                val cycleLabel = cycleTo?.let { stringResource(R.string.mode_cycle, com.prudnikweb.hypernova.ui.home.modeLabel(it)) }
-                val cycleNextTurn = cycleTo?.let { stringResource(R.string.mode_next_turn, com.prudnikweb.hypernova.ui.home.modeTitle(it)) }
-                val cycleMode = com.prudnikweb.hypernova.ui.components.rememberModeCycle { m ->
-                    appScope.launch {
-                        hub.setMode(sessionId, m)
-                            .onSuccess { nextTurn -> if (nextTurn) toast(if (session.codex) codexNextTurn else cycleNextTurn.orEmpty()) }
-                            .onFailure { toast(it.message.orEmpty()) }
-                    }
-                }
                 // While Claude works: what it's doing ("Bash: npm run build" → BASH), and for how long.
                 var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
                 LaunchedEffect(working) {
@@ -557,8 +542,12 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 session.automation?.let { auto -> com.prudnikweb.hypernova.ui.automations.AutoLine(auto.name, { opener.automation(auto.id) }, Modifier.padding(start = 12.dp)) }
                 // It switched agents: "CONTINUED FROM CLAUDE ›", a way to the conversation before (or after) it.
                 SwitchLine(hub, session, Modifier.padding(start = 12.dp))
+                // Fork: no planet before the words, and no agents, queue or mode after them (owner,
+                // 2026-10-29): those are the session sheet's, and TalkBack hears them on the strip.
+                val more = stripMore(session, agentsAtWork(session, sheetAgents(hub.agents(sessionId))))
                 Seam(
                     line = false,
+                    bars = false,
                     label = when {
                         statusBar.visible -> ""
                         !linked -> linkWord(hub.link.state)
@@ -570,31 +559,10 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     after = if (working && !statusBar.visible) elapsedText(now - workingSince) else null,
                     // "Thinking" is the daemon's word for Claude between tools: the label breathes.
                     thinking = !statusBar.visible && working && sending.not() && session.phase == Phase.Working && session.activity.substringBefore(':') == "Thinking",
-                    // Its agents and queued prompts in words, the permission mode as its glyph and
-                    // words (not "2 agents · ask first"), then (fork) the usage strip in the rest of the
-                    // row: one line instead of two, and the strip's chip is the only model shown.
+                    // The session's usage in the rest of the row: context, cost, tokens, the 5-hour
+                    // window (UsageStrip.kt); a tap opens the session sheet.
                     trailContent = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            StatusTrail(
-                                listOfNotNull(
-                                    if (agentsOnly) stringResource(R.string.agents_running, session.agentsRunning)
-                                    else session.agentsRunning.takeIf { it > 0 && session.phase != Phase.Ended }?.let { pluralStringResource(R.plurals.agents_count, it, it) },
-                                    session.queued.takeIf { it > 0 }?.let { stringResource(R.string.queued, it) },
-                                ),
-                                session.mode,
-                                onCycle = cycleTo?.let { next -> { cycleMode(next) } },
-                                cycleLabel = cycleLabel,
-                            )
-                            // The session's usage: context, cost, tokens, the 5-hour window (UsageStrip.kt).
-                            ChatUsage(hub, session, tailKey, working, onCompact = { quickSend("/compact") }, Modifier.weight(1f).padding(start = 10.dp))
-                        }
-                    },
-                    activity = when {
-                        !linked -> Activity.Rest
-                        session.state == SessionState.Working -> Activity.Live
-                        session.state == SessionState.NeedsYou -> Activity.Alert
-                        agentsOnly -> Activity.Live
-                        else -> Activity.Rest
+                        ChatUsage(hub, session, usage, onCompact = { quickSend("/compact") }, onOpen = { sheetOpen = true }, more = more, Modifier.padding(start = 10.dp))
                     },
                     color = when {
                         !linked -> HN.inkMuted
@@ -606,64 +574,12 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     },
                     modifier = Modifier
                         .padding(start = 12.dp)
-                        .then(
-                            if (canMode) Modifier.clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.mode_change), role = Role.Button) { modeOpen = !modeOpen }
-                            else Modifier,
-                        ),
+                        .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.session_sheet_open), role = Role.Button) { sheetOpen = true },
                 )
                 // Its reply being read aloud (here, or the glasses' speech played here): the speaking wave.
                 com.prudnikweb.hypernova.ui.voice.SpeakingStatus(session.id, Modifier.padding(start = 12.dp))
                 // "Chat | Blocked (n)" while calls were refused without the owner (BlockedTab.kt).
                 BlockedSwitch(session.blockedCalls, blockedOpen, { blockedOpen = it }, Modifier.padding(start = 12.dp, top = 8.dp))
-                // Tap the status line: the model and the permission mode, as in the new-session sheet.
-                AnimatedVisibility(
-                    modeOpen && canMode,
-                    enter = fadeIn(tween(Motion.FAST)) + expandVertically(tween(Motion.DIALOG, easing = Motion.Expo)),
-                    exit = fadeOut(tween(Motion.FAST)) + shrinkVertically(tween(Motion.DIALOG, easing = Motion.Expo)),
-                ) {
-                    Column(Modifier.padding(start = 12.dp, top = 12.dp)) {
-                        ModelLine(session.model, onClick = { modelOpen = true })
-                        Spacer(Modifier.height(10.dp))
-                        // Codex's two modes, from its next turn while one runs.
-                        if (session.codex) com.prudnikweb.hypernova.ui.components.Segmented(
-                            AgentKind.CODEX_MODES.map { it to com.prudnikweb.hypernova.ui.home.modeTitle(it) },
-                            session.mode,
-                            { m ->
-                                modeOpen = false
-                                if (m != session.mode) appScope.launch {
-                                    hub.setMode(sessionId, m).onSuccess { nextTurn -> if (nextTurn) toast(codexNextTurn) }.onFailure { toast(it.message.orEmpty()) }
-                                }
-                            },
-                        )
-                        // Auto and Bypass open the think-twice card first; Bypass is dimmed where it can't be reached.
-                        else com.prudnikweb.hypernova.ui.components.ModePicker(
-                            session.mode,
-                            { m ->
-                                modeOpen = false
-                                val go = {
-                                    appScope.launch {
-                                        hub.setMode(sessionId, m).onSuccess { nextTurn -> if (nextTurn) toast(bypassNextTurn) }.onFailure { toast(it.message.orEmpty()) }
-                                    }
-                                }
-                                // Bypass waits for the fingerprint or the screen lock too (docs/DECISIONS.md).
-                                if (m != session.mode && m == "bypassPermissions") {
-                                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                                        context, bypassTitle, session.name, noLock, hub.isDemo,
-                                        onOk = { go() }, onFail = { msg -> if (msg != null) toast(msg) },
-                                    )
-                                } else if (m != session.mode) go()
-                            },
-                            bypassAvailable = session.bypassAvailable,
-                        )
-                        // The other agent goes on from here (docs/PROTOCOL.md, "Switching agents"): Codex
-                        // once it's on this Mac, and back to Claude from any Codex session.
-                        val other = switchTarget(hub, session)
-                        if (other != null) {
-                            Spacer(Modifier.height(10.dp))
-                            AgentLine(session.codex, onClick = { modeOpen = false; switching = other })
-                        }
-                    }
-                }
                 // Fork: no "what changed" row (git summary / written files) in the header; the room
                 // goes to the chat.
             }
@@ -813,9 +729,20 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
         }
         // A message's long-press menu (MessageMenu.kt); Quote puts the words at the head of the box.
         ChatMenuHost(hub, session, items, menuKey, onQuote = { q -> draft = q + draft }, onDismiss = { menuKey = null })
+        // The session sheet (SessionSheet.kt); the model picker and the switch open over it.
+        if (sheetOpen) {
+            SessionSheet(
+                hub, session, usage,
+                onCompact = { sheetOpen = false; quickSend("/compact") },
+                onModel = { modelOpen = true },
+                onSwitchAgent = { to -> sheetOpen = false; switching = to },
+                onBlocked = { sheetOpen = false; blockedOpen = true },
+                onDismiss = { sheetOpen = false },
+            )
+        }
         if (modelOpen && canChange(hub, session)) {
-            if (session.codex) CodexModelPicker(hub, session, onPicked = { modeOpen = false }, onDismiss = { modelOpen = false })
-            else SessionModelPicker(hub, session, onPicked = { modeOpen = false }, onDismiss = { modelOpen = false })
+            if (session.codex) CodexModelPicker(hub, session, onDismiss = { modelOpen = false })
+            else SessionModelPicker(hub, session, onDismiss = { modelOpen = false })
         }
         ModelSwitchHost(hub, session)
         // Switching to the other agent (AgentSwitchSheet.kt): on success the chat goes on in the new session.
@@ -918,15 +845,15 @@ internal fun WaitingForMac(hub: Hub, onBack: () -> Unit) {
  * not for a terminal session the Mac only watches (its terminal isn't shared). A Codex session's
  * are Codex's own, changed over its app-server wherever it was started.
  */
-private fun canChange(hub: Hub, s: Session): Boolean =
+internal fun canChange(hub: Hub, s: Session): Boolean =
     s.phase != Phase.Ended && (s.codex || s.term != null || s.origin == "hypernova" || hub.isDemo)
 
 /**
- * The status line's panel, first row: the model the session runs, as its chip, and a way to
- * another one (the picker below). TalkBack hears "Model: Opus 5.5" and the action.
+ * The session sheet's Model part: the model the session runs, as its chip, and a way to another
+ * one (the picker below). TalkBack hears "Model: Opus 5.5" and the action.
  */
 @Composable
-private fun ModelLine(model: String, onClick: () -> Unit) {
+internal fun ModelLine(model: String, onClick: () -> Unit) {
     val res = LocalContext.current.resources
     val name = com.prudnikweb.hypernova.data.ModelNames.chip(model)
     val said = res.getString(R.string.meta_model_said, name)
@@ -952,10 +879,10 @@ private fun ModelLine(model: String, onClick: () -> Unit) {
  * The Start sheet's model picker for a running session: only its own provider's models (moving
  * to another provider is the limit card's "carry on elsewhere"), the one it runs marked. A pick
  * switches it ([Hub.setModel]); on a provider that bills it, after the owner's yes ("This costs
- * money", as automations ask). [onPicked] folds the panel it was opened from.
+ * money", as automations ask).
  */
 @Composable
-private fun SessionModelPicker(hub: Hub, s: Session, onPicked: () -> Unit, onDismiss: () -> Unit) {
+private fun SessionModelPicker(hub: Hub, s: Session, onDismiss: () -> Unit) {
     val provider = hub.providers.firstOrNull { it.id == (s.providerId ?: "anthropic") } ?: hub.providers.firstOrNull { it.builtIn } ?: return
     var lists by remember { mutableStateOf<List<com.prudnikweb.hypernova.data.ModelList>?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -976,7 +903,6 @@ private fun SessionModelPicker(hub: Hub, s: Session, onPicked: () -> Unit, onDis
             onDismiss()
             val o = com.prudnikweb.hypernova.data.ModelCatalog.find(options, value)
             if (o != null && o != current) {
-                onPicked()
                 ModelSwitching.ask(s.id, o.value ?: o.model, o.name, paid = com.prudnikweb.hypernova.data.ModelCatalog.paid(provider, o))
             }
         },
@@ -1549,26 +1475,3 @@ private fun TerminalTextCard(pending: String, onReplace: () -> Unit, onOpen: () 
     }
 }
 
-/**
- * The status line's trail: [counts] in words (agents, queued prompts), then the permission mode as
- * its glyph and words. Short of room the mode keeps its glyph, then the counts go. TalkBack hears
- * one sentence. Fork: no model chip here (the usage strip beside it names the model), and the mode
- * tag steps to the next mode on a tap when [onCycle] is given (ModeCycle.kt).
- */
-@Composable
-private fun StatusTrail(counts: List<String>, mode: String, onCycle: (() -> Unit)? = null, cycleLabel: String? = null) {
-    val res = LocalContext.current.resources
-    val words = com.prudnikweb.hypernova.ui.home.modeLabel(mode)
-    val said = (counts.map { "$it." } + res.getString(R.string.meta_mode_said, words)).joinToString(" ")
-    val countStyle = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.5f)
-    val parts: List<List<@Composable () -> Unit>> = counts.map { c -> listOf<@Composable () -> Unit> { HText(c, style = countStyle, color = HN.inkDim, maxLines = 1) } } + listOf(
-        listOf(
-            { com.prudnikweb.hypernova.ui.components.ModeCycleTag(mode, words, onCycle, cycleLabel) },
-            { com.prudnikweb.hypernova.ui.components.ModeCycleTag(mode, null, onCycle, cycleLabel) },
-        ),
-    )
-    val n = counts.size
-    // The mode's words, the queued and agents counts (last first), then the mode's glyph.
-    val giveWay = intArrayOf(n) + (n - 1 downTo 0).toList().toIntArray() + intArrayOf(n)
-    com.prudnikweb.hypernova.ui.components.FitRow(parts, giveWay, Modifier.clearAndSetSemantics { contentDescription = said })
-}

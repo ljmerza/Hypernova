@@ -47,12 +47,14 @@ import kotlinx.coroutines.launch
 // them: the usage strip under the status line, Claude's to-do list and the quick prompts over the
 // prompt box, and a message's long-press menu. Each piece lives in its own file beside this one.
 
-/** The usage strip, once the Mac has answered (nothing before, so the header never shows zeros). */
+/**
+ * The usage strip, once the Mac has answered (nothing before, so the header never shows zeros).
+ * [usage] is the screen's ([rememberSessionUsage]): the session sheet ([onOpen]) shows it too.
+ */
 @Composable
-internal fun ChatUsage(hub: Hub, session: Session, tailKey: String, working: Boolean, onCompact: () -> Unit, modifier: Modifier = Modifier) {
-    // Asked again as the transcript settles, and when the session's model changes (/model).
-    val usage = rememberSessionUsage(hub, session.id, "$tailKey|$working|${session.model}") ?: return
-    UsageStrip(hub, session, usage, onCompact, modifier)
+internal fun ChatUsage(hub: Hub, session: Session, usage: SessionUsage?, onCompact: () -> Unit, onOpen: () -> Unit, more: String, modifier: Modifier = Modifier) {
+    if (usage == null) return
+    UsageStrip(hub, session, usage, onCompact, onOpen, more, modifier)
 }
 
 /** The quick prompts, while there's nothing in the box and Claude isn't at work. */
