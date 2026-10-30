@@ -373,11 +373,28 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
             SlashCommand("model", "Set the AI model for Claude Code", "<model>", emptyList(), true),
             SlashCommand("compact", "Free up context by summarizing the conversation so far", "<optional custom summarization instructions>", emptyList(), true),
             SlashCommand("context", "Show current context usage", "", emptyList(), true),
-            SlashCommand("usage", "Show session cost, plan usage, and what's contributing to your limits", "", listOf("cost", "stats"), true),
+            SlashCommand("usage", "Show session cost, plan usage, and what's contributing to your limits", "", listOf("cost", "stats"), true, terminal = true),
             SlashCommand("effort", "Set effort level for model usage", "<low|medium|high|xhigh|max|auto>", emptyList(), true),
             SlashCommand("clear", "Start a new session with empty context", "[name]", listOf("reset", "new"), true),
+            SlashCommand("btw", "Ask a quick side question without interrupting the main conversation", "[question]", emptyList(), true),
+            SlashCommand("config", "Open settings", "", listOf("settings"), true, terminal = true),
         ),
     )
+
+    /** The demo's side questions: answered a moment later, in the same words each time. */
+    private val asides = HashMap<String, Aside>()
+    override suspend fun askAside(sessionId: String, question: String): Result<Aside> {
+        val a = Aside("demo-${System.currentTimeMillis()}", question.trim(), Aside.ASKING, null, null, false, System.currentTimeMillis())
+        asides[sessionId] = a
+        return Result.success(a)
+    }
+    override suspend fun aside(sessionId: String): Result<Aside?> {
+        val a = asides[sessionId] ?: return Result.success(null)
+        if (a.asking && System.currentTimeMillis() - a.askedAt > 1800) {
+            asides[sessionId] = a.copy(state = Aside.ANSWERED, answer = "In the demo, Claude answers on the side without stopping its work. On your Mac, this is Claude Code's /btw.")
+        }
+        return Result.success(asides[sessionId])
+    }
 
     /** As the Mac does: Backpack holds with the lid closed for 8 hours, Off holds nothing. */
     /** The demo's switch: nothing on a Mac changes, so it just says what it would. */

@@ -37,6 +37,8 @@ case "$1" in
   attach)
     echo "$2" > "$S/attached"
     if [ "$2" = "gone0000" ]; then echo "No background session $2" >&2; exit 1; fi
+    # btw*: Claude Code's /btw panel (fixtures/fake-claude-btw.mjs).
+    case "$2" in btw*) exec "${process.execPath}" "${join(import.meta.dirname, 'fixtures', 'fake-claude-btw.mjs')}" "$2" ;; esac
     if [ "$2" = "drift000" ]; then printf '\\033]0;Some other session\\007\\n────────────────────\\n❯ \\n────────────────────\\n'; exec sleep 30; fi
     if [ "$2" = "ask00000" ]; then printf '\\n Do you want to proceed?\\n ❯ 1. Yes\\n   2. No\\n'; exec sleep 30; fi
     # Claude Code's own permission dialog (the Arc screen); keys pressed into it land in a file.
@@ -95,6 +97,8 @@ const { addDevice, settings } = await import('../src/store.ts')
 const { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
 const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
 const { heldReady, promptSession, startServers } = await import('../src/http.ts')
+const { askAside } = await import('../src/aside.ts')
+const { heldOf } = await import('../src/held.ts')
 const TOKEN = 'test-device-token-agents-0123456789'
 addDevice({ id: 'phone', name: 'Phone', model: 'P', createdAt: Date.now(), lastSeenAt: Date.now() }, TOKEN)
 const closeServers = startServers()
@@ -452,6 +456,103 @@ test('the mode route never presses Shift+Tab in a claude attach holder that drif
   assert.equal(shiftTabs('modedrft', 1), 0, 'nothing pressed in the drifted one')
   assert.equal(shiftTabs('modedrft', 2), 2)
   assert.notEqual(termOf('agents-mode-3'), first)
+})
+
+function get(path: string): Promise<{ status: number; json: any }> {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port: API, method: 'GET', path, headers: { host: `127.0.0.1:${API}`, authorization: `Bearer ${TOKEN}` } }, (res) => {
+      let data = ''
+      res.setEncoding('utf8')
+      res.on('data', (c) => (data += c))
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, json: data ? JSON.parse(data) : null }))
+    })
+    req.on('error', reject)
+    req.end()
+  })
+}
+/** The keys the /btw stand-in got on job [jobId] ('' when none). */
+const btwKeys = (jobId: string): string => {
+  const f = join(process.env.FAKE_AGENTS_DIR!, `btw-keys-${jobId}`)
+  return existsSync(f) ? readFileSync(f, 'utf8') : ''
+}
+/** Session [id]'s side question once it's no longer `asking` (6 s at most). */
+async function settledAside(id: string): Promise<any> {
+  const t0 = Date.now()
+  for (;;) {
+    const r = await get(`/v1/sessions/${id}/btw`)
+    assert.equal(r.status, 200)
+    if (r.json.aside?.state !== 'asking' || Date.now() - t0 > 6000) return r.json.aside
+    await new Promise((ok) => setTimeout(ok, 150))
+  }
+}
+
+test('/btw to a claude agents job at work: typed through claude attach at once, never held or queued; its answer read off the panel, which Space closes', async () => {
+  settings.claudeAgents = true
+  job('agents-btw-1', 'btw00001', 'busy', { name: 'Mine' })
+  hub.pollRegistry()
+  assert.equal(hub.getSession('agents-btw-1')?.state, 'working')
+  assert.equal(termOf('agents-btw-1'), null)
+  const r = await post('/v1/sessions/agents-btw-1/btw', { question: 'Why does the parser\n  wrap around?' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.aside.state, 'asking')
+  assert.equal(r.json.aside.question, 'Why does the parser wrap around?')
+  assert.equal(r.json.queued, undefined)
+  assert.equal(heldOf('agents-btw-1').length, 0, 'not held for later')
+  assert.match(btwKeys('btw00001'), /\/btw Why does the parser wrap around\?(\x1b\[201~)?\r/, 'typed and entered while Claude works')
+  // One at a time: the last one is still being answered.
+  const twice = await post('/v1/sessions/agents-btw-1/btw', { question: 'And the lexer?' })
+  assert.equal(twice.status, 409)
+  assert.equal(twice.json.error.code, 'asking')
+  const a = await settledAside('agents-btw-1')
+  assert.equal(a.state, 'answered')
+  assert.equal(
+    a.answer,
+    'The parser keeps its tokens in a ring buffer of 64 entries, so a lookahead past that many tokens wraps around and reads stale ones. That only happens in the generated fixtures.\n\n- src/parser.ts: the buffer\n- src/lexer.ts: where tokens are made',
+  )
+  assert.equal(a.clipped, false)
+  // Space closes the panel, never Esc (which, the panel gone, would stop Claude's turn).
+  const t0 = Date.now()
+  while (!btwKeys('btw00001').endsWith(' ') && Date.now() - t0 < 3000) await new Promise((ok) => setTimeout(ok, 50))
+  assert.ok(btwKeys('btw00001').endsWith('\r '), JSON.stringify(btwKeys('btw00001')))
+  assert.doesNotMatch(btwKeys('btw00001').replace(/\x1b\[20[01]~/g, ''), /\x1b/)
+})
+
+test('/btw: Claude Code’s error in the panel comes back as failed, in its words', async () => {
+  settings.claudeAgents = true
+  job('agents-btw-2', 'btwfail1', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  const r = await post('/v1/sessions/agents-btw-2/btw', { question: 'Is the build green?' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  const a = await settledAside('agents-btw-2')
+  assert.equal(a.state, 'failed')
+  assert.equal(a.error, 'Rate limited')
+  assert.equal(a.answer, null)
+})
+
+test('/btw never types into a claude attach holder that shows another session', async () => {
+  settings.claudeAgents = true
+  job('agents-btw-3', 'btwdrft1', 'busy', { name: 'Mine' })
+  hub.pollRegistry()
+  const r = await post('/v1/sessions/agents-btw-3/btw', { question: 'Which file?' })
+  assert.equal(r.status, 409)
+  assert.equal(r.json.error.code, 'terminal_busy')
+  assert.doesNotMatch(btwKeys('btwdrft1'), /btw/)
+  assert.equal((await get('/v1/sessions/agents-btw-3/btw')).json.aside, null)
+})
+
+test('/btw: an empty question is a 400, a session without a terminal Hypernova holds a 409, never a fork', async () => {
+  settings.claudeAgents = true
+  job('agents-btw-4', 'btw00004', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  const empty = await post('/v1/sessions/agents-btw-4/btw', { question: '  \n ' })
+  assert.equal(empty.status, 400)
+  assert.equal(empty.json.error.code, 'empty')
+  settings.claudeAgents = false
+  hub.upsertSession('agents-btw-5', { cwd: scratch, origin: 'terminal', state: 'idle', title: 'Plain', lastActivityAt: Date.now() })
+  const before = hub.listSessions().length
+  await assert.rejects(askAside('agents-btw-5', 'Where is it?'), (e: any) => e.status === 409 && e.code === 'no_terminal')
+  assert.equal(hub.listSessions().length, before)
+  settings.claudeAgents = true
 })
 
 test('the mode route refuses a claude attach that shows another session from the start, pressing nothing', async () => {

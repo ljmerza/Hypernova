@@ -25,6 +25,8 @@ internal enum class SheetTab(@StringRes val label: Int) {
     Permissions(R.string.session_sheet_permissions),
     /** The agents at work, by workflow. */
     Agents(R.string.session_sheet_agents),
+    /** A side question (/btw), and Claude Code's commands and the owner's skills (CommandsTab.kt). */
+    Commands(R.string.session_sheet_tab_commands),
     /** Where it runs, and the Home card's menu. */
     Session(R.string.session_sheet_title),
 }

@@ -162,10 +162,11 @@ data class Unsent(val returned: Boolean, val prompts: List<Prompt>) {
 
 /**
  * A slash command or skill Claude Code offers in a project (the "/" list): Claude Code's own
- * ([builtin]), or the owner's, the project's, a plugin's.
+ * ([builtin]), or the owner's, the project's, a plugin's. [terminal]: one of Claude Code's own that
+ * opens a screen of its own in the terminal, which the phone can't work (an older Mac never says).
  */
 @Immutable
-data class SlashCommand(val name: String, val description: String, val argumentHint: String, val aliases: List<String>, val builtin: Boolean)
+data class SlashCommand(val name: String, val description: String, val argumentHint: String, val aliases: List<String>, val builtin: Boolean, val terminal: Boolean = false)
 
 /** A session's shared terminal on the Mac, and who has it open ([mac] terminal windows, [phone] screens). */
 @Immutable
@@ -877,7 +878,7 @@ object Wire {
         return (0 until a.length()).mapNotNull { i ->
             a.optJSONObject(i)?.let { c ->
                 c.str("name")?.takeIf { it.isNotBlank() }?.let {
-                    SlashCommand(it, c.str("description").orEmpty(), c.str("argumentHint").orEmpty(), c.arr("aliases").strings(), c.bool("builtin"))
+                    SlashCommand(it, c.str("description").orEmpty(), c.str("argumentHint").orEmpty(), c.arr("aliases").strings(), c.bool("builtin"), c.bool("terminal"))
                 }
             }
         }

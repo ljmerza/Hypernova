@@ -135,6 +135,13 @@ interface Hub {
     /** The "/" list: Claude Code's commands and skills in the project at [cwd] (cached a few minutes). */
     suspend fun commands(cwd: String?): Result<List<SlashCommand>> = Result.success(emptyList())
     /**
+     * Ask a side question (Claude Code's `/btw`, data/Aside.kt): typed in at once, while Claude works
+     * too, never held. Succeeds with it [Aside.asking]; [aside] has its answer once the Mac read it.
+     */
+    suspend fun askAside(sessionId: String, question: String): Result<Aside> = Result.failure(UnsupportedOperationException())
+    /** The session's last side question as the Mac has it now (null when none). */
+    suspend fun aside(sessionId: String): Result<Aside?> = Result.success(null)
+    /**
      * Answer the menu a session's terminal shows: [choice] is an option's index (null closes it
      * with Esc); [alt] picks it with the footer's other key instead of Enter.
      */

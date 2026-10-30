@@ -1,0 +1,37 @@
+<resources>
+    <!-- The session sheet's Commands tab (ui/session/CommandsTab.kt): a side question (Claude Code's /btw), then Claude Code's commands and the owner's skills. -->
+    <string name="session_sheet_tab_commands">Commands</string>
+
+    <!-- A side question (docs/PROTOCOL.md, "Side questions"). -->
+    <string name="aside_seam">Ask on the side</string>
+    <string name="aside_placeholder">A quick question about this session</string>
+    <string name="aside_intro">Claude answers without stopping its work. The answer isn\'t kept in the chat.</string>
+    <string name="aside_ask">Ask</string>
+    <string name="aside_asking">Claude is answering on the side…</string>
+    <!-- Over the answer: the question as it was asked, after Claude Code's command. -->
+    <string name="aside_question">/btw %1$s</string>
+    <string name="aside_question_said">You asked: %1$s</string>
+    <string name="aside_clipped">The answer goes on in the terminal.</string>
+    <string name="aside_unseen">The answer couldn\'t be read here. Open the terminal to see it.</string>
+    <string name="aside_failed">Claude Code couldn\'t answer: %1$s</string>
+    <string name="aside_unreachable">Side questions go to an open Claude Code session in a terminal: a shared one, or a claude agents job.</string>
+    <string name="aside_err_ask">Couldn\'t ask that. Try again.</string>
+    <string name="aside_err_read">Couldn\'t get the answer from your Mac.</string>
+
+    <!-- The command list. -->
+    <string name="commands_seam">Commands and skills</string>
+    <string name="commands_search">Find a command or skill</string>
+    <string name="commands_hint">A tap sends it, or asks for what goes after it first. Long-press to pin.</string>
+    <string name="commands_recent">Recent</string>
+    <string name="commands_pinned">Pinned</string>
+    <!-- The heading over Claude Code's commands that open a screen of their own in the terminal, and the mark on each. -->
+    <string name="commands_terminal">Open in the terminal</string>
+    <string name="commands_terminal_mark">In the terminal</string>
+    <string name="commands_pin">Pin</string>
+    <string name="commands_unpin">Unpin</string>
+    <string name="commands_pinned_toast">Pinned %1$s</string>
+    <string name="commands_unpinned_toast">Unpinned %1$s</string>
+    <string name="commands_sent">Sent %1$s</string>
+    <string name="commands_unreachable">Commands go to an open Claude Code session: in a terminal Hypernova holds, a claude agents job, or one the Mac runs.</string>
+    <string name="commands_no_terminal">That one opens a screen in the terminal, and this session has none.</string>
+</resources>

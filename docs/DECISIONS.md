@@ -1847,3 +1847,30 @@ the owner had its one long scroll put in tabs first.
    mark. The open tab is kept while the sheet is; the next time it opens on Overview again.
 4. **Nothing changes on the session's own screen.** The strip and the status line still open the
    sheet; every action in it does what it did.
+
+## Commands in the session sheet (2026-10-30)
+
+A Commands tab, before Session, for asking Claude something aside while it works (IDEAS SC1) and
+reaching his commands and skills without typing "/" (SC2, SC5).
+
+1. **Ask on the side first: Claude Code's `/btw`.** A field and Ask; typed into the session at
+   once, while Claude works too (never held, never queued behind the turn: that's what it's for),
+   only into a terminal Hypernova holds or a `claude agents` job through `claude attach`, never a
+   fork. A holder that shows another session is refused, nothing typed. One question at a time.
+2. **Its answer shows in the tab, not in the chat.** Claude Code draws it in a panel and keeps it
+   out of the transcript, so the Mac reads it off the screen, closes the panel with Space (Esc
+   could stop Claude's turn) and the tab asks for it until it's there. Where it can't be read, or
+   it ran past the screen, the tab says so with Open the live terminal. The panel's shape is read
+   from Claude Code's code: a live look must confirm it (PROTOCOL, "Side questions").
+3. **Then the commands and skills, as the "/" list has them:** Recent (sent from this tab, five),
+   Pinned (long-press, in the order pinned), then the owner's, then Claude Code's, with a search.
+   Recent and pinned are kept on the phone for every project; a project lists only those it has.
+4. **A tap sends one that takes nothing; one with an argument hint opens a field under it first**
+   (`<…>` needs something before Send, `[…]` or "optional" doesn't).
+5. **Claude Code's commands that open a screen of their own in the terminal are marked, not
+   hidden:** last, under "Open in the terminal", each with its mark; a tap sends it and opens the
+   live terminal (dimmed where there's none). Claude Code's list doesn't say how a command draws,
+   so the Mac keeps that list by hand (`commands.ts`, from 2.1.314's own command table); a
+   numbered picker (/model, /effort with nothing after) isn't on it, since the phone answers those.
+6. **Left out of the tab:** /btw (it has the field), /logout (one tap would sign Claude Code out on
+   the Mac) and /stop (the Session tab's Stop). The "/" list in the session's box is unchanged.
