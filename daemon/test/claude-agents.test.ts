@@ -7,6 +7,8 @@ import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { request } from 'node:http'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -43,6 +45,23 @@ case "$1" in
       [ "$2" = "permdrft" ] && printf '\\033]0;Some other session\\007'
       cat "$S/perm-screen.txt"; stty -echo 2>/dev/null; exec cat > "$S/keys-$2"
     fi
+    # mode*: Claude Code's mode line under the box, Shift+Tab cycling it. Each attach is counted and
+    # its Shift+Tabs land in keys-<job>-<n>. modedrft's first attach and every one of modestuk's
+    # show another session (its title), as a holder that drifted does.
+    case "$2" in mode*)
+      n=$(( $(cat "$S/n-$2" 2>/dev/null || echo 0) + 1 )); echo $n > "$S/n-$2"
+      t=Mine; [ "$2" = modestuk ] && t='Some other session'; [ "$2" = modedrft ] && [ $n = 1 ] && t='Some other session'
+      m=0
+      draw() {
+        case $m in 0) l='manual mode on';; 1) l='accept edits on';; *) l='plan mode on';; esac
+        printf '\\033[2J\\033[H\\033]0;%s\\007\\n────────────────────\\n❯ \\n────────────────────\\n  ⏵⏵ %s (shift+tab to cycle)\\n' "$t" "$l"
+      }
+      stty -echo -icanon min 1 time 0 2>/dev/null; draw
+      while k=$(dd bs=3 count=1 2>/dev/null) && [ -n "$k" ]; do
+        case "$k" in *Z*) echo shift-tab >> "$S/keys-$2-$n"; m=$(( (m + 1) % 3 )); draw ;; esac
+      done
+      exit 0 ;;
+    esac
     printf '\\n────────────────────\\n❯ \\n────────────────────\\n'
     exec sleep 30
     ;;
@@ -57,15 +76,45 @@ esac
 )
 chmodSync(fake, 0o755)
 process.env.CLAUDE_BIN = fake
+// The phone API, for the routes (POST /v1/sessions/<id>/mode).
+const freePort = () =>
+  new Promise<number>((resolve) => {
+    const s = createServer()
+    s.listen(0, '127.0.0.1', () => {
+      const port = (s.address() as { port: number }).port
+      s.close(() => resolve(port))
+    })
+  })
+const API = await freePort()
+process.env.HYPERNOVA_API_PORT = String(API)
+process.env.HYPERNOVA_LOCAL_PORT = String(await freePort())
+process.env.HYPERNOVA_LAN_PORT = '0'
 
 const hub = await import('../src/hub.ts')
-const { settings } = await import('../src/store.ts')
+const { addDevice, settings } = await import('../src/store.ts')
 const { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
 const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
-const { heldReady, promptSession } = await import('../src/http.ts')
+const { heldReady, promptSession, startServers } = await import('../src/http.ts')
+const TOKEN = 'test-device-token-agents-0123456789'
+addDevice({ id: 'phone', name: 'Phone', model: 'P', createdAt: Date.now(), lastSeenAt: Date.now() }, TOKEN)
+const closeServers = startServers()
+
+function post(path: string, body: object): Promise<{ status: number; json: any }> {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port: API, method: 'POST', path, headers: { host: `127.0.0.1:${API}`, authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' } }, (res) => {
+      let data = ''
+      res.setEncoding('utf8')
+      res.on('data', (c) => (data += c))
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, json: data ? JSON.parse(data) : null }))
+    })
+    req.on('error', reject)
+    req.end(JSON.stringify(body))
+  })
+}
 
 const procs: ChildProcess[] = []
-after(() => {
+after(async () => {
+  await closeServers()
   for (const p of procs) p.kill('SIGKILL')
   // The holders the tests started, and the jobs the stand-in's --bg left running.
   const terms = join(process.env.HYPERNOVA_SUPPORT!, 'terms')
@@ -349,4 +398,69 @@ test('a claude attach holder that drifted: its dialog is not the session’s men
   for (let i = 0; i < 3; i++) await watchMenus()
   assert.equal(hub.getSession('agents-perm-2')?.menu, null)
   assert.equal(hub.getSession('agents-perm-2')?.state, 'working')
+})
+
+/** The Shift+Tabs the stand-in took on job [jobId]'s [n]th attach (0 when it had none or wasn't attached). */
+function shiftTabs(jobId: string, n: number): number {
+  const f = join(process.env.FAKE_AGENTS_DIR!, `keys-${jobId}-${n}`)
+  return existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean).length : 0
+}
+const attaches = (jobId: string): number => {
+  const f = join(process.env.FAKE_AGENTS_DIR!, `n-${jobId}`)
+  return existsSync(f) ? Number(readFileSync(f, 'utf8').trim()) : 0
+}
+
+test('the mode route on a claude agents job with no terminal: claude attach, then Shift+Tab until the mode shows', async () => {
+  settings.claudeAgents = true
+  job('agents-mode-1', 'mode0000', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  assert.equal(termOf('agents-mode-1'), null)
+  const r = await post('/v1/sessions/agents-mode-1/mode', { permissionMode: 'plan' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.permissionMode, 'plan')
+  assert.equal(attaches('mode0000'), 1)
+  assert.equal(shiftTabs('mode0000', 1), 2, 'manual → accept edits → plan')
+  // Bypass: the job wasn't started with it allowed, so nothing is pressed.
+  const by = await post('/v1/sessions/agents-mode-1/mode', { permissionMode: 'bypassPermissions' })
+  assert.equal(by.status, 409)
+  assert.equal(by.json.error.code, 'mode_unavailable')
+  assert.equal(attaches('mode0000'), 1, 'the same holder, not a second attach')
+  assert.equal(shiftTabs('mode0000', 1), 2)
+})
+
+test('the mode route on a finished claude agents job (no process) attaches to it too', async () => {
+  settings.claudeAgents = true
+  hub.applyAgentList([...listed, { id: 'modedone', sessionId: 'agents-mode-2', cwd: scratch, state: 'done' }])
+  const r = await post('/v1/sessions/agents-mode-2/mode', { permissionMode: 'acceptEdits' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.permissionMode, 'acceptEdits')
+  assert.equal(shiftTabs('modedone', 1), 1)
+})
+
+test('the mode route never presses Shift+Tab in a claude attach holder that drifted: a fresh attach takes it', async () => {
+  settings.claudeAgents = true
+  job('agents-mode-3', 'modedrft', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  const first = await attachAgentsTerm('agents-mode-3', scratch, 'modedrft')
+  assert.ok(first)
+  scanTerms()
+  const t0 = Date.now()
+  while (!attachDrifted(first!, 'agents-mode-3') && Date.now() - t0 < 5000) await new Promise((ok) => setTimeout(ok, 100))
+  assert.equal(attachDrifted(first!, 'agents-mode-3'), true)
+  const r = await post('/v1/sessions/agents-mode-3/mode', { permissionMode: 'plan' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(shiftTabs('modedrft', 1), 0, 'nothing pressed in the drifted one')
+  assert.equal(shiftTabs('modedrft', 2), 2)
+  assert.notEqual(termOf('agents-mode-3'), first)
+})
+
+test('the mode route refuses a claude attach that shows another session from the start, pressing nothing', async () => {
+  settings.claudeAgents = true
+  job('agents-mode-4', 'modestuk', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  const r = await post('/v1/sessions/agents-mode-4/mode', { permissionMode: 'plan' })
+  assert.equal(r.status, 409)
+  assert.equal(r.json.error.code, 'terminal_busy')
+  assert.ok(attaches('modestuk') >= 1)
+  for (let n = 1; n <= attaches('modestuk'); n++) assert.equal(shiftTabs('modestuk', n), 0)
 })

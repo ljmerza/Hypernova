@@ -9,6 +9,7 @@ import com.prudnikweb.hypernova.data.WAgent
 import com.prudnikweb.hypernova.data.WPhase
 import com.prudnikweb.hypernova.data.WWorkflow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -23,8 +24,15 @@ class SessionSheetTest {
     private fun board(agents: List<WAgent>, workflows: List<WWorkflow> = emptyList()) =
         AgentBoard(agents.associateBy { it.id }, workflows.associateBy { it.id })
 
-    private fun session(phase: Phase = Phase.Working, agents: Int = 0, origin: String? = "hypernova", term: TermLink? = null) =
-        Session("00", "s", "s", "p", SessionState.Working, "claude-opus-5-5", "default", "", 0L, phase = phase, origin = origin, term = term, agentsRunning = agents)
+    private fun session(phase: Phase = Phase.Working, agents: Int = 0, origin: String? = "hypernova", term: TermLink? = null, agentJob: String? = null) =
+        Session("00", "s", "s", "p", SessionState.Working, "claude-opus-5-5", "default", "", 0L, phase = phase, origin = origin, term = term, agentsRunning = agents, agentJob = agentJob)
+
+    @Test fun aClaudeAgentsJobsModeChangesWithoutATerminalUntilItEnds() {
+        assertTrue(jobModeChangeable(session(origin = "terminal", agentJob = "feedbeef")))
+        assertFalse(jobModeChangeable(session(phase = Phase.Ended, origin = "terminal", agentJob = "feedbeef")))
+        // A plain terminal session the Mac only watches: still not from here.
+        assertFalse(jobModeChangeable(session(origin = "terminal")))
+    }
 
     @Test fun onlyAgentsAtWorkAreListedOldestFirst() {
         val a = sheetAgents(board(listOf(agent("b", at = 20), agent("a", at = 10), agent("done", status = "done"), agent("err", status = "error"))))

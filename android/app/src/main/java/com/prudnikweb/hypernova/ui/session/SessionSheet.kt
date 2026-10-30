@@ -113,7 +113,7 @@ internal fun SessionSheet(
         ModelPart(hub, session, usage, change, onModel, onSwitchAgent)
 
         SheetSeam(stringResource(R.string.session_sheet_permissions))
-        PermissionsPart(hub, session, change, atBlocked, onRetried, onEmptied)
+        PermissionsPart(hub, session, canChangeMode(hub, session), atBlocked, onRetried, onEmptied)
 
         // Only the plan's windows: none for another provider, nor while they're unknown.
         if (planShown(hub, session)) {

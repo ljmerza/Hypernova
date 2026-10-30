@@ -809,7 +809,8 @@ async function api(c: Ctx): Promise<void> {
     if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
     let tid = termOf(id!)
     // A `claude agents` session gets a shared terminal when one is needed: `claude attach` (terms.ts).
-    const agentsJob = settings.claudeAgents === true && (!tid || attachDrifted(tid, id!)) && ['terminal', 'interrupt', 'menu', 'mode'].includes(action!) && isLiveTerminal(id!) ? agentJobOf(id!) : null
+    // Its mode, a stopped or finished job's too (attach wakes it, as a prompt does).
+    const agentsJob = settings.claudeAgents === true && (!tid || attachDrifted(tid, id!)) && (['terminal', 'interrupt', 'menu'].includes(action!) ? isLiveTerminal(id!) : action === 'mode') ? agentJobOf(id!) : null
     if (agentsJob) tid = await attachAgentsTerm(id!, rec.cwd, agentsJob)
     const noTerm = () => new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
     const codex = isCodex(id!)
@@ -867,6 +868,10 @@ async function api(c: Ctx): Promise<void> {
       const b = await readJsonBody(req)
       const mode = String(b.permissionMode ?? 'default')
       if (!['default', 'acceptEdits', 'plan', 'auto', 'bypassPermissions'].includes(mode)) throw new HttpError(400, 'bad_mode', 'That isn’t a permission mode.')
+      // A `claude agents` job whose `claude attach` didn't open, or a holder showing another job or
+      // the agent list: Shift+Tab there would change another session's mode.
+      if (agentsJob && !tid) throw new HttpError(409, 'terminal_busy', 'The background session didn’t open. Try again in a moment.')
+      if (tid && attachDrifted(tid, id!)) throw new HttpError(409, 'terminal_busy', 'The terminal shows another session. Try again in a moment.')
       if (tid) {
         // Bypass in a terminal that wasn't started with it allowed: Shift+Tab never gets there, so
         // don't press it (the phone knows beforehand from session.bypassAvailable).

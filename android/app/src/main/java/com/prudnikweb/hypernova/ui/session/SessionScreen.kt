@@ -876,6 +876,16 @@ internal fun canChange(hub: Hub, s: Session): Boolean =
     s.phase != Phase.Ended && (s.codex || s.term != null || s.origin == "hypernova" || hub.isDemo)
 
 /**
+ * The permission mode can be changed from here: as [canChange], and a `claude agents` job's too,
+ * terminal or not (the Mac attaches to the job and presses Shift+Tab there, docs/PROTOCOL.md). Its
+ * model stays [canChange]'s: the model route doesn't attach to a job.
+ */
+internal fun canChangeMode(hub: Hub, s: Session): Boolean = canChange(hub, s) || jobModeChangeable(s)
+
+/** A `claude agents` job that hasn't ended: its mode changes through `claude attach`. */
+internal fun jobModeChangeable(s: Session): Boolean = s.phase != Phase.Ended && s.agentJob != null
+
+/**
  * The session sheet's Model part: the model the session runs, as its chip, and a way to another
  * one (the picker below). TalkBack hears "Model: Opus 5.5" and the action.
  */
