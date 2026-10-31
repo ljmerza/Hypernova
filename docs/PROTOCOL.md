@@ -494,7 +494,7 @@ objects with a `t` field:
 - `{t:"note", note: Note}`: an automation's notification, `to: "phone"`. A note with `ask` set asks a question its answers answer (see Automations,
   "Workflows", Answering an ask).
 - `{t:"ping"}` every 25 s; the client answers `{t:"pong"}`. Clients reconnect
-  with backoff (1, 2, 4 … 30 s) and receive a fresh snapshot.
+  once at once, then every 30 s (owner, 2026-10-31), and receive a fresh snapshot.
 
 ## Types
 

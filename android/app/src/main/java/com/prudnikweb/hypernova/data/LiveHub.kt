@@ -37,15 +37,14 @@ import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
-import kotlin.math.min
 import kotlin.random.Random
 
 /**
  * The real hub: one paired Mac's daemon, over REST and one WebSocket.
  *
  * - Connects with `GET /v1/snapshot`, then keeps `/v1/ws` open. The socket pushes everything.
- * - Can't reach the Mac: tries again after 1, 2, 4 … s, at most every 30 s while the app is on
- *   screen and every 5 minutes behind it (see [backoff]); at once when the network changes
+ * - Can't reach the server: tries again at once, then every 30 s, on screen or behind it (see
+ *   [backoff], [Retry]); at once when the network changes
  *   (a VPN coming up too), the screen comes on or the app returns, unless a try that has just
  *   begun is still under way. Never without a network, never off screen without the background
  *   service, and never by waking the phone. [link] says honestly how it stands.
@@ -490,19 +489,8 @@ class LiveHub(
         e.cause?.let { RoutePolicy.classify(it).second },
     ).joinToString(", ")
 
-    /**
-     * The wait after the [attempt]th failure in a row: 1, 2, 4 … s, up to 30 s while the app is on
-     * screen (someone is waiting) and 5 minutes behind it. A fifth either way so the tries don't
-     * fall in step with anything else, but never past the cap: at the cap only shorter, so behind
-     * the screen the next try is due within 5 minutes, well inside the 10 minutes an approval
-     * waits before it's denied.
-     */
-    private fun backoff(): Long {
-        val cap = if (onScreen()) RETRY_CAP_ON_SCREEN else RETRY_CAP
-        val base = min(cap, RETRY_FIRST shl min(attempt - 1, 10))
-        val jitter = if (base >= cap) Random.nextDouble(0.8, 1.0) else Random.nextDouble(0.8, 1.2)
-        return min(cap, (base * jitter).toLong())
-    }
+    /** The wait after the [attempt]th failure in a row ([Retry]: at once, then every 30 s). */
+    private fun backoff(): Long = Retry.wait(attempt, Random.nextDouble(0.9, 1.0))
 
     /**
      * The next attempt, [wait] ms from now, by two clocks. The coroutine's stops while the phone
@@ -2577,17 +2565,8 @@ class LiveHub(
         private const val EVENT_OUTPUT = 8192
         private const val HOUR = 3_600_000L
         private const val DAY = 24 * HOUR
-        /** The wait after a failed attempt; each failure in a row doubles it, up to a cap. */
-        private const val RETRY_FIRST = 1_000L
-        /** The cap while the app is on screen, showing "Trying again in…". */
-        private const val RETRY_CAP_ON_SCREEN = 30_000L
-        /**
-         * The cap behind it: a Mac that's away for good costs about 13 quick tries an hour while
-         * the phone is awake. One that comes back is found within 5 minutes, or at the phone's
-         * next wake-up after that (the alarm doesn't wake it), and at once when the screen comes
-         * on or the app opens.
-         */
-        private const val RETRY_CAP = 5 * 60_000L
+        /** The screen coming on retries at once only this long after the last try ([Retry.EVERY]). */
+        private const val RETRY_CAP_ON_SCREEN = Retry.EVERY
         /** How long a try that has just begun is left alone by the network or the app (see [freshTry]). */
         private const val FRESH_TRY = 3_000L
         private const val ALARM_TAG = "hypernova:retry"
