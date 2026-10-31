@@ -2120,6 +2120,12 @@ class LiveHub(
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_restart_session)) }
 
+    // One after another on the Mac, each up to half a minute: the slow client's two minutes. The
+    // sessions' new state comes over the socket.
+    override suspend fun respawnOutdated(sessionIds: List<String>): Result<List<JobRestart>> = try {
+        Result.success(OutdatedJobs.results(api.postSlow("/v1/jobs/respawn", JSONObject().put("ids", org.json.JSONArray(sessionIds)))))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_restart_jobs)) }
+
     override suspend fun deleteSession(sessionId: String): Result<Unit> = try {
         api.delete("/v1/sessions/$sessionId")
         // The Mac sends session.removed as well; the card goes now, not when that arrives.

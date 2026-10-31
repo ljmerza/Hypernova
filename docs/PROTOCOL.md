@@ -392,6 +392,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/folders?path=<abs dir, ~ or ~/…>&hidden=1` | → `Folders`: a folder's own folders, names only, for the new-session sheet's folder browser (no `path`: the home folder). See Files, The folder browser |
 | `GET /v1/file?path=<abs file>` | → the file's bytes to view: its Content-Type, max 20 MB (an attachment of the phone's own 30 MB), `Accept-Ranges`. `HEAD` too. See Files |
 | `GET /v1/file?path=<abs file>&download=1` | → the file to save, streamed: `Content-Disposition: attachment` with its name (RFC 5987 `filename*`), max 500 MB, `Range: bytes=…` → 206 (a dropped download carries on; `If-Range` with its `ETag` or `Last-Modified`), 416 for a range past its end. `HEAD` too. See Files |
+| `POST /v1/jobs/respawn` | `{ids?}` → `{results: [{id, job, ok, said}]}`: every `claude agents` job on an older Claude Code restarted, one `claude respawn <job>` each (see Session menu). 409 `not_agents` |
 | `POST /v1/preview` | `{path}` or `{port}` → `{url}` (see Artifacts) |
 | `GET /p/<token>/<file>` | → the previewed file or proxied page, no token: the signed URL `POST /v1/preview` returns (see Artifacts); 404 `preview_expired` |
 | `GET /v1/usage` | → `Usage` |
@@ -890,6 +891,14 @@ shows, finished ones too (`idle`, on Home rather than History; one blocked on th
   `agentOutdated` (the next registry read has the new process).
 - All three: the `claude attach` holder ends first; 409 `not_agents` for a session with no `agentJob`; 409 `agents_refused` with Claude Code's
   own words when it refuses (`rm` keeps a worktree with unpushed work).
+- `POST /v1/jobs/respawn` `{ids?: string[]}` → `{results: [{id, job, ok, said}]}`: Restart all, one
+  `claude respawn <job>` after another for every session with `agentOutdated` (with `ids`, only
+  those of them), each one's `claude attach` holder ended first; never `claude respawn --all`,
+  which restarts current jobs too. A job on the installed Claude Code is passed over. `ok: false`
+  is a refusal, `said` Claude Code's words either way; a restarted one loses `agentOutdated`. 409
+  `not_agents` without settings.claudeAgents. It answers once all are done (up to half a minute
+  each), so the phone waits up to two minutes. Home shows "N jobs run an older Claude Code" with
+  Restart all (asked first: a job at work is interrupted), swiped away until another job falls behind.
 
 ## Blocked calls
 
@@ -1018,7 +1027,15 @@ Claude Code's reasoning effort, `low`, `medium`, `high`, `xhigh` or `max` (`clau
 **Starting with one:** `NewSession.effort`. A shared terminal and a `claude agents` job get
 `--effort <level>`; a session the daemon runs passes it as the Agent SDK's `effort` with every query.
 None: nothing is passed, Claude Code's own default. Anything else is 400 `unknown_effort`, before
-anything starts. The phone remembers the last one started with, as it does the model.
+anything starts. The phone remembers the last one started with, as it does the model. The phone
+offers an effort on the Claude subscription only (`providerId` null or `anthropic`): none is sent
+for OpenRouter or a custom provider, and their sessions' sheet has no Effort row.
+
+**Resuming:** a shared terminal started again on a conversation (`--resume`, or `--session-id` for
+one never written down) gets `--effort` with the effort it last had (`Session.effort`, else what it
+was started with or set to), on the subscription only; none known, none passed. An ended terminal
+session the daemon goes on with itself (no shared terminals) keeps that effort for the SDK's
+`effort`, which goes with every query, resumes included.
 
 **`Session.effort`** is what Claude Code's status line last said (`effort.level`, read every 3 s
 with the model; it reports the default too, and a /effort typed in the terminal), else what the
@@ -2456,6 +2473,11 @@ home folder).
 `{port}` proxies `http://127.0.0.1:<port>/` the same way, for dev servers the
 agent started (`npm run dev` on 5173 and so on). Images and text files can also
 be fetched directly with `GET /v1/file`.
+
+The phone titles a preview with what was tapped (`localhost:5173`, or the file's name) and the
+page's own `<title>` under it when it has one, never the server's address the URL goes through. A
+502, 503 or 504 from a `{port}` preview reads "Nothing answers on port 5173 on your server. Is the
+dev server still running?".
 
 ## Attachments
 

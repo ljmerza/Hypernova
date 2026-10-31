@@ -89,6 +89,7 @@ import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.AccountWords
 import com.prudnikweb.hypernova.data.Blocked
 import com.prudnikweb.hypernova.data.FakeHub
+import com.prudnikweb.hypernova.data.OutdatedJobs
 import com.prudnikweb.hypernova.data.Provider
 import com.prudnikweb.hypernova.data.healthyOther
 import com.prudnikweb.hypernova.data.openLink
@@ -405,6 +406,13 @@ fun HomeScreen(
                 for (p in shownTroubled) {
                     item(key = "provider:${p.provider.id}") {
                         ProviderCard(p, Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem())
+                    }
+                }
+                // Jobs on an older Claude Code: one quiet notice with Restart all (SessionMenu.kt), never on a session's screen.
+                val outdated = OutdatedJobs.of(all)
+                if (outdated.isNotEmpty() && !hub.isDemo) {
+                    item(key = OUTDATED_CARD) {
+                        OutdatedJobsCard(hub, outdated, Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem())
                     }
                 }
                 // An automation's question (an ask step): its answers right here, swiped away like the others.

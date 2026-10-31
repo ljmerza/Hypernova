@@ -55,6 +55,7 @@ import com.prudnikweb.hypernova.data.DlState
 import com.prudnikweb.hypernova.data.FileFailure
 import com.prudnikweb.hypernova.data.Net
 import com.prudnikweb.hypernova.data.PageError
+import com.prudnikweb.hypernova.data.WebTitle
 import com.prudnikweb.hypernova.ui.files.DownloadDock
 import com.prudnikweb.hypernova.ui.files.DownloadJob
 import com.prudnikweb.hypernova.ui.files.downloadDir
@@ -78,10 +79,13 @@ import com.prudnikweb.hypernova.ui.theme.Type
  * the WebView then trusts exactly the pinned certificate and presents this phone's device
  * certificate to that listener, as the app's own requests do. A browser outside the app can't,
  * so "Open in browser" hands it the same page by the paired base URL.
+ *
+ * [preview]: a localhost link or a file opened as a page, titled with what was tapped ([title]) and
+ * never the server's address it comes through (data/WebTitle.kt); [port]: its dev server's.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun WebScreen(url: String, title: String, onBack: () -> Unit) {
+fun WebScreen(url: String, title: String, onBack: () -> Unit, preview: Boolean = false, port: Int? = null) {
     val context = LocalContext.current
     var web by remember { mutableStateOf<WebView?>(null) }
     var progress by remember { mutableFloatStateOf(0f) }
@@ -112,10 +116,12 @@ fun WebScreen(url: String, title: String, onBack: () -> Unit) {
         }
     }
 
+    val address = Uri.parse(web?.url ?: url).let { u -> (u.host ?: "") + (u.port.takeIf { it > 0 }?.let { ":$it" } ?: "") }
+    val bar = WebTitle.bar(title, pageTitle, address, preview)
     ScreenScaffold(
         sourceKey = "web:$url",
-        title = pageTitle?.takeIf { it.isNotBlank() && !it.startsWith("http") } ?: title,
-        subtitle = Uri.parse(web?.url ?: url).let { u -> (u.host ?: "") + (u.port.takeIf { it > 0 }?.let { ":$it" } ?: "") },
+        title = bar.title,
+        subtitle = bar.subtitle,
         onBack = onBack,
         actions = {
             GlyphButton(Glyph.Reload, stringResource(R.string.reload), { failed = null; web?.reload() })
@@ -173,7 +179,7 @@ fun WebScreen(url: String, title: String, onBack: () -> Unit) {
 
                                 // A dev server that stopped answers the Mac's proxy with a 502/503/504.
                                 override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
-                                    if (request.isForMainFrame && errorResponse.statusCode in 502..504) failed = PageError.text(0, errorResponse.statusCode)
+                                    if (request.isForMainFrame && errorResponse.statusCode in 502..504) failed = PageError.text(0, errorResponse.statusCode, port)
                                 }
 
                                 // The Mac's listener has a self-signed certificate: go on for the pinned one
@@ -236,7 +242,7 @@ fun WebScreen(url: String, title: String, onBack: () -> Unit) {
                     Column(Modifier.fillMaxSize().background(HN.bg).padding(24.dp)) {
                         HText(failedText, style = Type.title, color = HN.ink)
                         Spacer(Modifier.height(8.dp))
-                        HText(stringResource(f), style = Type.body, color = HN.inkMuted)
+                        HText(if (f == R.string.pg_dev_server_port && port != null) stringResource(f, port) else stringResource(f), style = Type.body, color = HN.inkMuted)
                         Spacer(Modifier.height(18.dp))
                         Pill(stringResource(R.string.reload), { failed = null; web?.reload() }, kind = PillKind.Outline, height = 44.dp)
                     }

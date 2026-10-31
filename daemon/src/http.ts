@@ -754,6 +754,26 @@ async function api(c: Ctx): Promise<void> {
     if (!dismissBlocked(id!, bid)) throw new HttpError(404, 'no_blocked', 'That call isn’t blocked any more.')
     return json(res, 200, { blocked: blockedList(id!) })
   }
+  // Every job on an older Claude Code restarted at once (docs/PROTOCOL.md, "Session menu"): `claude
+  // respawn <job>` for each session with agentOutdated, one after another, never `claude respawn
+  // --all` (it restarts the current ones too). Each one's attach holder ends first, as for one.
+  // `ids`: only those of them (the ones the phone asked about).
+  if (path === '/v1/jobs/respawn' && m === 'POST') {
+    if (settings.claudeAgents !== true) throw new HttpError(409, 'not_agents', 'Sessions don’t run in claude agents on this computer.')
+    const ids = (await readJsonBody(req))?.ids
+    const only = Array.isArray(ids) ? new Set(ids.filter((x): x is string => typeof x === 'string')) : null
+    const results: { id: string; job: string; ok: boolean; said: string }[] = []
+    for (const s of listSessions()) {
+      const job = s.agentOutdated && (!only || only.has(s.id)) ? agentJobOf(s.id) : null
+      if (!job) continue
+      const tid = termOf(s.id)
+      if (tid) await endTermAndWait(tid)
+      const r = await agentJobCommand('respawn', job)
+      if (r.ok) upsertSession(s.id, { agentOutdated: undefined })
+      results.push({ id: s.id, job, ok: r.ok, said: r.said })
+    }
+    return json(res, 200, { results })
+  }
   // The Home card's long-press menu (docs/PROTOCOL.md, "Session menu"): rename it (Claude Code's
   // /rename, typed in, so it shows in `claude agents` and the transcript keeps it), and for a
   // `claude agents` job, stop it or delete it there, or restart it on the installed Claude Code
@@ -1545,7 +1565,9 @@ async function switchProvider(rec: NonNullable<ReturnType<typeof getSession>>, p
 /** Adopt an ended terminal session so Hypernova can continue it in place. */
 function adoptTerminal(id: string, cwd: string, model?: string | null): void {
   if (getManaged(id)) return
-  saveManaged({ id, cwd, providerId: 'anthropic', model: model ?? null, permissionMode: 'default', createdAt: Date.now() })
+  // The effort it last ran at goes on with it (the SDK's option, each query), not Claude Code's default.
+  const effort = getSession(id)?.effort
+  saveManaged({ id, cwd, providerId: 'anthropic', model: model ?? null, permissionMode: 'default', createdAt: Date.now(), ...(isClaudeEffort(effort) ? { effort } : {}) })
   upsertSession(id, { origin: 'hypernova' })
 }
 

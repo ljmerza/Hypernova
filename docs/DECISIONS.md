@@ -1959,3 +1959,16 @@ Android app, local only. The entries above about the Mac app, the name service
    `com.prudnikweb.hypernova` (in-app updates depend on it); the app still reads a pasted
    `hypernova.observer/pair#…` link from an older computer, from its fragment, fetching nothing.
 4. **Links** in the app, the daemon and the docs point at `https://github.com/ljmerza/Hypernova`.
+
+## Previews, Restart all and effort defaults (2026-10-30)
+
+1. **A preview's title is what was tapped** (`localhost:5173`, or the file's name), with the page's
+   `<title>` under it when it has one; never the server's address it is proxied through, which
+   confused the owner. A dev server that stopped: "Nothing answers on port 5173 on your server."
+2. **Restart all** (replaces "One job at a time" above): a quiet, dismissable notice on Home, "3 jobs
+   run an older Claude Code", with Restart all, asked first (a job at work is interrupted). Each job
+   is `claude respawn <job>`, its attach holder ended first; never `--all`. Nothing on a session's screen.
+3. **Effort on the Claude subscription only:** no Effort chip in the New session sheet, and no
+   Effort row in the session sheet, for OpenRouter or a custom provider.
+4. **A resumed session keeps its effort:** started again in a terminal, it gets `--effort` with the
+   one it last had; the SDK passes it with every query. Still no "Default" mid-session.

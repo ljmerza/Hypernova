@@ -62,6 +62,7 @@ import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.CodexModel
 import com.prudnikweb.hypernova.data.pick
 import com.prudnikweb.hypernova.data.AttachDrafts
+import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.ModelCatalog
 import com.prudnikweb.hypernova.data.ModelList
@@ -242,6 +243,9 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     val choice: ModelOption = ModelCatalog.find(options, model)
         ?: model?.takeIf { lists == null }?.let { ModelOption(it, ModelNames.chip(it), it) }
         ?: options.first()
+    // Claude Code's effort only on the subscription: none is shown or sent for OpenRouter or a
+    // custom provider (the remembered one waits for the next session on the subscription).
+    val effortOffered = ClaudeEffort.offered(provider)
 
     // The sheet blurs the cosmos and the home list beneath it.
     val input = rememberEdgeInput(haze, HOME_SOURCE)
@@ -351,7 +355,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                     project = project, newName = newName, projects = projects, root = hub.projectsRoot,
                     provider = provider, choice = choice, options = options, mode = if (onCodex) codexMode else mode,
                     onProject = { open(Picking.Project) }, onModel = { open(Picking.Model) }, onMode = { open(Picking.Mode) },
-                    effort = effort, onEffort = { open(Picking.Effort) },
+                    effort = effort, onEffort = { open(Picking.Effort) }, offerEffort = effortOffered,
                     codex = if (!onCodex) null else CodexChips(
                         codexModelName(codexModels, codexModel, stringResource(R.string.model_label_default)),
                         (codexEffort ?: codexChoice?.defaultEffort)?.let { effortTitle(it) },
@@ -427,7 +431,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                                         model = choice.value,
                                         permissionMode = mode,
                                         files = sending.mapNotNull { it.attachment },
-                                        effort = effort,
+                                        effort = effort.takeIf { effortOffered },
                                     ),
                                 ).onSuccess { id ->
                                     started = true
@@ -520,7 +524,8 @@ private class CodexChips(val model: String, val effort: String?)
  * when it isn't the subscription), Claude Code's [effort] ("EFFORT" and its level, "Default" until
  * one is picked), the permission mode (its glyph and words; Bypass in red, Auto in amber). They give
  * way whole on a narrow phone (ChipRow). [codex]: a Codex session's model and effort instead of a
- * provider's model and Claude's effort (its mode is one of Codex's two).
+ * provider's model and Claude's effort (its mode is one of Codex's two). [offerEffort]: false on a
+ * provider other than the subscription, which has no Effort chip.
  */
 @Composable
 private fun SheetChips(
@@ -538,6 +543,7 @@ private fun SheetChips(
     effort: String?,
     onEffort: () -> Unit,
     codex: CodexChips? = null,
+    offerEffort: Boolean = true,
 ) {
     val p = projects.firstOrNull { it.path == project }
     val rootT = root?.let(ProjectPick::tilde) ?: "~"
@@ -614,7 +620,7 @@ private fun SheetChips(
         model = if (other || codex?.effort != null) listOf<@Composable () -> Unit>({ modelChip(true) }, { modelChip(false) }) else listOf<@Composable () -> Unit>({ modelChip(false) }),
         mode = listOf<@Composable () -> Unit>({ modeChip(true) }, { modeChip(false) }),
         modifier = Modifier.fillMaxWidth(),
-        effort = if (codex != null) emptyList() else listOf<@Composable () -> Unit>({ effortChip(true) }, { effortChip(false) }),
+        effort = if (codex != null || !offerEffort) emptyList() else listOf<@Composable () -> Unit>({ effortChip(true) }, { effortChip(false) }),
     )
 }
 

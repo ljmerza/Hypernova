@@ -276,7 +276,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                     previewBusy = true
                     scope.launch {
                         h.preview(path, port)
-                            .onSuccess { nav.push(Route.Web(it, title)) }
+                            .onSuccess { nav.push(Route.Web(it, title, preview = true, port = port)) }
                             .onFailure { vm.showToast(it.message.orEmpty()) }
                         previewBusy = false
                     }
@@ -555,7 +555,7 @@ private fun Screens(
                 is Route.Session -> SessionScreen(hub, r.id, onBack = { nav.pop() }, opening = System.identityHashCode(r))
                 is Route.Files -> FilesScreen(hub, r, onBack = { nav.pop() })
                 is Route.FileView -> FileViewer(hub, r.path, onBack = { nav.pop() })
-                is Route.Web -> WebScreen(r.url, r.title, onBack = { nav.pop() })
+                is Route.Web -> WebScreen(r.url, r.title, onBack = { nav.pop() }, preview = r.preview, port = r.port)
                 is Route.Terminal -> com.prudnikweb.hypernova.ui.term.TerminalScreen(hub, r.sessionId, onBack = { nav.pop() })
                 is Route.Agent -> com.prudnikweb.hypernova.ui.session.AgentScreen(hub, r.sessionId, r.agentId, onBack = { nav.pop() })
                 Route.Providers -> ProvidersScreen(hub, onBack = { nav.pop() }, onEdit = { id, kind -> nav.push(Route.ProviderEdit(id, kind)) })

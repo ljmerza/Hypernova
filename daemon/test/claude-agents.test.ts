@@ -94,7 +94,7 @@ case "$1" in
   stop|rm|respawn)
     echo "$1 $2" >> "$S/verbs"
     if [ "$2" = "dirty000" ]; then echo "Not deleted: the worktree has unpushed commits" >&2; exit 1; fi
-    if [ "$2" = "nore0000" ]; then echo "Couldn't respawn nore0000: it isn't running" >&2; exit 1; fi
+    case "$2" in nore*) echo "Couldn't respawn $2: it isn't running" >&2; exit 1 ;; esac
     echo "Deleted $2"
     ;;
   *) exec sleep 30 ;;
@@ -806,6 +806,54 @@ test('the respawn route: Claude Code’s words when it refuses; a session that i
   assert.equal(plain.json.error.code, 'not_agents')
 })
 
+/** The `claude stop|rm|respawn` lines the stand-in took since [from] of them. */
+const verbsSince = (from: number): string[] => {
+  const f = join(process.env.FAKE_AGENTS_DIR!, 'verbs')
+  return (existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean) : []).slice(from)
+}
+
+test('the respawn-all route: claude respawn <job> for each job on an older Claude Code only, holders first; each one’s result, a refusal in Claude Code’s words', async () => {
+  settings.claudeAgents = true
+  job('agents-all-1', 'all00001', 'idle', { version: '2.1.312' })
+  job('agents-all-2', 'all00002', 'busy', { version: '2.1.300' })
+  job('agents-all-3', 'all00003', 'idle', { version: '2.1.314' })
+  job('agents-all-4', 'nore0001', 'idle', { version: '2.1.312' })
+  hub.pollRegistry()
+  assert.equal(hub.getSession('agents-all-3')?.agentOutdated, undefined, 'on the installed one')
+  const tid = await attachAgentsTerm('agents-all-1', scratch, 'all00001')
+  assert.ok(tid)
+  scanTerms()
+  assert.equal(termOf('agents-all-1'), tid)
+  const from = verbsSince(0).length
+  const r = await post('/v1/jobs/respawn', {})
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  const mine = (r.json.results as { id: string; job: string; ok: boolean; said: string }[]).filter((x) => x.id.startsWith('agents-all-'))
+  assert.deepEqual(mine.map((x) => [x.id, x.job, x.ok]).sort(), [['agents-all-1', 'all00001', true], ['agents-all-2', 'all00002', true], ['agents-all-4', 'nore0001', false]])
+  assert.match(mine.find((x) => x.id === 'agents-all-4')!.said, /isn't running/)
+  const verbs = verbsSince(from)
+  for (const j of ['all00001', 'all00002', 'nore0001']) assert.ok(verbs.includes(`respawn ${j}`), JSON.stringify(verbs))
+  assert.ok(!verbs.some((v) => v.includes('all00003') || v.includes('--all')), 'never the current one, never --all')
+  assert.equal(termAlive(tid!, null), false, 'its claude attach holder went first')
+  assert.equal(hub.getSession('agents-all-1')?.agentOutdated, undefined)
+  assert.equal(hub.getSession('agents-all-2')?.agentOutdated, undefined)
+  assert.ok(hub.getSession('agents-all-4')?.agentOutdated, 'refused: still on the old one')
+  // `ids`: only those of them; one on the installed Claude Code is passed over all the same.
+  const from2 = verbsSince(0).length
+  const only = await post('/v1/jobs/respawn', { ids: ['agents-all-3', 'agents-all-4'] })
+  assert.equal(only.status, 200)
+  assert.deepEqual(only.json.results.map((x: { id: string }) => x.id), ['agents-all-4'])
+  assert.deepEqual(verbsSince(from2), ['respawn nore0001'])
+  // Sessions not run in claude agents: nothing to restart.
+  settings.claudeAgents = false
+  try {
+    const off = await post('/v1/jobs/respawn', {})
+    assert.equal(off.status, 409)
+    assert.equal(off.json.error.code, 'not_agents')
+  } finally {
+    settings.claudeAgents = true
+  }
+})
+
 // ── Effort (docs/PROTOCOL.md, "A session's effort") ──────────────────────
 
 /** The lines the stand-in took in job [jobId]'s input box. */
@@ -853,6 +901,57 @@ test('createSharedSession: --effort among a shared terminal’s arguments, kept 
   assert.ok(at > 0 && args![at + 1] === 'low', JSON.stringify(args))
   assert.ok(at < args!.indexOf('--'), 'before the prompt')
   assert.equal(hub.getSession(id)?.effort, 'low')
+})
+
+/** The arguments of session [id]'s shared terminal holder, once it has one. */
+async function holderArgs(id: string): Promise<string[] | null> {
+  const dir = join(process.env.HYPERNOVA_SUPPORT!, 'terms')
+  const t0 = Date.now()
+  while (Date.now() - t0 < 5000) {
+    for (const f of existsSync(dir) ? readdirSync(dir) : []) {
+      if (!f.endsWith('.json')) continue
+      try {
+        const meta = JSON.parse(readFileSync(join(dir, f), 'utf8'))
+        if (meta.sessionId === id) return meta.args
+      } catch {}
+    }
+    await new Promise((ok) => setTimeout(ok, 100))
+  }
+  return null
+}
+const effortArg = (args: string[] | null): string | null => {
+  const at = args?.indexOf('--effort') ?? -1
+  return at >= 0 ? args![at + 1]! : null
+}
+
+test('createSharedSession resuming: the effort it last ran at again, not the default; none known, none; not on another provider', async () => {
+  const { editProvider, saveManaged } = await import('../src/store.ts')
+  // What the status line last said (or the phone set) wins over what it started with.
+  saveManaged({ id: 'resume-effort-1', cwd: scratch, providerId: 'anthropic', model: null, permissionMode: 'default', createdAt: Date.now(), engine: 'term', effort: 'low' })
+  hub.upsertSession('resume-effort-1', { cwd: scratch, origin: 'hypernova', state: 'ended', effort: 'max' })
+  createSharedSession({ cwd: scratch, resume: 'resume-effort-1', prompt: 'Go on' })
+  const a1 = await holderArgs('resume-effort-1')
+  assert.equal(effortArg(a1), 'max', JSON.stringify(a1))
+  assert.ok(a1!.indexOf('--effort') < a1!.indexOf('--'), 'before the prompt')
+  // Only what it was started with: that one.
+  saveManaged({ id: 'resume-effort-2', cwd: scratch, providerId: 'anthropic', model: null, permissionMode: 'default', createdAt: Date.now(), engine: 'term', effort: 'medium' })
+  hub.upsertSession('resume-effort-2', { cwd: scratch, origin: 'hypernova', state: 'ended' })
+  createSharedSession({ cwd: scratch, resume: 'resume-effort-2', prompt: 'Go on' })
+  assert.equal(effortArg(await holderArgs('resume-effort-2')), 'medium')
+  // None known: nothing passed, Claude Code's own default.
+  hub.upsertSession('resume-effort-3', { cwd: scratch, origin: 'terminal', state: 'ended' })
+  createSharedSession({ cwd: scratch, resume: 'resume-effort-3', prompt: 'Go on' })
+  const a3 = await holderArgs('resume-effort-3')
+  assert.ok(a3, 'its holder')
+  assert.equal(effortArg(a3), null)
+  // On another provider (the phone offers no effort there): none either.
+  const other = editProvider({ name: 'Gateway test', kind: 'custom', baseUrl: 'https://llm.example' }).provider
+  saveManaged({ id: 'resume-effort-4', cwd: scratch, providerId: other.id, model: null, permissionMode: 'default', createdAt: Date.now(), engine: 'term' })
+  hub.upsertSession('resume-effort-4', { cwd: scratch, origin: 'hypernova', state: 'ended', providerId: other.id, effort: 'high' })
+  createSharedSession({ cwd: scratch, resume: 'resume-effort-4', prompt: 'Go on' })
+  const a4 = await holderArgs('resume-effort-4')
+  assert.ok(a4, 'its holder')
+  assert.equal(effortArg(a4), null)
 })
 
 test('the effort route on a claude agents job: claude attach, then /effort typed into its box', async () => {

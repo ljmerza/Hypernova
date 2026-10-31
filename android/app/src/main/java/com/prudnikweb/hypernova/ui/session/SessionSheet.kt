@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentKind
+import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.ModelNames
 import com.prudnikweb.hypernova.data.OutdatedClaude
@@ -146,8 +147,8 @@ internal fun SessionSheet(
                     SheetTab.Overview -> {
                         SheetSeam(stringResource(R.string.model))
                         ModelPart(hub, session, usage, change, onModel, onSwitchAgent)
-                        // Claude Code's effort (EffortPart.kt); Codex's goes with its model.
-                        if (!session.codex) {
+                        // Claude Code's effort (EffortPart.kt), on the subscription only; Codex's goes with its model.
+                        if (ClaudeEffort.shown(session)) {
                             SheetSeam(stringResource(R.string.effort))
                             EffortPart(hub, session)
                         }

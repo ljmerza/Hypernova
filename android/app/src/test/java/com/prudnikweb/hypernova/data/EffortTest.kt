@@ -40,6 +40,20 @@ class EffortTest {
         assertFalse(ClaudeEffort.changeable(session(phase = Phase.Ended), modeChangeable = true))
     }
 
+    /** The owner (2026-10-30): an effort is offered on the Claude subscription only, never on OpenRouter or a custom provider. */
+    @Test fun theEffortIsOfferedOnTheSubscriptionOnly() {
+        fun provider(id: String, kind: String, builtIn: Boolean) = Provider(id, id, kind, null, false, ProviderModels(), builtIn)
+        assertTrue(ClaudeEffort.offered(null))
+        assertTrue(ClaudeEffort.offered(provider("anthropic", "anthropic", builtIn = true)))
+        assertFalse(ClaudeEffort.offered(provider("or1", "openrouter", builtIn = false)))
+        assertFalse(ClaudeEffort.offered(provider("gw1", "custom", builtIn = false)))
+        // The session sheet's Effort part: the same, and never Codex's.
+        assertTrue(ClaudeEffort.shown(session()))
+        assertTrue(ClaudeEffort.shown(session().copy(providerId = "anthropic")))
+        assertFalse(ClaudeEffort.shown(session().copy(providerId = "or1")))
+        assertFalse(ClaudeEffort.shown(session(agent = AgentKind.CODEX)))
+    }
+
     @Test fun theSessionsEffortIsReadAndAnOlderMacSaysNone() {
         val base = """{"id":"s1","title":"t","cwd":"/p/alpha","state":"idle""""
         assertEquals("high", Wire.session(JSONObject("$base,\"effort\":\"high\"}")).effort)

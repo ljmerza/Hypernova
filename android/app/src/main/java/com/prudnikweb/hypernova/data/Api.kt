@@ -131,6 +131,8 @@ class Api(val base: String, private val token: String?, private val fixed: NetRo
 
     suspend fun get(path: String, max: Long = 8L * 1024 * 1024): JSONObject = json(request(path).get().build(), max)
     suspend fun post(path: String, body: JSONObject = JSONObject()): JSONObject = json(request(path).post(body.toString().toRequestBody(JSON)).build())
+    /** A POST the Mac takes a while to answer (restarting several jobs one after another): two minutes, the uploads client's. */
+    suspend fun postSlow(path: String, body: JSONObject = JSONObject()): JSONObject = json(request(path).post(body.toString().toRequestBody(JSON)).build(), client = route().uploads)
     suspend fun put(path: String, body: JSONObject): JSONObject = json(request(path).put(body.toString().toRequestBody(JSON)).build())
     suspend fun delete(path: String): JSONObject = json(request(path).delete().build())
     /** A picked file as the body, streamed (uploads). */

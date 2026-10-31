@@ -25,7 +25,8 @@ sealed interface Route {
     /** Browse files under [root], starting at [start]. */
     data class Files(val root: String, val title: String, val start: String = root) : Route { override val key = "files:$root" }
     data class FileView(val path: String) : Route { override val key = "file:$path" }
-    data class Web(val url: String, val title: String) : Route { override val key = "web:$url" }
+    /** A web page; [preview]: one the owner opened as a preview ([title] is what he tapped), [port] its dev server's. */
+    data class Web(val url: String, val title: String, val preview: Boolean = false, val port: Int? = null) : Route { override val key = "web:$url" }
     /** A session's live terminal. */
     data class Terminal(val sessionId: String) : Route { override val key = "terminal:$sessionId" }
     /** One of a session's agents: its own transcript, read-only. */

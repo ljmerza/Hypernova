@@ -11,9 +11,13 @@ object PageError {
     private const val FAILED_SSL = -11
     private const val IO = -7
 
-    /** [code]: a WebViewClient error code on the page; [httpStatus]: the page's own answer when it loaded with one (0 if none). */
-    fun text(code: Int, httpStatus: Int = 0): Int = when {
-        httpStatus in intArrayOf(502, 503, 504) -> R.string.pg_dev_server
+    /**
+     * [code]: a WebViewClient error code on the page; [httpStatus]: the page's own answer when it
+     * loaded with one (0 if none); [port]: the dev server's, for a localhost preview (its string then
+     * takes the port as its argument).
+     */
+    fun text(code: Int, httpStatus: Int = 0, port: Int? = null): Int = when {
+        httpStatus in intArrayOf(502, 503, 504) -> if (port != null) R.string.pg_dev_server_port else R.string.pg_dev_server
         httpStatus == 404 -> R.string.pg_gone
         httpStatus != 0 -> R.string.pg_other
         code == HOST_LOOKUP -> R.string.pg_dns

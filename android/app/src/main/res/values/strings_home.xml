@@ -68,6 +68,23 @@
     <!-- The session sheet's Session tab, above Restart: the version the job runs, then the installed one. -->
     <string name="session_outdated">Runs Claude Code %1$s; %2$s is installed.</string>
     <string name="err_restart_session">Couldn\'t restart the session. Try again.</string>
+    <!-- Home's quiet notice when claude agents jobs run an older Claude Code (data/OutdatedJobs.kt): Restart all, one `claude respawn` each. -->
+    <plurals name="jobs_outdated_title">
+        <item quantity="one">%d job runs an older Claude Code</item>
+        <item quantity="other">%d jobs run an older Claude Code</item>
+    </plurals>
+    <string name="jobs_outdated_line">%1$s is installed.</string>
+    <string name="jobs_restart_all">Restart all</string>
+    <plurals name="jobs_restart_q">
+        <item quantity="one">Restart %d job?</item>
+        <item quantity="other">Restart %d jobs?</item>
+    </plurals>
+    <string name="jobs_restart_body">Claude Code restarts each one on the version installed now. Any that are working are interrupted.</string>
+    <plurals name="jobs_restart_refused">
+        <item quantity="one">%1$d wasn\'t restarted. %2$s</item>
+        <item quantity="other">%1$d weren\'t restarted. %2$s</item>
+    </plurals>
+    <string name="err_restart_jobs">Couldn\'t restart the jobs. Try again.</string>
     <!-- Home, Sessions: the first Back says this; a second within 2 s closes the app. -->
     <string name="home_back_again">Press back again to close</string>
 </resources>

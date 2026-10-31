@@ -18,4 +18,9 @@ class PageErrorTest {
         assertEquals(R.string.pg_dev_server, PageError.text(0, 504))
         assertEquals(R.string.pg_gone, PageError.text(0, 404))
     }
+
+    @Test fun `a localhost preview names its port`() {
+        assertEquals(R.string.pg_dev_server_port, PageError.text(0, 502, port = 5173))
+        assertEquals(R.string.pg_gone, PageError.text(0, 404, port = 5173))
+    }
 }

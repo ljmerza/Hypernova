@@ -18,4 +18,10 @@ object ClaudeEffort {
      * a `claude agents` job), since the Mac types `/effort` the way it switches the mode.
      */
     fun changeable(s: Session, modeChangeable: Boolean): Boolean = !s.codex && s.phase != Phase.Ended && modeChangeable
+
+    /** The new-session sheet's Effort chip: on the Claude subscription only ([provider] null or the built-in one), never OpenRouter or a custom provider. */
+    fun offered(provider: Provider?): Boolean = provider == null || provider.builtIn
+
+    /** The session sheet's Effort part: a Claude Code session on the subscription (Codex's goes with its model). */
+    fun shown(s: Session): Boolean = !s.codex && !s.onOtherProvider
 }

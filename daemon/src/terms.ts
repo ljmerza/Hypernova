@@ -9,7 +9,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { WebSocket } from 'ws'
 import { CLAUDE_DIR, HOME, SUPPORT, findClaude, log, randomToken, readJson, trimText, writeText } from './util.ts'
-import { getManaged, getProvider, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
+import { getManaged, getProvider, isClaudeEffort, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
 import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, notePaste, noteTermDialog, sessionOfAgentJob, upsertSession, view } from './hub.ts'
 import { promptTitle, typedCommand } from './normalize.ts'
 import { trialEnded } from './blockers.ts'
@@ -831,6 +831,10 @@ export type AutomationStart = {
  */
 export function createSharedSession(o: { cwd: string; providerId?: string; model?: string | null; permissionMode?: string; effort?: string | null; prompt?: string; forkFrom?: string; resume?: string; title?: string; context?: string } & AutomationStart): string {
   const id = o.resume ?? randomUUID()
+  // A resume keeps the provider it had, unless it's moving to another one (the phone's
+  // "Continue on <provider>"): then its record says so, for its next restart too.
+  // A provider deleted since: 404 `no_provider`, never the subscription instead.
+  const provider = useProvider(o.providerId ?? (o.resume ? (getManaged(o.resume)?.providerId ?? getSession(o.resume)?.providerId) : undefined))
   const args: string[] = []
   // A conversation Claude Code never wrote down (its claude ended before taking a prompt): it
   // refuses to resume an id it has no transcript for, and the session would stay starting.
@@ -847,6 +851,12 @@ export function createSharedSession(o: { cwd: string; providerId?: string; model
   if (o.permissionMode) args.push('--permission-mode', o.permissionMode)
   // The phone's effort, for this session only (Claude Code's own default without one).
   if (o.effort) args.push('--effort', o.effort)
+  else if (o.resume) {
+    // A resume runs at the effort it last had again (the status line's, else what it started with
+    // or was set to), not Claude Code's default; on the subscription only, where the phone offers one.
+    const kept = getSession(o.resume)?.effort ?? getManaged(o.resume)?.effort
+    if (provider.builtIn && isClaudeEffort(kept)) args.push('--effort', kept)
+  }
   // No --allow-dangerously-skip-permissions (owner, 2026-10-30: no bypass for agents): Shift+Tab
   // never reaches Bypass in a session started in another mode, and the phone doesn't offer it.
   if (o.automation) {
@@ -862,10 +872,6 @@ export function createSharedSession(o: { cwd: string; providerId?: string; model
   const context = o.context ?? (o.resume ? getManaged(o.resume)?.context : undefined)
   if (context) args.push('--append-system-prompt', context)
   if (o.prompt?.trim()) args.push('--', o.prompt)
-  // A resume keeps the provider it had, unless it's moving to another one (the phone's
-  // "Continue on <provider>"): then its record says so, for its next restart too.
-  // A provider deleted since: 404 `no_provider`, never the subscription instead.
-  const provider = useProvider(o.providerId ?? (o.resume ? (getManaged(o.resume)?.providerId ?? getSession(o.resume)?.providerId) : undefined))
   const existing = getSession(id)
   const title = trimText(o.title ?? (o.prompt && promptTitle(o.prompt)), 80) ?? 'New session'
   if (!o.resume) {
