@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AgentStarting
 import com.prudnikweb.hypernova.data.AgentState
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
@@ -92,6 +93,8 @@ fun AgentScreen(hub: Hub, sessionId: String, agentId: String, onBack: () -> Unit
     }
     var events by remember(sessionId, agentId) { mutableStateOf<List<WEvent>?>(null) }
     var error by remember(sessionId, agentId) { mutableStateOf<String?>(null) }
+    // Just started: the Mac has no transcript of it yet (AgentStarting).
+    var starting by remember(sessionId, agentId) { mutableStateOf(false) }
     var attempt by remember { mutableStateOf(0) }
     val running by rememberUpdatedState(agent?.running == true)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -101,14 +104,21 @@ fun AgentScreen(hub: Hub, sessionId: String, agentId: String, onBack: () -> Unit
             // keep asking the Mac (or trying to reach one that's away) every 1.5 s.
             lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.STARTED) }
             hub.agentEvents(sessionId, agentId)
-                .onSuccess { events = it; error = null }
+                .onSuccess { events = it; error = null; starting = false }
                 .onFailure {
-                    if (events == null) error = it.message
-                    // The Mac is away: ask again once the hub has it back, not every 1.5 s.
-                    snapshotFlow { hub.link.state == LinkState.Connected }.first { it }
+                    if (it is AgentStarting) {
+                        starting = true
+                        error = null
+                    } else {
+                        starting = false
+                        if (events == null) error = it.message
+                        // The Mac is away: ask again once the hub has it back, not every 1.5 s.
+                        snapshotFlow { hub.link.state == LinkState.Connected }.first { it }
+                    }
                 }
-            // Ended (or not known yet): rest until it runs again (a message woke it).
-            if (!running) snapshotFlow { running }.first { it } else delay(POLL_MS)
+            // Ended (or not known yet): rest until it runs again (a message woke it). One starting
+            // is asked again in a moment, its file comes as it starts.
+            if (!running && !starting) snapshotFlow { running }.first { it } else delay(POLL_MS)
         }
     }
     val list = events
@@ -209,14 +219,15 @@ fun AgentScreen(hub: Hub, sessionId: String, agentId: String, onBack: () -> Unit
             if (items.isEmpty()) {
                 item(key = "empty") {
                     val err = error
-                    when {
-                        list == null && err == null -> LoadingLine(stringResource(R.string.loading_conversation), Modifier.padding(top = 8.dp))
-                        err != null -> Column(Modifier.padding(top = 8.dp)) {
-                            HText(err, style = Type.body, color = HN.danger)
+                    when (agentEmpty(list != null, err, starting)) {
+                        AgentEmpty.Loading -> LoadingLine(stringResource(R.string.loading_conversation), Modifier.padding(top = 8.dp))
+                        AgentEmpty.Starting -> LoadingLine(stringResource(R.string.agent_starting), Modifier.padding(top = 8.dp))
+                        AgentEmpty.Error -> Column(Modifier.padding(top = 8.dp)) {
+                            HText(err.orEmpty(), style = Type.body, color = HN.danger)
                             Spacer(Modifier.height(12.dp))
                             Pill(stringResource(R.string.try_again), { error = null; attempt++ }, kind = PillKind.Outline, height = 44.dp)
                         }
-                        else -> HText(stringResource(R.string.agent_empty), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 8.dp))
+                        AgentEmpty.Nothing -> HText(stringResource(R.string.agent_empty), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
             }
@@ -231,6 +242,20 @@ fun AgentScreen(hub: Hub, sessionId: String, agentId: String, onBack: () -> Unit
             }
         }
     }
+}
+
+/** What an agent's screen shows while it has no transcript rows. */
+internal enum class AgentEmpty { Loading, Starting, Error, Nothing }
+
+/**
+ * [loaded]: an answer came. Starting (the Mac has it as just started, no file yet) wins: it's asked
+ * again in a moment, not an error. Then an error, with Try again; then loading, or "Nothing yet."
+ */
+internal fun agentEmpty(loaded: Boolean, error: String?, starting: Boolean): AgentEmpty = when {
+    starting && !loaded -> AgentEmpty.Starting
+    error != null -> AgentEmpty.Error
+    !loaded -> AgentEmpty.Loading
+    else -> AgentEmpty.Nothing
 }
 
 /** The task an agent was given: TASK and its first lines; a tap unfolds the whole of it. */

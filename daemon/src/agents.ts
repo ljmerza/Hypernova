@@ -13,9 +13,9 @@
 // file read), and a scan of live sessions' folders every 2 s that reads a file only when its
 // folder or its size changed, and follows only running agents' own files. A whole agent
 // transcript (one can be 50 MB) is read only when the phone opens that agent.
-import { closeSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { closeSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, type Dirent } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { broadcast, emitEvent, ensureParsed, getSession, listSessionRecs, upsertSession } from './hub.ts'
 import { closeTool, feedLine, handbackText, maskSecrets, newParseState, structuredText, toolSummary, type AgentLink, type Ev, type ParseState, type TaskEnd, type WorkflowPhase } from './normalize.ts'
 import { log, trimText } from './util.ts'
@@ -516,10 +516,18 @@ function resume(b: Board, a: AgentRec, at: number): void {
 
 // ── Hooks ─────────────────────────────────────────────────────────────────
 
-/** A subagent's PreToolUse: what it does now. No file is read. */
+/**
+ * A subagent's PreToolUse: what it does now. No file is read for an agent the board knows. One it
+ * doesn't know counts only once its meta file is found (read now, for its label): Claude Code's own
+ * helpers (memory upkeep, summaries, prompt suggestions: forks of the main conversation) send these
+ * hooks too, under an id that names no file, and they aren't agents the main agent started (a
+ * `claude agents` job's show its main agent's type, "claude"). Agent calls and workflows write the
+ * meta file as they start; a hook that comes first is counted from the next one, or the next scan.
+ */
 export function hookActivity(sessionId: string, agentId: string, agentType: unknown, tool: string, summary: string): void {
   if (!SAFE_ID.test(agentId)) return
   const b = board(sessionId)
+  if (!b.agents.has(agentId) && !metaRead(b, agentId)) return
   const now = Date.now()
   const fresh = !b.agents.has(agentId)
   const a = newAgent(b, agentId, now)
@@ -677,9 +685,13 @@ export function sdkTask(sessionId: string, m: any): void {
 
 type Rec = NonNullable<ReturnType<typeof getSession>>
 
-/** Where a session's agents write: a folder named after it, next to its transcript. */
+/**
+ * Where a session's agents write: a folder named as its transcript is (`<session id>.jsonl` →
+ * `<session id>/subagents`, as Claude Code makes both), next to it.
+ */
 function subagentsDir(r: Rec): string {
-  return join(dirname(r.transcriptPath), r.id, 'subagents')
+  const stem = r.transcriptPath.endsWith('.jsonl') ? basename(r.transcriptPath, '.jsonl') : r.id
+  return join(dirname(r.transcriptPath), stem || r.id, 'subagents')
 }
 
 function ls(dir: string): string[] {
@@ -1105,19 +1117,72 @@ export function endSessionAgents(sessionId: string): void {
   publishRunning(b)
 }
 
-/** An agent's transcript in a session's subagents folder: flat, or in its workflow's folder. */
+/** An agent's transcript in a session's subagents folder: flat, in its workflow's folder, or further down. */
 function findFile(root: string, a: { id: string; workflowId: string | null }): string | null {
   if (!AGENT_ID.test(a.id)) return null
   const name = `agent-${a.id}.jsonl`
-  const flat = join(root, name)
   if (a.workflowId && RUN_ID.test(a.workflowId)) return join(root, 'workflows', a.workflowId, name)
+  return locate(root, name)
+}
+
+/**
+ * File [name] in a session's subagents folder [root]: flat, in a workflow's folder, else anywhere
+ * further down (Claude Code can file an agent's transcript in a folder of its own there,
+ * `subagents/<folders…>/agent-<id>.jsonl`). Never outside [root]; null when it isn't there.
+ */
+function locate(root: string, name: string): string | null {
+  const flat = join(root, name)
   if (mtimeOf(flat) != null) return flat
   for (const run of ls(join(root, 'workflows'))) {
     if (!RUN_ID.test(run)) continue
     const p = join(root, 'workflows', run, name)
     if (mtimeOf(p) != null) return p
   }
+  return search(root, name)
+}
+
+/** How many folders down, and how many folders in all, [search] looks below a subagents folder. */
+const TREE_DEPTH = 6
+const TREE_DIRS = 200
+
+/** File [name] anywhere below [root], nearest first. Links aren't followed. */
+function search(root: string, name: string): string | null {
+  let level = [root]
+  let dirs = 0
+  for (let depth = 0; depth < TREE_DEPTH && level.length; depth++) {
+    const next: string[] = []
+    for (const dir of level) {
+      let entries: Dirent[]
+      try {
+        entries = readdirSync(dir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const e of entries) {
+        if (e.isFile() && e.name === name) return join(dir, e.name)
+        if (e.isDirectory() && ++dirs <= TREE_DIRS) next.push(join(dir, e.name))
+      }
+    }
+    level = next
+  }
   return null
+}
+
+/**
+ * Agent [id]'s meta file, read when it is in its session's subagents folder (anywhere [locate]
+ * looks): whether the board has the agent now.
+ */
+function metaRead(b: Board, id: string): boolean {
+  if (!AGENT_ID.test(id)) return false
+  const r = getSession(b.id)
+  if (!r) return false
+  const root = subagentsDir(r)
+  const p = locate(root, `agent-${id}.meta.json`)
+  if (!p) return false
+  const dir = dirname(p)
+  const runId = dirname(dir) === join(root, 'workflows') && RUN_ID.test(basename(dir)) ? basename(dir) : null
+  readMeta(b, p, id, runId, dir)
+  return b.agents.has(id)
 }
 
 /**
@@ -1193,20 +1258,7 @@ export function agentLabel(sessionId: string, agentId: string): string | null {
   if (!SAFE_ID.test(agentId)) return null
   const b = board(sessionId)
   let a = b.agents.get(agentId)
-  if (!a?.label && AGENT_ID.test(agentId)) {
-    const r = getSession(sessionId)
-    if (r) {
-      const root = subagentsDir(r)
-      const dirs = [root, ...ls(join(root, 'workflows')).filter((d) => RUN_ID.test(d)).map((d) => join(root, 'workflows', d))]
-      for (const dir of dirs) {
-        const p = join(dir, `agent-${agentId}.meta.json`)
-        if (mtimeOf(p) == null) continue
-        readMeta(b, p, agentId, dir === root ? null : dir.slice(dir.lastIndexOf('/') + 1), dir)
-        break
-      }
-      a = b.agents.get(agentId)
-    }
-  }
+  if (!a?.label && metaRead(b, agentId)) a = b.agents.get(agentId)
   return a?.label || a?.type || null
 }
 
@@ -1255,16 +1307,24 @@ export type AgentEvents = {
   /** Where this answer leaves the phone: ask with it next time. */
   cursor: string
   full: boolean
+  /** It has only just started and Claude Code hasn't written its file yet: no events, ask again in a moment. */
+  starting?: true
 }
+
+/** How long after it started an agent with no file yet is still starting, rather than missing. */
+const START_MS = 2 * 60_000
 
 /**
  * Agent [agentId]'s own events (its prompt first, its report last): the last [limit], with its
  * task always first, or, given the [after] cursor of an earlier answer, only those added or changed
- * since then. Null when it has no file.
+ * since then. With no file: [AgentEvents.starting] for one the board has as just started, else null.
  */
 export function agentEvents(sessionId: string, agentId: string, limit = 200, after: string | null = null): AgentEvents | null {
   const file = agentFile(sessionId, agentId)
-  if (!file) return null
+  if (!file) {
+    const a = boards.get(sessionId)?.agents.get(agentId)
+    return a && a.status === 'running' && Date.now() - a.startedAt < START_MS ? { events: [], cursor: '', full: true, starting: true } : null
+  }
   const key = `${sessionId}/${agentId}`
   let c = transcripts.get(key)
   if (!c || c.file !== file) c = newCached(file)

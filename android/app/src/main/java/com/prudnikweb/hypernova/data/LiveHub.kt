@@ -1127,6 +1127,11 @@ class LiveHub(
         val prev = agentLogs[key]?.takeIf { boardSlot(sessionId).value.agents[agentId]?.running == true }
         val after = prev?.cursor?.let { "&after=${Api.q(it)}" }.orEmpty()
         val o = api.get("/v1/sessions/$sessionId/agents/${Api.q(agentId)}/events?limit=300$after", max = 32L * 1024 * 1024)
+        // Just started, no transcript yet: nothing kept, so the next answer is whole.
+        if (o.has("starting") && o.bool("starting")) {
+            agentLogs.remove(key)
+            throw AgentStarting()
+        }
         val log = withContext(Dispatchers.Default) {
             val got = o.arr("events").mapObjects(Wire::event)
             val full = prev == null || !o.has("full") || o.bool("full")
@@ -1134,7 +1139,7 @@ class LiveHub(
         }
         agentLogs[key] = log
         Result.success(log.events)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_agent)) }
+    } catch (e: CancellationException) { throw e } catch (e: AgentStarting) { Result.failure(e) } catch (e: Throwable) { Result.failure(handle(e, R.string.err_agent)) }
 
     /**
      * [changed] events into [old]: one it has is replaced where it is, a new one goes at the end (the

@@ -379,7 +379,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/snapshot` | → `Snapshot` |
 | `GET /v1/sessions/{id}/events?limit=200` | → `{events: Event[]}` its normalized history, the last `limit` events (300 without one), oldest first. Optional: `output=<n>` (tool outputs cut to their last n characters, 256–65536, with "…\n" in front) |
 | `GET /v1/sessions/{id}/agents` | → `{agents: Agent[], workflows: Workflow[]}`: the agents its main agent started and the workflows of them, newest first (the 60 most recent agents and any running; older ones only counted in their workflow). See Agents and workflows |
-| `GET /v1/sessions/{id}/agents/{agentId}/events?limit=200&after=<cursor>` | → `{events: Event[], cursor: string, full: boolean}`: that agent's own transcript, read like a session's (its task is the first `user` event, kept first whatever the limit; its report is the last `assistant` one); read-only. `full: true`: the last `limit` events (1–1000), which replace what the client has. With `after` (the `cursor` of an earlier answer): `full: false` and only the events added or changed since then, in transcript order (one with an `id` the client has replaces it, a new one goes at the end; none when nothing changed). A cursor from another read (the file was rewritten, the daemon restarted, the cache dropped it), a malformed one, or more changes than `limit` gets `full: true`. 400 `bad_agent` for an id that isn't an agent's (`a` and 16 hex digits), 404 `no_agent` when the session has no such agent file. The phone sends its cursor while the agent runs, and fetches the transcript whole once more when it ends |
+| `GET /v1/sessions/{id}/agents/{agentId}/events?limit=200&after=<cursor>` | → `{events: Event[], cursor: string, full: boolean}`: that agent's own transcript, read like a session's (its task is the first `user` event, kept first whatever the limit; its report is the last `assistant` one); read-only. `full: true`: the last `limit` events (1–1000), which replace what the client has. With `after` (the `cursor` of an earlier answer): `full: false` and only the events added or changed since then, in transcript order (one with an `id` the client has replaces it, a new one goes at the end; none when nothing changed). A cursor from another read (the file was rewritten, the daemon restarted, the cache dropped it), a malformed one, or more changes than `limit` gets `full: true`. An agent the session has as running, started less than 2 minutes ago, whose file Claude Code hasn't written yet answers `{events: [], cursor: "", full: true, starting: true}`: the phone shows "Starting…" and asks again every 1.5 s, keeping nothing of it. 400 `bad_agent` for an id that isn't an agent's (`a` and 16 hex digits), 404 `no_agent` when the session has no such agent file otherwise (its message names this computer: "isn't on the server" on Linux, "on the Mac" on a Mac). The phone sends its cursor while the agent runs, and fetches the transcript whole once more when it ends |
 | `GET /v1/sessions/{id}/usage` | → `{usage: SessionUsage}`: its model, how full its context window is, the tokens it used and what they cost, and the plan's windows (see Session usage, the to-do list and Rewind) |
 | `GET /v1/sessions/{id}/todos` | → `{todos: Todo[], updatedAt: number \| null}`: Claude's to-do list as its last TodoWrite or task tool calls left it; empty when it made none (see Session usage, the to-do list and Rewind) |
 | `POST /v1/sessions/{id}/rewind` | `{eventId}` → `{session: Session, text, files: Attachment[]}`: the conversation goes on in a new session from just before that `user` event; `text` and `files` are the message, for the prompt box. 404 `no_message`; 409 `first_message`, `not_found`, `no_transcript`, `fork_failed` (see Session usage, the to-do list and Rewind), `sdk_missing` (see Claude Code's SDK) |
@@ -3179,7 +3179,9 @@ them in `daemon/src/agents.ts`; the phone shows each under the call that started
   `~/.claude/projects/<folder>/<session id>/subagents/agent-<id>.jsonl`, next to a small
   `agent-<id>.meta.json` written as it starts (`agentType`, `description`, `toolUseId`,
   `parentAgentId` when an agent started it, `workflowPhase`). A workflow's agents sit in
-  `subagents/workflows/<run id>/`, next to a `journal.jsonl` (`started` with label and phase, then
+  `subagents/workflows/<run id>/` (an agent's file not in either is looked for further down the
+  session's own subagents folder, up to 6 folders down, links not followed; the folder is named as
+  the session's transcript is), next to a `journal.jsonl` (`started` with label and phase, then
   `result` or `failed`); the run's summary is written to `<session id>/workflows/<run id>.json` when
   it ends (status, times, phases, totals and each agent's state, tokens and tool calls). None of it
   is documented, so every field is optional and anything unreadable leaves an agent running or
@@ -3191,7 +3193,11 @@ them in `daemon/src/agents.ts`; the phone shows each under the call that started
   (task id, tool use id, `completed`/`failed`/`killed`/`stopped`, usage), logged as a queue entry, a
   hidden user entry and a queued command; each counts once.
 - **What an agent does now** comes from the PreToolUse hooks every subagent already sends
-  (`agent_id`): no file is read for it. The main turn's Stop lists background tasks still going.
+  (`agent_id`): no file is read for it. An `agent_id` the daemon doesn't know yet counts only once
+  its meta file is found in the session's subagents folder (read then, for its label): Claude Code's
+  own helpers (memory upkeep, summaries, prompt suggestions: forks of the main conversation) send
+  these hooks too, under an id that names no file (in a `claude agents` job, with its main agent's
+  type, `claude`), and get no card. The main turn's Stop lists background tasks still going.
   Sessions run through the Agent SDK report the same through its `task_*` messages.
 - **The folders** of sessions that are going, ended in the last 15 minutes or still have agents
   or a workflow running are looked at every 2 s: a meta file, journal or run summary is read only
