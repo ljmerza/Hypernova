@@ -17,7 +17,13 @@
 
     <!-- "All servers": Home shows every paired computer's sessions together (ui/home/AllHome.kt). -->
     <string name="servers_all">All servers</string>
-    <string name="all_servers_sessions_only">Not in All servers: pick a server to open this.</string>
+    <!-- Automations with "All servers": they stay one server's. -->
+    <string name="all_servers_no_automations">Automations are one server\'s: pick a server to see them.</string>
+    <!-- History with "All servers": the servers not linked, named (z2, gym). -->
+    <plurals name="history_all_offline">
+        <item quantity="one">%1$s is offline: its sessions are as last seen, and the words inside them aren\'t searched.</item>
+        <item quantity="other">%1$s are offline: their sessions are as last seen, and the words inside them aren\'t searched.</item>
+    </plurals>
     <string name="servers_all_label">Show every server\'s sessions together</string>
     <!-- The chip while Home shows all of them, and what TalkBack hears. -->
     <string name="servers_all_chip">All</string>

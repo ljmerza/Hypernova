@@ -599,6 +599,11 @@ private fun Screens(
                             nav.openSession(id)
                         },
                         onNewSession = onNewSessionOn,
+                        onRuns = { server, id ->
+                            // History's automation row: its runs on its own computer, as a card's session.
+                            vm.visit(server)
+                            nav.push(Route.AutomationEdit(id, null, true))
+                        },
                     ),
                 )
                 // Fork: a new route each time it's opened, so each opening lands at the latest (SessionScreen).
