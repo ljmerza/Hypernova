@@ -1065,10 +1065,12 @@ class LiveHub(
 
     override fun consumeReveal(s: Session): Boolean = s.isNew && revealed.add(s.id)
 
-    private class Cached(val events: List<WEvent>, val pending: List<Sent>, val approvals: Map<String, WApproval>, val resolved: Map<String, Resolved>, val answered: Map<String, Resolution>, val settled: Boolean, val active: Boolean, val shared: Boolean, val queue: List<WQueued>, val step: Boolean, val board: AgentBoard, val waiting: Int, val items: List<Item>, val held: List<WQueued> = emptyList())
+    private class Cached(val events: List<WEvent>, val pending: List<Sent>, val approvals: Map<String, WApproval>, val resolved: Map<String, Resolved>, val answered: Map<String, Resolution>, val settled: Boolean, val active: Boolean, val shared: Boolean, val queue: List<WQueued>, val step: Boolean, val board: AgentBoard, val waiting: Int, val items: List<Item>, val held: List<WQueued> = emptyList(), val asides: List<Asides.Entry> = emptyList())
     private val cache = HashMap<String, Cached>()
 
     override fun transcript(id: String): List<Item> {
+        // Side questions asked from this phone have their "/btw …" line in the chat, in time (data/Asides.kt).
+        val asides = Asides.of(id)
         val ev = slot(id).value
         val pend = pendingSlot(id).value
         val ap = approvals
@@ -1088,14 +1090,15 @@ class LiveHub(
         val held = raw[id]?.held.orEmpty()
         val c = cache[id]
         // The queue compared by value: the session arrives anew with every change of activity.
-        if (c != null && c.events === ev && c.pending === pend && c.approvals === ap && c.resolved === rs && c.answered === an && c.settled == st && c.active == active && c.shared == shared && c.queue == queue && c.step == step && c.board === board && c.waiting == waitingNow && c.held == held) return c.items
+        if (c != null && c.events === ev && c.pending === pend && c.approvals === ap && c.resolved === rs && c.answered === an && c.settled == st && c.active == active && c.shared == shared && c.queue == queue && c.step == step && c.board === board && c.waiting == waitingNow && c.held == held && c.asides === asides) return c.items
+        val all = if (asides.isEmpty()) ev else Asides.into(ev, asides)
         // Only events that changed (new instances) are converted again; streaming text and
         // 64 KB Bash outputs arrive several times a second.
-        val built = Items.build(ev, ap, rs, an, id, raw[id]?.cwd, now, settled = st, cache = itemCaches.getOrPut(id) { Items.Cache() }, active = active, board = board)
+        val built = Items.build(all, ap, rs, an, id, raw[id]?.cwd, now, settled = st, cache = itemCaches.getOrPut(id) { Items.Cache() }, active = active, board = board)
         // What waits on this phone for the Mac comes last, under everything.
         // Fork: held prompts before those, just above the asks waiting at the end (ui/session/AskStack.kt).
-        val items = withCopies(built, ev, pend, shared, queue, step) + Held.items(held, ev, queue) + offline.of(id).map(Waiting::item)
-        cache[id] = Cached(ev, pend, ap, rs, an, st, active, shared, queue, step, board, waitingNow, items, held)
+        val items = withCopies(built, all, pend, shared, queue, step) + Held.items(held, ev, queue) + offline.of(id).map(Waiting::item)
+        cache[id] = Cached(ev, pend, ap, rs, an, st, active, shared, queue, step, board, waitingNow, items, held, asides)
         return items
     }
 

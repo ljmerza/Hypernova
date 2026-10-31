@@ -25,6 +25,16 @@
     <string name="chat_copied">Copied</string>
     <!-- A code block in the chat: long-press (or TalkBack's action) copies it whole. -->
     <string name="copy_code">Copy code</string>
+    <!-- A link in the chat (data/Links.kt): a tap asks first, showing the whole address. -->
+    <string name="link_open_title">Open this link?</string>
+    <string name="link_open">Open</string>
+    <string name="link_copy">Copy link</string>
+    <string name="link_no_browser">No app on this phone opens links.</string>
+    <!-- A side question asked from the prompt box ("/btw …"): its answer in a card over the box. -->
+    <string name="aside_card_dismiss">Dismiss the answer</string>
+    <string name="aside_no_files">Side questions take no files: they stay in the box.</string>
+    <!-- Pasting into the prompt box: an image becomes an attachment, as the paperclip adds one. -->
+    <string name="paste_failed">Couldn\'t paste that image.</string>
     <string name="chat_quote">Quote</string>
     <string name="chat_read">Read aloud</string>
     <string name="chat_read_hint">your Mac\'s voice</string>

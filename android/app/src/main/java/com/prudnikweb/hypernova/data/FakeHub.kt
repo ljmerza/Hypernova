@@ -156,7 +156,9 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
     }).also { it.add("s-hypernova", res.getString(R.string.demo_waiting_prompt), emptyList(), cwd = "~/Programming/hypernova") }
 
     override fun transcript(id: String): List<Item> {
-        val list = slot(id).value
+        // Side questions asked in the demo: their lines last, as they're the newest (data/Asides.kt).
+        val asides = Asides.of(id)
+        val list = if (asides.isEmpty()) slot(id).value else slot(id).value + asides.map { Asides.event(it).let { e -> Item.User(e.id, e.text, command = e.command) } }
         val v = offline.version
         val waiting = offline.of(id)
         if (waiting.isEmpty() && list.none { it is Item.User && it.queued }) return list

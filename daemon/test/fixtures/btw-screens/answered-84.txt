@@ -1,0 +1,28 @@
+● Agent(Bug fixes)
+  ⎿  Backgrounded agent
+
+● Agent(Tidy-ups)
+  ⎿  Backgrounded agent
+
+● Agent(Permission rules)
+  ⎿  Backgrounded agent
+
+  /btw is it possible to run the ui in a desktop?
+  /btw I'm testing the btw
+
+    Your /btw question reached me and I'm answering it, so sending works. The
+    main session keeps working in the background; it's starting the bug-fix,
+    tidy-up and permission-rules agents.
+
+    What still needs checking on your phone is the other half: does this answer
+    show up in the session sheet's Commands tab? If it does, the server is
+    reading the /btw panel correctly. If you only see it in the terminal, tell
+    the main session. The panel's screen layout was guessed from Claude Code's
+    code, not captured from a real session, so the server's screen reader may
+    need adjusting.
+
+  ↑/↓ to browse · c to copy · f to fork · x to clear history · Esc to            ← 4
+  close ·                                                                     agents
+
+
+

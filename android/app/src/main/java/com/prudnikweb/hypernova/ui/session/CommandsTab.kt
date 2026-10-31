@@ -41,6 +41,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Aside
+import com.prudnikweb.hypernova.data.Asides
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SlashCommand
@@ -64,7 +65,8 @@ import kotlinx.coroutines.launch
 /**
  * The session sheet's Commands tab (owner, 2026-10-30; docs/DECISIONS.md, "Commands in the session
  * sheet"): a side question first (Claude Code's /btw, typed in while Claude works too; its answer,
- * read off the terminal on the Mac, shows here and nowhere in the chat), then Claude Code's commands
+ * read off the terminal on the Mac, shows here; one asked from the prompt box has its answer in a
+ * card over the box, and the chat has only its "/btw" line, data/Asides.kt), then Claude Code's commands
  * and the owner's skills for the project, as the "/" list has them: Recent and Pinned (kept on the
  * phone, CommandsTabModel.kt), then all of them, with a search. A tap sends a command that takes
  * nothing; one that takes something opens its field under it first. Long-press pins or unpins.
@@ -85,7 +87,7 @@ private fun SheetPartSeam(label: String) {
 }
 
 /** How often an answer being read on the Mac is asked for while the tab is open. */
-private const val ASIDE_POLL_MS = 1200L
+internal const val ASIDE_POLL_MS = 1200L
 
 /** The side question: its field and Ask, then the last one's answer (or how it stands). */
 @Composable
@@ -98,14 +100,15 @@ private fun AsidePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
         return
     }
     var question by remember(s.id) { mutableStateOf("") }
-    var aside by remember(s.id) { mutableStateOf<Aside?>(null) }
+    // Kept with the ones asked from the prompt box (data/Asides.kt), so the chat has its "/btw" line.
+    val aside = Asides.last(s.id)
     var sending by remember(s.id) { mutableStateOf(false) }
-    LaunchedEffect(s.id) { hub.aside(s.id).onSuccess { aside = it } }
+    LaunchedEffect(s.id) { hub.aside(s.id).onSuccess { a -> if (a != null) Asides.note(s.id, a) } }
     // Asked for again while the Mac is still reading the answer off the terminal.
     LaunchedEffect(s.id, aside?.id, aside?.asking) {
-        while (aside?.asking == true) {
+        while (Asides.last(s.id)?.asking == true) {
             delay(ASIDE_POLL_MS)
-            hub.aside(s.id).onSuccess { a -> if (a != null) aside = a }
+            hub.aside(s.id).onSuccess { a -> if (a != null) Asides.note(s.id, a) }
         }
     }
     val busy = sending || aside?.asking == true
@@ -116,7 +119,7 @@ private fun AsidePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
         appScope.launch {
             try {
                 hub.askAside(s.id, q)
-                    .onSuccess { aside = it; question = "" }
+                    .onSuccess { Asides.note(s.id, it); question = "" }
                     .onFailure { toast(it.message.orEmpty()) }
             } finally {
                 sending = false

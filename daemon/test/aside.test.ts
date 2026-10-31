@@ -5,7 +5,7 @@
 // when there are some (docs/PROTOCOL.md, "Side questions", says what a live look must confirm).
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -51,6 +51,43 @@ test('readAside: an error in words is failed; an answer that fills the panel is 
   const clipped = readAside(['', '  /btw list them', '', ...long, '', '  ↑/↓ to scroll · c to copy · Esc to close', '', '', '', '', '', ''].join('\n'), 'list them')
   assert.equal(clipped?.clipped, true)
   assert.equal(clipped?.text.split('\n').length, 23)
+})
+
+// A real panel, captured on the owner's phone (2026-10-30): a `claude attach` holder 84 columns wide,
+// Claude Code 2.1.314. An earlier question shows without its answer and with no "(+N earlier /btw)"
+// line; the footer starts "↑/↓ to browse" and wraps ("Esc to" / "close ·"), with the status line's
+// "← 4 agents" at the right of the same rows. Indents as read off the screenshot.
+test('readAside: the real panel, its footer wrapped beside the status line', () => {
+  const real = readFileSync(join(import.meta.dirname, 'fixtures', 'btw-screens', 'answered-84.txt'), 'utf8')
+  const p = readAside(real, "I'm testing the btw")
+  assert.equal(p?.state, 'answered')
+  assert.equal(p?.clipped, false)
+  assert.ok(p?.text.startsWith('Your /btw question reached me'))
+  assert.ok(p?.text.endsWith('need adjusting.'))
+  assert.equal(p?.text.split('\n\n').length, 2)
+  assert.ok(!/to browse|close ·|← 4/.test(p!.text))
+  assert.equal(
+    // As watchAside reflows it: the screen's columns less 7.
+    reflow(p!.text, 84 - 7).split('\n\n')[0],
+    'Your /btw question reached me and I\'m answering it, so sending works. The main session keeps working in the background; it\'s starting the bug-fix, tidy-up and permission-rules agents.',
+  )
+  assert.equal(reflow(p!.text, 84 - 7).split('\n').length, 3)
+  // The earlier question isn't this one's panel.
+  assert.equal(readAside(real, 'is it possible to run the ui in a desktop?'), null)
+  // Still answering, the same wrapped footer without "c to copy".
+  const asking = [
+    '  /btw is it possible to run the ui in a desktop?',
+    "  /btw I'm testing the btw",
+    '',
+    '    ⠙ Answering…',
+    '',
+    '  ↑/↓ to browse · x to clear history · f to fork · Esc to close ·              ← 4',
+    '                                                                            agents',
+  ].join('\n')
+  assert.equal(readAside(asking, "I'm testing the btw")?.state, 'asking')
+  // Wrapped between "Esc" and "to close": the rows are read as one footer.
+  const split = ['', '  /btw why?', '', '    Because.', '', '  ↑/↓ to browse · c to copy · f to fork · x to clear history · Esc     ← 4', '  to close ·                                                     agents'].join('\n')
+  assert.deepEqual(readAside(split, 'why?'), { state: 'answered', text: 'Because.', clipped: false })
 })
 
 test('reflow: lines the terminal broke are joined; lists, blank lines and short lines stay', () => {

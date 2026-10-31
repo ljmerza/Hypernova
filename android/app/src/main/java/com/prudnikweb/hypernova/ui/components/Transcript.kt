@@ -68,6 +68,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.withLink
+import com.prudnikweb.hypernova.data.Links
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentState
@@ -174,7 +177,8 @@ private fun TextMessage(item: Item.User, status: String?, hint: String?, files: 
             if (item.text.isNotBlank()) Spacer(Modifier.height(10.dp))
         }
         if (item.text.isNotBlank()) {
-            Selectable { HText(item.text, style = MessageText, color = if (item.pending) HN.inkMuted else HN.ink) }
+            val text = remember(item.text) { linked(item.text) }
+            Selectable { HText(text, style = MessageText, color = if (item.pending) HN.inkMuted else HN.ink) }
         }
         QueuedHint(hint)
         if (item.status == SendStatus.SessionGone && onStartNew != null) {
@@ -270,7 +274,8 @@ private fun PromptCommand(cmd: CommandRun, item: Item.User, status: String?, hin
             if (args.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Box(Modifier.clearAndSetSemantics { }) {
-                    Selectable { HText(args, style = MessageText, color = if (item.pending) HN.inkMuted else HN.ink) }
+                    val linkedArgs = remember(args) { linked(args) }
+                    Selectable { HText(linkedArgs, style = MessageText, color = if (item.pending) HN.inkMuted else HN.ink) }
                 }
             }
         }
@@ -464,28 +469,44 @@ fun PreviewPills(ports: List<Int>, onPreview: (Int) -> Unit) {
     }
 }
 
-/** Just enough markdown for replies: **bold** and `code`. */
-fun markdownLite(src: String): AnnotatedString = buildAnnotatedString {
+/**
+ * Just enough markdown for replies: **bold**, `code` and [links](https://…), and bare web
+ * addresses as links too ([links]; data/Links.kt): a tap asks first (LinkConfirm.kt).
+ */
+fun markdownLite(src: String, links: Boolean = true): AnnotatedString = buildAnnotatedString {
     var i = 0
+    val plain = StringBuilder()
+    fun AnnotatedString.Builder.text(s: String) = if (links) appendLinked(s) else append(s)
+    fun flush() { if (plain.isNotEmpty()) { text(plain.toString()); plain.clear() } }
     while (i < src.length) {
         when {
             src.startsWith("**", i) -> {
                 val end = src.indexOf("**", i + 2)
-                if (end < 0) { append(src.substring(i)); break }
-                withStyle(SpanStyle(color = HN.ink, fontWeight = FontWeight(600))) { append(src.substring(i + 2, end)) }
+                if (end < 0) { plain.append(src, i, src.length); break }
+                flush()
+                withStyle(SpanStyle(color = HN.ink, fontWeight = FontWeight(600))) { text(src.substring(i + 2, end)) }
                 i = end + 2
             }
             src[i] == '`' -> {
                 val end = src.indexOf('`', i + 1)
-                if (end < 0) { append(src.substring(i)); break }
+                if (end < 0) { plain.append(src, i, src.length); break }
+                flush()
                 withStyle(SpanStyle(fontFamily = JetBrainsMono, color = HN.accentBright, background = HN.accent.copy(alpha = 0.08f))) {
-                    append(src.substring(i + 1, end))
+                    text(src.substring(i + 1, end))
                 }
                 i = end + 1
             }
-            else -> { append(src[i]); i++ }
+            src[i] == '[' && Links.markdownLink(src, i) != null -> {
+                val md = Links.markdownLink(src, i)!!
+                flush()
+                // Its words; a link only to the web or a dev server, never another scheme.
+                if (links && Links.target(md.url) != Links.Target.Never) withLink(LinkAnnotation.Url(md.url, LinkStyles)) { append(md.label) } else append(md.label)
+                i = md.end
+            }
+            else -> { plain.append(src[i]); i++ }
         }
     }
+    flush()
 }
 
 internal sealed interface Block {
@@ -992,7 +1013,8 @@ private fun AgentBody(a: AgentView) {
         a.result != null -> {
             Spacer(Modifier.height(6.dp))
             val lines = remember(a.result) { reportLines(a.result, 3) }
-            HText(markdownLite(lines), style = Type.small, color = if (a.state == AgentState.Failed) HN.danger.copy(alpha = 0.85f) else HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            // No links: a tap on the card opens the agent.
+            HText(markdownLite(lines, links = false), style = Type.small, color = if (a.state == AgentState.Failed) HN.danger.copy(alpha = 0.85f) else HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         a.state == AgentState.Failed || a.state == AgentState.Stopped -> {
             Spacer(Modifier.height(6.dp))

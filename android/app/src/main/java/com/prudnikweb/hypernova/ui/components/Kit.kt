@@ -176,7 +176,8 @@ fun rememberFieldValue(text: String): FieldValue {
  * text and its offsets stay as typed, so the cursor and selection are untouched.
  */
 object CommandHighlight : VisualTransformation {
-    private val Lead = SpanStyle(fontFamily = JetBrainsMono, color = HN.accent, background = HN.accent.copy(alpha = 0.10f))
+    /** The mark, also drawn by the session's prompt box (its TextFieldState field, SessionScreen.kt). */
+    internal val Lead = SpanStyle(fontFamily = JetBrainsMono, color = HN.accent, background = HN.accent.copy(alpha = 0.10f))
 
     override fun filter(text: AnnotatedString): TransformedText {
         val at = CommandRun.lead(text.text) ?: return TransformedText(text, OffsetMapping.Identity)

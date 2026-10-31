@@ -1,6 +1,6 @@
 // Two HTTP servers on loopback: the phone API (phones reach the same routes through the LAN
 // listener, lan.ts) and the local API for the Mac app, Claude Code hooks and the testing checklist.
-import { listCommands } from './commands.ts'
+import { isImmediateCommand, listCommands } from './commands.ts'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { existsSync, statSync, readdirSync, readFileSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
@@ -1502,6 +1502,9 @@ useSessionOps({
  * prompts already held for an open session, it's held too, so they go in order.
  */
 export async function promptOrHold(id: string, text: string, clientId?: string): Promise<{ id: string; queued: boolean; forked?: boolean; heldId?: string }> {
+  // One of Claude Code's commands it runs at once (/btw, /status…): never held, behind other held
+  // prompts or a dialog, as the side-question route never holds /btw. Typed now, or the route's 409.
+  if (isImmediateCommand(text)) return await promptSession(id, text, { clientId })
   const held = () => ({ id, queued: true, heldId: hold(id, text, clientId ?? null).id })
   if (heldOf(id).length && heldReady(id) !== 'ended') return held()
   try {

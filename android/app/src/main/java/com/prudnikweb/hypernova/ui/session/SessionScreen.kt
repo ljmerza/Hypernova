@@ -54,6 +54,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.OutputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.foundation.content.MediaType
+import androidx.compose.foundation.content.ReceiveContentListener
+import androidx.compose.foundation.content.TransferableContent
+import androidx.compose.foundation.content.consume
+import androidx.compose.foundation.content.contentReceiver
+import androidx.compose.foundation.content.hasMediaType
+import androidx.compose.ui.text.SpanStyle
+import com.prudnikweb.hypernova.data.CommandRun
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -95,6 +108,8 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AccountWords
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.AttachDrafts
+import com.prudnikweb.hypernova.data.Aside
+import com.prudnikweb.hypernova.data.Asides
 import com.prudnikweb.hypernova.data.SessionSwitched
 import com.prudnikweb.hypernova.data.Blocked
 import com.prudnikweb.hypernova.data.healthyOther
@@ -218,8 +233,36 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     // [replace], until they're all on the Mac.
     var sendWaiting by remember(sessionId) { mutableStateOf<Boolean?>(null) }
     val fixFirst = stringResource(R.string.attach_fix_first)
+    val noFiles = stringResource(R.string.aside_no_files)
+    /**
+     * "/btw <question>" goes as the Commands tab asks it (data/Asides.kt): typed in at once, never
+     * held, its answer read off the terminal into the card over the box. Files stay in the box.
+     */
+    fun askAside(text: String, question: String) {
+        draft = ""
+        busy = null
+        tray = false
+        if (attach.files.isNotEmpty()) toast(noFiles)
+        // At once, "Answering…", until the Mac says it's typed.
+        val local = Aside("local:${System.nanoTime()}", question, Aside.ASKING, null, null, false, System.currentTimeMillis())
+        Asides.note(sessionId, local, chat = true)
+        appScope.launch {
+            var asked = false
+            try {
+                hub.askAside(sessionId, question)
+                    .onSuccess { asked = true; Asides.remove(sessionId, local.id); Asides.note(sessionId, it, chat = true) }
+                    .onFailure { toast(it.message.orEmpty()) }
+            } finally {
+                if (!asked) {
+                    Asides.remove(sessionId, local.id)
+                    AttachDrafts.giveBack(sessionId, text)
+                }
+            }
+        }
+    }
     /** Send the draft and the files ([replace]: clear unsent text in the terminal first). */
     val send: (Boolean) -> Unit = send@{ replace ->
+        Asides.sideQuestion(draft)?.takeIf { asideReach(session, hub.isDemo) }?.let { q -> askAside(draft, q); return@send }
         // Never without a file that was attached: one that failed is sent again or removed first,
         // and one still uploading is waited for.
         attach.failed?.let { f -> toast(String.format(fixFirst, f.name)); return@send }
@@ -255,6 +298,14 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     movedTo?.let { opener.switchSession(it) }
                 }
             }
+        }
+    }
+    // A side question's answer, asked for while the Mac is still reading it off the terminal.
+    val lastAside = Asides.last(sessionId)
+    LaunchedEffect(sessionId, lastAside?.id, lastAside?.asking) {
+        while (Asides.last(sessionId)?.let { it.asking && !it.id.startsWith("local:") } == true) {
+            delay(ASIDE_POLL_MS)
+            hub.aside(sessionId).onSuccess { a -> if (a != null) Asides.note(sessionId, a) }
         }
     }
     LaunchedEffect(sendWaiting, attach.uploading, attach.failed) {
@@ -679,6 +730,13 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     })
                     Spacer(Modifier.height(12.dp))
                 }
+                // A side question's answer ("/btw …" from the box), until it's swiped away (AsideCard.kt).
+                AsideCardHost(
+                    Asides.card(sessionId),
+                    terminal = !hub.isDemo && terminalReach(session),
+                    onTerminal = { opener.terminal(sessionId) },
+                    onDismiss = { Asides.dismiss(sessionId, it.id) },
+                )
                 // The agent status bar and, opened, Claude's to-do list (StatusBar.kt), while a turn runs.
                 ChatStatusBar(hub, session, statusBar)
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1438,6 +1496,7 @@ internal suspend fun glide(dist: Float, fps: Int, scale: Float, scrollBy: (Float
  * the Mac. While the box is empty and the Mac offers voice, Send is the mic ([voice]); words
  * still settling after a dictation are drawn dim.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun Composer(
     text: String,
@@ -1450,7 +1509,11 @@ private fun Composer(
     modifier: Modifier = Modifier,
 ) {
     val files = attach.files
-    val field = rememberFieldValue(text)
+    val field = rememberComposerField(text, onText)
+    // A pasted image (the clipboard's, a keyboard's) is an attachment, as the paperclip adds one;
+    // anything else pasted is the box's own paste. Not in the demo, which has no paperclip.
+    val context = LocalContext.current
+    val receiver = remember(attach, onTray != null) { if (onTray != null) pastedImages(context.contentResolver, attach::paste) else null }
     Column(
         modifier
             .fillMaxWidth()
@@ -1467,17 +1530,18 @@ private fun Composer(
             // As tall as the buttons for one line, so it lines up with them; taller lines grow upward.
             Box(Modifier.weight(1f).heightIn(min = 48.dp).padding(vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
                 if (text.isEmpty()) HText(if (voice.listening) stringResource(R.string.voice_waiting) else hint, style = Type.body, color = HN.inkDim, maxLines = 1)
+                // A TextFieldState field: only it takes content from the keyboard (an image) as well as text.
+                val look = remember(voice.tail, files.isEmpty()) { ComposerLook(voice.tail, files.isEmpty()) }
                 BasicTextField(
-                    value = field.value,
-                    onValueChange = { field.value = it; if (it.text != text) onText(it.text) },
+                    state = field,
                     textStyle = Type.body.copy(color = HN.ink),
                     cursorBrush = SolidColor(HN.accent),
                     // The "/command" (or "!") it starts with, marked as Claude Code will read it; with
                     // files attached it goes as a plain prompt, so nothing is marked.
-                    visualTransformation = voiceTail(voice.tail, if (files.isEmpty()) CommandHighlight else VisualTransformation.None),
-                    maxLines = 6,
+                    outputTransformation = look,
+                    lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 6),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().then(if (receiver != null) Modifier.contentReceiver(receiver) else Modifier),
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -1487,6 +1551,65 @@ private fun Composer(
             // With a file that failed, a tap says what to do about it rather than nothing.
             MicButton(voice, send = hasText, canSend = hasText && !uploading, uploading = uploading)
         }
+    }
+}
+
+/**
+ * The prompt box's field for a String the caller owns ([text], [onText]): typing reaches [onText],
+ * and a change from outside (a command put in, dictation, a draft given back) replaces the field's
+ * text with the cursor at its end, as [com.prudnikweb.hypernova.ui.components.rememberFieldValue]
+ * did for the field before it took pasted images.
+ */
+@Composable
+private fun rememberComposerField(text: String, onText: (String) -> Unit): TextFieldState {
+    val state = remember { TextFieldState(text) }
+    // The text this field last handed out (or was given): anything else in [text] came from outside.
+    val reported = remember { arrayOf(text) }
+    val latest by rememberUpdatedState(onText)
+    SideEffect {
+        if (text != reported[0]) {
+            reported[0] = text
+            if (state.text.toString() != text) state.setTextAndPlaceCursorAtEnd(text)
+        }
+    }
+    LaunchedEffect(state) {
+        snapshotFlow { state.text.toString() }.collect { if (it != reported[0]) { reported[0] = it; latest(it) } }
+    }
+    return state
+}
+
+/**
+ * How the box draws its text: the "/command" it starts with marked ([commands]; CommandHighlight's
+ * look), and dictation's [tail], the words that may still change, dim. Styles only: the text and
+ * its offsets stay as typed.
+ */
+private data class ComposerLook(val tail: IntRange?, val commands: Boolean) : OutputTransformation {
+    override fun TextFieldBuffer.transformOutput() {
+        if (commands) CommandRun.lead(asCharSequence().toString())?.let { addStyle(CommandHighlight.Lead, it.first, it.last + 1) }
+        val t = tail ?: return
+        val end = minOf(t.last + 1, length)
+        val start = t.first.coerceIn(0, end)
+        if (start < end) addStyle(SpanStyle(color = HN.inkMuted), start, end)
+    }
+}
+
+/**
+ * What the box takes when something is pasted or a keyboard inserts content: images go to
+ * [onImages] (data/Pasted.kt says which are), the rest (text) is pasted as text.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private fun pastedImages(resolver: android.content.ContentResolver, onImages: (List<android.net.Uri>) -> Unit): ReceiveContentListener = object : ReceiveContentListener {
+    override fun onReceive(transferableContent: TransferableContent): TransferableContent? {
+        if (!transferableContent.hasMediaType(MediaType.Image)) return transferableContent
+        val d = transferableContent.clipMetadata.clipDescription
+        val clip = (0 until d.mimeTypeCount).map { d.getMimeType(it) }
+        val images = ArrayList<android.net.Uri>()
+        val rest = transferableContent.consume { item ->
+            val uri = item.uri
+            if (uri != null && com.prudnikweb.hypernova.data.Pasted.isImage(runCatching { resolver.getType(uri) }.getOrNull(), clip)) { images += uri; true } else false
+        }
+        if (images.isNotEmpty()) onImages(images)
+        return rest
     }
 }
 
