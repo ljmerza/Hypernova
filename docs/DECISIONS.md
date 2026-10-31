@@ -2524,7 +2524,9 @@ widgets (2026-10-15)" above.
 The owner: "add an option to select All, and show me all servers combined into one view. In this
 combined view, if I open a new session, it asks me which server I want." His choice: Home only;
 History, Automations, Settings and Statistics keep working on one server and say which. Then: "I
-want to be able to select the session and see the details too."
+want to be able to select the session and see the details too." Later the same day History joined
+in (9): "history can be enabled because you can just search both and that's fine; automations
+that's fine to disable."
 
 1. **"All servers" first in the switcher**, only while two or more are paired. Chosen, it is kept on
    the phone (`ServerBook.all`) and survives restarts; picking one computer, or pairing a new one,
@@ -2550,7 +2552,22 @@ want to be able to select the session and see the details too."
 6. **New session asks which computer first**: every paired one with its link, only a linked one
    can be picked; then the New session sheet for it, its folders, models and providers. A
    launcher shortcut or Share keeps to the one picked.
-7. **The chip says "All"** on the Sessions tab, its moon the worst of their links; History,
+7. **The chip says "All"** on the Sessions and History tabs, its moon the worst of their links;
    Automations and Settings show the one picked last, the chip naming it; Statistics' subtitle
    names it. Switching tabs doesn't leave All.
 8. **Unchanged:** notifications, the widget, the chat screen; no daemon change.
+9. **History works in All servers; Automations doesn't.** History lists every computer's ended
+   sessions in one list, most recent first under its days, each row naming its computer in its
+   meta line (an automation's row after its name). Merged by time, not grouped by computer: the
+   days are History's own groups, and a computer's group would split each day in two. The search
+   and the project chips cover them all; each computer is asked for the words inside its own
+   conversations and its hits are merged only into its own; "Searching inside conversations…"
+   while any of them looks, "Partial results" when any ran out of time. An automation's runs fold
+   on each computer on its own (the same automation id on two is two rows). Opening a row, or an
+   automation's runs, makes that computer the one on screen, as a Home card does (`Core.visit`);
+   Back is All again. An offline computer's rows stay, dimmed and tagged `offline`, and still open;
+   a line under History's seam names the computers that are offline: their sessions are as last
+   seen and the words inside them aren't searched (`ui/home/AllHistory.kt`). One computer's
+   History is as it was. **Automations stays one server's**: its tab says "Automations are one
+   server's: pick a server to see them." and stays where it is, and choosing All from it brings
+   Sessions.
