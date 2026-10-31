@@ -13,7 +13,7 @@ x86_64 and arm64.
 **A Windows PC** runs the same service inside WSL 2 (Ubuntu) or in a Docker Desktop container:
 **experimental**, documented from Microsoft's and Docker's guides but not yet tried on a real Windows
 PC. The steps, what works and what doesn't, are in
-[INSTALL.md, "5. Windows (experimental)"](INSTALL.md#5-windows-experimental-wsl2-or-docker-desktop);
+[INSTALL.md, "4. Windows (experimental)"](INSTALL.md#4-windows-experimental-wsl2-or-docker-desktop);
 under WSL, `hypernova doctor`, `pair`, `lan` and `setup` say what differs there (systemd, keeping
 WSL running, no way in for the phone behind WSL's NAT unless its networking is mirrored).
 
@@ -103,7 +103,7 @@ docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped 
 | `hypernova doctor` | Every piece checked, each problem with the command that fixes it (`--json`). Exit 1 when something stops Hypernova working. With Codex alone, a missing Claude Code is only noted; with neither agent, it fails. |
 | `hypernova logs` | The daemon's log: the last 100 lines (`-n <lines>`), `-f` to follow, `--terminals` for the shared terminals' log. Both logs roll at 5 MB to `.1`. |
 | `hypernova lan on\|off` | The phone's direct route on the same network (below). |
-| `hypernova uninstall` | Removes the integration, the service, the command, the daemon and its Node. Paired phones and settings stay for a reinstall unless `--purge`. Claude Code, Codex and their logins stay, and so does lingering (other services of yours may use it; it says how to turn it off). `--purge` also gives up the private name. With no terminal it refuses unless you pass `--yes`. |
+| `hypernova uninstall` | Removes the integration, the service, the command, the daemon and its Node. Paired phones and settings stay for a reinstall unless `--purge`. Claude Code, Codex and their logins stay, and so does lingering (other services of yours may use it; it says how to turn it off). With no terminal it refuses unless you pass `--yes`. |
 | `hypernova run` | The daemon in the foreground, its log on the terminal too: what a container runs, and handy for debugging. |
 
 `hn ls` and `hn attach <id>` work as on the Mac (shared terminals, below).
@@ -151,11 +151,8 @@ The same as on a Mac (docs/PROTOCOL.md, "Transport and auth", "Local network (di
   route but health and pairing needs the phone's device certificate. On a Linux machine with a
   **public IPv4 address of its own** (a VPS) it is **off by default**: the phone is never on
   such a server's network, and the port would face the internet. `hypernova lan on` turns it on
-  anyway; `hypernova lan off` turns it off on a PC. No public name is used: the private name with a real certificate (docs/PROTOCOL.md, "A name on
-  the local network") is off unless a name service is configured (`nameServiceUrl` in
-  `settings.json`, or `HYPERNOVA_NAMES_URL`); there is none by default, so nothing is registered
-  or published anywhere. Configured, `hypernova pair` says so once, `hypernova name off` does
-  without it, and `hypernova uninstall` gives it up.
+  anyway; `hypernova lan off` turns it off on a PC. No name is registered or published anywhere: a
+  phone's browser opens the server's pages at its address, with the server's own certificate.
 - The admin token (`~/.local/share/hypernova/admin-token`, 0600) is for the local API and the
   `hypernova` command only.
 - Running as root works but `doctor` warns: Claude Code's sessions would have the whole server.

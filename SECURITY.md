@@ -22,7 +22,7 @@ Claude Code (and Codex, once you turn it on for Hypernova) that you have at the 
   listed but never read, shared or downloaded (`daemon/src/secretfiles.ts`).
 
 So a stolen or malware-infected paired phone is as serious as a stolen unlocked laptop. Forget a
-device from the Mac app (or `DELETE /local/devices/{id}`) and it is cut off at once, even on a
+device (`DELETE /local/devices/{id}` on the local API) and it is cut off at once, even on a
 connection that is already open. Pair only phones you own, and keep Tailscale's own access
 controls tight.
 
@@ -41,7 +41,7 @@ recognizer, so the audio never leaves the phone; provider keys go only to their 
 | --- | --- | --- | --- |
 | Phone API | `127.0.0.1:47321`, plain HTTP on loopback | Only this computer, plus your tailnet through `tailscale serve` (HTTPS with Tailscale's certificate). Never Tailscale Funnel, never the open internet | The `/v1` API, and the pairing, download and preview pages |
 | LAN listener | `0.0.0.0:47323`, HTTPS with mutual TLS (turn it off with the `lanAccess` setting) | Phones on the same network or hotspot | Exactly the phone API; never the Mac's local API |
-| Local API | `127.0.0.1:47322`, loopback only | The Mac app and Claude Code's hooks, on this computer | Setup, status, pairing, the testing checklist, `/hooks/*` |
+| Local API | `127.0.0.1:47322`, loopback only | The `hypernova` command and Claude Code's hooks, on this computer | Setup, status, pairing, the testing checklist, `/hooks/*` |
 
 Details that matter:
 
@@ -56,7 +56,7 @@ Details that matter:
   connection and time limits against a hostile Wi-Fi (32 connections per source, 64 in all,
   handshake in 10 s, headers in 15 s). Pairing on it is closed unless a code is being shown, and a
   source gets 5 wrong codes per 10 minutes.
-- **Local API.** Needs the **admin token**. The Mac's local port never sits behind the LAN
+- **Local API.** Needs the **admin token**. The local port never sits behind the LAN
   listener or `tailscale serve`, and the admin token counts for nothing on the LAN listener. The
   testing checklist page has its own key and refuses requests from other sites.
 - **Hooks.** Claude Code's hooks post to `/hooks/<secret>` on the local API; any other path is a
@@ -65,8 +65,8 @@ Details that matter:
 
 ## Secrets: what they are, where they live
 
-Everything lives in the support folder (on a Mac, `~/Library/Application Support/Hypernova`; on
-Linux, XDG's data folder), created `0700`, with each secret file `0600`.
+Everything lives in the support folder (`~/.local/share/hypernova`, XDG's data folder),
+created `0700`, with each secret file `0600`.
 
 - **Device tokens.** Made at pairing, 256 bits of randomness, handed to the phone once. The daemon
   keeps only the SHA-256 of each (`devices.json`) and compares in constant time.
@@ -77,12 +77,12 @@ Linux, XDG's data folder), created `0700`, with each secret file `0600`.
   the fingerprint of each device's certificate. One active certificate per device; a new one
   replaces the old at once.
 - **Admin token** (`admin-token`) and **hook secret** (`hook-secret`): random, per install, used
-  by the Mac app and the hooks. Anyone who can read them can drive the local API, which is why
+  by the `hypernova` command and the hooks. Anyone who can read them can drive the local API, which is why
   the folder is private to your user.
 - **Provider keys.** Stored in the support folder, readable by your user only. They are
   never sent to the phone (the phone sees only "has a key"), and only go to their own provider.
-  They are not in the Keychain today; treat the support folder as secret.
-- **Never logged** (`~/Library/Logs/Hypernova/daemon.log`): tokens, pairing codes, the admin token,
+  Treat the support folder as secret.
+- **Never logged** (`~/.local/state/hypernova/logs/daemon.log`): tokens, pairing codes, the admin token,
   provider keys, the text read aloud, Claude sign-in codes, and the output
   of Claude's account commands. Tests check several of these (for example "the key and the text
   never reach the log"). The log does name devices, projects and what happened, so look through it

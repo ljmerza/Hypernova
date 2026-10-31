@@ -1,7 +1,9 @@
 # Hypernova protocol (v1)
 
-The contract between the Mac daemon and its clients: the Android app and the Mac menu bar app.
-The daemon is the source of truth. All JSON is UTF-8, camelCase, and clients
+The contract between the daemon and its clients: the Android app, and the `hypernova` command on
+the server (docs/LINUX.md). "The Mac app" below is a macOS menu bar client that is no longer in
+this repository; the daemon still answers its routes (the admin-token feed, Mac-only features on a
+Mac), so they stay documented. The daemon is the source of truth. All JSON is UTF-8, camelCase, and clients
 must ignore unknown fields and unknown enum values (show them generically).
 
 ## Architecture in one picture
@@ -9,7 +11,7 @@ must ignore unknown fields and unknown enum values (show them generically).
 ```
  Android app ──https, pinned + device cert (Wi-Fi/VPN)▶ daemon LAN  0.0.0.0:47323 (the same API)
  (development: the emulator ──http 10.0.2.2──────────▶ daemon API  127.0.0.1:47321)
- Mac menu bar app ──http loopback + admin token──────▶ daemon local 127.0.0.1:47322
+ hypernova command ──http loopback + admin token─────▶ daemon local 127.0.0.1:47322
  Claude Code hooks (http hooks) ─────────────────────▶ daemon local /hooks/*
  Status line tee (marked block) ─▶ files in <support>/statusline/ ◀── daemon watches
  Holder (one per shared terminal) ──PTY──▶ claude (the real terminal UI)
@@ -18,8 +20,9 @@ must ignore unknown fields and unknown enum values (show them generically).
  Daemon ──Agent SDK──▶ claude (fallback for phone sessions when shared terminals can't run)
 ```
 
-- `<support>` is `~/Library/Application Support/Hypernova` (0700). Logs go to
-  `~/Library/Logs/Hypernova/daemon.log`.
+- `<support>` is `~/.local/share/hypernova` on Linux (`~/Library/Application Support/Hypernova`
+  on a Mac), 0700. Logs go to `~/.local/state/hypernova/logs/daemon.log`
+  (`~/Library/Logs/Hypernova/daemon.log`).
 - **Shared terminals** (see that section): interactive Claude Code running in a
   detached holder process. `claude` typed in a terminal starts one (through the
   shell function the integration installs), and so does every session started
@@ -62,7 +65,7 @@ must ignore unknown fields and unknown enum values (show them generically).
 
 ## Pairing
 
-1. The Mac app (or `hypernova pair` on Linux) calls `POST /local/pair/start` and shows a QR code
+1. `hypernova pair` calls `POST /local/pair/start` and shows a QR code
    of its `link`. **Pairing is local only** (since 2026-10-30; docs/DECISIONS.md, "Pairing is local
    only"): every link points at the computer itself on its own network, nothing public. While the
    LAN listener is on, `link` is the computer's own pairing page on it, `webLink`,
@@ -117,8 +120,8 @@ must ignore unknown fields and unknown enum values (show them generically).
 
 The daemon also serves the app, to install or update it: `GET /download/android`
 (no auth; on the local listener too, see Local network (direct HTTPS)) is a page with the version, a Download button and
-the install steps; the APK itself is `GET /download/android/Hypernova.apk`. The Mac app
-shows a "Get the app" QR code pointing at `<u>/download/android`.
+the install steps; the APK itself is `GET /download/android/Hypernova.apk`. `hypernova pair`
+prints that page's address (or the release's, when the server carries no APK).
 
 ### The app update
 
@@ -269,154 +272,15 @@ source filter, the addresses, the pairing limits) and `daemon/src/tls.ts` (the c
   query on the paired base URL `u` (preview tokens and the checklist's key aren't bound to a
   host).
 
-## A name on the local network (off unless configured)
+## A name on the local network (removed)
 
-**Off by default since 2026-10-30** (docs/DECISIONS.md, "Pairing is local only"): there is no name
-service unless one is configured, the `nameServiceUrl` setting or `HYPERNOVA_NAMES_URL`; unset, it
-is no longer `https://api.hypernova.observer`. With none, nothing below runs (`name.state` is `off`,
-its reason says so, `hypernova pair` says nothing about a name), and the links use the address.
-The pairing links never use the name, configured or not. What follows is how it works once
-configured.
-
-A phone's browser can't vouch for the LAN listener's own certificate, so the "Get the app" page
-at `https://192.168.x.y:47323/…` opens behind "Your connection is not private". The daemon
-therefore keeps a private name for itself, `l-<random>.<domain>` under the name service's domain, pointing at its
-Wi-Fi address while a code is shown, with a Let's Encrypt certificate for it; the same page at
-`https://l-<random>.<domain>:47323/download/android` opens with no warning. Only
-browser pages use the name: **the phone app never does**; it keeps the pinned IP route and its
-device certificate exactly as above. `daemon/src/names.ts` (the name), `daemon/src/acme.ts`
-(ACME), `names/` (the name service, its API and security model).
-
-- **Only after the user was told, and only while a code is shown:** nothing is registered,
-  published or certified (and no ACME account made, so no terms accepted) until the user has been
-  shown what the private name is and that Let's Encrypt's terms are accepted for it: Setup's phone
-  step sets the `nameTermsShown` setting when it puts that line on screen, and `hypernova pair` (or
-  `setup`) when it prints it. Then only while a code that uses the name is on screen: Setup's
-  phone step polls `GET /local/status?qr=1`, and a pairing code made with `POST
-  /local/pair/start?name=1` (Setup's and `hypernova pair`'s) counts until it expires; the menu
-  bar's pairing code doesn't (its QR never uses the name). A code shown while the name was off,
-  or before the line was shown, never counts later; turning the name off forgets the codes shown
-  before. The first time, the name is registered and its first certificate asked for (so a Mac
-  that never shows such a code costs Let's Encrypt's per-domain quota nothing); the links show the
-  IP address until the name is ready, then switch. **Thirty minutes after the last such moment
-  the address record is withdrawn** (`PUT /address` with no addresses), as soon as the name
-  service can be reached (a back-off after a failure is waited out first); the name and its
-  certificate stay, renewals need only the challenge record, and the next code publishes the
-  address again. A round asked for while one runs (a code shown, an address change) follows it
-  at once.
-- **The name:** an Ed25519 key made once registers a random name with the name service
-  (the configured `nameServiceUrl` or `HYPERNOVA_NAMES_URL`, none by default; changing it
-  gives the old name up with the old service first). The reply is checked: a plain name, under
-  the expected domain (`api.<domain>` serves `<domain>`; `HYPERNOVA_NAMES_DOMAIN` otherwise), and
-  `<name>.<domain>`, `l-<name>.<domain>` exactly; anything else is refused unstored. The service
-  is called with no redirects followed, 20 s per call, replies read up to 64 KB, its messages
-  cut and stripped of control characters before they reach the status or the log. While a code
-  is shown the daemon publishes `l-<name>` → the one address the download link uses (the
-  Wi-Fi's: IPv4, not a `.1` when there's another), 15 s after the address changes (the
-  interfaces are re-read every 5 s), with `"public": false`, so **no public record** is made. A
-  service that publishes one anyway (it predates the option) gets the name given up at once,
-  before any certificate puts it in the logs, and `/local/status` says to redeploy the service;
-  nothing more until the setting is turned off and on, or a restart. With no Wi-Fi address it
-  calls nothing.
-- **The certificate:** for `l-<name>` from Let's Encrypt by DNS-01: the challenge's TXT record
-  is published and removed through the name service (`PUT`/`DELETE /v1/names/<name>/acme`), and
-  the CA is asked to look only once the zone's own name servers answer with it. Every address
-  the CA hands out must be on its directory's own host, and only the requested name is ever
-  challenged; each request has 30 s in all. A fresh EC P-256 key per certificate; renewed from
-  30 days before it runs out (a third of the lifetime for a shorter one). The ACME account is an
-  EC P-256 key with no contact address; creating it accepts **Let's Encrypt's terms
-  (https://letsencrypt.org/repository/) on the user's behalf**: Setup's phone step says so next
-  to the switch "Use a private name for this Mac", and `hypernova pair` (or `setup`) says it
-  once on Linux, with `hypernova name off`. The CA: `HYPERNOVA_ACME_DIRECTORY` or the
-  `acmeDirectory` setting (`staging`, `production` or a directory URL); **production by
-  default** (the first real run, on the owner's Mac on 2026-10-18, used staging). Staging's
-  certificates aren't trusted by browsers, so with them the links keep the address (the listener
-  still serves the certificate by name, for a test).
-- **When the links use the name:** the setting is on, the listener is on, a code is shown, there's
-  a Wi-Fi address, it is the one published, the certificate covers the name, is in date and
-  chains to a root browsers trust, and **this computer's resolver finds the name at that
-  address** (checked 30 s after publishing, then every 10 minutes while it's published): routers
-  with DNS rebind protection hide private addresses behind public names, and on such a network
-  the name would lead nowhere. Otherwise the links use the address and the self-signed
-  certificate, as before.
-- **The listener:** the port's own listener reads each connection's TLS ClientHello for its server
-  name (SNI). A connection naming the daemon's name, while it has a certificate, goes to a TLS
-  server with that certificate that **asks for no client certificate** (Chrome on Android shows a
-  certificate picker for that); everything else (no name: an IP address, as the app connects; any
-  other name; not TLS) goes to the pinned listener above, unchanged. **Through the name only
-  `GET /download/android`, `GET /download/android/Hypernova.apk` and `GET /pair` for a pairing
-  code being shown answer**; everything else is 404, with no CORS or Private Network Access
-  headers, so a web page that knows the name can neither read anything nor spend the pairing
-  endpoint's wrong-code tries. The pairing page's links go to the name and port, never to a host
-  the request names.
-- **The pages and links:** whenever the name works, `download` (`POST /local/pair/start`) and
-  `downloadUrl` (`/local/status`) are `https://l-<name>.<domain>:<port>/download/android`:
-  a brand-new phone on the same Wi-Fi opens it with no app yet. `downloadAnywhere` is then an
-  https base URL's own download page (null with the usual base, whose certificate is the
-  computer's own). The pairing page through the name still answers for a code being shown;
-  it hands the app the code's usual route: `u` is the base URL, never the name, plus `fp`, `lan` and `lp`.
-  The download page through the name has no checksum warning (the Mac still shows the checksum,
-  quietly). No pairing link (`link`, `webLink`, `appLink`) ever uses the name: they are the
-  listener at its address (see Pairing). `downloadTrusted` is false for a plain-http base too.
-- **Fallbacks:** the service or the CA unreachable, a rate limit, a failed check, no Wi-Fi
-  address: the links keep the address, and `/local/status` says why. A `429` waits as long as its
-  `Retry-After` says (at least a minute); no answer doubles from a minute (the service) or five
-  (the CA) up to an hour or six; a failed DNS check doubles from an hour up to a day (Let's
-  Encrypt allows five failures per name an hour); a refusal from 15 minutes; a clock more than
-  five minutes off (the service refuses signed requests) waits an hour. A name the service no
-  longer knows is registered again, with a new certificate.
-- **`GET /local/status`** gains `downloadTrusted` (false for the listener at its address, whose
-  certificate is self-signed: compare the checksum), `downloadAnywhere` and `name` (also `GET
-  /local/name`): `{enabled, setting, state: "off"|"idle"|"working"|"waiting"|"ready", name, host,
-  address, showing, resolves: boolean|null, certificate: {expiresAt, renewsAt, trusted,
-  directory: "production"|"staging"|"custom"}|null, inUse, reason, lastError: {at,
-  message}|null, nextAttemptAt, service, terms, termsShown}` (times epoch ms; `setting`: the
-  switch; `address`: while published, else null; `showing`: a code is or was in the last 30
-  minutes shown; `reason`: why the links don't use the name, in plain words, or "In use." (a
-  name whose release hasn't got through comes first, whatever the setting); `terms`: Let's
-  Encrypt's; `termsShown`: the user has been told). `?qr=1` says a code is on screen.
-- **Settings:** `POST /local/settings {nameService: boolean}` (default on): off gives the name up
-  at once and the reply carries `nameRelease: {released, name, waited?}` (when there was a name):
-  the records leave DNS only when `released`; otherwise the key is kept and the release retried,
-  and the Mac's switch and `hypernova name off` say so. On makes a new name when a code is next
-  shown. `{nameTermsShown: true}`: the user has been told (Setup, `hypernova pair`). `{acmeDirectory:
-  "staging"|"production"|<url>|null}`: a name that has a certificate gets one from the new CA at
-  once, with no code shown (that's how staging is swapped for production). **`POST
-  /local/name/release`** →
-  `{released, name, waited?}`: the uninstall's step (the Mac app's and `hypernova uninstall`). A
-  round in progress (a DNS wait can take two minutes) is stopped and waited for 5 s at most, so
-  the answer comes within about 25 s; `waited`: it was still going. When the service can't be
-  reached the key is kept, marked, and the release tried again (with back-off, and by the next
-  start); the Mac app and the command say so. Nothing is registered again until the daemon
-  restarts or the setting is turned on. `hypernova name on|off` on Linux.
-- **Stored** in `<support>/names/` (0700), every file 0600: `name.json` (the name and its Ed25519
-  key), `acme.json` (the account key and account URLs), `certificate.json` (the chain and its
-  key), `state.json` (what was published, when a code was last shown, back-off). Keys never
-  reach the log.
-- **A test daemon** (`HYPERNOVA_SUPPORT`) registers nothing unless `HYPERNOVA_NAMES_URL` says
-  where (`off` turns it off anywhere). For tests also `HYPERNOVA_ACME_CA` (a PEM the ACME
-  server's HTTPS chains to), `HYPERNOVA_NAMES_DNS` (`host:port` servers to check records on) and
-  `HYPERNOVA_NAMES_ROOTS` (more roots to count as trusted).
-- **Privacy:** what's public: **the name, for ever, in Certificate Transparency logs** with the
-  times its certificates were issued (every certificate is logged); and **the Mac's private
-  Wi-Fi address under `l-<name>` in DNS while a code is shown and for 30 minutes after**, longer
-  only when the daemon can't withdraw it: while the name service can't be reached (until a
-  back-off runs out), or when the daemon isn't running at that moment (the Mac asleep or shut
-  down, the daemon stopped or removed): the record then stays until the daemon next runs, and
-  after an uninstall whose release didn't get through, until the service drops names unused for
-  90 days. No public address is published. The name is random and says nothing about its owner;
-  a private address can't be reached from outside the network. What answers on port 47323 to
-  anyone on the same network (a café's Wi-Fi, say), with no device certificate: **at the IP
-  address**, `GET /download/android` and its APK, `GET /v1/health` (with this computer's name),
-  and the pairing endpoints (`POST /v1/pair`,
-  closed while no code is shown and limited to 5 wrong codes per source address, and `POST
-  /v1/device/cert`, which needs a paired device's token); **by name**, only the download page,
-  the APK and a shown code's pairing page. Every other route needs a paired device's
-  certificate. Turning the setting off removes the records when its release gets through (it's
-  retried otherwise, and said); the log entries stay.
-- **Linux:** the same code, its files under the XDG data folder (platform.ts). On a server with a
-  public address of its own the listener is off by default, so no name is registered; a public
-  name for a VPS (`<name>` → its own address, direct HTTPS) is for later (LATER L59).
+(Until 2026-10-30 this place described an optional private name, `l-<random>.<domain>` from a
+name service with a Let's Encrypt certificate, for the browser's download page. It is gone from
+the daemon (`names.ts`, `acme.ts`, `hypernova name`, `/local/name*`, the `nameService`,
+`nameServiceUrl`, `nameTermsShown` and `acmeDirectory` settings): every page a phone's browser
+opens is the LAN listener at an address, with its own certificate, and the page says to compare
+the APK's checksum. A settings file from before keeps those keys, unread; `<support>/names/` is
+left on disk.)
 
 ## The route
 
@@ -3442,17 +3306,16 @@ SearchHit = {
   other failure, leaves the phone's own filter alone. Tests: `test/search.test.ts`, Android
   `HistorySearchTest`.
 
-## Mac app local API (127.0.0.1:47322, `Authorization: Bearer <admin token>`)
+## Local API (127.0.0.1:47322, `Authorization: Bearer <admin token>`)
 
-The admin token is in `<support>/admin-token` (0600); the Mac app reads it.
+The admin token is in `<support>/admin-token` (0600); the `hypernova` command reads it.
 
 | Method & path | Purpose |
 |---|---|
-| `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, downloadAnywhere, apk, name}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`, `downloadAnywhere` and `name`: see A name on the local network) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started) |
-| `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download}` (see Pairing; `link`, what the QR code carries, is `webLink`, the listener's own pairing page at the computer's address, or `appLink` while the listener is off; `url` is the base URL `u`, that listener). `?dev`: the emulator's base URL and the app link. `?name`: the code is shown where its download link may use the private name (Setup, `hypernova pair`), so it counts for the name until it expires (see A name on the local network); the menu bar's code leaves it out |
+| `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, apk}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`: false for the listener's own address, whose certificate a browser can't check) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started) |
+| `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download}` (see Pairing; `link`, what the QR code carries, is `webLink`, the listener's own pairing page at the computer's address, or `appLink` while the listener is off; `url` is the base URL `u`, that listener). `?dev`: the emulator's base URL and the app link |
 | `POST /local/automations/{id}/fire` | the payload (≤ 64 KB, text) → `{run}`: fires an automation's webhook trigger. Takes `Authorization: Bearer <that automation's fire token>` (or the admin token): the one `/local` route that does. 401 `bad_token`; 409 `paused`, `off`, `not_webhook`; 413, 415 (see Automations, "Workflows") |
-| `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, nameService?: boolean, acmeDirectory?: "staging" \| "production" \| url \| null, browseOutsideProjects?: boolean, codex?: boolean}` (`projectsRoot` kept only when that folder exists; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `nameService` and `acmeDirectory`, see A name on the local network; `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex) → the settings |
-| `GET /local/name`, `POST /local/name/release` | the name's state (as `/local/status`'s `name`); giving it up before an uninstall → `{released, name, waited?}` (see A name on the local network). `GET /local/status?qr=1`: a download or pairing code is on screen |
+| `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, browseOutsideProjects?: boolean, codex?: boolean}` (`projectsRoot` kept only when that folder exists; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex) → the settings |
 | `POST /local/integration/install` / `uninstall` | hooks + status line tee + the `claude` shell function (reversible, marked) |
 | `GET /local/devices`, `DELETE /local/devices/{id}` | paired phones: `{id, name, model, createdAt, lastSeenAt, appVersion?, client?, certFingerprint?, certExpiresAt?}` (`certFingerprint`: its device certificate's, once it has one, and `certExpiresAt` when that runs out, epoch ms). Deleting one revokes its certificate too |
 | `/v1/*` | the whole phone API is also available with the admin token |

@@ -1937,3 +1937,25 @@ The phone offered a reasoning effort only for Codex. The owner chose both places
 3. **What it shows** is what Claude Code's status line says (it reports the level, default or not),
    else what the session was started with or last set to.
 4. **Nothing new on the session's own screen** (owner): not in the chat, not in its header.
+
+## No name service, Mac app or website (2026-10-30)
+
+The owner: remove the visible ties to the project this one started from; a Linux server and the
+Android app, local only. The entries above about the Mac app, the name service
+(`hypernova.observer`), its App Links and the project website stay as history.
+
+1. **Removed from the repository:** `mac/` (the menu bar app), `names/` (the name service's
+   Worker), `site/` (the website), their workflows (`mac.yml`, `names.yml`) and
+   `scripts/release.sh` (it built the Mac app's disk image and the glasses' package). Releases are
+   `android-release.yml` alone (docs/RELEASING.md).
+2. **Removed from the daemon:** the private name and its certificate (`names.ts`,
+   `names-client.ts`, `acme.ts`), `hypernova name`, `/local/name` and `/local/name/release`,
+   `/local/status`'s `name` and `downloadAnywhere`, `?name` on `/local/pair/start`, and the
+   `nameService`, `nameTermsShown`, `nameServiceUrl` and `acmeDirectory` settings (with
+   `HYPERNOVA_NAMES_URL` and `HYPERNOVA_ACME_*`). The LAN listener no longer reads the TLS
+   ClientHello for a name: every connection goes to the pinned server, as before for an address.
+   An older `settings.json` keeps those keys, unread, and `<support>/names/` stays on disk.
+3. **Kept:** the licence, `NOTICE` and the third-party notices; the package name
+   `com.prudnikweb.hypernova` (in-app updates depend on it); the app still reads a pasted
+   `hypernova.observer/pair#…` link from an older computer, from its fragment, fetching nothing.
+4. **Links** in the app, the daemon and the docs point at `https://github.com/ljmerza/Hypernova`.
