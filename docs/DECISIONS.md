@@ -1686,7 +1686,9 @@ The owner removed the third-party (cloud) voice, Soniox, and kept the voice that
 phone. The entries above about Soniox and Hyperscribe Companion stay as history.
 
 1. **Dictation is the phone's own, always:** the mic uses Android's on-device recognizer
-   (`PhoneDictation.kt`, from 2026-10-29); a phone without one has no mic. Gone: speech to text
+   (`PhoneDictation.kt`, from 2026-10-29); a phone without one has no mic. (Refined 2026-10-31,
+   "The phone's recognizer for dictation": the phone's default recognizer by default, on-device as
+   a setting.) Gone: speech to text
    through the Mac (`stt.ts`, `/v1/stt*`, the snapshot's `stt`, `{t:"stt"}`), the Hyperscribe
    Companion route (`/v1/speech/companion`), the phone's streaming of its microphone, and Settings →
    Voice (the Soniox key, Language, Headset microphone).
@@ -2221,3 +2223,27 @@ Idea NT4: a `claude agents` job that crashed or ended on an error just showed as
    toggle: the others have none either.
 4. **Home's Completed card says `Stopped with an error`** in the danger colour as its line
    (`Session.died`), no new row; the session's chat shows nothing (no clutter there).
+
+## The phone's recognizer for dictation (2026-10-31)
+
+The on-device recognizer heard noticeably worse than the keyboard's voice typing. The owner chose a
+setting, defaulting to the keyboard's recognizer. This refines "Voice stays on the phone"
+(2026-10-30): dictation's audio still never goes to the Mac, and no cloud voice of Hypernova's own
+comes back, but by default the phone's own recognizer may send it to Google, as the keyboard does.
+
+1. **Settings → Voice → Voice recognition: Phone's recognizer | On-device only**, default Phone's
+   recognizer, kept on the phone (`VoicePrefs`), from the next dictation on. One line says where the
+   audio goes: "Phone's recognizer: as your keyboard's voice typing, may use Google's servers.
+   On-device only: never leaves the phone, less accurate." Nothing new on the chat screen.
+2. **Phone's recognizer** is `SpeechRecognizer.createSpeechRecognizer` (the default recognition
+   service, normally Google's), without `EXTRA_PREFER_OFFLINE`. **On-device only** is
+   `createOnDeviceSpeechRecognizer` with it, as before. Everything else is as it was: partial
+   results (the dim live words), 4 s of quiet, no language set (the recognizer's own), Send while
+   dictating, the errors.
+3. **Fallbacks** (`DictationChoice.engine`): Phone's recognizer with no default service uses
+   on-device. On-device only with no on-device recognizer has no mic ("Dictation isn't available on
+   this phone."); it never falls back to the phone's recognizer, which would break its "never leaves
+   the phone". Neither: no mic, as before.
+4. **Both, from Android 13:** `EXTRA_ENABLE_FORMATTING` = `FORMATTING_OPTIMIZE_QUALITY` (punctuation
+   and capitals, tuned for quality over speed) and `EXTRA_MASK_OFFENSIVE_WORDS` = false (words as
+   said). Older Android gets neither. Whether a recognizer honours them is its own affair.

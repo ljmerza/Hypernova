@@ -54,7 +54,8 @@ Settings → Agents & providers → Claude Code in the app turns it off.
 
 The phone API only listens on the server itself and is reached through a mutual-TLS listener on
 your network (port `47323`), with a certificate and token per paired phone. Provider keys never
-leave the server and voice stays on the phone. The full threat model is in
+leave the server, and dictation uses your phone's speech recognizer (as your keyboard's voice
+typing does), or on-device only if you choose. The full threat model is in
 [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md).
 
 ## Develop
