@@ -2,6 +2,7 @@
 // text frames over a unix socket (docs/specs/codex-app-server.md).
 import WebSocket from 'ws'
 import { connect } from 'node:net'
+import { VERSION } from '../util.ts'
 
 /**
  * A WebSocket over a unix socket. A `ws+unix:` URL would percent-encode the space in macOS's
@@ -62,7 +63,7 @@ export class CodexRpc {
       ws.once('open', resolve)
       ws.once('error', reject)
     })
-    const init = await this.call('initialize', { clientInfo: { name: 'hypernova', title: 'Hypernova', version: '0.2.0' }, capabilities: { experimentalApi: true } }, 10_000)
+    const init = await this.call('initialize', { clientInfo: { name: 'hypernova', title: 'Hypernova', version: VERSION }, capabilities: { experimentalApi: true } }, 10_000)
     this.send({ method: 'initialized' })
     return init
   }

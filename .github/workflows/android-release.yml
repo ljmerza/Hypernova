@@ -99,6 +99,8 @@ jobs:
       # dist/linux/hypernova-<version>.tar.gz, is the script's last line.
       - name: Linux server package
         run: |
+          # The daemon reports the release it is (daemon/src/util.ts reads its package.json).
+          (cd ../daemon && npm pkg set version="$VERSION")
           tgz=$(../scripts/pack-linux.sh | tail -1)
           test -s "$tgz"
           echo "SERVER_TGZ=$tgz" >> "$GITHUB_ENV"

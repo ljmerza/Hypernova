@@ -22,7 +22,17 @@ export const LOGS = PLACES.logs
 export const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR ?? join(HOME, '.claude')
 export const API_PORT = Number(process.env.HYPERNOVA_API_PORT ?? 47321)
 export const LOCAL_PORT = Number(process.env.HYPERNOVA_LOCAL_PORT ?? 47322)
-export const VERSION = '0.2.0'
+// The daemon's own package.json: the release build stamps the release's version into it
+// (.github/workflows/android-release.yml), so `hypernova --version` and the snapshot say the
+// release a server runs.
+export const VERSION: string = (() => {
+  try {
+    const v = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8')).version
+    return typeof v === 'string' && v ? v : '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+})()
 export const PROTOCOL = 1
 
 mkdirSync(SUPPORT, { recursive: true, mode: 0o700 })
