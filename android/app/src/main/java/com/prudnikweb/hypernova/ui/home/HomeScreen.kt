@@ -864,6 +864,10 @@ fun SessionCard(
                 // Working: the to-do under way ("Running the tests 3/7"), else what it does now, and
                 // "for 12 min" since its turn began (CardNow.kt).
                 WorkingNow(s)
+            } else if (s.diedLine) {
+                // Its `claude agents` job died (a crash, an error exit): said plainly, in place of its
+                // last words (data/JobDied.kt). Its chat shows nothing of it.
+                HText(stringResource(R.string.card_job_died), style = Type.monoSmall, color = HN.danger, maxLines = 1)
             } else HText(s.activity, style = Type.monoSmall, color = if (needs) HN.amber else HN.inkMuted, maxLines = 1)
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

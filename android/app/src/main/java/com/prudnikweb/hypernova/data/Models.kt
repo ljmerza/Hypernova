@@ -84,6 +84,8 @@ data class Session(
      * Session.agentOutdated): the session sheet says so, and Restart (`claude respawn`) is offered.
      */
     val agentOutdated: OutdatedClaude? = null,
+    /** Its `claude agents` job died (docs/PROTOCOL.md, Session.died): Home's Completed card says it stopped with an error. */
+    val died: Boolean = false,
     /** A `claude agents` job asked the owner something in words (docs/PROTOCOL.md, "Session menu"): a reply in the box answers it. */
     val question: String? = null,
     /** Calls refused without the owner, not yet retried or dismissed: its blocked calls (data/Blocked.kt). */
@@ -114,6 +116,12 @@ data class Session(
      * background notification, the widgets and the chat's status bar all ask this.
      */
     val busy: Boolean get() = phase != Phase.Ended && state != SessionState.NeedsYou && (state == SessionState.Working || agentsRunning > 0)
+
+    /**
+     * Its card's line says "Stopped with an error" in the danger colour, in place of its last words:
+     * a job that died ([died]) and rests in Completed (not at work again, not waiting on the owner).
+     */
+    val diedLine: Boolean get() = died && phase != Phase.Ended && state != SessionState.NeedsYou && !busy
 
     /** How long it has run, start to last activity, in minutes (0 if unknown). */
     val lengthMin: Float get() = if (createdAt <= 0L) 0f else ((updatedAt - createdAt).coerceAtLeast(0L) / 60_000f)

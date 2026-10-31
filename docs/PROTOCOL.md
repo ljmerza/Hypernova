@@ -442,6 +442,10 @@ objects with a `t` field:
 - `{t:"session", session: Session}` a session was added or changed.
 - `{t:"session.removed", id}`: a session deleted for good (a `claude agents` job deleted from the
   Home card's menu, "Session menu"). A session that ends comes as `session` with `state: "ended"`.
+- `{t:"job.died", sessionId, job, reason: string | null, at}`: a `claude agents` job died (a crash,
+  an error exit, its process gone mid-turn, an API error that ended it), once per death; `reason` is
+  Claude Code's, masked, at most 120 characters; `at` epoch ms (see Session menu, "A job that died").
+  Its `session` (with `died`) comes first. Clients that don't know it ignore it.
 - `{t:"event", sessionId, event: Event}` a new or updated event (same `id`
   replaces the previous version; `assistant` text grows while streaming, and a command
   event comes again with `command.kind: "skill"` once its skill's body is read).
@@ -577,6 +581,10 @@ Session = {
                               // installed ("2.1.312", "2.1.314"): `version` in its registry entry against the file
                               // `claude` resolves to (versions/<version>; else `claude --version`, once per install).
                               // Absent otherwise and for a job with no process. Restart: see Session menu
+  died?: {reason: string | null},  // a `claude agents` job Claude Code marked failed: it died, with why in its
+                              // words (null when it doesn't say). Until it works again or is deleted; absent
+                              // otherwise and from an older daemon. Home's Completed card says it (see Session
+                              // menu, "A job that died")
   contextPct: number | null, costUsd: number | null,
   queue: [{id, text, files?: Attachment[], at, clientId: string | null}],
                               // prompts waiting until Claude can take them, oldest first: Claude Code's
@@ -948,6 +956,23 @@ Agents & providers → Claude Code); the daemon takes it without a restart (each
   `not_agents` without settings.claudeAgents. It answers once all are done (up to half a minute
   each), so the phone waits up to two minutes. Home shows "N jobs run an older Claude Code" with
   Restart all (asked first: a job at work is interrupted), swiped away until another job falls behind.
+
+**A job that died** (`daemon/src/job-deaths.ts`). Claude Code's job state file
+(`~/.claude/jobs/<job>/state.json`) ends `done` (finished), `stopped` (`claude stop`, a signal) or
+`failed` (died: crash, error exit, process gone mid-turn, an API error, Claude giving up), with the
+reason in `detail` (seen in Claude Code 2.1.316). The daemon reads it for each job the list doesn't
+show `working` or `blocked` (again only when the file changes) and takes `failed` from either.
+- The session has `died: {reason}` while the job is failed; it goes when the job works again.
+- `{t:"job.died"}` (see WebSocket) when a job last seen alive is failed now, once. Each job's last
+  state is kept in `<support>/job-states.json`, so a restart of the daemon doesn't repeat an old
+  death and does say one that came while it was down; a job first seen already failed says nothing.
+- Never for the owner's doing: a job stopped, deleted or restarted through these routes in the last
+  minute isn't a death, whatever it ends as; `claude rm` takes it off the list.
+- A failed job whose detail ends `; respawning` (Claude Code starts it again) is said only if it's
+  still failed a minute later.
+- The phone: a banner, or a notification in Session updates (as a session stopping on an error:
+  "<name> stopped on an error", the reason under it, a tap opens it); the Completed card's line
+  `Stopped with an error` in red. Nothing in the chat.
 
 ## Blocked calls
 

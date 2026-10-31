@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { findClaude, log, trimText } from './util.ts'
 import { saveSettings, settings } from './store.ts'
 import { applyAgentList, type AgentJob } from './hub.ts'
+import { deaths } from './job-deaths.ts'
 
 /**
  * Settings → Claude Code → Sessions in claude agents (`POST /v1/claude {agents}`), or `hypernova
@@ -65,6 +66,8 @@ export function parseAgentList(out: string): AgentJob[] | null {
 export function agentJobCommand(verb: 'stop' | 'rm' | 'respawn', job: string): Promise<{ ok: boolean; said: string }> {
   const file = findClaude()
   if (!file) return Promise.resolve({ ok: false, said: 'Claude Code isn’t installed on this computer.' })
+  // The owner's doing: however the job ends now, it didn't die (job-deaths.ts).
+  deaths.ownerActed(job)
   return new Promise((done) =>
     execFile(file, [verb, job], { timeout: 30_000 }, (e, out, err) => {
       const said = trimText(`${out}\n${err}`.trim(), 400) ?? ''

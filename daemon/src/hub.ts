@@ -22,6 +22,7 @@ import { blockedCount, forgetBlocked, noteBlocked, onBlockedChange, sawToolResul
 import { heldView, type HeldView } from './held.ts'
 import { TODO_TOOLS, todoNow, type TodoNow } from './todos.ts'
 import { ruleString, type AlwaysChoice, type AlwaysScope } from './always.ts'
+import { deaths, jobEnd, type JobSeen } from './job-deaths.ts'
 
 export type SessionState = 'starting' | 'working' | 'needs_you' | 'idle' | 'error' | 'ended'
 export type Session = {
@@ -108,6 +109,12 @@ export type Session = {
    * `claude respawn` puts it on the new one. Absent otherwise, and for a job with no process.
    */
   agentOutdated?: { runs: string; installed: string }
+  /**
+   * A `claude agents` job Claude Code marked failed (job-deaths.ts): it died (a crash, an error exit,
+   * its process gone mid-turn, an API error that ended it), with why in Claude Code's words when it
+   * says. Until it works again or is deleted. Absent otherwise. Home's Completed card says it.
+   */
+  died?: { reason: string | null }
   /** Calls refused without the owner that he hasn't retried or dismissed (blocked.ts): its Blocked tab. */
   blockedCalls: number
   /**
@@ -124,7 +131,7 @@ export type Session = {
    */
   todo?: TodoNow | null
 }
-type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'agentRunning' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
+type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'agentRunning' | 'died' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
 export const isCodexRec = (r: { agent?: string }) => r.agent === 'codex'
 
@@ -270,7 +277,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null }
+  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), ...(agentDied.has(r.id) ? { died: { reason: agentDied.get(r.id) ?? null } } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
@@ -1484,6 +1491,8 @@ export type AgentJob = { id: string; sessionId: string; cwd: string; name?: stri
 
 /** Each listed job's state there ("working", "blocked", "done"), by session id: the list `claude agents` shows. */
 const agentStates = new Map<string, string>()
+/** Jobs Claude Code marked failed (job-deaths.ts), by session id: why, in its words (null when it doesn't say). */
+const agentDied = new Map<string, string | null>()
 /** `claude agents` shows the job as blocked: it waits on the owner, whatever its process says. */
 const agentBlocked = (id: string) => agentStates.get(id) === 'blocked'
 
@@ -1520,6 +1529,7 @@ function questionOf(id: string): string | null {
  */
 export function applyAgentList(list: AgentJob[]): void {
   const seen = new Set<string>()
+  const watched: JobSeen[] = []
   for (const j of list) {
     if (!j?.id || !j.sessionId || !j.cwd || isSdk(j.sessionId) || isHiddenCwd(j.cwd)) continue
     seen.add(j.sessionId)
@@ -1535,6 +1545,17 @@ export function applyAgentList(list: AgentJob[]): void {
       r = upsertSession(j.sessionId, { cwd: j.cwd, origin: 'terminal', state: 'ended', lastActivityAt: mtime || Number(j.startedAt) || Date.now(), createdAt: Number(j.startedAt) || Date.now() })
     }
     if (j.name && r.title === 'New session') upsertSession(r.id, { title: trimText(j.name, 80) ?? r.title })
+    // Died (job-deaths.ts): its state file says failed, and why. One at work or blocked is alive.
+    const end = j.state === 'working' || j.state === 'blocked' ? null : jobEnd(j.id)
+    const dead = j.state === 'failed' || end?.state === 'failed'
+    const reason = dead ? (end?.reason ?? null) : null
+    watched.push({ job: j.id, sessionId: j.sessionId, state: dead ? 'failed' : String(j.state ?? ''), reason, respawning: !!end?.respawning })
+    const diedBefore = agentDied.has(r.id) ? (agentDied.get(r.id) ?? null) : undefined
+    if ((dead ? reason : undefined) !== diedBefore) {
+      if (dead) agentDied.set(r.id, reason)
+      else agentDied.delete(r.id)
+      broadcast({ t: 'session', session: view(r) })
+    }
     // Its process runs: the registry has its state (pollRegistry). Stopped: the list's.
     if (r.pid) continue
     const state: SessionState = j.state === 'blocked' ? 'needs_you' : j.state === 'working' ? 'starting' : 'idle'
@@ -1546,8 +1567,15 @@ export function applyAgentList(list: AgentJob[]): void {
     if (seen.has(id)) continue
     agentJobs.delete(id)
     agentStates.delete(id)
+    agentDied.delete(id)
     const r = sessions.get(id)
     if (r && !r.pid && r.state !== 'ended') upsertSession(id, { state: 'ended', activity: null })
+  }
+  // A job that died since it was last seen alive: the phone says so once (a banner or a
+  // notification, docs/PROTOCOL.md, "Session menu"). Finished, stopped or deleted ones never.
+  for (const d of deaths.see(watched)) {
+    log('claude agents job died:', d.job, d.reason ?? '(no reason given)')
+    broadcast({ t: 'job.died', sessionId: d.sessionId, job: d.job, reason: d.reason, at: d.at })
   }
 }
 
@@ -1555,6 +1583,7 @@ export function applyAgentList(list: AgentJob[]): void {
 export function forgetSession(id: string): void {
   agentJobs.delete(id)
   agentStates.delete(id)
+  agentDied.delete(id)
   forgetBlocked(id)
   if (sessions.delete(id)) broadcast({ t: 'session.removed', id })
 }
