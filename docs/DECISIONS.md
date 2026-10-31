@@ -7,7 +7,7 @@ only on purpose, and log the change here.
 - **Name: Hypernova**, part of the Hyper* family (Hyperscribe, Hypernavigate). We don't use "Claude" in the name because of Anthropic's trademark, but describing it as "a control room for Claude Code" is fine.
 - Built to public quality from the start. The repo is local for now (see LATER L4).
 - One phone can pair with **several Macs**, with a switcher in the app. Built (owner, 2026-10-30; `android/.../data/Servers.kt`):
-  - **One is active**: Home, sessions, chat, Settings, the widgets and the glasses show it, as they showed the one pairing before.
+  - **One is active**: Home, sessions, chat, Settings, the widgets and the glasses show it, as they showed the one pairing before. (The widget shows every computer since 2026-10-31: "The widget: Needs you".)
   - **The others are watched in the background** (each has its own link): their notifications (needs you, finished, errors, approvals) name the computer, and a tap switches to it and opens the session; their needs-you count shows on the chip and in the switcher. Answers, replies and queued prompts go to the computer they belong to.
   - **The Home chip opens the switcher** (a glass sheet): each computer with its link and needs-you count, the active one ticked, and "Pair another Mac" last (the pairing steps, the others kept). It no longer opens Settings. With several paired the chip names the active one in every state, with an amber count while another needs you.
   - **Pairing another computer adds it** (no "Replace?" question any more); pairing one again takes its old place. **Forget** forgets only the active one, and the next comes on screen.
@@ -458,7 +458,8 @@ what Lens relies on from the daemon, and `docs/PROTOCOL.md` stays the daemon's w
 
 ## Home-screen widgets (2026-10-15)
 
-The owner picked two: a small one with the sun and "2 working · 1 needs you", and a large one with
+Replaced on 2026-10-31 by one "Needs you" widget across every paired computer ("The widget: Needs
+you", below); kept here as history. The owner picked two: a small one with the sun and "2 working · 1 needs you", and a large one with
 up to four sessions and Allow / Deny on the widget.
 
 - **Small: the sun.** The 5-hour usage drawn as the sky's star (it ages with usage, a protostar at
@@ -2483,3 +2484,37 @@ IDEAS PA7: say what made Claude Code ask, the case the owner hits being an ask r
    already shows the dialog's own lines) and the Home card are as they were.
 4. **Rules only leave the daemon**, as for the rules in effect: a rule string, never a settings
    file's other keys. A deny rule isn't looked for (one that matched would have refused the call).
+
+## The widget: Needs you (2026-10-31)
+
+The owner: remove the small widget, take the images off the big one and make it a clean list of
+what needs him on all his computers, with the details and Deny / Allow. Replaces "Home-screen
+widgets (2026-10-15)" above.
+
+1. **One widget.** The small sun widget is gone (placed ones disappear, as Android does when a
+   widget's provider goes). The large one stays where it's placed (same provider, `SessionsWidget`)
+   and is now **Needs you**.
+2. **No pictures.** No sun, planets, usage meters, agents' readouts, nebula or grain: text, the card,
+   the command well and the pills, in the app's colours (DESIGN.md, "Widgets"). Usage stays in the
+   app and the permanent notification.
+3. **Every paired computer, grouped by computer.** The one on screen and the ones watched in the
+   background, in the switcher's order; each with something waiting has its name and count, a
+   computer with nothing waiting is left out, and with nothing anywhere the list says "Nothing needs
+   you". One row per session that needs you: its name and what it waits on (the tool and its command
+   or summary; the question; "Plan to review" and the plan's first line; Claude Code's permission
+   dialog in its terminal by its title and command; else "Waiting for you"), its oldest approval
+   first with "+2 more" for the rest. Oldest wait first. The list scrolls; the widget resizes freely.
+4. **Deny and Allow by the notifications' rule.** Deny on every tool request and terminal dialog;
+   Allow only beside the whole command, exactly as it will run (`WidgetModel.answerable`, which the
+   notifications and Home cards also use); otherwise Open. The answer goes to that row's computer
+   (`WidgetSync.answer` with its server; the terminal dialog through the menu route, as a Home card).
+   Nothing new to unlock on the home screen: the phone is unlocked there. On a locked phone (a
+   lock-screen widget) the buttons answer nothing and open the session after unlocking, as a
+   notification's buttons need unlocking first. "Always" stays in the app, with its fingerprint.
+5. **A tap opens the session on its computer** (switching to it, `MainActivity.EXTRA_SERVER`);
+   questions and plans are answered there. A computer's name opens the app on it.
+6. **Offline or not heard from yet: open only.** An offline computer's rows, and a freshly started
+   process's kept rows (until that computer's snapshot arrives), are dimmed and only open.
+7. **Battery as before:** it redraws when what needs you changes on any computer, at most every
+   1.5s, never while the screen is off, with no timer or update period.
+8. **No daemon change**, nothing new on the chat screen.
