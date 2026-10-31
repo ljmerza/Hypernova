@@ -242,6 +242,7 @@ class HomeScreenTest {
             pickedName = "z2",
             onOpen = { server, id -> spy.opened += "$server:$id" },
             onNewSession = { server -> newSessions += server },
+            onRuns = { _, _ -> },
         )
         return z2 to e
     }
