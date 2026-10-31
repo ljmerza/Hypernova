@@ -2323,3 +2323,26 @@ what they say about it no longer holds.
 3. **An app last left in the demo** forgets the flag it kept (`demo` in its preferences) the first
    time it starts, and opens on its paired server, or on the onboarding if there is none.
 4. Nothing on the daemon was the demo's. Nothing new on the chat screen: this only removes.
+
+## Servers fetch the app's releases; Settings offers the update (2026-10-31)
+
+The owner: after a release nothing told the phone, and Settings showed no update. Decided:
+
+1. **The daemon learns of releases itself.** It asks GitHub for the latest release (unauthenticated,
+   30 s after start and every 6 hours, with the ETag, waiting out a rate limit), reads the
+   release's `hypernova-vX.Y.Z.json` (versionCode, versionName, the APK's SHA-256; the release
+   workflow now attaches it), and only when that versionCode is higher than the APK it hands out,
+   downloads the APK, checks the SHA-256, and puts it in `<support>/android/` the way `hnctl apk`
+   does (the note last). Never fails the daemon: offline or an error is a line in the log.
+2. **A local build wins when it's newer.** An APK an admin put there (`hnctl apk`, a dev build)
+   with a higher versionCode is never replaced by an older or equal release.
+3. **On by default**, the setting `releaseCheck` turns it off (`POST /local/settings` or
+   settings.json). docs/SECURITY-MODEL.md says what GitHub sees and how the APK is checked.
+4. **Connected phones hear of it**: `{t:"app", app}` when the offered APK changes (a release, `hnctl
+   apk`, removed), so no daemon restart or reconnect is needed. Older apps ignore it.
+5. **Settings → About** shows "Update available · 0.6.0" with **Update** under the App row while a
+   newer app is offered, the same flow as the banner (downloading with its percent, checking,
+   Allow, Install, Try again); nothing when there's none. The App row names the installed version as
+   it really is: a local build's versionName now comes from `git describe` (`0.5.0-3-g1a2b3c4`),
+   not a fixed default. The update card above stays as it was.
+6. Nothing new on the session chat screen.

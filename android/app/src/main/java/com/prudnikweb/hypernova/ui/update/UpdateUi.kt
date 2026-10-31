@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.BuildConfig
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AboutUpdate
 import com.prudnikweb.hypernova.data.AppUpdate
 import com.prudnikweb.hypernova.data.AppUpdater
 import com.prudnikweb.hypernova.data.UpdateFailure
@@ -216,6 +217,58 @@ private fun Modifier.progress(s: UpdateState): Modifier = semantics {
     liveRegion = LiveRegionMode.Polite
     val f = (s as? UpdateState.Downloading)?.fraction ?: if (s is UpdateState.Checking) 1f else 0f
     progressBarRangeInfo = ProgressBarRangeInfo(f, 0f..1f)
+}
+
+/**
+ * Settings → About's "Update available · 0.6.0" row (data/UpdatePolicy.kt [AboutUpdate]), under the
+ * App row: its button starts the same flow as the banner's (Update, then Allow, Install or Try
+ * again as it goes), with the step in a line under it and the download's hairline bar.
+ */
+@Composable
+fun AboutUpdateRow(row: AboutUpdate, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val failed = row.step == AboutUpdate.Step.Failed
+    val color = if (failed) HN.amber else HN.accent
+    val name = row.versionName ?: stringResource(R.string.about_update_build, row.update.versionCode)
+    val line = when (row.step) {
+        AboutUpdate.Step.Offered -> null
+        AboutUpdate.Step.NeedsPermission -> stringResource(R.string.update_permission)
+        AboutUpdate.Step.Downloading -> stringResource(R.string.update_downloading)
+        AboutUpdate.Step.Checking -> stringResource(R.string.update_checking)
+        AboutUpdate.Step.Confirming -> stringResource(R.string.update_ready)
+        AboutUpdate.Step.Failed -> row.failure?.let { updateFailureText(it) }
+    }
+    Column(modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                HText(stringResource(R.string.about_update_available, name), style = Type.small, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (line != null) {
+                    Spacer(Modifier.height(2.dp))
+                    HText(line, style = Type.small, color = if (failed) HN.amber else HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            val pct = row.fraction?.let { (it * 100).toInt() }
+            when (row.action) {
+                AboutUpdate.Action.Update -> Pill(stringResource(R.string.about_update_button), { AppUpdater.start(context, row.update) }, kind = PillKind.Primary, height = 36.dp)
+                AboutUpdate.Action.Allow -> Pill(stringResource(R.string.update_allow), { AppUpdater.allowInstalls(context) }, kind = PillKind.Primary, height = 36.dp)
+                AboutUpdate.Action.Install -> Pill(stringResource(R.string.update_install), { AppUpdater.start(context, row.update) }, kind = PillKind.Primary, height = 36.dp)
+                AboutUpdate.Action.TryAgain -> Pill(stringResource(R.string.try_again), { AppUpdater.start(context, row.update) }, kind = PillKind.Outline, height = 36.dp)
+                null -> if (row.step == AboutUpdate.Step.Downloading && pct != null) HText(stringResource(R.string.update_percent, pct), style = Type.monoSmall, color = HN.accent, maxLines = 1)
+            }
+        }
+        if (row.step == AboutUpdate.Step.Downloading || row.step == AboutUpdate.Step.Checking) {
+            Spacer(Modifier.height(8.dp))
+            // TalkBack hears it as a progress bar, politely (as the banner's).
+            UpdateBar(
+                row.fraction,
+                Modifier.semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    progressBarRangeInfo = ProgressBarRangeInfo(row.fraction ?: 0f, 0f..1f)
+                },
+            )
+        }
+    }
 }
 
 /**

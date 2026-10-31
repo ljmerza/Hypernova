@@ -29,4 +29,8 @@
     <string name="update_fail_install">Android couldn\'t install the update.</string>
     <string name="update_done_title">Hypernova is updated</string>
     <string name="update_done_body">Version %1$s, build %2$d. Tap to open it.</string>
+    <!-- Settings → About's row while an update is offered (ui/update/UpdateUi.kt AboutUpdateRow). -->
+    <string name="about_update_available">Update available · %1$s</string>
+    <string name="about_update_build">build %1$d</string>
+    <string name="about_update_button">Update</string>
 </resources>

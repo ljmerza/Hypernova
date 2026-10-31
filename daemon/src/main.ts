@@ -3,7 +3,8 @@ import { log, VERSION, API_PORT, LOCAL_PORT } from './util.ts'
 import { discover, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'
 import { pollStatusLine } from './services.ts'
 import { ensureProjectsRoot } from './files.ts'
-import { startServers } from './http.ts'
+import { announceApp, appInfo, startServers } from './http.ts'
+import { startReleaseCheck } from './releases.ts'
 import { refreshClaudeCommands, scanTerms, watchMenus, writeHnBin } from './terms.ts'
 import { refreshHooks, refreshShell } from './hooks.ts'
 import { startAccount } from './account.ts'
@@ -58,6 +59,9 @@ startStats()
 startUsageProbe()
 // After the servers, the account, the battery and Stay awake: automations fire off all of them.
 void startAutomations()
+// The app's GitHub releases (releases.ts): a newer one's APK is fetched, checked and offered to the
+// phones, 30 s after start and every 6 hours, while settings.releaseCheck isn't off.
+startReleaseCheck({ offered: () => appInfo()?.versionCode ?? null, published: announceApp })
 
 setInterval(pollRegistry, 2000)
 setInterval(pollTranscripts, 700)

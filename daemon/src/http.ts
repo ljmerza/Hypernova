@@ -59,6 +59,7 @@ import { PLATFORM, RELEASES, UNAVAILABLE, bypassBlockedByRoot, has, unavailable 
 import { randomUUID } from 'node:crypto'
 import { putEvent, tapBroadcast } from './hub.ts'
 import { editHeld, heldOf, hold, kickHeld, removeHeld, useHeldOps, type HeldReady } from './held.ts'
+import { checkReleaseNow } from './releases.ts'
 
 /**
  * `lan`: came in on the LAN listener (lan.ts), where the admin token counts for nothing and pairing
@@ -1106,11 +1107,29 @@ function findApk(): string | null {
  * The Android app this Mac hands out: its version (the build writes `<apk>.json` next to it),
  * so the phone can tell when there's a newer one.
  */
-function appInfo(): { versionCode: number; versionName: string } | null {
+export function appInfo(): { versionCode: number; versionName: string } | null {
   const apk = findApk()
   if (!apk) return null
   const meta = readJson<{ versionCode?: number; versionName?: string } | null>(apk.replace(/\.apk$/, '.json'), null)
   return typeof meta?.versionCode === 'number' ? { versionCode: meta.versionCode, versionName: String(meta.versionName ?? '') } : null
+}
+
+/**
+ * The offer the phones last heard (the snapshot's `mac.app`, then `{t:"app"}`), as JSON. Set when
+ * the servers start, so only a change is said.
+ */
+let saidApp: string | null = null
+/**
+ * The APK handed out changed (a GitHub release fetched, `hnctl apk`, a dev build, removed): every
+ * connected client hears `{t:"app", app}` (null: none any more), without reconnecting. Looked at
+ * every few seconds by the servers, and at once after a release is fetched (releases.ts).
+ */
+export function announceApp(): void {
+  const app = appInfo()
+  const s = JSON.stringify(app)
+  if (s === saidApp) return
+  saidApp = s
+  broadcast({ t: 'app', app })
 }
 
 /**
@@ -1730,7 +1749,10 @@ async function local(c: Ctx): Promise<void> {
   if (path === '/local/settings' && m === 'POST') {
     const b = await readJsonBody(req)
     if (b.projectsRoot && existsSync(b.projectsRoot)) settings.projectsRoot = b.projectsRoot
+    // The app's GitHub releases (releases.ts): turned on, a look now.
+    if (typeof b.releaseCheck === 'boolean') settings.releaseCheck = b.releaseCheck
     saveSettings()
+    if (b.releaseCheck === true) checkReleaseNow()
     // Browse outside projects (files.ts): every phone hears of it, with the sessions it opens or closes.
     if (typeof b.browseOutsideProjects === 'boolean') setBrowseOutside(b.browseOutsideProjects)
     // Codex for Hypernova (codex/client.ts): connects, and the shell's `codex` function comes with it.
@@ -1894,7 +1916,12 @@ export function startServers(): () => Promise<void> {
     log('local server error', e)
     process.exit(1)
   })
+  // The APK handed out, as the snapshot says it now; a change later reaches every client as {t:"app"}.
+  saidApp = JSON.stringify(appInfo())
+  const appWatch = setInterval(announceApp, 5000)
+  appWatch.unref()
   return async () => {
+    clearInterval(appWatch)
     for (const ws of wss.clients) ws.terminate()
     apiServer.closeAllConnections()
     localServer.closeAllConnections()

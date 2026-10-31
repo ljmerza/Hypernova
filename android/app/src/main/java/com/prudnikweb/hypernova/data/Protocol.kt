@@ -580,6 +580,15 @@ private fun flatInput(o: JSONObject?): Map<String, String> {
 }
 
 object Wire {
+    /**
+     * The app the computer hands out, from `{t:"app", app}` (docs/PROTOCOL.md, "The app update"): the
+     * snapshot's [MacInfo] with its offer replaced; `app` null or without a versionCode: none any more.
+     */
+    fun withApp(m: MacInfo, app: JSONObject?): MacInfo {
+        val code = app?.int("versionCode")
+        return m.copy(appVersionCode = code, appVersionName = if (code != null) app?.str("versionName") else null)
+    }
+
     fun mac(o: JSONObject) = MacInfo(
         id = o.str("id").orEmpty(),
         name = o.str("name") ?: "Mac",
