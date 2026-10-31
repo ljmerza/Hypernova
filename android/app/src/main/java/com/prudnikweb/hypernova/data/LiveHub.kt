@@ -81,11 +81,13 @@ class LiveHub(
     private val onScreen: () -> Boolean = isVisible,
     /** This is the computer the screens show (not one watched in the background): the app's words follow it. */
     private val isActive: () -> Boolean = { true },
+    /** The wall clock (epoch ms). Tests pass their own, so the watchdog and the usage timers can be driven. */
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : Hub {
     private val app = context.applicationContext
     private val res = app.resources
     private val api = Api(pairing.baseUrl, pairing.token)
-    private val now get() = System.currentTimeMillis()
+    private val now get() = clock()
     /** This phone's device certificate for the Mac's local listener (data/DeviceCert.kt). */
     private val certs = DeviceCertStore(context, serverId)
     /**
