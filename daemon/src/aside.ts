@@ -9,14 +9,18 @@
 // ask for, and once it has it, closes the panel with Space (never Esc: with the panel gone, Esc
 // would stop Claude's turn) so the box is back for the next prompt.
 //
-// The panel as Claude Code 2.1.314 draws it (read from its code, not yet from a live screen):
+// The panel as Claude Code 2.1.314 draws it (read from its code, then seen on the owner's phone
+// 2026-10-30, test/fixtures/btw-screens):
 //
 //   /btw <an earlier question>                    up to five, dim, "(+N earlier /btw)" above them
 //   /btw <the question>
 //
 //     ⠋ Answering…                                then the answer (Markdown), scrolling past
 //                                                 max(5, rows − 11 − earlier lines) lines
-//   ↑/↓ to scroll · c to copy · f to fork · Esc to close
+//   ↑/↓ to browse · c to copy · f to fork · x to clear history · Esc to       ← 4
+//   close ·                                                                agents
+//
+// The footer wraps on a narrow terminal, and the status line's right side shares its rows.
 import { randomUUID } from 'node:crypto'
 import { agentJobOf, getSession, pendingApprovals } from './hub.ts'
 import { attachAgentsTerm, attachDrifted, pressKeys, termOf, termScreen, typeInto } from './terms.ts'
@@ -132,7 +136,8 @@ async function watchAside(id: string, tid: string, a: Aside, answerMs: number, p
       const s = await termScreen(tid)
       const p = s && readAside(s.text, a.question)
       if (!p || p.state === 'asking') continue
-      settle(p.state === 'answered' ? { state: 'answered', answer: reflow(p.text, s.cols - 4), clipped: p.clipped } : { state: 'failed', error: p.text.replace(/\s+/g, ' ').trim() })
+      // The answer wraps a few columns short of its indent's room: 75 to 77 of 84 on the owner's phone.
+      settle(p.state === 'answered' ? { state: 'answered', answer: reflow(p.text, s.cols - 7), clipped: p.clipped } : { state: 'failed', error: p.text.replace(/\s+/g, ' ').trim() })
       // Space closes the panel (so does Esc, which with the panel gone would stop Claude's turn),
       // only while it's still on the screen and still this session's.
       const again = await termScreen(tid)
@@ -155,6 +160,30 @@ const PENDING = /Answering…|retrying in \d+s/
 // The panel's own lines sit two columns in; its answer four.
 const QUESTION = /^ {0,3}\/btw\s+(.*)$/
 const EARLIER = /^ {0,3}\(\+\d+ earlier \/btw\)\s*$/
+// A row of the footer's hints ("↑/↓ to browse · c to copy · … · Esc to"), two columns in.
+const HINTS = /^ {0,3}\S/
+const HINT = /(?:^|·)\s*\S+ to(?:\s|$)/
+/** A row without what Claude Code's status line draws at its right ("← 4 agents"), trimmed. */
+const left = (l: string) => l.trim().split(/\s{3,}/)[0] ?? ''
+
+/**
+ * The footer under the panel: its first row and its words, the rows it wrapped onto joined (on a
+ * narrow terminal "Esc to" / "close ·", beside the status line's own words). Null without one.
+ */
+function footerOf(lines: string[]): { at: number; rows: number; text: string } | null {
+  const hints = (i: number) => HINTS.test(lines[i]!) && !QUESTION.test(lines[i]!) && !EARLIER.test(lines[i]!) && HINT.test(left(lines[i]!))
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!hints(i)) continue
+    let at = i
+    while (at > 0 && hints(at - 1)) at--
+    // The rows it wrapped onto, up to two, until a blank one.
+    let end = i
+    while (end + 1 < lines.length && end < i + 2 && lines[end + 1]!.trim()) end++
+    const text = lines.slice(at, end + 1).map(left).join(' ').replace(/\s+/g, ' ')
+    if (FOOTER.test(text)) return { at, rows: end - at + 1, text }
+  }
+  return null
+}
 
 /**
  * The /btw panel on [screen] (plain lines, as a holder sends them) for [question]: the lowest
@@ -164,9 +193,9 @@ const EARLIER = /^ {0,3}\(\+\d+ earlier \/btw\)\s*$/
  */
 export function readAside(screen: string, question: string): AsideScreen | null {
   const lines = screen.split('\n')
-  let foot = -1
-  for (let i = lines.length - 1; i >= 0 && foot < 0; i--) if (FOOTER.test(lines[i]!)) foot = i
-  if (foot < 0) return null
+  const footer = footerOf(lines)
+  if (!footer) return null
+  const foot = footer.at
   let at = -1
   for (let i = foot - 1; i >= 0 && at < 0; i--) if (QUESTION.test(lines[i]!)) at = i
   if (at < 0) return null
@@ -178,10 +207,12 @@ export function readAside(screen: string, question: string): AsideScreen | null 
   const indent = Math.min(...body.filter(Boolean).map((l) => /^ */.exec(l)![0].length))
   body = body.map((l) => l.slice(Number.isFinite(indent) ? indent : 0))
   const text = body.join('\n')
-  if (ANSWERED.test(lines[foot]!)) {
+  if (ANSWERED.test(footer.text)) {
     let earlier = 0
     for (let i = at - 1; i >= 0 && (QUESTION.test(lines[i]!) || EARLIER.test(lines[i]!)); i--) earlier++
-    return { state: 'answered', text, clipped: body.length >= Math.max(5, lines.length - 11 - earlier) }
+    // A footer that wrapped takes its extra rows from the answer's (a guess: Claude Code sizes the
+    // answer by rows alone), so it counts as clipped sooner rather than later.
+    return { state: 'answered', text, clipped: body.length >= Math.max(5, lines.length - 11 - earlier - (footer.rows - 1)) }
   }
   if (!text.trim() || PENDING.test(text)) return { state: 'asking', text: '', clipped: false }
   return { state: 'failed', text, clipped: false }

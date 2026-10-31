@@ -156,6 +156,18 @@ test('behind a held prompt, the next is held too, so they go in order', async ()
   assert.deepEqual(heldOf('held-ask-1').map((e) => e.prompt), ['and then?', 'second'])
 })
 
+test('a command Claude Code runs at once (/btw, /status) is never held: the route’s 409, nothing in line', async () => {
+  for (const cmd of ['/btw is it slow?', '/status']) {
+    await assert.rejects(promptOrHold('held-ask-1', cmd, `phone-${cmd.length}`), (e: any) => e.code === 'needs_answer')
+  }
+  assert.deepEqual(heldOf('held-ask-1').map((e) => e.prompt), ['and then?', 'second'])
+  // A regular command still waits its turn.
+  const r = await promptOrHold('held-ask-1', '/compact', 'phone-send-c')
+  assert.ok(r.heldId)
+  assert.equal(heldOf('held-ask-1').length, 3)
+  await call('DELETE', `/v1/sessions/held-ask-1/held/${r.heldId}`)
+})
+
 test('PUT edits a held prompt, DELETE takes it back; one that left is 404 no_held', async () => {
   const second = heldOf('held-ask-1')[1]!
   const ed = await call('PUT', `/v1/sessions/held-ask-1/held/${second.id}`, { text: 'second, edited' })

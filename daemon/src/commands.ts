@@ -34,6 +34,22 @@ export function isBuiltinCommand(name: string): boolean {
   return LOCAL.has(name)
 }
 
+// Claude Code's own commands it runs at once, even while Claude works (`immediate` in its command
+// table: read from 2.1.314's, not from a live session): a held prompt behind the turn or a dialog
+// would run them out of their moment, so the phone's held prompts never hold them (http.ts,
+// promptOrHold). /btw is one: the phone sends it through the side-question route (aside.ts).
+const IMMEDIATE = new Set([
+  'btw', 'status', 'usage', 'stop', 'version', 'rename', 'color', 'focus', 'brief', 'goal', 'autocompact', 'permissions',
+  'hooks', 'mcp', 'plugin', 'skills', 'tasks', 'workflows', 'loops', 'artifacts', 'bug', 'feedback', 'import', 'daemon',
+  'skill-doctor', 'wellbeing',
+])
+
+/** Whether [text] is one of Claude Code's own commands it runs at once ("/btw why?"), by its first word. */
+export function isImmediateCommand(text: string): boolean {
+  const m = /^\/([a-z][\w-]*)(?:\s|$)/.exec(text.trimStart())
+  return !!m && IMMEDIATE.has(m[1]!)
+}
+
 // Claude Code's own commands that only make sense in a terminal on the Mac, or not at all from a phone.
 const HIDDEN = new Set(['heapdump', 'workflow-launch-exec', 'color', 'focus', 'statusline', 'terminal-setup', 'vim', 'ide', 'exit', 'quit'])
 // Claude Code's own commands that open a screen of their own in the terminal, one the phone can't
