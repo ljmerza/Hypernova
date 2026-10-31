@@ -95,6 +95,10 @@ data class WSession(
     val effort: String? = null,
     /** When its turn started (docs/PROTOCOL.md, Session.turnStartedAt); null out of a turn, or from an older Mac. */
     val turnStartedAt: Long? = null,
+    /** Claude's to-do list in short (docs/PROTOCOL.md, Session.todo); null: none, or an older Mac. */
+    val todo: TodoNow? = null,
+    /** When the turn it works on started (Session.workingSince); null: not working, or an older Mac. */
+    val workingSince: Long? = null,
 )
 
 /**
@@ -637,6 +641,11 @@ object Wire {
             held = o.arr("held").mapObjects(::queued),
             effort = o.str("effort")?.takeIf { it.isNotBlank() },
             turnStartedAt = o.long("turnStartedAt")?.takeIf { it > 0 },
+            todo = o.obj("todo")?.let { t ->
+                val total = t.int("total") ?: 0
+                if (total > 0) TodoNow(t.str("active")?.takeIf { it.isNotBlank() }, (t.int("done") ?: 0).coerceIn(0, total), total) else null
+            },
+            workingSince = o.long("workingSince")?.takeIf { it > 0 },
         )
     }
 

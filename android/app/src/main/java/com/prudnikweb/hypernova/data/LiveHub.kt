@@ -1053,6 +1053,8 @@ class LiveHub(
             question = w.question,
             blockedCalls = w.blockedCalls,
             turnStartedAt = w.turnStartedAt ?: 0L,
+            todo = w.todo,
+            workingSince = w.workingSince ?: 0L,
         )
     }
 

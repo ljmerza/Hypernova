@@ -459,10 +459,25 @@ fun HomeScreen(
                     items(members, key = { it.id }) { s ->
                         // Its approval, else Claude Code's own permission dialog in its terminal (CardAsk.Terminal).
                         val ask = hub.approval(s.id).let { a -> remember(a, s) { CardAsk.of(a, s) } }
+                        // A swipe: Needs input opens, a Completed job stops or is deleted (asked first,
+                        // the menu's own confirm), Working none (CardSwipe.kt).
+                        val swipe = CardSwipe.of(group, s, demo = hub.isDemo)
+                        var deleting by rememberSaveable(s.id) { mutableStateOf(false) }
+                        if (deleting) SessionMenu(hub, s, { deleting = false }, start = MenuPage.Delete)
+                        val appScope = LocalAppScope.current
+                        val toast = LocalToast.current
+                        val slide = cardSwipe(swipe) {
+                            when (swipe) {
+                                CardSwipe.Open -> onOpen(s.id)
+                                CardSwipe.Stop -> appScope.launch { hub.stopSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_stop_session)) } }
+                                CardSwipe.Delete -> deleting = true
+                                null -> Unit
+                            }
+                        }
                         SessionCard(
                             s, now = now, scramble = remember(s.id) { hub.consumeReveal(s) },
                             onClick = { onOpen(s.id) },
-                            modifier = Modifier.padding(horizontal = 16.dp).animateItem(),
+                            modifier = Modifier.padding(horizontal = 16.dp).animateItem().then(slide),
                             block = s.activeBlock(account, hub.providers, now),
                             waiting = hub.waitingCount(s.id),
                             held = hub.heldCount(s.id),
@@ -845,6 +860,10 @@ fun SessionCard(
                     },
                     style = Type.monoSmall, color = HN.ink,
                 )
+            } else if (!needs && s.busy) {
+                // Working: the to-do under way ("Running the tests 3/7"), else what it does now, and
+                // "for 12 min" since its turn began (CardNow.kt).
+                WorkingNow(s)
             } else HText(s.activity, style = Type.monoSmall, color = if (needs) HN.amber else HN.inkMuted, maxLines = 1)
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

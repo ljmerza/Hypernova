@@ -92,6 +92,10 @@ data class Session(
     val effort: String? = null,
     /** When its turn started, as the Mac saw it (0 out of a turn, or not known): the session sheet's "This turn". */
     val turnStartedAt: Long = 0L,
+    /** Claude's to-do list in short (docs/PROTOCOL.md, Session.todo): a Working card's "Running the tests 3/7". */
+    val todo: TodoNow? = null,
+    /** When the turn it works on started (Session.workingSince): a Working card's "for 12 min"; 0 when not working or not said. */
+    val workingSince: Long = 0L,
 ) {
     /** A Codex session: no rewind, no other provider, no carrying on by itself, Codex's two modes. */
     val codex: Boolean get() = agent == AgentKind.CODEX
@@ -133,6 +137,13 @@ data class Session(
         }
     }
 }
+
+/**
+ * Claude's to-do list in short (docs/PROTOCOL.md, Session.todo): the item under way as it reads
+ * while under way ([active], "Running the tests"; null when none is), [done] of [total].
+ */
+@Immutable
+data class TodoNow(val active: String?, val done: Int, val total: Int)
 
 /** The Claude Code a `claude agents` job's process [runs] ("2.1.312") and the one [installed] since ("2.1.314"). */
 @Immutable

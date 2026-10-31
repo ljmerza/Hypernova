@@ -17,9 +17,9 @@ process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
 after(() => rmSync(scratch, { recursive: true, force: true }))
 
 const { callCost, contextWindow, modelInfo, sessionUsage } = await import('../src/session-usage.ts')
-const { todosOf } = await import('../src/todos.ts')
+const { todosOf, todoNow } = await import('../src/todos.ts')
 const { rewindTo, RewindError } = await import('../src/rewind.ts')
-const { ensureParsed, getSession, upsertSession } = await import('../src/hub.ts')
+const { emitEvent, ensureParsed, getSession, upsertSession, view } = await import('../src/hub.ts')
 const { getManaged } = await import('../src/store.ts')
 const { projectSlug } = await import('../src/util.ts')
 type Ev = import('../src/normalize.ts').Ev
@@ -147,6 +147,66 @@ test('the task list TaskCreate and TaskUpdate keep', () => {
     { id: '1', text: 'Write the parser', active: 'Writing the parser', status: 'completed' },
     { id: '2', text: 'Test it', active: 'Testing it', status: 'in_progress' },
   ])
+})
+
+test('the list in short for Home: the item under way, done and total', () => {
+  assert.equal(todoNow([]), null)
+  const list = [
+    { content: 'Read the code', activeForm: 'Reading the code', status: 'completed' },
+    { content: 'Run the tests', activeForm: 'Running the tests', status: 'in_progress' },
+    { content: 'Fix it', status: 'pending' },
+  ]
+  assert.deepEqual(todoNow([tool('t1', 'TodoWrite', { todos: list })]), { active: 'Running the tests', done: 1, total: 3 })
+  // No form while under way: its text. None under way: no line, the counts stay.
+  assert.deepEqual(todoNow([tool('t1', 'TodoWrite', { todos: [{ content: 'Fix it', status: 'in_progress' }] })]), { active: 'Fix it', done: 0, total: 1 })
+  assert.deepEqual(todoNow([tool('t1', 'TodoWrite', { todos: [{ content: 'Fix it', status: 'completed' }] })]), { active: null, done: 1, total: 1 })
+  // A long one is cut, for one line on a card.
+  assert.equal(todoNow([tool('t1', 'TodoWrite', { todos: [{ content: 'x'.repeat(300), status: 'in_progress' }] })])?.active?.length, 120)
+})
+
+test("a session carries its list in short, and it moves on with Claude's next call", () => {
+  const sid = randomUUID()
+  const path = join(projectDir, `${sid}.jsonl`)
+  const use = (uuid: string, id: string, todos: object[]) => ({ ...base(sid, uuid, null), type: 'assistant', message: { id: `msg_${uuid}`, type: 'message', role: 'assistant', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id, name: 'TodoWrite', input: { todos } }] } })
+  const done = (uuid: string, id: string) => ({ ...base(sid, uuid, null), type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'Todos have been modified successfully.' }] } })
+  writeFileSync(path, lines(prompt(sid, randomUUID(), null, 'Go'), use('a1', 'tu1', [{ content: 'Run the tests', activeForm: 'Running the tests', status: 'in_progress' }, { content: 'Ship', status: 'pending' }]), done('u1', 'tu1')))
+  upsertSession(sid, { cwd, transcriptPath: path, title: 'Todo', state: 'idle' })
+  const rec = getSession(sid)!
+  const st = ensureParsed(rec)
+  assert.deepEqual(view(rec).todo, { active: 'Running the tests', done: 0, total: 2 })
+  // The next call, as an event the runner or a poll brings.
+  const ev = tool('tu2', 'TodoWrite', { todos: [{ content: 'Run the tests', status: 'completed' }, { content: 'Ship', activeForm: 'Shipping', status: 'in_progress' }] })
+  st.events.push(ev)
+  st.byId.set(ev.id, ev)
+  emitEvent(sid, ev.id)
+  assert.deepEqual(view(rec).todo, { active: 'Shipping', done: 1, total: 2 })
+  // A session with no list says so.
+  upsertSession(`${sid}-none`, { cwd, title: 'None', state: 'idle' })
+  assert.equal(view(getSession(`${sid}-none`)!).todo, null)
+})
+
+test("a working session says when its turn started, through an ask, and not once it's idle", () => {
+  const sid = randomUUID()
+  upsertSession(sid, { cwd, title: 'Turn', state: 'idle' })
+  const rec = getSession(sid)!
+  assert.equal(view(rec).workingSince, null)
+  const before = Date.now()
+  upsertSession(sid, { state: 'working' })
+  const since = view(rec).workingSince!
+  assert.ok(since >= before && since <= Date.now())
+  // More steps and an ask within the turn keep it.
+  upsertSession(sid, { state: 'working', activity: 'Bash: npm test' })
+  upsertSession(sid, { state: 'needs_you' })
+  upsertSession(sid, { state: 'working' })
+  assert.equal(view(rec).workingSince, since)
+  // Done: gone, and the next turn starts again.
+  upsertSession(sid, { state: 'idle' })
+  assert.equal(view(rec).workingSince, null)
+  // A time the patch brings (Claude Code's registry stamp, a daemon seeing it mid-turn) is kept.
+  upsertSession(sid, { state: 'working', workingSince: 1_000 })
+  assert.equal(view(rec).workingSince, 1_000)
+  upsertSession(sid, { state: 'ended' })
+  assert.equal(view(rec).workingSince, null)
 })
 
 // ── Rewind to here ───────────────────────────────────────────────────────

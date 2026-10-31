@@ -557,6 +557,20 @@ Session = {
                               // counts from then. The session sheet's "This turn"; absent: an older daemon
   lastText: string | null,    // last assistant text, trimmed to 200 chars
   activity: string | null,    // what it's doing now, e.g. "Bash: ./gradlew build"
+  todo: null | {active: string | null, done: number, total: number},
+                              // Claude's to-do list in short (the list GET …/todos returns, see Session usage
+                              // and the to-do list): the item in progress as it reads while under way
+                              // ("Running the tests"; its text without one; at most 120 characters; null when
+                              // none is), how many are completed, and how many there are. Worked out again
+                              // after each TodoWrite, TaskCreate or TaskUpdate event; null when Claude made no
+                              // list. Home's Working card says "Running the tests 3/7" with it. Absent: an
+                              // older daemon
+  workingSince: number | null,  // epoch ms: when the turn it works on started. Set as it goes "working" or
+                              // "starting" (Claude Code's registry stamp, statusUpdatedAt, when the daemon first
+                              // sees it busy, as after a daemon restart; else that moment), kept through
+                              // "needs_you" within the turn, null once "idle", "error" or "ended" (and for a
+                              // session whose agents alone work). Home's Working card says "for 12 min" with it.
+                              // Absent: an older daemon
   pendingApprovalIds: string[],
   stoppedForAway: boolean,    // Codex: auto-denied after 10 min → show the Continue button (Claude Code's
                               // ask goes back to its terminal instead, see Approvals; never set for it)
