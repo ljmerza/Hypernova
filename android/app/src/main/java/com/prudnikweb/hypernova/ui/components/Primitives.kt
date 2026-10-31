@@ -126,7 +126,9 @@ fun Seam(
             Spacer(Modifier.width(8.dp))
             HText(after, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
         }
-        Spacer(Modifier.width(10.dp))
+        // No words (the session's status line while its bar shows): no gap for them either, so the
+        // planet sits as far from what follows as from the screen's edge (owner, 2026-10-30).
+        if (label.isNotEmpty() || after != null) Spacer(Modifier.width(10.dp))
         if (line) Box(Modifier.weight(1f).height(1.dp).background(HN.line)) else Spacer(Modifier.weight(1f))
         if (trailContent != null) {
             Spacer(Modifier.width(10.dp))

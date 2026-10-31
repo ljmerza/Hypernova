@@ -518,7 +518,7 @@ export const isRunning = (id: string) => !!runs.get(id)?.running
  * waits for the phone however long it takes (the SDK waits on canUseTool as long). An automation's
  * run still stops, away, after 10 minutes (Automations, "Following").
  */
-export const sdkAwayRule = (m: Pick<ManagedSession, 'automation'>): AwayRule => (m.automation ? 'deny' : 'never')
+export const sdkAwayRule = (_m: Pick<ManagedSession, 'automation'>): AwayRule => 'never'
 
 /** A turn running in session [id] with query [q] (tests: a real one needs Claude Code). */
 export function testTurn(id: string, q: Pick<Query, 'setPermissionMode'> | null): void {

@@ -1829,6 +1829,10 @@ answered from the phone", 2026-10-13) stays as history for Claude Code; Codex ke
    owner's sessions no longer presses Esc on that session's Claude Code permission dialog (an ask
    handed back there) after 10 minutes: the run stops following it, away, and the dialog stays. The
    run's own sessions keep the Esc of 6.
+9. **Automations wait too** (owner, 2026-10-30: "no 10 min no, just keep open forever"). This
+   replaces 6, 7's automation exception and 8: an automation's SDK run gets no 10-minute "no"
+   (`sdkAwayRule` is always `never`), a run never presses Esc on a terminal menu however long it
+   waits, and the 12-hour watch spares a run while it waits on the owner (`needs_you`).
 
 ## Default mode for new sessions (2026-10-30)
 

@@ -188,27 +188,31 @@ test('a session the daemon runs through the SDK: its ask waits for the phone pas
   assert.equal((await asked!).decision, 'allow')
 })
 
-test('an automation’s run through the SDK still stops, away, after 10 minutes, and the phone counts down to it', async () => {
+test('an automation’s run through the SDK waits for the owner too: no 10-minute "no", no countdown', async () => {
   const { sdkAwayRule } = await import('../src/runner.ts')
   const rule = sdkAwayRule({ automation: { id: 'a1', name: 'Morning brief', runId: 'r1' } })
-  assert.equal(rule, 'deny')
+  assert.equal(rule, 'never')
   const sid = 'bl-sdk-auto'
   hub.upsertSession(sid, { cwd, origin: 'hypernova', state: 'working' })
+  let settled = false
   mock.timers.enable({ apis: ['setTimeout'] })
+  let asked: Promise<{ decision: string }>
   try {
-    const asked = hub.requestApproval({ sessionId: sid, kind: 'tool', toolName: 'Bash', summary: 'Bash: npm publish', input: { command: 'npm publish' }, reason: null, canAlways: false, questions: null, plan: null }, 'toolu_sdk2', undefined, rule)
+    asked = hub.requestApproval({ sessionId: sid, kind: 'tool', toolName: 'Bash', summary: 'Bash: npm publish', input: { command: 'npm publish' }, reason: null, canAlways: false, questions: null, plan: null }, 'toolu_sdk2', undefined, rule)
+    void asked.then(() => (settled = true))
     const [a] = hub.pendingApprovals().filter((x) => x.sessionId === sid)
-    assert.equal(a!.autoDeny, true)
-    assert.equal(typeof a!.expiresAt, 'number')
-    mock.timers.tick(hub.AWAY_MS)
-    assert.equal((await asked).decision, 'timeout')
+    assert.deepEqual([a!.autoDeny, a!.expiresAt], [false, null])
+    mock.timers.tick(10 * hub.AWAY_MS)
+    await new Promise((r) => setImmediate(r))
   } finally {
     mock.timers.reset()
   }
-  assert.equal(hub.getSession(sid)?.stoppedForAway, true)
-  assert.equal(blocked.blockedList(sid)[0]?.reason, 'away')
-  const notes = hub.eventsFor(sid).filter((e) => e.kind === 'notice').map((e) => (e.kind === 'notice' ? e.text : ''))
-  assert.deepEqual(notes, ['Paused: nobody answered for 10 minutes, so Hypernova said no and asked Claude to wait for you.'])
+  assert.equal(settled, false, 'still waiting')
+  assert.equal(hub.getSession(sid)?.stoppedForAway, false)
+  assert.equal(blocked.blockedCount(sid), 0)
+  const [a] = hub.pendingApprovals().filter((x) => x.sessionId === sid)
+  assert.ok(hub.answerApproval(a!.id, { decision: 'deny' }, 'phone'))
+  assert.equal((await asked!).decision, 'deny')
 })
 
 test('a call refused for want of an answer (Codex): Allow & retry says so, and its next ask is answered yes once', async () => {

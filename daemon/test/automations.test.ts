@@ -1176,7 +1176,7 @@ test('small outcomes: a failure said once a problem; a terminal Hypernova doesn�
 })
 
 // ── Fixes of 2026-10-18 (docs/PROTOCOL.md, "Automations") ─────────────────
-test('a run stuck on a terminal menu (no approval behind it) gets Esc after 10 minutes and stops, away: slot and the Mac let go', async () => {
+test('a run stuck on a terminal menu (no approval behind it) waits for the owner as long as it takes: never Esc, not even past 12 hours', async () => {
   const { w, e } = setup()
   const a = e.create(brief())
   const r = await e.runNow(a.id)
@@ -1185,25 +1185,24 @@ test('a run stuck on a terminal menu (no approval behind it) gets Esc after 10 m
   await later(w, e, 30 * SEC)
   // Claude Code's own permission prompt, its approval lost in a restart: a menu, nothing pending.
   w.set(e, sid, { state: 'needs_you', menu: { id: 'm1', title: 'Do you want to proceed?', options: [] } as never, pendingApprovalIds: [] })
-  await later(w, e, 9 * MIN)
+  await later(w, e, 11 * MIN)
   assert.equal(e.runsPage(a.id, null, 1)[0]!.state, 'needs_you')
-  assert.equal(w.awake.get(`automation:${r.id}`), true)
   assert.deepEqual(w.interrupted, [])
-  await later(w, e, 2 * MIN)
-  const run = e.runsPage(a.id, null, 1)[0]!
-  assert.deepEqual([run.state, run.reason], ['stopped', 'away'])
-  assert.deepEqual(w.interrupted, [sid])
-  assert.equal(w.awake.get(`automation:${r.id}`), false)
-  // An approval waiting is left to its own 10 minutes (it answers itself and the session stops, away).
-  const r2 = await e.runNow(a.id)
+  await later(w, e, 13 * 60 * MIN)
+  // (Its schedule fired again meanwhile: that newer run was skipped, this one still waits.)
+  assert.equal(e.runsPage(a.id, null, 10).find((x) => x.id === r.id)!.state, 'needs_you', 'the 12-hour watch spares a run waiting on the owner')
+  assert.deepEqual(w.interrupted, [])
+  // An approval waiting is left alone too (another automation: this one still waits).
+  const a2 = e.create({ ...brief(), name: 'Second' })
+  const r2 = await e.runNow(a2.id)
   const s2 = r2.sessionIds[0]!
   w.set(e, s2, { state: 'needs_you', pendingApprovalIds: ['ap1'] })
   await later(w, e, 30 * MIN)
-  assert.equal(e.runsPage(a.id, null, 1)[0]!.state, 'needs_you')
-  assert.deepEqual(w.interrupted, [sid])
+  assert.equal(e.runsPage(a2.id, null, 10).find((x) => x.id === r2.id)!.state, 'needs_you')
+  assert.deepEqual(w.interrupted, [])
 })
 
-test('a run never presses Esc on the permission dialog of the owner’s own session it continued: it stops following, away, and the dialog stays', async () => {
+test('a run never presses Esc on the permission dialog of the owner’s own session it continued: it waits, and the dialog stays', async () => {
   const { w, e } = setup()
   w.sessions.set('s1', newSession('s1'))
   const a = e.create({ name: 'Nudge', enabled: true, trigger: { kind: 'time', at: '09:00', days: [5] }, action: { kind: 'continue', target: 's1', prompt: 'Carry on.', then: 'none' } })
@@ -1214,8 +1213,7 @@ test('a run never presses Esc on the permission dialog of the owner’s own sess
   // Its ask was handed back to Claude Code's own dialog (nobody answered on the phone).
   w.set(e, 's1', { state: 'needs_you', menu: { id: 'perm:npm publish', title: 'Bash command', options: [], permission: { tool: 'Bash command', command: 'npm publish', question: 'Do you want to proceed?' } } as never, pendingApprovalIds: [] })
   await later(w, e, 11 * MIN)
-  const run = e.runsPage(a.id, null, 1)[0]!
-  assert.deepEqual([run.state, run.reason], ['stopped', 'away'])
+  assert.equal(e.runsPage(a.id, null, 1)[0]!.state, 'needs_you')
   assert.deepEqual(w.interrupted, [], 'no Esc on the owner’s dialog')
 })
 

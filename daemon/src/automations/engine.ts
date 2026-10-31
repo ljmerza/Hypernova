@@ -2240,20 +2240,10 @@ export class Automations {
     }
     if (s.menu || s.state === 'needs_you') {
       // A terminal menu with no approval behind it (a question, a dialog, Claude Code's own
-      // permission prompt) never times out by itself: after 10 minutes it gets Esc, and the run
-      // stops, away, so it neither needs you all night nor keeps the Mac awake and a slot taken.
+      // permission prompt) waits for the owner as long as it takes: never Esc, never a "no"
+      // (owner, 2026-10-30: "keep open forever"; docs/DECISIONS.md, "Never auto-deny").
       seen.needsAt ??= now
-      if (now - seen.needsAt < NEEDS_MAX_MS) return { kind: 'needs' }
-      // Never Esc on the permission dialog of a session the run didn't start (the owner's, its ask
-      // handed back there): that would be a "no" for him (docs/DECISIONS.md, "Never auto-deny").
-      // The run stops following it, away; the dialog stays for him.
-      if (s.menu?.permission && s.automation?.runId !== r.id) return { kind: 'end', state: 'stopped', reason: 'away' }
-      if (seen.escAt == null) {
-        seen.escAt = now
-        log('automation run', r.id, 'a menu waited 10 minutes: Esc')
-        void this.io.interrupt(sid).catch(() => {})
-      }
-      return { kind: 'end', state: 'stopped', reason: 'away' }
+      return { kind: 'needs' }
     }
     seen.needsAt = null
     if (s.state === 'error') return { kind: 'end', state: 'failed', reason: 'error', why: this.io.lastError?.(sid) ?? null }
@@ -2287,7 +2277,8 @@ export class Automations {
     const now = this.io.now()
     const st = this.cur(r)
     const rs = this.rstep(r)
-    if (r.startedAt != null && now - r.startedAt > TIMEOUT_MS) {
+    // A run waiting on the owner isn't timed out: it waits as long as it takes.
+    if (r.startedAt != null && now - r.startedAt > TIMEOUT_MS && r.state !== 'needs_you') {
       // Watched for 12 hours at most. A session it started itself and still at work gets Esc (one
       // it only continued is the owner's own, and is left alone), and the phone hears why.
       for (const sid of r.sessionIds) {
