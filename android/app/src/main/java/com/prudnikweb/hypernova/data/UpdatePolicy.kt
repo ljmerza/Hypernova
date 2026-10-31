@@ -141,6 +141,55 @@ object UpdatePolicy {
     }
 }
 
+/**
+ * Settings → About's update row: "Update available · 0.6.0" and its button while the paired computer
+ * offers a newer app ([update]), with the in-app update's step for that version (the banner's and
+ * the card's flow, data/AppUpdater.kt). [fraction]: the download's, null while its size isn't known.
+ */
+@Immutable
+data class AboutUpdate(
+    val update: AppUpdate,
+    val step: Step,
+    val fraction: Float? = null,
+    val failure: UpdateFailure? = null,
+) {
+    enum class Step { Offered, NeedsPermission, Downloading, Checking, Confirming, Failed }
+
+    /** What the row's button does; none while the update downloads or is checked (its bar says how far). */
+    enum class Action { Update, Allow, Install, TryAgain }
+
+    val action: Action?
+        get() = when (step) {
+            Step.Offered -> Action.Update
+            Step.NeedsPermission -> Action.Allow
+            Step.Downloading, Step.Checking -> null
+            Step.Confirming -> Action.Install
+            Step.Failed -> Action.TryAgain
+        }
+
+    /** The version to name: its versionName, or null when the computer gave none (the row says the build then). */
+    val versionName: String? get() = update.versionName.takeIf { it.isNotBlank() }
+
+    companion object {
+        /**
+         * The row for [offer] (null: no update, no row) with the flow's [state] when the flow is for
+         * that version ([target]); a flow for another version (an older offer) counts as not started.
+         */
+        fun of(offer: AppUpdate?, state: UpdateState, target: AppUpdate?): AboutUpdate? {
+            val u = offer ?: return null
+            val s = state.takeIf { target?.versionCode == u.versionCode } ?: UpdateState.Idle
+            return when (s) {
+                UpdateState.Idle -> AboutUpdate(u, Step.Offered)
+                is UpdateState.NeedsPermission -> AboutUpdate(u, Step.NeedsPermission)
+                is UpdateState.Downloading -> AboutUpdate(u, Step.Downloading, fraction = s.fraction)
+                is UpdateState.Checking -> AboutUpdate(u, Step.Checking, fraction = 1f)
+                is UpdateState.Confirming -> AboutUpdate(u, Step.Confirming)
+                is UpdateState.Failed -> AboutUpdate(u, Step.Failed, failure = s.failure)
+            }
+        }
+    }
+}
+
 /** The flow's steps as a pure function of the state and what happened. */
 object UpdateFlow {
     sealed interface Event {

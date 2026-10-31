@@ -352,6 +352,13 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                             }
                         },
                     )
+                    // A newer app on the Mac: "Update available · 0.6.0" and Update, the banner's flow
+                    // (ui/update AboutUpdateRow); nothing when there's none.
+                    com.prudnikweb.hypernova.data.AboutUpdate.of(
+                        live?.appUpdate,
+                        com.prudnikweb.hypernova.data.AppUpdater.state,
+                        com.prudnikweb.hypernova.data.AppUpdater.target,
+                    )?.let { com.prudnikweb.hypernova.ui.update.AboutUpdateRow(it) }
                     if (live != null) {
                         InfoRow(stringResource(R.string.about_daemon), live.mac.daemonVersion ?: unknown)
                         // Claude Code's version, or that it isn't installed (Codex leads then: data/AgentLead.kt).

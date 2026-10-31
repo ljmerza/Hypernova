@@ -18,9 +18,18 @@ abstract class BuildMinute : ValueSource<Int, ValueSourceParameters.None> {
 val buildMinute: Int = providers.of(BuildMinute::class) {}.get()
 /**
  * The versionName. A release passes its own, `-PappVersion=0.3.1` (scripts/next-version.sh, from
- * the commits since the last release; docs/RELEASING.md, "Versions"); a local build uses this one.
+ * the commits since the last release; docs/RELEASING.md, "Versions"). A local build (`hnctl apk`, a
+ * dev build) says where it stands from git: the last release's tag, and after it the commits since,
+ * the commit and whether it had changes (`git describe`: "0.5.0", "0.5.0-3-g1a2b3c4-dirty"), so
+ * Settings → About names the version it really is. Without git or a tag: "0.0.0-dev".
  */
-val appVersion: String = providers.gradleProperty("appVersion").orNull?.trim()?.takeIf { it.isNotEmpty() } ?: "0.3.0"
+fun gitVersion(): String? = runCatching {
+    providers.exec {
+        commandLine("git", "describe", "--tags", "--match", "v[0-9]*.[0-9]*.[0-9]*", "--dirty")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().removePrefix("v").takeIf { Regex("""\d+\.\d+\.\d+[\w.+-]*""").matches(it) }
+}.getOrNull()
+val appVersion: String = providers.gradleProperty("appVersion").orNull?.trim()?.takeIf { it.isNotEmpty() } ?: gitVersion() ?: "0.0.0-dev"
 
 /**
  * The release key (docs/RELEASING.md): a properties file outside the repo (storeFile, relative to

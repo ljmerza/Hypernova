@@ -624,6 +624,8 @@ class LiveHub(
         class CodexMsg(val c: CodexState?) : Msg
         /** Claude Code as the Mac has it: sessions in `claude agents` turned on or off. */
         class ClaudeMsg(val c: ClaudeState) : Msg
+        /** The app the Mac hands out changed (a release fetched, a build put there, none any more): `app` null for none. */
+        class AppMsg(val app: JSONObject?) : Msg
         data object Ping : Msg
     }
 
@@ -657,6 +659,7 @@ class LiveHub(
         "automation", "automation.removed", "automations", "run", "note" -> AutomationWire.message(o)?.let { Msg.AutoMsgs(it) }
         "ping" -> Msg.Ping
         "lan" -> Msg.LanMsg(LanInfo.parse(o.obj("lan")))
+        "app" -> Msg.AppMsg(o.obj("app"))
         else -> null
     }
 
@@ -712,6 +715,12 @@ class LiveHub(
             is Msg.BatteryMsg -> setBattery(m.b)
             is Msg.AwakeMsg -> macAwake = m.a
             is Msg.FilesMsg -> macBrowse = m.browseOutsideProjects
+            // A newer app now on the Mac, without reconnecting: the banner (App.kt) and Settings follow
+            // [appUpdate]; in the background, the notification once per version.
+            is Msg.AppMsg -> macInfo?.let { info ->
+                macInfo = Wire.withApp(info, m.app)
+                offerUpdate()
+            }
             is Msg.SleepSoonMsg -> sleepSoon(m.s)
             is Msg.BackpackEndingMsg -> backpackEnding(m.s)
             is Msg.SpeechMsg -> speech.message(m.o)
