@@ -2266,3 +2266,24 @@ comes back, but by default the phone's own recognizer may send it to Google, as 
 4. **Both, from Android 13:** `EXTRA_ENABLE_FORMATTING` = `FORMATTING_OPTIMIZE_QUALITY` (punctuation
    and capitals, tuned for quality over speed) and `EXTRA_MASK_OFFENSIVE_WORDS` = false (words as
    said). Older Android gets neither. Whether a recognizer honours them is its own affair.
+
+## Rename, Stop and Delete for Codex sessions (2026-10-31)
+
+The owner couldn't rename or delete a Codex session: the Home card's long-press menu and the
+session sheet's Actions offered nothing for one. Codex's app-server has the calls (its generated
+0.164.0 protocol: `thread/name/set`, `thread/delete`, `thread/archive`), so Hypernova uses Codex's
+own, not a name or a hiding of its own (docs/PROTOCOL.md, "Session menu").
+
+1. **Rename** is Codex's `thread/name/set`: the name is Codex's, so `codex resume` shows it too. A
+   thread Codex never wrote down, or a Codex without the call, keeps the name in Hypernova only.
+2. **Delete** is Codex's `thread/delete`, for good, as `codex delete`; the word stays "Delete"
+   because that is what happens. Asked first like a job's Delete, with its own line: "Codex deletes
+   the conversation for good, so codex resume won't find it either. A terminal open on it closes."
+   Not `thread/archive`: that would be "Archive", and it isn't what the owner asked for. A Codex
+   without the call says so and nothing is forgotten. A `codex delete` elsewhere removes the session
+   from Hypernova too.
+3. **Stop** is the existing interrupt (the turn ends, waiting prompts come back named), offered
+   while the session works or waits on the owner. No Restart: that's `claude agents`' own.
+4. **Home's swipe stays as decided** (HM2: only a job swipes): a Completed Codex card doesn't swipe
+   to Delete, since that one can't be undone. The menu and the session sheet's Actions (the same
+   `MenuOffer`) have it. Nothing new on the chat screen.

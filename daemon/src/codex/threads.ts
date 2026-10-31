@@ -50,6 +50,12 @@ export function saveThread(t: CodexThread): CodexThread {
   save()
   return t
 }
+/** Forget a thread (Codex deleted it): nothing when there's none. */
+export function removeThread(id: string): void {
+  const n = threads.length
+  threads = threads.filter((t) => t.id !== id)
+  if (threads.length !== n) save()
+}
 /** Change a thread's record in place; nothing when there's none. */
 export function patchThread(id: string, patch: Partial<CodexThread>): CodexThread | null {
   const t = getThread(id)

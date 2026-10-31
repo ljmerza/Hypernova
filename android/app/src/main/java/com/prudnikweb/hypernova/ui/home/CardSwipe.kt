@@ -44,7 +44,8 @@ internal enum class CardSwipe { Open, Stop, Delete;
         fun of(group: HomeGroup, s: Session, demo: Boolean = false): CardSwipe? = when (group) {
             HomeGroup.NeedsInput -> Open
             HomeGroup.Working -> null
-            HomeGroup.Completed -> {
+            // Only a job swipes (DECISIONS, HM2): a Codex card's Delete is Codex's for good, from the menu only.
+            HomeGroup.Completed -> if (s.codex) null else {
                 val offer = MenuOffer.of(s)
                 when {
                     demo -> null

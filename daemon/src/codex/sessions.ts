@@ -2,13 +2,13 @@
 // or found in a shared terminal; prompted, stopped and set up over Codex's app-server. A thread
 // is never resumed before Codex has written it down (docs/specs/codex-app-server.md, 1.2).
 import { randomUUID } from 'node:crypto'
-import { ensureParsed, getSession, loadHistory, notice, putEvent, setState, upsertSession } from '../hub.ts'
+import { ensureParsed, forgetSession, getSession, loadHistory, notice, putEvent, setState, upsertSession } from '../hub.ts'
 import { promptTitle, queueView, unsentPrompts, type QueueEntry } from '../normalize.ts'
 import { splitAttachments } from '../attachments.ts'
 import { log, trimText } from '../util.ts'
 import { RpcError, type CodexRpc } from './rpc.ts'
 import { CodexError, codexBinary, codexEnabled, connected, onCodexConnected, onCodexNotification, rpc, setCodexEnabled } from './client.ts'
-import { getThread, isCodex, listThreads, patchThread, saveThread, type CodexMode, type CodexThread } from './threads.ts'
+import { getThread, isCodex, listThreads, patchThread, removeThread, saveThread, type CodexMode, type CodexThread } from './threads.ts'
 import { abandonTurn, droppedNotice, historyEvents, liveOf, onTurnEnded, runningTurn, sentEvent, turnOver } from './events.ts'
 import { onApprovalTimeout } from './approvals.ts'
 import { refreshCodexAccount } from './account.ts'
@@ -378,6 +378,72 @@ export function setCodexMode(id: string, mode: CodexMode): 'now' | 'next_turn' {
   upsertSession(id, { permissionMode: mode })
   return runningTurn(id) ? 'next_turn' : 'now'
 }
+
+// ── The session menu (docs/PROTOCOL.md, "Session menu") ───────────────────
+/** Codex doesn't know the method it was asked (one older than the call). */
+const unknownMethod = (e: unknown) => e instanceof RpcError && (e.code === -32601 || /method not found|unknown variant/i.test(e.message))
+
+/**
+ * Rename: Codex's own thread/name/set, so `codex resume` shows the name too. Kept by Hypernova
+ * alone ('hypernova') for a thread Codex never wrote down, or a Codex that can't name threads.
+ */
+export async function renameCodex(id: string, name: string): Promise<'codex' | 'hypernova'> {
+  const t = getThread(id)
+  if (!t || !getSession(id)) throw new CodexError(404, 'no_session', 'That session no longer exists.')
+  let kept: 'codex' | 'hypernova' = 'hypernova'
+  if (t.started) {
+    const c = await rpc()
+    try {
+      await c.call('thread/name/set', { threadId: id, name })
+      kept = 'codex'
+    } catch (e) {
+      if (!unknownMethod(e)) throw new CodexError(502, 'codex_refused', (e as Error).message)
+      log('codex has no thread/name/set: the name is Hypernova’s only', id.slice(0, 8))
+    }
+  }
+  patchThread(id, { title: name })
+  upsertSession(id, { title: name })
+  return kept
+}
+
+/** Everything this daemon keeps about thread [id], and its session, gone. */
+function forgetCodex(id: string): void {
+  joined.delete(id)
+  read.delete(id)
+  waiting.delete(id)
+  queues.delete(id)
+  next.delete(id)
+  stopAsked.delete(id)
+  removeThread(id)
+  forgetSession(id)
+}
+
+/**
+ * Delete: Codex's own thread/delete, for good (`codex delete`: gone from `codex resume` too), then
+ * Hypernova forgets it. A turn running is stopped first. A thread Codex never wrote down has
+ * nothing to delete there: Hypernova only forgets it.
+ */
+export async function deleteCodex(id: string): Promise<void> {
+  const t = getThread(id)
+  if (!t || !getSession(id)) throw new CodexError(404, 'no_session', 'That session no longer exists.')
+  if (t.started) {
+    const c = await rpc()
+    if (runningTurn(id)) await interruptCodex(id).catch(() => {})
+    try {
+      await c.call('thread/delete', { threadId: id })
+    } catch (e) {
+      if (unknownMethod(e)) throw new CodexError(409, 'codex_too_old', 'This Codex can’t delete conversations. Run `codex update`.')
+      throw new CodexError(502, 'codex_refused', (e as Error).message)
+    }
+  } else if (joined.has(id)) void connected()?.call('thread/unsubscribe', { threadId: id }).catch(() => {})
+  forgetCodex(id)
+}
+
+// Deleted elsewhere (`codex delete` in a terminal): Hypernova forgets it too.
+onCodexNotification((m) => {
+  const id = m.params?.threadId
+  if (m.method === 'thread/deleted' && typeof id === 'string' && isCodex(id)) forgetCodex(id)
+})
 
 // Terminals' threads: taken on and followed as holders report them (terms.ts).
 useCodexHolders({ follow: followTerminal })

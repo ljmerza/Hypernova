@@ -57,8 +57,21 @@ class HomeCardTest {
         assertFalse(MenuOffer.of(session(SessionState.Idle, Phase.Ended, "j1", running = true)).stop)
         // Not a claude agents job: only a rename.
         assertEquals(MenuOffer(rename = true, stop = false, delete = false), MenuOffer.of(session(SessionState.Working, Phase.Working, null)))
-        // Codex's sessions: nothing, so no long-press.
-        assertFalse(MenuOffer.of(session(SessionState.Working, Phase.Working, null, AgentKind.CODEX)).any)
+    }
+
+    @Test fun theMenuOffersRenameStopAndDeleteForCodex() {
+        fun codex(state: SessionState, phase: Phase) = session(state, phase, null, AgentKind.CODEX)
+        // At work or waiting on the owner: Stop (its turn's interrupt) with the rest.
+        assertEquals(MenuOffer(rename = true, stop = true, delete = true), MenuOffer.of(codex(SessionState.Working, Phase.Working)))
+        assertTrue(MenuOffer.of(codex(SessionState.NeedsYou, Phase.NeedsYou)).stop)
+        // At rest or ended: nothing to stop; renamed and deleted all the same.
+        assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(codex(SessionState.Idle, Phase.Idle)))
+        assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(codex(SessionState.Idle, Phase.Ended)))
+        // Never Restart: that's claude agents' own.
+        assertFalse(MenuOffer.of(codex(SessionState.Working, Phase.Working)).restart)
+        // The menu's Delete is for good: a Completed Codex card doesn't swipe to it.
+        assertNull(CardSwipe.of(HomeGroup.Completed, codex(SessionState.Idle, Phase.Idle)))
+        assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, Phase.Idle, "j1", running = false)))
     }
 
     @Test fun readsTheJob() {
