@@ -456,6 +456,39 @@ export async function lan(cli: Cli, rest: string[]): Promise<number> {
   }
 }
 
+// ── auto-update ───────────────────────────────────────────────────────────
+
+/**
+ * `hypernova auto-update [on|off]`: the server updating itself to newer releases (settings.autoUpdate,
+ * off unless turned on; daemon/src/server-update.ts), as the phone's switch does. Without a word, how
+ * it stands: on or off, whether this install can, and the last update it installed.
+ */
+export async function autoUpdate(cli: Cli, rest: string[]): Promise<number> {
+  const want = rest[0]
+  if (want !== undefined && want !== 'on' && want !== 'off') {
+    cli.sys.say('hypernova auto-update [on|off]: this server installs newer Hypernova releases by itself, when no session is working.')
+    return 2
+  }
+  try {
+    if (want) await local(cli, 'POST', '/local/settings', { autoUpdate: want === 'on' })
+    const st = await local(cli, 'GET', '/local/status')
+    const u = st.update as { auto: boolean; available: boolean; reason: string | null; state: string; target: string | null; last: { from: string; to: string; at: number } | null } | undefined
+    if (!u) {
+      line(cli, 'fail', 'This daemon is too old to update itself.')
+      return 1
+    }
+    line(cli, u.auto ? 'ok' : 'info', u.auto ? 'Auto-update is on: newer releases install themselves when no session is working.' : 'Auto-update is off.', u.auto ? undefined : 'hypernova auto-update on turns it on.')
+    if (!u.available) line(cli, u.auto ? 'warn' : 'info', `Auto-update isn’t available here: ${u.reason}`)
+    if (u.state === 'waiting' && u.target) line(cli, 'info', `${u.target} is downloaded and checked, waiting for a quiet moment.`)
+    if (u.state === 'installing' && u.target) line(cli, 'doing', `Installing ${u.target}…`)
+    if (u.last) line(cli, 'info', `Last updated itself from ${u.last.from} to ${u.last.to}, ${new Date(u.last.at).toLocaleString()}.`)
+    return 0
+  } catch (e: any) {
+    line(cli, 'fail', e instanceof ApiError && e.status === 0 ? 'The daemon isn’t running.' : e.message)
+    return 1
+  }
+}
+
 // ── codex ─────────────────────────────────────────────────────────────────
 
 /**
@@ -573,6 +606,8 @@ export const HELP = `hypernova: a control room for Claude Code and Codex, on thi
   hypernova codex [on|off]
                         OpenAI's Codex for Hypernova: what's found here, or turn it on or off
   hypernova lan on|off  the phone's direct route on the same network
+  hypernova auto-update [on|off]
+                        this server installs newer releases by itself (off unless turned on)
   hypernova uninstall   remove it (--purge: paired phones and settings too; --yes)
   hypernova run         run the daemon in the foreground (containers, debugging)
   hypernova automation fire <id>
