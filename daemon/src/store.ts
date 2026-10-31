@@ -49,6 +49,11 @@ export type Settings = {
   webhookPrivateHosts?: string[]
   /** Codex as a second agent (codex/client.ts): Setup turns it on, or the first Codex session from the phone. Unset: off. */
   codex?: boolean
+  /**
+   * The app's GitHub releases (releases.ts): the daemon looks for a newer one at start and every 6
+   * hours and offers its APK to the phones. `POST /local/settings` or settings.json. Unset: on.
+   */
+  releaseCheck?: boolean
 }
 /**
  * A session started from Hypernova. `engine` "term" runs in a shared terminal; "sdk" (or none, from

@@ -125,9 +125,12 @@ prints that page's address (or the release's, when the server carries no APK).
 
 ### The app update
 
-The snapshot's `mac.app` names the APK the computer hands out (`{versionCode, versionName}`); a
+The snapshot's `mac.app` names the APK the computer hands out (`{versionCode, versionName}`), and
+`{t:"app"}` says it again when it changes (see WebSocket); a
 higher `versionCode` than the running app's is an update (a banner once per version, a
-notification while the app is closed, a card in Settings). "Get the update" happens in the app
+notification while the app is closed, a card in Settings, and Settings → About's "Update available
+· 0.6.0" row with **Update**, the same flow as the banner's, with its steps: downloading with its
+percent, checking, Allow, Install, Try again). "Get the update" happens in the app
 (`data/AppUpdater.kt`, its rules in `data/UpdatePolicy.kt`), never in a browser: a browser can't
 check the local listener's own certificate, which only the app pins.
 
@@ -157,6 +160,37 @@ check the local listener's own certificate, which only the app pins.
 
 "Open in browser" stays on the card only where a browser could open the computer's page: an
 `https://` name (never an address, whose certificate only the app pins).
+
+### Where the offered APK comes from
+
+The APK in `<support>/android/` (`hypernova.apk`, with its note `hypernova.json`
+`{versionCode, versionName}`; no note, no offer) is either an admin's (`hnctl apk`; a dev build in
+a checkout's `dist/` counts when `<support>/android/` has none) or **the latest GitHub release's**,
+which the daemon fetches itself (`daemon/src/releases.ts`):
+
+1. **The release.** `GET https://api.github.com/repos/ljmerza/Hypernova/releases/latest`, no
+   token, 30 s after start and every 6 hours, with `If-None-Match` (the last ETag: a 304 means the
+   same release, and its note isn't read again). A 403 or 429 with `X-RateLimit-Remaining: 0`
+   (until `X-RateLimit-Reset`) or `Retry-After`: no request until then. Offline, a 5xx, a 404 (no
+   release): a line in the log, the next look in 6 hours; never a failure of the daemon.
+2. **The note.** The release's `hypernova-<tag>.json` asset (the release workflow attaches it,
+   docs/RELEASING.md): `{versionCode, versionName, sha256}`, `sha256` the APK's (hex). A release
+   without one (from before the notes) offers nothing.
+3. **Newer only.** Its `versionCode` must be higher than the APK handed out now; else nothing is
+   downloaded. So an admin's build with a higher versionCode (`hnctl apk`, versionCodes are build
+   minutes) is never replaced by an older release, nor an equal one.
+4. **The APK.** `hypernova-<tag>.apk` into `<support>/android/.hypernova.apk.<pid>.download`
+   (256 MB at most, its size as the release lists it), its SHA-256 counted on the way. A different
+   SHA-256 than the note's: deleted, nothing offered, tried again at the next look. The
+   versionCode handed out is read again (an admin may have published meanwhile).
+5. **Published** as `hnctl apk` does it: the old `hypernova.json` goes, the APK is renamed into
+   place, then the new note (`{versionCode, versionName, sha256, tag, source: "github"}`) is
+   renamed into place; each rename is atomic in the same folder, so no note ever names another
+   build's file. Then `{t:"app"}` goes out.
+
+The setting `releaseCheck` (default on; `POST /local/settings {releaseCheck}` or `settings.json`)
+turns it off; turned on, it looks at once. `HYPERNOVA_GITHUB_API` points it at another API (tests
+use a fake GitHub on a local port).
 
 ## Local network (direct HTTPS)
 
@@ -484,6 +518,11 @@ objects with a `t` field:
 - `{t:"devices"}` a phone paired (nothing else in it).
 - `{t:"lan", lan: {port, addresses, fingerprint} | null}`: the Mac's private addresses changed, or
   the LAN listener was turned on or off (see Local network (direct HTTPS)).
+- `{t:"app", app: {versionCode, versionName} | null}`: the APK the computer hands out changed (a
+  GitHub release fetched, `hnctl apk`, a dev build, or none any more), as the snapshot's `mac.app`
+  would say it now; the phone updates its offer without reconnecting (see The app update). Looked
+  at every 5 s and at once after a release is fetched; said only when it changed. An app from
+  before it ignores the message (unknown `t`), and keeps the offer it read at connect.
 - `{t:"speech", speech: Speech}`: the Mac's voice or speed changed. `{t:"speech.stop", id}` to the phone app that plays a play; the phone sends
   `{t:"speech.progress", …}` about its own plays; `{t:"speaking", speaking}` to the Mac app's feed
   alone. See Read aloud, "Plays".
@@ -3544,7 +3583,7 @@ The admin token is in `<support>/admin-token` (0600); the `hypernova` command re
 | `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, apk}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`: false for the listener's own address, whose certificate a browser can't check) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started) |
 | `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download}` (see Pairing; `link`, what the QR code carries, is `webLink`, the listener's own pairing page at the computer's address, or `appLink` while the listener is off; `url` is the base URL `u`, that listener). `?dev`: the emulator's base URL and the app link |
 | `POST /local/automations/{id}/fire` | the payload (≤ 64 KB, text) → `{run}`: fires an automation's webhook trigger. Takes `Authorization: Bearer <that automation's fire token>` (or the admin token): the one `/local` route that does. 401 `bad_token`; 409 `paused`, `off`, `not_webhook`; 413, 415 (see Automations, "Workflows") |
-| `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, browseOutsideProjects?: boolean, codex?: boolean, claudeAgents?: boolean}` (`projectsRoot` kept only when that folder exists; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex; `claudeAgents`, sessions in `claude agents`, as `POST /v1/claude`) → the settings |
+| `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, browseOutsideProjects?: boolean, codex?: boolean, claudeAgents?: boolean, releaseCheck?: boolean}` (`projectsRoot` kept only when that folder exists; `releaseCheck` the app's GitHub releases, see The app update, "Where the offered APK comes from"; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex; `claudeAgents`, sessions in `claude agents`, as `POST /v1/claude`) → the settings |
 | `POST /local/integration/install` / `uninstall` | hooks + status line tee + the `claude` shell function (reversible, marked) |
 | `GET /local/devices`, `DELETE /local/devices/{id}` | paired phones: `{id, name, model, createdAt, lastSeenAt, appVersion?, client?, certFingerprint?, certExpiresAt?}` (`certFingerprint`: its device certificate's, once it has one, and `certExpiresAt` when that runs out, epoch ms). Deleting one revokes its certificate too |
 | `/v1/*` | the whole phone API is also available with the admin token |
