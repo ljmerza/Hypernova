@@ -20,7 +20,7 @@
     </plurals>
     <string name="stats_said_hm">%1$s %2$s</string>
 
-    <!-- The galaxy's readout: a day's Codex share after its hours and tokens ("CODEX 5m"); TalkBack appends it. -->
+    <!-- The last 30 days' readout:a day's Codex share after its hours and tokens ("CODEX 5m"); TalkBack appends it. -->
     <string name="stats_day_codex_said">%1$s, Codex %2$s</string>
 
     <!-- The streak, the footer and the loading line, for both agents and for Codex alone. -->

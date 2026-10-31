@@ -1,9 +1,12 @@
 package com.prudnikweb.hypernova.ui.stats
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,26 +30,35 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,6 +72,7 @@ import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Problem
+import com.prudnikweb.hypernova.data.StatDay
 import com.prudnikweb.hypernova.data.StatProject
 import com.prudnikweb.hypernova.data.Stats
 import com.prudnikweb.hypernova.data.StatsAgents
@@ -93,6 +105,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.PI
+import kotlin.math.max
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -109,8 +122,8 @@ private const val STATS_SOURCE = "stats"
 
 /**
  * Statistics, opened by tapping the sun: how much the agents worked on the Mac, in the range picked
- * (Today, Week, Month, All). The hours and the work behind them, the last 30 days as a spiral
- * galaxy, the projects as planets, and a few records. The Mac adds it up from Claude Code's
+ * (Today, Week, Month, All). The hours and the work behind them, the last 30 days as a bar a day,
+ * the projects as planets, and a few records. The Mac adds it up from Claude Code's
  * transcripts and the Codex turns it followed; this asks for it when the screen opens or the range
  * changes (showing the last answer at once), then every minute while open. Back (the arrow or the
  * gesture) is [onBack]. Every total covers both agents; with Codex at work in the range the hero
@@ -125,7 +138,7 @@ fun StatsScreen(hub: Hub, onBack: () -> Unit) {
     var loading by remember(hub) { mutableStateOf(false) }
     var problem by remember(hub) { mutableStateOf<ApiException?>(null) }
     var retry by remember { mutableIntStateOf(0) }
-    // The day the galaxy's readout shows (epoch day); none picked: today.
+    // The day the last 30 days' readout shows (epoch day); none picked: today.
     var picked by rememberSaveable { mutableStateOf<Long?>(null) }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -216,10 +229,10 @@ fun StatsScreen(hub: Hub, onBack: () -> Unit) {
                         HText(stringResource(R.string.stats_stale, at), style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 20.dp))
                     }
                     item(key = "hero") { Hero(s, agents, Modifier.padding(horizontal = 16.dp)) }
-                    item(key = "galaxy") {
+                    item(key = "days") {
                         val today = s.days.lastOrNull()?.day
                         val day = picked?.let { p -> s.days.firstOrNull { it.day.toEpochDay() == p } } ?: s.days.lastOrNull()
-                        GalaxySection(s, day?.day ?: today, onSelect = { picked = it.toEpochDay() }, agents = agents)
+                        DaysSection(s, day?.day ?: today, onSelect = { picked = it.toEpochDay() }, agents = agents)
                     }
                     if (s.projects.isNotEmpty()) item(key = "projects") { Projects(s) }
                     item(key = "records") { Records(s, agents) }
@@ -385,63 +398,188 @@ private fun MiniStat(value: String, label: String, modifier: Modifier = Modifier
     }
 }
 
-// ─── The galaxy ────────────────────────────────────────────────────────────
+// ─── The last 30 days ──────────────────────────────────────────────────────
 
+/**
+ * The last 30 days, a card like the others: a bar a day ([DayBarsChart]) and under it the picked
+ * day's line (`SAT 31 OCT  ⏱ 9h 17m  ⬡ 435M`), today until another is picked. The seam's trail
+ * counts the days with work.
+ */
 @Composable
-private fun GalaxySection(s: Stats, selected: LocalDate?, onSelect: (LocalDate) -> Unit, agents: StatsAgents = StatsAgents.Claude) {
+private fun DaysSection(s: Stats, selected: LocalDate?, onSelect: (LocalDate) -> Unit, agents: StatsAgents = StatsAgents.Claude) {
     val res = LocalContext.current.resources
     val active = s.days.count { it.claudeMs > 0 }
     val day = s.days.firstOrNull { it.day == selected }
-    // With both agents at work, a day's Codex share follows its hours and tokens (a star is both agents' hours).
+    // With both agents at work, a day's Codex share follows its hours and tokens (a bar is both agents' hours).
     val codexPart = day?.takeIf { d -> agents == StatsAgents.Both && d.codexMs >= 60_000L && d.claudeMs > 0 }?.codexMs
     val readout = day?.let {
         if (it.claudeMs <= 0) res.getString(R.string.stats_day_none)
         else res.getString(R.string.stats_day_said, hours(res, it.claudeMs), compact(res, it.tokens))
             .let { said -> codexPart?.let { c -> res.getString(R.string.stats_day_codex_said, said, hours(res, c)) } ?: said }
     }
+    // TalkBack: the chart in a sentence (its busiest day), then the picked day.
+    val busiest = DayBars.busiest(s.days.map { it.claudeMs })
+    val summary = if (busiest < 0) stringResource(R.string.a11y_stats_days_none)
+    else stringResource(R.string.a11y_stats_days, hoursSaid(res, s.days[busiest].claudeMs), dayName(s.days[busiest].day))
+    val picked = listOfNotNull(day?.let { dayName(it.day) }, readout).joinToString(", ")
     Column(Modifier.fillMaxWidth()) {
         Seam(
-            stringResource(R.string.stats_galaxy),
+            stringResource(R.string.stats_last_days),
             trail = pluralStringResource(R.plurals.stats_active_days, active, active),
-            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 18.dp),
+            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 18.dp, bottom = 12.dp),
         )
-        Galaxy(
-            days = s.days,
-            lit = if (s.range == StatsRange.All) 30 else s.range.days,
-            selected = day?.day,
-            onSelect = onSelect,
-            description = stringResource(R.string.a11y_stats_galaxy, listOfNotNull(day?.let { dayName(it.day) }, readout).joinToString(", ")),
-            modifier = Modifier.fillMaxWidth().aspectRatio(1.5f),
-        )
-        // The readout holds its place under the galaxy, as the sun's does under the sun.
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { liveRegion = LiveRegionMode.Polite },
-            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (day != null) {
-                // The name gives way first when the figures need the room (large fonts, Codex's share too).
-                HText(dayName(day.day).uppercase(), style = Type.label, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                Spacer(Modifier.width(12.dp))
-                // Its hours after a stopwatch and its tokens after a token, as the legend says the
-                // star draws them (size, light); a day without work in words.
-                if (day.claudeMs > 0) {
-                    GlyphFigure(Glyph.Timer, hours(res, day.claudeMs))
-                    Spacer(Modifier.width(12.dp))
-                    GlyphFigure(Glyph.Token, compact(res, day.tokens))
-                    if (codexPart != null) {
-                        Spacer(Modifier.width(12.dp))
-                        HText(stringResource(R.string.cx_agent_codex).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
-                        Spacer(Modifier.width(6.dp))
-                        HText(hours(res, codexPart), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
-                    }
-                } else HText(readout.orEmpty(), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+        GlassCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+            Column(Modifier.padding(horizontal = 16.dp).padding(top = 14.dp, bottom = 12.dp)) {
+                DayBarsChart(
+                    days = s.days,
+                    lit = if (s.range == StatsRange.All) 30 else s.range.days,
+                    selected = day?.day,
+                    onSelect = onSelect,
+                    description = listOf(summary, picked).filter { it.isNotEmpty() }.joinToString(" "),
+                    modifier = Modifier.fillMaxWidth().height(132.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+                Hairline(Modifier.fillMaxWidth(), HN.lineSoft)
+                Spacer(Modifier.height(10.dp))
+                DayLine(day, codexPart, readout)
             }
         }
-        Spacer(Modifier.height(8.dp))
-        HText(
-            stringResource(R.string.stats_galaxy_legend), style = Type.small.copy(textAlign = TextAlign.Center), color = HN.inkDim,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 36.dp),
+    }
+}
+
+/** The picked day's line, holding its place under the chart: its name, its hours after a stopwatch, its tokens after a token. */
+@Composable
+private fun DayLine(day: StatDay?, codexPart: Long?, readout: String?) {
+    val res = LocalContext.current.resources
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 20.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (day != null) {
+            // The name gives way first when the figures need the room (large fonts, Codex's share too).
+            HText(dayName(day.day).uppercase(), style = Type.label, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Spacer(Modifier.width(12.dp))
+            // Its hours after a stopwatch and its tokens after a token; a day without work in words.
+            if (day.claudeMs > 0) {
+                GlyphFigure(Glyph.Timer, hours(res, day.claudeMs))
+                Spacer(Modifier.width(12.dp))
+                GlyphFigure(Glyph.Token, compact(res, day.tokens))
+                if (codexPart != null) {
+                    Spacer(Modifier.width(12.dp))
+                    HText(stringResource(R.string.cx_agent_codex).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
+                    Spacer(Modifier.width(6.dp))
+                    HText(hours(res, codexPart), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
+                }
+            } else HText(readout.orEmpty(), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+        }
+    }
+}
+
+/**
+ * A bar a day, oldest on the left: its height the day's hours of work against the scale's top (a
+ * round figure of hours, [DayBars.scaleHours], marked by a dashed hairline with its hours), today's
+ * in the accent, the others accent-dim, a day without work a faint tick on the baseline. Under the
+ * bars the first day, the middle one and TODAY. Days outside the chosen range ([lit]: how many of
+ * the latest are in it) stay, fainter. A tap or a drag across the bars picks a day ([onSelect]):
+ * a faint column behind it and its bar brighter. TalkBack hears [description], and the day before
+ * and after as actions. The bars grow in once; under Reduce Motion they're simply there.
+ */
+@Composable
+private fun DayBarsChart(
+    days: List<StatDay>,
+    lit: Int,
+    selected: LocalDate?,
+    onSelect: (LocalDate) -> Unit,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    val res = LocalContext.current.resources
+    val reduced = LocalMotion.current.reduced
+    val litAnim by animateFloatAsState(lit.toFloat(), if (reduced) snap() else tween(Motion.SECTION, easing = Motion.Expo), label = "lit")
+    val grow = remember { Animatable(if (reduced) 1f else 0f) }
+    LaunchedEffect(Unit) { grow.animateTo(1f, tween(900, easing = Motion.Expo)) }
+    val ms = remember(days) { days.map { it.claudeMs } }
+    val heights = remember(ms) { DayBars.heights(ms) }
+    val measurer = rememberTextMeasurer()
+    val scale = res.getString(R.string.stats_h, DayBars.scaleHours(ms.maxOrNull() ?: 0L))
+    val scaleLayout = remember(measurer, scale) { measurer.measure(scale, Type.monoSmall.copy(color = HN.inkDim)) }
+    val today = stringResource(R.string.stats_today_tick).uppercase()
+    val labels = remember(measurer, days, today) {
+        DayBars.labelDays(days.size).map { i ->
+            if (i == days.lastIndex) measurer.measure(today, Type.label.copy(color = HN.inkMuted))
+            else measurer.measure(dateName(days[i].day).uppercase(), Type.label.copy(color = HN.inkDim))
+        }
+    }
+    val labelWidths = remember(labels) { FloatArray(labels.size) { labels[it].size.width.toFloat() } }
+    val sel = days.indexOfFirst { it.day == selected }
+    val now = rememberUpdatedState(days)
+    val select = rememberUpdatedState(onSelect)
+    fun pick(x: Float, width: Int) {
+        val d = now.value
+        DayBars.indexAt(x, width.toFloat(), d.size).takeIf { it >= 0 }?.let { select.value(d[it].day) }
+    }
+    val prev = stringResource(R.string.a11y_stats_prev_day)
+    val next = stringResource(R.string.a11y_stats_next_day)
+    Canvas(
+        modifier
+            .semantics {
+                contentDescription = description
+                customActions = listOfNotNull(
+                    days.getOrNull(sel - 1)?.let { d -> CustomAccessibilityAction(prev) { onSelect(d.day); true } },
+                    days.getOrNull(sel + 1)?.let { d -> CustomAccessibilityAction(next) { onSelect(d.day); true } },
+                )
+            }
+            .pointerInput(Unit) { detectTapGestures { p -> pick(p.x, size.width) } }
+            .pointerInput(Unit) {
+                // Across only: an up-and-down drag stays the screen's scroll.
+                detectHorizontalDragGestures(onDragStart = { p -> pick(p.x, size.width) }) { change, _ ->
+                    change.consume()
+                    pick(change.position.x, size.width)
+                }
+            },
+    ) {
+        val n = days.size
+        if (n == 0) return@Canvas
+        val w = size.width
+        val u = 1.dp.toPx()
+        // The scale's hours sit over its hairline; the labels under the baseline.
+        val top = scaleLayout.size.height + 4 * u
+        val labelGap = 8 * u
+        val base = size.height - (labels.maxOfOrNull { it.size.height } ?: 0) - labelGap
+        val chart = (base - top).coerceAtLeast(0f)
+
+        drawText(scaleLayout, topLeft = Offset(0f, 0f))
+        drawLine(
+            HN.line, Offset(scaleLayout.size.width + 8 * u, top), Offset(w, top), strokeWidth = u,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * u, 3 * u)),
         )
+
+        if (sel in 0 until n) {
+            val slot = w / n
+            drawRoundRect(HN.ink.copy(alpha = 0.06f), Offset(slot * sel, top), Size(slot, base - top + 3 * u), CornerRadius(3 * u))
+        }
+
+        val bw = DayBars.barWidth(w, n)
+        val corner = CornerRadius(minOf(bw / 2f, 2 * u))
+        for (i in 0 until n) {
+            val x = DayBars.barLeft(i, w, n)
+            val shown = 0.35f + 0.65f * DayBars.lit(i, n, litAnim)
+            if (days[i].claudeMs <= 0L) {
+                drawRect(HN.inkDim.copy(alpha = 0.55f * shown), Offset(x, base - 1.5f * u), Size(bw, 1.5f * u))
+                continue
+            }
+            // Even a few minutes stand clear of a tick.
+            val h = max(3 * u, chart * heights[i] * grow.value)
+            val colour = when (i) {
+                n - 1 -> HN.accent
+                sel -> HN.accentBright
+                else -> HN.accentDim
+            }
+            drawRoundRect(colour.copy(alpha = shown), Offset(x, base - h), Size(bw, h), corner)
+        }
+
+        val lefts = DayBars.labelLefts(n, w, labelWidths, 8 * u)
+        for (k in labels.indices) if (!lefts[k].isNaN()) drawText(labels[k], topLeft = Offset(lefts[k], base + labelGap))
     }
 }
 
