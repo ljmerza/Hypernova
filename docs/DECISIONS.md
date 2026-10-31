@@ -2552,5 +2552,33 @@ want to be able to select the session and see the details too."
    launcher shortcut or Share keeps to the one picked.
 7. **The chip says "All"** on the Sessions tab, its moon the worst of their links; History,
    Automations and Settings show the one picked last, the chip naming it; Statistics' subtitle
-   names it. Switching tabs doesn't leave All.
+   names it. Switching tabs doesn't leave All. (Settings no longer: "All servers in Settings" below.)
 8. **Unchanged:** notifications, the widget, the chat screen; no daemon change.
+
+### All servers in Settings (2026-10-31)
+
+The owner: "it's weird that certain things are being defaulted back to Z2 when you're in all view,
+this shouldn't happen ... disable whatever settings don't make sense or have them combined if that
+makes sense, such as server settings, you would just see all of them one by one." Before, All
+servers only hid the server's parts and left the rest on the one picked. Now nothing in Settings
+acts on the one picked while All servers is on (`ui/settings/SettingsPlan.kt` decides what shows):
+
+1. **Each server's own settings, one block per server**, in the order they were paired, each under
+   its name and link (a title-sized heading with the connection chip): its card (Stay awake and the
+   battery, the route and address, its daemon, Claude Code and Codex versions, Retry while it can't
+   be reached, **Forget**, which forgets that server, not the one picked), **Agents & providers**
+   (opening it makes that server the one on screen for those screens, as a session's does, until
+   Home is back), **Read aloud** (its voices and speed; each Test its own), **Files** (Browse outside
+   projects) and the testing checklist when unlocked. Each block reads and writes its own server
+   only. "Turn on in Settings" from a session's files scrolls to that session's server's Files.
+2. **A server that isn't connected shows its card alone**, saying "Its settings show here once it's
+   connected." with its problem and Retry, and Forget: no controls from its last snapshot.
+3. **Then "This phone"**: Voice recognition, New sessions, Display, Card swipes, Session top bar,
+   Typing, Notifications (Stay connected in the background is one setting for every server's
+   link), the connection log (once: it is the phone's, every server's lines in it) and About.
+4. **About's update offers the newest app any connected server has** (the one picked first on a
+   tie), downloaded from the server that offers it (`AppUpdate.server`; before, the download always
+   went to the one on screen). The app is the phone's, so one row, whoever offers it; the versions
+   of each server's software are in its own card.
+5. **Unchanged:** Settings with one server picked; nothing on the session chat screen; the update
+   banner and the update notification still follow the one on screen.
