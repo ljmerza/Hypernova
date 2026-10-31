@@ -2540,7 +2540,7 @@ want to be able to select the session and see the details too."
    one computer, without becoming the one picked; **Back to Home** is "All servers" again and the
    one picked is back on screen (`Core.visit`, `Core.backToPicked`). A notification or widget tap
    while All is chosen opens its session the same way and All stays; their other taps switch, as before.
-4. **The cards above the sessions and the usage cards are the one picked last's** (account,
+4. **The cards above the sessions are the one picked last's** (account,
    providers, prompts for gone sessions, outdated jobs, automation questions, the offline card),
    each saying its name: per-computer cards for everything would crowd Home, and a session another
    computer's limit or sign-out stops already says so on its own card (its PAUSED or SIGNED OUT chip).
@@ -2554,3 +2554,12 @@ want to be able to select the session and see the details too."
    Automations and Settings show the one picked last, the chip naming it; Statistics' subtitle
    names it. Switching tabs doesn't leave All.
 8. **Unchanged:** notifications, the widget, the chat screen; no daemon change.
+9. **The usage cards are every computer's** (owner, the same day: "a card for each Claude Code or
+   Codex instance for all the servers at the bottom"; `AllUsage` in `ui/home/UsageCards.kt`): under
+   the sessions, each computer's own cards by the one-computer rule (Claude's where Claude Code is
+   installed, Codex's while in use, "Claude usage" and "Codex usage" only where both show there),
+   in the order paired, each with the computer's name after its title. Two computers on the same
+   Claude account each keep their card (the phone can't tell one account from two, and the owner
+   asked for one per instance). An offline computer's stay, dimmed, `z2 offline`, as its sessions'
+   cards do (the last numbers it sent, still worth seeing; dropping them would make cards come and
+   go with the link). Statistics stays the one picked last's; with one computer nothing changes.
