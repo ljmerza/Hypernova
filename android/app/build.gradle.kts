@@ -95,6 +95,9 @@ android {
         compose = true
         buildConfig = true
     }
+    // The protocol's contract fixtures, shared with the daemon's tests (docs/PROTOCOL.md, "Contract
+    // fixtures"): on the unit tests' classpath as fixtures/*.json, so a changed fixture runs them again.
+    sourceSets.getByName("test").resources.srcDir("../../protocol")
 }
 
 dependencies {

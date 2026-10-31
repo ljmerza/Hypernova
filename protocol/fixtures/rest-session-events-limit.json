@@ -1,0 +1,18 @@
+{
+  "events": [
+    {
+      "id": "l1",
+      "kind": "user",
+      "ts": 1800000000000,
+      "text": "Port the plugin"
+    },
+    {
+      "id": "l2",
+      "kind": "notice",
+      "ts": 1800000000000,
+      "text": "You've hit your session limit · resets 2am",
+      "tone": "warn",
+      "blocker": "limit"
+    }
+  ]
+}

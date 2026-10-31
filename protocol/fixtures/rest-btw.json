@@ -1,0 +1,12 @@
+{
+  "aside": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "question": "Why does the parser wrap around?",
+    "state": "answered",
+    "answer": "The parser keeps its tokens in a ring buffer of 64 entries, so a lookahead past that many tokens wraps around and reads stale ones. That only happens in the generated fixtures.\n\n- src/parser.ts: the buffer\n- src/lexer.ts: where tokens are made",
+    "error": null,
+    "clipped": false,
+    "askedAt": 1800000000000,
+    "at": 1800000000000
+  }
+}

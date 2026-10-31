@@ -1,0 +1,14 @@
+{
+  "t": "codex",
+  "codex": {
+    "available": true,
+    "enabled": false,
+    "connected": false,
+    "version": "0.163.0",
+    "min": "0.163.0",
+    "path": "/tmp/hn/codex",
+    "problem": null,
+    "account": null,
+    "usage": null
+  }
+}

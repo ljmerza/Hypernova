@@ -1,0 +1,17 @@
+{
+  "t": "providers",
+  "providers": [
+    {
+      "id": "anthropic",
+      "name": "Claude (your subscription)",
+      "kind": "anthropic",
+      "baseUrl": null,
+      "models": {},
+      "builtIn": true,
+      "hasKey": false,
+      "paid": false,
+      "status": null,
+      "balance": null
+    }
+  ]
+}

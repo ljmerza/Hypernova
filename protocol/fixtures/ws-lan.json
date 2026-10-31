@@ -1,0 +1,10 @@
+{
+  "t": "lan",
+  "lan": {
+    "port": 47323,
+    "addresses": [
+      "192.168.1.20"
+    ],
+    "fingerprint": "abababababababababababababababababababababababababababababababab"
+  }
+}

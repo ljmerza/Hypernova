@@ -41,6 +41,28 @@ must ignore unknown fields and unknown enum values (show them generically).
 - **Providers**: every Hypernova session runs Claude Code with a provider
   profile, applied as environment variables (see Providers).
 
+## Contract fixtures
+
+`protocol/fixtures/` holds one golden JSON file for each message and answer the app parses: the
+snapshot (`snapshot.json`), the live feed's messages (`ws-*.json`) and the routes' answers
+(`rest-*.json`). Two suites read them:
+
+- **The daemon** (`daemon/test/contract.test.ts`) builds each shape through its own code (the hub's
+  views, the routes over HTTP, the broadcasts as a phone hears them) and fails when one no longer
+  deep-equals its file. Times, random ids, the scratch folder, this machine's name and the local
+  listener's port and key are normalised first (every time is `1800000000000`, a UUID the test
+  didn't pick is `00000000-0000-4000-8000-00000000000N` in the order it first appears).
+- **The app** (`android/app/src/test/.../data/ContractTest.kt`) runs every file through its own
+  parsers (`Wire`, `LiveHub`'s helpers, `ChangesRepo`, `PermissionRulesWire`…) and checks the
+  fields it reads. Gradle puts the folder on the unit tests' classpath, so a changed fixture runs
+  them again. A fixture without a check there, or a check without its fixture, fails.
+
+The rule: change the protocol, then the fixtures, then both suites must pass. A shape changed on
+purpose is written again with `UPDATE_FIXTURES=1 npm test` in `daemon/` (or `UPDATE_FIXTURES=1 node
+--test test/contract.test.ts`), which also deletes fixtures no test makes any more; review the diff,
+then make `./gradlew :app:testDebugUnitTest` pass. Never edit a fixture by hand to make one side
+pass: the daemon's suite would fail on it next.
+
 ## Transport and auth
 
 - Phones use the local route: `https://<the computer's private address>:47323`, the daemon's own

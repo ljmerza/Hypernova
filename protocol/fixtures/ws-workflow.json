@@ -1,0 +1,29 @@
+{
+  "t": "workflow",
+  "workflow": {
+    "id": "wf_0a1b2c3d-4e5",
+    "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+    "toolUseId": "toolu_wf",
+    "taskId": "w1a2b3c4d",
+    "name": "parser-survey",
+    "summary": "Survey the parser, then fix it",
+    "status": "running",
+    "phases": [
+      {
+        "title": "Survey",
+        "detail": "Read the code"
+      },
+      {
+        "title": "Implement",
+        "detail": null
+      }
+    ],
+    "agentCount": 1,
+    "done": 1,
+    "failed": 0,
+    "startedAt": 1800000000000,
+    "endedAt": null,
+    "tokens": null,
+    "toolUses": null
+  }
+}

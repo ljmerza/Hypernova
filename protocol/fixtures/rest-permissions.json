@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "sources": [
+      {
+        "source": "local",
+        "path": "/home/me/Projects/app-parser-fix/.claude/settings.local.json",
+        "state": "missing",
+        "allow": [],
+        "ask": [],
+        "deny": [],
+        "defaultMode": null,
+        "additionalDirectories": [],
+        "clipped": false
+      },
+      {
+        "source": "project",
+        "path": "/home/me/Projects/app-parser-fix/.claude/settings.json",
+        "state": "ok",
+        "allow": [
+          "Bash(npm test *)"
+        ],
+        "ask": [],
+        "deny": [
+          "Read(./.env)"
+        ],
+        "defaultMode": "acceptEdits",
+        "additionalDirectories": [],
+        "clipped": false
+      },
+      {
+        "source": "user",
+        "path": "/tmp/hn/claude/settings.json",
+        "state": "ok",
+        "allow": [],
+        "ask": [
+          "Bash(git push *)"
+        ],
+        "deny": [],
+        "defaultMode": null,
+        "additionalDirectories": [
+          "~/shared"
+        ],
+        "clipped": false
+      }
+    ],
+    "managedOnly": false
+  }
+}

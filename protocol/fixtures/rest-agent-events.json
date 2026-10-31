@@ -1,0 +1,36 @@
+{
+  "events": [
+    {
+      "id": "s1",
+      "kind": "user",
+      "ts": 1800000000000,
+      "text": "Read parser.ts and review it."
+    },
+    {
+      "id": "t:msg-s2",
+      "kind": "assistant",
+      "ts": 1800000000000,
+      "text": "Reading the parser.",
+      "streaming": false
+    },
+    {
+      "id": "tu-read",
+      "kind": "tool",
+      "ts": 1800000000000,
+      "toolUseId": "tu-read",
+      "name": "Read",
+      "summary": "app-parser-fix/parser.ts",
+      "input": {
+        "file_path": "/home/me/Projects/app-parser-fix/parser.ts"
+      },
+      "status": "running",
+      "output": null,
+      "exitCode": null,
+      "durationMs": null,
+      "diff": null,
+      "path": "/home/me/Projects/app-parser-fix/parser.ts"
+    }
+  ],
+  "cursor": "cursor",
+  "full": true
+}

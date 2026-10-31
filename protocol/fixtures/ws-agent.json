@@ -1,0 +1,23 @@
+{
+  "t": "agent",
+  "agent": {
+    "id": "a0123456789abcdef",
+    "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+    "toolUseId": "toolu_agent",
+    "parentAgentId": null,
+    "workflowId": null,
+    "phase": null,
+    "label": "Review the parser",
+    "type": "Explore",
+    "model": "claude-sonnet-5-5",
+    "background": true,
+    "status": "running",
+    "activity": null,
+    "startedAt": 1800000000000,
+    "endedAt": null,
+    "lastActivityAt": 1800000000000,
+    "tokens": null,
+    "toolUses": null,
+    "result": null
+  }
+}
