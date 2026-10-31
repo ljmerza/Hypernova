@@ -196,8 +196,9 @@ which the daemon fetches itself (`daemon/src/releases.ts`):
    (until `X-RateLimit-Reset`) or `Retry-After`: no request until then. Offline, a 5xx, a 404 (no
    release): a line in the log, the next look in 6 hours; never a failure of the daemon.
 2. **The note.** The release's `hypernova-<tag>.json` asset (the release workflow attaches it,
-   docs/RELEASING.md): `{versionCode, versionName, sha256}`, `sha256` the APK's (hex). A release
-   without one (from before the notes) offers nothing.
+   docs/RELEASING.md): `{versionCode, versionName, sha256, serverSha256}`, `sha256` the APK's and
+   `serverSha256` the server package's (hex; from 2026-10-31, see The server's own update). A
+   release without a note (from before the notes) offers nothing.
 3. **Newer only.** Its `versionCode` must be higher than the APK handed out now; else nothing is
    downloaded. So an admin's build with a higher versionCode (`hnctl apk`, versionCodes are build
    minutes) is never replaced by an older release, nor an equal one.
@@ -213,6 +214,63 @@ which the daemon fetches itself (`daemon/src/releases.ts`):
 The setting `releaseCheck` (default on; `POST /local/settings {releaseCheck}` or `settings.json`)
 turns it off; turned on, it looks at once. `HYPERNOVA_GITHUB_API` points it at another API (tests
 use a fake GitHub on a local port).
+
+### The server's own update
+
+Off unless the owner turns it on (`autoUpdate`; docs/DECISIONS.md, "Servers update themselves, off
+by default"): `POST /v1/mac/update {autoUpdate}` from the phone (Settings, the server's section:
+**Update this server automatically**), `hypernova auto-update on|off`, or `POST /local/settings
+{autoUpdate}`. The release check above hands each release it reads to `daemon/src/server-update.ts`
+after the APK's part (it looks while `releaseCheck` is off too, for this alone), so the phones are
+offered the release's app before the server restarts.
+
+```ts
+ServerUpdate = {
+  auto: boolean,                 // the setting
+  available: boolean,            // this install can update itself…
+  reason: string | null,         // …else why not, a sentence to show ("Installed from a checkout: …")
+  state: "idle" | "waiting" | "installing",   // waiting: downloaded and checked, for a quiet moment
+  target: string | null,         // the release's tag while waiting or installing
+  last: {from, to, at} | null,   // the last update it installed by itself (versions, epoch ms)
+}
+```
+
+1. **Only an install the installer manages**: Linux, not in a container, this daemon running from
+   `<app>/daemon` (`HYPERNOVA_APP`, else `<support>/app`), which `hypernova setup` put there from a
+   release's package: its `install.json` says `{"source": "package"}` (setup writes `checkout` when
+   it installs from a git checkout: `scripts/install-linux.sh` in a clone, `hnctl update`; an
+   install from before the marker has none), started by its systemd user service (`INVOCATION_ID`,
+   and `hypernova.service` running this daemon's `main.ts`), with `systemd-run` there. Anything
+   else is `available: false` with its reason, in the log once.
+2. **Newer only.** The release's tag (`vX.Y.Z`) must be a higher version than the daemon's
+   (`daemonVersion`); an equal, older or other tag installs nothing.
+3. **The package, checked.** The note's `serverSha256` (the release's
+   `hypernova-server-<tag>-linux.tar.gz`; releases from before 2026-10-31 have none, and install
+   nothing, logged); the package (128 MB at most, its listed size) into `<support>/updates/`, its
+   SHA-256 counted on the way, unpacked with `tar` into a new folder there, which must hold one
+   `hypernova-<version>/` with `scripts/install-linux.sh` and a daemon whose version is the tag's.
+4. **A quiet moment**: no session `working` or `starting` and no approval waiting, 2 minutes on end
+   (looked at every 15 s); after 24 hours it goes ahead anyway. Turned off meanwhile: nothing.
+5. **The install**, in a transient systemd unit of the user's (`systemd-run --user
+   --unit=hypernova-update`, `daemon/src/server-update.sh`, its output in `<logs>/update.log`), with
+   the service's environment: a copy of the installed daemon is kept, then the package's own
+   `scripts/install-linux.sh --from <it> --yes --no-claude` installs it as a manual update does
+   (the new daemon swapped in only once its terminal module works, the service written again and
+   restarted). The new daemon must answer `/v1/health` within 60 s (a service still on the old
+   process is restarted first); else the copy goes back and the service restarts on it. The unit
+   writes `<support>/updates/result.json` `{tag, code, at}`: 0 updated, 3 no copy could be kept,
+   4 went back, else the install's own exit (the server as it was).
+6. **After.** The waiting install is kept in `<support>/server-update.json`; the new daemon, at
+   start, finds itself its version, logs "this server updated itself from A to B", sets `last`
+   and looks at the releases 5 s after start (rather than 30 s). The old daemon, or one restarted
+   on it, reads a failed result (or an install not back within an hour) as a failure.
+7. **Failures** (a download, a checksum, the package, the install) leave the running server as it
+   was, are logged, and wait before the same release is tried again: 1 hour, 6, 24, then not again
+   until the setting is turned off and on or a newer release comes.
+
+The phone shows the switch only from a daemon that sends `mac.update`, with its line: what it does,
+or `reason`, or what it's doing, and `last`. When the daemon's version changes between two
+snapshots, the phone's connection log says so ("the server updated: A → B").
 
 ## Local network (direct HTTPS)
 
@@ -459,6 +517,8 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/mac/awake` | → `{awake: Awake}` (see Stay awake) |
 | `GET /v1/mac/files` | → `{files: {browseOutsideProjects}}` (see Files, The setting) |
 | `POST /v1/mac/files` | `{browseOutsideProjects: boolean}` → `{files}`; goes out as `{t:"files"}` with the sessions it opens or closes. 400 `bad_value` |
+| `GET /v1/mac/update` | → `{update: ServerUpdate}` (see The server's own update) |
+| `POST /v1/mac/update` | `{autoUpdate: boolean}` → `{update}`: Update this server automatically on or off, saved at once; on, the releases are looked at now. Goes out as `{t:"update"}`. 400 `bad_value` |
 | `POST /v1/mac/awake` | `{mode?: "working" \| "backpack" \| "off", minBattery?: 5–50}` or `{extend: true}` (Backpack's "+2 h", in its last 10 minutes; 409 `too_early`, `not_backpack`) → `{awake: Awake}`. Backpack starts its 8 hours again each time it's chosen. 400 `bad_mode`, `bad_battery`; 409 `needs_setup` (Backpack's one-time setup isn't done), `no_battery` (a desktop Mac). See Stay awake |
 | `GET /v1/stats?range=today\|week\|month\|all` | → `Stats`: how long Claude worked, tokens, sessions, prompts, tools, files, agents, records, projects and the last 30 days (see Statistics) |
 | `POST /v1/account/check` | `{}` → `{account: Account}`: asks `claude auth status` now (at most once in 10 s; sooner, the last answer). See Account |
@@ -528,6 +588,9 @@ objects with a `t` field:
   Stay awake).
 - `{t:"files", files: {browseOutsideProjects}}`: Browse outside projects was turned on or off (see
   Files); a `{t:"session"}` follows for each session whose `browsable` changed.
+- `{t:"update", update: ServerUpdate}`: the server's own update changed: the setting turned on or
+  off, a release downloaded and waiting for a quiet moment, its install begun (see The server's own
+  update). An app from before it ignores it.
 - `{t:"mac_sleep_soon", inSeconds, reason: "battery" | "hot" | "time", percent: number | null,
   stillAwake: boolean, otherApp: string | null}`: about two minutes before the daemon lets the Mac
   sleep (see Stay awake); `percent` is the battery's. `stillAwake`: another app's SleepDisabled
@@ -565,6 +628,7 @@ Snapshot = { mac: {id, name, daemonVersion, claudeVersion, projectsRoot,
                     battery: Battery | null,                   // null: no battery (see Battery)
                     awake: Awake,                              // see Stay awake
                     files: {browseOutsideProjects: boolean},   // see Files, The setting
+                    update: ServerUpdate,                      // the server updating itself (see The server's own update)
                     tz: string,                                // the Mac's time zone (IANA, "Europe/Moscow")
                     platform?: "darwin" | "linux",             // the server's system; absent: an older daemon (a Mac)
                     unavailable?: {[feature]: string}},        // Mac-only features this server lacks, each with
@@ -3671,10 +3735,10 @@ The admin token is in `<support>/admin-token` (0600); the `hypernova` command re
 
 | Method & path | Purpose |
 |---|---|
-| `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, apk}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`: false for the listener's own address, whose certificate a browser can't check) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started) |
+| `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, update: ServerUpdate, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, apk}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`: false for the listener's own address, whose certificate a browser can't check) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started) |
 | `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download}` (see Pairing; `link`, what the QR code carries, is `webLink`, the listener's own pairing page at the computer's address, or `appLink` while the listener is off; `url` is the base URL `u`, that listener). `?dev`: the emulator's base URL and the app link |
 | `POST /local/automations/{id}/fire` | the payload (≤ 64 KB, text) → `{run}`: fires an automation's webhook trigger. Takes `Authorization: Bearer <that automation's fire token>` (or the admin token): the one `/local` route that does. 401 `bad_token`; 409 `paused`, `off`, `not_webhook`; 413, 415 (see Automations, "Workflows") |
-| `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, browseOutsideProjects?: boolean, codex?: boolean, claudeAgents?: boolean, releaseCheck?: boolean}` (`projectsRoot` kept only when that folder exists; `releaseCheck` the app's GitHub releases, see The app update, "Where the offered APK comes from"; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex; `claudeAgents`, sessions in `claude agents`, as `POST /v1/claude`) → the settings |
+| `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, browseOutsideProjects?: boolean, codex?: boolean, claudeAgents?: boolean, releaseCheck?: boolean, autoUpdate?: boolean}` (`projectsRoot` kept only when that folder exists; `releaseCheck` the app's GitHub releases, see The app update, "Where the offered APK comes from"; `autoUpdate` the server updating itself, off unless set, see The server's own update, `hypernova auto-update`; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex; `claudeAgents`, sessions in `claude agents`, as `POST /v1/claude`) → the settings |
 | `POST /local/integration/install` / `uninstall` | hooks + status line tee + the `claude` shell function (reversible, marked) |
 | `GET /local/devices`, `DELETE /local/devices/{id}` | paired phones: `{id, name, model, createdAt, lastSeenAt, appVersion?, client?, certFingerprint?, certExpiresAt?}` (`certFingerprint`: its device certificate's, once it has one, and `certExpiresAt` when that runs out, epoch ms). Deleting one revokes its certificate too |
 | `/v1/*` | the whole phone API is also available with the admin token |

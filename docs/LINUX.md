@@ -103,6 +103,7 @@ docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped 
 | `hypernova doctor` | Every piece checked, each problem with the command that fixes it (`--json`). Exit 1 when something stops Hypernova working. With Codex alone, a missing Claude Code is only noted; with neither agent, it fails. |
 | `hypernova logs` | The daemon's log: the last 100 lines (`-n <lines>`), `-f` to follow, `--terminals` for the shared terminals' log. Both logs roll at 5 MB to `.1`. |
 | `hypernova lan on\|off` | The phone's direct route on the same network (below). |
+| `hypernova auto-update [on\|off]` | The server installing newer releases by itself (below, "Updating"), **off** unless turned on; the app's Settings has the same switch in the server's section (**Update this server automatically**). Without a word, how it stands: on or off, whether this install can (and why not), what it's doing, the last update it installed. |
 | `hypernova uninstall` | Removes the integration, the service, the command, the daemon and its Node. Paired phones and settings stay for a reinstall unless `--purge`. Claude Code, Codex and their logins stay, and so does lingering (other services of yours may use it; it says how to turn it off). With no terminal it refuses unless you pass `--yes`. |
 | `hypernova run` | The daemon in the foreground, its log on the terminal too: what a container runs, and handy for debugging. |
 
@@ -208,6 +209,33 @@ Run the install script again from the new package (a newer release's
 `scripts/install-linux.sh`) or tarball (or `hypernova setup --from <dir>`).
 The new daemon is prepared beside the old one and swapped in only once its terminal module works,
 then the service restarts; open sessions keep running. (Docker: see "Updating the container" above.)
+
+**By itself** (`hypernova auto-update on`, or the app's Settings → the server → **Update this server
+automatically**; off unless turned on; `"autoUpdate": true` in `settings.json`). The daemon's look at
+GitHub's latest release (30 s after start, then every 6 hours) then also installs a release newer
+than the daemon, never an older or equal one:
+
+- **Only an install of a release's package** (`get.sh`, or `install-linux.sh` from an unpacked
+  `hypernova-server-<tag>-linux.tar.gz`) in `~/.local/share/hypernova/app`, run by
+  `hypernova.service`. Setup marks the daemon it installs (`app/daemon/install.json`, `package` or
+  `checkout`): an install from a git checkout (`scripts/install-linux.sh` in a clone, or a helper
+  that pulls and runs it) updates from there, never by itself, and says "not available here". So do
+  a container, `hypernova run`, a test copy started from elsewhere, and an install from before the
+  marker (install the latest release once, and it can from then on).
+- **Checked first**: the server package's SHA-256 against the release's note (`serverSha256`;
+  older releases have none, and aren't installed), and its daemon's version against the tag.
+- **At a quiet moment**: no session working and no approval waiting, for 2 minutes; after 24
+  hours of waiting it goes ahead (the shared terminals keep running through the restart).
+- **Installed as above**, by the package's own `scripts/install-linux.sh --from <it> --yes
+  --no-claude`, in a transient systemd unit of its own (`systemd-run --user`, `hypernova-update`),
+  so the service's restart can't cut it off; its output in
+  `~/.local/state/hypernova/logs/update.log`. If the new daemon doesn't answer within a minute, the
+  old one is put back and the service restarted on it. It installs nothing new, and asks no
+  `sudo`: a system package the new version needs makes it fail (logged); run the install by hand.
+- **A failure** (a download, a checksum, the install) leaves the server as it was and is logged; the
+  same release is tried again after 1 hour, 6, then 24, then not until the setting is turned off and
+  on. The phones are offered the release's app before the restart, and the new daemon logs "this
+  server updated itself from A to B" (`hypernova logs`; the app shows it under the switch).
 
 ## Troubleshooting
 
