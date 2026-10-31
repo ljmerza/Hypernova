@@ -4,7 +4,9 @@ name: android-release
 # app, the daemon or the server's install scripts (and a manual run) builds both and publishes the
 # next semantic version, vX.Y.Z from the conventional commits since the last one
 # (scripts/next-version.sh; docs/RELEASING.md, "Versions"), with hypernova-vX.Y.Z.apk and
-# hypernova-server-vX.Y.Z-linux.tar.gz attached, so a download says which build it is. The APK's
+# hypernova-server-vX.Y.Z-linux.tar.gz attached, so a download says which build it is, and
+# hypernova-vX.Y.Z.json (the APK's versionCode, versionName and SHA-256: servers read it to offer
+# the phones the release's APK, daemon/src/releases.ts). The APK's
 # versionName is that version; its versionCode the build minute. One job, so one push makes one release, and every
 # release has both files (a daemon-only fix rebuilds the same app). A release published by hand gets
 # both attached too. The key must never change: Android only installs an update signed with the key
@@ -120,7 +122,13 @@ jobs:
           tag=$TAG
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
           cp "$SERVER_TGZ" "../dist/hypernova-server-$tag-linux.tar.gz"
+          # The version note servers read before fetching the APK (daemon/src/releases.ts): the
+          # build's versionCode and versionName, and the APK's SHA-256. Uploaded last.
+          sum=$(sha256sum "../dist/hypernova-$tag.apk" | cut -d' ' -f1)
+          jq -c --arg sha256 "$sum" '{versionCode, versionName, sha256: $sha256}' ../dist/hypernova.json > "../dist/hypernova-$tag.json"
+          jq -e '(.versionCode | type == "number") and (.versionName | type == "string") and (.sha256 | test("^[0-9a-f]{64}$"))' "../dist/hypernova-$tag.json" > /dev/null
           gh release upload "$tag" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" --clobber
+          gh release upload "$tag" "../dist/hypernova-$tag.json" --clobber
       # A push or a manual run: the release vX.Y.Z (the Version step), with the APK on it once, as
       # hypernova-vX.Y.Z.apk, and the server as hypernova-server-vX.Y.Z-linux.tar.gz (a download says
       # which build it is). A release made with the workflow token starts no other workflows.
@@ -133,8 +141,13 @@ jobs:
           tag=$TAG
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
           cp "$SERVER_TGZ" "../dist/hypernova-server-$tag-linux.tar.gz"
+          # The version note servers read before fetching the APK (daemon/src/releases.ts): the
+          # build's versionCode and versionName, and the APK's SHA-256.
+          sum=$(sha256sum "../dist/hypernova-$tag.apk" | cut -d' ' -f1)
+          jq -c --arg sha256 "$sum" '{versionCode, versionName, sha256: $sha256}' ../dist/hypernova.json > "../dist/hypernova-$tag.json"
+          jq -e '(.versionCode | type == "number") and (.versionName | type == "string") and (.sha256 | test("^[0-9a-f]{64}$"))' "../dist/hypernova-$tag.json" > /dev/null
           # The notes: what changed since the release before, by type, and how to install
           # (scripts/release-notes.sh).
           ../scripts/release-notes.sh "$tag" "$PREV" "$GITHUB_SHA" > ../dist/notes.md
-          gh release create "$tag" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" \
+          gh release create "$tag" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" "../dist/hypernova-$tag.json" \
             --target "$GITHUB_SHA" --title "$tag" --notes-file ../dist/notes.md

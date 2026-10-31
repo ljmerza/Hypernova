@@ -8,16 +8,17 @@ leak.
 
 `.github/workflows/android-release.yml` cuts every release: each push to `main` that touches
 `android/`, `daemon/`, `scripts/pack-linux.sh` or `scripts/install-linux.sh` (or a manual run)
-publishes the next version, `vX.Y.Z` (below), with two files:
+publishes the next version, `vX.Y.Z` (below), with three files:
 
 | File | What |
 |---|---|
 | `hypernova-vX.Y.Z.apk` | the Android app, signed with the release key (repo secrets), `:app:distRelease` |
+| `hypernova-vX.Y.Z.json` | the APK's version note, `{"versionCode": N, "versionName": "X.Y.Z", "sha256": "<the APK's SHA-256, hex>"}`: `dist/hypernova.json` with the checksum added (`jq`, checked before it's attached). Servers read it to know the release's versionCode without downloading the APK, fetch the APK only when it's newer than the one they hand out, and offer it only when its SHA-256 matches (docs/PROTOCOL.md, "Where the offered APK comes from"). A release without it (from before 2026-10-31) is never offered by a server |
 | `hypernova-server-vX.Y.Z-linux.tar.gz` | the Linux server package, `scripts/pack-linux.sh` renamed: the daemon's sources and lockfile, the font, the install script, `LINUX.md` as its README. No `node_modules` and no Node, so one package serves x86_64 and arm64 (the install fetches Node.js for the server and builds node-pty there) |
 
 One job builds both, so one push makes one release and every release has both, even when only the
-daemon changed. A release published by hand keeps the tag it was given, and gets both attached
-under that tag's name. Installing the server package: [INSTALL.md](INSTALL.md), "On a Linux
+daemon changed. A release published by hand keeps the tag it was given, and gets all three
+attached under that tag's name (the note last, after the APK). Installing the server package: [INSTALL.md](INSTALL.md), "On a Linux
 server"; in one line, `curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash`.
 
 ### Versions
@@ -120,7 +121,10 @@ It writes three files to `dist/`:
 - `hypernova.apk`: the release APK (about 13 MB; the debug one is about 48 MB).
 - `hypernova.json`: its version note, `{"versionCode": N, "versionName": "0.3.0"}`. The versionCode
   is the build's minute since 2026-01-01, so every build updates the one before; the versionName
-  is `-PappVersion` when given (a release, "Versions" above), else `appVersion`'s default.
+  is `-PappVersion` when given (a release, "Versions" above), else what `git describe` says of the
+  checkout: the last release's tag without its `v`, and after it the commits since, the commit and
+  `-dirty` for uncommitted changes (`0.5.0`, `0.5.0-3-g1a2b3c4-dirty`), or `0.0.0-dev` without git
+  or a tag. Settings → About shows it with the build.
 - `hypernova-mapping.txt`: R8's mapping. **Keep it with the release** (the workflow uploads it as
   an artifact; it isn't published): it is the only way to read a crash trace from this build,
   with `$ANDROID_HOME/cmdline-tools/latest/bin/retrace dist/hypernova-mapping.txt trace.txt`.
@@ -131,7 +135,10 @@ one signer, and that signer's certificate is the keystore's own (never Android's
 
 The daemon serves `dist/hypernova.apk` and its note (or a copy in `<support>/android/`) on the
 "Get the app" page and to the phone's in-app update; it prefers an APK without `-debug` in its
-name to a debug one.
+name to a debug one. It also puts the latest GitHub release's APK in `<support>/android/` itself
+when that release's versionCode (its `hypernova-vX.Y.Z.json`) is higher than the one it hands out
+(checked 30 s after start and every 6 hours; `releaseCheck: false` turns it off), and connected
+phones hear of a new one at once (`{t:"app"}`, docs/PROTOCOL.md).
 
 **Without the key:** `./gradlew :app:assembleRelease` still builds a release APK, signed
 with your own debug key, and warns that it must not be handed out; `:app:distRelease` refuses.
