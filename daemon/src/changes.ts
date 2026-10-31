@@ -7,7 +7,7 @@
 // out), never a file secretfiles.ts blocks (a project's .env), and a diff capped in size.
 import { spawn } from 'node:child_process'
 import { closeSync, fstatSync, lstatSync, openSync, readSync, realpathSync } from 'node:fs'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { basename, isAbsolute, relative, resolve, sep } from 'node:path'
 import { isSecretFile } from './secretfiles.ts'
 
 export type ChangedFile = {
@@ -38,6 +38,15 @@ export type Changes = {
   more: boolean
   totalAdd: number
   totalDel: number
+  /** The branch's upstream ("origin/main"); null with none, on a detached HEAD, or when git was too slow. */
+  upstream: string | null
+  /** Commits ahead of and behind the upstream; null without one, when it's gone, or when git was too slow. */
+  ahead: number | null
+  behind: number | null
+  /** Files with uncommitted changes in the folder, whatever the scope (untracked and credential files too). */
+  dirty: number
+  /** The linked worktree's name (git's own: its folder under .git/worktrees) when the folder is in one; null in the main checkout. */
+  worktree: string | null
 }
 export type FileDiff = { path: string; diff: string; truncated: boolean; binary: boolean }
 
@@ -55,7 +64,7 @@ type Out = { code: number | null; out: string; cut: boolean }
  * Runs git, collecting at most [cap] bytes of output (then stops it). Never prompts, never
  * touches the index (optional locks off), ignores the user's pager, diff tools and textconv.
  */
-function git(cwd: string, args: string[], cap = 8 * 1024 * 1024): Promise<Out> {
+function git(cwd: string, args: string[], cap = 8 * 1024 * 1024, timeout = GIT_TIMEOUT): Promise<Out> {
   return new Promise((done) => {
     const p = spawn('git', ['--no-optional-locks', '-c', 'core.quotepath=off', '-c', 'core.fsmonitor=false', ...args], {
       cwd,
@@ -65,7 +74,7 @@ function git(cwd: string, args: string[], cap = 8 * 1024 * 1024): Promise<Out> {
     const chunks: Buffer[] = []
     let size = 0
     let cut = false
-    const timer = setTimeout(() => p.kill('SIGKILL'), GIT_TIMEOUT)
+    const timer = setTimeout(() => p.kill('SIGKILL'), timeout)
     p.stdout.on('data', (c: Buffer) => {
       if (cut) return
       size += c.length
@@ -135,6 +144,52 @@ async function repoOf(cwd: string): Promise<{ top: string; base: string; branch:
   return { top: real(top.out.trim()) ?? top.out.trim(), base: head.code === 0 ? 'HEAD' : EMPTY_TREE, branch: br.code === 0 ? br.out.trim() || null : null }
 }
 
+/** The git line beside the changes: the branch's upstream, how far apart they are, and the worktree. */
+type GitLine = Pick<Changes, 'upstream' | 'ahead' | 'behind' | 'worktree'>
+
+/**
+ * The git line's own commands answer within this (ms), or what they'd say is left out: the changes
+ * still come. Tests shorten it.
+ */
+export const gitLineTimeout = { ms: 3000 }
+/** A git line is kept this long per folder and branch: the session sheet asks each time it opens. */
+const LINE_TTL = 5000
+const lines = new Map<string, { at: number; line: GitLine }>()
+
+/**
+ * [root]'s upstream with its ahead/behind counts (`for-each-ref`'s `upstream:track`: "[ahead 2,
+ * behind 1]", "[gone]", nothing when even), and the linked worktree it is in, if any (its git dir
+ * isn't the common one). Read-only, local only: nothing is fetched, so the counts are as of the
+ * last fetch.
+ */
+async function lineOf(root: string, branch: string | null): Promise<GitLine> {
+  const key = `${root}\0${branch ?? ''}`
+  const hit = lines.get(key)
+  if (hit && Date.now() - hit.at < LINE_TTL) return hit.line
+  const ms = gitLineTimeout.ms
+  const [dirs, track] = await Promise.all([
+    git(root, ['rev-parse', '--git-dir', '--git-common-dir'], 64 * 1024, ms),
+    branch ? git(root, ['for-each-ref', '--format=%(upstream:short)%00%(upstream:track)', `refs/heads/${branch}`], 64 * 1024, ms) : null,
+  ])
+  const line: GitLine = { upstream: null, ahead: null, behind: null, worktree: null }
+  const [gitDir, commonDir] = dirs.code === 0 ? dirs.out.split('\n').map((l) => l.trim()) : []
+  if (gitDir && commonDir) {
+    const own = resolve(root, gitDir)
+    const common = resolve(root, commonDir)
+    if ((real(own) ?? own) !== (real(common) ?? common)) line.worktree = basename(own)
+  }
+  const [up, tr] = track?.code === 0 ? track.out.replace(/\n$/, '').split('\0') : []
+  if (up) {
+    line.upstream = up
+    if (tr !== '[gone]') {
+      line.ahead = Number(/ahead (\d+)/.exec(tr ?? '')?.[1] ?? 0)
+      line.behind = Number(/behind (\d+)/.exec(tr ?? '')?.[1] ?? 0)
+    }
+  }
+  lines.set(key, { at: Date.now(), line })
+  return line
+}
+
 /** One status entry: a path in the repo and how it changed. */
 type Entry = { rel: string; status: 'M' | 'A' | 'D'; untracked: boolean }
 
@@ -170,11 +225,15 @@ function parseNumstat(out: string): Map<string, { add: number | null; del: numbe
  * rest, `all` brings them in); without, the whole working tree of the folder.
  */
 export async function changesOf(cwd: string, touchedPaths: Iterable<string>, all = false): Promise<Changes> {
-  const empty: Changes = { git: false, branch: null, scope: 'tree', files: [], others: 0, hidden: 0, more: false, totalAdd: 0, totalDel: 0 }
+  const empty: Changes = {
+    git: false, branch: null, scope: 'tree', files: [], others: 0, hidden: 0, more: false, totalAdd: 0, totalDel: 0,
+    upstream: null, ahead: null, behind: null, dirty: 0, worktree: null,
+  }
   const root = real(cwd)
   if (!root) return empty
   const repo = await repoOf(root)
   if (!repo) return empty
+  const gitLine = lineOf(root, repo.branch)
 
   // "." limits both commands to the session's folder, whatever the repository holds.
   const st = await git(root, ['status', '--porcelain=v1', '-z', '-uall', '--no-renames', '--', '.'])
@@ -246,6 +305,8 @@ export async function changesOf(cwd: string, touchedPaths: Iterable<string>, all
     more,
     totalAdd: files.reduce((n, f) => n + (f.add ?? 0), 0),
     totalDel: files.reduce((n, f) => n + (f.del ?? 0), 0),
+    ...(await gitLine),
+    dirty: entries.length + hidden,
   }
 }
 

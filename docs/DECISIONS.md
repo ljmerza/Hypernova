@@ -2052,3 +2052,28 @@ a skill's chip and "YOU · SENDING…", and the answer only showed in the termin
    Open (the phone's browser), Copy link, Cancel. A dev server on the Mac (`localhost:5173`) opens
    its in-app preview at once, as its pill does; Hypernova's own ports and any other scheme
    (`intent:`, `file:`, `javascript:`, `content:`) are never links.
+
+## Time, git and files touched in the session sheet (2026-10-31)
+
+The owner picked ideas SS7, SS8 and SS9 for the session sheet only ("is it stuck or slow", what it
+changed, which branch), compact, nothing on the session's own screen.
+
+1. **In the Session tab, before WHERE IT RUNS:** TIME, then GIT. Overview stays the model and the
+   plan's windows (the tab most opens land on, kept short), and the summary line already says how
+   long it has run; the Session tab is the facts about this run, live ones first.
+2. **TIME:** Started (the phone's clock: `14:05`, `Wed 9:30`, `17 Oct 8:00`), Running for (to now;
+   `Ran for`, to its last activity, once ended), This turn in mint while it's in a turn (working,
+   starting or waiting for an answer), Last activity (`just now`, `2m ago`, `yesterday`).
+3. **This turn is the Mac's clock:** a new `turnStartedAt` on the session, set when it goes into a
+   turn and cleared when it's out, so reopening the chat doesn't restart it. A turn already running
+   when the daemon started counts from then.
+4. **GIT:** Branch with `↑2 ↓1` against its upstream in mint (`no upstream` dim; even shows
+   nothing), Worktree when the folder is a linked worktree (git's name for it), Uncommitted files in
+   the folder (`none` when clean; left out when the next line already says the same), then the line
+   to What changed, `7 files touched` and `+120 −30`, which opens the What changed screen over the
+   sheet (scoped to the session as before; `7 files changed` when none is known to be this
+   session's). Not a repository: no GIT part. The counts are as of the last fetch: nothing is
+   fetched.
+5. **The daemon's git line** rides on the changes route (`upstream`, `ahead`, `behind`, `dirty`,
+   `worktree`): two read-only local commands in the session's folder, 3 seconds at most (then left
+   out, the changes still come), kept 5 seconds per folder and branch.

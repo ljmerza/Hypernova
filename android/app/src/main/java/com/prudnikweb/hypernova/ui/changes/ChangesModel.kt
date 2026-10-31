@@ -46,6 +46,15 @@ data class WorkChanges(
     val more: Boolean,
     val totalAdd: Int,
     val totalDel: Int,
+    /** The branch's upstream ("origin/main"); null with none (or from an older Mac). */
+    val upstream: String? = null,
+    /** Commits ahead of and behind [upstream]; null when not known (none, gone, git too slow). */
+    val ahead: Int? = null,
+    val behind: Int? = null,
+    /** Files with uncommitted changes in the folder, whatever the scope; null from an older Mac. */
+    val dirty: Int? = null,
+    /** The linked git worktree's name when the folder is in one. */
+    val worktree: String? = null,
 )
 
 enum class LineKind { Hunk, Add, Del, Ctx, Note }
@@ -119,6 +128,11 @@ object ChangesRepo {
             more = o.optBoolean("more"),
             totalAdd = o.optInt("totalAdd"),
             totalDel = o.optInt("totalDel"),
+            upstream = if (o.isNull("upstream")) null else o.optString("upstream").takeIf { it.isNotBlank() },
+            ahead = if (o.isNull("ahead")) null else o.optInt("ahead"),
+            behind = if (o.isNull("behind")) null else o.optInt("behind"),
+            dirty = if (o.isNull("dirty")) null else o.optInt("dirty"),
+            worktree = if (o.isNull("worktree")) null else o.optString("worktree").takeIf { it.isNotBlank() },
         )
     }
 
@@ -168,6 +182,7 @@ internal object DemoChanges {
         return WorkChanges(
             git = true, branch = "main", scoped = !everything, files = shown, others = if (everything) 0 else all.size - shown.size,
             hidden = 0, more = false, totalAdd = shown.sumOf { it.add ?: 0 }, totalDel = shown.sumOf { it.del ?: 0 },
+            upstream = "origin/main", ahead = 2, behind = 0, dirty = all.size,
         )
     }
 

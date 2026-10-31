@@ -551,6 +551,10 @@ Session = {
                               // Browse outside projects opens it (whether or not that is on now)
   bypassAvailable: boolean,   // can switch to "bypassPermissions": always for a session the daemon runs; in a shared terminal only if Claude Code was started with bypass allowed (--allow-dangerously-skip-permissions, --dangerously-skip-permissions or --permission-mode bypassPermissions); true while in bypass. Sessions the phone starts in a terminal always allow it
   createdAt: number, lastActivityAt: number,      // epoch ms
+  turnStartedAt: number | null,  // epoch ms: when it went into its turn (from idle, error or ended to starting,
+                              // working or needs_you), as the daemon saw it; null out of a turn. Kept through a
+                              // stop for the owner's answer. A turn already running when the daemon started
+                              // counts from then. The session sheet's "This turn"; absent: an older daemon
   lastText: string | null,    // last assistant text, trimmed to 200 chars
   activity: string | null,    // what it's doing now, e.g. "Bash: ./gradlew build"
   pendingApprovalIds: string[],
@@ -2596,12 +2600,21 @@ Reading a transcript, the daemon splits these mentions back out of the prompt: t
 
 `GET /v1/sessions/{id}/changes[?all=1]` → `{changes: Changes}`: the files changed in the session's folder
 since the last commit (`git status` and `git diff` limited to that folder, read-only; `daemon/src/changes.ts`).
-`Changes = {git, branch, scope, files, others, hidden, more, totalAdd, totalDel}`; each file is
+`Changes = {git, branch, scope, files, others, hidden, more, totalAdd, totalDel, upstream, ahead, behind, dirty,
+worktree}`; each file is
 `{path (relative, "/"), status: "M"|"A"|"D", untracked, add, del (null for a binary or a file too big to
 count), binary, touched}`. `scope: "session"` lists only files the session's own edit tools wrote (Edit, Write...;
 `others` counts the rest, `all=1` brings them in); `"tree"` lists the whole working tree (nothing known to be
 touched, e.g. edits made by Bash). `git: false`: not a repository. `hidden` counts changed credential files
 (secretfiles.ts), which are never listed. At most 300 files (`more`).
+
+The git line beside them (the session sheet's GIT part): `upstream` (the branch's, `"origin/main"`; null with
+none, on a detached HEAD, or when git was too slow), `ahead` and `behind` (commits against it, as of the last
+fetch: nothing is fetched; null without an upstream, when it's gone, or when git was too slow), `dirty` (files
+with uncommitted changes in the folder whatever the scope, untracked and credential files included) and
+`worktree` (git's name for the linked worktree the folder is in, its folder under `.git/worktrees`; null in the
+main checkout). Read with `for-each-ref`'s `upstream:track` and `rev-parse --git-dir --git-common-dir`, 3 s at
+most (then left out; the files still come), kept 5 s per folder and branch. Absent from an older daemon.
 
 `GET /v1/sessions/{id}/changes/diff?path=<relative path>` → `{path, diff, truncated, binary}`: that file's unified
 diff against HEAD (`diff` is cut at 256 KB on a whole line, `truncated`). 400 `bad_path`, 403 `outside` (a path or

@@ -1248,7 +1248,9 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
     ) + autoSessions()).map { s ->
         // How long each has run, so the planets in the sky differ in size.
         val ran = mapOf("a3" to 190, "b8" to 50, "c7" to 95, "1f" to 18, "9b" to 360, "e2" to 9, "d4" to 75, "5e" to 40, "7a" to 25, "4b" to 120, "2c" to 35)[s.hex] ?: 30
-        s.copy(createdAt = s.updatedAt - ran * 60_000L)
+        // One in a turn has been at it a few minutes (the session sheet's "This turn").
+        val turn = if (s.state == SessionState.Working || s.state == SessionState.NeedsYou) s.updatedAt - 4 * 60_000L else 0L
+        s.copy(createdAt = s.updatedAt - ran * 60_000L, turnStartedAt = turn)
     }
 
     /**

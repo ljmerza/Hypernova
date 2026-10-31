@@ -92,7 +92,7 @@ import kotlinx.coroutines.launch
  * not just usage, it's all the information about this session and what you can change"). Under
  * its header a summary line, always in view, then tabs (owner, 2026-10-30; [SheetTab]): Overview
  * (the model, the plan's windows), Permissions (the mode, the blocked calls), Agents (the agents
- * at work) and Session (where it runs, the Home card's menu), each scrolling in the sheet. What
+ * at work) and Session (its time and git line, where it runs, the Home card's menu), each scrolling in the sheet. What
  * changes here, changes at once: the sheet stays open and shows it.
  *
  * [usage]: the screen's, null until the Mac has answered (the model's id). [onModel] opens the
@@ -170,6 +170,10 @@ internal fun SessionSheet(
                     }
                     SheetTab.Commands -> CommandsTab(hub, session, onDismiss)
                     SheetTab.Session -> {
+                        // How it's going, then what it changed (SessionInfo.kt), before where it runs.
+                        SheetSeam(stringResource(R.string.session_sheet_time))
+                        TimePart(session)
+                        GitPart(hub, session) { SheetSeam(stringResource(R.string.session_sheet_git)) }
                         SheetSeam(stringResource(R.string.session_sheet_where))
                         WherePart(hub, session, onDismiss)
                         // The Home card's long-press menu (not in the demo, as on Home).
