@@ -2266,3 +2266,20 @@ comes back, but by default the phone's own recognizer may send it to Google, as 
 4. **Both, from Android 13:** `EXTRA_ENABLE_FORMATTING` = `FORMATTING_OPTIMIZE_QUALITY` (punctuation
    and capitals, tuned for quality over speed) and `EXTRA_MASK_OFFENSIVE_WORDS` = false (words as
    said). Older Android gets neither. Whether a recognizer honours them is its own affair.
+
+## No demo mode (2026-10-31)
+
+The owner chose to remove the demo entirely. The entries above that mention the demo are history:
+what they say about it no longer holds.
+
+1. **No demo in the app**: no "Explore with demo data" on the onboarding or the "unpaired" screen,
+   no Demo row in the switcher, no Demo mode in Settings. A phone with no paired server sees the
+   onboarding and the pairing steps only.
+2. **Gone with it**: its sample data and its own hub (`FakeHub`) with its automations, files,
+   statistics, models, provider checks, dictation, chat usage, to-dos and changes; the sun's
+   time warp and long press; the demo-only cron reader (a real server checks schedules itself);
+   and every branch for it on the screens, which keep what they did with a real server. `Hub` has
+   no `isDemo`, and `LinkState` no `Demo`.
+3. **An app last left in the demo** forgets the flag it kept (`demo` in its preferences) the first
+   time it starts, and opens on its paired server, or on the onboarding if there is none.
+4. Nothing on the daemon was the demo's. Nothing new on the chat screen: this only removes.
