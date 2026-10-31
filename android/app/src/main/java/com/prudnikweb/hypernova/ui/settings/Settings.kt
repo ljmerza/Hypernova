@@ -271,6 +271,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
             Spacer(Modifier.height(10.dp))
             DisplaySection()
         }
+        // Card swipes: what a swipe left and right on a Home card do (CardSwipeSection.kt), kept on this phone.
+        item(key = "cardSwipes") {
+            Spacer(Modifier.height(10.dp))
+            CardSwipeSection()
+        }
         // Session top bar: what the chat's top bar shows, in what order (TopBarSection.kt), kept on this phone.
         item(key = "topBar") {
             Spacer(Modifier.height(10.dp))

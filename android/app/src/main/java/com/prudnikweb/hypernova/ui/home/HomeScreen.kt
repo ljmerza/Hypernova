@@ -498,19 +498,26 @@ fun HomeScreen(
                     items(members, key = { it.id }) { s ->
                         // Its approval, else Claude Code's own permission dialog in its terminal (CardAsk.Terminal).
                         val ask = hub.approval(s.id).let { a -> remember(a, s) { CardAsk.of(a, s) } }
-                        // A swipe: Needs input opens, a Completed job stops or is deleted (asked first,
-                        // the menu's own confirm), Working none (CardSwipe.kt).
-                        val swipe = CardSwipe.of(group, s)
-                        var deleting by rememberSaveable(s.id) { mutableStateOf(false) }
-                        if (deleting) SessionMenu(hub, s, { deleting = false }, start = MenuPage.Delete)
+                        // A swipe each way, as Settings → Card swipes has them (CardSwipe.kt, CardSwipePref.kt):
+                        // by default left is Smart (Needs input opens, a Completed job stops or is
+                        // deleted, Working none) and right nothing. Delete, Rename and Restart open the
+                        // menu's own page (its confirms, its sheet); Stop goes at once, as in the menu.
+                        val unread = group == HomeGroup.Completed && readMarks != null && ReadState.unread(readMarks, s)
+                        val swipes = CardSwipePref.state(context).value
+                        val left = CardSwipe.of(swipes.left, group, s, unread)
+                        val right = CardSwipe.of(swipes.right, group, s, unread)
+                        var page by rememberSaveable(s.id) { mutableStateOf<MenuPage?>(null) }
+                        page?.let { SessionMenu(hub, s, { page = null }, start = it) }
                         val appScope = LocalAppScope.current
                         val toast = LocalToast.current
-                        val slide = cardSwipe(swipe) {
-                            when (swipe) {
+                        val slide = cardSwipe(left, right) { act ->
+                            when (act) {
                                 CardSwipe.Open -> onOpen(s.id)
                                 CardSwipe.Stop -> appScope.launch { hub.stopSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_stop_session)) } }
-                                CardSwipe.Delete -> deleting = true
-                                null -> Unit
+                                CardSwipe.Delete -> page = MenuPage.Delete
+                                CardSwipe.Rename -> page = MenuPage.Rename
+                                CardSwipe.Restart -> page = MenuPage.Restart
+                                CardSwipe.MarkRead -> ReadState.server(hub)?.let { ReadState.mark(context, it, s.id, s.updatedAt) }
                             }
                         }
                         SessionCard(
@@ -525,7 +532,7 @@ fun HomeScreen(
                             onAnswer = { id, answer -> answerCard(hub, s.id, ask, id, answer) },
                             menu = if (MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
                             completed = group == HomeGroup.Completed,
-                            unread = group == HomeGroup.Completed && readMarks != null && ReadState.unread(readMarks, s),
+                            unread = unread,
                             hit = hits?.of(s.id),
                         )
                     }
