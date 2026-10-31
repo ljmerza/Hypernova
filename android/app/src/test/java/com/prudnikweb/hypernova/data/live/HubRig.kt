@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Looper
+import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.LiveHub
 import com.prudnikweb.hypernova.data.Notice
@@ -20,6 +21,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
 import org.junit.Assert.fail
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
@@ -39,9 +41,13 @@ class HubRig(
     val serverId: String = Servers.LEGACY_ID,
     token: String = "tok-${daemon.name}",
     val deviceId: String? = "dev-1",
+    /** Shared by several rigs (several computers), so pumping one runs them all. */
+    val dispatcher: TestDispatcher = StandardTestDispatcher(),
 ) : AutoCloseable {
-    val context: Context = RuntimeEnvironment.getApplication()
-    val dispatcher = StandardTestDispatcher()
+    val context: Context = RuntimeEnvironment.getApplication().also {
+        // A fresh install's words (a Mac's): ComputerWords is process-wide and outlives a test.
+        ComputerWords.clear(it)
+    }
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
     val pairing = Pairing(baseUrl = daemon.base, token = token, macName = daemon.name, macId = "m-${daemon.name}", deviceId = deviceId)
     private val startedAt = System.currentTimeMillis()

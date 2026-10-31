@@ -151,9 +151,10 @@ class FakeDaemon(val name: String = "z2") : AutoCloseable {
             sessions: List<JSONObject> = emptyList(),
             approvals: List<JSONObject> = emptyList(),
             usage: JSONObject? = null,
+            platform: String = "linux",
             more: JSONObject.() -> Unit = {},
         ): JSONObject = JSONObject()
-            .put("mac", JSONObject().put("id", "m-$name").put("name", name).put("daemonVersion", "1.0.0").put("platform", "linux"))
+            .put("mac", JSONObject().put("id", "m-$name").put("name", name).put("daemonVersion", "1.0.0").put("platform", platform))
             .put("sessions", JSONArray(sessions))
             .put("approvals", JSONArray(approvals))
             .put("projects", JSONArray())
