@@ -5,7 +5,9 @@
 // <support>/android/, checks the SHA-256, and only then puts it where the phone's update comes from.
 // An APK an admin put there (`hnctl apk`, a dev build) with a higher versionCode is never replaced.
 // Never fails the daemon: offline, GitHub down or a rate limit is a line in the log, then the next
-// check. Settings: `releaseCheck` (unset: on).
+// check. Settings: `releaseCheck` (unset: on). The same look hands the release to the server's own
+// update (server-update.ts, `autoUpdate`, unset: off), after the APK, so the phones are offered the
+// new app before the server restarts into the new version.
 import { createHash } from 'node:crypto'
 import { once } from 'node:events'
 import { chmodSync, createWriteStream, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -22,10 +24,17 @@ const FIRST_CHECK = 30_000
 const NOTE_MAX = 64 * 1024
 const APK_MAX = 256 * 1024 * 1024
 
-/** The release's `hypernova-<tag>.json`. */
-export type ReleaseNote = { versionCode: number; versionName: string; sha256: string }
+/**
+ * The release's `hypernova-<tag>.json`. `serverSha256`: the server package's
+ * (`hypernova-server-<tag>-linux.tar.gz`), null in a note from before 2026-10-31 (such a release
+ * never installs itself on a server).
+ */
+export type ReleaseNote = { versionCode: number; versionName: string; sha256: string; serverSha256: string | null }
+type Asset = { url: string; size: number | null }
 /** What the last release read was; `note` null: it carries no version note (a release from before the notes). */
-type Known = { tag: string; note: ReleaseNote | null; apk: { url: string; size: number | null } | null }
+type Known = { tag: string; note: ReleaseNote | null; apk: Asset | null; server: Asset | null }
+/** A release as the server's own update sees it (server-update.ts): its tag, the package and its SHA-256 from the note. */
+export type ServerRelease = { tag: string; sha256: string | null; tarball: Asset | null }
 export type Outcome =
   | { kind: 'off' }
   | { kind: 'limited'; until: number }
@@ -46,14 +55,20 @@ export type CheckerOptions = {
   offered: () => number | null
   /** A new APK is in place: the phones hear of it (http.ts announceApp). */
   published: () => void
-  /** Default: settings.releaseCheck, unset on. */
+  /** The APK's part. Default: settings.releaseCheck, unset on. */
   enabled?: () => boolean
+  /**
+   * The server's own update (server-update.ts): handed each release read, after the APK's part, and
+   * not waited for. Absent: none.
+   */
+  server?: { consider(r: ServerRelease): Promise<unknown>; enabled(): boolean }
   now?: () => number
   /** Per request (default 30 s for the release and its note, 10 minutes for the APK). */
   timeoutMs?: number
 }
 
-/** The note, as the release workflow writes it; null for anything else. */
+const HEX64 = /^[0-9a-fA-F]{64}$/
+/** The note, as the release workflow writes it; null for anything else. A malformed `serverSha256` is none. */
 export function parseNote(v: unknown): ReleaseNote | null {
   if (!v || typeof v !== 'object') return null
   const o = v as Record<string, unknown>
@@ -62,8 +77,41 @@ export function parseNote(v: unknown): ReleaseNote | null {
   const sha = o.sha256
   if (typeof code !== 'number' || !Number.isSafeInteger(code) || code <= 0) return null
   if (typeof name !== 'string' || name.length > 64) return null
-  if (typeof sha !== 'string' || !/^[0-9a-fA-F]{64}$/.test(sha)) return null
-  return { versionCode: code, versionName: name, sha256: sha.toLowerCase() }
+  if (typeof sha !== 'string' || !HEX64.test(sha)) return null
+  const server = typeof o.serverSha256 === 'string' && HEX64.test(o.serverSha256) ? o.serverSha256.toLowerCase() : null
+  return { versionCode: code, versionName: name, sha256: sha.toLowerCase(), serverSha256: server }
+}
+
+/**
+ * A release's file into [tmp] (0600), its SHA-256 counted on the way: its digest, or an error. At
+ * most [max] bytes, and exactly [size] when the release lists one. [what] names it in the errors.
+ */
+export async function downloadTo(url: string, tmp: string, o: { size: number | null; max: number; what: string; signal: AbortSignal }): Promise<string> {
+  const res = await fetch(url, { headers: { accept: 'application/octet-stream', 'user-agent': `hypernova-daemon/${VERSION}` }, signal: o.signal })
+  if (!res.ok || !res.body) {
+    await res.body?.cancel()
+    throw new Error(`${o.what} answered ${res.status}`)
+  }
+  if (Number(res.headers.get('content-length')) > o.max) {
+    await res.body.cancel()
+    throw new Error(`${o.what} is too big`)
+  }
+  const hash = createHash('sha256')
+  const out = createWriteStream(tmp, { mode: 0o600 })
+  let got = 0
+  try {
+    for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+      got += chunk.length
+      if (got > o.max) throw new Error(`${o.what} is too big`)
+      hash.update(chunk)
+      if (!out.write(chunk)) await once(out, 'drain')
+    }
+  } finally {
+    out.end()
+    await once(out, 'close').catch(() => {})
+  }
+  if (o.size != null && got !== o.size) throw new Error(`${o.what} came with ${got} bytes, not ${o.size}`)
+  return hash.digest('hex')
 }
 
 /** One release checker (the daemon starts one; tests make their own, against a fake GitHub). */
@@ -73,6 +121,8 @@ export function releaseChecker(o: CheckerOptions) {
   const dir = o.dir ?? join(SUPPORT, 'android')
   const now = o.now ?? Date.now
   const enabled = o.enabled ?? (() => settings.releaseCheck !== false)
+  // A look at all: for the APK, or for the server's own update (which works with releaseCheck off).
+  const looking = () => enabled() || !!o.server?.enabled()
   // Plain http only when the API itself is (a test's fake GitHub); GitHub's own links are https.
   const plainOk = api.startsWith('http://')
   // The release last read and its ETag: a 304 means it's still the one, so no second look at its note.
@@ -108,7 +158,7 @@ export function releaseChecker(o: CheckerOptions) {
   }
 
   /** The release's own JSON as the APK and its note to fetch. */
-  function assetsOf(body: unknown): { tag: string; note: { url: string; size: number | null } | null; apk: { url: string; size: number | null } | null } | null {
+  function assetsOf(body: unknown): { tag: string; note: Asset | null; apk: Asset | null; server: Asset | null } | null {
     const r = body as { tag_name?: unknown; assets?: unknown }
     if (!r || typeof r.tag_name !== 'string' || !/^[\w.+-]{1,64}$/.test(r.tag_name)) return null
     const tag = r.tag_name
@@ -117,7 +167,7 @@ export function releaseChecker(o: CheckerOptions) {
       const a = assets.find((x) => x && x.name === name && okUrl(x.browser_download_url))
       return a ? { url: a.browser_download_url as string, size: typeof a.size === 'number' ? a.size : null } : null
     }
-    return { tag, note: find(`hypernova-${tag}.json`), apk: find(`hypernova-${tag}.apk`) }
+    return { tag, note: find(`hypernova-${tag}.json`), apk: find(`hypernova-${tag}.apk`), server: find(`hypernova-server-${tag}-linux.tar.gz`) }
   }
 
   async function readNote(url: string): Promise<ReleaseNote | null> {
@@ -140,33 +190,7 @@ export function releaseChecker(o: CheckerOptions) {
   }
 
   /** The APK into [tmp], its SHA-256 counted on the way; its digest, or an error. */
-  async function download(url: string, tmp: string, size: number | null): Promise<string> {
-    const res = await fetch(url, { headers: headers('application/octet-stream'), signal: timeout(true) })
-    if (!res.ok || !res.body) {
-      await res.body?.cancel()
-      throw new Error(`the APK answered ${res.status}`)
-    }
-    if (Number(res.headers.get('content-length')) > APK_MAX) {
-      await res.body.cancel()
-      throw new Error('the APK is too big')
-    }
-    const hash = createHash('sha256')
-    const out = createWriteStream(tmp, { mode: 0o600 })
-    let got = 0
-    try {
-      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
-        got += chunk.length
-        if (got > APK_MAX) throw new Error('the APK is too big')
-        hash.update(chunk)
-        if (!out.write(chunk)) await once(out, 'drain')
-      }
-    } finally {
-      out.end()
-      await once(out, 'close').catch(() => {})
-    }
-    if (size != null && got !== size) throw new Error(`the APK came with ${got} bytes, not ${size}`)
-    return hash.digest('hex')
-  }
+  const download = (url: string, tmp: string, size: number | null): Promise<string> => downloadTo(url, tmp, { size, max: APK_MAX, what: 'the APK', signal: timeout(true) })
 
   /**
    * In place, as `hnctl apk` does it: no note = no offer, so the old note goes first, then the new
@@ -183,7 +207,7 @@ export function releaseChecker(o: CheckerOptions) {
   }
 
   async function run(): Promise<Outcome> {
-    if (!enabled()) return { kind: 'off' }
+    if (!looking()) return { kind: 'off' }
     if (now() < limitedUntil) return { kind: 'limited', until: limitedUntil }
     const h = headers('application/vnd.github+json')
     h['x-github-api-version'] = '2022-11-28'
@@ -210,10 +234,12 @@ export function releaseChecker(o: CheckerOptions) {
       const found = assetsOf(await res.json())
       if (!found) return { kind: 'error', message: 'the latest release has no tag' }
       const note = found.note ? await readNote(found.note.url) : null
-      known = { tag: found.tag, note, apk: found.apk }
+      known = { tag: found.tag, note, apk: found.apk, server: found.server }
       etag = res.headers.get('etag')
     }
     const k = known!
+    // Looking only for the server's own update (releaseCheck off): the APK isn't fetched.
+    if (!enabled()) return { kind: 'off' }
     if (!k.note || !k.apk) return { kind: 'no-note', tag: k.tag }
     const offered = o.offered() ?? 0
     if (k.note.versionCode <= offered) return { kind: 'not-newer', tag: k.tag, versionCode: k.note.versionCode, offered }
@@ -248,6 +274,14 @@ export function releaseChecker(o: CheckerOptions) {
     log(line)
   }
 
+  /** The release just read, to the server's own update: not waited for (it may wait for a quiet moment). */
+  function toServer(r: Outcome): void {
+    if (!o.server || !known || r.kind === 'limited' || r.kind === 'none' || r.kind === 'error') return
+    if (r.kind === 'off' && !o.server.enabled()) return
+    const k = known
+    o.server.consider({ tag: k.tag, sha256: k.note?.serverSha256 ?? null, tarball: k.server }).catch((e: unknown) => log('server update failed', e))
+  }
+
   /** One check now; a check under way is the one. Never throws. */
   function check(): Promise<Outcome> {
     if (running) return running
@@ -255,6 +289,7 @@ export function releaseChecker(o: CheckerOptions) {
       .catch((e: unknown): Outcome => ({ kind: 'error', message: e instanceof Error ? (e.cause instanceof Error ? `${e.message}: ${e.cause.message}` : e.message) : String(e) }))
       .then((r) => {
         note(r)
+        toServer(r)
         return r
       })
       .finally(() => {
@@ -263,8 +298,9 @@ export function releaseChecker(o: CheckerOptions) {
     return running
   }
 
-  function start(): () => void {
-    first = setTimeout(() => void check(), FIRST_CHECK)
+  /** [firstMs]: the first look (default 30 s; sooner right after the server updated itself). */
+  function start(firstMs = FIRST_CHECK): () => void {
+    first = setTimeout(() => void check(), firstMs)
     first.unref()
     timer = setInterval(() => void check(), CHECK_EVERY)
     timer.unref()
@@ -278,12 +314,12 @@ export function releaseChecker(o: CheckerOptions) {
 }
 
 let daemonChecker: ReturnType<typeof releaseChecker> | null = null
-/** The daemon's checker (main.ts): at start and every 6 hours. */
-export function startReleaseCheck(o: CheckerOptions): void {
+/** The daemon's checker (main.ts): at start (after [firstMs], default 30 s) and every 6 hours. */
+export function startReleaseCheck(o: CheckerOptions, firstMs?: number): void {
   daemonChecker = releaseChecker(o)
-  daemonChecker.start()
+  daemonChecker.start(firstMs)
 }
-/** `releaseCheck` turned on (POST /local/settings): a look now rather than in up to 6 hours. */
+/** `releaseCheck` or `autoUpdate` turned on (POST /local/settings, the phone): a look now rather than in up to 6 hours. */
 export function checkReleaseNow(): void {
   if (daemonChecker) void daemonChecker.check()
 }

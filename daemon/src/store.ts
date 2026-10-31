@@ -55,6 +55,12 @@ export type Settings = {
    * hours and offers its APK to the phones. `POST /local/settings` or settings.json. Unset: on.
    */
   releaseCheck?: boolean
+  /**
+   * The server updates itself to a newer GitHub release (server-update.ts; owner, 2026-10-31): only
+   * an install the installer manages, never in the middle of work. Settings on the phone, `hypernova
+   * auto-update on|off`, `POST /local/settings`. Unset: off.
+   */
+  autoUpdate?: boolean
 }
 /**
  * A session started from Hypernova. `engine` "term" runs in a shared terminal; "sdk" (or none, from

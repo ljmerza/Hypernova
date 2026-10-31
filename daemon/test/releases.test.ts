@@ -274,7 +274,7 @@ test('turned off (settings.releaseCheck false): GitHub is never asked', async ()
 
 test('the version note: a versionCode, a versionName and a SHA-256, or nothing', () => {
   const s = 'A'.repeat(64)
-  assert.deepEqual(parseNote({ versionCode: 5, versionName: '0.6.0', sha256: s }), { versionCode: 5, versionName: '0.6.0', sha256: 'a'.repeat(64) })
+  assert.deepEqual(parseNote({ versionCode: 5, versionName: '0.6.0', sha256: s }), { versionCode: 5, versionName: '0.6.0', sha256: 'a'.repeat(64), serverSha256: null })
   assert.equal(parseNote({ versionCode: 5, versionName: '0.6.0' }), null)
   assert.equal(parseNote({ versionCode: 0, versionName: '0.6.0', sha256: s }), null)
   assert.equal(parseNote({ versionCode: 1.5, versionName: '0.6.0', sha256: s }), null)

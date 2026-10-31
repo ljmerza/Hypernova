@@ -524,6 +524,12 @@ test('{t:"files"} and {t:"lan"}', async () => {
   setLanAccess(false)
 })
 
+test('{t:"update"} and POST /v1/mac/update: the server updating itself', async () => {
+  contract('rest-update', await ok(post('/v1/mac/update', { autoUpdate: true })))
+  contract('ws-update', heard('update', (m) => m.update.auto === true))
+  await ok(post('/v1/mac/update', { autoUpdate: false }))
+})
+
 test('{t:"app"}: a newer app to hand out', () => {
   writeFileSync(join(apkDir, 'hypernova.json'), JSON.stringify({ versionCode: 4300, versionName: '0.43.0' }))
   announceApp()
