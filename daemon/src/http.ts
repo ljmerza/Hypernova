@@ -20,7 +20,7 @@ import { agentJobCommand, setClaudeAgents } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
 import { codexModels, codexSessionUsage, codexState, refreshCodexAccount } from './codex/account.ts'
 import { isCodex, isCodexMode } from './codex/threads.ts'
-import { createCodexSession, ensureCodexHistory, interruptCodex, promptCodex, setCodexMode, setCodexModel } from './codex/sessions.ts'
+import { createCodexSession, deleteCodex, ensureCodexHistory, interruptCodex, promptCodex, renameCodex, setCodexMode, setCodexModel } from './codex/sessions.ts'
 import { SwitchError, commitSwitch, previewSwitch, useShared } from './switch.ts'
 import { linkOf } from './switch-links.ts'
 import { boxLines, boxText } from './term/shared.ts'
@@ -796,7 +796,8 @@ async function api(c: Ctx): Promise<void> {
   // The Home card's long-press menu (docs/PROTOCOL.md, "Session menu"): rename it (Claude Code's
   // /rename, typed in, so it shows in `claude agents` and the transcript keeps it), and for a
   // `claude agents` job, stop it or delete it there, or restart it on the installed Claude Code
-  // (`claude respawn`, for a job on an older one: session.agentOutdated).
+  // (`claude respawn`, for a job on an older one: session.agentOutdated). A Codex session: rename,
+  // stop and delete over Codex's app-server (codex/sessions.ts).
   const menu = /^\/v1\/sessions\/([\w-]+)(?:\/(rename|stop|respawn))?$/.exec(path)
   if (menu && ((menu[2] && m === 'POST') || (!menu[2] && m === 'DELETE'))) {
     const [, id, action] = menu
@@ -806,13 +807,30 @@ async function api(c: Ctx): Promise<void> {
     if (action === 'rename') {
       const name = String((await readJsonBody(req))?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
       if (!name) throw new HttpError(400, 'bad_name', 'Give it a name.')
-      if (isCodex(id!) || isSdk(id!)) throw new HttpError(409, 'no_terminal', 'Only a session in a terminal can be renamed.')
+      // Codex names its own threads (thread/name/set), terminal or not.
+      if (isCodex(id!)) {
+        const kept = await renameCodex(id!, name)
+        return json(res, 200, { session: listSessions().find((x) => x.id === id), kept })
+      }
+      if (isSdk(id!)) throw new HttpError(409, 'no_terminal', 'Only a session in a terminal can be renamed.')
       // An ended session that isn't a claude agents job would be resumed just to be renamed: not that.
       if (!job && !termOf(id!) && !isLiveTerminal(id!)) throw new HttpError(409, 'not_open', 'Only an open session can be renamed.')
       // Never a fork: a session open in a terminal Hypernova doesn't hold is a 409.
       await promptSession(id!, `/rename ${name}`, { noFork: true })
       upsertSession(id!, { title: name })
       return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+    }
+    // Codex: Stop is its turn's interrupt; Delete is Codex's own thread/delete, its shared terminal
+    // (the `codex` TUI on that thread) ended first. Restart is claude agents' only.
+    if (isCodex(id!) && action !== 'respawn') {
+      if (action === 'stop') {
+        await interruptCodex(id!)
+        return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+      }
+      const tid = termOf(id!)
+      if (tid) await endTermAndWait(tid)
+      await deleteCodex(id!)
+      return json(res, 200, { ok: true })
     }
     if (!job) throw new HttpError(409, 'not_agents', 'Only a session in claude agents can be stopped or deleted here.')
     // Its holder (`claude attach`) goes first: it only watched, and would hold the job open.

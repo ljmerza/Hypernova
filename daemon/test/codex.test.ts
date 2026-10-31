@@ -2,7 +2,7 @@
 // through the daemon's routes against a stand-in for Codex's app-server, on scratch state.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -347,6 +347,110 @@ test('two switches at once make one new session', async () => {
   const [a, b] = await Promise.all([call('POST', `/v1/sessions/${id}/switch`, { to: 'claude', text: '' }), call('POST', `/v1/sessions/${id}/switch`, { to: 'claude', text: '' })])
   const codes = [a, b].map((r) => (r.status === 200 ? 'ok' : r.body.error.code)).sort()
   assert.deepEqual(codes, ['ok', 'switched'])
+})
+
+const threadsFile = () => JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'codex-threads.json'), 'utf8')) as any[]
+
+test('the session menu renames a Codex session through Codex’s own thread/name/set', async () => {
+  const id = (await call('POST', '/v1/sessions', { agent: 'codex', projectPath: project, prompt: 'name me' })).body.session.id
+  await until(() => session(id)?.state === 'idle')
+  const r = await call('POST', `/v1/sessions/${id}/rename`, { name: '  Release   notes ' })
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  assert.equal(r.body.kept, 'codex')
+  assert.equal(r.body.session.title, 'Release notes')
+  const set = await codex.waitFor('thread/name/set', (p) => p.threadId === id)
+  assert.deepEqual(set.params, { threadId: id, name: 'Release notes' })
+  assert.equal(threadsFile().find((t) => t.id === id).title, 'Release notes')
+  assert.equal((await call('POST', `/v1/sessions/${id}/rename`, { name: ' ' })).body.error.code, 'bad_name')
+  // A Codex without thread/name/set: Hypernova keeps the name, and says so.
+  const real = codex.handlers['thread/name/set']!
+  codex.handlers['thread/name/set'] = () => {
+    throw { code: -32601, message: 'Method not found' }
+  }
+  try {
+    const old = await call('POST', `/v1/sessions/${id}/rename`, { name: 'Kept here' })
+    assert.equal(old.status, 200)
+    assert.equal(old.body.kept, 'hypernova')
+    assert.equal(session(id)?.title, 'Kept here')
+  } finally {
+    codex.handlers['thread/name/set'] = real
+  }
+})
+
+test('the session menu’s Stop on a Codex session interrupts its turn; Restart isn’t for Codex', async () => {
+  codex.autoTurn = false
+  try {
+    const id = (await call('POST', '/v1/sessions', { agent: 'codex', projectPath: project, prompt: 'long one' })).body.session.id
+    await until(() => codex.running.has(id))
+    codex.notify('turn/started', { threadId: id, turn: { id: codex.running.get(id), status: 'inProgress', items: [] } })
+    await until(() => session(id)?.state === 'working')
+    const r = await call('POST', `/v1/sessions/${id}/stop`)
+    assert.equal(r.status, 200, JSON.stringify(r.body))
+    await codex.waitFor('turn/interrupt', (p) => p.threadId === id)
+    await until(() => session(id)?.state === 'idle')
+    assert.equal((await call('POST', `/v1/sessions/${id}/respawn`)).body.error.code, 'not_agents')
+  } finally {
+    codex.autoTurn = true
+  }
+})
+
+test('the session menu deletes a Codex session with Codex’s own thread/delete, and Hypernova forgets it', async () => {
+  const id = (await call('POST', '/v1/sessions', { agent: 'codex', projectPath: project, prompt: 'delete me' })).body.session.id
+  await until(() => session(id)?.state === 'idle')
+  // A Codex that can't delete: refused, and nothing is forgotten.
+  const real = codex.handlers['thread/delete']!
+  codex.handlers['thread/delete'] = () => {
+    throw { code: -32600, message: 'Invalid request: unknown variant `thread/delete`' }
+  }
+  try {
+    const old = await call('DELETE', `/v1/sessions/${id}`)
+    assert.equal(old.status, 409)
+    assert.equal(old.body.error.code, 'codex_too_old')
+    assert.ok(session(id))
+  } finally {
+    codex.handlers['thread/delete'] = real
+  }
+  const r = await call('DELETE', `/v1/sessions/${id}`)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  assert.deepEqual(r.body, { ok: true })
+  assert.equal((await codex.waitFor('thread/delete', (p) => p.threadId === id)).params.threadId, id)
+  assert.equal(session(id), undefined)
+  assert.equal(threadsFile().some((t) => t.id === id), false)
+  assert.equal((await call('DELETE', `/v1/sessions/${id}`)).status, 404)
+  assert.equal(codex.count('thread/archive'), 0, 'deleted, not archived')
+})
+
+test('a Codex session Codex never wrote down is only forgotten by Delete, and renamed in Hypernova', async () => {
+  const real = codex.handlers['turn/start']!
+  codex.handlers['turn/start'] = () => {
+    throw { code: -32603, message: 'nope' }
+  }
+  try {
+    await call('POST', '/v1/sessions', { agent: 'codex', projectPath: project, prompt: 'never started' })
+  } finally {
+    codex.handlers['turn/start'] = real
+  }
+  const id = threadsFile().find((t) => t.title === 'never started' && !t.started)?.id
+  assert.ok(id && session(id))
+  const sets = codex.count('thread/name/set')
+  const named = await call('POST', `/v1/sessions/${id}/rename`, { name: 'Local name' })
+  assert.equal(named.body.kept, 'hypernova')
+  assert.equal(codex.count('thread/name/set'), sets)
+  const deletes = codex.count('thread/delete')
+  assert.equal((await call('DELETE', `/v1/sessions/${id}`)).status, 200)
+  assert.equal(codex.count('thread/delete'), deletes, 'nothing of Codex’s to delete')
+  assert.equal(session(id), undefined)
+  assert.equal(threadsFile().some((t) => t.id === id), false)
+})
+
+test('a Codex thread deleted elsewhere (`codex delete` in a terminal) goes from Hypernova too', async () => {
+  const id = (await call('POST', '/v1/sessions', { agent: 'codex', projectPath: project, prompt: 'gone soon' })).body.session.id
+  await until(() => session(id)?.state === 'idle')
+  const deletes = codex.count('thread/delete')
+  codex.notify('thread/deleted', { threadId: id })
+  await until(() => session(id) === undefined)
+  assert.equal(threadsFile().some((t) => t.id === id), false)
+  assert.equal(codex.count('thread/delete'), deletes, 'Hypernova deletes nothing itself')
 })
 
 test('the models’ default is the one Codex starts a thread on: the owner’s own config, with its effort', async () => {

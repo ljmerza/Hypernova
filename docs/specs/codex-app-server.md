@@ -46,6 +46,11 @@ the exact protocol types for the installed version.
   in favour of `thread/turns/list` plus `thread/items/list`, but still answers in 0.163.0).
 - `thread/archive {threadId}` hides a thread from `codex resume`. Hypernova never archives the
   owner's threads; only its tests do.
+- Read from `codex app-server generate-ts` on 0.164.0 (2026-10-31), not probed against a live
+  server: `thread/name/set {threadId, name}` → `{}` (and `thread/name/updated {threadId,
+  threadName?}`), `thread/delete {threadId}` → `{}` (and `thread/deleted {threadId}`), as `codex
+  delete` ("Permanently delete a saved session"), and `thread/unarchive`. Whether 0.163.0 has the
+  first two isn't checked; Hypernova's Rename and Delete use them (docs/PROTOCOL.md, "Session menu").
 
 ### 1.3 More than one client on a thread
 - A second connection joins a thread with `thread/resume {threadId, excludeTurns:true}`, but only

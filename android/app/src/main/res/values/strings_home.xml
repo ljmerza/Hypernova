@@ -58,6 +58,7 @@
     <string name="session_stop">Stop</string>
     <string name="session_delete_q">Delete “%1$s”?</string>
     <string name="session_delete_body">The background session goes from claude agents, and its worktree with it when that\'s safe. Claude Code says no while the worktree has unpushed work.</string>
+    <string name="session_delete_body_codex">Codex deletes the conversation for good, so codex resume won\'t find it either. A terminal open on it closes.</string>
     <string name="err_rename">Couldn\'t rename the session. Try again.</string>
     <string name="err_stop_session">Couldn\'t stop the session. Try again.</string>
     <string name="err_delete_session">Couldn\'t delete the session. Try again.</string>

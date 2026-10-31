@@ -47,10 +47,11 @@ import kotlinx.coroutines.launch
 
 /**
  * What a Home card's long-press menu offers for [Session] (docs/PROTOCOL.md, "Session menu"): Rename
- * for any session but Codex's; Stop and Delete only for a `claude agents` job ([Session.agentJob]),
- * Stop while it works or waits on the owner, or idles with its process still running
- * ([Session.agentRunning]; owner, 2026-10-30: idle jobs couldn't be stopped). Not for one stopped or
- * done already, nor, from an older Mac that doesn't say, for an idle one.
+ * for any session; Stop and Delete for a `claude agents` job ([Session.agentJob]) or a Codex session
+ * (its turn's interrupt, Codex's own delete; 2026-10-31). Stop while it works or waits on the owner,
+ * or, for a job, idles with its process still running ([Session.agentRunning]; owner, 2026-10-30:
+ * idle jobs couldn't be stopped). Not for one stopped or done already, nor, from an older Mac that
+ * doesn't say, for an idle one.
  */
 data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean, val restart: Boolean = false) {
     val any: Boolean get() = rename || stop || delete || restart
@@ -59,14 +60,14 @@ data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean
         fun of(s: Session): MenuOffer {
             val job = s.agentJob != null
             val live = s.phase != Phase.Ended && (s.state != SessionState.Idle || s.agentRunning == true)
-            return MenuOffer(rename = !s.codex, stop = job && live, delete = job, restart = job && s.agentOutdated != null)
+            return MenuOffer(rename = true, stop = (job || s.codex) && live, delete = job || s.codex, restart = job && s.agentOutdated != null)
         }
     }
 }
 
 /**
  * A Home card's long-press menu: Rename (Claude Code's /rename, so claude agents shows it too),
- * Stop and Delete a `claude agents` job. Delete asks first. The Mac's own words come back when it
+ * Stop and Delete a `claude agents` job or a Codex session (Codex's own name and delete). Delete asks first. The Mac's own words come back when it
  * can't (Claude Code keeps a worktree with unpushed work). [start]: the page it opens on (the chat's
  * session sheet lists the actions itself, then opens Rename or Delete here).
  */
@@ -88,7 +89,7 @@ internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit, start: Men
         MenuPage.Delete -> ConfirmDialog(
             visible = true,
             title = stringResource(R.string.session_delete_q, s.name),
-            body = stringResource(R.string.session_delete_body),
+            body = stringResource(if (s.codex) R.string.session_delete_body_codex else R.string.session_delete_body),
             confirm = stringResource(R.string.delete),
             danger = true,
             onConfirm = {

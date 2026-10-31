@@ -957,6 +957,21 @@ Agents & providers → Claude Code); the daemon takes it without a restart (each
   each), so the phone waits up to two minutes. Home shows "N jobs run an older Claude Code" with
   Restart all (asked first: a job at work is interrupted), swiped away until another job falls behind.
 
+**A Codex session** (2026-10-31; `daemon/src/codex/sessions.ts`) takes the same three routes over
+Codex's app-server, with or without a terminal; the phone offers Rename and Delete always, Stop while
+it works or waits on the owner, never Restart (409 `not_agents`).
+- `rename` `{name}`: Codex's `thread/name/set {threadId, name}`, so `codex resume` shows it too.
+  `{session, kept: "codex"}`. `kept: "hypernova"`: the name is in `codex-threads.json` only, for a
+  thread Codex never wrote down or a Codex that doesn't know the call. 502 `codex_refused` with
+  Codex's words; Codex's own errors when it isn't reachable (`codex_off`, …).
+- `stop`: the `interrupt` route's Stop (the turn ends, the queue comes back named). `{session}`.
+- `DELETE`: Codex's `thread/delete {threadId}`, for good (as `codex delete`; not `thread/archive`),
+  after its shared terminal ends and a running turn is stopped; then the thread leaves
+  `codex-threads.json` and `session.removed` goes out. `{ok: true}`. A thread Codex never wrote down
+  is only forgotten. 409 `codex_too_old` from a Codex without the call (nothing is forgotten), 502
+  `codex_refused`. Codex's `thread/deleted` (a `codex delete` elsewhere) makes the daemon forget the
+  session the same way. Home's swipe doesn't delete a Codex card: the menu and the session sheet do.
+
 **A job that died** (`daemon/src/job-deaths.ts`). Claude Code's job state file
 (`~/.claude/jobs/<job>/state.json`) ends `done` (finished), `stopped` (`claude stop`, a signal) or
 `failed` (died: crash, error exit, process gone mid-turn, an API error, Claude giving up), with the
@@ -1483,7 +1498,7 @@ CodexModel = { value: string, name: string, description: string | null,
 - **Usage**: `GET /v1/sessions/{id}/usage` has Codex's context and tokens and Codex's own windows, no
   price. The snapshot's `codex.usage` is the meter.
 - **Not for Codex**: `rewind`, `provider`, `auto-continue`, `menu` and a `continue` after a limit answer
-  409 `unsupported_for_agent`; `agents` and `todos` are empty.
+  409 `unsupported_for_agent`; `agents` and `todos` are empty. Rename, Stop and Delete: see Session menu.
 - **Terminals**: `POST /v1/sessions/{id}/terminal` and `open` start `codex resume` in a shared terminal
   when the session has none (409 `not_started` before Codex wrote the thread down). See Shared
   terminals for the Codex holder and the shell's `codex`.

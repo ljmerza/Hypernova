@@ -55,6 +55,16 @@ export class FakeCodex {
     },
     'thread/read': (p) => ({ thread: { id: p.threadId, turns: [] } }),
     'thread/unsubscribe': () => ({ status: 'unsubscribed' }),
+    // As the generated 0.164.0 protocol has them: an empty answer, and the change said to clients.
+    'thread/name/set': (p) => {
+      this.notify('thread/name/updated', { threadId: p.threadId, threadName: p.name })
+      return {}
+    },
+    'thread/delete': (p) => {
+      this.running.delete(p.threadId)
+      this.notify('thread/deleted', { threadId: p.threadId })
+      return {}
+    },
     'turn/start': (p) => {
       this.empty.delete(p.threadId)
       const turn = randomUUID()
