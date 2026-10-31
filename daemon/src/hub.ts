@@ -20,6 +20,7 @@ import { bypassBlockedByRoot } from './platform.ts'
 import { linkOf } from './switch-links.ts'
 import { blockedCount, forgetBlocked, noteBlocked, onBlockedChange, sawToolResult, takeRetryGrant } from './blocked.ts'
 import { heldView, type HeldView } from './held.ts'
+import { TODO_TOOLS, todoNow, type TodoNow } from './todos.ts'
 
 export type SessionState = 'starting' | 'working' | 'needs_you' | 'idle' | 'error' | 'ended'
 export type Session = {
@@ -108,6 +109,16 @@ export type Session = {
   question?: string | null
   /** Fork: prompts held until Claude Code's input box is back (held.ts), oldest first. Absent when none. */
   held?: HeldView[]
+  /**
+   * Claude's to-do list in short (todos.ts, [todoNow]): the item under way, done and total. Home's
+   * Working card says "Running the tests 3/7" with it. Null when Claude made none.
+   */
+  todo?: TodoNow | null
+  /**
+   * When the turn it works on started (ms), kept while it waits on the owner in that turn; null
+   * when it isn't working ([noteWorking]). Home's Working card says "for 12 min" with it.
+   */
+  workingSince?: number | null
 }
 type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'agentRunning' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
@@ -235,7 +246,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id) }
+  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null, workingSince: r.workingSince ?? null }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
@@ -315,6 +326,7 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
     sessions.set(id, r)
   }
   Object.assign(r, patch)
+  noteWorking(r)
   // Running again (a prompt resumed it): no longer one a restart of the Mac cut short.
   if (patch.state && patch.state !== 'ended') runsAgain(id)
   // Ended: no dialog of its own waits any more.
@@ -327,6 +339,24 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
   if (JSON.stringify(after) !== before) broadcast({ t: 'session', session: after })
   return r
 }
+
+/**
+ * When its turn started (Session.workingSince): set as it starts working or starting (now, unless
+ * the patch brought a better time: Claude Code's registry stamps when it went busy), kept while it
+ * waits on the owner within the turn, gone once it's idle, failed or ended.
+ */
+function noteWorking(r: Rec): void {
+  if (r.state === 'working' || r.state === 'starting') r.workingSince ??= Date.now()
+  else if (r.state !== 'needs_you') r.workingSince = null
+}
+
+/** Claude's to-do list in short (Session.todo), worked out again after a to-do tool's event. */
+function refreshTodo(r: Rec): void {
+  if (!r.parse) return
+  const t = todoNow(r.parse.events)
+  if (JSON.stringify(t) !== JSON.stringify(r.todo ?? null)) upsertSession(r.id, { todo: t })
+}
+const isTodoEvent = (ev: Ev | undefined) => ev?.kind === 'tool' && TODO_TOOLS.has(ev.name)
 
 export function setState(id: string, state: SessionState, activity?: string | null): void {
   const r = sessions.get(id)
@@ -368,6 +398,7 @@ export function ensureParsed(r: Rec): ParseState {
   if (st.queue.length && !registryBusy(r.pid)) st.queue = []
   st.queueChanged = true
   publishQueue(r)
+  refreshTodo(r)
   return st
 }
 
@@ -624,6 +655,7 @@ export function putEvent(sessionId: string, ev: Ev): void {
   }
   st.byId.set(ev.id, ev)
   broadcast({ t: 'event', sessionId, event: ev })
+  if (isTodoEvent(ev)) refreshTodo(r)
 }
 
 /** One last read of a terminal session's transcript (lines written just before it ended). */
@@ -666,6 +698,8 @@ export function emitEvent(sessionId: string, id: string): void {
   if (ev) broadcast({ t: 'event', sessionId, event: ev })
   // An SDK session's results, and those the hooks bring before the transcript does (blocked.ts).
   if (ev?.kind === 'tool' && r && !isCodexRec(r)) sawToolResult(sessionId, ev)
+  // Its to-do list moved on (a transcript line, a hook's result, the SDK's message).
+  if (r && isTodoEvent(ev)) refreshTodo(r)
 }
 
 export function notice(sessionId: string, text: string, tone: 'info' | 'warn' | 'error' = 'info'): void {
@@ -1531,6 +1565,9 @@ export function pollRegistry(): void {
     // Claude Code stamps status changes; use that rather than "now" (a daemon restart isn't activity).
     const at = Number(o.statusUpdatedAt ?? o.updatedAt) || r.lastActivityAt
     if (r.state !== state) Object.assign(patch, { state, lastActivityAt: Math.max(r.lastActivityAt, at) })
+    // Busy since its stamp: the turn's start, also when the daemon first sees it mid-turn (a restart).
+    const busyAt = Number(o.statusUpdatedAt) || 0
+    if (state === 'working' && r.workingSince == null && busyAt > 0 && busyAt <= Date.now()) patch.workingSince = busyAt
     if (state === 'idle') patch.activity = null
     if (o.name && r.title === 'New session') patch.title = o.name
     upsertSession(r.id, patch)

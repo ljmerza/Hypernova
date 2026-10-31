@@ -1214,7 +1214,9 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
 
     private fun seedSessions(): List<Session> = (listOf(
         Session("a3", "s-hypernova", "cosmos renderer", "hypernova", SessionState.Working, "opus", "acceptEdits",
-            "$ ./gradlew :app:assembleDebug", now - 20_000, queued = 1),
+            "$ ./gradlew :app:assembleDebug", now - 20_000, queued = 1,
+            // Its to-do list as the chat's demo has it (ChatRepo.kt), and its turn so far.
+            todo = TodoNow("Fading the deep-sky objects behind text", 2, 5), workingSince = now - 12 * 60_000),
         Session("b8", "s-haze", "haze edges", "hypernova", SessionState.Idle, "sonnet", "acceptEdits",
             "waiting for your next prompt", now - 4 * 60_000),
         Session("c7", "s-0stems", "release landing copy", "0stems", SessionState.NeedsYou, "opus", "default",
@@ -1231,7 +1233,7 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
             "", now - 2 * 60_000, agentsRunning = 2),
         // Two on OpenRouter: ringed moons of the companion star, which shines on while the sun is dead.
         Session("5e", OR_WORK, "port the widget", "0stems", SessionState.Working, "openai/gpt-5", "acceptEdits",
-            "Edit: widget/Widget.tsx", now - 30_000, providerId = "openrouter"),
+            "Edit: widget/Widget.tsx", now - 30_000, providerId = "openrouter", workingSince = now - 74 * 60_000),
         Session("7a", OR_IDLE, "translate the docs", "prudnikov-site", SessionState.Idle, "openai/gpt-5", "default",
             "waiting for your next prompt", now - 9 * 60_000, providerId = "openrouter"),
         // Projects left alone for a day or more: quiet, so the sky's belt rather than planets.

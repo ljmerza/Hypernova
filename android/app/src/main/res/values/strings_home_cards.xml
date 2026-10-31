@@ -1,0 +1,25 @@
+<resources>
+    <!-- A Working card's turn so far, at the end of its second line (ui/home/CardNow.kt, Elapsed). -->
+    <string name="working_for_m">for %1$d min</string>
+    <string name="working_for_h">for %1$d h</string>
+    <string name="working_for_hm">for %1$d h %2$d min</string>
+    <string name="working_for_d">for %1$d d</string>
+    <string name="working_for_dh">for %1$d d %2$d h</string>
+    <!-- TalkBack: "Working for 1 hour 5 minutes." -->
+    <string name="working_for_said">Working for %1$s.</string>
+    <plurals name="working_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <plurals name="working_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <plurals name="working_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <!-- What a swipe on a Needs input card does, shown under the card as it slides (ui/home/CardSwipe.kt);
+         Stop and Delete use the long-press menu's words. -->
+    <string name="swipe_open">Open</string>
+</resources>

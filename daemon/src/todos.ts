@@ -77,3 +77,20 @@ export function todosOf(events: Ev[]): { todos: Todo[]; updatedAt: number } | nu
   if (list == null || list.length === 0) return null
   return { todos: list, updatedAt: at }
 }
+
+/** The tools that change the list: an event of one of them is news for [todoNow]. */
+export const TODO_TOOLS = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate'])
+
+/**
+ * The list in short, for Home's Working card (docs/PROTOCOL.md, Session.todo): the item under way
+ * as it reads while under way ("Running the tests"; its text when it has no such form; null when
+ * none is), how many are done, and how many there are. Null when Claude made no list.
+ */
+export type TodoNow = { active: string | null; done: number; total: number }
+export function todoNow(events: Ev[]): TodoNow | null {
+  const l = todosOf(events)
+  if (!l) return null
+  const on = l.todos.find((t) => t.status === 'in_progress')
+  const active = on ? (on.active ?? on.text) : null
+  return { active: active && active.length > 120 ? active.slice(0, 119) + '…' : active, done: l.todos.filter((t) => t.status === 'completed').length, total: l.todos.length }
+}

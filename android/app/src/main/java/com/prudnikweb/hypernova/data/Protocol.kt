@@ -93,6 +93,10 @@ data class WSession(
     val held: List<WQueued> = emptyList(),
     /** Claude Code's reasoning effort ("low"…"max"; docs/PROTOCOL.md, "A session's effort"); null: not known (its default), Codex, or an older Mac. */
     val effort: String? = null,
+    /** Claude's to-do list in short (docs/PROTOCOL.md, Session.todo); null: none, or an older Mac. */
+    val todo: TodoNow? = null,
+    /** When the turn it works on started (Session.workingSince); null: not working, or an older Mac. */
+    val workingSince: Long? = null,
 )
 
 /**
@@ -634,6 +638,11 @@ object Wire {
             blockedCalls = o.int("blockedCalls") ?: 0,
             held = o.arr("held").mapObjects(::queued),
             effort = o.str("effort")?.takeIf { it.isNotBlank() },
+            todo = o.obj("todo")?.let { t ->
+                val total = t.int("total") ?: 0
+                if (total > 0) TodoNow(t.str("active")?.takeIf { it.isNotBlank() }, (t.int("done") ?: 0).coerceIn(0, total), total) else null
+            },
+            workingSince = o.long("workingSince")?.takeIf { it > 0 },
         )
     }
 

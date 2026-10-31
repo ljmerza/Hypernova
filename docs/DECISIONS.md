@@ -2052,3 +2052,27 @@ a skill's chip and "YOU · SENDING…", and the answer only showed in the termin
    Open (the phone's browser), Copy link, Cancel. A dev server on the Mac (`localhost:5173`) opens
    its in-app preview at once, as its pill does; Hypernova's own ports and any other scheme
    (`intent:`, `file:`, `javascript:`, `content:`) are never links.
+
+## Home cards: what it's doing, for how long, and swipes (2026-10-31)
+
+The owner's picks from IDEAS (HM1, HM7, HM2), with the cards kept as uncluttered as they are: no
+new chip, no new row, nothing on a session's own screen.
+
+1. **A Working card's second line is what it's doing now** (HM1): the to-do under way as Claude
+   words it while under way, with its tally, "Running the tests 3/7" (done of all, as the chat's
+   status bar counts), else the session's activity ("Bash: npm test"). One quiet line, ellipsized,
+   the tally kept. Needs input keeps its ask; Completed keeps its last line and "finished … ago".
+   The daemon sends the list in short on the session (`Session.todo`, PROTOCOL), so Home asks for
+   no to-do list per card.
+2. **"for 12 min" at that line's end** (HM7): since the current turn started, kept while it waits
+   on him within the turn; `for 1 h 5 min` past an hour, `for 1 d 3 h` past a day, nothing in the
+   first minute. The daemon had no such time, so it keeps one (`Session.workingSince`: set as the
+   session starts working, from Claude Code's registry stamp when it first sees it busy, cleared
+   once it's idle, failed or ended). A session working only through its agents has none, so it shows
+   none. The figure ticks on its own minute, alone: no card recomposes for it.
+3. **A swipe left on a card** (HM2), a reveal with the action under the card, a haptic tick at the
+   threshold, the card springing back: **Needs input opens** it; **Completed stops** a `claude
+   agents` job whose process still runs (`agentRunning`, as the menu's Stop), **else deletes** it
+   (`claude rm`), asking first with the long-press menu's own confirm. Working cards don't swipe,
+   nor does a Completed card that isn't a job. The demo only opens. The long-press menu, the list's
+   scroll and Allow and Deny work as before.
