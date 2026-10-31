@@ -232,15 +232,7 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                 }
             }
         }
-        // A newer app on the Mac: downloaded and installed in the app, over its own route (ui/update).
-        val update = live?.appUpdate
-        if (update != null && pairing != null) {
-            item(key = "update") {
-                Spacer(Modifier.height(10.dp))
-                // The Mac's page as a way round only where a browser could open it.
-                com.prudnikweb.hypernova.ui.update.UpdateCard(update, com.prudnikweb.hypernova.data.UpdatePolicy.browserPage(pairing.baseUrl))
-            }
-        }
+        // A newer app is offered only in About's update row (owner, 2026-10-31: one place, with the versions).
         if (hub != null) {
             item(key = "providers") {
                 Spacer(Modifier.height(10.dp))
