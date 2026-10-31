@@ -130,7 +130,7 @@ class LiveHub(
             val m = macInfo ?: return null
             val code = m.appVersionCode ?: return null
             if (code <= BuildConfig.VERSION_CODE) return null
-            return AppUpdate(m.appVersionName ?: "", code, pairing.baseUrl.trimEnd('/') + "/download/android")
+            return AppUpdate(m.appVersionName ?: "", code, pairing.baseUrl.trimEnd('/') + "/download/android", server = serverId)
         }
     override val mac: Mac
         get() = Mac(

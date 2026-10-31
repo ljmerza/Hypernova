@@ -82,4 +82,17 @@ class AboutUpdateTest {
         }
         assertNull(Wire.withApp(mac, JSONObject("""{"versionName":"0.6.0"}""")).appVersionCode)
     }
+
+    @Test fun allServersOffersTheNewestOfAny() {
+        val older = AppUpdate("0.5.9", 499_000, offer.url, server = "z2")
+        val newer = AppUpdate("0.6.0", 500_000, "https://192.168.0.50:47323/download/android", server = "shed")
+        assertNull(AboutUpdate.newest(emptyList()))
+        assertNull(AboutUpdate.newest(listOf(null, null)))
+        // Not the one picked first's when another server has a newer one.
+        assertEquals(newer, AboutUpdate.newest(listOf(older, null, newer)))
+        assertEquals(newer, AboutUpdate.newest(listOf(newer, older)))
+        // The same version on two: the first's (the one picked).
+        val same = newer.copy(server = "z2")
+        assertEquals(same, AboutUpdate.newest(listOf(same, newer)))
+    }
 }
