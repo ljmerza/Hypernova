@@ -1,15 +1,17 @@
 package com.prudnikweb.hypernova.ui.session
 
 import android.content.Context
+import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SlashCommand
 import com.prudnikweb.hypernova.data.find
+import com.prudnikweb.hypernova.ui.home.MenuOffer
 import org.json.JSONArray
 
 /*
  * The session sheet's Commands tab (CommandsTab.kt) as plain data, unit-tested: what a command
- * takes after its name, the line that's sent, the commands used lately and pinned on this phone,
+ * takes after its name and the helper a tap opens for it, the line that's sent, the commands used lately and pinned on this phone,
  * the list in its parts, and which sessions can take a side question or a command from here.
  */
 
@@ -39,6 +41,52 @@ internal fun canSendCommand(c: SlashCommand, args: String): Boolean = argNeed(c.
 
 /** A tap on [c] sends it at once (it takes nothing), else opens its argument field first. */
 internal fun sendsOnTap(c: SlashCommand): Boolean = argNeed(c.argumentHint) == ArgNeed.None
+
+/**
+ * What a tap on a command opens instead of a bare field (IDEAS SC3, SC8; docs/DECISIONS.md,
+ * "Argument helpers in the Commands tab"): [Effort] the five levels as chips under it, [Model] the
+ * session's model picker, [Rename] the rename sheet with the name filled, [Compact] the Compact
+ * sheet with its optional "Keep…" line. [Field]: as before, the field from its argument hint (or
+ * nothing, for one that takes nothing).
+ */
+internal enum class ArgHelper { Field, Effort, Model, Rename, Compact }
+
+/**
+ * Which of Claude Code's helpers [s] can take from the tab, each through its own route, not typed:
+ * the effort ([ClaudeEffort.changeable], on the subscription only, as the Overview's Effort part),
+ * the model (as the Overview's model picker) and the name (Claude Code's /rename, which the Mac
+ * types only where it holds a terminal or attaches to a job). [changeable]: the session's model and
+ * mode can be changed from the phone (`canChangeModel`, SessionScreen.kt).
+ */
+internal data class HelperReach(val effort: Boolean, val model: Boolean, val rename: Boolean) {
+    companion object {
+        fun of(s: Session, changeable: Boolean, demo: Boolean): HelperReach = HelperReach(
+            effort = ClaudeEffort.shown(s) && ClaudeEffort.changeable(s, changeable),
+            model = changeable && !s.codex,
+            rename = MenuOffer.of(s).rename && s.phase != Phase.Ended && (demo || terminalReach(s)),
+        )
+    }
+}
+
+/**
+ * The helper a tap on [c] opens: only Claude Code's own /effort, /model and /rename (not a skill of
+ * the same name), each while [reach] has its route, else their field as before; /compact always.
+ */
+internal fun argHelper(c: SlashCommand, reach: HelperReach): ArgHelper = when {
+    !c.builtin -> ArgHelper.Field
+    c.name == "effort" && reach.effort -> ArgHelper.Effort
+    c.name == "model" && reach.model -> ArgHelper.Model
+    c.name == "rename" && reach.rename -> ArgHelper.Rename
+    c.name == "compact" -> ArgHelper.Compact
+    else -> ArgHelper.Field
+}
+
+/**
+ * The Compact sheet's line: "/compact", or "/compact <focus>" with what was typed on its "Keep…"
+ * line, trimmed and on one line (a line break would send it early in the terminal).
+ */
+internal fun compactLine(focus: String): String =
+    "/compact" + focus.trim().replace(Regex("\\s+"), " ").let { if (it.isEmpty()) "" else " $it" }
 
 /**
  * Commands the tab doesn't list: /btw has its own field at the top; /logout would sign Claude Code

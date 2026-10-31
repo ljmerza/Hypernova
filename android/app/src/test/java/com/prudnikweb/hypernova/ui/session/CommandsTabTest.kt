@@ -62,6 +62,45 @@ class CommandsTabTest {
         assertEquals("/compact keep the API notes", commandLine(cmd("compact"), "  keep the API notes \n"))
     }
 
+    @Test fun effortModelRenameAndCompactOpenTheirHelpersWhereTheirRoutesReach() {
+        val all = HelperReach(effort = true, model = true, rename = true)
+        assertEquals(ArgHelper.Effort, argHelper(cmd("effort", "<low|medium|high|xhigh|max|auto>"), all))
+        assertEquals(ArgHelper.Model, argHelper(cmd("model", "<model>"), all))
+        assertEquals(ArgHelper.Rename, argHelper(cmd("rename", "[name]"), all))
+        assertEquals(ArgHelper.Compact, argHelper(cmd("compact", "<optional custom summarization instructions>"), all))
+        // The rest keep their field; a skill named as one of Claude Code's is the owner's, a field too.
+        assertEquals(ArgHelper.Field, argHelper(cmd("clear", "[name]"), all))
+        assertEquals(ArgHelper.Field, argHelper(cmd("context"), all))
+        assertEquals(ArgHelper.Field, argHelper(cmd("model", "[name]", builtin = false), all))
+        // Without its route, its field as before; /compact's sheet needs none.
+        val none = HelperReach(effort = false, model = false, rename = false)
+        assertEquals(ArgHelper.Field, argHelper(cmd("effort", "<low|medium|high|xhigh|max|auto>"), none))
+        assertEquals(ArgHelper.Field, argHelper(cmd("model", "<model>"), none))
+        assertEquals(ArgHelper.Field, argHelper(cmd("rename", "[name]"), none))
+        assertEquals(ArgHelper.Compact, argHelper(cmd("compact"), none))
+    }
+
+    @Test fun theRoutesReachAsTheOverviewsPickersDo() {
+        // A shared terminal: all three.
+        assertEquals(HelperReach(effort = true, model = true, rename = true), HelperReach.of(session(term = TermLink("t", 0, 1)), changeable = true, demo = false))
+        // One the Mac runs itself: the model and the effort, but /rename has no terminal to be typed into.
+        assertEquals(HelperReach(effort = true, model = true, rename = false), HelperReach.of(session(origin = "hypernova"), changeable = true, demo = false))
+        // A job: the name too, through claude attach.
+        assertTrue(HelperReach.of(session(agentJob = "feedbeef"), changeable = true, demo = false).rename)
+        // Where the mode can't be changed, neither can the model nor the effort.
+        assertEquals(HelperReach(effort = false, model = false, rename = true), HelperReach.of(session(term = TermLink("t", 0, 1)), changeable = false, demo = false))
+        // Ended: none.
+        assertEquals(HelperReach(effort = false, model = false, rename = false), HelperReach.of(session(phase = Phase.Ended, term = TermLink("t", 0, 1)), changeable = false, demo = false))
+    }
+
+    @Test fun compactSendsItsFocusTrimmedOnOneLineOrNothing() {
+        assertEquals("/compact", compactLine(""))
+        assertEquals("/compact", compactLine("   \n "))
+        assertEquals("/compact keep the API notes", compactLine("keep the API notes"))
+        assertEquals("/compact keep the API notes", compactLine("  keep the API notes \n"))
+        assertEquals("/compact keep the API notes and the bugs", compactLine("keep the API notes\nand  the bugs"))
+    }
+
     @Test fun recentIsMostRecentFirstOnceEachAndPinningToggles() {
         val p = CommandPicks().used("context").used("compact").used("context")
         assertEquals(listOf("context", "compact"), p.recent)

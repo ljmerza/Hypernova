@@ -5,7 +5,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -35,6 +40,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -42,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Aside
 import com.prudnikweb.hypernova.data.Asides
+import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SlashCommand
@@ -55,7 +62,10 @@ import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.glassChoice
+import com.prudnikweb.hypernova.ui.home.MenuPage
 import com.prudnikweb.hypernova.ui.home.SearchField
+import com.prudnikweb.hypernova.ui.home.SessionMenu
+import com.prudnikweb.hypernova.ui.home.claudeEffortTitle
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -71,14 +81,17 @@ import kotlinx.coroutines.launch
  * phone, CommandsTabModel.kt), then all of them, with a search. A tap sends a command that takes
  * nothing; one that takes something opens its field under it first. Long-press pins or unpins.
  * The ones that open a screen of their own in the terminal come last, and send then open the
- * live terminal. The session's own screen is untouched: its "/" list stays as it was.
+ * live terminal. Some open a helper instead of a bare field (2026-10-31, [argHelper]): /effort its
+ * five levels as chips, /model the model picker ([onModel], the sheet's own, over it), /rename the
+ * rename sheet with the name filled, /compact the Compact sheet with an optional "Keep…" line.
+ * The session's own screen is untouched: its "/" list and the usage strip's Compact stay as they were.
  */
 @Composable
-internal fun CommandsTab(hub: Hub, session: Session, onDismiss: () -> Unit) {
+internal fun CommandsTab(hub: Hub, session: Session, onDismiss: () -> Unit, onModel: (() -> Unit)? = null) {
     SheetPartSeam(stringResource(R.string.aside_seam))
     AsidePart(hub, session, onDismiss)
     SheetPartSeam(stringResource(R.string.commands_seam))
-    CommandsPart(hub, session, onDismiss)
+    CommandsPart(hub, session, onDismiss, onModel)
 }
 
 @Composable
@@ -176,7 +189,7 @@ private fun AsideAnswer(a: Aside, terminal: Boolean, onTerminal: () -> Unit) {
 
 /** The project's commands and skills: Recent, Pinned, then all, with a search. */
 @Composable
-private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit) {
+private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (() -> Unit)?) {
     val context = LocalContext.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
@@ -195,28 +208,55 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit) {
     var openIn by remember(s.id) { mutableStateOf("") }
     var args by remember(s.id) { mutableStateOf("") }
     var sending by remember(s.id) { mutableStateOf(false) }
+    // The Compact sheet (open with /compact's entry from the list) and the rename sheet.
+    var compacting by remember(s.id) { mutableStateOf<SlashCommand?>(null) }
+    var renaming by remember(s.id) { mutableStateOf(false) }
     val res = context.resources
     val canTerminal = !hub.isDemo && terminalReach(s)
+    val reach = HelperReach.of(s, canChangeModel(hub, s), hub.isDemo).let { if (onModel == null) it.copy(model = false) else it }
 
-    fun send(c: SlashCommand, typed: String) {
+    fun used(c: SlashCommand) {
+        picks = picks.used(c.name).also { CommandPicksStore.save(context, it) }
+    }
+    fun send(c: SlashCommand, typed: String, line: String = commandLine(c, typed)) {
         if (sending || !canSendCommand(c, typed)) return
         if (c.terminal && !canTerminal && !hub.isDemo) {
             toast(res.getString(R.string.commands_no_terminal))
             return
         }
-        val line = commandLine(c, typed)
         sending = true
         appScope.launch {
             try {
                 hub.send(s.id, line)
                     .onSuccess { id ->
-                        picks = picks.used(c.name).also { CommandPicksStore.save(context, it) }
+                        used(c)
                         picked = null
                         args = ""
+                        compacting = null
                         toast(res.getString(R.string.commands_sent, line))
                         // Its screen is in the terminal: open it there. A session that went on as another: that one.
                         if (c.terminal && canTerminal) { onDismiss(); opener.terminal(s.id) }
                         else if (id != s.id) { onDismiss(); opener.switchSession(id) }
+                    }
+                        .onFailure { toast(it.message.orEmpty()) }
+            } finally {
+                sending = false
+            }
+        }
+    }
+    // /effort through the effort route (as the Overview's Effort part), not typed.
+    val nextTurn = stringResource(R.string.effort_next_turn)
+    val levelNames = ClaudeEffort.LEVELS.associateWith { claudeEffortTitle(it) }
+    fun setEffort(c: SlashCommand, level: String) {
+        if (sending) return
+        sending = true
+        appScope.launch {
+            try {
+                hub.setEffort(s.id, level)
+                    .onSuccess { later ->
+                        used(c)
+                        picked = null
+                        toast(if (later) nextTurn else res.getString(R.string.commands_effort_set, levelNames[level] ?: level))
                     }
                     .onFailure { toast(it.message.orEmpty()) }
             } finally {
@@ -261,22 +301,32 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit) {
                 if (heading != null) Heading(heading)
                 for (c in cs) key(group, c.name) {
                     val open = picked == c && openIn == group
+                    val helper = argHelper(c, reach)
                     CommandLine(
                         c, pinned = picks.isPinned(c.name), dim = c.terminal && !canTerminal && !hub.isDemo,
                         onClick = {
                             when {
-                                sendsOnTap(c) -> send(c, "")
+                                // The picker and the rename sheet finish on their own: used once opened.
+                                helper == ArgHelper.Model -> { picked = null; used(c); onModel?.invoke() }
+                                helper == ArgHelper.Rename -> { picked = null; used(c); renaming = true }
+                                helper == ArgHelper.Compact -> { picked = null; compacting = c }
+                                helper == ArgHelper.Field && sendsOnTap(c) -> send(c, "")
                                 open -> picked = null
                                 else -> { picked = c; openIn = group; args = "" }
                             }
                         },
                         onLongClick = { pin(c) },
                     )
-                    if (open) ArgsLine(c, args, { args = it }, enabled = !sending && canSendCommand(c, args), onSend = { send(c, args) }, onCancel = { picked = null })
+                    if (open) {
+                        if (helper == ArgHelper.Effort) EffortLine(s.effort, levelNames, enabled = !sending, onPick = { setEffort(c, it) }, onCancel = { picked = null })
+                        else ArgsLine(c, args, { args = it }, enabled = !sending && canSendCommand(c, args), onSend = { send(c, args) }, onCancel = { picked = null })
+                    }
                 }
             }
         }
     }
+    compacting?.let { c -> CompactSheet(sending, onCompact = { focus -> send(c, focus, compactLine(focus)) }, onDismiss = { compacting = null }) }
+    if (renaming) SessionMenu(hub, s, { renaming = false }, start = MenuPage.Rename)
 }
 
 @Composable
@@ -333,6 +383,64 @@ private fun ArgsLine(c: SlashCommand, value: String, onChange: (String) -> Unit,
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
             Pill(stringResource(R.string.cancel), onCancel, kind = PillKind.Ghost, height = 40.dp)
             Pill(stringResource(R.string.send), onSend, kind = PillKind.Primary, height = 40.dp, leading = Glyph.Send, enabled = enabled)
+        }
+    }
+}
+
+/**
+ * /effort's helper, under its row: Claude Code's five levels as chips ([ClaudeEffort.LEVELS], named
+ * as the effort picker names them), the one the session runs at lit; a tap is the choice.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EffortLine(current: String?, names: Map<String, String>, enabled: Boolean, onPick: (String) -> Unit, onCancel: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 10.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (level in ClaudeEffort.LEVELS) {
+                val on = level == current
+                Box(
+                    Modifier
+                        .heightIn(min = 48.dp)
+                        .selectable(on, enabled = enabled, interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.RadioButton) { onPick(level) }
+                        .alpha(if (enabled) 1f else 0.45f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(Modifier.clip(CircleShape).glassChoice(on).padding(horizontal = 14.dp, vertical = 8.dp)) {
+                        HText(names[level] ?: level, style = Type.small, color = if (on) HN.accent else HN.inkMuted, maxLines = 1)
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Pill(stringResource(R.string.cancel), onCancel, kind = PillKind.Ghost, height = 40.dp)
+        }
+    }
+}
+
+/**
+ * /compact's sheet (IDEAS SC8): what it does, an optional "Keep…" line for what the summary should
+ * keep, and Compact, which sends `/compact` or `/compact <focus>` ([compactLine]). It closes once sent.
+ */
+@Composable
+private fun CompactSheet(sending: Boolean, onCompact: (String) -> Unit, onDismiss: () -> Unit) {
+    var focus by remember { mutableStateOf("") }
+    val title = stringResource(R.string.chat_compact)
+    ChatSheet(title, onDismiss) {
+        HText(title, style = Type.title, color = HN.ink)
+        Spacer(Modifier.height(6.dp))
+        HText(stringResource(R.string.commands_compact_intro), style = Type.small, color = HN.inkDim)
+        Spacer(Modifier.height(14.dp))
+        Field(
+            focus, { focus = it },
+            placeholder = stringResource(R.string.commands_compact_keep),
+            keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+            label = compactLine(""),
+            onDone = { if (!sending) onCompact(focus) },
+        )
+        Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+            Pill(stringResource(R.string.cancel), onDismiss, kind = PillKind.Ghost, height = 44.dp)
+            Pill(title, { onCompact(focus) }, kind = PillKind.Primary, height = 44.dp, leading = Glyph.Send, enabled = !sending)
         }
     }
 }

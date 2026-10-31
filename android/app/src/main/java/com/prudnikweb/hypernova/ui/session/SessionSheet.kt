@@ -168,7 +168,7 @@ internal fun SessionSheet(
                         SheetSeam(stringResource(R.string.session_sheet_agents), trail = if (atWork > 0) stringResource(R.string.agents_running, atWork).uppercase() else null)
                         AgentsPart(agents, atWork, onOpen = { id -> onDismiss(); opener.agent(session.id, id) })
                     }
-                    SheetTab.Commands -> CommandsTab(hub, session, onDismiss)
+                    SheetTab.Commands -> CommandsTab(hub, session, onDismiss, onModel)
                     SheetTab.Session -> {
                         SheetSeam(stringResource(R.string.session_sheet_where))
                         WherePart(hub, session, onDismiss)

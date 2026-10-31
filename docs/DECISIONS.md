@@ -2052,3 +2052,21 @@ a skill's chip and "YOU · SENDING…", and the answer only showed in the termin
    Open (the phone's browser), Copy link, Cancel. A dev server on the Mac (`localhost:5173`) opens
    its in-app preview at once, as its pill does; Hypernova's own ports and any other scheme
    (`intent:`, `file:`, `javascript:`, `content:`) are never links.
+
+## Argument helpers in the Commands tab (2026-10-31)
+
+IDEAS SC3 and SC8, in the session sheet's Commands tab only. This updates "Commands in the session
+sheet", item 4, for these four.
+
+1. **A tap on Claude Code's own /effort, /model or /rename opens a helper, through its route, not
+   typed:** /effort its five levels as chips under its row, the session's lit (`…/effort`, as the
+   Overview's Effort part, on the subscription only); /model the Overview's model picker, over the
+   sheet (`…/model`); /rename the rename sheet with the name filled (`…/rename`, where the Mac holds
+   a terminal or attaches to a job). Where a route doesn't reach, the field as before. A skill of the
+   same name is the owner's: its field.
+2. **/compact opens a small sheet**: one line on what it does, an optional "Keep…" line, Compact.
+   It sends `/compact`, or `/compact <focus>` trimmed onto one line (a line break would send it early).
+3. **Recent counts a helper's command once it's sent** (an effort once set); the model picker and
+   the rename sheet finish on their own, so those count once opened.
+4. **The chat screen is unchanged** (owner, the same day: nothing more added to it): its "/" list,
+   its box and the usage strip's Compact, which still sends `/compact` with one tap.

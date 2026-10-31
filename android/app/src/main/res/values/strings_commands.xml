@@ -34,4 +34,9 @@
     <string name="commands_sent">Sent %1$s</string>
     <string name="commands_unreachable">Commands go to an open Claude Code session: in a terminal Hypernova holds, a claude agents job, or one the Mac runs.</string>
     <string name="commands_no_terminal">That one opens a screen in the terminal, and this session has none.</string>
+    <!-- /effort's chips: said once Claude Code has the new level. -->
+    <string name="commands_effort_set">Effort set to %1$s</string>
+    <!-- /compact's sheet (IDEAS SC8): what it does, and its optional line. -->
+    <string name="commands_compact_intro">Claude Code folds the conversation into a summary and carries on. Say what it should keep, or leave it empty.</string>
+    <string name="commands_compact_keep">Keep…</string>
 </resources>
