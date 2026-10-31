@@ -62,6 +62,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -1668,70 +1675,154 @@ private fun sessionToolLabel(tool: String): String = stringResource(
     },
 )
 
-/** AskUserQuestion: each question with its options (radio or checkboxes), plus "Other…". */
+/** The screen's share one question's options may take before they scroll under the card's buttons. */
+private const val ASK_STEP_TALL = 0.45f
+
+/**
+ * AskUserQuestion, one question at a time ([QuestionSteps]; owner, 2026-10-31): its options (radio
+ * or checkboxes) plus "Other…". Several questions are steps, "1 of 2 · Versioning" with a dot for
+ * each (filled once answered; a tap goes there), Back and Next, and Send answers on the last once
+ * every question has an answer. The options scroll past [ASK_STEP_TALL] of the screen, so the
+ * buttons always show under them; typing under "Other…" brings them above the keyboard.
+ */
 @Composable
 private fun QuestionAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
     val view = LocalView.current
-    // Chosen labels per question index; "other" text per question.
-    var chosen by remember(item.key) { mutableStateOf(mapOf<Int, Set<String>>()) }
-    var other by remember(item.key) { mutableStateOf(mapOf<Int, String>()) }
-    var otherOn by remember(item.key) { mutableStateOf(setOf<Int>()) }
     val qs = item.questions
+    var s by remember(item.key, qs) { mutableStateOf(QuestionSteps(qs)) }
     if (qs.isEmpty()) {
         HText(item.detail.ifBlank { stringResource(R.string.approval_loading) }, style = Type.body, color = HN.ink)
     }
-    qs.forEachIndexed { qi, q ->
-        if (qi > 0) Spacer(Modifier.height(18.dp))
-        Seam(q.header.ifBlank { stringResource(R.string.question) }, trail = if (q.multiSelect) stringResource(R.string.pick_many) else stringResource(R.string.pick_one))
-        Spacer(Modifier.height(8.dp))
-        HText(q.question, style = Type.heading, color = HN.ink)
-        Spacer(Modifier.height(6.dp))
-        val sel = chosen[qi].orEmpty()
-        for (o in q.options) {
-            val on = o.label in sel
-            OptionRow(o, on, q.multiSelect) {
-                chosen = chosen + (qi to toggle(sel, o.label, q.multiSelect))
-                if (!q.multiSelect) otherOn = otherOn - qi
-            }
-        }
-        val isOther = qi in otherOn
-        OptionRow(Question.Option(stringResource(R.string.other), null), isOther, q.multiSelect) {
-            otherOn = if (isOther) otherOn - qi else otherOn + qi
-            if (!q.multiSelect && !isOther) chosen = chosen + (qi to emptySet())
-        }
-        if (isOther) {
-            Spacer(Modifier.height(6.dp))
-            Field(other[qi].orEmpty(), { other = other + (qi to it) }, placeholder = stringResource(R.string.other_hint), singleLine = false, maxLines = 4)
+    // Typing under "Other…": once the keyboard is up, the buttons come up above it (and the composer).
+    val bring = remember { BringIntoViewRequester() }
+    var typing by remember(item.key) { mutableStateOf(false) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val ime = WindowInsets.ime
+    val imeUp by remember(ime, density) { androidx.compose.runtime.derivedStateOf { ime.getBottom(density) > 0 } }
+    var rowHeight by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(typing, imeUp) {
+        if (typing && imeUp) {
+            // The list's padding grows with the keyboard first.
+            delay(300)
+            val below = ime.getBottom(density) + with(density) { 200.dp.toPx() }
+            bring.bringIntoView(androidx.compose.ui.geometry.Rect(0f, 0f, 1f, rowHeight + below))
         }
     }
-    val answers = qs.mapIndexedNotNull { qi, q ->
-        val labels = q.options.map { it.label }.filter { it in chosen[qi].orEmpty() } +
-            listOfNotNull(other[qi]?.trim()?.takeIf { qi in otherOn && it.isNotEmpty() })
-        if (labels.isEmpty()) null else q.question to labels.joinToString(", ")
-    }.toMap()
-    val ready = qs.isNotEmpty() && answers.size == qs.size
-    Spacer(Modifier.height(16.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.skip), { onAnswer(Answer.Deny) }, Modifier.weight(1f), kind = PillKind.Ghost)
-        Pill(
-            if (qs.size > 1) stringResource(R.string.send_answers) else stringResource(R.string.send_answer),
-            {
-                if (ready) {
-                    view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
-                    onAnswer(Answer.Answers(answers))
+    val q = s.current
+    if (q != null) {
+        val i = s.at
+        val head = q.header.ifBlank { stringResource(R.string.question) }
+        val pick = if (q.multiSelect) stringResource(R.string.pick_many) else stringResource(R.string.pick_one)
+        Seam(
+            if (s.stepped) stringResource(R.string.ask_step, i + 1, s.count, head) else head,
+            trail = pick,
+            trailContent = if (s.stepped) {
+                {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        HText(pick, style = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.5f), color = HN.inkDim, maxLines = 1)
+                        Spacer(Modifier.width(4.dp))
+                        StepDots(s, onJump = { s = s.jump(it) })
+                    }
                 }
-            },
-            Modifier.weight(1.6f),
-            kind = PillKind.Primary,
-            enabled = ready,
+            } else null,
         )
+        Spacer(Modifier.height(8.dp))
+        val max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * ASK_STEP_TALL).dp
+        // Each step scrolls on its own, from its top.
+        androidx.compose.runtime.key(i) {
+            Column(Modifier.fillMaxWidth().heightIn(max = max).verticalScroll(rememberScrollState())) {
+                HText(q.question, style = Type.heading, color = HN.ink)
+                Spacer(Modifier.height(6.dp))
+                val sel = s.chosen[i].orEmpty()
+                for (o in q.options) OptionRow(o, o.label in sel, q.multiSelect) { s = s.pick(o.label) }
+                val isOther = i in s.otherOn
+                OptionRow(Question.Option(stringResource(R.string.other), null), isOther, q.multiSelect) { s = s.toggleOther() }
+                if (isOther) {
+                    Spacer(Modifier.height(6.dp))
+                    Field(
+                        s.other[i].orEmpty(), { s = s.type(it) },
+                        modifier = Modifier.onFocusChanged { typing = it.isFocused },
+                        placeholder = stringResource(R.string.other_hint), singleLine = false, maxLines = 4,
+                    )
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(14.dp))
+    Row(
+        Modifier
+            .bringIntoViewRequester(bring)
+            .onSizeChanged { rowHeight = it.height },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Pill(stringResource(R.string.skip), { onAnswer(Answer.Deny) }, Modifier.weight(if (s.stepped) 0.8f else 1f), kind = PillKind.Ghost)
+        if (s.stepped) {
+            Pill(stringResource(R.string.back), { s = s.back() }, Modifier.weight(1f), kind = PillKind.Outline, enabled = !s.isFirst)
+        }
+        if (s.stepped && !s.isLast) {
+            Pill(stringResource(R.string.ask_next), { s = s.next() }, Modifier.weight(1.3f), kind = PillKind.Primary)
+        } else {
+            Pill(
+                if (s.stepped) stringResource(R.string.send_answers) else stringResource(R.string.send_answer),
+                {
+                    if (s.complete) {
+                        view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
+                        onAnswer(Answer.Answers(s.answers()))
+                    }
+                },
+                Modifier.weight(if (s.stepped) 1.3f else 1.6f),
+                kind = PillKind.Primary,
+                enabled = s.complete,
+            )
+        }
+    }
+    // On the last step with one left open: which, and a tap goes to it.
+    val open = s.firstUnanswered
+    if (s.stepped && s.isLast && open != null) {
+        val name = s.questions[open].header.ifBlank { stringResource(R.string.ask_step_n, open + 1) }
+        Box(
+            Modifier
+                .heightIn(min = 40.dp)
+                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { s = s.jump(open) },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            HText(stringResource(R.string.ask_still_open, name), style = Type.small, color = HN.amber, maxLines = 1)
+        }
     }
 }
 
-private fun toggle(sel: Set<String>, label: String, multi: Boolean): Set<String> = when {
-    multi && label in sel -> sel - label
-    multi -> sel + label
-    else -> setOf(label)
+/** A dot for each question: filled once answered, ringed where you are; a tap goes to that question. */
+@Composable
+private fun StepDots(s: QuestionSteps, onJump: (Int) -> Unit) {
+    val yes = stringResource(R.string.ask_answered)
+    val no = stringResource(R.string.ask_unanswered)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        for (i in 0 until s.count) {
+            val done = s.answered(i)
+            val here = i == s.at
+            val name = s.questions[i].header.ifBlank { stringResource(R.string.ask_step_n, i + 1) }
+            val said = stringResource(R.string.ask_step_said, i + 1, s.count, name, if (done) yes else no)
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { onJump(i) }
+                    .semantics {
+                        contentDescription = said
+                        selected = here
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                val dot = androidx.compose.foundation.shape.CircleShape
+                Box(
+                    Modifier
+                        .size(if (here) 11.dp else 8.dp)
+                        .clip(dot)
+                        .background(if (done) HN.amber else Color.Transparent)
+                        .border(1.dp, if (here || done) HN.amber else HN.inkDim, dot),
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -336,6 +336,17 @@
     <string name="other_hint">Type your answer</string>
     <string name="pick_many">Pick any</string>
     <string name="pick_one">Pick one</string>
+    <!-- A question card with several questions, one at a time: "1 of 2 · Versioning". -->
+    <string name="ask_step">%1$d of %2$d · %3$s</string>
+    <string name="ask_step_n">Question %d</string>
+    <string name="ask_next">Next</string>
+    <string name="ask_still_open">%s has no answer yet</string>
+    <string name="ask_answered">answered</string>
+    <string name="ask_unanswered">not answered</string>
+    <string name="ask_step_said">Question %1$d of %2$d, %3$s, %4$s</string>
+    <!-- A question form in the terminal (several questions): its steps on the menu card. -->
+    <string name="menu_step_submit">Submit</string>
+    <string name="menu_step_said">Go to %s in the terminal</string>
     <string name="approve_plan">Approve plan</string>
     <string name="keep_planning">Keep planning</string>
     <string name="auto_deny_in">auto-deny in %1$s</string>

@@ -50,6 +50,11 @@ case "$1" in
       [ "$2" = "permdrft" ] && printf '\\033]0;Some other session\\007'
       cat "$S/perm-screen.txt"; stty -echo 2>/dev/null; exec cat > "$S/keys-$2"
     fi
+    # form0000: AskUserQuestion's form of several questions (form-screen.txt); its keys, arrows
+    # included, land in a file as they come.
+    if [ "$2" = "form0000" ]; then
+      cat "$S/form-screen.txt"; stty -echo -icanon min 1 time 0 2>/dev/null; exec cat > "$S/keys-$2"
+    fi
     # hb*: the dialog of an ask handed back (perm-screen.txt) until a key answers it (that key lands
     # in keys-<job>-<n>, n counting attaches), then the input box. hbdrift0's first attach shows
     # another session's title, as a holder that drifted does.
@@ -445,6 +450,41 @@ test('Claude Code’s own permission dialog through claude attach: a menu with p
   while (!(existsSync(keys) && readFileSync(keys, 'utf8').includes('\n')) && Date.now() - t0 < 3000) await new Promise((ok) => setTimeout(ok, 50))
   assert.equal(readFileSync(keys, 'utf8'), '\n', 'Enter, nothing else')
   assert.equal(hub.getSession('agents-perm-1')?.menu, null)
+})
+
+test('a question form of several questions: its steps on the menu, Back/Next and a jump press ← and → there', async () => {
+  settings.claudeAgents = true
+  writeFileSync(join(process.env.FAKE_AGENTS_DIR!, 'form-screen.txt'), readFileSync(join(import.meta.dirname, 'fixtures', 'question-screens', 'two-questions.txt')))
+  job('agents-form-1', 'form0000', 'busy')
+  hub.pollRegistry()
+  const tid = await attachAgentsTerm('agents-form-1', scratch, 'form0000', 1500)
+  assert.ok(tid)
+  scanTerms()
+  await settleMenus('agents-form-1', (m) => m !== null)
+  const menu = hub.getSession('agents-form-1')!.menu!
+  assert.deepEqual(menu.steps, { labels: ['Versioning', 'First version'], answered: [false, false] })
+  const keys = join(process.env.FAKE_AGENTS_DIR!, 'keys-form0000')
+  const pressed = async (n: number) => {
+    const t0 = Date.now()
+    while (!(existsSync(keys) && readFileSync(keys, 'utf8').length >= n) && Date.now() - t0 < 3000) await new Promise((ok) => setTimeout(ok, 50))
+    return readFileSync(keys, 'utf8')
+  }
+  // Next: one →.
+  assert.deepEqual(await answerMenu(tid!, menu.id, { move: 1 }), { ok: true })
+  assert.equal(await pressed(3), '\x1b[C')
+  assert.equal(hub.getSession('agents-form-1')?.menu, null, 'off the session until the next look')
+  await settleMenus('agents-form-1', (m) => m !== null)
+  // Back: one ←.
+  assert.deepEqual(await answerMenu(tid!, menu.id, { move: -1 }), { ok: true })
+  assert.equal(await pressed(6), '\x1b[C\x1b[D')
+  await settleMenus('agents-form-1', (m) => m !== null)
+  // Straight to Submit (step 2 of two questions): ← twice (to the first, wherever it was), → twice.
+  assert.deepEqual(await answerMenu(tid!, menu.id, { step: 2 }), { ok: true })
+  assert.equal(await pressed(18), '\x1b[C\x1b[D' + '\x1b[D\x1b[D\x1b[C\x1b[C')
+  await settleMenus('agents-form-1', (m) => m !== null)
+  // Past Submit, or on a menu with no steps: refused, nothing pressed.
+  assert.deepEqual(await answerMenu(tid!, menu.id, { step: 3 }), { ok: false, reason: 'menu_moved' })
+  assert.equal(readFileSync(keys, 'utf8').length, 18)
 })
 
 test('a claude attach holder that drifted: its dialog is not the session’s menu', async () => {

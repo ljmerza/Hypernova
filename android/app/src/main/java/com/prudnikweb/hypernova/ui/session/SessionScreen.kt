@@ -11,6 +11,7 @@ import com.prudnikweb.hypernova.data.TerminalAsk
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -685,6 +686,9 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                                 appScope.launch { hub.answerMenu(sessionId, m.id, choice, alt).onFailure { toast(it.message.orEmpty()) } }
                             },
                             onOpen = { opener.terminal(sessionId) },
+                            onStep = { move, step ->
+                                appScope.launch { hub.menuStep(sessionId, m.id, move, step).onFailure { toast(it.message.orEmpty()) } }
+                            },
                         )
                         Spacer(Modifier.height(12.dp))
                     }
@@ -1283,9 +1287,12 @@ private fun PausedCard(busy: Boolean, codex: Boolean, onContinue: () -> Unit) {
  * A menu Claude Code shows in the session's terminal (the /model picker, a dialog with no card
  * here), as buttons: a tap picks that option there (arrow keys, then Enter). [onPick] gets the
  * option's index, or null to close it (Esc), and whether to use the footer's other key.
+ * AskUserQuestion's form with several questions ([TermMenu.steps]) gets its tabs as a row: Back,
+ * a chip per question (ticked once answered) and Submit, Next; [onStep] gets -1 or 1 to move, or
+ * the tab to go to.
  */
 @Composable
-private fun MenuCard(menu: TermMenu, onPick: (Int?, Boolean) -> Unit, onOpen: () -> Unit) {
+private fun MenuCard(menu: TermMenu, onPick: (Int?, Boolean) -> Unit, onOpen: () -> Unit, onStep: (move: Int?, step: Int?) -> Unit = { _, _ -> }) {
     var alt by remember(menu.id) { mutableStateOf(false) }
     // The option on its way to the terminal: the card holds still until the menu changes.
     var sent by remember(menu.id) { mutableStateOf<Int?>(null) }
@@ -1299,6 +1306,14 @@ private fun MenuCard(menu: TermMenu, onPick: (Int?, Boolean) -> Unit, onOpen: ()
     GlassCard(Modifier.fillMaxWidth(), accent = HN.amber) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Seam(stringResource(R.string.menu_in_terminal), activity = Activity.Alert, line = false)
+            val steps = menu.steps
+            if (steps != null) {
+                Spacer(Modifier.height(10.dp))
+                MenuSteps(steps, enabled = sent == null) { move, step ->
+                    sent = -2
+                    onStep(move, step)
+                }
+            }
             if (menu.title != null) {
                 Spacer(Modifier.height(10.dp))
                 HText(menu.title, style = Type.heading, color = HN.ink)
@@ -1340,6 +1355,48 @@ private fun MenuCard(menu: TermMenu, onPick: (Int?, Boolean) -> Unit, onOpen: ()
                 Pill(stringResource(if (menu.cancel) R.string.menu_open_terminal else R.string.open_terminal), onOpen, Modifier.weight(1f), kind = PillKind.Outline, height = 40.dp, leading = Glyph.Terminal)
             }
         }
+    }
+}
+
+/**
+ * A terminal question form's tabs, as its own top row shows them: Back, each question (✓ once
+ * answered) and Submit, Next. Which one is open the terminal shows only in colour, so none is
+ * marked; the question under the row says it.
+ */
+@Composable
+private fun MenuSteps(steps: TermMenu.Steps, enabled: Boolean, onStep: (move: Int?, step: Int?) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Pill(stringResource(R.string.back), { if (enabled) onStep(-1, null) }, kind = PillKind.Ghost, height = 36.dp, enabled = enabled)
+        Spacer(Modifier.width(6.dp))
+        Row(
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val names = steps.labels + stringResource(R.string.menu_step_submit)
+            names.forEachIndexed { i, name ->
+                val done = steps.answered.getOrNull(i) == true
+                val said = stringResource(R.string.menu_step_said, name)
+                val shape = RoundedCornerShape(10.dp)
+                Row(
+                    Modifier
+                        .heightIn(min = 36.dp)
+                        .clip(shape)
+                        .border(1.dp, if (done) HN.amber.copy(alpha = 0.6f) else HN.line, shape)
+                        .clickable(remember { MutableInteractionSource() }, indication = null, enabled = enabled, role = Role.Tab, onClickLabel = said) { onStep(null, i) }
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (done) {
+                        Icon(Glyph.Check, size = 11.dp, color = HN.amber)
+                        Spacer(Modifier.width(5.dp))
+                    }
+                    HText(name, style = Type.small, color = if (done) HN.ink else HN.inkMuted, maxLines = 1)
+                }
+            }
+        }
+        Spacer(Modifier.width(6.dp))
+        Pill(stringResource(R.string.ask_next), { if (enabled) onStep(1, null) }, kind = PillKind.Ghost, height = 36.dp, enabled = enabled)
     }
 }
 

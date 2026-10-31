@@ -2150,3 +2150,28 @@ to clutter the chat screen, we can't have anything else added to that."
    Each is allowed as its own Allow, with no rule. Only Allow: a deny stays one at a time on its
    card, and a question or a plan waits for its own answer. Never automatic. Only the asks the
    phone has as approvals; Claude Code's own dialog in a terminal is answered on its card.
+
+## Questions one at a time (2026-10-31)
+
+The owner, on a question with two questions ("Versioning", "First version"): he "didn't see the
+submit button" and couldn't "move back and forth between steps of the form". The card stacked
+every question with their descriptions and put Send answers under the last, off the screen.
+Only the question card's insides change; nothing is added to the chat screen.
+
+1. **Several questions are steps**: one at a time under "1 of 2 · Versioning", a dot for each
+   (filled once answered; a tap goes there), and Skip, Back and Next under it. On the last, Send
+   answers sends them all at once, enabled once every question has an answer (one option, at least
+   one of a multi-select, or "Other…" with words); while one is open it says which, and a tap goes
+   to it. Back and Next keep every answer. Claude Code would take fewer answers (its form lets one
+   go unanswered); the phone asks for all, as before.
+2. **The buttons always show**: a step's options scroll past 45% of the screen, under its header
+   and above the buttons; typing under "Other…" brings the buttons up above the keyboard.
+3. **One question stays as it was**: pick, then Send answer (Skip beside it).
+4. **Multi-select labels are joined as Claude Code joins them**: by ", ", a label with ", " or a
+   quote in it in quotes, so Claude reads the list back right.
+5. **The same form in the terminal** (an ask handed back after 10 minutes): its menu card gets the
+   form's tabs, Back, a chip per question (✓ once answered) and Submit, Next, pressing ← and → there
+   (PROTOCOL, `menu.steps` and the menu route's `move`/`step`). Which tab is open shows only in
+   colour, so no chip is marked; a jump presses ← to the first, then → to it. Laid out from Claude
+   Code 2.1.314's code, not a captured screen: a live look must confirm the row reads, ← and → move
+   there (also from "Type something.", which gets ↑ first) and "Submit answers" shows as an option.
