@@ -2195,3 +2195,29 @@ The owner's decision: proper semantic versions from conventional commits, no mor
    working here.
 5. **The `v0.2.0-ljm.N` releases (N = 1 to 28) become `v0.2.N`**: tag, title, notes and asset names, by `scripts/rename-releases.sh` (a dry run unless `--apply`).
    The newest stays the latest until v0.3.0. The entries above that name `-ljm` tags are history.
+
+## A notice when a job dies (2026-10-31)
+
+Idea NT4: a `claude agents` job that crashed or ended on an error just showed as done or ended.
+
+1. **Claude Code's own verdict decides** (`daemon/src/job-deaths.ts`): a job's state file
+   (`~/.claude/jobs/<job>/state.json`) ends `done` when it finished, `stopped` when it was stopped
+   (`claude stop`, the phone's Stop, a signal) and `failed` when it died: a crash or error exit
+   ("exit 1 — …", "SIGKILL (137)"), its process gone mid-turn, an API error that ended it, Claude
+   giving up. Its `detail` is the reason. Read for every job `claude agents --json --all` doesn't
+   show at work or blocked, again only when the file changes. Found in Claude Code 2.1.316 (its
+   `crashed` is on the way to `failed`); a later version may say it differently. Hypernova doesn't
+   guess from a process vanishing: Claude Code's supervisor watches its own jobs, and one that was
+   down says `process gone while supervisor was down` when it's back.
+2. **Said once per death, never for the owner's doing.** The daemon keeps each job's last state
+   (`<support>/job-states.json`): a death is a job last seen alive now `failed`, so a restart of the
+   daemon neither repeats an old one nor misses one while it was down, and a job first seen dead
+   says nothing. A job stopped, deleted or restarted from the phone in the last minute isn't a
+   death, whatever it ends as; a deleted one leaves the list. One Claude Code is respawning
+   (`…; respawning`) is said only if it's still dead a minute later.
+3. **The phone says it as a session stopping on an error** (`{t:"job.died"}`, docs/PROTOCOL.md,
+   "Session menu"): a banner while the app is open, else a notification in Session updates, "<name>
+   stopped on an error" over Claude Code's reason; a tap opens the session. No new channel or
+   toggle: the others have none either.
+4. **Home's Completed card says `Stopped with an error`** in the danger colour as its line
+   (`Session.died`), no new row; the session's chat shows nothing (no clutter there).
