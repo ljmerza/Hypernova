@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The session sheet's Permissions tab: Claude Code's permission rules in effect, read-only (ui/session/RulesPart.kt). -->
+    <string name="rules_seam">Rules in effect</string>
+    <string name="rules_loading">Reading the rules…</string>
+    <string name="rules_err">Couldn’t get the rules from your Mac.</string>
+    <string name="rules_none">No rules</string>
+    <!-- One short line on how Claude Code weighs them. -->
+    <string name="rules_precedence">Deny beats ask, ask beats allow, whichever file it’s in. Top of the list wins a default mode.</string>
+    <string name="rules_managed_only">The managed policy allows only its own rules: the others don’t apply.</string>
+    <string name="rules_not_in_effect">Set aside by the managed policy</string>
+    <!-- Sources with no file, in one line: "No file: Project local, Project". -->
+    <string name="rules_missing">No file: %1$s</string>
+    <string name="rules_source_managed">Managed policy</string>
+    <string name="rules_source_session">This session</string>
+    <string name="rules_source_local">Project local</string>
+    <string name="rules_source_project">Project</string>
+    <string name="rules_source_user">User</string>
+    <!-- What the session's own rules are: no file. -->
+    <string name="rules_session_path">From Hypernova: an automation, or “this session” answers</string>
+    <string name="rules_state_missing">no file</string>
+    <string name="rules_state_unreadable">couldn’t read it</string>
+    <string name="rules_state_invalid">not valid JSON</string>
+    <string name="rules_state_too_big">too big to read</string>
+    <string name="rules_kind_deny">deny</string>
+    <string name="rules_kind_ask">ask</string>
+    <string name="rules_kind_allow">allow</string>
+    <string name="rules_default_mode">Default mode: %1$s</string>
+    <string name="rules_dirs">Extra folders</string>
+    <string name="rules_clipped">Some rules were too long or too many to show.</string>
+    <!-- TalkBack: the seam ("Rules in effect: 2 deny, 1 ask, 5 allow."), and a source's row. -->
+    <string name="rules_said">%1$s: %2$d deny, %3$d ask, %4$d allow.</string>
+    <string name="rules_source_said">%1$s, %2$s</string>
+    <string name="rules_open">Show the rules</string>
+    <string name="rules_close">Hide the rules</string>
+</resources>

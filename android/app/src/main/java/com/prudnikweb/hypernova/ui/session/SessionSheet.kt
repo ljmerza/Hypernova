@@ -161,6 +161,8 @@ internal fun SessionSheet(
                     SheetTab.Permissions -> {
                         SheetSeam(stringResource(R.string.session_sheet_permissions))
                         PermissionsPart(hub, session, canChangeMode(hub, session), toBlocked, onRetried, onEmptied, onBrought = { toBlocked = false })
+                        // Claude Code's rules in effect, folded (RulesPart.kt); Codex has none.
+                        if (!session.codex) RulesPart(hub, session)
                     }
                     SheetTab.Agents -> {
                         SheetSeam(stringResource(R.string.session_sheet_agents), trail = if (atWork > 0) stringResource(R.string.agents_running, atWork).uppercase() else null)
@@ -327,9 +329,9 @@ private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolea
  * its next turn while one runs; Auto and Bypass behind the think-twice card, Bypass behind the
  * fingerprint too), or said with why it can't be; then the calls refused without the owner, with
  * Allow & retry and Dismiss, while any wait (and once shown, until the sheet closes, so the last
- * one dismissed doesn't take the part away under the finger). The phone knows nothing more of its
- * rules (allow lists are Claude Code's own, on the Mac). [atBlocked]: the calls into view once
- * they're in, then [onBrought].
+ * one dismissed doesn't take the part away under the finger). Claude Code's rules in effect come
+ * after it, read-only (RulesPart.kt). [atBlocked]: the calls into view once they're in, then
+ * [onBrought].
  */
 @Composable
 private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Boolean, onRetried: () -> Unit, onEmptied: () -> Unit, onBrought: () -> Unit) {

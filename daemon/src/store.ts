@@ -71,7 +71,11 @@ export type ManagedSession = {
   providerFrom?: string
   /** An automation's run started it (automations.ts): its badge, which survives restarts and the automation's deletion. */
   automation?: { id: string; name: string; runId: string }
-  /** An automation's SDK session: its allow rules and its appended system prompt, sent with every query. */
+  /**
+   * An automation's SDK session: its allow rules and its appended system prompt, sent with every
+   * query. A shared terminal's run keeps its rules (`--allowedTools`) here too, for the rules in
+   * effect (permission-rules.ts) only.
+   */
   allowedTools?: string[]
   appendSystemPrompt?: string
   /**

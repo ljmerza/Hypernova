@@ -21,7 +21,7 @@ import com.prudnikweb.hypernova.data.WAgent
 internal enum class SheetTab(@StringRes val label: Int) {
     /** The model and the plan's windows. */
     Overview(R.string.session_sheet_tab_overview),
-    /** The mode and the blocked calls. */
+    /** The mode, the blocked calls and Claude Code's rules in effect (RulesPart.kt). */
     Permissions(R.string.session_sheet_permissions),
     /** The agents at work, by workflow. */
     Agents(R.string.session_sheet_agents),

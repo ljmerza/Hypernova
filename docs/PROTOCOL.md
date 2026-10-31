@@ -363,6 +363,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `POST /v1/sessions/{id}/menu` | `{menuId, choice: number, alt?: boolean}` or `{menuId, cancel: true}` → `{ok}`: answers `session.menu` in its shared terminal (arrow keys to the option, then Enter, or the footer's `alt.key`; `cancel` presses Esc). Claude Code's own permission dialog (`menu.permission`) is answered here too (see Approvals, "In the terminal"). 409 `menu_gone` (that menu isn't on screen any more), `menu_moved` (the cursor didn't reach the option), `no_terminal` |
 | `GET /v1/commands?project=` | → `{commands: [{name, description, argumentHint, aliases: string[], builtin, terminal}]}`: the slash commands and skills Claude Code offers in that folder (its own, the owner's, the project's, plugins', MCP prompts), asked of an SDK process started there with hooks off and no prompt; cached 5 minutes per folder. Commands bound to a terminal on the Mac (vim, statusline, …), internal, removed and renamed ones are left out. `terminal`: one of Claude Code's own that opens a screen of its own in the terminal, which the phone can't work (/config, /permissions, /resume, /mcp, /status…; a list the daemon keeps by hand in `commands.ts`, since Claude Code's list doesn't say how a command draws); a numbered picker such as /model's isn't one (the phone answers it as `session.menu`). 409 when Claude Code isn't installed, `sdk_missing` without its SDK (see Claude Code's SDK) |
 | `POST /v1/sessions/{id}/btw`, `GET …` | `{question}` → `{aside: Aside}`; GET → `{aside: Aside \| null}`: a side question, Claude Code's `/btw`, and its answer (see Side questions) |
+| `GET /v1/sessions/{id}/permissions` | → `{permissions: {sources: RuleFile[], managedOnly}}`: Claude Code's permission rules for the session, read-only, highest precedence first, only the permissions lists of its settings files (see Rules in effect). 404 `no_session`; 409 `unsupported_for_agent` (Codex) |
 | `POST /v1/sessions/{id}/terminal` | `{}` → `{termId, url}`: a single-use, one-minute WebSocket URL for the live terminal (409 `no_terminal` if it isn't shared) |
 | `POST /v1/sessions/{id}/open` | `{}` → `{app, already}`: opens the shared terminal in a window on the Mac (or brings it forward) |
 | `POST /v1/sessions/{id}/continue` | `{reason?: "away" \| "limit"}` → `{session}`: sends "I'm back. Please continue where you left off." (no reason, or `"away"`); `"limit"` sends the continuation after a limit (see Auto-continue), drawn as a notice row, and the session's ready card goes once its turn starts. Its errors are `prompt`'s |
@@ -987,6 +988,51 @@ and the indents; that `claude attach` draws the panel itself (a thin client: it 
 job with a `side_question` control request); that Space closes it; that the answer isn't written to
 the transcript; and that a terminal Claude Code thinks isn't in front doesn't hold the panel back
 (Claude Code then asks unwatched and reopens the panel later, which the daemon waits for).
+
+## Rules in effect
+
+Claude Code's permission rules for a session, read-only, from the session sheet's Permissions tab
+(`permission-rules.ts`): why a call asked or didn't.
+
+- `GET /v1/sessions/{id}/permissions` → `{permissions: {sources: RuleFile[], managedOnly: boolean}}`.
+  404 `no_session`; 409 `unsupported_for_agent` (Codex: its sandbox decides). Read fresh each time.
+
+`sources`, highest precedence first, as Claude Code 2.1.314 reads them (its own code):
+1. **`managed`**: the managed policy, `managed-settings.json` in `/etc/claude-code` (Linux) or
+   `/Library/Application Support/ClaudeCode` (macOS), then each `*.json` in `managed-settings.d/`
+   beside it, A to Z, not dotfiles (20 at most). Left out when there's no such file. Server-managed
+   settings, MDM and the Windows policy key aren't files the daemon reads.
+2. **`session`**: rules Hypernova gave the session itself, no file (`path: null`): an automation's
+   `--allowedTools` and the tools allowed "for this session" from the phone. Left out when none.
+3. **`local`**: `<cwd>/.claude/settings.local.json`; 4. **`project`**: `<cwd>/.claude/settings.json`;
+   5. **`user`**: `settings.json` in the Claude folder (`CLAUDE_CONFIG_DIR`, else `~/.claude`).
+   These three are always listed. `<cwd>` is the session's own folder, as the daemon has it; the
+   route takes no path.
+
+```
+RuleFile = {
+  source: "managed" | "session" | "local" | "project" | "user",
+  path: string | null,
+  state: "ok" | "missing" | "unreadable" | "invalid" | "too_big",
+                              // invalid: not JSON, or not an object; too_big: over 512 KB, not
+                              // read; unreadable: not a regular file, or no permission. Only an
+                              // ok source has rules.
+  allow: string[], ask: string[], deny: string[],
+                              // permissions.allow|ask|deny as written; strings only, 200 a list,
+                              // 300 characters a rule (longer ones end in "…")
+  defaultMode: string | null, // permissions.defaultMode, a bare word only
+  additionalDirectories: string[],   // 50 at most
+  clipped: boolean            // something above was left out or cut
+}
+```
+
+`managedOnly`: a managed file says `allowManagedPermissionRulesOnly: true` (at its top or under
+`permissions`; which one Claude Code reads wasn't confirmed), so only the managed rules apply.
+Deny rules win over ask, ask over allow, wherever each is written.
+
+**Nothing else of a settings file leaves the daemon**: not the file, not `env`, `apiKeyHelper`,
+hooks, MCP servers or any other key, and not a parse error's words (Node's quote the text). A file
+is opened without blocking and checked to be a regular file on the open file itself.
 
 ## A session's model
 

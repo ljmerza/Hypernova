@@ -1972,3 +1972,22 @@ Android app, local only. The entries above about the Mac app, the name service
    Effort row in the session sheet, for OpenRouter or a custom provider.
 4. **A resumed session keeps its effort:** started again in a terminal, it gets `--effort` with the
    one it last had; the SDK passes it with every query. Still no "Default" mid-session.
+
+## Rules in effect (2026-10-30)
+
+IDEAS SS5: the sheet said the phone knows no allow rules. It now shows Claude Code's, read-only, so
+the owner can see why a call asked or didn't. This supersedes "Nothing new from the Mac … the sheet
+shows none" (The session sheet, 3).
+
+1. **Permissions tab, after the mode and the blocked calls: one "Rules in effect" seam, folded,**
+   with the deny, ask and allow counts. Open, one line on how they weigh (deny beats ask, ask beats
+   allow), then each source as a row with its counts, which opens to its rules in mono: the managed
+   policy, this session's own (an automation's allow rules, "this session" answers), project local,
+   project, user, in Claude Code's precedence order, highest first. A file that couldn't be read
+   says so on its row; sources with no file share one quiet line. Read each time the tab opens.
+   Not for Codex.
+2. **Only the permissions lists leave the Mac** (`allow`, `ask`, `deny`, `defaultMode`,
+   `additionalDirectories`), cut to size: settings files hold secrets (`env`, `apiKeyHelper`, MCP
+   servers). Only the fixed files for the session's own folder are read; the route takes no path
+   (docs/PROTOCOL.md, "Rules in effect").
+3. **Read-only for now:** adding and removing rules is PA1, the owner's call.

@@ -142,6 +142,8 @@ interface Hub {
     suspend fun askAside(sessionId: String, question: String): Result<Aside> = Result.failure(UnsupportedOperationException())
     /** The session's last side question as the Mac has it now (null when none). */
     suspend fun aside(sessionId: String): Result<Aside?> = Result.success(null)
+    /** The Claude Code permission rules in effect for the session, read-only (data/PermissionRules.kt). */
+    suspend fun permissionRules(sessionId: String): Result<PermissionRules> = Result.failure(UnsupportedOperationException())
     /**
      * Answer the menu a session's terminal shows: [choice] is an option's index (null closes it
      * with Esc); [alt] picks it with the footer's other key instead of Enter.

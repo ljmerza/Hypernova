@@ -1989,6 +1989,10 @@ class LiveHub(
         Result.success(AsideWire.of(api.get("/v1/sessions/$sessionId/btw")))
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.aside_err_read)) }
 
+    override suspend fun permissionRules(sessionId: String): Result<PermissionRules> = try {
+        Result.success(PermissionRulesWire.of(api.get("/v1/sessions/$sessionId/permissions")))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.rules_err)) }
+
     override suspend fun answerMenu(sessionId: String, menuId: String, choice: Int?, alt: Boolean): Result<Unit> = try {
         // Whatever opened the menu has landed, logged or not (a picker closed with Esc isn't).
         menuAnswered[sessionId] = now
