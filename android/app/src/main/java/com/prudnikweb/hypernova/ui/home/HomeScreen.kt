@@ -183,14 +183,17 @@ const val HOME_SOURCE = "home"
 
 /**
  * Home's "All servers" (AllHome.kt): every paired computer with its hub, in the order paired, and
- * where a card's opening and a new session go. The cards above the sessions, the usage cards, the
- * other tabs and Statistics stay the one picked last's ([pickedName], the hub Home is given).
+ * where a card's opening and a new session go. History lists them all too (AllHistory.kt), its
+ * automation rows opening their runs on their own computer ([onRuns]). The cards above the
+ * sessions, the usage cards, Automations, Settings and Statistics stay the one picked last's
+ * ([pickedName], the hub Home is given).
  */
 class Everywhere(
     val servers: List<Pair<com.prudnikweb.hypernova.data.ServerStatus, Hub>>,
     val pickedName: String,
     val onOpen: (server: String, id: String) -> Unit,
     val onNewSession: (server: String) -> Unit,
+    val onRuns: (server: String, automation: String) -> Unit,
 )
 
 @Composable
@@ -247,9 +250,9 @@ fun HomeScreen(
     BackHandler(enabled = !statsOpen && tab != Tab.Sessions) { tab = Tab.Sessions }
     val backToast = LocalToast.current
     val backAgain = stringResource(R.string.home_back_again)
-    val allOnlySessions = stringResource(R.string.all_servers_sessions_only)
-    // Choosing All servers from History or Automations brings Sessions.
-    LaunchedEffect(everywhere != null) { if (everywhere != null && (tab == Tab.History || tab == Tab.Automations)) tab = Tab.Sessions }
+    val allNoAutomations = stringResource(R.string.all_servers_no_automations)
+    // Choosing All servers from Automations brings Sessions (History lists every server's).
+    LaunchedEffect(everywhere != null) { if (everywhere != null && tab == Tab.Automations) tab = Tab.Sessions }
     var backArmed by remember { mutableStateOf(false) }
     LaunchedEffect(backArmed) { if (backArmed) { delay(2_000); backArmed = false } }
     BackHandler(enabled = !statsOpen && tab == Tab.Sessions && !backArmed) { backArmed = true; backToast(backAgain) }
@@ -604,7 +607,8 @@ fun HomeScreen(
                 onEdit = { id, template -> onAutomation(id, template, false) },
                 onOpenSession = onOpen,
             )
-            Tab.History -> HistoryTab(hub, top, bottom, now, onOpen, onRuns = { id -> onAutomation(id, null, true) })
+            Tab.History -> if (everywhere != null) AllHistoryTab(everywhere, top, bottom, now)
+                else HistoryTab(hub, top, bottom, now, onOpen, onRuns = { id -> onAutomation(id, null, true) })
             Tab.Settings -> settings(top)
         }
 
@@ -639,8 +643,8 @@ fun HomeScreen(
                     Spacer(Modifier.width(8.dp))
                 }
                 // The switcher (owner, 2026-10-30): Settings is the bottom tab's alone now.
-                // "All" on the Sessions tab with "All servers"; the other tabs' chip names the one they show.
-                LinkChip(hub, servers, all = everywhere?.takeIf { tab == Tab.Sessions }, onClick = { if (servers != null) switching = true })
+                // "All" on the Sessions and History tabs with "All servers"; the other tabs' chip names the one they show.
+                LinkChip(hub, servers, all = everywhere?.takeIf { tab == Tab.Sessions || tab == Tab.History }, onClick = { if (servers != null) switching = true })
             }
             if (searchShown) {
                 // Under the bar, over the top of the list; the keyboard comes up with it.
@@ -668,10 +672,10 @@ fun HomeScreen(
                             Tab.Settings -> stringResource(R.string.settings)
                         }
                     },
-                    // All servers (owner, 2026-10-31): History and Automations are one server's; Settings shows what the phone keeps.
+                    // All servers (owner, 2026-10-31): Automations are one server's; History lists every server's; Settings shows what the phone keeps.
                     tab.ordinal, { i ->
                         val to = Tab.entries[i]
-                        if (everywhere != null && (to == Tab.History || to == Tab.Automations)) backToast(allOnlySessions) else tab = to
+                        if (everywhere != null && to == Tab.Automations) backToast(allNoAutomations) else tab = to
                     },
                     Modifier.padding(horizontal = 12.dp),
                 )
@@ -1319,7 +1323,7 @@ private fun LinkChip(hub: Hub, servers: ServerChoice?, all: Everywhere? = null, 
 }
 
 /** How much an offline computer's cards are dimmed with "All servers" (they only open). */
-private const val OFFLINE_ALPHA = 0.5f
+internal const val OFFLINE_ALPHA = 0.5f
 
 /** Permission modes in plain words: "ask first", "accept edits", "plan"… */
 @Composable

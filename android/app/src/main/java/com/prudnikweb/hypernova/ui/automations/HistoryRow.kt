@@ -57,9 +57,12 @@ fun foldRuns(ended: List<Session>): List<HistoryEntry> {
     }
 }
 
-/** "◉ MORNING BRIEF ─── 2h" over "12 runs  ◷ Today 9:00" and the AUTO chip; a tap opens its runs. */
+/**
+ * "◉ MORNING BRIEF ─── 2h" over "12 runs  ◷ Today 9:00" and the AUTO chip; a tap opens its runs.
+ * [server]: History with "All servers" names its computer after the name.
+ */
 @Composable
-fun AutomationHistoryRow(hub: Hub, e: HistoryEntry, now: Long, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun AutomationHistoryRow(hub: Hub, e: HistoryEntry, now: Long, onClick: () -> Unit, modifier: Modifier = Modifier, server: String? = null) {
     val a = e.automation ?: return
     val w = rememberWords()
     val live = hub.automations.automation(a.id)
@@ -70,7 +73,7 @@ fun AutomationHistoryRow(hub: Hub, e: HistoryEntry, now: Long, onClick: () -> Un
     val last = live?.lastRun?.let { it.startedAt ?: it.firedAt } ?: e.session.createdAt.takeIf { it > 0 } ?: e.session.updatedAt
     GlassCard(modifier.fillMaxWidth(), onClick = onClick, onClickLabel = stringResource(R.string.au_runs)) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Seam(live?.name ?: a.name, trail = ago(e.session.updatedAt, now), activity = Activity.Rest)
+            Seam(live?.name ?: a.name, trail = ago(e.session.updatedAt, now), activity = Activity.Rest, after = server)
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // How many runs, then the last one's time after a clock, as a session stamp has its age.
