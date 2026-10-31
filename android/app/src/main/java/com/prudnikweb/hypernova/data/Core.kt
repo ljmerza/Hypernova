@@ -342,7 +342,9 @@ class Notifier(private val context: Context) {
      */
     fun approval(a: WApproval, s: Session?, failed: Boolean = false, server: String? = null) {
         if (!canPost() || nm == null) return
-        val project = s?.project?.takeIf { it.isNotBlank() }
+        // The session's name, as on its card (owner, 2026-10-31); its folder only when it has none.
+        val untitled = context.getString(R.string.untitled_session)
+        val project = (s?.name?.takeIf { it.isNotBlank() && it != untitled } ?: s?.project)?.takeIf { it.isNotBlank() }
         val title = when (a.kind) {
             "question" -> project?.let { context.getString(R.string.notif_question, it) } ?: context.getString(R.string.notif_question_plain)
             "plan" -> project?.let { context.getString(R.string.notif_plan, it) } ?: context.getString(R.string.notif_plan_plain)
