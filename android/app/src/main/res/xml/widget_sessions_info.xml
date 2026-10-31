@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The large widget: sessions, approvals and usage. 4×3 by default; as small as 3×2 (the
-     approval and a session) and as tall as you like (up to four sessions). No update period,
-     as for the sun (widget_sun_info). -->
+<!-- The widget: "Needs you" across every paired computer, a list that scrolls. 4×3 by default, as
+     small as 3×2 and as tall as you like. No update period: the app pushes every real change itself,
+     and redraws a picture that goes out of date by itself with a non-waking alarm
+     (WidgetSync.schedule). A period would wake the phone every half hour to redraw what's known.
+     Before Android 12 the picker shows the app's icon (no preview picture). -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_sessions_desc"
     android:initialLayout="@layout/widget_sessions"
@@ -9,7 +11,7 @@
     android:minHeight="180dp"
     android:minResizeWidth="180dp"
     android:minResizeHeight="110dp"
-    android:previewImage="@drawable/widget_preview_sessions"
+    android:previewLayout="@layout/widget_preview"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"
     android:targetCellHeight="3"

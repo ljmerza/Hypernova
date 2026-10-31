@@ -119,19 +119,9 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps a live connection to the user's own Mac (over their home network or their own VPN into it) so that permission requests from coding sessions running there reach the phone immediately and can be answered." />
         </service>
-        <!-- Home screen widgets (widget/): the sun, and the sessions with their approvals. Only the
-             system sends them updates, so they aren't exported. -->
-        <receiver
-            android:name=".widget.SunWidget"
-            android:exported="false"
-            android:label="@string/widget_sun_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_sun_info" />
-        </receiver>
+        <!-- The home screen widget (widget/): "Needs you" across every paired computer. Only the
+             system sends it updates, so it isn't exported. (The small sun widget was removed
+             2026-10-31: placed ones disappear.) -->
         <receiver
             android:name=".widget.SessionsWidget"
             android:exported="false"
@@ -143,11 +133,25 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_sessions_info" />
         </receiver>
-        <!-- Allow and Deny on the sessions widget, and the widgets' alarm (WidgetSync.schedule):
-             reached only through their own PendingIntents. -->
+        <!-- Allow and Deny on the widget (from WidgetTap), and the widget's alarm (WidgetSync.schedule):
+             reached only through the app's own intents. -->
         <receiver
             android:name=".widget.WidgetActions"
             android:exported="false" />
+        <!-- The widget's list rows (they scroll): bound only by the system. -->
+        <service
+            android:name=".widget.WidgetListService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+        <!-- Every tap on the widget's list (a list's rows share one PendingIntent): opens the session,
+             or hands Deny and Allow to WidgetActions. Never shows a window. -->
+        <activity
+            android:name=".widget.WidgetTap"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
         <!-- PackageInstaller's answers about the in-app update (its own PendingIntent), and this app
              being replaced by it, which a quiet notification then says (data/AppUpdater.kt). -->
         <receiver

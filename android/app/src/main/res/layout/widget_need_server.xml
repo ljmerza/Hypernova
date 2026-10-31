@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A computer's line in the widget's list: its name in tracked caps, how many need you (amber),
+     and "Offline" while it can't be reached. A tap opens the app on that computer. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/s_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="24dp"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="4dp">
+
+    <TextView
+        android:id="@+id/s_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif"
+        android:includeFontPadding="false"
+        android:letterSpacing="0.14"
+        android:maxWidth="220dp"
+        android:maxLines="1"
+        android:textAllCaps="true"
+        android:textColor="@color/widget_ink_dim"
+        android:textFontWeight="600"
+        android:textSize="10sp" />
+
+    <TextView
+        android:id="@+id/s_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:fontFamily="monospace"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/widget_amber"
+        android:textSize="10.5sp" />
+
+    <TextView
+        android:id="@+id/s_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:fontFamily="sans-serif"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="@string/widget_offline"
+        android:textColor="@color/widget_ink_dim"
+        android:textSize="10.5sp"
+        android:visibility="gone" />
+</LinearLayout>

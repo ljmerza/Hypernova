@@ -1,471 +1,328 @@
 package com.prudnikweb.hypernova.widget
 
 import android.content.Context
-import com.prudnikweb.hypernova.data.Account
-import com.prudnikweb.hypernova.data.AgentKind
-import com.prudnikweb.hypernova.data.AgentLead
-import com.prudnikweb.hypernova.data.ClaudeState
-import com.prudnikweb.hypernova.data.CodexState
 import com.prudnikweb.hypernova.data.LinkState
-import com.prudnikweb.hypernova.data.LiveHub
 import com.prudnikweb.hypernova.data.Phase
+import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
-import com.prudnikweb.hypernova.data.UsageProjection
+import com.prudnikweb.hypernova.data.TerminalAsk
 import com.prudnikweb.hypernova.data.WApproval
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlin.math.roundToInt
 
 /**
- * What the home screen widgets show, cut down from the live hub: a few sessions, the oldest
- * approval, usage and how fresh it all is. Small enough to keep on disk, so a widget drawn by a
- * freshly started process (after a reboot, or for the widgets' own alarm) shows the last
- * thing it knew, honestly labelled, instead of an empty card.
+ * What the home screen widget shows: every session that needs the owner, on every paired computer
+ * (the one on screen and the ones watched in the background), grouped by computer. Built from plain
+ * [Source]s, so it's pure and unit-tested without a hub. Small enough to keep on disk: a widget drawn
+ * by a freshly started process shows what it last knew of each computer (to open, not to answer)
+ * until that computer is heard from again.
  */
 internal data class WidgetModel(
-    val conn: Conn,
-    val macName: String?,
-    val usage: UsageView,
-    val working: Int,
-    val needs: Int,
-    /** Most urgent first: needs you, working, then the most recent idle ones. */
-    val rows: List<Row>,
-    val ask: Ask?,
-    /** When the data was last known to be current (0 when it never was). */
+    /** Some computer is paired with this phone (and hasn't forgotten it). */
+    val paired: Boolean,
+    /** Something keeps the links open (the app on screen, or the background connection): changes arrive as they happen. */
+    val live: Boolean,
+    /** Some paired computer has been heard from, or what it last said was kept: false only while nothing is known at all. */
+    val known: Boolean,
+    /** The computers with something waiting, in the switcher's order (the one on screen first); none for a computer with nothing. */
+    val groups: List<Group>,
+    /** The paired computers that can't be reached now, by name. */
+    val offline: List<String> = emptyList(),
+    /** When it was last known to be current (0 when it never was); stamped when it's drawn. */
     val updatedAt: Long = 0L,
-    /**
-     * The account's state when Claude can't reply until the owner acts
-     * ([com.prudnikweb.hypernova.data.Account.needsYou]: "logged_out", "no_subscription",
-     * "on_hold", "no_credit"); null when it's fine or only resting at a limit (which [usage] shows).
-     */
-    val account: String? = null,
-    /**
-     * Past a usage limit on usage credits Claude carries on, though the numbers still say 100%:
-     * nothing to lead with, as the permanent notification has it (AccountWords.headline).
-     */
-    val usingCredits: Boolean = false,
-    /**
-     * Which agent the star, its readout and the lead follow (data/AgentLead.kt): [AgentKind.CLAUDE],
-     * or [AgentKind.CODEX] where Claude Code isn't installed and Codex is. [usage] is that agent's.
-     */
-    val leadAgent: String = AgentKind.CLAUDE,
-    /**
-     * While Codex leads, what stops it until the owner acts: [CODEX_SIGNED_OUT], or the Mac's words
-     * for what's wrong (its problem, on one line); null when it's fine. [account] is Claude's alone.
-     */
-    val codexTrouble: String? = null,
-    /**
-     * The star's window is the week (a Codex plan with only that, or Claude Code reporting no 5-hour
-     * window, Usage.fiveHourReported): [usage]'s 5-hour numbers are the week's, and no 5H meter shows.
-     */
-    val weekOnly: Boolean = false,
-    /** The other agent's compact readout ("CODEX 61%") while both agents are in use; null otherwise. */
-    val other: Other? = null,
 ) {
-    /** Claude Code and Codex both in use: the widgets name the agents (and only then). */
-    val both: Boolean get() = other != null
+    /** Everything waiting, on every computer. */
+    val count: Int get() = groups.sumOf { it.rows.size }
 
     /**
-     * The agent that doesn't lead, as the widgets' second readout draws it while both are in use:
-     * [agent] ([AgentKind.CODEX]), how much of its window is spent ([used], 0..1 in whole percents;
-     * null without numbers), when that window (or, when [limited], the window it's limited by)
-     * resets ([resetAt], 0 when not known), and [trouble]: [CODEX_SIGNED_OUT] or the Mac's words
-     * for what's wrong, drawn in amber.
+     * One computer's sessions that need the owner. [kept]: from disk, not heard from yet in this
+     * process; [offline]: it can't be reached now. Either way its rows only open, never answer.
      */
-    data class Other(
-        val agent: String,
-        val used: Float?,
-        val resetAt: Long,
-        val limited: Boolean,
-        val trouble: String? = null,
-    ) {
-        /** As it is at [now]: past its reset the window is fresh again (no number until new ones come, no limit). */
-        fun at(now: Long): Other = if (resetAt in 1..now) copy(used = null, resetAt = 0L, limited = false) else this
-    }
-
-    /** How much the widget can promise about what it shows. */
-    enum class Conn {
-        /** The app is on screen or the background connection runs: changes arrive as they happen. */
-        Live,
-        /** Connected a moment ago, but nothing keeps the link open now: "Last updated hh:mm". */
-        Stale,
-        /**
-         * The background connection is off (in Settings, or Disconnect on its notification) and
-         * the app is closed: nothing keeps the widget current, by the owner's choice. Drawn as
-         * [Stale], whether or not the socket happens to be up: a link that dropped then says
-         * nothing about the Mac, so there's no "Not connected", only "Updates while Hypernova is open".
-         */
-        AppOnly,
-        /** Paired, but the Mac can't be reached: "Not connected to your Mac". */
-        Offline,
-        /** No Mac paired (or the Mac forgot this phone). */
-        Unpaired,
-    }
-
-    data class UsageView(
-        val fiveHour: Float,
-        val sevenDay: Float,
-        /** When each window resets (0: not known, as after a reset that has passed). */
-        val fiveResetAt: Long,
-        val sevenResetAt: Long,
-        /** False until the Mac has official numbers. */
-        val known: Boolean,
-        val limited: Boolean,
-        val weekLimited: Boolean,
-        /**
-         * How fast each window is being spent (%/min, [WidgetMeter.pace]) while something works, as
-         * the Mac measures it; null at rest. Drawn only on a live picture: a stale one can't say
-         * whether anything still works.
-         */
-        val fivePace: Float? = null,
-        val sevenPace: Float? = null,
-        /** When, at that pace, each window is full, if that comes before its reset (0: it doesn't); whole minutes. */
-        val fiveLimitAt: Long = 0L,
-        val sevenLimitAt: Long = 0L,
-    ) {
-        /**
-         * These numbers as they are at [now]. A window whose reset has passed is fresh again, as
-         * LiveHub.recomputeUsage has it: no percentage until the Mac sends new numbers, and no
-         * limit. A widget that isn't live may be drawn long after its numbers came in.
-         */
-        fun at(now: Long): UsageView {
-            val over5 = fiveResetAt in 1..now
-            val over7 = sevenResetAt in 1..now
-            if (!over5 && !over7) return this
-            return UsageView(
-                fiveHour = if (over5) 0f else fiveHour,
-                sevenDay = if (over7) 0f else sevenDay,
-                fiveResetAt = if (over5) 0L else fiveResetAt,
-                sevenResetAt = if (over7) 0L else sevenResetAt,
-                known = known && !over5,
-                limited = limited && !over5,
-                weekLimited = weekLimited && !over7,
-                fivePace = fivePace.takeIf { !over5 },
-                sevenPace = sevenPace.takeIf { !over7 },
-                fiveLimitAt = if (over5) 0L else fiveLimitAt,
-                sevenLimitAt = if (over7) 0L else sevenLimitAt,
-            )
-        }
-
-        /**
-         * The 5-hour window as the meters draw it at [now] ([UsageProjection]): what's used, and on
-         * a [live] picture where the pace leads by the reset, and whether the limit comes first.
-         */
-        fun five(now: Long, live: Boolean): UsageProjection =
-            UsageProjection.of(fiveHour, fiveResetAt, now, fivePace.takeIf { live }, (fiveLimitAt - now).takeIf { live && fiveLimitAt > now }, limited)
-
-        /** The weekly window, as [five]. */
-        fun seven(now: Long, live: Boolean): UsageProjection =
-            UsageProjection.of(sevenDay, sevenResetAt, now, sevenPace.takeIf { live }, (sevenLimitAt - now).takeIf { live && sevenLimitAt > now }, weekLimited)
-    }
-
-    data class Row(
-        val id: String,
-        val title: String,
-        val project: String,
-        val activity: String,
-        /** As the widget draws it: a session whose main agent waits on agents it started is [SessionState.Working]. */
-        val state: SessionState,
-        /**
-         * Agents still at work while its main agent is idle (0 otherwise): then they're what it's
-         * doing, and the row says so instead of [activity] (its last words).
-         */
-        val agents: Int = 0,
-        /** A Codex session, marked CODEX on its row: only while both agents are in use. */
-        val codex: Boolean = false,
+    data class Group(
+        val server: String,
+        val name: String,
+        val rows: List<Row>,
+        val kept: Boolean = false,
+        val offline: Boolean = false,
     )
 
-    data class Ask(
-        val id: String,
+    /** What a session waits on. */
+    enum class Kind {
+        /** A tool's approval (Bash, Edit, WebFetch…). */
+        Tool,
+        /** Claude Code's own permission dialog in its terminal ([TerminalAsk]), answered through the menu route. */
+        Terminal,
+        Question,
+        Plan,
+        /** Needs you with nothing to answer here (a picker in its terminal, a stop for being away): opens. */
+        Waiting,
+    }
+
+    /**
+     * A session that needs the owner, and what it waits on: its oldest approval ([more] others behind
+     * it), else Claude Code's dialog in its terminal, else just that it waits.
+     */
+    data class Row(
+        val server: String,
         val sessionId: String,
-        /** "tool", "question" or "plan": only tools are answered on the widget. */
-        val kind: String,
+        /** Its name, masked; "" when it has none. */
+        val title: String,
+        val project: String,
+        val kind: Kind,
+        /** The tool ("Bash"), or the terminal dialog's title ("Bash command"); "" for the other kinds. */
         val tool: String,
         /**
-         * The exact command (or the question, or the plan's first line). When it's [whole], exactly
-         * as it will run, line breaks and all; otherwise on one line, secrets masked.
+         * What it waits on: the command (or the one path, pattern or address a read-only tool reads),
+         * the tool's summary, the question, the plan's first line. When it's [whole], exactly as it
+         * will run, line breaks and all; otherwise on one line, secrets masked.
          */
         val detail: String,
-        val project: String,
-        val title: String,
-        /** Other approvals waiting behind this one. */
-        val more: Int,
-        /**
-         * [detail] is everything being approved, untouched: a command (or the one path, pattern
-         * or address a read-only tool reads) that isn't cut short, has nothing masked and draws as
-         * what it is. Only then can the widget offer Allow, and only at a size that shows all of
-         * it; anything else opens the app.
-         */
-        val whole: Boolean = false,
-        /** When the Mac denies it for nobody answering (its 10-minute rule); 0 if not known. */
+        /** [detail] is everything being approved, untouched: only then is Allow offered (the notifications' rule). */
+        val whole: Boolean,
+        /** The approval's id, or the terminal dialog's menu id; null when there's nothing to answer here. */
+        val askId: String?,
+        /** The terminal dialog's options for Allow and Deny ([TerminalAsk.allow], [TerminalAsk.deny]). */
+        val allowChoice: Int = -1,
+        val denyChoice: Int = -1,
+        /** Other approvals of the same session behind this one. */
+        val more: Int = 0,
+        /** The order: an approval by when it was asked, anything else by when its session started (it holds still). */
+        val since: Long = 0L,
+        /** When the approval leaves the phone for nobody answering; 0 if it doesn't. */
         val expiresAt: Long = 0L,
+        /** Deny is offered: a tool's approval or the terminal's dialog, on a computer that can take the answer. */
+        val deny: Boolean = false,
+        /** Allow is offered: as [deny], and the [whole] command shows. */
+        val allow: Boolean = false,
         /** This phone is sending an answer to it, or the last try failed. */
         val answering: Answering? = null,
-    )
+    ) {
+        fun toJson(): JSONObject = JSONObject()
+            .put("server", server).put("sessionId", sessionId).put("title", title).put("project", project)
+            .put("kind", kind.name).put("tool", tool).put("detail", detail).put("whole", whole).put("askId", askId)
+            .put("allowChoice", allowChoice).put("denyChoice", denyChoice).put("more", more).put("since", since).put("expiresAt", expiresAt)
+
+        companion object {
+            /** A kept row: it only opens ([deny] and [allow] off) until its computer is heard from. */
+            fun fromJson(r: JSONObject) = Row(
+                server = r.getString("server"),
+                sessionId = r.getString("sessionId"),
+                title = r.optString("title"),
+                project = r.optString("project"),
+                kind = Kind.valueOf(r.getString("kind")),
+                tool = r.optString("tool"),
+                detail = r.optString("detail"),
+                whole = r.optBoolean("whole"),
+                askId = r.optString("askId").takeIf { r.has("askId") && !r.isNull("askId") && it.isNotEmpty() },
+                allowChoice = r.optInt("allowChoice", -1),
+                denyChoice = r.optInt("denyChoice", -1),
+                more = r.optInt("more"),
+                since = r.optLong("since"),
+                expiresAt = r.optLong("expiresAt"),
+            )
+        }
+    }
 
     enum class Answering { Allowing, Denying, Failed }
+
+    /** One paired computer as its hub has it: what [of] reads. [synced]: it has had a snapshot in this process. */
+    data class Source(
+        val id: String,
+        val name: String,
+        val link: LinkState,
+        val synced: Boolean,
+        val sessions: List<Session>,
+        val approvals: List<WApproval>,
+    )
 
     /** Everything but the timestamp: two models that only differ in time look the same on screen. */
     fun sameContent(o: WidgetModel?): Boolean = o != null && copy(updatedAt = 0L) == o.copy(updatedAt = 0L)
 
     /**
-     * What's still true of this model at [now], for drawing: resets that have passed (see
-     * [UsageView.at]), and no approval the Mac has already denied for nobody answering. A live
-     * model keeps its approval: the Mac's own list drops it, by the Mac's clock.
+     * What's still true of this model at [now], for drawing: no approval the computer has already
+     * let go of for nobody answering. A live model keeps its rows: the computer's own list drops them.
      */
     fun at(now: Long): WidgetModel {
-        val u = usage.at(now)
-        val a = ask?.takeIf { conn == Conn.Live || now < it.expiresAt }
-        val o = other?.at(now)
-        return if (u === usage && a === ask && o == other) this else copy(usage = u, ask = a, other = o)
+        if (live) return this
+        val gs = groups.map { g -> g.copy(rows = g.rows.filter { it.expiresAt !in 1..now }) }.filter { it.rows.isNotEmpty() }
+        return if (gs == groups) this else copy(groups = gs)
     }
 
     fun toJson(): JSONObject = JSONObject()
-        .put("conn", conn.name)
-        .put("macName", macName)
+        .put("paired", paired)
+        .put("known", known)
         .put("updatedAt", updatedAt)
-        .put("account", account)
-        .put("usingCredits", usingCredits)
-        .put("working", working)
-        .put("needs", needs)
-        .put("leadAgent", leadAgent)
-        .put("codexTrouble", codexTrouble)
-        .put("weekOnly", weekOnly)
+        .put("offline", JSONArray(offline))
         .put(
-            "other",
-            other?.let {
-                JSONObject().put("agent", it.agent).put("used", it.used?.toDouble()).put("resetAt", it.resetAt)
-                    .put("limited", it.limited).put("trouble", it.trouble)
-            },
-        )
-        .put(
-            "usage", JSONObject()
-                .put("fiveHour", usage.fiveHour.toDouble()).put("sevenDay", usage.sevenDay.toDouble())
-                .put("fiveResetAt", usage.fiveResetAt).put("sevenResetAt", usage.sevenResetAt)
-                .put("known", usage.known).put("limited", usage.limited).put("weekLimited", usage.weekLimited),
-        )
-        .put(
-            "rows",
-            JSONArray(rows.map { JSONObject().put("id", it.id).put("title", it.title).put("project", it.project).put("activity", it.activity).put("state", it.state.name).put("agents", it.agents).put("codex", it.codex) }),
-        )
-        .put(
-            "ask",
-            ask?.let {
-                JSONObject().put("id", it.id).put("sessionId", it.sessionId).put("kind", it.kind).put("tool", it.tool)
-                    .put("detail", it.detail).put("project", it.project).put("title", it.title).put("more", it.more)
-                    .put("whole", it.whole).put("expiresAt", it.expiresAt)
-            },
+            "groups",
+            JSONArray(groups.map { g -> JSONObject().put("server", g.server).put("name", g.name).put("rows", JSONArray(g.rows.map { it.toJson() })) }),
         )
 
     companion object {
-        /** How many sessions a model keeps; the largest widget shows four. */
-        const val MAX_ROWS = 6
-
-        private val NO_USAGE = UsageView(0f, 0f, 0L, 0L, known = false, limited = false, weekLimited = false)
-
-        fun unpaired() = WidgetModel(Conn.Unpaired, null, NO_USAGE, 0, 0, emptyList(), null)
+        fun unpaired() = WidgetModel(paired = false, live = false, known = false, groups = emptyList())
 
         fun fromJson(o: JSONObject): WidgetModel? = runCatching {
-            val u = o.getJSONObject("usage")
-            val rows = o.optJSONArray("rows") ?: JSONArray()
+            val gs = o.getJSONArray("groups")
+            val off = o.optJSONArray("offline") ?: JSONArray()
             WidgetModel(
-                conn = Conn.valueOf(o.getString("conn")),
-                macName = o.optString("macName").takeIf { o.has("macName") && !o.isNull("macName") },
-                usage = UsageView(
-                    u.getDouble("fiveHour").toFloat(), u.getDouble("sevenDay").toFloat(),
-                    u.getLong("fiveResetAt"), u.getLong("sevenResetAt"),
-                    u.getBoolean("known"), u.getBoolean("limited"), u.getBoolean("weekLimited"),
-                ),
-                working = o.getInt("working"),
-                needs = o.getInt("needs"),
-                rows = (0 until rows.length()).map { i ->
-                    val r = rows.getJSONObject(i)
-                    Row(r.getString("id"), r.getString("title"), r.getString("project"), r.getString("activity"), SessionState.valueOf(r.getString("state")), r.optInt("agents"), codex = r.optBoolean("codex"))
+                paired = o.getBoolean("paired"),
+                live = false,
+                known = o.optBoolean("known"),
+                groups = (0 until gs.length()).map { i ->
+                    val g = gs.getJSONObject(i)
+                    val rs = g.getJSONArray("rows")
+                    Group(g.getString("server"), g.optString("name"), (0 until rs.length()).map { Row.fromJson(rs.getJSONObject(it)) }, kept = true)
                 },
-                ask = o.optJSONObject("ask")?.let { a ->
-                    Ask(
-                        a.getString("id"), a.getString("sessionId"), a.getString("kind"), a.getString("tool"),
-                        a.getString("detail"), a.getString("project"), a.getString("title"), a.getInt("more"),
-                        whole = a.optBoolean("whole"), expiresAt = a.optLong("expiresAt"),
-                    )
-                },
+                offline = (0 until off.length()).map { off.getString(it) },
                 updatedAt = o.optLong("updatedAt"),
-                account = o.optString("account").takeIf { o.has("account") && !o.isNull("account") && it.isNotEmpty() },
-                usingCredits = o.optBoolean("usingCredits"),
-                // Kept by a build before Codex: Claude leads, nothing else.
-                leadAgent = if (o.optString("leadAgent") == AgentKind.CODEX) AgentKind.CODEX else AgentKind.CLAUDE,
-                codexTrouble = o.optString("codexTrouble").takeIf { o.has("codexTrouble") && !o.isNull("codexTrouble") && it.isNotEmpty() },
-                weekOnly = o.optBoolean("weekOnly"),
-                other = o.optJSONObject("other")?.let { x ->
-                    Other(
-                        agent = x.optString("agent").ifEmpty { AgentKind.CODEX },
-                        used = if (x.has("used") && !x.isNull("used")) x.optDouble("used").takeIf { !it.isNaN() }?.toFloat() else null,
-                        resetAt = x.optLong("resetAt"),
-                        limited = x.optBoolean("limited"),
-                        trouble = x.optString("trouble").takeIf { x.has("trouble") && !x.isNull("trouble") && it.isNotEmpty() },
-                    )
-                },
             )
         }.getOrNull()
 
-        /** [WidgetModel.codexTrouble] and [Other.trouble] when Codex is signed out on the Mac. */
-        const val CODEX_SIGNED_OUT = "signed_out"
-
-        /** The most of the Mac's words for Codex's trouble a widget keeps. */
-        private const val TROUBLE_MAX = 160
-
         /**
-         * The agents' part of the widgets' picture (data/AgentLead.kt), pure: which agent leads, the
-         * other's readout while both are in use, and what stops Codex while it leads.
+         * The widget's view of every paired computer right now ([sources], in the switcher's order).
+         * A computer that has had its snapshot answers for itself; one that hasn't yet shows what
+         * [kept] had for it, to open only. [live]: something keeps the links open. [answering]:
+         * answers on their way from the widget; [done]: answered from the widget, hidden before the
+         * computer confirms. A computer forgotten by its server (unpaired) isn't shown.
          */
-        internal data class Agents(val leadAgent: String, val codexTrouble: String?, val weekOnly: Boolean, val other: Other?) {
-            val codexLeads: Boolean get() = leadAgent == AgentKind.CODEX
-            val both: Boolean get() = other != null
-        }
-
-        /** The widgets' view of the agents on the Mac: [claude] and [codex] as the snapshot has them. */
-        internal fun agents(claude: ClaudeState?, codex: CodexState?): Agents {
-            val leads = AgentLead.codexLeads(claude, codex)
-            val u = codex?.usage
-            val other = if (AgentLead.both(claude, codex)) {
-                Other(
-                    agent = AgentKind.CODEX,
-                    // In whole percents: finer steps wouldn't show, and would redraw the widget for nothing.
-                    used = AgentLead.codexUsed(u)?.let { (it * 100f).roundToInt() / 100f },
-                    resetAt = (AgentLead.codexLimitedWindow(u) ?: AgentLead.codexWindow(u))?.resetsAt ?: 0L,
-                    limited = u?.limited == true,
-                    trouble = codexTrouble(codex),
-                )
-            } else null
-            return Agents(
-                leadAgent = if (leads) AgentKind.CODEX else AgentKind.CLAUDE,
-                codexTrouble = if (leads) codexTrouble(codex) else null,
-                weekOnly = leads && u?.fiveHour == null && u?.sevenDay != null,
-                other = other,
-            )
-        }
-
-        /** What stops Codex until the owner acts: signed out, or the Mac's words for what's wrong; null when nothing does. */
-        private fun codexTrouble(c: CodexState?): String? = when {
-            c == null -> null
-            c.account?.signedIn == false -> CODEX_SIGNED_OUT
-            else -> c.problem?.let { oneLine(it).take(TROUBLE_MAX) }?.takeIf { it.isNotEmpty() }
-        }
-
-        /**
-         * The widgets' view of [live] right now. [live] answers for sessions and usage only once it
-         * has a snapshot ([LiveHub.synced]); before that the caller shows what was kept on disk.
-         * [fresh]: something keeps the link open (the app on screen, or the background service).
-         * [held]: the background connection is meant to keep it open while the app is closed (it's
-         * on in Settings and wasn't disconnected from its notification).
-         * [answering]: answers on their way from the widget; [done]: answered from the widget, hidden
-         * before the Mac confirms.
-         */
-        fun of(live: LiveHub, fresh: Boolean, held: Boolean, answering: Map<String, Answering>, done: Set<String>): WidgetModel {
-            val link = live.link.state
-            // Which agent the star follows, and the other's readout while both are in use.
-            val who = agents(live.claude, live.codex)
-            val conn = when {
-                link == LinkState.Unpaired -> return unpaired()
-                // Nothing is meant to hold the link: the picture waits for the app, by choice.
-                !fresh && !held -> Conn.AppOnly
-                // A dropped socket comes back within seconds; only "Offline" is worth saying.
-                link == LinkState.Connected || link == LinkState.Reconnecting -> if (fresh) Conn.Live else Conn.Stale
-                link == LinkState.Offline -> Conn.Offline
-                else -> Conn.Stale
-            }
-            // A conversation that switched agents is its newest session, as on Home.
-            val alive = live.sessions.filter { it.phase != Phase.Ended && it.switchedTo == null }
-            val byId = alive.associateBy { it.id }
-            // Within a state, an order that holds still: working and waiting sessions newest first
-            // by when they started, idle ones by when they last did something (which doesn't move
-            // while they're idle). By latest activity, two busy sessions would swap places every
-            // few seconds, and the widget would redraw each time.
-            val rows = alive
-                .sortedWith(
-                    compareBy<com.prudnikweb.hypernova.data.Session> { rank(shown(it)) }
-                        .thenByDescending { if (shown(it) == SessionState.Idle) it.updatedAt else it.createdAt }
-                        .thenBy { it.id },
-                )
-                .take(MAX_ROWS)
-                .map { s ->
-                    Row(
-                        id = s.id,
-                        title = Secrets.mask(s.name),
-                        project = s.project,
-                        // Busy, it's a tool's line ("Bash: psql …"), masked as a command; idle, the
-                        // session's last words, as prose. Cut to the window after masking: the row
-                        // shows one line, but TalkBack reads all of it.
-                        activity = oneLine(Secrets.shown(s.activity, command = s.state != SessionState.Idle)),
-                        state = shown(s),
-                        agents = if (s.state == SessionState.Idle) s.agentsRunning else 0,
-                        codex = who.both && s.codex,
-                    )
+        fun of(
+            sources: List<Source>,
+            live: Boolean,
+            answering: Map<String, Answering> = emptyMap(),
+            done: Set<String> = emptySet(),
+            kept: WidgetModel? = null,
+        ): WidgetModel {
+            val paired = sources.filter { it.link != LinkState.Unpaired }
+            if (paired.isEmpty()) return unpaired()
+            var known = false
+            val offline = ArrayList<String>()
+            val groups = ArrayList<Group>()
+            for (src in paired) {
+                val down = src.link == LinkState.Offline
+                if (down) offline += src.name
+                if (src.synced) {
+                    known = true
+                    // Offline, the answer couldn't reach it: the rows open the session instead.
+                    val rows = rows(src, answering, done, answer = !down)
+                    if (rows.isNotEmpty()) groups += Group(src.id, src.name, rows, offline = down)
+                } else {
+                    val k = kept?.groups?.firstOrNull { it.server == src.id } ?: continue
+                    known = true
+                    val rows = k.rows.filter { it.askId == null || it.askId !in done }.map { it.copy(deny = false, allow = false, answering = null) }
+                    if (rows.isNotEmpty()) groups += Group(src.id, src.name.ifEmpty { k.name }, rows, kept = true, offline = down)
                 }
-            val asks = live.pendingApprovals.filter { it.id !in done }.sortedBy { it.createdAt }
-            val first = asks.firstOrNull()
-            val ask = first?.let { a ->
-                val s = byId[a.sessionId] ?: live.session(a.sessionId)
-                val (raw, exact) = detail(a)
-                val text = raw.trim()
-                // Only what can be shown is masked: a longer command is never whole anyway, and
-                // the patterns needn't run over a megabyte of heredoc on the main thread. A
-                // question or a plan is prose.
-                val masked = Secrets.shown(text, command = a.kind == "tool")
-                // Shown exactly as it will run, or it can't be allowed from here: a masked run could
-                // hide a payload, and a cut or reordered line hides what follows.
-                val whole = exact && answerableText(text) != null
-                Ask(
-                    id = a.id,
-                    sessionId = a.sessionId,
-                    kind = a.kind,
-                    tool = a.toolName,
-                    detail = if (whole) text else oneLine(masked).take(DETAIL_MAX),
-                    project = s?.project.orEmpty(),
-                    title = s?.name?.let(Secrets::mask).orEmpty(),
-                    more = asks.size - 1,
-                    whole = whole,
-                    expiresAt = a.expiresAt ?: (a.createdAt + AUTO_DENY),
-                    answering = answering[a.id],
-                )
             }
-            // Where the pace leads: the app's projection, kept as the pace and the limit's time.
-            val now = System.currentTimeMillis()
-            // The leading agent's usage: Codex's windows (no pace) where Codex leads.
-            val u = if (who.codexLeads) AgentLead.codexSunUsage(live.codex, now).let {
-                // No numbers from Codex yet: no resets either (its placeholders move with the clock,
-                // and would redraw the widgets for nothing).
-                if (it.known) it else it.copy(fiveHourResetAt = 0L, sevenDayResetAt = 0L)
-            } else live.usage
-            // Claude's account only where Claude Code is (it leads then): elsewhere it says nothing true.
-            val claude = !who.codexLeads && AgentLead.claudeAvailable(live.claude)
-            val p5 = UsageProjection.fiveHour(u, now)
-            val p7 = UsageProjection.sevenDay(u, now)
-            return WidgetModel(
-                conn = conn,
-                macName = live.mac.name,
-                usage = UsageView(
-                    fiveHour = u.fiveHour, sevenDay = u.sevenDay,
-                    fiveResetAt = u.fiveHourResetAt, sevenResetAt = u.sevenDayResetAt,
-                    known = u.known, limited = u.limited, weekLimited = u.weekLimited,
-                    fivePace = WidgetMeter.pace(p5), sevenPace = WidgetMeter.pace(p7),
-                    fiveLimitAt = WidgetMeter.limitAt(p5, now), sevenLimitAt = WidgetMeter.limitAt(p7, now),
-                ),
-                working = alive.count { shown(it) == SessionState.Working },
-                needs = alive.count { it.state == SessionState.NeedsYou },
-                rows = rows,
-                ask = ask,
-                account = live.account.takeIf { claude && it.needsYou }?.state,
-                usingCredits = claude && live.account.state == Account.LIMITED && live.account.limit?.usingCredits == true,
-                leadAgent = who.leadAgent,
-                codexTrouble = who.codexTrouble,
-                // Week-only: Codex leading on such a plan, or Claude Code reporting no 5-hour window.
-                weekOnly = who.weekOnly || !u.fiveHourReported,
-                other = who.other,
+            return WidgetModel(paired = true, live = live, known = known, groups = groups, offline = offline)
+        }
+
+        /**
+         * One computer's sessions that need the owner, oldest wait first: each session with an
+         * approval (its oldest), then each with Claude Code's dialog in its terminal, then any other
+         * that needs you. A session whose every approval was just answered here is left out until the
+         * computer's list catches up.
+         */
+        private fun rows(src: Source, answering: Map<String, Answering>, done: Set<String>, answer: Boolean): List<Row> {
+            val byId = src.sessions.associateBy { it.id }
+            val asked = src.approvals.groupBy { it.sessionId }
+            val out = ArrayList<Row>()
+            for ((sid, all) in asked) {
+                val open = all.filter { it.id !in done }.sortedWith(compareBy<WApproval>({ it.createdAt }, { it.id }))
+                val first = open.firstOrNull() ?: continue
+                out += approvalRow(src.id, byId[sid], first, open.size - 1, answering[first.id], answer)
+            }
+            for (s in src.sessions) {
+                // A conversation that switched agents is its newest session, as on Home.
+                if (s.id in asked || s.phase == Phase.Ended || s.switchedTo != null) continue
+                val t = TerminalAsk.of(s)
+                when {
+                    t != null -> if (t.menuId !in done) out += terminalRow(src.id, s, t, answering[t.menuId], answer)
+                    s.state == SessionState.NeedsYou -> out += waitingRow(src.id, s)
+                }
+            }
+            return out.sortedWith(compareBy<Row>({ it.since }, { it.sessionId }))
+        }
+
+        private fun title(s: Session?): String = Secrets.mask(s?.name.orEmpty()).trim()
+
+        private fun approvalRow(server: String, s: Session?, a: WApproval, more: Int, answering: Answering?, answer: Boolean): Row {
+            val kind = when (a.kind) {
+                "question" -> Kind.Question
+                "plan" -> Kind.Plan
+                else -> Kind.Tool
+            }
+            val (raw, exact) = detail(a)
+            val text = raw.trim()
+            // Shown exactly as it will run, or it can't be allowed from here: a masked run could
+            // hide a payload, and a cut or reordered line hides what follows. Only what can be shown
+            // is masked; a question or a plan is prose.
+            val whole = kind == Kind.Tool && exact && exactText(text) != null
+            return Row(
+                server = server,
+                sessionId = a.sessionId,
+                title = title(s),
+                project = s?.project.orEmpty(),
+                kind = kind,
+                tool = if (kind == Kind.Tool) a.toolName else "",
+                detail = if (whole) text else oneLine(Secrets.shown(text, command = kind == Kind.Tool)).take(DETAIL_MAX),
+                whole = whole,
+                askId = a.id,
+                more = more,
+                since = a.createdAt,
+                expiresAt = a.expiresAt ?: 0L,
+                // Deny for any tool's request, Allow only beside its whole command (as a notification's).
+                deny = answer && kind == Kind.Tool,
+                allow = answer && whole,
+                answering = answering,
             )
         }
 
-        /** What an ask shows of its command at most; [Secrets.WINDOW] keeps 200 more behind it. */
+        /** Claude Code's dialog in the terminal: its command as the terminal shows it, Deny, and Allow when that's whole. */
+        private fun terminalRow(server: String, s: Session, t: TerminalAsk, answering: Answering?, answer: Boolean): Row {
+            val cmd = t.command?.trim()?.takeIf { it.isNotEmpty() }
+            val whole = cmd != null && exactText(cmd) != null
+            val detail = when {
+                cmd == null -> oneLine(Secrets.shown(s.menu?.permission?.question ?: t.lines.lastOrNull().orEmpty(), command = false)).take(DETAIL_MAX)
+                whole -> cmd
+                else -> oneLine(Secrets.shown(cmd, command = true)).take(DETAIL_MAX)
+            }
+            return Row(
+                server = server,
+                sessionId = s.id,
+                title = title(s),
+                project = s.project,
+                kind = Kind.Terminal,
+                tool = t.tool.orEmpty(),
+                detail = detail,
+                whole = whole,
+                askId = t.menuId,
+                allowChoice = t.allow,
+                denyChoice = t.deny,
+                since = s.createdAt,
+                deny = answer,
+                allow = answer && whole,
+                answering = answering,
+            )
+        }
+
+        /** Needs you with nothing to answer here: what its terminal's menu asks, else its last line. Opens. */
+        private fun waitingRow(server: String, s: Session): Row {
+            val m = s.menu
+            val said = m?.title?.takeIf { it.isNotBlank() } ?: m?.body?.lastOrNull { it.isNotBlank() }
+            return Row(
+                server = server,
+                sessionId = s.id,
+                title = title(s),
+                project = s.project,
+                kind = Kind.Waiting,
+                tool = "",
+                detail = oneLine(Secrets.shown(said ?: s.activity, command = said == null)).take(DETAIL_MAX),
+                whole = false,
+                askId = null,
+                since = s.createdAt,
+            )
+        }
+
+        /** What a row shows of its command at most; [Secrets.WINDOW] keeps 200 more behind it. */
         internal const val DETAIL_MAX = 400
 
         /**
@@ -478,29 +335,12 @@ internal data class WidgetModel(
         fun answerable(a: WApproval, max: Int = DETAIL_MAX): String? {
             if (a.kind != "tool") return null
             val (raw, exact) = detail(a)
-            return if (exact) answerableText(raw.trim(), max) else null
+            return if (exact) exactText(raw.trim(), max) else null
         }
 
-        private fun answerableText(text: String, max: Int = DETAIL_MAX): String? =
+        /** [text] when it can be allowed as it shows ([answerable]'s rule for the text itself), else null. */
+        internal fun exactText(text: String, max: Int = DETAIL_MAX): String? =
             text.takeIf { it.isNotEmpty() && it.length <= max && Secrets.shown(it, command = true) == it && plain(it) }
-
-        /** The Mac denies an approval nobody answered after 10 minutes (DECISIONS: Sessions). */
-        private const val AUTO_DENY = 10 * 60_000L
-
-        /**
-         * A session as the widgets count and draw it, by the one rule ([Session.busy]): one whose
-         * main agent is idle while agents it started still run is working, as on the Home cards and
-         * in the connection notification, so the widget never reads "All quiet" while agents work.
-         * [alive] sessions only: an ended one's agents have ended with it.
-         */
-        private fun shown(s: com.prudnikweb.hypernova.data.Session): SessionState =
-            if (s.busy) SessionState.Working else s.state
-
-        private fun rank(s: SessionState) = when (s) {
-            SessionState.NeedsYou -> 0
-            SessionState.Working -> 1
-            SessionState.Idle -> 2
-        }
 
         /**
          * What the approval is about, as the session screen shows it, and whether that's all of
@@ -563,14 +403,19 @@ internal data class WidgetModel(
     }
 }
 
-/** The widgets' last model, kept in app-private storage for a process that starts cold. */
+/** The widget's last model, kept in app-private storage for a process that starts cold. */
 internal object WidgetStore {
     private fun prefs(c: Context) = c.applicationContext.getSharedPreferences("widget", Context.MODE_PRIVATE)
 
-    fun load(c: Context): WidgetModel? = prefs(c).getString("model", null)?.let { runCatching { WidgetModel.fromJson(JSONObject(it)) }.getOrNull() }
+    fun load(c: Context): WidgetModel? {
+        val p = prefs(c)
+        // The sessions-and-usage picture from before the "Needs you" list (2026-10-31): not this shape.
+        if (p.contains("model")) p.edit().remove("model").apply()
+        return p.getString("needs", null)?.let { runCatching { WidgetModel.fromJson(JSONObject(it)) }.getOrNull() }
+    }
 
     fun save(c: Context, m: WidgetModel) {
-        prefs(c).edit().putString("model", m.copy(ask = m.ask?.copy(answering = null)).toJson().toString()).apply()
+        prefs(c).edit().putString("needs", m.toJson().toString()).apply()
     }
 }
 

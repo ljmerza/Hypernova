@@ -10,9 +10,6 @@
     <color name="widget_accent">#FF7FFFA0</color>
     <color name="widget_amber">#FFE8B341</color>
     <color name="widget_danger">#FFFF7878</color>
-    <!-- The meters' pace: their fill's colour at 30%. -->
-    <color name="widget_accent_pace">#4D7FFFA0</color>
-    <color name="widget_amber_pace">#4DE8B341</color>
 
     <!-- Android 12+ takes the launcher's own widget radii (values-v31). -->
     <dimen name="widget_radius">16dp</dimen>

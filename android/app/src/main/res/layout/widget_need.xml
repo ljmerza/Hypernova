@@ -1,138 +1,156 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- widget_ask for a widget two rows tall: the same band, then the command and the buttons on
-     one line. The buttons' touch targets are 44dp tall around 32dp pills (hence the 1dp padding
-     above and below the line). -->
+<!-- A session that needs you, in the widget's list: its name ("+2 more" when other approvals wait),
+     what it waits on in small amber caps with its project, the detail (a command in a mono well with
+     an amber prompt sign, or a question or a plan as prose), and its buttons: Deny and Allow, Deny
+     and Open, or Open. A tap anywhere else opens the session. The pills are 32dp inside 44dp touch
+     targets, as in the app. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/a_root"
+    android:id="@+id/n_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
-    android:background="@drawable/widget_ask_bg"
-    android:orientation="vertical">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="22dp"
-        android:background="@drawable/widget_ask_band"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp">
-
-        <TextView
-            android:id="@+id/a_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="sans-serif"
-            android:includeFontPadding="false"
-            android:letterSpacing="0.18"
-            android:maxLines="1"
-            android:text="@string/state_needs_you"
-            android:textAllCaps="true"
-            android:textColor="@color/widget_bg"
-            android:textFontWeight="700"
-            android:textSize="10sp" />
-
-        <TextView
-            android:id="@+id/a_project"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif"
-            android:includeFontPadding="false"
-            android:letterSpacing="0.14"
-            android:maxLines="1"
-            android:textAllCaps="true"
-            android:textColor="#B314110E"
-            android:textFontWeight="600"
-            android:textSize="10sp" />
-
-        <TextView
-            android:id="@+id/a_tool"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:fontFamily="sans-serif"
-            android:includeFontPadding="false"
-            android:letterSpacing="0.18"
-            android:maxLines="1"
-            android:textAllCaps="true"
-            android:textColor="#B314110E"
-            android:textFontWeight="700"
-            android:textSize="10sp" />
-    </LinearLayout>
+    android:background="@drawable/widget_row_bg"
+    android:orientation="vertical"
+    android:paddingStart="10dp"
+    android:paddingTop="9dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="2dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:minHeight="46dp"
-        android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingTop="1dp"
-        android:paddingEnd="8dp"
-        android:paddingBottom="1dp">
+        android:orientation="horizontal">
 
         <TextView
-            android:id="@+id/a_command"
+            android:id="@+id/n_title"
             android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_command_bg"
-            android:breakStrategy="simple"
-            android:ellipsize="end"
-            android:fontFamily="monospace"
-            android:gravity="center_vertical"
-            android:hyphenationFrequency="none"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:textColor="@color/widget_ink"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/a_text"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="4dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:ellipsize="end"
             android:fontFamily="sans-serif"
-            android:gravity="center_vertical"
             android:includeFontPadding="false"
             android:maxLines="1"
             android:textColor="@color/widget_ink"
             android:textFontWeight="500"
-            android:textSize="13sp"
-            android:visibility="gone" />
+            android:textSize="13.5sp" />
 
         <TextView
-            android:id="@+id/a_note"
+            android:id="@+id/n_more"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/widget_ink_dim"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/n_kind"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.14"
+            android:maxWidth="160dp"
+            android:maxLines="1"
+            android:textAllCaps="true"
+            android:textColor="@color/widget_amber"
+            android:textFontWeight="700"
+            android:textSize="9.5sp" />
+
+        <TextView
+            android:id="@+id/n_project"
             android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="4dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:ellipsize="end"
             android:fontFamily="sans-serif"
-            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.12"
+            android:maxLines="1"
+            android:textAllCaps="true"
+            android:textColor="@color/widget_ink_dim"
+            android:textFontWeight="600"
+            android:textSize="9.5sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/n_command"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="7dp"
+        android:background="@drawable/widget_command_bg"
+        android:breakStrategy="simple"
+        android:ellipsize="end"
+        android:fontFamily="monospace"
+        android:hyphenationFrequency="none"
+        android:includeFontPadding="false"
+        android:lineSpacingExtra="3dp"
+        android:maxLines="2"
+        android:paddingStart="10dp"
+        android:paddingTop="7dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="7dp"
+        android:textColor="@color/widget_ink"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <!-- A question, a plan, or what a session waits on: prose, not a command. -->
+    <TextView
+        android:id="@+id/n_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif"
+        android:includeFontPadding="false"
+        android:lineSpacingExtra="3dp"
+        android:maxLines="3"
+        android:textColor="@color/widget_ink_muted"
+        android:textFontWeight="500"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="44dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/n_note"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif"
             android:includeFontPadding="false"
             android:maxLines="1"
             android:textColor="@color/widget_ink_dim"
             android:textFontWeight="500"
-            android:textSize="12sp"
-            android:visibility="gone" />
+            android:textSize="12sp" />
 
         <FrameLayout
-            android:id="@+id/a_deny"
+            android:id="@+id/n_deny"
             android:layout_width="wrap_content"
             android:layout_height="44dp"
-            android:layout_marginStart="8dp">
+            android:visibility="gone">
 
             <TextView
-                android:id="@+id/a_deny_pill"
                 android:layout_width="wrap_content"
                 android:layout_height="32dp"
                 android:layout_gravity="center_vertical"
@@ -142,7 +160,7 @@
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:minWidth="64dp"
+                android:minWidth="68dp"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:text="@string/deny"
@@ -152,13 +170,13 @@
         </FrameLayout>
 
         <FrameLayout
-            android:id="@+id/a_allow"
+            android:id="@+id/n_allow"
             android:layout_width="wrap_content"
             android:layout_height="44dp"
-            android:layout_marginStart="6dp">
+            android:layout_marginStart="8dp"
+            android:visibility="gone">
 
             <TextView
-                android:id="@+id/a_allow_pill"
                 android:layout_width="wrap_content"
                 android:layout_height="32dp"
                 android:layout_gravity="center_vertical"
@@ -168,7 +186,7 @@
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:minWidth="64dp"
+                android:minWidth="68dp"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:text="@string/allow"
@@ -178,14 +196,13 @@
         </FrameLayout>
 
         <FrameLayout
-            android:id="@+id/a_open"
+            android:id="@+id/n_open"
             android:layout_width="wrap_content"
             android:layout_height="44dp"
             android:layout_marginStart="8dp"
             android:visibility="gone">
 
             <TextView
-                android:id="@+id/a_open_pill"
                 android:layout_width="wrap_content"
                 android:layout_height="32dp"
                 android:layout_gravity="center_vertical"
@@ -195,7 +212,7 @@
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:minWidth="64dp"
+                android:minWidth="68dp"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:text="@string/widget_open"

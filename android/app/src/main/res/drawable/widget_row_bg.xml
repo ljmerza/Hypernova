@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A session row: no fill at rest, a soft ink ripple when pressed. -->
+<!-- A row of the list: a faint ink fill (4%) with a hairline ring (ink 8%), a soft ink ripple when pressed. -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#1AF5F2EB">
-    <item android:id="@android:id/mask">
+    <item>
         <shape android:shape="rectangle">
             <corners android:radius="@dimen/widget_inner_radius" />
-            <solid android:color="#FFFFFFFF" />
+            <solid android:color="#0AF5F2EB" />
+            <stroke
+                android:width="1dp"
+                android:color="#14F5F2EB" />
         </shape>
     </item>
 </ripple>
