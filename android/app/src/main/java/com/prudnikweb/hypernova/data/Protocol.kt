@@ -406,6 +406,13 @@ data class WApproval(
      * terminal's dialog or wait for the phone, so they have no countdown.
      */
     val autoDeny: Boolean = false,
+    /**
+     * The rules Claude Code suggests for Always (`Bash(npm test:*)`) and where it would put them
+     * (`session`, `project`, `everywhere`); the Always sheet starts from them. Empty from an older
+     * Mac, or when the suggestion holds no rule (a mode, a folder): Always then goes as it is.
+     */
+    val alwaysRules: List<String> = emptyList(),
+    val alwaysScope: String? = null,
 )
 
 @Immutable
@@ -854,6 +861,8 @@ object Wire {
             (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { e -> e.str("old_string").orEmpty() to e.str("new_string").orEmpty() } }
         }.orEmpty(),
         autoDeny = o.bool("autoDeny"),
+        alwaysRules = o.optJSONArray("alwaysRules")?.let { a -> (0 until a.length()).mapNotNull { i -> a.opt(i) as? String }.filter { it.isNotBlank() } }.orEmpty(),
+        alwaysScope = o.str("alwaysScope")?.takeIf { it.isNotBlank() },
     )
 
     private fun window(o: JSONObject?): Window? {

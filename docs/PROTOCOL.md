@@ -379,7 +379,8 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `POST /v1/sessions/{id}/mode` | `{permissionMode}` (`default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) → `{session, applies?}`. A session the daemon runs takes it from its next turn while a turn runs (the running query can't change its mode): `applies: "next_turn"`, else `"now"`, and the phone says so. A shared terminal switches by Shift+Tab (409 `waiting` with a dialog open, `mode_unavailable` for a mode it can't reach: Bypass when `session.bypassAvailable` is false, answered without pressing any key). A `claude agents` job (`agentJob`) without one gets one first: `claude attach <job>` (which wakes a stopped one), or the attach holder it has unless that drifted to another job or the agent list; 409 `terminal_busy` when the attach doesn't open or shows another session, with no key pressed. The phone offers the mode picker for such a job, and the model and effort ones |
 | `POST /v1/sessions/{id}/model` | `{model: string \| null, confirmPaid?: true}` → `{model, session, applies: "now" \| "next_turn"}`: switches the session's model (see A session's model; a `claude agents` job's through `claude attach`, as the effort route). 400 `unknown_model`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_model` (a terminal Hypernova doesn't hold: type /model there), `confirm_paid` |
 | `POST /v1/sessions/{id}/effort` | `{effort}` (`low`, `medium`, `high`, `xhigh`, `max`) → `{effort, session, applies: "now" \| "next_turn"}`: Claude Code's reasoning effort, `/effort <level>` typed into its terminal (see A session's effort). 400 `unknown_effort`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_effort` (a terminal Hypernova doesn't hold: type /effort there), `not_open` (it has ended), `unsupported_for_agent` (Codex: its effort goes with `…/model`) |
-| `POST /v1/approvals/{id}` | `ApprovalAnswer` → `{ok}` (409 if already resolved) |
+| `POST /v1/approvals/{id}` | `ApprovalAnswer` → `{ok}` (409 if already resolved; 400 `bad_scope`, `bad_rule` for an Always's `scope` and `rules`, see Approvals, "What Always covers") |
+| `POST /v1/sessions/{id}/allow` | `{ids: string[]}` → `{allowed: string[], gone: string[]}`: "Allow these N", each of the session's asks named allowed as its own Allow (see Approvals). 400 `bad_ids` (none, over 50, not ids, or one waiting that is another session's or not a tool's: nothing is answered then); 404 `no_session` |
 | `GET /v1/history/search?q=<words>` | → `{results: SearchHit[], partial: boolean}`: the sessions whose conversations have every word of `q` inside, newest first, 50 at most (see History search). 400 `bad_query` (fewer than 2 or more than 200 characters). An older daemon answers 404, and the phone filters on its own |
 | `GET /v1/projects` | → `{projects: Project[], root}` |
 | `POST /v1/projects` | `{name, git?: true}` → `{project}` creates `<root>/<name>` |
@@ -641,6 +642,12 @@ Approval = {
   input: object,                             // trimmed tool input
   reason: string | null,                     // why Claude Code asks
   canAlways: boolean,
+  alwaysRules: string[],      // the allow rules in Claude Code's suggestion for Always, as a settings
+                              // file writes them ("Bash(npm test:*)"); [] when it holds none (a mode,
+                              // a folder) or there's no Always
+  alwaysScope: "session" | "project" | "everywhere" | null,
+                              // where Claude Code's suggestion puts them (localSettings and
+                              // projectSettings are "project", userSettings "everywhere")
   canSession: boolean,        // WebFetch, WebSearch, Read, Glob, Grep, LS: "all this session" offered
   questions: Question[] | null,              // kind "question" (AskUserQuestion)
   plan: string | null,                       // kind "plan" (ExitPlanMode markdown)
@@ -651,6 +658,10 @@ Question = { question, header, multiSelect, options: [{label, description}] }
 
 ApprovalAnswer =
   | {decision: "allow" | "deny" | "always" | "session", message?: string}
+  | {decision: "always", scope: "session" | "project" | "everywhere", rules?: string[]}
+                              // where the rule goes and, edited, the rules (1 to 20, "Tool" or
+                              // "Tool(pattern)", 2000 characters each); no rules: Claude Code's.
+                              // No scope: Claude Code's suggestion as it is (see Approvals)
   | {decision: "allow", answers: {[questionText]: string}}  // labels; multi-select joined by ", "
 
 Usage = { fiveHour: Window | null, sevenDay: Window | null,
@@ -1024,7 +1035,8 @@ Claude Code's permission rules for a session, read-only, from the session sheet'
    beside it, A to Z, not dotfiles (20 at most). Left out when there's no such file. Server-managed
    settings, MDM and the Windows policy key aren't files the daemon reads.
 2. **`session`**: rules Hypernova gave the session itself, no file (`path: null`): an automation's
-   `--allowedTools` and the tools allowed "for this session" from the phone. Left out when none.
+   `--allowedTools`, the tools allowed "for this session" from the phone and the rules an Always
+   added for this session only (see Approvals, "What Always covers"). Left out when none.
 3. **`local`**: `<cwd>/.claude/settings.local.json`; 4. **`project`**: `<cwd>/.claude/settings.json`;
    5. **`user`**: `settings.json` in the Claude folder (`CLAUDE_CONFIG_DIR`, else `~/.claude`).
    These three are always listed. `<cwd>` is the session's own folder, as the daemon has it; the
@@ -2436,9 +2448,43 @@ session step's whole output 8 KB (its first).
   The phone draws it as an approval card where the asks go (the command, Deny and Allow, the
   dialog's other options as it words them) and as Deny and Allow on the Home card; a tap answers it
   through `POST /v1/sessions/{id}/menu`: Allow is its first option (Yes), Deny its last No.
-- `always` allows and adds Claude Code's suggested permission rule for the
-  session (`updatedPermissions`). The phone asks for the fingerprint or the screen lock first,
-  and notifications and the widget offer Allow and Deny only.
+- `always` allows and adds a permission rule, as Claude Code's own "Yes, and don't ask again"
+  does: the hook's allow (or the SDK's answer) carries it in `updatedPermissions`, and Claude Code
+  adds it to the session and saves it in the settings file its destination names. The daemon never
+  writes a settings file. The phone asks for the fingerprint or the screen lock first, and
+  notifications and the widget offer Allow and Deny only.
+- **What Always covers** (DECISIONS, "What Always covers"). The approval carries Claude Code's
+  suggested allow rules (`alwaysRules`) and where it would put them (`alwaysScope`); for a command
+  that is the project's local file. Where there are rules, the card's Always opens the Always sheet:
+  the rules, editable, with quick widenings, and where they go. The answer then says `scope` and
+  `rules` (`daemon/src/always.ts`), and Claude Code gets one `addRules` with them:
+
+  | `scope` | `destination` | The file Claude Code writes |
+  |---|---|---|
+  | `session` | `session` | none: until the session ends |
+  | `project` | `localSettings` | `<cwd>/.claude/settings.local.json`, which Claude Code keeps out of git |
+  | `everywhere` | `userSettings` | `settings.json` in the Claude folder (`~/.claude`) |
+
+  ```
+  {"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow",
+    "updatedPermissions": [{"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}],
+      "behavior": "allow", "destination": "localSettings"}]}}}
+  ```
+
+  A rule is `Tool` or `Tool(pattern)`, read as Claude Code reads one: the tool a name (`Bash`,
+  `mcp__github__create_issue`), the pattern closing the rule, its `(`, `)` and `\` escaped with a
+  backslash; `Tool()` and `Tool(*)` are the whole tool; no control characters. The rest of Claude
+  Code's suggestion (a folder to add, a mode) goes with it unchanged, but to the session for
+  `session`, so "this session" saves nothing. Without `scope` (an older phone, or a suggestion with
+  no rule to show) Claude Code's suggestion goes as it came. Rules an Always added for the session
+  show in the rules in effect as the session's own. Claude Code may still drop a rule it doesn't let
+  a hook add (its own checks: a skill that asks each time, a hosted session's web tools), and a
+  managed policy with `allowManagedPermissionRulesOnly` sets them all aside.
+- **Allow these N** (`POST /v1/sessions/{id}/allow {ids}`): when a session has two or more tool
+  asks waiting (parallel agents), the session sheet's Permissions tab lists each command and allows
+  them with one confirmation. Each is answered as its own Allow (no rule is added); a question or a
+  plan needs its own answer, and a deny is always one at a time, on its card. An id no longer
+  waiting comes back in `gone`.
 - `session` (only where `canSession`) allows that tool for the rest of the session: this
   approval, the same tool's other approvals waiting in that session (they resolve as
   allowed), and later ones, which the daemon answers without asking (subagents included).

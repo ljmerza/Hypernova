@@ -55,6 +55,7 @@ import { attachmentReadInput, readsAttachment } from './attachments.ts'
 import { noteDenied } from './denied.ts'
 import { noteBlocked } from './blocked.ts'
 import { noteHookEvent } from './hookevents.ts'
+import { alwaysUpdates, suggestedRules, suggestedScope } from './always.ts'
 
 // PreToolUse → tool_use_id, to pair with PermissionRequest (which has no id).
 const recentPre = new Map<string, string>()
@@ -215,6 +216,9 @@ async function permission(ev: any, sid: string, req: IncomingMessage, res: Serve
       input,
       reason: null,
       canAlways: Array.isArray(ev.permission_suggestions) && ev.permission_suggestions.length > 0,
+      // The rule Claude Code suggests, for the phone's Always sheet to show and edit (always.ts).
+      alwaysRules: suggestedRules(ev.permission_suggestions),
+      alwaysScope: suggestedScope(ev.permission_suggestions),
       questions: kind === 'question' ? (input.questions ?? null) : null,
       plan: kind === 'plan' ? String(input.plan ?? '') : null,
       // A subagent asks: the phone says which (and notifies later, as agents often settle it).
@@ -236,8 +240,10 @@ async function permission(ev: any, sid: string, req: IncomingMessage, res: Serve
       return {}
     case 'deny':
       return out({ behavior: 'deny', message: ans.message || (kind === 'plan' ? 'The user wants to keep planning. Ask what to change.' : 'The user denied this from Hypernova.') })
+    // Claude Code writes the rule where the owner chose (the session, the project's local file, the
+    // user's), or its own suggestion as it is when he chose nothing (always.ts).
     case 'always':
-      return out({ behavior: 'allow', updatedPermissions: ev.permission_suggestions ?? [] })
+      return out({ behavior: 'allow', updatedPermissions: alwaysUpdates(ev.permission_suggestions, ans.always) })
     case 'session':
       return out({ behavior: 'allow', updatedPermissions: sessionRule(tool) })
     default:

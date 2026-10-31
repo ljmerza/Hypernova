@@ -22,6 +22,37 @@
     <string name="check_no_lock">Set up a screen lock on this phone first: this step needs it.</string>
     <string name="check_failed">The fingerprint check didn’t open. Try again.</string>
 
+    <!-- The Always sheet, from the approval card's Always (IDEAS PA2, PA3). -->
+    <string name="always_rule">Rule</string>
+    <string name="always_rules">Rules</string>
+    <string name="always_where">Where</string>
+    <string name="always_suggested">Claude Code’s</string>
+    <string name="always_bad_rule">Write Tool or Tool(pattern), such as Bash(npm test:*).</string>
+    <string name="always_whole_tool">%1$s with no pattern allows all of it, whatever it runs.</string>
+    <string name="always_scope_session">This session</string>
+    <string name="always_scope_project">This project</string>
+    <string name="always_scope_everywhere">Everywhere</string>
+    <string name="always_scope_session_body">Until this session ends. Nothing is saved.</string>
+    <string name="always_scope_project_body">Saved in this project’s .claude/settings.local.json, which stays out of git.</string>
+    <string name="always_scope_everywhere_body">Saved in your Claude Code settings (~/.claude/settings.json), for every project.</string>
+    <string name="always_save">Always allow</string>
+    <string name="always_check_session">%1$s, for this session</string>
+    <string name="always_check_project">%1$s, in this project</string>
+    <string name="always_check_everywhere">%1$s, everywhere</string>
+
+    <!-- Allow these N, in the session sheet's Permissions tab (IDEAS PA6). -->
+    <string name="several_seam">Asks waiting</string>
+    <plurals name="several_allow">
+        <item quantity="one">Allow this one</item>
+        <item quantity="other">Allow these %d</item>
+    </plurals>
+    <plurals name="several_q">
+        <item quantity="one">Allow this command?</item>
+        <item quantity="other">Allow these %d commands?</item>
+    </plurals>
+    <string name="several_body">Each one is allowed as if you tapped Allow on it. To deny one, answer it in the chat.</string>
+    <string name="several_more">Questions and plans wait for their own answer in the chat.</string>
+
     <!-- The Mac away. -->
     <string name="hint_mac_away">Your Mac isn’t reachable right now</string>
     <string name="waiting_mac_title">Waiting for your Mac</string>

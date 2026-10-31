@@ -206,7 +206,8 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
         slot(DemoAutomations.SESSION_TESTS).value = listOf(
             Item.User(key("u"), res.getString(R.string.au_t_plugged_prompt)),
             Item.Tool(key("t"), "Read", "package.json"),
-            Item.Approval(key("ap"), "Bash", "npm test", "Run the project's tests"),
+            // Always opens the Always sheet in the demo too: Claude Code's rule, for this project.
+            Item.Approval(key("ap"), "Bash", "npm test", "Run the project's tests", alwaysRules = listOf("Bash(npm test)"), alwaysScope = "project"),
         )
         slot(DemoAutomations.SESSION_PRS).value = listOf(
             Item.User(key("u"), res.getString(R.string.au_t_prs_prompt)),
@@ -330,7 +331,7 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
             sessionId, item.key,
             when (answer) {
                 Answer.Allow -> Resolution.Allowed
-                Answer.Always -> Resolution.AllowedAlways
+                Answer.Always, is Answer.AlwaysAs -> Resolution.AllowedAlways
                 Answer.Session -> Resolution.AllowedSession
                 Answer.Deny -> Resolution.Denied
                 Answer.ApprovePlan -> Resolution.PlanApproved

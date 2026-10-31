@@ -161,6 +161,8 @@ internal fun SessionSheet(
                     SheetTab.Permissions -> {
                         SheetSeam(stringResource(R.string.session_sheet_permissions))
                         PermissionsPart(hub, session, canChangeMode(hub, session), toBlocked, onRetried, onEmptied, onBrought = { toBlocked = false })
+                        // Several asks waiting: allowed together, each listed (AllowSeveral.kt).
+                        AllowSeveralPart(hub, session)
                         // Claude Code's rules in effect, folded (RulesPart.kt); Codex has none.
                         if (!session.codex) RulesPart(hub, session)
                     }

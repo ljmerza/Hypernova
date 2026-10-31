@@ -283,6 +283,8 @@ object Items {
             agent = a?.agentLabel ?: a?.agentId?.let { "" },
             change = a?.let { change(it.toolName, it.input, it.edits) },
             autoDeny = a?.autoDeny ?: false,
+            alwaysRules = a?.alwaysRules.orEmpty(),
+            alwaysScope = a?.alwaysScope,
         )
     }
 
