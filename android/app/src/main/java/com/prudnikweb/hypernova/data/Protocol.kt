@@ -212,8 +212,11 @@ data class TermMenu(
     @Immutable data class Steps(val labels: List<String>, val answered: List<Boolean>)
     @Immutable data class Option(val label: String, val detail: String?, val current: Boolean)
     @Immutable data class Alt(val enter: String, val key: String, val label: String)
-    /** [tool]: the dialog's title ("Bash command"); [command]: what it would run, as the screen shows it. */
-    @Immutable data class Permission(val tool: String?, val command: String?, val question: String)
+    /**
+     * [tool]: the dialog's title ("Bash command"); [command]: what it would run, as the screen shows
+     * it; [why]: why it asked ([Why]), null when neither the dialog nor the daemon says.
+     */
+    @Immutable data class Permission(val tool: String?, val command: String?, val question: String, val why: Why? = null)
 }
 
 @Immutable
@@ -426,6 +429,8 @@ data class WApproval(
      */
     val alwaysRules: List<String> = emptyList(),
     val alwaysScope: String? = null,
+    /** Why it asked ([Why]); null from an older Mac, for a question or a plan. */
+    val why: Why? = null,
 )
 
 @Immutable
@@ -793,7 +798,7 @@ object Wire {
             },
             // An older daemon sends none: the menu card as before.
             permission = o.obj("permission")?.let { p ->
-                p.str("question")?.let { q -> TermMenu.Permission(p.str("tool"), p.str("command")?.takeIf { it.isNotBlank() }, q) }
+                p.str("question")?.let { q -> TermMenu.Permission(p.str("tool"), p.str("command")?.takeIf { it.isNotBlank() }, q, Why.wire(p.obj("why"))) }
             },
             steps = o.obj("steps")?.let { st ->
                 val labels = st.arr("labels").strings()
@@ -896,6 +901,7 @@ object Wire {
         autoDeny = o.bool("autoDeny"),
         alwaysRules = o.optJSONArray("alwaysRules")?.let { a -> (0 until a.length()).mapNotNull { i -> a.opt(i) as? String }.filter { it.isNotBlank() } }.orEmpty(),
         alwaysScope = o.str("alwaysScope")?.takeIf { it.isNotBlank() },
+        why = Why.wire(o.obj("why")),
     )
 
     private fun window(o: JSONObject?): Window? {

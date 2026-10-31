@@ -2458,3 +2458,28 @@ decided above ("Home cards: what it's doing, for how long, and swipes", 3).
    past the touch slop). TalkBack lists each way's action on the card.
 6. **Kept on the phone** (`ui/home/CardSwipePref.kt`, the app's `hypernova_ui` preferences), applied
    to Home at once. Nothing on the session's chat screen.
+
+## Why it asked (2026-10-31)
+
+IDEAS PA7: say what made Claude Code ask, the case the owner hits being an ask rule over auto mode
+("Ask rule Bash(python:*) overrides auto mode for this command").
+
+1. **Claude Code's words first, Hypernova's reading second, and said which.** Its terminal dialog
+   prints the reason (an ask rule, a permission rule, a hook, a path outside the working folders, a
+   safety check); the SDK hands it to a session the daemon runs; the PermissionRequest hook carries
+   none (checked in Claude Code 2.1.316), only a suggestion to add a folder when the call reaches
+   outside the project's. Otherwise the daemon reads the rules in effect itself: a matching ask
+   rule, a file outside the folders, an allow rule that matches anyway (one of Claude Code's own
+   checks, most likely), plan mode, or no allow rule. That reading ends "· Hypernova's reading" on
+   the phone: it is simplified and may differ from Claude Code's (docs/PROTOCOL.md, "Why it asked").
+2. **One line, the rule in mono**, in two places off the chat screen:
+   - **The Always sheet**, under the command: when he is about to save an allow rule, an ask rule
+     behind the ask matters most (an allow rule doesn't beat it: the next one asks again).
+   - **The session sheet's Permissions tab**, next to the rules in effect it comes from: under each
+     command of "Asks waiting" when two or more wait, else a small "Why it asked" part for the one
+     waiting ask and for Claude Code's own dialog in the terminal (whose card has no Always sheet).
+     Nothing shows when nothing waits.
+3. **Nothing new on the chat screen or Home.** The approval card, the terminal dialog's card (which
+   already shows the dialog's own lines) and the Home card are as they were.
+4. **Rules only leave the daemon**, as for the rules in effect: a rule string, never a settings
+   file's other keys. A deny rule isn't looked for (one that matched would have refused the call).

@@ -645,7 +645,7 @@ test('the finished rule: agents at work, a queue, an approval or a block keep it
 test('needs you: once per approval; an agent’s only if it still waits after 10 s; a terminal menu', async () => {
   const { w, e } = setup()
   const a = e.create({ name: 'Ping me', enabled: true, trigger: { kind: 'session', event: 'needs_you', projectPath: null, from: 'any' }, action: { kind: 'notify', text: '{session}: {ask}' } })
-  const ap = (id: string, agentId: string | null): Approval => ({ id, sessionId: 's1', createdAt: w.now, expiresAt: w.now + 10 * MIN, autoDeny: false, kind: 'tool', toolName: 'Bash', summary: 'Bash: git push origin main', input: {}, reason: null, canAlways: true, alwaysRules: [], alwaysScope: null, canSession: false, questions: null, plan: null, agentId, agentLabel: agentId ? 'Review' : null })
+  const ap = (id: string, agentId: string | null): Approval => ({ id, sessionId: 's1', createdAt: w.now, expiresAt: w.now + 10 * MIN, autoDeny: false, kind: 'tool', toolName: 'Bash', summary: 'Bash: git push origin main', input: {}, reason: null, canAlways: true, alwaysRules: [], alwaysScope: null, why: null, canSession: false, questions: null, plan: null, agentId, agentLabel: agentId ? 'Review' : null })
   w.sessions.set('s1', newSession('s1'))
   const main = ap('ap1', null)
   w.approvals = [main]

@@ -9,6 +9,7 @@ import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CLAUDE_DIR, SUPPORT } from '../util.ts'
+import { whyFromDialog, type Why } from '../why.ts'
 
 export const DATA = 1
 export const MSG = 2
@@ -248,9 +249,11 @@ function stepsOf(line: string): Steps | null {
  * auto mode, a hook that handed it back): its question ("Do you want to proceed?") last above
  * options that start with Yes and have a No. [tool] is the dialog's title ("Bash command", "Edit
  * file"); [command] what it would run or change, between its dashed rules, the "│ " margin taken
- * off and lines the screen wrapped joined again (null when it shows none).
+ * off and lines the screen wrapped joined again (null when it shows none). [why]: the reason it
+ * prints over the question ("Ask rule Bash(python:*) overrides auto mode for this command."), as
+ * why.ts reads it; null when it prints none (terms.ts may fill in Hypernova's reading).
  */
-export type Permission = { tool: string | null; command: string | null; question: string }
+export type Permission = { tool: string | null; command: string | null; question: string; why: Why | null }
 /** The question over a permission dialog's options. */
 const ASKS = /^Do you want to\b.*\?$/
 const MARKS = ' ❯›↓↑'
@@ -384,12 +387,14 @@ export function menuOf(lines: string[]): Menu | null {
   let permission: Permission | null = null
   if (question && ASKS.test(question) && /^yes\b/i.test(options[0]!.label) && options.some((o) => /^no\b/i.test(o.label))) {
     const block = commandBlock(region, width)
-    permission = { tool: title === question ? null : title, command: block?.text ?? null, question }
+    permission = { tool: title === question ? null : title, command: block?.text ?? null, question, why: null }
     // What it would run is the command, not the body.
     if (block) {
       head = paragraphs([...region.slice(0, block.from), ...region.slice(block.to + 1)], width)
       if (title !== null && head[0] === title) head.shift()
     }
+    // Its reason is printed under the command (all of the body without one).
+    permission.why = whyFromDialog(block ? paragraphs(region.slice(block.to + 1), width) : head)
   }
   // A permission dialog's id names its command too: Allow on the phone never answers the next one.
   const id = createHash('sha1')

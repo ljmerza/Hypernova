@@ -1230,7 +1230,7 @@ test('a session trigger’s “after”: needs_you only, 1 to 120 minutes; absen
 test('a session trigger’s “after”: it fires only if the session still needs you then; answered meanwhile, never', async () => {
   const { w, e } = setup()
   const a = e.create(base({ trigger: { kind: 'session', event: 'needs_you', projectPath: null, from: 'any', after: 10 }, steps: [{ kind: 'notify', text: '{session} still waits: {ask}' }] }))
-  const ap = (id: string): Approval => ({ id, sessionId: 's1', createdAt: w.now, expiresAt: w.now + 10 * MIN, autoDeny: false, kind: 'tool', toolName: 'Bash', summary: 'Bash: git push', input: {}, reason: null, canAlways: true, alwaysRules: [], alwaysScope: null, canSession: false, questions: null, plan: null, agentId: null, agentLabel: null })
+  const ap = (id: string): Approval => ({ id, sessionId: 's1', createdAt: w.now, expiresAt: w.now + 10 * MIN, autoDeny: false, kind: 'tool', toolName: 'Bash', summary: 'Bash: git push', input: {}, reason: null, canAlways: true, alwaysRules: [], alwaysScope: null, why: null, canSession: false, questions: null, plan: null, agentId: null, agentLabel: null })
   w.sessions.set('s1', newSession('s1'))
   const runs = () => e.runsPage(a.id, null, 10).length
   // Answered after 4 minutes: nothing, then or later.

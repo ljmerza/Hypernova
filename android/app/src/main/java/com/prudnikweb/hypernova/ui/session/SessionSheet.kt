@@ -163,6 +163,8 @@ internal fun SessionSheet(
                     SheetTab.Permissions -> {
                         SheetSeam(stringResource(R.string.session_sheet_permissions))
                         PermissionsPart(hub, session, canChangeMode(session), toBlocked, onRetried, onEmptied, onBrought = { toBlocked = false })
+                        // Why the waiting ask asked (WhyAsked.kt); with several, each says it under "Asks waiting".
+                        if (!session.codex) WhyAskedPart(hub, session)
                         // Several asks waiting: allowed together, each listed (AllowSeveral.kt).
                         AllowSeveralPart(hub, session)
                         // Claude Code's rules in effect, folded (RulesPart.kt); Codex has none.
