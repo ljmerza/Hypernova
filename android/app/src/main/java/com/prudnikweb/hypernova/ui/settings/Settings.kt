@@ -26,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +39,7 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Confirm
 import com.prudnikweb.hypernova.data.HubViewModel
 import com.prudnikweb.hypernova.data.LinkState
+import com.prudnikweb.hypernova.data.LiveHub
 import com.prudnikweb.hypernova.data.MacBattery
 import com.prudnikweb.hypernova.data.Route
 import com.prudnikweb.hypernova.ui.LocalConfirm
@@ -127,35 +130,41 @@ private suspend fun scrollToKey(list: androidx.compose.foundation.lazy.LazyListS
     }
 }
 
-/** The Settings tab: the Mac, providers, the testing checklist, versions. */
+/**
+ * The Settings tab: the Mac, providers, the testing checklist, versions. Which parts show, and for
+ * which server, is SettingsPlan's: with "All servers", each server's own parts once per server under
+ * its name, each bound to that server's hub, then what this phone keeps under "This phone".
+ */
 @Composable
 fun SettingsTab(vm: HubViewModel, top: Dp) {
     val haze = LocalHaze.current
-    val opener = LocalOpener.current
-    val toast = LocalToast.current
-    val confirm = LocalConfirm.current
-    val askNotifications = com.prudnikweb.hypernova.ui.LocalAskNotifications.current
     val res = LocalContext.current.resources
-    // All servers (owner, 2026-10-31): only what this phone keeps shows; one server's settings need it picked.
+    // All servers (owner, 2026-10-31): nothing here acts on the server picked last; each server's settings are its own block.
     val allMode = vm.allServers
-    val scope = rememberCoroutineScope()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val live = vm.live
     val pairing = vm.pairing
     val hub = vm.hub
-    var checklistBusy by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val toast = LocalToast.current
+    val confirm = LocalConfirm.current
     var testing by remember { mutableStateOf(TestingTools.unlocked(context)) }
-    var taps by remember { mutableStateOf(0) }
     val list = androidx.compose.foundation.lazy.rememberLazyListState()
 
-    // Another part was asked for (SettingsJump: "Turn on in Settings"): scrolled to, once.
+    // The servers shown: every paired one with All servers (in the order they were paired), else the one on screen.
+    val every = if (allMode) vm.everyHub else emptyList()
+    val hubs: Map<String, LiveHub> = if (allMode) every.associate { it.first.id to it.second } else live?.let { mapOf(it.serverId to it) }.orEmpty()
+    val facts = if (allMode) every.map { (s, h) -> serverFacts(h, s.state) } else listOfNotNull(live?.let { serverFacts(it, it.link.state) })
+    val parts = SettingsPlan.parts(allMode, facts, BuildConfig.DEBUG || testing)
+
+    // Another part was asked for (SettingsJump: "Turn on in Settings"): scrolled to, once. With All
+    // servers, the part of the server it was asked on.
     val jumpAsked = SettingsJump.asked
     LaunchedEffect(jumpAsked, hub != null) {
         val key = SettingsJump.wanted() ?: return@LaunchedEffect
         if (hub == null) return@LaunchedEffect
         try {
-            scrollToKey(list, key)
+            scrollToKey(list, if (allMode) SettingsPlan.keyOf(key, SettingsJump.server ?: live?.serverId.orEmpty(), true) else key)
         } finally {
             if (SettingsJump.asked == jumpAsked) SettingsJump.shown()
         }
@@ -167,215 +176,345 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
         contentPadding = PaddingValues(top = top + 84.dp, bottom = bottom + 120.dp, start = 16.dp, end = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (!allMode) item(key = "mac") {
-            Seam(stringResource(R.string.mac), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
-            GlassCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    if (pairing == null || live == null) {
-                        HText(stringResource(R.string.not_paired), style = Type.heading, color = HN.ink)
+        for ((index, part) in parts.withIndex()) item(key = part.key) {
+            when (part) {
+                is SettingsPlan.Server -> {
+                    // Forget asks first, naming the server; with All servers it forgets that one, not the one picked.
+                    fun askForget(name: String, server: String?) = confirm(
+                        Confirm(
+                            title = res.getString(R.string.forget_q, name),
+                            body = res.getString(R.string.forget_body),
+                            action = res.getString(R.string.forget),
+                            danger = true,
+                        ) {
+                            vm.forget(server) { reached -> if (!reached) toast(res.getString(R.string.forgot_offline)) }
+                        },
+                    )
+                    if (allMode) {
+                        // A server's block starts with its name and link.
+                        val h = hubs[part.server] ?: return@item
+                        val status = every.firstOrNull { it.first.id == part.server }?.first
+                        val name = status?.name ?: h.mac.name
+                        GroupHeading(name, status?.state ?: h.link.state, first = index == 0)
+                        ServerCard(h, h.pairing.baseUrl, all = true, waiting = part.waiting, onConnectionLog = {}, onForget = { askForget(name, part.server) })
                     } else {
-                        val link = live.link
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            HText(live.mac.name, style = Type.heading, color = HN.ink, maxLines = 1, modifier = Modifier.weight(1f))
-                            Spacer(Modifier.width(10.dp))
-                            // The Mac's name is the heading, so the chip says the state in a word.
-                            ConnectionChip(link.state)
-                        }
-                        // Stay awake in one line under the name ("Awake with the lid closed" and the battery drawn), while
-                        // linked; a Linux server has no Stay awake (Mac.FEATURE_AWAKE).
-                        val awake = live.mac.awake?.takeIf { link.state == LinkState.Connected && live.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_AWAKE) }
-                        if (awake != null) {
-                            Spacer(Modifier.height(4.dp))
-                            AwakeStatus(awake, live.mac.battery)
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        // The route in use, drawn: Local or Remote (and its address below).
-                        if (link.state == LinkState.Connected && routeWord(live.mac.via) != null) {
-                            com.prudnikweb.hypernova.ui.onboarding.RouteRow(stringResource(R.string.mac_route), live.mac.via)
-                        }
-                        InfoRow(stringResource(R.string.mac_address), live.mac.url ?: pairing.baseUrl)
-                        // A MacBook's charge; a desktop Mac has no battery and no row. Only while
-                        // linked: one that can't be reached may have been plugged in or run down since.
-                        val battery = live.mac.battery?.takeIf { link.state == LinkState.Connected }
-                        if (battery != null) BatteryRow(battery)
-                        if (awake != null) StayAwakeBlock(live, awake, live.mac.battery)
-                        if (link.state == LinkState.Offline || link.state == LinkState.Reconnecting) {
-                            Spacer(Modifier.height(6.dp))
-                            HText(com.prudnikweb.hypernova.data.linkProblemText(res, link), style = Type.small, color = HN.inkMuted)
-                            link.tried?.let {
-                                Spacer(Modifier.height(10.dp))
-                                RouteTriedRow(it, showBase = live.mac.via == com.prudnikweb.hypernova.data.Mac.VIA_REMOTE)
-                            }
-                            Spacer(Modifier.height(12.dp))
-                            Pill(stringResource(R.string.retry_now), live::retry, kind = PillKind.Outline, height = 44.dp)
-                        }
-                        // What the app tried to reach the Mac, step by step (data/ConnLog.kt), in every state.
-                        Spacer(Modifier.height(8.dp))
-                        Hairline(Modifier.fillMaxWidth())
-                        NavRow(stringResource(R.string.connlog_title), stringResource(R.string.connlog_desc), { vm.nav.push(Route.ConnectionLog) })
-                        Spacer(Modifier.height(14.dp))
-                        Pill(
-                            stringResource(R.string.forget_mac),
-                            {
-                                confirm(
-                                    Confirm(
-                                        title = res.getString(R.string.forget_q, live.mac.name),
-                                        body = res.getString(R.string.forget_body),
-                                        action = res.getString(R.string.forget),
-                                        danger = true,
-                                    ) {
-                                        vm.forget { reached -> if (!reached) toast(res.getString(R.string.forgot_offline)) }
-                                    },
-                                )
-                            },
-                            kind = PillKind.Danger, height = 44.dp,
+                        Seam(stringResource(R.string.mac), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+                        ServerCard(
+                            live?.takeIf { pairing != null }, pairing?.baseUrl, all = false, waiting = false,
+                            onConnectionLog = { vm.nav.push(Route.ConnectionLog) },
+                            onForget = { askForget(live?.mac?.name.orEmpty(), null) },
                         )
                     }
                 }
-            }
-        }
-        // A newer app is offered only in About's update row (owner, 2026-10-31: one place, with the versions).
-        if (hub != null) {
-            if (!allMode) item(key = "providers") {
-                Spacer(Modifier.height(10.dp))
-                Seam(stringResource(R.string.providers), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
-                GlassCard(Modifier.fillMaxWidth()) {
-                    NavRow(
-                        stringResource(R.string.providers),
-                        // Codex on the Mac too: the row names both agents; otherwise it reads as it always has.
-                        if (hub.codex != null) androidx.compose.ui.res.pluralStringResource(R.plurals.ag_settings_desc, hub.providers.size, hub.providers.size)
-                        else stringResource(R.string.providers_desc, hub.providers.size),
-                        { vm.nav.push(Route.Providers) }, Modifier.padding(horizontal = 16.dp),
-                    )
+                is SettingsPlan.Providers -> hubs[part.server]?.let { h ->
+                    // With All servers its screens are that server's (as a session's from Home), until Home is back.
+                    ProvidersCard(h) {
+                        if (allMode) vm.visit(part.server)
+                        vm.nav.push(Route.Providers)
+                    }
                 }
-            }
-            // Voice (VoiceSection.kt): the recognizer dictation uses, kept on this phone. Then Read aloud
-            // (ReadAloudSection.kt): only from a Mac that reads aloud this way.
-            item(key = "voice") {
-                VoiceRecognitionSection()
-                if (!allMode && hub.speech?.settings != null) ReadAloudSection(hub)
-            }
-            // Files: Browse outside projects (FilesSection below), from a Mac that has it.
-            if (!allMode && hub.mac.browseOutsideProjects != null) {
-                item(key = SettingsJump.FILES) {
+                // Voice (VoiceSection.kt): the recognizer dictation uses, kept on this phone. Then, with one
+                // server, Read aloud (ReadAloudSection.kt): only from a Mac that reads aloud this way.
+                is SettingsPlan.Voice -> {
+                    VoiceRecognitionSection()
+                    part.readAloud?.let(hubs::get)?.let { ReadAloudSection(it) }
+                }
+                // With All servers, each server's own Read aloud: its voices and speed.
+                is SettingsPlan.ReadAloud -> hubs[part.server]?.let { ReadAloudSection(it) }
+                // Files: Browse outside projects (FilesSection below), from a Mac that has it.
+                is SettingsPlan.Files -> hubs[part.server]?.let { h ->
                     Spacer(Modifier.height(10.dp))
-                    FilesSection(hub)
+                    FilesSection(h)
                 }
-            }
-        }
-        // Fork: New sessions, the mode they start in (NewSessionsSection below), kept on this phone.
-        item(key = "newSessions") {
-            Spacer(Modifier.height(10.dp))
-            NewSessionsSection()
-        }
-        // Fork: Display, the app's text size (DisplaySection below), kept on this phone.
-        item(key = "display") {
-            Spacer(Modifier.height(10.dp))
-            DisplaySection()
-        }
-        // Card swipes: what a swipe left and right on a Home card do (CardSwipeSection.kt), kept on this phone.
-        item(key = "cardSwipes") {
-            Spacer(Modifier.height(10.dp))
-            CardSwipeSection()
-        }
-        // Session top bar: what the chat's top bar shows, in what order (TopBarSection.kt), kept on this phone.
-        item(key = "topBar") {
-            Spacer(Modifier.height(10.dp))
-            TopBarSection()
-        }
-        // Typing: what the keyboard's Enter does in the boxes that send (TypingSection below), kept on this phone.
-        item(key = "typing") {
-            Spacer(Modifier.height(10.dp))
-            TypingSection()
-        }
-        if (live != null) {
-            item(key = "background") {
-                Spacer(Modifier.height(10.dp))
-                Seam(stringResource(R.string.notifications), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
-                GlassCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        ToggleRow(stringResource(R.string.bg_title), stringResource(R.string.bg_desc), vm.background, { vm.stayConnected(it) })
-                        // Re-checked every few seconds: the answer can change in system settings.
-                        val canPost by produceState(com.prudnikweb.hypernova.data.Core.notifier.canPost()) {
-                            while (true) { value = com.prudnikweb.hypernova.data.Core.notifier.canPost(); kotlinx.coroutines.delay(2000) }
-                        }
-                        if (!canPost) {
-                            Hairline(Modifier.fillMaxWidth())
-                            Spacer(Modifier.height(12.dp))
-                            HText(stringResource(R.string.notif_off), style = Type.small, color = HN.amber)
-                            Spacer(Modifier.height(10.dp))
-                            Pill(stringResource(R.string.notif_allow), askNotifications, kind = PillKind.Outline, height = 44.dp)
-                            Spacer(Modifier.height(14.dp))
-                        }
-                        // Android may stop the background connection to save battery: one line and the way to
-                        // allow it (P8), while it's on and the app isn't exempt.
-                        if (vm.background) BatteryExemption()
+                // The owner's own test list: in debug builds, or after seven taps on the app's build (P19).
+                is SettingsPlan.Checklist -> hubs[part.server]?.let { ChecklistCard(it) }
+                SettingsPlan.PhoneHeading -> GroupHeading(stringResource(R.string.st_all_phone), null, first = index == 0)
+                // The connection log is the phone's, every server's lines in it: once, with All servers.
+                SettingsPlan.ConnectionLog -> {
+                    Spacer(Modifier.height(10.dp))
+                    Seam(stringResource(R.string.connlog_title), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+                    GlassCard(Modifier.fillMaxWidth()) {
+                        NavRow(stringResource(R.string.connlog_title), stringResource(R.string.connlog_desc), { vm.nav.push(Route.ConnectionLog) }, Modifier.padding(horizontal = 16.dp))
                     }
                 }
-            }
-        }
-        // The owner's own test list: in debug builds, or after seven taps on the app's build (P19).
-        if (!allMode && live != null && (BuildConfig.DEBUG || testing)) {
-            item(key = "qa") {
-                Spacer(Modifier.height(10.dp))
-                Seam(stringResource(R.string.testing_checklist), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
-                GlassCard(Modifier.fillMaxWidth()) {
-                    NavRow(
-                        stringResource(R.string.testing_checklist), stringResource(R.string.checklist_desc),
-                        {
-                            if (!checklistBusy) {
-                                checklistBusy = true
-                                scope.launch {
-                                    live.checklist()
-                                        .onSuccess { opener.web(it, res.getString(R.string.testing_checklist)) }
-                                        .onFailure { toast(it.message.orEmpty()) }
-                                    checklistBusy = false
-                                }
-                            }
-                        },
-                        Modifier.padding(horizontal = 16.dp),
-                    )
+                // Fork: New sessions, the mode they start in (NewSessionsSection below), kept on this phone.
+                SettingsPlan.NewSessions -> {
+                    Spacer(Modifier.height(10.dp))
+                    NewSessionsSection()
                 }
-            }
-        }
-        item(key = "about") {
-            Spacer(Modifier.height(10.dp))
-            Seam(stringResource(R.string.about), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
-            GlassCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                    val unknown = stringResource(R.string.unknown)
-                    InfoRow(
-                        stringResource(R.string.about_app), stringResource(R.string.about_app_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                        Modifier.clickable(remember { MutableInteractionSource() }, indication = null) {
-                            if (testing || BuildConfig.DEBUG) return@clickable
-                            taps++
-                            if (taps >= 7) {
-                                testing = true
-                                TestingTools.unlock(context)
-                                toast(res.getString(R.string.st_checklist_unlocked))
-                            }
-                        },
+                // Fork: Display, the app's text size (DisplaySection below), kept on this phone.
+                SettingsPlan.Display -> {
+                    Spacer(Modifier.height(10.dp))
+                    DisplaySection()
+                }
+                // Card swipes: what a swipe left and right on a Home card do (CardSwipeSection.kt), kept on this phone.
+                SettingsPlan.CardSwipes -> {
+                    Spacer(Modifier.height(10.dp))
+                    CardSwipeSection()
+                }
+                // Session top bar: what the chat's top bar shows, in what order (TopBarSection.kt), kept on this phone.
+                SettingsPlan.TopBar -> {
+                    Spacer(Modifier.height(10.dp))
+                    TopBarSection()
+                }
+                // Typing: what the keyboard's Enter does in the boxes that send (TypingSection below), kept on this phone.
+                SettingsPlan.Typing -> {
+                    Spacer(Modifier.height(10.dp))
+                    TypingSection()
+                }
+                // Stay connected in the background: one setting for every server's link (Core.background).
+                SettingsPlan.Notifications -> NotificationsSection(vm)
+                SettingsPlan.About -> {
+                    // A newer app: with All servers, the newest any connected server offers (the one
+                    // picked first on a tie), downloaded from that server (AppUpdate.server); else the one on screen's.
+                    val offer = if (allMode) {
+                        com.prudnikweb.hypernova.data.AboutUpdate.newest(
+                            every.filter { it.first.state == LinkState.Connected }.sortedBy { it.second !== live }.map { it.second.appUpdate },
+                        )
+                    } else live?.appUpdate
+                    AboutSection(
+                        offer,
+                        // With All servers each server's versions are in its own card.
+                        versionsOf = live.takeIf { !allMode },
+                        testing = testing,
+                        onTestingUnlocked = { testing = true },
                     )
-                    // A newer app on the Mac: "Update available · 0.6.0" and Update, the banner's flow
-                    // (ui/update AboutUpdateRow); nothing when there's none.
-                    com.prudnikweb.hypernova.data.AboutUpdate.of(
-                        live?.appUpdate,
-                        com.prudnikweb.hypernova.data.AppUpdater.state,
-                        com.prudnikweb.hypernova.data.AppUpdater.target,
-                    )?.let { com.prudnikweb.hypernova.ui.update.AboutUpdateRow(it) }
-                    if (live != null) {
-                        InfoRow(stringResource(R.string.about_daemon), live.mac.daemonVersion ?: unknown)
-                        // Claude Code's version, or that it isn't installed (Codex leads then: data/AgentLead.kt).
-                        val claude = if (!com.prudnikweb.hypernova.data.AgentLead.claudeAvailable(live.claude)) stringResource(R.string.ag_about_not_installed)
-                        else live.claude?.version ?: live.mac.claudeVersion ?: unknown
-                        InfoRow(stringResource(R.string.about_claude), claude)
-                        // Codex's, only where it's installed.
-                        live.codex?.let { c -> InfoRow(stringResource(R.string.ag_about_codex), c.version ?: unknown) }
-                    }
                 }
             }
         }
     }
+}
+
+private fun serverFacts(h: LiveHub, link: LinkState) = SettingsPlan.ServerFacts(
+    id = h.serverId,
+    link = link,
+    readAloud = h.speech.settings != null,
+    files = h.mac.browseOutsideProjects != null,
+)
+
+/**
+ * With All servers, the heading over a server's block (its name and link) or over what this phone
+ * keeps ([state] null): one step above the sections' seams, so each block reads as one.
+ */
+@Composable
+private fun GroupHeading(text: String, state: LinkState?, first: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(top = if (first) 0.dp else 18.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HText(text, style = Type.title, color = HN.ink, maxLines = 1, modifier = Modifier.weight(1f).semantics { heading() })
+        if (state != null) {
+            Spacer(Modifier.width(10.dp))
+            ConnectionChip(state)
+        }
+    }
+}
+
+/**
+ * A server's card: its name and link, Stay awake and its battery, the route and address, Retry while
+ * it can't be reached, the connection log, Forget. [all]: in its block with All servers, under its
+ * name ([GroupHeading]): no name row, its versions here (About is the phone's then), no connection
+ * log (one for all, under This phone); [waiting]: it isn't connected, so its other settings are left
+ * out and one line says they come back (Retry and Forget stay).
+ */
+@Composable
+private fun ServerCard(
+    live: LiveHub?,
+    baseUrl: String?,
+    all: Boolean,
+    waiting: Boolean,
+    onConnectionLog: () -> Unit,
+    onForget: (() -> Unit)?,
+) {
+    val res = LocalContext.current.resources
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            if (baseUrl == null || live == null) {
+                HText(stringResource(R.string.not_paired), style = Type.heading, color = HN.ink)
+            } else {
+                val link = live.link
+                // Stay awake in one line under the name ("Awake with the lid closed" and the battery drawn), while
+                // linked; a Linux server has no Stay awake (Mac.FEATURE_AWAKE).
+                val awake = live.mac.awake?.takeIf { link.state == LinkState.Connected && live.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_AWAKE) }
+                if (!all) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        HText(live.mac.name, style = Type.heading, color = HN.ink, maxLines = 1, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(10.dp))
+                        // The Mac's name is the heading, so the chip says the state in a word.
+                        ConnectionChip(link.state)
+                    }
+                    if (awake != null) {
+                        Spacer(Modifier.height(4.dp))
+                        AwakeStatus(awake, live.mac.battery)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                } else if (awake != null) {
+                    AwakeStatus(awake, live.mac.battery)
+                    Spacer(Modifier.height(10.dp))
+                }
+                // The route in use, drawn: Local or Remote (and its address below).
+                if (link.state == LinkState.Connected && routeWord(live.mac.via) != null) {
+                    com.prudnikweb.hypernova.ui.onboarding.RouteRow(stringResource(R.string.mac_route), live.mac.via)
+                }
+                InfoRow(stringResource(R.string.mac_address), live.mac.url ?: baseUrl)
+                if (waiting) {
+                    Spacer(Modifier.height(6.dp))
+                    HText(stringResource(R.string.st_all_waiting), style = Type.small, color = HN.inkMuted)
+                }
+                if (all && link.state == LinkState.Connected) ServerVersions(live)
+                // A MacBook's charge; a desktop Mac has no battery and no row. Only while
+                // linked: one that can't be reached may have been plugged in or run down since.
+                val battery = live.mac.battery?.takeIf { link.state == LinkState.Connected }
+                if (battery != null) BatteryRow(battery)
+                if (awake != null) StayAwakeBlock(live, awake, live.mac.battery)
+                if (link.state == LinkState.Offline || link.state == LinkState.Reconnecting) {
+                    Spacer(Modifier.height(6.dp))
+                    HText(com.prudnikweb.hypernova.data.linkProblemText(res, link), style = Type.small, color = HN.inkMuted)
+                    link.tried?.let {
+                        Spacer(Modifier.height(10.dp))
+                        RouteTriedRow(it, showBase = live.mac.via == com.prudnikweb.hypernova.data.Mac.VIA_REMOTE)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Pill(stringResource(R.string.retry_now), live::retry, kind = PillKind.Outline, height = 44.dp)
+                }
+                if (!all) {
+                    // What the app tried to reach the Mac, step by step (data/ConnLog.kt), in every state.
+                    Spacer(Modifier.height(8.dp))
+                    Hairline(Modifier.fillMaxWidth())
+                    NavRow(stringResource(R.string.connlog_title), stringResource(R.string.connlog_desc), onConnectionLog)
+                }
+                if (onForget != null) {
+                    Spacer(Modifier.height(14.dp))
+                    Pill(stringResource(R.string.forget_mac), onForget, kind = PillKind.Danger, height = 44.dp)
+                }
+            }
+        }
+    }
+}
+
+/** Agents & providers: the row that opens [hub]'s list (Providers.kt). */
+@Composable
+private fun ProvidersCard(hub: com.prudnikweb.hypernova.data.Hub, onOpen: () -> Unit) {
+    Spacer(Modifier.height(10.dp))
+    Seam(stringResource(R.string.providers), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        NavRow(
+            stringResource(R.string.providers),
+            // Codex on the Mac too: the row names both agents; otherwise it reads as it always has.
+            if (hub.codex != null) androidx.compose.ui.res.pluralStringResource(R.plurals.ag_settings_desc, hub.providers.size, hub.providers.size)
+            else stringResource(R.string.providers_desc, hub.providers.size),
+            onOpen, Modifier.padding(horizontal = 16.dp),
+        )
+    }
+}
+
+/** The testing checklist of [hub]'s server, opened in the app (its own page on that server). */
+@Composable
+private fun ChecklistCard(hub: com.prudnikweb.hypernova.data.Hub) {
+    val opener = LocalOpener.current
+    val toast = LocalToast.current
+    val res = LocalContext.current.resources
+    val scope = rememberCoroutineScope()
+    var checklistBusy by remember { mutableStateOf(false) }
+    Spacer(Modifier.height(10.dp))
+    Seam(stringResource(R.string.testing_checklist), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        NavRow(
+            stringResource(R.string.testing_checklist), stringResource(R.string.checklist_desc),
+            {
+                if (!checklistBusy) {
+                    checklistBusy = true
+                    scope.launch {
+                        hub.checklist()
+                            .onSuccess { opener.web(it, res.getString(R.string.testing_checklist)) }
+                            .onFailure { toast(it.message.orEmpty()) }
+                        checklistBusy = false
+                    }
+                }
+            },
+            Modifier.padding(horizontal = 16.dp),
+        )
+    }
+}
+
+/** Notifications: Stay connected in the background (every server's link), the system's permission, the battery exemption. */
+@Composable
+private fun NotificationsSection(vm: HubViewModel) {
+    val askNotifications = com.prudnikweb.hypernova.ui.LocalAskNotifications.current
+    Spacer(Modifier.height(10.dp))
+    Seam(stringResource(R.string.notifications), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            ToggleRow(stringResource(R.string.bg_title), stringResource(R.string.bg_desc), vm.background, { vm.stayConnected(it) })
+            // Re-checked every few seconds: the answer can change in system settings.
+            val canPost by produceState(com.prudnikweb.hypernova.data.Core.notifier.canPost()) {
+                while (true) { value = com.prudnikweb.hypernova.data.Core.notifier.canPost(); kotlinx.coroutines.delay(2000) }
+            }
+            if (!canPost) {
+                Hairline(Modifier.fillMaxWidth())
+                Spacer(Modifier.height(12.dp))
+                HText(stringResource(R.string.notif_off), style = Type.small, color = HN.amber)
+                Spacer(Modifier.height(10.dp))
+                Pill(stringResource(R.string.notif_allow), askNotifications, kind = PillKind.Outline, height = 44.dp)
+                Spacer(Modifier.height(14.dp))
+            }
+            // Android may stop the background connection to save battery: one line and the way to
+            // allow it (P8), while it's on and the app isn't exempt.
+            if (vm.background) BatteryExemption()
+        }
+    }
+}
+
+/**
+ * About: the app's build (seven taps unlock the testing checklist), a newer app when [offer] is one,
+ * and the versions of [versionsOf]'s daemon, Claude Code and Codex (null with All servers: they're
+ * in each server's card).
+ */
+@Composable
+private fun AboutSection(offer: com.prudnikweb.hypernova.data.AppUpdate?, versionsOf: com.prudnikweb.hypernova.data.Hub?, testing: Boolean, onTestingUnlocked: () -> Unit) {
+    val context = LocalContext.current
+    val res = context.resources
+    val toast = LocalToast.current
+    var taps by remember { mutableStateOf(0) }
+    Spacer(Modifier.height(10.dp))
+    Seam(stringResource(R.string.about), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            InfoRow(
+                stringResource(R.string.about_app), stringResource(R.string.about_app_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                Modifier.clickable(remember { MutableInteractionSource() }, indication = null) {
+                    if (testing || BuildConfig.DEBUG) return@clickable
+                    taps++
+                    if (taps >= 7) {
+                        onTestingUnlocked()
+                        TestingTools.unlock(context)
+                        toast(res.getString(R.string.st_checklist_unlocked))
+                    }
+                },
+            )
+            // A newer app on the Mac: "Update available · 0.6.0" and Update, the banner's flow
+            // (ui/update AboutUpdateRow); nothing when there's none.
+            com.prudnikweb.hypernova.data.AboutUpdate.of(
+                offer,
+                com.prudnikweb.hypernova.data.AppUpdater.state,
+                com.prudnikweb.hypernova.data.AppUpdater.target,
+            )?.let { com.prudnikweb.hypernova.ui.update.AboutUpdateRow(it) }
+            if (versionsOf != null) ServerVersions(versionsOf)
+        }
+    }
+}
+
+/** A server's daemon, Claude Code (or that it isn't installed) and Codex (only where it's installed). */
+@Composable
+private fun ServerVersions(live: com.prudnikweb.hypernova.data.Hub) {
+    val unknown = stringResource(R.string.unknown)
+    InfoRow(stringResource(R.string.about_daemon), live.mac.daemonVersion ?: unknown)
+    // Claude Code's version, or that it isn't installed (Codex leads then: data/AgentLead.kt).
+    val claude = if (!com.prudnikweb.hypernova.data.AgentLead.claudeAvailable(live.claude)) stringResource(R.string.ag_about_not_installed)
+    else live.claude?.version ?: live.mac.claudeVersion ?: unknown
+    InfoRow(stringResource(R.string.about_claude), claude)
+    // Codex's, only where it's installed.
+    live.codex?.let { c -> InfoRow(stringResource(R.string.ag_about_codex), c.version ?: unknown) }
 }
 
 /** The testing checklist's switch on the phone: off for everyone but debug builds, until seven taps on the build. */

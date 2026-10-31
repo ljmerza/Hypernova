@@ -122,14 +122,16 @@ fun ReadAloudSection(hub: Hub) {
             Spacer(Modifier.height(4.dp))
             Hairline(Modifier.fillMaxWidth().padding(top = 8.dp))
             Spacer(Modifier.height(12.dp))
-            val testing = Speaker.now?.key == TEST_KEY
+            // Each server's own Test (with "All servers" every one has a Read aloud card): only its Stop shows.
+            val testKey = TEST_KEY + ((hub as? com.prudnikweb.hypernova.data.LiveHub)?.serverId?.let { ":$it" } ?: "")
+            val testing = Speaker.now?.key == testKey
             val sample = stringResource(R.string.read_aloud_sample)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Pill(
                     stringResource(if (testing) R.string.speaking_stop else R.string.read_aloud_test),
                     {
                         if (testing) Speaker.stop("phone")
-                        else scope.launch { speech.read(sample, null, TEST_KEY).onFailure { toast(it.message.orEmpty()) } }
+                        else scope.launch { speech.read(sample, null, testKey).onFailure { toast(it.message.orEmpty()) } }
                     },
                     kind = PillKind.Outline, height = 40.dp,
                 )

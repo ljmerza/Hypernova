@@ -143,7 +143,8 @@ object AppUpdater {
     }
 
     private fun download(app: Context) {
-        val pairing = Core.pairing
+        // From the computer that offers it (Settings' About with "All servers" offers the newest of any), else the one on screen.
+        val pairing = target?.server?.let { id -> Core.servers.firstOrNull { it.id == id }?.pairing } ?: Core.pairing
         if (pairing == null) {
             on(UpdateFlow.Event.Failed(UpdateFailure.Network))
             return

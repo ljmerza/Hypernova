@@ -319,9 +319,11 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
             automation = { nav.push(Route.AutomationEdit(it)) },
             connectionLog = { nav.push(Route.ConnectionLog) },
             settings = { key ->
+                // The server on screen as it's asked (a session's own, opened from "All servers"), before Home brings the one picked back.
+                val server = com.prudnikweb.hypernova.data.Core.activeId
                 sheet = false
                 nav.reset()
-                com.prudnikweb.hypernova.ui.settings.SettingsJump.show(key)
+                com.prudnikweb.hypernova.ui.settings.SettingsJump.show(key, server)
             },
             runAtReset = { project -> nav.push(Route.AutomationEdit(null, com.prudnikweb.hypernova.ui.automations.Templates.RESET, project = project)) },
         )

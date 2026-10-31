@@ -304,12 +304,13 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Forget this Mac (the one on screen) here and (if it can be reached) on the Mac too; only this
-     * one, even if the switcher shows another meanwhile. The next one paired comes on screen.
+     * Forget this Mac (the one on screen, or [server] when given: Settings' block for it with "All
+     * servers") here and (if it can be reached) on the Mac too; only this one, even if the switcher
+     * shows another meanwhile. The next one paired comes on screen.
      */
-    fun forget(onDone: (reachedMac: Boolean) -> Unit = {}) {
-        val l = live
-        val id = Core.activeId
+    fun forget(server: String? = null, onDone: (reachedMac: Boolean) -> Unit = {}) {
+        val id = server?.takeIf { s -> Core.servers.any { it.id == s } } ?: if (server == null) Core.activeId else return
+        val l = if (server == null) live else Core.everyHub.firstOrNull { it.first.id == id }?.second
         viewModelScope.launch {
             val ok = l?.forget()?.isSuccess ?: true
             if (id != null) Core.forget(id)

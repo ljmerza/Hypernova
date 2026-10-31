@@ -172,6 +172,14 @@ data class AboutUpdate(
 
     companion object {
         /**
+         * With "All servers", About's one offer: the newest app any of [offers] has (the connected
+         * servers', the one picked first), so it doesn't depend on which was picked; the first of
+         * the newest on a tie. Null: none offers one.
+         */
+        fun newest(offers: List<AppUpdate?>): AppUpdate? =
+            offers.filterNotNull().fold(null as AppUpdate?) { best, u -> if (best == null || u.versionCode > best.versionCode) u else best }
+
+        /**
          * The row for [offer] (null: no update, no row) with the flow's [state] when the flow is for
          * that version ([target]); a flow for another version (an older offer) counts as not started.
          */

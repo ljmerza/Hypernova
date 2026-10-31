@@ -63,8 +63,9 @@ class PutAway {
     }
 }
 
+/** A newer app a paired computer offers; [server]: which one (data/Servers.kt), so it's downloaded from there. Null: the one on screen. */
 @Immutable
-data class AppUpdate(val versionName: String, val versionCode: Int, val url: String)
+data class AppUpdate(val versionName: String, val versionCode: Int, val url: String, val server: String? = null)
 
 /** True the first time it's asked about this version (remembered on the phone), so an update is announced once. */
 fun updateNoticed(context: Context, versionCode: Int): Boolean {
