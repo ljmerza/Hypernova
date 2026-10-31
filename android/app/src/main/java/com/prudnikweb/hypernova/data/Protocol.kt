@@ -200,7 +200,14 @@ data class TermMenu(
     val cancel: Boolean,
     val alt: Alt?,
     val permission: Permission? = null,
+    /**
+     * AskUserQuestion's form with several questions in the terminal: each question's tab (its
+     * header as the screen shows it, and whether it has an answer), Submit the one after the last.
+     * Which is open isn't known. Null for any other menu, and from an older daemon.
+     */
+    val steps: Steps? = null,
 ) {
+    @Immutable data class Steps(val labels: List<String>, val answered: List<Boolean>)
     @Immutable data class Option(val label: String, val detail: String?, val current: Boolean)
     @Immutable data class Alt(val enter: String, val key: String, val label: String)
     /** [tool]: the dialog's title ("Bash command"); [command]: what it would run, as the screen shows it. */
@@ -775,6 +782,11 @@ object Wire {
             // An older daemon sends none: the menu card as before.
             permission = o.obj("permission")?.let { p ->
                 p.str("question")?.let { q -> TermMenu.Permission(p.str("tool"), p.str("command")?.takeIf { it.isNotBlank() }, q) }
+            },
+            steps = o.obj("steps")?.let { st ->
+                val labels = st.arr("labels").strings()
+                val answered = st.optJSONArray("answered")
+                if (labels.isEmpty()) null else TermMenu.Steps(labels, labels.indices.map { answered?.optBoolean(it) == true })
             },
         )
     }

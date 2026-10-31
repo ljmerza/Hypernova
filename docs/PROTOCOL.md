@@ -361,7 +361,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `PUT /v1/sessions/{id}/held/{heldId}`, `DELETE …` | Fork: `{text}` → `{session}`: a held prompt's new words (its files kept), or (DELETE) taken back, never sent. 400 `empty`; 404 `no_session`, `no_held` (sent or removed already); 409 `sending` (being typed right now). See Held prompts |
 | `POST /v1/attachments?name=<file name>` | the file's bytes (any Content-Type, max 30 MB) → `{attachment: Attachment}` (see Attachments) |
 | `POST /v1/sessions/{id}/interrupt` | `{}` → `{ok}` (Esc in a shared terminal) |
-| `POST /v1/sessions/{id}/menu` | `{menuId, choice: number, alt?: boolean}` or `{menuId, cancel: true}` → `{ok}`: answers `session.menu` in its shared terminal (arrow keys to the option, then Enter, or the footer's `alt.key`; `cancel` presses Esc). Claude Code's own permission dialog (`menu.permission`) is answered here too (see Approvals, "In the terminal"). 409 `menu_gone` (that menu isn't on screen any more), `menu_moved` (the cursor didn't reach the option), `no_terminal` |
+| `POST /v1/sessions/{id}/menu` | `{menuId, choice: number, alt?: boolean}` or `{menuId, cancel: true}` → `{ok}`: answers `session.menu` in its shared terminal (arrow keys to the option, then Enter, or the footer's `alt.key`; `cancel` presses Esc). Claude Code's own permission dialog (`menu.permission`) is answered here too (see Approvals, "In the terminal"). A question form with `menu.steps` also takes `{menuId, move: -1 \| 1}` (← or →: the question before or after) and `{menuId, step: number}` (straight to that tab, 0 the first question, `steps.labels.length` Submit: ← as many times as there are questions, then → `step` times, since which tab is open isn't on the plain screen); on "Type something." ↑ goes first, off the text box. 400 `bad_step`; 409 `menu_gone` (that menu isn't on screen any more), `menu_moved` (the cursor didn't reach the option; a `move` or `step` on a menu with no steps, or past Submit), `no_terminal` |
 | `GET /v1/commands?project=` | → `{commands: [{name, description, argumentHint, aliases: string[], builtin, terminal}]}`: the slash commands and skills Claude Code offers in that folder (its own, the owner's, the project's, plugins', MCP prompts), asked of an SDK process started there with hooks off and no prompt; cached 5 minutes per folder. Commands bound to a terminal on the Mac (vim, statusline, …), internal, removed and renamed ones are left out. `terminal`: one of Claude Code's own that opens a screen of its own in the terminal, which the phone can't work (/config, /permissions, /resume, /mcp, /status…; a list the daemon keeps by hand in `commands.ts`, since Claude Code's list doesn't say how a command draws); a numbered picker such as /model's isn't one (the phone answers it as `session.menu`). 409 when Claude Code isn't installed, `sdk_missing` without its SDK (see Claude Code's SDK) |
 | `POST /v1/sessions/{id}/btw`, `GET …` | `{question}` → `{aside: Aside}`; GET → `{aside: Aside \| null}`: a side question, Claude Code's `/btw`, and its answer (see Side questions) |
 | `GET /v1/sessions/{id}/permissions` | → `{permissions: {sources: RuleFile[], managedOnly}}`: Claude Code's permission rules for the session, read-only, highest precedence first, only the permissions lists of its settings files (see Rules in effect). 404 `no_session`; 409 `unsupported_for_agent` (Codex) |
@@ -613,6 +613,13 @@ Session = {
       tool: string | null,     // its title: "Bash command", "Edit file"
       command: string | null,  // what it would run or change, between its dashed rules, whole
       question: string         // "Do you want to proceed?"; options start with Yes and have a No
+    },
+    steps: null | {            // AskUserQuestion's form asking several questions (an ask handed back to the
+                               // terminal): its tab row "←  ☐ Versioning  ☒ First version  ✔ Submit  →",
+                               // not the title (the question under it is); absent from an older daemon
+      labels: string[],        // each question's header as the row shows it (cut with "…" when narrow)
+      answered: boolean[]      // ☒: it has an answer. Submit is the tab after the last; which is open
+                               // shows only in colour, so it isn't said
     }
   }
 }
@@ -677,7 +684,9 @@ ApprovalAnswer =
                               // where the rule goes and, edited, the rules (1 to 20, "Tool" or
                               // "Tool(pattern)", 2000 characters each); no rules: Claude Code's.
                               // No scope: Claude Code's suggestion as it is (see Approvals)
-  | {decision: "allow", answers: {[questionText]: string}}  // labels; multi-select joined by ", "
+  | {decision: "allow", answers: {[questionText]: string}}  // labels; multi-select joined by ", " (a label
+                              // with ", " or a quote in it JSON-quoted, as Claude Code joins them); the
+                              // phone sends one for every question (Claude Code would take fewer)
 
 Usage = { fiveHour: Window | null, sevenDay: Window | null,
           models: ModelWindow[],              // the weeks some models have of their own (Fable,

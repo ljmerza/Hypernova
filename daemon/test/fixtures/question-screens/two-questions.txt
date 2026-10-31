@@ -1,0 +1,18 @@
+● Before I set up releases, two choices.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ←  ☐ Versioning  ☐ First version  ✔ Submit  →
+
+Which versioning scheme should releases use?
+
+❯ 1. Semver
+     MAJOR.MINOR.PATCH, bumped from the commit types
+  2. CalVer
+     The year and month, like 2026.10
+  3. Build number
+     A counter the workflow bumps on each release
+  4. Type something.
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  5. Chat about this
+
+Enter to select · Tab/Arrow keys to navigate · Esc to cancel

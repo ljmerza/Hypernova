@@ -155,6 +155,11 @@ interface Hub {
      */
     suspend fun answerMenu(sessionId: String, menuId: String, choice: Int?, alt: Boolean = false): Result<Unit> = Result.failure(UnsupportedOperationException())
     /**
+     * Move between the questions of a question form in a session's terminal ([TermMenu.steps]):
+     * [move] -1 or 1 (← or →), or [step] straight to one (0 the first question, the last + 1 Submit).
+     */
+    suspend fun menuStep(sessionId: String, menuId: String, move: Int? = null, step: Int? = null): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /**
      * Change a session's permission mode (a shared terminal presses Shift+Tab until it shows).
      * Succeeds with true when it only starts with the session's next turn (Bypass while one runs).
      */

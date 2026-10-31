@@ -222,6 +222,26 @@ export type Menu = {
   alt: { enter: string; key: string; label: string } | null
   /** Claude Code's own permission dialog ([Permission]); null for any other menu. */
   permission: Permission | null
+  /** A question form with several questions (AskUserQuestion in the terminal): its tabs ([Steps]); null otherwise. */
+  steps: Steps | null
+}
+/**
+ * The tab row over AskUserQuestion's form when it asks several questions ("←  ☐ Versioning
+ * ☒ First version  ✔ Submit  →"): each question's header as the row shows it (cut with "…" when
+ * the screen is narrow) and whether it has an answer (☒). Submit is the tab after the last.
+ * Which tab is open shows only in colour, so it isn't known. ← and → move between them.
+ */
+export type Steps = { labels: string[]; answered: boolean[] }
+const TABS = /^\s*←\s+(.*?)\s*✔\s*Submit\s*→\s*$/
+function stepsOf(line: string): Steps | null {
+  const m = TABS.exec(line)
+  if (!m) return null
+  const parts = m[1]!
+    .split(/(?=[☐☒])/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (!parts.length || !parts.every((p) => /^[☐☒]/.test(p))) return null
+  return { labels: parts.map((p) => p.slice(1).trim()), answered: parts.map((p) => p[0] === '☒') }
 }
 /**
  * Claude Code's own permission dialog, the one it shows when no hook answered (an ask rule over
@@ -344,7 +364,12 @@ export function menuOf(lines: string[]): Menu | null {
   // 3"; a subagent's dialog says whose after the title, "Bash command · from the Explore agent"):
   // not the title's, and a row that full would read as one that wrapped into the next.
   const lead = lines.slice(top + 1, a).findIndex((l) => l.trim())
-  const region = lines.slice(top + 1, a).map((l, k) => (k === lead ? l.replace(/(\S)\s{2,}\d+ of \d+\s*$/, '$1') : l))
+  // A question form's tab row is its steps, not its title (the question under it is).
+  const tabRow = lines.slice(top + 1, a).findIndex((l) => stepsOf(l) !== null)
+  const steps = tabRow >= 0 ? stepsOf(lines[top + 1 + tabRow]!) : null
+  const region = lines
+    .slice(top + 1, a)
+    .map((l, k) => (k === tabRow ? '' : k === lead ? l.replace(/(\S)\s{2,}\d+ of \d+\s*$/, '$1') : l))
   let head = paragraphs(region, width)
   const title = head[0] && head[0].length <= 80 ? head.shift()! : null
   const options = es.map((e) => {
@@ -381,6 +406,7 @@ export function menuOf(lines: string[]): Menu | null {
     cancel: /\besc to (cancel|exit|close|go back|dismiss)/i.test(footer),
     alt: enter && key ? { enter, key: key[1]!, label: key[2]! } : null,
     permission,
+    steps,
   }
 }
 

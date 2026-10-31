@@ -422,14 +422,34 @@ export async function watchMenus(): Promise<void> {
 /**
  * Answer the menu on a shared terminal's screen the way a person would: arrow keys to the option
  * (checking where the cursor landed), then Enter or the footer's other key, or Esc to close it.
+ * A question form with several questions ([Menu.steps]) also moves between its tabs: [move] one
+ * back or on (← or →), or [step] straight to one (0 the first question, `steps.labels.length`
+ * Submit): which tab is open isn't on the plain screen, so ← as often as there are tabs (the
+ * first one stops it), then → [step] times.
  */
-export async function answerMenu(id: string, menuId: string, pick: { choice?: number; alt?: boolean; cancel?: boolean }): Promise<Typed> {
+export async function answerMenu(id: string, menuId: string, pick: { choice?: number; alt?: boolean; cancel?: boolean; move?: -1 | 1; step?: number }): Promise<Typed> {
   const read = async () => {
     const text = await screenOf(id)
     return text === null ? null : menuOf(text.split('\n'))
   }
   let menu = await read()
   if (!menu || menu.id !== menuId) return { ok: false, reason: 'menu_gone' }
+  if (pick.move !== undefined || pick.step !== undefined) {
+    const steps = menu.steps
+    if (!steps || (pick.step !== undefined && (pick.step < 0 || pick.step > steps.labels.length))) return { ok: false, reason: 'menu_moved' }
+    // On "Type something." the text box takes ← and → itself: up off it first.
+    if (/^type something/i.test(menu.options[menu.cursor]?.label ?? '')) {
+      pressKeys(id, '\x1b[A')
+      await sleep(35)
+    }
+    const keys = pick.step !== undefined ? [...Array<string>(steps.labels.length).fill('\x1b[D'), ...Array<string>(pick.step).fill('\x1b[C')] : [pick.move! < 0 ? '\x1b[D' : '\x1b[C']
+    for (const k of keys) {
+      pressKeys(id, k)
+      await sleep(35)
+    }
+    forgetMenu(id)
+    return { ok: true }
+  }
   let key = '\x1b'
   if (!pick.cancel) {
     const want = pick.choice ?? -1
@@ -451,12 +471,17 @@ export async function answerMenu(id: string, menuId: string, pick: { choice?: nu
     key = pick.alt && menu.alt ? menu.alt.key : '\r'
   }
   pressKeys(id, key)
+  forgetMenu(id)
+  return { ok: true }
+}
+
+/** The menu terminal [id] showed is answered: off its session until the next look. */
+function forgetMenu(id: string): void {
   const sid = listSessionRecs().find((r) => r.term?.id === id)?.id
   if (sid) {
     lastMenu.set(sid, null)
     upsertSession(sid, { menu: null })
   }
-  return { ok: true }
 }
 
 /** The holder's screen as plain text (null if it doesn't answer). */

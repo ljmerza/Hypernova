@@ -2012,6 +2012,13 @@ class LiveHub(
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
 
+    override suspend fun menuStep(sessionId: String, menuId: String, move: Int?, step: Int?): Result<Unit> = try {
+        val body = JSONObject().put("menuId", menuId)
+        if (step != null) body.put("step", step) else body.put("move", if ((move ?: 1) < 0) -1 else 1)
+        api.post("/v1/sessions/$sessionId/menu", body)
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
+
     override suspend fun extendAwake(): Result<Unit> = try {
         val r = api.post("/v1/mac/awake", JSONObject().put("extend", true))
         MacAwake.parse(r.obj("awake"))?.let { macAwake = it }

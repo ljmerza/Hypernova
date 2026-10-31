@@ -938,7 +938,11 @@ async function api(c: Ctx): Promise<void> {
       // An option of the menu its terminal shows (session.menu), or Esc.
       if (!tid) throw noTerm()
       const b = await readJsonBody(req)
-      const r = await answerMenu(tid, String(b.menuId ?? ''), { choice: Number.isInteger(b.choice) ? Number(b.choice) : undefined, alt: b.alt === true, cancel: b.cancel === true })
+      // A question form's tabs: one back or on (`move`), or straight to one (`step`).
+      const move = b.move === -1 || b.move === 1 ? (b.move as -1 | 1) : undefined
+      const step = Number.isInteger(b.step) && b.step >= 0 && b.step <= 20 ? Number(b.step) : undefined
+      if ((b.move !== undefined && move === undefined) || (b.step !== undefined && step === undefined)) throw new HttpError(400, 'bad_step', 'move is -1 or 1; step is a tab’s number from 0.')
+      const r = await answerMenu(tid, String(b.menuId ?? ''), { choice: Number.isInteger(b.choice) ? Number(b.choice) : undefined, alt: b.alt === true, cancel: b.cancel === true, move, step })
       if (!r.ok) {
         if (r.reason === 'menu_gone') throw new HttpError(409, 'menu_gone', 'That menu isn’t in the terminal any more.')
         throw new HttpError(409, 'menu_moved', 'The terminal didn’t take that answer. Open it to check.')
