@@ -177,7 +177,7 @@ latest.
 | NT1 | Mute a session or project | Silence a noisy one. | S | app |
 | NT2 | Quiet hours | Silent notifications at night; asks still wait, never denied. | S | app |
 | NT3 | Context alert | A notice when a session passes 85% context or auto-compacts. | S | both |
-| NT4 | Job died | A notice when a `claude agents` job ends with an error. | S | daemon |
+| NT4 | Job died ✓ built 2026-10-31 | A notice when a `claude agents` job ends with an error. | S | daemon |
 | NT5 | Long turn | Optional "working for 30 min" notice. | S | app |
 | NT6 | Quick Settings tile | In the 1.0 scope (DECISIONS, Sessions) but not built: a tile with the needs-you count, opening Home. | S | app |
 | NT7 | What changed from the notification | A "What changed" action on a finished notice. | S | app |
