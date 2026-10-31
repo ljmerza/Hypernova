@@ -60,10 +60,10 @@ internal enum class ArgHelper { Field, Effort, Model, Rename, Compact }
  */
 internal data class HelperReach(val effort: Boolean, val model: Boolean, val rename: Boolean) {
     companion object {
-        fun of(s: Session, changeable: Boolean, demo: Boolean): HelperReach = HelperReach(
+        fun of(s: Session, changeable: Boolean): HelperReach = HelperReach(
             effort = ClaudeEffort.shown(s) && ClaudeEffort.changeable(s, changeable),
             model = changeable && !s.codex,
-            rename = MenuOffer.of(s).rename && s.phase != Phase.Ended && (demo || terminalReach(s)),
+            rename = MenuOffer.of(s).rename && s.phase != Phase.Ended && terminalReach(s),
         )
     }
 }
@@ -136,16 +136,16 @@ internal fun commandSections(list: List<SlashCommand>, picks: CommandPicks, quer
 
 /**
  * A side question can go to [s]: Claude Code (not Codex), still open, in a shared terminal Hypernova
- * holds or a `claude agents` job (`claude attach`). The demo answers its own.
+ * holds or a `claude agents` job (`claude attach`).
  */
-internal fun asideReach(s: Session, demo: Boolean): Boolean =
-    s.phase != Phase.Ended && !s.codex && (demo || s.term != null || s.agentJob != null)
+internal fun asideReach(s: Session): Boolean =
+    s.phase != Phase.Ended && !s.codex && (s.term != null || s.agentJob != null)
 
 /**
  * A command can go to [s] from the tab: as [asideReach], or a session the Mac runs itself. A
  * command that opens a screen in the terminal ([SlashCommand.terminal]) needs a terminal to open.
  */
-internal fun commandReach(s: Session, demo: Boolean): Boolean = asideReach(s, demo) || (s.phase != Phase.Ended && !s.codex && s.origin == "hypernova")
+internal fun commandReach(s: Session): Boolean = asideReach(s) || (s.phase != Phase.Ended && !s.codex && s.origin == "hypernova")
 
 internal fun terminalReach(s: Session): Boolean = s.term != null || s.agentJob != null
 

@@ -371,7 +371,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                 // The subscription's trouble is Claude Code's: Codex goes by its own account.
                 if (stopped && !onCodex) {
                     // One line of why, and where it goes instead (or how to have somewhere to go).
-                    val why = whyLine(account, if (hub.isDemo) stringResource(R.string.your_mac) else hub.mac.name, opened)
+                    val why = whyLine(account, hub.mac.name, opened)
                     val onSubscription = provider == null || provider.builtIn
                     HText(
                         when {
@@ -391,11 +391,9 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
 
             // ─── The foot: attachments, the mic, Start ───
             Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (!hub.isDemo) {
-                    GlyphButton(Glyph.Image, stringResource(R.string.attach_photos), pickers.photos, color = HN.inkMuted)
-                    GlyphButton(Glyph.Camera, stringResource(R.string.attach_camera), pickers.camera, color = HN.inkMuted)
-                    GlyphButton(Glyph.File, stringResource(R.string.attach_files), pickers.files, color = HN.inkMuted)
-                }
+                GlyphButton(Glyph.Image, stringResource(R.string.attach_photos), pickers.photos, color = HN.inkMuted)
+                GlyphButton(Glyph.Camera, stringResource(R.string.attach_camera), pickers.camera, color = HN.inkMuted)
+                GlyphButton(Glyph.File, stringResource(R.string.attach_files), pickers.files, color = HN.inkMuted)
                 Spacer(Modifier.weight(1f))
                 if (voice.available || voice.listening) {
                     MicButton(voice, send = false, canSend = false)
@@ -502,7 +500,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                     com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
                         context, context.getString(R.string.check_bypass_title),
                         if (project == NEW_PROJECT) newName.trim() else project.trimEnd('/').substringAfterLast('/'),
-                        context.getString(R.string.check_no_lock), hub.isDemo,
+                        context.getString(R.string.check_no_lock),
                         onOk = { mode = m }, onFail = { msg -> if (msg != null) toast(msg) },
                     )
                 } else {
@@ -635,7 +633,7 @@ private fun providerTrail(p: Provider, account: Account, hub: Hub, now: Long): P
     val context = LocalContext.current
     if (p.builtIn) {
         if (!account.stopsNewSessions(now)) return null
-        return whyLine(account, if (hub.isDemo) stringResource(R.string.your_mac) else hub.mac.name, now) to true
+        return whyLine(account, hub.mac.name, now) to true
     }
     return ProviderWords.trail(context, p, now)
 }

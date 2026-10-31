@@ -360,7 +360,6 @@
     <string name="au_discard">Discard</string>
     <string name="au_keep_editing">Keep editing</string>
     <string name="au_unknown_note">This automation uses something this app doesn\'t know yet. Update the app on your phone to edit it.</string>
-    <string name="au_demo_note">In the demo, runs only pretend.</string>
 
     <!-- The daemon's refusals, in the app's words. -->
     <string name="au_err_name">Give it a name, up to 60 characters.</string>

@@ -97,7 +97,7 @@ object ReadState {
         private set
     private val marks = HashMap<String, ReadMarks>()
 
-    /** The server [hub] is: a paired computer's id; null for the demo, which keeps none. */
+    /** The server [hub] is: a paired computer's id; null for any other hub, which keeps none. */
     fun server(hub: Hub): String? = (hub as? LiveHub)?.serverId
 
     @Synchronized

@@ -78,14 +78,14 @@ const val COMPACT_AT = 85
  * request, not one per word. The last answer stays while a new one is on its way or fails.
  */
 @Composable
-internal fun rememberSessionUsage(hub: Hub, sessionId: String, key: String): SessionUsage? {
+internal fun rememberSessionUsage(sessionId: String, key: String): SessionUsage? {
     val k by rememberUpdatedState(key)
     val usage by produceState<SessionUsage?>(null, sessionId) {
         var first = true
         snapshotFlow { k }.collectLatest {
             if (!first) delay(1500)
             first = false
-            ChatRepo.usage(hub, sessionId).onSuccess { u -> value = u }
+            ChatRepo.usage(sessionId).onSuccess { u -> value = u }
         }
     }
     return usage
@@ -323,7 +323,7 @@ internal fun modelId(u: SessionUsage?, sessionModel: String, unknown: String): S
 @Composable
 internal fun UsageDetails(hub: Hub) {
     // The plan's per-model weeks below are read off /usage every 15 minutes: a fresh look now (data/UsageRefresh.kt).
-    LaunchedEffect(Unit) { com.prudnikweb.hypernova.data.UsageRefresh.ask(hub) }
+    LaunchedEffect(Unit) { com.prudnikweb.hypernova.data.UsageRefresh.ask() }
     val usage = hub.usage
     val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(usage.fiveHourResetAt, usage.sevenDayResetAt)
     val five = UsageProjection.fiveHour(usage, now)

@@ -87,13 +87,13 @@ private const val SERVER_RELEASES = "https://github.com/ljmerza/Hypernova/releas
 
 /**
  * Not paired yet: three short steps (install Hypernova on the server, run hypernova pair there, scan
- * the code or use its link), a paste fallback for the link, and a way to look around with demo data.
+ * the code or use its link) and a paste fallback for the link.
  * With [onClose] ("Add a server" from the switcher, others paired already): the same steps over the
- * app, titled for adding one, with Cancel where the demo was, and Back closes them. The bottom button
+ * app, titled for adding one, with Cancel at the bottom, and Back closes them. The bottom button
  * stays put above the navigation bar (and the keyboard) while the steps scroll.
  */
 @Composable
-fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Unit)? = null) {
+fun Onboarding(onPaste: (String) -> Unit, onClose: (() -> Unit)? = null) {
     if (onClose != null) BackHandler(onBack = onClose)
     val context = LocalContext.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -161,8 +161,8 @@ fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Un
             }
         }
     }
-    // Cancel (or the demo) never scrolls under the navigation bar: it sits above it, and above the
-    // keyboard while the link is typed in.
+    // Cancel never scrolls under the navigation bar: it sits above it, and above the keyboard while
+    // the link is typed in (with no Cancel, the steps still end above them).
     Box(
         Modifier
             .fillMaxWidth()
@@ -170,7 +170,6 @@ fun Onboarding(onPaste: (String) -> Unit, onDemo: () -> Unit, onClose: (() -> Un
             .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 12.dp),
     ) {
         if (onClose != null) Pill(stringResource(R.string.cancel), onClose, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
-        else Pill(stringResource(R.string.onb_demo), onDemo, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
     }
     }
     // Whatever scrolls under the status bar is blurred, like every other screen.
@@ -326,7 +325,7 @@ fun PairScreen(flow: PairFlow, onRetry: (PairLink) -> Unit, onClose: () -> Unit,
 
 /** The Mac answered 401: this phone's token is gone. */
 @Composable
-fun UnpairedScreen(macName: String, onPairAgain: () -> Unit, onDemo: () -> Unit) {
+fun UnpairedScreen(macName: String, onPairAgain: () -> Unit) {
     Box(Modifier.fillMaxSize().pointerBlock()) {
         StateScreen(
             mark = { StateMark(HN.danger, Glyph.Cross) },
@@ -336,7 +335,6 @@ fun UnpairedScreen(macName: String, onPairAgain: () -> Unit, onDemo: () -> Unit)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Pill(stringResource(R.string.unpaired_pair), onPairAgain, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 48.dp)
-                Pill(stringResource(R.string.onb_demo), onDemo, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
             }
         }
     }

@@ -46,26 +46,24 @@ import com.prudnikweb.hypernova.ui.theme.Type
 /** What Home's chip needs for the switcher: the paired computers (the active one first), and what a row does. */
 class ServerChoice(
     val servers: List<ServerStatus>,
-    val demo: Boolean,
     val onSwitch: (String) -> Unit,
     val onPair: () -> Unit,
 ) {
     /** The chip names the computer in every state once there are several. */
     val several: Boolean get() = servers.size > 1
     /** The chip's amber count: the other computers' sessions that need the owner. */
-    val elsewhere: Int get() = Servers.elsewhere(if (demo) servers.map { it.copy(active = false) } else servers)
+    val elsewhere: Int get() = Servers.elsewhere(servers)
 }
 
 /**
  * The Home chip's sheet (data/Servers.kt): each paired computer with its link (the connection
  * chip's word and moon) and how many of its sessions need the owner, the one on screen ticked; a tap
- * on another shows it. [demo]: the demo is on screen, ticked above them. The last row pairs another
+ * on another shows it. The last row pairs another
  * computer without forgetting these. It opens with one computer too, for that row.
  */
 @Composable
 internal fun ServerSwitcher(
     servers: List<ServerStatus>,
-    demo: Boolean,
     onSwitch: (String) -> Unit,
     onPair: () -> Unit,
     onDismiss: () -> Unit,
@@ -73,9 +71,8 @@ internal fun ServerSwitcher(
     GlassSheet(stringResource(R.string.servers_title), onDismiss) {
         HText(stringResource(R.string.servers_title).uppercase(), style = Type.label, color = HN.inkDim)
         Spacer(Modifier.height(8.dp))
-        if (demo) ServerRow(stringResource(R.string.servers_demo), LinkState.Demo, needsYou = 0, ticked = true) { onDismiss() }
         for (s in servers) {
-            ServerRow(s.name, s.state, s.needsYou, ticked = s.active && !demo) {
+            ServerRow(s.name, s.state, s.needsYou, ticked = s.active) {
                 onSwitch(s.id)
                 onDismiss()
             }
@@ -108,11 +105,9 @@ private fun ServerRow(name: String, state: LinkState, needsYou: Int, ticked: Boo
             Spacer(Modifier.width(8.dp))
             StatusChip(pluralStringResource(R.plurals.notif_needs_you, needsYou, needsYou), HN.amber, filled = true)
         }
-        if (state != LinkState.Demo) {
-            Spacer(Modifier.width(8.dp))
-            // The state in a word, as Settings' chip: the name is already the row's.
-            ConnectionChip(state)
-        }
+        Spacer(Modifier.width(8.dp))
+        // The state in a word, as Settings' chip: the name is already the row's.
+        ConnectionChip(state)
     }
 }
 

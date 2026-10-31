@@ -82,15 +82,15 @@ class CommandsTabTest {
 
     @Test fun theRoutesReachAsTheOverviewsPickersDo() {
         // A shared terminal: all three.
-        assertEquals(HelperReach(effort = true, model = true, rename = true), HelperReach.of(session(term = TermLink("t", 0, 1)), changeable = true, demo = false))
+        assertEquals(HelperReach(effort = true, model = true, rename = true), HelperReach.of(session(term = TermLink("t", 0, 1)), changeable = true))
         // One the Mac runs itself: the model and the effort, but /rename has no terminal to be typed into.
-        assertEquals(HelperReach(effort = true, model = true, rename = false), HelperReach.of(session(origin = "hypernova"), changeable = true, demo = false))
+        assertEquals(HelperReach(effort = true, model = true, rename = false), HelperReach.of(session(origin = "hypernova"), changeable = true))
         // A job: the name too, through claude attach.
-        assertTrue(HelperReach.of(session(agentJob = "feedbeef"), changeable = true, demo = false).rename)
+        assertTrue(HelperReach.of(session(agentJob = "feedbeef"), changeable = true).rename)
         // Where the mode can't be changed, neither can the model nor the effort.
-        assertEquals(HelperReach(effort = false, model = false, rename = true), HelperReach.of(session(term = TermLink("t", 0, 1)), changeable = false, demo = false))
+        assertEquals(HelperReach(effort = false, model = false, rename = true), HelperReach.of(session(term = TermLink("t", 0, 1)), changeable = false))
         // Ended: none.
-        assertEquals(HelperReach(effort = false, model = false, rename = false), HelperReach.of(session(phase = Phase.Ended, term = TermLink("t", 0, 1)), changeable = false, demo = false))
+        assertEquals(HelperReach(effort = false, model = false, rename = false), HelperReach.of(session(phase = Phase.Ended, term = TermLink("t", 0, 1)), changeable = false))
     }
 
     @Test fun compactSendsItsFocusTrimmedOnOneLineOrNothing() {
@@ -139,15 +139,15 @@ class CommandsTabTest {
     }
 
     @Test fun aSideQuestionGoesToAnOpenClaudeSessionInATerminalOrAJob() {
-        assertTrue(asideReach(session(term = TermLink("t", 0, 1)), demo = false))
-        assertTrue(asideReach(session(agentJob = "feedbeef"), demo = false))
-        assertFalse(asideReach(session(origin = "hypernova"), demo = false))
-        assertFalse(asideReach(session(origin = "terminal"), demo = false))
-        assertFalse(asideReach(session(phase = Phase.Ended, agentJob = "feedbeef"), demo = false))
-        assertFalse(asideReach(session(term = TermLink("t", 0, 1), agent = AgentKind.CODEX), demo = false))
+        assertTrue(asideReach(session(term = TermLink("t", 0, 1))))
+        assertTrue(asideReach(session(agentJob = "feedbeef")))
+        assertFalse(asideReach(session(origin = "hypernova")))
+        assertFalse(asideReach(session(origin = "terminal")))
+        assertFalse(asideReach(session(phase = Phase.Ended, agentJob = "feedbeef")))
+        assertFalse(asideReach(session(term = TermLink("t", 0, 1), agent = AgentKind.CODEX)))
         // Commands go to one the Mac runs too; a terminal command only where there's a terminal.
-        assertTrue(commandReach(session(origin = "hypernova"), demo = false))
-        assertFalse(commandReach(session(origin = "terminal"), demo = false))
+        assertTrue(commandReach(session(origin = "hypernova")))
+        assertFalse(commandReach(session(origin = "terminal")))
         assertFalse(terminalReach(session(origin = "hypernova")))
         assertTrue(terminalReach(session(agentJob = "feedbeef")))
     }

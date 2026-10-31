@@ -115,7 +115,7 @@ internal fun SessionSheet(
     atBlocked: Boolean = false,
 ) {
     val opener = LocalOpener.current
-    val change = canChange(hub, session)
+    val change = canChange(session)
     // Rename or Delete from the actions, over the sheet (ui/home/SessionMenu.kt).
     var menuPage by remember { mutableStateOf<MenuPage?>(null) }
     // The open tab, kept while the sheet is (a new one opens on Overview again).
@@ -146,7 +146,7 @@ internal fun SessionSheet(
                 when (tab) {
                     SheetTab.Overview -> {
                         SheetSeam(stringResource(R.string.model))
-                        ModelPart(hub, session, usage, change, canChangeModel(hub, session), onModel, onSwitchAgent)
+                        ModelPart(hub, session, usage, change, canChangeModel(session), onModel, onSwitchAgent)
                         // Claude Code's effort (EffortPart.kt), on the subscription only; Codex's goes with its model.
                         if (ClaudeEffort.shown(session)) {
                             SheetSeam(stringResource(R.string.effort))
@@ -160,7 +160,7 @@ internal fun SessionSheet(
                     }
                     SheetTab.Permissions -> {
                         SheetSeam(stringResource(R.string.session_sheet_permissions))
-                        PermissionsPart(hub, session, canChangeMode(hub, session), toBlocked, onRetried, onEmptied, onBrought = { toBlocked = false })
+                        PermissionsPart(hub, session, canChangeMode(session), toBlocked, onRetried, onEmptied, onBrought = { toBlocked = false })
                         // Several asks waiting: allowed together, each listed (AllowSeveral.kt).
                         AllowSeveralPart(hub, session)
                         // Claude Code's rules in effect, folded (RulesPart.kt); Codex has none.
@@ -178,8 +178,8 @@ internal fun SessionSheet(
                         GitPart(hub, session) { SheetSeam(stringResource(R.string.session_sheet_git)) }
                         SheetSeam(stringResource(R.string.session_sheet_where))
                         WherePart(hub, session, onDismiss)
-                        // The Home card's long-press menu (not in the demo, as on Home).
-                        if (!hub.isDemo && MenuOffer.of(session).any) {
+                        // The Home card's long-press menu.
+                        if (MenuOffer.of(session).any) {
                             SheetSeam(stringResource(R.string.session_sheet_actions))
                             // Its job runs an older Claude Code: said quietly, above Restart.
                             session.agentOutdated?.let { OutdatedNotice(it) }
@@ -369,7 +369,7 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Bo
                 // Bypass waits for the fingerprint or the screen lock too (docs/DECISIONS.md).
                 if (m != s.mode && m == "bypassPermissions") {
                     com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, bypassTitle, s.name, noLock, hub.isDemo,
+                        context, bypassTitle, s.name, noLock,
                         onOk = { go() }, onFail = { msg -> if (msg != null) toast(msg) },
                     )
                 } else if (m != s.mode) go()
@@ -492,7 +492,7 @@ private fun WherePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
     val cwd = s.cwd
     if (cwd != null) InfoRow(stringResource(R.string.session_sheet_folder), cwd)
     // As the header's Folder button: quieter where only Browse outside projects would open it.
-    if (cwd != null && !hub.isDemo && (s.browsable || s.outsideProjects)) {
+    if (cwd != null && (s.browsable || s.outsideProjects)) {
         SheetLink(stringResource(R.string.files), null, { onDismiss(); opener.files(cwd, s.project) }, dim = !s.browsable)
         Spacer(Modifier.height(4.dp))
     }
@@ -507,7 +507,7 @@ private fun WherePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
         ),
     )
     // A Codex session gets a terminal when it's asked for, as from the header.
-    if ((s.term != null || s.codex) && !hub.isDemo) {
+    if (s.term != null || s.codex) {
         SheetLink(stringResource(R.string.open_terminal), null, { onDismiss(); opener.terminal(s.id) })
         Spacer(Modifier.height(4.dp))
     }

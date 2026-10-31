@@ -114,7 +114,7 @@ internal class StatusBarState(
  */
 @Composable
 internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, sending: Boolean, away: String? = null): StatusBarState {
-    val todos = rememberTodos(hub, session.id, items)
+    val todos = rememberTodos(session.id, items)
     val pending = remember(items) { items.lastOrNull { it is Item.Approval && it.resolved == null } as? Item.Approval }
     val reads = remember(items) { trailingReads(items) }
     val workflow = remember(items) { runningWorkflow(items) }
@@ -124,7 +124,7 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     val agents = remember(board, asking) { barAgents(board, asking) }
     // Stop sends Esc to a shared terminal or interrupts a session the Mac runs; a terminal session
     // the Mac only watches can't be stopped from here (the Mac answers 409).
-    val stoppable = session.term != null || session.origin == "hypernova" || hub.isDemo
+    val stoppable = session.term != null || session.origin == "hypernova"
     val raw = statusBar(
         BarInput(session.phase, session.state, session.activity, sending, session.agentsRunning, pending, todos, reads, stoppable = stoppable, workflow = workflow, agents = agents),
     )

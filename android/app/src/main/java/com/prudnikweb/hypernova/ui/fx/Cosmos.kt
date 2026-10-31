@@ -56,7 +56,6 @@ class CosmosState {
     private val blasts = mutableIntStateOf(0)
     private val events = mutableIntStateOf(0)
     private val eclipseLine = mutableStateOf<String?>(null)
-    private val demoEclipseLine = mutableStateOf<String?>(null)
     private val readoutBottom = mutableFloatStateOf(0f)
     private val hintLine = mutableStateOf(false)
     internal val sky = Sky()
@@ -96,11 +95,6 @@ class CosmosState {
     var eclipse: String?
         get() = eclipseLine.value
         set(v) { eclipseLine.value = v }
-
-    /** The demo's eclipse (long-press the sun), kept apart so it never sticks to a real Mac's sky. */
-    var demoEclipse: String?
-        get() = demoEclipseLine.value
-        set(v) { demoEclipseLine.value = v }
 
     /**
      * Increments when something happens in the sky while it's watched (a limit, the week's low
@@ -287,7 +281,7 @@ fun Cosmos(
                 // The selection and the hint's line are drawn the moment they change.
                 val selected = currentSelected.value
                 solar.hint = state.hint
-                solar.eclipse = state.eclipse ?: state.demoEclipse
+                solar.eclipse = state.eclipse
                 val f = focus().coerceIn(0f, 1f)
                 val now = System.currentTimeMillis()
                 // Sessions on other providers orbit the companion, Codex's (while both agents are in use)

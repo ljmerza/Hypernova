@@ -3,7 +3,7 @@ package com.prudnikweb.hypernova.data
 import androidx.compose.runtime.Immutable
 
 /** How the app is talking to the Mac right now. */
-enum class LinkState { Demo, Connecting, Connected, Reconnecting, Offline, Unpaired }
+enum class LinkState { Connecting, Connected, Reconnecting, Offline, Unpaired }
 
 @Immutable
 data class Link(
@@ -59,11 +59,10 @@ data class NewSessionRequest(
 )
 
 /**
- * Everything the screens read and do. [LiveHub] talks to the Mac's daemon; [FakeHub] is the
- * demo, with believable sessions that move. Screens never know which one they have.
+ * Everything the screens read and do. [LiveHub] talks to the Mac's daemon; tests have small
+ * hubs of their own.
  */
 interface Hub {
-    val isDemo: Boolean
     val mac: Mac
     val link: Link
     val usage: Usage
@@ -101,7 +100,7 @@ interface Hub {
     /** The agents a session's main agent started, and the workflows of them (empty until known). */
     fun agents(sessionId: String): AgentBoard = AgentBoard.Empty
     /** An agent's own transcript, read-only, as the Mac has it now. */
-    suspend fun agentEvents(sessionId: String, agentId: String): Result<List<WEvent>> = Result.failure(HubException("Agents' transcripts aren't part of the demo."))
+    suspend fun agentEvents(sessionId: String, agentId: String): Result<List<WEvent>> = Result.failure(UnsupportedOperationException())
     /** [events] of agent [agentId] as its screen draws them, with its approvals still waiting at the end. */
     fun agentTranscript(sessionId: String, agentId: String, events: List<WEvent>): List<Item> =
         Items.build(events, emptyMap(), emptyMap(), emptyMap(), sessionId, session(sessionId)?.cwd, System.currentTimeMillis(), active = agents(sessionId).agents[agentId]?.running == true, board = agents(sessionId), orphans = false)
@@ -188,11 +187,11 @@ interface Hub {
      */
     suspend fun resume(sessionId: String): Result<String>
     fun answer(sessionId: String, item: Item.Approval, answer: Answer)
-    /** The approval a session waits on, as its Home card answers it (null when none, and in the demo). */
+    /** The approval a session waits on, as its Home card answers it (null when none). */
     fun approval(sessionId: String): WApproval? = null
     /** [answer] approval [id] from its Home card: true once the Mac has it, false when it didn't get through (said in a toast). */
     suspend fun answerApproval(id: String, answer: Answer): Boolean = false
-    /** Every ask session [sessionId] waits on that this phone hasn't answered, oldest first (none in the demo). */
+    /** Every ask session [sessionId] waits on that this phone hasn't answered, oldest first. */
     fun waitingAsks(sessionId: String): List<WApproval> = emptyList()
     /**
      * "Allow these N" (IDEAS PA6): asks [ids] of session [sessionId] allowed with one answer, each
@@ -225,14 +224,14 @@ interface Hub {
      * A folder's own folders, for the new-session sheet's folder browser (`GET /v1/folders`): [path] a
      * full path, `~` or `~/…` (null: the home folder); dot-folders with [hidden]. Failures are [FileFailure]s.
      */
-    suspend fun folders(path: String?, hidden: Boolean = false): Result<Folders> = Result.failure(HubException("Not in the demo."))
+    suspend fun folders(path: String?, hidden: Boolean = false): Result<Folders> = Result.failure(UnsupportedOperationException())
     suspend fun file(path: String): Result<FileBytes>
     /**
      * Streams a file ([source]: a Mac path, or a full page URL the Mac handed out) into [target], carrying on from
      * [resume] when the Mac still has the same file. Failures are [FileFailure]s; a cancel stops the call.
      */
     suspend fun download(source: String, target: java.io.File, resume: DownloadResume?, onStart: (etag: String?) -> Unit, onProgress: (done: Long, total: Long) -> Unit): Result<Downloaded> =
-        Result.failure(HubException("Not in the demo."))
+        Result.failure(UnsupportedOperationException())
     /** A signed URL a WebView can load: an HTML file ([path]) or a dev server ([port]). */
     suspend fun preview(path: String? = null, port: Int? = null): Result<String>
     /**
@@ -245,15 +244,13 @@ interface Hub {
     /** The testing checklist page (a signed URL). */
     suspend fun checklist(): Result<String>
     /** A single-use WebSocket link to this session's live terminal, on the route in use. */
-    suspend fun terminal(sessionId: String): Result<TermTicket> = Result.failure(HubException("The live terminal isn't part of the demo."))
+    suspend fun terminal(sessionId: String): Result<TermTicket> = Result.failure(UnsupportedOperationException())
     /** Open the session's terminal in a window on the Mac: the app's name, and whether it was open already. */
-    suspend fun openOnMac(sessionId: String): Result<Pair<String, Boolean>> = Result.failure(HubException("Not in the demo."))
+    suspend fun openOnMac(sessionId: String): Result<Pair<String, Boolean>> = Result.failure(UnsupportedOperationException())
 
     // ─── Voice (data/VoiceApi.kt) ──────────────────────────────────────────────
 
-    /** The demo's dictation; null elsewhere, where the phone dictates itself (PhoneDictation.kt). */
-    fun dictate(): Dictation? = null
-    /** Read aloud with the Mac's voices, played here; null in the demo (SpeechLink.kt). */
+    /** Read aloud with the Mac's voices, played here; null where there are none (SpeechLink.kt). */
     val speech: PhoneSpeech? get() = null
 
     // ─── Account (docs/PROTOCOL.md, "Account") ───────────────────────────────
@@ -347,14 +344,14 @@ interface Hub {
     /** A session's calls refused without the owner (data/Blocked.kt), newest first. */
     suspend fun blocked(sessionId: String): Result<List<BlockedCall>> = Result.success(emptyList())
     /** Allow & retry: the owner's approval of that call typed into the session. The list as it's left. */
-    suspend fun retryBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = Result.failure(HubException("Not in the demo."))
+    suspend fun retryBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = Result.failure(UnsupportedOperationException())
     /** Dismiss: off the list. The list as it's left. */
-    suspend fun dismissBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = Result.failure(HubException("Not in the demo."))
+    suspend fun dismissBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = Result.failure(UnsupportedOperationException())
 
     /**
      * History's full-text search (data/HistorySearch.kt; docs/PROTOCOL.md, "History search"): the
      * conversations with every word of [query] inside. Succeeds with null when this Mac can't (an
-     * older daemon, the demo): History then filters on the phone alone. Fails quietly when offline.
+     * older daemon): History then filters on the phone alone. Fails quietly when offline.
      */
     suspend fun searchHistory(query: String): Result<TextHits?> = Result.success(null)
 
@@ -363,11 +360,6 @@ interface Hub {
     /** The app came to the foreground (true) or left it (false). */
     fun foreground(visible: Boolean) {}
     fun close() {}
-
-    /** Demo only: scrub usage to watch the sun live its life. */
-    val canWarp: Boolean get() = false
-    fun warpFiveHour(f: Float) {}
-    fun warpSevenDay(f: Float) {}
 }
 
 /** A failure the UI can show as-is (the message is already human). */

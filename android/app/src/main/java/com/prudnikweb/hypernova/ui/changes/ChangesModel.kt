@@ -5,7 +5,6 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Api
 import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.Core
-import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.HubException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +65,7 @@ data class DiffLine(val kind: LineKind, val text: String, val oldNo: Int = 0, va
 @Immutable
 data class FileDiff(val path: String, val lines: List<DiffLine>, val truncated: Boolean, val binary: Boolean)
 
-/** The calls behind the "What changed" screen. Demo sessions get a believable sample. */
+/** The calls behind the "What changed" screen. */
 object ChangesRepo {
     private fun api(): Api {
         val p = Core.pairing ?: throw HubException(Core.app.getString(R.string.changes_err))
@@ -80,25 +79,19 @@ object ChangesRepo {
         else -> HubException(Core.app.getString(R.string.changes_err))
     }
 
-    suspend fun load(hub: Hub, sessionId: String, all: Boolean = false): Result<WorkChanges> = try {
-        if (hub.isDemo) Result.success(DemoChanges.changes(all))
-        else {
-            val o = api().get("/v1/sessions/$sessionId/changes" + if (all) "?all=1" else "")
-            Result.success(withContext(Dispatchers.Default) { parseChanges(o.getJSONObject("changes")) })
-        }
+    suspend fun load(sessionId: String, all: Boolean = false): Result<WorkChanges> = try {
+        val o = api().get("/v1/sessions/$sessionId/changes" + if (all) "?all=1" else "")
+        Result.success(withContext(Dispatchers.Default) { parseChanges(o.getJSONObject("changes")) })
     } catch (e: Throwable) {
         if (e is CancellationException) throw e
         Result.failure(fail(e))
     }
 
-    suspend fun diff(hub: Hub, sessionId: String, path: String): Result<FileDiff> = try {
-        if (hub.isDemo) Result.success(DemoChanges.diff(path))
-        else {
-            val o = api().get("/v1/sessions/$sessionId/changes/diff?path=${Api.q(path)}", max = 2L * 1024 * 1024)
-            Result.success(withContext(Dispatchers.Default) {
-                FileDiff(path, parseDiff(o.optString("diff")), o.optBoolean("truncated"), o.optBoolean("binary"))
-            })
-        }
+    suspend fun diff(sessionId: String, path: String): Result<FileDiff> = try {
+        val o = api().get("/v1/sessions/$sessionId/changes/diff?path=${Api.q(path)}", max = 2L * 1024 * 1024)
+        Result.success(withContext(Dispatchers.Default) {
+            FileDiff(path, parseDiff(o.optString("diff")), o.optBoolean("truncated"), o.optBoolean("binary"))
+        })
     } catch (e: Throwable) {
         if (e is CancellationException) throw e
         Result.failure(fail(e))
@@ -166,47 +159,4 @@ object ChangesRepo {
         }
         return out
     }
-}
-
-/** What demo mode shows: a small change set with a diff, so the screen can be seen without a Mac. */
-internal object DemoChanges {
-    private val all = listOf(
-        ChangedFile("src/session/Composer.kt", 'M', false, 24, 6, false, true),
-        ChangedFile("src/session/Attachments.kt", 'A', true, 58, 0, false, true),
-        ChangedFile("docs/PROTOCOL.md", 'M', false, 9, 2, false, true),
-        ChangedFile("notes/scratch.txt", 'D', false, 0, 14, false, false),
-    )
-
-    fun changes(everything: Boolean): WorkChanges {
-        val shown = if (everything) all else all.filter { it.touched }
-        return WorkChanges(
-            git = true, branch = "main", scoped = !everything, files = shown, others = if (everything) 0 else all.size - shown.size,
-            hidden = 0, more = false, totalAdd = shown.sumOf { it.add ?: 0 }, totalDel = shown.sumOf { it.del ?: 0 },
-            upstream = "origin/main", ahead = 2, behind = 0, dirty = all.size,
-        )
-    }
-
-    fun diff(path: String): FileDiff = FileDiff(
-        path,
-        ChangesRepo.parseDiff(
-            """
-            @@ -41,9 +41,12 @@ fun Composer(state: ComposerState) {
-                 val draft = state.draft
-            -    // Send on the keyboard's action.
-            -    val send = { state.send(draft) }
-            +    // Send on the keyboard's action, but never an empty box.
-            +    val send = {
-            +        if (draft.isNotBlank() || state.files.isNotEmpty()) state.send(draft)
-            +    }
-                 BasicTextField(
-                     value = draft,
-                     onValueChange = state::onChange,
-            @@ -88,6 +91,7 @@ fun Composer(state: ComposerState) {
-                     keyboardActions = KeyboardActions(onSend = { send() }),
-            +        maxLines = 8,
-                 )
-            """.trimIndent(),
-        ),
-        truncated = false, binary = false,
-    )
 }

@@ -107,8 +107,6 @@ class LiveHub(
     /** Asked the Mac for a device certificate this connection (once; the next snapshot says if it took). */
     private var certAsked = false
 
-    override val isDemo = false
-
     override var link by mutableStateOf(Link(LinkState.Connecting))
         private set
     private var macInfo by mutableStateOf<MacInfo?>(null)

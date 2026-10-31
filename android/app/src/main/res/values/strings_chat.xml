@@ -62,7 +62,6 @@
     <string name="chat_rewind_go">Rewind</string>
     <string name="chat_rewinding">Rewinding…</string>
     <string name="chat_rewound">Rewound. Your message is back in the box.</string>
-    <string name="chat_rewind_demo">Rewinding needs your Mac: it isn\'t part of the demo.</string>
 
     <!-- Quick prompts -->
     <string name="chat_qp_continue">Continue</string>

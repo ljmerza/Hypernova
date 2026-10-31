@@ -55,7 +55,7 @@ internal fun EffortPart(hub: Hub, s: Session) {
     val appScope = LocalAppScope.current
     val res = LocalContext.current.resources
     val nextTurn = stringResource(R.string.effort_next_turn)
-    val change = ClaudeEffort.changeable(s, canChangeMode(hub, s))
+    val change = ClaudeEffort.changeable(s, canChangeMode(s))
     // What was picked, until the Mac says otherwise (its answer, or the status line later).
     var shown by remember(s.id, s.effort) { mutableStateOf(s.effort) }
     var picking by rememberSaveable { mutableStateOf(false) }

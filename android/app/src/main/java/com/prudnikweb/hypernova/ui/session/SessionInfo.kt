@@ -94,12 +94,12 @@ private fun agoWords(f: Finished): String = when (f) {
  */
 @Composable
 internal fun GitPart(hub: Hub, s: Session, seam: @Composable () -> Unit) {
-    if (!hub.isDemo && s.cwd == null) return
+    if (s.cwd == null) return
     var changes by remember(s.id) { mutableStateOf<WorkChanges?>(null) }
     var open by remember(s.id) { mutableStateOf(false) }
     val inTurn = s.phase == Phase.Working || s.phase == Phase.Starting || s.phase == Phase.NeedsYou
     LaunchedEffect(s.id, inTurn, open) {
-        if (!open && (changes == null || !inTurn)) changes = ChangesRepo.load(hub, s.id).getOrNull() ?: changes
+        if (!open && (changes == null || !inTurn)) changes = ChangesRepo.load(s.id).getOrNull() ?: changes
     }
     if (open) ChangesDialog(hub, s, onDismiss = { open = false })
     val g = changes?.let(::sheetGit) ?: return

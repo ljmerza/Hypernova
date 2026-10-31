@@ -5,8 +5,8 @@ import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.widget.WidgetModel.Conn
 
 /**
- * Debug builds: believable pictures for the widgets without a Mac, for screenshots (the demo
- * doesn't reach the widgets, which follow the live hub only). Drawn by [WidgetSync.sample] into
+ * Debug builds: believable pictures for the widgets without a Mac, for screenshots (the widgets
+ * follow the live hub only). Drawn by [WidgetSync.sample] into
  * the widgets on the home screen, or by [WidgetSync.render] into files:
  *
  *     adb shell run-as com.prudnikweb.hypernova am broadcast --user 0 \

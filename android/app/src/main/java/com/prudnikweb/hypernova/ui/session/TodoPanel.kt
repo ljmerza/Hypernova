@@ -44,7 +44,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
-import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.GlassCard
@@ -65,7 +64,7 @@ private val TODO_TOOLS = setOf("TodoWrite", "TaskCreate", "TaskUpdate")
  * tools runs or finishes (they're in the transcript as tool rows), never on a timer.
  */
 @Composable
-internal fun rememberTodos(hub: Hub, sessionId: String, items: List<Item>): List<Todo> {
+internal fun rememberTodos(sessionId: String, items: List<Item>): List<Todo> {
     val key = remember(items) {
         items.filter { it is Item.Tool && it.verb in TODO_TOOLS }.joinToString("|") { "${it.key}:${(it as Item.Tool).running}" }
     }
@@ -73,7 +72,7 @@ internal fun rememberTodos(hub: Hub, sessionId: String, items: List<Item>): List
     LaunchedEffect(sessionId, key) {
         // A to-do tool's result lands a moment after its row.
         if (key.isNotEmpty()) delay(300)
-        ChatRepo.todos(hub, sessionId).onSuccess { todos = it }
+        ChatRepo.todos(sessionId).onSuccess { todos = it }
     }
     return todos
 }

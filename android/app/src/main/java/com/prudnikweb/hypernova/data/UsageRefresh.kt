@@ -22,8 +22,7 @@ object UsageRefresh {
     /** Whether a look asked at [now] goes out, given the last one went out at [last]. */
     fun due(now: Long, last: Long): Boolean = last == 0L || now - last >= EVERY_MS || now < last
 
-    fun ask(hub: Hub) {
-        if (hub.isDemo) return
+    fun ask() {
         val p = Core.pairing ?: return
         val now = System.currentTimeMillis()
         synchronized(this) {

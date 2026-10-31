@@ -460,7 +460,7 @@ sealed interface Item {
         val detail: String,
         val reason: String,
         val resolved: Resolution? = null,
-        /** The daemon's approval id (null in demo data). */
+        /** The daemon's approval id (null when it has none). */
         val approvalId: String? = null,
         val kind: ApprovalKind = ApprovalKind.Tool,
         val canAlways: Boolean = true,

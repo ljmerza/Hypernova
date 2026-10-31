@@ -108,7 +108,7 @@ private fun AsidePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val opener = LocalOpener.current
-    if (!asideReach(s, hub.isDemo)) {
+    if (!asideReach(s)) {
         HText(stringResource(R.string.aside_unreachable), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
         return
     }
@@ -155,7 +155,7 @@ private fun AsidePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
     }
     val a = aside ?: return
     Spacer(Modifier.height(14.dp))
-    AsideAnswer(a, terminal = !hub.isDemo && terminalReach(s), onTerminal = { onDismiss(); opener.terminal(s.id) })
+    AsideAnswer(a, terminal = terminalReach(s), onTerminal = { onDismiss(); opener.terminal(s.id) })
 }
 
 /** The last side question and its answer, selectable, or how it stands. */
@@ -196,7 +196,7 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
     val appScope = LocalAppScope.current
     val opener = LocalOpener.current
     val view = LocalView.current
-    if (!commandReach(s, hub.isDemo)) {
+    if (!commandReach(s)) {
         HText(stringResource(R.string.commands_unreachable), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
         return
     }
@@ -213,15 +213,15 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
     var compacting by remember(s.id) { mutableStateOf<SlashCommand?>(null) }
     var renaming by remember(s.id) { mutableStateOf(false) }
     val res = context.resources
-    val canTerminal = !hub.isDemo && terminalReach(s)
-    val reach = HelperReach.of(s, canChangeModel(hub, s), hub.isDemo).let { if (onModel == null) it.copy(model = false) else it }
+    val canTerminal = terminalReach(s)
+    val reach = HelperReach.of(s, canChangeModel(s)).let { if (onModel == null) it.copy(model = false) else it }
 
     fun used(c: SlashCommand) {
         picks = picks.used(c.name).also { CommandPicksStore.save(context, it) }
     }
     fun send(c: SlashCommand, typed: String, line: String = commandLine(c, typed)) {
         if (sending || !canSendCommand(c, typed)) return
-        if (c.terminal && !canTerminal && !hub.isDemo) {
+        if (c.terminal && !canTerminal) {
             toast(res.getString(R.string.commands_no_terminal))
             return
         }
@@ -304,7 +304,7 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
                     val open = picked == c && openIn == group
                     val helper = argHelper(c, reach)
                     CommandLine(
-                        c, pinned = picks.isPinned(c.name), dim = c.terminal && !canTerminal && !hub.isDemo,
+                        c, pinned = picks.isPinned(c.name), dim = c.terminal && !canTerminal,
                         onClick = {
                             when {
                                 // The picker and the rename sheet finish on their own: used once opened.

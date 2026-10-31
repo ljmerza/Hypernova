@@ -256,7 +256,7 @@ fun AutomationEditor(
         return
     }
     // Out of reach: what's here can be read and changed, but Save and Run now wait (A15).
-    val offline = !hub.isDemo && hub.link.state != com.prudnikweb.hypernova.data.LinkState.Connected
+    val offline = hub.link.state != com.prudnikweb.hypernova.data.LinkState.Connected
     // A spent Once switched on from its card: moved to the next day at that time, to save (A6).
     val again = remember(id) { OnceAgain.take(id) }
 
@@ -334,7 +334,6 @@ fun AutomationEditor(
                 title = res.getString(if (shell) R.string.wf_shell_title else R.string.au_bypass_title),
                 subtitle = input.name.ifBlank { res.getString(R.string.au_edit_new) },
                 noLock = res.getString(if (shell) R.string.wf_lock_needed else R.string.au_bypass_needed),
-                demo = hub.isDemo,
                 onOk = { go(ready) },
                 onFail = { msg -> if (msg != null) toast(msg) },
             )
@@ -437,9 +436,6 @@ fun AutomationEditor(
                     } else if (offline) {
                         Spacer(Modifier.height(10.dp))
                         HText(stringResource(R.string.au_offline_edit), style = Type.small, color = HN.amber)
-                    } else if (hub.isDemo) {
-                        Spacer(Modifier.height(6.dp))
-                        HText(stringResource(R.string.au_demo_note), style = Type.small, color = HN.inkDim)
                     }
                     Spacer(Modifier.height(14.dp))
                 }
@@ -562,7 +558,7 @@ fun AutomationEditor(
 
     if (whenSheet) {
         // Ghosted only when the Mac says it has no battery, not while it doesn't know yet (A15).
-        val battery = st?.hasBattery != false || hub.isDemo
+        val battery = st?.hasBattery != false
         val noBattery = stringResource(R.string.au_w_no_battery)
         TilesSheet(
             stringResource(R.string.au_pick_when),

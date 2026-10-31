@@ -61,7 +61,7 @@ internal fun Runs(hub: Hub, a: Automation, w: Words, ctx: SummaryContext, now: L
     val scope = LocalAppScope.current
     val toast = LocalToast.current
     val confirm = LocalConfirm.current
-    val linked = hub.isDemo || hub.link.state == LinkState.Connected
+    val linked = hub.link.state == LinkState.Connected
     // The first page as it opens, and again each time the Mac comes back.
     LaunchedEffect(a.id, linked) { if (linked) autos.loadRuns(a.id) }
     val page = autos.runs(a.id)

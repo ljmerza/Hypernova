@@ -100,5 +100,4 @@
     <string name="attach_mac_away">Can’t attach while your Mac is away. Your words stay in the box.</string>
     <string name="start_mac_away">Your Mac is away. Start waits for it; your words stay here.</string>
     <string name="waiting_no_folder">Your Mac doesn’t say which folder this was for. Copy the words and start a session there.</string>
-    <string name="demo_waiting_prompt">Also add a short section to the README about running the daemon on a second Mac.</string>
 </resources>

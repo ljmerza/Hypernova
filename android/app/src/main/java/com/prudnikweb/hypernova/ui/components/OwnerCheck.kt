@@ -22,13 +22,13 @@ object OwnerCheck {
     /**
      * [onOk] after a good fingerprint or screen lock; [onFail] with a line to show (null: the
      * owner cancelled). [noLock]: what to say on a phone without a screen lock, where there is
-     * nothing to check; [demo] goes on anyway there, since the demo changes nothing on a Mac.
+     * nothing to check.
      */
-    fun ask(context: Context, title: String, subtitle: String, noLock: String, demo: Boolean, onOk: () -> Unit, onFail: (String?) -> Unit) {
+    fun ask(context: Context, title: String, subtitle: String, noLock: String, onOk: () -> Unit, onFail: (String?) -> Unit) {
         val activity = context.activity()
         val secure = context.getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
         if (activity == null || !secure) {
-            if (demo) onOk() else onFail(noLock)
+            onFail(noLock)
             return
         }
         val b = BiometricPrompt.Builder(activity).setTitle(title).setSubtitle(subtitle)
