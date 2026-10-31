@@ -97,13 +97,13 @@ class VoiceInput internal constructor(private val hub: Hub, private val prefs: V
     val settlingEmpty: Boolean get() = current != null && !listening && (state as? DictationState.Settling)?.text.isNullOrEmpty()
 
     /**
-     * This phone can dictate by itself (Android's on-device recognizer, PhoneDictation.kt): the audio
-     * never leaves the phone. Set by [rememberVoiceInput].
+     * This phone can dictate by itself (its own recognizer as Settings → Voice chooses,
+     * PhoneDictation.kt). Set by [rememberVoiceInput].
      */
     internal var phoneVoice by mutableStateOf(false)
     internal var phoneDictate: () -> Dictation? = { null }
 
-    /** The phone has an on-device recognizer (or this is the demo, which has its own). */
+    /** The phone has a recognizer the setting may use (or this is the demo, which has its own). */
     val available: Boolean get() = hub.isDemo || phoneVoice
     /** No link to the Mac is needed to dictate: the words come from this phone. */
     val linked: Boolean get() = true
@@ -287,8 +287,9 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
     val scope = rememberCoroutineScope()
     val prefs = remember { VoicePrefs.of(context) }
     val voice = remember(hub) { VoiceInput(hub, prefs, scope) }
-    // Asked once per box (it reads the system's recognizer setup), not on every recomposition.
-    val phoneVoice = remember(hub) { !hub.isDemo && com.prudnikweb.hypernova.data.PhoneDictation.available(context) }
+    // Asked once per box and setting (it reads the system's recognizer setup), not on every recomposition.
+    val engine = prefs.dictationEngine
+    val phoneVoice = remember(hub, engine) { !hub.isDemo && com.prudnikweb.hypernova.data.PhoneDictation.available(context, engine) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) voice.show(VoiceHint.First)
         else voice.show(VoiceHint.Permission(forGood = !rationale(context)))
@@ -307,7 +308,7 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
         }
         // Dictation on this phone (never in the demo, which has its own).
         voice.phoneVoice = phoneVoice
-        voice.phoneDictate = { com.prudnikweb.hypernova.data.PhoneDictation.start(context) }
+        voice.phoneDictate = { com.prudnikweb.hypernova.data.PhoneDictation.start(context, prefs.dictationEngine) }
         voice.haptic = { view.buzz(it) }
         voice.announce = { words -> view.announce(context.getString(R.string.voice_a11y_ready, words)) }
     }

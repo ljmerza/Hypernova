@@ -257,11 +257,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                     )
                 }
             }
-            // Read aloud (ReadAloudSection.kt): only from a Mac that reads aloud this way.
-            if (hub.speech?.settings != null) {
-                item(key = "voice") {
-                    ReadAloudSection(hub)
-                }
+            // Voice (VoiceSection.kt): the recognizer dictation uses, kept on this phone. Then Read aloud
+            // (ReadAloudSection.kt): only from a Mac that reads aloud this way.
+            item(key = "voice") {
+                VoiceRecognitionSection()
+                if (hub.speech?.settings != null) ReadAloudSection(hub)
             }
             // Files: Browse outside projects (FilesSection below), from a Mac that has it.
             if (hub.mac.browseOutsideProjects != null) {

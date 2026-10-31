@@ -2,7 +2,7 @@ package com.prudnikweb.hypernova.data
 
 import kotlinx.coroutines.flow.StateFlow
 
-/** Why a dictation ended early: the phone has no on-device recognizer, the two-minute cap, the microphone busy or failing. */
+/** Why a dictation ended early: the phone has no recognizer the setting may use, the two-minute cap, the microphone busy or failing. */
 enum class VoiceProblem { Offline, TooLong, MicBusy, Mic }
 
 sealed interface DictationState {

@@ -15,8 +15,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.sin
 
 /*
- * Voice on the phone (docs/specs/spec-voice.md, 3.6): the mic dictates with Android's on-device
- * recognizer (PhoneDictation.kt), so the audio never leaves the phone. Nothing runs until a press,
+ * Voice on the phone (docs/specs/spec-voice.md, 3.6): the mic dictates with the phone's own
+ * recognizer, or Android's on-device one only, as Settings → Voice chooses (PhoneDictation.kt); the
+ * audio never goes to the Mac. Nothing runs until a press,
  * nothing is written down, and words are never lost: whatever ends a dictation, what was heard goes
  * into the box. This file has no Android audio in it, so its logic runs in JVM tests.
  */
@@ -115,7 +116,11 @@ class VoicePrefs private constructor(private val prefs: SharedPreferences) {
     /** The microphone permission has been asked for once (so a "no" since means "denied for good"). */
     var micAsked by mutableStateOf(prefs.getBoolean("micAsked", false))
         private set
+    /** Settings → Voice: which recognizer dictation uses, from the next dictation on. */
+    var dictationEngine by mutableStateOf(DictationEngine.of(prefs.getString("dictationEngine", null)))
+        private set
 
+    fun chooseDictationEngine(e: DictationEngine) { dictationEngine = e; prefs.edit().putString("dictationEngine", e.key).apply() }
     fun dictated() { dictations++; prefs.edit().putInt("dictations", dictations).apply() }
     fun firstHintDone() { firstHintShown = true; prefs.edit().putBoolean("firstHintShown", true).apply() }
     fun moreHintDone() { moreHintShown = true; prefs.edit().putBoolean("moreHintShown", true).apply() }

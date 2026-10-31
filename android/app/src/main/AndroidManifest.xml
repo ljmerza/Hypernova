@@ -11,7 +11,7 @@
     <!-- The background connection comes back after the phone restarts (BootReceiver). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Voice: the mic in the composer, only between a press and the end (asked at the first press);
-         Android's on-device recognizer hears it, on the phone. -->
+         the phone's recognizer hears it, or Android's on-device one (Settings → Voice). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Read aloud: the CPU stays up while the phone plays a reply with the screen off, for that play only. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -23,7 +23,7 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <queries>
-        <!-- Fork: the phone's own speech recognizer (data/PhoneDictation.kt), when the Mac offers no voice. -->
+        <!-- Fork: the phone's own speech recognizer (data/PhoneDictation.kt), the default for dictation. -->
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
