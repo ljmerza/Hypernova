@@ -81,8 +81,19 @@ object ComputerWords {
     }
 
     /** [base] as is for a Mac; for a Linux computer, Resources that reword their text. */
-    fun wrap(base: Resources): Resources {
-        if (platform != Mac.LINUX) return base
+    fun wrap(base: Resources): Resources = if (platform != Mac.LINUX) base else reworded(base)
+
+    /**
+     * [base] worded for [computer] ([Mac.LINUX] or not), whichever computer is on screen: a hub's
+     * own messages (LiveHub's toasts and errors) say what its own computer is, a Linux server's
+     * "server" even next to a Mac, and from its first snapshot on, not only after a restart.
+     */
+    fun wordedFor(base: Resources, computer: String): Resources {
+        val plain = (base as? Reworded)?.base ?: base
+        return if (computer == Mac.LINUX) reworded(plain) else plain
+    }
+
+    private fun reworded(base: Resources): Resources {
         synchronized(made) {
             val cached = made[base]
             if (cached != null && cached.config == base.configuration) return cached

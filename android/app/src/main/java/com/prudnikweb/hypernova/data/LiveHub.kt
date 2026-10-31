@@ -85,7 +85,10 @@ class LiveHub(
     private val clock: () -> Long = System::currentTimeMillis,
 ) : Hub {
     private val app = context.applicationContext
-    private val res = app.resources
+    // Read each time, worded for this hub's own computer (ComputerWords.wordedFor): kept from when the
+    // hub was made, they said "Mac" for a Linux server until the app restarted.
+    private val res: android.content.res.Resources
+        get() = ComputerWords.wordedFor(app.resources, macInfo?.platform ?: if (isActive()) ComputerWords.platform else Mac.DARWIN)
     private val api = Api(pairing.baseUrl, pairing.token)
     private val now get() = clock()
     /** This phone's device certificate for the Mac's local listener (data/DeviceCert.kt). */

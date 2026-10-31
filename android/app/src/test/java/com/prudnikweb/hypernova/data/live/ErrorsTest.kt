@@ -40,12 +40,10 @@ class ErrorsTest {
     private fun words(id: Int) = rig.context.getString(id)
 
     /**
-     * BUG (LiveHub.kt:88, `private val res = app.resources`): the hub keeps the Resources it was made
-     * with. Made before its first snapshot (a first pairing, or a Linux server paired next to a Mac),
-     * they are the plain ones, and every message of the hub's (toasts, errors, banners) says "your
-     * Mac" for a Linux server until the app restarts, while the screens around them say "server".
+     * A Linux server's hub words its own messages (toasts, errors, banners) for a server, as the
+     * screens around them do (ComputerWords.wordedFor). It once kept the Resources it was made with,
+     * the plain Mac ones, until the app restarted.
      */
-    @org.junit.Ignore("BUG: LiveHub.kt:88 keeps the Resources it was made with, so a Linux server's hub words its messages for a Mac until the app restarts")
     @Test fun aLinuxServersHubSaysServerInItsOwnMessages() {
         daemon.snapshot = snapshot(sessions = listOf(session("s1")), platform = "linux")
         rig.connect()
