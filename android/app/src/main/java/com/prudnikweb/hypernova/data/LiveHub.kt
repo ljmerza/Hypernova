@@ -634,6 +634,8 @@ class LiveHub(
         class LanMsg(val lan: LanInfo?) : Msg
         /** Codex turned on or off, connected or not, its account or its windows (null: not installed). */
         class CodexMsg(val c: CodexState?) : Msg
+        /** Claude Code as the Mac has it: sessions in `claude agents` turned on or off. */
+        class ClaudeMsg(val c: ClaudeState) : Msg
         data object Ping : Msg
     }
 
@@ -656,6 +658,7 @@ class LiveHub(
         "providers" -> Msg.Providers(o.arr("providers").mapObjects(Wire::provider))
         "account" -> o.obj("account")?.let { Msg.AccountMsg(Wire.account(it)) }
         "codex" -> Msg.CodexMsg(runCatching { CodexWire.state(o.obj("codex")) }.getOrNull())
+        "claude" -> ClaudeState.parse(o.obj("claude"))?.let { Msg.ClaudeMsg(it) }
         "battery" -> Msg.BatteryMsg(Wire.battery(o.obj("battery")))
         "awake" -> Msg.AwakeMsg(MacAwake.parse(o.obj("awake")))
         "files" -> Msg.FilesMsg(o.obj("files")?.bool("browseOutsideProjects") == true)
@@ -712,6 +715,7 @@ class LiveHub(
             }
             is Msg.AccountMsg -> setAccount(m.a, live = true)
             is Msg.CodexMsg -> codexChanged(m.c)
+            is Msg.ClaudeMsg -> claude = m.c
             is Msg.BatteryMsg -> setBattery(m.b)
             is Msg.AwakeMsg -> macAwake = m.a
             is Msg.FilesMsg -> macBrowse = m.browseOutsideProjects
@@ -2178,6 +2182,12 @@ class LiveHub(
         if (c?.enabled != codex?.enabled || c?.available != codex?.available) codexModelCache = null
         codex = c
     }
+
+    override suspend fun setClaudeAgents(on: Boolean): Result<ClaudeState?> = try {
+        val c = ClaudeState.parse(api.post("/v1/claude", JSONObject().put("agents", on)).obj("claude"))
+        if (c != null) claude = c
+        Result.success(c)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.ag_claude_agents_err)) }
 
     override suspend fun setCodexEnabled(on: Boolean): Result<CodexState?> = try {
         val c = CodexWire.state(api.post("/v1/codex", JSONObject().put("enabled", on)).obj("codex"))

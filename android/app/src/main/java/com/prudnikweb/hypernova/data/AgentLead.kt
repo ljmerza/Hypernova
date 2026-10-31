@@ -8,9 +8,16 @@ import org.json.JSONObject
  * not, and its version. Null from an older daemon, where it always was.
  */
 @Immutable
-data class ClaudeState(val available: Boolean, val version: String?) {
+data class ClaudeState(
+    val available: Boolean,
+    val version: String?,
+    /** Sessions live in `claude agents` (the Mac's settings.claudeAgents); null from a Mac that doesn't say. */
+    val agents: Boolean? = null,
+) {
     companion object {
-        fun parse(o: JSONObject?): ClaudeState? = o?.let { ClaudeState(it.optBoolean("available", true), it.str("version")?.takeIf { v -> v.isNotBlank() }) }
+        fun parse(o: JSONObject?): ClaudeState? = o?.let {
+            ClaudeState(it.optBoolean("available", true), it.str("version")?.takeIf { v -> v.isNotBlank() }, if (it.has("agents")) it.optBoolean("agents") else null)
+        }
     }
 }
 

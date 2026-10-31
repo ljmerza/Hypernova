@@ -643,7 +643,7 @@ test('the finished rule: agents at work, a queue, an approval or a block keep it
 test('needs you: once per approval; an agent’s only if it still waits after 10 s; a terminal menu', async () => {
   const { w, e } = setup()
   const a = e.create({ name: 'Ping me', enabled: true, trigger: { kind: 'session', event: 'needs_you', projectPath: null, from: 'any' }, action: { kind: 'notify', text: '{session}: {ask}' } })
-  const ap = (id: string, agentId: string | null): Approval => ({ id, sessionId: 's1', createdAt: w.now, expiresAt: w.now + 10 * MIN, kind: 'tool', toolName: 'Bash', summary: 'Bash: git push origin main', input: {}, reason: null, canAlways: true, canSession: false, questions: null, plan: null, agentId, agentLabel: agentId ? 'Review' : null })
+  const ap = (id: string, agentId: string | null): Approval => ({ id, sessionId: 's1', createdAt: w.now, expiresAt: w.now + 10 * MIN, autoDeny: false, kind: 'tool', toolName: 'Bash', summary: 'Bash: git push origin main', input: {}, reason: null, canAlways: true, canSession: false, questions: null, plan: null, agentId, agentLabel: agentId ? 'Review' : null })
   w.sessions.set('s1', newSession('s1'))
   const main = ap('ap1', null)
   w.approvals = [main]
@@ -1201,6 +1201,22 @@ test('a run stuck on a terminal menu (no approval behind it) gets Esc after 10 m
   await later(w, e, 30 * MIN)
   assert.equal(e.runsPage(a.id, null, 1)[0]!.state, 'needs_you')
   assert.deepEqual(w.interrupted, [sid])
+})
+
+test('a run never presses Esc on the permission dialog of the owner’s own session it continued: it stops following, away, and the dialog stays', async () => {
+  const { w, e } = setup()
+  w.sessions.set('s1', newSession('s1'))
+  const a = e.create({ name: 'Nudge', enabled: true, trigger: { kind: 'time', at: '09:00', days: [5] }, action: { kind: 'continue', target: 's1', prompt: 'Carry on.', then: 'none' } })
+  await at(w, e, msk('2026-10-16T09:00') + SEC)
+  assert.equal(e.runsPage(a.id, null, 1)[0]!.state, 'running')
+  w.set(e, 's1', { state: 'working' })
+  await later(w, e, 30 * SEC)
+  // Its ask was handed back to Claude Code's own dialog (nobody answered on the phone).
+  w.set(e, 's1', { state: 'needs_you', menu: { id: 'perm:npm publish', title: 'Bash command', options: [], permission: { tool: 'Bash command', command: 'npm publish', question: 'Do you want to proceed?' } } as never, pendingApprovalIds: [] })
+  await later(w, e, 11 * MIN)
+  const run = e.runsPage(a.id, null, 1)[0]!
+  assert.deepEqual([run.state, run.reason], ['stopped', 'away'])
+  assert.deepEqual(w.interrupted, [], 'no Esc on the owner’s dialog')
 })
 
 test('a run stopped by a block says its real reason: no plan, on hold, credit, a provider, a limit with no reset', async () => {

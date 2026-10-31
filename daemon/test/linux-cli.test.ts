@@ -6,7 +6,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,7 +15,7 @@ import { cliContext, realSys, wslHere, type Cli, type Ran, type RunOptions, type
 import { doctor, lan, logs, pair, parseArgs, setup, status, uninstall } from '../src/cli/commands.ts'
 import { CARRIED, enableLinger, installService, userManager, launcherText, ownLauncher, removeService, serviceState, servicePath, unitText, userBusEnv } from '../src/cli/service.ts'
 import { downloadNode, majorOf, nodeArch, pickRelease, shaFor } from '../src/cli/node.ts'
-import { daemonIn, findClaudeBin, integrationDir, isDaemonDir, setIntegration } from '../src/cli/install.ts'
+import { daemonIn, defaultClaudeAgents, findClaudeBin, integrationDir, isDaemonDir, setIntegration } from '../src/cli/install.ts'
 import { claudeCandidates } from '../src/platform.ts'
 import { listenersOn, loopback, parseProcNet } from '../src/cli/doctor.ts'
 import { encodeQr, formatBits, qrLines, versionFor } from '../src/cli/qr.ts'
@@ -638,6 +638,10 @@ test('setup then uninstall: Node, the daemon, the command, the service with ling
   assert.match(text, /✓ The service: hypernova\.service, running, starts at boot with nobody logged in/)
   // The integration through the running daemon.
   assert.ok(daemon.requests.includes('POST /local/integration/install'))
+  // Sessions in claude agents: on in settings.json for the service to read, and told to the daemon.
+  assert.equal(JSON.parse(readFileSync(join(c.support, 'settings.json'), 'utf8')).claudeAgents, true)
+  assert.ok(daemon.bodies.some((b) => b.claudeAgents === true))
+  assert.match(text, /✓ Sessions run in claude agents/)
   // Claude Code is there (the stand-in's), not signed in: the owner is told, nothing signs in for him.
   assert.ok(!sys.calls.some((x) => x.args.includes('login') || x.args.includes('setup-token')))
   assert.match(text, /Sign in to Claude: run `claude` once on this server/)
@@ -659,6 +663,29 @@ test('setup then uninstall: Node, the daemon, the command, the service with ling
   assert.match(sys.out.join('\n'), /Lingering stays on for ada .*sudo loginctl disable-linger ada/)
   await uninstall(c, { yes: true, purge: true })
   assert.ok(!existsSync(c.support))
+})
+
+test('setup turns on sessions in claude agents only while settings.json doesn’t say: never over a false, nor a file it can’t read', () => {
+  const support = join(scratch, `agents-${++n}`)
+  const file = join(support, 'settings.json')
+  const read = () => readFileSync(file, 'utf8')
+  // A new install: no settings.json yet.
+  assert.equal(defaultClaudeAgents({ support }), 'set')
+  assert.equal(JSON.parse(read()).claudeAgents, true)
+  assert.equal(statSync(file).mode & 0o777, 0o600)
+  assert.equal(defaultClaudeAgents({ support }), 'kept')
+  // Unset beside the owner's other settings: on, the rest kept.
+  writeFileSync(file, JSON.stringify({ projectsRoot: '/home/ada/Projects', codex: true }))
+  assert.equal(defaultClaudeAgents({ support }), 'set')
+  assert.deepEqual(JSON.parse(read()), { projectsRoot: '/home/ada/Projects', codex: true, claudeAgents: true })
+  // Turned off by the owner: stays off.
+  writeFileSync(file, JSON.stringify({ projectsRoot: '/p', claudeAgents: false }))
+  assert.equal(defaultClaudeAgents({ support }), 'kept')
+  assert.equal(JSON.parse(read()).claudeAgents, false)
+  // A file that isn't JSON: left as it is.
+  writeFileSync(file, '{ broken')
+  assert.equal(defaultClaudeAgents({ support }), 'kept')
+  assert.equal(read(), '{ broken')
 })
 
 test('setup and pair point a Mac to its menu bar app', async () => {

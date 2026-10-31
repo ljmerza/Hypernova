@@ -21,6 +21,20 @@ class AskStackTest {
         assertEquals(listOf("soon", "late", "arriving"), asks.map { it.key })
     }
 
+    @Test fun onlyAnAskTheMacWillDenyCountsDown() {
+        // Codex, an automation's run: the Mac says no at expiresAt.
+        assertEquals(240_000L, Item.Approval("a", "Bash", "ls", "", expiresAt = 300_000L, autoDeny = true).autoDenyIn(60_000L))
+        assertNull(Item.Approval("a", "Bash", "ls", "", expiresAt = 300_000L, autoDeny = true).autoDenyIn(300_000L))
+        // The owner's Claude Code asks: never a no, so no countdown, whether they leave for the terminal or wait.
+        assertNull(Item.Approval("b", "Bash", "ls", "", expiresAt = 300_000L).autoDenyIn(60_000L))
+        assertNull(Item.Approval("c", "Bash", "ls", "", expiresAt = null).autoDenyIn(60_000L))
+        // As the Mac says it.
+        val sdk = com.prudnikweb.hypernova.data.Wire.approval(org.json.JSONObject("""{"id":"ap1","sessionId":"s1","kind":"tool","toolName":"Bash","summary":"Bash: ls","input":{},"expiresAt":null,"autoDeny":false}"""))
+        assertEquals(null to false, sdk.expiresAt to sdk.autoDeny)
+        val codex = com.prudnikweb.hypernova.data.Wire.approval(org.json.JSONObject("""{"id":"ap2","sessionId":"s1","kind":"tool","toolName":"Bash","summary":"Bash: ls","input":{},"expiresAt":600000,"autoDeny":true}"""))
+        assertEquals(600_000L to true, codex.expiresAt to codex.autoDeny)
+    }
+
     @Test fun answeredOnesStayInTheChat() {
         val items = listOf(ask("denied", 100L, resolved = Resolution.Denied), Item.Assistant("r", "ok"))
         val (chat, asks) = Asks.split(items)

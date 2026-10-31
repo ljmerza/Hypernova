@@ -457,7 +457,15 @@ sealed interface Item {
          * whole: the card shows its start and the rest on "Show all". Null for other tools.
          */
         val change: List<DiffLine>? = null,
-    ) : Item
+        /** The Mac says no at [expiresAt] for nobody answering ([WApproval.autoDeny]): Codex, an automation's run. */
+        val autoDeny: Boolean = false,
+    ) : Item {
+        /**
+         * How long until the Mac says no for nobody answering, for the band's countdown: only where it
+         * will ([autoDeny]); null for the owner's Claude Code asks, which are never a "no".
+         */
+        fun autoDenyIn(now: Long): Long? = expiresAt?.takeIf { autoDeny && it > now }?.minus(now)
+    }
     /**
      * Claude thought before answering; the text isn't shown, only its size. [ongoing]: it is still
      * going (the newest thing in a running session), so its label shimmers; [tookMs]: how long it

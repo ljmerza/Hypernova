@@ -70,7 +70,8 @@ test('without Claude Code, the snapshot says so and a session with no agent name
   const snap = (await call('GET', '/v1/snapshot')).body
   // `sdk`: whether Claude Code's SDK is in the daemon's packages (sdk.ts), here or not.
   const { sdk, ...claude } = snap.claude
-  assert.deepEqual(claude, { available: false, version: null })
+  // `agents`: sessions in `claude agents` (settings.claudeAgents), off unless set.
+  assert.deepEqual(claude, { available: false, version: null, agents: false })
   assert.equal(typeof sdk, 'boolean')
   assert.equal(snap.codex.available, true)
   const r = await call('POST', '/v1/sessions', { projectPath: project, prompt: 'hello' })

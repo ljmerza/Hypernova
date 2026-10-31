@@ -9,7 +9,7 @@ import { createInterface } from 'node:readline'
 import { ApiError, health, local, localText, waitHealthy } from './api.ts'
 import { bold, line, tilde, type Cli, UNIT } from './context.ts'
 import { CODEX_LOGIN, codexChecks, doctorChecks, type CodexState, type DoctorOptions } from './doctor.ts'
-import { claudeSignedIn, claudeVersionOf, findClaudeBin, installClaude, installDaemon, setIntegration } from './install.ts'
+import { claudeSignedIn, claudeVersionOf, defaultClaudeAgents, findClaudeBin, installClaude, installDaemon, setIntegration } from './install.ts'
 import { ensureNode, recordedNode } from './node.ts'
 import { encodeQr, qrLines } from './qr.ts'
 import { WSL_GUIDE, behindNat, systemdFix, wslNetworkingOf, wslPairNote } from './wsl.ts'
@@ -89,6 +89,14 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
     }
   }
   if (claude) line(cli, 'ok', `Claude Code ${(await claudeVersionOf(cli, claude)) ?? ''} · ${tilde(cli, claude)}`.replace('  ', ' '))
+  // Sessions in `claude agents`: on unless the owner turned it off, read by the service as it starts.
+  let agentsSet = false
+  try {
+    agentsSet = defaultClaudeAgents(cli) === 'set'
+    if (agentsSet) line(cli, 'ok', 'Sessions run in claude agents (Claude Code’s background sessions). To turn it off: Settings → Agents & providers in the app.')
+  } catch (e: any) {
+    line(cli, 'warn', 'Couldn’t turn on sessions in claude agents.', e.message)
+  }
 
   // 4. The service
   let running = false
@@ -123,6 +131,8 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
     }
   }
   if (!running) running = !!(await health(cli.localPort, 1500))
+  // A daemon that was already running and wasn't restarted (no service here) takes it at once too.
+  if (agentsSet && running) await local(cli, 'POST', '/local/settings', { claudeAgents: true }).catch(() => {})
 
   // 5. The integration: hooks, the status line, the claude function. Not in a container image
   // (--no-integration): the hooks carry the daemon's secret, which each volume makes for itself at

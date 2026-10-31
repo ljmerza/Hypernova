@@ -1818,6 +1818,17 @@ answered from the phone", 2026-10-13) stays as history for Claude Code; Codex ke
    while the card shows, removed once the asks are answered.
 6. **Left as it is:** automation runs still get Esc on a terminal menu that waits 10 minutes with no
    approval behind it (Automations, "Following"), so a run never needs you all night.
+7. **Sessions the daemon runs through the SDK wait** (2026-10-30, follow-up). They still got a no
+   with the away message after 10 minutes while the phone was told the ask had gone to the terminal,
+   which they don't have. Now their ask simply stays pending (no timer, `expiresAt: null`): the session
+   needs you and the phone keeps the card until it is answered, with no notice. An automation's own
+   run keeps the stop, away (`autoDeny`, `stoppedForAway`), since automations are left as they are
+   (6). The phone's band counts down ("auto-deny in 9m") only where Hypernova will say no: Codex and
+   an automation's run, never the owner's Claude Code asks.
+8. **Never Esc on the owner's dialog** (follow-up). An automation run that continued one of the
+   owner's sessions no longer presses Esc on that session's Claude Code permission dialog (an ask
+   handed back there) after 10 minutes: the run stops following it, away, and the dialog stays. The
+   run's own sessions keep the Esc of 6.
 
 ## Default mode for new sessions (2026-10-30)
 
@@ -1991,3 +2002,16 @@ shows none" (The session sheet, 3).
    servers). Only the fixed files for the session's own folder are read; the route takes no path
    (docs/PROTOCOL.md, "Rules in effect").
 3. **Read-only for now:** adding and removing rules is PA1, the owner's call.
+
+## claude agents on by default (2026-10-30)
+
+`settings.claudeAgents` was off unless written by hand into `settings.json`, which bit the owner on a
+second server (his sessions there never showed as `claude agents` jobs).
+
+1. **On for a Linux install.** `hypernova setup` writes `"claudeAgents": true` while `settings.json`
+   doesn't say, before the service starts (and tells a running daemon); never over the owner's own
+   `false`, nor over a `settings.json` it can't read. Running setup again on a server that never had
+   it turns it on.
+2. **A switch in the app:** Settings → Agents & providers → Claude Code → Sessions in claude agents
+   (`POST /v1/claude {agents}`), with one line saying what it does. The daemon takes it at once,
+   without a restart: each poll reads the setting, and turning it on reads the job list right away.

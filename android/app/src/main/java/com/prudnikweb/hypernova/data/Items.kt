@@ -282,6 +282,7 @@ object Items {
             // Empty: an agent asks whose name the Mac doesn't know yet.
             agent = a?.agentLabel ?: a?.agentId?.let { "" },
             change = a?.let { change(it.toolName, it.input, it.edits) },
+            autoDeny = a?.autoDeny ?: false,
         )
     }
 

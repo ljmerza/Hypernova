@@ -156,6 +156,61 @@ test('asks handed back to the terminal: one notice for the session, gone once ea
   assert.equal(notices().length, 0)
 })
 
+test('a session the daemon runs through the SDK: its ask waits for the phone past 10 minutes, never a no, no notice, no countdown', async () => {
+  const { sdkAwayRule } = await import('../src/runner.ts')
+  assert.equal(sdkAwayRule({}), 'never')
+  const sid = 'bl-sdk-wait'
+  hub.upsertSession(sid, { cwd, origin: 'hypernova', state: 'working' })
+  const feed = sent()
+  let settled = false
+  mock.timers.enable({ apis: ['setTimeout'] })
+  let asked: Promise<{ decision: string }>
+  try {
+    asked = hub.requestApproval({ sessionId: sid, kind: 'tool', toolName: 'Bash', summary: 'Bash: npm publish', input: { command: 'npm publish' }, reason: null, canAlways: false, questions: null, plan: null }, 'toolu_sdk1', undefined, sdkAwayRule({}))
+    void asked.then(() => (settled = true))
+    mock.timers.tick(hub.AWAY_MS)
+    mock.timers.tick(10 * hub.AWAY_MS)
+    await new Promise((r) => setImmediate(r))
+  } finally {
+    mock.timers.reset()
+  }
+  assert.equal(settled, false, 'still waiting')
+  const [a] = hub.pendingApprovals().filter((x) => x.sessionId === sid)
+  assert.ok(a, 'the phone still has the card')
+  assert.deepEqual([a!.expiresAt, a!.autoDeny], [null, false])
+  assert.ok(feed.some((m) => m.t === 'approval' && m.approval.id === a!.id && m.approval.expiresAt === null))
+  assert.equal(hub.getSession(sid)?.state, 'needs_you')
+  assert.equal(hub.getSession(sid)?.stoppedForAway, false)
+  assert.equal(hub.eventsFor(sid).filter((e) => e.kind === 'notice').length, 0, 'no "the question is in the terminal"')
+  assert.equal(blocked.blockedCount(sid), 0)
+  // Answered from the phone an hour later: Claude gets that answer.
+  assert.ok(hub.answerApproval(a!.id, { decision: 'allow' }, 'phone'))
+  assert.equal((await asked!).decision, 'allow')
+})
+
+test('an automation’s run through the SDK still stops, away, after 10 minutes, and the phone counts down to it', async () => {
+  const { sdkAwayRule } = await import('../src/runner.ts')
+  const rule = sdkAwayRule({ automation: { id: 'a1', name: 'Morning brief', runId: 'r1' } })
+  assert.equal(rule, 'deny')
+  const sid = 'bl-sdk-auto'
+  hub.upsertSession(sid, { cwd, origin: 'hypernova', state: 'working' })
+  mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    const asked = hub.requestApproval({ sessionId: sid, kind: 'tool', toolName: 'Bash', summary: 'Bash: npm publish', input: { command: 'npm publish' }, reason: null, canAlways: false, questions: null, plan: null }, 'toolu_sdk2', undefined, rule)
+    const [a] = hub.pendingApprovals().filter((x) => x.sessionId === sid)
+    assert.equal(a!.autoDeny, true)
+    assert.equal(typeof a!.expiresAt, 'number')
+    mock.timers.tick(hub.AWAY_MS)
+    assert.equal((await asked).decision, 'timeout')
+  } finally {
+    mock.timers.reset()
+  }
+  assert.equal(hub.getSession(sid)?.stoppedForAway, true)
+  assert.equal(blocked.blockedList(sid)[0]?.reason, 'away')
+  const notes = hub.eventsFor(sid).filter((e) => e.kind === 'notice').map((e) => (e.kind === 'notice' ? e.text : ''))
+  assert.deepEqual(notes, ['Paused: nobody answered for 10 minutes, so Hypernova said no and asked Claude to wait for you.'])
+})
+
 test('a call refused for want of an answer (Codex): Allow & retry says so, and its next ask is answered yes once', async () => {
   const sid = 'bl-away-1'
   hub.upsertSession(sid, { cwd, origin: 'terminal' })

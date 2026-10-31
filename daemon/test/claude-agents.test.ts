@@ -79,9 +79,11 @@ case "$1" in
       exit 0 ;;
     esac
     # eff*: an input box that takes a typed line (echoed into it) and empties on Enter; each line
-    # lands in typed-<job>. effstuk0 shows another session (its title) on every attach.
+    # lands in typed-<job>. effstuk* show another session (its title) on every attach, effdrft*
+    # on the first one only (attaches counted in n-<job>).
     case "$2" in eff*)
-      t=Mine; [ "$2" = effstuk0 ] && t='Some other session'
+      n=$(( $(cat "$S/n-$2" 2>/dev/null || echo 0) + 1 )); echo $n > "$S/n-$2"
+      t=Mine; case "$2" in effstuk*) t='Some other session' ;; effdrft*) [ $n = 1 ] && t='Some other session' ;; esac
       draw() { printf '\\033[2J\\033[H\\033]0;%s\\007\\n────────────────────\\n❯ \\n────────────────────\\n\\033[3;3H' "$t"; }
       stty echo icanon 2>/dev/null; draw
       while IFS= read -r l; do echo "$l" >> "$S/typed-$2"; draw; done
@@ -177,6 +179,32 @@ test('setting off: a claude agents entry in the registry is passed over, as befo
   hub.pollRegistry()
   assert.equal(hub.getSession('agents-off-1'), undefined)
   assert.equal(hub.agentJobOf('agents-off-1'), null)
+})
+
+test('the setting from the phone: POST /v1/claude {agents}, saved, said to every phone, taken without a restart', async () => {
+  settings.claudeAgents = false
+  const feed: any[] = []
+  hub.addClient({ send: (s) => feed.push(JSON.parse(s)) })
+  const bad = await post('/v1/claude', { agents: 'yes' })
+  assert.equal(bad.status, 400)
+  assert.equal(bad.json.error.code, 'bad_value')
+  assert.equal(settings.claudeAgents, false)
+  const saved = () => JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'settings.json'), 'utf8')).claudeAgents
+  const on = await post('/v1/claude', { agents: true })
+  assert.equal(on.status, 200, JSON.stringify(on.json))
+  assert.equal(on.json.claude.agents, true)
+  assert.equal(settings.claudeAgents, true)
+  assert.equal(saved(), true)
+  assert.ok(feed.some((m) => m.t === 'claude' && m.claude.agents === true))
+  // The registry's next look takes the job, no restart.
+  job('agents-route-1', 'rout0001')
+  hub.pollRegistry()
+  assert.equal(hub.agentJobOf('agents-route-1'), 'rout0001')
+  const off = await post('/v1/claude', { agents: false })
+  assert.equal(off.json.claude.agents, false)
+  assert.equal(saved(), false)
+  assert.ok(feed.some((m) => m.t === 'claude' && m.claude.agents === false))
+  settings.claudeAgents = true
 })
 
 test('setting on: a claude agents session is live, with the job id claude attach takes', () => {
@@ -1000,4 +1028,71 @@ test('the status line’s effort is the session’s, unless the phone set one af
   // Not an effort: nothing.
   hub.noteStatusEffort('agents-effort-3', { level: 'max' }, 4000)
   assert.equal(hub.getSession('agents-effort-3')?.effort, 'medium')
+})
+
+// ── Model (docs/PROTOCOL.md, "A session's model") ────────────────────────
+
+const { useClaudeProbe, noteClaudeModels } = await import('../src/models.ts')
+// Claude Code's own list, as its initialize answer gives it (no Claude Code is started).
+useClaudeProbe(async () =>
+  noteClaudeModels([
+    { value: 'default', displayName: 'Default (recommended)', description: 'Opus 5.5', resolvedModel: 'claude-opus-5-5' },
+    { value: 'sonnet', displayName: 'Sonnet', resolvedModel: 'claude-sonnet-5-5' },
+  ]),
+)
+
+test('the model route on a claude agents job with no terminal: claude attach, then /model typed into its box', async () => {
+  settings.claudeAgents = true
+  job('agents-model-1', 'effmod00', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  assert.equal(termOf('agents-model-1'), null)
+  const r = await post('/v1/sessions/agents-model-1/model', { model: 'sonnet' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.deepEqual([r.json.model, r.json.applies, r.json.session.model], ['claude-sonnet-5-5', 'now', 'claude-sonnet-5-5'])
+  assert.deepEqual(typed('effmod00'), ['/model sonnet'])
+  assert.equal(attaches('effmod00'), 1)
+  // Again: the same holder.
+  const d = await post('/v1/sessions/agents-model-1/model', { model: null })
+  assert.equal(d.status, 200, JSON.stringify(d.json))
+  assert.deepEqual(typed('effmod00'), ['/model sonnet', '/model default'])
+  assert.equal(attaches('effmod00'), 1)
+})
+
+test('the model route on a finished claude agents job attaches to it, never keeps a model for a resume that won’t use it', async () => {
+  settings.claudeAgents = true
+  hub.applyAgentList([...listed, { id: 'effmodd0', sessionId: 'agents-model-2', cwd: scratch, state: 'done' }])
+  const r = await post('/v1/sessions/agents-model-2/model', { model: 'sonnet' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.deepEqual(typed('effmodd0'), ['/model sonnet'])
+  assert.equal(r.json.session.model, 'claude-sonnet-5-5')
+})
+
+test('the model route never types into a claude attach that shows another session', async () => {
+  settings.claudeAgents = true
+  job('agents-model-3', 'effstuk1', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  const before = hub.getSession('agents-model-3')?.model ?? null
+  const r = await post('/v1/sessions/agents-model-3/model', { model: 'sonnet' })
+  assert.equal(r.status, 409, JSON.stringify(r.json))
+  assert.equal(r.json.error.code, 'busy')
+  assert.equal(r.json.error.reason, 'terminal_busy')
+  assert.deepEqual(typed('effstuk1'), [])
+  assert.equal(hub.getSession('agents-model-3')?.model ?? null, before, 'no model shown that wasn’t applied')
+})
+
+test('the model route replaces a claude attach holder that drifted, typing only into the fresh one', async () => {
+  settings.claudeAgents = true
+  job('agents-model-4', 'effdrft0', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  const first = await attachAgentsTerm('agents-model-4', scratch, 'effdrft0')
+  assert.ok(first)
+  scanTerms()
+  const t0 = Date.now()
+  while (!attachDrifted(first!, 'agents-model-4') && Date.now() - t0 < 5000) await new Promise((ok) => setTimeout(ok, 100))
+  assert.equal(attachDrifted(first!, 'agents-model-4'), true)
+  const r = await post('/v1/sessions/agents-model-4/model', { model: 'sonnet' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(attaches('effdrft0'), 2, 'a fresh claude attach')
+  assert.notEqual(termOf('agents-model-4'), first)
+  assert.deepEqual(typed('effdrft0'), ['/model sonnet'])
 })

@@ -50,6 +50,13 @@ class AgentLeadTest {
         assertNull(Wire.snapshot(JSONObject("""{"mac":{"id":"m"}}""")).claude)
     }
 
+    @Test fun sessionsInClaudeAgentsAreSaidOrUnknown() {
+        // Said: the Settings switch shows it; not said (an older Mac): no switch.
+        assertEquals(true, ClaudeState.parse(JSONObject("""{"available":true,"version":"2.1.3","agents":true}"""))?.agents)
+        assertEquals(false, ClaudeState.parse(JSONObject("""{"available":true,"agents":false}"""))?.agents)
+        assertNull(ClaudeState.parse(JSONObject("""{"available":true,"version":"2.1.3"}"""))?.agents)
+    }
+
     @Test fun codexsStarIsLitByItsFiveHourWindowElseItsWeek() {
         val five = Window(40.0, now + 3_600_000L)
         val week = Window(70.0, now + 86_400_000L)
