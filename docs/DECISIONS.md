@@ -2405,3 +2405,30 @@ one tool call) and got "That agent's transcript isn't on the Mac." on a Linux se
    on a Mac (`MACHINE`, platform.ts). Messages about a Mac-only feature (its voice, macOS' privacy
    question, opening a window, the Mac app's Setup) keep "Mac".
 5. On the session chat screen, only that: those helpers' cards no longer show. Nothing new there.
+
+## Card swipes in Settings (2026-10-31)
+
+The owner wanted to set what swiping right or left does on a Home card, not only the one swipe left
+decided above ("Home cards: what it's doing, for how long, and swipes", 3).
+
+1. **Settings → Card swipes**, after Display: **Swipe left** and **Swipe right**, each one of
+   **Smart**, **Open**, **Stop**, **Delete**, **Rename**, **Restart**, **Mark read**, **Nothing**.
+   Smart is the swipe as decided before (Needs input opens; a Completed job stops while its process
+   runs, else is deleted; Working and Completed Codex cards don't). **Defaults: left Smart, right
+   Nothing**, so nothing changes until he picks.
+2. **A pick that doesn't fit a card leaves that way without a swipe**, never something else in its
+   place. What fits is the long-press menu's own `MenuOffer`, so a swipe never offers what the menu
+   doesn't: Stop for a job or a Codex session while it works or waits (a job idling with its process
+   too); Delete for a job or a Codex session; Rename for any; Restart for a job on an older Claude
+   Code only; Open for any; Mark read only on a card showing the unread dot.
+3. **Codex goes through its own routes** (above, "Rename, Stop and Delete for Codex sessions"):
+   Delete picked on purpose deletes a Codex session too, Codex's for good, asked first. Smart still
+   keeps a Completed Codex card from swiping to Delete (that decision's 4 stands for Smart).
+4. **Confirms as in the menu:** Delete always asks first, Restart asks first, Stop goes at once;
+   Rename opens the rename sheet. Mark read marks the reply read on this phone (data/Unread.kt).
+5. **Right looks like left, mirrored:** the word in the action's colour under the card at the end it
+   uncovers, the haptic tick at 38%, the card springing back. A way with no swipe gives 16dp. Both
+   ways on one card don't fight the list's scroll, the long-press menu or Allow and Deny (sideways only
+   past the touch slop). TalkBack lists each way's action on the card.
+6. **Kept on the phone** (`ui/home/CardSwipePref.kt`, the app's `hypernova_ui` preferences), applied
+   to Home at once. Nothing on the session's chat screen.

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Under a Home card as it slides (ui/home/CardSwipe.kt); the other actions use the long-press menu's words. -->
+    <string name="swipe_mark_read">Mark read</string>
+
+    <!-- Settings → Card swipes (ui/settings/CardSwipeSection.kt). -->
+    <string name="st_card_swipes">Card swipes</string>
+    <string name="st_card_swipes_desc">What a swipe on a Home card does. A card the action doesn\'t fit doesn\'t swipe that way.</string>
+    <string name="st_swipe_left">Swipe left</string>
+    <string name="st_swipe_right">Swipe right</string>
+    <string name="st_swipe_smart">Smart</string>
+    <string name="st_swipe_smart_desc">Needs input opens. A finished claude agents job stops while it runs, else it\'s deleted, asking first. Working cards don\'t swipe.</string>
+    <string name="st_swipe_open">Open</string>
+    <string name="st_swipe_open_desc">Opens the session.</string>
+    <string name="st_swipe_stop">Stop</string>
+    <string name="st_swipe_stop_desc">Stops a job or a Codex session while it works or waits, as the menu\'s Stop.</string>
+    <string name="st_swipe_delete">Delete</string>
+    <string name="st_swipe_delete_desc">Deletes a job or a Codex session, always asking first.</string>
+    <string name="st_swipe_rename">Rename</string>
+    <string name="st_swipe_rename_desc">Opens Rename for the session.</string>
+    <string name="st_swipe_restart">Restart</string>
+    <string name="st_swipe_restart_desc">Restarts a job on an older Claude Code on the installed one, asking first.</string>
+    <string name="st_swipe_mark_read">Mark read</string>
+    <string name="st_swipe_mark_read_desc">Marks an unread reply read, taking its dot away.</string>
+    <string name="st_swipe_nothing">Nothing</string>
+    <string name="st_swipe_nothing_desc">Cards don\'t swipe this way.</string>
+</resources>
