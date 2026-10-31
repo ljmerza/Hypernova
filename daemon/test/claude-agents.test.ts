@@ -1136,3 +1136,106 @@ test('the model route replaces a claude attach holder that drifted, typing only 
   assert.notEqual(termOf('agents-model-4'), first)
   assert.deepEqual(typed('effdrft0'), ['/model sonnet'])
 })
+
+// ── A job that died (job-deaths.ts, IDEAS NT4) ───────────────────────────────
+/** A job's state file as Claude Code leaves it when the job ends: its state and its detail. */
+function jobEnded(job: string, state: string, detail: string): void {
+  const dir = join(process.env.CLAUDE_CONFIG_DIR!, 'jobs', job)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'state.json'), JSON.stringify({ state, detail, tempo: 'idle', updatedAt: new Date().toISOString() }))
+}
+function del(path: string): Promise<{ status: number; json: any }> {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port: API, method: 'DELETE', path, headers: { host: `127.0.0.1:${API}`, authorization: `Bearer ${TOKEN}` } }, (res) => {
+      let data = ''
+      res.setEncoding('utf8')
+      res.on('data', (c) => (data += c))
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, json: data ? JSON.parse(data) : null }))
+    })
+    req.on('error', reject)
+    req.end()
+  })
+}
+/** The `{t:"job.died"}` messages every phone hears from now on. */
+function deathFeed(): any[] {
+  const feed: any[] = []
+  hub.addClient({ send: (s) => void (JSON.parse(s).t === 'job.died' && feed.push(JSON.parse(s))) })
+  return feed
+}
+
+test('a job that crashes mid-turn: one job.died with Claude Code’s reason, its session says died; later reads say nothing more', async () => {
+  settings.claudeAgents = true
+  const feed = deathFeed()
+  const pid = job('agents-died-1', 'died0001', 'busy', { name: 'Crashy' })
+  const list = [{ id: 'died0001', sessionId: 'agents-died-1', cwd: scratch, name: 'Crashy', state: 'working' }]
+  hub.applyAgentList(list)
+  hub.pollRegistry()
+  assert.equal(hub.getSession('agents-died-1')?.state, 'working')
+  // The process dies mid-turn: gone from the registry, and Claude Code marks the job failed.
+  process.kill(pid, 'SIGKILL')
+  await new Promise((ok) => setTimeout(ok, 100))
+  rmSync(join(registry, `${pid}.json`), { force: true })
+  hub.pollRegistry()
+  jobEnded('died0001', 'failed', 'exit 1 — Error: ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789 rejected')
+  hub.applyAgentList([{ ...list[0]!, state: 'failed' }])
+  assert.equal(feed.length, 1, JSON.stringify(feed))
+  assert.equal(feed[0].sessionId, 'agents-died-1')
+  assert.equal(feed[0].job, 'died0001')
+  assert.match(feed[0].reason, /^exit 1 — Error: /)
+  assert.doesNotMatch(feed[0].reason, /sk-ant-api03/, 'secrets masked')
+  const s = hub.listSessions().find((x) => x.id === 'agents-died-1')
+  assert.equal(s?.state, 'idle', 'on Home with the finished ones')
+  assert.equal(s?.died?.reason, feed[0].reason)
+  hub.applyAgentList([{ ...list[0]!, state: 'failed' }])
+  hub.applyAgentList([{ ...list[0]!, state: 'failed' }])
+  assert.equal(feed.length, 1, 'never twice for one death')
+  // At work again (a prompt woke it): no longer died; dying once more is a new death.
+  hub.applyAgentList([{ ...list[0]!, state: 'working' }])
+  assert.equal(hub.listSessions().find((x) => x.id === 'agents-died-1')?.died, undefined)
+  jobEnded('died0001', 'failed', 'SIGKILL (137)')
+  hub.applyAgentList([{ ...list[0]!, state: 'failed' }])
+  assert.equal(feed.length, 2)
+  assert.equal(feed[1].reason, 'SIGKILL (137)')
+})
+
+test('a job that dies with the list still saying done: its state file’s failed counts', () => {
+  settings.claudeAgents = true
+  const feed = deathFeed()
+  const j = { id: 'died0002', sessionId: 'agents-died-2', cwd: scratch, state: 'working' }
+  hub.applyAgentList([j])
+  jobEnded('died0002', 'failed', 'API error')
+  hub.applyAgentList([{ ...j, state: 'done' }])
+  assert.equal(feed.length, 1)
+  assert.equal(feed[0].reason, 'API error')
+})
+
+test('a job that finishes normally: no job.died, and its session has no died', () => {
+  settings.claudeAgents = true
+  const feed = deathFeed()
+  const j = { id: 'fine0001', sessionId: 'agents-fine-1', cwd: scratch, state: 'working' }
+  hub.applyAgentList([j])
+  jobEnded('fine0001', 'done', 'Pushed the fix')
+  hub.applyAgentList([{ ...j, state: 'done' }])
+  assert.deepEqual(feed, [])
+  assert.equal(hub.listSessions().find((x) => x.id === 'agents-fine-1')?.died, undefined)
+})
+
+test('the owner’s Stop and Delete from the phone: no job.died, whatever the job ends as', async () => {
+  settings.claudeAgents = true
+  const feed = deathFeed()
+  const a = { id: 'stop0001', sessionId: 'agents-stop-1', cwd: scratch, state: 'working' }
+  const b = { id: 'dele0001', sessionId: 'agents-dele-1', cwd: scratch, state: 'working' }
+  const c = { id: 'kill0001', sessionId: 'agents-kill-1', cwd: scratch, state: 'working' }
+  hub.applyAgentList([a, b, c])
+  // Stop: Claude Code says stopped.
+  assert.equal((await post('/v1/sessions/agents-stop-1/stop', {})).status, 200)
+  jobEnded('stop0001', 'stopped', 'stopped')
+  // Stopped from the phone, though Claude Code calls the end of it failed: still his doing.
+  assert.equal((await post('/v1/sessions/agents-kill-1/stop', {})).status, 200)
+  jobEnded('kill0001', 'failed', 'SIGTERM (143)')
+  // Delete: gone from the list.
+  assert.equal((await del('/v1/sessions/agents-dele-1')).status, 200)
+  hub.applyAgentList([{ ...a, state: 'stopped' }, { ...c, state: 'failed' }])
+  hub.applyAgentList([{ ...a, state: 'stopped' }, { ...c, state: 'failed' }])
+  assert.deepEqual(feed, [])
+})
