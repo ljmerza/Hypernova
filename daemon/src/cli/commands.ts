@@ -151,7 +151,6 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
   if (cli.wsl && !cli.wsl.container) next.push(`Keep WSL running for the phone: instanceIdleTimeout=-1 under [general] in %UserProfile%\\.wslconfig on Windows (${WSL_GUIDE}).`)
   next.push(cli.wsl ? 'Pair your phone: hypernova pair (WSL keeps this PC off the Wi‑Fi unless its networking is mirrored)' : 'Pair your phone: hypernova pair')
   next.push('Check everything: hypernova doctor')
-  await nameTermsOnce(cli)
   cli.sys.say(bold(cli, failed ? 'Setup finished with problems (above). Then:' : 'Done. Next:'))
   next.forEach((n, i) => cli.sys.say(`  ${i + 1}. ${n}`))
   return failed ? 1 : 0
@@ -201,12 +200,9 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
   }
   let p: { code?: string; link: string; appLink: string; webLink?: string; download?: string; expiresAt: number; url: string }
   let before: string[] = []
-  // Before the code (which makes the name the first time): what the private name is, once.
-  await nameTermsOnce(cli)
   try {
     before = ((await local(cli, 'GET', '/local/devices')).devices ?? []).map((d: any) => d.id)
-    // `name`: this code's download link may use the private name, so it counts for it (names.ts).
-    p = await local(cli, 'POST', '/local/pair/start?name=1', {})
+    p = await local(cli, 'POST', '/local/pair/start', {})
   } catch (e: any) {
     line(cli, 'fail', 'The daemon couldn’t make a pairing code.', e.message)
     return 1
@@ -228,8 +224,7 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
     line(cli, wslNote.mark, wslNote.text, wslNote.fix)
     cli.sys.say()
   }
-  // The app's page (on the local network's name whenever that works: the daemon's names.ts). The
-  // page the code opens without the app sends the owner here for it ("hypernova pair says where").
+  // The app's page (on the local network's listener). The page the code opens without the app sends the owner here for it ("hypernova pair says where").
   // No download line when the daemon could only guess its address (the emulator's host alias), and
   // the release's when this computer has no app to hand out (a Linux package carries none).
   if (p.download) {
@@ -370,8 +365,6 @@ export async function status(cli: Cli, flags: Flags): Promise<number> {
     row('Sessions', sessions.length ? `${[['working', by('working')], ['need you', by('needs_you')], ['idle', by('idle')]].filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(', ') || `${sessions.length} open`}; ${terms} in shared terminals` : 'none open')
     if (st.account && st.account.state !== 'ok') row('Account', `${st.account.state}${st.account.text ? `: ${st.account.text}` : ''}`)
   }
-  const nm = await local(cli, 'GET', '/local/name').catch(() => null)
-  if (nm && nm.enabled !== false) row('Name', `${nm.host ?? (nm.state === 'off' ? 'off' : 'none yet')}${nm.reason ? ` (${nm.reason})` : ''}${nm.lastError ? `; last error: ${nm.lastError.message}` : ''}`)
   row('Log', tilde(cli, join(cli.logs, 'daemon.log')))
   return 0
 }
@@ -490,61 +483,6 @@ export async function codex(cli: Cli, rest: string[]): Promise<number> {
   }
 }
 
-// ── name ──────────────────────────────────────────────────────────────────
-
-/**
- * Once per server (on `setup` or the first `pair`, whichever comes first): what the private name
- * is and that Let's Encrypt's terms are accepted for it, with how to turn it off; then the daemon
- * is told it was said (`nameTermsShown`), which it waits for before making anything. Nothing when
- * the name doesn't apply here (turned off, no local network listener, a test daemon, an older
- * daemon) or was already said.
- */
-export async function nameTermsOnce(cli: Cli): Promise<void> {
-  let st: { enabled?: boolean; reason?: string; terms?: string; termsShown?: boolean; service?: string | null } | null = null
-  try {
-    st = await local(cli, 'GET', '/local/name')
-  } catch {
-    return
-  }
-  if (!st?.enabled || st.termsShown !== false || /listener is off/.test(st.reason ?? '')) return
-  line(cli, 'info', `A private name: while a code is shown, this server’s Wi‑Fi address gets a name from the name service configured here (${st.service ?? 'the nameServiceUrl setting'}) with a free Let’s Encrypt certificate, so a phone’s browser opens the download page without a warning. Hypernova accepts Let’s Encrypt’s terms (${st.terms ?? 'https://letsencrypt.org/repository/'}) for you. The name is public; the address is in DNS only while a code is shown.`, 'hypernova name off   (to do without it)')
-  try {
-    await local(cli, 'POST', '/local/settings', { nameTermsShown: true })
-  } catch {}
-}
-
-/** `hypernova name on|off`: the private name under hypernova.observer (docs/PROTOCOL.md, "A name on the local network"). */
-export async function name(cli: Cli, rest: string[]): Promise<number> {
-  const want = rest[0]
-  if (want !== 'on' && want !== 'off') {
-    cli.sys.say('hypernova name on|off: a private name with a real certificate for the download page, published only while a code is shown.')
-    return 2
-  }
-  try {
-    const r = await local<{ nameRelease?: { released?: boolean; name?: string | null } }>(cli, 'POST', '/local/settings', { nameService: want === 'on' }, 30_000)
-    const st = await local(cli, 'GET', '/local/name')
-    if (want === 'on') {
-      // No name service unless one is configured (names.ts): the setting alone makes nothing.
-      if (st.service == null) {
-        line(cli, 'warn', 'Private name on, but no name service is configured, so there is no name: the links use this server’s address.', 'set nameServiceUrl in settings.json (or HYPERNOVA_NAMES_URL) to use one')
-        return 0
-      }
-      line(cli, 'ok', `Private name on${st.host ? ` (${st.host})` : ''}: it’s made or published when a code is shown.`)
-      return 0
-    }
-    const rel = r?.nameRelease
-    if (rel?.name && !rel.released) {
-      line(cli, 'warn', `Private name off, but ${rel.name} couldn’t be given up just now: its records stay in DNS until the daemon gets through (it keeps trying), or 90 days unused.`)
-      return 1
-    }
-    line(cli, 'ok', rel?.name ? `Private name off; ${rel.name} was given up.` : 'Private name off.')
-    return 0
-  } catch (e: any) {
-    line(cli, 'fail', e instanceof ApiError && e.status === 0 ? 'The daemon isn’t running.' : e.message)
-    return 1
-  }
-}
-
 // ── uninstall ─────────────────────────────────────────────────────────────
 
 /**
@@ -557,7 +495,7 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
     cli.sys.say('On a Mac, uninstall from Hypernova’s menu bar app (its menu, Uninstall…).')
     return 1
   }
-  const taken = flags.purge ? 'Hypernova, its paired phones and settings and its private name' : 'Hypernova (its paired phones and settings stay)'
+  const taken = flags.purge ? 'Hypernova, its paired phones and settings' : 'Hypernova (its paired phones and settings stay)'
   if (!flags.yes) {
     // Without a terminal nobody can answer: refuse rather than remove everything unasked.
     if (!process.stdin.isTTY) {
@@ -576,16 +514,6 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
     line(cli, 'ok', 'Hooks, status line and the claude function removed')
   } catch (e: any) {
     notes.push(`The integration couldn’t be removed (${e.message}). Its hooks point at Hypernova’s local port, so they do nothing once it’s gone.`)
-  }
-  // The server's name under hypernova.observer (the daemon's names.ts): its record leaves DNS now
-  // rather than after 90 days unused. A daemon that's down, or older, has nothing to say.
-  try {
-    const r = await local<{ released?: boolean; name?: string | null }>(cli, 'POST', '/local/name/release', {}, 30_000)
-    if (r?.name && r.released) line(cli, 'ok', `Its name ${r.name} under hypernova.observer given up`)
-    else if (r?.name) notes.push(`This server’s name (${r.name}) under hypernova.observer couldn’t be given up just now; its records go by themselves after 90 days unused.`)
-  } catch (e) {
-    // An older daemon has no such route; otherwise say so when there is a name to give up.
-    if (!(e instanceof ApiError && e.status === 404) && existsSync(join(cli.support, 'names', 'name.json'))) notes.push(`This server’s name under hypernova.observer couldn’t be confirmed given up (${(e as Error).message}); its records go by themselves after 90 days unused.`)
   }
   notes.push(...(await removeService(cli)))
   line(cli, 'ok', `${UNIT} stopped and removed`)
@@ -635,12 +563,11 @@ export const HELP = `hypernova: a control room for Claude Code and Codex, on thi
   hypernova codex [on|off]
                         OpenAI's Codex for Hypernova: what's found here, or turn it on or off
   hypernova lan on|off  the phone's direct route on the same network
-  hypernova name on|off a private name for the download page (published only while a code is shown)
   hypernova uninstall   remove it (--purge: paired phones and settings too; --yes)
   hypernova run         run the daemon in the foreground (containers, debugging)
   hypernova automation fire <id>
                         fire an automation's webhook trigger (--data <text> or --data-file <file|->: its payload)
 
 Shared terminals: \`claude\` (and \`codex\`, while it's on) in your shell runs in one your phone can see; hn ls, hn attach.
-Docs: https://hypernova.nikbraun.tech, or docs/LINUX.md in Hypernova's repository.
+Docs: docs/LINUX.md in https://github.com/ljmerza/Hypernova
 `

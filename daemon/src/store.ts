@@ -33,14 +33,6 @@ export type Settings = {
   terminalApp?: string | null
   /** The LAN listener (lan.ts): the phone reaches the daemon directly on the local network. Unset: on. */
   lanAccess?: boolean
-  /** A name with a real certificate for the local network's pages (names.ts), from the name service at `nameServiceUrl`. Unset: on, but with no `nameServiceUrl` there is no name. */
-  nameService?: boolean
-  /** Setup's phone step (or `hypernova pair`) has shown what that name is and Let's Encrypt's terms; nothing is made before. */
-  nameTermsShown?: boolean
-  /** A name service (names/README.md); unset: none, so no name (until 2026-10-30, https://api.hypernova.observer). */
-  nameServiceUrl?: string
-  /** Where the name's certificate comes from: "staging", "production" or an ACME directory URL (names.ts); HYPERNOVA_ACME_DIRECTORY wins. */
-  acmeDirectory?: string
   /**
    * Sessions live in Claude Code's own background daemon (`claude agents`): the phone types into
    * one through `claude attach` in a shared terminal (the same conversation, never a fork), and a

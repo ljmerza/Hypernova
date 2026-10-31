@@ -11,8 +11,7 @@ import { API_PORT, LOCAL_PORT, PROTOCOL, SUPPORT, VERSION, claudeCached, claudeV
 import type { Ev } from './normalize.ts'
 import { speechFeed, speechRoute, speechState } from './readaloud.ts'
 import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider, isClaudeEffort } from './store.ts'
-import { lanDevice, lanInfo, lanNamed, lanNamedHost, lanOrigin, pairAllowed, pairFailed, pairingAddresses, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
-import { nameKick, nameStatus, namedOrigin, releaseName, setNameService, setNameTermsShown, wantName } from './names.ts'
+import { lanDevice, lanInfo, lanOrigin, pairAllowed, pairFailed, pairingAddresses, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort, setMode } from './runner.ts'
@@ -171,10 +170,6 @@ function attachments(b: any): string[] {
 // ── Pairing codes (single use, 10 minutes) ───────────────────────────────
 const pairCodes = new Map<string, number>()
 /**
- * A pairing code. [forName]: it's shown where the name is used (Setup's phone step, `hypernova
- * pair`), so it counts for the name until it expires (names.ts); the menu bar's code doesn't.
- */
-/**
  * A code the Mac stopped showing (the Pair page closed, or a fresh code replaced it): it stops
  * pairing at once instead of at its expiry. With no code, every live code. Returns how many ended.
  */
@@ -185,12 +180,10 @@ export function cancelPairing(code?: string | null): number {
   return n
 }
 
-export async function startPairing(dev = false, forName = false) {
+export async function startPairing(dev = false) {
   const code = randomToken(16)
   const expiresAt = Date.now() + 10 * 60_000
   pairCodes.set(sha256(code), expiresAt)
-  // A code on screen until it expires, where its download link uses the name: published meanwhile.
-  if (!dev && forName) wantName(expiresAt)
   // Local only (docs/PROTOCOL.md, "Pairing"): everything points at this computer on its own
   // network, the LAN listener at the address a phone's browser is sent to (lan.ts), reached on the
   // same Wi-Fi or over the owner's VPN into that network. Nothing public is named.
@@ -237,10 +230,8 @@ function pairQuery(): string {
 const BASE_URL = `http://10.0.2.2:${API_PORT}`
 
 /**
- * Where a phone gets the app: this computer's name on the local network whenever it works
- * (names.ts): a brand-new phone on the same Wi-Fi opens that page with a real certificate, with no
- * app yet. Otherwise the local network's listener at its Wi-Fi address (the browser warns about
- * this computer's own certificate once).
+ * Where a phone gets the app: the local network's listener at its Wi-Fi address (the browser warns
+ * about this computer's own certificate once).
  */
 export function downloadUrl(base: string): string {
   return downloadTarget(base).url
@@ -248,22 +239,18 @@ export function downloadUrl(base: string): string {
 /**
  * The download URL; `local`: this daemon's own LAN listener (bundled APK), as opposed to a published
  * release or the base URL's page; `trusted`: a browser can check the page's certificate (false only
- * for the listener's own address, whose certificate is self-signed); `anywhere`: with the link on
- * the local network's name, an https base URL's page too (null when there's none a browser could
- * check, which without a public base URL is always).
+ * for the listener's own address, whose certificate is self-signed).
  */
-export function downloadTarget(base: string): { url: string; local: boolean; trusted: boolean; anywhere: string | null } {
+export function downloadTarget(base: string): { url: string; local: boolean; trusted: boolean } {
   // A published build (a release URL the owner sets) beats anything of ours: it needs no certificate warning.
-  if (process.env.HYPERNOVA_APK_URL) return { url: process.env.HYPERNOVA_APK_URL, local: false, trusted: true, anywhere: null }
-  const named = namedOrigin()
-  if (named) return { url: `${named}/download/android`, local: true, trusted: true, anywhere: /^https:\/\//.test(base) ? `${base}/download/android` : null }
+  if (process.env.HYPERNOVA_APK_URL) return { url: process.env.HYPERNOVA_APK_URL, local: false, trusted: true }
   const lan = lanInfo()
   // The listener whenever the base is the emulator's plain-http address, which no phone on the
   // Wi-Fi can open.
   const a = !base.startsWith('https://') && lan ? pickLanAddress(lan.addresses) : null
-  if (a) return { url: `https://${a.includes(':') ? `[${a}]` : a}:${lan!.port}/download/android`, local: true, trusted: false, anywhere: null }
+  if (a) return { url: `https://${a.includes(':') ? `[${a}]` : a}:${lan!.port}/download/android`, local: true, trusted: false }
   // An https base's page; a plain-http one (the emulator's address) can't be checked.
-  return { url: `${base}/download/android`, local: false, trusted: base.startsWith('https://'), anywhere: null }
+  return { url: `${base}/download/android`, local: false, trusted: base.startsWith('https://') }
 }
 /**
  * A pairing over the listener that was turned away, in the log (a phone that "can't pair" then
@@ -420,31 +407,21 @@ async function api(c: Ctx): Promise<void> {
     return json(res, 200, { token, deviceId, mac: { id: identity.id, name: macName() } })
   }
   // A page first (a bare APK link just starts a download, which looks like nothing happened).
-  // Through the name (names.ts) a browser can check the certificate, so the page has no warning.
-  const viaName = c.lan && lanNamed(req.socket)
-  if (path === '/download/android') return appPage(res, viaName)
+  if (path === '/download/android') return appPage(res)
   if (path === '/download/android/Hypernova.apk') return serveApk(req, res)
   if (path === '/pair' && m === 'GET') {
     const code = url.searchParams.get('c') ?? ''
     // On the listener at an address (what the QR code opens): only for a code being shown, and the
     // app is handed the address the browser came in on, read from the socket (never a header the
     // request writes), so the page and its download link stay on this computer.
-    if (c.lan && !viaName) {
+    if (c.lan) {
       if (!liveCode(code)) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
       const here = req.socket.localAddress
       const port = lanInfo()?.port
       if (!here || !port) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
       return pairPage(res, lanOrigin(here, port), code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code))
     }
-    if (!viaName) return pairPage(res, baseUrlOf(req), code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code))
-    // Through the name, only for a code being shown on the Mac: the page is this computer's own
-    // listener, and the app it hands over to pairs as from that code (the base URL, then the
-    // pinned local addresses). Its own links go to the name, never to a host the request names.
-    if (!liveCode(code)) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
-    const port = lanInfo()?.port
-    const host = lanNamedHost()
-    if (!port || !host) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
-    return pairPage(res, pairOrigin() ?? BASE_URL, code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code), `https://${host}:${port}`)
+    return pairPage(res, baseUrlOf(req), code, url.searchParams.get('n') ?? macName(), await pairPageExtras(code))
   }
   if (path === '/qa' || path.startsWith('/qa/')) return qa(c, false)
   const p = /^\/p\/([\w-]+)\/?(.*)$/.exec(path)
@@ -997,11 +974,11 @@ async function api(c: Ctx): Promise<void> {
   throw new HttpError(404, 'not_found', 'Unknown endpoint.')
 }
 
-/** The pairing page: hands [base] (the app's `u`) and the code over to the app; [pageBase]: where this page itself is, for its download links. */
-function pairPage(res: ServerResponse, base: string, code: string, name: string, lanQuery = '', pageBase = base): void {
+/** The pairing page: hands [base] (the app's `u`) and the code over to the app; its download links are on [base] too. */
+function pairPage(res: ServerResponse, base: string, code: string, name: string, lanQuery = ''): void {
   const esc = (x: string) => x.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`)
   const appLink = `hypernova://pair?v=1&u=${encodeURIComponent(base)}&c=${encodeURIComponent(code)}&n=${encodeURIComponent(name)}${lanQuery}`
-  const intent = `intent://pair?v=1&u=${encodeURIComponent(base)}&c=${encodeURIComponent(code)}&n=${encodeURIComponent(name)}${lanQuery}#Intent;scheme=hypernova;package=com.prudnikweb.hypernova;S.browser_fallback_url=${encodeURIComponent(pageBase + '/download/android')};end`
+  const intent = `intent://pair?v=1&u=${encodeURIComponent(base)}&c=${encodeURIComponent(code)}&n=${encodeURIComponent(name)}${lanQuery}#Intent;scheme=hypernova;package=com.prudnikweb.hypernova;S.browser_fallback_url=${encodeURIComponent(base + '/download/android')};end`
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
   res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Pair with Hypernova</title>
 <style>:root{color-scheme:dark}body{margin:0;min-height:100vh;background:#14110E;color:#F5F2EB;font:500 16px/24px system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
@@ -1009,7 +986,7 @@ main{max-width:420px;padding:32px 24px}.wm{font-weight:200;font-size:22px;color:
 p{color:#B5B0A6;margin:0 0 24px}a.b{display:block;text-align:center;text-decoration:none;font-weight:600;border-radius:999px;padding:15px 20px;margin:10px 0}
 .p{background:#7FFFA0;color:#14110E}.g{color:#B5B0A6;box-shadow:inset 0 0 0 1px #2C2823}small{display:block;color:#7A7468;margin-top:18px;font-size:13px;line-height:19px}</style></head>
 <body><main><div class="wm">hypernova<b>/</b></div><h1>Pair with ${esc(name)}.</h1><p>Open Hypernova on this phone to finish pairing.</p>
-<a class="b p" href="${esc(intent)}">Open Hypernova</a><a class="b g" href="${esc(pageBase)}/download/android">Get the app first</a>
+<a class="b p" href="${esc(intent)}">Open Hypernova</a><a class="b g" href="${esc(base)}/download/android">Get the app first</a>
 <small>If nothing happens, install the app with the second button, then scan the code again.</small></main>
 <script>if (/Android/.test(navigator.userAgent)) setTimeout(function(){ location.href = ${JSON.stringify(intent)} }, 300); else document.querySelector('.p').href = ${JSON.stringify(appLink)}</script></body></html>`)
 }
@@ -1058,10 +1035,9 @@ export const groupedHex = (hex: string): string => hex.replace(/(.{4})/g, '$1 ')
 
 /**
  * "Get Hypernova for Android": what it is, a Download button, its checksum, and how to install it.
- * [trusted]: opened through this computer's name (names.ts), whose certificate the browser checked,
- * so the warning about comparing the checksum isn't needed.
+ * The browser can't check this computer's own certificate, so the page says to compare the checksum.
  */
-function appPage(res: ServerResponse, trusted = false): void {
+function appPage(res: ServerResponse): void {
   const apk = findApk()
   const s = apk ? statSync(apk) : null
   const built = s ? new Date(s.mtimeMs).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
@@ -1071,7 +1047,7 @@ function appPage(res: ServerResponse, trusted = false): void {
     ? `<p>Version ${info ? `${info.versionName} (${info.versionCode})` : VERSION} · ${built} · ${(s.size / 1048576).toFixed(1)} MB</p>
 <a class="b p" href="/download/android/Hypernova.apk" download="Hypernova.apk">Download the app</a>
 <p class="sum">SHA-256 of the file<br>${groupedHex(digest ?? '')}</p>
-${trusted ? '' : `<small class="warn">Opened over your own Wi‑Fi, your browser can't vouch for this page (the computer's certificate is its own), so the checksum above must be the one shown next to the code on your computer. If it isn't, don't install.</small>`}
+<small class="warn">Opened over your own Wi‑Fi, your browser can't vouch for this page (the computer's certificate is its own), so the checksum above must be the one shown next to the code on your computer. If it isn't, don't install.</small>
 <ol><li>Tap <b>Download the app</b>. If your browser asks whether to keep the file, keep it.</li>
 <li>Open it from the notification, or from Files → Downloads.</li>
 <li>Tap <b>Install</b>, or <b>Update</b> if Hypernova is already on this phone. The first time, Android asks to let your browser install apps: allow it, then go back.</li></ol>
@@ -1597,8 +1573,6 @@ async function local(c: Ctx): Promise<void> {
   }
   if (!safeEqual(auth, `Bearer ${adminToken}`)) throw new HttpError(401, 'unauthorized', 'Missing the admin token.')
   if (path === '/local/status') {
-    // Setup shows a download or pairing code while it asks this way: the name is published for it (names.ts).
-    if (url.searchParams.has('qr')) wantName()
     const integ = integrationStatus()
     const dl = downloadTarget(BASE_URL)
     return json(res, 200, {
@@ -1627,21 +1601,14 @@ async function local(c: Ctx): Promise<void> {
       downloadLocal: dl.local,
       // …and false when that is its address with the self-signed certificate: then the checksum below is the one to compare.
       downloadTrusted: dl.trusted,
-      // With the link on the local network's name: an https base URL's page too (else null).
-      downloadAnywhere: dl.anywhere,
       apk: apkInfo(),
-      // This computer's name under hypernova.observer and its certificate (names.ts).
-      name: nameStatus(),
     })
   }
-  if (path === '/local/pair/start' && m === 'POST') return json(res, 200, await startPairing(url.searchParams.has('dev'), url.searchParams.has('name')))
+  if (path === '/local/pair/start' && m === 'POST') return json(res, 200, await startPairing(url.searchParams.has('dev')))
   if (path === '/local/pair/cancel' && m === 'POST') {
     const b = await readJsonBody(req)
     return json(res, 200, { ok: true, cancelled: cancelPairing(typeof b?.code === 'string' ? b.code : null) })
   }
-  // The name (names.ts): its state, and giving it up before an uninstall.
-  if (path === '/local/name' && m === 'GET') return json(res, 200, nameStatus())
-  if (path === '/local/name/release' && m === 'POST') return json(res, 200, await releaseName())
   if (path === '/local/integration/install' && m === 'POST') return json(res, 200, installIntegration())
   if (path === '/local/integration/uninstall' && m === 'POST') return json(res, 200, uninstallIntegration())
   if (path === '/local/devices') return json(res, 200, { devices: listDevices() })
@@ -1659,23 +1626,9 @@ async function local(c: Ctx): Promise<void> {
     if (typeof b.browseOutsideProjects === 'boolean') setBrowseOutside(b.browseOutsideProjects)
     // Codex for Hypernova (codex/client.ts): connects, and the shell's `codex` function comes with it.
     if (typeof b.codex === 'boolean') setCodexEnabled(b.codex)
-    // The LAN listener starts or stops at once (lan.ts), and the name follows it (names.ts).
-    if (typeof b.lanAccess === 'boolean') {
-      setLanAccess(b.lanAccess)
-      nameKick()
-    }
-    // The name: what it is has been shown (Setup, `hypernova pair`); off gives it up at once (and
-    // says whether that got through); on resumes. Its certificate's authority.
-    if (b.nameTermsShown === true) setNameTermsShown()
-    let nameRelease = null
-    if (typeof b.nameService === 'boolean') nameRelease = (await setNameService(b.nameService)).release
-    if (b.acmeDirectory === null || ['staging', 'production'].includes(b.acmeDirectory) || /^https:\/\/\S+$/.test(String(b.acmeDirectory ?? ''))) {
-      if (b.acmeDirectory === null) delete settings.acmeDirectory
-      else settings.acmeDirectory = b.acmeDirectory
-      saveSettings()
-      nameKick()
-    }
-    return json(res, 200, nameRelease ? { ...settings, nameRelease } : settings)
+    // The LAN listener starts or stops at once (lan.ts).
+    if (typeof b.lanAccess === 'boolean') setLanAccess(b.lanAccess)
+    return json(res, 200, settings)
   }
   return api({ ...c, local: true })
 }
@@ -1692,14 +1645,6 @@ function openOnLan(method: string, path: string): boolean {
   return (method === 'GET' && path === '/v1/health') || (method === 'POST' && (path === '/v1/pair' || path === '/v1/device/cert'))
 }
 
-/**
- * Through the name (names.ts), what a browser on the network may reach, and nothing else: the
- * download page and the APK, and the pairing page for a code being shown (checked by the route).
- * Not the API, health or pairing endpoints: any web page that knows the name could otherwise
- * read this computer's name or spend a source's wrong-code tries.
- */
-const openByName = (method: string, path: string): boolean => method === 'GET' && (path === '/download/android' || path === '/download/android/Hypernova.apk' || path === '/pair')
-
 function handler(isLocal: boolean, lan = false) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://x')
@@ -1710,11 +1655,8 @@ function handler(isLocal: boolean, lan = false) {
     const device = token ? deviceForToken(token) : null
     const adminLocal = direct && token !== '' && safeEqual(token, adminToken)
     const c: Ctx = { req, res, url, local: adminLocal, deviceId: device?.id ?? null, lan }
-    const viaName = lan && lanNamed(req.socket)
     try {
-      if (viaName) {
-        if (!openByName(req.method ?? 'GET', url.pathname)) throw new HttpError(404, 'not_found', 'Unknown endpoint.')
-      } else if (lan) {
+      if (lan) {
         // On the local network OPTIONS never reaches a route, whose handlers don't look at the
         // method (a preview, the download page).
         if (req.method === 'OPTIONS') throw new HttpError(404, 'not_found', 'Unknown endpoint.')

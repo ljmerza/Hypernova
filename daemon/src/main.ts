@@ -15,7 +15,6 @@ import { startStats } from './stats.ts'
 import { startBattery } from './battery.ts'
 import { startAwake } from './awake.ts'
 import { startAutomations } from './automations.ts'
-import { startNames } from './names.ts'
 import { startUsageProbe } from './usage-probe.ts'
 import { PLATFORM, has } from './platform.ts'
 import { startCodex } from './codex/client.ts'
@@ -46,8 +45,6 @@ pollStatusLine()
 startServers()
 // Codex's shared app-server, only when the owner uses Codex (codex/client.ts).
 startCodex()
-// A name under hypernova.observer and its certificate for the LAN listener's pages (names.ts).
-startNames()
 startAccount()
 // The Mac's battery and Stay awake (pmset, caffeinate): nothing to read or hold on Linux.
 if (has('battery')) startBattery()

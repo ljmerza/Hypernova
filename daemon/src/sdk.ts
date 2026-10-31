@@ -16,7 +16,7 @@ import { ON_MAC } from './platform.ts'
 
 export type ClaudeSdk = typeof Sdk
 export const SDK_PACKAGE = '@anthropic-ai/claude-agent-sdk'
-/** The one line mac/build.sh writes next to the bundled daemon: the version Setup fetches. */
+/** An optional one-line file next to a bundled daemon: the SDK version to fetch (else the lockfile's). */
 export const SDK_VERSION_FILE = 'sdk-version'
 /** This daemon's own folder (its package.json and node_modules). */
 export const DAEMON_DIR = dirname(dirname(fileURLToPath(import.meta.url)))

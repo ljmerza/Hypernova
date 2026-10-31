@@ -140,8 +140,7 @@ tasks.register("dist") {
 /**
  * `./gradlew :app:distRelease`: the APK people install (docs/RELEASING.md). The release build
  * signed with the release key, in ../dist as hypernova.apk with its version note (hypernova.json:
- * mac/build.sh prefers this APK to a -debug one and bundles the note next to it, and the daemon
- * serves both) and R8's mapping (hypernova-mapping.txt: keep it with the release, it turns crash
+ * the daemon serves both) and R8's mapping (hypernova-mapping.txt: keep it with the release, it turns crash
  * traces back into names). Refuses to start without the release key, and checks the signed APK:
  * v2 and v3 signatures, and the release key's certificate (never Android's debug one).
  */

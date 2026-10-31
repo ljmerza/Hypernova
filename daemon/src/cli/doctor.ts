@@ -224,15 +224,6 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
     add({ name: 'lan', mark: pub.length ? 'warn' : 'ok', text: `Local network route on port ${status.lan.port}${status.lan.addresses?.length ? ` (${status.lan.addresses.join(', ')})` : ''}, device certificates required`, ...(pub.length ? { fix: `This server has a public address (${pub.join(', ')}): turn the local route off unless the phone shares its network:\n  hypernova lan off` } : {}) })
   } else if (status) add({ name: 'lan', mark: 'warn', text: 'Local network route off: it is the phone’s only way in, so no phone can reach this server.', fix: 'hypernova lan on   (only on a network you trust)' })
 
-  // The private name (names.ts): a failing name is silent otherwise.
-  if (loc) {
-    try {
-      const nm = await local(cli, 'GET', '/local/name')
-      if (nm?.enabled !== false && nm?.lastError?.message) add({ name: 'name', mark: 'warn', text: `The private name has a problem: ${nm.lastError.message}`, fix: 'Pairing still works without it (a browser warns about the download page). hypernova name off turns it off.' })
-      else if (nm?.enabled !== false && nm?.host) add({ name: 'name', mark: 'info', text: `Private name: ${nm.host}${nm.reason ? ` (${nm.reason})` : ''}` })
-    } catch {}
-  }
-
   // Claude Code. On a server with Codex alone (docs/PROTOCOL.md, "Which agent leads") its absence
   // and its missing hooks are nothing to fix.
   const claude = findClaudeBin(cli)

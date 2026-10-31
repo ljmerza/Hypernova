@@ -3,10 +3,10 @@
 The base comes from 0stems (atmosphere, colour, type), the structure from
 Hyperscribe (the seam, pills, quiet copy), and urgent states from
 Hypernavigate (the filled block). On Android it's implemented in
-`android/app/src/main/java/com/prudnikweb/hypernova/ui/`. The Mac app ports
-the same tokens to SwiftUI (`mac/Sources/Hypernova/Theme/`), the home screen
-widgets repeat them as Android resources, and Lens translates them for a green
-lens (see the last three sections).
+`android/app/src/main/java/com/prudnikweb/hypernova/ui/`. The home screen
+widgets repeat them as Android resources. (The Mac app's SwiftUI port, "Mac menu bar and mini app",
+and Lens, "The Lens guide" and "Lens (G2)", are no longer in this repository; those sections stay
+as history.)
 
 ## Colour (0stems tokens)
 | Token | Value | Use |
