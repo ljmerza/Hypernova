@@ -17,6 +17,7 @@
 
     <!-- "All servers": Home shows every paired computer's sessions together (ui/home/AllHome.kt). -->
     <string name="servers_all">All servers</string>
+    <string name="all_servers_sessions_only">Not in All servers: pick a server to open this.</string>
     <string name="servers_all_label">Show every server\'s sessions together</string>
     <!-- The chip while Home shows all of them, and what TalkBack hears. -->
     <string name="servers_all_chip">All</string>

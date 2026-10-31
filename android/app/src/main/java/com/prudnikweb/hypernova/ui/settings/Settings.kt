@@ -136,6 +136,8 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
     val confirm = LocalConfirm.current
     val askNotifications = com.prudnikweb.hypernova.ui.LocalAskNotifications.current
     val res = LocalContext.current.resources
+    // All servers (owner, 2026-10-31): only what this phone keeps shows; one server's settings need it picked.
+    val allMode = vm.allServers
     val scope = rememberCoroutineScope()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val live = vm.live
@@ -165,7 +167,7 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
         contentPadding = PaddingValues(top = top + 84.dp, bottom = bottom + 120.dp, start = 16.dp, end = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item(key = "mac") {
+        if (!allMode) item(key = "mac") {
             Seam(stringResource(R.string.mac), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
             GlassCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
@@ -234,7 +236,7 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
         }
         // A newer app is offered only in About's update row (owner, 2026-10-31: one place, with the versions).
         if (hub != null) {
-            item(key = "providers") {
+            if (!allMode) item(key = "providers") {
                 Spacer(Modifier.height(10.dp))
                 Seam(stringResource(R.string.providers), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
                 GlassCard(Modifier.fillMaxWidth()) {
@@ -251,10 +253,10 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
             // (ReadAloudSection.kt): only from a Mac that reads aloud this way.
             item(key = "voice") {
                 VoiceRecognitionSection()
-                if (hub.speech?.settings != null) ReadAloudSection(hub)
+                if (!allMode && hub.speech?.settings != null) ReadAloudSection(hub)
             }
             // Files: Browse outside projects (FilesSection below), from a Mac that has it.
-            if (hub.mac.browseOutsideProjects != null) {
+            if (!allMode && hub.mac.browseOutsideProjects != null) {
                 item(key = SettingsJump.FILES) {
                     Spacer(Modifier.height(10.dp))
                     FilesSection(hub)
@@ -313,7 +315,7 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
             }
         }
         // The owner's own test list: in debug builds, or after seven taps on the app's build (P19).
-        if (live != null && (BuildConfig.DEBUG || testing)) {
+        if (!allMode && live != null && (BuildConfig.DEBUG || testing)) {
             item(key = "qa") {
                 Spacer(Modifier.height(10.dp))
                 Seam(stringResource(R.string.testing_checklist), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))

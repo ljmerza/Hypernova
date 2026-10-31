@@ -247,6 +247,9 @@ fun HomeScreen(
     BackHandler(enabled = !statsOpen && tab != Tab.Sessions) { tab = Tab.Sessions }
     val backToast = LocalToast.current
     val backAgain = stringResource(R.string.home_back_again)
+    val allOnlySessions = stringResource(R.string.all_servers_sessions_only)
+    // Choosing All servers from History or Automations brings Sessions.
+    LaunchedEffect(everywhere != null) { if (everywhere != null && (tab == Tab.History || tab == Tab.Automations)) tab = Tab.Sessions }
     var backArmed by remember { mutableStateOf(false) }
     LaunchedEffect(backArmed) { if (backArmed) { delay(2_000); backArmed = false } }
     BackHandler(enabled = !statsOpen && tab == Tab.Sessions && !backArmed) { backArmed = true; backToast(backAgain) }
@@ -665,7 +668,11 @@ fun HomeScreen(
                             Tab.Settings -> stringResource(R.string.settings)
                         }
                     },
-                    tab.ordinal, { tab = Tab.entries[it] },
+                    // All servers (owner, 2026-10-31): History and Automations are one server's; Settings shows what the phone keeps.
+                    tab.ordinal, { i ->
+                        val to = Tab.entries[i]
+                        if (everywhere != null && (to == Tab.History || to == Tab.Automations)) backToast(allOnlySessions) else tab = to
+                    },
                     Modifier.padding(horizontal = 12.dp),
                 )
             }
