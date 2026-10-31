@@ -38,6 +38,16 @@ export function daemonIn(from: string): string | null {
 }
 
 /**
+ * Where an install comes from, for the server's own update (server-update.ts, `install.json` in the
+ * installed daemon): `checkout` when [src] is a git checkout's daemon (`scripts/install-linux.sh` in
+ * a clone, `hnctl update`), which updates from there and never by itself; `package` otherwise (a
+ * release's unpacked package, get.sh).
+ */
+export function installSource(src: string, exists: (p: string) => boolean = existsSync): 'package' | 'checkout' {
+  return exists(join(src, '.git')) || exists(join(src, '..', '.git')) ? 'checkout' : 'package'
+}
+
+/**
  * Whether node-pty loads and runs a program in a terminal here, in [dir] with [node]: what the
  * shared terminals need. The answer is node-pty's own error when it doesn't.
  */
@@ -89,6 +99,15 @@ export async function installDaemon(cli: Cli, node: string, from: string, say: (
   rmSync(staging, { recursive: true, force: true })
   mkdirSync(staging, { recursive: true })
   for (const f of ['src', 'package.json', 'package-lock.json']) if (existsSync(join(src, f))) cpSync(join(src, f), join(staging, f), { recursive: true })
+  // Where it came from (server-update.ts reads it: only a package's install updates itself).
+  const version = (() => {
+    try {
+      return String(JSON.parse(readFileSync(join(staging, 'package.json'), 'utf8')).version ?? '')
+    } catch {
+      return ''
+    }
+  })()
+  writeFileSync(join(staging, 'install.json'), JSON.stringify({ source: installSource(src), version, at: Date.now() }) + '\n', { mode: 0o600 })
   // The same lockfile as the copy in place: its packages (node-pty built for this machine) move over.
   const sameLock = (() => {
     try {

@@ -367,6 +367,8 @@ private fun ServerCard(
                 val battery = live.mac.battery?.takeIf { link.state == LinkState.Connected }
                 if (battery != null) BatteryRow(battery)
                 if (awake != null) StayAwakeBlock(live, awake, live.mac.battery)
+                // The server updating itself (AutoUpdateRow.kt), from a daemon that can say; not from a last snapshot.
+                if (!waiting) live.mac.update?.let { AutoUpdateRow(live, it) }
                 if (link.state == LinkState.Offline || link.state == LinkState.Reconnecting) {
                     Spacer(Modifier.height(6.dp))
                     HText(com.prudnikweb.hypernova.data.linkProblemText(res, link), style = Type.small, color = HN.inkMuted)

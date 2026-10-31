@@ -30,6 +30,8 @@ data class MacInfo(
     val platform: String = Mac.DARWIN,
     /** Settings → Browse outside projects (docs/PROTOCOL.md, "Files"); null from a daemon too old to have it. */
     val browseOutsideProjects: Boolean? = null,
+    /** The server updating itself (data/ServerUpdate.kt); null from a daemon too old to. */
+    val update: ServerUpdate? = null,
     /** The Mac features this computer lacks, each with its sentence (docs/PROTOCOL.md, "Mac-only features"). */
     val unavailable: Map<String, String> = emptyMap(),
 )
@@ -606,6 +608,7 @@ object Wire {
         awake = MacAwake.parse(o.obj("awake")),
         platform = if (o.str("platform") == Mac.LINUX) Mac.LINUX else Mac.DARWIN,
         browseOutsideProjects = o.obj("files")?.bool("browseOutsideProjects"),
+        update = ServerUpdate.parse(o.obj("update")),
         unavailable = o.obj("unavailable")?.let { u -> u.keys().asSequence().mapNotNull { k -> u.str(k)?.let { k to it } }.toMap() }.orEmpty(),
     )
 

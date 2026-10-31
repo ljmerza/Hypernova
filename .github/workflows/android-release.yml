@@ -5,8 +5,9 @@ name: android-release
 # next semantic version, vX.Y.Z from the conventional commits since the last one
 # (scripts/next-version.sh; docs/RELEASING.md, "Versions"), with hypernova-vX.Y.Z.apk and
 # hypernova-server-vX.Y.Z-linux.tar.gz attached, so a download says which build it is, and
-# hypernova-vX.Y.Z.json (the APK's versionCode, versionName and SHA-256: servers read it to offer
-# the phones the release's APK, daemon/src/releases.ts). The APK's
+# hypernova-vX.Y.Z.json (the APK's versionCode, versionName and SHA-256, and the server package's
+# SHA-256: servers read it to offer the phones the release's APK, daemon/src/releases.ts, and to
+# update themselves, daemon/src/server-update.ts). The APK's
 # versionName is that version; its versionCode the build minute. One job, so one push makes one release, and every
 # release has both files (a daemon-only fix rebuilds the same app). A release published by hand gets
 # both attached too. The key must never change: Android only installs an update signed with the key
@@ -123,10 +124,12 @@ jobs:
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
           cp "$SERVER_TGZ" "../dist/hypernova-server-$tag-linux.tar.gz"
           # The version note servers read before fetching the APK (daemon/src/releases.ts): the
-          # build's versionCode and versionName, and the APK's SHA-256. Uploaded last.
+          # build's versionCode and versionName, the APK's SHA-256 and the server package's. Uploaded last.
           sum=$(sha256sum "../dist/hypernova-$tag.apk" | cut -d' ' -f1)
-          jq -c --arg sha256 "$sum" '{versionCode, versionName, sha256: $sha256}' ../dist/hypernova.json > "../dist/hypernova-$tag.json"
-          jq -e '(.versionCode | type == "number") and (.versionName | type == "string") and (.sha256 | test("^[0-9a-f]{64}$"))' "../dist/hypernova-$tag.json" > /dev/null
+          # And the server package's, for servers that update themselves (daemon/src/server-update.ts).
+          ssum=$(sha256sum "../dist/hypernova-server-$tag-linux.tar.gz" | cut -d' ' -f1)
+          jq -c --arg sha256 "$sum" --arg serverSha256 "$ssum" '{versionCode, versionName, sha256: $sha256, serverSha256: $serverSha256}' ../dist/hypernova.json > "../dist/hypernova-$tag.json"
+          jq -e '(.versionCode | type == "number") and (.versionName | type == "string") and (.sha256 | test("^[0-9a-f]{64}$")) and (.serverSha256 | test("^[0-9a-f]{64}$"))' "../dist/hypernova-$tag.json" > /dev/null
           gh release upload "$tag" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" --clobber
           gh release upload "$tag" "../dist/hypernova-$tag.json" --clobber
       # A push or a manual run: the release vX.Y.Z (the Version step), with the APK on it once, as
@@ -142,10 +145,12 @@ jobs:
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
           cp "$SERVER_TGZ" "../dist/hypernova-server-$tag-linux.tar.gz"
           # The version note servers read before fetching the APK (daemon/src/releases.ts): the
-          # build's versionCode and versionName, and the APK's SHA-256.
+          # build's versionCode and versionName, the APK's SHA-256 and the server package's.
           sum=$(sha256sum "../dist/hypernova-$tag.apk" | cut -d' ' -f1)
-          jq -c --arg sha256 "$sum" '{versionCode, versionName, sha256: $sha256}' ../dist/hypernova.json > "../dist/hypernova-$tag.json"
-          jq -e '(.versionCode | type == "number") and (.versionName | type == "string") and (.sha256 | test("^[0-9a-f]{64}$"))' "../dist/hypernova-$tag.json" > /dev/null
+          # And the server package's, for servers that update themselves (daemon/src/server-update.ts).
+          ssum=$(sha256sum "../dist/hypernova-server-$tag-linux.tar.gz" | cut -d' ' -f1)
+          jq -c --arg sha256 "$sum" --arg serverSha256 "$ssum" '{versionCode, versionName, sha256: $sha256, serverSha256: $serverSha256}' ../dist/hypernova.json > "../dist/hypernova-$tag.json"
+          jq -e '(.versionCode | type == "number") and (.versionName | type == "string") and (.sha256 | test("^[0-9a-f]{64}$")) and (.serverSha256 | test("^[0-9a-f]{64}$"))' "../dist/hypernova-$tag.json" > /dev/null
           # The notes: what changed since the release before, by type, and how to install
           # (scripts/release-notes.sh).
           ../scripts/release-notes.sh "$tag" "$PREV" "$GITHUB_SHA" > ../dist/notes.md

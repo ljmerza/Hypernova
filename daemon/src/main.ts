@@ -1,10 +1,11 @@
 // Hypernova daemon entry point.
 import { log, VERSION, API_PORT, LOCAL_PORT } from './util.ts'
-import { discover, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'
+import { broadcast, discover, listSessions, pendingApprovals, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'
 import { pollStatusLine } from './services.ts'
 import { ensureProjectsRoot } from './files.ts'
 import { announceApp, appInfo, startServers } from './http.ts'
 import { startReleaseCheck } from './releases.ts'
+import { serverUpdateHook, startServerUpdate, updateView } from './server-update.ts'
 import { refreshClaudeCommands, scanTerms, watchMenus, writeHnBin } from './terms.ts'
 import { refreshHooks, refreshShell } from './hooks.ts'
 import { startAccount } from './account.ts'
@@ -59,9 +60,17 @@ startStats()
 startUsageProbe()
 // After the servers, the account, the battery and Stay awake: automations fire off all of them.
 void startAutomations()
+// The server updating itself (server-update.ts, settings.autoUpdate, off unless turned on): an
+// update this start is the result of is said now; one waits for no session working and no approval.
+const justUpdated = startServerUpdate({
+  busy: () => ({ working: listSessions().filter((s) => s.state === 'working' || s.state === 'starting').length, approvals: pendingApprovals().length }),
+  changed: () => broadcast({ t: 'update', update: updateView() }),
+})
 // The app's GitHub releases (releases.ts): a newer one's APK is fetched, checked and offered to the
-// phones, 30 s after start and every 6 hours, while settings.releaseCheck isn't off.
-startReleaseCheck({ offered: () => appInfo()?.versionCode ?? null, published: announceApp })
+// phones, 30 s after start (5 s right after the server updated itself, so the phones are offered
+// the release's app at once) and every 6 hours, while settings.releaseCheck isn't off; then the
+// release goes to the server's own update.
+startReleaseCheck({ offered: () => appInfo()?.versionCode ?? null, published: announceApp, server: serverUpdateHook }, justUpdated ? 5000 : undefined)
 
 setInterval(pollRegistry, 2000)
 setInterval(pollTranscripts, 700)

@@ -2608,3 +2608,43 @@ acts on the one picked while All servers is on (`ui/settings/SettingsPlan.kt` de
    of each server's software are in its own card.
 5. **Unchanged:** Settings with one server picked; nothing on the session chat screen; the update
    banner and the update notification still follow the one on screen.
+
+## Servers update themselves, off by default (2026-10-31)
+
+The owner: "for the server auto updating allow it to be a setting ... default no, and then yeah the
+server updates itself and then pushes to the client that needs update too." Decided
+(`daemon/src/server-update.ts`, docs/PROTOCOL.md, "The server's own update"):
+
+1. **A setting, off by default**: `autoUpdate` (unset: off). On the phone it is one switch in the
+   server's own section of Settings, **Update this server automatically**, with a line saying what
+   it does, or why this install can't, what it's doing and the last update it installed; on the
+   server `hypernova auto-update on|off`, or `POST /local/settings {autoUpdate}`.
+2. **The same release check.** The look the daemon already makes for the app's releases (30 s after
+   start, every 6 hours; it now runs for the server too while `releaseCheck` is off) hands the
+   release on after the APK's part, so the phones are offered the new app before the server
+   restarts. Only a release newer than the running daemon's version installs: never a downgrade,
+   never the same version again, never a tag that isn't `vX.Y.Z`.
+3. **Checked before anything is touched.** The release's note now carries the server package's
+   SHA-256 (`serverSha256`, the release workflow); a note without it installs nothing (logged).
+   The package is downloaded, its SHA-256 checked, unpacked into a new folder, and its daemon's
+   version checked against the tag. A failure at any step leaves the server as it was and waits
+   before trying that release again: 1 hour, then 6, then 24, then not until the setting is turned
+   off and on, or a newer release comes.
+4. **Never in the middle of work.** It waits for no session working or starting and no approval
+   waiting, 2 minutes on end; after 24 hours of waiting it goes ahead anyway (the shared terminals
+   outlive the restart; an approval still waiting then is lost the way any restart loses one).
+5. **Installed the way `install-linux.sh --from` installs**, by the package's own script, in a
+   transient systemd unit of its own (`systemd-run --user`, `hypernova-update`), not as a child of
+   the daemon: the service's restart, which ends the daemon, can't cut the install off. Setup swaps
+   the new daemon in only once its terminal module works and restarts the service; a copy of the
+   old daemon is kept until the new one answers, and put back (the service restarted on it) when
+   it doesn't. Phones, settings and keys stay where they are. Nothing new is installed with it
+   (`--no-claude`; no `sudo` without a terminal).
+6. **Only an install the installer manages**: a Linux install in `<support>/app` that `hypernova
+   setup` put there from a release's package (its `install.json`; setup writes `checkout` for a
+   git checkout, so `hnctl update` and `scripts/install-linux.sh` in a clone are never replaced),
+   run by its systemd user service. A checkout, a test copy, a container, an install from before
+   the marker or one without the service says "not available here" and why.
+7. **The phones learn of it**: the new daemon, at start, sees the update it was waiting for and
+   logs it; the snapshot's `mac.update.last` says from and to what, and the phone's connection log
+   has a line when the server's version changed between two snapshots. No banner or toast.

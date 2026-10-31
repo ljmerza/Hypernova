@@ -60,6 +60,7 @@ import { randomUUID } from 'node:crypto'
 import { putEvent, tapBroadcast } from './hub.ts'
 import { editHeld, heldOf, hold, kickHeld, removeHeld, useHeldOps, type HeldReady } from './held.ts'
 import { checkReleaseNow } from './releases.ts'
+import { setAutoUpdate, updateView } from './server-update.ts'
 
 /**
  * `lan`: came in on the LAN listener (lan.ts), where the admin token counts for nothing and pairing
@@ -328,6 +329,8 @@ function snapshot(deviceId: string | null) {
       id: identity.id, name: macName(), daemonVersion: VERSION, claudeVersion: claudeVersion(), projectsRoot: settings.projectsRoot, app: appInfo(), battery: getBattery(), awake: awakeState(), tz: systemZone(),
       // Settings → Browse outside projects (files.ts).
       files: filesState(),
+      // The server updating itself (server-update.ts): the setting, whether it can here, the last one.
+      update: updateView(),
       // The server's system, and the Mac features it lacks with the reason to show (platform.ts):
       // empty on a Mac; on Linux the battery, Stay awake, the Mac's voice, opening a window.
       platform: PLATFORM, unavailable: UNAVAILABLE,
@@ -517,6 +520,18 @@ async function api(c: Ctx): Promise<void> {
     if (typeof b?.browseOutsideProjects !== 'boolean') throw new HttpError(400, 'bad_value', 'Say browseOutsideProjects: true or false.')
     setBrowseOutside(b.browseOutsideProjects)
     return json(res, 200, { files: filesState() })
+  }
+  // The server updating itself (server-update.ts): Settings → the server → Update this server
+  // automatically. Turned on, a look at the releases now; every phone hears {t:"update"}.
+  if (path === '/v1/mac/update' && m === 'GET') return json(res, 200, { update: updateView() })
+  if (path === '/v1/mac/update' && m === 'POST') {
+    const b = await readJsonBody(req)
+    if (typeof b?.autoUpdate !== 'boolean') throw new HttpError(400, 'bad_value', 'Say autoUpdate: true or false.')
+    setAutoUpdate(b.autoUpdate)
+    if (b.autoUpdate) checkReleaseNow()
+    const update = updateView()
+    broadcast({ t: 'update', update })
+    return json(res, 200, { update })
   }
   if (path === '/v1/stats' && m === 'GET') {
     // Statistics: how long Claude worked, tokens, sessions… (see stats.ts).
@@ -1718,6 +1733,8 @@ async function local(c: Ctx): Promise<void> {
       projectsRoot: settings.projectsRoot,
       // Browse outside projects (files.ts): the Mac's Settings shows the same switch as the phone.
       files: filesState(),
+      // The server updating itself (server-update.ts; `hypernova auto-update`).
+      update: updateView(),
       account: getAccount(),
       // The popover's one line: what's next, what runs (automations.ts).
       automations: automations().status(),
@@ -1753,6 +1770,12 @@ async function local(c: Ctx): Promise<void> {
     if (typeof b.releaseCheck === 'boolean') settings.releaseCheck = b.releaseCheck
     saveSettings()
     if (b.releaseCheck === true) checkReleaseNow()
+    // The server updating itself (server-update.ts): turned on, a look now; every phone hears it.
+    if (typeof b.autoUpdate === 'boolean') {
+      setAutoUpdate(b.autoUpdate)
+      if (b.autoUpdate) checkReleaseNow()
+      broadcast({ t: 'update', update: updateView() })
+    }
     // Browse outside projects (files.ts): every phone hears of it, with the sessions it opens or closes.
     if (typeof b.browseOutsideProjects === 'boolean') setBrowseOutside(b.browseOutsideProjects)
     // Codex for Hypernova (codex/client.ts): connects, and the shell's `codex` function comes with it.
