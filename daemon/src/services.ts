@@ -11,6 +11,7 @@ import { FileError, allowedPath, keyPlace, tooBroad } from './files.ts'
 import { isSecretFile } from './secretfiles.ts'
 import { mimeByName, needsSniff, sniff } from './mime.ts'
 import { requestCheck } from './account.ts'
+import { MACHINE } from './platform.ts'
 
 // ── Usage from the status line tap ───────────────────────────────────────
 const STATUS_DIR = join(SUPPORT, 'statusline')
@@ -189,8 +190,8 @@ export function createPreview(body: { path?: string; port?: number }, base: stri
   const attached = body.path ? attachmentFile(body.path) : null
   const full = body.path ? (allowed(body.path) ?? attached) : null
   if (!full) throw new FileError(403, 'outside_projects', 'That file is outside the folders the phone can open.')
-  if (!existsSync(full)) throw new FileError(404, 'not_found', 'That file isn’t on the Mac any more.')
-  if (!attached && isSecretFile(full)) throw new FileError(403, 'secret_file', 'Files with keys and passwords stay on the Mac.')
+  if (!existsSync(full)) throw new FileError(404, 'not_found', `That file isn’t on the ${MACHINE} any more.`)
+  if (!attached && isSecretFile(full)) throw new FileError(403, 'secret_file', `Files with keys and passwords stay on the ${MACHINE}.`)
   const isDir = statSync(full).isDirectory()
   const root = isDir ? full : resolve(full, '..')
   const entry = isDir ? '' : basename(full)
@@ -262,7 +263,7 @@ export function servePreview(req: IncomingMessage, res: ServerResponse, token: s
   res.on('close', () => up.destroy())
   up.on('error', () => {
     if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain', ...headers })
-    res.end(`Nothing is running on port ${p.port} on the Mac right now.`)
+    res.end(`Nothing is running on port ${p.port} on the ${MACHINE} right now.`)
   })
   req.pipe(up)
   return true

@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process'
 import { closeSync, fstatSync, lstatSync, openSync, readSync, realpathSync } from 'node:fs'
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path'
 import { isSecretFile } from './secretfiles.ts'
+import { MACHINE } from './platform.ts'
 
 export type ChangedFile = {
   /** Relative to the session's folder, with "/". */
@@ -333,7 +334,7 @@ export async function diffOf(cwd: string, rel: string): Promise<FileDiff> {
   // file has no real path, so its folder's).
   const anchor = real(full) ?? real(resolve(full, '..'))
   if (!anchor || !inside(root, anchor) || !inside(root, full)) throw new ChangeError(403, 'outside', 'That file is outside the session’s folder.')
-  if (isSecretFile(full) || isSecretFile(anchor)) throw new ChangeError(403, 'secret', 'That file holds credentials; it stays on the Mac.')
+  if (isSecretFile(full) || isSecretFile(anchor)) throw new ChangeError(403, 'secret', `That file holds credentials; it stays on the ${MACHINE}.`)
   const repo = await repoOf(root)
   if (!repo) throw new ChangeError(404, 'no_git', 'This folder is not a git repository.')
   const key = relative(repo.top, full).split(sep).join('/')

@@ -2386,3 +2386,22 @@ Pro, Max and Ultra. We can't check that, so the rule is the data's. Decided:
    at an edge where there's more; a tap, not a drag, opens the session sheet. TalkBack reads one
    sentence of what it shows, then the queue. This replaces the strip's give-way order (FitRow).
 6. Nothing else new on the chat screen.
+
+## Agents with no transcript, and "Mac" on a server (2026-10-31)
+
+The owner tapped a helper agent working in a `claude agents` job's chat ("claude", CLAUDE AGENT,
+one tool call) and got "That agent's transcript isn't on the Mac." on a Linux server.
+
+1. **Claude Code's own helpers are not agents of the session.** Its forks of the main conversation
+   (memory upkeep, summaries, prompt suggestions) send subagent hooks under an id that names no
+   file, with no meta file; in a `claude agents` job they carry its main agent's type, `claude`. A
+   hook from an agent the daemon doesn't know counts only once its meta file is found, so these get
+   no card (docs/PROTOCOL.md, "Agents and workflows").
+2. **An agent's file is looked for further down** its session's own subagents folder when it isn't
+   flat or in a workflow's folder (up to 6 folders down, no links), and never outside it.
+3. **Starting, not an error.** An agent just started (under 2 minutes) whose file isn't written yet
+   answers `starting`; its screen says "Starting…" and asks again every 1.5 s.
+4. **The daemon's messages name this computer**: "the server" / "this server" on Linux, "the Mac"
+   on a Mac (`MACHINE`, platform.ts). Messages about a Mac-only feature (its voice, macOS' privacy
+   question, opening a window, the Mac app's Setup) keep "Mac".
+5. On the session chat screen, only that: those helpers' cards no longer show. Nothing new there.

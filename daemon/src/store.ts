@@ -2,6 +2,7 @@
 import { join } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
 import { HOME, SUPPORT, randomToken, readJson, sha256, writeJson, writeText, safeEqual } from './util.ts'
+import { MACHINE } from './platform.ts'
 
 /**
  * `client`: which app paired (none for the Android app), so the Mac can name it. `certFingerprint`:
@@ -321,7 +322,7 @@ export type ProviderSaved = { provider: ProviderRecord; keyDropped: boolean; add
  */
 export function editProvider(input: Partial<ProviderRecord> & { name?: string; kind?: ProviderKind }, id?: string): ProviderSaved {
   const existing = id ? providers.find((p) => p.id === id) : undefined
-  if (id && !existing) throw new ProviderError(404, 'no_provider', 'That provider isn’t set up on this Mac.')
+  if (id && !existing) throw new ProviderError(404, 'no_provider', `That provider isn’t set up on this ${MACHINE}.`)
   if (existing?.builtIn) {
     // Only the models of the built-in profile can change.
     existing.models = clean(input.models ?? existing.models)

@@ -11,6 +11,7 @@ import { getProvider, providerEnv } from './store.ts'
 import { childEnv } from './runner.ts'
 import { notePlan } from './account.ts'
 import { claudeSdk } from './sdk.ts'
+import { MACHINE } from './platform.ts'
 
 /** [terminal]: one of Claude Code's own that opens a screen of its own in the terminal (TERMINAL). */
 export type Command = { name: string; description: string; argumentHint: string; aliases: string[]; builtin: boolean; terminal: boolean }
@@ -96,7 +97,7 @@ export function onClaudeInit(f: (init: SDKControlInitializeResponse) => void): v
 
 async function fetchCommands(cwd: string): Promise<Command[]> {
   const claude = findClaude()
-  if (!claude) throw Object.assign(new Error('Claude Code isn’t installed on this Mac.'), { status: 409 })
+  if (!claude) throw Object.assign(new Error(`Claude Code isn’t installed on this ${MACHINE}.`), { status: 409 })
   // 409 `sdk_missing` (SdkMissingError) while Claude Code's SDK isn't here.
   const { query } = await claudeSdk()
   let release = () => {}

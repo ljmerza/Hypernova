@@ -27,6 +27,7 @@ import { attachAgentsTerm, attachDrifted, pressKeys, termOf, termScreen, typeInt
 import { isSdk, settings } from './store.ts'
 import { isCodex } from './codex/threads.ts'
 import { log } from './util.ts'
+import { MACHINE } from './platform.ts'
 
 /**
  * A side question and how it stands: `asking` until its answer is on the screen; `answered`;
@@ -105,7 +106,7 @@ export async function askAside(id: string, question: string, o: { answerMs?: num
   if (!r.ok) {
     const why: Record<string, [string, string]> = {
       no_input: ['waiting', 'Claude is showing something in the terminal (a question or a menu). Open the terminal to answer it.'],
-      busy_input: ['typing', 'There’s unsent text in this session’s terminal on the Mac. Send or clear it there first.'],
+      busy_input: ['typing', `There’s unsent text in this session’s terminal on the ${MACHINE}. Send or clear it there first.`],
       not_started: ['starting', 'The session is still starting. Try again in a moment.'],
       not_seen: ['not_sent', 'Your question is in the terminal’s input box but wasn’t sent. Open the terminal to check it.'],
       not_sent: ['not_sent', 'Your question is in the terminal’s input box but wasn’t sent. Open the terminal to send it.'],

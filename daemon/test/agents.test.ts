@@ -5,11 +5,11 @@
 // real transcript.
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 const scratch = mkdtempSync(join(tmpdir(), 'hypernova-test-'))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
@@ -410,6 +410,88 @@ test('an agent\'s transcript is served from its own file, only for an agent of t
   writeFileSync(outside, agentLines(PLAIN, true))
   symlinkSync(outside, join(sub, 'agent-a3333333333333333.jsonl'))
   assert.equal(agents.agentFile(id, 'a3333333333333333'), null)
+})
+
+// ── Where the files are (the layout Claude Code 2.1.316 writes) ───────────
+// Its keys as 2.1.316 writes them (names only; the values here are made up).
+const META_316 = { isBuiltIn: true, spawnDepth: 1, requestShape: 'prompt', requestNonInteractive: false, launchedWithDefaults: true }
+
+test('an agent\'s file is found flat, in its workflow\'s folder, or further down its session\'s subagents folder, never outside it', () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000201'
+  const nested = 'a4444444444444444'
+  const { sub, runDir } = makeSession(id, [...launchAgent('toolu_a1', PLAIN, 'Review the parser'), ...launchAgent('toolu_a2', nested, 'Port the plugin')])
+  writeMeta(sub, PLAIN, { ...META_316, agentType: 'general-purpose', description: 'Review the parser', toolUseId: 'toolu_a1' })
+  writeFileSync(join(sub, `agent-${PLAIN}.jsonl`), agentLines(PLAIN, false))
+  writeMeta(runDir, SURVEYOR, { ...META_316, agentType: 'workflow-subagent', description: 'survey:agents', workflowPhase: 'Survey' })
+  writeFileSync(join(runDir, `agent-${SURVEYOR}.jsonl`), agentLines(SURVEYOR, false))
+  // One in a folder of its own, two down.
+  const deep = join(sub, 'nested', 'deeper')
+  writeMeta(deep, nested, { ...META_316, agentType: 'general-purpose', description: 'Port the plugin', toolUseId: 'toolu_a2' })
+  writeFileSync(join(deep, `agent-${nested}.jsonl`), agentLines(nested, false))
+  assert.equal(agents.agentFile(id, PLAIN), realpathSync(join(sub, `agent-${PLAIN}.jsonl`)))
+  assert.equal(agents.agentFile(id, SURVEYOR), realpathSync(join(runDir, `agent-${SURVEYOR}.jsonl`)))
+  assert.equal(agents.agentFile(id, nested), realpathSync(join(deep, `agent-${nested}.jsonl`)))
+  assert.deepEqual(agents.agentEvents(id, nested)!.events.map((e) => e.kind), ['user', 'assistant', 'tool'])
+  // A folder linked in from elsewhere isn't looked through.
+  const away = join(scratch, 'away-201')
+  mkdirSync(away)
+  writeFileSync(join(away, 'agent-a5555555555555555.jsonl'), agentLines('a5555555555555555', false))
+  symlinkSync(away, join(sub, 'linked'))
+  assert.equal(agents.agentFile(id, 'a5555555555555555'), null)
+})
+
+test('a session\'s subagents folder is the one named as its transcript is', () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000202'
+  const { transcriptPath } = makeSession(id, [])
+  const stem = 'eeeeeeee-0000-4000-8000-0000000002ff'
+  const other = join(dirname(transcriptPath), `${stem}.jsonl`)
+  writeFileSync(other, '')
+  hub.upsertSession(id, { transcriptPath: other })
+  const sub = join(dirname(other), stem, 'subagents')
+  writeMeta(sub, PLAIN, { ...META_316, agentType: 'general-purpose', description: 'Review the parser', toolUseId: 'toolu_a1' })
+  writeFileSync(join(sub, `agent-${PLAIN}.jsonl`), agentLines(PLAIN, false))
+  assert.equal(agents.agentFile(id, PLAIN), realpathSync(join(sub, `agent-${PLAIN}.jsonl`)))
+})
+
+test('Claude Code\'s own helpers (forks of the main conversation) send subagent hooks with no meta file: no agent for them; an agent with one counts from its first hook', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000203'
+  const { sub } = makeSession(id, [])
+  const fork = 'a6666666666666666'
+  const { got, stop } = listen()
+  const hook = (agentId: string, tool: string, input: object) =>
+    handleHook({ session_id: id, cwd: '/tmp/agents', hook_event_name: 'PreToolUse', agent_id: agentId, agent_type: 'claude', tool_name: tool, tool_input: input, tool_use_id: `tu-${agentId}-${tool}` }, {} as never, {} as never)
+  // A `claude agents` job's fork shows its main agent's type, under an id that names no file;
+  // memory upkeep's id carries its label.
+  await hook(fork, 'Read', { file_path: '/tmp/memory/MEMORY.md' })
+  await hook('aextract_memories-0123456789abcdef', 'Read', { file_path: '/tmp/memory/MEMORY.md' })
+  assert.deepEqual(agents.listAgents(id).agents, [])
+  assert.equal(hub.getSession(id)!.agentsRunning ?? 0, 0)
+  assert.ok(!got.some((m) => m.t === 'agent'))
+  assert.equal(agents.agentEvents(id, fork), null)
+  // An agent the main agent started has its meta file from its start: its first hook counts, labelled.
+  const started = 'a7777777777777777'
+  writeMeta(sub, started, { ...META_316, agentType: 'claude', description: 'Port the plugin', toolUseId: 'toolu_x' })
+  await hook(started, 'Bash', { command: 'npm test' })
+  const a = agents.listAgents(id).agents.find((x) => x.id === started)!
+  assert.equal(a.label, 'Port the plugin')
+  assert.equal(a.activity, 'Bash: npm test')
+  assert.equal(a.status, 'running')
+  assert.ok(got.some((m) => m.t === 'agent' && m.agent.id === started))
+  stop()
+})
+
+test('an agent just started, its file not written yet, is starting; then its events come; one started long ago with no file has none', () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000204'
+  const now = launchAgent('toolu_a1', PLAIN, 'Review the parser').map((o) => ({ ...o, timestamp: new Date().toISOString() }))
+  // FIXER's call is half an hour old.
+  const { sub } = makeSession(id, [...launchAgent('toolu_a2', FIXER, 'Fix the parser'), ...now])
+  agents.listAgents(id)
+  assert.deepEqual(agents.agentEvents(id, PLAIN), { events: [], cursor: '', full: true, starting: true })
+  assert.equal(agents.agentEvents(id, FIXER), null)
+  writeFileSync(join(sub, `agent-${PLAIN}.jsonl`), agentLines(PLAIN, false))
+  const got = agents.agentEvents(id, PLAIN)!
+  assert.equal(got.starting, undefined)
+  assert.deepEqual(got.events.map((e) => e.kind), ['user', 'assistant', 'tool'])
 })
 
 test('an agent whose file went quiet when its session ended is done when its last word was its report, else stopped', () => {

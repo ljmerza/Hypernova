@@ -20,7 +20,7 @@ import { broadcast, listSessionRecs, view } from './hub.ts'
 import { isSecretFile, keyPlacesIn } from './secretfiles.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile } from './attachments.ts'
 import { mimeByName, needsSniff, sniff } from './mime.ts'
-import { ON_MAC } from './platform.ts'
+import { MACHINE, ON_MAC } from './platform.ts'
 
 /** What went wrong, for the phone: an HTTP status, a code from docs/PROTOCOL.md "Files", words, and more fields. */
 export class FileError extends Error {
@@ -265,7 +265,7 @@ const outside = (setting = false) =>
     projectsRoot: settings.projectsRoot,
     ...(setting ? { setting: 'browseOutsideProjects' } : {}),
   })
-const lockedFolder = () => new FileError(403, 'locked_folder', 'Keys, passwords and private data live there, so it stays on the Mac.')
+const lockedFolder = () => new FileError(403, 'locked_folder', `Keys, passwords and private data live there, so it stays on the ${MACHINE}.`)
 
 /** [checkPath], or the error that says why not. */
 function checked(p: string): string {
@@ -279,7 +279,7 @@ function fsError(e: any, what: 'folder' | 'file'): FileError {
   switch (e?.code) {
     case 'ENOENT':
     case 'ELOOP': // a link put where a checked file was
-      return new FileError(404, 'not_found', what === 'folder' ? 'That folder isn’t on the Mac any more.' : 'That file isn’t on the Mac any more.')
+      return new FileError(404, 'not_found', what === 'folder' ? `That folder isn’t on the ${MACHINE} any more.` : `That file isn’t on the ${MACHINE} any more.`)
     case 'ENOTDIR':
       return new FileError(400, 'not_a_dir', 'That’s a file, not a folder.')
     case 'EISDIR':
@@ -359,7 +359,7 @@ async function sniffFile(path: string): Promise<string | null> {
 export async function listDir(p: string): Promise<Listing> {
   const full = checked(p)
   // Inside .ssh, .aws, .gnupg and the like: even the names stay on the Mac.
-  if (isSecretFile(join(full, '_'))) throw new FileError(403, 'secret_file', 'Folders with keys stay on the Mac.')
+  if (isSecretFile(join(full, '_'))) throw new FileError(403, 'secret_file', `Folders with keys stay on the ${MACHINE}.`)
   let dirents
   try {
     dirents = await readdir(full, { withFileTypes: true })
@@ -470,7 +470,7 @@ export async function listFolders(p: string | null, hidden = false): Promise<Fol
  */
 export async function fileFor(p: string, max: number | null): Promise<{ full: string; size: number; mtime: number; mime: string; attachment: boolean }> {
   const attached = p ? attachmentFile(p) : null
-  if (!attached && p && resolve(p).startsWith(ATTACH_DIR + sep)) throw new FileError(404, 'attachment_gone', 'This attachment is no longer on the Mac (they’re kept for 30 days).')
+  if (!attached && p && resolve(p).startsWith(ATTACH_DIR + sep)) throw new FileError(404, 'attachment_gone', `This attachment is no longer on the ${MACHINE} (they’re kept for 30 days).`)
   const full = attached ?? checked(p)
   let s
   try {
@@ -479,7 +479,7 @@ export async function fileFor(p: string, max: number | null): Promise<{ full: st
     throw fsError(e, 'file')
   }
   if (s.isDirectory()) throw new FileError(400, 'is_dir', 'That’s a folder, not a file.')
-  if (!attached && isSecretFile(full)) throw new FileError(403, 'secret_file', 'Files with keys and passwords stay on the Mac.')
+  if (!attached && isSecretFile(full)) throw new FileError(403, 'secret_file', `Files with keys and passwords stay on the ${MACHINE}.`)
   const limit = max ?? (attached ? MAX_ATTACHMENT : VIEW_MAX)
   if (s.size > limit) throw new FileError(413, 'too_large', `That file is ${mb(s.size)}; the phone ${max === DOWNLOAD_MAX ? 'downloads' : 'opens'} files up to ${mb(limit)}.`, { size: s.size, max: limit })
   const mime = mimeByName(full) ?? (needsSniff(full) ? ((await sniffFile(full)) ?? 'application/octet-stream') : 'application/octet-stream')

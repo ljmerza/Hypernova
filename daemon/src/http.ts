@@ -55,7 +55,7 @@ import { RewindError, rewindTo } from './rewind.ts'
 import { SdkMissingError, claudeSdk, sdkState } from './sdk.ts'
 import { AutomationError, FIRE_BODY_MAX, automations, useSessionOps } from './automations.ts'
 import { systemZone } from './schedule.ts'
-import { PLATFORM, RELEASES, UNAVAILABLE, bypassBlockedByRoot, has, unavailable } from './platform.ts'
+import { MACHINE, PLATFORM, RELEASES, UNAVAILABLE, bypassBlockedByRoot, has, unavailable } from './platform.ts'
 import { randomUUID } from 'node:crypto'
 import { putEvent, tapBroadcast } from './hub.ts'
 import { editHeld, heldOf, hold, kickHeld, removeHeld, useHeldOps, type HeldReady } from './held.ts'
@@ -166,7 +166,7 @@ function attachments(b: any): string[] {
   return b.attachments.map((p: unknown) => {
     // The path as uploaded (not its real path), so the chat recognizes it in the transcript.
     const path = typeof p === 'string' ? resolve(p) : ''
-    if (!path.startsWith(ATTACH_DIR + '/') || !attachmentFile(path)) throw new HttpError(410, 'attachment_gone', 'An attached file is no longer on the Mac. Attach it again.')
+    if (!path.startsWith(ATTACH_DIR + '/') || !attachmentFile(path)) throw new HttpError(410, 'attachment_gone', `An attached file is no longer on the ${MACHINE}. Attach it again.`)
     return path
   })
 }
@@ -378,7 +378,7 @@ async function api(c: Ctx): Promise<void> {
       // Anyone on the Wi-Fi can reach this: closed with no code to compare, and few tries each (lan.ts).
       if (!pairingOpen()) {
         pairRefused(source, 'no code is being shown')
-        throw new HttpError(403, 'pairing_closed', 'No pairing code is being shown on the Mac.')
+        throw new HttpError(403, 'pairing_closed', `No pairing code is being shown on the ${MACHINE}.`)
       }
       const gate = pairAllowed(source)
       if (!gate.ok) {
@@ -394,7 +394,7 @@ async function api(c: Ctx): Promise<void> {
         pairFailed(source)
         pairRefused(source, 'a wrong or used code')
       }
-      throw new HttpError(403, 'code_expired', 'This pairing code has expired or was already used. Show a new one on your Mac.')
+      throw new HttpError(403, 'code_expired', `This pairing code has expired or was already used. Show a new one on your ${MACHINE}.`)
     }
     pairCodes.delete(h)
     const token = randomToken(32)
@@ -445,7 +445,7 @@ async function api(c: Ctx): Promise<void> {
     // Absolute asset paths requested by a previewed page carry the preview cookie.
     const ck = /(?:^|;\s*)hn_preview=([\w-]+)/.exec(req.headers.cookie ?? '')
     if (ck && !path.startsWith('/v1/') && servePreview(req, res, ck[1]!, path.slice(1) + url.search, false)) return
-    throw new HttpError(401, 'unauthorized', 'This phone is not paired with this Mac.')
+    throw new HttpError(401, 'unauthorized', `This phone is not paired with this ${MACHINE}.`)
   }
 
   if (path === '/v1/snapshot') return json(res, 200, snapshot(c.deviceId))
@@ -566,7 +566,7 @@ async function api(c: Ctx): Promise<void> {
     const kind = b.kind ?? (typeof b.id === 'string' ? findProvider(b.id)?.kind : undefined)
     if (kind !== 'openrouter' && kind !== 'custom') throw new HttpError(400, 'bad_kind', 'Choose OpenRouter or Custom.')
     const saved = typeof b.id === 'string' ? findProvider(b.id) : null
-    if (typeof b.id === 'string' && !saved) throw new HttpError(404, 'no_provider', 'That provider isn’t set up on this Mac.')
+    if (typeof b.id === 'string' && !saved) throw new HttpError(404, 'no_provider', `That provider isn’t set up on this ${MACHINE}.`)
     const raw = typeof b.baseUrl === 'string' && b.baseUrl.trim() ? b.baseUrl : (saved?.baseUrl ?? (kind === 'openrouter' ? OPENROUTER_URL : null))
     if (!raw) throw new HttpError(400, 'missing_url', 'A custom provider needs a base URL.')
     const baseUrl = cleanBaseUrl(raw)
@@ -597,7 +597,7 @@ async function api(c: Ctx): Promise<void> {
     return json(res, 200, await afterSave(saved))
   }
   if (prov && m === 'DELETE') {
-    if (!findProvider(prov[1]!)) throw new HttpError(404, 'no_provider', 'That provider isn’t set up on this Mac.')
+    if (!findProvider(prov[1]!)) throw new HttpError(404, 'no_provider', `That provider isn’t set up on this ${MACHINE}.`)
     if (!deleteProvider(prov[1]!)) throw new HttpError(400, 'cannot_delete', 'This provider can’t be deleted.')
     clearProviderStatus(prov[1]!)
     // Sessions that would start on it again (SDK turns, resumes) now say it was removed.
@@ -611,7 +611,7 @@ async function api(c: Ctx): Promise<void> {
   if (path === '/v1/account/login' && m === 'POST') {
     const b = await readJsonBody(req)
     const where = b?.where === 'mac' ? 'mac' : b?.where === 'phone' || b?.where == null ? 'phone' : null
-    if (!where) throw new HttpError(400, 'bad_where', 'Sign in on the phone or on the Mac.')
+    if (!where) throw new HttpError(400, 'bad_where', `Sign in on the phone or on the ${MACHINE}.`)
     // Signing in "on the Mac" opens a terminal window there; a Linux server has no screen for one.
     if (where === 'mac' && !has('openWindow')) throw unavailable('openWindow')
     return json(res, 200, { account: startLogin(where) })
@@ -678,7 +678,7 @@ async function api(c: Ctx): Promise<void> {
     const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get('limit') ?? 200) || 200))
     // A phone following a running agent asks only for what changed since its last answer.
     const got = agentEvents(id!, agentId, limit, url.searchParams.get('after'))
-    if (!got) throw new HttpError(404, 'no_agent', 'That agent’s transcript isn’t on the Mac.')
+    if (!got) throw new HttpError(404, 'no_agent', `That agent’s transcript isn’t on the ${MACHINE}.`)
     return json(res, 200, got)
   }
   // The chat's own: the usage strip (session-usage.ts), Claude's to-do list (todos.ts) and
@@ -950,7 +950,7 @@ async function api(c: Ctx): Promise<void> {
       if (codex) await interruptCodex(id!)
       else if (tid) pressKeys(tid, '\x1b')
       else if (isSdk(id!)) await interrupt(id!)
-      else throw new HttpError(409, 'terminal_session', 'This session runs in a terminal on your Mac. Press Esc there to stop it.')
+      else throw new HttpError(409, 'terminal_session', `This session runs in a terminal on your ${MACHINE}. Press Esc there to stop it.`)
       return json(res, 200, { ok: true })
     }
     if (action === 'menu') {
@@ -1315,7 +1315,7 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
     if (!r.ok) {
       const why: Record<string, [string, string]> = {
         no_input: ['waiting', 'Claude is showing something in the terminal (a question or a menu). Open the terminal to answer it.'],
-        busy_input: ['typing', 'There’s unsent text in this session’s terminal on the Mac. Send or clear it there first.'],
+        busy_input: ['typing', `There’s unsent text in this session’s terminal on the ${MACHINE}. Send or clear it there first.`],
         not_started: ['starting', 'The session is still starting. Try again in a moment.'],
         not_seen: ['not_seen', 'Your message is in the terminal’s input box but wasn’t sent. Open the terminal to check it.'],
         not_sent: ['not_sent', 'Your message is in the terminal’s input box but wasn’t sent. Open the terminal to send it.'],
@@ -1387,7 +1387,7 @@ export async function moveSession(id: string, providerId: string, o: { noFork?: 
   if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
   if (isCodex(id)) throw notForCodex()
   const p = providerId ? findProvider(providerId) : null
-  if (!p) throw new HttpError(404, 'no_provider', 'That provider isn’t set up on this Mac.')
+  if (!p) throw new HttpError(404, 'no_provider', `That provider isn’t set up on this ${MACHINE}.`)
   // A move still under way (its old claude closing, the new one starting): one at a time, or a
   // second restart would close the terminal the first just opened.
   if (isRestarting(id)) throw new HttpError(409, 'busy', 'This session is moving to another provider right now. Try again in a moment.')
@@ -1456,7 +1456,7 @@ export async function setSessionModel(id: string, b: any, tid: string | null = t
     const r = await typeInto(tid, `/model ${value ?? 'default'}`)
     if (!r.ok) {
       if (r.reason === 'no_input') throw busy('waiting', 'Claude is showing something in the terminal (a question or a menu). Answer it first, then change the model.')
-      if (r.reason === 'busy_input') throw busy('typing', 'There’s unsent text in this session’s terminal on the Mac. Send or clear it there first.', r.text ? { pending: r.text } : undefined)
+      if (r.reason === 'busy_input') throw busy('typing', `There’s unsent text in this session’s terminal on the ${MACHINE}. Send or clear it there first.`, r.text ? { pending: r.text } : undefined)
       if (r.reason === 'not_started') throw busy('starting', 'The session is still starting. Try again in a moment.')
       throw busy('terminal_busy', 'The terminal didn’t answer. Try again in a moment.')
     }
@@ -1466,7 +1466,7 @@ export async function setSessionModel(id: string, b: any, tid: string | null = t
     keep()
     applies = isRunning(id) ? 'next_turn' : 'now'
   } else if (isLiveTerminal(id)) {
-    throw new HttpError(409, 'terminal_model', 'This session runs in a terminal Hypernova doesn’t hold. Type /model there on the Mac.')
+    throw new HttpError(409, 'terminal_model', `This session runs in a terminal Hypernova doesn’t hold. Type /model there on the ${MACHINE}.`)
   } else {
     // Ended: it runs on this model once it resumes.
     keep()
@@ -1501,7 +1501,7 @@ async function setSessionEffort(id: string, raw: unknown, tid: string | null, ag
     const r = await typeInto(tid, `/effort ${effort}`)
     if (!r.ok) {
       if (r.reason === 'no_input') throw busy('waiting', 'Claude is showing something in the terminal (a question or a menu). Answer it first, then change the effort.')
-      if (r.reason === 'busy_input') throw busy('typing', 'There’s unsent text in this session’s terminal on the Mac. Send or clear it there first.', r.text ? { pending: r.text } : undefined)
+      if (r.reason === 'busy_input') throw busy('typing', `There’s unsent text in this session’s terminal on the ${MACHINE}. Send or clear it there first.`, r.text ? { pending: r.text } : undefined)
       if (r.reason === 'not_started') throw busy('starting', 'The session is still starting. Try again in a moment.')
       throw busy('terminal_busy', 'The terminal didn’t answer. Try again in a moment.')
     }
@@ -1512,7 +1512,7 @@ async function setSessionEffort(id: string, raw: unknown, tid: string | null, ag
   } else if (isSdk(id)) {
     applies = setEffort(id, effort)
   } else if (isLiveTerminal(id)) {
-    throw new HttpError(409, 'terminal_effort', 'This session runs in a terminal Hypernova doesn’t hold. Type /effort there on the Mac.')
+    throw new HttpError(409, 'terminal_effort', `This session runs in a terminal Hypernova doesn’t hold. Type /effort there on the ${MACHINE}.`)
   } else throw new HttpError(409, 'not_open', 'Only an open session’s effort can be changed.')
   noteEffortSet(id)
   return { effort, session: listSessions().find((x) => x.id === id), applies }
@@ -1533,7 +1533,7 @@ async function automationMayMove(rec: NonNullable<ReturnType<typeof getSession>>
     const screen = await termScreen(tid)
     if (!screen) throw new HttpError(409, 'terminal_busy', 'The terminal didn’t answer. Try again in a moment.')
     const typed = unsentText(screen.text)
-    if (typed) throw new HttpError(409, 'typing', 'There’s unsent text in this session’s terminal on the Mac. Send or clear it there first.', { pending: typed.slice(0, 500) })
+    if (typed) throw new HttpError(409, 'typing', `There’s unsent text in this session’s terminal on the ${MACHINE}. Send or clear it there first.`, { pending: typed.slice(0, 500) })
     return
   }
   if (tid || isLiveTerminal(rec.id)) throw new HttpError(409, 'no_terminal', 'This session runs in a terminal Hypernova doesn’t hold.')

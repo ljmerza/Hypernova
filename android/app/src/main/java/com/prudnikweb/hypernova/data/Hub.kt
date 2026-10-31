@@ -368,6 +368,9 @@ open class HubException(message: String) : Exception(message)
 /** A prompt didn't go: the session's terminal has unsent text ([pending]) in its input box. */
 class TerminalBusy(message: String, val pending: String) : HubException(message)
 
+/** [Hub.agentEvents]: the agent has only just started and its transcript isn't written yet (`starting`): ask again in a moment. */
+class AgentStarting : HubException("starting")
+
 /** A model switch done: the model the session has now, and whether it applies [nextTurn] (a turn runs, or it has ended). */
 data class ModelSwitch(val model: String?, val nextTurn: Boolean)
 

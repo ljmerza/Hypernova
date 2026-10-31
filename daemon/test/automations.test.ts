@@ -19,6 +19,8 @@ mkdirSync(process.env.HOME, { recursive: true })
 const { Automations, AutomationError, appendedPrompt, checkRule, fill, resultOf, ruleFor, weekText, NOTHING_NEW } = await import('../src/automations.ts')
 const { newParseState, feedLine } = await import('../src/normalize.ts')
 const { CONTINUE_TEXT } = await import('../src/blockers.ts')
+// This computer in messages: "Mac" on a Mac, "server" on Linux.
+const { MACHINE } = await import('../src/platform.ts')
 type AutoIO = import('../src/automations.ts').AutoIO
 type Session = import('../src/hub.ts').Session
 type Approval = import('../src/hub.ts').Approval
@@ -532,7 +534,7 @@ test('the account gate: signed out skips with one note per episode; a provider�
   assert.deepEqual(runs.map((r) => r.reason), ['signed_out', 'signed_out'])
   const told = w.notes().filter((n) => n.automationId === null)
   assert.equal(told.length, 1)
-  assert.equal(told[0].text, 'Automations are skipping runs: Claude Code is signed out on the Mac.')
+  assert.equal(told[0].text, `Automations are skipping runs: Claude Code is signed out on the ${MACHINE}.`)
   await assert.rejects(e.runNow(a.id), (err: any) => err.code === 'signed_out')
   // Another provider goes by its own status.
   w.account = { ...OK }
@@ -572,7 +574,7 @@ test('following: needs you, waiting on a limit mid-run (slot kept), away, blocke
   w.set(e, r2.sessionIds[0]!, { state: 'idle', blocked: { kind: 'logged_out', text: 'Please run /login', resetsAt: null, autoResumeAt: null } })
   await later(w, e, SEC)
   assert.deepEqual([e.list()[0]!.lastRun?.state, e.list()[0]!.lastRun?.reason, e.list()[0]!.lastRun?.result], ['failed', 'signed_out', 'Please run /login'])
-  assert.equal(w.notes().at(-1).text, 'It stopped: Claude Code is signed out on the Mac.')
+  assert.equal(w.notes().at(-1).text, `It stopped: Claude Code is signed out on the ${MACHINE}.`)
   // Watched for 12 hours at most: the session it started gets Esc, and the phone hears why.
   const r3 = await e.runNow(a.id)
   w.set(e, r3.sessionIds[0]!, { state: 'working' })
@@ -1219,7 +1221,7 @@ test('a run never presses Esc on the permission dialog of the owner’s own sess
 
 test('a run stopped by a block says its real reason: no plan, on hold, credit, a provider, a limit with no reset', async () => {
   const cases: [string, string, string][] = [
-    ['no_subscription', 'no_plan', 'It stopped: there’s no Claude plan on the Mac.'],
+    ['no_subscription', 'no_plan', `It stopped: there’s no Claude plan on the ${MACHINE}.`],
     ['on_hold', 'on_hold', 'It stopped: the Claude account is on hold.'],
     ['no_credit', 'no_credit', 'It stopped: you’re out of usage credits.'],
     ['limit', 'limited', 'It stopped: your usage limit is reached.'],
@@ -1540,8 +1542,8 @@ test('a Codex start step: its own sandboxes, no allow rules, Codex’s account a
   }
   const before = w.started.length
   gate = { state: 'signed_out', resetsAt: null }
-  assert.deepEqual(await refused(), ['signed_out', 'Codex is signed out on the Mac.'])
+  assert.deepEqual(await refused(), ['signed_out', `Codex is signed out on the ${MACHINE}.`])
   gate = { state: 'off', resetsAt: null }
-  assert.deepEqual(await refused(), ['no_provider', 'Codex isn’t set up on this Mac.'])
+  assert.deepEqual(await refused(), ['no_provider', `Codex isn’t set up on this ${MACHINE}.`])
   assert.equal(w.started.length, before)
 })
