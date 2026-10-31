@@ -14,6 +14,8 @@ in the Hyper* family's "digital cosmos" look.
 - `docs/INSTALL.md`: the one install guide, for strangers. When setup's steps, their words or the
   requirements change, change it and README's short version too.
 - `docs/LINUX.md`: the `hypernova` command, every flag, and where things live on the server.
+- `docs/FEATURES.md`: every user-facing feature and the tests that guard it (covered, partial or
+  gap). Update it whenever a feature or its tests change.
 
 Layout: `android/` (Gradle, Kotlin, Compose), `daemon/` (TypeScript on Node 22.18 or newer,
 run directly without a build step; `daemon/src/cli/` is the `hypernova` command), `scripts/`
