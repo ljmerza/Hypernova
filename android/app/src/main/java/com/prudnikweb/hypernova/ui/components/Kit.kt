@@ -189,6 +189,9 @@ object CommandHighlight : VisualTransformation {
 /**
  * Single-line or multi-line text input in the house style (bg800 well, ink 10% ring).
  * [commands]: a prompt for Claude Code, its leading "/command" marked ([CommandHighlight]).
+ * [onSend]: a box that sends (or submits) as a whole; with Settings' Enter key on Send (EnterKeyPref)
+ * the keyboard's Enter is [onSend] while [canSend], else nothing, and a hardware Shift+Enter is a
+ * new line. On New line, Enter is a new line as in any box.
  */
 @Composable
 fun Field(
@@ -206,26 +209,48 @@ fun Field(
     label: String? = null,
     onDone: (() -> Unit)? = null,
     commands: Boolean = false,
+    onSend: (() -> Unit)? = null,
+    canSend: Boolean = true,
 ) {
     val style: TextStyle = (if (mono) Type.mono.copy(fontSize = Type.body.fontSize, lineHeight = Type.body.lineHeight) else Type.body).copy(color = HN.ink)
     val shape = RoundedCornerShape(14.dp)
     val field = rememberFieldValue(value)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sends = onSend != null && remember { EnterKeyPref.state(context) }.value == com.prudnikweb.hypernova.data.EnterKey.Send
+    // A Shift+Enter let through to the field: its one new line goes in.
+    val shiftEnter = remember { booleanArrayOf(false) }
+    val canSendNow by androidx.compose.runtime.rememberUpdatedState(canSend)
+    val sendNow by androidx.compose.runtime.rememberUpdatedState(onSend)
     BasicTextField(
         value = field.value,
-        onValueChange = { field.value = it; if (it.text != value) onValueChange(it.text) },
+        onValueChange = change@{
+            // A keyboard that types a new line for Enter instead of pressing Send: it's Enter.
+            if (sends && !shiftEnter[0] && com.prudnikweb.hypernova.data.EnterKeys.typedNewline(field.value.text, it.text)) {
+                if (canSend) onSend?.invoke()
+                return@change
+            }
+            shiftEnter[0] = false
+            field.value = it; if (it.text != value) onValueChange(it.text)
+        },
         textStyle = style,
         cursorBrush = SolidColor(HN.accent),
         singleLine = singleLine,
         minLines = minLines,
         maxLines = maxLines,
-        keyboardOptions = if (secret) keyboard.copy(keyboardType = KeyboardType.Password) else keyboard,
+        keyboardOptions = (if (secret) keyboard.copy(keyboardType = KeyboardType.Password) else keyboard)
+            .let { if (sends) it.copy(imeAction = androidx.compose.ui.text.input.ImeAction.Send) else it },
         visualTransformation = when {
             secret -> PasswordVisualTransformation()
             commands -> CommandHighlight
             else -> VisualTransformation.None
         },
-        keyboardActions = if (onDone != null) KeyboardActions(onDone = { onDone() }) else KeyboardActions.Default,
+        keyboardActions = when {
+            sends -> KeyboardActions(onSend = { if (canSend) onSend?.invoke() })
+            onDone != null -> KeyboardActions(onDone = { onDone() })
+            else -> KeyboardActions.Default
+        },
         modifier = modifier
+            .then(if (sends) Modifier.enterKey(com.prudnikweb.hypernova.data.EnterKey.Send, { canSendNow }, { sendNow?.invoke() }, { shiftEnter[0] = it }) else Modifier)
             .fillMaxWidth()
             .semantics { if (label != null) contentDescription = label },
         decorationBox = { inner ->

@@ -281,6 +281,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
             Spacer(Modifier.height(10.dp))
             DisplaySection()
         }
+        // Typing: what the keyboard's Enter does in the boxes that send (TypingSection below), kept on this phone.
+        item(key = "typing") {
+            Spacer(Modifier.height(10.dp))
+            TypingSection()
+        }
         if (live != null) {
             item(key = "background") {
                 Spacer(Modifier.height(10.dp))
@@ -430,6 +435,33 @@ private fun DisplaySection() {
                 ),
                 scale,
                 { com.prudnikweb.hypernova.ui.theme.TextSize.set(context, it) },
+            )
+        }
+    }
+}
+
+/**
+ * Settings → Typing → **Enter key** (data/EnterKey.kt): Send, the default, or New line. It reaches
+ * every box that sends at once (EnterKeyPref is one state for the app).
+ */
+@Composable
+private fun TypingSection() {
+    val context = LocalContext.current
+    val enter by remember { com.prudnikweb.hypernova.ui.components.EnterKeyPref.state(context) }
+    Seam(stringResource(R.string.st_typing), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            HText(stringResource(R.string.st_enter_key), style = Type.body, color = HN.ink)
+            Spacer(Modifier.height(4.dp))
+            HText(stringResource(R.string.st_enter_key_desc), style = Type.small, color = HN.inkMuted)
+            Spacer(Modifier.height(12.dp))
+            com.prudnikweb.hypernova.ui.components.Segmented(
+                listOf(
+                    com.prudnikweb.hypernova.data.EnterKey.Send to stringResource(R.string.st_enter_send),
+                    com.prudnikweb.hypernova.data.EnterKey.NewLine to stringResource(R.string.st_enter_newline),
+                ),
+                enter,
+                { com.prudnikweb.hypernova.ui.components.EnterKeyPref.set(context, it) },
             )
         }
     }

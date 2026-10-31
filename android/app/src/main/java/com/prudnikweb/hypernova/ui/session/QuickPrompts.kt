@@ -184,6 +184,7 @@ private fun QuickPromptEditor(text: String, onSave: (String) -> Unit, onDelete: 
             singleLine = false, maxLines = 5, commands = true,
             keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             label = stringResource(R.string.chat_qp_edit),
+            onSend = { onSave(value) }, canSend = value.isNotBlank(),
         )
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -145,6 +145,7 @@ private fun AsidePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
         singleLine = false, maxLines = 4,
         keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         label = stringResource(R.string.aside_seam),
+        onSend = ::ask, canSend = question.isNotBlank() && !busy,
     )
     Spacer(Modifier.height(8.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -378,6 +379,7 @@ private fun ArgsLine(c: SlashCommand, value: String, onChange: (String) -> Unit,
             placeholder = c.argumentHint, mono = true, singleLine = false, maxLines = 4,
             keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
             label = commandLine(c),
+            onSend = onSend, canSend = enabled,
         )
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {

@@ -296,6 +296,8 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
 
             // ─── The prompt: what grows scrolls; the choices and Start below it stay put ───
             val voice = rememberVoiceInput(hub, text = { prompt }, setText = { prompt = it; error = null })
+            // Start (the pill's, set at the foot below); the prompt's Enter is it too (Settings' Enter key).
+            lateinit var start: () -> Unit
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
                 VoiceHintHost(voice.hint, voice::dismissHint, onAllow = { askAgain(voice) }, onSettings = { openAppSettings(context) })
                 // The field stays (hidden) under the capsule, so a keyboard that was open stays open.
@@ -311,6 +313,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                             .graphicsLayer { alpha = fieldAlpha },
                         placeholder = stringResource(if (onCodex) R.string.cx_prompt_new_hint else R.string.prompt_new_hint), singleLine = false, minLines = 3, maxLines = 8,
                         label = stringResource(R.string.prompt), commands = true,
+                        onSend = { start() }, canSend = ready && !away,
                     )
                     if (voice.listening) DictationCapsule(
                         voice,
@@ -398,10 +401,9 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                     MicButton(voice, send = false, canSend = false)
                     Spacer(Modifier.width(6.dp))
                 }
-                Pill(
-                    if (busy) stringResource(R.string.starting) else stringResource(R.string.start),
-                    {
-                        if (!ready) return@Pill
+                start = start@{
+                        // busy read now too: two Enters before the sheet redraws start one session.
+                        if (!ready || busy) return@start
                         busy = true
                         error = null
                         val sending = AttachDrafts.take(DRAFT)
@@ -455,7 +457,10 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                                 busy = false
                             }
                         }
-                    },
+                    }
+                Pill(
+                    if (busy) stringResource(R.string.starting) else stringResource(R.string.start),
+                    start,
                     // Nothing to start with yet: a disabled pill, as TalkBack says (P14); "Starting…" stays lit.
                     kind = PillKind.Primary, height = 44.dp, leading = Glyph.Send, enabled = (ready && !away) || busy,
                 )

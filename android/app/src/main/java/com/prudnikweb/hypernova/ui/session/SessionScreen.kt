@@ -55,7 +55,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.input.OutputTransformation
+import com.prudnikweb.hypernova.ui.components.enterKey
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
@@ -1584,6 +1587,26 @@ private fun Composer(
     // anything else pasted is the box's own paste. Not in the demo, which has no paperclip.
     val context = LocalContext.current
     val receiver = remember(attach, onTray != null) { if (onTray != null) pastedImages(context.contentResolver, attach::paste) else null }
+    // Settings' Enter key (EnterKeyPref): on Send, Enter is the button's own send. Hands-free, it's
+    // Done and then Send (the words go in first, as Send waits for them); held, the finger decides.
+    val enterKey = remember { com.prudnikweb.hypernova.ui.components.EnterKeyPref.state(context) }.value
+    val canEnter = when {
+        voice.handsFree -> true
+        voice.listening -> false
+        else -> voice.current != null || ((text.isNotBlank() || files.isNotEmpty()) && !attach.uploading)
+    }
+    val canEnterNow by rememberUpdatedState(canEnter)
+    val enter: () -> Unit = {
+        if (voice.handsFree) voice.on(com.prudnikweb.hypernova.ui.voice.MicEvent.Done)
+        voice.sendNow()
+    }
+    val enterNow by rememberUpdatedState(enter)
+    val enterScope = rememberCoroutineScope()
+    val shiftEnter = remember { booleanArrayOf(false) }
+    val sends = enterKey == com.prudnikweb.hypernova.data.EnterKey.Send
+    val guard = remember(sends) {
+        if (sends) EnterGuard(shiftEnter) { enterScope.launch { if (canEnterNow) enterNow() } } else null
+    }
     Column(
         modifier
             .fillMaxWidth()
@@ -1610,8 +1633,13 @@ private fun Composer(
                     // files attached it goes as a plain prompt, so nothing is marked.
                     outputTransformation = look,
                     lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 6),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                    modifier = Modifier.fillMaxWidth().then(if (receiver != null) Modifier.contentReceiver(receiver) else Modifier),
+                    // Send: the keyboard shows Send for Enter and the text still wraps to 6 lines.
+                    keyboardOptions = KeyboardOptions(imeAction = if (sends) ImeAction.Send else ImeAction.Default),
+                    onKeyboardAction = if (sends) KeyboardActionHandler { if (canEnterNow) enterNow() } else null,
+                    inputTransformation = guard,
+                    modifier = Modifier.fillMaxWidth()
+                        .then(if (sends) Modifier.enterKey(enterKey, { canEnterNow }, { enterNow() }, { shiftEnter[0] = it }) else Modifier)
+                        .then(if (receiver != null) Modifier.contentReceiver(receiver) else Modifier),
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -1660,6 +1688,20 @@ private data class ComposerLook(val tail: IntRange?, val commands: Boolean) : Ou
         val end = minOf(t.last + 1, length)
         val start = t.first.coerceIn(0, end)
         if (start < end) addStyle(SpanStyle(color = HN.inkMuted), start, end)
+    }
+}
+
+/**
+ * Enter on Send, for a keyboard that types a new line instead of pressing Send: that new line is
+ * taken back and [typed] (the box's Enter) runs. A Shift+Enter let through ([shiftEnter]) goes in.
+ */
+private class EnterGuard(private val shiftEnter: BooleanArray, private val typed: () -> Unit) : InputTransformation {
+    override fun TextFieldBuffer.transformInput() {
+        if (shiftEnter[0]) { shiftEnter[0] = false; return }
+        if (com.prudnikweb.hypernova.data.EnterKeys.typedNewline(originalText, asCharSequence())) {
+            revertAllChanges()
+            typed()
+        }
     }
 }
 
