@@ -157,14 +157,16 @@ const squash = (s: string) => s.replace(/\s+/g, '')
 const FOOTER = /\besc to close\b/i
 const ANSWERED = /\bc to copy\b|copied to clipboard/i
 const PENDING = /Answering…|retrying in \d+s/
-// The panel's own lines sit two columns in; its answer four.
-const QUESTION = /^ {0,3}\/btw\s+(.*)$/
-const EARLIER = /^ {0,3}\(\+\d+ earlier \/btw\)\s*$/
-// A row of the footer's hints ("↑/↓ to browse · c to copy · … · Esc to"), two columns in.
-const HINTS = /^ {0,3}\S/
+// The panel's own lines sit two columns in, its answer four; on the owner's phone (a session in
+// claude agents, attached) four and six. Up to eight are taken.
+const QUESTION = /^ {0,8}\/btw\s+(.*)$/
+const EARLIER = /^ {0,8}\(\+\d+ earlier \/btw\)\s*$/
+// A row of the footer's hints ("↑/↓ to browse · c to copy · … · Esc to"), as far in as the panel.
+const HINTS = /^ {0,8}\S/
 const HINT = /(?:^|·)\s*\S+ to(?:\s|$)/
 /** A row without what Claude Code's status line draws at its right ("← 4 agents"), trimmed. */
-const left = (l: string) => l.trim().split(/\s{3,}/)[0] ?? ''
+// Its "← 4" can sit one space after the hints ("Esc to ← 4" / "close ·        agents").
+const left = (l: string) => (l.trim().split(/\s{3,}/)[0] ?? '').replace(/\s*←\s*\d+\s*$/, '')
 
 /**
  * The footer under the panel: its first row and its words, the rows it wrapped onto joined (on a

@@ -53,6 +53,16 @@ test('readAside: an error in words is failed; an answer that fills the panel is 
   assert.equal(clipped?.text.split('\n').length, 23)
 })
 
+// The real panel read live off the session's own holder (2026-10-30, after the owner's /btw went
+// unread): everything four columns in and the answer six, and the status line's "← 4" one space
+// after "Esc to", its "agents" at the right of the wrapped row.
+test('readAside: the live panel, indented four, "← 4" inside the footer', () => {
+  const live = readFileSync(join(import.meta.dirname, 'fixtures', 'btw-screens', 'answered-indented-84.txt'), 'utf8')
+  assert.deepEqual(readAside(live, 'reply with just the word pong'), { state: 'answered', text: 'pong', clipped: false })
+  // The earlier question isn't this one's panel.
+  assert.equal(readAside(live, 'come up with some new names for this app'), null)
+})
+
 // A real panel, captured on the owner's phone (2026-10-30): a `claude attach` holder 84 columns wide,
 // Claude Code 2.1.314. An earlier question shows without its answer and with no "(+N earlier /btw)"
 // line; the footer starts "↑/↓ to browse" and wraps ("Esc to" / "close ·"), with the status line's
