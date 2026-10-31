@@ -63,7 +63,6 @@ class CardNowTest {
     @Test fun whatASwipeOffers() {
         // Needs input: open, whatever it is.
         assertEquals(CardSwipe.Open, CardSwipe.of(HomeGroup.NeedsInput, session(SessionState.NeedsYou)))
-        assertEquals(CardSwipe.Open, CardSwipe.of(HomeGroup.NeedsInput, session(SessionState.NeedsYou), demo = true))
         // Working: none.
         assertNull(CardSwipe.of(HomeGroup.Working, session(job = "j1", running = true)))
         // Completed: a job whose process still runs stops; one done or stopped is deleted (asked first).
@@ -71,9 +70,8 @@ class CardNowTest {
         assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, job = "j1", running = false)))
         // An older Mac that doesn't say whether it runs: delete, as the menu offers no Stop then.
         assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, job = "j1")))
-        // Not a claude agents job (nothing to stop or delete), or the demo: none.
+        // Not a claude agents job (nothing to stop or delete): none.
         assertNull(CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle)))
-        assertNull(CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, job = "j1", running = true), demo = true))
         // Cut short by a restart of the Mac: ended, so no Stop; a job is still deleted.
         assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, Phase.Ended, job = "j1", running = true)))
     }

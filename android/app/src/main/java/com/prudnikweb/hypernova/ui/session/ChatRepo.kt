@@ -7,7 +7,6 @@ import com.prudnikweb.hypernova.data.Api
 import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.Attachment
 import com.prudnikweb.hypernova.data.Core
-import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.HubException
 import com.prudnikweb.hypernova.data.Net
 import com.prudnikweb.hypernova.data.NetRoute
@@ -70,7 +69,7 @@ data class Rewound(val sessionId: String, val text: String, val files: List<Atta
 
 /**
  * The chat's own calls to the Mac: the usage strip, Claude's to-do list, "Rewind to here" and
- * the Mac's voice for "Read aloud". Demo sessions get believable answers of their own.
+ * the Mac's voice for "Read aloud".
  */
 object ChatRepo {
     private fun api(): Api {
@@ -87,9 +86,8 @@ object ChatRepo {
         else -> HubException(Core.app.getString(fallback))
     }
 
-    suspend fun usage(hub: Hub, sessionId: String): Result<SessionUsage> = try {
-        if (hub.isDemo) Result.success(DemoChat.usage(sessionId, hub.session(sessionId)?.model))
-        else Result.success(parseUsage(api().get("/v1/sessions/$sessionId/usage").getJSONObject("usage")))
+    suspend fun usage(sessionId: String): Result<SessionUsage> = try {
+        Result.success(parseUsage(api().get("/v1/sessions/$sessionId/usage").getJSONObject("usage")))
     } catch (e: CancellationException) {
         // Left the screen: not a failure to show ("StandaloneCoroutine was cancelled").
         throw e
@@ -97,9 +95,8 @@ object ChatRepo {
         Result.failure(fail(e))
     }
 
-    suspend fun todos(hub: Hub, sessionId: String): Result<List<Todo>> = try {
-        if (hub.isDemo) Result.success(DemoChat.todos(sessionId))
-        else Result.success(parseTodos(api().get("/v1/sessions/$sessionId/todos")))
+    suspend fun todos(sessionId: String): Result<List<Todo>> = try {
+        Result.success(parseTodos(api().get("/v1/sessions/$sessionId/todos")))
     } catch (e: CancellationException) {
         // Left the screen: not a failure to show ("StandaloneCoroutine was cancelled").
         throw e
@@ -107,8 +104,7 @@ object ChatRepo {
         Result.failure(fail(e))
     }
 
-    suspend fun rewind(hub: Hub, sessionId: String, eventId: String): Result<Rewound> = try {
-        if (hub.isDemo) throw HubException(Core.app.getString(R.string.chat_rewind_demo))
+    suspend fun rewind(sessionId: String, eventId: String): Result<Rewound> = try {
         val o = api().post("/v1/sessions/$sessionId/rewind", JSONObject().put("eventId", eventId))
         val id = o.obj("session")?.str("id") ?: throw HubException(Core.app.getString(R.string.chat_err_mac))
         val files = o.arr("files")?.let { a -> (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(Wire::attachment) } }.orEmpty()
@@ -194,22 +190,4 @@ object ChatRepo {
             Todo(t.str("id") ?: "$i", text, t.str("active")?.takeIf { it.isNotBlank() }, status)
         }
     }
-}
-
-/** The demo's numbers: one session close to a full context window, so Compact shows. */
-private object DemoChat {
-    fun usage(sessionId: String, model: String?): SessionUsage = when {
-        sessionId == "s-haze" -> SessionUsage("claude-sonnet-4-5", "Sonnet 4.5", 176_400, 200_000, 88, true, 3_120, 61_870, 2_904_000, 211_500, 0, 2.41, true)
-        sessionId == "s-hypernova" -> SessionUsage("claude-opus-5-5", "Opus 5.5", 418_000, 1_000_000, 42, false, 8_410, 148_200, 6_812_000, 402_900, 1_310_000, 7.86, false)
-        model == "sonnet" -> SessionUsage("claude-sonnet-4-5", "Sonnet 4.5", 38_000, 200_000, 19, false, 900, 12_100, 310_000, 38_000, 0, 0.29, false)
-        else -> SessionUsage("claude-opus-5-5", "Opus 5.5", 61_000, 1_000_000, 6, false, 1_200, 18_400, 540_000, 61_000, 0, 0.64, false)
-    }
-
-    fun todos(sessionId: String): List<Todo> = if (sessionId != "s-hypernova") emptyList() else listOf(
-        Todo("1", "Port the nebula breathing from 0stems", "Porting the nebula breathing", TodoStatus.Done),
-        Todo("2", "Draw the stars from the shared atlas", "Drawing the stars from the shared atlas", TodoStatus.Done),
-        Todo("3", "Fade the deep-sky objects behind text", "Fading the deep-sky objects behind text", TodoStatus.Active),
-        Todo("4", "Check 30 fps on battery saver", "Checking 30 fps on battery saver", TodoStatus.Pending),
-        Todo("5", "Run the screenshot tests", "Running the screenshot tests", TodoStatus.Pending),
-    )
 }

@@ -94,12 +94,12 @@ private val DEL = HN.danger
  */
 @Composable
 fun ChangesEntry(hub: Hub, session: Session, modifier: Modifier = Modifier, fallback: @Composable () -> Unit = {}) {
-    if (!hub.isDemo && session.cwd == null) return fallback()
+    if (session.cwd == null) return fallback()
     var summary by remember(session.id) { mutableStateOf<WorkChanges?>(null) }
     var open by rememberSaveable(session.id) { mutableStateOf(false) }
     val running = session.turnRunning
     LaunchedEffect(session.id, running, open) {
-        if (!running && !open) summary = ChangesRepo.load(hub, session.id).getOrNull() ?: summary
+        if (!running && !open) summary = ChangesRepo.load(session.id).getOrNull() ?: summary
     }
     val s = summary
     // [fallback] where there's no summary to show (not a git folder, nothing changed, not loaded yet).
@@ -165,7 +165,7 @@ internal fun ChangesDialog(hub: Hub, session: Session, onDismiss: () -> Unit) {
                     label = "changes",
                 ) { f ->
                     if (f == null) ChangesList(hub, session, onBack = onDismiss, onOpen = { file = it })
-                    else DiffScreen(hub, session, f, onBack = { file = null })
+                    else DiffScreen(session, f, onBack = { file = null })
                 }
                 Grain(Modifier.fillMaxSize())
             }
@@ -180,7 +180,7 @@ private fun ChangesList(hub: Hub, session: Session, onBack: () -> Unit, onOpen: 
     var changes by remember { mutableStateOf<WorkChanges?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(session.id, all, attempt, session.turnRunning) {
-        ChangesRepo.load(hub, session.id, all)
+        ChangesRepo.load(session.id, all)
             .onSuccess { changes = it; error = null }
             .onFailure { if (changes == null) error = it.message }
     }
@@ -330,12 +330,12 @@ private fun CommitBar(hub: Hub, session: Session, c: WorkChanges, onDone: () -> 
 // ─── One file's diff ───────────────────────────────────────────────────────
 
 @Composable
-private fun DiffScreen(hub: Hub, session: Session, path: String, onBack: () -> Unit) {
+private fun DiffScreen(session: Session, path: String, onBack: () -> Unit) {
     var diff by remember(path) { mutableStateOf<FileDiff?>(null) }
     var error by remember(path) { mutableStateOf<String?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
     LaunchedEffect(path, attempt) {
-        ChangesRepo.diff(hub, session.id, path).onSuccess { diff = it; error = null }.onFailure { error = it.message }
+        ChangesRepo.diff(session.id, path).onSuccess { diff = it; error = null }.onFailure { error = it.message }
     }
     val nav = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val ext = remember(path) { Highlight.extOf(path) }

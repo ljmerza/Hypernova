@@ -62,7 +62,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *   [hint] says why. The keyboard is never opened or closed by voice.
  */
 @Stable
-class VoiceInput internal constructor(private val hub: Hub, private val prefs: VoicePrefs, private val scope: CoroutineScope) {
+class VoiceInput internal constructor(private val prefs: VoicePrefs, private val scope: CoroutineScope) {
     // Wired by [rememberVoiceInput] on every composition, so they always see the current box.
     internal var text: () -> String = { "" }
     internal var setText: (String) -> Unit = {}
@@ -103,8 +103,8 @@ class VoiceInput internal constructor(private val hub: Hub, private val prefs: V
     internal var phoneVoice by mutableStateOf(false)
     internal var phoneDictate: () -> Dictation? = { null }
 
-    /** The phone has a recognizer the setting may use (or this is the demo, which has its own). */
-    val available: Boolean get() = hub.isDemo || phoneVoice
+    /** The phone has a recognizer the setting may use. */
+    val available: Boolean get() = phoneVoice
     /** No link to the Mac is needed to dictate: the words come from this phone. */
     val linked: Boolean get() = true
 
@@ -145,7 +145,7 @@ class VoiceInput internal constructor(private val hub: Hub, private val prefs: V
         detach()
         cancelled = false
         hint = null
-        val d = if (hub.isDemo) hub.dictate() else phoneDictate()
+        val d = phoneDictate()
         if (d == null) {
             gesture = MicState.Idle
             show(VoiceHint.Problem(VoiceProblem.Offline))
@@ -276,7 +276,7 @@ class VoiceInput internal constructor(private val hub: Hub, private val prefs: V
 
 /**
  * The [VoiceInput] for a text box: [text] and [setText] reach the box, [onSend] is Send (the
- * session's composer). It asks for the microphone at the first press (never in the demo), buzzes
+ * session's composer). It asks for the microphone at the first press, buzzes
  * at the start, cancel and end, finishes on leaving the app and cancels on leaving the screen,
  * and Back while hands-free is Done.
  */
@@ -286,10 +286,10 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val prefs = remember { VoicePrefs.of(context) }
-    val voice = remember(hub) { VoiceInput(hub, prefs, scope) }
+    val voice = remember(hub) { VoiceInput(prefs, scope) }
     // Asked once per box and setting (it reads the system's recognizer setup), not on every recomposition.
     val engine = prefs.dictationEngine
-    val phoneVoice = remember(hub, engine) { !hub.isDemo && com.prudnikweb.hypernova.data.PhoneDictation.available(context, engine) }
+    val phoneVoice = remember(hub, engine) { com.prudnikweb.hypernova.data.PhoneDictation.available(context, engine) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) voice.show(VoiceHint.First)
         else voice.show(VoiceHint.Permission(forGood = !rationale(context)))
@@ -298,7 +298,7 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
         voice.text = text
         voice.setText = setText
         voice.onSend = onSend
-        voice.permitted = { hub.isDemo || ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED }
+        voice.permitted = { ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED }
         voice.askPermission = {
             // The first press asks; after a "no", the note offers it again (or Settings, once Android won't).
             if (!prefs.micAsked) {
@@ -306,7 +306,7 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
                 ask.launch(Manifest.permission.RECORD_AUDIO)
             } else voice.show(VoiceHint.Permission(forGood = !rationale(context)))
         }
-        // Dictation on this phone (never in the demo, which has its own).
+        // Dictation on this phone.
         voice.phoneVoice = phoneVoice
         voice.phoneDictate = { com.prudnikweb.hypernova.data.PhoneDictation.start(context, prefs.dictationEngine) }
         voice.haptic = { view.buzz(it) }

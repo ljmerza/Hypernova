@@ -177,7 +177,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     if (hub == null && sheet) sheet = false
 
     val route = nav.top
-    val unpaired = !vm.demo && vm.live?.link?.state == LinkState.Unpaired
+    val unpaired = vm.live?.link?.state == LinkState.Unpaired
     // The solar system steps back behind full-screen states, so its labels never sit under their text.
     val onHome = route == Route.Home && hub != null && vm.pairFlow == null && !unpaired && !vm.addingServer
     val focus by animateFloatAsState(if (onHome) 1f else 0f, tween(Motion.SECTION, easing = Motion.Expo), label = "focus")
@@ -233,7 +233,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
         val id = pendingOpen ?: return@LaunchedEffect
         val h = hub ?: return@LaunchedEffect
         val synced = kotlinx.coroutines.withTimeoutOrNull(30_000L) {
-            androidx.compose.runtime.snapshotFlow { h.link.state }.first { it == LinkState.Connected || it == LinkState.Demo }
+            androidx.compose.runtime.snapshotFlow { h.link.state }.first { it == LinkState.Connected }
         }
         if (synced != null) kotlinx.coroutines.delay(10_000L)
         if (vm.pendingOpen == id && h.session(id) == null) {
@@ -352,7 +352,6 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 if (adding || (!covered && hub == null)) {
                     Onboarding(
                         onPaste = vm::handleLink,
-                        onDemo = { vm.switchDemo(true) },
                         onClose = if (adding && hub != null) ({ vm.addServer(false) }) else null,
                     )
                 } else if (!covered && hub != null) {
@@ -387,7 +386,6 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                     UnpairedScreen(
                         macName = live.mac.name,
                         onPairAgain = vm::pairAgain,
-                        onDemo = { vm.switchDemo(true) },
                     )
                 }
 
@@ -543,8 +541,8 @@ private fun Screens(
         label = "screen",
     ) { r ->
         // Each screen keeps its saveable state (list scroll, tab) while it's off screen.
-        // Home starts fresh (Sessions tab, top of the list) for each Mac and for demo mode.
-        val key = if (r == Route.Home) "home:${vm.pairing?.token?.hashCode()}:${vm.demo}" else r.key
+        // Home starts fresh (Sessions tab, top of the list) for each Mac.
+        val key = if (r == Route.Home) "home:${vm.pairing?.token?.hashCode()}" else r.key
         screens.SaveableStateProvider(key) {
             when (r) {
                 Route.Home -> HomeScreen(
@@ -555,7 +553,7 @@ private fun Screens(
                     toAccount = toAccount,
                     toAutomations = toAutomations,
                     onAutomation = { id, template, runs -> nav.push(Route.AutomationEdit(id, template, runs)) },
-                    servers = com.prudnikweb.hypernova.ui.home.ServerChoice(vm.servers, vm.demo, vm::switchServer, { vm.addServer(true) }),
+                    servers = com.prudnikweb.hypernova.ui.home.ServerChoice(vm.servers, vm::switchServer, { vm.addServer(true) }),
                 )
                 // Fork: a new route each time it's opened, so each opening lands at the latest (SessionScreen).
                 is Route.Session -> SessionScreen(hub, r.id, onBack = { nav.pop() }, opening = System.identityHashCode(r))

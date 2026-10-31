@@ -69,8 +69,8 @@ object DictationChoice {
 
 /**
  * Fork: dictation on the phone, the mic's only way: the phone's own recognizer, as the setting
- * chooses ([DictationEngine], [DictationChoice]). A [Dictation], as the demo's is, so the mic, the
- * capsule and the box are the same. Main thread only, as SpeechRecognizer is.
+ * chooses ([DictationEngine], [DictationChoice]). A [Dictation], so the mic, the capsule and the box
+ * never know where the words come from. Main thread only, as SpeechRecognizer is.
  */
 class PhoneDictation private constructor(context: Context, engine: DictationEngine) : Dictation {
     private val _state = MutableStateFlow<DictationState>(DictationState.Opening)

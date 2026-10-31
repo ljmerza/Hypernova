@@ -127,7 +127,7 @@ private suspend fun scrollToKey(list: androidx.compose.foundation.lazy.LazyListS
     }
 }
 
-/** The Settings tab: the Mac, providers, demo mode, the testing checklist, versions. */
+/** The Settings tab: the Mac, providers, the testing checklist, versions. */
 @Composable
 fun SettingsTab(vm: HubViewModel, top: Dp) {
     val haze = LocalHaze.current
@@ -171,15 +171,13 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                 Column(Modifier.padding(16.dp)) {
                     if (pairing == null || live == null) {
                         HText(stringResource(R.string.not_paired), style = Type.heading, color = HN.ink)
-                        Spacer(Modifier.height(14.dp))
-                        Pill(stringResource(R.string.pair_with_mac), { vm.switchDemo(false) }, kind = PillKind.Primary, height = 44.dp)
                     } else {
                         val link = live.link
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             HText(live.mac.name, style = Type.heading, color = HN.ink, maxLines = 1, modifier = Modifier.weight(1f))
                             Spacer(Modifier.width(10.dp))
                             // The Mac's name is the heading, so the chip says the state in a word.
-                            if (link.state != LinkState.Demo) ConnectionChip(link.state)
+                            ConnectionChip(link.state)
                         }
                         // Stay awake in one line under the name ("Awake with the lid closed" and the battery drawn), while
                         // linked; a Linux server has no Stay awake (Mac.FEATURE_AWAKE).
@@ -310,17 +308,6 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                         if (vm.background) BatteryExemption()
                     }
                 }
-            }
-        }
-        item(key = "demo") {
-            Spacer(Modifier.height(10.dp))
-            Seam(stringResource(R.string.demo_mode), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
-            GlassCard(Modifier.fillMaxWidth()) {
-                ToggleRow(
-                    stringResource(R.string.onb_demo),
-                    if (pairing != null) stringResource(R.string.demo_mode_desc) else stringResource(R.string.demo_mode_desc_unpaired),
-                    vm.demo, { vm.switchDemo(it) }, Modifier.padding(horizontal = 16.dp),
-                )
             }
         }
         // The owner's own test list: in debug builds, or after seven taps on the app's build (P19).
@@ -520,7 +507,7 @@ private fun FilesSection(hub: com.prudnikweb.hypernova.data.Hub) {
                     if (want) {
                         com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
                             context, context.getString(R.string.st_browse_check_title), context.getString(R.string.st_browse_check_sub),
-                            context.getString(R.string.st_browse_no_lock), hub.isDemo,
+                            context.getString(R.string.st_browse_no_lock),
                             onOk = { set(true) }, onFail = { msg -> if (msg != null) toast(msg) },
                         )
                     } else set(false)

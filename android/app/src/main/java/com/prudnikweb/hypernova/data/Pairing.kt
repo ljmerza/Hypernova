@@ -200,9 +200,11 @@ class PairingStore(context: Context) : LegacyPairing {
             .remove("tailnetName").remove("tailnetIp").remove("tailnetUrl").remove("tailnetAccount").remove("controlUrl").remove("controlConfirmed").apply()
     }
 
-    var demo: Boolean
-        get() = prefs.getBoolean("demo", false)
-        set(v) { prefs.edit().putBoolean("demo", v).apply() }
+    init {
+        // The demo mode an older build had (gone 2026-10-31, docs/DECISIONS.md): its flag goes, so a
+        // phone last left in the demo opens on its paired computer, or on the pairing steps.
+        if (prefs.contains("demo")) prefs.edit().remove("demo").apply()
+    }
 
     /** "Stay connected in the background" (default on). */
     var background: Boolean

@@ -105,7 +105,7 @@ fun AgentScreen(hub: Hub, sessionId: String, agentId: String, onBack: () -> Unit
                 .onFailure {
                     if (events == null) error = it.message
                     // The Mac is away: ask again once the hub has it back, not every 1.5 s.
-                    snapshotFlow { hub.isDemo || hub.link.state == LinkState.Connected }.first { it }
+                    snapshotFlow { hub.link.state == LinkState.Connected }.first { it }
                 }
             // Ended (or not known yet): rest until it runs again (a message woke it).
             if (!running) snapshotFlow { running }.first { it } else delay(POLL_MS)

@@ -543,7 +543,7 @@ private fun Modifier.filledGlass(color: Color): Modifier = drawWithCache {
  *   planet: within 1.2 s, or, if it has to swing round to the front, in up to 1.7 s, never faster
  *   than it circles.
  * - Offline: a dark disc slides over the planet, leaving a thin red edge (eclipsed), and the moon goes.
- * - Unpaired: an empty outline. Demo: the planet and moon in grey.
+ * - Unpaired: an empty outline.
  * - [battery]: a MacBook's charge after its name while linked, quietly, drawn: a small battery
  *   filled to its level and the percentage ("MacBook Air ▭ 62%", a small mint bolt while it
  *   charges); amber under 20% on battery, red under 10%. Never cut: a long name gives way first. A
@@ -572,7 +572,7 @@ fun ConnectionChip(
 ) {
     // Once linked, the Mac's name says it all; otherwise, the state in a word (with several paired,
     // the name still, so it's clear which one isn't linked).
-    val mac = name?.takeIf { (state == LinkState.Connected || (named && state != LinkState.Demo)) && it.isNotBlank() }
+    val mac = name?.takeIf { (state == LinkState.Connected || named) && it.isNotBlank() }
     // The route, in a word, only while linked: "Local" on the Mac's own network, "Remote" otherwise.
     val route = via?.takeIf { state == LinkState.Connected }?.let { routeWord(it) }
     val word = when (state) {
@@ -581,10 +581,9 @@ fun ConnectionChip(
         LinkState.Reconnecting -> stringResource(R.string.link_reconnecting)
         LinkState.Offline -> stringResource(R.string.link_offline)
         LinkState.Unpaired -> stringResource(R.string.link_unpaired)
-        LinkState.Demo -> stringResource(R.string.link_demo)
     }
     // Only what's current: a Mac that isn't linked may have been plugged in or run down since.
-    val power = battery?.takeIf { state == LinkState.Connected || state == LinkState.Demo }
+    val power = battery?.takeIf { state == LinkState.Connected }
     val base = when {
         mac == null -> word
         state == LinkState.Connected -> stringResource(R.string.link_connected_to, mac)
@@ -597,7 +596,7 @@ fun ConnectionChip(
         else -> stringResource(R.string.link_said_battery, base, power.percent)
     }
     // Only while linked, as the battery: the crescent says how the Mac is now.
-    val moon = awake?.takeIf { state == LinkState.Connected || state == LinkState.Demo }?.let {
+    val moon = awake?.takeIf { state == LinkState.Connected }?.let {
         when {
             it.sleepAt != null -> HN.amber
             it.awakeLidClosed -> HN.accentDim
@@ -621,7 +620,7 @@ fun ConnectionChip(
         // Named while not linked: in the state's own colour, as its word would be.
         mac != null -> if (state == LinkState.Connecting) HN.inkMuted else target
         state == LinkState.Connected -> HN.accent
-        state == LinkState.Connecting || state == LinkState.Demo -> HN.inkMuted
+        state == LinkState.Connecting -> HN.inkMuted
         else -> target
     }
     Row(
@@ -685,7 +684,7 @@ private fun ElsewhereCount(n: Int) {
     }
 }
 
-/** [Mac.via] in a word: "Local" or "Remote" (anything else, such as the demo's, says nothing). */
+/** [Mac.via] in a word: "Local" or "Remote" (anything else says nothing). */
 @Composable
 fun routeWord(via: String): String? = when (via) {
     Mac.VIA_LOCAL -> stringResource(R.string.route_local)
@@ -751,7 +750,6 @@ private fun linkTone(state: LinkState): Color = when (state) {
     LinkState.Connecting -> HN.inkMuted
     LinkState.Reconnecting -> HN.amber
     LinkState.Offline, LinkState.Unpaired -> HN.danger
-    LinkState.Demo -> HN.inkDim
 }
 
 private const val MOON_REST = 0.55f

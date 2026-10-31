@@ -123,7 +123,7 @@ fun replacesAnother(current: Pairing, link: PairLink): Boolean =
     !current.macName.equals(link.macName, ignoreCase = true)
 
 /**
- * The app's root state: which hub is active (live, demo, or none → onboarding), the
+ * The app's root state: which hub is active (a paired computer's, or none → onboarding), the
  * pairing flow, navigation and toasts. It outlives the Activity.
  */
 class HubViewModel(application: Application) : AndroidViewModel(application) {
@@ -146,9 +146,8 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
     /** Every paired computer for the switcher, the active one first (data/Servers.kt). */
     val servers: List<ServerStatus> get() = Core.statuses
 
-    /** The switcher: another paired computer on screen, out of demo mode. */
+    /** The switcher: another paired computer on screen. */
     fun switchServer(id: String) {
-        if (demo) setDemoInternal(false)
         if (id == Core.activeId) return
         Core.switchTo(id)
         nav.reset()
@@ -159,13 +158,9 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
     var addingServer by mutableStateOf(false)
         private set
     fun addServer(on: Boolean) { addingServer = on }
-    var demo by mutableStateOf(Core.store.demo)
-        private set
-    private var fakeHub: FakeHub? = null
-    private fun fake(): FakeHub = fakeHub ?: FakeHub(viewModelScope, app.resources).also { fakeHub = it }
 
-    /** The hub the screens use; null means "not paired, not in demo": show onboarding. */
-    val hub: Hub? get() = if (demo) fake() else live
+    /** The hub the screens use; null means "not paired": show onboarding. */
+    val hub: Hub? get() = live
 
     var pairFlow by mutableStateOf<PairFlow?>(null)
         private set
@@ -256,7 +251,6 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
                 // Added next to the computers paired already (or in the place of the same one paired
                 // before), and on screen.
                 Core.paired(p)
-                setDemoInternal(false)
                 nav.reset()
                 pairFlow = PairFlow.Done(p.macName)
             } catch (e: CancellationException) {
@@ -311,16 +305,6 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
     fun pairAgain() {
         clearPairing()
         if (Core.servers.isNotEmpty()) addingServer = true
-    }
-
-    fun switchDemo(on: Boolean) {
-        setDemoInternal(on)
-        nav.reset()
-    }
-
-    private fun setDemoInternal(on: Boolean) {
-        demo = on
-        store.demo = on
     }
 
     var askedNotifications: Boolean

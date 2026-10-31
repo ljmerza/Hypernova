@@ -371,7 +371,7 @@ internal fun AgentSwitchSheet(hub: Hub, s: Session, to: String, onSwitched: (Str
                 if (m == "bypassPermissions" && m != mode) {
                     com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
                         context, context.getString(R.string.check_bypass_title), s.name,
-                        context.getString(R.string.check_no_lock), hub.isDemo,
+                        context.getString(R.string.check_no_lock),
                         onOk = { mode = m }, onFail = { msg -> if (msg != null) error = msg },
                     )
                 } else mode = m

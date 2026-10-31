@@ -46,11 +46,6 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
-import androidx.compose.foundation.gestures.horizontalDrag
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -60,7 +55,6 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
@@ -88,7 +82,6 @@ import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.AccountWords
 import com.prudnikweb.hypernova.data.Blocked
-import com.prudnikweb.hypernova.data.FakeHub
 import com.prudnikweb.hypernova.data.OutdatedJobs
 import com.prudnikweb.hypernova.data.Provider
 import com.prudnikweb.hypernova.data.healthyOther
@@ -153,12 +146,9 @@ import androidx.compose.foundation.layout.size
 import com.prudnikweb.hypernova.ui.fx.formatDuration
 import com.prudnikweb.hypernova.ui.fx.rememberCountdownNow
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -213,7 +203,7 @@ fun HomeScreen(
     // The chip's switcher (ui/home/ServerSwitcher.kt) is open.
     var switching by rememberSaveable { mutableStateOf(false) }
     if (switching && servers != null) {
-        ServerSwitcher(servers.servers, servers.demo, servers.onSwitch, servers.onPair, onDismiss = { switching = false })
+        ServerSwitcher(servers.servers, servers.onSwitch, servers.onPair, onDismiss = { switching = false })
     }
     // Statistics, opened by tapping the sun: a screen of its own over Home, which fades back as it
     // comes forward (the way a session opens), and Back returns. Only what Home draws leaves, so
@@ -263,9 +253,7 @@ fun HomeScreen(
     }
     // The sun is eclipsed while the app can't follow usage (signed out, no plan, on hold), with
     // the reason under it; the eclipse ends with a diamond ring when the account is back. Leaving
-    // for a session keeps it. In the demo a long press on the sun walks through the account's
-    // states (see FakeHub).
-    val demo = hub as? FakeHub
+    // for a session keeps it.
     val account = hub.account
     // The sun is the leading agent's (data/AgentLead.kt): Claude Code's account eclipses it only where
     // Claude Code is installed; where Codex leads, Codex signed out does.
@@ -410,7 +398,7 @@ fun HomeScreen(
                 }
                 // Jobs on an older Claude Code: one quiet notice with Restart all (SessionMenu.kt), never on a session's screen.
                 val outdated = OutdatedJobs.of(all)
-                if (outdated.isNotEmpty() && !hub.isDemo) {
+                if (outdated.isNotEmpty()) {
                     item(key = OUTDATED_CARD) {
                         OutdatedJobsCard(hub, outdated, Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem())
                     }
@@ -427,7 +415,7 @@ fun HomeScreen(
                 if (filter is SkyFilter.Project) {
                     val name = filter.name
                     val path = hub.projects.firstOrNull { it.name == name }?.path ?: sessions.firstOrNull { it.cwd != null }?.cwd
-                    if (path != null && !hub.isDemo) {
+                    if (path != null) {
                         item(key = "browse") {
                             Row(Modifier.animateItem().padding(horizontal = 16.dp).padding(bottom = 4.dp)) {
                                 Pill(
@@ -447,7 +435,7 @@ fun HomeScreen(
                 // input, working, completed, each under its own seam with how many it holds. An empty
                 // group has no seam. A card moves only when its group changes (homeGroups).
                 // Completed cards say when they finished and mark a reply not read on this phone
-                // (data/Unread.kt); the demo keeps no marks.
+                // (data/Unread.kt).
                 val readMarks = ReadState.server(hub)?.let { ReadState.of(context, it) }
                 for ((group, members) in homeGroups(sessions)) {
                     item(key = group.key) {
@@ -461,7 +449,7 @@ fun HomeScreen(
                         val ask = hub.approval(s.id).let { a -> remember(a, s) { CardAsk.of(a, s) } }
                         // A swipe: Needs input opens, a Completed job stops or is deleted (asked first,
                         // the menu's own confirm), Working none (CardSwipe.kt).
-                        val swipe = CardSwipe.of(group, s, demo = hub.isDemo)
+                        val swipe = CardSwipe.of(group, s)
                         var deleting by rememberSaveable(s.id) { mutableStateOf(false) }
                         if (deleting) SessionMenu(hub, s, { deleting = false }, start = MenuPage.Delete)
                         val appScope = LocalAppScope.current
@@ -484,7 +472,7 @@ fun HomeScreen(
                             codex = codexOn && s.codex,
                             ask = ask,
                             onAnswer = { id, answer -> answerCard(hub, s.id, ask, id, answer) },
-                            menu = if (!hub.isDemo && MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
+                            menu = if (MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
                             completed = group == HomeGroup.Completed,
                             unread = group == HomeGroup.Completed && readMarks != null && ReadState.unread(readMarks, s),
                         )
@@ -626,7 +614,6 @@ internal fun homeGroups(sessions: List<Session>): List<Pair<HomeGroup, List<Sess
 @Composable
 private fun SkyWindow(
     height: Dp, cosmos: CosmosState,
-    usageNow: () -> Float, onWarp: ((Float) -> Unit)?, onHoldSun: (() -> Unit)?,
     filter: SkyFilter?, a11y: String, projects: List<String>, quiet: Boolean,
     onFilter: (SkyFilter?) -> Unit, onJumpToUsage: () -> Unit,
     onStats: () -> Unit, hint: Boolean, visibility: () -> Float,
@@ -637,9 +624,6 @@ private fun SkyWindow(
 ) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     val hit = rememberUpdatedState(onHit)
-    val warp = rememberUpdatedState(onWarp)
-    val hold = rememberUpdatedState(onHoldSun)
-    val usage = rememberUpdatedState(usageNow)
     val showOnly = stringResource(R.string.a11y_show_only)
     val showQuiet = stringResource(R.string.a11y_show_quiet)
     val showAll = stringResource(R.string.a11y_filter_clear)
@@ -664,26 +648,7 @@ private fun SkyWindow(
                     )
             }
             .pointerInput(cosmos) {
-                detectTapGestures(
-                    onLongPress = { p -> if (cosmos.hitAt(origin + p) == CosmosHit.Sun) hold.value?.invoke() },
-                ) { p -> cosmos.hitAt(origin + p)?.let { hit.value(it) } }
-            }
-            .pointerInput(cosmos) {
-                // Time warp (demo only): a horizontal drag that starts on the sun ages it (right)
-                // or rejuvenates it (left). Anything else is left alone for the list to scroll.
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    if (warp.value == null) return@awaitEachGesture
-                    if (cosmos.hitAt(origin + down.position) != CosmosHit.Sun) return@awaitEachGesture
-                    val start = usage.value()
-                    var dx = 0f
-                    val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over -> change.consume(); dx += over } ?: return@awaitEachGesture
-                    horizontalDrag(drag.id) { change ->
-                        dx += change.positionChange().x
-                        change.consume()
-                        warp.value?.invoke((start + dx / (size.width * 0.7f)).coerceIn(0f, 1f))
-                    }
-                }
+                detectTapGestures { p -> cosmos.hitAt(origin + p)?.let { hit.value(it) } }
             },
     ) {
         SunHint(hint, cosmos, { origin.y }, visibility, onStats)
@@ -1042,7 +1007,6 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
                 stringResource(cards.claudeTitle),
                 trail = when {
                     u.stale -> stringResource(R.string.usage_stale_trail)
-                    hub.canWarp -> stringResource(R.string.time_warp_hint)
                     u.known -> stringResource(R.string.usage_official)
                     else -> stringResource(R.string.usage_waiting)
                 },
@@ -1060,21 +1024,13 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
             // Each window as a projection meter: what's used, where the pace leads by its reset, and
             // one tag (the reset, or the time to the limit when that comes first).
             val five = UsageProjection.fiveHour(u, now)
-            WarpMeter(
-                stringResource(R.string.five_hours), five, projectionSaid(stringResource(cards.claudeFive), five),
-                enabled = hub.canWarp && !u.anyLimited,
-                onWarp = hub::warpFiveHour,
-            )
+            UsageMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(cards.claudeFive), five))
             Spacer(Modifier.height(14.dp))
             val seven = UsageProjection.sevenDay(u, now)
-            WarpMeter(
-                stringResource(R.string.seven_days), seven, projectionSaid(stringResource(cards.claudeSeven), seven),
-                enabled = hub.canWarp && !u.weekLimited,
-                onWarp = hub::warpSevenDay,
-            )
+            UsageMeter(stringResource(R.string.seven_days), seven, projectionSaid(stringResource(cards.claudeSeven), seven))
             // Fable's week and the like, which only /usage on the Mac shows (ModelWeekMeters.kt).
             ModelWeekMeters(u.models, now)
-            if (!u.known && !hub.canWarp) {
+            if (!u.known) {
                 Spacer(Modifier.height(14.dp))
                 HText(stringResource(R.string.usage_unknown_note), style = Type.small, color = HN.inkDim)
             }
@@ -1125,41 +1081,16 @@ private fun CodexUsageCard(c: CodexState, cards: UsageCards, modifier: Modifier 
     }
 }
 
-/**
- * A usage meter you can drag to scrub (the demo time warp). Drags are relative (no jump to
- * the finger), the limit is only committed when you let go at the end, and TalkBack can
- * adjust it like a slider (it reads [spoken]).
- */
+/** A usage meter that TalkBack reads as progress (it reads [spoken]). */
 @Composable
-private fun WarpMeter(label: String, p: UsageProjection, spoken: String, enabled: Boolean = true, onWarp: (Float) -> Unit) {
-    var widthPx by remember { mutableIntStateOf(1) }
-    val warp = rememberUpdatedState(onWarp)
+private fun UsageMeter(label: String, p: UsageProjection, spoken: String) {
     val value = p.used
-    val current = rememberUpdatedState(value)
-    val on = rememberUpdatedState(enabled)
     ProjectionMeter(
         label, p, spoken,
-        modifier = Modifier
-            .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
-            .semantics(mergeDescendants = true) {
-                // The meter's own sentence is its description; the slider adds only its value.
-                progressBarRangeInfo = ProgressBarRangeInfo(value, 0f..1f)
-                if (enabled) setProgress { v -> warp.value(v); true }
-            }
-            .pointerInput(enabled) {
-                if (!on.value) return@pointerInput
-                var start = 0f
-                var dx = 0f
-                detectHorizontalDragGestures(
-                    onDragStart = { start = current.value; dx = 0f },
-                    onDragEnd = { if (on.value && start + dx / widthPx >= 0.995f) warp.value(1f) },
-                ) { change, delta ->
-                    if (!on.value) return@detectHorizontalDragGestures
-                    change.consume()
-                    dx += delta
-                    warp.value((start + dx / widthPx).coerceIn(0f, 0.99f))
-                }
-            },
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            // The meter's own sentence is its description; the progress adds only its value.
+            progressBarRangeInfo = ProgressBarRangeInfo(value, 0f..1f)
+        },
     )
 }
 
@@ -1362,7 +1293,7 @@ private fun AccountCard(hub: Hub, onOpen: (String) -> Unit, onNewSession: () -> 
     // The countdown in the seam moves exactly when its text changes, as the sky's does
     // (ui/fx/Countdown.kt): it used to look every 20 s and read 6:06 under the sky's 5:59.
     val now = rememberCountdownNow(a.limit?.resetsAt)
-    val mac = if (hub.isDemo) stringResource(R.string.your_mac) else hub.mac.name
+    val mac = hub.mac.name
     val limit = a.resting(now)
     // The session that hit it, while it's still stopped: the card's actions carry that one on.
     val hit = a.sessionId?.let(hub::session)?.takeIf { it.activeBlock(a, hub.providers, now) != null }

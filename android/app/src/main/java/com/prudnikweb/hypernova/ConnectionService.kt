@@ -81,7 +81,7 @@ class ConnectionService : Service() {
         val title = if (watched > 0) getString(R.string.notif_title_watched, live.mac.name, watched) else live.mac.name
         val text = when (link.state) {
             LinkState.Unpaired -> return null
-            LinkState.Connecting, LinkState.Demo -> getString(R.string.notif_connecting)
+            LinkState.Connecting -> getString(R.string.notif_connecting)
             LinkState.Reconnecting -> getString(R.string.notif_reconnecting)
             // Without a network nothing is tried until one comes (LiveHub.fail).
             LinkState.Offline -> getString(if (link.problem == Problem.NoNetwork) R.string.notif_no_network else R.string.notif_offline)

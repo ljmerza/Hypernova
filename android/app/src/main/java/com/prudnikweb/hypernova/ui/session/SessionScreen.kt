@@ -209,7 +209,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     val list = rememberLazyListState(initialFirstVisibleItemIndex = (items.size - 1).coerceAtLeast(0))
     val scope = rememberCoroutineScope()
     val cwd = session.cwd
-    val openFile: ((String) -> Unit)? = if (hub.isDemo) null else opener.file
+    val openFile: ((String) -> Unit)? = opener.file
     // The "/" list if it has been fetched (typing "/" does): a command sent from here draws as
     // Claude Code's own or as the owner's before the Mac's copy arrives.
     val known = knownCommands(cwd)
@@ -266,7 +266,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     }
     /** Send the draft and the files ([replace]: clear unsent text in the terminal first). */
     val send: (Boolean) -> Unit = send@{ replace ->
-        Asides.sideQuestion(draft)?.takeIf { asideReach(session, hub.isDemo) }?.let { q -> askAside(draft, q); return@send }
+        Asides.sideQuestion(draft)?.takeIf { asideReach(session) }?.let { q -> askAside(draft, q); return@send }
         // Never without a file that was attached: one that failed is sent again or removed first,
         // and one still uploading is waited for.
         attach.failed?.let { f -> toast(String.format(fixFirst, f.name)); return@send }
@@ -425,7 +425,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     val sending = hub.sending(sessionId)
     // The Mac isn't linked (asleep, away, reconnecting): nothing here is live, so nothing says
     // "working" with a ticking clock; the status line and the bar say where the Mac is instead.
-    val linked = hub.isDemo || hub.link.state == LinkState.Connected
+    val linked = hub.link.state == LinkState.Connected
     val working = linked && (sending || session.phase == Phase.Starting ||
         (session.state == SessionState.Working && items.none { it is Item.Approval && it.resolved == null }))
     // The status bar above the composer: while it shows, the header line below doesn't repeat it.
@@ -433,7 +433,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     val workingSince = remember(sessionId, working) { System.currentTimeMillis() }
     // The session's usage, for the strip and the sheet: asked again as the transcript settles, and
     // when the session's model changes (/model).
-    val usage = rememberSessionUsage(hub, sessionId, "$tailKey|$working|${session.model}")
+    val usage = rememberSessionUsage(sessionId,"$tailKey|$working|${session.model}")
     // A limit, a sign-out or the provider stopped it: the card above the composer and its hint say so.
     val block = activeBlock(hub, session)
     // The chat's quick wins (ChatExtras.kt): which message's long-press menu is open, and a quick
@@ -575,12 +575,12 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                         }
                     }
                     // A Codex session gets a terminal when it's asked for (`codex resume` on the Mac).
-                    if ((session.term != null || session.codex) && !hub.isDemo) {
+                    if (session.term != null || session.codex) {
                         GlyphButton(Glyph.Terminal, stringResource(R.string.open_terminal), { opener.terminal(sessionId) }, color = if ((session.term?.mac ?: 0) > 0) HN.accent else HN.ink)
                     }
                     // Where the Mac lets the phone browse; quieter where only Browse outside projects would
                     // (its page says why, with Open projects and Turn on in Settings). Elsewhere, none.
-                    if (cwd != null && !hub.isDemo && (session.browsable || session.outsideProjects)) {
+                    if (cwd != null && (session.browsable || session.outsideProjects)) {
                         GlyphButton(Glyph.Folder, stringResource(R.string.files), { opener.files(cwd, session.project) }, color = if (session.browsable) HN.ink else HN.inkDim)
                     }
                 }
@@ -698,7 +698,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 }
                 // A question in words isn't a dialog: the reply goes in the composer, not the terminal.
                 val waitingInTerminal = session.term != null && session.state == SessionState.NeedsYou && noCard && menu == null && termAsk == null && session.question == null
-                if (waitingInTerminal && !hub.isDemo) {
+                if (waitingInTerminal) {
                     WaitingCard(codex = session.codex, onOpen = { opener.terminal(sessionId) })
                     Spacer(Modifier.height(12.dp))
                 }
@@ -740,7 +740,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 // A side question's answer ("/btw …" from the box), until it's swiped away (AsideCard.kt).
                 AsideCardHost(
                     Asides.card(sessionId),
-                    terminal = !hub.isDemo && terminalReach(session),
+                    terminal = terminalReach(session),
                     onTerminal = { opener.terminal(sessionId) },
                     onDismiss = { Asides.dismiss(sessionId, it.id) },
                 )
@@ -789,7 +789,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 val picked = commands.picked(draft)
                 if (picked != null && picked.argumentHint.isNotBlank()) CommandHint(picked, Modifier.padding(start = 18.dp, end = 18.dp, bottom = 8.dp))
                 AnimatedVisibility(
-                    tray && !hub.isDemo,
+                    tray,
                     enter = fadeIn(tween(Motion.FAST)) + expandVertically(tween(Motion.DIALOG, easing = Motion.Expo)),
                     exit = fadeOut(tween(Motion.FAST)) + shrinkVertically(tween(Motion.DIALOG, easing = Motion.Expo)),
                 ) {
@@ -811,7 +811,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     onText = { draft = it },
                     attach = attach,
                     trayOpen = tray,
-                    onTray = if (hub.isDemo) null else ({ tray = !tray }),
+                    onTray = { tray = !tray },
                     voice = voice,
                 )
             }
@@ -832,7 +832,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 atBlocked = sheetAtBlocked,
             )
         }
-        if (modelOpen && canChangeModel(hub, session)) {
+        if (modelOpen && canChangeModel(session)) {
             if (session.codex) CodexModelPicker(hub, session, onDismiss = { modelOpen = false })
             else SessionModelPicker(hub, session, onDismiss = { modelOpen = false })
         }
@@ -853,7 +853,7 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
     val opener = LocalOpener.current
     val preview: (Int) -> Unit = { port -> opener.preview(null, port, "localhost:$port") }
     // Read rows and diff cards open their file only where the Mac lets the phone browse the folder.
-    val openFile: ((String) -> Unit)? = if (hub.isDemo || hub.session(sessionId)?.browsable == false) null else opener.file
+    val openFile: ((String) -> Unit)? = if (hub.session(sessionId)?.browsable == false) null else opener.file
     val openAgent: (String) -> Unit = { id -> opener.agent(sessionId, id) }
     when (item) {
         // [onMenu]: the session's chat gives its messages a long-press menu (ChatExtras.kt).
@@ -865,13 +865,13 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
                 codex = hub.session(sessionId)?.codex == true,
                 onStartNew = item.waitingId?.let { w -> { appScope.launch { hub.startFromWaiting(w).onSuccess { opener.switchSession(it) }.onFailure { toast(it.message.orEmpty()) } } } },
                 // Attachments are the Mac's own copies (its attachments folder), wherever the session is.
-                files = { SentFiles(item.files, hub, if (hub.isDemo) null else opener.file) },
+                files = { SentFiles(item.files, hub, opener.file) },
             )
         }
         is Item.Assistant -> WithMessageMenu(item, onMenu) { menu -> AssistantMessage(item, modifier.then(menu), onPreview = preview, codex = hub.session(sessionId)?.codex == true, named = named) }
         is Item.Tool -> ToolRow(item, modifier, onOpen = openFile, onPreview = preview)
         is Item.Terminal -> MiniTerminal(item, modifier, onPreview = preview)
-        is Item.Diff -> DiffCard(item, modifier, onOpen = openFile, onPreviewFile = if (hub.isDemo) null else ({ path -> opener.preview(path, null, path.substringAfterLast('/')) }))
+        is Item.Diff -> DiffCard(item, modifier, onOpen = openFile, onPreviewFile = { path -> opener.preview(path, null, path.substringAfterLast('/')) })
         is Item.Approval -> {
             // "Always" waits for the fingerprint or the screen lock (docs/DECISIONS.md).
             val context = LocalContext.current
@@ -886,7 +886,7 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
                     alwaysSheet = true
                 } else if (a == Answer.Always) {
                     com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, title, item.detail.lineSequence().firstOrNull().orEmpty().take(80), noLock, hub.isDemo,
+                        context, title, item.detail.lineSequence().firstOrNull().orEmpty().take(80), noLock,
                         onOk = { hub.answer(sessionId, item, a) }, onFail = { msg -> if (msg != null) toast(msg) },
                     )
                 } else hub.answer(sessionId, item, a)
@@ -894,7 +894,7 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
             if (alwaysSheet && item.resolved == null) {
                 AlwaysSheet(item, onDismiss = { alwaysSheet = false }, onSave = { a ->
                     com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, title, alwaysCheckLine(context.resources, a).take(120), noLock, hub.isDemo,
+                        context, title, alwaysCheckLine(context.resources, a).take(120), noLock,
                         onOk = { alwaysSheet = false; hub.answer(sessionId, item, a) }, onFail = { msg -> if (msg != null) toast(msg) },
                     )
                 })
@@ -908,9 +908,9 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
     }
 }
 
-/** The Mac isn't linked yet or now (not the demo, not unpaired): what's on screen may be stale. */
+/** The Mac isn't linked yet or now (not unpaired): what's on screen may be stale. */
 internal fun macAway(hub: Hub): Boolean =
-    !hub.isDemo && hub.link.state != LinkState.Connected && hub.link.state != LinkState.Unpaired
+    hub.link.state != LinkState.Connected && hub.link.state != LinkState.Unpaired
 
 /** The link's state in a word, for the status line ("Reconnecting", "Offline"). */
 @Composable
@@ -950,20 +950,20 @@ internal fun WaitingForMac(hub: Hub, onBack: () -> Unit) {
  * not for a terminal session the Mac only watches (its terminal isn't shared). A Codex session's
  * are Codex's own, changed over its app-server wherever it was started.
  */
-internal fun canChange(hub: Hub, s: Session): Boolean =
-    s.phase != Phase.Ended && (s.codex || s.term != null || s.origin == "hypernova" || hub.isDemo)
+internal fun canChange(s: Session): Boolean =
+    s.phase != Phase.Ended && (s.codex || s.term != null || s.origin == "hypernova")
 
 /**
  * The permission mode can be changed from here: as [canChange], and a `claude agents` job's too,
  * terminal or not (the Mac attaches to the job and presses Shift+Tab there, docs/PROTOCOL.md).
  */
-internal fun canChangeMode(hub: Hub, s: Session): Boolean = canChange(hub, s) || jobModeChangeable(s)
+internal fun canChangeMode(s: Session): Boolean = canChange(s) || jobModeChangeable(s)
 
 /**
  * The model can be changed from here: as the mode ([canChangeMode]), a `claude agents` job's too
  * (the Mac attaches to the job and types `/model` there, as for the effort).
  */
-internal fun canChangeModel(hub: Hub, s: Session): Boolean = canChangeMode(hub, s)
+internal fun canChangeModel(s: Session): Boolean = canChangeMode(s)
 
 /** A `claude agents` job that hasn't ended: its mode, effort and model change through `claude attach`. */
 internal fun jobModeChangeable(s: Session): Boolean = s.phase != Phase.Ended && s.agentJob != null
@@ -1245,7 +1245,7 @@ private fun BlockedCard(hub: Hub, s: Session, b: Blocked, onMoved: (String) -> U
             if (b.kind == Blocked.LOGGED_OUT) {
                 // Signing in may not help (a refused login can be an ended plan): this conversation
                 // can go on elsewhere meanwhile.
-                SignInPanel(hub, if (hub.isDemo) stringResource(R.string.your_mac) else hub.mac.name, more = {
+                SignInPanel(hub, hub.mac.name, more = {
                     if (other != null) Pill(continueLabel(other), { act { hub.switchProvider(s.id, other.id) } }, kind = PillKind.Outline, height = 40.dp)
                     else Pill(stringResource(R.string.account_add_provider), opener.providers, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Plus)
                 })
@@ -1264,7 +1264,7 @@ private fun BlockedCard(hub: Hub, s: Session, b: Blocked, onMoved: (String) -> U
                 }
                 // A limit that will lift: the work can wait for it (the "reset" automation, in this folder).
                 val cwd = s.cwd
-                if (b.kind == Blocked.LIMIT && cwd != null && !hub.isDemo && !s.codex) {
+                if (b.kind == Blocked.LIMIT && cwd != null && !s.codex) {
                     Pill(stringResource(R.string.blocked_run_at_reset), { opener.runAtReset(cwd) }, kind = PillKind.Ghost, height = 40.dp, leading = Glyph.Play)
                 }
             }
@@ -1564,7 +1564,7 @@ internal suspend fun glide(dist: Float, fps: Int, scale: Float, scrollBy: (Float
 }
 
 /**
- * The prompt box: a paperclip ([onTray], null in the demo), the files waiting to go, the text
+ * The prompt box: a paperclip ([onTray], null for none), the files waiting to go, the text
  * and Send, the buttons on the last line as the text grows. Send waits until every file is on
  * the Mac. While the box is empty and the Mac offers voice, Send is the mic ([voice]); words
  * still settling after a dictation are drawn dim.
@@ -1584,7 +1584,7 @@ private fun Composer(
     val files = attach.files
     val field = rememberComposerField(text, onText)
     // A pasted image (the clipboard's, a keyboard's) is an attachment, as the paperclip adds one;
-    // anything else pasted is the box's own paste. Not in the demo, which has no paperclip.
+    // anything else pasted is the box's own paste. Not without a paperclip.
     val context = LocalContext.current
     val receiver = remember(attach, onTray != null) { if (onTray != null) pastedImages(context.contentResolver, attach::paste) else null }
     // Settings' Enter key (EnterKeyPref): on Send, Enter is the button's own send. Hands-free, it's

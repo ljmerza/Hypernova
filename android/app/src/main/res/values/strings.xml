@@ -15,7 +15,6 @@
     <string name="group_said">%1$s, %2$s.</string>
     <string name="usage">Usage</string>
     <string name="percent">%1$d%%</string>
-    <string name="time_warp_hint">drag to time-warp</string>
     <string name="resets_in">resets in %1$s</string>
     <!-- Under the quiet disk while a limit holds: through the 5-hour wait the stream refills it until the
          reset; through the week's low state the disk refills when the stream returns at the week's reset. -->
@@ -128,7 +127,6 @@
     <string name="link_reconnecting">Reconnecting</string>
     <string name="link_offline">Offline</string>
     <string name="link_unpaired">Unpaired</string>
-    <string name="link_demo">Demo</string>
     <!-- The Mac's battery beside its name in the connection chip, after a small drawn battery ("MacBook Air ▭ 62%"); a Mac without one shows nothing. -->
     <string name="link_battery">%1$d%%</string>
     <!-- What TalkBack hears: "Connected to MacBook Air, battery 62%, charging". -->
@@ -192,12 +190,6 @@
     <string name="mode_label_bypass">bypass</string>
     <string name="untitled_session">Untitled session</string>
     <string name="plan_keep_message">Not yet. Keep planning: the user wants to refine the plan before you start.</string>
-    <string name="continue_prompt">I\'m back. Please continue where you left off.</string>
-    <string name="provider_builtin_name">Claude (your subscription)</string>
-    <string name="demo_mac">demo</string>
-    <string name="demo_needs_mac">Pair your Mac to open files and previews. Demo mode has none.</string>
-    <!-- Demo: a session moved to another provider ("Continue on OpenRouter"). -->
-    <string name="demo_moved_to">Continues on %1$s from here.</string>
 
     <!-- Onboarding: first run, and "Add a server" from the switcher (no "Mac" here: ComputerWords would turn it into "server"). -->
     <string name="onb_title">Connect your server.</string>
@@ -216,7 +208,6 @@
     <string name="onb_paste_hint">https://192.168.1.20:47323/pair?c=…</string>
     <string name="onb_paste_help">No link on the clipboard. On the server, hypernova pair prints the link under the code: copy it and paste it here.</string>
     <string name="onb_pair">Pair</string>
-    <string name="onb_demo">Explore with demo data</string>
     <string name="onb_or">Or</string>
 
     <!-- Pairing -->
@@ -472,10 +463,6 @@
     <string name="forget">Forget</string>
     <string name="forgot_offline">Forgotten on this phone. Your Mac still lists it until you remove it there.</string>
     <string name="not_paired">Not paired with a Mac.</string>
-    <string name="pair_with_mac">Pair with your Mac</string>
-    <string name="demo_mode">Demo mode</string>
-    <string name="demo_mode_desc">Made-up sessions that move, to explore the app. Your Mac stays paired.</string>
-    <string name="demo_mode_desc_unpaired">Made-up sessions that move, to explore the app.</string>
     <string name="providers_desc">%1$d set up. Run sessions through OpenRouter or any Anthropic-compatible API.</string>
     <string name="checklist_desc">The owner\'s test list for this build, served by your Mac.</string>
     <string name="about">About</string>
@@ -631,7 +618,6 @@
 
     <!-- Account (docs/PROTOCOL.md, "Account"): Claude Code's subscription on the Mac, at a limit or stopped. -->
     <string name="at_clock">at %1$s</string>
-    <string name="your_mac">your Mac</string>
     <string name="limit_session">Session limit</string>
     <string name="limit_weekly">Weekly limit</string>
     <string name="limit_model">Model limit</string>
@@ -696,11 +682,9 @@
     <string name="signin_code_hint">Paste the code</string>
     <string name="signin_paste">Paste</string>
     <string name="signin_nothing_to_paste">Nothing to paste yet. Copy the code from the sign-in page.</string>
-    <string name="signin_code_refused">That code didn\'t work. Copy it again from the sign-in page.</string>
     <string name="signin_on_mac">Finish in the terminal that opened on your Mac.</string>
     <string name="signin_finishing">Signing in…</string>
     <string name="signin_failed">The sign-in didn\'t finish.</string>
-    <string name="signin_gone">That sign-in has ended. Start it again.</string>
     <!-- A session stopped by the account: its chip on Home, its line in mono, the card above its composer. -->
     <string name="state_paused">Paused</string>
     <string name="state_signed_out">Signed out</string>

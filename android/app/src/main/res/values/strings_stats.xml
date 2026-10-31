@@ -102,7 +102,6 @@
     <string name="stats_tok_cache_write">Cache write</string>
 
     <string name="stats_footer">From Claude Code’s transcripts on %1$s.</string>
-    <string name="stats_footer_demo">Demo numbers.</string>
     <string name="stats_loading">Reading Claude’s history on %1$s…</string>
     <string name="stats_error">Couldn’t load statistics.</string>
     <string name="stats_old_mac">Update Hypernova on your Mac to see statistics.</string>

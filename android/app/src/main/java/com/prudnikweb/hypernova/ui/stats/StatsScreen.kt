@@ -164,7 +164,7 @@ fun StatsScreen(hub: Hub, onBack: () -> Unit) {
     // Another range's numbers stay while the Mac answers, and glide to this one's. They never
     // stand in for this range otherwise: not once asking has failed, and not while there's no
     // link to the Mac, when the answer may be seconds away or not come at all.
-    val linked = hub.link.state == LinkState.Connected || hub.link.state == LinkState.Demo
+    val linked = hub.link.state == LinkState.Connected
     val s = stats?.takeIf { it.range == range || (linked && problem == null) }
     // Whose work it is: Claude's alone (as ever), both agents', or Codex's where it leads.
     val agents = s?.agents(hub.codexLeads) ?: StatsAgents.Claude
@@ -226,8 +226,7 @@ fun StatsScreen(hub: Hub, onBack: () -> Unit) {
                     if (s.prompts > 0 || s.toolCalls > 0 || s.approvals > 0) item(key = "work") { Work(s) }
                     item(key = "footer") {
                         HText(
-                            if (hub.isDemo) stringResource(R.string.stats_footer_demo)
-                            else stringResource(
+                            stringResource(
                                 when (agents) {
                                     StatsAgents.Claude -> R.string.stats_footer
                                     StatsAgents.Both -> R.string.stats_footer_agents

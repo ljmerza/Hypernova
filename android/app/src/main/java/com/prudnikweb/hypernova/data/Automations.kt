@@ -454,7 +454,6 @@ sealed interface AutoMsg {
 
 /**
  * The automations as last heard, as Compose state: the snapshot's list, then the socket's changes.
- * Shared by the live client and the demo.
  */
 open class AutomationBook {
     var current by mutableStateOf<AutomationsState?>(null)

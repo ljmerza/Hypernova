@@ -91,7 +91,7 @@ fun AutomationsTab(
     val w = rememberWords()
     // Out of reach, the last snapshot holds still where the Mac was last heard: no stopwatch counts
     // on, no switch flips to bounce back (A15).
-    val offline = !hub.isDemo && hub.link.state != LinkState.Connected
+    val offline = hub.link.state != LinkState.Connected
     var asOf by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(offline) { asOf = if (offline) System.currentTimeMillis() else null }
     val anyActive = !offline && st?.list?.any { it.lastRun?.active == true } == true

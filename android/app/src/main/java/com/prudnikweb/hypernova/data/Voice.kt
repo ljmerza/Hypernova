@@ -6,13 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-import kotlin.math.sin
 
 /*
  * Voice on the phone (docs/specs/spec-voice.md, 3.6): the mic dictates with the phone's own
@@ -34,68 +27,6 @@ fun unsettledFrom(final: String, interim: String): Int {
         i.isEmpty() -> f.length
         f.isEmpty() -> 0
         else -> f.length + 1
-    }
-}
-
-// ─── The demo ────────────────────────────────────────────────────────────────
-
-/**
- * The demo's dictation: no microphone, no permission. A phrase arrives three words a second, the
- * last word or two still changing, with a level that rises and falls like speech; letting go
- * settles it 120 ms later.
- */
-class FakeDictation(private val scope: CoroutineScope, override val startedAt: Long, private val clock: () -> Long) : Dictation {
-    private val words = PHRASE.split(' ')
-    private val flow = MutableStateFlow<DictationState>(DictationState.Opening)
-    override val state: StateFlow<DictationState> = flow
-    private var shown = 0
-    private var job: Job? = null
-    private var done = false
-
-    init {
-        job = scope.launch {
-            delay(450)
-            while (shown < words.size) {
-                shown++
-                if (!done) flow.value = DictationState.Live(settled(), changing())
-                delay(333)
-            }
-        }
-    }
-
-    private fun settled() = words.take((shown - 2).coerceAtLeast(0)).joinToString(" ")
-    private fun changing() = words.subList((shown - 2).coerceAtLeast(0), shown).joinToString(" ")
-
-    override fun level(): Float {
-        if (done || shown == 0 || shown >= words.size) return 0.04f
-        val t = (clock() - startedAt) / 1000f
-        // Syllables about five a second, louder words now and then.
-        val syllable = (0.5f + 0.5f * sin(t * 31f)).let { it * it }
-        val phrase = 0.55f + 0.45f * sin(t * 2.3f)
-        return (0.12f + 0.75f * syllable * phrase).coerceIn(0f, 1f)
-    }
-
-    override fun finish() {
-        if (done) return
-        done = true
-        job?.cancel()
-        val text = heardText(settled(), changing())
-        flow.value = DictationState.Settling(text, unsettledFrom(settled(), changing()))
-        scope.launch {
-            delay(120)
-            flow.value = DictationState.Ended(text)
-        }
-    }
-
-    override fun cancel() {
-        if (done) return
-        done = true
-        job?.cancel()
-        flow.value = DictationState.Cancelled
-    }
-
-    companion object {
-        const val PHRASE = "Add a dark mode toggle to settings, and make it follow the system."
     }
 }
 

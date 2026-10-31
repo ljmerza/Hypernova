@@ -9,7 +9,7 @@ import java.time.LocalDate
  * Statistics: how much the agents worked on the Mac (docs/PROTOCOL.md, "Statistics"). The Mac adds
  * Claude Code's part up from its transcripts and counts Codex's turns as it follows them; every
  * total covers both, [Stats.claude] and [Stats.codex] split them. The Statistics screen (a tap on
- * the sun) draws it. The demo makes its own (DemoStats), Claude's alone.
+ * the sun) draws it.
  */
 
 /** The ranges the Statistics screen offers; [wire] is what `GET /v1/stats?range=` takes. */
@@ -192,8 +192,7 @@ object StatsWire {
 
 /**
  * Where the Statistics screen gets its numbers: the Mac (a short cache per range, so opening it
- * again or switching ranges shows the last answer at once while a fresh one comes), or the
- * demo's own.
+ * again or switching ranges shows the last answer at once while a fresh one comes).
  */
 object StatsSource {
     private class Entry(val stats: Stats, val at: Long)
@@ -202,7 +201,7 @@ object StatsSource {
     /** A Mac answers within the daemon's own 15 s cache; older than this, ask again. */
     private const val FRESH_MS = 30_000L
 
-    private fun key(hub: Hub, range: StatsRange): String = "${(hub as? LiveHub)?.pairing?.baseUrl ?: "demo"}|${range.wire}"
+    private fun key(hub: Hub, range: StatsRange): String = "${(hub as? LiveHub)?.pairing?.baseUrl ?: "none"}|${range.wire}"
 
     /** The last answer for [range], if any (shown at once while a fresh one loads). */
     fun cached(hub: Hub, range: StatsRange): Stats? = cache[key(hub, range)]?.stats
@@ -210,12 +209,11 @@ object StatsSource {
     fun fresh(hub: Hub, range: StatsRange, now: Long = System.currentTimeMillis()): Boolean =
         cache[key(hub, range)]?.let { now - it.at < FRESH_MS } == true
 
-    /** Ask the Mac (or the demo). A failure is an [ApiException] to explain. */
+    /** Ask the Mac. A failure is an [ApiException] to explain. */
     suspend fun load(hub: Hub, range: StatsRange): Result<Stats> {
         val k = key(hub, range)
         return try {
             val s = when {
-                hub.isDemo -> DemoStats.make(range, System.currentTimeMillis())
                 hub is LiveHub -> StatsWire.parse(Api(hub.pairing.baseUrl, hub.pairing.token).get("/v1/stats?range=${range.wire}"))
                 else -> throw ApiException(Problem.Server, 0, "no_stats")
             }

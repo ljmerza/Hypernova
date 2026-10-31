@@ -109,7 +109,7 @@ internal fun MessageMenu(
                 if (reading) ChatGlyph.Stop else ChatGlyph.Speaker,
                 stringResource(if (reading) R.string.chat_read_stop else R.string.chat_read),
                 { ReadAloud.toggle(hub, item.key, text, appScope, toast, sessionId); onDismiss() },
-                hint = if (reading || hub.isDemo) null else stringResource(R.string.chat_read_hint),
+                hint = if (reading) null else stringResource(R.string.chat_read_hint),
             )
             SheetAction(ChatGlyph.Select, stringResource(R.string.chat_select), { page = Page.Select })
             if (mine) {
@@ -131,7 +131,7 @@ internal fun MessageMenu(
                 Pill(stringResource(R.string.chat_close), onDismiss, kind = PillKind.Ghost, height = 44.dp)
             }
         }
-        Page.Rewind -> RewindConfirm(hub, item, rewind ?: return onDismiss(), onRewound, onDismiss)
+        Page.Rewind -> RewindConfirm(item, rewind ?: return onDismiss(), onRewound, onDismiss)
     }
 }
 
@@ -145,7 +145,7 @@ data class RewindAsk(val sessionId: String, val yours: Int, val replies: Int)
  * (in the new session; this one stays as it was), but not the files Claude changed.
  */
 @Composable
-private fun RewindConfirm(hub: Hub, item: Item, ask: RewindAsk, onRewound: (Rewound) -> Unit, onDismiss: () -> Unit) {
+private fun RewindConfirm(item: Item, ask: RewindAsk, onRewound: (Rewound) -> Unit, onDismiss: () -> Unit) {
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     var busy by remember { mutableStateOf(false) }
@@ -166,7 +166,7 @@ private fun RewindConfirm(hub: Hub, item: Item, ask: RewindAsk, onRewound: (Rewo
                 if (busy) return@Pill
                 busy = true
                 appScope.launch {
-                    ChatRepo.rewind(hub, ask.sessionId, item.key)
+                    ChatRepo.rewind(ask.sessionId, item.key)
                         .onSuccess { onDismiss(); onRewound(it) }
                         .onFailure { toast(it.message.orEmpty()); busy = false }
                 }

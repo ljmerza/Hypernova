@@ -24,7 +24,7 @@ import java.io.File
  * "Read aloud" for one message at a time. With a Mac that reads aloud this way, it asks the Mac for
  * a play in its own voice (docs/PROTOCOL.md "Read aloud") and plays it natively as it streams in ([Speaker]: the phone's current output, music
  * ducked, the screen may go off). Without one, the Mac's whole clip as before; and the phone's own
- * text-to-speech when the Mac can't (the demo, no connection), so it always reads.
+ * text-to-speech when the Mac can't (no connection), so it always reads.
  * [reading] is the message being read (or fetched), for its Stop and its wave.
  */
 object ReadAloud {
@@ -56,7 +56,7 @@ object ReadAloud {
         if (spoken.isBlank()) return
         // The Mac's voices only where the computer has them (a Linux server doesn't): else the phone's.
         val macVoice = hub.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_MAC_VOICE)
-        val speech = hub.speech?.takeIf { it.settings != null && !hub.isDemo && macVoice }
+        val speech = hub.speech?.takeIf { it.settings != null && macVoice }
         if (speech != null) {
             asked = key
             job = scope.launch {
@@ -74,7 +74,7 @@ object ReadAloud {
     private fun olderWay(hub: Hub, key: String, text: String, scope: CoroutineScope, toast: (String) -> Unit) {
         legacy = key
         job = scope.launch {
-            val audio = if (hub.isDemo || !hub.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_MAC_VOICE)) null else ChatRepo.speech(text).getOrNull()
+            val audio = if (!hub.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_MAC_VOICE)) null else ChatRepo.speech(text).getOrNull()
             if (legacy != key) return@launch
             if (audio != null && audio.isNotEmpty() && play(audio, key)) return@launch
             onPhone(text, key, toast)

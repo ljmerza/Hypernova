@@ -36,18 +36,17 @@ import kotlinx.coroutines.launch
 /**
  * What a swipe on a Home card does (docs/IDEAS.md, HM2): a Needs input card opens; a Completed
  * `claude agents` job stops while its process still runs, else it's deleted (asked first, as the
- * long-press menu's Delete); a Working card has none, and in the demo only Open. What the Mac can
- * do is the long-press menu's own rule ([MenuOffer]).
+ * long-press menu's Delete); a Working card has none. What the Mac can do is the long-press menu's
+ * own rule ([MenuOffer]).
  */
 internal enum class CardSwipe { Open, Stop, Delete;
     companion object {
-        fun of(group: HomeGroup, s: Session, demo: Boolean = false): CardSwipe? = when (group) {
+        fun of(group: HomeGroup, s: Session): CardSwipe? = when (group) {
             HomeGroup.NeedsInput -> Open
             HomeGroup.Working -> null
             HomeGroup.Completed -> {
                 val offer = MenuOffer.of(s)
                 when {
-                    demo -> null
                     offer.stop -> Stop
                     offer.delete -> Delete
                     else -> null
