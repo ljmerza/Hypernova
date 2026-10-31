@@ -8,17 +8,69 @@ leak.
 
 `.github/workflows/android-release.yml` cuts every release: each push to `main` that touches
 `android/`, `daemon/`, `scripts/pack-linux.sh` or `scripts/install-linux.sh` (or a manual run)
-publishes the next `v<appVersion>-ljm.<n>` with two files:
+publishes the next version, `vX.Y.Z` (below), with two files:
 
 | File | What |
 |---|---|
-| `hypernova-<tag>.apk` | the Android app, signed with the release key (repo secrets), `:app:distRelease` |
-| `hypernova-server-<tag>-linux.tar.gz` | the Linux server package, `scripts/pack-linux.sh` renamed: the daemon's sources and lockfile, the font, the install script, `LINUX.md` as its README. No `node_modules` and no Node, so one package serves x86_64 and arm64 (the install fetches Node.js for the server and builds node-pty there) |
+| `hypernova-vX.Y.Z.apk` | the Android app, signed with the release key (repo secrets), `:app:distRelease` |
+| `hypernova-server-vX.Y.Z-linux.tar.gz` | the Linux server package, `scripts/pack-linux.sh` renamed: the daemon's sources and lockfile, the font, the install script, `LINUX.md` as its README. No `node_modules` and no Node, so one package serves x86_64 and arm64 (the install fetches Node.js for the server and builds node-pty there) |
 
 One job builds both, so one push makes one release and every release has both, even when only the
-daemon changed. A release published by hand gets both attached. The notes list the commits since
-the release before (`scripts/release-notes.sh`). Installing the server package:
-[INSTALL.md](INSTALL.md), "On a Linux server".
+daemon changed. A release published by hand keeps the tag it was given, and gets both attached
+under that tag's name. Installing the server package: [INSTALL.md](INSTALL.md), "On a Linux
+server"; in one line, `curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash`.
+
+### Versions
+
+Semantic versions, counted from the commits the way semantic-release does it, by
+`scripts/next-version.sh` (its self-tests: `scripts/test-next-version.sh`). The last release is the
+highest `vX.Y.Z` tag the pushed commit contains (a tag with anything after the numbers doesn't
+count). The commits after it, merge commits left out (the commits a merge brings in count on their
+own), decide the next one:
+
+| In the commits | Step | e.g. from v0.3.0 |
+|---|---|---|
+| a `type!:` subject, or a `BREAKING CHANGE:` line in a body | major | v1.0.0 |
+| a `feat:` | minor | v0.4.0 |
+| anything else: `fix:`, `perf:`, `docs:`, `chore:`, a message without a type, or no commit at all (a manual rebuild) | patch | v0.3.1 |
+
+Never under **v0.3.0**, the first release with these versions: the v0.2.x before it are the old
+`v0.2.0-ljm.N` builds renamed to `v0.2.N` (`scripts/rename-releases.sh`), and `v0.2.0` itself is
+upstream's tag. The workflow refuses a tag that already exists.
+
+The version is the app's versionName: the workflow builds with `-PappVersion=X.Y.Z`;
+`appVersion` in `android/app/build.gradle.kts` is only the default for a local build. The
+versionCode stays the build's minute, so any newer build updates the one before.
+
+### Commits
+
+Conventional commits, since they make the version and the notes: `type(scope): subject`, the scope
+optional, the subject in the repo's plain style (what changed, in words, no period), e.g.
+`fix(daemon): a held prompt goes in once the box is back`.
+
+- `feat:` something new (a minor release)
+- `fix:` something that was wrong
+- `perf:`, `refactor:`, `docs:`, `test:`, `chore:` the rest (with `fix:`, a patch release)
+- `feat!:` (any type with `!`), or a `BREAKING CHANGE: …` line in the body: a change that breaks
+  what was there, like a phone and a daemon that no longer fit each other's older version (a major)
+
+### Notes
+
+`scripts/release-notes.sh <tag> <previous tag> <commit>` writes them: the commits since the release
+before, grouped into **Features** (`feat`), **Fixes** (`fix`) and **Other** (the rest, and messages
+without a type), each with its `type(scope):` taken off, then how to install, with the one-line
+`get.sh` install and the files' own names.
+
+### Renaming the old releases
+
+`scripts/rename-releases.sh` turns each `v0.2.0-ljm.N` release into `v0.2.N`: a new tag at the same
+commit, the release moved onto it and retitled, the tag names in its notes rewritten, its assets
+renamed (`hypernova-v0.2.0-ljm.N.apk` to `hypernova-v0.2.N.apk`, the server package likewise; an
+early plain `hypernova.apk` keeps its name), then the old tag deleted. The newest stays the latest
+release until v0.3.0. It is a dry run (the plan, nothing changed) unless given `--apply`, and safe
+to run again. Run it before the first v0.3.0 is published, so that release's notes start from the
+last v0.2.N rather than from upstream's v0.2.0. Clones keep the old tags until
+`git tag -l 'v0.2.0-ljm.*' | xargs -r git tag -d`.
 
 ## Android
 
@@ -66,8 +118,9 @@ From `android/`, with JDK 21:
 It writes three files to `dist/`:
 
 - `hypernova.apk`: the release APK (about 13 MB; the debug one is about 48 MB).
-- `hypernova.json`: its version note, `{"versionCode": N, "versionName": "0.2.0"}`. The versionCode
-  is the build's minute since 2026-01-01, so every build updates the one before.
+- `hypernova.json`: its version note, `{"versionCode": N, "versionName": "0.3.0"}`. The versionCode
+  is the build's minute since 2026-01-01, so every build updates the one before; the versionName
+  is `-PappVersion` when given (a release, "Versions" above), else `appVersion`'s default.
 - `hypernova-mapping.txt`: R8's mapping. **Keep it with the release** (the workflow uploads it as
   an artifact; it isn't published): it is the only way to read a crash trace from this build,
   with `$ANDROID_HOME/cmdline-tools/latest/bin/retrace dist/hypernova-mapping.txt trace.txt`.

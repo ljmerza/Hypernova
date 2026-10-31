@@ -11,7 +11,7 @@
 #
 #   curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash -s -- --yes
 #
-# HYPERNOVA_TAG=v0.2.0-ljm.23 picks a release instead of the latest. Run again to update.
+# HYPERNOVA_TAG=v0.3.0 picks a release instead of the latest. Run again to update.
 set -euo pipefail
 
 REPO=ljmerza/Hypernova

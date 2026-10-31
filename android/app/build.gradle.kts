@@ -16,7 +16,11 @@ abstract class BuildMinute : ValueSource<Int, ValueSourceParameters.None> {
     override fun obtain(): Int = ((System.currentTimeMillis() / 60_000L) - 29_453_760L).toInt()
 }
 val buildMinute: Int = providers.of(BuildMinute::class) {}.get()
-val appVersion = "0.2.0"
+/**
+ * The versionName. A release passes its own, `-PappVersion=0.3.1` (scripts/next-version.sh, from
+ * the commits since the last release; docs/RELEASING.md, "Versions"); a local build uses this one.
+ */
+val appVersion: String = providers.gradleProperty("appVersion").orNull?.trim()?.takeIf { it.isNotEmpty() } ?: "0.3.0"
 
 /**
  * The release key (docs/RELEASING.md): a properties file outside the repo (storeFile, relative to
