@@ -472,6 +472,9 @@ sealed interface Item {
         val change: List<DiffLine>? = null,
         /** The Mac says no at [expiresAt] for nobody answering ([WApproval.autoDeny]): Codex, an automation's run. */
         val autoDeny: Boolean = false,
+        /** Claude Code's rules for Always and where they'd go ([WApproval.alwaysRules]): the Always sheet's start. */
+        val alwaysRules: List<String> = emptyList(),
+        val alwaysScope: String? = null,
     ) : Item {
         /**
          * How long until the Mac says no for nobody answering, for the band's countdown: only where it

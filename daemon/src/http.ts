@@ -42,7 +42,8 @@ import { ResumeError, setAutoContinue, typeContinue } from './resume.ts'
 import { BlockedError, blockedList, dismissBlocked, retryBlocked } from './blocked.ts'
 import { AsideError, askAside, asideOf } from './aside.ts'
 import { rulesInEffect } from './permission-rules.ts'
-import { sessionAllowedTools } from './hub.ts'
+import { allowSeveral, sessionAllowedTools, sessionAlwaysRules } from './hub.ts'
+import { AlwaysError, readAlwaysChoice, type AlwaysChoice } from './always.ts'
 import { CONTINUE_TEXT } from './blockers.ts'
 import { checkBalance, hasBalance, providerSaved } from './balance.ts'
 import { checkProvider, type ProviderCheck } from './providers-check.ts'
@@ -848,8 +849,24 @@ async function api(c: Ctx): Promise<void> {
     if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
     if (isCodex(rec.id)) throw notForCodex()
     const managed = getManaged(rec.id)
-    const own = [...(managed?.automation ? (managed.allowedTools ?? []) : []), ...sessionAllowedTools(rec.id)]
-    return json(res, 200, { permissions: rulesInEffect(rec.cwd, { allow: own }) })
+    const own = [...(managed?.automation ? (managed.allowedTools ?? []) : []), ...sessionAllowedTools(rec.id), ...sessionAlwaysRules(rec.id)]
+    return json(res, 200, { permissions: rulesInEffect(rec.cwd, { allow: [...new Set(own)] }) })
+  }
+  // "Allow these N" (docs/PROTOCOL.md, "Approvals"; IDEAS PA6): several of one session's asks
+  // allowed with one answer, each as its own Allow. Never a deny, never another session's.
+  const al = /^\/v1\/sessions\/([\w-]+)\/allow$/.exec(path)
+  if (al && m === 'POST') {
+    const id = al[1]!
+    if (!getSession(id)) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    const b = await readJsonBody(req)
+    const ids: unknown = b?.ids
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 50 || !ids.every((x) => typeof x === 'string' && /^[\w-]{1,64}$/.test(x))) {
+      throw new HttpError(400, 'bad_ids', 'Name the asks to allow.')
+    }
+    const r = allowSeveral(id, ids as string[], c.local ? 'mac' : 'phone')
+    if (!r) throw new HttpError(400, 'bad_ids', 'Only this session’s commands can be allowed together.')
+    for (const _ of r.allowed) noteApproval(c.deviceId, c.local)
+    return json(res, 200, r)
   }
   // Fork: a held prompt's new words, or taken back (docs/PROTOCOL.md, "Held prompts").
   const hp = /^\/v1\/sessions\/([\w-]+)\/held\/([\w-]+)$/.exec(path)
@@ -984,7 +1001,17 @@ async function api(c: Ctx): Promise<void> {
     const b = await readJsonBody(req)
     if (!['allow', 'deny', 'always', 'session'].includes(b?.decision)) throw new HttpError(400, 'bad_decision', 'Answer with allow, deny, always or session.')
     const decision = b.decision as 'allow' | 'deny' | 'always' | 'session'
-    const ok = answerApproval(ap[1]!, { decision, message: b.message, answers: b.answers }, c.local ? 'mac' : 'phone')
+    // An Always may say where its rule goes and what it is (always.ts): checked before anything is answered.
+    let always: AlwaysChoice | undefined
+    if (decision === 'always') {
+      try {
+        always = readAlwaysChoice(b)
+      } catch (e) {
+        if (e instanceof AlwaysError) throw new HttpError(400, e.code, e.message)
+        throw e
+      }
+    }
+    const ok = answerApproval(ap[1]!, { decision, message: b.message, answers: b.answers, ...(always ? { always } : {}) }, c.local ? 'mac' : 'phone')
     if (!ok) throw new HttpError(409, 'resolved', 'This was already answered.')
     noteApproval(c.deviceId, c.local)
     return json(res, 200, { ok: true })

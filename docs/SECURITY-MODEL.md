@@ -107,7 +107,11 @@ steps) are asked for on the phone with `BiometricPrompt` (on the Mac app with To
 password) and then sent as a flag. The daemon can't see a fingerprint and can't check one. The flags
 stop a mistaken tap and a notification's or the widget's quick answer; they don't stop a stolen device
 token, which can send them like the phone does. That is no more than a stolen phone could do anyway
-(start a session in Bypass). The daemon itself asks for them on every save that needs them,
+(start a session in Bypass). Since 2026-10-31 an "Always" may also name its rule and where it goes,
+up to the owner's user settings (`docs/PROTOCOL.md`, "What Always covers"), so one waiting ask can
+leave a lasting rule as broad as `Bash` everywhere. Claude Code writes that rule itself, from the
+hook's answer; the daemon reads and writes no settings file for it, and the answer takes only an
+allow rule, never a deny, ask, mode or folder of the phone's. The daemon itself asks for them on every save that needs them,
 including a save that keeps the steps as they were.
 
 ### Automations and words from outside

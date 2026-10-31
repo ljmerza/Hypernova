@@ -35,6 +35,7 @@ import { noteDenied } from './denied.ts'
 import { noteHookEvent } from './hookevents.ts'
 import type { AutomationStart } from './terms.ts'
 import { SdkMissingError, claudeSdk, type ClaudeSdk } from './sdk.ts'
+import { alwaysUpdates, suggestedRules, suggestedScope } from './always.ts'
 
 /**
  * One session's runs: the query running now, and the prompts waiting behind it ([queue], shaped
@@ -296,6 +297,8 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
             input: input as Record<string, unknown>,
             reason: (opts as { decisionReason?: string; title?: string }).title ?? (opts as { decisionReason?: string }).decisionReason ?? null,
             canAlways: !!opts.suggestions?.length,
+            alwaysRules: suggestedRules(opts.suggestions),
+            alwaysScope: suggestedScope(opts.suggestions),
             questions: kind === 'question' ? ((input as { questions?: unknown[] }).questions ?? null) : null,
             plan: kind === 'plan' ? String((input as { plan?: string }).plan ?? '') : null,
             agentId,
@@ -319,7 +322,7 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
           return { behavior: 'deny', message: ans.message ? `The user wants to keep planning: ${ans.message}` : 'The user wants to keep planning. Ask what to change.' }
         }
         if (ans.decision === 'deny') return { behavior: 'deny', message: ans.message || 'The user denied this from Hypernova.' }
-        if (ans.decision === 'always') return { behavior: 'allow', updatedInput: input, updatedPermissions: opts.suggestions }
+        if (ans.decision === 'always') return { behavior: 'allow', updatedInput: input, updatedPermissions: alwaysUpdates(opts.suggestions, ans.always) as never }
         if (ans.decision === 'session') return { behavior: 'allow', updatedInput: input, updatedPermissions: sessionRule(toolName) as never }
         return { behavior: 'allow', updatedInput: input }
       },

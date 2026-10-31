@@ -24,6 +24,11 @@ data class Link(
 sealed interface Answer {
     data object Allow : Answer
     data object Always : Answer
+    /**
+     * Always, with where the rule goes and the rules as the owner left them on the Always sheet
+     * ([AlwaysDraft]): Claude Code saves them there (docs/PROTOCOL.md, "Approvals").
+     */
+    data class AlwaysAs(val scope: AlwaysScope, val rules: List<String>) : Answer
     /** This tool (all web pages, all searches, all reads) for the rest of the session. */
     data object Session : Answer
     data object Deny : Answer
@@ -182,6 +187,14 @@ interface Hub {
     fun approval(sessionId: String): WApproval? = null
     /** [answer] approval [id] from its Home card: true once the Mac has it, false when it didn't get through (said in a toast). */
     suspend fun answerApproval(id: String, answer: Answer): Boolean = false
+    /** Every ask session [sessionId] waits on that this phone hasn't answered, oldest first (none in the demo). */
+    fun waitingAsks(sessionId: String): List<WApproval> = emptyList()
+    /**
+     * "Allow these N" (IDEAS PA6): asks [ids] of session [sessionId] allowed with one answer, each
+     * as its own Allow; never a deny. Succeeds with how many the Mac allowed (some may have been
+     * answered elsewhere a moment before).
+     */
+    suspend fun allowSeveral(sessionId: String, ids: List<String>): Result<Int> = Result.failure(UnsupportedOperationException())
 
     // ─── The Home card's menu (docs/PROTOCOL.md, "Session menu") ───
 

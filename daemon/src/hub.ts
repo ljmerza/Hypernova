@@ -21,6 +21,7 @@ import { linkOf } from './switch-links.ts'
 import { blockedCount, forgetBlocked, noteBlocked, onBlockedChange, sawToolResult, takeRetryGrant } from './blocked.ts'
 import { heldView, type HeldView } from './held.ts'
 import { TODO_TOOLS, todoNow, type TodoNow } from './todos.ts'
+import { ruleString, type AlwaysChoice, type AlwaysScope } from './always.ts'
 
 export type SessionState = 'starting' | 'working' | 'needs_you' | 'idle' | 'error' | 'ended'
 export type Session = {
@@ -144,6 +145,13 @@ export type Approval = {
   input: Record<string, unknown>
   reason: string | null
   canAlways: boolean
+  /**
+   * The allow rules Claude Code suggests for Always, as a settings file writes them
+   * (`Bash(npm test:*)`), and where it would put them; the phone shows them, editable, on its
+   * Always sheet (always.ts). Empty and null when the suggestion holds no rule (a mode, a folder).
+   */
+  alwaysRules: string[]
+  alwaysScope: AlwaysScope | null
   /** The tool can be allowed for the rest of the session at once (web and read tools). */
   canSession: boolean
   questions: unknown[] | null
@@ -153,7 +161,12 @@ export type Approval = {
   agentLabel: string | null
 }
 /** What asks: the approval without what the daemon adds itself. */
-export type ApprovalAsk = Omit<Approval, 'id' | 'createdAt' | 'expiresAt' | 'autoDeny' | 'canSession' | 'agentId' | 'agentLabel'> & { agentId?: string | null; agentLabel?: string | null }
+export type ApprovalAsk = Omit<Approval, 'id' | 'createdAt' | 'expiresAt' | 'autoDeny' | 'canSession' | 'agentId' | 'agentLabel' | 'alwaysRules' | 'alwaysScope'> & {
+  agentId?: string | null
+  agentLabel?: string | null
+  alwaysRules?: string[]
+  alwaysScope?: AlwaysScope | null
+}
 /**
  * What 10 minutes without an answer does to an ask (docs/DECISIONS.md, "Never auto-deny"):
  * `terminal`, Claude Code's hook hands it back to its own dialog (hooks.ts); `deny`, Hypernova says
@@ -162,7 +175,8 @@ export type ApprovalAsk = Omit<Approval, 'id' | 'createdAt' | 'expiresAt' | 'aut
  * runs through the SDK, which has no dialog either).
  */
 export type AwayRule = 'terminal' | 'deny' | 'never'
-export type Answer = { decision: 'allow' | 'deny' | 'always' | 'session' | 'timeout' | 'terminal'; message?: string; answers?: Record<string, string> }
+/** [always]: with `always`, where its rule goes and which rules, as the owner chose (always.ts); none, Claude Code's suggestion as it is. */
+export type Answer = { decision: 'allow' | 'deny' | 'always' | 'session' | 'timeout' | 'terminal'; message?: string; answers?: Record<string, string>; always?: AlwaysChoice }
 
 /**
  * Tools the owner can allow for a whole session with one answer. A research run fetches dozens
@@ -173,9 +187,16 @@ export const SESSION_TOOLS = new Set(['WebFetch', 'WebSearch', 'Read', 'Glob', '
 const sessionAllowed = new Map<string, Set<string>>()
 /** The owner allowed this tool for the rest of the session (subagents included). */
 export const allowedForSession = (sessionId: string, tool: string) => !!sessionAllowed.get(sessionId)?.has(tool)
-export const forgetSessionAllowed = (sessionId: string) => sessionAllowed.delete(sessionId)
+/** Rules an Always gave for "this session" only (Claude Code holds them; nothing saved), per session. */
+const sessionAlways = new Map<string, Set<string>>()
+export const forgetSessionAllowed = (sessionId: string) => {
+  sessionAllowed.delete(sessionId)
+  sessionAlways.delete(sessionId)
+}
 /** The tools allowed for the rest of the session from the phone (the rules in effect, permission-rules.ts). */
 export const sessionAllowedTools = (sessionId: string): string[] => [...(sessionAllowed.get(sessionId) ?? [])]
+/** The rules an Always added for this session only (the rules in effect, as the session's own). */
+export const sessionAlwaysRules = (sessionId: string): string[] => [...(sessionAlways.get(sessionId) ?? [])]
 /** Claude Code's own rule for it, so it stops asking too (session only, nothing saved). */
 export const sessionRule = (tool: string) => [{ type: 'addRules', rules: [{ toolName: tool }], behavior: 'allow', destination: 'session' }]
 type Pending = { approval: Approval; toolUseId: string | null; resolve: (a: Answer) => void; timer: NodeJS.Timeout | null; away: AwayRule }
@@ -952,6 +973,8 @@ export function requestApproval(a: ApprovalAsk, toolUseId: string | null, signal
     ...a,
     agentId: a.agentId ?? null,
     agentLabel: a.agentLabel ?? null,
+    alwaysRules: a.canAlways ? (a.alwaysRules ?? []) : [],
+    alwaysScope: a.canAlways ? (a.alwaysScope ?? null) : null,
     canSession: a.kind === 'tool' && SESSION_TOOLS.has(a.toolName),
     id,
     createdAt: now,
@@ -981,7 +1004,31 @@ export function answerApproval(id: string, ans: Answer, by: 'phone' | 'mac'): bo
     for (const q of [...pending.values()]) if (q.approval.sessionId === sessionId && q.approval.toolName === toolName) finish(q.approval.id, ans, by)
     return ok
   }
+  // An Always for this session only: Claude Code holds the rule; the rules in effect say it too.
+  if (ans.decision === 'always' && ans.always?.scope === 'session' && p) {
+    const rules = ans.always.rules ? ans.always.rules.map(ruleString) : p.approval.alwaysRules
+    let set = sessionAlways.get(p.approval.sessionId)
+    if (!set) sessionAlways.set(p.approval.sessionId, (set = new Set()))
+    for (const r of rules) set.add(r)
+  }
   return finish(id, ans.decision === 'session' ? { ...ans, decision: 'allow' } : ans, by)
+}
+
+/**
+ * "Allow these N" (IDEAS PA6): several asks of one session allowed with one answer, each as its
+ * own Allow. Only Allow, only a tool's asks (a question or a plan needs its own answer), never
+ * another session's: an id that is waiting but isn't one refuses the lot (null) before any is
+ * answered. Ids no longer waiting (answered elsewhere a moment ago) come back in [gone].
+ */
+export function allowSeveral(sessionId: string, ids: string[], by: 'phone' | 'mac'): { allowed: string[]; gone: string[] } | null {
+  for (const id of ids) {
+    const p = pending.get(id)
+    if (p && (p.approval.sessionId !== sessionId || p.approval.kind !== 'tool')) return null
+  }
+  const allowed: string[] = []
+  const gone: string[] = []
+  for (const id of new Set(ids)) (pending.has(id) && finish(id, { decision: 'allow' }, by) ? allowed : gone).push(id)
+  return { allowed, gone }
 }
 
 /**

@@ -2119,3 +2119,34 @@ new chip, no new row, nothing on a session's own screen.
    (`claude rm`), asking first with the long-press menu's own confirm. Working cards don't swipe,
    nor does a Completed card that isn't a job. The demo only opens. The long-press menu, the list's
    scroll and Allow and Deny work as before.
+
+## What Always covers, and allowing several (2026-10-31)
+
+IDEAS PA2, PA3 and PA6, the owner's picks. One constraint over all three, his words: "I don't want
+to clutter the chat screen, we can't have anything else added to that."
+
+1. **The approval card stays exactly as it was.** Deny, Always, Allow, "Allow all … this session"
+   where offered, and the "Yes, and don't ask again" line. Nothing new on the chat screen.
+2. **Always opens the Always sheet** where Claude Code suggests a rule: the rule (`Bash(npm test)`)
+   in an editable field, quick widenings under it (the command as a prefix, `Bash(npm test:*)`;
+   its first two words as one; the whole tool, said as allowing all of it), Claude Code's own to go
+   back to, and **where it goes: This session, This project or Everywhere**. It starts on Claude
+   Code's rule and Claude Code's place (the project, for a command), so a plain Always allow does
+   what Always did before. A rule that isn't `Tool` or `Tool(pattern)` says so and can't be saved.
+   Always allow, then the fingerprint or the screen lock, which names the rule and the place. Where
+   the suggestion has no rule (a mode, a folder), Always goes straight to the fingerprint as before.
+3. **"This project" is the project's local file** (`localSettings`, `.claude/settings.local.json`),
+   not `projectSettings`: Claude Code keeps the local one out of git, so a rule from the phone never
+   lands in a commit for others; it's also where Claude Code's own "don't ask again" puts it.
+   Everywhere is the owner's user settings (`userSettings`). This session saves nothing.
+4. **Claude Code writes the rule, never the daemon.** The answer goes back in the hook's allow as
+   `updatedPermissions` with that destination, the way its own dialog does it (checked in Claude
+   Code 2.1.314). The daemon reads no settings file for this and writes none. Found on the way: the
+   old Always already saved Claude Code's suggestion to the project's local file, not "for the
+   session" as PROTOCOL said; now it's said and chosen.
+5. **Allow these N lives in the session sheet's Permissions tab**, not in the chat and not on the
+   Home card: with two or more of a session's tool asks waiting (parallel agents), "Asks waiting",
+   each command listed with the agent that asks, and "Allow these 3", confirmed once in a dialog.
+   Each is allowed as its own Allow, with no rule. Only Allow: a deny stays one at a time on its
+   card, and a question or a plan waits for its own answer. Never automatic. Only the asks the
+   phone has as approvals; Claude Code's own dialog in a terminal is answered on its card.

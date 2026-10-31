@@ -871,14 +871,27 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
             val toast = LocalToast.current
             val title = stringResource(R.string.check_always_title)
             val noLock = stringResource(R.string.check_no_lock)
+            // The card's own Always opens the Always sheet where Claude Code suggested a rule: the
+            // rule, editable, and where it goes (AlwaysSheet.kt). The card itself is unchanged.
+            var alwaysSheet by remember(item.key) { mutableStateOf(false) }
             ApprovalBlock(item, onAnswer = { a ->
-                if (a == Answer.Always) {
+                if (a == Answer.Always && item.alwaysRules.isNotEmpty()) {
+                    alwaysSheet = true
+                } else if (a == Answer.Always) {
                     com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
                         context, title, item.detail.lineSequence().firstOrNull().orEmpty().take(80), noLock, hub.isDemo,
                         onOk = { hub.answer(sessionId, item, a) }, onFail = { msg -> if (msg != null) toast(msg) },
                     )
                 } else hub.answer(sessionId, item, a)
             }, modifier = modifier)
+            if (alwaysSheet && item.resolved == null) {
+                AlwaysSheet(item, onDismiss = { alwaysSheet = false }, onSave = { a ->
+                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
+                        context, title, alwaysCheckLine(context.resources, a).take(120), noLock, hub.isDemo,
+                        onOk = { alwaysSheet = false; hub.answer(sessionId, item, a) }, onFail = { msg -> if (msg != null) toast(msg) },
+                    )
+                })
+            }
         }
         is Item.Thinking -> ThinkingRow(item, modifier)
         is Item.Result -> ResultRow(item, modifier)

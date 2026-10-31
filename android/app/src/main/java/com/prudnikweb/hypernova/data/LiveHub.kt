@@ -2077,6 +2077,10 @@ class LiveHub(
         val shown: Resolution = when (answer) {
             Answer.Allow -> { body.put("decision", "allow"); Resolution.Allowed }
             Answer.Always -> { body.put("decision", "always"); Resolution.AllowedAlways }
+            is Answer.AlwaysAs -> {
+                body.put("decision", "always").put("scope", answer.scope.wire).put("rules", org.json.JSONArray(answer.rules))
+                Resolution.AllowedAlways
+            }
             Answer.Session -> { body.put("decision", "session"); Resolution.AllowedSession }
             Answer.Deny -> { body.put("decision", "deny"); Resolution.Denied }
             Answer.ApprovePlan -> { body.put("decision", "allow"); Resolution.PlanApproved }
@@ -2116,6 +2120,26 @@ class LiveHub(
     }
 
     override suspend fun answerApproval(id: String, answer: Answer): Boolean = answerAsync(id, answer).await()
+
+    override fun waitingAsks(sessionId: String): List<WApproval> =
+        approvals.values.filter { it.sessionId == sessionId && it.id !in answered }.sortedBy { it.createdAt }
+
+    override suspend fun allowSeveral(sessionId: String, ids: List<String>): Result<Int> {
+        // Shown as allowed at once, as a single Allow is; put back if the Mac didn't get it.
+        answered = answered + ids.associateWith { Resolution.Allowed }
+        return try {
+            val r = api.post("/v1/sessions/$sessionId/allow", JSONObject().put("ids", org.json.JSONArray(ids)))
+            approvals = approvals - ids.toSet()
+            publish()
+            Result.success(r.optJSONArray("allowed")?.length() ?: ids.size)
+        } catch (e: CancellationException) {
+            answered = answered - ids.toSet()
+            throw e
+        } catch (e: Throwable) {
+            answered = answered - ids.toSet()
+            Result.failure(handle(e, R.string.err_answer))
+        }
+    }
 
     // ─── The Home card's menu (docs/PROTOCOL.md, "Session menu") ───
 
