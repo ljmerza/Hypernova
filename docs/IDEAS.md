@@ -106,7 +106,7 @@ Claude Code's own terminal dialog answered from the phone, held prompts, the mod
 | PA4 | Approvals log | Across sessions and servers: what was asked, answered how, by which device, any rule added. Also an audit trail (SEC2). | M | both |
 | PA5 | Suggest a rule | From the log: "You allowed `npm test` 14 times this week. Always allow it in this project?" Never adds one on its own. | M | both |
 | PA6 | Allow several ✓ built 2026-10-31 | When one session has several asks waiting (parallel agents), "Allow these 3", each command listed. Only ever Allow; Deny stays one at a time. | S | app |
-| PA7 | Why it asked | Show what caused the ask: an ask rule ("Ask rule Bash(python:*) overrides auto mode"), no matching rule, or a file outside the folder. | S | both |
+| PA7 | Why it asked ✓ built 2026-10-31 | Show what caused the ask: an ask rule ("Ask rule Bash(python:*) overrides auto mode"), no matching rule, or a file outside the folder. | S | both |
 | PA8 | Risk on the card | Already parked: L34 (risk in the daemon). A colour and a long-press for high-risk commands; never a deny. | | |
 | PA9 | Auto mode rules | Show `claude auto-mode config` (the effective allow, soft_deny and hard_deny) read-only, so blocked calls make sense, and link to `/auto-mode-setup`. `claude auto-mode critique` costs a model call. | M | both |
 | PA10 | Allow & add rule | On a blocked call, beside Allow & retry: add an auto mode allow rule so the same call isn't blocked again. Writes settings; behind the fingerprint. | M | both |

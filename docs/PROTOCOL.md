@@ -659,7 +659,10 @@ Session = {
     permission: null | {       // Fork: Claude Code's own permission dialog (see Approvals, "In the terminal")
       tool: string | null,     // its title: "Bash command", "Edit file"
       command: string | null,  // what it would run or change, between its dashed rules, whole
-      question: string         // "Do you want to proceed?"; options start with Yes and have a No
+      question: string,        // "Do you want to proceed?"; options start with Yes and have a No
+      why: Why | null          // why it asked: the reason the dialog prints, else (a Bash dialog) the
+                               // daemon's reading of the rules; null when neither says (see Approvals,
+                               // "Why it asked"); absent from an older daemon
     },
     steps: null | {            // AskUserQuestion's form asking several questions (an ask handed back to the
                                // terminal): its tab row "←  ☐ Versioning  ☒ First version  ✔ Submit  →",
@@ -717,6 +720,8 @@ Approval = {
   alwaysScope: "session" | "project" | "everywhere" | null,
                               // where Claude Code's suggestion puts them (localSettings and
                               // projectSettings are "project", userSettings "everywhere")
+  why: Why | null,            // why it asked (see Approvals, "Why it asked"); null for a question, a
+                              // plan, Codex, or when the rules couldn't be read; absent from an older daemon
   canSession: boolean,        // WebFetch, WebSearch, Read, Glob, Grep, LS: "all this session" offered
   questions: Question[] | null,              // kind "question" (AskUserQuestion)
   plan: string | null,                       // kind "plan" (ExitPlanMode markdown)
@@ -2593,6 +2598,52 @@ session step's whole output 8 KB (its first).
   them with one confirmation. Each is answered as its own Allow (no rule is added); a question or a
   plan needs its own answer, and a deny is always one at a time, on its card. An id no longer
   waiting comes back in `gone`.
+- **Why it asked** (IDEAS PA7; `daemon/src/why.ts`). A tool approval's `why`, and a terminal
+  dialog's `menu.permission.why`:
+
+  ```
+  Why = {
+    kind: "ask_rule" | "hook" | "outside_folder" | "safety" | "classifier" | "mode" | "no_rule" | "other",
+    text: string,           // the line to show, at most 300 characters
+    rule?: string,          // the rule it names, as a settings file writes it ("Bash(python:*)")
+    source: "claude" | "hypernova"   // Claude Code said so, or the daemon's own reading of the rules
+  }
+  ```
+
+  `ask_rule` an ask rule matches; `hook` a hook asked for confirmation; `outside_folder` the call
+  reaches a path outside the project's folders; `safety` one of Claude Code's own checks; `classifier`
+  auto mode's classifier; `mode` plan mode; `no_rule` no allow rule matches (every part of a command
+  needs one); `other` anything else. What Claude Code says comes first, then the daemon's reading:
+
+  1. **Claude Code's dialog** prints the reason over its question (Claude Code 2.1.316): "Ask rule X
+     overrides auto mode for this command." (an ask rule in auto mode, not the managed policy's),
+     "Permission rule X requires confirmation for this command.", "Hook X requires confirmation for
+     this command…", "Path is outside allowed working directories" or "…, which is outside the
+     allowed working directories", a safety check's own words. The daemon reads the lines under the
+     command; `source: "claude"`.
+  2. **The SDK** (a session the daemon runs) hands canUseTool `matchedAskRule`, `decisionReasonType`
+     (`rule`, `hook`, `workingDir`, `safetyCheck`, `classifier`, `mode`, …), `decisionReason` and
+     `blockedPath`; `source: "claude"`.
+  3. **The PermissionRequest hook carries no reason** (2.1.316: the common fields, `tool_name`,
+     `tool_input`, `permission_suggestions`, an MCP tool's `mcp_server`). Its suggestion to add a
+     folder (`addDirectories`) is offered only for a call outside the project's folders:
+     `outside_folder`, `source: "claude"`.
+  4. **Otherwise the daemon's reading** of the rules in effect for the session's folder (the same
+     sources as Rules in effect, `managedOnly` honoured, the session's own included; read fresh per
+     ask, never sent): the first ask rule that matches (`ask_rule`, with where it's written), a
+     file tool's path outside the folder and its `additionalDirectories` (`outside_folder`), an allow
+     rule that matches anyway (`safety`: one of Claude Code's own checks, most likely), plan mode
+     (`mode`), auto or bypass mode with no ask rule (`other`), else `no_rule`; `source: "hypernova"`.
+     For a terminal dialog only a Bash one, once per dialog. Matching is simplified: a command's parts
+     split on `&&`, `||`, `;`, `|` and new lines; leading `VAR=value` words skipped; a program run by
+     its path also read by its name (`.venv/bin/python` is `python`, as the owner's dialog showed);
+     `prefix:*`, `*` wildcards; a path rule as a glob (`//` absolute, `~/` home, else the session's
+     folder); Edit rules cover Write, MultiEdit and NotebookEdit, Read rules Glob and Grep;
+     `WebFetch(domain:…)`; `mcp__server`. A deny rule isn't looked for: one that matched would have
+     refused the call. Only a rule string leaves the daemon, never a settings file's other keys.
+
+  The phone shows it on the Always sheet and in the session sheet's Permissions tab, never on the
+  chat's approval card (its `reason` is unchanged) nor on Home.
 - `session` (only where `canSession`) allows that tool for the rest of the session: this
   approval, the same tool's other approvals waiting in that session (they resolve as
   allowed), and later ones, which the daemon answers without asking (subagents included).
