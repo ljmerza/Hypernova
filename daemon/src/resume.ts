@@ -19,6 +19,7 @@ import { CONTINUE_TEXT, parseWhen, type Blocked, type BlockedKind, type LimitNot
 import { answerMenu, createSharedSession, pressKeys, sharedTerminalsAvailable, termChildPid, termOf, termScreen, typeInto, type Typed } from './terms.ts'
 import { sendPrompt } from './runner.ts'
 import { boxLines, boxText, isWorking, menuOf, registryBusy, type Menu } from './term/shared.ts'
+import { MACHINE } from './platform.ts'
 
 const PATH = join(SUPPORT, 'resume.json')
 /** Claude Code carries on only within this of the limit (its own rule; SDK sessions follow it too). */
@@ -558,7 +559,7 @@ export async function setAutoContinue(sid: string, on: boolean, io?: TermIO): Pr
   const rv = e ? resumeOf(e, s) : null
   if (!e || !rv || rv.state === 'ready') throw new ResumeError(409, 'not_limited', 'This session isn’t waiting on a limit.')
   if (on === (rv.state === 'armed')) return
-  if (on ? !rv.canArm : !rv.canCancel) throw new ResumeError(409, 'not_available', on ? 'This session can’t carry on by itself from here.' : 'This can only be stopped in the terminal on the Mac.')
+  if (on ? !rv.canArm : !rv.canCancel) throw new ResumeError(409, 'not_available', on ? 'This session can’t carry on by itself from here.' : `This can only be stopped in the terminal on the ${MACHINE}.`)
   const now = clock()
   if (e.by === 'hypernova') {
     if (on) {

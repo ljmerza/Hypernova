@@ -27,7 +27,7 @@ import {
 } from './hub.ts'
 import { applyToolResult, feedAssistantBlock, isLauncher, promptTitle, queueView, resultLinks, toolSummary, typedCommand, unsentPrompts, userEvent, type QueueEntry } from './normalize.ts'
 import { classifyApiError, cleanText, type Blocker } from './blockers.ts'
-import { bypassBlockedByRoot } from './platform.ts'
+import { MACHINE, bypassBlockedByRoot } from './platform.ts'
 import { agentLabel, applyLinks, sdkTask } from './agents.ts'
 import { attachmentReadInput, readsAttachment } from './attachments.ts'
 import { isBuiltinCommand } from './commands.ts'
@@ -220,7 +220,7 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
   if (!m || !rec) throw new Error('unknown session')
   const st = ensureParsed(rec)
   const claude = findClaude()
-  if (!claude) throw new Error('Claude Code is not installed on this Mac')
+  if (!claude) throw new Error(`Claude Code is not installed on this ${MACHINE}`)
   const provider = getProvider(m.providerId)
   const exists = existsSync(rec.transcriptPath)
   const started = Date.now()

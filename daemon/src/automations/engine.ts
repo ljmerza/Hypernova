@@ -18,6 +18,7 @@ import {
 } from './contract.ts'
 import { FROM_OUTSIDE, capQuestion, checkRule, fill, fillShell, isQuiet, placeholdersIn, resultOf, ruleFor, sentences, stepRefs } from './text.ts'
 import { PRESETS, checkSecret, fileLine, secretHint, webhookRequest } from './outputs.ts'
+import { MACHINE } from '../platform.ts'
 
 const MAX_TICK_MS = 30_000
 /** The timer never comes sooner than this after a tick (a deadline already past must not spin it). */
@@ -187,7 +188,7 @@ const STEP_WHY: Partial<Record<RunReason, string>> = {
   error: 'It stopped with an error.',
   away: 'Nobody answered it for 10 minutes.',
   ended: 'It ended before it finished.',
-  mac_restart: 'The Mac restarted before it finished.',
+  mac_restart: `The ${MACHINE} restarted before it finished.`,
   timeout: 'It ran past its time.',
 }
 /** A file a run of the watching automation wrote this long before it ended is its own write, not news. */
@@ -842,7 +843,7 @@ export class Automations {
   /** A trigger as sent ([before]: the one it replaces), checked and made whole. Its errors name `trigger.…`. */
   private trigger(v: any, now: number, enabled: boolean, before: KeptTrigger | null): KeptTrigger {
     const F = (f?: string) => (f ? `trigger.${f}` : 'trigger')
-    const not = (what: string) => bad('bad_trigger', `This Mac can’t watch for ${what} yet: update Hypernova on it.`, F())
+    const not = (what: string) => bad('bad_trigger', `This ${MACHINE} can’t watch for ${what} yet: update Hypernova on it.`, F())
     switch (v?.kind) {
       case 'time':
         return { kind: 'time', at: hm(v.at, 'bad_time', F('at')), days: days(v.days, F('days')) }
@@ -898,7 +899,7 @@ export class Automations {
         return { kind: 'hook', event: v.event, tool, projectPath, from }
       }
       case 'power':
-        if (this.noBattery()) throw bad('no_battery', 'This Mac has no battery.', F())
+        if (this.noBattery()) throw bad('no_battery', `This ${MACHINE} has no battery.`, F())
         if (v.event === 'plugged_in') return { kind: 'power', event: 'plugged_in' }
         if (v.event === 'low') {
           const below = v.below == null ? 20 : v.below
@@ -965,7 +966,7 @@ export class Automations {
     }
     const provider = (x: unknown): string => {
       const id = typeof x === 'string' && x ? x : 'anthropic'
-      if (!this.io.providerKind(id)) throw bad('no_provider', 'That provider isn’t set up on this Mac.', `${at}.providerId`)
+      if (!this.io.providerKind(id)) throw bad('no_provider', `That provider isn’t set up on this ${MACHINE}.`, `${at}.providerId`)
       return id
     }
     const prompt = (x: unknown, empty = false): string => {
@@ -1042,7 +1043,7 @@ export class Automations {
   /** Its steps, checked in order (`steps[i]…`). */
   private steps(list: unknown, trigger: KeptTrigger, b: any): Step[] {
     if (!Array.isArray(list) || list.length < 1 || list.length > MAX_STEPS) throw bad('bad_steps', `From 1 to ${MAX_STEPS} steps.`, 'steps')
-    if (list.length > 1 && !this.offers('steps')) throw bad('bad_steps', 'This Mac runs one step: update Hypernova on it for more.', 'steps')
+    if (list.length > 1 && !this.offers('steps')) throw bad('bad_steps', `This ${MACHINE} runs one step: update Hypernova on it for more.`, 'steps')
     const out: Step[] = []
     const ids = new Set<string>()
     for (let i = 0; i < list.length; i++) {
@@ -1063,11 +1064,11 @@ export class Automations {
           break
         }
         case 'ask':
-          if (!this.offers('ask')) throw bad('bad_step', 'This Mac can’t ask yet: update Hypernova on it.', `${at}.kind`)
+          if (!this.offers('ask')) throw bad('bad_step', `This ${MACHINE} can’t ask yet: update Hypernova on it.`, `${at}.kind`)
           st = { id, if: guard, ...this.askStep(v, at) }
           break
         case 'shell':
-          if (!this.offers('shell')) throw bad('bad_step', 'This Mac can’t run commands for automations yet: update Hypernova on it.', `${at}.kind`)
+          if (!this.offers('shell')) throw bad('bad_step', `This ${MACHINE} can’t run commands for automations yet: update Hypernova on it.`, `${at}.kind`)
           st = { id, if: guard, ...this.shellStep(v, at) }
           break
         default:
@@ -1093,7 +1094,7 @@ export class Automations {
     if (v == null) return null
     const F = `${at}.if`
     if (i === 0) throw bad('bad_guard', 'The first step runs whenever it fires: it takes no “only if”.', F)
-    if (!this.offers('steps')) throw bad('bad_guard', 'This Mac can’t run steps only if: update Hypernova on it.', F)
+    if (!this.offers('steps')) throw bad('bad_guard', `This ${MACHINE} can’t run steps only if: update Hypernova on it.`, F)
     if (typeof v !== 'object' || !['ok', 'failed', 'quiet', 'not_quiet', 'contains', 'answer'].includes(v.on)) throw bad('bad_guard', 'Pick when this step runs.', `${F}.on`)
     if (v.on === 'contains') {
       const text = str(v.text).trim()
@@ -1157,7 +1158,7 @@ export class Automations {
           outputs.push({ id, text, kind: 'notify' })
           return
         case 'webhook': {
-          if (!this.offers('output.webhook')) throw bad('bad_output', 'This Mac can’t send webhooks yet: update Hypernova on it.', `${at}.kind`)
+          if (!this.offers('output.webhook')) throw bad('bad_output', `This ${MACHINE} can’t send webhooks yet: update Hypernova on it.`, `${at}.kind`)
           if (!PRESETS.includes(v.preset)) throw bad('bad_output', 'Pick ntfy, Slack, Discord, Telegram or a plain POST.', `${at}.preset`)
           const sent = checkSecret(v.preset, v, at, this.io.webhookPrivateHosts?.() ?? [])
           // Saved again without its secret: the one kept for it, if it's the same kind of webhook.
@@ -1170,7 +1171,7 @@ export class Automations {
           return
         }
         case 'file': {
-          if (!this.offers('output.file') || !this.io.checkFile) throw bad('bad_output', 'This Mac can’t write to files for automations yet: update Hypernova on it.', `${at}.kind`)
+          if (!this.offers('output.file') || !this.io.checkFile) throw bad('bad_output', `This ${MACHINE} can’t write to files for automations yet: update Hypernova on it.`, `${at}.kind`)
           const r = this.io.checkFile(str(v.path).trim())
           if ('code' in r) throw bad(r.code, FILE_WORDS[r.code]!, `${at}.path`)
           outputs.push({ id, text, kind: 'file', path: r.path })
@@ -1183,7 +1184,7 @@ export class Automations {
   }
   private budget(v: any): Budget | null {
     if (v == null) return null
-    if (!this.offers('budget')) throw bad('bad_budget', 'This Mac can’t keep a budget yet: update Hypernova on it.', 'budget')
+    if (!this.offers('budget')) throw bad('bad_budget', `This ${MACHINE} can’t keep a budget yet: update Hypernova on it.`, 'budget')
     if (typeof v !== 'object') throw bad('bad_budget', 'A budget in minutes, or in points of the 5-hour window.', 'budget')
     const minutes = v.minutes == null ? null : v.minutes
     if (minutes != null && (!Number.isInteger(minutes) || minutes < 1 || minutes > BUDGET_MINUTES_MAX)) throw bad('bad_budget', 'From 1 to 720 minutes.', 'budget.minutes')
@@ -1240,7 +1241,7 @@ export class Automations {
     }
     // Commands run on the Mac: every save of one that has them is confirmed by the owner's hand.
     const sh = steps.findIndex((st) => st.kind === 'shell')
-    if (sh >= 0 && b.confirmShell !== true) throw bad('confirm_shell', 'Confirm with your fingerprint or screen lock that it may run commands on the Mac.', `steps[${sh}].command`)
+    if (sh >= 0 && b.confirmShell !== true) throw bad('confirm_shell', `Confirm with your fingerprint or screen lock that it may run commands on the ${MACHINE}.`, `steps[${sh}].command`)
     // So is every save of one with a No asking start, also one whose steps are kept as they were
     // (an old client's {kind: "workflow"}): its trigger or name may be what changed.
     const nb = steps.findIndex((st) => st.kind === 'start' && st.permissionMode === 'bypassPermissions')
@@ -1273,7 +1274,7 @@ export class Automations {
     if (t?.kind !== 'github' || !this.io.ghReady || !this.io.githubRepo) return
     const path = this.io.project(str(t.repoPath))
     if (!path) return
-    if (!(await this.io.ghReady().catch(() => false))) throw bad('no_gh', 'Install gh on the Mac and sign in to it (gh auth login).', 'trigger.repoPath')
+    if (!(await this.io.ghReady().catch(() => false))) throw bad('no_gh', `Install gh on the ${MACHINE} and sign in to it (gh auth login).`, 'trigger.repoPath')
     if (!(await this.io.githubRepo(path).catch(() => false))) throw bad('not_github', 'That folder’s git remote isn’t on GitHub.', 'trigger.repoPath')
   }
 
@@ -1713,8 +1714,8 @@ export class Automations {
     if (providerId === CODEX) {
       // Codex goes by its own account and limits (codex/account.ts).
       const g = this.io.codexGate?.() ?? { state: 'off' as const, resetsAt: null }
-      if (g.state === 'off') return skip('no_provider', 'Codex isn’t set up on this Mac.', 'Codex isn’t set up on this Mac.', 'codex:off')
-      if (g.state === 'signed_out') return skip('signed_out', 'Codex is signed out on the Mac.', 'Codex is signed out on the Mac.', 'codex:signed_out')
+      if (g.state === 'off') return skip('no_provider', `Codex isn’t set up on this ${MACHINE}.`, `Codex isn’t set up on this ${MACHINE}.`, 'codex:off')
+      if (g.state === 'signed_out') return skip('signed_out', `Codex is signed out on the ${MACHINE}.`, `Codex is signed out on the ${MACHINE}.`, 'codex:signed_out')
       if (g.state === 'limited') return wait(g.resetsAt, `codex:limited:${g.resetsAt ?? 0}`)
       return { kind: 'ok' }
     }
@@ -1742,9 +1743,9 @@ export class Automations {
         return wait(l?.resetsAt ?? null, episode)
       }
       case 'logged_out':
-        return skip('signed_out', 'Claude Code is signed out on the Mac.', 'Claude Code is signed out on the Mac.', episode)
+        return skip('signed_out', `Claude Code is signed out on the ${MACHINE}.`, `Claude Code is signed out on the ${MACHINE}.`, episode)
       case 'no_subscription':
-        return skip('no_plan', 'There’s no Claude plan on the Mac.', 'there’s no Claude plan on the Mac.', episode)
+        return skip('no_plan', `There’s no Claude plan on the ${MACHINE}.`, `there’s no Claude plan on the ${MACHINE}.`, episode)
       case 'on_hold':
         return skip('on_hold', 'The Claude account is on hold.', 'the Claude account is on hold.', episode)
       case 'no_credit':
@@ -2541,7 +2542,7 @@ export class Automations {
             this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: 'phone' })
             break
           case 'file': {
-            if (!this.io.append) throw new Error('This Mac can’t write to files for automations.')
+            if (!this.io.append) throw new Error(`This ${MACHINE} can’t write to files for automations.`)
             const p = localParts(r.endedAt ?? this.io.now(), tz)
             const two = (n: number) => String(n).padStart(2, '0')
             this.io.append(o.path, fileLine(`${p.y}-${two(p.mo)}-${two(p.d)}`, `${two(p.h)}:${two(p.mi)}`, r.name, text))
@@ -2591,7 +2592,7 @@ export class Automations {
         if (r.f.retryAt) delete r.f.retryAt[o.id]
       }
     }
-    if (!sec || !this.io.post) fail('Its address is gone from the Mac: save it again with the address.', false)
+    if (!sec || !this.io.post) fail(`Its address is gone from the ${MACHINE}: save it again with the address.`, false)
     else {
       const text = this.outputText(r, o)
       const req = webhookRequest(o.preset, sec, r.name, text, { id: r.id, automationId: r.automationId, state: r.state, reason: r.reason, startedAt: r.startedAt, endedAt: r.endedAt, result: r.result, firedBy: r.fired.by })
@@ -2619,10 +2620,10 @@ export class Automations {
     // A run on Codex says so in Codex's words (its account, its start), not Claude Code's.
     const codex = r.spec.steps?.some((st) => st.kind === 'start' && st.providerId === CODEX) || r.sessionIds.some((id) => this.io.session(id)?.providerId === CODEX)
     const onCodex: Partial<Record<RunReason, string>> = {
-      no_provider: 'It didn’t run: Codex isn’t set up on this Mac.',
+      no_provider: `It didn’t run: Codex isn’t set up on this ${MACHINE}.`,
       start_failed: 'It didn’t run: Codex didn’t start.',
       blocked: 'It stopped: Codex couldn’t go on.',
-      signed_out: 'It stopped: Codex is signed out on the Mac.',
+      signed_out: `It stopped: Codex is signed out on the ${MACHINE}.`,
       limited: 'It stopped: Codex’s usage limit is reached.',
     }
     const why: Partial<Record<RunReason, string>> = {
@@ -2634,8 +2635,8 @@ export class Automations {
       start_failed: 'It didn’t run: Claude Code didn’t start.',
       error: r.result && r.sessionIds.length ? `It stopped with an error: ${r.result}` : 'It stopped with an error.',
       blocked: 'It stopped: Claude couldn’t go on.',
-      signed_out: 'It stopped: Claude Code is signed out on the Mac.',
-      no_plan: 'It stopped: there’s no Claude plan on the Mac.',
+      signed_out: `It stopped: Claude Code is signed out on the ${MACHINE}.`,
+      no_plan: `It stopped: there’s no Claude plan on the ${MACHINE}.`,
       on_hold: 'It stopped: the Claude account is on hold.',
       no_credit: 'It stopped: you’re out of usage credits.',
       limited: 'It stopped: your usage limit is reached.',

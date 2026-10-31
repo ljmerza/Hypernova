@@ -9,6 +9,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { join } from 'node:path'
 import { SUPPORT, log } from './util.ts'
 import { identity } from './store.ts'
+import { MACHINE } from './platform.ts'
 
 export const TLS_DIR = join(SUPPORT, 'tls')
 const OPENSSL = existsSync('/usr/bin/openssl') ? '/usr/bin/openssl' : 'openssl'
@@ -99,7 +100,7 @@ export type IssuedCert = { cert: Buffer; ca: Buffer; fingerprint: string; certFi
  */
 export function issueDeviceCert(deviceId: string, csrBase64: string): IssuedCert {
   const id = serverIdentity()
-  if (!id) throw new TlsError('no_tls', 'This Mac has no certificates for the local network.')
+  if (!id) throw new TlsError('no_tls', `This ${MACHINE} has no certificates for the local network.`)
   const der = Buffer.from(String(csrBase64 ?? ''), 'base64')
   // A PKCS#10 request is one DER SEQUENCE; a phone's is a few hundred bytes.
   if (der.length < 64 || der.length > 8192 || der[0] !== 0x30) throw new TlsError('bad_csr', 'Send the certificate request as base64 DER.')

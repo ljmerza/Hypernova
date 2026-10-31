@@ -5,8 +5,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { NetworkInterfaceInfo } from 'node:os'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   LINUX_REASONS,
+  MACHINE,
+  PLATFORM,
+  machineWord,
   claudeCandidates,
   packageBinDirs,
   findTool,
@@ -72,6 +78,28 @@ test('a Mac lacks nothing; Linux lacks the Mac-only features, each with a senten
   // A copy: a caller changing it can't change the reasons.
   ;(linux as any).battery = 'x'
   assert.notEqual(unavailableOn('linux').battery, 'x')
+})
+
+test('messages call this computer the Mac on a Mac and the server on Linux', () => {
+  assert.equal(machineWord('darwin'), 'Mac')
+  assert.equal(machineWord('linux'), 'server')
+  assert.equal(MACHINE, machineWord(PLATFORM))
+})
+
+test('the daemon\'s error messages don\'t say "Mac" on a server, except about a Mac-only feature', () => {
+  const src = fileURLToPath(new URL('../src/', import.meta.url))
+  // Read aloud with the Mac's voice, macOS' own privacy question, a window opened on the Mac, the Mac's Setup.
+  const macOnly = /'(mac_privacy|bad_engine|bad_voice|bad_target|speech_failed)'|open a terminal window|SDK_MISSING_MAC/
+  const thrown = /\b(Http|File|Change|Provider|Tls|Resume)Error\(|new Error\(|\b(bad|skip|fail)\(/
+  const found: string[] = []
+  for (const f of readdirSync(src, { recursive: true }) as string[]) {
+    // The command line's own lines are about where it runs (cli/).
+    if (!f.endsWith('.ts') || f.startsWith('cli/')) continue
+    readFileSync(join(src, f), 'utf8').split('\n').forEach((l, i) => {
+      if (thrown.test(l) && /['`][^'`]*\bMac\b/.test(l) && !macOnly.test(l)) found.push(`${f}:${i + 1}`)
+    })
+  }
+  assert.deepEqual(found, [])
 })
 
 test('programs: a tool by full path in the system folders, null when missing', () => {

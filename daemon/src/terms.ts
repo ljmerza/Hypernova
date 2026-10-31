@@ -19,7 +19,7 @@ import { DATA, Frames, MSG, TERMS, boxLines, boxText, codexTuiArgs, frame, isWor
 import { CodexError, codexBinary, codexSocketPath, rpc } from './codex/client.ts'
 import { getThread } from './codex/threads.ts'
 import { isHiddenCwd } from './term/hidden.ts'
-import { has, unavailable } from './platform.ts'
+import { MACHINE, has, unavailable } from './platform.ts'
 
 export type TermView = { id: string; mac: number; phone: number }
 type T = {
@@ -570,7 +570,7 @@ const isLogin = (args: string[] | undefined) => !!args && args[0] === 'auth' && 
 /** Start signing in Claude Code in a new holder. */
 export function startLoginTerm(): { termId: string; pid: number | null } {
   const file = findClaude()
-  if (!file) throw Object.assign(new Error('Claude Code isn’t installed on this Mac.'), { status: 409, code: 'no_claude' })
+  if (!file) throw Object.assign(new Error(`Claude Code isn’t installed on this ${MACHINE}.`), { status: 409, code: 'no_claude' })
   const id = newTermId()
   const pid = spawnHolder({
     id,
@@ -616,7 +616,7 @@ export function startTermSession(o: {
   origin: 'terminal' | 'hypernova'
 }): string {
   const file = findClaude()
-  if (!file) throw Object.assign(new Error('Claude Code isn’t installed on this Mac.'), { status: 409 })
+  if (!file) throw Object.assign(new Error(`Claude Code isn’t installed on this ${MACHINE}.`), { status: 409 })
   const id = newTermId()
   spawnHolder({
     id,

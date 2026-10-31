@@ -92,6 +92,13 @@ export const WSL_REASONS: Partial<Record<Feature, string>> = {
 /** The features this platform lacks, each with the reason to show ([wsl]: Linux under WSL on Windows). */
 export const unavailableOn = (platform: Platform, wsl = false): Partial<Record<Feature, string>> => (platform === 'darwin' ? {} : { ...LINUX_REASONS, ...(wsl ? WSL_REASONS : {}) })
 
+/**
+ * What the daemon's messages to the phone call this computer: "Mac" on a Mac, "server" on Linux
+ * ("isn’t on the server", "this server"), the word the phone's own strings use there
+ * (ComputerWords.kt). Messages about a Mac-only feature keep their "Mac".
+ */
+export const machineWord = (platform: Platform): string => (platform === 'darwin' ? 'Mac' : 'server')
+
 // ── Programs ──────────────────────────────────────────────────────────────
 
 /** The folders a Linux system keeps its programs in (a service's PATH may lack some). */
@@ -323,6 +330,8 @@ export function bypassBlockedByRoot(uid: number | undefined = process.getuid?.()
 
 export const PLATFORM: Platform = platformOf(process.platform)
 export const ON_MAC = PLATFORM === 'darwin'
+/** This computer in messages: "Mac" or "server" ([machineWord]). */
+export const MACHINE = machineWord(PLATFORM)
 export const UNAVAILABLE = unavailableOn(PLATFORM, PLATFORM === 'linux' && isWsl())
 
 /** Whether this machine has [f]. */

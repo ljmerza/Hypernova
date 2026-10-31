@@ -14,6 +14,7 @@ import { childEnv } from './runner.ts'
 import { endLoginTerms, ensureTerm, onTermExit, openOnMac, pressKeys, startLoginTerm, stopTerm, termAlive, termScreen } from './terms.ts'
 import { cleanText, type AccountReason, type AccountState, type Blocked, type Blocker, type Limit, type LimitNotice, type ProviderState } from './blockers.ts'
 import { noteNoCredit } from './balance.ts'
+import { MACHINE } from './platform.ts'
 
 /** Signing in from the phone or the Mac: its holder's progress, and the sign-in page's address. */
 export type Login = { state: 'starting' | 'waiting_code' | 'finishing' | 'failed'; url: string | null; where: 'phone' | 'mac'; error: string | null }
@@ -547,7 +548,7 @@ function launchLogin(where: 'phone' | 'mac', after: LoginRun | null): LoginRun {
 /** Start signing in (`where`: the phone opens the page; "mac" also opens the holder in a terminal there). */
 export function startLogin(where: 'phone' | 'mac'): Account {
   if (login && login.view.state !== 'failed') return getAccount()
-  if (acc.state === 'ok') throw fail(409, 'not_needed', 'Claude Code is already signed in on this Mac.')
+  if (acc.state === 'ok') throw fail(409, 'not_needed', `Claude Code is already signed in on this ${MACHINE}.`)
   launchLogin(where, null)
   return getAccount()
 }
