@@ -76,9 +76,18 @@ class ServerBook(private val kv: KeyValue, private val legacy: LegacyPairing) {
         if (old != null) legacy.save(old.pairing) else legacy.clear()
     }
 
+    /**
+     * "All servers" chosen in the switcher (Home shows every computer's sessions together), kept
+     * between runs. It only shows while two or more are paired ([Servers.allShown]).
+     */
+    var all: Boolean
+        get() = kv.get(ALL) == "1"
+        set(v) = kv.put(ALL, if (v) "1" else null)
+
     companion object {
         const val SERVERS = "servers"
         const val ACTIVE = "activeServer"
+        const val ALL = "allServers"
     }
 }
 
@@ -155,6 +164,24 @@ object Servers {
      */
     fun elsewhere(statuses: List<ServerStatus>): Int =
         statuses.filter { !it.active && (it.state == LinkState.Connected || it.state == LinkState.Reconnecting) }.sumOf { it.needsYou }
+
+    /** Whether Home shows every computer together: "All servers" chosen, and two or more paired. */
+    fun allShown(chosen: Boolean, paired: Int): Boolean = chosen && paired > 1
+
+    /** A computer's list is current enough to act on: linked, or only reconnecting (the rule of [elsewhere]). */
+    fun fresh(state: LinkState): Boolean = state == LinkState.Connected || state == LinkState.Reconnecting
+
+    /**
+     * The "All" chip's link: the worst of the computers' (unpaired, offline, reconnecting, connecting,
+     * connected), so one in trouble shows in the moon's colour. Connecting for none.
+     */
+    fun worst(states: List<LinkState>): LinkState {
+        val order = listOf(LinkState.Unpaired, LinkState.Offline, LinkState.Reconnecting, LinkState.Connecting, LinkState.Connected)
+        return order.firstOrNull { it in states } ?: LinkState.Connecting
+    }
+
+    /** How many computers aren't linked now (for the "All" chip's TalkBack line). */
+    fun notLinked(states: List<LinkState>): Int = states.count { it != LinkState.Connected }
 
     fun encode(list: List<Server>): String = JSONArray().apply { for (s in list) put(encode(s)) }.toString()
 

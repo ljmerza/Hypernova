@@ -146,13 +146,36 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
     /** Every paired computer for the switcher, the active one first (data/Servers.kt). */
     val servers: List<ServerStatus> get() = Core.statuses
 
-    /** The switcher: another paired computer on screen. */
+    /** The switcher: another paired computer on screen (from "All servers" too: that one alone). */
     fun switchServer(id: String) {
-        if (id == Core.activeId) return
+        if (id == Core.activeId && !Core.all) return
         Core.switchTo(id)
         nav.reset()
         notice = null
     }
+
+    /** Home shows every paired computer together (the switcher's "All servers", two or more paired). */
+    val allServers: Boolean get() = Core.all
+
+    /** The switcher's "All servers". */
+    fun showAll() {
+        if (Core.all) return
+        Core.showAll()
+        nav.reset()
+        notice = null
+    }
+
+    /** A session of [server] opens from "All servers" (a card, a new session, a notification): its screens are that computer's. */
+    fun visit(server: String) = Core.visit(server)
+
+    /** Home is back in "All servers": History, Automations, Settings and Statistics are the one picked's again. */
+    fun backToPicked() = Core.backToPicked()
+
+    /** Every paired computer with its hub, for Home's "All servers". */
+    val everyHub: List<Pair<ServerStatus, LiveHub>> get() = Core.everyHub
+
+    /** A paired computer's hub (null: not paired any more). */
+    fun hubOf(server: String): Hub? = Core.hub(server)
 
     /** "Add a server" (the switcher): the pairing steps over the app, the computers paired kept. */
     var addingServer by mutableStateOf(false)
@@ -175,6 +198,12 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Set by a notification tap: open this session once the hub has it. */
     var pendingOpen by mutableStateOf<String?>(null)
+
+    /**
+     * The computer [pendingOpen] is on, while Home shows "All servers": it is visited as the session
+     * opens ([visit]), and "All servers" stays. Null: the computer on screen.
+     */
+    var pendingServer by mutableStateOf<String?>(null)
 
     /** Set by an automation's notification: open its editor ("" the Automations tab). */
     var pendingAutomation by mutableStateOf<String?>(null)

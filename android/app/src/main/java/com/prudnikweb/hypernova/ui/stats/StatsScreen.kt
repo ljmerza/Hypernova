@@ -130,7 +130,12 @@ private const val STATS_SOURCE = "stats"
  * splits its hours between them ([StatsAgents]); Claude's alone reads exactly as before Codex.
  */
 @Composable
-fun StatsScreen(hub: Hub, onBack: () -> Unit) {
+fun StatsScreen(
+    hub: Hub,
+    onBack: () -> Unit,
+    /** Home shows "All servers": whose statistics these are (the one picked last), before the days they cover. */
+    server: String? = null,
+) {
     val res = LocalContext.current.resources
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var range by rememberSaveable { mutableStateOf(StatsRange.Week) }
@@ -187,7 +192,11 @@ fun StatsScreen(hub: Hub, onBack: () -> Unit) {
     ScreenScaffold(
         sourceKey = STATS_SOURCE,
         title = stringResource(R.string.stats_title),
-        subtitle = span,
+        subtitle = when {
+            server == null -> span
+            span.isBlank() -> server
+            else -> stringResource(R.string.stats_on_server, server, span)
+        },
         onBack = onBack,
         // The activity meter: it turns while an answer loads.
         actions = { Planet(if (loading) Activity.Live else Activity.Rest, Modifier.padding(end = 10.dp)) },

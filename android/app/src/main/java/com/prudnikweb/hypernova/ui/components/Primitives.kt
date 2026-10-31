@@ -569,6 +569,8 @@ fun ConnectionChip(
     named: Boolean = false,
     /** Sessions on the other paired computers that need the owner: a small amber count at the end. */
     elsewhere: Int = 0,
+    /** What TalkBack hears in place of the link's own words (Home's "All servers" chip). */
+    said: String? = null,
 ) {
     // Once linked, the Mac's name says it all; otherwise, the state in a word (with several paired,
     // the name still, so it's clear which one isn't linked).
@@ -609,7 +611,8 @@ fun ConnectionChip(
         awake?.sleepAt != null -> stringResource(R.string.link_said_sleep_soon, routeSaid)
         else -> stringResource(R.string.link_said_awake_lid, routeSaid)
     }
-    val said = if (elsewhere > 0) "$awakeSaid. " + pluralStringResource(R.plurals.servers_elsewhere, elsewhere, elsewhere) else awakeSaid
+    val linkSaid = said ?: awakeSaid
+    val allSaid = if (elsewhere > 0) "$linkSaid. " + pluralStringResource(R.plurals.servers_elsewhere, elsewhere, elsewhere) else linkSaid
     val target = linkTone(state)
     // Read while drawing, so the 800ms ease redraws the chip without recomposing it. The greys have
     // no light of their own, so the glass's fades out to them.
@@ -625,7 +628,7 @@ fun ConnectionChip(
     }
     Row(
         modifier
-            .clearAndSetSemantics { contentDescription = said }
+            .clearAndSetSemantics { contentDescription = allSaid }
             .frostedGlass({ glow.value }, glowX = 15.dp, dense = true)
             .heightIn(min = 30.dp)
             .padding(start = 5.dp, end = 12.dp, top = 3.dp, bottom = 3.dp),

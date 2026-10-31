@@ -140,6 +140,9 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     // nothing live in it at once (a launcher shortcut's project is often one).
     var sheetProject by rememberSaveable { mutableStateOf<String?>(null) }
     var sheetLaunch by rememberSaveable { mutableStateOf(0L) }
+    // The computer the sheet starts the session on, picked first while Home shows "All servers"
+    // (ui/home/ServerSwitcher.kt, ServerPicker); null: the one on screen.
+    var sheetServer by rememberSaveable { mutableStateOf<String?>(null) }
     // What the home list shows: one project (its planet framed in the sky), the quiet ones (the
     // belt framed), or everything (both off).
     var focusProject by rememberSaveable { mutableStateOf<String?>(null) }
@@ -217,27 +220,33 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     }
 
     val pendingOpen = vm.pendingOpen
-    LaunchedEffect(pendingOpen, hub, sessions) {
+    // With "All servers", a notification's session is on its own computer, visited as it opens.
+    val pendingServer = vm.pendingServer
+    val openHub = pendingServer?.let(vm::hubOf) ?: hub
+    LaunchedEffect(pendingOpen, openHub, pendingServer) {
         val id = pendingOpen ?: return@LaunchedEffect
-        if (hub?.session(id) != null) {
-            sheet = false
-            nav.openSession(id, fresh = true)
-            vm.pendingOpen = null
-        }
+        val h = openHub ?: return@LaunchedEffect
+        androidx.compose.runtime.snapshotFlow { h.session(id) != null }.first { it }
+        sheet = false
+        if (pendingServer != null) vm.visit(pendingServer)
+        nav.openSession(id, fresh = true)
+        vm.pendingOpen = null
+        vm.pendingServer = null
     }
     // One the hub doesn't know (it ended and left, audit P11): it isn't waited for forever, nor
     // opened minutes later out of nowhere. Once the hub has caught up and 10 s more have passed,
     // or after 30 s without reaching the Mac, it's said and let go.
     val openContext = androidx.compose.ui.platform.LocalContext.current
-    LaunchedEffect(pendingOpen, hub) {
+    LaunchedEffect(pendingOpen, openHub) {
         val id = pendingOpen ?: return@LaunchedEffect
-        val h = hub ?: return@LaunchedEffect
+        val h = openHub ?: return@LaunchedEffect
         val synced = kotlinx.coroutines.withTimeoutOrNull(30_000L) {
             androidx.compose.runtime.snapshotFlow { h.link.state }.first { it == LinkState.Connected }
         }
         if (synced != null) kotlinx.coroutines.delay(10_000L)
         if (vm.pendingOpen == id && h.session(id) == null) {
             vm.pendingOpen = null
+            vm.pendingServer = null
             vm.showToast(openContext.getString(if (synced != null) R.string.open_gone else R.string.open_unreachable))
         }
     }
@@ -250,8 +259,17 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
         focusProject = hub.projects.firstOrNull { it.path == launch.projectPath }?.name
         sheetProject = launch.projectPath
         sheetLaunch = launch.id
+        sheetServer = null
         sheet = true
         com.prudnikweb.hypernova.ui.share.ShareLaunch.newSession = null
+    }
+
+    // Home again with "All servers": the other tabs (and the cards above the sessions) are the one
+    // picked last's again, after a session of another computer was open (Core.visit).
+    val allServers = vm.allServers
+    val activeNow = com.prudnikweb.hypernova.data.Core.activeId
+    LaunchedEffect(route == Route.Home, allServers, activeNow) {
+        if (route == Route.Home && allServers) vm.backToPicked()
     }
 
     BackHandler(enabled = sheet || nav.depth > 1 || filter != null) {
@@ -355,7 +373,11 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                         onClose = if (adding && hub != null) ({ vm.addServer(false) }) else null,
                     )
                 } else if (!covered && hub != null) {
-                    Screens(hub, vm, route, nav.depth, screens, cosmos, skyVisibility, filter, onFilter, plan.value, { sheetProject = focusProject; sheet = true }, toAccount, toAutomations)
+                    Screens(
+                        hub, vm, route, nav.depth, screens, cosmos, skyVisibility, filter, onFilter, plan.value,
+                        { sheetProject = focusProject; sheetServer = null; sheet = true }, toAccount, toAutomations,
+                        onNewSessionOn = { server -> sheetProject = focusProject; sheetServer = server; sheet = true },
+                    )
                 }
 
                 if (hub != null && !covered) {
@@ -367,16 +389,23 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                         enter = slideInVertically(tween(Motion.REVEAL, easing = Motion.Expo)) { it / 3 } + fadeIn(tween(Motion.DIALOG)),
                         exit = slideOutVertically(tween(Motion.DIALOG)) { it / 4 } + fadeOut(tween(Motion.DIALOG)),
                     ) {
-                        NewSessionSheet(
-                            hub = hub,
-                            initialProject = sheetProject,
-                            launch = sheetLaunch,
-                            onStarted = { id ->
-                                sheet = false
-                                focusProject = null
-                                nav.openSession(id)
-                            },
-                        )
+                        // From "All servers", the computer picked first: its folders, models and providers.
+                        val onServer = sheetServer
+                        val sheetHub = onServer?.let(vm::hubOf) ?: hub
+                        androidx.compose.runtime.key(onServer) {
+                            NewSessionSheet(
+                                hub = sheetHub,
+                                initialProject = sheetProject,
+                                launch = sheetLaunch,
+                                onStarted = { id ->
+                                    sheet = false
+                                    focusProject = null
+                                    // Its screens are that computer's (Home stays on "All servers").
+                                    if (onServer != null) vm.visit(onServer)
+                                    nav.openSession(id)
+                                },
+                            )
+                        }
                     }
                 }
 
@@ -523,6 +552,8 @@ private fun Screens(
     onNewSession: () -> Unit,
     toAccount: androidx.compose.runtime.MutableState<Boolean>,
     toAutomations: androidx.compose.runtime.MutableState<Boolean>,
+    /** New session from "All servers", on the computer picked for it. */
+    onNewSessionOn: (String) -> Unit = {},
 ) {
     val nav = vm.nav
     val opener = LocalOpener.current
@@ -541,8 +572,13 @@ private fun Screens(
         label = "screen",
     ) { r ->
         // Each screen keeps its saveable state (list scroll, tab) while it's off screen.
-        // Home starts fresh (Sessions tab, top of the list) for each Mac.
-        val key = if (r == Route.Home) "home:${vm.pairing?.token?.hashCode()}" else r.key
+        // Home starts fresh (Sessions tab, top of the list) for each Mac; "All servers" is one Home of
+        // its own, kept while its cards' sessions (on their own computers) come and go.
+        val all = vm.allServers
+        val key = if (r == Route.Home) (if (all) "home:all" else "home:${vm.pairing?.token?.hashCode()}") else r.key
+        // A screen over Home stays on the computer it opened on (a session from "All servers" is
+        // its own computer's), though Home's hub changes back under it as it closes.
+        val shown = if (r == Route.Home) hub else remember { hub }
         screens.SaveableStateProvider(key) {
             when (r) {
                 Route.Home -> HomeScreen(
@@ -553,20 +589,30 @@ private fun Screens(
                     toAccount = toAccount,
                     toAutomations = toAutomations,
                     onAutomation = { id, template, runs -> nav.push(Route.AutomationEdit(id, template, runs)) },
-                    servers = com.prudnikweb.hypernova.ui.home.ServerChoice(vm.servers, vm::switchServer, { vm.addServer(true) }),
+                    servers = com.prudnikweb.hypernova.ui.home.ServerChoice(vm.servers, vm::switchServer, { vm.addServer(true) }, all = all, onAll = vm::showAll),
+                    everywhere = if (!all) null else com.prudnikweb.hypernova.ui.home.Everywhere(
+                        vm.everyHub,
+                        pickedName = hub.mac.name,
+                        onOpen = { server, id ->
+                            // Its chat, sheet and terminal are its own computer's; Back is Home on "All servers" again.
+                            vm.visit(server)
+                            nav.openSession(id)
+                        },
+                        onNewSession = onNewSessionOn,
+                    ),
                 )
                 // Fork: a new route each time it's opened, so each opening lands at the latest (SessionScreen).
-                is Route.Session -> SessionScreen(hub, r.id, onBack = { nav.pop() }, opening = System.identityHashCode(r))
-                is Route.Files -> FilesScreen(hub, r, onBack = { nav.pop() })
-                is Route.FileView -> FileViewer(hub, r.path, onBack = { nav.pop() })
+                is Route.Session -> SessionScreen(shown, r.id, onBack = { nav.pop() }, opening = System.identityHashCode(r))
+                is Route.Files -> FilesScreen(shown, r, onBack = { nav.pop() })
+                is Route.FileView -> FileViewer(shown, r.path, onBack = { nav.pop() })
                 is Route.Web -> WebScreen(r.url, r.title, onBack = { nav.pop() }, preview = r.preview, port = r.port)
-                is Route.Terminal -> com.prudnikweb.hypernova.ui.term.TerminalScreen(hub, r.sessionId, onBack = { nav.pop() })
-                is Route.Agent -> com.prudnikweb.hypernova.ui.session.AgentScreen(hub, r.sessionId, r.agentId, onBack = { nav.pop() })
-                Route.Providers -> ProvidersScreen(hub, onBack = { nav.pop() }, onEdit = { id, kind -> nav.push(Route.ProviderEdit(id, kind)) })
+                is Route.Terminal -> com.prudnikweb.hypernova.ui.term.TerminalScreen(shown, r.sessionId, onBack = { nav.pop() })
+                is Route.Agent -> com.prudnikweb.hypernova.ui.session.AgentScreen(shown, r.sessionId, r.agentId, onBack = { nav.pop() })
+                Route.Providers -> ProvidersScreen(shown, onBack = { nav.pop() }, onEdit = { id, kind -> nav.push(Route.ProviderEdit(id, kind)) })
                 Route.ConnectionLog -> com.prudnikweb.hypernova.ui.settings.ConnectionLogScreen(onBack = { nav.pop() })
-                is Route.ProviderEdit -> ProviderEditScreen(hub, r.id, r.kind, onBack = { nav.pop() })
+                is Route.ProviderEdit -> ProviderEditScreen(shown, r.id, r.kind, onBack = { nav.pop() })
                 is Route.AutomationEdit -> com.prudnikweb.hypernova.ui.automations.AutomationEditor(
-                    hub, r.id, r.template, r.runs, r.project,
+                    shown, r.id, r.template, r.runs, r.project,
                     onBack = { nav.pop() },
                     // A new one, once saved, carries on as itself: its runs and Run now.
                     onSaved = { id -> nav.replaceTop(Route.AutomationEdit(id)) },

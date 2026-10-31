@@ -37,6 +37,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * the others has a [LiveHub] of its own too, watched in the background: its link, its approvals and
  * notices as notifications that name it (a tap switches to it), and its needs-you count for the chip
  * and the switcher. Switching makes a watched hub the active one as it is, already linked.
+ *
+ * "All servers" ([all]): Home lists every hub's sessions together; the active one stays the one
+ * picked last, for the other tabs, except while a session of another is open from Home ([visit],
+ * undone by [backToPicked]), so that session's screens are its own computer's.
  */
 object Core {
     lateinit var app: Application
@@ -53,6 +57,15 @@ object Core {
     /** The computer the screens show (null: none paired). */
     var activeId by mutableStateOf<String?>(null)
         private set
+    /**
+     * The one last picked in the switcher (or paired), the one kept between runs. It is [activeId]
+     * except while a session of another computer is open from Home's "All servers" ([visit]).
+     */
+    private var picked: String? = null
+    /** "All servers" chosen in the switcher, kept between runs; it shows only while [all]. */
+    private var allChosen by mutableStateOf(false)
+    /** Home shows every paired computer's sessions together (two or more paired, "All servers" chosen). */
+    val all: Boolean get() = Servers.allShown(allChosen, servers.size)
     /** A hub per paired computer, by [Server.id]. */
     private val hubs = mutableStateMapOf<String, LiveHub>()
 
@@ -84,6 +97,13 @@ object Core {
             ServerStatus(s.id, h?.mac?.name ?: s.pairing.macName, h?.link?.state ?: LinkState.Connecting, h?.sessions?.let(Servers::needsYou) ?: 0, s.id == activeId)
         }
 
+    /** Each paired computer with its hub, in the order they were paired: Home's "All servers". */
+    val everyHub: List<Pair<ServerStatus, LiveHub>>
+        get() = servers.mapNotNull { s ->
+            val h = hubs[s.id] ?: return@mapNotNull null
+            ServerStatus(s.id, h.mac.name.ifBlank { s.pairing.macName }, h.link.state, Servers.needsYou(h.sessions), s.id == activeId) to h
+        }
+
     /** "Stay connected in the background" (default on). */
     var background by mutableStateOf(true)
         private set
@@ -108,6 +128,8 @@ object Core {
         val (list, active) = store.servers.load()
         servers = list
         activeId = active
+        picked = active
+        allChosen = store.servers.all
         for (s in list) startHub(s)
         syncService()
         WidgetSync.start(a)
@@ -134,7 +156,20 @@ object Core {
         }
     }
 
-    private fun save() = store.servers.save(servers, activeId)
+    /** The one picked is what's kept (a visit from "All servers" isn't). */
+    private fun save() = store.servers.save(servers, picked)
+
+    /** [id] becomes the computer on screen and the one picked. */
+    private fun pick(id: String?) {
+        activeId = id
+        picked = id
+    }
+
+    private fun chooseAll(on: Boolean) {
+        if (allChosen == on) return
+        allChosen = on
+        store.servers.all = on
+    }
 
     /** [s]'s hub, made anew (a new pairing, or the same computer paired again). */
     private fun startHub(s: Server) {
@@ -165,7 +200,9 @@ object Core {
     fun paired(p: Pairing) {
         val (list, id) = Servers.withPairing(servers, p)
         servers = list
-        activeId = id
+        pick(id)
+        // The new one on screen alone, not among all of them.
+        chooseAll(false)
         save()
         disconnected = false
         startHub(list.first { it.id == id })
@@ -177,10 +214,45 @@ object Core {
      * on its way). The one shown before goes on being watched in the background.
      */
     fun switchTo(id: String) {
-        if (id == activeId || servers.none { it.id == id }) return
-        activeId = id
+        if (servers.none { it.id == id }) return
+        // One computer picked: Home is that one's alone again.
+        chooseAll(false)
+        if (id == activeId && id == picked) return
+        val changed = id != activeId
+        pick(id)
         save()
+        if (changed) activated(id)
+    }
+
+    /**
+     * The switcher's "All servers": Home shows every paired computer's sessions together; History,
+     * Automations, Settings and Statistics stay on the one picked last.
+     */
+    fun showAll() {
+        if (servers.size < 2) return
+        chooseAll(true)
+        backToPicked()
+    }
+
+    /**
+     * From Home's "All servers": a session of [id] opens, so [id] is the computer on screen for its
+     * screens (its chat, sheet, terminal), without becoming the one picked. [backToPicked] undoes it
+     * once Home is back.
+     */
+    fun visit(id: String) {
+        if (servers.none { it.id == id }) return
+        if (!all) return switchTo(id)
+        if (id == activeId) return
+        activeId = id
         activated(id)
+    }
+
+    /** Home is back in "All servers": the one picked last is the computer on screen again. */
+    fun backToPicked() {
+        val p = picked?.takeIf { id -> servers.any { it.id == id } } ?: return
+        if (p == activeId) return
+        activeId = p
+        activated(p)
     }
 
     /** [id] is on screen now: its words, its approvals seen (their notifications go), a link at once if it's down. */
@@ -207,10 +279,11 @@ object Core {
         if (servers.none { it.id == id }) return
         hubs.remove(id)?.close()
         val left = servers.filter { it.id != id }
-        val next = Servers.activeAfterRemoval(servers, id, activeId)
+        // After the one picked (a visit from "All servers" ends with it).
+        val next = Servers.activeAfterRemoval(servers, id, picked ?: activeId)
         val switched = next != activeId
         servers = left
-        activeId = next
+        pick(next)
         save()
         // The key stays while another computer's certificate is for it.
         DeviceCertStore(app, id).clear(dropKey = left.isEmpty())

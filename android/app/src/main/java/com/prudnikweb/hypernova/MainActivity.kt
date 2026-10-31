@@ -87,7 +87,11 @@ class MainActivity : ComponentActivity() {
         val link = if (intent.action == Intent.ACTION_VIEW) com.prudnikweb.hypernova.data.PairLinks.kind(intent.dataString) else null
         // A notification from a computer the app doesn't show now: that one comes on screen first
         // (data/Servers.kt), then what the notification opens, there.
-        intent.getStringExtra(EXTRA_SERVER)?.let { vm.switchServer(it) }
+        // With Home on "All servers" a session opens on its computer and All stays (vm.pendingServer).
+        if (intent.action == ACTION_OPEN_SESSION) vm.pendingServer = null
+        intent.getStringExtra(EXTRA_SERVER)?.let {
+            if (vm.allServers && intent.action == ACTION_OPEN_SESSION) vm.pendingServer = it else vm.switchServer(it)
+        }
         when {
             // The app link hypernova://pair?…, as the server's pairing page (its QR code) hands it
             // over, or adb: data/Pairing.kt, PairLinks.

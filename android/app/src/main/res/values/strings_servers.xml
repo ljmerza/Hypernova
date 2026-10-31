@@ -15,6 +15,24 @@
         <item quantity="other">%d need you on another Mac</item>
     </plurals>
 
+    <!-- "All servers": Home shows every paired computer's sessions together (ui/home/AllHome.kt). -->
+    <string name="servers_all">All servers</string>
+    <string name="servers_all_label">Show every server\'s sessions together</string>
+    <!-- The chip while Home shows all of them, and what TalkBack hears. -->
+    <string name="servers_all_chip">All</string>
+    <string name="servers_all_said">All servers</string>
+    <plurals name="servers_all_said_down">
+        <item quantity="one">All servers, %d not linked</item>
+        <item quantity="other">All servers, %d not linked</item>
+    </plurals>
+    <!-- A card's tag in its meta line: its server's name, and "offline" while that one isn't linked. -->
+    <string name="servers_tag_offline">%1$s offline</string>
+    <!-- New session from "All servers": which server first. -->
+    <string name="servers_new_on">New session on</string>
+    <string name="servers_new_on_label">New session on %1$s</string>
+    <!-- Statistics while Home shows all servers: whose they are, before the days they cover. -->
+    <string name="stats_on_server">%1$s · %2$s</string>
+
     <!-- A notification from one of several computers: its name under the title (data/Core.kt, Notifier). -->
     <string name="notif_server_from_agent">%1$s, from %2$s</string>
     <string name="notif_server_from_an_agent">%1$s, from an agent</string>

@@ -30,6 +30,7 @@ import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -180,6 +181,18 @@ enum class Tab { Sessions, History, Automations, Settings }
 
 const val HOME_SOURCE = "home"
 
+/**
+ * Home's "All servers" (AllHome.kt): every paired computer with its hub, in the order paired, and
+ * where a card's opening and a new session go. The cards above the sessions, the usage cards, the
+ * other tabs and Statistics stay the one picked last's ([pickedName], the hub Home is given).
+ */
+class Everywhere(
+    val servers: List<Pair<com.prudnikweb.hypernova.data.ServerStatus, Hub>>,
+    val pickedName: String,
+    val onOpen: (server: String, id: String) -> Unit,
+    val onNewSession: (server: String) -> Unit,
+)
+
 @Composable
 fun HomeScreen(
     hub: Hub,
@@ -201,6 +214,8 @@ fun HomeScreen(
     onAutomation: (id: String?, template: String?, runs: Boolean) -> Unit = { _, _, _ -> },
     /** The paired computers, for the chip's switcher (data/Servers.kt); null: the chip opens nothing. */
     servers: ServerChoice? = null,
+    /** "All servers" chosen (two or more paired): the Sessions tab shows every computer's together. */
+    everywhere: Everywhere? = null,
 ) {
     val haze = LocalHaze.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -210,8 +225,14 @@ fun HomeScreen(
     // The chip's switcher (ui/home/ServerSwitcher.kt) is open.
     var switching by rememberSaveable { mutableStateOf(false) }
     if (switching && servers != null) {
-        ServerSwitcher(servers.servers, servers.onSwitch, servers.onPair, onDismiss = { switching = false })
+        ServerSwitcher(servers.servers, servers.onSwitch, servers.onPair, onDismiss = { switching = false }, all = servers.all, onAll = servers.onAll)
     }
+    // New session from "All servers": which computer first (ServerPicker), then its New session sheet.
+    var pickingServer by rememberSaveable { mutableStateOf(false) }
+    if (pickingServer && everywhere != null) {
+        ServerPicker(AllHome.picks(everywhere.servers.map { it.first }), everywhere.onNewSession, onDismiss = { pickingServer = false })
+    }
+    val newSession = if (everywhere != null) ({ pickingServer = true }) else onNewSession
     // Statistics, opened by tapping the sun: a screen of its own over Home, which fades back as it
     // comes forward (the way a session opens), and Back returns. Only what Home draws leaves, so
     // its tab and scroll are where they were.
@@ -285,7 +306,7 @@ fun HomeScreen(
     // Ended sessions move to History; the home list is what's alive, and what a restart of the Mac
     // ended lately (nobody ended it): those stay here, to pick up where they left off. A conversation
     // that switched agents is its newest session; the one before it opens from there ("Continued from").
-    val all = remember(hub.sessions) { hub.sessions.filter { (it.phase != Phase.Ended || it.cutByRestart) && it.switchedTo == null } }
+    val all = remember(hub.sessions) { AllHome.homeSessions(hub.sessions) }
     // Both agents in use (data/AgentLead.kt): Codex's sessions say CODEX. Never otherwise (where Codex
     // leads, every session is Codex's). Which usage cards show, and whether they say whose they are.
     val codexOn = hub.bothAgents
@@ -295,8 +316,22 @@ fun HomeScreen(
     // folder, last line and short id, and from 3 characters the words inside the conversations.
     // While words are typed the list is the matches in their groups; the cards above step aside.
     val typed = searchOpen && searchQuery.isNotBlank()
-    val full = rememberFullText(hub, if (searchOpen) searchQuery else "")
+    val full = rememberFullText(hub, if (searchOpen && everywhere == null) searchQuery else "")
     val shown = remember(sessions, typed, searchQuery, full.hits) { if (typed) HomeSearch.find(sessions, searchQuery, full.hits) else sessions }
+    // "All servers" (AllHome.kt): each computer's sessions, filtered and searched on their own (each
+    // asked for its full-text hits), then grouped together; each card goes to its own computer.
+    val fullBy: Map<String, FullText> = everywhere?.servers?.associate { (st, h) ->
+        st.id to key(st.id) { rememberFullText(h, if (searchOpen) searchQuery else "") }
+    }.orEmpty()
+    val parts = everywhere?.servers?.map { (st, h) -> ServerPart(st.id, st.name, st.state, h, h.sessions, fullBy[st.id]?.hits) }
+    val narrowed: List<HomeCard<Hub>>? = parts?.let { AllHome.cards(it) { list -> SkyFilter.apply(list, filter, quiet) } }
+    val cards: List<HomeCard<Hub>> = when {
+        parts == null -> shown.map { HomeCard(null, null, hub, it) }
+        typed -> AllHome.cards(parts, searchQuery) { list -> SkyFilter.apply(list, filter, quiet) }
+        else -> narrowed.orEmpty()
+    }
+    val searching = if (everywhere != null) fullBy.values.any { it.searching } else full.searching
+    val partial = if (everywhere != null) fullBy.values.any { it.hits?.partial == true } else full.hits?.partial == true
     // The matches start at the top.
     LaunchedEffect(searchOpen, searchQuery) { if (searchOpen) list.scrollToItem(0) }
     // The line under the sun's readout ("Tap the sun for your statistics"): the sky keeps room for it.
@@ -306,8 +341,10 @@ fun HomeScreen(
     val troubled = remember(hub.providers, hub.sessions) { troubledProviders(hub.providers, hub.sessions) }
     val opener = LocalOpener.current
     // Who needs you here and elsewhere: the filter chip says how many wait outside it.
-    val waiting = sessions.count { it.state == SessionState.NeedsYou }
-    val waitingAll = all.count { it.state == SessionState.NeedsYou }
+    val waiting = if (narrowed != null) AllHome.needsYou(narrowed) else sessions.count { it.state == SessionState.NeedsYou }
+    val waitingAll = if (parts != null) AllHome.needsYou(AllHome.cards(parts)) else all.count { it.state == SessionState.NeedsYou }
+    // Nothing on Home at all (on any computer, with "All servers").
+    val nothing = if (narrowed != null) narrowed.isEmpty() else sessions.isEmpty()
     // Claude Code's account: only where it's installed (a Mac where Codex leads has no Claude account to fix).
     val showAccount = claudeHere && accountCardShown(account, now)
     // The attention cards above the list, unless swiped away (an Undo stands in for a moment).
@@ -373,7 +410,8 @@ fun HomeScreen(
             },
     ) {
         when (tab) {
-            Tab.Sessions -> LazyColumn(
+            // With "All servers" the cards above the sessions are the one picked last's, and say so.
+            Tab.Sessions -> androidx.compose.runtime.CompositionLocalProvider(com.prudnikweb.hypernova.ui.components.LocalAttentionFrom provides everywhere?.pickedName) { LazyColumn(
                 Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = HOME_SOURCE),
                 state = list,
                 // The first card starts under the top bar (fork: no sky above it any more); the last
@@ -401,8 +439,8 @@ fun HomeScreen(
                 // couldn't look everywhere in time (History's words), and "No sessions match".
                 if (typed) {
                     val note = when {
-                        full.searching -> R.string.history_searching
-                        full.hits?.partial == true -> R.string.history_partial
+                        searching -> R.string.history_searching
+                        partial -> R.string.history_partial
                         else -> null
                     }
                     if (note != null) {
@@ -413,7 +451,7 @@ fun HomeScreen(
                             )
                         }
                     }
-                    if (shown.isEmpty() && !full.searching) {
+                    if (cards.isEmpty() && !searching) {
                         item(key = "search-none") {
                             HText(
                                 stringResource(R.string.home_no_match), style = Type.small, color = HN.inkDim,
@@ -475,7 +513,7 @@ fun HomeScreen(
                         }
                     }
                 }
-                if (sessions.isEmpty() && filter == null && !typed) {
+                if (nothing && filter == null && !typed) {
                     item(key = "empty") {
                         EmptyCard(hub, onHistory = { tab = Tab.History }, modifier = Modifier.animateItem().padding(horizontal = 16.dp))
                     }
@@ -486,33 +524,42 @@ fun HomeScreen(
                 // Completed cards say when they finished and mark a reply not read on this phone
                 // (data/Unread.kt). Searching, the groups hold the matches (the counts theirs), and a
                 // card the Mac found by its words shows the snippet under its title.
-                val readMarks = ReadState.server(hub)?.let { ReadState.of(context, it) }
-                val hits = if (typed) full.hits else null
-                for ((group, members) in homeGroups(shown)) {
+                // With "All servers" the groups hold every computer's (their counts all of them), each
+                // card tagged with its computer and everything it does going there (AllHome.kt); an
+                // offline computer's are dimmed and only open.
+                val groups = if (everywhere != null) AllHome.groups(cards) else homeGroupsOf(cards, { it.session })
+                for ((group, members) in groups) {
                     item(key = group.key) {
                         GroupSeam(
                             group, members.size,
                             Modifier.animateItem().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 4.dp),
                         )
                     }
-                    items(members, key = { it.id }) { s ->
+                    items(members, key = { it.key }) { c ->
+                        val s = c.session
+                        val hub = c.hub
+                        val readMarks = ReadState.server(hub)?.let { ReadState.of(context, it) }
+                        val hits = if (!typed) null else if (c.server == null) full.hits else fullBy[c.server]?.hits
+                        val server = c.server
+                        // Opening it: on its own computer (which is visited for the session's screens) with "All servers".
+                        val open: (String) -> Unit = if (server != null && everywhere != null) ({ id -> everywhere.onOpen(server, id) }) else onOpen
                         // Its approval, else Claude Code's own permission dialog in its terminal (CardAsk.Terminal).
-                        val ask = hub.approval(s.id).let { a -> remember(a, s) { CardAsk.of(a, s) } }
+                        val ask = hub.approval(s.id).let { a -> remember(a, s) { CardAsk.of(a, s) } }.takeIf { !c.offline }
                         // A swipe each way, as Settings → Card swipes has them (CardSwipe.kt, CardSwipePref.kt):
                         // by default left is Smart (Needs input opens, a Completed job stops or is
                         // deleted, Working none) and right nothing. Delete, Rename and Restart open the
                         // menu's own page (its confirms, its sheet); Stop goes at once, as in the menu.
                         val unread = group == HomeGroup.Completed && readMarks != null && ReadState.unread(readMarks, s)
                         val swipes = CardSwipePref.state(context).value
-                        val left = CardSwipe.of(swipes.left, group, s, unread)
-                        val right = CardSwipe.of(swipes.right, group, s, unread)
-                        var page by rememberSaveable(s.id) { mutableStateOf<MenuPage?>(null) }
+                        val left = CardSwipe.of(swipes.left, group, s, unread).takeIf { !c.offline }
+                        val right = CardSwipe.of(swipes.right, group, s, unread).takeIf { !c.offline }
+                        var page by rememberSaveable(c.key) { mutableStateOf<MenuPage?>(null) }
                         page?.let { SessionMenu(hub, s, { page = null }, start = it) }
                         val appScope = LocalAppScope.current
                         val toast = LocalToast.current
                         val slide = cardSwipe(left, right) { act ->
                             when (act) {
-                                CardSwipe.Open -> onOpen(s.id)
+                                CardSwipe.Open -> open(s.id)
                                 CardSwipe.Stop -> appScope.launch { hub.stopSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_stop_session)) } }
                                 CardSwipe.Delete -> page = MenuPage.Delete
                                 CardSwipe.Rename -> page = MenuPage.Rename
@@ -521,29 +568,34 @@ fun HomeScreen(
                             }
                         }
                         SessionCard(
-                            s, now = now, scramble = remember(s.id) { hub.consumeReveal(s) },
-                            onClick = { onOpen(s.id) },
-                            modifier = Modifier.padding(horizontal = 16.dp).animateItem().then(slide),
-                            block = s.activeBlock(account, hub.providers, now),
+                            s, now = now, scramble = remember(c.key) { hub.consumeReveal(s) },
+                            onClick = { open(s.id) },
+                            modifier = Modifier.padding(horizontal = 16.dp).animateItem().then(slide)
+                                .then(if (c.offline) Modifier.graphicsLayer { alpha = OFFLINE_ALPHA } else Modifier),
+                            block = s.activeBlock(hub.account, hub.providers, now),
                             waiting = hub.waitingCount(s.id),
                             held = hub.heldCount(s.id),
-                            codex = codexOn && s.codex,
+                            codex = (if (server == null) codexOn else hub.bothAgents) && s.codex,
                             ask = ask,
                             onAnswer = { id, answer -> answerCard(hub, s.id, ask, id, answer) },
-                            menu = if (MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
+                            menu = if (!c.offline && MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
                             completed = group == HomeGroup.Completed,
                             unread = unread,
                             hit = hits?.of(s.id),
+                            server = c.name,
+                            offline = c.offline,
                         )
                     }
                 }
                 // The usage cards (UsageCards.kt): Claude's, Codex's, or both, each saying whose it is only when both show.
-                if (usageCards.claude && !typed) item(key = "usage") { UsageCard(hub, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp)) }
+                // With "All servers", the one picked last's, its name in their seam.
+                val from = everywhere?.pickedName
+                if (usageCards.claude && !typed) item(key = "usage") { UsageCard(hub, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp), from) }
                 val codexState = hub.codex
                 if (usageCards.codex && codexState != null && !typed) {
-                    item(key = "codex-usage") { CodexUsageCard(codexState, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp)) }
+                    item(key = "codex-usage") { CodexUsageCard(codexState, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp), from) }
                 }
-            }
+            } }
             Tab.Automations -> com.prudnikweb.hypernova.ui.automations.AutomationsTab(
                 hub, top, bottom, HOME_SOURCE,
                 onEdit = { id, template -> onAutomation(id, template, false) },
@@ -575,7 +627,7 @@ fun HomeScreen(
                 if (tab == Tab.Sessions) {
                     // The lens: searching Home's sessions (idea HM8); lit while the field is open.
                     SearchButton(searchOpen, onClick = { if (searchOpen) closeSearch() else searchOpen = true })
-                    Pill(stringResource(R.string.new_session), onNewSession, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
+                    Pill(stringResource(R.string.new_session), newSession, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
                     Spacer(Modifier.width(8.dp))
                 }
                 // A Mac with automations: a new one from here (an old Mac's tab only says to update).
@@ -584,7 +636,8 @@ fun HomeScreen(
                     Spacer(Modifier.width(8.dp))
                 }
                 // The switcher (owner, 2026-10-30): Settings is the bottom tab's alone now.
-                LinkChip(hub, servers, onClick = { if (servers != null) switching = true })
+                // "All" on the Sessions tab with "All servers"; the other tabs' chip names the one they show.
+                LinkChip(hub, servers, all = everywhere?.takeIf { tab == Tab.Sessions }, onClick = { if (servers != null) switching = true })
             }
             if (searchShown) {
                 // Under the bar, over the top of the list; the keyboard comes up with it.
@@ -631,7 +684,7 @@ fun HomeScreen(
                 scaleY = scaleX
             },
     ) {
-        StatsScreen(hub, onBack = { statsOpen = false })
+        StatsScreen(hub, onBack = { statsOpen = false }, server = everywhere?.pickedName)
     }
 }
 
@@ -703,11 +756,14 @@ internal fun homeGroup(s: Session) = when {
  * its group changes. Completed by when it finished, newest first (owner, 2026-10-30), the time its
  * card says ("5m ago"); the same time by name.
  */
-internal fun homeGroups(sessions: List<Session>): List<Pair<HomeGroup, List<Session>>> {
-    val byName = compareBy(String.CASE_INSENSITIVE_ORDER, Session::name).thenBy { it.id }
-    val newest = compareByDescending<Session> { it.updatedAt }.then(byName)
+internal fun homeGroups(sessions: List<Session>): List<Pair<HomeGroup, List<Session>>> = homeGroupsOf(sessions, { it })
+
+/** [homeGroups] for anything that carries a session (a card of "All servers", AllHome.kt); [tie] after the name and id. */
+internal fun <T> homeGroupsOf(items: List<T>, session: (T) -> Session, tie: Comparator<T> = Comparator { _, _ -> 0 }): List<Pair<HomeGroup, List<T>>> {
+    val byName = compareBy<T, String>(String.CASE_INSENSITIVE_ORDER) { session(it).name }.thenBy { session(it).id }.then(tie)
+    val newest = compareByDescending<T> { session(it).updatedAt }.then(byName)
     return HomeGroup.entries.mapNotNull { g ->
-        sessions.filter { homeGroup(it) == g }
+        items.filter { homeGroup(session(it)) == g }
             .sortedWith(if (g == HomeGroup.Completed) newest else byName)
             .takeIf { it.isNotEmpty() }?.let { g to it }
     }
@@ -866,6 +922,12 @@ fun SessionCard(
      * a Working one does still shows under it.
      */
     hit: TextHit? = null,
+    /**
+     * Home shows "All servers" (AllHome.kt): the computer it's on, a quiet name after its project in
+     * the meta line, "z2 offline" while that one isn't linked.
+     */
+    server: String? = null,
+    offline: Boolean = false,
 ) {
     val needs = s.state == SessionState.NeedsYou
     val res = LocalContext.current.resources
@@ -879,6 +941,7 @@ fun SessionCard(
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Seam(
                 label = s.project,
+                after = server?.let { if (offline) stringResource(R.string.servers_tag_offline, it) else it },
                 // Its short id and age as quiet marks, not "c7 · 1m". Completed: when it finished.
                 trailContent = {
                     if (completed) SessionStamp(s.hex, finishedAgo(s.updatedAt, now), finishedSaid(res, s.hex, s.updatedAt, now))
@@ -1110,7 +1173,7 @@ private fun ScrambledName(name: String, scramble: Boolean) {
 }
 
 @Composable
-private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier) {
+private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier, from: String? = null) {
     val u = hub.usage
     val res = LocalContext.current.resources
     // Each meter's countdown moves when its text changes, in step with the sky's and the account card's.
@@ -1120,6 +1183,7 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
         Column(Modifier.padding(16.dp)) {
             Seam(
                 stringResource(cards.claudeTitle),
+                after = from,
                 trail = when {
                     u.stale -> stringResource(R.string.usage_stale_trail)
                     u.known -> stringResource(R.string.usage_official)
@@ -1166,7 +1230,7 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
  * with no numbers yet, one quiet line instead. It moves with the live feed, never by asking.
  */
 @Composable
-private fun CodexUsageCard(c: CodexState, cards: UsageCards, modifier: Modifier = Modifier) {
+private fun CodexUsageCard(c: CodexState, cards: UsageCards, modifier: Modifier = Modifier, from: String? = null) {
     val u = c.usage
     val res = LocalContext.current.resources
     val now = rememberCountdownNow(u?.fiveHour?.resetsAt, u?.sevenDay?.resetsAt)
@@ -1174,6 +1238,7 @@ private fun CodexUsageCard(c: CodexState, cards: UsageCards, modifier: Modifier 
         Column(Modifier.padding(16.dp)) {
             Seam(
                 stringResource(cards.codexTitle),
+                after = from,
                 trailContent = if (u?.limited == true) ({ SeamWords(stringResource(R.string.cx_usage_limited), color = HN.amber) }) else null,
                 color = if (u?.limited == true) HN.amber else HN.inkMuted,
             )
@@ -1222,19 +1287,32 @@ private fun UsageMeter(label: String, p: UsageProjection, spoken: String) {
  * switcher (ui/home/ServerSwitcher.kt).
  */
 @Composable
-private fun LinkChip(hub: Hub, servers: ServerChoice?, onClick: () -> Unit) {
+private fun LinkChip(hub: Hub, servers: ServerChoice?, all: Everywhere? = null, onClick: () -> Unit) {
     Box(
         Modifier
             .heightIn(min = 48.dp)
             .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.servers_chip_label), onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
+        if (all != null) {
+            // "All servers": "All", its moon the worst of their links; every one is on screen, so no count elsewhere.
+            val states = all.servers.map { it.first.state }
+            val down = com.prudnikweb.hypernova.data.Servers.notLinked(states)
+            ConnectionChip(
+                com.prudnikweb.hypernova.data.Servers.worst(states), name = stringResource(R.string.servers_all_chip), named = true,
+                said = if (down > 0) pluralStringResource(R.plurals.servers_all_said_down, down, down) else stringResource(R.string.servers_all_said),
+            )
+            return@Box
+        }
         ConnectionChip(
             hub.link.state, name = hub.mac.name, battery = hub.mac.battery, awake = hub.mac.awake, via = hub.mac.via,
             named = servers?.several == true, elsewhere = servers?.elsewhere ?: 0,
         )
     }
 }
+
+/** How much an offline computer's cards are dimmed with "All servers" (they only open). */
+private const val OFFLINE_ALPHA = 0.5f
 
 /** Permission modes in plain words: "ask first", "accept edits", "plan"… */
 @Composable

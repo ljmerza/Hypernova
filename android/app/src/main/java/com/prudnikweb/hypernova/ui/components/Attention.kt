@@ -80,6 +80,13 @@ object AttentionStore {
     }
 }
 
+/**
+ * The computer the attention cards under it are about, while Home shows "All servers" (its cards
+ * above the sessions are the one picked last's): a quiet name over each card's title. Null: one
+ * computer on screen, nothing said.
+ */
+val LocalAttentionFrom = androidx.compose.runtime.staticCompositionLocalOf<String?> { null }
+
 /** An action on an attention card: the pill on its right, or a quiet link under its line. */
 class AttentionAction(val text: String, val onClick: () -> Unit, val glyph: Glyph? = null, val description: String? = null)
 
@@ -184,6 +191,10 @@ fun AttentionCard(
                         ToneBadge(glyph, tone)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f).padding(top = 1.dp)) {
+                            LocalAttentionFrom.current?.let { from ->
+                                HText(from, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                                Spacer(Modifier.height(2.dp))
+                            }
                             HText(title, style = Type.heading, color = HN.ink)
                             if (line != null) {
                                 Spacer(Modifier.height(3.dp))
