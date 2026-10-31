@@ -10,7 +10,8 @@ import org.junit.Test
 
 /**
  * Voice's logic on the JVM: the words as the box gets them, and the demo's dictation. The phone's
- * own dictation (PhoneDictation.kt) is Android's on-device recognizer and has no JVM test.
+ * own dictation (PhoneDictation.kt) is Android's recognizer and has no JVM test; its engine choice
+ * and extras are DictationChoiceTest's.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class VoiceTest {

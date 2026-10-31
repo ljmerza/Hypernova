@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Voice on the phone: the mic in the composer, the dictation capsule and its hints
-     (docs/specs/spec-voice.md, 3.5). The words come from the phone's own on-device recognizer. -->
+     (docs/specs/spec-voice.md, 3.5). The words come from the phone's own recognizer, or its on-device one (Settings → Voice). -->
 <resources>
+    <string name="voice_settings">Voice</string>
+    <string name="voice_engine">Voice recognition</string>
+    <string name="voice_engine_phone">Phone\'s recognizer</string>
+    <string name="voice_engine_on_device">On-device only</string>
+    <string name="voice_engine_desc">Phone\'s recognizer: as your keyboard\'s voice typing, may use Google\'s servers. On-device only: never leaves the phone, less accurate.</string>
     <string name="voice_mic">Dictate</string>
     <string name="voice_listening">Listening</string>
     <string name="voice_hands_free">Hands-free</string>

@@ -45,6 +45,13 @@ backup and device transfer (`allowBackup=false`); an older build's Tailscale nod
 (`files/tsnet`) stay there, no longer read since 2026-10-30. Downloaded files go where the user
 saves them.
 
+**Dictation's audio** never goes to the Mac. The phone's speech recognizer hears it, as Settings →
+Voice chooses (`data/PhoneDictation.kt`; docs/DECISIONS.md, 2026-10-31): **Phone's recognizer**
+(the default) is the phone's default recognition service, the one the keyboard's voice typing uses,
+normally Google's, which may send the audio to Google's servers; **On-device only** is Android's
+on-device recognizer, and the audio never leaves the phone (no fallback to the other: a phone
+without one has no mic). Hypernova keeps no audio and writes no words down.
+
 ## 3. What each outside party sees
 
 | Party | Sees | Does not see |
@@ -53,6 +60,7 @@ saves them.
 | The owner's network and VPN | That a phone connects to the server's port 47323, and when. The traffic is TLS to the server's pinned certificate. | Message contents. |
 | A provider (OpenRouter, a gateway) | What a session on that provider sends, with its own key. | Other sessions. |
 | nodejs.org, Anthropic's installer, GitHub (setup) | Downloads the user asks for (Node.js is checked against its published checksums). | -- |
+| The phone's speech recognizer (normally Google's), with Phone's recognizer chosen (the default) | Dictation's audio and words, as when the keyboard's voice typing is used; whether it goes to the recognizer's servers is that service's own choice. Nothing with On-device only. | Sessions, the Mac, pairing. |
 
 No name service and no DNS record: nothing about the computer or its pairing is published.
 
