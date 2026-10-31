@@ -5,6 +5,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.roborazzi)
 }
 
 /**
@@ -98,7 +99,7 @@ android {
     // The protocol's contract fixtures, shared with the daemon's tests (docs/PROTOCOL.md, "Contract
     // fixtures"): on the unit tests' classpath as fixtures/*.json, so a changed fixture runs them again.
     sourceSets.getByName("test").resources.srcDir("../../protocol")
-    // Robolectric tests read the app's own strings (LiveHub's words, data/live tests).
+    // Robolectric tests read the app's own resources (LiveHub's words in data/live; strings and fonts in ui/screens).
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
@@ -124,7 +125,19 @@ dependencies {
     testImplementation(libs.org.json)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+    // Screen tests on the JVM (app/src/test/.../ui/screens): Compose under Robolectric, and Roborazzi's
+    // screenshots of them (baselines in app/src/test/snapshots; `verifyRoborazziDebug` compares,
+    // `recordRoborazziDebug` writes them again).
+    testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    // The empty activity createComposeRule launches, in the debug manifest only.
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+roborazzi {
+    outputDir.set(file("src/test/snapshots"))
 }
 
 // `./gradlew :app:dist`: the debug APK in ../dist, with its version in a note next to it. The Mac

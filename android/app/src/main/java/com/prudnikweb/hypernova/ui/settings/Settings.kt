@@ -443,7 +443,7 @@ private fun DisplaySection() {
  * every box that sends at once (EnterKeyPref is one state for the app).
  */
 @Composable
-private fun TypingSection() {
+internal fun TypingSection() {
     val context = LocalContext.current
     val enter by remember { com.prudnikweb.hypernova.ui.components.EnterKeyPref.state(context) }
     Seam(stringResource(R.string.st_typing), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
