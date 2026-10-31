@@ -380,6 +380,7 @@ data class WApproval(
     val id: String,
     val sessionId: String,
     val createdAt: Long,
+    /** When it leaves the phone for nobody answering; null when it never does (it waits for the phone). */
     val expiresAt: Long?,
     val kind: String,
     val toolName: String,
@@ -396,6 +397,12 @@ data class WApproval(
     val agentLabel: String? = null,
     /** A MultiEdit's edits, old text to new ([input] has only their flattened text). */
     val edits: List<Pair<String, String>> = emptyList(),
+    /**
+     * At [expiresAt] the Mac says no for nobody answering (Codex, an automation's run). Never for the
+     * owner's Claude Code sessions (docs/DECISIONS.md, "Never auto-deny"): their asks go back to the
+     * terminal's dialog or wait for the phone, so they have no countdown.
+     */
+    val autoDeny: Boolean = false,
 )
 
 @Immutable
@@ -843,6 +850,7 @@ object Wire {
         edits = o.obj("input")?.optJSONArray("edits")?.let { a ->
             (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { e -> e.str("old_string").orEmpty() to e.str("new_string").orEmpty() } }
         }.orEmpty(),
+        autoDeny = o.bool("autoDeny"),
     )
 
     private fun window(o: JSONObject?): Window? {

@@ -117,7 +117,10 @@ export type Approval = {
   id: string
   sessionId: string
   createdAt: number
-  expiresAt: number
+  /** When it leaves the phone for nobody answering ([AwayRule]); null when it never does. */
+  expiresAt: number | null
+  /** At [expiresAt] Hypernova says no ([AwayRule] `deny`): only then has the phone a countdown to show. */
+  autoDeny: boolean
   kind: 'tool' | 'question' | 'plan'
   toolName: string
   summary: string
@@ -133,7 +136,15 @@ export type Approval = {
   agentLabel: string | null
 }
 /** What asks: the approval without what the daemon adds itself. */
-export type ApprovalAsk = Omit<Approval, 'id' | 'createdAt' | 'expiresAt' | 'canSession' | 'agentId' | 'agentLabel'> & { agentId?: string | null; agentLabel?: string | null }
+export type ApprovalAsk = Omit<Approval, 'id' | 'createdAt' | 'expiresAt' | 'autoDeny' | 'canSession' | 'agentId' | 'agentLabel'> & { agentId?: string | null; agentLabel?: string | null }
+/**
+ * What 10 minutes without an answer does to an ask (docs/DECISIONS.md, "Never auto-deny"):
+ * `terminal`, Claude Code's hook hands it back to its own dialog (hooks.ts); `deny`, Hypernova says
+ * no and the session stops until you're back (Codex, which has no dialog to fall back to, and an
+ * automation's run through the SDK); `never`, nothing: it waits for the phone (a session the daemon
+ * runs through the SDK, which has no dialog either).
+ */
+export type AwayRule = 'terminal' | 'deny' | 'never'
 export type Answer = { decision: 'allow' | 'deny' | 'always' | 'session' | 'timeout' | 'terminal'; message?: string; answers?: Record<string, string> }
 
 /**
@@ -148,7 +159,7 @@ export const allowedForSession = (sessionId: string, tool: string) => !!sessionA
 export const forgetSessionAllowed = (sessionId: string) => sessionAllowed.delete(sessionId)
 /** Claude Code's own rule for it, so it stops asking too (session only, nothing saved). */
 export const sessionRule = (tool: string) => [{ type: 'addRules', rules: [{ toolName: tool }], behavior: 'allow', destination: 'session' }]
-type Pending = { approval: Approval; toolUseId: string | null; resolve: (a: Answer) => void; timer: NodeJS.Timeout }
+type Pending = { approval: Approval; toolUseId: string | null; resolve: (a: Answer) => void; timer: NodeJS.Timeout | null; away: AwayRule }
 
 export const AWAY_MS = 10 * 60_000
 export const AWAY_MESSAGE =
@@ -874,17 +885,32 @@ const pending = new Map<string, Pending>()
 export const pendingApprovals = () => [...pending.values()].map((p) => p.approval)
 export const hasPairedDevice = () => listDevices().length > 0
 
-export function requestApproval(a: ApprovalAsk, toolUseId: string | null, signal?: AbortSignal): Promise<Answer> {
+/**
+ * Asks the phone. [away]: what 10 minutes without an answer does ([AwayRule]); by default Codex's
+ * ask is denied and Claude Code's handed back to its terminal (its hook).
+ */
+export function requestApproval(a: ApprovalAsk, toolUseId: string | null, signal?: AbortSignal, away?: AwayRule): Promise<Answer> {
   // Already allowed for this session: no need to ask (a subagent that started before, say).
   if (a.kind === 'tool' && allowedForSession(a.sessionId, a.toolName)) return Promise.resolve({ decision: 'session' })
   // The owner allowed this very call with Allow & retry a moment ago (blocked.ts).
   if (a.kind === 'tool' && takeRetryGrant(a.sessionId, a.toolName, a.input)) return Promise.resolve({ decision: 'allow' })
   const id = randomUUID()
   const now = Date.now()
-  const approval: Approval = { ...a, agentId: a.agentId ?? null, agentLabel: a.agentLabel ?? null, canSession: a.kind === 'tool' && SESSION_TOOLS.has(a.toolName), id, createdAt: now, expiresAt: now + AWAY_MS }
+  const rec = sessions.get(a.sessionId)
+  const rule: AwayRule = away ?? (rec && isCodexRec(rec) ? 'deny' : 'terminal')
+  const approval: Approval = {
+    ...a,
+    agentId: a.agentId ?? null,
+    agentLabel: a.agentLabel ?? null,
+    canSession: a.kind === 'tool' && SESSION_TOOLS.has(a.toolName),
+    id,
+    createdAt: now,
+    expiresAt: rule === 'never' ? null : now + AWAY_MS,
+    autoDeny: rule === 'deny',
+  }
   return new Promise<Answer>((resolve) => {
-    const timer = setTimeout(() => finish(id, { decision: 'timeout' }, 'timeout'), AWAY_MS)
-    pending.set(id, { approval, toolUseId, resolve, timer })
+    const timer = rule === 'never' ? null : setTimeout(() => finish(id, { decision: 'timeout' }, 'timeout'), AWAY_MS)
+    pending.set(id, { approval, toolUseId, resolve, timer, away: rule })
     putEvent(a.sessionId, { id: `a:${id}`, kind: 'approval', ts: now, approvalId: id, summary: a.summary, resolution: null })
     waitStarted.set(id, { toolUseId, at: now })
     setState(a.sessionId, 'needs_you', a.summary)
@@ -988,12 +1014,12 @@ function finish(id: string, ans: Answer, by: string): boolean {
   waitStarted.delete(id)
   const tev = w?.toolUseId ? sessions.get(p.approval.sessionId)?.parse?.byId.get(w.toolUseId) : undefined
   if (tev && tev.kind === 'tool') tev.ts = Date.now()
-  clearTimeout(p.timer)
+  if (p.timer) clearTimeout(p.timer)
   const sid = p.approval.sessionId
   // "terminal": answered on the Mac (allowed, denied or cancelled; we can't tell which).
   const r = sessions.get(sid)
   // A Claude Code ask nobody answered goes back to its own dialog (hooks.ts): handed to the terminal, not denied.
-  const handedBack = ans.decision === 'timeout' && !(r && isCodexRec(r))
+  const handedBack = ans.decision === 'timeout' && p.away === 'terminal'
   const decision = ans.decision === 'terminal' || handedBack ? 'unknown' : ans.decision === 'deny' || ans.decision === 'timeout' ? 'deny' : 'allow'
   const resolution = handedBack ? 'terminal' : ans.decision === 'timeout' ? 'timeout' : ans.decision === 'terminal' ? 'terminal' : (decision as 'allow' | 'deny')
   const ev = r?.parse?.byId.get(`a:${id}`)
@@ -1003,11 +1029,12 @@ function finish(id: string, ans: Answer, by: string): boolean {
   }
   broadcast({ t: 'approval.resolved', id, sessionId: sid, decision, by })
   if (ans.decision === 'timeout') {
-    if (r && isCodexRec(r)) {
+    if (p.away === 'deny') {
       // Codex's own approvals have no terminal dialog to fall back to: it stops until you're back.
+      // So does an automation's run through the SDK (Automations, "Following": a run never needs you all night).
       if (p.approval.kind === 'tool') noteBlocked(sid, { tool: p.approval.toolName, input: p.approval.input, reason: 'away', toolUseId: p.toolUseId })
       upsertSession(sid, { stoppedForAway: true })
-      notice(sid, 'Paused: nobody answered for 10 minutes, so Hypernova said no and stopped Codex until you’re back.', 'warn')
+      notice(sid, r && isCodexRec(r) ? 'Paused: nobody answered for 10 minutes, so Hypernova said no and stopped Codex until you’re back.' : 'Paused: nobody answered for 10 minutes, so Hypernova said no and asked Claude to wait for you.', 'warn')
     } else {
       // Claude Code: never a "no" (owner, 2026-10-30). Its hook hands the question back (hooks.ts),
       // and Claude Code asks in its own dialog; the session waits there, needing you, not paused.

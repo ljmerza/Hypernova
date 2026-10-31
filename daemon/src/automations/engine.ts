@@ -2232,7 +2232,9 @@ export class Automations {
       return { kind: 'end', state: 'failed', reason: BLOCKED_REASON[s.blocked.kind] ?? 'blocked', why: s.blocked.text || null }
     }
     if (s.pendingApprovalIds.length) {
-      // An approval answers itself "no" after 10 minutes (the session then stops, away).
+      // A run's own approval answers itself "no" after 10 minutes (the session then stops, away);
+      // a session it only continued is the owner's, whose asks are never a "no" (they go back to
+      // Claude Code's dialog, the menu below, or wait for the phone).
       seen.needsAt = null
       return { kind: 'needs' }
     }
@@ -2242,6 +2244,10 @@ export class Automations {
       // stops, away, so it neither needs you all night nor keeps the Mac awake and a slot taken.
       seen.needsAt ??= now
       if (now - seen.needsAt < NEEDS_MAX_MS) return { kind: 'needs' }
+      // Never Esc on the permission dialog of a session the run didn't start (the owner's, its ask
+      // handed back there): that would be a "no" for him (docs/DECISIONS.md, "Never auto-deny").
+      // The run stops following it, away; the dialog stays for him.
+      if (s.menu?.permission && s.automation?.runId !== r.id) return { kind: 'end', state: 'stopped', reason: 'away' }
       if (seen.escAt == null) {
         seen.escAt = now
         log('automation run', r.id, 'a menu waited 10 minutes: Esc')

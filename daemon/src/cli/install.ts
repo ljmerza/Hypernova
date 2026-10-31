@@ -1,7 +1,7 @@
 // The pieces `hypernova setup` puts in place on Linux, each one safe to run again: the daemon's
 // files in <support>/app (with node-pty built for this machine), Claude Code through Anthropic's
 // official installer, and the integration (hooks, status line, the `claude` shell function).
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { claudeCandidates, onWindowsDrive } from '../platform.ts'
 import { local, waitHealthy, health } from './api.ts'
@@ -185,6 +185,33 @@ export async function installClaude(cli: Cli): Promise<string> {
   const bin = findClaudeBin(cli)
   if (!bin) throw new Error('Claude Code’s installer finished, but there’s no claude in ~/.local/bin.')
   return bin
+}
+
+/**
+ * Sessions in `claude agents` (the daemon's settings.claudeAgents) are on for a Linux install:
+ * written into <support>/settings.json while it doesn't say, before the service (re)starts and
+ * reads it (docs/DECISIONS.md, "claude agents on by default"). Never over the owner's own false, nor
+ * over a settings.json that can't be read. `set`: turned on now; `kept`: it already said either way.
+ */
+export function defaultClaudeAgents(cli: Pick<Cli, 'support'>): 'set' | 'kept' {
+  const file = join(cli.support, 'settings.json')
+  let s: Record<string, unknown> = {}
+  if (existsSync(file)) {
+    try {
+      const o = JSON.parse(readFileSync(file, 'utf8'))
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return 'kept'
+      s = o
+    } catch {
+      return 'kept'
+    }
+  }
+  if (typeof s.claudeAgents === 'boolean') return 'kept'
+  mkdirSync(cli.support, { recursive: true, mode: 0o700 })
+  const tmp = `${file}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify({ ...s, claudeAgents: true }, null, 2) + '\n', { mode: 0o600 })
+  chmodSync(tmp, 0o600)
+  renameSync(tmp, file)
+  return 'set'
 }
 
 // ── The integration ───────────────────────────────────────────────────────

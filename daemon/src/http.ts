@@ -16,7 +16,7 @@ import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort, setMode } from './runner.ts'
 import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
-import { agentJobCommand } from './claude-agents.ts'
+import { agentJobCommand, setClaudeAgents } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
 import { codexModels, codexSessionUsage, codexState, refreshCodexAccount } from './codex/account.ts'
 import { isCodex, isCodexMode } from './codex/threads.ts'
@@ -312,6 +312,12 @@ export function claudeHere(): boolean {
   return claudeSeen.here
 }
 
+/**
+ * Claude Code as the snapshot, `POST /v1/claude` and `{t:"claude"}` say it: here or not, its
+ * version, its SDK, and `agents`: sessions live in `claude agents` (settings.claudeAgents).
+ */
+const claudeState = () => ({ available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed, agents: settings.claudeAgents === true })
+
 function snapshot(deviceId: string | null) {
   return {
     mac: {
@@ -336,7 +342,7 @@ function snapshot(deviceId: string | null) {
     lan: lanSnapshot(deviceId),
     // The agents (docs/PROTOCOL.md, "Codex"): Claude Code here or not, and Codex (null: not installed).
     // `sdk`: Claude Code's SDK is here (sdk.ts); without it what the daemon runs through it answers `sdk_missing`.
-    claude: { available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed },
+    claude: claudeState(),
     codex: codexState(),
   }
 }
@@ -477,6 +483,16 @@ async function api(c: Ctx): Promise<void> {
     if (b.enabled && !codexBinary().ok) throw new HttpError(409, 'no_codex', 'Codex isn’t installed on this computer, or it’s too old for Hypernova.')
     setCodexEnabled(b.enabled)
     return json(res, 200, { codex: codexState() })
+  }
+  // Sessions in `claude agents` on or off from the phone (Settings → Agents & providers → Claude Code):
+  // taken at once, said to every phone.
+  if (path === '/v1/claude' && m === 'POST') {
+    const b = await readJsonBody(req)
+    if (typeof b?.agents !== 'boolean') throw new HttpError(400, 'bad_value', 'Say agents: true or false.')
+    setClaudeAgents(b.agents)
+    const claude = claudeState()
+    broadcast({ t: 'claude', claude })
+    return json(res, 200, { claude })
   }
   if (path === '/v1/codex/refresh' && m === 'POST') return json(res, 200, { codex: await refreshCodexAccount() })
   if (path === '/v1/codex/models' && m === 'GET') return json(res, 200, { models: await codexModels(url.searchParams.get('fresh') === '1') })
@@ -823,8 +839,8 @@ async function api(c: Ctx): Promise<void> {
     if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
     let tid = termOf(id!)
     // A `claude agents` session gets a shared terminal when one is needed: `claude attach` (terms.ts).
-    // Its mode and effort, a stopped or finished job's too (attach wakes it, as a prompt does).
-    const agentsJob = settings.claudeAgents === true && (!tid || attachDrifted(tid, id!)) && (['terminal', 'interrupt', 'menu'].includes(action!) ? isLiveTerminal(id!) : action === 'mode' || action === 'effort') ? agentJobOf(id!) : null
+    // Its mode, effort and model, a stopped or finished job's too (attach wakes it, as a prompt does).
+    const agentsJob = settings.claudeAgents === true && (!tid || attachDrifted(tid, id!)) && (['terminal', 'interrupt', 'menu'].includes(action!) ? isLiveTerminal(id!) : action === 'mode' || action === 'effort' || action === 'model') ? agentJobOf(id!) : null
     if (agentsJob) tid = await attachAgentsTerm(id!, rec.cwd, agentsJob)
     const noTerm = () => new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
     const codex = isCodex(id!)
@@ -834,7 +850,7 @@ async function api(c: Ctx): Promise<void> {
     if (action === 'events') return json(res, 200, { events: eventsView(rec, url.searchParams) })
     if (action === 'model') {
       if (m !== 'POST') throw new HttpError(405, 'method', 'Change the model with POST.')
-      return json(res, 200, await setSessionModel(id!, await readJsonBody(req)))
+      return json(res, 200, await setSessionModel(id!, await readJsonBody(req), tid, !!agentsJob))
     }
     if (action === 'effort') {
       if (m !== 'POST') throw new HttpError(405, 'method', 'Change the effort with POST.')
@@ -1289,12 +1305,14 @@ const resumeModels = new Map<string, string | null>()
 /**
  * Session [id]'s model, as `POST /v1/sessions/{id}/model {model, confirmPaid?}`: one of
  * `GET /v1/models`' for its provider (`null` or "default": the provider's default). Shown at once.
- * A shared terminal gets `/model <value>` typed (Claude Code takes it while Claude works, from its
- * next request); a session the daemon runs takes it from its next turn; an ended one when it
- * resumes. A terminal Hypernova doesn't hold can't be typed into. On a provider other than the
- * subscription (it costs money) only with `confirmPaid: true`, as automations ask.
+ * A shared terminal [tid] gets `/model <value>` typed (Claude Code takes it while Claude works, from
+ * its next request; a `claude agents` job's through `claude attach`, [agentsJob], as the effort
+ * route; never into a holder that shows another session); a session the daemon runs takes it from
+ * its next turn; an ended one when it resumes. A terminal Hypernova doesn't hold can't be typed
+ * into. Nothing is recorded that wasn't applied. On a provider other than the subscription (it
+ * costs money) only with `confirmPaid: true`, as automations ask.
  */
-export async function setSessionModel(id: string, b: any): Promise<{ model: string | null; session: ReturnType<typeof listSessions>[number] | undefined; applies: 'now' | 'next_turn' }> {
+export async function setSessionModel(id: string, b: any, tid: string | null = termOf(id), agentsJob = false): Promise<{ model: string | null; session: ReturnType<typeof listSessions>[number] | undefined; applies: 'now' | 'next_turn' }> {
   const rec = getSession(id)
   if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
   const raw = b?.model
@@ -1327,7 +1345,10 @@ export async function setSessionModel(id: string, b: any): Promise<{ model: stri
     if (m && m.model !== value) saveManaged({ ...m, model: value })
   }
   let applies: 'now' | 'next_turn'
-  const tid = termOf(id)
+  // A `claude agents` job whose `claude attach` didn't open, or a holder showing another job or the
+  // agent list: /model there would change another session's model.
+  if (agentsJob && !tid) throw busy('terminal_busy', 'The background session didn’t open. Try again in a moment.')
+  if (tid && attachDrifted(tid, id)) throw busy('terminal_busy', 'The terminal shows another session. Try again in a moment.')
   if (tid) {
     if (pendingApprovals().some((a) => a.sessionId === id)) throw busy('needs_answer', 'Claude is waiting for your answer. Answer it first, then change the model.')
     const r = await typeInto(tid, `/model ${value ?? 'default'}`)
@@ -1628,6 +1649,11 @@ async function local(c: Ctx): Promise<void> {
     if (typeof b.codex === 'boolean') setCodexEnabled(b.codex)
     // The LAN listener starts or stops at once (lan.ts).
     if (typeof b.lanAccess === 'boolean') setLanAccess(b.lanAccess)
+    // Sessions in `claude agents` (claude-agents.ts): `hypernova setup` turns it on; every phone hears it.
+    if (typeof b.claudeAgents === 'boolean') {
+      setClaudeAgents(b.claudeAgents)
+      broadcast({ t: 'claude', claude: claudeState() })
+    }
     return json(res, 200, settings)
   }
   return api({ ...c, local: true })

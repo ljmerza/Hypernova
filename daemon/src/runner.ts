@@ -23,6 +23,7 @@ import {
   emitEvent,
   seedFrom,
   sessionRule,
+  type AwayRule,
 } from './hub.ts'
 import { applyToolResult, feedAssistantBlock, isLauncher, promptTitle, queueView, resultLinks, toolSummary, typedCommand, unsentPrompts, userEvent, type QueueEntry } from './normalize.ts'
 import { classifyApiError, cleanText, type Blocker } from './blockers.ts'
@@ -302,6 +303,7 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
           },
           (opts as { toolUseID?: string }).toolUseID ?? null,
           opts.signal,
+          sdkAwayRule(m),
         )
         if (ans.decision === 'timeout') return { behavior: 'deny', message: AWAY_MESSAGE }
         if (ans.decision === 'terminal') return { behavior: 'deny', message: 'Cancelled.' }
@@ -509,6 +511,14 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
 }
 
 export const isRunning = (id: string) => !!runs.get(id)?.running
+
+/**
+ * What 10 minutes without an answer does to an ask of a session run here: never a "no" for the
+ * owner (docs/DECISIONS.md, "Never auto-deny"), and there is no dialog to hand it back to, so it
+ * waits for the phone however long it takes (the SDK waits on canUseTool as long). An automation's
+ * run still stops, away, after 10 minutes (Automations, "Following").
+ */
+export const sdkAwayRule = (m: Pick<ManagedSession, 'automation'>): AwayRule => (m.automation ? 'deny' : 'never')
 
 /** A turn running in session [id] with query [q] (tests: a real one needs Claude Code). */
 export function testTurn(id: string, q: Pick<Query, 'setPermissionMode'> | null): void {

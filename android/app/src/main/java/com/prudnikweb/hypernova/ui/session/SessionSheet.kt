@@ -145,7 +145,7 @@ internal fun SessionSheet(
                 when (tab) {
                     SheetTab.Overview -> {
                         SheetSeam(stringResource(R.string.model))
-                        ModelPart(hub, session, usage, change, onModel, onSwitchAgent)
+                        ModelPart(hub, session, usage, change, canChangeModel(hub, session), onModel, onSwitchAgent)
                         // Claude Code's effort (EffortPart.kt); Codex's goes with its model.
                         if (!session.codex) {
                             SheetSeam(stringResource(R.string.effort))
@@ -296,14 +296,14 @@ private fun SheetTabs(tab: SheetTab, onTab: (SheetTab) -> Unit) {
 
 /**
  * The model, as the status line's panel had it: its chip and a way to another one (or, where it
- * can't be changed from here, the chip alone), its full id when that says more, and the way to the
- * other agent.
+ * can't be changed from here, [changeModel] false, the chip alone), its full id when that says more,
+ * and the way to the other agent (where [change]).
  */
 @Composable
-private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolean, onModel: () -> Unit, onSwitchAgent: (String) -> Unit) {
+private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolean, changeModel: Boolean, onModel: () -> Unit, onSwitchAgent: (String) -> Unit) {
     val res = LocalContext.current.resources
     val id = modelId(usage, s.model, res.getString(R.string.model_default))
-    if (change) ModelLine(s.model, onClick = onModel)
+    if (changeModel) ModelLine(s.model, onClick = onModel)
     else {
         val name = ModelNames.chip(s.model)
         Row(Modifier.clearAndSetSemantics { contentDescription = res.getString(R.string.meta_model_said, name) }) { ModelChip(name) }

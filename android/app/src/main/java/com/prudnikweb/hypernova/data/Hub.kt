@@ -300,6 +300,11 @@ interface Hub {
      */
     val claude: ClaudeState? get() = null
     /**
+     * Sessions in `claude agents` on or off on the Mac (`POST /v1/claude {agents}`, Settings → Agents &
+     * providers → Claude Code). Succeeds with Claude Code as the Mac has it now.
+     */
+    suspend fun setClaudeAgents(on: Boolean): Result<ClaudeState?> = Result.failure(UnsupportedOperationException())
+    /**
      * Codex on or off for Hypernova, from the phone (`POST /v1/codex {enabled}`). Succeeds with Codex
      * as the Mac has it now; fails with the Mac's words (a Codex that isn't installed, or too old).
      */

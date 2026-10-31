@@ -151,12 +151,19 @@ fun ProvidersScreen(hub: Hub, onBack: () -> Unit, onEdit: (id: String?, kind: St
 
 /**
  * Claude Code on the Mac: its version, or that it isn't installed (data/AgentLead.kt), and its
- * account in one line. Nothing to switch: Claude Code is always the one sessions use where it's there.
+ * account in one line. Claude Code is always the one sessions use where it's there; its switch is
+ * where they run: **Sessions in claude agents** (`POST /v1/claude {agents}`), from a Mac that says.
  */
 @Composable
 private fun ClaudeAgentCard(hub: Hub) {
     val installed = hub.claudeAvailable
     val version = (hub.claude?.version ?: hub.mac.claudeVersion)?.takeIf { installed }
+    val context = LocalContext.current
+    val toast = LocalToast.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    // The switch follows a tap at once; the Mac's answer (or a failure) settles it.
+    var asked by remember { mutableStateOf<Boolean?>(null) }
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Seam(stringResource(R.string.ag_vendor_anthropic), trail = version)
@@ -169,6 +176,29 @@ private fun ClaudeAgentCard(hub: Hub) {
             }
             val (line, trouble) = claudeAccountLine(hub.account, hub.mac.name)
             HText(line, style = Type.small, color = if (trouble) HN.amber else HN.inkMuted)
+            val agents = hub.claude?.agents ?: return@Column
+            Spacer(Modifier.height(12.dp))
+            Hairline(Modifier.fillMaxWidth())
+            ToggleRow(
+                stringResource(R.string.ag_claude_agents),
+                stringResource(R.string.ag_claude_agents_body, hub.mac.name),
+                checked = asked ?: agents,
+                onChange = { on ->
+                    if (!busy) {
+                        busy = true
+                        asked = on
+                        scope.launch {
+                            hub.setClaudeAgents(on).onFailure { e ->
+                                toast(e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.ag_claude_agents_err))
+                            }
+                            asked = null
+                            busy = false
+                        }
+                    }
+                },
+                // While the Mac answers, taps wait: dimmed, and said so to TalkBack.
+                modifier = Modifier.alpha(if (busy) 0.6f else 1f).semantics { if (busy) disabled() },
+            )
         }
     }
 }

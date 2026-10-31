@@ -85,7 +85,9 @@ The script, then `hypernova setup` which it runs for you:
 3. **The daemon** in `~/.local/share/hypernova/app`, and **the `hypernova` command** in
    `~/.local/bin`.
 4. **Claude Code**, with Anthropic's installer, when it isn't there. For Codex alone, add
-   `--no-claude` to the script.
+   `--no-claude` to the script. Sessions run as Claude Code's background sessions (`claude
+   agents`) unless you turned that off; Settings → Agents & providers → Claude Code in the app
+   switches it.
 5. **The service**: a systemd user service, `hypernova.service`, with **lingering** turned on so it
    runs at boot with nobody logged in.
 6. **The integration**: hooks and the status line tap in `~/.claude/settings.json`, and the `claude`

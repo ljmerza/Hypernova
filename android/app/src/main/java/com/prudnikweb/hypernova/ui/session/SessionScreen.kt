@@ -767,7 +767,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 atBlocked = sheetAtBlocked,
             )
         }
-        if (modelOpen && canChange(hub, session)) {
+        if (modelOpen && canChangeModel(hub, session)) {
             if (session.codex) CodexModelPicker(hub, session, onDismiss = { modelOpen = false })
             else SessionModelPicker(hub, session, onDismiss = { modelOpen = false })
         }
@@ -877,12 +877,17 @@ internal fun canChange(hub: Hub, s: Session): Boolean =
 
 /**
  * The permission mode can be changed from here: as [canChange], and a `claude agents` job's too,
- * terminal or not (the Mac attaches to the job and presses Shift+Tab there, docs/PROTOCOL.md). Its
- * model stays [canChange]'s: the model route doesn't attach to a job.
+ * terminal or not (the Mac attaches to the job and presses Shift+Tab there, docs/PROTOCOL.md).
  */
 internal fun canChangeMode(hub: Hub, s: Session): Boolean = canChange(hub, s) || jobModeChangeable(s)
 
-/** A `claude agents` job that hasn't ended: its mode changes through `claude attach`. */
+/**
+ * The model can be changed from here: as the mode ([canChangeMode]), a `claude agents` job's too
+ * (the Mac attaches to the job and types `/model` there, as for the effort).
+ */
+internal fun canChangeModel(hub: Hub, s: Session): Boolean = canChangeMode(hub, s)
+
+/** A `claude agents` job that hasn't ended: its mode, effort and model change through `claude attach`. */
 internal fun jobModeChangeable(s: Session): Boolean = s.phase != Phase.Ended && s.agentJob != null
 
 /**

@@ -353,6 +353,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/codex` | → `{codex: Codex \| null}` (see Codex) |
 | `POST /v1/codex` | `{enabled: boolean}` → `{codex}`: Codex on or off for Hypernova, from the phone (see Codex). 409 `no_codex` |
 | `POST /v1/codex/refresh` | `{}` → `{codex}`: Codex's account and limits read now |
+| `POST /v1/claude` | `{agents: boolean}` → `{claude}` (the snapshot's `claude`): sessions in `claude agents` on or off (settings.claudeAgents, see Session menu), saved and taken at once, without a restart; every phone hears `{t:"claude"}`. 400 `bad_value` |
 | `GET /v1/codex/models?fresh=1` | → `{models: CodexModel[]}`: Codex's models for the pickers (read at most once an hour; `fresh=1` now). 409 `codex_off`, 503 `codex_unavailable` |
 | `POST /v1/sessions/{id}/switch/preview` | `{to: "claude" \| "codex", context?: "recent" \| "all" \| "none"}` → `{text, messages, bytes, maxBytes}`: what a switch to the other agent would carry over, for the owner to read and edit (see Switching agents). 400 `bad_agent`, `bad_context`; 409 `same_agent` |
 | `POST /v1/sessions/{id}/switch` | `{to, text, model?, effort?, permissionMode?}` → `{session}`: the conversation goes on with the other agent in a new session (see Switching agents). 409 `busy`, `switched` (with `to`), `terminal_session`, `same_agent`, `no_codex`; 413 `context_too_large` (with `maxBytes`) |
@@ -374,8 +375,8 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `POST /v1/speech/play` | `{text, sessionId?, to?: "me"}` → `{play: Play & {to: {id, name}}}`: read aloud by the Hypernova app on the phone that asks, streamed. 400 `bad_target` (the Mac app), 413 `too_long`, 400 `empty` (see Read aloud, "Plays") |
 | `GET /v1/speech/plays/{id}/audio` | → `audio/pcm`, 24 kHz 16-bit mono as it's made; only the phone playing it. 404 `no_play`, 410 `play_over`, 502 `speech_failed` |
 | `POST /v1/speech/plays/{id}/stop` | `{}` → `{ok, state}`: the phone playing it, or the Mac app. 404 `no_play` |
-| `POST /v1/sessions/{id}/mode` | `{permissionMode}` (`default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) → `{session, applies?}`. A session the daemon runs takes it from its next turn while a turn runs (the running query can't change its mode): `applies: "next_turn"`, else `"now"`, and the phone says so. A shared terminal switches by Shift+Tab (409 `waiting` with a dialog open, `mode_unavailable` for a mode it can't reach: Bypass when `session.bypassAvailable` is false, answered without pressing any key). A `claude agents` job (`agentJob`) without one gets one first: `claude attach <job>` (which wakes a stopped one), or the attach holder it has unless that drifted to another job or the agent list; 409 `terminal_busy` when the attach doesn't open or shows another session, with no key pressed. The phone offers the mode picker for such a job, not the model one |
-| `POST /v1/sessions/{id}/model` | `{model: string \| null, confirmPaid?: true}` → `{model, session, applies: "now" \| "next_turn"}`: switches the session's model (see A session's model). 400 `unknown_model`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_model` (a terminal Hypernova doesn't hold: type /model there), `confirm_paid` |
+| `POST /v1/sessions/{id}/mode` | `{permissionMode}` (`default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) → `{session, applies?}`. A session the daemon runs takes it from its next turn while a turn runs (the running query can't change its mode): `applies: "next_turn"`, else `"now"`, and the phone says so. A shared terminal switches by Shift+Tab (409 `waiting` with a dialog open, `mode_unavailable` for a mode it can't reach: Bypass when `session.bypassAvailable` is false, answered without pressing any key). A `claude agents` job (`agentJob`) without one gets one first: `claude attach <job>` (which wakes a stopped one), or the attach holder it has unless that drifted to another job or the agent list; 409 `terminal_busy` when the attach doesn't open or shows another session, with no key pressed. The phone offers the mode picker for such a job, and the model and effort ones |
+| `POST /v1/sessions/{id}/model` | `{model: string \| null, confirmPaid?: true}` → `{model, session, applies: "now" \| "next_turn"}`: switches the session's model (see A session's model; a `claude agents` job's through `claude attach`, as the effort route). 400 `unknown_model`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_model` (a terminal Hypernova doesn't hold: type /model there), `confirm_paid` |
 | `POST /v1/sessions/{id}/effort` | `{effort}` (`low`, `medium`, `high`, `xhigh`, `max`) → `{effort, session, applies: "now" \| "next_turn"}`: Claude Code's reasoning effort, `/effort <level>` typed into its terminal (see A session's effort). 400 `unknown_effort`; 404 `no_session`; 409 `busy` (with `reason`: `needs_answer`, `waiting`, `typing` + `pending`, `starting`, `terminal_busy`), `terminal_effort` (a terminal Hypernova doesn't hold: type /effort there), `not_open` (it has ended), `unsupported_for_agent` (Codex: its effort goes with `…/model`) |
 | `POST /v1/approvals/{id}` | `ApprovalAnswer` → `{ok}` (409 if already resolved) |
 | `GET /v1/history/search?q=<words>` | → `{results: SearchHit[], partial: boolean}`: the sessions whose conversations have every word of `q` inside, newest first, 50 at most (see History search). 400 `bad_query` (fewer than 2 or more than 200 characters). An older daemon answers 404, and the phone filters on its own |
@@ -453,6 +454,8 @@ objects with a `t` field:
 - `{t:"usage", usage: Usage}`
 - `{t:"codex", codex: Codex | null}`: Codex changed: turned on or off, connected or not, its account or
   its usage windows (once per change; a window that resets is said then). See Codex.
+- `{t:"claude", claude}`: Claude Code as the snapshot's `claude` says it, when sessions in `claude
+  agents` were turned on or off (`POST /v1/claude`, or `POST /local/settings {claudeAgents}`).
 - `{t:"account", account: Account}`: the account changed (once per change, however many sessions
   brought it; see Account).
 - `{t:"battery", battery: Battery | null}`: the Mac's battery percentage changed (by 1 or more),
@@ -510,7 +513,10 @@ Snapshot = { mac: {id, name, daemonVersion, claudeVersion, projectsRoot,
                                                                  // an older daemon, where it always was.
                                                                  // `sdk`: Claude Code's SDK is in the daemon's
                                                                  // packages (see Claude Code's SDK); absent:
-                                                                 // an older daemon, which always carried it
+                                                                 // an older daemon, which always carried it.
+                                                                 // `agents?: boolean`: sessions live in
+                                                                 // `claude agents` (settings.claudeAgents, see
+                                                                 // Session menu); absent: an older daemon
              codex?: Codex | null }                              // Codex as a second agent (see Codex); null: not
                                                                  // installed here; absent: an older daemon
 
@@ -623,7 +629,11 @@ Diff = { path, added, removed, hunks: [{oldStart, oldLines, newStart, newLines, 
        // lines start with " ", "+" or "-"
 
 Approval = {
-  id, sessionId, createdAt, expiresAt,      // expiresAt = createdAt + 10 min
+  id, sessionId, createdAt,
+  expiresAt: number | null,                  // createdAt + 10 min, when it leaves the phone for nobody
+                                             // answering (see Approvals); null: never (it waits)
+  autoDeny: boolean,                         // at expiresAt Hypernova says no (Codex, an automation's
+                                             // run): only then does the phone count down to it
   kind: "tool" | "question" | "plan",
   toolName, summary,                         // e.g. "Bash: git push origin main"
   input: object,                             // trimmed tool input
@@ -874,6 +884,9 @@ ModelOption = {value: string | null, name, model: string | null, description: st
 The Home card's long-press menu. A session has `agentJob` (the job id) when it is a `claude agents`
 job (settings.claudeAgents); with that setting the daemon lists every job `claude agents --json --all`
 shows, finished ones too (`idle`, on Home rather than History; one blocked on the owner is `needs_you`).
+The setting is on for a Linux install (`hypernova setup` writes it while settings.json doesn't say,
+never over a `false`), and the phone turns it on or off (`POST /v1/claude {agents}`, Settings →
+Agents & providers → Claude Code); the daemon takes it without a restart (each poll reads it).
 
 - `POST /v1/sessions/{id}/rename` `{name}`: Claude Code's `/rename <name>`, typed into its terminal
   (a `claude agents` job through `claude attach`, which wakes a stopped one). `{session}`; 400
@@ -1001,11 +1014,18 @@ option's id when known) and broadcasts it, then:
   the session is working or starting, else `"now"`. When it can't be typed: 409 `busy` with
   `reason` `needs_answer` (an approval is open), `waiting` (a dialog or menu), `typing` (unsent text,
   in `pending`), `starting` or `terminal_busy`;
+- **a `claude agents` job** (`agentJob`), a stopped or finished one too: through `claude attach <job>`,
+  as the effort route does (it wakes a stopped job), then `/model` typed as above. Never typed into
+  an attach holder that shows another job or the agent list (`attachDrifted`): a fresh attach takes
+  over, and one that shows another session too, or an attach that doesn't open, is 409 `busy` with
+  `reason: "terminal_busy"`, nothing typed and nothing recorded (the session keeps the model it had).
+  The phone offers the model picker for such a job, as the mode and effort ones;
 - **a session the daemon runs (Agent SDK)**: its next query starts on it (`applies: "next_turn"` while
   a turn runs, else `"now"`);
 - **a terminal Hypernova doesn't hold**: 409 `terminal_model` ("Type /model there on the Mac");
 - **an ended session**: it resumes on it (`applies: "next_turn"`; kept in memory until it resumes
-  for a session the daemon didn't start).
+  for a session the daemon didn't start). Not a `claude agents` job: that one goes through `claude
+  attach` (above), as its resume would.
 
 A session on a provider other than the subscription costs money: the switch needs `confirmPaid:
 true` (409 `confirm_paid` otherwise), as automations ask, unless the model is free (price 0).
@@ -1781,9 +1801,11 @@ Note = { id: string, automationId: string | null, runId: string | null, name: st
   tried again like a 409. A session keeps its own permission mode.
 - **Following.** A run mirrors its sessions: `needs_you` while one has an approval or a menu;
   `waiting` while one is blocked with a reset (`until`); `done` when all are finished (the rule
-  above); `stopped`, `away` after 10 minutes unanswered (an approval answers itself then; a
+  above); `stopped`, `away` after 10 minutes unanswered (the run's own approval answers itself then; a
   terminal menu with no approval behind it, such as a question or Claude Code's own permission
-  prompt after an approval was lost in a restart, gets Esc), so a run never needs you all night,
+  prompt after an approval was lost in a restart, gets Esc; never the permission dialog of a session
+  the run didn't start, such as the owner's own it continued with its ask handed back there: the run
+  stops following it and the dialog stays), so a run never needs you all night,
   keeps the Mac awake or holds a slot; `failed` for a block with no reset, by its real reason
   (`signed_out`, `no_plan`, `on_hold`, `no_credit`, `provider`, `limited`; `blocked` for any other),
   with the block's own words as `result`; `failed`, `error` when a session ends on an error (the
@@ -2324,9 +2346,13 @@ session step's whole output 8 KB (its first).
   the first ask handed back (one holder for all of them), so its dialog comes as a card. Codex
   has no dialog to fall back to: its ask is cancelled, the session gets `stoppedForAway: true`,
   and the app shows a **Continue** button (`POST /continue`). A session the daemon runs through
-  the SDK (`runner.ts`) still gets a no with this message: "The user didn't respond within 10
-  minutes and is probably away from their phone. Don't retry or work around this. Stop here and
-  wait until they come back."
+  the SDK (`runner.ts`) has no dialog either, and its ask is never a no: it simply stays pending
+  (`expiresAt: null`), the session `needs_you` and the phone's card there, however long it takes;
+  no notice. Only an automation's run through the SDK still gets a no after 10 minutes (`autoDeny`,
+  `stoppedForAway`, an `away` blocked call, and "Paused: … asked Claude to wait for you."), with this
+  message to Claude: "The user didn't respond within 10 minutes and is probably away from their
+  phone. Don't retry or work around this. Stop here and wait until they come back." The phone counts
+  down ("auto-deny in 9m") only where `autoDeny` is true.
 - **In the terminal** (fork). Claude Code's own permission dialog, after the 10 minutes or brought
   up with no hook asking (an ask rule over auto mode: "Ask rule Bash(python:*) overrides auto mode
   for this command"), is the session's `menu` with `permission` wherever its terminal is shared (a
@@ -3315,7 +3341,7 @@ The admin token is in `<support>/admin-token` (0600); the `hypernova` command re
 | `GET /local/status` | `{daemonVersion, apiPort, claude: {path, version, sdk: {installed, version, wanted}}, codex: Codex \| null, hooks: {installed}, statusLine: {installed, supported}, shell: {installed, supported}, devices, connectedClients: n, sessions: Session[], approvals: Approval[], usage, projectsRoot, files: {browseOutsideProjects}, account: Account, automations?: {paused, count, next: {id, name, at} \| null, running: [{id, name, sessionId, startedAt}]}, lan: {port, addresses, fingerprint, deviceCert: false} \| null, downloadUrl, downloadLocal, downloadTrusted, apk}` (`lan`: the LAN listener, see Local network (direct HTTPS); `null` when off; `downloadTrusted`: false for the listener's own address, whose certificate a browser can't check) (`claude.sdk`: Claude Code's SDK in the daemon's packages, its version and the one this daemon pins, see Claude Code's SDK) (`sessions`: those not ended; `automations`: see Automations, `next` the soonest due, `running` its runs running or needing you, `sessionId` the first session each started) |
 | `POST /local/pair/start` | → `{code, link, appLink, webLink, expiresAt, url, download}` (see Pairing; `link`, what the QR code carries, is `webLink`, the listener's own pairing page at the computer's address, or `appLink` while the listener is off; `url` is the base URL `u`, that listener). `?dev`: the emulator's base URL and the app link |
 | `POST /local/automations/{id}/fire` | the payload (≤ 64 KB, text) → `{run}`: fires an automation's webhook trigger. Takes `Authorization: Bearer <that automation's fire token>` (or the admin token): the one `/local` route that does. 401 `bad_token`; 409 `paused`, `off`, `not_webhook`; 413, 415 (see Automations, "Workflows") |
-| `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, browseOutsideProjects?: boolean, codex?: boolean}` (`projectsRoot` kept only when that folder exists; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex) → the settings |
+| `POST /local/settings` | `{projectsRoot?, lanAccess?: boolean, browseOutsideProjects?: boolean, codex?: boolean, claudeAgents?: boolean}` (`projectsRoot` kept only when that folder exists; `lanAccess` starts or stops the LAN listener at once, see Local network (direct HTTPS); `browseOutsideProjects`, see Files, The setting; `codex` turns Codex on or off for Hypernova, with the shell's `codex` function, see Codex; `claudeAgents`, sessions in `claude agents`, as `POST /v1/claude`) → the settings |
 | `POST /local/integration/install` / `uninstall` | hooks + status line tee + the `claude` shell function (reversible, marked) |
 | `GET /local/devices`, `DELETE /local/devices/{id}` | paired phones: `{id, name, model, createdAt, lastSeenAt, appVersion?, client?, certFingerprint?, certExpiresAt?}` (`certFingerprint`: its device certificate's, once it has one, and `certExpiresAt` when that runs out, epoch ms). Deleting one revokes its certificate too |
 | `/v1/*` | the whole phone API is also available with the admin token |

@@ -47,9 +47,8 @@ To update the server run the same `curl` line again. Docker and the manual steps
 - Run automations on a schedule, use several servers, and dictate with the phone's own voice
   recognition
 
-Claude Code's background agents (`claude agents`) show up as sessions too once you turn them on in
-`~/.local/share/hypernova/settings.json` with `"claudeAgents": true`, then restart the service with
-`systemctl --user restart hypernova`.
+Claude Code's background agents (`claude agents`) show up as sessions too: on by default, and
+Settings → Agents & providers → Claude Code in the app turns it off.
 
 ## Privacy
 

@@ -19,6 +19,10 @@
     <string name="ag_claude_no_plan">The Claude plan has ended. Renew it on claude.ai, then sign in again.</string>
     <string name="ag_claude_on_hold">The account is on hold.</string>
     <string name="ag_claude_no_credit">Out of usage credits.</string>
+    <!-- Claude Code's switch: sessions in its background daemon (`claude agents`, the Mac's settings.claudeAgents). -->
+    <string name="ag_claude_agents">Sessions in claude agents</string>
+    <string name="ag_claude_agents_body">New sessions run as Claude Code’s background sessions, so they also show in claude agents on %1$s and keep going there. Off: in Hypernova’s own terminals.</string>
+    <string name="ag_claude_agents_err">Couldn’t change that setting.</string>
 
     <!-- Codex: its version against the oldest Hypernova works with, its account, its trouble, and the switch. -->
     <string name="ag_codex_too_old">Version %1$s: Hypernova needs %2$s or newer.</string>

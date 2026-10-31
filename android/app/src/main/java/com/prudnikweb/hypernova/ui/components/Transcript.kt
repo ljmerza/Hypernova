@@ -1464,18 +1464,21 @@ fun ApprovalBlock(item: Item.Approval, onAnswer: (Answer) -> Unit, modifier: Mod
 @Composable
 private fun Band(item: Item.Approval) {
     val res = LocalContext.current.resources
-    val expires = item.expiresAt
-    val now by produceState(System.currentTimeMillis(), expires) {
-        while (expires != null) { value = System.currentTimeMillis(); delay(15_000) }
+    // A countdown only where the Mac will say no (Codex, an automation's run): the owner's Claude
+    // Code asks never get one (docs/DECISIONS.md, "Never auto-deny").
+    val counts = item.autoDeny && item.expiresAt != null
+    val now by produceState(System.currentTimeMillis(), counts, item.expiresAt) {
+        while (counts) { value = System.currentTimeMillis(); delay(15_000) }
     }
+    val left = item.autoDenyIn(now)
     Row(
         Modifier.fillMaxWidth().background(HN.amber).padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         HText(stringResource(R.string.state_needs_you).uppercase(), style = Type.label.copy(fontWeight = FontWeight(700)), color = HN.bg, maxLines = 1)
-        if (expires != null && expires > now) {
+        if (left != null) {
             Spacer(Modifier.width(10.dp))
-            HText(stringResource(R.string.auto_deny_in, formatDuration(res, expires - now)), style = Type.monoSmall, color = HN.bg.copy(alpha = 0.7f), maxLines = 1)
+            HText(stringResource(R.string.auto_deny_in, formatDuration(res, left)), style = Type.monoSmall, color = HN.bg.copy(alpha = 0.7f), maxLines = 1)
         }
         Spacer(Modifier.width(10.dp))
         val tag = when (item.kind) {

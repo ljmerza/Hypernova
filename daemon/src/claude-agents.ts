@@ -1,7 +1,22 @@
 import { execFile } from 'node:child_process'
 import { findClaude, log, trimText } from './util.ts'
-import { settings } from './store.ts'
+import { saveSettings, settings } from './store.ts'
 import { applyAgentList, type AgentJob } from './hub.ts'
+
+/**
+ * Settings → Claude Code → Sessions in claude agents (`POST /v1/claude {agents}`), or `hypernova
+ * setup` through `/local/settings`: saved, and taken at once, without a restart. Every poll reads
+ * the setting (this list each 5 s, Claude Code's registry every 2 s), so on, the jobs are read now;
+ * off, they are passed over from the registry's next look, as before it was ever on.
+ */
+export function setClaudeAgents(on: boolean): boolean {
+  if (settings.claudeAgents === on) return on
+  settings.claudeAgents = on
+  saveSettings()
+  log('claude agents:', on ? 'on' : 'off')
+  if (on) pollClaudeAgents()
+  return on
+}
 
 /**
  * `claude agents` as its own list shows it (settings.claudeAgents): `claude agents --json --all`,
