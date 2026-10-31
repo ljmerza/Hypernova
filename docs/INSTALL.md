@@ -41,7 +41,7 @@ Nothing else: Hypernova brings its own Node.js.
 ## 1. Download
 
 Releases are on [GitHub](https://github.com/ljmerza/Hypernova/releases/latest). Each one is named
-`v<version>-ljm.<n>` (the tag below) and carries:
+by its version, `vX.Y.Z` (the tag below, e.g. `v0.3.0`), and carries:
 
 - `hypernova-server-<tag>-linux.tar.gz`: the Linux server package (one package for x86_64 and
   arm64: Node.js and the terminal module are fetched and built for the server at install)

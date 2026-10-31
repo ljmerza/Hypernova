@@ -2177,3 +2177,21 @@ Only the question card's insides change; nothing is added to the chat screen.
    colour, so no chip is marked; a jump presses ← to the first, then → to it. Laid out from Claude
    Code 2.1.314's code, not a captured screen: a live look must confirm the row reads, ← and → move
    there (also from "Type something.", which gets ↑ first) and "Submit answers" shows as an option.
+
+## Semantic versions (2026-10-31)
+
+The owner's decision: proper semantic versions from conventional commits, no more `-ljm.N`.
+
+1. **Each release is the next `vX.Y.Z`**, counted from the commits since the last one, as
+   semantic-release does (`scripts/next-version.sh`): a breaking change (`type!:` or a
+   `BREAKING CHANGE:` line) is a major, a `feat:` a minor, anything else a patch. Merge commits
+   don't count, the commits they bring in do. The first is **v0.3.0**, and nothing goes under it.
+2. **The files carry the version:** `hypernova-vX.Y.Z.apk` and
+   `hypernova-server-vX.Y.Z-linux.tar.gz`; the APK's versionName is the version (the workflow
+   passes `-PappVersion`), its versionCode still the build minute.
+3. **The notes group the commits** into Features, Fixes and Other, without the `type(scope):`
+   prefix, then the install, with the one-line `get.sh`.
+4. **Commits are conventional from now on** (CLAUDE.md, docs/RELEASING.md, "Commits"), for anyone
+   working here.
+5. **The `v0.2.0-ljm.N` releases (N = 1 to 28) become `v0.2.N`**: tag, title, notes and asset names, by `scripts/rename-releases.sh` (a dry run unless `--apply`).
+   The newest stays the latest until v0.3.0. The entries above that name `-ljm` tags are history.

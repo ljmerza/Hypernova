@@ -61,6 +61,15 @@ scripts (docs/RELEASING.md). There is no Mac app, website or name service in thi
 daemon keeps the `/v1/mac/*` route names and its Mac-only features (battery, Stay awake), which
 answer as unavailable on Linux (docs/PROTOCOL.md, "Mac-only features").
 
+Commits: conventional commits, because the release's version and notes are counted from them
+(`scripts/next-version.sh`, docs/RELEASING.md, "Versions"). `type(scope): subject`, the scope
+optional, the subject in the repo's plain style (what changed, in words, no period):
+`feat(android): Home cards say what a Working session is doing`. Types: `feat:` (something new:
+the next release is a minor one), `fix:`, `perf:`, `refactor:`, `docs:`, `test:`, `chore:` (a
+patch). A breaking change, the phone and the daemon no longer fitting each other's older version,
+is `feat!:` / `fix!:` or a `BREAKING CHANGE: …` line in the body (a major). Merge commits don't
+count, the commits they bring in do.
+
 `skills/hyper-cosmos/` is a versioned copy of the personal skill at
 `~/.claude/skills/hyper-cosmos/` (the copy that actually triggers). When the
 design changes, update the skill too (its `assets/compose/` holds this app's
