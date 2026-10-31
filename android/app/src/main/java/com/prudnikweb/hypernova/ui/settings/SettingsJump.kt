@@ -21,9 +21,16 @@ object SettingsJump {
     var asked by mutableStateOf<String?>(null)
         private set
     private var at by mutableLongStateOf(0L)
+    /**
+     * The server whose part is asked for (the one on screen when it was asked, a session's own from
+     * "All servers"): with All servers each server has its own part (SettingsPlan.keyOf). Null: the one on screen.
+     */
+    var server by mutableStateOf<String?>(null)
+        private set
 
-    fun show(key: String, now: Long = System.currentTimeMillis()) {
+    fun show(key: String, server: String? = null, now: Long = System.currentTimeMillis()) {
         at = now
+        this.server = server
         asked = key
     }
 

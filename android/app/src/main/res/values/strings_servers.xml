@@ -39,4 +39,9 @@
     <string name="notif_server_from_an_agent">%1$s, from an agent</string>
     <!-- The permanent notification's title with others watched under it. -->
     <string name="notif_title_watched">%1$s · +%2$d watched</string>
+
+    <!-- Settings with "All servers" (ui/settings/SettingsPlan.kt): each server's block under its name, then this phone's. -->
+    <string name="st_all_phone">This phone</string>
+    <!-- In a server's block while it isn't connected: its other settings are left out until it is. -->
+    <string name="st_all_waiting">Its settings show here once it\'s connected.</string>
 </resources>
