@@ -35,6 +35,10 @@
     <!-- Full-text search: the Mac looks inside the conversations from 3 characters. -->
     <string name="history_searching">Searching inside conversations…</string>
     <string name="history_partial">Partial results: your Mac ran out of time before it read every conversation.</string>
+    <!-- Home's search (ui/home/HomeScreen.kt, idea HM8): the lens in the top bar, its field and an empty result. -->
+    <string name="home_search">Search sessions</string>
+    <string name="home_search_close">Close search</string>
+    <string name="home_no_match">No sessions match</string>
 
     <!-- A notification's session that isn't known (ui/App.kt, audit P11). -->
     <string name="open_gone">That session isn\'t on your Mac any more.</string>

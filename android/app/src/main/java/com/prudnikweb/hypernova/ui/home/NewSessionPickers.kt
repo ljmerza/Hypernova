@@ -255,11 +255,14 @@ internal fun chipVariants(model: List<Int>, effort: List<Int>, mode: List<Int>, 
 
 // ─── Shared parts of the pickers ───
 
-/** A picker's search box: the house field's well, a lens before the words, a cross to clear them. */
+/**
+ * A picker's search box: the house field's well, a lens before the words, a cross to clear them.
+ * [onClose]: the cross always shows and closes the search instead (Home's, [closeLabel] for TalkBack).
+ */
 @Composable
-internal fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier) {
+internal fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier, onClose: (() -> Unit)? = null, closeLabel: String? = null) {
     val shape = RoundedCornerShape(14.dp)
-    val clear = stringResource(R.string.close)
+    val clear = closeLabel ?: stringResource(R.string.close)
     BasicTextField(
         value, onChange,
         singleLine = true,
@@ -284,11 +287,11 @@ internal fun SearchField(value: String, onChange: (String) -> Unit, placeholder:
                     if (value.isEmpty()) HText(placeholder, style = Type.body, color = HN.inkGhost, maxLines = 1)
                     inner()
                 }
-                if (value.isNotEmpty()) {
+                if (value.isNotEmpty() || onClose != null) {
                     Box(
                         Modifier
                             .size(40.dp)
-                            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = clear) { onChange("") }
+                            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = clear) { if (onClose != null) onClose() else onChange("") }
                             .semantics { contentDescription = clear },
                         contentAlignment = Alignment.Center,
                     ) { Icon(Glyph.Cross, size = 12.dp, color = HN.inkMuted) }

@@ -3588,8 +3588,9 @@ SearchHit = {
 - **The phone** shows "Searching inside conversations…" while it waits, a hit's snippet in place of
   its last line with the words in the accent, and "Partial results…" with `partial`. A 404 (an older
   daemon) turns the full-text search off for that computer until History is opened again; offline, or any
-  other failure, leaves the phone's own filter alone. Tests: `test/search.test.ts`, Android
-  `HistorySearchTest`.
+  other failure, leaves the phone's own filter alone. Home's search (idea HM8) asks the same route
+  the same way and keeps the hits on its own sessions, History only those on its ended ones. Tests:
+  `test/search.test.ts`, Android `HistorySearchTest`, `HomeSearchTest`.
 
 ## Local API (127.0.0.1:47322, `Authorization: Bearer <admin token>`)
 

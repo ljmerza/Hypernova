@@ -153,6 +153,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import com.prudnikweb.hypernova.data.HomeSearch
+import com.prudnikweb.hypernova.data.TextHit
+import com.prudnikweb.hypernova.ui.components.Icon
 import kotlinx.coroutines.launch
 import com.prudnikweb.hypernova.ui.fx.rememberScrambled
 import com.prudnikweb.hypernova.ui.theme.HN
@@ -222,6 +229,13 @@ fun HomeScreen(
     var backArmed by remember { mutableStateOf(false) }
     LaunchedEffect(backArmed) { if (backArmed) { delay(2_000); backArmed = false } }
     BackHandler(enabled = !statsOpen && tab == Tab.Sessions && !backArmed) { backArmed = true; backToast(backAgain) }
+    // Searching Home's sessions (idea HM8): the lens in the top bar opens a field under it; Back or
+    // its cross closes it and clears the words. Leaving Sessions closes it too.
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val closeSearch = { searchOpen = false; searchQuery = "" }
+    BackHandler(enabled = !statsOpen && tab == Tab.Sessions && searchOpen) { closeSearch() }
+    LaunchedEffect(tab) { if (tab != Tab.Sessions) closeSearch() }
     // The sun's tap is shown once ("Tap the sun for your statistics"), until Statistics is first opened.
     val context = LocalContext.current
     var sunHinted by remember { mutableStateOf(sunHintDone(context)) }
@@ -277,6 +291,14 @@ fun HomeScreen(
     val codexOn = hub.bothAgents
     val usageCards = UsageCards.of(hub.claude, hub.codex)
     val sessions = remember(all, filter, quiet) { SkyFilter.apply(all, filter, quiet) }
+    // What the search finds among them (HomeSearch, History's search shared): by title, project,
+    // folder, last line and short id, and from 3 characters the words inside the conversations.
+    // While words are typed the list is the matches in their groups; the cards above step aside.
+    val typed = searchOpen && searchQuery.isNotBlank()
+    val full = rememberFullText(hub, if (searchOpen) searchQuery else "")
+    val shown = remember(sessions, typed, searchQuery, full.hits) { if (typed) HomeSearch.find(sessions, searchQuery, full.hits) else sessions }
+    // The matches start at the top.
+    LaunchedEffect(searchOpen, searchQuery) { if (searchOpen) list.scrollToItem(0) }
     // The line under the sun's readout ("Tap the sun for your statistics"): the sky keeps room for it.
     val hint = !sunHinted && !eclipsed && !sunUsage.weekLimited && !sunUsage.limited
     androidx.compose.runtime.SideEffect { cosmos.hint = hint }
@@ -312,9 +334,11 @@ fun HomeScreen(
     if (toAccount != null) LaunchedEffect(toAccount) {
         snapshotFlow { toAccount.value }.filter { it }.collect {
             toAccount.value = false
-            val fromTab = tab != Tab.Sessions || statsOpen
+            // A search hides the account card: closed, the list is about to be laid out with it again.
+            val fromTab = tab != Tab.Sessions || statsOpen || (searchOpen && searchQuery.isNotBlank())
             tab = Tab.Sessions
             statsOpen = false
+            closeSearch()
             if (!accountCardShown(hub.account, System.currentTimeMillis())) return@collect
             // Asked for, the account card is back even if it was swiped away.
             AttentionStore.undo(ACCOUNT_CARD)
@@ -354,7 +378,7 @@ fun HomeScreen(
                 state = list,
                 // The first card starts under the top bar (fork: no sky above it any more); the last
                 // clears the bottom bar (fork: tabs only).
-                contentPadding = PaddingValues(top = top + 80.dp, bottom = bottom + 84.dp),
+                contentPadding = PaddingValues(top = top + 80.dp + (if (searchOpen) SEARCH_ROOM else 0.dp), bottom = bottom + 84.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // Fork: no sky (owner, 2026-10-30): Home is the sessions in their groups. Statistics opens
@@ -373,38 +397,63 @@ fun HomeScreen(
                         OfflineCard(hub, Modifier.animateItem().padding(horizontal = 16.dp).padding(bottom = 6.dp))
                     }
                 }
+                // Searching: a quiet line while the Mac looks inside the conversations, or when it
+                // couldn't look everywhere in time (History's words), and "No sessions match".
+                if (typed) {
+                    val note = when {
+                        full.searching -> R.string.history_searching
+                        full.hits?.partial == true -> R.string.history_partial
+                        else -> null
+                    }
+                    if (note != null) {
+                        item(key = "search-note") {
+                            HText(
+                                stringResource(note), style = Type.small, color = HN.inkDim,
+                                modifier = Modifier.animateItem().padding(horizontal = 24.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                            )
+                        }
+                    }
+                    if (shown.isEmpty() && !full.searching) {
+                        item(key = "search-none") {
+                            HText(
+                                stringResource(R.string.home_no_match), style = Type.small, color = HN.inkDim,
+                                modifier = Modifier.animateItem().padding(horizontal = 24.dp, vertical = 10.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                            )
+                        }
+                    }
+                }
                 // The account's trouble (a limit, signed out, no plan): why Claude isn't replying,
                 // and what to do, above the sessions it stopped.
-                if (accountShown) {
+                if (accountShown && !typed) {
                     item(key = ACCOUNT_CARD) {
                         AccountCard(hub, onOpen = onOpen, onNewSession = onNewSession, modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem())
                     }
                 }
-                if (showOrphans) {
+                if (showOrphans && !typed) {
                     item(key = REMOVED_CARD) {
                         RemovedProviderCard(orphans, onOpen, Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem())
                     }
                 }
                 // Prompts typed for a session the Mac no longer has: kept, with a way to start a new session with them.
-                for (w in hub.orphanedPrompts()) {
+                for (w in if (typed) emptyList() else hub.orphanedPrompts()) {
                     item(key = "gone:${w.waitingId}") {
                         GonePromptCard(hub, w, onOpen, Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem())
                     }
                 }
-                for (p in shownTroubled) {
+                for (p in if (typed) emptyList() else shownTroubled) {
                     item(key = "provider:${p.provider.id}") {
                         ProviderCard(p, Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem())
                     }
                 }
                 // Jobs on an older Claude Code: one quiet notice with Restart all (SessionMenu.kt), never on a session's screen.
                 val outdated = OutdatedJobs.of(all)
-                if (outdated.isNotEmpty()) {
+                if (outdated.isNotEmpty() && !typed) {
                     item(key = OUTDATED_CARD) {
                         OutdatedJobsCard(hub, outdated, Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem())
                     }
                 }
                 // An automation's question (an ask step): its answers right here, swiped away like the others.
-                for (r in hub.automations.state?.asks.orEmpty()) {
+                for (r in if (typed) emptyList() else hub.automations.state?.asks.orEmpty()) {
                     item(key = "ask:${r.id}") {
                         com.prudnikweb.hypernova.ui.automations.AskCard(
                             hub, r, Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp).animateItem(),
@@ -412,7 +461,7 @@ fun HomeScreen(
                         )
                     }
                 }
-                if (filter is SkyFilter.Project) {
+                if (filter is SkyFilter.Project && !typed) {
                     val name = filter.name
                     val path = hub.projects.firstOrNull { it.name == name }?.path ?: sessions.firstOrNull { it.cwd != null }?.cwd
                     if (path != null) {
@@ -426,7 +475,7 @@ fun HomeScreen(
                         }
                     }
                 }
-                if (sessions.isEmpty() && filter == null) {
+                if (sessions.isEmpty() && filter == null && !typed) {
                     item(key = "empty") {
                         EmptyCard(hub, onHistory = { tab = Tab.History }, modifier = Modifier.animateItem().padding(horizontal = 16.dp))
                     }
@@ -435,9 +484,11 @@ fun HomeScreen(
                 // input, working, completed, each under its own seam with how many it holds. An empty
                 // group has no seam. A card moves only when its group changes (homeGroups).
                 // Completed cards say when they finished and mark a reply not read on this phone
-                // (data/Unread.kt).
+                // (data/Unread.kt). Searching, the groups hold the matches (the counts theirs), and a
+                // card the Mac found by its words shows the snippet under its title.
                 val readMarks = ReadState.server(hub)?.let { ReadState.of(context, it) }
-                for ((group, members) in homeGroups(sessions)) {
+                val hits = if (typed) full.hits else null
+                for ((group, members) in homeGroups(shown)) {
                     item(key = group.key) {
                         GroupSeam(
                             group, members.size,
@@ -475,13 +526,14 @@ fun HomeScreen(
                             menu = if (MenuOffer.of(s).any) { { done -> SessionMenu(hub, s, done) } } else null,
                             completed = group == HomeGroup.Completed,
                             unread = group == HomeGroup.Completed && readMarks != null && ReadState.unread(readMarks, s),
+                            hit = hits?.of(s.id),
                         )
                     }
                 }
                 // The usage cards (UsageCards.kt): Claude's, Codex's, or both, each saying whose it is only when both show.
-                if (usageCards.claude) item(key = "usage") { UsageCard(hub, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp)) }
+                if (usageCards.claude && !typed) item(key = "usage") { UsageCard(hub, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp)) }
                 val codexState = hub.codex
-                if (usageCards.codex && codexState != null) {
+                if (usageCards.codex && codexState != null && !typed) {
                     item(key = "codex-usage") { CodexUsageCard(codexState, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp)) }
                 }
             }
@@ -496,8 +548,10 @@ fun HomeScreen(
 
         // Top: status bar area + brand row, blurred over whatever scrolls beneath.
         BlurredTop(haze, HOME_SOURCE, Modifier.fillMaxWidth()) {
+            val searchShown = searchOpen && tab == Tab.Sessions
+            Column {
             Row(
-                Modifier.fillMaxWidth().padding(top = top + 10.dp, start = 20.dp, end = 16.dp, bottom = 28.dp),
+                Modifier.fillMaxWidth().padding(top = top + 10.dp, start = 20.dp, end = 16.dp, bottom = if (searchShown) 8.dp else 28.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Fork: the mark alone (owner, 2026-10-30); the word "hypernova" made the bar crowded.
@@ -512,6 +566,8 @@ fun HomeScreen(
                 // Fork: the new-session (and new-automation) pill sits up here, small, instead of
                 // over the tabs, so the bottom bar is just the tabs; 30dp, the Mac's chip's height.
                 if (tab == Tab.Sessions) {
+                    // The lens: searching Home's sessions (idea HM8); lit while the field is open.
+                    SearchButton(searchOpen, onClick = { if (searchOpen) closeSearch() else searchOpen = true })
                     Pill(stringResource(R.string.new_session), onNewSession, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
                     Spacer(Modifier.width(8.dp))
                 }
@@ -522,6 +578,17 @@ fun HomeScreen(
                 }
                 // The switcher (owner, 2026-10-30): Settings is the bottom tab's alone now.
                 LinkChip(hub, servers, onClick = { if (servers != null) switching = true })
+            }
+            if (searchShown) {
+                // Under the bar, over the top of the list; the keyboard comes up with it.
+                val focus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+                SearchField(
+                    searchQuery, { searchQuery = it }, stringResource(R.string.home_search),
+                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 28.dp).focusRequester(focus),
+                    onClose = closeSearch, closeLabel = stringResource(R.string.home_search_close),
+                )
+            }
             }
         }
 
@@ -582,6 +649,34 @@ private fun usageIndex(list: androidx.compose.foundation.lazy.LazyListState, cod
     val last = list.layoutInfo.totalItemsCount - 1
     val back = if (!codex && cards.claude && cards.codex) 1 else 0
     return (last - back).coerceAtLeast(0)
+}
+
+/** How much lower Home's list starts while the search field shows under the top bar (the field and its gap). */
+private val SEARCH_ROOM = 52.dp
+
+/**
+ * The top bar's lens (idea HM8): a 30dp circle of dense frosted glass, the Glass pill's family, in a
+ * 48dp target; lit mint while the search is open, when a tap closes it.
+ */
+@Composable
+private fun SearchButton(open: Boolean, onClick: () -> Unit) {
+    val view = LocalView.current
+    val label = stringResource(if (open) R.string.home_search_close else R.string.home_search)
+    Box(
+        Modifier
+            .size(48.dp)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = label) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onClick()
+            }
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.size(30.dp).clip(CircleShape).frostedGlass(if (open) HN.accent else null, glowX = 15.dp, dense = true),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Glyph.Search, size = 14.dp, color = if (open) HN.accent else HN.ink, stroke = 1.4.dp) }
+    }
 }
 
 /** Home's groups, in the list's order, each with its seam's item key. */
@@ -758,6 +853,12 @@ fun SessionCard(
     completed: Boolean = false,
     /** Its latest reply came after it was last opened on this phone (data/Unread.kt): a mint dot before its title. */
     unread: Boolean = false,
+    /**
+     * Home's search found it by the words inside (idea HM8): the snippet under its title, the words
+     * in the accent (History's [HitSnippet]), in place of a plain last line; an ask, a block or what
+     * a Working one does still shows under it.
+     */
+    hit: TextHit? = null,
 ) {
     val needs = s.state == SessionState.NeedsYou
     val res = LocalContext.current.resources
@@ -793,6 +894,12 @@ fun SessionCard(
                 }
             } else ScrambledName(s.name, scramble)
             Spacer(Modifier.height(4.dp))
+            // Only a plain last line gives way to a search's snippet (an ask's stays: it says what it waits on).
+            val plainLine = block == null && ask !is CardAsk.Terminal && ask !is CardAsk.Exact && (needs || !s.busy) && !s.diedLine
+            if (hit != null) {
+                HitSnippet(hit, maxLines = 2)
+                if (!plainLine || needs) Spacer(Modifier.height(4.dp))
+            }
             if (block != null) {
                 // Stopped by a limit, the account or its provider: the eclipsed sun the chat's line
                 // has, then what it is and when it lifts, in words ("session limit until 2:00").
@@ -834,7 +941,7 @@ fun SessionCard(
                 // Its `claude agents` job died (a crash, an error exit): said plainly, in place of its
                 // last words (data/JobDied.kt). Its chat shows nothing of it.
                 HText(stringResource(R.string.card_job_died), style = Type.monoSmall, color = HN.danger, maxLines = 1)
-            } else HText(s.activity, style = Type.monoSmall, color = if (needs) HN.amber else HN.inkMuted, maxLines = 1)
+            } else if (hit == null || needs) HText(s.activity, style = Type.monoSmall, color = if (needs) HN.amber else HN.inkMuted, maxLines = 1)
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // With an ask, its pills keep their room and the chips give way.

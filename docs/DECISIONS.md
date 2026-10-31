@@ -2405,3 +2405,29 @@ one tool call) and got "That agent's transcript isn't on the Mac." on a Linux se
    on a Mac (`MACHINE`, platform.ts). Messages about a Mac-only feature (its voice, macOS' privacy
    question, opening a window, the Mac app's Setup) keep "Mac".
 5. On the session chat screen, only that: those helpers' cards no longer show. Nothing new there.
+
+## Searching Home's sessions (2026-10-31)
+
+The owner's pick from IDEAS (HM8): History's search over Home's live sessions too, without
+cluttering Home.
+
+1. **A lens in Home's top bar**, before New session (Sessions tab only). A tap opens a search field
+   under the bar, over the top of the list, with the keyboard up; Back or its cross closes it and
+   clears the words, as does leaving the Sessions tab. Nothing else on Home changes while it's
+   closed.
+2. **What it searches:** each card's title, project, its folder's own name (when it isn't the
+   project's), last line and short hex id (`c7`), any case, every word of the query, History's
+   matching (`data/Fuzzy.kt`: scattered letters only when nothing has the words as words). From 3
+   characters, once typing has paused 300 ms, the server's full-text search (HI1) is asked too and
+   its hits on Home's sessions are merged in, each session once; a hit's card shows the snippet
+   under its title, the words in the accent, as History's do. One code path for both
+   (`data/HomeSearch.kt` on `HistorySearch`, `rememberFullText` and `HitSnippet` in History.kt).
+3. **The groups hold the matches:** Needs input, Working and Completed keep their order (A to Z, and
+   newest first for Completed), their counts are the matches, a group with none hides. While words
+   are typed the cards above the sessions (account, providers, questions, the usage cards…) step
+   aside until the search closes; the offline card stays. Nothing found: a quiet "No sessions
+   match".
+4. **No daemon change.** `GET /v1/history/search` already searches every session the snapshot lists,
+   Home's and History's alike; History leaves Home's hits out on the phone by merging only into its
+   ended sessions, and Home merges only into its own.
+5. Nothing new on a session's chat screen.

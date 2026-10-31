@@ -83,26 +83,9 @@ internal fun HistoryTab(hub: Hub, top: Dp, bottom: Dp, now: Long, onOpen: (Strin
     // A project chip that has gone (its sessions aged out) no longer narrows anything.
     val narrowed = project?.takeIf { it in projects }
     val local = remember(ended, query, narrowed) { HistorySearch.find(ended, query, narrowed) }
-    // From 3 characters, once typing pauses, the Mac looks inside the conversations too (idea HI1).
-    // An older Mac (null) or none reachable leaves the phone's own filter alone.
-    val asked = query.trim()
-    val canAsk = hub.link.state == LinkState.Connected
-    var unsupported by remember(hub) { mutableStateOf(false) }
-    var hits by remember(hub) { mutableStateOf<Pair<String, TextHits>?>(null) }
-    var searching by remember { mutableStateOf(false) }
-    LaunchedEffect(hub, asked, canAsk, unsupported) {
-        if (!HistorySearch.wantsFullText(asked) || !canAsk || unsupported) {
-            searching = false
-            return@LaunchedEffect
-        }
-        searching = true
-        delay(HistorySearch.FULL_TEXT_DEBOUNCE_MS)
-        hub.searchHistory(asked)
-            .onSuccess { if (it == null) unsupported = true else hits = asked to it }
-            .onFailure { hits = null }
-        searching = false
-    }
-    val text = hits?.takeIf { it.first == asked && HistorySearch.wantsFullText(asked) && canAsk }?.second
+    val full = rememberFullText(hub, query)
+    val searching = full.searching
+    val text = full.hits
     val found = remember(ended, local, text, narrowed) { HistorySearch.merge(ended, local, text, narrowed) }
     val rows = remember(found) { com.prudnikweb.hypernova.ui.automations.foldRuns(found) }
     val zone = remember { ZoneId.systemDefault() }
@@ -188,6 +171,50 @@ internal fun HistoryTab(hub: Hub, top: Dp, bottom: Dp, now: Long, onOpen: (Strin
     }
 }
 
+/** The Mac's full-text answer for the query typed now ([hits], null while there's none) and whether it's being asked ([searching]). */
+internal class FullText(val hits: TextHits?, val searching: Boolean)
+
+/**
+ * The words inside the conversations, for History's search and Home's: from 3 characters, once
+ * typing pauses, the current Mac is asked (idea HI1, [Hub.searchHistory]). An older Mac (null)
+ * turns it off until this leaves the screen; none reachable, or a failure, leaves the phone's own
+ * filter alone. Hits only ever answer the query they were asked for.
+ */
+@Composable
+internal fun rememberFullText(hub: Hub, query: String): FullText {
+    val asked = query.trim()
+    val canAsk = hub.link.state == LinkState.Connected
+    var unsupported by remember(hub) { mutableStateOf(false) }
+    var hits by remember(hub) { mutableStateOf<Pair<String, TextHits>?>(null) }
+    var searching by remember { mutableStateOf(false) }
+    LaunchedEffect(hub, asked, canAsk, unsupported) {
+        if (!HistorySearch.wantsFullText(asked) || !canAsk || unsupported) {
+            searching = false
+            return@LaunchedEffect
+        }
+        searching = true
+        delay(HistorySearch.FULL_TEXT_DEBOUNCE_MS)
+        hub.searchHistory(asked)
+            .onSuccess { if (it == null) unsupported = true else hits = asked to it }
+            .onFailure { hits = null }
+        searching = false
+    }
+    return FullText(hits?.takeIf { it.first == asked && HistorySearch.wantsFullText(asked) && canAsk }?.second, searching)
+}
+
+/** A hit's snippet in mono, the words it found in the accent (History's hit cards, Home's cards while searching). */
+@Composable
+internal fun HitSnippet(hit: TextHit, maxLines: Int = 3) {
+    val accent = HN.accent
+    val snippet = remember(hit, accent) {
+        buildAnnotatedString {
+            append(hit.snippet)
+            for (m in hit.marks) addStyle(SpanStyle(color = accent), m.first, m.last + 1)
+        }
+    }
+    HText(snippet, style = Type.monoSmall, color = HN.inkMuted, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+}
+
 /**
  * A session the Mac found by the words inside it: its project, id and age, its name, and the
  * snippet around the first hit with the words in the accent, in place of the last line.
@@ -204,14 +231,7 @@ private fun HitCard(s: Session, hit: TextHit, now: Long, onClick: () -> Unit, mo
             Spacer(Modifier.height(12.dp))
             HText(s.name, style = Type.heading, color = HN.ink, maxLines = 1)
             Spacer(Modifier.height(4.dp))
-            val accent = HN.accent
-            val snippet = remember(hit, accent) {
-                buildAnnotatedString {
-                    append(hit.snippet)
-                    for (m in hit.marks) addStyle(SpanStyle(color = accent), m.first, m.last + 1)
-                }
-            }
-            HText(snippet, style = Type.monoSmall, color = HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            HitSnippet(hit)
         }
     }
 }

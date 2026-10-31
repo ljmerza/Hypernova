@@ -130,7 +130,7 @@ switcher, usage cards, account and offline cards, the long-press menu.
 | HM5 | Order by finish time ✓ built 2026-10-30 | Completed sorted newest first, with "finished 5 min ago". The A to Z rule was for cards that kept swapping; finished ones don't move. | S | app |
 | HM6 | Unread replies ✓ built 2026-10-30, per phone | A dot on a card whose last reply hasn't been opened on any of his phones. | S | both |
 | HM7 | Elapsed time ✓ built 2026-10-31 | "for 12 min" on Working cards. | S | app |
-| HM8 | Search live sessions | The History search over Home's sessions too. | S | app |
+| HM8 | Search live sessions ✓ built 2026-10-31 | The History search over Home's sessions too. | S | app |
 | HM9 | Reply from the card | An inline reply field on Needs input and Completed cards, without opening the chat. | M | app |
 | HM10 | All servers on one Home | Every paired server's sessions in one list, each tagged with its server (see MS1). | M | app |
 | HM11 | Compact density | A denser card for many sessions. | S | app |

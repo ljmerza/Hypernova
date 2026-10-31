@@ -29,19 +29,23 @@ object HistorySearch {
      * The ended sessions [query] finds, most recent first, in [project] only when given. Every
      * word of the query has to be in the title, the project or the last line ([Fuzzy]); when some
      * sessions have each word as a word, the ones with only scattered letters are left out.
+     * [by]: what a session is searched by (Home adds its folder and short id, [HomeSearch]).
      */
-    fun find(ended: List<Session>, query: String, project: String? = null): List<Session> {
+    fun find(ended: List<Session>, query: String, project: String? = null, by: (Session) -> String = ::searched): List<Session> {
         val pool = ended.filter { project == null || it.project == project }.sortedByDescending { it.updatedAt }
         val words = Fuzzy.words(query)
         if (words.isEmpty()) return pool
         val scored = pool.mapNotNull { s ->
-            val text = "${s.name} ${s.project} ${s.activity}"
+            val text = by(s)
             var weakest = Int.MAX_VALUE
             for (w in words) weakest = minOf(weakest, Fuzzy.word(w, text) ?: return@mapNotNull null)
             s to weakest
         }
         return Fuzzy.keepStrong(scored)
     }
+
+    /** What History searches a session by: its title, project and last line. */
+    private fun searched(s: Session): String = "${s.name} ${s.project} ${s.activity}"
 
     /** The Mac is asked to look inside the conversations from this many characters. */
     const val FULL_TEXT_MIN = 3
@@ -52,8 +56,9 @@ object HistorySearch {
 
     /**
      * [local] (what [find] found) and the ended sessions the Mac found by their words ([hits]),
-     * each once, most recent first, in [project] only when given. A hit on a session the phone
-     * doesn't list in History (one on Home) is left out.
+     * each once, most recent first, in [project] only when given. A hit on a session not in
+     * [ended] is left out: History passes its ended sessions (so a hit on one on Home stays off
+     * it), Home its live ones ([HomeSearch]); the Mac answers for both alike.
      */
     fun merge(ended: List<Session>, local: List<Session>, hits: TextHits?, project: String? = null): List<Session> {
         if (hits == null || hits.hits.isEmpty()) return local
