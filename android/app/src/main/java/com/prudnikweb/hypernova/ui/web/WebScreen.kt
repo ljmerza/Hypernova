@@ -71,11 +71,11 @@ import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 
 /**
- * A web page from the Mac (an HTML preview, a dev server, the testing checklist) in a
+ * A web page from the server (an HTML preview, a dev server, the testing checklist) in a
  * WebView under the app's own top bar. Back goes back in the page's history first. File
  * inputs open the system picker, so the checklist's screenshot picker works.
  *
- * On the local route the page comes from the Mac's own listener (data/LanRoute.kt, [ActiveRoutes]):
+ * On the local route the page comes from the server's own listener (data/LanRoute.kt, [ActiveRoutes]):
  * the WebView then trusts exactly the pinned certificate and presents this phone's device
  * certificate to that listener, as the app's own requests do. A browser outside the app can't,
  * so "Open in browser" hands it the same page by the paired base URL.
@@ -177,18 +177,18 @@ fun WebScreen(url: String, title: String, onBack: () -> Unit, preview: Boolean =
                                     if (request.isForMainFrame) failed = PageError.text(error.errorCode)
                                 }
 
-                                // A dev server that stopped answers the Mac's proxy with a 502/503/504.
+                                // A dev server that stopped answers the server's proxy with a 502/503/504.
                                 override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
                                     if (request.isForMainFrame && errorResponse.statusCode in 502..504) failed = PageError.text(0, errorResponse.statusCode, port)
                                 }
 
-                                // The Mac's listener has a self-signed certificate: go on for the pinned one
+                                // The server's listener has a self-signed certificate: go on for the pinned one
                                 // alone; anything else is refused, as the WebView would anyway.
                                 override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
                                     if (local?.trusts(error.certificate?.x509Certificate) == true) handler.proceed() else handler.cancel()
                                 }
 
-                                // The device certificate goes to the Mac's listener only; any other server asking gets none.
+                                // The device certificate goes to the paired server's listener only; any other server asking gets none.
                                 override fun onReceivedClientCertRequest(view: WebView, request: ClientCertRequest) {
                                     val id = local?.identityFor(request.host, request.port)
                                     if (id != null) request.proceed(id.key, id.chain) else super.onReceivedClientCertRequest(view, request)
