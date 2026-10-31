@@ -13,27 +13,27 @@ uncluttered UI. An idea that bends one says so. The last section lists the ones 
 
 ## Top 10 picks
 
-The best value for the effort, in order.
+The best value for the effort, in order. ✓ marks the ones built since (2026-10-30/31; the rows below say which day).
 
-1. **SS1 + SS2, a summary line and folding parts in the session sheet.** The sheet now scrolls through six parts;
+1. ✓ **SS1 + SS2, a summary line and folding parts in the session sheet.** The sheet now scrolls through six parts;
    one line (mode, model, context, branch, time) answers most looks, and folded parts keep it uncluttered.
-2. **SC1, `/btw` from the phone.** Ask a side question while an agent works, without derailing it: the thing a
+2. ✓ **SC1, `/btw` from the phone.** Ask a side question while an agent works, without derailing it: the thing a
    phone is best placed to do, and Claude Code already has the command.
-3. **NS1 + SS3, effort for Claude Code sessions.** Claude Code takes `--effort low…max` and `/effort`; the phone
+3. ✓ **NS1 + SS3, effort for Claude Code sessions.** Claude Code takes `--effort low…max` and `/effort`; the phone
    offers effort only for Codex today. Small, and used every day.
-4. **SS5, the rules in effect, read-only.** The sheet says "the phone knows no allow rules"; reading the allow,
+4. ✓ **SS5, the rules in effect, read-only.** The sheet says "the phone knows no allow rules"; reading the allow,
    ask and deny lists from the settings files explains why something asked or didn't.
-5. **PA2 + PA3, choose what "Always" covers, and edit the rule first.** Session, this project or everywhere,
+5. ✓ **PA2 + PA3, choose what "Always" covers, and edit the rule first.** Session, this project or everywhere,
    with the rule shown and widened before saving (`Bash(npm test)` to `Bash(npm test:*)`). Fewer asks, on purpose.
-6. **SC2 + SC5, a command palette with the skills.** The "/" list only shows while typing; a palette with
+6. ✓ **SC2 + SC5, a command palette with the skills.** The "/" list only shows while typing; a palette with
    recent, pinned and skills makes his ~20 skills and Claude Code's commands reachable in two taps.
-7. **HM6, unread and "finished 5 min ago" on Completed cards.** With many `claude agents` jobs, knowing which
+7. ✓ **HM6, unread and "finished 5 min ago" on Completed cards.** With many `claude agents` jobs, knowing which
    finished replies he hasn't read is the main thing Home is for.
-8. **HI1, full-text history search.** History searches title, project and last line; finding "the session
+8. ✓ **HI1, full-text history search.** History searches title, project and last line; finding "the session
    where we fixed the PIA port" needs the words inside.
 9. **NS2, start in a worktree.** `claude --worktree` keeps parallel agents off each other's files, and
    `claude rm` already cleans worktrees up safely. One switch in the New session sheet.
-10. **AG4, respawn jobs running an old Claude Code.** Claude Code updates itself, but background jobs keep the old
+10. ✓ **AG4, respawn jobs running an old Claude Code.** Claude Code updates itself, but background jobs keep the old
     binary until `claude respawn`; a notice and one button keeps every job current.
 
 ## Session sheet and usage view
@@ -45,15 +45,15 @@ on 2026-10-30 (DECISIONS, "The session sheet", 4); ideas that bring any back say
 
 | ID | Idea | What and why | Size | Where |
 |----|------|--------------|------|-------|
-| SS1 | Summary line at the top | One quiet mono line under the name: mode, model, context %, branch, how long it has run. Most opens of the sheet are "what is it doing and in what mode", answered without scrolling. | S | app |
-| SS2 | Folding parts | Each seam folds; the sheet opens with only live parts open (blocked calls, agents at work) and the rest folded, remembered per part. Keeps the sheet short as more goes in. | S | app |
-| SS3 | Effort in the Model part | Show and change the session's effort (`/effort`, low to max) next to the model, typed into the terminal as Rename types `/rename`. Unsure whether the status line reports the current effort; it may have to be read from the transcript or remembered. | M | both |
+| SS1 | Summary line at the top ✓ built 2026-10-30 | One quiet mono line under the name: mode, model, context %, branch, how long it has run. Most opens of the sheet are "what is it doing and in what mode", answered without scrolling. | S | app |
+| SS2 | Folding parts ✓ built 2026-10-30, as tabs | Each seam folds; the sheet opens with only live parts open (blocked calls, agents at work) and the rest folded, remembered per part. Keeps the sheet short as more goes in. | S | app |
+| SS3 | Effort in the Model part ✓ built 2026-10-30 | Show and change the session's effort (`/effort`, low to max) next to the model, typed into the terminal as Rename types `/rename`. Unsure whether the status line reports the current effort; it may have to be read from the transcript or remembered. | M | both |
 | SS4 | Context back, folded | The context % with Compact and a `/context` breakdown, folded by default. **Reverses** the 2026-10-30 removal (the strip keeps context and Compact from 85%), so only if the owner wants it. | S | app |
-| SS5 | Rules in effect (read-only) | The allow, ask and deny rules from `~/.claude/settings.json`, the project's `.claude/settings.json` and `settings.local.json`, plus the session's own (from "Always" and "session" answers), grouped by source. Explains every ask and every non-ask. | M | both |
+| SS5 | Rules in effect (read-only) ✓ built 2026-10-30 | The allow, ask and deny rules from `~/.claude/settings.json`, the project's `.claude/settings.json` and `settings.local.json`, plus the session's own (from "Always" and "session" answers), grouped by source. Explains every ask and every non-ask. | M | both |
 | SS6 | Approvals in this session | A short log: each ask, the answer, who answered (phone, terminal, Allow & retry) and when. The daemon already sees `approval` and `approval.resolved`; it only needs keeping. | M | both |
-| SS7 | Files touched | "7 files, +120 −30" with a link to What changed, scoped to the session (the changes route already has `scope: "session"`). | S | app |
-| SS8 | Git line | Branch, ahead/behind, dirty count, and the worktree's name for a worktree session. `changes` already returns the branch. | S | both |
-| SS9 | Time | Started at, running for, this turn's time, last activity. Useful for "is it stuck or slow". | S | app |
+| SS7 | Files touched ✓ built 2026-10-31 | "7 files, +120 −30" with a link to What changed, scoped to the session (the changes route already has `scope: "session"`). | S | app |
+| SS8 | Git line ✓ built 2026-10-31 | Branch, ahead/behind, dirty count, and the worktree's name for a worktree session. `changes` already returns the branch. | S | both |
+| SS9 | Time ✓ built 2026-10-31 | Started at, running for, this turn's time, last activity. Useful for "is it stuck or slow". | S | app |
 | SS10 | Tokens and cost, folded | The tokens table and the estimate under a "Details" fold. **Reverses** "Remove the API cost amount"; listed for completeness. | S | app |
 | SS11 | Quick actions row | Compact, Stop turn (Esc), Open terminal, Branch, Export as small pills under the summary. Today the actions are only Rename, Stop and Delete for jobs. | S | app |
 | SS12 | Background tasks | Background shells and monitors the session started (Claude Code's `/tasks`, "everything running in the background") listed in the Agents part. Unsure how to read them from outside; `run_in_background` Bash calls in the transcript are a start. | M | both |
@@ -74,14 +74,14 @@ minutes per folder.
 
 | ID | Idea | What and why | Size | Where |
 |----|------|--------------|------|-------|
-| SC1 | `/btw` side questions | An "Ask aside" action (long-press Send, or a palette entry) that sends `/btw <question>`, and the answer shown as a card that goes away, not in the chat. Claude Code's own description: "Ask a quick side question without interrupting the main conversation". Unsure whether the answer reaches the transcript; it may only show in the terminal, in which case the daemon reads it off the screen as it reads menus. | M | both |
-| SC2 | Command palette | A "/" button opens a sheet: recent and pinned first, then Built-in, Skills, Yours, Plugins, MCP, with search. The list today shows only while the box starts with "/". | M | app |
-| SC3 | Argument helpers | Use the argument hint to offer a field or chips: `/effort` as five chips, `/model` as the model picker, `/rename` with the name filled. | S | app |
+| SC1 | `/btw` side questions ✓ built 2026-10-30 | An "Ask aside" action (long-press Send, or a palette entry) that sends `/btw <question>`, and the answer shown as a card that goes away, not in the chat. Claude Code's own description: "Ask a quick side question without interrupting the main conversation". Unsure whether the answer reaches the transcript; it may only show in the terminal, in which case the daemon reads it off the screen as it reads menus. | M | both |
+| SC2 | Command palette ✓ built 2026-10-30, the Commands tab | A "/" button opens a sheet: recent and pinned first, then Built-in, Skills, Yours, Plugins, MCP, with search. The list today shows only while the box starts with "/". | M | app |
+| SC3 | Argument helpers ✓ built 2026-10-31 | Use the argument hint to offer a field or chips: `/effort` as five chips, `/model` as the model picker, `/rename` with the name filled. | S | app |
 | SC4 | Panels as cards | Commands that draw a panel in the TUI (`/context`, `/usage`, `/status`, `/permissions`, `/hooks`, `/mcp`, `/tasks`, `/workflows`, `/skills`) come back as a card with the screen's text, or open the terminal by themselves. Check first how each shows on the phone today. | M | both |
-| SC5 | Skills list | The skills Claude Code reports for the project (his ~20 personal ones and the project's), with descriptions, tap to insert. Not a market (that is L21). | S | app |
+| SC5 | Skills list ✓ built 2026-10-30, the Commands tab | The skills Claude Code reports for the project (his ~20 personal ones and the project's), with descriptions, tap to insert. Not a market (that is L21). | S | app |
 | SC6 | Commands in quick prompts | Let a quick prompt chip hold a command (`/compact`, `/code-review`) and draw it as a command. | S | app |
 | SC7 | "Opens in the terminal" mark | Commands that need the TUI's own picker (`/config`, `/theme`, `/resume`, `/login`, `/keybindings`) say so in the list, or are hidden. | S | both |
-| SC8 | `/compact` with a focus | A small sheet for Compact with an optional "keep…" line, sent as `/compact <focus>`. | S | app |
+| SC8 | `/compact` with a focus ✓ built 2026-10-31 | A small sheet for Compact with an optional "keep…" line, sent as `/compact <focus>`. | S | app |
 | SC9 | Branch and fork from a message | "Branch here" (`/branch`, "a branch of the current conversation at this point") and "Fork to background" (`/fork`, "copy this conversation into a new background session") next to Rewind in the message menu. Unsure how `/branch` differs from Hypernova's Rewind fork in practice. | M | both |
 | SC10 | Side task | `/subtask` ("send a subagent off with your full context; its result comes back here") as an action, for "also check X" without a new session. | S | app |
 | SC11 | Recap | `/recap` ("a one-line session recap now") on demand, shown on the Home card. It costs a model call, so on demand only. | S | both |
@@ -101,11 +101,11 @@ Claude Code's own terminal dialog answered from the phone, held prompts, the mod
 | ID | Idea | What and why | Size | Where |
 |----|------|--------------|------|-------|
 | PA1 | Rules manager | After SS5's read-only list: add and remove rules from the phone, per file, behind the fingerprint. The daemon already edits `~/.claude/settings.json` safely for hooks (backup, symlinks). Writing settings is a step up; the owner decides. | L | both |
-| PA2 | Scope for "Always" | Choose session, this project (`projectSettings` or `localSettings`) or everywhere (`userSettings`) on the Always sheet; Claude Code's `addRules` takes a destination. | M | both |
-| PA3 | Edit the rule | Change the suggested rule before saving (a prefix, a wildcard). | S | app |
+| PA2 | Scope for "Always" ✓ built 2026-10-31 | Choose session, this project (`projectSettings` or `localSettings`) or everywhere (`userSettings`) on the Always sheet; Claude Code's `addRules` takes a destination. | M | both |
+| PA3 | Edit the rule ✓ built 2026-10-31 | Change the suggested rule before saving (a prefix, a wildcard). | S | app |
 | PA4 | Approvals log | Across sessions and servers: what was asked, answered how, by which device, any rule added. Also an audit trail (SEC2). | M | both |
 | PA5 | Suggest a rule | From the log: "You allowed `npm test` 14 times this week. Always allow it in this project?" Never adds one on its own. | M | both |
-| PA6 | Allow several | When one session has several asks waiting (parallel agents), "Allow these 3", each command listed. Only ever Allow; Deny stays one at a time. | S | app |
+| PA6 | Allow several ✓ built 2026-10-31 | When one session has several asks waiting (parallel agents), "Allow these 3", each command listed. Only ever Allow; Deny stays one at a time. | S | app |
 | PA7 | Why it asked | Show what caused the ask: an ask rule ("Ask rule Bash(python:*) overrides auto mode"), no matching rule, or a file outside the folder. | S | both |
 | PA8 | Risk on the card | Already parked: L34 (risk in the daemon). A colour and a long-press for high-risk commands; never a deny. | | |
 | PA9 | Auto mode rules | Show `claude auto-mode config` (the effective allow, soft_deny and hard_deny) read-only, so blocked calls make sense, and link to `/auto-mode-setup`. `claude auto-mode critique` costs a model call. | M | both |
@@ -123,13 +123,13 @@ switcher, usage cards, account and offline cards, the long-press menu.
 
 | ID | Idea | What and why | Size | Where |
 |----|------|--------------|------|-------|
-| HM1 | What it's doing now | A Working card's second line: the active to-do ("Running the tests 3/7") or the current tool. | S | app |
-| HM2 | Swipe actions | Swipe a Completed card to Stop or Remove (`claude rm`, asking first), a Needs input one to open it. | S | app |
+| HM1 | What it's doing now ✓ built 2026-10-31 | A Working card's second line: the active to-do ("Running the tests 3/7") or the current tool. | S | app |
+| HM2 | Swipe actions ✓ built 2026-10-31 | Swipe a Completed card to Stop or Remove (`claude rm`, asking first), a Needs input one to open it. | S | app |
 | HM3 | Group by project | An option to group by project inside each status. | S | app |
 | HM4 | Clear completed | Remove finished `claude agents` jobs older than a day, listed first; `rm` already refuses a worktree with unpushed work. | M | both |
-| HM5 | Order by finish time | Completed sorted newest first, with "finished 5 min ago". The A to Z rule was for cards that kept swapping; finished ones don't move. | S | app |
-| HM6 | Unread replies | A dot on a card whose last reply hasn't been opened on any of his phones. | S | both |
-| HM7 | Elapsed time | "for 12 min" on Working cards. | S | app |
+| HM5 | Order by finish time ✓ built 2026-10-30 | Completed sorted newest first, with "finished 5 min ago". The A to Z rule was for cards that kept swapping; finished ones don't move. | S | app |
+| HM6 | Unread replies ✓ built 2026-10-30, per phone | A dot on a card whose last reply hasn't been opened on any of his phones. | S | both |
+| HM7 | Elapsed time ✓ built 2026-10-31 | "for 12 min" on Working cards. | S | app |
 | HM8 | Search live sessions | The History search over Home's sessions too. | S | app |
 | HM9 | Reply from the card | An inline reply field on Needs input and Completed cards, without opening the chat. | M | app |
 | HM10 | All servers on one Home | Every paired server's sessions in one list, each tagged with its server (see MS1). | M | app |
@@ -190,7 +190,7 @@ Today: folder browser, model, mode (default in Settings), Codex's model and effo
 
 | ID | Idea | What and why | Size | Where |
 |----|------|--------------|------|-------|
-| NS1 | Effort | Low, medium, high, xhigh, max (`--effort`), remembered like the mode. | S | both |
+| NS1 | Effort ✓ built 2026-10-30 | Low, medium, high, xhigh, max (`--effort`), remembered like the mode. | S | both |
 | NS2 | Worktree | A switch for `--worktree [name]`, so parallel jobs don't share files. | M | both |
 | NS3 | Name | `--name` at start, so `claude agents` and Home show it from the first second. | S | both |
 | NS4 | Agent | `--agent` from the user's and project's agents (none in `~/.claude/agents` today). | M | both |
@@ -249,7 +249,7 @@ Today: folder browser, model, mode (default in Settings), Codex's model and effo
 
 | ID | Idea | What and why | Size | Where |
 |----|------|--------------|------|-------|
-| HI1 | Full-text search | Search inside every conversation, with the matching line shown. | M | daemon |
+| HI1 | Full-text search ✓ built 2026-10-30 | Search inside every conversation, with the matching line shown. | M | daemon |
 | HI2 | Further back | More than 30 days and 300, a page at a time. | S | both |
 | HI3 | Resume differently | Resume an ended session with another model, mode or effort. | S | both |
 | HI4 | Starred messages | Star a reply to find it later. | M | both |
@@ -281,7 +281,7 @@ Today: folder browser, model, mode (default in Settings), Codex's model and effo
 | AG1 | Stop one agent | Stop a single sub-agent or background task. Unsure Claude Code allows this from outside; `/tasks` manages background work in the TUI. | M | both |
 | AG2 | Workflows list | Running and finished workflows (`/workflows`) with their result. | M | both |
 | AG3 | Jobs started elsewhere | Make sure jobs dispatched from the TUI's agent view look like the phone's own on Home. | S | daemon |
-| AG4 | Respawn old jobs | "3 jobs run 2.1.310, Claude Code is 2.1.314: Respawn". `claude respawn <id>` or `--all`. | S | both |
+| AG4 | Respawn old jobs ✓ built 2026-10-30 | "3 jobs run 2.1.310, Claude Code is 2.1.314: Respawn". `claude respawn <id>` or `--all`. | S | both |
 
 ## Reliability and diagnostics
 
