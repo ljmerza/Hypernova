@@ -36,6 +36,8 @@ class AgentCardsTest {
         assertEquals("Max", planWord("max"))
         assertEquals("Plus", planWord("plus"))
         assertEquals("Pro Lite", planWord("prolite"))
+        // A plan the app has no word for (Ultra, 2026-10-31): as Claude Code names it, capitalised.
+        assertEquals("Ultra", planWord("ultra"))
         assertNull(planWord(null))
         assertNull(planWord(" "))
     }

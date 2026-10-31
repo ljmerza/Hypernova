@@ -267,6 +267,13 @@ data class Usage(
     val models: List<ModelWeek> = emptyList(),
     /** How fast the windows are being spent; null while nothing works (and from an older Mac). */
     val rate: UsageRate? = null,
+    /**
+     * Claude Code reports a 5-hour window ([fiveHourReported]). False when the Mac has the week and
+     * no 5-hour window (Max dropped it, 2026-10-31): [fiveHour], [fiveHourResetAt] and the 5-hour
+     * pace then carry the week, for the sun's disk (as where Codex leads on a week-only plan), and
+     * nothing labelled 5H shows.
+     */
+    val fiveHourReported: Boolean = true,
 ) {
     val limited: Boolean get() = limitedAt != null
     val weekLimited: Boolean get() = weekLimitedAt != null

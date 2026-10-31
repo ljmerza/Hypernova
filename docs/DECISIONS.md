@@ -2346,3 +2346,43 @@ The owner: after a release nothing told the phone, and Settings showed no update
    it really is: a local build's versionName now comes from `git describe` (`0.5.0-3-g1a2b3c4`),
    not a fixed default. The update card above stays as it was.
 6. Nothing new on the session chat screen.
+
+## The 5-hour window only when reported; the session top bar is the owner's (2026-10-31)
+
+On the owner's Claude Max account, Claude Code's `/usage` stopped showing a "Current session" row at
+2026-10-31 05:09 UTC (the usage probe's log went from "5-hour 14%, week 62%" to "week 62%"); the
+owner says Anthropic dropped the 5-hour limit for Max and a new Ultra plan, and renamed the plans
+Pro, Max and Ultra. We can't check that, so the rule is the data's. Decided:
+
+1. **A 5-hour window shows only while Claude Code reports one.** No list of plans: a plan that has
+   one shows it, one that comes back to one shows it again.
+2. **The daemon says none, not the last one.** It kept the last 5-hour reading and rolled it into
+   fresh, empty windows for ever (a 0% meter with a made-up reset). Now a reading that lists every
+   window and has the week without a 5-hour one (the probe's `/usage` screen with no "Current
+   session" row, a status line's `rate_limits` with `seven_day` and no `five_hour`) clears it:
+   `Usage.fiveHour` is `null`. A 5-hour reading no newer than that (an idle session's status line
+   still carrying the old window) doesn't bring it back; a newer one does. A weekly limit (which
+   carries the week alone) says nothing about it, and a 5-hour limit the account is stopped at
+   keeps it. The probe's log line says "no 5-hour window".
+3. **The phone:** no 5H on Home's usage card, the session sheet's Usage part, the chat's top bar or
+   the widget's footer. The sun's disk, the widget's star and their TalkBack follow the week then,
+   as where Codex leads on a week-only plan. The limit and reset automation templates (Carry on
+   after the limit, Do it when I have budget again, Switch provider at the limit, Night shift, Fix
+   the tests while I sleep) start on the week, the Carry
+   on blurb says "your usage limit", and a run's budget offers no "Of the 5-hour window" (unless
+   one is set, so it can be turned off). Plan names are Claude Code's own (`subscriptionType`),
+   capitalised: "ultra" is "Ultra".
+4. **The session top bar is the owner's choice** (his final word the same day, over two earlier
+   passes: mode and effort, agents and the turn's time in the freed space; then mode and effort
+   alone). **Settings → Session top bar** lists the parts, each with a switch, in the order the bar
+   shows them, moved with up and down arrows (not dragging: the list is inside Settings' scrolling
+   list, and arrows work with TalkBack), kept on the phone, applied at once, with **Reset to
+   default**. The parts: the context ring, mode and effort (`auto · high`; the effort only for a
+   Claude session with one; Codex its mode), the 5-hour window and its reset (only when reported),
+   the week and its reset, the model, the tokens, the agents at work (`3 agents`, only when more
+   than none; a tap opens the session sheet on its Agents tab) and this turn's time (`4m`, only in a
+   turn). **Default:** the context ring, mode and effort, the 5-hour window, the week; the rest off.
+5. **Nothing drops for room:** the bar stays one line and scrolls sideways under a finger, fading
+   at an edge where there's more; a tap, not a drag, opens the session sheet. TalkBack reads one
+   sentence of what it shows, then the queue. This replaces the strip's give-way order (FitRow).
+6. Nothing else new on the chat screen.

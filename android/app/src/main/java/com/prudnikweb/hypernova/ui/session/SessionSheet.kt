@@ -113,13 +113,15 @@ internal fun SessionSheet(
     onEmptied: () -> Unit = {},
     onDismiss: () -> Unit,
     atBlocked: Boolean = false,
+    /** Opened from the strip's agents count: on the Agents tab. */
+    atAgents: Boolean = false,
 ) {
     val opener = LocalOpener.current
     val change = canChange(session)
     // Rename or Delete from the actions, over the sheet (ui/home/SessionMenu.kt).
     var menuPage by remember { mutableStateOf<MenuPage?>(null) }
     // The open tab, kept while the sheet is (a new one opens on Overview again).
-    var tab by rememberSaveable { mutableStateOf(openingTab(atBlocked)) }
+    var tab by rememberSaveable { mutableStateOf(openingTab(atBlocked, atAgents)) }
     // The blocked calls into view once, not each time Permissions is chosen again.
     var toBlocked by remember { mutableStateOf(atBlocked) }
     val agents = sheetAgents(hub.agents(session.id))
@@ -555,15 +557,12 @@ private fun SheetLink(text: String, trail: String?, onClick: () -> Unit, dim: Bo
 }
 
 /**
- * What the header's line used to say, for TalkBack after the usage strip's own sentences: the
- * agents at work ([atWork]), the prompts queued, and the permission mode. Starts with a space.
+ * What the header's line used to say, for TalkBack after the usage strip's own sentence: the
+ * prompts queued (the mode and the agents at work are the strip's own parts now, when chosen in
+ * Settings → Session top bar). Starts with a space; empty with none queued.
  */
 @Composable
-internal fun stripMore(s: Session, atWork: Int): String {
+internal fun stripMore(s: Session): String {
     val res = LocalContext.current.resources
-    return buildString {
-        if (atWork > 0) append(' ').append(res.getQuantityString(R.plurals.session_sheet_agents_said, atWork, atWork))
-        if (s.queued > 0) append(' ').append(res.getString(R.string.queued, s.queued)).append('.')
-        append(' ').append(res.getString(R.string.meta_mode_said, modeLabel(s.mode)))
-    }
+    return if (s.queued > 0) " " + res.getString(R.string.queued, s.queued) + "." else ""
 }

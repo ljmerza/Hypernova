@@ -262,7 +262,8 @@ fun AutomationEditor(
 
     val baseInput = remember(id, template) {
         val i = saved?.input()
-            ?: template?.let { Templates.input(it, res, project, hub.providers)?.let { t -> if (codexLeads) movedToCodex(t) else t } }
+            // The limit templates go by the 5-hour window only while Claude Code reports one (2026-10-31).
+            ?: template?.let { Templates.input(it, res, project, hub.providers, if (hub.usage.fiveHourReported) Trigger.FIVE_HOUR else Trigger.SEVEN_DAY)?.let { t -> if (codexLeads) movedToCodex(t) else t } }
             ?: AutomationInput("", true, false, Trigger.Time("09:00", Trigger.WEEKDAYS), newStart(project.orEmpty(), "", startOn, Then.NOTIFY), null)
         shaped(i, flow)
     }
@@ -476,7 +477,7 @@ fun AutomationEditor(
                 }
                 if (features?.contains(Features.BUDGET) == true || draft.budget != null) {
                     item(key = "budget") {
-                        BudgetSection(draft.budget, flowErrors[FieldPath.BUDGET]?.text, editable) { b -> update { it.copy(budget = b) } }
+                        BudgetSection(draft.budget, flowErrors[FieldPath.BUDGET]?.text, editable, fiveHour = hub.usage.fiveHourReported) { b -> update { it.copy(budget = b) } }
                     }
                 }
             } else {

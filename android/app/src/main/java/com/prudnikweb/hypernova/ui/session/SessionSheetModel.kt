@@ -31,8 +31,12 @@ internal enum class SheetTab(@StringRes val label: Int) {
     Session(R.string.session_sheet_title),
 }
 
-/** The tab the sheet opens on: Permissions from the strip's blocked mark, else Overview. */
-internal fun openingTab(atBlocked: Boolean): SheetTab = if (atBlocked) SheetTab.Permissions else SheetTab.Overview
+/** The tab the sheet opens on: Permissions from the strip's blocked mark, Agents from its agents count, else Overview. */
+internal fun openingTab(atBlocked: Boolean, atAgents: Boolean = false): SheetTab = when {
+    atBlocked -> SheetTab.Permissions
+    atAgents -> SheetTab.Agents
+    else -> SheetTab.Overview
+}
 
 /**
  * The tab row's widths, in px, from each tab's own [widths]: all as wide as the widest when that

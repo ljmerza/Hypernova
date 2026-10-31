@@ -220,6 +220,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     var modelOpen by rememberSaveable { mutableStateOf(false) }
     // The sheet opened from the strip's blocked mark: its blocked calls into view.
     var sheetAtBlocked by rememberSaveable(sessionId) { mutableStateOf(false) }
+    // The sheet opened from the strip's agents count: on its Agents tab.
+    var sheetAtAgents by rememberSaveable(sessionId) { mutableStateOf(false) }
     // The switch to the other agent, open ([AgentKind.CLAUDE] or [AgentKind.CODEX]), from the same sheet.
     var switching by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -609,7 +611,8 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 // Fork: no agents, queue or mode after the words (owner, 2026-10-29): those are the
                 // session sheet's, and TalkBack hears them on the strip. The planet before them is
                 // back (owner, 2026-10-30): it turns while Claude works, holds amber when it needs you.
-                val more = stripMore(session, agentsAtWork(session, sheetAgents(hub.agents(sessionId))))
+                val atWork = agentsAtWork(session, sheetAgents(hub.agents(sessionId)))
+                val more = stripMore(session)
                 val words = when {
                     statusBar.visible -> ""
                     !linked -> linkWord(hub.link.state)
@@ -631,14 +634,15 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     after = if (working && !statusBar.visible) elapsedText(now - workingSince) else null,
                     // "Thinking" is the daemon's word for Claude between tools: the label breathes.
                     thinking = !statusBar.visible && working && sending.not() && session.phase == Phase.Working && session.activity.substringBefore(':') == "Thinking",
-                    // The session's usage in the rest of the row: context, tokens, the 5-hour and weekly
-                    // windows (UsageStrip.kt); a tap opens the session sheet. Then the blocked mark
-                    // while calls wait, a tap to them in the sheet.
+                    // The session's top bar in the rest of the row: what Settings → Session top bar
+                    // chose (UsageStrip.kt, TopBar.kt); a tap opens the session sheet, the agents
+                    // count its Agents tab. Then the blocked mark while calls wait, a tap to them in the sheet.
                     trailContent = {
                         ChatUsage(
-                            hub, session, usage, onCompact = { quickSend("/compact") },
-                            onOpen = { sheetAtBlocked = false; sheetOpen = true },
-                            onBlocked = { sheetAtBlocked = true; sheetOpen = true },
+                            hub, session, usage, atWork, onCompact = { quickSend("/compact") },
+                            onOpen = { sheetAtBlocked = false; sheetAtAgents = false; sheetOpen = true },
+                            onAgents = { sheetAtBlocked = false; sheetAtAgents = true; sheetOpen = true },
+                            onBlocked = { sheetAtBlocked = true; sheetAtAgents = false; sheetOpen = true },
                             // No words while the status bar shows: the planet's gap is enough.
                             more = more, Modifier.padding(start = if (words.isEmpty()) 0.dp else 10.dp),
                         )
@@ -653,7 +657,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                     },
                     modifier = Modifier
                         .padding(start = 12.dp)
-                        .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.session_sheet_open), role = Role.Button) { sheetAtBlocked = false; sheetOpen = true },
+                        .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.session_sheet_open), role = Role.Button) { sheetAtBlocked = false; sheetAtAgents = false; sheetOpen = true },
                 )
                 // Its reply being read aloud here: the speaking wave.
                 com.prudnikweb.hypernova.ui.voice.SpeakingStatus(session.id, Modifier.padding(start = 12.dp))
@@ -830,6 +834,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
                 onEmptied = { sheetOpen = false },
                 onDismiss = { sheetOpen = false },
                 atBlocked = sheetAtBlocked,
+                atAgents = sheetAtAgents,
             )
         }
         if (modelOpen && canChangeModel(session)) {

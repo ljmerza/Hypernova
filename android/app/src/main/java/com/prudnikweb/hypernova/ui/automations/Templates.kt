@@ -95,36 +95,38 @@ object Templates {
 
     /**
      * The template filled in: [project] is the most recently active one (null: none yet, the editor
-     * asks); another provider for Switch.
+     * asks); another provider for Switch. [window]: the limit the limit and reset templates go by,
+     * the 5-hour one, or the week on a plan Claude Code reports no 5-hour window for (2026-10-31).
      */
-    fun input(id: String, res: Resources, project: String?, providers: List<Provider>): AutomationInput? {
+    fun input(id: String, res: Resources, project: String?, providers: List<Provider>, window: String = Trigger.FIVE_HOUR): AutomationInput? {
         val t = byId(id) ?: return null
+        val w = window
         val name = res.getString(t.name)
         val builtIn = providers.firstOrNull { it.builtIn }?.id ?: "anthropic"
         fun start(prompt: String, mode: String, rules: List<String> = emptyList(), then: String = Then.NOTIFY) =
             Action.Start(project.orEmpty(), prompt, builtIn, null, mode, rules, then)
         val (trigger, action, once) = when (id) {
-            CARRY_ON -> Triple(Trigger.Reset(Trigger.FIVE_HOUR, afterLimit = true), Action.Continue(Action.Continue.LIMITED, "", Then.NONE), false)
-            RESET -> Triple(Trigger.Reset(Trigger.FIVE_HOUR, afterLimit = true), start("", AutoMode.ASK), true)
+            CARRY_ON -> Triple(Trigger.Reset(w, afterLimit = true), Action.Continue(Action.Continue.LIMITED, "", Then.NONE), false)
+            RESET -> Triple(Trigger.Reset(w, afterLimit = true), start("", AutoMode.ASK), true)
             SWITCH -> Triple(
-                Trigger.Limit(Trigger.FIVE_HOUR),
+                Trigger.Limit(w),
                 Action.Continue(Action.Continue.LIMITED, "", Then.NONE, providerId = providers.firstOrNull { !it.builtIn }?.id.orEmpty()),
                 false,
             )
-            NIGHT -> Triple(Trigger.Reset(Trigger.FIVE_HOUR, afterLimit = false, from = "00:00", to = "07:00"), start("", AutoMode.ALLOWED), false)
+            NIGHT -> Triple(Trigger.Reset(w, afterLimit = false, from = "00:00", to = "07:00"), start("", AutoMode.ALLOWED), false)
             // On the phone.
             DEBRIEF -> Triple(Trigger.Reset(Trigger.SEVEN_DAY, afterLimit = false), Action.Notify(WEEK), false)
             BRIEF -> Triple(Trigger.Time("09:00", Trigger.WEEKDAYS), start(res.getString(R.string.au_t_brief_prompt), AutoMode.ALLOWED, GIT_READ), false)
             PRS -> Triple(Trigger.Every(2, "09:00", "19:00", Trigger.WEEKDAYS), start(res.getString(R.string.au_t_prs_prompt), AutoMode.ALLOWED, GH_READ), false)
             PLUGGED -> Triple(Trigger.Plugged, start(res.getString(R.string.au_t_plugged_prompt), AutoMode.ASK), false)
             BATTERY -> Triple(Trigger.BatteryLow(15), Action.Continue(Action.Continue.WORKING, res.getString(R.string.au_t_battery_prompt), Then.NOTIFY), false)
-            else -> return flow(id, name, res, project, builtIn)
+            else -> return flow(id, name, res, project, builtIn, w)
         }
         return AutomationInput(name, enabled = true, onlyOnce = once, trigger = trigger, action = action, template = id)
     }
 
     /** The workflow templates, filled in: steps with their conditions, outputs where the result goes. */
-    private fun flow(id: String, name: String, res: Resources, project: String?, builtIn: String): AutomationInput? {
+    private fun flow(id: String, name: String, res: Resources, project: String?, builtIn: String, window: String): AutomationInput? {
         val path = project.orEmpty()
         fun start(prompt: String, rules: List<String>) = Action.Start(path, prompt, builtIn, null, AutoMode.ALLOWED, rules, Then.NONE)
         fun input(trigger: Trigger, steps: List<Step>, outputs: List<Output> = emptyList()) =
@@ -132,7 +134,7 @@ object Templates {
         return when (id) {
             // At the night reset: fix what fails; only if that failed, say so.
             FIX_TESTS -> input(
-                Trigger.Reset(Trigger.FIVE_HOUR, afterLimit = false, from = "00:00", to = "07:00"),
+                Trigger.Reset(window, afterLimit = false, from = "00:00", to = "07:00"),
                 listOf(
                     Step("st_fix1", null, start(res.getString(R.string.wf_t_fix_prompt), listOf("Bash(npm test:*)", "Edit(src/**)"))),
                     Step("st_fix2", Guard(Guard.FAILED), Action.Notify(res.getString(R.string.wf_t_fix_notify))),

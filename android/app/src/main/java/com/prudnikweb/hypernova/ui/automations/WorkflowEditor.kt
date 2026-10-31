@@ -812,12 +812,12 @@ internal fun KeyChip(last4: String, modifier: Modifier = Modifier) {
 
 /** BUDGET: a switch, then how long a run may work and how much of the 5-hour window it may spend. */
 @Composable
-internal fun BudgetSection(budget: Budget?, error: String?, editable: Boolean, onChange: (Budget?) -> Unit) {
+internal fun BudgetSection(budget: Budget?, error: String?, editable: Boolean, fiveHour: Boolean = true, onChange: (Budget?) -> Unit) {
     Column {
         BlockSeam(stringResource(R.string.wf_budget))
         GlassCard(Modifier.fillMaxWidth(), accent = if (error != null) HN.amber else null) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                ToggleRow(stringResource(R.string.wf_budget_on), stringResource(R.string.wf_budget_body), budget != null, { on -> if (editable) onChange(if (on) Budget(30, null) else null) })
+                ToggleRow(stringResource(R.string.wf_budget_on), stringResource(if (fiveHour) R.string.wf_budget_body else R.string.wf_budget_body_time), budget != null, { on -> if (editable) onChange(if (on) Budget(30, null) else null) })
                 if (budget != null) {
                     val off = stringResource(R.string.wf_off)
                     ParamLabel(stringResource(R.string.wf_budget_minutes), Modifier.padding(top = 0.dp))
@@ -826,12 +826,16 @@ internal fun BudgetSection(budget: Budget?, error: String?, editable: Boolean, o
                         listOf<Pair<Int?, String>>(null to off) + minutes.map { it to if (it % 60 == 0) stringResource(R.string.wf_hours, it / 60) else stringResource(R.string.wf_min, it) },
                         budget.minutes, { m -> onChange(Budget(m, budget.windowPct).takeIf { it.any }) },
                     )
-                    ParamLabel(stringResource(R.string.wf_budget_pct))
-                    val pcts = (listOf(10, 25, 50) + listOfNotNull(budget.windowPct)).distinct().sorted()
-                    Segmented(
-                        listOf<Pair<Int?, String>>(null to off) + pcts.map { it to stringResource(R.string.wf_pct, it) },
-                        budget.windowPct, { p -> onChange(Budget(budget.minutes, p).takeIf { it.any }) },
-                    )
+                    // Points of the 5-hour window: only while Claude Code reports one ([fiveHour]),
+                    // or one already set, so it can be turned off.
+                    if (fiveHour || budget.windowPct != null) {
+                        ParamLabel(stringResource(R.string.wf_budget_pct))
+                        val pcts = (listOf(10, 25, 50) + listOfNotNull(budget.windowPct)).distinct().sorted()
+                        Segmented(
+                            listOf<Pair<Int?, String>>(null to off) + pcts.map { it to stringResource(R.string.wf_pct, it) },
+                            budget.windowPct, { p -> onChange(Budget(budget.minutes, p).takeIf { it.any }) },
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
                 }
                 if (error != null) {

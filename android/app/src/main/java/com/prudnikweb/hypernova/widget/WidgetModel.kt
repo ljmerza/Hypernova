@@ -54,7 +54,10 @@ internal data class WidgetModel(
      * for what's wrong (its problem, on one line); null when it's fine. [account] is Claude's alone.
      */
     val codexTrouble: String? = null,
-    /** The star's window is Codex's week (a Codex plan with only that): [usage]'s 5-hour numbers are the week's. */
+    /**
+     * The star's window is the week (a Codex plan with only that, or Claude Code reporting no 5-hour
+     * window, Usage.fiveHourReported): [usage]'s 5-hour numbers are the week's, and no 5H meter shows.
+     */
     val weekOnly: Boolean = false,
     /** The other agent's compact readout ("CODEX 61%") while both agents are in use; null otherwise. */
     val other: Other? = null,
@@ -456,7 +459,8 @@ internal data class WidgetModel(
                 usingCredits = claude && live.account.state == Account.LIMITED && live.account.limit?.usingCredits == true,
                 leadAgent = who.leadAgent,
                 codexTrouble = who.codexTrouble,
-                weekOnly = who.weekOnly,
+                // Week-only: Codex leading on such a plan, or Claude Code reporting no 5-hour window.
+                weekOnly = who.weekOnly || !u.fiveHourReported,
                 other = who.other,
             )
         }

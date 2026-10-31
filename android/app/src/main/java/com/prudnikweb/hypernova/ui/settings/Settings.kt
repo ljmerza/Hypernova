@@ -271,6 +271,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
             Spacer(Modifier.height(10.dp))
             DisplaySection()
         }
+        // Session top bar: what the chat's top bar shows, in what order (TopBarSection.kt), kept on this phone.
+        item(key = "topBar") {
+            Spacer(Modifier.height(10.dp))
+            TopBarSection()
+        }
         // Typing: what the keyboard's Enter does in the boxes that send (TypingSection below), kept on this phone.
         item(key = "typing") {
             Spacer(Modifier.height(10.dp))

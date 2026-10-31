@@ -103,6 +103,7 @@ object AgentLead {
             weekLimitedAt = if (weekFull) at else null,
             known = true,
             stale = c.account?.signedIn == false,
+            fiveHourReported = five != null,
         )
     }
 }

@@ -716,8 +716,9 @@ private fun skyDescription(hub: Hub, cosmos: CosmosState, quiet: Int, u: Usage, 
         u.weekLimited -> stringResource(R.string.a11y_week_limit, formatDuration(res, (u.sevenDayResetAt - now).coerceAtLeast(0)))
         u.limited -> stringResource(R.string.a11y_limit, formatDuration(res, (u.fiveHourResetAt - now).coerceAtLeast(0)))
         !u.known -> stringResource(R.string.sun_unknown_said)
-        // Codex leading on a plan with only the week: the sun's window is that week.
-        else -> projectionSaid(res, stringResource(if (hub.codexLeads && hub.codex?.usage?.fiveHour == null) R.string.usage_name_seven else R.string.usage_name_five), UsageProjection.fiveHour(u, now))
+        // A plan with only the week (Codex leading on one, or Claude Code reporting no 5-hour
+        // window): the sun's window is that week.
+        else -> projectionSaid(res, stringResource(if (!u.fiveHourReported) R.string.usage_name_seven else R.string.usage_name_five), UsageProjection.fiveHour(u, now))
     }
     val needs = hub.sessions.count { it.state == SessionState.NeedsYou }
     val sky = if (quiet > 0) stringResource(R.string.a11y_sky_quiet, usage, cosmos.projects().size, quiet, needs)
@@ -1014,8 +1015,11 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
             Spacer(Modifier.height(14.dp))
             if (u.stale) {
                 // Signed out or stopped: the last numbers would look live, so none, and why.
-                StaleMeter(stringResource(R.string.five_hours))
-                Spacer(Modifier.height(14.dp))
+                // The 5-hour window only while Claude Code reports one (owner, 2026-10-31).
+                if (u.fiveHourReported) {
+                    StaleMeter(stringResource(R.string.five_hours))
+                    Spacer(Modifier.height(14.dp))
+                }
                 StaleMeter(stringResource(R.string.seven_days))
                 Spacer(Modifier.height(14.dp))
                 HText(staleNote(hub.account), style = Type.small, color = HN.inkDim)
@@ -1023,9 +1027,12 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
             }
             // Each window as a projection meter: what's used, where the pace leads by its reset, and
             // one tag (the reset, or the time to the limit when that comes first).
-            val five = UsageProjection.fiveHour(u, now)
-            UsageMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(cards.claudeFive), five))
-            Spacer(Modifier.height(14.dp))
+            // The 5-hour window only while Claude Code reports one (owner, 2026-10-31: Max has none).
+            if (u.fiveHourReported) {
+                val five = UsageProjection.fiveHour(u, now)
+                UsageMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(cards.claudeFive), five))
+                Spacer(Modifier.height(14.dp))
+            }
             val seven = UsageProjection.sevenDay(u, now)
             UsageMeter(stringResource(R.string.seven_days), seven, projectionSaid(stringResource(cards.claudeSeven), seven))
             // Fable's week and the like, which only /usage on the Mac shows (ModelWeekMeters.kt).

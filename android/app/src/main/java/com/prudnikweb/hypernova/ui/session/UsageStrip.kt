@@ -5,11 +5,23 @@ import com.prudnikweb.hypernova.ui.components.glassChoice
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import com.prudnikweb.hypernova.ui.components.ModeTag
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,7 +63,6 @@ import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.UsageProjection
 import com.prudnikweb.hypernova.ui.components.ProjectionMeter
 import com.prudnikweb.hypernova.data.ModelNames
-import com.prudnikweb.hypernova.ui.components.FitRow
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphFigure
 import com.prudnikweb.hypernova.ui.components.ModelChip
@@ -92,56 +103,101 @@ internal fun rememberSessionUsage(sessionId: String, key: String): SessionUsage?
 }
 
 /**
- * The slim glass strip at the top of the chat: how full the context is (a ring and its share),
- * the model, the tokens the session has used, and the plan's 5-hour and weekly windows as compact
- * projection meters (ui/components/ProjectionMeter.kt: what's used, where the pace leads, one tag).
- * No cost (owner, 2026-10-30). "≈" marks what's worked out rather than Claude Code's own number.
- * From [COMPACT_AT]% a Compact chip offers /compact; a tap on the strip opens the session sheet
- * ([onOpen], SessionSheet.kt). TalkBack hears [more] after its own sentences: what the header's
- * line used to say (the agents at work, the queue, the mode).
+ * The slim glass strip at the top of the chat, the session's top bar: what the owner chose in
+ * Settings → Session top bar, in his order ([TopBarChoice], TopBar.kt; owner, 2026-10-31). By
+ * default the context ring and its share, the mode and the effort ("auto · high"), the plan's
+ * 5-hour window (only while Claude Code reports one) and the week, as compact projection meters
+ * with their resets (ui/components/ProjectionMeter.kt); the model, the tokens, the agents at work
+ * ([agents]) and this turn's time can be turned on. No cost (owner, 2026-10-30). "≈" marks what's
+ * worked out rather than Claude Code's own number. One line: nothing drops for room, the row
+ * scrolls sideways under a finger, its edges fading where there's more. A tap (not a drag) opens
+ * the session sheet ([onOpen], SessionSheet.kt); a tap on the agents count opens it on its Agents
+ * tab ([onAgents]). From [COMPACT_AT]% a Compact chip after it offers /compact. TalkBack hears one
+ * sentence of what it shows, then [more] (the queue).
  */
 @Composable
-internal fun UsageStrip(hub: Hub, session: Session, usage: SessionUsage, onCompact: () -> Unit, onOpen: () -> Unit, more: String, modifier: Modifier = Modifier) {
-    val res = LocalContext.current.resources
+internal fun UsageStrip(
+    hub: Hub, session: Session, usage: SessionUsage, agents: Int, onCompact: () -> Unit, onOpen: () -> Unit, onAgents: () -> Unit, more: String,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val res = context.resources
+    val choice by remember { TopBarPref.state(context) }
     val pct = usage.contextPct
     val u = hub.usage
     // Moves when "resets in" would read differently, in step with Home's countdowns (ui/fx/Countdown.kt).
     val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(u.fiveHourResetAt, u.sevenDayResetAt)
-    val showPlan = planShown(hub, session)
-    val five = if (showPlan) UsageProjection.fiveHour(u, now) else null
-    val seven = if (showPlan) UsageProjection.sevenDay(u, now) else null
-    val said = stripDescription(res, usage, session, five, seven) + more
+    val facts = TopBarFacts(
+        codex = session.codex, effort = session.effort, tokens = usage.tokens, agents = agents,
+        turnStartedAt = session.turnStartedAt, ended = session.phase == com.prudnikweb.hypernova.data.Phase.Ended,
+        plan = planShown(hub, session), fiveHour = u.fiveHourReported,
+    )
+    // This turn's time, to the minute, while it's shown.
+    val turnOn = TopBarItem.TURN in choice.items && facts.inTurn(System.currentTimeMillis())
+    val clock by produceState(System.currentTimeMillis(), turnOn) {
+        while (turnOn) {
+            value = System.currentTimeMillis()
+            delay(15_000)
+        }
+    }
+    val parts = choice.visible(facts, maxOf(clock, now))
+    val five = UsageProjection.fiveHour(u, now)
+    val seven = UsageProjection.sevenDay(u, now)
+    val mode = com.prudnikweb.hypernova.ui.home.modeLabel(session.mode)
+    val effort = session.effort?.takeIf { facts.effortShown }?.let { com.prudnikweb.hypernova.ui.home.claudeEffortTitle(it) }
+    val model = stripModel(usage, session.model, res.getString(R.string.model_default))
+    val turnMs = (maxOf(clock, now) - session.turnStartedAt).coerceAtLeast(0L)
+    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, turnMs) + more
+    val agentsLabel = stringResource(R.string.top_bar_agents_open)
     val shape = RoundedCornerShape(12.dp)
+    val scroll = rememberScrollState()
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Row(
+        Box(
             Modifier
                 .weight(1f)
                 .heightIn(min = 40.dp)
                 .clip(shape)
                 .glassChoice(false, 12.dp)
                 .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.session_sheet_open), onClick = onOpen)
-                .clearAndSetSemantics { contentDescription = said }
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .clearAndSetSemantics {
+                    contentDescription = said
+                    if (TopBarItem.AGENTS in parts) customActions = listOf(CustomAccessibilityAction(agentsLabel) { onAgents(); true })
+                },
+            contentAlignment = Alignment.CenterStart,
         ) {
-            ContextRing(pct, size = 16.dp)
-            Spacer(Modifier.width(7.dp))
-            HText(
-                pct?.let { (if (usage.contextExact) "" else "≈") + res.getString(R.string.percent, it) } ?: "—",
-                style = Type.monoSmall, color = ringColor(pct), maxLines = 1,
-            )
-            Spacer(Modifier.width(9.dp))
-            // The model as a chip, the tokens as a figure after its glyph (drawn, not "Opus 5.5 ·
-            // 7.4M tok"). Whole parts give way when the row is too narrow (the Compact chip, the
-            // blocked mark, a small phone), least useful first: the chip's version ("OPUS"), then
-            // the tokens, then the chip. They have what the windows leave.
-            FitRow(stripParts(res, usage, session), giveWay = intArrayOf(0, 1, 0), modifier = Modifier.weight(1f), gap = 6.dp)
-            // The plan's windows, 5 hours then the week: drawn, not worded (their words are
-            // TalkBack's). They come before the chip and the tokens; short of room even so, they
-            // give way too ([WINDOWS_GIVE_WAY]).
-            if (five != null && seven != null) {
-                Spacer(Modifier.width(8.dp))
-                FitRow(windowParts(five, seven), giveWay = WINDOWS_GIVE_WAY, gap = 10.dp)
+            Row(
+                Modifier
+                    .fadedEdges(scroll)
+                    .horizontalScroll(scroll)
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                for (part in parts) when (part) {
+                    TopBarItem.CONTEXT -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        ContextRing(pct, size = 16.dp)
+                        Spacer(Modifier.width(7.dp))
+                        HText(
+                            pct?.let { (if (usage.contextExact) "" else "≈") + res.getString(R.string.percent, it) } ?: "—",
+                            style = Type.monoSmall, color = ringColor(pct), maxLines = 1,
+                        )
+                    }
+                    // The mode's glyph and word, the effort after it: "auto · high"; Codex its mode alone.
+                    TopBarItem.MODE -> ModeTag(session.mode, if (effort != null) "$mode · ${effort.lowercase()}" else mode, color = HN.inkMuted)
+                    TopBarItem.FIVE_HOUR -> ProjectionMeterCompact(stringResource(R.string.usage_five_short), five, barWidth = 32.dp)
+                    TopBarItem.SEVEN_DAY -> ProjectionMeterCompact(stringResource(R.string.usage_seven_short), seven, barWidth = 32.dp)
+                    TopBarItem.MODEL -> ModelChip(ModelNames.chip(model))
+                    TopBarItem.TOKENS -> GlyphFigure(Glyph.Token, compact(res, usage.tokens))
+                    TopBarItem.AGENTS -> Box(
+                        Modifier
+                            .heightIn(min = 26.dp)
+                            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onAgents),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        HText(pluralStringResource(R.plurals.top_bar_agents, agents, agents), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
+                    }
+                    TopBarItem.TURN -> GlyphFigure(Glyph.Timer, turnShort(turnMs))
+                }
             }
         }
         // /compact is Claude Code's: a Codex session has no Compact.
@@ -152,55 +208,28 @@ internal fun UsageStrip(hub: Hub, session: Session, usage: SessionUsage, onCompa
     }
 }
 
+/**
+ * The row's content fades out at an edge it can scroll past ([scroll]), so a bar wider than the
+ * phone says there's more; the glass under it stays as it is.
+ */
+private fun Modifier.fadedEdges(scroll: ScrollState): Modifier = this
+    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+    .drawWithContent {
+        drawContent()
+        val fade = 18.dp.toPx().coerceAtMost(size.width / 3f)
+        if (scroll.value > 0) drawRect(
+            Brush.horizontalGradient(0f to Color.Transparent, 1f to Color.Black, startX = 0f, endX = fade),
+            size = Size(fade, size.height), blendMode = BlendMode.DstIn,
+        )
+        if (scroll.value < scroll.maxValue) drawRect(
+            Brush.horizontalGradient(0f to Color.Black, 1f to Color.Transparent, startX = size.width - fade, endX = size.width),
+            topLeft = Offset(size.width - fade, 0f), size = Size(fade, size.height), blendMode = BlendMode.DstIn,
+        )
+    }
+
 /** The session runs on the subscription's own provider: the plan's windows are about it. */
 internal fun builtIn(hub: Hub, session: Session): Boolean =
     hub.providers.firstOrNull { it.id == (session.providerId ?: "anthropic") }?.builtIn ?: (session.providerId == null || session.providerId == "anthropic")
-
-/**
- * The strip's parts after the ring, for [FitRow]: the model's chip (whole, then just its family)
- * and the tokens after a token (the plan's windows are the meters after them). A session that
- * hasn't spent anything yet (a rewind's new one) has no tokens.
- */
-private fun stripParts(res: Resources, usage: SessionUsage, session: Session): List<List<@Composable () -> Unit>> {
-    val name = stripModel(usage, session.model, res.getString(R.string.model_default))
-    val model = ModelNames.chip(name)
-    val family = ModelNames.family(name)
-    val chips = buildList<@Composable () -> Unit> {
-        add { ModelChip(model) }
-        if (family != null) add { ModelChip(family) }
-    }
-    val tokens = compact(res, usage.tokens)
-    val tokensPart = if (usage.tokens > 0) listOf<@Composable () -> Unit> { GlyphFigure(Glyph.Token, tokens) } else emptyList()
-    return listOf(chips, tokensPart)
-}
-
-/**
- * How the plan's windows give way, for [FitRow] over [windowParts] (0: the 5-hour window, 1: the
- * week): first the week's bar, then the 5-hour reset countdown, then the week. The 5-hour meter
- * stays.
- */
-internal val WINDOWS_GIVE_WAY = intArrayOf(1, 0, 1)
-
-/**
- * The strip's windows, for [FitRow]: the 5-hour meter (whole, then without its reset countdown),
- * then the week's ("7D", whole, then without its bar). The week's reset is days away, so it never
- * shows here; the time to either limit, in red, always does.
- */
-@Composable
-private fun windowParts(five: UsageProjection, seven: UsageProjection): List<List<@Composable () -> Unit>> {
-    val fiveLabel = stringResource(R.string.usage_five_short)
-    val sevenLabel = stringResource(R.string.usage_seven_short)
-    return listOf(
-        listOf(
-            { ProjectionMeterCompact(fiveLabel, five, barWidth = 32.dp) },
-            { ProjectionMeterCompact(fiveLabel, five, barWidth = 32.dp, reset = false) },
-        ),
-        listOf(
-            { ProjectionMeterCompact(sevenLabel, seven, barWidth = 32.dp, reset = false) },
-            { ProjectionMeterCompact(sevenLabel, seven, bar = false, reset = false) },
-        ),
-    )
-}
 
 /**
  * The model the strip names: the usage's own name while it is about the model the session runs
@@ -282,26 +311,27 @@ internal fun money(usd: Double): String = when {
     else -> String.format(Locale.ENGLISH, "$%,.0f", usd)
 }
 
-private fun stripDescription(res: Resources, u: SessionUsage, s: Session, five: UsageProjection?, seven: UsageProjection?): String = buildString {
-    append(res.getString(R.string.meta_model_said, stripModel(u, s.model, res.getString(R.string.model_default))))
-    append(' ')
-    val pct = u.contextPct
-    append(
-        when {
-            pct == null -> res.getString(R.string.chat_context_unknown_said, com.prudnikweb.hypernova.ui.components.agentName(res, s.codex))
-            u.contextExact -> res.getString(R.string.chat_context_said, pct)
-            else -> res.getString(R.string.chat_context_about_said, pct)
-        },
-    )
-    append(' ')
-    append(res.getString(R.string.chat_tokens_said, grouped(u.tokens)))
-    if (five != null) {
-        append(' ')
-        append(projectionSaid(res, res.getString(R.string.usage_name_five), five))
-    }
-    if (seven != null) {
-        append(' ')
-        append(projectionSaid(res, res.getString(R.string.usage_name_seven), seven))
+/** TalkBack's one sentence for the bar: each part it shows ([parts]), in its order. */
+private fun stripDescription(
+    res: Resources, parts: List<TopBarItem>, u: SessionUsage, s: Session, model: String, mode: String, effort: String?,
+    five: UsageProjection, seven: UsageProjection, agents: Int, turnMs: Long,
+): String = parts.joinToString(" ") { part ->
+    when (part) {
+        TopBarItem.CONTEXT -> {
+            val pct = u.contextPct
+            when {
+                pct == null -> res.getString(R.string.chat_context_unknown_said, com.prudnikweb.hypernova.ui.components.agentName(res, s.codex))
+                u.contextExact -> res.getString(R.string.chat_context_said, pct)
+                else -> res.getString(R.string.chat_context_about_said, pct)
+            }
+        }
+        TopBarItem.MODE -> res.getString(R.string.meta_mode_said, mode) + (effort?.let { " " + res.getString(R.string.ns_effort_said, it) } ?: "")
+        TopBarItem.FIVE_HOUR -> projectionSaid(res, res.getString(R.string.usage_name_five), five)
+        TopBarItem.SEVEN_DAY -> projectionSaid(res, res.getString(R.string.usage_name_seven), seven)
+        TopBarItem.MODEL -> res.getString(R.string.meta_model_said, model)
+        TopBarItem.TOKENS -> res.getString(R.string.chat_tokens_said, grouped(u.tokens))
+        TopBarItem.AGENTS -> res.getQuantityString(R.plurals.session_sheet_agents_said, agents, agents)
+        TopBarItem.TURN -> res.getString(R.string.top_bar_turn_said, formatDuration(res, turnMs))
     }
 }
 
@@ -326,9 +356,12 @@ internal fun UsageDetails(hub: Hub) {
     LaunchedEffect(Unit) { com.prudnikweb.hypernova.data.UsageRefresh.ask() }
     val usage = hub.usage
     val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(usage.fiveHourResetAt, usage.sevenDayResetAt)
-    val five = UsageProjection.fiveHour(usage, now)
-    ProjectionMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(R.string.usage_name_five), five))
-    Spacer(Modifier.height(12.dp))
+    // The 5-hour window only while Claude Code reports one (owner, 2026-10-31: Max has none).
+    if (usage.fiveHourReported) {
+        val five = UsageProjection.fiveHour(usage, now)
+        ProjectionMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(R.string.usage_name_five), five))
+        Spacer(Modifier.height(12.dp))
+    }
     val seven = UsageProjection.sevenDay(usage, now)
     ProjectionMeter(stringResource(R.string.seven_days), seven, projectionSaid(stringResource(R.string.usage_name_seven), seven))
     com.prudnikweb.hypernova.ui.home.ModelWeekMeters(usage.models, now, gap = 12.dp)

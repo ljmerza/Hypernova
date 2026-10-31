@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The session's top bar on the chat screen (ui/session/UsageStrip.kt, TopBar.kt). -->
+    <plurals name="top_bar_agents">
+        <item quantity="one">%d agent</item>
+        <item quantity="other">%d agents</item>
+    </plurals>
+    <string name="top_bar_agents_open">Show the agents</string>
+    <!-- TalkBack: this turn's time so far ("This turn: 4:05 so far."). -->
+    <string name="top_bar_turn_said">This turn: %1$s so far.</string>
+
+    <!-- Settings → Session top bar (ui/settings/TopBarSection.kt). -->
+    <string name="st_top_bar">Session top bar</string>
+    <string name="st_top_bar_desc">What the bar at the top of a chat shows, in this order. Too much for the screen, it scrolls sideways.</string>
+    <string name="st_top_bar_reset">Reset to default</string>
+    <string name="st_top_bar_up">Move %1$s up</string>
+    <string name="st_top_bar_down">Move %1$s down</string>
+    <string name="st_top_bar_end">Already at the end</string>
+    <string name="st_top_bar_context">Context</string>
+    <string name="st_top_bar_context_desc">How full the conversation is, as a ring.</string>
+    <string name="st_top_bar_mode">Mode and effort</string>
+    <string name="st_top_bar_mode_desc">The permission mode, and Claude Code’s effort.</string>
+    <string name="st_top_bar_five">5-hour window</string>
+    <string name="st_top_bar_five_desc">Its use and reset, while Claude Code reports one.</string>
+    <string name="st_top_bar_seven">7-day window</string>
+    <string name="st_top_bar_seven_desc">The week’s use and reset.</string>
+    <string name="st_top_bar_model">Model</string>
+    <string name="st_top_bar_model_desc">The model the session runs.</string>
+    <string name="st_top_bar_tokens">Tokens</string>
+    <string name="st_top_bar_tokens_desc">The tokens the session has used.</string>
+    <string name="st_top_bar_agents">Agents at work</string>
+    <string name="st_top_bar_agents_desc">How many agents work for it, while any do. A tap shows them.</string>
+    <string name="st_top_bar_turn">This turn’s time</string>
+    <string name="st_top_bar_turn_desc">How long the turn under way has run.</string>
+</resources>

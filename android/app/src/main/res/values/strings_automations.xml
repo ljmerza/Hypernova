@@ -197,7 +197,7 @@
 
     <!-- Templates: the limit ones lead (owner, 2026-10-15). -->
     <string name="au_t_carry_on">Carry on after the limit</string>
-    <string name="au_t_carry_on_blurb">Pick up every session the 5-hour limit stopped, the moment it resets</string>
+    <string name="au_t_carry_on_blurb">Pick up every session your usage limit stopped, the moment it resets</string>
     <string name="au_t_reset">Do it when I have budget again</string>
     <string name="au_t_reset_blurb">Park a task for when your limit comes back</string>
     <string name="au_t_reset_hint">What should it pick up when your limit is back?</string>

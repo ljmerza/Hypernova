@@ -54,6 +54,28 @@ data class UsageProjection(val used: Float, val projected: Float?, val tag: Tag,
             else UsageProjection(u, lead.coerceIn(u, 1f), reset, pace, resetIn)
         }
 
+        /**
+         * Claude Code reports a 5-hour window: the rule for every 5H on the phone (owner, 2026-10-31:
+         * Max dropped it; shown only when Claude Code reports one, no list of plans). False only when
+         * the Mac has the week and no 5-hour window, and no 5-hour limit holds ([hit]); with nothing
+         * known yet, as before (true).
+         */
+        fun fiveHourReported(fiveHour: Window?, sevenDay: Window?, hit: Boolean = false): Boolean =
+            hit || fiveHour != null || sevenDay == null
+
+        /**
+         * [u] without a 5-hour window ([Usage.fiveHourReported] false): the week in the 5-hour slot
+         * too, so the sun's disk (and the widget's star) follow the week, as where Codex leads on a
+         * week-only plan (AgentLead.codexSunUsage). Never a 5-hour limit: the week's is the low state.
+         */
+        fun weekAsDisk(u: Usage): Usage = u.copy(
+            fiveHour = u.sevenDay,
+            fiveHourResetAt = u.sevenDayResetAt,
+            limitedAt = null,
+            rate = u.rate?.copy(fiveHour = u.rate.sevenDay, fiveHourEtaMs = u.rate.sevenDayEtaMs),
+            fiveHourReported = false,
+        )
+
         /** The 5-hour window of [usage] at [now]. */
         fun fiveHour(usage: Usage, now: Long): UsageProjection =
             of(usage.fiveHour, usage.fiveHourResetAt, now, usage.rate?.fiveHour, usage.rate?.fiveHourEtaMs, usage.limited)

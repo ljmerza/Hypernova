@@ -180,6 +180,8 @@
     <!-- Budget. -->
     <string name="wf_budget_on">Limit each run</string>
     <string name="wf_budget_body">It stops when it works too long, or spends too much of your 5-hour window.</string>
+    <!-- The same, while Claude Code reports no 5-hour window (a plan with only the week). -->
+    <string name="wf_budget_body_time">It stops when it works too long.</string>
     <string name="wf_budget_minutes">Time at work</string>
     <string name="wf_budget_pct">Of the 5-hour window</string>
     <string name="wf_off">Off</string>
