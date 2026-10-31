@@ -7,7 +7,7 @@ only on purpose, and log the change here.
 - **Name: Hypernova**, part of the Hyper* family (Hyperscribe, Hypernavigate). We don't use "Claude" in the name because of Anthropic's trademark, but describing it as "a control room for Claude Code" is fine.
 - Built to public quality from the start. The repo is local for now (see LATER L4).
 - One phone can pair with **several Macs**, with a switcher in the app. Built (owner, 2026-10-30; `android/.../data/Servers.kt`):
-  - **One is active**: Home, sessions, chat, Settings, the widgets and the glasses show it, as they showed the one pairing before. (The widget shows every computer since 2026-10-31: "The widget: Needs you".)
+  - **One is active**: Home, sessions, chat, Settings, the widgets and the glasses show it, as they showed the one pairing before. (The widget shows every computer since 2026-10-31: "The widget: Needs you"; Home can too: "All servers on Home".)
   - **The others are watched in the background** (each has its own link): their notifications (needs you, finished, errors, approvals) name the computer, and a tap switches to it and opens the session; their needs-you count shows on the chip and in the switcher. Answers, replies and queued prompts go to the computer they belong to.
   - **The Home chip opens the switcher** (a glass sheet): each computer with its link and needs-you count, the active one ticked, and "Pair another Mac" last (the pairing steps, the others kept). It no longer opens Settings. With several paired the chip names the active one in every state, with an amber count while another needs you.
   - **Pairing another computer adds it** (no "Replace?" question any more); pairing one again takes its old place. **Forget** forgets only the active one, and the next comes on screen.
@@ -2518,3 +2518,39 @@ widgets (2026-10-15)" above.
 7. **Battery as before:** it redraws when what needs you changes on any computer, at most every
    1.5s, never while the screen is off, with no timer or update period.
 8. **No daemon change**, nothing new on the chat screen.
+
+## All servers on Home (2026-10-31)
+
+The owner: "add an option to select All, and show me all servers combined into one view. In this
+combined view, if I open a new session, it asks me which server I want." His choice: Home only;
+History, Automations, Settings and Statistics keep working on one server and say which. Then: "I
+want to be able to select the session and see the details too."
+
+1. **"All servers" first in the switcher**, only while two or more are paired. Chosen, it is kept on
+   the phone (`ServerBook.all`) and survives restarts; picking one computer, or pairing a new one,
+   leaves it. With one computer left it no longer shows (the choice waits for a second).
+2. **Home's Sessions tab holds every computer's sessions** in its three groups and sorts (A to Z,
+   newest first for Completed; the same name and id on two computers by the computer's name), the
+   counts all of them. Each card names its computer in its meta line, after the project; nothing
+   else on the card changes. Home search filters each computer's and asks each for its full-text
+   hits, each merged only into its own (`ui/home/AllHome.kt`).
+3. **Everything a card does goes to its own computer:** Allow and Deny, the long-press menu, both
+   swipes, its unread mark. **Opening one** makes that computer the one on screen for the
+   session's screens (chat, session sheet with its tabs, terminal, agents, files), exactly as with
+   one computer, without becoming the one picked; **Back to Home** is "All servers" again and the
+   one picked is back on screen (`Core.visit`, `Core.backToPicked`). A notification or widget tap
+   while All is chosen opens its session the same way and All stays; their other taps switch, as before.
+4. **The cards above the sessions and the usage cards are the one picked last's** (account,
+   providers, prompts for gone sessions, outdated jobs, automation questions, the offline card),
+   each saying its name: per-computer cards for everything would crowd Home, and a session another
+   computer's limit or sign-out stops already says so on its own card (its PAUSED or SIGNED OUT chip).
+5. **An offline computer's sessions stay, dimmed**, its tag saying `offline`, and only open (no
+   Allow, Deny, swipes or menu), as the widget's rows do: what was running there is still worth
+   seeing, and an answer couldn't reach it. "Offline" is any link but connected or reconnecting.
+6. **New session asks which computer first**: every paired one with its link, only a linked one
+   can be picked; then the New session sheet for it, its folders, models and providers. A
+   launcher shortcut or Share keeps to the one picked.
+7. **The chip says "All"** on the Sessions tab, its moon the worst of their links; History,
+   Automations and Settings show the one picked last, the chip naming it; Statistics' subtitle
+   names it. Switching tabs doesn't leave All.
+8. **Unchanged:** notifications, the widget, the chat screen; no daemon change.
