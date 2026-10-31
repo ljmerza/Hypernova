@@ -27,6 +27,20 @@ that affects other people:** the project only switches to a mirror when a machin
 - JDK: Android Studio's bundled JBR 21 (`/Applications/Android Studio.app/Contents/jbr/Contents/Home`).
 - Kotlin 2.4.21: AGP 9's built-in Kotlin picks it up from the root `plugins {}` block, and Haze 2 needs it.
 
+## Screen tests (Robolectric and Roborazzi)
+`android/app/src/test/java/com/prudnikweb/hypernova/ui/screens/` draws Home, the chat, the session
+sheet, the New session sheet, Settings' parts and Statistics on the JVM (Robolectric, Compose's test
+rule) with a fake hub (`FakeHub`, `Samples`): no phone, no network. Each test clicks and checks what the
+fake hub was asked, and takes a picture of the screen (Roborazzi). The pictures are in
+`android/app/src/test/snapshots/`, one phone size (`robolectric.properties` beside the tests).
+- `./gradlew :app:testDebugUnitTest` runs them with the rest; it doesn't compare the pictures.
+- `./gradlew :app:verifyRoborazziDebug` compares them: a picture that changed fails its test, and
+  `app/build/outputs/roborazzi/<name>_compare.png` shows the old one, the difference and the new one.
+- A change to how a screen looks on purpose: `./gradlew :app:recordRoborazziDebug` (all of them, or
+  `--tests '*.ui.screens.HomeScreenTest'` for one class) writes them again; look at the new pictures
+  before committing them.
+- The first run downloads Robolectric's Android jar (SDK 35) from Maven Central.
+
 ## Fake provider (other providers' limits, without spending anything)
 `daemon/test/fake-provider/` (tests only, never bundled) is a tiny Anthropic-compatible server on
 loopback that streams canned replies ("Fake provider here. Nothing went to a model.") and, told to,

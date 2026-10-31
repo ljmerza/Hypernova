@@ -5,6 +5,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.roborazzi)
 }
 
 /**
@@ -95,6 +96,10 @@ android {
         compose = true
         buildConfig = true
     }
+    // Robolectric's screen tests read the app's own resources (strings, fonts).
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -116,6 +121,19 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Screen tests on the JVM (app/src/test/.../ui/screens): Compose under Robolectric, and Roborazzi's
+    // screenshots of them (baselines in app/src/test/snapshots; `verifyRoborazziDebug` compares,
+    // `recordRoborazziDebug` writes them again).
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    // The empty activity createComposeRule launches, in the debug manifest only.
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+roborazzi {
+    outputDir.set(file("src/test/snapshots"))
 }
 
 // `./gradlew :app:dist`: the debug APK in ../dist, with its version in a note next to it. The Mac

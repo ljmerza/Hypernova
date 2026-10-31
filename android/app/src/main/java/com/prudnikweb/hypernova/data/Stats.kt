@@ -209,6 +209,12 @@ object StatsSource {
     fun fresh(hub: Hub, range: StatsRange, now: Long = System.currentTimeMillis()): Boolean =
         cache[key(hub, range)]?.let { now - it.at < FRESH_MS } == true
 
+    /** A screen test's answer for [range] of [hub] (which has no Mac to ask): kept as one just received. */
+    @androidx.annotation.VisibleForTesting
+    internal fun put(hub: Hub, range: StatsRange, stats: Stats) {
+        cache[key(hub, range)] = Entry(stats, System.currentTimeMillis())
+    }
+
     /** Ask the Mac. A failure is an [ApiException] to explain. */
     suspend fun load(hub: Hub, range: StatsRange): Result<Stats> {
         val k = key(hub, range)

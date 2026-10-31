@@ -181,7 +181,11 @@ private val EDIT_TOOLS = setOf("Write", "Edit", "MultiEdit", "NotebookEdit")
 
 /** [opening]: which opening of the session this is (a new one each time it's opened; see below). */
 @Composable
-fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int = 0) {
+fun SessionScreen(
+    hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int = 0,
+    /** The session's usage for its top bar and sheet: the Mac's (ChatRepo); a screen test passes its own. */
+    usageOf: @Composable (sessionId: String, key: String) -> SessionUsage? = { id, key -> rememberSessionUsage(id, key) },
+) {
     val haze = LocalHaze.current
     val opener = LocalOpener.current
     val toast = LocalToast.current
@@ -435,7 +439,7 @@ fun SessionScreen(hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int 
     val workingSince = remember(sessionId, working) { System.currentTimeMillis() }
     // The session's usage, for the strip and the sheet: asked again as the transcript settles, and
     // when the session's model changes (/model).
-    val usage = rememberSessionUsage(sessionId,"$tailKey|$working|${session.model}")
+    val usage = usageOf(sessionId, "$tailKey|$working|${session.model}")
     // A limit, a sign-out or the provider stopped it: the card above the composer and its hint say so.
     val block = activeBlock(hub, session)
     // The chat's quick wins (ChatExtras.kt): which message's long-press menu is open, and a quick
