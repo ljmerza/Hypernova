@@ -41,17 +41,18 @@
     <string name="stats_agents">Agents</string>
     <string name="a11y_stats_hero">Claude worked %1$s. %2$s tokens, %3$d sessions, %4$d agents.</string>
 
-    <!-- The galaxy of the last 30 days. -->
-    <string name="stats_galaxy">Last 30 days</string>
+    <!-- The last 30 days, a bar a day. -->
+    <string name="stats_last_days">Last 30 days</string>
     <plurals name="stats_active_days">
         <item quantity="one">%d day with work</item>
         <item quantity="other">%d days with work</item>
     </plurals>
-    <string name="stats_galaxy_legend">One star a day: its size is the hours, its light the tokens.</string>
     <string name="stats_today_tick">Today</string>
     <string name="stats_day_tokens">%1$s tokens</string>
     <string name="stats_day_none">no work</string>
-    <string name="a11y_stats_galaxy">Last 30 days as a galaxy, one star a day. %1$s</string>
+    <!-- TalkBack, the whole chart: "…, the most 9 hours 17 minutes on Sat 31 Oct. Sat 31 Oct, 9h 17m, 435M tokens". -->
+    <string name="a11y_stats_days">Hours of work over the last 30 days, a bar a day, the most %1$s on %2$s.</string>
+    <string name="a11y_stats_days_none">No work in the last 30 days.</string>
     <string name="a11y_stats_prev_day">Day before</string>
     <string name="a11y_stats_next_day">Day after</string>
 

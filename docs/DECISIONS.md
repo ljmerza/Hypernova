@@ -2266,3 +2266,22 @@ comes back, but by default the phone's own recognizer may send it to Google, as 
 4. **Both, from Android 13:** `EXTRA_ENABLE_FORMATTING` = `FORMATTING_OPTIMIZE_QUALITY` (punctuation
    and capitals, tuned for quality over speed) and `EXTRA_MASK_OFFENSIVE_WORDS` = false (words as
    said). Older Android gets neither. Whether a recognizer honours them is its own affair.
+
+## The last 30 days as a bar chart (2026-10-31)
+
+The owner: "remove the galaxy image and make this stats section a generic stats section instead.
+Each section is good but make the 30 days generic like the others."
+
+1. **The spiral galaxy is gone** (`ui/stats/Galaxy.kt`: the disc's painted arms, dust and bulge,
+   the stars by size and light, the slow turn, the "TODAY" name beside the newest star) and its
+   caption "One star a day: its size is the hours, its light the tokens." with it.
+2. **In its place a card like the others** (DESIGN.md, Statistics): the same seam `LAST 30 DAYS`
+   and trail, a GlassCard, one bar a day for the hours of work, oldest left and today right in the
+   accent, a day without work a faint tick, light labels only (the first day, the middle one,
+   TODAY, the scale's hours). A tap or a drag across picks a day; its line stays under the chart
+   as before (`SAT 31 OCT  ⏱ 9h 17m  ⬡ 435M`), today by default. Days outside the chosen range
+   stay, fainter, as the galaxy's did.
+3. **Tokens are only in the day's line now**: the bars draw the hours alone (the galaxy drew tokens
+   as a star's light). Same data as before (`days[]` of `/v1/stats`), no daemon change.
+4. **TalkBack**: the chart says its busiest day, then the picked day; "Day before" and "Day after"
+   stay as its actions.
