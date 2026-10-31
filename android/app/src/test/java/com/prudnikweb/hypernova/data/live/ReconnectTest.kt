@@ -183,6 +183,17 @@ class ReconnectTest {
         rig.until("a new socket") { daemon.opened.get() == 2 }
     }
 
+    @Test fun backOnScreenASocketSilentForThirtySecondsIsReplacedAtOnce() {
+        rig.connect()
+        rig.advance(20_000)
+        rig.hub.foreground(true)
+        rig.pump()
+        assertEquals("heard from 20 s ago: kept", 1, daemon.opened.get())
+        rig.advance(11_000)
+        rig.hub.foreground(true)
+        rig.until("a new socket") { daemon.opened.get() == 2 && rig.hub.link.state == LinkState.Connected }
+    }
+
     @Test fun pauseClosesTheSocketUntilTheAppOpens() {
         rig.connect()
         rig.hub.pause()

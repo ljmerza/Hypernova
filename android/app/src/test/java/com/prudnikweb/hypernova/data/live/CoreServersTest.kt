@@ -2,10 +2,16 @@ package com.prudnikweb.hypernova.data.live
 
 import android.os.Looper
 import com.prudnikweb.hypernova.data.Answer
+import com.prudnikweb.hypernova.data.AppUpdate
+import com.prudnikweb.hypernova.data.AppUpdater
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Pairing
+import com.prudnikweb.hypernova.data.UpdateFailure
+import com.prudnikweb.hypernova.data.UpdatePolicy
+import com.prudnikweb.hypernova.data.UpdateState
+import okhttp3.mockwebserver.MockResponse
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
@@ -22,9 +28,10 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 
 /**
- * [Core] itself with two computers paired (the app's process starts it: HypernovaApp.onCreate): its
- * hubs on the main thread, the switcher, "All servers" and where an answer goes. One test: Core is
- * the process's, and lives on from one test to the next in the same sandbox.
+ * [Core] itself (the app's process starts it: HypernovaApp.onCreate), its hubs on the main thread:
+ * two computers paired, the switcher, "All servers" and where an answer goes; the in-app update from
+ * the active one. Core is the process's and outlives a test in the same sandbox, so each test
+ * forgets every computer it paired.
  */
 @RunWith(RobolectricTestRunner::class)
 class CoreServersTest {
@@ -35,6 +42,49 @@ class CoreServersTest {
             if (cond()) return
             if (System.nanoTime() > deadline) fail("timed out waiting for: $what (${Core.statuses})")
             Thread.sleep(3)
+        }
+    }
+
+    /**
+     * The in-app update (data/AppUpdater.kt) from the active computer: the permission first, then
+     * the download over its route, and a 404 or a file Android can't read is a failure it can say.
+     */
+    @Test fun theAppUpdateAsksForThePermissionThenDownloadsAndSaysWhatWentWrong() {
+        Core.init(RuntimeEnvironment.getApplication())
+        val app = Core.app
+        val z2 = FakeDaemon("z2")
+        try {
+            z2.snapshot = snapshot("z2", sessions = listOf(session("z-1")))
+            Core.paired(Pairing(z2.base, "tok-z2", "z2", "m-z2", "dev-1"))
+            until("linked") { Core.live?.link?.state == LinkState.Connected }
+            val u = AppUpdate("9.9.9", 2_000_000_000, z2.base + "/download/android")
+            val pm = shadowOf(app.packageManager)
+
+            pm.setCanRequestPackageInstalls(false)
+            AppUpdater.start(app, u)
+            assertEquals(UpdateState.NeedsPermission(u.versionCode), AppUpdater.state)
+
+            // Allowed in the system's settings, back in the app: the download, and the server has none.
+            pm.setCanRequestPackageInstalls(true)
+            AppUpdater.resumed(app)
+            until("the 404") { AppUpdater.state is UpdateState.Failed }
+            assertEquals(UpdateFailure.Missing, (AppUpdater.state as UpdateState.Failed).failure)
+            assertEquals(1, z2.count("GET", UpdatePolicy.APK_PATH))
+            AppUpdater.dismiss(app)
+            assertEquals(UpdateState.Idle, AppUpdater.state)
+
+            // A file that isn't an APK Android can read.
+            z2.on("GET", UpdatePolicy.APK_PATH) { MockResponse().setResponseCode(200).setBody("not an apk") }
+            AppUpdater.start(app, u)
+            until("the check") { AppUpdater.state is UpdateState.Failed }
+            assertEquals(UpdateFailure.Damaged, (AppUpdater.state as UpdateState.Failed).failure)
+            assertEquals(2, z2.count("GET", UpdatePolicy.APK_PATH))
+            AppUpdater.dismiss(app)
+        } finally {
+            AppUpdater.cleanUp(app)
+            for (s in Core.servers.toList()) Core.forget(s.id)
+            shadowOf(Looper.getMainLooper()).idle()
+            z2.close()
         }
     }
 

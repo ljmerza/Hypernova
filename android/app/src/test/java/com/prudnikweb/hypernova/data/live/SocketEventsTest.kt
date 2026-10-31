@@ -186,6 +186,21 @@ class SocketEventsTest {
         rig.push(msg("claude") { put("claude", JSONObject().put("available", true).put("agents", false)) }) { rig.hub.claude?.agents == false }
     }
 
+    @Test fun aLowBatteryIsSaidOnceUntilItHasBeenCharged() {
+        connectWith(session("s1"))
+        fun battery(pct: Int, charging: Boolean = false) = msg("battery") { put("battery", JSONObject().put("percent", pct).put("charging", charging).put("onAC", charging)) }
+        rig.push(battery(19)) { rig.banners.any { it.id == "battery" } }
+        daemon.push(battery(15))
+        rig.sync()
+        assertEquals(1, rig.banners.count { it.id == "battery" })
+        assertEquals(15, rig.hub.mac.battery?.percent)
+        // On the charger: said again the next time it runs low.
+        daemon.push(battery(16, charging = true))
+        daemon.push(battery(18))
+        rig.sync()
+        assertEquals(2, rig.banners.count { it.id == "battery" })
+    }
+
     @Test fun usageMessagesMoveTheSun() {
         connectWith(session("s1"))
         val reset = rig.now + 3_600_000L
