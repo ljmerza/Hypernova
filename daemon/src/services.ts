@@ -73,7 +73,8 @@ export function pollStatusLine(): void {
         }
       } else if (Number.isFinite(api) && api > prev.api) at = s.mtimeMs
       limitsAsOf.set(sid, { api: Number.isFinite(api) ? api : (prev?.api ?? 0), at })
-      offerUsage(conv(rl.five_hour), conv(rl.seven_day), at)
+      // The week without a 5-hour window: the plan has none (Max, 2026-10-31), not "unchanged".
+      offerUsage(conv(rl.five_hour), conv(rl.seven_day), at, false, !rl.five_hour && !!rl.seven_day)
     } catch {}
   }
   const now = Date.now()

@@ -1184,15 +1184,24 @@ const limitedIn = (k: 'five' | 'seven'): boolean => {
 const usageAt = { five: 0, seven: 0 }
 const usageForced = { five: false, seven: false }
 /**
+ * When a reading last said there is no 5-hour window (Claude Code reported the week and no session
+ * window: Max dropped it, 2026-10-31). A 5-hour reading as old as that or older, an idle session's
+ * status line still carrying one, doesn't bring the old window back.
+ */
+let fiveGoneAt = 0
+/**
  * Merge a reading true as of [observedAt]: a later reset wins; within the same window the newest
  * reading wins, even when it's lower (the owner reset his limits on claude.ai and the meter stayed
  * at 94%: "within a window usage only grows" kept idle sessions' old numbers). Readings within a
  * second of each other keep the higher. A limit Claude Code hit ([forced]) stands until a newer
- * reading or the reset.
+ * reading or the reset. [noFive]: the reading lists every window Claude Code reports and the
+ * 5-hour one isn't among them, so, newer than the last 5-hour reading, there is none (null), not
+ * the last one rolled into empty windows (unless the account is stopped at that limit now).
  */
-export function offerUsage(five: Reading | null, seven: Reading | null, observedAt: number, forced = false): void {
+export function offerUsage(five: Reading | null, seven: Reading | null, observedAt: number, forced = false, noFive = false): void {
   const pick = (k: 'five' | 'seven', cur: Window | null, next: Reading | null): Window | null => {
     if (!next || !Number.isFinite(next.pct)) return cur
+    if (k === 'five' && !forced && observedAt <= fiveGoneAt) return cur
     const take = () => {
       usageAt[k] = Math.max(usageAt[k], observedAt)
       usageForced[k] = forced
@@ -1209,7 +1218,13 @@ export function offerUsage(five: Reading | null, seven: Reading | null, observed
     if (observedAt >= usageAt[k] - 1000 && !usageForced[k] && next.pct > cur.pct) return take()
     return cur
   }
-  const nf = pick('five', usage.fiveHour, five)
+  let nf = pick('five', usage.fiveHour, five)
+  if (noFive && !five && observedAt > usageAt.five && !(usageForced.five && limitedIn('five'))) {
+    fiveGoneAt = Math.max(fiveGoneAt, observedAt)
+    usageAt.five = Math.max(usageAt.five, observedAt)
+    usageForced.five = false
+    nf = null
+  }
   const ns = pick('seven', usage.sevenDay, seven)
   if (JSON.stringify([nf, ns]) === JSON.stringify([usage.fiveHour, usage.sevenDay])) return
   usage = { ...usage, fiveHour: nf, sevenDay: ns, source: 'official', observedAt: Math.max(usage.observedAt ?? 0, observedAt) }
@@ -1222,9 +1237,10 @@ export function offerUsage(five: Reading | null, seven: Reading | null, observed
  * the same rules. The screen gives the reset to the minute: one within two minutes of the window
  * already known keeps that one's (a status line's is to the second), and a row with no reset, or
  * one no such window could have (further off than the window is long), takes the known window's
- * while that hasn't ended, else is passed over.
+ * while that hasn't ended, else is passed over. [noFive]: the screen had the week's row and no
+ * "Current session" row, so the plan has no 5-hour window (any more).
  */
-export function offerScreenUsage(five: PlanWindow | null, seven: PlanWindow | null, observedAt: number): void {
+export function offerScreenUsage(five: PlanWindow | null, seven: PlanWindow | null, observedAt: number, noFive = false): void {
   const fit = (w: PlanWindow | null, cur: Window | null, period: number): Reading | null => {
     if (!w || !Number.isFinite(w.pct)) return null
     const r = w.resetsAt
@@ -1237,7 +1253,7 @@ export function offerScreenUsage(five: PlanWindow | null, seven: PlanWindow | nu
     if (cur && at === cur.resetsAt && w.pct < cur.pct && cur.pct - w.pct < 1) return { pct: cur.pct, resetsAt: at, pace: Math.max(cur.pct, pace) }
     return { pct: w.pct, resetsAt: at, pace }
   }
-  offerUsage(fit(five, usage.fiveHour, FIVE_HOURS), fit(seven, usage.sevenDay, WEEK), observedAt)
+  offerUsage(fit(five, usage.fiveHour, FIVE_HOURS), fit(seven, usage.sevenDay, WEEK), observedAt, false, noFive && !five)
 }
 
 /** The usage probe's health changed (usage-probe.ts): clients hear it with the usage. */

@@ -199,8 +199,9 @@ export function probeUsage(why: string): Promise<boolean> {
     const r = await runProbe()
     // The 5-hour window and the week, as of the moment the screen was read: for the meters and the pace.
     const plan = r.ok && r.screen && r.at ? planWindows(r.screen.rows) : null
-    if (plan) offerScreenUsage(plan.fiveHour, plan.sevenDay, r.at!)
-    const said = plan ? [plan.fiveHour && `5-hour ${plan.fiveHour.pct}%`, plan.sevenDay && `week ${plan.sevenDay.pct}%`].filter(Boolean).join(', ') : ''
+    // The week's row with no "Current session" row: no 5-hour window (Max, 2026-10-31), not "unchanged".
+    if (plan) offerScreenUsage(plan.fiveHour, plan.sevenDay, r.at!, !plan.fiveHour && !!plan.sevenDay)
+    const said = plan ? [plan.fiveHour ? `5-hour ${plan.fiveHour.pct}%` : plan.sevenDay && 'no 5-hour window', plan.sevenDay && `week ${plan.sevenDay.pct}%`].filter(Boolean).join(', ') : ''
     if (r.ok) {
       failingSince = null
       setProbeHealth(true, null)

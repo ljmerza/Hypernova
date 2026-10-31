@@ -748,6 +748,9 @@ Usage = { fiveHour: Window | null, sevenDay: Window | null,
           // into new windows (the status line stops reporting limits then). source and observedAt
           // are the official readings' (status lines, and the usage probe's look at /usage: see
           // Per-model weeks); models have their own source
+          // fiveHour null with sevenDay set: Claude Code reports no 5-hour window (a plan without
+          // one, Max from 2026-10-31); clients show no 5-hour window then (see "No 5-hour window"
+          // under Per-model weeks). Both null: nothing read yet.
 Window = { pct: number, resetsAt: number }   // pct 0..100, resetsAt epoch ms
 Rate = { fiveHour: number | null,            // %/min, a least-squares line over the last ~10 minutes
                                              // of official readings (status lines, and the usage
@@ -2870,6 +2873,14 @@ brings no readings and the spend pace (`Usage.rate`) would go flat; the probe's 
   line's is to the second); a row without a reset, or with one no such window could have (more than
   a window's length ahead), takes the known window's while it hasn't ended, else isn't offered.
   `Usage.source` is `"official"` and `observedAt` moves with them like a status line's.
+- **No 5-hour window** (2026-10-31: the owner's Max account's screen lost its "Current session"
+  row; DECISIONS.md): a look whose screen has the all-models week and no "Current session" row, or
+  a status line whose `rate_limits` has `seven_day` and no `five_hour`, says there is none:
+  `Usage.fiveHour` becomes `null` (it was the last reading, rolled into empty windows for ever),
+  unless the account is stopped at a 5-hour limit now. A 5-hour reading no newer than that one
+  (an idle session's status line still carrying the old window) is passed over; a newer one brings
+  the window back. A weekly limit Claude Code hit, which carries only the week, says nothing about
+  it. The log line says "no 5-hour window".
 - **When:** while any client is connected (the Mac app counts): every 2 minutes while a session on
   the subscription works or its agents run (what `Usage.rate` goes by; sessions on other providers
   don't spend these windows; not at a 5-hour or weekly limit, whose meter stands full with no
