@@ -98,6 +98,10 @@ android {
     // The protocol's contract fixtures, shared with the daemon's tests (docs/PROTOCOL.md, "Contract
     // fixtures"): on the unit tests' classpath as fixtures/*.json, so a changed fixture runs them again.
     sourceSets.getByName("test").resources.srcDir("../../protocol")
+    // Robolectric tests read the app's own strings (LiveHub's words, data/live tests).
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -119,6 +123,8 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.robolectric)
 }
 
 // `./gradlew :app:dist`: the debug APK in ../dist, with its version in a note next to it. The Mac
