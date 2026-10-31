@@ -54,9 +54,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Fork: no https://hypernova.observer App Link (an autoVerify filter would make Android
-                 fetch that site's assetlinks.json at install). Pairing is local only: the QR code
-                 opens the server's own pairing page on the network, which hands over to the link below. -->
+            <!-- No https App Link (an autoVerify filter would make Android fetch a site's
+                 assetlinks.json at install). Pairing is local only: the QR code opens the server's
+                 own pairing page on the network, which hands over to the link below. -->
 
             <!-- The app link, hypernova://pair?v=1&u=…&c=…&n=…: the server's pairing page's hand-over, Paste link, adb. -->
             <intent-filter>

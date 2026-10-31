@@ -1,7 +1,7 @@
 // Node.js for the daemon on Linux: the one Hypernova downloaded (<support>/node/<version>), else the
 // one running this command, when either is Node 24 or newer; otherwise the newest Node 24 from
-// nodejs.org, checked against nodejs.org's SHASUMS256.txt and unpacked into Hypernova's own folder,
-// as the Mac app does (mac/…/Core/NodeInstaller.swift). Nothing outside that folder is touched.
+// nodejs.org, checked against nodejs.org's SHASUMS256.txt and unpacked into Hypernova's own folder.
+// Nothing outside that folder is touched.
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

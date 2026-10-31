@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { cliContext, realSys, wslHere, type Cli, type Ran, type RunOptions, type Sys, type WslHere } from '../src/cli/context.ts'
-import { doctor, lan, logs, name, pair, parseArgs, setup, status, uninstall } from '../src/cli/commands.ts'
+import { doctor, lan, logs, pair, parseArgs, setup, status, uninstall } from '../src/cli/commands.ts'
 import { CARRIED, enableLinger, installService, userManager, launcherText, ownLauncher, removeService, serviceState, servicePath, unitText, userBusEnv } from '../src/cli/service.ts'
 import { downloadNode, majorOf, nodeArch, pickRelease, shaFor } from '../src/cli/node.ts'
 import { daemonIn, findClaudeBin, integrationDir, isDaemonDir, setIntegration } from '../src/cli/install.ts'
@@ -73,7 +73,7 @@ function ctx(sys: Sys, o: Partial<Cli> = {}, env: NodeJS.ProcessEnv = {}): Cli {
 
 // ── A stand-in daemon ─────────────────────────────────────────────────────
 
-type Fake = { api: number; local: number; devices: any[]; status: any; name: any; releaseOk: boolean; requests: string[]; bodies: any[]; pairLink: { link: string; appLink: string; download?: string }; close: () => Promise<void> }
+type Fake = { api: number; local: number; devices: any[]; status: any; requests: string[]; bodies: any[]; pairLink: { link: string; appLink: string; download?: string }; close: () => Promise<void> }
 async function fakeDaemon(): Promise<Fake> {
   const f: Fake = {
     api: 0,
@@ -93,8 +93,6 @@ async function fakeDaemon(): Promise<Fake> {
     },
     // The listener off: the daemon's link is the app's own (no address a browser could open).
     pairLink: { link: 'hypernova://pair?v=1&u=http%3A%2F%2F10.0.2.2%3A47321&c=CODE&n=box&fp=ab', appLink: 'hypernova://pair?v=1&u=http%3A%2F%2F10.0.2.2%3A47321&c=CODE&n=box&fp=ab' },
-    name: { enabled: true, setting: true, termsShown: false, reason: 'Not made yet.', terms: 'https://letsencrypt.org/repository/', host: null },
-    releaseOk: true,
     close: async () => {},
   }
   const servers: Server[] = []
@@ -109,17 +107,13 @@ async function fakeDaemon(): Promise<Fake> {
     if (path === '/local/status') return send(f.status)
     if (path === '/local/devices') return send({ devices: f.devices })
     if (path === '/local/pair/start') return send({ ...f.pairLink, expiresAt: Date.now() + 600_000, url: 'x' })
-    if (path === '/local/name/release') return send({ released: true, name: 'k3x9mq2z7a' })
-    if (path === '/local/name') return send(f.name)
     if (path === '/local/settings') {
       let body = ''
       req.on('data', (c: Buffer) => (body += c))
       return req.on('end', () => {
         const b = JSON.parse(body || '{}')
         f.bodies.push(b)
-        if (b.nameTermsShown === true) f.name = { ...f.name, termsShown: true }
-        if (typeof b.nameService === 'boolean') f.name = { ...f.name, enabled: b.nameService, setting: b.nameService }
-        send(b.nameService === false ? { nameRelease: { released: f.releaseOk, name: 'k3x9mq2z7a' } } : {})
+        send({})
       })
     }
     if (path.startsWith('/local/integration/')) return send({ hooks: { installed: path.endsWith('install') }, statusLine: { installed: true, supported: true }, shell: { installed: true, supported: true } })
@@ -653,9 +647,6 @@ test('setup then uninstall: Node, the daemon, the command, the service with ling
   sys.out.length = 0
   assert.equal(await uninstall(c, { yes: true }), 0)
   assert.ok(daemon.requests.includes('POST /local/integration/uninstall'))
-  // The name goes too, so its record doesn't linger in DNS.
-  assert.ok(daemon.requests.includes('POST /local/name/release'))
-  assert.match(sys.out.join('\n'), /k3x9mq2z7a under hypernova\.observer given up/)
   assert.ok(sys.calls.some((x) => x.cmd === 'systemctl' && x.args.join(' ') === '--user disable --now hypernova.service'))
   assert.ok(!existsSync(c.unitFile))
   assert.ok(!existsSync(c.launcher))
@@ -687,52 +678,7 @@ test('setup stops at a missing build tool with the apt line that fixes it', asyn
   assert.deepEqual(readdirSync(c.appDir).filter((x) => x.startsWith('daemon')), [])
 })
 
-test('the private name: its terms said once, before the first code, and the daemon told; hypernova name on|off', async () => {
-  const sys = fakeSys(() => ({}))
-  const c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
-  // A daemon that hasn't been told yet (setup's test above told this stand-in already).
-  daemon.name = { ...daemon.name, enabled: true, setting: true, termsShown: false }
-  daemon.requests.length = 0
-  assert.equal(await pair(c, { 'no-wait': true, 'no-qr': true }), 0)
-  const text = sys.out.join('\n')
-  assert.match(text, /A private name: .*the name service configured here.*Let’s Encrypt’s terms \(https:\/\/letsencrypt\.org\/repository\/\)/s)
-  assert.match(text, /hypernova name off/)
-  // Said, then the daemon told so, and only then the code (which counts for the name) asked for.
-  const said = daemon.requests.indexOf('POST /local/settings')
-  const code = daemon.requests.indexOf('POST /local/pair/start?name=1')
-  assert.ok(said >= 0 && code > said, daemon.requests.join(' | '))
-  assert.equal(daemon.name.termsShown, true)
-  // Once: not on the next pair, on this or another shell.
-  const again = fakeSys(() => ({}))
-  await pair(ctx(again, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true, 'no-qr': true })
-  assert.doesNotMatch(again.out.join('\n'), /A private name/)
-  // Off: given up, and said so; a release that didn't get through is said too, with exit 1.
-  const off = fakeSys(() => ({}))
-  assert.equal(await name(ctx(off, { apiPort: daemon.api, localPort: daemon.local }), ['off']), 0)
-  assert.match(off.out.join('\n'), /Private name off; k3x9mq2z7a was given up/)
-  daemon.releaseOk = false
-  const stuck = fakeSys(() => ({}))
-  assert.equal(await name(ctx(stuck, { apiPort: daemon.api, localPort: daemon.local }), ['off']), 1)
-  assert.match(stuck.out.join('\n'), /couldn’t be given up just now: its records stay in DNS/)
-  daemon.releaseOk = true
-  // While off, nothing is said on pair.
-  daemon.name.termsShown = false
-  const fresh = fakeSys(() => ({}))
-  await pair(ctx(fresh, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true, 'no-qr': true })
-  assert.doesNotMatch(fresh.out.join('\n'), /A private name/)
-  // On with no name service configured (the default since 2026-10-30): said, and nothing to make.
-  const on = fakeSys(() => ({}))
-  assert.equal(await name(ctx(on, { apiPort: daemon.api, localPort: daemon.local }), ['on']), 0)
-  assert.match(on.out.join('\n'), /no name service is configured, so there is no name/)
-  daemon.name = { ...daemon.name, service: 'https://names.example' }
-  const onWith = fakeSys(() => ({}))
-  assert.equal(await name(ctx(onWith, { apiPort: daemon.api, localPort: daemon.local }), ['on']), 0)
-  assert.match(onWith.out.join('\n'), /Private name on: it’s made or published when a code is shown\./)
-  delete daemon.name.service
-  assert.equal(await name(ctx(fakeSys(() => ({})), { apiPort: daemon.api, localPort: daemon.local }), ['maybe']), 2)
-})
-
-test('uninstall without a terminal and without --yes refuses; --purge --yes gives up the name and says nothing of Tailscale', async () => {
+test('uninstall without a terminal and without --yes refuses; --purge --yes says nothing of Tailscale or a name', async () => {
   // No terminal (the test run has none): nothing is removed without --yes.
   let sys = fakeSys(() => ({}))
   let c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
@@ -744,8 +690,8 @@ test('uninstall without a terminal and without --yes refuses; --purge --yes give
   sys = fakeSys(() => ({}))
   c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })
   assert.equal(await uninstall(c, { yes: true, purge: true }), 0)
-  assert.ok(daemon.requests.includes('POST /local/name/release'), daemon.requests.join(' | '))
-  assert.doesNotMatch(sys.out.join('\n'), /Tailscale|tailnet/)
+  assert.ok(!daemon.requests.some((r) => r.includes('/local/name')), daemon.requests.join(' | '))
+  assert.doesNotMatch(sys.out.join('\n'), /Tailscale|tailnet|hypernova\.observer/)
 })
 
 test('hypernova logs --terminals reads the shared terminals’ log', async () => {
@@ -755,23 +701,6 @@ test('hypernova logs --terminals reads the shared terminals’ log', async () =>
   writeFileSync(join(c.logs, 'terminals.log'), '2026-01-01T00:00:00Z [abc] holder started\n')
   assert.equal(await logs(c, { terminals: true }), 0)
   assert.match(sys.out.join('\n'), /holder started/)
-})
-
-test('status shows the private name, and doctor warns when it has an error', async () => {
-  const saved = daemon.name
-  try {
-    daemon.name = { ...daemon.name, enabled: true, host: 'l-k3x9.hypernova.observer', reason: 'Ready.', lastError: null }
-    let sys = fakeSys(claudeAnswers(true))
-    await status(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), {})
-    assert.match(sys.out.join('\n'), /Name +l-k3x9\.hypernova\.observer \(Ready\.\)/)
-    daemon.name = { ...daemon.name, lastError: { at: 1, message: 'the name service said 429' } }
-    sys = fakeSys(claudeAnswers(true), ['openssl', 'make', 'g++', 'python3'])
-    await doctor(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { json: true })
-    const checks = JSON.parse(sys.out.join('\n')) as { name: string; mark: string; text: string }[]
-    assert.equal(checks.find((x) => x.name === 'name')?.mark, 'warn')
-  } finally {
-    daemon.name = saved
-  }
 })
 
 // ── WSL on a Windows PC (cli/wsl.ts; experimental, never yet run on a real Windows PC) ─────────

@@ -129,91 +129,6 @@ export function lanOrigin(address: string, port: number): string {
   return `https://${a.includes(':') ? `[${a}]` : a}:${port}`
 }
 
-// ── The name's certificate (names.ts) ────────────────────────────────────
-/**
- * Which listener a connection goes to, from the server name in its TLS ClientHello (SNI): a
- * browser opening `https://l-<name>.<domain>:47323/…` names the host, and gets the name's real
- * certificate, with no client certificate asked for (Chrome on Android shows a certificate picker
- * for that). The phone app connects to an IP address, which TLS never names, so it gets the
- * pinned certificate and mutual TLS, unchanged. Returns the host name, null for none (or not a
- * name), or undefined while the ClientHello is still incomplete.
- */
-export function clientHelloName(buf: Buffer): string | null | undefined {
-  if (buf.length < 5) return undefined
-  // A TLS handshake record holding a ClientHello; anything else goes to the pinned listener,
-  // which fails it as before.
-  if (buf[0] !== 0x16 || buf[1] !== 0x03) return null
-  const recordEnd = 5 + buf.readUInt16BE(3)
-  if (buf.length < recordEnd) return undefined
-  try {
-    if (buf[5] !== 0x01) return null
-    // The handshake must fit in this record (browsers' do; a split one just gets no name).
-    const helloEnd = 9 + buf.readUIntBE(6, 3)
-    if (helloEnd > recordEnd) return null
-    let p = 9 + 2 + 32 // version, random
-    p += 1 + buf[p]! // session id
-    p += 2 + buf.readUInt16BE(p) // cipher suites
-    p += 1 + buf[p]! // compression methods
-    if (p + 2 > helloEnd) return null
-    const extEnd = p + 2 + buf.readUInt16BE(p)
-    p += 2
-    if (extEnd > helloEnd) return null
-    while (p + 4 <= extEnd) {
-      const type = buf.readUInt16BE(p)
-      const len = buf.readUInt16BE(p + 2)
-      p += 4
-      if (p + len > extEnd) return null
-      if (type === 0) {
-        // server_name: a list of (type, length, name); the host_name entry (type 0).
-        let q = p + 2
-        while (q + 3 <= p + len) {
-          const nameLen = buf.readUInt16BE(q + 1)
-          if (buf[q] === 0 && q + 3 + nameLen <= p + len) return buf.toString('latin1', q + 3, q + 3 + nameLen).toLowerCase().replace(/\.$/, '')
-          q += 3 + nameLen
-        }
-        return null
-      }
-      p += len
-    }
-    return null
-  } catch {
-    return null
-  }
-}
-
-/** The name's certificate as names.ts hands it over: the host it is for, PEM key and chain. */
-export type NamedCert = { host: string; key: string; cert: string }
-let named: NamedCert | null = null
-let namedServer: Server | null = null
-/** The TLS sockets that came in for the name (the pages served there say so). */
-const viaName = new WeakSet<object>()
-const changeListeners: (() => void)[] = []
-
-/** Whether this request came in through the name (its own certificate, no client certificate). */
-export const lanNamed = (socket: unknown): boolean => !!socket && viaName.has(socket as object)
-/** The host the listener answers to with the real certificate, while it has one. */
-export const lanNamedHost = (): string | null => named?.host ?? null
-
-/** names.ts: the name's certificate, or null to stop serving one. Takes effect for new connections at once. */
-export function setNamedCert(c: NamedCert | null): void {
-  named = c
-  if (!c) {
-    if (namedServer) {
-      namedServer.closeAllConnections()
-      namedServer.close(() => {})
-      namedServer = null
-    }
-    return
-  }
-  if (namedServer) namedServer.setSecureContext({ key: c.key, cert: c.cert, minVersion: 'TLSv1.2' })
-  else if (server) namedServer = innerServer(false)
-}
-
-/** Called when the Wi-Fi addresses change (names.ts republishes the name's record). */
-export function onLanChange(fn: () => void): void {
-  changeListeners.push(fn)
-}
-
 // ── The listener ─────────────────────────────────────────────────────────
 export type LanInfo = { port: number; addresses: string[]; fingerprint: string }
 
@@ -227,7 +142,7 @@ export type LanInfo = { port: number; addresses: string[]; fingerprint: string }
  */
 export const lanLimits = { connections: 64, perSource: 32, handshakeMs: 10_000, headersMs: 15_000, keepAliveMs: 10_000, requestMs: 15 * 60_000 }
 
-/** The port's own listener (plain TCP: the source filter, the limits, the SNI peek); the two TLS servers behind it never listen themselves. */
+/** The port's own listener (plain TCP: the source filter, the limits); the TLS server behind it never listens itself. */
 let server: TcpServer | null = null
 let pinnedServer: Server | null = null
 let port = 0
@@ -284,33 +199,31 @@ export function startLan(handler: Handler, upgrade: Upgrade): void {
       if (now === lastAddresses) return
       lastAddresses = now
       if (server) broadcast({ t: 'lan', lan: lanInfo() })
-      for (const fn of changeListeners) {
-        try {
-          fn()
-        } catch {}
-      }
     }, 5000)
     watcher.unref()
   }
 }
 
 /**
- * One of the two TLS servers behind the port: the pinned one (the daemon's own certificate,
- * client certificates asked for and checked against the device CA) or the name's. Neither
- * listens; the port's listener hands them their connections. They're told they're listening
- * all the same: that's when Node starts the clock on requests' headers and idle connections.
+ * The TLS server behind the port: the daemon's own certificate, client certificates asked for and
+ * checked against the device CA. It never listens; the port's listener hands it its connections.
+ * It's told it's listening all the same: that's when Node starts the clock on requests' headers and
+ * idle connections.
  */
-function innerServer(pinned: boolean): Server | null {
+function innerServer(): Server | null {
   const id = serverIdentity()
-  if (!id || !onRequest || !onUpgrade || (!pinned && !named)) return null
+  if (!id || !onRequest || !onUpgrade) return null
   const L = lanLimits
   // The phone pins `cert`; `ca` plus requestCert makes Node check a client certificate against the
   // device CA in the handshake (socket.authorized), while rejectUnauthorized false lets a phone with no
   // certificate yet still reach health, pairing and the certificate route.
-  const tlsOptions = pinned ? { key: id.key, cert: id.cert, ca: [id.ca], requestCert: true, rejectUnauthorized: false } : { key: named!.key, cert: named!.cert }
   const s = createServer(
     {
-      ...tlsOptions,
+      key: id.key,
+      cert: id.cert,
+      ca: [id.ca],
+      requestCert: true,
+      rejectUnauthorized: false,
       minVersion: 'TLSv1.2',
       handshakeTimeout: L.handshakeMs,
       headersTimeout: L.headersMs,
@@ -323,7 +236,6 @@ function innerServer(pinned: boolean): Server | null {
   )
   s.on('tlsClientError', () => {})
   s.on('upgrade', onUpgrade)
-  if (!pinned) s.on('secureConnection', (t: TLSSocket) => viaName.add(t))
   s.emit('listening')
   return s
 }
@@ -331,17 +243,15 @@ function innerServer(pinned: boolean): Server | null {
 function listen(): void {
   if (server || !onRequest || !onUpgrade) return
   const id = serverIdentity()
-  const pinned = id && innerServer(true)
+  const pinned = id && innerServer()
   if (!id || !pinned) return
   pinnedServer = pinned
-  if (named) namedServer = innerServer(false)
   const L = lanLimits
   // Dropped at accept, before any TLS: anything but the local network, the hotspot and a VPN's
-  // ranges, and a source already holding its share. Then the ClientHello is read (within the
-  // handshake's time) for the server name, and the connection handed, unread, to the TLS server
-  // for it: the name's when it names the name and there's a certificate, the pinned one otherwise.
+  // ranges, and a source already holding its share. The rest is handed, unread, to the TLS server
+  // (whose handshake must finish within handshakeMs).
   const open = new Map<string, number>()
-  const s = createTcpServer({ pauseOnConnect: true }, (sock: Socket) => {
+  const s = createTcpServer((sock: Socket) => {
     const ip = plainIp(sock.remoteAddress)
     const n = (open.get(ip) ?? 0) + 1
     if (!privateAddress(ip) || n > L.perSource) return void sock.destroy()
@@ -352,25 +262,8 @@ function listen(): void {
       else open.delete(ip)
     })
     sock.on('error', () => {})
-    let buf: Buffer = Buffer.alloc(0)
-    const timer = setTimeout(() => sock.destroy(), L.handshakeMs)
-    const onData = (d: Buffer) => {
-      buf = buf.length ? Buffer.concat([buf, d]) : d
-      let host = clientHelloName(buf)
-      // A ClientHello bigger than one record's worth isn't waited for any longer.
-      if (host === undefined && buf.length < 5 + 16_384 + 256) return
-      host ??= null
-      clearTimeout(timer)
-      sock.removeListener('data', onData)
-      sock.pause()
-      sock.unshift(buf)
-      const target = host && named && host === named.host && namedServer ? namedServer : pinnedServer
-      if (!target || sock.destroyed) return void sock.destroy()
-      target.emit('connection', sock)
-    }
-    sock.on('data', onData)
-    sock.once('close', () => clearTimeout(timer))
-    sock.resume()
+    if (!pinnedServer || sock.destroyed) return void sock.destroy()
+    pinnedServer.emit('connection', sock)
   })
   s.maxConnections = L.connections
   s.on('error', (e) => {
@@ -387,15 +280,15 @@ function listen(): void {
   })
 }
 
-/** Closes the port and every connection the TLS servers behind it hold. */
+/** Closes the port and every connection the TLS server behind it holds. */
 function closeAll(): Promise<unknown> {
   const s = server
-  const inner = [pinnedServer, namedServer].filter((x): x is Server => !!x)
-  server = pinnedServer = namedServer = null
-  for (const x of inner) {
-    x.closeAllConnections()
+  const inner = pinnedServer
+  server = pinnedServer = null
+  if (inner) {
+    inner.closeAllConnections()
     // Never listened, so close() only stops its clocks (and says it wasn't running).
-    x.close(() => {})
+    inner.close(() => {})
   }
   return s ? new Promise((r) => s.close(r)) : Promise.resolve()
 }

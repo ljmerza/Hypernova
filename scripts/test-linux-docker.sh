@@ -51,9 +51,8 @@ cleanup() {
   docker image rm "$IMAGE-up" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
-# The documented way to run it: a volume for the state, a restart policy. The name service is off
-# (no real DNS records or certificates from a test), as in every automated run.
-docker run -d --name "$NAME" --hostname hypernova-e2e --restart unless-stopped -e HYPERNOVA_NAMES_URL=off -v "$VOL:/home/hypernova" "$IMAGE" >/dev/null
+# The documented way to run it: a volume for the state, a restart policy.
+docker run -d --name "$NAME" --hostname hypernova-e2e --restart unless-stopped -v "$VOL:/home/hypernova" "$IMAGE" >/dev/null
 IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$NAME")"
 echo "Container $NAME at $IP"
 
@@ -154,7 +153,7 @@ expect "the holder's screen shows the stand-in, run through node-pty with the ar
 expect "hypernova logs shows the daemon's log" "$(in_box hypernova logs -n 50 2>&1)" 'api on 127\.0\.0\.1:47321' 'local api on 127\.0\.0\.1:47322' 'lan api on'
 
 # ── No shared identity: a second container from the same image has its own ──
-docker run -d --name "$NAME-b" --hostname hypernova-e2e-b -e HYPERNOVA_NAMES_URL=off -v "$VOL-b:/home/hypernova" "$IMAGE" >/dev/null
+docker run -d --name "$NAME-b" --hostname hypernova-e2e-b -v "$VOL-b:/home/hypernova" "$IMAGE" >/dev/null
 for _ in $(seq 1 60); do docker exec "$NAME-b" curl -fsS --max-time 2 http://127.0.0.1:47321/v1/health >/dev/null 2>&1 && break; sleep 1; done
 S=/home/hypernova/.local/share/hypernova
 id_a="$(in_box cat $S/daemon.json)"; id_b="$(docker exec "$NAME-b" cat $S/daemon.json)"
@@ -168,7 +167,7 @@ docker rm -f "$NAME-b" >/dev/null 2>&1 || true
 printf 'FROM %s\nRUN sed -i "s/^export const VERSION = .*/export const VERSION = \x279.9.9\x27/" /opt/hypernova/app/daemon/src/util.ts\n' "$IMAGE" | docker build -q -t "$IMAGE-up" - >/dev/null
 docker stop -t 3 "$NAME" >/dev/null
 docker rm "$NAME" >/dev/null
-docker run -d --name "$NAME-up" --hostname hypernova-e2e -e HYPERNOVA_NAMES_URL=off -v "$VOL:/home/hypernova" "$IMAGE-up" >/dev/null
+docker run -d --name "$NAME-up" --hostname hypernova-e2e -v "$VOL:/home/hypernova" "$IMAGE-up" >/dev/null
 for _ in $(seq 1 60); do docker exec "$NAME-up" curl -fsS --max-time 2 http://127.0.0.1:47321/v1/health >/dev/null 2>&1 && break; sleep 1; done
 expect "after a rebuild with the same volume the new daemon runs, with the old state" "$(docker exec "$NAME-up" hypernova version 2>&1; docker exec "$NAME-up" hypernova status 2>&1)" 'hypernova 9\.9\.9' 'Hypernova 9\.9\.9' 'Devices +1 paired \(E2E phone\)'
 [ "$(docker exec "$NAME-up" cat $S/daemon.json)" = "$id_a" ] && ok "the volume's identity survives the upgrade" || bad "the identity changed across the upgrade"
