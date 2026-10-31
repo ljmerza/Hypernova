@@ -183,8 +183,9 @@ const val HOME_SOURCE = "home"
 
 /**
  * Home's "All servers" (AllHome.kt): every paired computer with its hub, in the order paired, and
- * where a card's opening and a new session go. The cards above the sessions, the usage cards, the
- * other tabs and Statistics stay the one picked last's ([pickedName], the hub Home is given).
+ * where a card's opening and a new session go. The usage cards are every computer's (AllUsage); the
+ * cards above the sessions, the other tabs and Statistics stay the one picked last's ([pickedName],
+ * the hub Home is given).
  */
 class Everywhere(
     val servers: List<Pair<com.prudnikweb.hypernova.data.ServerStatus, Hub>>,
@@ -311,9 +312,8 @@ fun HomeScreen(
     // that switched agents is its newest session; the one before it opens from there ("Continued from").
     val all = remember(hub.sessions) { AllHome.homeSessions(hub.sessions) }
     // Both agents in use (data/AgentLead.kt): Codex's sessions say CODEX. Never otherwise (where Codex
-    // leads, every session is Codex's). Which usage cards show, and whether they say whose they are.
+    // leads, every session is Codex's). Which usage cards show is usageSlots, below.
     val codexOn = hub.bothAgents
-    val usageCards = UsageCards.of(hub.claude, hub.codex)
     val sessions = remember(all, filter, quiet) { SkyFilter.apply(all, filter, quiet) }
     // What the search finds among them (HomeSearch, History's search shared): by title, project,
     // folder, last line and short id, and from 3 characters the words inside the conversations.
@@ -327,6 +327,8 @@ fun HomeScreen(
         st.id to key(st.id) { rememberFullText(h, if (searchOpen) searchQuery else "") }
     }.orEmpty()
     val parts = everywhere?.servers?.map { (st, h) -> ServerPart(st.id, st.name, st.state, h, h.sessions, fullBy[st.id]?.hits) }
+    // The usage cards under the sessions: this computer's, or with "All servers" every computer's (AllUsage).
+    val usageSlots = if (parts != null) AllUsage.all(parts, { it.claude }, { it.codex }) else AllUsage.of(hub, hub.claude, hub.codex)
     val narrowed: List<HomeCard<Hub>>? = parts?.let { AllHome.cards(it) { list -> SkyFilter.apply(list, filter, quiet) } }
     val cards: List<HomeCard<Hub>> = when {
         parts == null -> shown.map { HomeCard(null, null, hub, it) }
@@ -591,12 +593,16 @@ fun HomeScreen(
                     }
                 }
                 // The usage cards (UsageCards.kt): Claude's, Codex's, or both, each saying whose it is only when both show.
-                // With "All servers", the one picked last's, its name in their seam.
-                val from = everywhere?.pickedName
-                if (usageCards.claude && !typed) item(key = "usage") { UsageCard(hub, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp), from) }
-                val codexState = hub.codex
-                if (usageCards.codex && codexState != null && !typed) {
-                    item(key = "codex-usage") { CodexUsageCard(codexState, usageCards, Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp), from) }
+                // With "All servers", every computer's (AllUsage.all), in the order paired, each with
+                // its name in its seam; an offline one's dimmed, its name saying offline.
+                if (!typed) for (u in usageSlots) item(key = u.key) {
+                    val m = Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 8.dp)
+                        .then(if (u.offline) Modifier.graphicsLayer { alpha = OFFLINE_ALPHA } else Modifier)
+                    val from = u.name?.let { if (u.offline) stringResource(R.string.servers_tag_offline, it) else it }
+                    when (u.agent) {
+                        UsageAgent.Claude -> UsageCard(u.hub, u.cards, m, from)
+                        UsageAgent.Codex -> u.hub.codex?.let { CodexUsageCard(it, u.cards, m, from) }
+                    }
                 }
             } }
             Tab.Automations -> com.prudnikweb.hypernova.ui.automations.AutomationsTab(
@@ -709,13 +715,14 @@ private fun markSunHintDone(c: Context) {
 internal fun homeHeadIndex(filter: Boolean, offline: Boolean): Int = (if (filter) 1 else 0) + (if (offline) 1 else 0)
 
 /**
- * The index of a usage card ([codex]: Codex's, else the sun's), wherever the list has put it: they
- * are the list's last items, Claude's before Codex's. Where Codex leads, its card is the sun's.
+ * The list index of a usage card ([agent]'s, on [picked] with "All servers"; AllUsage.jumpTo picks
+ * which), wherever the list has put it: [slots] are the list's last items, in their order. Where
+ * Codex leads, its card is the sun's.
  */
-private fun usageIndex(list: androidx.compose.foundation.lazy.LazyListState, codex: Boolean, cards: UsageCards): Int {
+private fun usageIndex(list: androidx.compose.foundation.lazy.LazyListState, slots: List<UsageSlot<Hub>>, agent: UsageAgent, picked: String? = null): Int {
     val last = list.layoutInfo.totalItemsCount - 1
-    val back = if (!codex && cards.claude && cards.codex) 1 else 0
-    return (last - back).coerceAtLeast(0)
+    val at = AllUsage.jumpTo(slots, agent, picked).coerceAtLeast(0)
+    return (last - (slots.size - 1 - at)).coerceAtLeast(0)
 }
 
 /** How much lower Home's list starts while the search field shows under the top bar (the field and its gap). */
