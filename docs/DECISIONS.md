@@ -2221,3 +2221,22 @@ Idea NT4: a `claude agents` job that crashed or ended on an error just showed as
    toggle: the others have none either.
 4. **Home's Completed card says `Stopped with an error`** in the danger colour as its line
    (`Session.died`), no new row; the session's chat shows nothing (no clutter there).
+
+## Enter sends (2026-10-31)
+
+The owner: "When I press Enter it [should] submit, it doesn't do new line."
+
+1. **A setting, Settings → Typing → Enter key: Send (the default) or New line**, kept on this phone
+   (`data/EnterKey.kt`, `ui/components/EnterKeyPref.kt`); a change reaches open boxes at once.
+2. **On Send, Enter is the box's own Send**, the same path as its button (/btw to the side question,
+   files, held prompts): the soft keyboard shows Send for Enter, and the text still wraps up to its
+   lines (6 in the session's box). An empty box: Enter does nothing, no new line either. Hands-free
+   dictation: Enter is Done, then Send once the words are in. A hardware keyboard's Shift+Enter is a
+   new line; the soft keyboard has none then (pasted lines still paste as they are). A keyboard that
+   types a new line for Enter instead of pressing Send has it taken back and sent.
+3. **On New line, Enter is a new line as before** and only the button sends.
+4. **Where**: the session's prompt box, the New session prompt (Enter is Start), /btw and a command's
+   argument in the Commands tab, and a quick prompt being edited (Enter is Save). Left as they were:
+   the automation and workflow prompt editors, the text carried to the other agent, an answer's
+   "Other", the edit of a waiting prompt; one-line fields already submit on Done. Nothing new on the
+   chat screen: only the key changed.
