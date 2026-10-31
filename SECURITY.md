@@ -23,8 +23,8 @@ Claude Code (and Codex, once you turn it on for Hypernova) that you have at the 
 
 So a stolen or malware-infected paired phone is as serious as a stolen unlocked laptop. Forget a
 device (`DELETE /local/devices/{id}` on the local API) and it is cut off at once, even on a
-connection that is already open. Pair only phones you own, and keep Tailscale's own access
-controls tight.
+connection that is already open. Pair only phones you own, and keep your Wi-Fi and the VPN
+into it to people and devices you trust.
 
 Hypernova does not try to defend against someone who already runs code as you on the computer:
 that person can read the admin token and the provider keys directly. It also does not make Claude
@@ -39,25 +39,25 @@ recognizer, so the audio never leaves the phone; provider keys go only to their 
 
 | Listener | Address | Who can reach it | What it serves |
 | --- | --- | --- | --- |
-| Phone API | `127.0.0.1:47321`, plain HTTP on loopback | Only this computer, plus your tailnet through `tailscale serve` (HTTPS with Tailscale's certificate). Never Tailscale Funnel, never the open internet | The `/v1` API, and the pairing, download and preview pages |
-| LAN listener | `0.0.0.0:47323`, HTTPS with mutual TLS (turn it off with the `lanAccess` setting) | Phones on the same network or hotspot | Exactly the phone API; never the Mac's local API |
+| Phone API | `127.0.0.1:47321`, plain HTTP on loopback | Only this computer. Never the open internet | The `/v1` API, and the pairing, download and preview pages |
+| LAN listener | `0.0.0.0:47323`, HTTPS with mutual TLS (turn it off with the `lanAccess` setting) | Phones on the same network or hotspot, or coming in over your own VPN into that network. The only way a phone comes in | Exactly the phone API; never the local API |
 | Local API | `127.0.0.1:47322`, loopback only | The `hypernova` command and Claude Code's hooks, on this computer | Setup, status, pairing, the testing checklist, `/hooks/*` |
 
 Details that matter:
 
 - **Phone API.** Every `/v1` route except `GET /v1/health`, `POST /v1/pair`
   and a terminal's WebSocket (which carries a short-lived ticket) needs the device's bearer token.
-  Requests that arrive through `tailscale serve` are recognised by their forwarding header and are
-  never treated as local.
-- **LAN listener.** Connections from outside private ranges (loopback, RFC 1918, link-local, the
-  tailnet's 100.64/10, IPv6 ULA) are dropped before any TLS. The phone pins the daemon's own
+  Requests that arrive through a proxy are recognised by their forwarding header and are never
+  treated as local.
+- **LAN listener.** Connections from outside private ranges (loopback, RFC 1918, link-local,
+  carrier-grade NAT's 100.64/10, which VPNs hand out, IPv6 ULA) are dropped before any TLS. The phone pins the daemon's own
   self-signed certificate, and the listener asks for a **device certificate** that the daemon signed
   for that phone; without one it answers only `health`, `pair` and the certificate request. It has
   connection and time limits against a hostile Wi-Fi (32 connections per source, 64 in all,
   handshake in 10 s, headers in 15 s). Pairing on it is closed unless a code is being shown, and a
   source gets 5 wrong codes per 10 minutes.
 - **Local API.** Needs the **admin token**. The local port never sits behind the LAN
-  listener or `tailscale serve`, and the admin token counts for nothing on the LAN listener. The
+  listener, and the admin token counts for nothing on the LAN listener. The
   testing checklist page has its own key and refuses requests from other sites.
 - **Hooks.** Claude Code's hooks post to `/hooks/<secret>` on the local API; any other path is a
   404. The secret (`hook-secret`) is in the installed hook configuration, so it is as private as
@@ -107,5 +107,5 @@ reading a file the phone should not read, and a web page that can drive the loca
 browser.
 
 Out of scope: attacks that already need code running as your user on the computer, a paired
-device doing what pairing allows, and weaknesses in Claude Code, Tailscale or your operating
+device doing what pairing allows, and weaknesses in Claude Code, your VPN or your operating
 system themselves (report those upstream).

@@ -37,7 +37,7 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
 scripts/pack-linux.sh
 ```
 
-Tests must not depend on your machine: no real Claude login, no Tailscale, no files in your home
+Tests must not depend on your machine: no real Claude login, no files in your home
 folder or in the live support folder, no fixed ports of a running install. Use a temporary folder
 and `HYPERNOVA_SUPPORT`, and port `0` where a test needs a port. If a test truly needs something
 only one OS has, skip it on the others with a reason, as the Mac-voice tests do for macOS.

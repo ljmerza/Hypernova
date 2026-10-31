@@ -15,7 +15,7 @@ disagree, the code wins and this page has a bug.
 | The daemon (`daemon/`, Node) | the same machine | Watches Claude Code through hooks and transcripts, runs the phone's sessions in shared terminals, serves the phone API. The only thing the phone talks to. |
 | The `hypernova` command (`daemon/src/cli/`) | the same machine | Setup, pairing, status, the systemd user service. Talks to the daemon over loopback with the admin token. |
 | The Android app (`android/`) | the phone | The client. |
-| Tailscale | the Mac, the phone (its own app or Hypernova's built-in node) | The route from outside the local network. |
+| The owner's network | the Wi-Fi, or the owner's own VPN into it | The only route in: the phone reaches the LAN listener (47323) on it. Hypernova carries no VPN of its own (Tailscale was removed on 2026-10-30, docs/DECISIONS.md). |
 
 There is no Hypernova account and no Hypernova server that carries sessions.
 
@@ -30,25 +30,27 @@ There is no Hypernova account and no Hypernova server that carries sessions.
   token, the fingerprint of its certificate), settings, session records and titles.
 - Attachments the phone uploaded (`attachments/`, kept 30 days).
 - Tokens and keys: the **admin token**, the **hook secret**, TLS keys (`tls/`: the server key and the
-  device CA), Hypernova's own Tailscale node key (`tsnet/`), provider keys, automations'
+  device CA), provider keys, automations'
   **fire tokens** (only their SHA-256, in `automations.json`) and their webhook outputs' addresses
-  and bot tokens (`automation-secrets.json`, never logged, never sent back).
+  and bot tokens (`automation-secrets.json`, never logged, never sent back). An install from before
+  2026-10-30 may still have a `tsnet/` folder with a Tailscale node key in it, no longer read.
 - The daemon log (`~/Library/Logs/Hypernova/daemon.log`, `0600`, in a `0700` folder): names devices,
   projects and events; never tokens, codes or keys (see `SECURITY.md`).
 
 **The phone.** Its device token (the daemon keeps only its hash), the Mac's base URL and name, and
 sessions' text as the app shows it. The token sits in the app's private preferences, not the
 Keystore (**unverified** beyond reading `data/Pairing.kt`). The device certificate's private key is
-made on the phone and stays in the Android Keystore. Hypernova's own Tailscale node keys are in the
-app's private files, excluded from backup and device transfer (`allowBackup=false`). Downloaded files
-go where the user saves them.
+made on the phone and stays in the Android Keystore. The app's private files are excluded from
+backup and device transfer (`allowBackup=false`); an older build's Tailscale node keys
+(`files/tsnet`) stay there, no longer read since 2026-10-30. Downloaded files go where the user
+saves them.
 
 ## 3. What each outside party sees
 
 | Party | Sees | Does not see |
 | --- | --- | --- |
 | Anthropic | What Claude Code sends it, exactly as when the user runs Claude Code in a terminal: prompts (including ones typed on the phone), the files Claude reads, usage. The usage probe runs Claude Code itself to read the subscription's limits (**unverified**: not re-read for this page). | Anything about Hypernova's phone or pairing. Hypernova makes no calls to Anthropic's API of its own. |
-| Tailscale | The usual coordination data: node keys, addresses, device names, the account. Traffic between the phone and Mac is WireGuard, end to end; a relay sees ciphertext (Tailscale's own documented behaviour, **unverified here**). | Message contents. |
+| The owner's network and VPN | That a phone connects to the server's port 47323, and when. The traffic is TLS to the server's pinned certificate. | Message contents. |
 | A provider (OpenRouter, a gateway) | What a session on that provider sends, with its own key. | Other sessions. |
 | nodejs.org, Anthropic's installer, GitHub (setup) | Downloads the user asks for (Node.js is checked against its published checksums). | -- |
 
@@ -59,10 +61,9 @@ No name service and no DNS record: nothing about the computer or its pairing is 
 | Channel | Where | Who can connect | How it is protected |
 | --- | --- | --- | --- |
 | Loopback phone API | `127.0.0.1:47321`, plain HTTP | Programs on the machine | Bearer device token on every `/v1` route except `health`, `pair` and a terminal's ticketed WebSocket. No CORS headers, so a web page can't read it. Requests that came through a proxy are recognised by their forwarding header and never treated as local. |
-| Local API | `127.0.0.1:47322` | Programs on the machine | The **admin token**; hooks use `/hooks/<secret>` (compared in constant time). Never behind the LAN listener or Tailscale. The checklist page has its own key. |
+| Local API | `127.0.0.1:47322` | Programs on the machine | The **admin token**; hooks use `/hooks/<secret>` (compared in constant time). Never behind the LAN listener. The checklist page has its own key. |
 | The fire route | `POST 127.0.0.1:47322/local/automations/<id>/fire` | Programs on the machine (git hooks, cron, CI, `hypernova automation fire`) | That automation's own **fire token** or the admin token, checked before the body is read. A wrong token is 401 alike whether the automation exists, isn't a webhook's or has another token, so nothing tells which ids exist. 64 KB of text at most; 10 fires a minute per automation, then 429 with nothing recorded. The only `/local` route that takes another token than the admin one. A paired device fires the same way over its own routes. |
-| LAN listener | `0.0.0.0:47323`, HTTPS, mutual TLS | Phones on the same network or hotspot | Sources outside private ranges are dropped before TLS. The phone pins the daemon's self-signed certificate (fingerprint from the pairing link) and presents a device certificate the daemon signed for it (ECDSA P-256, 2 years, revoked at once when the device is forgotten). Without one only `health`, `pair`, `device/cert` and the app's download page answer. Per-source and total connection caps, handshake and header timeouts; pairing closed unless a code is shown, 5 wrong codes per source per 10 minutes. Can be turned off (`lanAccess`; off by default in containers and on cloud VMs). |
-| Tailscale (the app's `serve`, or Hypernova's built-in node) | `https://<mac>.<tailnet>.ts.net:47321` | Devices in the user's tailnet | Tailscale's WireGuard and ACLs, then the same bearer token. Never Funnel, never a public interface. Without tailnet HTTPS certificates the node serves the daemon's pinned certificate. The helper strips any forwarding headers a client sent. |
+| LAN listener | `0.0.0.0:47323`, HTTPS, mutual TLS | Phones on the same network or hotspot, or over the owner's own VPN into it: the only way a phone comes in | Sources outside private ranges are dropped before TLS. The phone pins the daemon's self-signed certificate (fingerprint from the pairing link) and presents a device certificate the daemon signed for it (ECDSA P-256, 2 years, revoked at once when the device is forgotten). Without one only `health`, `pair`, `device/cert` and the app's download page answer. Per-source and total connection caps, handshake and header timeouts; pairing closed unless a code is shown, 5 wrong codes per source per 10 minutes. Can be turned off (`lanAccess`; off by default in containers and on cloud VMs). |
 | The pairing link | `https://<address>:47323/pair?c=…` (QR), the server's own page on the LAN listener | Anyone on the network who sees the QR code while it is valid | The page answers only for a code being shown and hands the app the address the browser came in on (never a header's). See codes below. |
 | App update | `GET /download/android/Hypernova.apk` over the app's own route | Anyone who reaches a listener, without a token | The APK is public by design. Android checks it: same package, newer version, same signing key. |
 
@@ -78,7 +79,7 @@ glasses are removed"). The section numbers after it are kept.
 
 | Credential | Held by | What it opens | Lifetime and revocation |
 | --- | --- | --- | --- |
-| **Admin token** | The `hypernova` command, on the server | The local API (setup, pairing, settings, forgetting devices, the service) | Per install; anyone who can read the support folder has it. Not valid on the LAN listener or over Tailscale. |
+| **Admin token** | The `hypernova` command, on the server | The local API (setup, pairing, settings, forgetting devices, the service) | Per install; anyone who can read the support folder has it. Not valid on the LAN listener. |
 | **Device token** | One paired phone | The whole `/v1` phone API: start sessions, prompts, approvals, terminals, files, settings the phone may change | 256 random bits, stored by the daemon as a hash. Forget the device (`DELETE /local/devices/{id}`, or `DELETE /v1/devices/me` from the phone) and it stops working at once, on open connections too. Pairing the same app install again replaces its old device. |
 | **Device certificate** | One phone, for the LAN listener | The LAN listener at all | Two years; one active per device; revoked with the device. |
 | **Preview token** | Whoever holds the URL | One folder's files or one dev-server port, no header needed | 12 hours. Never serves dotfiles or key files. |
@@ -139,12 +140,12 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   as data: JSON; Slack's `&`, `<`, `>` escaped; Discord mentions nobody; Telegram without a parse
   mode.
 - **Webhook outputs** go over https only, never to this computer or a private network: loopback,
-  the private ranges, carrier-grade NAT and the tailnet (100.64/10), link-local and cloud metadata
+  the private ranges, carrier-grade NAT (100.64/10, which VPNs hand out), link-local and cloud metadata
   (169.254.169.254, `fd00:ec2::254`), unique-local, multicast, reserved and documentation ranges,
   IPv4 inside IPv6 judged as IPv4. A name is judged after DNS, by every address it has, and the
   connection is pinned to the addresses judged (DNS rebinding changes nothing); no redirect is
   followed; 10 s; the answer's body is never read. To send to a self-hosted ntfy on the local
-  network or the tailnet, add its host, as written in the URL, to `webhookPrivateHosts` in
+  network or a VPN, add its host, as written in the URL, to `webhookPrivateHosts` in
   `<support>/settings.json` (with the daemon stopped, then start it).
 - **File outputs and watches** stay inside the projects folder and never touch a file with keys. A
   file output is appended without following a link (one put there after the check is refused). A
@@ -164,7 +165,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
 - Claude Code's login and its credentials.
 - Provider keys: never logged, never sent to the phone (it sees only "has a key"), and
   they go only to their own provider.
-- The admin token, the hook secret, the TLS keys, Hypernova's Tailscale node key.
+- The admin token, the hook secret, the TLS keys.
 - Automations' fire tokens (only their hashes are kept) and webhook outputs' addresses and bot
   tokens: a webhook's secret goes only to its own host.
 - Transcripts, attachments and files: they leave the computer only to a paired device, over the routes above,
@@ -188,8 +189,8 @@ another session's reply. All of that is **outside text**, and the daemon treats 
    plain private files or preferences, not the Keychain or Keystore (LATER L30 for the keys). Anyone who
    already runs code as the user on the Mac or the phone has them.
 6. (Removed with the name service, 2026-10-30: the private name in Certificate Transparency logs and DNS.)
-7. **A lost phone is a lost unlocked keyboard** until it is forgotten on the Mac. Tailscale key expiry
-   and its ACLs are the user's to set.
+7. **A lost phone is a lost unlocked keyboard** until it is forgotten on the Mac. Who can join the Wi-Fi
+   and the VPN into it is the user's to set.
 8. (Removed with the glasses, 2026-10-30: an iframe on a Telescope page.)
 9. **Approval notifications** show the raw command on the lock screen unless the phone hides sensitive
    notifications (LATER L41).
@@ -212,7 +213,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
     phone.
 
 Out of scope: someone already running code as the user on the machine, Claude Code's own permission
-rules, and weaknesses in Tailscale or the operating system.
+rules, and weaknesses in the VPN or the operating system.
 
 ## 9. Reporting
 
