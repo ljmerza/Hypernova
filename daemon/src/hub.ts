@@ -22,6 +22,7 @@ import { blockedCount, forgetBlocked, noteBlocked, onBlockedChange, sawToolResul
 import { heldView, type HeldView } from './held.ts'
 import { TODO_TOOLS, todoNow, type TodoNow } from './todos.ts'
 import { ruleString, type AlwaysChoice, type AlwaysScope } from './always.ts'
+import type { Why } from './why.ts'
 import { deaths, jobEnd, type JobSeen } from './job-deaths.ts'
 
 export type SessionState = 'starting' | 'working' | 'needs_you' | 'idle' | 'error' | 'ended'
@@ -156,6 +157,8 @@ export type Approval = {
    */
   alwaysRules: string[]
   alwaysScope: AlwaysScope | null
+  /** Why it asked (why.ts): Claude Code's own reason first, else Hypernova's reading of the rules; null for a question or a plan. */
+  why: Why | null
   /** The tool can be allowed for the rest of the session at once (web and read tools). */
   canSession: boolean
   questions: unknown[] | null
@@ -165,11 +168,12 @@ export type Approval = {
   agentLabel: string | null
 }
 /** What asks: the approval without what the daemon adds itself. */
-export type ApprovalAsk = Omit<Approval, 'id' | 'createdAt' | 'expiresAt' | 'autoDeny' | 'canSession' | 'agentId' | 'agentLabel' | 'alwaysRules' | 'alwaysScope'> & {
+export type ApprovalAsk = Omit<Approval, 'id' | 'createdAt' | 'expiresAt' | 'autoDeny' | 'canSession' | 'agentId' | 'agentLabel' | 'alwaysRules' | 'alwaysScope' | 'why'> & {
   agentId?: string | null
   agentLabel?: string | null
   alwaysRules?: string[]
   alwaysScope?: AlwaysScope | null
+  why?: Why | null
 }
 /**
  * What 10 minutes without an answer does to an ask (docs/DECISIONS.md, "Never auto-deny"):
@@ -969,6 +973,7 @@ export function requestApproval(a: ApprovalAsk, toolUseId: string | null, signal
     agentLabel: a.agentLabel ?? null,
     alwaysRules: a.canAlways ? (a.alwaysRules ?? []) : [],
     alwaysScope: a.canAlways ? (a.alwaysScope ?? null) : null,
+    why: a.kind === 'tool' ? (a.why ?? null) : null,
     canSession: a.kind === 'tool' && SESSION_TOOLS.has(a.toolName),
     id,
     createdAt: now,

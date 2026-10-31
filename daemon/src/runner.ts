@@ -22,6 +22,8 @@ import {
   upsertSession,
   emitEvent,
   seedFrom,
+  sessionAllowedTools,
+  sessionAlwaysRules,
   sessionRule,
   type AwayRule,
 } from './hub.ts'
@@ -36,6 +38,25 @@ import { noteHookEvent } from './hookevents.ts'
 import type { AutomationStart } from './terms.ts'
 import { SdkMissingError, claudeSdk, type ClaudeSdk } from './sdk.ts'
 import { alwaysUpdates, suggestedRules, suggestedScope } from './always.ts'
+import { rulesInEffect } from './permission-rules.ts'
+import { whyFromRules, whyFromSdk, whyFromSuggestions, type SdkAsk, type Why } from './why.ts'
+
+/**
+ * Why an SDK session's ask asked (IDEAS PA7): what the SDK says (its decision reason, the ask rule
+ * that forced it, a blocked path), else its suggestion's folder, else Hypernova's reading of the
+ * rules in effect, with an automation's allow rules as the session's own. Null if that can't be read.
+ */
+function sdkWhy(m: ManagedSession, toolName: string, input: Record<string, unknown>, opts: SdkAsk & { suggestions?: unknown }): Why | null {
+  try {
+    const said = whyFromSdk(opts) ?? whyFromSuggestions(opts.suggestions)
+    if (said) return said
+    const own = [...(m.automation ? (m.allowedTools ?? []) : []), ...sessionAllowedTools(m.id), ...sessionAlwaysRules(m.id)]
+    return whyFromRules(toolName, input, getSession(m.id)?.permissionMode ?? m.permissionMode ?? null, m.cwd, rulesInEffect(m.cwd, { allow: [...new Set(own)] }))
+  } catch (e) {
+    log('why it asked:', (e as Error).message)
+    return null
+  }
+}
 
 /**
  * One session's runs: the query running now, and the prompts waiting behind it ([queue], shaped
@@ -299,6 +320,7 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
             canAlways: !!opts.suggestions?.length,
             alwaysRules: suggestedRules(opts.suggestions),
             alwaysScope: suggestedScope(opts.suggestions),
+            why: kind === 'tool' ? sdkWhy(m, toolName, input as Record<string, unknown>, opts as SdkAsk & { suggestions?: unknown }) : null,
             questions: kind === 'question' ? ((input as { questions?: unknown[] }).questions ?? null) : null,
             plan: kind === 'plan' ? String((input as { plan?: string }).plan ?? '') : null,
             agentId,

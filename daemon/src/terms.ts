@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url'
 import type { WebSocket } from 'ws'
 import { CLAUDE_DIR, HOME, SUPPORT, findClaude, log, randomToken, readJson, trimText, writeText } from './util.ts'
 import { getManaged, getProvider, isClaudeEffort, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
-import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, notePaste, noteTermDialog, sessionOfAgentJob, upsertSession, view } from './hub.ts'
+import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, notePaste, noteTermDialog, sessionAllowedTools, sessionAlwaysRules, sessionOfAgentJob, upsertSession, view } from './hub.ts'
+import { rulesInEffect } from './permission-rules.ts'
+import { whyFromRules, type Why } from './why.ts'
 import { promptTitle, typedCommand } from './normalize.ts'
 import { trialEnded } from './blockers.ts'
 import { noteTrialEnded } from './account.ts'
@@ -379,6 +381,20 @@ let looking = false
  * job's stays "busy"): the session needs you while it shows, and works again once it's gone
  * (the registry and the hooks say more within seconds).
  */
+/**
+ * Hypernova's reading of why a Bash dialog asked, when Claude Code's dialog says nothing (an ask
+ * its hook handed back, no allow rule): the rules in effect for the session's folder (why.ts).
+ * Only a Bash dialog: another dialog's title doesn't name its tool and input exactly. Null on error.
+ */
+function dialogWhy(r: { id: string; cwd: string; permissionMode: string }, p: Permission): Why | null {
+  if (!p.command || !/^Bash\b/i.test(p.tool ?? '')) return null
+  try {
+    return whyFromRules('Bash', { command: p.command }, r.permissionMode ?? null, r.cwd, rulesInEffect(r.cwd, { allow: [...new Set([...sessionAllowedTools(r.id), ...sessionAlwaysRules(r.id)])] }), HOME)
+  } catch {
+    return null
+  }
+}
+
 export async function watchMenus(): Promise<void> {
   if (looking) return
   looking = true
@@ -408,6 +424,8 @@ export async function watchMenus(): Promise<void> {
           if (r.menu) upsertSession(r.id, { menu: null, ...(r.menu.permission && r.state === 'needs_you' && !asked ? { state: 'working' as const, activity: null } : {}) })
         } else if (menu.id === before || menu.id === r.menu?.id) {
           const p = menu.permission
+          // A dialog that prints no reason: Hypernova's reading, worked out once per dialog.
+          if (p && !p.why) p.why = r.menu?.id === menu.id ? (r.menu.permission?.why ?? null) : dialogWhy(r, p)
           upsertSession(r.id, { menu, ...(p && r.state !== 'needs_you' ? { state: 'needs_you' as const, activity: permissionActivity(menu.title, p), lastActivityAt: Date.now() } : {}) })
         }
         // An ask handed back to this dialog: its notice points at the card, and goes once it's answered.

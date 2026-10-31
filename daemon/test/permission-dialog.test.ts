@@ -23,6 +23,8 @@ test('the Arc screen: Yes and No, the tool, the whole command, the ask rule in t
     command:
       '/media/cubxi/docker/projects/arc/.venv/bin/python /media/cubxi/docker/projects/arc/scratch/deploy/check.py http://192.168.1.76:8108 /healthz / /variants/1/ /variants/1/blend/ /compare/?v=1 /accuracy/ /devices/',
     question: 'Do you want to proceed?',
+    // Why it asked, as the dialog says it (IDEAS PA7).
+    why: { kind: 'ask_rule', text: 'Ask rule Bash(python:*) overrides auto mode for this command.', rule: 'Bash(python:*)', source: 'claude' },
   })
   assert.deepEqual(m.body, [
     'Smoke-check all live pages',
@@ -78,6 +80,8 @@ test('a subagent’s dialog in its session’s terminal: whose it is stays in th
     tool: 'Bash command · from the general-purpose agent',
     command: 'ls /media/cubxi/docker/projects/hypernova/daemon/test',
     question: 'Do you want to proceed?',
+    // It prints no reason: the daemon may fill in its own reading (terms.ts).
+    why: null,
   })
   assert.deepEqual(m.body, ["List the daemon's tests", 'Do you want to proceed?'])
   assert.deepEqual(m.options.map((o) => o.label), ['Yes', 'Yes, and don’t ask again for ls commands in /media/cubxi/docker/projects/hypernova', 'No'])

@@ -33,6 +33,8 @@ import {
   forgetSessionAllowed,
   isRestarting,
   resolveSession,
+  sessionAllowedTools,
+  sessionAlwaysRules,
   sessionRule,
   ensureParsed,
   getSession,
@@ -56,6 +58,8 @@ import { noteDenied } from './denied.ts'
 import { noteBlocked } from './blocked.ts'
 import { noteHookEvent } from './hookevents.ts'
 import { alwaysUpdates, suggestedRules, suggestedScope } from './always.ts'
+import { rulesInEffect } from './permission-rules.ts'
+import { whyFromRules, whyFromSuggestions, type Why } from './why.ts'
 
 // PreToolUse → tool_use_id, to pair with PermissionRequest (which has no id).
 const recentPre = new Map<string, string>()
@@ -195,6 +199,22 @@ export async function handleHook(ev: any, req: IncomingMessage, res: ServerRespo
   return {}
 }
 
+/**
+ * Why a hook's ask asked (IDEAS PA7): Claude Code's offer to add a folder, else Hypernova's reading
+ * of the session's rules in effect (its own folder's settings files and the rules Hypernova gave it).
+ * Null if the files can't be read: the ask goes on without it.
+ */
+function hookWhy(sid: string, tool: string, input: Record<string, unknown>, suggestions: unknown): Why | null {
+  try {
+    const rec = getSession(sid)
+    if (!rec) return null
+    return whyFromSuggestions(suggestions) ?? whyFromRules(tool, input, rec.permissionMode ?? null, rec.cwd, rulesInEffect(rec.cwd, { allow: [...new Set([...sessionAllowedTools(sid), ...sessionAlwaysRules(sid)])] }), HOME)
+  } catch (e) {
+    log('why it asked:', (e as Error).message)
+    return null
+  }
+}
+
 async function permission(ev: any, sid: string, req: IncomingMessage, res: ServerResponse): Promise<object> {
   // Nobody to ask: let the terminal dialog handle it.
   if (!hasPairedDevice()) return {}
@@ -219,6 +239,9 @@ async function permission(ev: any, sid: string, req: IncomingMessage, res: Serve
       // The rule Claude Code suggests, for the phone's Always sheet to show and edit (always.ts).
       alwaysRules: suggestedRules(ev.permission_suggestions),
       alwaysScope: suggestedScope(ev.permission_suggestions),
+      // Why it asked: the hook says no reason (Claude Code 2.1.316), so its suggestion's folder
+      // first, else Hypernova's reading of the rules in effect (why.ts).
+      why: kind === 'tool' ? hookWhy(sid, tool, input, ev.permission_suggestions) : null,
       questions: kind === 'question' ? (input.questions ?? null) : null,
       plan: kind === 'plan' ? String(input.plan ?? '') : null,
       // A subagent asks: the phone says which (and notifies later, as agents often settle it).
