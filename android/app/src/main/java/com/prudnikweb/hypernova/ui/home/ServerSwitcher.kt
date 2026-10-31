@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -108,7 +109,7 @@ internal fun ServerSwitcher(
     }
 }
 
-/** One computer: the tick (or room for it), its name, its needs-you count in amber, and its link as the chip says it. */
+/** One computer: the tick (or room for it), its name, its needs-you count in amber (the number alone), and its link as the chip says it. */
 @Composable
 private fun ServerRow(name: String, state: LinkState, needsYou: Int, ticked: Boolean, label: String? = null, onClick: () -> Unit) {
     PickRow(
@@ -122,8 +123,10 @@ private fun ServerRow(name: String, state: LinkState, needsYou: Int, ticked: Boo
         Spacer(Modifier.width(12.dp))
         HText(name, style = Type.body, color = if (ticked) HN.ink else HN.inkMuted, maxLines = 1, modifier = Modifier.weight(1f))
         if (needsYou > 0) {
+            // Only the number (owner, 2026-10-31: "4 NEED YOU" pushed the names out); TalkBack still hears the words.
+            val words = pluralStringResource(R.plurals.notif_needs_you, needsYou, needsYou)
             Spacer(Modifier.width(8.dp))
-            StatusChip(pluralStringResource(R.plurals.notif_needs_you, needsYou, needsYou), HN.amber, filled = true)
+            StatusChip("$needsYou", HN.amber, Modifier.semantics { contentDescription = words }, filled = true)
         }
         Spacer(Modifier.width(8.dp))
         // The state in a word, as Settings' chip: the name is already the row's.
