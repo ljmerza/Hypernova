@@ -1,5 +1,6 @@
-// Session.turnStartedAt, the session sheet's "This turn": set as a session goes into a turn, kept
-// through a stop for the owner's answer, cleared when the turn is over.
+// Session.turnStartedAt, the session sheet's "This turn" and Home's "for 12 min": set as a session
+// goes into a turn (or from the time the patch brings: Claude Code's registry stamp), kept through
+// a stop for the owner's answer, cleared when the turn is over.
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
@@ -50,4 +51,14 @@ test('a session first seen working is in a turn from then; a patch without a sta
   assert.equal(turn('t2'), started)
   hub.upsertSession('t2', { state: 'error' })
   assert.equal(turn('t2'), null)
+})
+
+test("a time the patch brings (the registry's stamp, seen mid-turn after a restart) is the turn's start", () => {
+  hub.upsertSession('t3', { cwd, state: 'working', turnStartedAt: 1_000 })
+  assert.equal(turn('t3'), 1_000)
+  hub.setState('t3', 'needs_you')
+  hub.setState('t3', 'working')
+  assert.equal(turn('t3'), 1_000)
+  hub.setState('t3', 'idle')
+  assert.equal(turn('t3'), null)
 })

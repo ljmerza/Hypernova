@@ -90,12 +90,13 @@ data class Session(
     val blockedCalls: Int = 0,
     /** Claude Code's reasoning effort (data/Effort.kt); null: not known yet (its default), or Codex's session. */
     val effort: String? = null,
-    /** When its turn started, as the Mac saw it (0 out of a turn, or not known): the session sheet's "This turn". */
+    /**
+     * When its turn started, as the Mac saw it, kept while it waits on the owner (0 out of a turn, or
+     * not known): the session sheet's "This turn" and a Working card's "for 12 min".
+     */
     val turnStartedAt: Long = 0L,
     /** Claude's to-do list in short (docs/PROTOCOL.md, Session.todo): a Working card's "Running the tests 3/7". */
     val todo: TodoNow? = null,
-    /** When the turn it works on started (Session.workingSince): a Working card's "for 12 min"; 0 when not working or not said. */
-    val workingSince: Long = 0L,
 ) {
     /** A Codex session: no rewind, no other provider, no carrying on by itself, Codex's two modes. */
     val codex: Boolean get() = agent == AgentKind.CODEX

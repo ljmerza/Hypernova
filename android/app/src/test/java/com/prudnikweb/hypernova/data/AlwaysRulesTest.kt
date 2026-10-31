@@ -16,6 +16,8 @@ class AlwaysRulesTest {
     private fun r(s: String) = AlwaysRule.parse(s)
 
     @Test fun readsARuleAsClaudeCodeDoes() {
+        assertEquals(AlwaysRule("Bash", "npm test *"), r("Bash(npm test *)"))
+        // The older prefix form, as rules in files still have it.
         assertEquals(AlwaysRule("Bash", "npm test:*"), r("Bash(npm test:*)"))
         assertEquals(AlwaysRule("WebFetch", null), r("  WebFetch "))
         assertEquals(AlwaysRule("mcp__github__create_issue", null), r("mcp__github__create_issue"))
@@ -33,21 +35,23 @@ class AlwaysRulesTest {
     }
 
     @Test fun writesItBackTheSame() {
-        for (s in listOf("Bash(npm test:*)", "WebFetch", "Bash(echo \\(hi\\))", "Bash(printf a\\\\b)")) assertEquals(s, r(s).toString())
+        for (s in listOf("Bash(npm test *)", "Bash(npm test:*)", "WebFetch", "Bash(echo \\(hi\\))", "Bash(printf a\\\\b)")) assertEquals(s, r(s).toString())
     }
 
     @Test fun widensACommandToItsPrefixItsFirstTwoWordsAndTheWholeTool() {
-        assertEquals(listOf("Bash(npm test:*)", "Bash"), r("Bash(npm test)")!!.widenings().map { it.toString() })
+        // A prefix as Claude Code's own suggestions now write one: a space, then *.
+        assertEquals(listOf("Bash(npm test *)", "Bash"), r("Bash(npm test)")!!.widenings().map { it.toString() })
         assertEquals(
-            listOf("Bash(npm test --prefix daemon:*)", "Bash(npm test:*)", "Bash"),
+            listOf("Bash(npm test --prefix daemon *)", "Bash(npm test *)", "Bash"),
             r("Bash(npm test --prefix daemon)")!!.widenings().map { it.toString() },
         )
-        // Already a prefix (either way Claude Code writes one): only shorter ones and the tool.
-        assertEquals(listOf("Bash(git log:*)", "Bash"), r("Bash(git log --oneline:*)")!!.widenings().map { it.toString() })
+        // Already a prefix (either way Claude Code writes one, :* in older files): only shorter ones and the tool.
+        assertEquals(listOf("Bash(git log *)", "Bash"), r("Bash(git log --oneline:*)")!!.widenings().map { it.toString() })
+        assertEquals(listOf("Bash(git log *)", "Bash"), r("Bash(git log --oneline *)")!!.widenings().map { it.toString() })
         assertEquals(listOf("Bash"), r("Bash(npm test:*)")!!.widenings().map { it.toString() })
         assertEquals(listOf("Bash"), r("Bash(git status *)")!!.widenings().map { it.toString() })
         // One word: its prefix, then the tool.
-        assertEquals(listOf("Bash(ls:*)", "Bash"), r("Bash(ls)")!!.widenings().map { it.toString() })
+        assertEquals(listOf("Bash(ls *)", "Bash"), r("Bash(ls)")!!.widenings().map { it.toString() })
         // Another tool's pattern widens to the tool; a whole tool not at all.
         assertEquals(listOf("Read"), r("Read(//home/u/p/**)")!!.widenings().map { it.toString() })
         assertTrue(r("WebFetch")!!.widenings().isEmpty())
@@ -68,15 +72,15 @@ class AlwaysRulesTest {
     @Test fun editingWideningAndGoingBack() {
         var d = AlwaysDraft.of(listOf("Bash(npm test)", "Bash(git status:*)"), "project")
         d = d.set(0, r("Bash(npm test)")!!.widenings().first())
-        assertEquals(listOf("Bash(npm test:*)", "Bash(git status:*)"), d.rules)
+        assertEquals(listOf("Bash(npm test *)", "Bash(git status:*)"), d.rules)
         assertEquals("Bash(npm test)", d.suggestedAt(0))
         d = d.edit(1, "Bash(git status")
         assertFalse(d.valid)
         assertNull(d.parsed[1])
-        d = d.edit(1, "Bash(npm test:*)")
+        d = d.edit(1, "Bash(npm test *)")
         // Sent once each.
         assertTrue(d.valid)
-        assertEquals(listOf("Bash(npm test:*)"), d.rules)
+        assertEquals(listOf("Bash(npm test *)"), d.rules)
         d = d.edit(0, d.suggestedAt(0)!!)
         assertNull(d.suggestedAt(0))
         assertFalse(AlwaysDraft(emptyList(), emptyList(), AlwaysScope.Session).valid)
@@ -84,9 +88,9 @@ class AlwaysRulesTest {
 
     @Test fun theApprovalCarriesTheRulesFromTheMac() {
         val a = Wire.approval(
-            JSONObject("""{"id":"a1","sessionId":"s","kind":"tool","toolName":"Bash","summary":"Bash: npm test","input":{"command":"npm test"},"canAlways":true,"alwaysRules":["Bash(npm test:*)","",7],"alwaysScope":"project"}"""),
+            JSONObject("""{"id":"a1","sessionId":"s","kind":"tool","toolName":"Bash","summary":"Bash: npm test","input":{"command":"npm test"},"canAlways":true,"alwaysRules":["Bash(npm test *)","",7],"alwaysScope":"project"}"""),
         )
-        assertEquals(listOf("Bash(npm test:*)"), a.alwaysRules)
+        assertEquals(listOf("Bash(npm test *)"), a.alwaysRules)
         assertEquals("project", a.alwaysScope)
         // An older Mac: none.
         val old = Wire.approval(JSONObject("""{"id":"a2","sessionId":"s","kind":"tool","toolName":"Bash","summary":"Bash: ls","canAlways":true}"""))

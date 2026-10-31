@@ -185,30 +185,6 @@ test("a session carries its list in short, and it moves on with Claude's next ca
   assert.equal(view(getSession(`${sid}-none`)!).todo, null)
 })
 
-test("a working session says when its turn started, through an ask, and not once it's idle", () => {
-  const sid = randomUUID()
-  upsertSession(sid, { cwd, title: 'Turn', state: 'idle' })
-  const rec = getSession(sid)!
-  assert.equal(view(rec).workingSince, null)
-  const before = Date.now()
-  upsertSession(sid, { state: 'working' })
-  const since = view(rec).workingSince!
-  assert.ok(since >= before && since <= Date.now())
-  // More steps and an ask within the turn keep it.
-  upsertSession(sid, { state: 'working', activity: 'Bash: npm test' })
-  upsertSession(sid, { state: 'needs_you' })
-  upsertSession(sid, { state: 'working' })
-  assert.equal(view(rec).workingSince, since)
-  // Done: gone, and the next turn starts again.
-  upsertSession(sid, { state: 'idle' })
-  assert.equal(view(rec).workingSince, null)
-  // A time the patch brings (Claude Code's registry stamp, a daemon seeing it mid-turn) is kept.
-  upsertSession(sid, { state: 'working', workingSince: 1_000 })
-  assert.equal(view(rec).workingSince, 1_000)
-  upsertSession(sid, { state: 'ended' })
-  assert.equal(view(rec).workingSince, null)
-})
-
 // ── Rewind to here ───────────────────────────────────────────────────────
 test('rewinds to just before a message, in a new session, leaving the original as it was', async () => {
   const sid = randomUUID()

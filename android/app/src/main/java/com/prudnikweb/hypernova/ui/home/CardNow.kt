@@ -50,7 +50,7 @@ internal sealed interface WorkingLine {
 
 /**
  * How long a Working card's turn has run ("for 12 min", "for 1 h 5 min", "for 1 d 3 h"), from
- * [Session.workingSince]. Nothing under a minute, nor when it's unknown or ahead of this phone's clock.
+ * [Session.turnStartedAt]. Nothing under a minute, nor when it's unknown or ahead of this phone's clock.
  */
 internal sealed interface Elapsed {
     data class Minutes(val n: Int) : Elapsed
@@ -91,9 +91,9 @@ internal fun WorkingNow(s: Session) {
                 is WorkingLine.Doing -> HText(line.text, style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (s.workingSince > 0L) {
+        if (s.turnStartedAt > 0L) {
             Spacer(Modifier.width(10.dp))
-            WorkingFor(s.workingSince)
+            WorkingFor(s.turnStartedAt)
         }
     }
 }

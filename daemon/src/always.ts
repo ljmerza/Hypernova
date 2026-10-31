@@ -13,7 +13,9 @@
 // `~/.claude/settings.json`). Its own suggestions for a command go to `localSettings`.
 //
 // A rule is written as Claude Code writes one: `Tool` or `Tool(content)`, the content's `\`, `(`
-// and `)` escaped with a backslash; `Tool()` and `Tool(*)` are the whole tool.
+// and `)` escaped with a backslash; `Tool()` and `Tool(*)` are the whole tool. A command's prefix
+// is `Bash(npm test *)` (a space, then `*`), as 2.1.314's own suggestions write it; the older
+// `Bash(npm test:*)` that files still hold is a prefix too, and passes through as it is.
 
 /** Where an Always rule goes, as the phone names it. */
 export type AlwaysScope = 'session' | 'project' | 'everywhere'
@@ -54,7 +56,7 @@ function escaped(s: string, i: number): boolean {
   return n % 2 === 1
 }
 
-/** [v] as Claude Code writes it in a settings file (`Bash(npm test:*)`). */
+/** [v] as Claude Code writes it in a settings file (`Bash(npm test *)`). */
 export function ruleString(v: RuleValue): string {
   if (!v.ruleContent) return v.toolName
   return `${v.toolName}(${v.ruleContent.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)')})`
@@ -130,7 +132,7 @@ export function readAlwaysChoice(b: any): AlwaysChoice | undefined {
   const rules: RuleValue[] = []
   for (const r of b.rules) {
     const v = parseRule(r)
-    if (!v) throw new AlwaysError('bad_rule', `“${String(r).slice(0, 80)}” isn’t a rule. Write Tool or Tool(pattern), such as Bash(npm test:*).`)
+    if (!v) throw new AlwaysError('bad_rule', `“${String(r).slice(0, 80)}” isn’t a rule. Write Tool or Tool(pattern), such as Bash(npm test *).`)
     if (!rules.some((x) => ruleString(x) === ruleString(v))) rules.push(v)
   }
   return { scope: b.scope, rules }

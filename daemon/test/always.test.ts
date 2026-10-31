@@ -81,8 +81,9 @@ function call(method: string, path: string, body?: unknown): Promise<{ status: n
   })
 }
 
-// Claude Code's own suggestion for `npm test --prefix daemon`: a prefix rule for the project's local file.
-const NPM = [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test:*' }], behavior: 'allow', destination: 'localSettings' }]
+// Claude Code's own suggestion for `npm test --prefix daemon`: a prefix rule for the project's local
+// file, written as 2.1.314 writes one (a space, then *).
+const NPM = [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test *' }], behavior: 'allow', destination: 'localSettings' }]
 const out = (decision: object) => ({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } })
 
 /** A PermissionRequest from session [sid]; resolves to what the hook hands Claude Code. */
@@ -96,6 +97,8 @@ function ask(sid: string, command: string, suggestions: unknown[] = NPM, tool = 
 // ── The rule, as Claude Code reads and writes it ─────────────────────────
 test('a rule reads as Claude Code reads one: Tool or Tool(content), escapes undone, the rest refused', () => {
   const p = always.parseRule
+  assert.deepEqual(p('Bash(npm test *)'), { toolName: 'Bash', ruleContent: 'npm test *' })
+  // The older prefix form, as rules in files still have it.
   assert.deepEqual(p('Bash(npm test:*)'), { toolName: 'Bash', ruleContent: 'npm test:*' })
   assert.deepEqual(p('  WebFetch  '), { toolName: 'WebFetch' })
   assert.deepEqual(p('mcp__github__create_issue'), { toolName: 'mcp__github__create_issue' })
@@ -110,7 +113,7 @@ test('a rule reads as Claude Code reads one: Tool or Tool(content), escapes undo
     assert.equal(p(bad), null, `refused: ${JSON.stringify(bad)}`)
   }
   // Written back as Claude Code writes it: the same string.
-  for (const s of ['Bash(npm test:*)', 'WebFetch', 'Bash(echo \\(hi\\))', 'Bash(printf a\\\\b)']) assert.equal(always.ruleString(p(s)!), s)
+  for (const s of ['Bash(npm test *)', 'Bash(npm test:*)', 'WebFetch', 'Bash(echo \\(hi\\))', 'Bash(printf a\\\\b)']) assert.equal(always.ruleString(p(s)!), s)
 })
 
 test('the suggestion’s rules and scope: only its allow rules, once each, in its order', () => {
@@ -134,7 +137,7 @@ test('the suggestion’s rules and scope: only its allow rules, once each, in it
 test('the approval carries Claude Code’s rule and scope for the phone’s Always sheet', async () => {
   const { answer, a } = ask('al-carry', 'npm test --prefix daemon')
   assert.equal(a.canAlways, true)
-  assert.deepEqual(a.alwaysRules, ['Bash(npm test:*)'])
+  assert.deepEqual(a.alwaysRules, ['Bash(npm test *)'])
   assert.equal(a.alwaysScope, 'project')
   hub.answerApproval(a.id, { decision: 'allow' }, 'phone')
   assert.deepEqual(await answer, out({ behavior: 'allow' }))
@@ -155,22 +158,22 @@ test('Always with no scope: Claude Code’s suggestion exactly as it came (an ol
 
 test('this session: the rule to the session only (nothing saved), and the rules in effect say so', async () => {
   const { answer, a } = ask('al-session', 'npm test --prefix daemon')
-  assert.equal((await call('POST', `/v1/approvals/${a.id}`, { decision: 'always', scope: 'session', rules: ['Bash(npm test:*)'] })).status, 200)
+  assert.equal((await call('POST', `/v1/approvals/${a.id}`, { decision: 'always', scope: 'session', rules: ['Bash(npm test *)'] })).status, 200)
   assert.deepEqual(
     await answer,
-    out({ behavior: 'allow', updatedPermissions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test:*' }], behavior: 'allow', destination: 'session' }] }),
+    out({ behavior: 'allow', updatedPermissions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test *' }], behavior: 'allow', destination: 'session' }] }),
   )
   const r = await call('GET', '/v1/sessions/al-session/permissions')
   assert.equal(r.status, 200)
-  assert.deepEqual(r.json.permissions.sources.find((x: any) => x.source === 'session').allow, ['Bash(npm test:*)'])
+  assert.deepEqual(r.json.permissions.sources.find((x: any) => x.source === 'session').allow, ['Bash(npm test *)'])
 })
 
 test('this project: the project’s local file (localSettings), with the rule as edited', async () => {
   const { answer, a } = ask('al-project', 'npm test --prefix daemon')
-  assert.equal((await call('POST', `/v1/approvals/${a.id}`, { decision: 'always', scope: 'project', rules: ['Bash(npm test --prefix daemon:*)'] })).status, 200)
+  assert.equal((await call('POST', `/v1/approvals/${a.id}`, { decision: 'always', scope: 'project', rules: ['Bash(npm test --prefix daemon *)'] })).status, 200)
   assert.deepEqual(
     await answer,
-    out({ behavior: 'allow', updatedPermissions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test --prefix daemon:*' }], behavior: 'allow', destination: 'localSettings' }] }),
+    out({ behavior: 'allow', updatedPermissions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test --prefix daemon *' }], behavior: 'allow', destination: 'localSettings' }] }),
   )
 })
 
@@ -189,20 +192,20 @@ test('a scope without rules keeps Claude Code’s; the rest of its suggestion st
     out({
       behavior: 'allow',
       updatedPermissions: [
-        { type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test:*' }], behavior: 'allow', destination: 'userSettings' },
+        { type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test *' }], behavior: 'allow', destination: 'userSettings' },
         { type: 'addDirectories', directories: ['/srv/shared'], destination: 'localSettings' },
         { type: 'setMode', mode: 'acceptEdits', destination: 'session' },
       ],
     }),
   )
   const two = ask('al-mixed', 'npm test --prefix daemon', mixed)
-  assert.equal((await call('POST', `/v1/approvals/${two.a.id}`, { decision: 'always', scope: 'session', rules: ['Bash(npm test:*)'] })).status, 200)
+  assert.equal((await call('POST', `/v1/approvals/${two.a.id}`, { decision: 'always', scope: 'session', rules: ['Bash(npm test *)'] })).status, 200)
   assert.deepEqual(
     await two.answer,
     out({
       behavior: 'allow',
       updatedPermissions: [
-        { type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test:*' }], behavior: 'allow', destination: 'session' },
+        { type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test *' }], behavior: 'allow', destination: 'session' },
         { type: 'addDirectories', directories: ['/srv/shared'], destination: 'session' },
         { type: 'setMode', mode: 'acceptEdits', destination: 'session' },
       ],

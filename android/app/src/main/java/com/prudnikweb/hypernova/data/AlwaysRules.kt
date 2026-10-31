@@ -23,20 +23,21 @@ enum class AlwaysScope(val wire: String) {
 
 /** A rule as Claude Code holds it: the tool, and what of it ([content], null for all of it). */
 data class AlwaysRule(val tool: String, val content: String?) {
-    /** As a settings file writes it: `Bash(npm test:*)`, the content's `\`, `(` and `)` escaped. */
+    /** As a settings file writes it: `Bash(npm test *)`, the content's `\`, `(` and `)` escaped. */
     override fun toString(): String =
         if (content == null) tool else "$tool(${content.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")})"
 
     /** A command rule's command without its trailing wildcard (`npm test` of `npm test:*` or `npm test *`). */
     private val command: String? get() = content?.let { c -> (if (prefix) c.dropLast(2) else c).trim() }
 
-    /** Already a prefix rule (`npm test:*`, `npm test *`). */
+    /** Already a prefix rule (`npm test *`, or the older `npm test:*` rules in files still use). */
     private val prefix: Boolean get() = content != null && (content.endsWith(":*") || content.endsWith(" *"))
 
     /**
      * Quick ways to widen it, widest last, never itself: a command as a prefix (`Bash(npm test
-     * --prefix daemon:*)`), its first two words as one (`Bash(npm test:*)`), then the whole tool
-     * (`Bash`). Other tools with a pattern widen only to the whole tool; a whole tool not at all.
+     * --prefix daemon *)`), its first two words as one (`Bash(npm test *)`), then the whole tool
+     * (`Bash`). A prefix is written as Claude Code 2.1.314's own suggestions write one: a space,
+     * then `*`. Other tools with a pattern widen only to the whole tool; a whole tool not at all.
      */
     fun widenings(): List<AlwaysRule> {
         if (content == null) return emptyList()
@@ -45,9 +46,9 @@ data class AlwaysRule(val tool: String, val content: String?) {
             val cmd = command.orEmpty()
             val words = cmd.split(Regex("\\s+")).filter { it.isNotEmpty() }
             if (words.isNotEmpty()) {
-                if (!prefix) out += AlwaysRule(tool, "$cmd:*")
+                if (!prefix) out += AlwaysRule(tool, "$cmd *")
                 val two = words.take(2).joinToString(" ")
-                if (two != cmd) out += AlwaysRule(tool, "$two:*")
+                if (two != cmd) out += AlwaysRule(tool, "$two *")
             }
         }
         out += AlwaysRule(tool, null)

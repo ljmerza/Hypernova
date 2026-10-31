@@ -1217,7 +1217,7 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
         Session("a3", "s-hypernova", "cosmos renderer", "hypernova", SessionState.Working, "opus", "acceptEdits",
             "$ ./gradlew :app:assembleDebug", now - 20_000, queued = 1,
             // Its to-do list as the chat's demo has it (ChatRepo.kt), and its turn so far.
-            todo = TodoNow("Fading the deep-sky objects behind text", 2, 5), workingSince = now - 12 * 60_000),
+            todo = TodoNow("Fading the deep-sky objects behind text", 2, 5), turnStartedAt = now - 12 * 60_000),
         Session("b8", "s-haze", "haze edges", "hypernova", SessionState.Idle, "sonnet", "acceptEdits",
             "waiting for your next prompt", now - 4 * 60_000),
         Session("c7", "s-0stems", "release landing copy", "0stems", SessionState.NeedsYou, "opus", "default",
@@ -1234,7 +1234,7 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
             "", now - 2 * 60_000, agentsRunning = 2),
         // Two on OpenRouter: ringed moons of the companion star, which shines on while the sun is dead.
         Session("5e", OR_WORK, "port the widget", "0stems", SessionState.Working, "openai/gpt-5", "acceptEdits",
-            "Edit: widget/Widget.tsx", now - 30_000, providerId = "openrouter", workingSince = now - 74 * 60_000),
+            "Edit: widget/Widget.tsx", now - 30_000, providerId = "openrouter", turnStartedAt = now - 74 * 60_000),
         Session("7a", OR_IDLE, "translate the docs", "prudnikov-site", SessionState.Idle, "openai/gpt-5", "default",
             "waiting for your next prompt", now - 9 * 60_000, providerId = "openrouter"),
         // Projects left alone for a day or more: quiet, so the sky's belt rather than planets.
@@ -1251,8 +1251,10 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
     ) + autoSessions()).map { s ->
         // How long each has run, so the planets in the sky differ in size.
         val ran = mapOf("a3" to 190, "b8" to 50, "c7" to 95, "1f" to 18, "9b" to 360, "e2" to 9, "d4" to 75, "5e" to 40, "7a" to 25, "4b" to 120, "2c" to 35)[s.hex] ?: 30
-        // One in a turn has been at it a few minutes (the session sheet's "This turn").
-        val turn = if (s.state == SessionState.Working || s.state == SessionState.NeedsYou) s.updatedAt - 4 * 60_000L else 0L
+        // One in a turn has been at it a few minutes, unless its own is set above (the session
+        // sheet's "This turn" and a Working card's "for 12 min").
+        val inTurn = s.state == SessionState.Working || s.state == SessionState.NeedsYou
+        val turn = if (!inTurn) 0L else s.turnStartedAt.takeIf { it > 0L } ?: (s.updatedAt - 4 * 60_000L)
         s.copy(createdAt = s.updatedAt - ran * 60_000L, turnStartedAt = turn)
     }
 

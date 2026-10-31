@@ -50,8 +50,10 @@ export type Session = {
   lastActivityAt: number
   /**
    * When its turn started (epoch ms): the moment it went from idle, error or ended to starting,
-   * working or needing you, as the daemon saw it; null while it isn't in a turn. The session
-   * sheet's "This turn". A turn already running when the daemon started counts from then.
+   * working or needing you, as the daemon saw it, kept through a stop for the owner's answer; null
+   * while it isn't in a turn. A session the daemon first sees busy (as after a restart) counts from
+   * Claude Code's registry stamp, else from then. The session sheet's "This turn" and Home's
+   * Working card's "for 12 min".
    */
   turnStartedAt?: number | null
   lastText: string | null
@@ -121,11 +123,6 @@ export type Session = {
    * Working card says "Running the tests 3/7" with it. Null when Claude made none.
    */
   todo?: TodoNow | null
-  /**
-   * When the turn it works on started (ms), kept while it waits on the owner in that turn; null
-   * when it isn't working ([noteWorking]). Home's Working card says "for 12 min" with it.
-   */
-  workingSince?: number | null
 }
 type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'agentRunning' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
@@ -147,7 +144,7 @@ export type Approval = {
   canAlways: boolean
   /**
    * The allow rules Claude Code suggests for Always, as a settings file writes them
-   * (`Bash(npm test:*)`), and where it would put them; the phone shows them, editable, on its
+   * (`Bash(npm test *)`), and where it would put them; the phone shows them, editable, on its
    * Always sheet (always.ts). Empty and null when the suggestion holds no rule (a mode, a folder).
    */
   alwaysRules: string[]
@@ -273,7 +270,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null, workingSince: r.workingSince ?? null }
+  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
@@ -352,11 +349,11 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
     }
     sessions.set(id, r)
   }
-  const wasInTurn = inTurn(r.state) && r.turnStartedAt != null
+  const turnSoFar = inTurn(r.state) ? (r.turnStartedAt ?? null) : null
   Object.assign(r, patch)
-  // The turn's clock: from the moment it went into a turn, until it's out of it.
-  if (patch.state) r.turnStartedAt = !inTurn(patch.state) ? null : wasInTurn ? r.turnStartedAt : Date.now()
-  noteWorking(r)
+  // The turn's clock: from the moment it went into a turn (or the better time the patch brings:
+  // Claude Code's registry stamp), kept through a stop for the owner's answer, until it's out of it.
+  if (patch.state) r.turnStartedAt = !inTurn(patch.state) ? null : (patch.turnStartedAt ?? turnSoFar ?? Date.now())
   // Running again (a prompt resumed it): no longer one a restart of the Mac cut short.
   if (patch.state && patch.state !== 'ended') runsAgain(id)
   // Ended: no dialog of its own waits any more.
@@ -373,16 +370,6 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
 /** In a turn: starting, working, or stopped in it for the owner's answer. */
 function inTurn(s: SessionState): boolean {
   return s === 'starting' || s === 'working' || s === 'needs_you'
-}
-
-/**
- * When its turn started (Session.workingSince): set as it starts working or starting (now, unless
- * the patch brought a better time: Claude Code's registry stamps when it went busy), kept while it
- * waits on the owner within the turn, gone once it's idle, failed or ended.
- */
-function noteWorking(r: Rec): void {
-  if (r.state === 'working' || r.state === 'starting') r.workingSince ??= Date.now()
-  else if (r.state !== 'needs_you') r.workingSince = null
 }
 
 /** Claude's to-do list in short (Session.todo), worked out again after a to-do tool's event. */
@@ -1628,7 +1615,7 @@ export function pollRegistry(): void {
     if (r.state !== state) Object.assign(patch, { state, lastActivityAt: Math.max(r.lastActivityAt, at) })
     // Busy since its stamp: the turn's start, also when the daemon first sees it mid-turn (a restart).
     const busyAt = Number(o.statusUpdatedAt) || 0
-    if (state === 'working' && r.workingSince == null && busyAt > 0 && busyAt <= Date.now()) patch.workingSince = busyAt
+    if (state === 'working' && r.turnStartedAt == null && busyAt > 0 && busyAt <= Date.now()) patch.turnStartedAt = busyAt
     if (state === 'idle') patch.activity = null
     if (o.name && r.title === 'New session') patch.title = o.name
     upsertSession(r.id, patch)

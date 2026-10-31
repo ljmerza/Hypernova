@@ -27,7 +27,7 @@
     <string name="always_rules">Rules</string>
     <string name="always_where">Where</string>
     <string name="always_suggested">Claude Code’s</string>
-    <string name="always_bad_rule">Write Tool or Tool(pattern), such as Bash(npm test:*).</string>
+    <string name="always_bad_rule">Write Tool or Tool(pattern), such as Bash(npm test *).</string>
     <string name="always_whole_tool">%1$s with no pattern allows all of it, whatever it runs.</string>
     <string name="always_scope_session">This session</string>
     <string name="always_scope_project">This project</string>

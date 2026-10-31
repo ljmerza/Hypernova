@@ -97,8 +97,6 @@ data class WSession(
     val turnStartedAt: Long? = null,
     /** Claude's to-do list in short (docs/PROTOCOL.md, Session.todo); null: none, or an older Mac. */
     val todo: TodoNow? = null,
-    /** When the turn it works on started (Session.workingSince); null: not working, or an older Mac. */
-    val workingSince: Long? = null,
 )
 
 /**
@@ -413,7 +411,7 @@ data class WApproval(
      */
     val autoDeny: Boolean = false,
     /**
-     * The rules Claude Code suggests for Always (`Bash(npm test:*)`) and where it would put them
+     * The rules Claude Code suggests for Always (`Bash(npm test *)`) and where it would put them
      * (`session`, `project`, `everywhere`); the Always sheet starts from them. Empty from an older
      * Mac, or when the suggestion holds no rule (a mode, a folder): Always then goes as it is.
      */
@@ -652,7 +650,6 @@ object Wire {
                 val total = t.int("total") ?: 0
                 if (total > 0) TodoNow(t.str("active")?.takeIf { it.isNotBlank() }, (t.int("done") ?: 0).coerceIn(0, total), total) else null
             },
-            workingSince = o.long("workingSince")?.takeIf { it > 0 },
         )
     }
 

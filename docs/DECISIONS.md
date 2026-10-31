@@ -2083,8 +2083,9 @@ changed, which branch), compact, nothing on the session's own screen.
    `Ran for`, to its last activity, once ended), This turn in mint while it's in a turn (working,
    starting or waiting for an answer), Last activity (`just now`, `2m ago`, `yesterday`).
 3. **This turn is the Mac's clock:** a new `turnStartedAt` on the session, set when it goes into a
-   turn and cleared when it's out, so reopening the chat doesn't restart it. A turn already running
-   when the daemon started counts from then.
+   turn, kept while it waits on him within it, and cleared when it's out, so reopening the chat
+   doesn't restart it. A turn already running when the daemon started counts from Claude Code's
+   registry stamp for it, else from then. Home's "for 12 min" reads the same clock (below).
 4. **GIT:** Branch with `↑2 ↓1` against its upstream in mint (`no upstream` dim; even shows
    nothing), Worktree when the folder is a linked worktree (git's name for it), Uncommitted files in
    the folder (`none` when clean; left out when the next line already says the same), then the line
@@ -2109,10 +2110,10 @@ new chip, no new row, nothing on a session's own screen.
    no to-do list per card.
 2. **"for 12 min" at that line's end** (HM7): since the current turn started, kept while it waits
    on him within the turn; `for 1 h 5 min` past an hour, `for 1 d 3 h` past a day, nothing in the
-   first minute. The daemon had no such time, so it keeps one (`Session.workingSince`: set as the
-   session starts working, from Claude Code's registry stamp when it first sees it busy, cleared
-   once it's idle, failed or ended). A session working only through its agents has none, so it shows
-   none. The figure ticks on its own minute, alone: no card recomposes for it.
+   first minute. It's the session sheet's turn clock (`Session.turnStartedAt`, above: set as the
+   session goes into a turn, from Claude Code's registry stamp when the daemon first sees it busy,
+   cleared once it's idle, failed or ended); the two branches each added one, merged into this one.
+   A session working only through its agents has none, so it shows none. The figure ticks on its own minute, alone: no card recomposes for it.
 3. **A swipe left on a card** (HM2), a reveal with the action under the card, a haptic tick at the
    threshold, the card springing back: **Needs input opens** it; **Completed stops** a `claude
    agents` job whose process still runs (`agentRunning`, as the menu's Stop), **else deletes** it
@@ -2128,8 +2129,9 @@ to clutter the chat screen, we can't have anything else added to that."
 1. **The approval card stays exactly as it was.** Deny, Always, Allow, "Allow all … this session"
    where offered, and the "Yes, and don't ask again" line. Nothing new on the chat screen.
 2. **Always opens the Always sheet** where Claude Code suggests a rule: the rule (`Bash(npm test)`)
-   in an editable field, quick widenings under it (the command as a prefix, `Bash(npm test:*)`;
-   its first two words as one; the whole tool, said as allowing all of it), Claude Code's own to go
+   in an editable field, quick widenings under it (the command as a prefix, `Bash(npm test *)`, a
+   space then `*` as Claude Code 2.1.314's own suggestions write it, the older `:*` in a file still
+   read as a prefix; its first two words as one; the whole tool, said as allowing all of it), Claude Code's own to go
    back to, and **where it goes: This session, This project or Everywhere**. It starts on Claude
    Code's rule and Claude Code's place (the project, for a command), so a plain Always allow does
    what Always did before. A rule that isn't `Tool` or `Tool(pattern)` says so and can't be saved.

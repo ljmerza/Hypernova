@@ -58,7 +58,7 @@ internal fun alwaysScopeTitle(s: AlwaysScope): String = stringResource(
     },
 )
 
-/** The fingerprint prompt's line: the rules and where (`Bash(npm test:*), in this project`). */
+/** The fingerprint prompt's line: the rules and where (`Bash(npm test *), in this project`). */
 internal fun alwaysCheckLine(res: android.content.res.Resources, a: Answer.AlwaysAs): String = res.getString(
     when (a.scope) {
         AlwaysScope.Session -> R.string.always_check_session

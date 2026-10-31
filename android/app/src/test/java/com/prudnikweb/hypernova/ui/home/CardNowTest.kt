@@ -86,8 +86,9 @@ class CardNowTest {
         assertNull(wire(""","todo":null""").todo)
         assertNull(wire(""","todo":{"active":"x","done":0,"total":0}""").todo)
         assertNull(wire("").todo)
-        assertEquals(1_700_000_000_000L, wire(""","workingSince":1700000000000""").workingSince)
-        assertNull(wire(""","workingSince":null""").workingSince)
-        assertNull(wire("").workingSince)
+        // The one turn clock, the sheet's This turn and the card's "for 12 min".
+        assertEquals(1_700_000_000_000L, wire(""","turnStartedAt":1700000000000""").turnStartedAt)
+        assertNull(wire(""","turnStartedAt":null""").turnStartedAt)
+        assertNull(wire("").turnStartedAt)
     }
 }

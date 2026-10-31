@@ -553,9 +553,12 @@ Session = {
   bypassAvailable: boolean,   // can switch to "bypassPermissions": always for a session the daemon runs; in a shared terminal only if Claude Code was started with bypass allowed (--allow-dangerously-skip-permissions, --dangerously-skip-permissions or --permission-mode bypassPermissions); true while in bypass. Sessions the phone starts in a terminal always allow it
   createdAt: number, lastActivityAt: number,      // epoch ms
   turnStartedAt: number | null,  // epoch ms: when it went into its turn (from idle, error or ended to starting,
-                              // working or needs_you), as the daemon saw it; null out of a turn. Kept through a
-                              // stop for the owner's answer. A turn already running when the daemon started
-                              // counts from then. The session sheet's "This turn"; absent: an older daemon
+                              // working or needs_you), as the daemon saw it; null out of a turn ("idle",
+                              // "error", "ended", and a session whose agents alone work). Kept through a stop
+                              // for the owner's answer. A session the daemon first sees busy (as after a daemon
+                              // restart) counts from Claude Code's registry stamp, statusUpdatedAt, else from
+                              // then. The session sheet's "This turn" and Home's Working card's "for 12 min";
+                              // absent: an older daemon
   lastText: string | null,    // last assistant text, trimmed to 200 chars
   activity: string | null,    // what it's doing now, e.g. "Bash: ./gradlew build"
   todo: null | {active: string | null, done: number, total: number},
@@ -566,12 +569,6 @@ Session = {
                               // after each TodoWrite, TaskCreate or TaskUpdate event; null when Claude made no
                               // list. Home's Working card says "Running the tests 3/7" with it. Absent: an
                               // older daemon
-  workingSince: number | null,  // epoch ms: when the turn it works on started. Set as it goes "working" or
-                              // "starting" (Claude Code's registry stamp, statusUpdatedAt, when the daemon first
-                              // sees it busy, as after a daemon restart; else that moment), kept through
-                              // "needs_you" within the turn, null once "idle", "error" or "ended" (and for a
-                              // session whose agents alone work). Home's Working card says "for 12 min" with it.
-                              // Absent: an older daemon
   pendingApprovalIds: string[],
   stoppedForAway: boolean,    // Codex: auto-denied after 10 min → show the Continue button (Claude Code's
                               // ask goes back to its terminal instead, see Approvals; never set for it)
@@ -661,7 +658,7 @@ Approval = {
   reason: string | null,                     // why Claude Code asks
   canAlways: boolean,
   alwaysRules: string[],      // the allow rules in Claude Code's suggestion for Always, as a settings
-                              // file writes them ("Bash(npm test:*)"); [] when it holds none (a mode,
+                              // file writes them ("Bash(npm test *)"); [] when it holds none (a mode,
                               // a folder) or there's no Always
   alwaysScope: "session" | "project" | "everywhere" | null,
                               // where Claude Code's suggestion puts them (localSettings and
@@ -2474,7 +2471,9 @@ session step's whole output 8 KB (its first).
 - **What Always covers** (DECISIONS, "What Always covers"). The approval carries Claude Code's
   suggested allow rules (`alwaysRules`) and where it would put them (`alwaysScope`); for a command
   that is the project's local file. Where there are rules, the card's Always opens the Always sheet:
-  the rules, editable, with quick widenings, and where they go. The answer then says `scope` and
+  the rules, editable, with quick widenings (a command's prefix written as Claude Code 2.1.314's own
+  suggestions write one, `Bash(npm test *)`: a space, then `*`; the older `Bash(npm test:*)` in a
+  file still reads as a prefix), and where they go. The answer then says `scope` and
   `rules` (`daemon/src/always.ts`), and Claude Code gets one `addRules` with them:
 
   | `scope` | `destination` | The file Claude Code writes |
@@ -2485,7 +2484,7 @@ session step's whole output 8 KB (its first).
 
   ```
   {"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow",
-    "updatedPermissions": [{"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}],
+    "updatedPermissions": [{"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test *"}],
       "behavior": "allow", "destination": "localSettings"}]}}}
   ```
 
