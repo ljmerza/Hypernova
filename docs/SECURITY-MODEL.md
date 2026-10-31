@@ -166,6 +166,9 @@ another session's reply. All of that is **outside text**, and the daemon treats 
 - Transcripts, attachments and files: they leave the computer only to a paired device, over the routes above,
   and (for Anthropic) as Claude Code itself sends them.
 - The pairing details: only to the server's own pairing page on the local network.
+- Claude Code's settings files (their `env`, `apiKeyHelper`, hooks, MCP servers): a paired device
+  gets only their permission lists, for the session's own folder (`docs/PROTOCOL.md`, "Rules in
+  effect", 2026-10-30).
 
 ## 8. Known residual risks
 

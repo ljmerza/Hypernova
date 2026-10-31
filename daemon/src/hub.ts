@@ -146,6 +146,8 @@ const sessionAllowed = new Map<string, Set<string>>()
 /** The owner allowed this tool for the rest of the session (subagents included). */
 export const allowedForSession = (sessionId: string, tool: string) => !!sessionAllowed.get(sessionId)?.has(tool)
 export const forgetSessionAllowed = (sessionId: string) => sessionAllowed.delete(sessionId)
+/** The tools allowed for the rest of the session from the phone (the rules in effect, permission-rules.ts). */
+export const sessionAllowedTools = (sessionId: string): string[] => [...(sessionAllowed.get(sessionId) ?? [])]
 /** Claude Code's own rule for it, so it stops asking too (session only, nothing saved). */
 export const sessionRule = (tool: string) => [{ type: 'addRules', rules: [{ toolName: tool }], behavior: 'allow', destination: 'session' }]
 type Pending = { approval: Approval; toolUseId: string | null; resolve: (a: Answer) => void; timer: NodeJS.Timeout }

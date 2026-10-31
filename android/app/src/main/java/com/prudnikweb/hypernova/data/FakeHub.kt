@@ -396,6 +396,22 @@ class FakeHub(private val scope: CoroutineScope, private val res: Resources) : H
         return Result.success(asides[sessionId])
     }
 
+    /** The demo's rules in effect: a project's and the user's, as a Mac would send them. */
+    override suspend fun permissionRules(sessionId: String): Result<PermissionRules> {
+        fun src(source: String, path: String?, allow: List<String> = emptyList(), ask: List<String> = emptyList(), deny: List<String> = emptyList(), mode: String? = null, state: String = RuleSource.OK) =
+            RuleSource(source, path, state, allow, ask, deny, mode, emptyList(), false)
+        return Result.success(
+            PermissionRules(
+                listOf(
+                    src(RuleSource.LOCAL, "~/Programming/hypernova/.claude/settings.local.json", allow = listOf("Bash(npm test:*)", "Bash(./gradlew:*)")),
+                    src(RuleSource.PROJECT, "~/Programming/hypernova/.claude/settings.json", ask = listOf("Bash(git push:*)"), deny = listOf("Read(./.env)")),
+                    src(RuleSource.USER, "~/.claude/settings.json", allow = listOf("WebSearch", "Bash(git status)", "Bash(git diff:*)"), mode = "acceptEdits"),
+                ),
+                managedOnly = false,
+            ),
+        )
+    }
+
     /** As the Mac does: Backpack holds with the lid closed for 8 hours, Off holds nothing. */
     /** The demo's switch: nothing on a Mac changes, so it just says what it would. */
     override suspend fun setBrowseOutsideProjects(on: Boolean): Result<Unit> {

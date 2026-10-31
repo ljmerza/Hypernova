@@ -869,7 +869,7 @@ export function createSharedSession(o: { cwd: string; providerId?: string; model
   const existing = getSession(id)
   const title = trimText(o.title ?? (o.prompt && promptTitle(o.prompt)), 80) ?? 'New session'
   if (!o.resume) {
-    saveManaged({ id, cwd: o.cwd, providerId: provider.id, model: o.model || null, permissionMode: mode, createdAt: Date.now(), title, engine: 'term', ...(o.effort ? { effort: o.effort } : {}), ...(o.automation ? { automation: o.automation } : {}), ...(o.context ? { context: o.context } : {}) })
+    saveManaged({ id, cwd: o.cwd, providerId: provider.id, model: o.model || null, permissionMode: mode, createdAt: Date.now(), title, engine: 'term', ...(o.effort ? { effort: o.effort } : {}), ...(o.automation ? { automation: o.automation } : {}), ...(o.automation && o.allowedTools?.length ? { allowedTools: o.allowedTools } : {}), ...(o.context ? { context: o.context } : {}) })
   } else if (o.providerId) {
     const m = getManaged(id)
     const moved = { providerAt: Date.now(), providerFrom: m?.providerId ?? existing?.providerId ?? 'anthropic' }

@@ -41,6 +41,8 @@ import { toolPath } from './normalize.ts'
 import { ResumeError, setAutoContinue, typeContinue } from './resume.ts'
 import { BlockedError, blockedList, dismissBlocked, retryBlocked } from './blocked.ts'
 import { AsideError, askAside, asideOf } from './aside.ts'
+import { rulesInEffect } from './permission-rules.ts'
+import { sessionAllowedTools } from './hub.ts'
 import { CONTINUE_TEXT } from './blockers.ts'
 import { checkBalance, hasBalance, providerSaved } from './balance.ts'
 import { checkProvider, type ProviderCheck } from './providers-check.ts'
@@ -800,6 +802,18 @@ async function api(c: Ctx): Promise<void> {
       if (e instanceof AsideError) throw new HttpError(e.status, e.code, e.message, e.extra)
       throw e
     }
+  }
+  // The Claude Code permission rules in effect, read-only (docs/PROTOCOL.md, "Rules in effect";
+  // permission-rules.ts): only the permissions lists of the fixed settings files for the session's
+  // own folder, plus the rules Hypernova gave it (an automation's, "this session" answers).
+  const pr = /^\/v1\/sessions\/([\w-]+)\/permissions$/.exec(path)
+  if (pr && m === 'GET') {
+    const rec = getSession(pr[1]!)
+    if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    if (isCodex(rec.id)) throw notForCodex()
+    const managed = getManaged(rec.id)
+    const own = [...(managed?.automation ? (managed.allowedTools ?? []) : []), ...sessionAllowedTools(rec.id)]
+    return json(res, 200, { permissions: rulesInEffect(rec.cwd, { allow: own }) })
   }
   // Fork: a held prompt's new words, or taken back (docs/PROTOCOL.md, "Held prompts").
   const hp = /^\/v1\/sessions\/([\w-]+)\/held\/([\w-]+)$/.exec(path)
