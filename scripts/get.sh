@@ -2,14 +2,14 @@
 # Hypernova's server in one line, on Ubuntu or Debian (x86_64 or arm64), as the user who will run
 # the agents (not root):
 #
-#   curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/scripts/get.sh | bash
+#   curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
 #
 # It downloads the latest release's server package (hypernova-server-<tag>-linux.tar.gz) from
 # GitHub and runs its scripts/install-linux.sh, which installs the system packages (with sudo),
 # Node.js 24, the daemon, Claude Code and the service. Options after `bash -s --` go to that
 # script (--no-claude, --yes):
 #
-#   curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/scripts/get.sh | bash -s -- --yes
+#   curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash -s -- --yes
 #
 # HYPERNOVA_TAG=v0.2.0-ljm.23 picks a release instead of the latest. Run again to update.
 set -euo pipefail

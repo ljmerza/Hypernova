@@ -47,7 +47,7 @@ Releases are on [GitHub](https://github.com/ljmerza/Hypernova/releases/latest). 
   arm64: Node.js and the terminal module are fetched and built for the server at install)
 - `hypernova-<tag>.apk`: the Android app
 
-On the server, `curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/scripts/get.sh | bash`
+On the server, `curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash`
 downloads the newest server package and installs it in one go (`scripts/get.sh`). By hand,
 `gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'` fetches it; or save
 it from the release page and copy it over.

@@ -25,7 +25,7 @@ packages only.
 ```sh
 # In one line: the latest release's server package, downloaded and installed (scripts/get.sh;
 # HYPERNOVA_TAG=<tag> for another release, `| bash -s -- --yes` for no questions):
-curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/scripts/get.sh | bash
+curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
 
 # The same by hand. A release's server package (https://github.com/ljmerza/Hypernova/releases/latest:
 # hypernova-server-<tag>-linux.tar.gz, one package for x86_64 and arm64), on the server:

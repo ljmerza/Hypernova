@@ -15,7 +15,7 @@ through a cloud service of ours, the phone talks straight to your server.
 On the server (Ubuntu or Debian, x86_64 or arm64), as the user who'll run the agents, not root.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/scripts/get.sh | bash
+curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
 ```
 
 That installs the system packages it needs (it asks for sudo), Node.js, the Hypernova service and
