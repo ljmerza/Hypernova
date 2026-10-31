@@ -549,6 +549,10 @@
     <!-- Banners and notifications -->
     <string name="notice_finished">Finished.</string>
     <string name="notice_waiting">Waiting for you in the terminal.</string>
+    <!-- A claude agents job that died, when Claude Code gave no reason (data/JobDied.kt). -->
+    <string name="notice_job_died">Its background job ended with an error.</string>
+    <!-- A Completed Home card of a claude agents job that died, in the danger colour. -->
+    <string name="card_job_died">Stopped with an error</string>
     <string name="notice_kind_needs_you">Needs you</string>
     <string name="notice_kind_question">A question</string>
     <string name="notice_kind_plan">A plan</string>

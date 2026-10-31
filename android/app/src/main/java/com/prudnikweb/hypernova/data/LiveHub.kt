@@ -608,6 +608,8 @@ class LiveHub(
         class Snap(val s: Snapshot, val speech: JSONObject? = null) : Msg
         class SessionMsg(val s: WSession) : Msg
         class Removed(val id: String) : Msg
+        /** A `claude agents` job died (data/JobDied.kt): said once, as a session stopping on an error is. */
+        class Died(val d: JobDied) : Msg
         class Event(val sessionId: String, val e: WEvent) : Msg
         /** An event the Mac took back (a notice that no longer holds). */
         class EventRemoved(val sessionId: String, val id: String) : Msg
@@ -643,6 +645,7 @@ class LiveHub(
         "snapshot" -> o.obj("snapshot")?.let { Msg.Snap(Wire.snapshot(it), it.obj("speech")) }
         "session" -> o.obj("session")?.let { Msg.SessionMsg(Wire.session(it)) }
         "session.removed" -> o.str("id")?.let { Msg.Removed(it) }
+        "job.died" -> JobDied.parse(o)?.let { Msg.Died(it) }
         "event" -> {
             val sid = o.str("sessionId")
             val ev = o.obj("event")
@@ -687,6 +690,10 @@ class LiveHub(
                 if (old != null) heldLeft(old, m.s)
             }
             is Msg.Removed -> { raw = raw - m.id; publish() }
+            is Msg.Died -> {
+                val n = m.d.notice(session(m.d.sessionId)?.name ?: raw[m.d.sessionId]?.title ?: res.getString(R.string.untitled_session), res.getString(R.string.notice_job_died))
+                if (noticed.add(n.id)) notice(n)
+            }
             is Msg.Event -> appendEvent(m.sessionId, m.e)
             is Msg.EventRemoved -> dropEvent(m.sessionId, m.id)
             is Msg.Approval -> {
@@ -1050,6 +1057,7 @@ class LiveHub(
             agentJob = w.agentJob,
             agentRunning = w.agentRunning,
             agentOutdated = w.agentOutdated,
+            died = w.died,
             question = w.question,
             blockedCalls = w.blockedCalls,
             turnStartedAt = w.turnStartedAt ?: 0L,
