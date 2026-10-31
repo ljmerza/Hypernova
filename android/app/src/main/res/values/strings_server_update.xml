@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings → the server: Update this server automatically (data/ServerUpdate.kt; owner, 2026-10-31). -->
+    <string name="su_title">Update this server automatically</string>
+    <string name="su_desc">Installs new Hypernova releases on this server by itself, when no session is working.</string>
+    <string name="su_unavailable">Not available here: %1$s</string>
+    <string name="su_waiting">%1$s is ready: it installs once no session is working.</string>
+    <string name="su_installing">Installing %1$s: the server restarts in a moment.</string>
+    <string name="su_last">Updated itself to %1$s (from %2$s), %3$s.</string>
+    <string name="err_auto_update">Couldn\'t change Update this server automatically.</string>
+</resources>

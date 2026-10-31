@@ -118,6 +118,8 @@ class LiveHub(
     private var macAwake by mutableStateOf<MacAwake?>(null)
     /** Browse outside projects as last heard (the snapshot, then `{t:"files"}`); null from a Mac too old to have it. */
     private var macBrowse by mutableStateOf<Boolean?>(null)
+    /** The server updating itself as last heard (the snapshot, then `{t:"update"}`); null from a daemon too old to. */
+    private var macUpdate by mutableStateOf<ServerUpdate?>(null)
     /** Read aloud: the Mac's voice setting and this phone's own reads (SpeechLink.kt). */
     override val speech = PhoneSpeech(pairing, api, send = { ws?.send(it) == true }, labelOf = { id -> id?.let { i -> sessions.firstOrNull { it.id == i }?.project } })
 
@@ -147,6 +149,7 @@ class LiveHub(
             awake = macAwake,
             platform = macInfo?.platform ?: Mac.DARWIN,
             browseOutsideProjects = macBrowse,
+            update = macUpdate,
             unavailable = macInfo?.unavailable.orEmpty(),
         )
 
@@ -614,6 +617,8 @@ class LiveHub(
         class AwakeMsg(val a: MacAwake?) : Msg
         /** Browse outside projects turned on or off (the sessions it changes come as their own messages). */
         class FilesMsg(val browseOutsideProjects: Boolean) : Msg
+        /** The server updating itself: the setting, waiting, installing (data/ServerUpdate.kt). */
+        class UpdateMsg(val u: ServerUpdate) : Msg
         class SleepSoonMsg(val s: SleepSoon) : Msg
         class BackpackEndingMsg(val s: BackpackEnding) : Msg
         /** Read aloud: the setting, a stop (SpeechLink.kt). */
@@ -655,6 +660,7 @@ class LiveHub(
         "battery" -> Msg.BatteryMsg(Wire.battery(o.obj("battery")))
         "awake" -> Msg.AwakeMsg(MacAwake.parse(o.obj("awake")))
         "files" -> Msg.FilesMsg(o.obj("files")?.bool("browseOutsideProjects") == true)
+        "update" -> ServerUpdate.parse(o.obj("update"))?.let { Msg.UpdateMsg(it) }
         "mac_sleep_soon" -> SleepSoon.parse(o)?.let { Msg.SleepSoonMsg(it) }
         "mac_backpack_ending" -> BackpackEnding.parse(o)?.let { Msg.BackpackEndingMsg(it) }
         "speech", "speech.stop" -> Msg.SpeechMsg(o)
@@ -717,6 +723,7 @@ class LiveHub(
             is Msg.BatteryMsg -> setBattery(m.b)
             is Msg.AwakeMsg -> macAwake = m.a
             is Msg.FilesMsg -> macBrowse = m.browseOutsideProjects
+            is Msg.UpdateMsg -> macUpdate = m.u
             // A newer app now on the Mac, without reconnecting: the banner (App.kt) and Settings follow
             // [appUpdate]; in the background, the notification once per version.
             is Msg.AppMsg -> macInfo?.let { info ->
@@ -860,6 +867,8 @@ class LiveHub(
     }
 
     private fun applySnapshot(s: Snapshot) {
+        // A server that updated itself (or was updated) since the last snapshot: a line in the connection log.
+        ServerUpdate.versionChange(macInfo?.daemonVersion, s.mac.daemonVersion)?.let { ConnLog.add(ConnKind.Mac, ConnResult.Info, text = it) }
         macInfo = s.mac
         // A Linux server's words instead of a Mac's, on every screen (data/ComputerWords.kt): the
         // active computer's (Core says the next one's when the switcher changes it).
@@ -867,6 +876,7 @@ class LiveHub(
         setBattery(s.mac.battery)
         macAwake = s.mac.awake
         macBrowse = s.mac.browseOutsideProjects
+        macUpdate = s.mac.update
         raw = s.sessions.associateBy { it.id }
         val before = approvals.keys
         approvals = s.approvals.associateBy { it.id }
@@ -2040,6 +2050,12 @@ class LiveHub(
         macBrowse = r.obj("files")?.bool("browseOutsideProjects") ?: on
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_browse_setting)) }
+
+    override suspend fun setAutoUpdate(on: Boolean): Result<Unit> = try {
+        val r = api.post("/v1/mac/update", JSONObject().put("autoUpdate", on))
+        macUpdate = ServerUpdate.parse(r.obj("update")) ?: macUpdate?.copy(auto = on)
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_auto_update)) }
 
     override suspend fun setAwake(mode: String): Result<Unit> = try {
         val r = api.post("/v1/mac/awake", JSONObject().put("mode", mode))

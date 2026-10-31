@@ -136,6 +136,14 @@ class ContractTest {
         "ws-codex" to { o -> codexOff(CodexWire.state(ws(o, "codex").obj("codex"))) },
         "ws-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true), ClaudeState.parse(ws(o, "claude").obj("claude"))) },
         "ws-files" to { o -> assertTrue(ws(o, "files").obj("files")?.bool("browseOutsideProjects") == true) },
+        "ws-update" to { o ->
+            val u = ServerUpdate.parse(ws(o, "update").obj("update"))!!
+            assertTrue(u.auto)
+            assertEquals(false, u.available)
+            assertTrue(u.reason!!.isNotBlank())
+            assertEquals(ServerUpdate.IDLE, u.state)
+            assertNull(u.last)
+        },
         "ws-lan" to { o ->
             val lan = LanInfo.parse(ws(o, "lan").obj("lan"))!!
             assertEquals(47323, lan.port)
@@ -322,6 +330,7 @@ class ContractTest {
             assertNull(s.agentOutdated)
         },
         "rest-jobs-respawn" to { o -> assertEquals(listOf(JobRestart("sess-all", true, "Done all00001")), OutdatedJobs.results(o)) },
+        "rest-update" to { o -> assertEquals(true, ServerUpdate.parse(o.obj("update"))?.auto) },
         "rest-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true), ClaudeState.parse(o.obj("claude"))) },
         // Pairing.pair reads these three.
         "rest-pair" to { o ->
@@ -435,6 +444,8 @@ class ContractTest {
         assertEquals(MacAwake.OFF, mac.awake!!.mode)
         assertEquals(Mac.LINUX, mac.platform)
         assertEquals(false, mac.browseOutsideProjects)
+        assertEquals(false, mac.update!!.auto)
+        assertEquals(false, mac.update!!.available)
         assertEquals(setOf("battery", "awake", "macVoice", "openWindow"), mac.unavailable.keys)
         usageWithoutFiveHours(s.usage)
 

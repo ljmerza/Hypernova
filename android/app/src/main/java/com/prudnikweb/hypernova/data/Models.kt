@@ -309,6 +309,8 @@ data class Mac(
      * open here, read-only. Null from a Mac too old to have it: Settings doesn't offer it.
      */
     val browseOutsideProjects: Boolean? = null,
+    /** The server updating itself (data/ServerUpdate.kt): Settings' switch; null from a daemon too old to. */
+    val update: ServerUpdate? = null,
     /**
      * The Mac's features this computer lacks ([FEATURE_OPEN_WINDOW] and the rest), each with the
      * sentence that says why (docs/PROTOCOL.md, "Mac-only features"): empty on a Mac.
