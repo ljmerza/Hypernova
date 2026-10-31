@@ -167,5 +167,6 @@ private fun rewindAsk(session: Session, items: List<Item>, item: Item): RewindAs
     val at = items.indexOf(item)
     if (at < 0 || items.subList(0, at).none { it is Item.User && it.status == null }) return null
     val after = items.subList(at, items.size)
-    return RewindAsk(session.id, after.count { it is Item.User && it.status == null }, after.count { it is Item.Assistant })
+    // A side question's line isn't in the conversation (data/Asides.kt): nothing of it goes.
+    return RewindAsk(session.id, after.count { it is Item.User && it.status == null && !it.key.startsWith(com.prudnikweb.hypernova.data.Asides.KEY) }, after.count { it is Item.Assistant })
 }

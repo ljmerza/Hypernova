@@ -261,6 +261,9 @@ data class CommandRun(val name: String, val args: String, val kind: String, val 
             "agents", "hooks", "doctor", "add-dir", "exit", "quit", "plugin", "todos", "ide", "upgrade",
             "output-style", "privacy-settings", "reload-plugins", "reload-skills", "skills", "autocompact",
             "rate-limit-options", "usage-credits", "advisor",
+            // Claude Code's own that it runs at once, even while Claude works (owner, 2026-10-30: "/btw
+            // I'm testing the btw" read as a skill's chip and its words): drawn as typed, a COMMAND row.
+            "btw", "version", "stop", "tasks", "workflows", "loops", "focus", "bug", "feedback",
         )
 
         /**

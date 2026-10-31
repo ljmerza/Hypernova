@@ -1959,3 +1959,36 @@ Android app, local only. The entries above about the Mac app, the name service
    `com.prudnikweb.hypernova` (in-app updates depend on it); the app still reads a pasted
    `hypernova.observer/pair#…` link from an older computer, from its fragment, fetching nothing.
 4. **Links** in the app, the daemon and the docs point at `https://github.com/ljmerza/Hypernova`.
+
+## /btw from the prompt box, commands as typed, pasted images, links (2026-10-30)
+
+The owner typed `/btw I'm testing the btw` in the session's box while Claude worked: the chat drew
+a skill's chip and "YOU · SENDING…", and the answer only showed in the terminal, its panel left open.
+
+1. **"/btw <question>" in the box goes as the Commands tab asks it** (the side-question route,
+   never held), not as a prompt. A deliberate exception to "nothing new on the session's own
+   screen", asked for by the owner: the chat shows the "/btw …" line as a sent command, where it
+   falls in time, kept in the app's memory per session (the transcript never has it; an app restart
+   forgets it), and **the answer is a card that slides up over the box**, not a row in the chat and
+   not a pop-up: "Answering…", then the answer (selectable), Claude Code's error words, or Open the
+   live terminal where it couldn't be read or ran past the screen. Swiped sideways or pulled down,
+   it goes, on this phone only; the Commands tab still has the last one. Files in the box stay
+   there (a side question takes none). This updates "Commands in the session sheet", item 2.
+2. **The real panel, seen on the owner's phone** (84 columns): its footer wraps beside the status
+   line's "← 4 agents", which the reader didn't expect, so no answer was ever read. The daemon reads
+   the footer's rows as one now (PROTOCOL, "Side questions"; `test/fixtures/btw-screens`).
+3. **Claude Code's own commands read as typed**: /btw and the others Claude Code runs at once
+   (/stop, /tasks…) are COMMAND rows ("/btw I'm testing the btw"), as /model and /effort were, with
+   what they printed under them; skills and the owner's commands keep their chip.
+4. **Commands Claude Code runs at once are never held** (held prompts): typed now, or refused as an
+   unheld prompt is. Regular ones wait their turn as before.
+5. **A pasted image is an attachment**, as the paperclip adds one (the clipboard's, or a keyboard's
+   such as a screenshot suggestion); anything else pasted stays text. The box became a
+   TextFieldState field for it (only those take a keyboard's images); its look is unchanged.
+6. **Every web address in the chat is a link** (bare `https://…` and `www.…`, Markdown's
+   `[words](url)`), in replies and the owner's messages; not in code blocks, tool output or an
+   agent's card (a tap there does something else). **A tap asks first**: "Open this link?" with the
+   whole address, its scheme and host bright (what's before an "@" dim, so a lookalike shows),
+   Open (the phone's browser), Copy link, Cancel. A dev server on the Mac (`localhost:5173`) opens
+   its in-app preview at once, as its pill does; Hypernova's own ports and any other scheme
+   (`intent:`, `file:`, `javascript:`, `content:`) are never links.

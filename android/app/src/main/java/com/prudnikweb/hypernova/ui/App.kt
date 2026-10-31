@@ -309,8 +309,11 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
         )
     }
 
+    // Every link the chat draws comes here when tapped: the web asks first, a dev server opens its preview.
+    val links = remember(opener) { com.prudnikweb.hypernova.ui.components.LinkHandler(opener) }
     ProvideAmbientClock(vm.clock) {
         CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalUriHandler provides links,
             LocalHaze provides haze, LocalToast provides vm::showToast, LocalOpener provides opener,
             LocalConfirm provides { vm.confirm = it },
             LocalAppScope provides vm.appScope,
@@ -413,6 +416,9 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                         onDismiss = { vm.confirm = null },
                     )
                 }
+
+                // A tapped link in the chat: "Open this link?" (ui/components/LinkConfirm.kt).
+                com.prudnikweb.hypernova.ui.components.LinkConfirmHost(links, vm::showToast)
 
                 ToastHost(vm.toast, onDismiss = vm::dismissToast)
 

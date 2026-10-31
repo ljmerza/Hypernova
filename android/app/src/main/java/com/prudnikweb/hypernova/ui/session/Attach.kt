@@ -68,6 +68,7 @@ import com.prudnikweb.hypernova.data.AttachDrafts
 import com.prudnikweb.hypernova.data.Attachment
 import com.prudnikweb.hypernova.data.DraftFile
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.Pasted
 import com.prudnikweb.hypernova.data.Picked
 import com.prudnikweb.hypernova.data.Thumbs
 import com.prudnikweb.hypernova.data.isImage
@@ -153,6 +154,19 @@ class AttachState(
                 f.failed = why
                 toast(context.getString(R.string.attach_failed_named, f.name, why))
             }
+        }
+    }
+
+    /**
+     * Images pasted into the box ([uris], a keyboard's or the clipboard's): copied into the app's
+     * cache first, while their grant lasts, then added as the paperclip adds them.
+     */
+    fun paste(uris: List<Uri>) {
+        val at = Date()
+        scope.launch {
+            val kept = uris.mapIndexedNotNull { i, u -> Pasted.keep(context, u, i + 1, at) }
+            if (kept.size < uris.size) toast(context.getString(R.string.paste_failed))
+            if (kept.isNotEmpty()) add(kept, temporary = true)
         }
     }
 

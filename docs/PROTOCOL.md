@@ -968,16 +968,24 @@ Aside = {
 `unseen`: no answer could be read (the panel never showed with this question in 4 minutes, the
 terminal went, or it showed another session); the phone says to open the terminal.
 
-The panel as the daemon expects it (read from Claude Code 2.1.314's code, not yet from a live
-screen): the earlier questions (`/btw …`, five at most, under `(+N earlier /btw)`), the question
-two columns in, then the answer four in (`Answering…` with a spinner, or `retrying in Ns`, until
-it's there), then a footer of hints ending in `Esc to close`, which offers `c to copy` once there is
-an answer. What a live look must confirm before relying on it: that the panel replaces the input
-box rather than sitting over it (the daemon takes the box's going as "sent"); the footer's words
-and the indents; that `claude attach` draws the panel itself (a thin client: it asks the background
-job with a `side_question` control request); that Space closes it; that the answer isn't written to
-the transcript; and that a terminal Claude Code thinks isn't in front doesn't hold the panel back
+The panel as the daemon expects it (read from Claude Code 2.1.314's code, then seen on the owner's
+phone 2026-10-30 in a `claude attach` holder 84 columns wide, `test/fixtures/btw-screens`): the
+earlier questions (`/btw …`, without their answers, five at most, under `(+N earlier /btw)` when
+there are more), the question two columns in, then the answer four in (`Answering…` with a spinner,
+or `retrying in Ns`, until it's there; wrapped a few columns short of the screen's edge), then a
+footer of hints (`↑/↓ to browse · c to copy · f to fork · x to clear history · Esc to close ·`),
+which offers `c to copy` once there is an answer. On a narrow terminal the footer wraps ("Esc to" /
+"close ·") and the status line's right side ("← 4 agents") shares its rows: the daemon reads the
+footer's rows as one, without what sits far to their right. Seen live: `claude attach` draws the
+panel itself, and the answer isn't in the transcript. Still to confirm: that the panel replaces the
+input box rather than sitting over it (the daemon takes the box's going as "sent"); that Space
+closes it; and that a terminal Claude Code thinks isn't in front doesn't hold the panel back
 (Claude Code then asks unwatched and reopens the panel later, which the daemon waits for).
+
+The phone asks it from the session's prompt box too: "/btw <question>" typed there goes through
+this route, not the prompt route (the composer's text, never held). The chat shows its "/btw …"
+line where it falls in time, from the phone's memory (the transcript never has it), and the answer
+in a card over the box until it's swiped away; the Commands tab still shows the last one.
 
 ## A session's model
 
@@ -2483,6 +2491,10 @@ path's `canUseTool` too). Claude also tends to ask for `pages`, which needs popp
 `updatedInput`, so the whole PDF arrives as a document (a retry with pages goes through
 unchanged, so a PDF too long to read whole can't loop).
 
+An image pasted into the session's prompt box (the clipboard's, or a keyboard's image such as a
+screenshot suggestion) is uploaded the same way, copied into the app's cache first while the
+keyboard's grant lasts; other pasted content stays text.
+
 Reading a transcript, the daemon splits these mentions back out of the prompt: the
 `user` event gets the text alone and `files`.
 
@@ -3113,7 +3125,9 @@ on the daemon and typed in once Claude Code's input box is back (`daemon/src/hel
   Where it would be 409 `needs_answer` (an approval, a question or a plan is open for the session) or
   `waiting` (a dialog or menu in the terminal instead of the input box), it's held: 200 `{session,
   queued: true, held: true, heldId}`. A prompt sent while others are held for an open session is held
-  behind them, so they go in order. Without `hold` (an older app) nothing changes. `clientId` works as for
+  behind them, so they go in order. One of Claude Code's own commands it runs at once, while Claude
+  works (`/btw`, `/status`, `/stop`… `commands.ts`, `isImmediateCommand`, from 2.1.314's command
+  table), is never held: typed now, or the route's own 409. Without `hold` (an older app) nothing changes. `clientId` works as for
   any send: a repeat gets the first answer, and the `user` event or queue entry it becomes carries it.
 - **Shown**: `session.held` (absent when none), and a `session` message whenever it changes.
 - **Sent** oldest first, one at a time, as soon as the session is ready: no approval open for it, no

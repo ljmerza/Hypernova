@@ -4,4 +4,6 @@
     <cache-path name="camera" path="camera/" />
     <!-- Files shared to Hypernova, copied here for the upload (ui/share/ShareStage.kt). -->
     <cache-path name="shared" path="shared/" />
+    <!-- Images pasted into the prompt box, copied here while the keyboard's grant lasts (data/Pasted.kt). -->
+    <cache-path name="pasted" path="pasted/" />
 </paths>
