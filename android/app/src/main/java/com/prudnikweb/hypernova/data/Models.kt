@@ -491,6 +491,8 @@ sealed interface Item {
         /** Claude Code's rules for Always and where they'd go ([WApproval.alwaysRules]): the Always sheet's start. */
         val alwaysRules: List<String> = emptyList(),
         val alwaysScope: String? = null,
+        /** Why it asked ([WApproval.why]): on the Always sheet, never on the card. */
+        val why: Why? = null,
     ) : Item {
         /**
          * How long until the Mac says no for nobody answering, for the band's countdown: only where it

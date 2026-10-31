@@ -53,6 +53,12 @@
     <string name="several_body">Each one is allowed as if you tapped Allow on it. To deny one, answer it in the chat.</string>
     <string name="several_more">Questions and plans wait for their own answer in the chat.</string>
 
+    <!-- Why it asked (IDEAS PA7): on the Always sheet and in the Permissions tab, never on the chat's card. -->
+    <string name="why_seam">Why it asked</string>
+    <string name="why_label">Why it asked:</string>
+    <!-- After a reason that is the daemon's own reading of the rules, not Claude Code's words. -->
+    <string name="why_hypernova">Hypernova’s reading</string>
+
     <!-- The Mac away. -->
     <string name="hint_mac_away">Your Mac isn’t reachable right now</string>
     <string name="waiting_mac_title">Waiting for your Mac</string>

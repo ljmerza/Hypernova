@@ -27,6 +27,7 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.WApproval
+import com.prudnikweb.hypernova.data.Why
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.ConfirmDialog
@@ -43,8 +44,8 @@ import kotlinx.coroutines.launch
 // all with one confirmation. Only Allow: a deny stays one at a time, on its card in the chat.
 // Nothing here is on the chat screen itself (the owner: nothing more on the chat screen).
 
-/** One ask in the list: its command (or a tool's one line), and the agent that asks, if not the main one. */
-internal data class SeveralAsk(val id: String, val tool: String, val text: String, val agent: String?)
+/** One ask in the list: its command (or a tool's one line), the agent that asks if not the main one, and why it asked. */
+internal data class SeveralAsk(val id: String, val tool: String, val text: String, val agent: String?, val why: Why? = null)
 
 /** What the part shows: the tool asks it can allow, oldest first, and how many other asks wait (questions, plans). */
 internal data class Several(val asks: List<SeveralAsk>, val others: Int)
@@ -59,7 +60,7 @@ internal fun severalOf(waiting: List<WApproval>): Several? {
     return Several(
         tools.map { a ->
             val text = a.input["command"]?.takeIf { it.isNotBlank() } ?: a.summary.removePrefix("${a.toolName}: ").ifBlank { a.toolName }
-            SeveralAsk(a.id, a.toolName, text, a.agentLabel ?: a.agentId?.let { "" })
+            SeveralAsk(a.id, a.toolName, text, a.agentLabel ?: a.agentId?.let { "" }, a.why)
         },
         waiting.size - tools.size,
     )
@@ -104,6 +105,8 @@ internal fun AllowSeveralPart(hub: Hub, s: Session) {
                     )
                 }
             }
+            // Why it asked, under its command (WhyAsked.kt).
+            if (a.why != null) WhyLine(a.why, Modifier.padding(start = 16.dp, bottom = 4.dp), label = false)
         }
         if (several.others > 0) {
             Spacer(Modifier.height(4.dp))

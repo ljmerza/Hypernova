@@ -84,6 +84,11 @@ internal fun AlwaysSheet(item: Item.Approval, onDismiss: () -> Unit, onSave: (An
             (if (item.tool == "Bash") "$ " else "${item.tool}: ") + item.detail.lineSequence().firstOrNull().orEmpty(),
             style = Type.mono, color = HN.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
+        // Why it asked (WhyAsked.kt): an ask rule here means an allow rule won't stop the next ask.
+        item.why?.let {
+            Spacer(Modifier.height(6.dp))
+            WhyLine(it)
+        }
         Spacer(Modifier.height(16.dp))
         FieldLabel(stringResource(if (draft.texts.size > 1) R.string.always_rules else R.string.always_rule))
         val parsed = draft.parsed

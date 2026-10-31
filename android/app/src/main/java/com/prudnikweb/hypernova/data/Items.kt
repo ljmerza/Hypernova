@@ -285,6 +285,7 @@ object Items {
             autoDeny = a?.autoDeny ?: false,
             alwaysRules = a?.alwaysRules.orEmpty(),
             alwaysScope = a?.alwaysScope,
+            why = a?.why,
         )
     }
 
