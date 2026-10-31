@@ -46,6 +46,12 @@ export type Session = {
   bypassAvailable: boolean
   createdAt: number
   lastActivityAt: number
+  /**
+   * When its turn started (epoch ms): the moment it went from idle, error or ended to starting,
+   * working or needing you, as the daemon saw it; null while it isn't in a turn. The session
+   * sheet's "This turn". A turn already running when the daemon started counts from then.
+   */
+  turnStartedAt?: number | null
   lastText: string | null
   activity: string | null
   pendingApprovalIds: string[]
@@ -235,7 +241,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id) }
+  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id) }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
@@ -314,7 +320,10 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
     }
     sessions.set(id, r)
   }
+  const wasInTurn = inTurn(r.state) && r.turnStartedAt != null
   Object.assign(r, patch)
+  // The turn's clock: from the moment it went into a turn, until it's out of it.
+  if (patch.state) r.turnStartedAt = !inTurn(patch.state) ? null : wasInTurn ? r.turnStartedAt : Date.now()
   // Running again (a prompt resumed it): no longer one a restart of the Mac cut short.
   if (patch.state && patch.state !== 'ended') runsAgain(id)
   // Ended: no dialog of its own waits any more.
@@ -326,6 +335,11 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
   const after = view(r)
   if (JSON.stringify(after) !== before) broadcast({ t: 'session', session: after })
   return r
+}
+
+/** In a turn: starting, working, or stopped in it for the owner's answer. */
+function inTurn(s: SessionState): boolean {
+  return s === 'starting' || s === 'working' || s === 'needs_you'
 }
 
 export function setState(id: string, state: SessionState, activity?: string | null): void {

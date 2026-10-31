@@ -93,6 +93,8 @@ data class WSession(
     val held: List<WQueued> = emptyList(),
     /** Claude Code's reasoning effort ("low"…"max"; docs/PROTOCOL.md, "A session's effort"); null: not known (its default), Codex, or an older Mac. */
     val effort: String? = null,
+    /** When its turn started (docs/PROTOCOL.md, Session.turnStartedAt); null out of a turn, or from an older Mac. */
+    val turnStartedAt: Long? = null,
 )
 
 /**
@@ -634,6 +636,7 @@ object Wire {
             blockedCalls = o.int("blockedCalls") ?: 0,
             held = o.arr("held").mapObjects(::queued),
             effort = o.str("effort")?.takeIf { it.isNotBlank() },
+            turnStartedAt = o.long("turnStartedAt")?.takeIf { it > 0 },
         )
     }
 

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The session sheet's Session tab: TIME and GIT (ui/session/SessionInfo.kt). -->
+<resources>
+    <string name="session_sheet_time">Time</string>
+    <string name="session_sheet_started">Started</string>
+    <string name="session_sheet_running_for">Running for</string>
+    <string name="session_sheet_ran_for">Ran for</string>
+    <string name="session_sheet_this_turn">This turn</string>
+    <string name="session_sheet_last_activity">Last activity</string>
+
+    <string name="session_sheet_git">Git</string>
+    <string name="session_sheet_branch">Branch</string>
+    <string name="session_sheet_detached">detached HEAD</string>
+    <string name="session_sheet_no_upstream">no upstream</string>
+    <string name="session_sheet_worktree">Worktree</string>
+    <string name="session_sheet_uncommitted">Uncommitted</string>
+    <string name="session_sheet_clean">none</string>
+    <plurals name="session_sheet_files_touched">
+        <item quantity="one">%d file touched</item>
+        <item quantity="other">%d files touched</item>
+    </plurals>
+    <!-- Nothing this session's own edit tools wrote changed: everything changed in its folder. -->
+    <plurals name="session_sheet_files_changed">
+        <item quantity="one">%d file changed</item>
+        <item quantity="other">%d files changed</item>
+    </plurals>
+    <!-- TalkBack. -->
+    <string name="session_sheet_branch_said">Branch %1$s.</string>
+    <string name="session_sheet_detached_said">Detached HEAD.</string>
+    <string name="session_sheet_ahead_behind_said">%1$d ahead and %2$d behind %3$s.</string>
+    <string name="session_sheet_even_said">Up to date with %1$s.</string>
+    <string name="session_sheet_upstream_unknown_said">Tracks %1$s.</string>
+    <string name="session_sheet_no_upstream_said">No upstream.</string>
+    <string name="session_sheet_lines_said">%1$s, %2$d lines added and %3$d removed.</string>
+</resources>

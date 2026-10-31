@@ -146,10 +146,11 @@ private fun Counts(add: Int?, del: Int?) {
 /**
  * The changes in their own window over the session: the files, and one file's diff in the same
  * window (Back goes from the diff to the list, then closes). A window of its own keeps this one
- * entry point in the session screen; it paints its own ground and blur.
+ * entry point in the session screen; it paints its own ground and blur. The session sheet's Files
+ * touched opens it too (ui/session/SessionInfo.kt).
  */
 @Composable
-private fun ChangesDialog(hub: Hub, session: Session, onDismiss: () -> Unit) {
+internal fun ChangesDialog(hub: Hub, session: Session, onDismiss: () -> Unit) {
     var file by rememberSaveable(session.id) { mutableStateOf<String?>(null) }
     Dialog(
         onDismissRequest = { if (file != null) file = null else onDismiss() },

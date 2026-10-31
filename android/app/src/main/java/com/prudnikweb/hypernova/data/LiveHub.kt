@@ -1052,6 +1052,7 @@ class LiveHub(
             agentOutdated = w.agentOutdated,
             question = w.question,
             blockedCalls = w.blockedCalls,
+            turnStartedAt = w.turnStartedAt ?: 0L,
         )
     }
 

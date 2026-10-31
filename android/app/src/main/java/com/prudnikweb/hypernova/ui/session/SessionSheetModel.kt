@@ -27,7 +27,7 @@ internal enum class SheetTab(@StringRes val label: Int) {
     Agents(R.string.session_sheet_agents),
     /** A side question (/btw), and Claude Code's commands and the owner's skills (CommandsTab.kt). */
     Commands(R.string.session_sheet_tab_commands),
-    /** Where it runs, and the Home card's menu. */
+    /** Its time and git line (SessionInfo.kt), where it runs, and the Home card's menu. */
     Session(R.string.session_sheet_title),
 }
 

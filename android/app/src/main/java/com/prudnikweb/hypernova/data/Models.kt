@@ -90,6 +90,8 @@ data class Session(
     val blockedCalls: Int = 0,
     /** Claude Code's reasoning effort (data/Effort.kt); null: not known yet (its default), or Codex's session. */
     val effort: String? = null,
+    /** When its turn started, as the Mac saw it (0 out of a turn, or not known): the session sheet's "This turn". */
+    val turnStartedAt: Long = 0L,
 ) {
     /** A Codex session: no rewind, no other provider, no carrying on by itself, Codex's two modes. */
     val codex: Boolean get() = agent == AgentKind.CODEX
