@@ -1,0 +1,72 @@
+{
+  "agents": [
+    {
+      "id": "a2222222222222222",
+      "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+      "toolUseId": null,
+      "parentAgentId": null,
+      "workflowId": "wf_0a1b2c3d-4e5",
+      "phase": "Survey",
+      "label": "survey:parser",
+      "type": "workflow-subagent",
+      "model": null,
+      "background": true,
+      "status": "done",
+      "activity": null,
+      "startedAt": 1800000000000,
+      "endedAt": 1800000000000,
+      "lastActivityAt": 1800000000000,
+      "tokens": null,
+      "toolUses": null,
+      "result": "The parser never trims"
+    },
+    {
+      "id": "a0123456789abcdef",
+      "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+      "toolUseId": "toolu_agent",
+      "parentAgentId": null,
+      "workflowId": null,
+      "phase": null,
+      "label": "Review the parser",
+      "type": "Explore",
+      "model": "claude-sonnet-5-5",
+      "background": true,
+      "status": "running",
+      "activity": "Read: app-parser-fix/parser.ts",
+      "startedAt": 1800000000000,
+      "endedAt": null,
+      "lastActivityAt": 1800000000000,
+      "tokens": 20100,
+      "toolUses": 1,
+      "result": null
+    }
+  ],
+  "workflows": [
+    {
+      "id": "wf_0a1b2c3d-4e5",
+      "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+      "toolUseId": "toolu_wf",
+      "taskId": "w1a2b3c4d",
+      "name": "parser-survey",
+      "summary": "Survey the parser, then fix it",
+      "status": "running",
+      "phases": [
+        {
+          "title": "Survey",
+          "detail": "Read the code"
+        },
+        {
+          "title": "Implement",
+          "detail": null
+        }
+      ],
+      "agentCount": 1,
+      "done": 1,
+      "failed": 0,
+      "startedAt": 1800000000000,
+      "endedAt": null,
+      "tokens": null,
+      "toolUses": null
+    }
+  ]
+}

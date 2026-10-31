@@ -1,0 +1,8 @@
+{
+  "token": "device-token",
+  "deviceId": "device-id",
+  "mac": {
+    "id": "mac-id",
+    "name": "server"
+  }
+}

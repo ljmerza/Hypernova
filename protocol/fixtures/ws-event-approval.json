@@ -1,0 +1,12 @@
+{
+  "t": "event",
+  "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+  "event": {
+    "id": "a:00000000-0000-4000-8000-000000000001",
+    "kind": "approval",
+    "ts": 1800000000000,
+    "approvalId": "00000000-0000-4000-8000-000000000001",
+    "summary": "Bash: npm test --prefix daemon",
+    "resolution": null
+  }
+}

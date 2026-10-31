@@ -1,0 +1,11 @@
+{
+  "t": "event",
+  "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+  "event": {
+    "id": "n:00000000-0000-4000-8000-000000000001",
+    "kind": "notice",
+    "ts": 1800000000000,
+    "text": "Claude Code restarted",
+    "tone": "warn"
+  }
+}

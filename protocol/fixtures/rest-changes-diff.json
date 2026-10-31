@@ -1,0 +1,6 @@
+{
+  "path": "parser.ts",
+  "diff": "diff --git a/parser.ts b/parser.ts\nindex d9d5934..f595963 100644\n--- a/parser.ts\n+++ b/parser.ts\n@@ -1 +1 @@\n-export const parse = (s: string) => s\n+export const parse = (s: string) => s.trim()\n",
+  "truncated": false,
+  "binary": false
+}

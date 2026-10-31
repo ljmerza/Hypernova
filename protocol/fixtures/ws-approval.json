@@ -1,0 +1,34 @@
+{
+  "t": "approval",
+  "approval": {
+    "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+    "kind": "tool",
+    "toolName": "Bash",
+    "summary": "Bash: npm test --prefix daemon",
+    "input": {
+      "command": "npm test --prefix daemon",
+      "description": "Run the daemon tests"
+    },
+    "reason": null,
+    "canAlways": true,
+    "alwaysRules": [
+      "Bash(npm test *)"
+    ],
+    "alwaysScope": "project",
+    "why": {
+      "kind": "safety",
+      "text": "Allow rule Bash(npm test *) matches, yet Claude Code asked: one of its own checks, most likely.",
+      "rule": "Bash(npm test *)",
+      "source": "hypernova"
+    },
+    "questions": null,
+    "plan": null,
+    "agentId": null,
+    "agentLabel": null,
+    "canSession": false,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "createdAt": 1800000000000,
+    "expiresAt": 1800000000000,
+    "autoDeny": false
+  }
+}

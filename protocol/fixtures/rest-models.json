@@ -1,0 +1,42 @@
+{
+  "providers": [
+    {
+      "providerId": "anthropic",
+      "source": "claude",
+      "models": [
+        {
+          "value": null,
+          "model": "claude-opus-5-5",
+          "description": "Best for everyday tasks",
+          "context": 1000000,
+          "price": null,
+          "older": false,
+          "slot": null,
+          "name": "Default"
+        },
+        {
+          "value": "sonnet",
+          "model": "claude-sonnet-5-5",
+          "description": null,
+          "context": 1000000,
+          "price": null,
+          "older": false,
+          "slot": null,
+          "name": "Sonnet"
+        },
+        {
+          "value": "sonnet[1m]",
+          "model": "claude-sonnet-5-5[1m]",
+          "description": null,
+          "context": 1000000,
+          "price": null,
+          "older": false,
+          "slot": null,
+          "name": "Sonnet (1M context)"
+        }
+      ],
+      "checkedAt": 1800000000000,
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "aside": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "question": "Why does the parser wrap around?",
+    "state": "asking",
+    "answer": null,
+    "error": null,
+    "clipped": false,
+    "askedAt": 1800000000000,
+    "at": 1800000000000
+  }
+}

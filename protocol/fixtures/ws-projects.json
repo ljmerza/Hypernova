@@ -1,0 +1,23 @@
+{
+  "t": "projects",
+  "projects": [
+    {
+      "path": "/home/me/Projects/demo",
+      "name": "demo",
+      "lastActivityAt": 1800000000000,
+      "sessionCount": 0
+    },
+    {
+      "path": "/home/me/Projects/app",
+      "name": "app",
+      "lastActivityAt": 1800000000000,
+      "sessionCount": 1
+    },
+    {
+      "path": "/home/me/Projects/app-parser-fix",
+      "name": "app-parser-fix",
+      "lastActivityAt": 1800000000000,
+      "sessionCount": 8
+    }
+  ]
+}

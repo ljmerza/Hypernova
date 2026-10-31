@@ -1,0 +1,7 @@
+{
+  "t": "job.died",
+  "sessionId": "sess-died",
+  "job": "died0001",
+  "reason": "exit 1 — Error: the API refused the request",
+  "at": 1800000000000
+}

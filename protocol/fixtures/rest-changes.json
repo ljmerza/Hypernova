@@ -1,0 +1,28 @@
+{
+  "changes": {
+    "git": true,
+    "branch": "parser-fix",
+    "scope": "session",
+    "files": [
+      {
+        "path": "parser.ts",
+        "status": "M",
+        "untracked": false,
+        "add": 1,
+        "del": 1,
+        "binary": false,
+        "touched": true
+      }
+    ],
+    "others": 2,
+    "hidden": 0,
+    "more": false,
+    "totalAdd": 1,
+    "totalDel": 1,
+    "upstream": "origin/main",
+    "ahead": 2,
+    "behind": 1,
+    "worktree": "app-parser-fix",
+    "dirty": 3
+  }
+}

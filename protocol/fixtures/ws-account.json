@@ -1,0 +1,21 @@
+{
+  "t": "account",
+  "account": {
+    "state": "limited",
+    "providerId": "anthropic",
+    "plan": null,
+    "limit": {
+      "window": "five_hour",
+      "label": "session limit",
+      "resetsAt": 1800000000000,
+      "autoResumeAt": null,
+      "usingCredits": false
+    },
+    "reason": null,
+    "text": "You've hit your session limit · resets 2am",
+    "since": 1800000000000,
+    "sessionId": "c0ffee00-0000-4000-8000-00000000beef",
+    "checkedAt": null,
+    "login": null
+  }
+}
