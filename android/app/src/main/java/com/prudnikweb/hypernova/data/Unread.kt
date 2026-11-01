@@ -98,7 +98,10 @@ object ReadState {
     private val marks = HashMap<String, ReadMarks>()
 
     /** The server [hub] is: a paired computer's id; null for any other hub, which keeps none. */
-    fun server(hub: Hub): String? = (hub as? LiveHub)?.serverId
+    fun server(hub: Hub): String? = serverOf(hub)
+
+    /** How [server] tells: a test's hub names a server of its own here. */
+    internal var serverOf: (Hub) -> String? = { (it as? LiveHub)?.serverId }
 
     @Synchronized
     fun of(context: Context, server: String): ReadMarks = marks.getOrPut(server) {
@@ -114,5 +117,19 @@ object ReadState {
     /** Session [id] on [server] was on screen with its last activity at [at]. */
     fun mark(context: Context, server: String, id: String, at: Long) {
         if (of(context, server).mark(id, at)) version++
+    }
+}
+
+/**
+ * A session's chat on screen ([sessionId], null when none is) is read up to its last activity, and
+ * stays read while replies come in: its Completed card on Home has no unread dot (App.kt).
+ */
+@androidx.compose.runtime.Composable
+fun MarkReadOnScreen(hub: Hub?, sessionId: String?) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val readAt = sessionId?.let { hub?.session(it)?.updatedAt }
+    androidx.compose.runtime.LaunchedEffect(hub, sessionId, readAt) {
+        val server = hub?.let(ReadState::server)
+        if (server != null && sessionId != null && readAt != null) ReadState.mark(context, server, sessionId, readAt)
     }
 }
