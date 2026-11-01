@@ -17,7 +17,7 @@ import { closeSync, fstatSync, openSync, readFileSync, readSync, readdirSync, re
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, join } from 'node:path'
 import { broadcast, emitEvent, ensureParsed, getSession, listSessionRecs, upsertSession } from './hub.ts'
-import { closeTool, feedLine, handbackText, maskSecrets, newParseState, structuredText, toolSummary, type AgentLink, type Ev, type ParseState, type TaskEnd, type WorkflowPhase } from './normalize.ts'
+import { closeTool, feedLine, handbackText, maskSecrets, newParseState, parseTaskNotification, structuredText, toolSummary, waitingWord, type AgentLink, type Ev, type ParseState, type TaskEnd, type WorkflowPhase } from './normalize.ts'
 import { log, trimText } from './util.ts'
 
 export type AgentStatus = 'running' | 'done' | 'error' | 'stopped'
@@ -69,6 +69,14 @@ export type Workflow = {
 
 /** Its last word: a tool call waiting, work after a result, text, its report, or an API error that cut it off (a 429, a usage limit). */
 type Last = 'tool' | 'working' | 'text' | 'result' | 'error' | null
+/** Background work an agent started: a shell or Monitor ('command'), an agent or workflow of its own ('agent'). */
+type BgWork = {
+  kind: 'command' | 'agent'
+  /** When it started. */
+  at: number
+  /** When a Monitor runs out by itself (Infinity: a persistent one), 0 for anything else. */
+  until: number
+}
 type AgentRec = Agent & {
   /** Its transcript, once found. */
   file: string | null
@@ -105,6 +113,18 @@ type AgentRec = Agent & {
   outTokens: number
   msgId: string | null
   msgOut: number
+  /** Background work it started, from its file, not known to have ended, by task id. */
+  bg: Map<string, BgWork>
+  /** TaskStop calls waiting for their result: call id → the task. */
+  stops: Map<string, string>
+  /** Its turn has ended (its last reply's stop_reason, or SubagentStop) and nothing has woken it since. */
+  turnOver: boolean
+  /** When Claude Code last said it waits on its own background work (0: not since it last wrote). */
+  saidWaitingAt: number
+  /** ... and said it hasn't reported yet, so its last text isn't a report. */
+  unreported: boolean
+  /** Its turn ended with background work going, so it's still at work, and its activity says so. */
+  waiting: boolean
 }
 type WorkflowRec = Workflow & {
   journalOffset: number
@@ -163,9 +183,28 @@ const IDLE_MAX = 2 * 3_600_000
 const IDLE_ERROR = 2 * 60_000
 /** While its session is stopped by a limit (or signed out, out of credit), an agent silent this long has stopped with it. */
 const IDLE_BLOCKED = 60_000
+/**
+ * A waiting agent whose file has been still this long ends: nothing tells a shell that hangs for
+ * good from a long build, and it counts as at work until then. Its next hook brings it back if it
+ * was wrong. Past a Monitor that runs longer (plus [IDLE_LIVE]), up to [WAIT_MAX].
+ */
+const WAIT_CAP = IDLE_MAX
+const WAIT_MAX = 12 * 3_600_000
+/** Background work that started this recently is believed even when a list of what's going doesn't name it (the list came first). */
+const BG_FRESH = 2000
+const WAIT_PREFIX = 'Waiting for '
 /** Where following an agent's file starts: its last 256 KB (its activity is at the end). */
 const TAIL_START = 256 * 1024
 const MAX_AGENTS = 60
+
+/** A line for the log when an agent ends or is left out for a reason that could look wrong later: once each. Not for history read in bulk. */
+const logged = new Set<string>()
+function logOnce(key: string, ...parts: unknown[]): void {
+  if (hush || logged.has(key)) return
+  if (logged.size >= 5000) logged.clear()
+  logged.add(key)
+  log(...parts)
+}
 
 /** Text from a transcript, for the phone: keys masked, one size. */
 const clean = (s: unknown, max = 600): string | null => (typeof s === 'string' && s.trim() ? trimText(maskSecrets(s.trim()), max) : null)
@@ -188,6 +227,7 @@ function newAgent(b: Board, id: string, at: number): AgentRec {
       status: 'running', activity: null, startedAt: at, endedAt: null, lastActivityAt: at, tokens: null, toolUses: null, result: null,
       file: null, offset: 0, carry: Buffer.alloc(0), whole: false, tools: new Set(), hookTools: 0, hookAt: 0, last: null, text: null, fromFile: false, peeked: false, checkedAt: 0,
       sure: false, retried: false, inTokens: 0, outTokens: 0, msgId: null, msgOut: 0,
+      bg: new Map(), stops: new Map(), turnOver: false, saidWaitingAt: 0, unreported: false, waiting: false,
     }
     b.agents.set(id, a)
   }
@@ -303,12 +343,112 @@ function end(b: Board, a: AgentRec, status: AgentStatus, at: number, known: bool
   a.sure = known
   if (was === 'running' || a.endedAt == null) a.endedAt = Math.max(at, a.startedAt)
   a.activity = null
+  a.waiting = false
   if (status === 'done' && !a.result && a.text) a.result = clean(a.text)
   closeLauncher(b, a.toolUseId, status, a.endedAt - a.startedAt, a.endedAt)
   changed(b, a, was !== status)
 }
 
 const taskStatus = (s: AgentStatus) => (s === 'done' ? 'completed' : s === 'error' ? 'failed' : 'stopped')
+
+// ── Waiting on its own background work ────────────────────────────────────
+// A subagent that starts a background command and waits for it ends its turn: SubagentStop fires,
+// and Claude Code marks it "completed" with the command keeping it alive, then wakes it when the
+// command ends. It hasn't finished, so it stays running here, with an activity that says why.
+
+/** Its turn is over, it hasn't reported and its background work goes on. (A foreground agent's call ends with its turn.) */
+const waits = (a: AgentRec) => a.status === 'running' && a.background && a.turnOver && a.last !== 'result' && a.last !== 'error' && (a.bg.size > 0 || a.saidWaitingAt > 0)
+
+function waitLine(a: AgentRec): string {
+  const all = [...a.bg.values()]
+  const commands = all.filter((w) => w.kind === 'command').length
+  if (!all.length || (commands && commands < all.length)) return `${WAIT_PREFIX}its background work`
+  if (commands) return commands === 1 ? `${WAIT_PREFIX}its background command` : `${WAIT_PREFIX}its ${commands} background commands`
+  return `${WAIT_PREFIX}the agents it started`
+}
+
+/** Its file read up to now, found first if need be. */
+function catchUp(b: Board, a: AgentRec): void {
+  const r = getSession(b.id)
+  if (!a.file && r) a.file = findFile(subagentsDir(r), a)
+  follow(a)
+}
+
+/** Whether it waits now, and its activity with it. */
+function syncWait(a: AgentRec): void {
+  if (waits(a)) {
+    a.waiting = true
+    a.activity = waitLine(a)
+  } else if (a.waiting) {
+    a.waiting = false
+    if (a.activity?.startsWith(WAIT_PREFIX)) a.activity = null
+  }
+}
+
+/** Something woke it: whatever was said about its wait is over. */
+function woke(a: AgentRec): void {
+  a.turnOver = false
+  a.saidWaitingAt = 0
+  a.unreported = false
+}
+
+/**
+ * [tasks] is a Stop or SubagentStop hook's background_tasks: what's in flight in the whole session.
+ * Shells of [a]'s it doesn't name have ended, whatever its file hasn't said. Agents are left alone:
+ * one that waits itself counts as completed there, so it isn't named.
+ */
+function dropEnded(a: AgentRec, tasks: unknown, now: number): void {
+  if (!Array.isArray(tasks) || !a.bg.size) return
+  const live = new Set<string>()
+  for (const t of tasks) if (t && typeof t === 'object' && typeof t.id === 'string') live.add(t.id)
+  let dropped = false
+  for (const [id, w] of a.bg) {
+    if (w.kind !== 'command' || live.has(id) || now - w.at < BG_FRESH) continue
+    a.bg.delete(id)
+    dropped = true
+  }
+  if (dropped && !a.bg.size) a.saidWaitingAt = 0
+}
+
+/** How an agent ends when nothing says: done with its report or last words, unless Claude Code said it hadn't reported. */
+const quietEnd = (a: AgentRec): AgentStatus => (a.last === 'result' || (a.last === 'text' && !a.unreported) ? 'done' : 'stopped')
+
+/** The longest a waiting agent's file may stay still, given when it was last written. */
+function waitCap(a: AgentRec, lastWrite: number): number {
+  let cap = WAIT_CAP
+  for (const w of a.bg.values()) if (w.until > lastWrite) cap = Math.max(cap, Math.min(w.until - lastWrite + IDLE_LIVE, WAIT_MAX))
+  return cap
+}
+
+/**
+ * A "completed" notification that isn't its end: the agent waits on its own background work. Its
+ * file decides first (a report handed back is its end, whatever goes on behind it); the
+ * notification's words only say what a file can't, such as work started before the part followed.
+ * Whether it goes on. History read in bulk reads no file: its scan settles it.
+ */
+function goesOn(b: Board, a: AgentRec, e: TaskEnd, ts: number): boolean {
+  if (e.waiting === false) {
+    a.bg.clear()
+    woke(a)
+    return false
+  }
+  if (!hush) catchUp(b, a)
+  if (a.last === 'result') return false
+  if (e.waiting === null && (hush || !waits(a))) return false
+  if (a.status !== 'running') {
+    // Stopped is stopped; one taken as done before this word came goes on.
+    if (a.status !== 'done') return true
+    const { last } = a
+    resume(b, a, ts)
+    a.last = last
+  }
+  a.saidWaitingAt = Math.max(a.saidWaitingAt, ts)
+  a.unreported = /has not reported yet/.test(e.result ?? '')
+  a.turnOver = true
+  syncWait(a)
+  changed(b, a, false)
+  return true
+}
 
 /** The call that launched an agent or workflow stops running with it (it was left running at launch). */
 function closeLauncher(b: Board, toolUseId: string | null, status: AgentStatus, durationMs: number | null, at: number): void {
@@ -375,6 +515,7 @@ function taskEnd(b: Board, e: TaskEnd, ts: number): void {
   if (!AGENT_ID.test(e.taskId)) return
   const a = newAgent(b, e.taskId, e.durationMs != null ? ts - e.durationMs : ts)
   a.toolUseId ??= e.toolUseId
+  if (status === 'done' && goesOn(b, a, e, ts)) return
   a.tokens = e.tokens ?? a.tokens
   a.toolUses = e.toolUses ?? a.toolUses
   // Its own file says best what it found: a hand-back's <result> only says one was sent. (Not for
@@ -450,6 +591,8 @@ export function applyLinks(sessionId: string, links: AgentLink[], quiet = false)
         case 'resume': {
           const a = b.agents.get(l.agentId)
           if (a && a.status !== 'running') resume(b, a, l.ts)
+          // One waiting on its background work is awake now too.
+          else if (a) woke(a)
           break
         }
         case 'stop': {
@@ -511,6 +654,9 @@ function resume(b: Board, a: AgentRec, at: number): void {
   a.lastActivityAt = Math.max(a.lastActivityAt, at)
   a.checkedAt = 0
   a.last = null
+  // What it said before isn't its report any more: a hand-back of its own still is, until the next.
+  if (!a.fromFile) a.result = null
+  woke(a)
   changed(b, a, true)
 }
 
@@ -527,12 +673,17 @@ function resume(b: Board, a: AgentRec, at: number): void {
 export function hookActivity(sessionId: string, agentId: string, agentType: unknown, tool: string, summary: string): void {
   if (!SAFE_ID.test(agentId)) return
   const b = board(sessionId)
-  if (!b.agents.has(agentId) && !metaRead(b, agentId)) return
+  if (!b.agents.has(agentId) && !metaRead(b, agentId)) {
+    logOnce(`hook:${sessionId}/${agentId}`, 'agent hook not counted: no meta file for', agentId, 'in', sessionId, '(a helper of Claude Code, or its file is still to come)')
+    return
+  }
   const now = Date.now()
   const fresh = !b.agents.has(agentId)
   const a = newAgent(b, agentId, now)
   if (!a.type && typeof agentType === 'string') a.type = agentType
   if (a.status !== 'running') resume(b, a, now)
+  woke(a)
+  a.waiting = false
   a.activity = clean(summary && summary !== tool ? `${tool}: ${summary}` : tool, 200)
   a.hookAt = now
   a.lastActivityAt = now
@@ -543,17 +694,26 @@ export function hookActivity(sessionId: string, agentId: string, agentType: unkn
 }
 
 /**
- * A subagent's SubagentStop: it has finished (its last message is its report). One that already
- * ended (a TaskStop, a notification) keeps how it ended; a notification later still says best.
+ * A subagent's SubagentStop: its turn ended. It has finished (its last message is its report), unless
+ * its file has background work still going with no report handed back ([tasks], the hook's
+ * background_tasks, says which shells really still run): then it waits, and stays running. One that
+ * already ended (a TaskStop, a notification) keeps how it ended; a notification later still says best.
  */
-export function hookSubagentStop(sessionId: string, agentId: string, last: unknown): void {
+export function hookSubagentStop(sessionId: string, agentId: string, last: unknown, tasks?: unknown): void {
   if (!SAFE_ID.test(agentId)) return
   const b = boards.get(sessionId)
   const a = b?.agents.get(agentId)
   if (!b || !a || a.status !== 'running') return
+  // What it wrote up to here first: the command it started, or the report it handed back.
+  catchUp(b, a)
   if (typeof last === 'string' && last.trim()) a.text = last
   if (a.last !== 'result') a.last = 'text'
-  end(b, a, 'done', Date.now(), true)
+  a.turnOver = true
+  const now = Date.now()
+  dropEnded(a, tasks, now)
+  syncWait(a)
+  if (a.waiting) changed(b, a, false)
+  else end(b, a, 'done', now, true)
   publishRunning(b)
 }
 
@@ -588,7 +748,9 @@ export const launchedInBackground = (sessionId: string, toolUseId: string) => bo
  * background agent of the main agent's still running here that it doesn't name has ended (a
  * TaskStop, a 429 or a limit that cut it off, a notification never written): done when its file's
  * last word is its report, else stopped. Not a workflow's agents, nor one an agent started (the
- * list names the main agent's tasks), nor one that started a moment ago.
+ * list names the main agent's tasks), nor one that started a moment ago, nor one waiting on its own
+ * background work (Claude Code counts that one as completed, so the list doesn't name it; the
+ * shells it waits for are named, and those no longer named have ended).
  */
 export function hookStop(sessionId: string, tasks: unknown): void {
   if (!Array.isArray(tasks)) return
@@ -596,12 +758,15 @@ export function hookStop(sessionId: string, tasks: unknown): void {
   const now = Date.now()
   const named = new Set<string>()
   for (const t of tasks) if (t && typeof t === 'object' && typeof t.id === 'string') named.add(t.id)
-  const r = getSession(sessionId)
   for (const a of b.agents.values()) {
-    if (a.status !== 'running' || named.has(a.id) || !a.background || a.workflowId || a.parentAgentId || now - a.startedAt < 2000) continue
-    if (!a.file && r) a.file = findFile(subagentsDir(r), a)
-    follow(a)
-    end(b, a, a.last === 'result' || a.last === 'text' ? 'done' : 'stopped', mtimeOf(a.file) ?? a.lastActivityAt, false)
+    if (a.status !== 'running') continue
+    catchUp(b, a)
+    dropEnded(a, tasks, now)
+    syncWait(a)
+    if (a.waiting) changed(b, a, false)
+    if (a.waiting || named.has(a.id) || !a.background || a.workflowId || a.parentAgentId || now - a.startedAt < 2000) continue
+    logOnce(`stop:${sessionId}/${a.id}`, 'agent ended: the main turn\'s Stop no longer lists', a.id, 'in', sessionId)
+    end(b, a, quietEnd(a), mtimeOf(a.file) ?? a.lastActivityAt, false)
   }
   for (const t of tasks) {
     if (!t || typeof t !== 'object' || typeof t.id !== 'string') continue
@@ -665,7 +830,14 @@ export function sdkTask(sessionId: string, m: any): void {
       if (!status) break
       const at = numOr(m.patch?.end_time, now)!
       const a = b.agents.get(id)
-      if (a) end(b, a, status, at, true)
+      if (a) {
+        // Marked completed with its background work still going: its notification says so next.
+        if (status === 'done') {
+          catchUp(b, a)
+          syncWait(a)
+        }
+        if (status !== 'done' || !a.waiting) end(b, a, status, at, true)
+      }
       const runId = b.tasks.get(id)
       const w = runId ? b.workflows.get(runId) : undefined
       if (w) endWorkflow(b, w, status, at)
@@ -674,7 +846,7 @@ export function sdkTask(sessionId: string, m: any): void {
     case 'task_notification':
       taskEnd(b, {
         taskId: id, toolUseId: typeof m.tool_use_id === 'string' ? m.tool_use_id : null, status: m.status, summary: typeof m.summary === 'string' ? m.summary : null, result: null,
-        tokens: numOr(m.usage?.total_tokens, null), toolUses: numOr(m.usage?.tool_uses, null), durationMs: numOr(m.usage?.duration_ms, null), agentCount: null, agentsError: null,
+        tokens: numOr(m.usage?.total_tokens, null), toolUses: numOr(m.usage?.tool_uses, null), durationMs: numOr(m.usage?.duration_ms, null), agentCount: null, agentsError: null, waiting: waitingWord(typeof m.summary === 'string' ? m.summary : null, null),
       }, now)
       break
   }
@@ -887,12 +1059,62 @@ function countUsage(a: AgentRec, msgId: string | null, u: any): void {
   a.tokens = a.inTokens + a.outTokens + a.msgOut
 }
 
+/** The background work a tool's result ([r], its toolUseResult) started, as Claude Code 2.1.316 logs it. */
+function bgStarted(r: any, at: number): [string, BgWork] | null {
+  if (!r || typeof r !== 'object') return null
+  let id: unknown
+  let work: BgWork
+  if (r.backgroundTaskId) {
+    // run_in_background, or a foreground command moved there by its timeout: only the result says.
+    id = r.backgroundTaskId
+    work = { kind: 'command', at, until: 0 }
+  } else if (typeof r.timeoutMs === 'number' || typeof r.persistent === 'boolean') {
+    // Monitor.
+    id = r.taskId
+    work = { kind: 'command', at, until: r.persistent === true ? Infinity : at + (typeof r.timeoutMs === 'number' ? r.timeoutMs : 0) }
+  } else if (r.status === 'async_launched' || r.status === 'remote_launched') {
+    id = r.agentId ?? r.taskId
+    work = { kind: 'agent', at, until: 0 }
+  } else return null
+  return typeof id === 'string' && SAFE_ID.test(id) ? [id, work] : null
+}
+
+/**
+ * A line's task notifications, when Claude Code put them there: an entry it marks as one (with a
+ * notice before them, several at once when they came together) or a queued command. Not a prompt
+ * that only quotes one.
+ */
+function notifications(o: any): TaskEnd[] {
+  let text: unknown
+  if (o?.type === 'attachment') {
+    if (o.attachment?.type === 'queued_command' && o.attachment.commandMode === 'task-notification') text = o.attachment.prompt
+  } else if (o?.type === 'user') {
+    const c = o.message?.content
+    const s = typeof c === 'string' ? c : Array.isArray(c) ? c.map((x: any) => (x?.type === 'text' && typeof x.text === 'string' ? x.text : '')).join('') : ''
+    if (o.origin?.kind === 'task-notification' || s.trimStart().startsWith('<task-notification>')) text = s
+  }
+  if (Array.isArray(text)) text = text.map((x: any) => (typeof x?.text === 'string' ? x.text : '')).join('')
+  if (typeof text !== 'string') return []
+  const out: TaskEnd[] = []
+  for (const m of text.matchAll(/<task-notification>[\s\S]*?<\/task-notification>/g)) {
+    const e = parseTaskNotification(m[0])
+    if (e) out.push(e)
+  }
+  return out
+}
+
 /** One line of an agent's transcript, read lightly: what it does, its tokens, its report. */
 function lightLine(a: AgentRec, o: any): void {
   const ts = typeof o?.timestamp === 'string' ? Date.parse(o.timestamp) : NaN
   if (Number.isFinite(ts)) {
     a.lastActivityAt = Math.max(a.lastActivityAt, ts)
     if (a.whole && ts < a.startedAt) a.startedAt = ts
+  }
+  // Written after Claude Code said it waits (and not an older line, read late): it has woken.
+  const later = !(ts <= a.saidWaitingAt)
+  if (o?.type === 'assistant' && later) {
+    a.saidWaitingAt = 0
+    a.unreported = false
   }
   // Claude Code's API error (a 429, the usage limit, an overloaded API): the agent was cut off
   // there, unless a line after it says otherwise.
@@ -903,6 +1125,7 @@ function lightLine(a: AgentRec, o: any): void {
   }
   if (o?.type === 'assistant') {
     const m = o.message
+    a.turnOver = m?.stop_reason === 'end_turn'
     // An unmetered reply (Claude Code marks it so) isn't counted, as in its footer.
     if (o.isUnmetered !== true) countUsage(a, typeof m?.id === 'string' ? m.id : null, m?.usage)
     if (typeof m?.model === 'string' && m.model !== '<synthetic>') a.model ??= m.model
@@ -911,6 +1134,8 @@ function lightLine(a: AgentRec, o: any): void {
         if (a.tools.has(blk.id)) continue
         a.tools.add(blk.id)
         const report = handbackText(blk.name, blk.input)
+        const stops = blk.name === 'TaskStop' || blk.name === 'KillShell' ? (blk.input?.task_id ?? blk.input?.shell_id) : null
+        if (typeof stops === 'string') a.stops.set(blk.id, stops)
         if (report != null) {
           a.result = clean(report)
           a.fromFile = a.result != null
@@ -927,6 +1152,16 @@ function lightLine(a: AgentRec, o: any): void {
     }
   } else if (o?.type === 'user' && Array.isArray(o.message?.content) && o.message.content.some((x: any) => x?.type === 'tool_result')) {
     if (a.last === 'tool') a.last = 'working'
+    a.turnOver = false
+    const started = bgStarted(o.toolUseResult, Number.isFinite(ts) ? ts : Date.now())
+    if (started) a.bg.set(started[0], started[1])
+    // TaskStop came back: stopped now, or "not running" (already over). No notification has to follow.
+    for (const x of o.message.content) {
+      const task = x?.type === 'tool_result' ? a.stops.get(x.tool_use_id) : undefined
+      if (task == null) continue
+      a.bg.delete(task)
+      a.stops.delete(x.tool_use_id)
+    }
   } else if (o?.type === 'attachment' && o.attachment?.type === 'structured_output') {
     const r = clean(structuredText(o.attachment.data))
     if (r) {
@@ -934,6 +1169,21 @@ function lightLine(a: AgentRec, o: any): void {
       a.fromFile = true
     }
     a.last = 'result'
+  } else if (o?.type === 'attachment' && o.attachment?.hookEvent === 'SubagentStop') {
+    a.turnOver = true
+  } else {
+    const ends = notifications(o)
+    if (ends.length) {
+      // Background work's news reaches it as its next turn's input: it's awake. A notification's
+      // own "waiting" (an agent it started) ends nothing, and a Monitor's event has no status.
+      for (const e of ends) if (e.waiting !== true) a.bg.delete(e.taskId)
+      a.turnOver = false
+      if (later) {
+        a.saidWaitingAt = 0
+        a.unreported = false
+      }
+      if (a.last === 'text') a.last = 'working'
+    }
   }
 }
 
@@ -979,6 +1229,9 @@ function follow(a: AgentRec): void {
     a.outTokens = 0
     a.msgId = null
     a.msgOut = 0
+    a.bg.clear()
+    a.stops.clear()
+    a.turnOver = false
   }
   if (size === a.offset) return
   let skip = false
@@ -1005,14 +1258,16 @@ function sizeOf(p: string): number | null {
  * after an API error, 1 while its session is stopped by a limit): done when its last word was its
  * report or text with no tool call after, else stopped. One waiting on a tool (a long build, an
  * approval) in a live session is still at work, unless an API error or its session's limit cut it
- * off. An agent never followed has its last 64 KB read for this, once. [gone]: its claude process
- * is gone, so it has stopped however recently it wrote.
+ * off. One waiting on its own background work still is too, up to its cap ([waitCap]), a limit on
+ * the session or not (it needs no model while it waits). An agent never followed has its last 64 KB
+ * read for this, once. [gone]: its claude process is gone, so it has stopped however recently it wrote.
  */
 function settle(b: Board, a: AgentRec, live: boolean, gone = false, blocked = false): void {
   const now = Date.now()
   if (!gone && !blocked && a.last !== 'error' && now - a.checkedAt < 60_000) return
   const mtime = mtimeOf(a.file)
-  const quiet = now - Math.max(mtime ?? a.lastActivityAt, a.hookAt)
+  const lastWrite = Math.max(mtime ?? a.lastActivityAt, a.hookAt)
+  const quiet = now - lastWrite
   const cutOff = blocked || a.last === 'error'
   if (!gone && quiet < (blocked ? IDLE_BLOCKED : a.last === 'error' ? IDLE_ERROR : live ? IDLE_LIVE : IDLE_ENDED)) return
   a.checkedAt = now
@@ -1021,7 +1276,11 @@ function settle(b: Board, a: AgentRec, live: boolean, gone = false, blocked = fa
     readLines(a, a.file, Math.max(0, size - 64 * 1024), 64 * 1024, size > 64 * 1024, false)
   }
   if (!gone && !cutOff && live && quiet < IDLE_MAX && (a.last === 'tool' || a.last === 'working')) return
-  end(b, a, a.last === 'result' || a.last === 'text' ? 'done' : 'stopped', mtime ?? a.lastActivityAt, false)
+  if (!gone && live && a.waiting && quiet < waitCap(a, lastWrite)) return
+  const status = quietEnd(a)
+  const why = gone ? 'its claude process is gone' : a.waiting ? (live ? 'waited past its cap on background work' : 'its session ended while it waited') : a.last === 'error' ? 'an API error cut it off' : blocked ? 'its session is blocked' : 'its file went quiet'
+  logOnce(`settle:${b.id}/${a.id}:${why}`, `agent ended ${status}: ${why}:`, a.id, 'in', b.id, `(last write ${Math.round(quiet / 60_000)} min ago)`)
+  end(b, a, status, mtime ?? a.lastActivityAt, false)
 }
 
 /**
@@ -1083,6 +1342,12 @@ function scan(b: Board, r: Rec, follows: boolean): void {
     if (!a.file) a.file = findFile(root, a)
     const before = `${a.activity}|${a.tokens}|${a.tools.size}`
     if (follows && live) follow(a)
+    // It handed back its report after all: nothing it left running keeps it.
+    if (a.last === 'result' && (a.waiting || a.saidWaitingAt > 0)) {
+      end(b, a, 'done', mtimeOf(a.file) ?? a.lastActivityAt, false)
+      continue
+    }
+    syncWait(a)
     settle(b, a, live, false, blocked)
     if (a.status === 'running' && `${a.activity}|${a.tokens}|${a.tools.size}` !== before) changed(b, a, false)
   }

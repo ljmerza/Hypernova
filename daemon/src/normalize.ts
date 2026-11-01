@@ -396,6 +396,12 @@ export type TaskEnd = {
   /** A workflow's: how many agents it ran, and how many failed. */
   agentCount: number | null
   agentsError: number | null
+  /**
+   * An agent's "completed" says only that this turn stopped. true: Claude Code says it is waiting on
+   * its own background work and will notify again, so this isn't its end. false: it says the agent
+   * stopped with no background work left. null: it says neither (see [waitingWord]).
+   */
+  waiting: boolean | null
 }
 export type AgentLink =
   /** An Agent call started agent [agentId]; [report] when it ran in the foreground and has finished. */
@@ -422,6 +428,19 @@ function tag(s: string, name: string): string | null {
 const num = (s: string | null) => (s && /^\d+$/.test(s) ? Number(s) : null)
 
 /**
+ * Whether a notification's words say its agent waits on its own background work. Claude Code 2.1.316
+ * has no field for it (the status is "completed" either way), only its summary ("… is waiting on its
+ * own background work" or "… finished") and note, so agents.ts trusts the agent's own file over
+ * wording it doesn't know.
+ */
+export function waitingWord(summary: string | null, note: string | null): boolean | null {
+  const said = `${summary ?? ''}\n${note ?? ''}`
+  if (/waiting on its own background work|background work of its own still running/.test(said)) return true
+  if (/no live background children/.test(said) || /\bfinished\s*$/.test(summary ?? '')) return false
+  return null
+}
+
+/**
  * A `<task-notification>`: Claude Code's word that a background agent ("a…"), workflow ("w…") or
  * shell command ("b…") ended, with its tool call, status and usage. null for anything else.
  */
@@ -433,17 +452,19 @@ export function parseTaskNotification(text: unknown): TaskEnd | null {
   const status = tag(s, 'status')
   if (!taskId || !status || !TASK_STATUSES.has(status)) return null
   const usage = tag(s, 'usage') ?? ''
+  const summary = tag(s, 'summary')
   return {
     taskId,
     toolUseId: tag(s, 'tool-use-id') || null,
     status: status as TaskStatus,
-    summary: tag(s, 'summary'),
+    summary,
     result: tag(s, 'result'),
     tokens: num(tag(usage, 'subagent_tokens') ?? tag(usage, 'total_tokens')),
     toolUses: num(tag(usage, 'tool_uses')),
     durationMs: num(tag(usage, 'duration_ms')),
     agentCount: num(tag(usage, 'agent_count')),
     agentsError: num(tag(usage, 'agents_error')),
+    waiting: waitingWord(summary, tag(s, 'note')),
   }
 }
 
@@ -1026,19 +1047,24 @@ function feedLimitNotice(st: ParseState, n: LimitNotice, ts: number): void {
 /**
  * A task notification read from any of its copies (a queue entry, a hidden user entry, a queued
  * command): a link for agents.ts once per task and status (again if this copy brings usage the
- * first lacked), and the launcher's call stops running.
+ * first lacked), and the launcher's call stops running, unless its agent only waits.
  */
 function noteTaskEnd(st: ParseState, end: TaskEnd | null, ts: number): void {
   if (!end) return
-  const key = `${end.taskId}:${end.status}`
+  // The same task notifies again (an agent with each wait and once more at its end, or woken and
+  // finished again), with a longer time: not a copy, and its end has to get through.
   const usage = end.tokens != null || end.durationMs != null
-  const seen = st.taskSeen.get(key)
-  if (seen === true || (seen === false && !usage)) return
+  const any = `${end.taskId}:${end.status}${end.waiting ? ':waiting' : ''}`
+  const key = usage ? `${any}:${end.durationMs}` : any
+  if (st.taskSeen.has(key) || st.taskSeen.has(any) && !usage) return
   st.taskSeen.set(key, usage)
+  st.taskSeen.set(any, usage)
   if (st.taskSeen.size > 2000) st.taskSeen.delete(st.taskSeen.keys().next().value!)
   // Shell commands' ends ("b…") are the Bash cards' business.
   if (!/^[aw]/.test(end.taskId)) return
   st.links.push({ kind: 'end', ts, ...end })
+  // Still at work: its call keeps running.
+  if (end.waiting) return
   const ev = end.toolUseId ? st.byId.get(end.toolUseId) : undefined
   if (ev?.kind === 'tool' && isLauncher(ev.name) && closeTool(ev, end, ts)) st.changed.add(ev.id)
 }

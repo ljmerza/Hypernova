@@ -3368,6 +3368,51 @@ them in `daemon/src/agents.ts`; the phone shows each under the call that started
   agent's structured output). An agent whose file goes quiet (10 minutes in a session that is
   going, 2 once it has ended) is done if its last word was its report, else stopped; one waiting on
   a tool or an approval in a live session is still at work (for up to 2 hours).
+- **Waiting on its own background work.** An agent that starts a background command and waits for it
+  ends its turn: SubagentStop fires, Claude Code marks it `completed` with the command keeping it
+  alive, and wakes it when the command ends (in the same file). It hasn't finished, so its `status`
+  stays `running`, and `activity` says why: "Waiting for its background command" ("… its 2 background
+  commands", "Waiting for the agents it started", or "Waiting for its background work" when mixed or
+  when only Claude Code's word is to go on). No new status and no change on the wire: an older app
+  shows a running agent with that line, and everything that counts running agents counts it
+  (`agentsRunning`, Home, the widget, Stay awake, the server's own update).
+  - **What counts as waiting.** Read from the agent's own file (Claude Code 2.1.316's shapes): its
+    turn has ended (its last reply's `stop_reason: "end_turn"`, the SubagentStop hook or its
+    `hook_success` line), it hasn't handed back a report, it's a background agent, and work it started
+    hasn't ended. Started: a tool result's `toolUseResult.backgroundTaskId` (`run_in_background`, or a
+    foreground command the timeout moved there), Monitor's `{taskId, timeoutMs, persistent}`, or
+    `status: "async_launched"` / `"remote_launched"` (`agentId` or `taskId`: agents and workflows of its
+    own). Ended: a `<task-notification>` for that id with a `<status>` (an entry with
+    `origin.kind: "task-notification"`, Claude Code's notice before it and several in one entry when
+    they came together, or a `queued_command` attachment with `commandMode: "task-notification"`; not
+    a prompt that only quotes one, and a Monitor's event has no status so isn't its end); TaskStop's
+    result on that id, or "not running"; or for a shell, a Stop or SubagentStop `background_tasks` that
+    no longer names it (work that began in the last 2 s is believed anyway, as the list came first).
+    The list's contents are read from the 2.1.316 binary, not from a recorded hook: the session's
+    tasks that are `running` or `pending` and not foreground, so a subagent's shells are named. Were
+    that wrong, Claude Code's word below still holds the agent.
+  - **Claude Code's word on it.** The main transcript gets a `<task-notification>` with
+    `<status>completed</status>` and `<summary>Agent "…" is waiting on its own background work</summary>`
+    (and a `<note>`). The words are the only signal there: the real end says `completed` too, with
+    "… finished". That word doesn't end the agent or its call; it also holds an agent whose file
+    shows nothing (its command started before the 256 KB followed) and brings back one a SubagentStop
+    just took as done. A wording the daemon doesn't know ends it unless its file shows it waiting.
+    Each wait and the real end each count, told apart by their `duration_ms`.
+  - **How it ends.** Woken, it's simply at work again (the notification in its file, then its next
+    hook). Its report handed back ends it `done`, at once and whatever it left running. Its turn ending
+    with nothing outstanding ends it `done`, as usual, and so does Claude Code's "finished".
+  - **The main turn's Stop** doesn't end it: `background_tasks` doesn't name a waiting agent, since
+    Claude Code counts it as completed, only its shells (the same reading of the binary).
+  - **The cap.** A waiting agent whose file has had no write for 2 hours ends, `done` with its report
+    in hand or last words, `stopped` if Claude Code said it hadn't reported yet (it then has no
+    `result`). A Monitor due to run longer extends that to its end plus 10 minutes, a persistent one
+    to 12 hours at most. Its next hook or notification still brings it back or says how it really
+    ended, so a wrong end corrects itself, and the count can't stay up for good. Its session ending ends
+    it as for any agent; a limit on its session doesn't by itself (it needs no model while it waits).
+  - **A daemon restart** re-reads all this from the transcripts: the launch and the end from its file,
+    Claude Code's words from the main transcript, in order, and one over the cap ends on sight.
+    The daemon logs one line per agent it ends for a reason that could look wrong later (the cap, its
+    file going quiet, a Stop no longer naming it), and per hook id it leaves out for having no meta file.
 - **Tokens** of a running agent are counted from its file as Claude Code 2.1.31x counts them for its
   own footer (the number beside each agent there): the context its latest reply read
   (`input_tokens + cache_creation_input_tokens + cache_read_input_tokens`) plus the `output_tokens` of
@@ -3395,15 +3440,16 @@ them in `daemon/src/agents.ts`; the phone shows each under the call that started
     background agent of the main agent's that the daemon has running and the list no longer names
     has ended, `done` if its file's last word is its report, else `stopped` (a notification later
     still says how it really ended). Not a workflow's agents or one an agent started (the list names
-    the main agent's tasks), not one that started in the last 2 s, and nothing when the Stop carries
-    no list (an older Claude Code).
+    the main agent's tasks), not one waiting on its own background work, not one that started in the
+    last 2 s, and nothing when the Stop carries no list (an older Claude Code).
   - **An API error** as an agent's last line (a 429, the usage limit, an overloaded API: Claude Code
     writes one only after its own retries) ends it `stopped` once its file has been quiet for 2
     minutes, even waiting on a tool.
   - **While its session is stopped** (`blocked`: a limit, signed out, out of credit, the provider
     failing; not a model's own week), its agents silent for a minute end `stopped` with it.
   - **SubagentStop** (an optional hook, see Hooks) ends a running agent `done`, its
-    `last_assistant_message` as its report; one already ended keeps how it ended.
+    `last_assistant_message` as its report, unless it's waiting on its own background work (see
+    above); one already ended keeps how it ended.
   An agent ended by a guess comes back `running` on its next hook or its SendMessage wake-up.
 - **Retries and runs started again.** A workflow step started again under the same journal `key`
   is a retry: the earlier attempt ends `stopped` (unless Claude Code had already said how it
@@ -3786,8 +3832,9 @@ it in place of Stop when an API error ended the turn: its `error`, `error_detail
 before at daemon start (as the shell block is rewritten; not by a daemon on its own
 `HYPERNOVA_SUPPORT`), but the integration counts as installed without it, so an older install
 never looks unconnected. It stops the session `idle` with `blocked` (see Account); its message is
-Claude Code's error, so `lastText` stays as it was. SubagentStop (an agent finished: `agent_id`,
-`last_assistant_message`) is optional the same way; it ends that agent (see Agents and workflows).
+Claude Code's error, so `lastText` stays as it was. SubagentStop (an agent's turn ended: `agent_id`,
+`last_assistant_message`, `background_tasks`) is optional the same way; it ends that agent, unless it
+waits on its own background work (see Agents and workflows).
 PreCompact (the context is about to be compacted) is optional the same way; only automations' hook
 triggers listen (see Automations, "Workflows"). PermissionDenied (matcher `*`; auto mode's classifier
 refused a call: `tool_name`, `tool_input`, `tool_use_id`, `reason`) is optional the same way; the call

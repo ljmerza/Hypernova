@@ -156,10 +156,10 @@ export async function handleHook(ev: any, req: IncomingMessage, res: ServerRespo
       noteHookEvent('Stop', sid, null, 'A turn ended.')
       return {}
     case 'SubagentStop':
-      // An agent the main agent started has finished: its count goes down now, not when a
-      // notification (that may never come) says so.
+      // An agent the main agent started has finished, unless it's waiting on its own background
+      // work: its count goes down now, not when a notification (that may never come) says so.
       if (typeof ev.agent_id === 'string' && ev.agent_id) {
-        hookSubagentStop(sid, ev.agent_id, ev.last_assistant_message)
+        hookSubagentStop(sid, ev.agent_id, ev.last_assistant_message, ev.background_tasks)
         // Its asks handed back to the terminal were answered there: it couldn't finish otherwise.
         settleHandBack(sid, (a) => a.agentId === ev.agent_id)
       }

@@ -12,6 +12,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AgentBoard
+import com.prudnikweb.hypernova.data.WAgent
 import com.prudnikweb.hypernova.ui.session.SessionSheet
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -64,6 +66,32 @@ class SessionSheetTest {
         rule.onNodeWithText(str(R.string.session_sheet_where).uppercase(), useUnmergedTree = true).assertExists()
         rule.onNodeWithText("j-zeta", useUnmergedTree = true).assertExists()
         // No picture of this tab: its "Started" is a wall-clock time.
+    }
+
+    @Test fun anAgentWaitingOnItsBackgroundCommandIsAtWorkAndSaysSo() {
+        val line = "Waiting for its background command"
+        val hub = FeatureHub()
+        hub.board = AgentBoard(
+            mapOf(
+                "a1" to WAgent(
+                    id = "a1", sessionId = Samples.ZETA, toolUseId = null, parentAgentId = null, workflowId = null, phase = null, label = "Integrate the branches",
+                    type = "general-purpose", model = null, background = true, status = "running", activity = line,
+                    startedAt = Samples.NOW - 60_000L, endedAt = null, lastActivityAt = Samples.NOW - 60_000L, tokens = null, toolUses = null, result = null,
+                ),
+            ),
+            emptyMap(),
+        )
+        val s = hub.base.session(Samples.ZETA)!!
+        rule.setContent {
+            Harness(spy) {
+                SessionSheet(hub, s, usage = null, onModel = {}, onSwitchAgent = {}, onRetried = {}, onDismiss = { dismissed++ })
+            }
+        }
+        rule.waitForIdle()
+        tab(R.string.session_sheet_agents)
+        rule.onNodeWithText(line, useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("Integrate the branches", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.session_sheet_no_agents)).assertDoesNotExist()
     }
 
     @Test fun closeDismisses() {

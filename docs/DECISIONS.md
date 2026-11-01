@@ -2833,3 +2833,32 @@ Exact versions, the npm builds unmodified, in `assets/term/`.
    Its one visible gain is box-drawing lines without gaps.
 5. **Checked by** `daemon/test/term-widths.test.ts`, including a real holder's snapshot, and
    `scripts/term-page-check.mjs` by hand in a headless Chromium (docs/DEV-SETUP.md). Not yet on a phone.
+
+## An agent waiting on its background command is still at work (2026-11-01)
+
+The owner's choice. A subagent that starts a background command and waits for it ends its turn, so
+SubagentStop fired, the daemon took it as done, and the app said "No agents at work" while the
+terminal still listed it (seen live on 2026-11-01).
+
+1. **It stays `running`, its activity saying why** ("Waiting for its background command"). No new
+   status, so no break in the protocol: an older app shows a running agent with that line.
+2. **Its own file decides, not a sentence.** Claude Code's transcripts record what started
+   (`backgroundTaskId`, Monitor's `taskId`, `async_launched`) and what ended (a notification with a
+   status, TaskStop). The hook's `background_tasks` says which shells really still run. Only the
+   main transcript's "is waiting on its own background work" has no field behind it (`completed`
+   either way), so those words are a fallback, not the rule. Checked against the 86 agents of one
+   real session, 51 of which started background work: only the agent then running and 3 that had handed
+   back a report were left with any outstanding.
+3. **A report handed back ends it, whatever it left running.** One real agent reported and left a
+   shell going for good; Claude Code still lists it, and it must not stay "at work".
+4. **The cap is 2 hours with no write to its file**, then `done` with a report in hand, `stopped`
+   without. In this server's transcripts, 148 times an agent went on after ending a turn (for any
+   reason, a message from the main agent too, so an upper bound on the waits): the median after 18
+   seconds, 95% within 17 minutes, the longest 47 and 123 minutes. 2 hours matches what a silent tool
+   call gets, a wrong end corrects itself at its next hook, and too long a cap costs a wrong count
+   and a held update. A Monitor running longer extends it to its end, a persistent one to 12 hours
+   at most (the 12 is a judgement: the Monitors seen ran 30 minutes at most, none persistent).
+5. **The server's own update waits for these agents too** (Servers update themselves, point 4).
+
+How it's detected and ended: docs/PROTOCOL.md, "Agents and workflows", **Waiting on its own background
+work**.

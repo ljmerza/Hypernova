@@ -5,7 +5,7 @@
 // real transcript.
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { tmpdir } from 'node:os'
@@ -417,7 +417,7 @@ test('an agent\'s transcript is served from its own file, only for an agent of t
 const META_316 = { isBuiltIn: true, spawnDepth: 1, requestShape: 'prompt', requestNonInteractive: false, launchedWithDefaults: true }
 
 test('an agent\'s file is found flat, in its workflow\'s folder, or further down its session\'s subagents folder, never outside it', () => {
-  const id = 'eeeeeeee-0000-4000-8000-000000000201'
+  const id = 'eeeeeeee-0000-4000-8000-000000000701'
   const nested = 'a4444444444444444'
   const { sub, runDir } = makeSession(id, [...launchAgent('toolu_a1', PLAIN, 'Review the parser'), ...launchAgent('toolu_a2', nested, 'Port the plugin')])
   writeMeta(sub, PLAIN, { ...META_316, agentType: 'general-purpose', description: 'Review the parser', toolUseId: 'toolu_a1' })
@@ -441,9 +441,9 @@ test('an agent\'s file is found flat, in its workflow\'s folder, or further down
 })
 
 test('a session\'s subagents folder is the one named as its transcript is', () => {
-  const id = 'eeeeeeee-0000-4000-8000-000000000202'
+  const id = 'eeeeeeee-0000-4000-8000-000000000702'
   const { transcriptPath } = makeSession(id, [])
-  const stem = 'eeeeeeee-0000-4000-8000-0000000002ff'
+  const stem = 'eeeeeeee-0000-4000-8000-0000000007ff'
   const other = join(dirname(transcriptPath), `${stem}.jsonl`)
   writeFileSync(other, '')
   hub.upsertSession(id, { transcriptPath: other })
@@ -454,7 +454,7 @@ test('a session\'s subagents folder is the one named as its transcript is', () =
 })
 
 test('Claude Code\'s own helpers (forks of the main conversation) send subagent hooks with no meta file: no agent for them; an agent with one counts from its first hook', async () => {
-  const id = 'eeeeeeee-0000-4000-8000-000000000203'
+  const id = 'eeeeeeee-0000-4000-8000-000000000703'
   const { sub } = makeSession(id, [])
   const fork = 'a6666666666666666'
   const { got, stop } = listen()
@@ -481,7 +481,7 @@ test('Claude Code\'s own helpers (forks of the main conversation) send subagent 
 })
 
 test('an agent just started, its file not written yet, is starting; then its events come; one started long ago with no file has none', () => {
-  const id = 'eeeeeeee-0000-4000-8000-000000000204'
+  const id = 'eeeeeeee-0000-4000-8000-000000000704'
   const now = launchAgent('toolu_a1', PLAIN, 'Review the parser').map((o) => ({ ...o, timestamp: new Date().toISOString() }))
   // FIXER's call is half an hour old.
   const { sub } = makeSession(id, [...launchAgent('toolu_a2', FIXER, 'Fix the parser'), ...now])
@@ -981,4 +981,454 @@ test('SubagentStop ends a running agent done with its last message; one already 
   assert.equal(agents.listAgents(id).agents.find((x) => x.id === other)!.status, 'stopped')
   assert.equal(hub.getSession(id)!.agentsRunning, 0)
   stop()
+})
+
+// ── Waiting on its own background work ──────────────────────────────────
+// Shapes as Claude Code 2.1.316 records them: a subagent that starts a background command and waits
+// for it ends its turn (SubagentStop) and wakes when the command ends. Written by hand, as above.
+const WAITER = 'a3333333333333333'
+const SHELL = 'b0fa11y1e'
+const side = (agentId = WAITER) => ({ isSidechain: true, agentId })
+const shellResult = (id: string) => ({ stdout: '', stderr: '', interrupted: false, isImage: false, noOutputExpected: false, backgroundTaskId: id })
+/** A Bash call run in the background, and its result naming the shell. */
+const bgBash = (toolUseId: string, shell = SHELL) => [
+  assistant(`as-${toolUseId}`, [toolUse(toolUseId, 'Bash', { command: 'until grep -q done /tmp/x.log; do sleep 5; done', description: 'Wait for the build', run_in_background: true })], side()),
+  result(`ur-${toolUseId}`, toolUseId, `Command running in background with ID: ${shell}. Output is being written to: /tmp/tasks/${shell}.output. You will be notified when it completes.`, shellResult(shell), side()),
+]
+/** A reply that ends its turn. */
+const endTurn = (uuid: string, text: string) => {
+  const a = assistant(uuid, [{ type: 'text', text }], side())
+  return { ...a, message: { ...a.message, stop_reason: 'end_turn' } }
+}
+const stopHookLine = () => ({ type: 'attachment', uuid: 'hook-stop', timestamp: at(), ...side(), attachment: { type: 'hook_success', hookName: 'SubagentStop', hookEvent: 'SubagentStop', exitCode: 200 } })
+const NOTICE = '[SYSTEM NOTIFICATION - NOT USER INPUT]\nThis is an automated background-task event, NOT a message from the user.\n\n'
+/** What wakes it: a command's end as the input of its next turn, after Claude Code's notice. */
+const bgEnded = (shell: string, toolUseId: string, status = 'completed', summary = `Background command "Wait for the build" completed (exit code 0)`) => ({
+  type: 'user', uuid: `wake-${shell}`, timestamp: at(), sessionId: 'S', ...side(), isMeta: true, origin: { kind: 'task-notification', producer: 'session-task' },
+  message: { role: 'user', content: `${NOTICE}<task-notification>\n<task-id>${shell}</task-id>\n<tool-use-id>${toolUseId}</tool-use-id>\n<output-file>/tmp/tasks/${shell}.output</output-file>\n<status>${status}</status>\n<summary>${summary}</summary>\n</task-notification>` },
+})
+/** The main transcript's word on a waiting agent: "completed", and the words alone say it isn't over. */
+const waitingNote = (agentId: string, durationMs: number, resultText = 'This agent has not reported yet: it is waiting on its own background work and will deliver its report through SubagentHandback when that finishes.', toolUseId?: string) =>
+  `<task-notification>\n<task-id>${agentId}</task-id>\n${toolUseId ? `<tool-use-id>${toolUseId}</tool-use-id>\n` : ''}<output-file>/tmp/${agentId}.output</output-file>\n<status>completed</status>\n<summary>Agent "Build it" is waiting on its own background work</summary>\n<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>\n<result>${resultText}\n</result>\n<usage><subagent_tokens>191703</subagent_tokens><tool_uses>64</tool_uses><duration_ms>${durationMs}</duration_ms></usage>\n</task-notification>`
+const finishedNote = (agentId: string, durationMs: number) =>
+  `<task-notification>\n<task-id>${agentId}</task-id>\n<output-file>/tmp/${agentId}.output</output-file>\n<status>completed</status>\n<summary>Agent "Build it" finished</summary>\n<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>\n<result>This agent's report was delivered to you as a message.\n</result>\n<usage><subagent_tokens>200000</subagent_tokens><tool_uses>70</tool_uses><duration_ms>${durationMs}</duration_ms></usage>\n</task-notification>`
+const handBack = (uuid: string, message: string) => assistant(uuid, [toolUse(`tu-${uuid}`, 'SubagentHandback', { message })], side())
+
+/** A session with one background agent at [lines] so far, seen by the board; [main] after its launch. */
+function waiter(id: string, lines: object[], main: object[] = []) {
+  const s = makeSession(id, [...launchAgent('toolu_w', WAITER, 'Build it', 'general-purpose'), ...main])
+  writeMeta(s.sub, WAITER, { agentType: 'general-purpose', description: 'Build it', toolUseId: 'toolu_w' })
+  const file = join(s.sub, `agent-${WAITER}.jsonl`)
+  writeFileSync(file, lines.map(line).join(''))
+  agents.pollAgents()
+  const me = () => agents.listAgents(id).agents.find((a) => a.id === WAITER)!
+  const stop = (last: string, tasks?: object[]) => handleHook({ session_id: id, cwd: '/tmp/agents', hook_event_name: 'SubagentStop', agent_id: WAITER, agent_type: 'general-purpose', last_assistant_message: last, ...(tasks ? { background_tasks: tasks } : {}) }, {} as never, {} as never)
+  const hookTool = () => handleHook({ session_id: id, cwd: '/tmp/agents', hook_event_name: 'PreToolUse', agent_id: WAITER, agent_type: 'general-purpose', tool_name: 'Bash', tool_use_id: `t-${tick}`, tool_input: { command: 'grep FAILED /tmp/x.log' } }, {} as never, {} as never)
+  const running = () => hub.getSession(id)!.agentsRunning
+  return { ...s, file, me, stop, hookTool, running, append: (...o: object[]) => appendFileSync(file, o.map(line).join('')) }
+}
+const shellTask = (id = SHELL) => ({ id, type: 'local_bash', status: 'running', description: 'Wait for the build', command: 'until …' })
+const WAITING = 'Waiting for its background command'
+
+test('a background command and then SubagentStop: still running, saying it waits for it', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000901'
+  const w = waiter(id, [prompt('s1', 'Build it.', { ...side(), parentUuid: null }), ...bgBash('tu-bg'), endTurn('s2', 'The build is running, so I am waiting for it to finish.')])
+  const { got, stop } = listen()
+  await w.stop('The build is running, so I am waiting for it to finish.', [shellTask()])
+  const a = w.me()
+  assert.equal(a.status, 'running')
+  assert.equal(a.activity, WAITING)
+  assert.equal(a.endedAt, null)
+  assert.equal(a.result, null)
+  assert.equal(w.running(), 1)
+  // Nothing tells a phone it ended, and its line goes out.
+  assert.ok(!got.some((m) => m.t === 'agent' && m.agent.id === WAITER && m.agent.status !== 'running'))
+  const st = hub.getSession(id)!.parse!.byId.get('toolu_w')
+  assert.ok(st?.kind === 'tool')
+  assert.equal(st.status, 'running')
+  stop()
+})
+
+test('Claude Code\'s word that it waits ends nothing and keeps its call running; the word is believed with no file to go on', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000902'
+  const w = waiter(id, [prompt('s1', 'Build it.', side()), ...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')])
+  await w.stop('Waiting for the build.', [shellTask()])
+  appendFileSync(w.transcriptPath, line(prompt('n1', waitingNote(WAITER, 35045882, undefined, 'toolu_w'), { origin: { kind: 'task-notification' }, promptSource: 'system' })))
+  hub.pollTranscripts()
+  assert.equal(w.me().status, 'running')
+  assert.equal(w.me().activity, WAITING)
+  assert.equal(hub.getSession(id)!.agentsRunning, 1)
+  const call = hub.getSession(id)!.parse!.byId.get('toolu_w')
+  assert.ok(call?.kind === 'tool')
+  assert.equal(call.status, 'running')
+
+  // Its launch long before the part of its file followed: the word alone holds it, and brings back
+  // one a SubagentStop took as done a moment earlier.
+  const other = 'eeeeeeee-0000-4000-8000-000000000903'
+  const v = waiter(other, [prompt('s1', 'Build it.', side()), endTurn('s2', 'Waiting for the build.')])
+  await v.stop('Waiting for the build.')
+  assert.equal(v.me().status, 'done')
+  appendFileSync(v.transcriptPath, line(enqueue(waitingNote(WAITER, 1000))))
+  hub.pollTranscripts()
+  assert.equal(v.me().status, 'running')
+  assert.equal(v.me().activity, 'Waiting for its background work')
+  assert.equal(v.me().result, null)
+  assert.equal(v.me().endedAt, null)
+})
+
+test('wording it does not know: its own file decides; "finished" with a command in its file still ends it', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000904'
+  const w = waiter(id, [...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')])
+  await w.stop('Waiting for the build.', [shellTask()])
+  const reworded = waitingNote(WAITER, 2000).replace('is waiting on its own background work', 'is paused').replace(/<note>.*<\/note>/, '')
+  appendFileSync(w.transcriptPath, line(enqueue(reworded)))
+  hub.pollTranscripts()
+  assert.equal(w.me().status, 'running')
+  // Claude Code knows better than the file: nothing of its own is left alive.
+  appendFileSync(w.transcriptPath, line(enqueue(finishedNote(WAITER, 3000))))
+  hub.pollTranscripts()
+  assert.equal(w.me().status, 'done')
+})
+
+test('the wake-up carries on, a second wait holds, and the real finish ends it done with its report', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000905'
+  const w = waiter(id, [prompt('s1', 'Build it.', side()), ...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')])
+  await w.stop('Waiting for the build.', [shellTask()])
+  appendFileSync(w.transcriptPath, line(enqueue(waitingNote(WAITER, 1000))))
+  hub.pollTranscripts()
+  // The command ended: its news is the input of the agent's next turn.
+  w.append(bgEnded(SHELL, 'tu-bg'))
+  agents.pollAgents()
+  assert.equal(w.me().status, 'running')
+  assert.notEqual(w.me().activity, WAITING)
+  await w.hookTool()
+  assert.equal(w.me().status, 'running')
+  assert.match(w.me().activity!, /^Bash/)
+  // A second wait, its second word in the main transcript: not a copy of the first.
+  w.append(...bgBash('tu-bg2', 'be6ot3sif'), endTurn('s3', 'Both suites are running; waiting for them.'))
+  await w.stop('Both suites are running; waiting for them.', [shellTask('be6ot3sif')])
+  appendFileSync(w.transcriptPath, line(enqueue(waitingNote(WAITER, 2000))))
+  hub.pollTranscripts()
+  assert.equal(w.me().status, 'running')
+  assert.equal(w.me().activity, WAITING)
+  w.append(bgEnded('be6ot3sif', 'tu-bg2'))
+  agents.pollAgents()
+  await w.hookTool()
+  // Its report: done at once, and the launcher's call with it.
+  w.append(handBack('s4', 'The build is green.'))
+  await w.stop('The build is green.', [])
+  assert.equal(w.me().status, 'done')
+  assert.equal(w.me().result, 'The build is green.')
+  assert.equal(w.me().activity, null)
+  assert.equal(hub.getSession(id)!.agentsRunning, 0)
+  // Its last notification gets through after the waiting ones, and says the same.
+  appendFileSync(w.transcriptPath, line(enqueue(finishedNote(WAITER, 3000))))
+  hub.pollTranscripts()
+  assert.equal(w.me().status, 'done')
+  assert.equal(w.me().result, 'The build is green.')
+  const call = hub.getSession(id)!.parse!.byId.get('toolu_w')
+  assert.ok(call?.kind === 'tool')
+  assert.equal(call.status, 'done')
+})
+
+test('the finish reported only by its last words, after a wait, is its report', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000906'
+  const w = waiter(id, [...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')])
+  await w.stop('Waiting for the build.', [shellTask()])
+  w.append(bgEnded(SHELL, 'tu-bg'), endTurn('s3', 'The build passed.'))
+  await w.stop('The build passed.', [])
+  assert.equal(w.me().status, 'done')
+  assert.equal(w.me().result, 'The build passed.')
+})
+
+test('no background command: SubagentStop ends it done at once, as before', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000907'
+  const w = waiter(id, [prompt('s1', 'Read it.', side()), endTurn('s2', 'It reads well.')])
+  await w.stop('It reads well.', [])
+  assert.equal(w.me().status, 'done')
+  assert.equal(w.me().result, 'It reads well.')
+  // An older Claude Code's stop, no list, ends it the same.
+  const other = 'eeeeeeee-0000-4000-8000-000000000908'
+  const v = waiter(other, [endTurn('s2', 'It reads well.')])
+  await v.stop('It reads well.')
+  assert.equal(v.me().status, 'done')
+})
+
+test('a command that ended, was killed or is gone from the hook\'s list holds nothing', async () => {
+  // Ended before the turn did: its news came mid-turn, as a queued command.
+  const a = waiter('eeeeeeee-0000-4000-8000-000000000909', [
+    ...bgBash('tu-bg'),
+    { type: 'attachment', uuid: 'q1', timestamp: at(), ...side(), attachment: { type: 'queued_command', commandMode: 'task-notification', prompt: bgEnded(SHELL, 'tu-bg').message.content } },
+    endTurn('s2', 'All built.'),
+  ])
+  await a.stop('All built.', [])
+  assert.equal(a.me().status, 'done')
+  assert.equal(a.me().result, 'All built.')
+
+  // Failed counts as ended: exit 143 is how a killed one reads.
+  const b = waiter('eeeeeeee-0000-4000-8000-000000000910', [
+    ...bgBash('tu-bg'),
+    { type: 'attachment', uuid: 'q1', timestamp: at(), ...side(), attachment: { type: 'queued_command', commandMode: 'task-notification', prompt: bgEnded(SHELL, 'tu-bg', 'failed', 'Background command "x" failed with exit code 143').message.content } },
+    endTurn('s2', 'It failed.'),
+  ])
+  await b.stop('It failed.')
+  assert.equal(b.me().status, 'done')
+
+  // TaskStop, with no notification to follow; also when it answers "not running".
+  const c = waiter('eeeeeeee-0000-4000-8000-000000000911', [
+    ...bgBash('tu-bg'),
+    assistant('s3', [toolUse('tu-stop', 'TaskStop', { task_id: SHELL })], side()),
+    result('s4', 'tu-stop', 'Stopped.', { message: `Successfully stopped task: ${SHELL}`, task_id: SHELL, task_type: 'local_bash', command: 'x' }, side()),
+    endTurn('s5', 'Stopped it, all done.'),
+  ])
+  await c.stop('Stopped it, all done.')
+  assert.equal(c.me().status, 'done')
+  const d = waiter('eeeeeeee-0000-4000-8000-000000000912', [
+    ...bgBash('tu-bg'),
+    assistant('s3', [toolUse('tu-stop', 'TaskStop', { task_id: SHELL })], side()),
+    failed('s4', 'tu-stop', `Task ${SHELL} is not running (status: completed)`),
+    endTurn('s5', 'Already over, all done.'),
+  ])
+  await d.stop('Already over, all done.')
+  assert.equal(d.me().status, 'done')
+
+  // A shell whose end never reached its file: the hook's list no longer names it.
+  const e = waiter('eeeeeeee-0000-4000-8000-000000000913', [...bgBash('tu-bg'), endTurn('s2', 'Here is my full report.')])
+  await e.stop('Here is my full report.', [shellTask('bother')])
+  assert.equal(e.me().status, 'done')
+  assert.equal(e.me().result, 'Here is my full report.')
+})
+
+test('a report handed back ends it, whatever it left running behind it', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000914'
+  const w = waiter(id, [...bgBash('tu-bg'), handBack('s2', 'Key screens are covered.')])
+  await w.stop('', [shellTask()])
+  assert.equal(w.me().status, 'done')
+  assert.equal(w.me().result, 'Key screens are covered.')
+  // Claude Code still calls it waiting, for the shell behind it: it stays ended.
+  appendFileSync(w.transcriptPath, line(enqueue(waitingNote(WAITER, 3520062, "This agent's report was delivered to you as a message from \"x\"."))))
+  hub.pollTranscripts()
+  assert.equal(w.me().status, 'done')
+  assert.equal(w.me().result, 'Key screens are covered.')
+
+  // Its hand-back reaches the file just after the hook: the next scan ends it.
+  const other = 'eeeeeeee-0000-4000-8000-000000000915'
+  const v = waiter(other, [...bgBash('tu-bg'), endTurn('s2', 'Handing it back.')])
+  await v.stop('Handing it back.', [shellTask()])
+  assert.equal(v.me().status, 'running')
+  v.append(handBack('s3', 'Late report.'))
+  agents.pollAgents()
+  assert.equal(v.me().status, 'done')
+  assert.equal(v.me().result, 'Late report.')
+})
+
+test('the cap: a wait with no writes ends, done with a report in hand or stopped without, and comes back if it wakes', async () => {
+  const old = (file: string, hours: number) => {
+    const t = new Date(Date.now() - hours * 3_600_000)
+    utimesSync(file, t, t)
+  }
+  // Under the cap it waits on, however long past the 10 minutes an idle file gets.
+  const under = waiter('eeeeeeee-0000-4000-8000-000000000933', [...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')])
+  await under.stop('Waiting for the build.', [shellTask()])
+  old(under.file, 1.9)
+  agents.pollAgents()
+  assert.equal(under.me().status, 'running')
+  assert.equal(under.me().activity, WAITING)
+  // Over it. Claude Code said it hasn't reported, and its words were about waiting: no report.
+  const id = 'eeeeeeee-0000-4000-8000-000000000916'
+  const w = waiter(id, [...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')])
+  await w.stop('Waiting for the build.', [shellTask()])
+  appendFileSync(w.transcriptPath, line(enqueue(waitingNote(WAITER, 1000))))
+  hub.pollTranscripts()
+  old(w.file, 2.1)
+  agents.pollAgents()
+  assert.equal(w.me().status, 'stopped')
+  assert.equal(w.me().result, null)
+  assert.equal(w.me().activity, null)
+  assert.equal(hub.getSession(id)!.agentsRunning, 0)
+  // One line in the log, once.
+  agents.pollAgents()
+  const logFile = join(process.env.HYPERNOVA_LOGS!, 'daemon.log')
+  const said = readFileSync(logFile, 'utf8').split('\n').filter((l) => l.includes(`waited past its cap`) && l.includes(id))
+  assert.equal(said.length, 1)
+  // It was only slow: its next hook brings it back.
+  await w.hookTool()
+  assert.equal(w.me().status, 'running')
+  assert.match(w.me().activity!, /^Bash/)
+
+  // Nobody said it hadn't reported (an older Claude Code): its last words stand as its report.
+  const other = 'eeeeeeee-0000-4000-8000-000000000917'
+  const v = waiter(other, [...bgBash('tu-bg'), endTurn('s2', 'The whole report, at length.')])
+  await v.stop('The whole report, at length.', [shellTask()])
+  old(v.file, 2.1)
+  agents.pollAgents()
+  assert.equal(v.me().status, 'done')
+  assert.equal(v.me().result, 'The whole report, at length.')
+})
+
+test('a long Monitor holds past the cap as long as it runs, a persistent one up to the most; an ended session ends it', async () => {
+  const old = (file: string, hours: number) => {
+    const t = new Date(Date.now() - hours * 3_600_000)
+    utimesSync(file, t, t)
+  }
+  const monitor = (uuid: string, r: object) => [
+    assistant(`as-${uuid}`, [toolUse(uuid, 'Monitor', { command: 'tail -f x', description: 'Watch', timeout_ms: 1 })], side()),
+    result(`ur-${uuid}`, uuid, 'Monitor started (task bqd8v7a31).', r, side()),
+  ]
+  const a = waiter('eeeeeeee-0000-4000-8000-000000000918', [...monitor('tu-m', { taskId: 'bqd8v7a31', timeoutMs: 1800000, persistent: true }), endTurn('s2', 'Watching.')])
+  await a.stop('Watching.', [shellTask('bqd8v7a31')])
+  assert.equal(a.me().activity, WAITING)
+  old(a.file, 11)
+  agents.pollAgents()
+  assert.equal(a.me().status, 'running')
+  const over = waiter('eeeeeeee-0000-4000-8000-000000000934', [...monitor('tu-m', { taskId: 'bqd8v7a31', timeoutMs: 1800000, persistent: true }), endTurn('s2', 'Watching.')])
+  await over.stop('Watching.', [shellTask('bqd8v7a31')])
+  old(over.file, 12.5)
+  agents.pollAgents()
+  assert.notEqual(over.me().status, 'running')
+
+  // A Monitor's event has no status of its own: it isn't its end. Its stream ending is.
+  const b = waiter('eeeeeeee-0000-4000-8000-000000000919', [...monitor('tu-m', { taskId: 'bqd8v7a31', timeoutMs: 1800000, persistent: false }), endTurn('s2', 'Watching.')])
+  await b.stop('Watching.', [shellTask('bqd8v7a31')])
+  b.append({ ...bgEnded('bqd8v7a31', 'tu-m'), message: { role: 'user', content: `${NOTICE}<task-notification>\n<task-id>bqd8v7a31</task-id>\n<summary>Monitor event: "Watch"</summary>\n<event>a line</event>\n</task-notification>` } }, endTurn('s3', 'Still watching.'))
+  await b.stop('Still watching.', [shellTask('bqd8v7a31')])
+  assert.equal(b.me().status, 'running')
+  b.append(bgEnded('bqd8v7a31', 'tu-m', 'completed', 'Monitor "Watch" stream ended'), endTurn('s4', 'It ended.'))
+  await b.stop('It ended.', [])
+  assert.equal(b.me().status, 'done')
+
+  // Its session's process gone: what it waited for went too.
+  const c = waiter('eeeeeeee-0000-4000-8000-000000000920', [...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')])
+  await c.stop('Waiting for the build.', [shellTask()])
+  agents.endSessionAgents('eeeeeeee-0000-4000-8000-000000000920')
+  assert.notEqual(c.me().status, 'running')
+})
+
+test('work of other kinds: a foreground command moved to the background, agents it started; a prompt only quoting a notification ends nothing', async () => {
+  const moved = waiter('eeeeeeee-0000-4000-8000-000000000921', [
+    assistant('s1', [toolUse('tu-fg', 'Bash', { command: 'npm test' })], side()),
+    result('s2', 'tu-fg', `Command was moved to the background (ID: ${SHELL}) after running for 180s.`, { ...shellResult(SHELL), timedOutAfterMs: 180000, subagentCapApplied: true }, side()),
+    endTurn('s3', 'Waiting for the tests.'),
+  ])
+  await moved.stop('Waiting for the tests.', [shellTask()])
+  assert.equal(moved.me().status, 'running')
+  assert.equal(moved.me().activity, WAITING)
+
+  // Agents it started: the hook's list doesn't name one that itself waits, so that isn't their end.
+  const child = 'a4444444444444444'
+  const nested = waiter('eeeeeeee-0000-4000-8000-000000000922', [
+    assistant('s1', [toolUse('tu-a', 'Agent', { description: 'Sub', prompt: 'x', subagent_type: 'fork' })], side()),
+    result('s2', 'tu-a', 'Async agent launched successfully.', { isAsync: true, status: 'async_launched', agentId: child, description: 'Sub', prompt: 'x', outputFile: '/tmp/x' }, side()),
+    endTurn('s3', 'Waiting for my agent.'),
+  ])
+  await nested.stop('Waiting for my agent.', [])
+  assert.equal(nested.me().status, 'running')
+  assert.equal(nested.me().activity, 'Waiting for the agents it started')
+  // Its child's own "waiting" isn't its end; its "finished" is.
+  nested.append({ ...bgEnded(child, 'tu-a'), message: { role: 'user', content: `${NOTICE}${waitingNote(child, 1000)}` } }, endTurn('s4', 'Still waiting.'))
+  await nested.stop('Still waiting.', [])
+  assert.equal(nested.me().status, 'running')
+  nested.append({ ...bgEnded(child, 'tu-a'), message: { role: 'user', content: `${NOTICE}${finishedNote(child, 2000)}` } }, endTurn('s5', 'All done.'))
+  await nested.stop('All done.', [])
+  assert.equal(nested.me().status, 'done')
+
+  // Several ended at once, in one line.
+  const two = waiter('eeeeeeee-0000-4000-8000-000000000923', [...bgBash('tu-1', 'bone'), ...bgBash('tu-2', 'btwo'), endTurn('s2', 'Waiting for both.')])
+  await two.stop('Waiting for both.', [shellTask('bone'), shellTask('btwo')])
+  assert.equal(two.me().activity, 'Waiting for its 2 background commands')
+  two.append({ ...bgEnded('bone', 'tu-1'), message: { role: 'user', content: bgEnded('bone', 'tu-1').message.content + '\n\n' + bgEnded('btwo', 'tu-2').message.content } }, endTurn('s3', 'Both passed.'))
+  await two.stop('Both passed.', [])
+  assert.equal(two.me().status, 'done')
+
+  // The owner's prompt quotes one (it has no origin and doesn't start with it): the shell still runs.
+  const quoted = waiter('eeeeeeee-0000-4000-8000-000000000924', [...bgBash('tu-bg'), prompt('s2', `Look at <task-notification><task-id>${SHELL}</task-id><status>completed</status></task-notification> in the docs.`, side()), endTurn('s3', 'Looked; waiting for the build.')])
+  await quoted.stop('Looked; waiting for the build.', [shellTask()])
+  assert.equal(quoted.me().status, 'running')
+})
+
+test('the main turn\'s Stop leaves a waiting agent be, while its shell is listed; once it is not, the agent ends', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000925'
+  const w = waiter(id, [...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')])
+  await w.stop('Waiting for the build.', [shellTask()])
+  appendFileSync(w.transcriptPath, line(enqueue(waitingNote(WAITER, 1000))))
+  hub.pollTranscripts()
+  // Claude Code counts a waiting agent as completed: only its shell is named.
+  await handleHook({ session_id: id, cwd: '/tmp/agents', hook_event_name: 'Stop', background_tasks: [shellTask()] }, {} as never, {} as never)
+  assert.equal(w.me().status, 'running')
+  assert.equal(w.me().activity, WAITING)
+  assert.equal(hub.getSession(id)!.agentsRunning, 1)
+  // An older Claude Code's Stop, no list: nothing changes.
+  await handleHook({ session_id: id, cwd: '/tmp/agents', hook_event_name: 'Stop' }, {} as never, {} as never)
+  assert.equal(w.me().status, 'running')
+  // Its shell gone and no wake-up: it has no more reason to wait, and no report.
+  await handleHook({ session_id: id, cwd: '/tmp/agents', hook_event_name: 'Stop', background_tasks: [] }, {} as never, {} as never)
+  assert.equal(w.me().status, 'stopped')
+  assert.equal(w.me().result, null)
+  assert.equal(hub.getSession(id)!.agentsRunning, 0)
+})
+
+test('a daemon restart mid-wait: read afresh it is still waiting; finished or reported, it is not', () => {
+  // A session first read now, with everything already written, is what a restart reads.
+  const fresh = (id: string, agentLines: object[], main: object[]) => {
+    const dir = join(scratch, 'claude', 'projects', '-tmp-agents')
+    const sub = join(dir, id, 'subagents')
+    mkdirSync(sub, { recursive: true })
+    writeMeta(sub, WAITER, { agentType: 'general-purpose', description: 'Build it', toolUseId: 'toolu_w' })
+    const file = join(sub, `agent-${WAITER}.jsonl`)
+    writeFileSync(file, agentLines.map(line).join(''))
+    const transcriptPath = join(dir, `${id}.jsonl`)
+    writeFileSync(transcriptPath, [...launchAgent('toolu_w', WAITER, 'Build it', 'general-purpose'), ...main].map(line).join(''))
+    const r = hub.upsertSession(id, { cwd: '/tmp/agents', transcriptPath, origin: 'terminal', state: 'working' })
+    hub.ensureParsed(r)
+    agents.pollAgents()
+    return { file, me: () => agents.listAgents(id).agents.find((a) => a.id === WAITER)! }
+  }
+  const mid = fresh('eeeeeeee-0000-4000-8000-000000000926', [prompt('s1', 'Build it.', side()), ...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.'), stopHookLine()], [enqueue(waitingNote(WAITER, 1000))])
+  assert.equal(mid.me().status, 'running')
+  assert.equal(mid.me().activity, WAITING)
+  assert.equal(hub.getSession('eeeeeeee-0000-4000-8000-000000000926')!.agentsRunning, 1)
+
+  // No word in the main transcript yet: its file is enough.
+  const fileOnly = fresh('eeeeeeee-0000-4000-8000-000000000927', [...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.')], [])
+  assert.equal(fileOnly.me().status, 'running')
+  assert.equal(fileOnly.me().activity, WAITING)
+
+  // Woken since the last word: at work, not waiting, its older word doesn't bring it back.
+  const awake = fresh('eeeeeeee-0000-4000-8000-000000000928', [...bgBash('tu-bg'), endTurn('s2', 'Waiting for the build.'), bgEnded(SHELL, 'tu-bg'), assistant('s3', [toolUse('tu-x', 'Read', { file_path: '/tmp/x.log' })], side())], [enqueue(waitingNote(WAITER, 1000))])
+  assert.equal(awake.me().status, 'running')
+  assert.notEqual(awake.me().activity, WAITING)
+
+  // Waited, woke, finished: the waits replayed don't hold it.
+  const over = fresh('eeeeeeee-0000-4000-8000-000000000929', [...bgBash('tu-bg'), endTurn('s2', 'Waiting.'), bgEnded(SHELL, 'tu-bg'), handBack('s3', 'All green.')], [enqueue(waitingNote(WAITER, 1000)), enqueue(finishedNote(WAITER, 2000))])
+  assert.equal(over.me().status, 'done')
+  assert.equal(over.me().result, 'All green.')
+
+  // Reported with a shell left behind, the word still "waiting": done, as soon as it's read.
+  const left = fresh('eeeeeeee-0000-4000-8000-000000000930', [...bgBash('tu-bg'), handBack('s2', 'Key screens are covered.')], [enqueue(waitingNote(WAITER, 1000, 'This agent\'s report was delivered to you as a message.'))])
+  assert.equal(left.me().status, 'done')
+  assert.equal(left.me().result, 'Key screens are covered.')
+
+  // Its file long still: over the cap by the time the daemon looks.
+  const id = 'eeeeeeee-0000-4000-8000-000000000931'
+  const dir = join(scratch, 'claude', 'projects', '-tmp-agents', id, 'subagents')
+  mkdirSync(dir, { recursive: true })
+  const stale = join(dir, `agent-${WAITER}.jsonl`)
+  writeFileSync(stale, [...bgBash('tu-bg'), endTurn('s2', 'Waiting.')].map(line).join(''))
+  const t = new Date(Date.now() - 3 * 3_600_000)
+  utimesSync(stale, t, t)
+  const gone = fresh(id, [...bgBash('tu-bg'), endTurn('s2', 'Waiting.')], [enqueue(waitingNote(WAITER, 1000))])
+  assert.equal(gone.me().status, 'running')
+  utimesSync(gone.file, t, t)
+  agents.pollAgents()
+  assert.equal(gone.me().status, 'stopped')
+})
+
+test('a hook from an agent with no meta file is left out, and logged once', async () => {
+  const id = 'eeeeeeee-0000-4000-8000-000000000932'
+  makeSession(id, [])
+  const helper = 'a5555555555555555'
+  for (let i = 0; i < 3; i++) await handleHook({ session_id: id, cwd: '/tmp/agents', hook_event_name: 'PreToolUse', agent_id: helper, agent_type: 'claude', tool_name: 'Read', tool_use_id: `h${i}`, tool_input: { file_path: '/tmp/x' } }, {} as never, {} as never)
+  assert.equal(agents.listAgents(id).agents.length, 0)
+  const lines = readFileSync(join(process.env.HYPERNOVA_LOGS!, 'daemon.log'), 'utf8').split('\n').filter((l) => l.includes('no meta file') && l.includes(helper))
+  assert.equal(lines.length, 1)
 })

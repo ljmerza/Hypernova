@@ -192,6 +192,13 @@ class StatusModelTest {
         assertFalse(alone.canStop)
     }
 
+    @Test fun anAgentsWaitingLineIsSaidAsItIs() {
+        // No colon, so it never reads as a tool's name: an older app shows the daemon's words too.
+        for (line in listOf("Waiting for its background command", "Waiting for its 2 background commands", "Waiting for the agents it started", "Waiting for its background work")) {
+            assertEquals(Say(SayKind.Raw, line), agentSay(line))
+        }
+    }
+
     private fun plain(id: String, type: String = "general-purpose", label: String = "Add routing helpers", activity: String? = "Edit: android/Servers.kt", status: String = "running", tokens: Long? = 81_200, workflowId: String? = null, startedAt: Long = 0) = WAgent(
         id = id, sessionId = "s", toolUseId = null, parentAgentId = null, workflowId = workflowId, phase = null, label = label,
         type = type, model = null, background = true, status = status, activity = activity,
