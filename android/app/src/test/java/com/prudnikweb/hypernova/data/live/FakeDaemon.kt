@@ -17,9 +17,9 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * A scripted daemon (docs/PROTOCOL.md) on plain HTTP: `GET /v1/health` for the router's probe,
  * `GET /v1/snapshot`, the `/v1/ws` socket, and whatever a test [on]s. Everything the phone asks is
- * kept in [requests]; everything it says on the socket in [received].
+ * kept in [requests]; everything it says on the socket in [received]. [port]: 0, any free one.
  */
-class FakeDaemon(val name: String = "z2") : AutoCloseable {
+class FakeDaemon(val name: String = "z2", port: Int = 0) : AutoCloseable {
     private val server = MockWebServer()
 
     /** A request the phone made. */
@@ -66,7 +66,8 @@ class FakeDaemon(val name: String = "z2") : AutoCloseable {
                 }
             }
         }
-        server.start()
+        // A fixed [port] only where a picture shows the address (0: any free one).
+        server.start(port)
     }
 
     private val listener = object : WebSocketListener() {
