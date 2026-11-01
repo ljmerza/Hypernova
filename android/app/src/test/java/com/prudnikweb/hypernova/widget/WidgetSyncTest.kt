@@ -258,6 +258,27 @@ class WidgetSyncTest {
         until("the buttons back") { row().answering == null }
     }
 
+    @Test fun claudeCodesOwnDialogIsAnsweredThroughItsMenuOnTheRowsComputer() {
+        // The contract's session waiting on Claude Code's permission dialog in its terminal.
+        val snap = JSONObject(javaClass.classLoader!!.getResource("fixtures/snapshot.json")!!.readText())
+        val dialog = (0 until snap.getJSONArray("sessions").length()).map { snap.getJSONArray("sessions").getJSONObject(it) }.single { it.getString("id") == "sess-dialog" }
+        // Open in a shared terminal (the contract's has none), so the widget can answer it there.
+        dialog.put("term", JSONObject().put("id", "term-1").put("mac", 0).put("phone", 0))
+        placed(listOf(dialog))
+        val r = row()
+        assertEquals(WidgetModel.Kind.Terminal, r.kind)
+        val menuId = dialog.getJSONObject("menu").getString("id")
+        assertEquals(menuId, r.askId)
+        z2.ok("POST", "/v1/sessions/sess-dialog/menu")
+        tap(Taps.answer(r, allow = false))
+        until("the answer") { z2.count("POST", "/v1/sessions/sess-dialog/menu") == 1 }
+        val b = z2.calls("POST", "/v1/sessions/sess-dialog/menu").single().json
+        assertEquals(menuId, b.getString("menuId"))
+        assertEquals(r.denyChoice, b.getInt("choice"))
+        assertTrue(r.denyChoice >= 0)
+        assertEquals(0, z2.count("POST", "/v1/approvals/$menuId"))
+    }
+
     @Test fun onALockedPhoneATapOpensTheSessionAndAnswersNothing() {
         placed(listOf(session("s1", state = "needs_you")), listOf(approval("a1", "s1")))
         shadowOf(app.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(true)
