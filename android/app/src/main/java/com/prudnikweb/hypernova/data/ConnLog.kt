@@ -265,6 +265,10 @@ object ConnLog {
     /** Newest first. */
     fun entries(): List<ConnEntry> = ring.newestFirst()
 
+    /** A screen test's clean start: the log is one for the whole process, and the tests before it wrote in it. */
+    @androidx.annotation.VisibleForTesting
+    internal fun clear() = ring.clear()
+
     private fun bump() {
         val h = main ?: return
         if (!bumpPosted.compareAndSet(false, true)) return

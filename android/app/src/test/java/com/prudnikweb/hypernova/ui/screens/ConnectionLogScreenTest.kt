@@ -31,7 +31,10 @@ class ConnectionLogScreenTest {
     private val spy = AppSpy()
     private var backs = 0
 
-    @Before fun setUp() = resetPrefs()
+    @Before fun setUp() {
+        resetPrefs()
+        ConnLog.clear()
+    }
 
     /** A round two and a half minutes ago: every line says "2m" however slowly the test runs. */
     private fun round(t0: Long) {
