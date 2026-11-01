@@ -221,6 +221,20 @@ class NotifyActionsTest {
         assertEquals(0, z2.count("POST", answerPath))
     }
 
+    @Test fun aFailedServerUpdateOpensThatServersSettings_andGoesOnceItsFine() {
+        val notice = Notice(com.prudnikweb.hypernova.data.SERVER_UPDATE_NOTICE, Notice.Kind.ServerUpdateFailed, null, "z2", "Couldn't update to 0.14.0.")
+        Core.notifier.notice(notice, server = server)
+        val id = ("session:" + (if (server == com.prudnikweb.hypernova.data.Servers.LEGACY_ID) notice.id else "$server:${notice.id}")).hashCode()
+        val n = nm.getNotification(id)!!
+        val sent = shadowOf(n.contentIntent).savedIntent
+        assertEquals(com.prudnikweb.hypernova.MainActivity.ACTION_SERVER_UPDATE, sent.action)
+        assertEquals(server, sent.getStringExtra(com.prudnikweb.hypernova.MainActivity.EXTRA_SERVER))
+        assertEquals("z2", n.extras.getString(android.app.Notification.EXTRA_TITLE))
+        assertEquals("nothing to press: it says what happened", 0, n.actions?.size ?: 0)
+        Core.notifier.cancelServerUpdate(server)
+        org.junit.Assert.assertNull(nm.getNotification(id))
+    }
+
     @Test fun backpacksNoticeOffersTwoHoursMoreWithoutOpeningTheApp() {
         Core.notifier.notice(Notice("backpack-ending", Notice.Kind.Backpack, null, "z2", "Backpack ends in 9 minutes", action = Notice.ACTION_EXTEND), server = server)
         val id = ("session:" + (if (server == com.prudnikweb.hypernova.data.Servers.LEGACY_ID) "backpack-ending" else "$server:backpack-ending")).hashCode()

@@ -44,6 +44,17 @@ class ServerUpdateTest {
         assertNull(ServerUpdate.parse(JSONObject("""{"auto":true,"available":true,"last":{"from":"","to":"0.9.0"}}"""))!!.last)
     }
 
+    @Test fun aFailureSaysWhatAndWhatNext_anOlderDaemonSaysNothing() {
+        val u = ServerUpdate.parse(JSONObject("""{"auto":true,"available":true,"state":"idle","failure":{"tag":"v0.9.0","why":"it broke","at":5,"next":9}}"""))!!
+        assertEquals(ServerUpdate.Failure("v0.9.0", "it broke", 5L, 9L), u.failure)
+        assertEquals("0.9.0", u.failure!!.version)
+        val final = ServerUpdate.parse(JSONObject("""{"auto":true,"available":true,"state":"idle","failure":{"tag":"v0.9.0","why":null,"at":null,"next":null}}"""))!!
+        assertNull(final.failure!!.next)
+        assertNull(final.failure!!.why)
+        assertNull(ServerUpdate.parse(JSONObject("""{"auto":true,"available":true,"state":"idle"}"""))!!.failure)
+        assertNull(ServerUpdate.parse(JSONObject("""{"auto":true,"available":true,"state":"idle","failure":{"tag":""}}"""))!!.failure)
+    }
+
     @Test fun aVersionChangeIsALogLine() {
         assertEquals("the server updated: 0.8.0 → 0.9.0", ServerUpdate.versionChange("0.8.0", "0.9.0"))
         assertNull(ServerUpdate.versionChange("0.9.0", "0.9.0"))

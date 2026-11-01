@@ -148,6 +148,14 @@ class ContractTest {
             assertTrue(u.reason!!.isNotBlank())
             assertEquals(ServerUpdate.IDLE, u.state)
             assertNull(u.last)
+            assertNull(u.failure)
+        },
+        "ws-update-failed" to { o ->
+            val f = ServerUpdate.parse(ws(o, "update").obj("update"))!!.failure!!
+            assertEquals("v0.9.0", f.tag)
+            assertEquals("the new daemon didn’t answer, so the old one is back; still 0.5.0", f.why)
+            assertEquals(T, f.at)
+            assertEquals(T + 3600_000L, f.next)
         },
         "ws-lan" to { o ->
             val lan = LanInfo.parse(ws(o, "lan").obj("lan"))!!

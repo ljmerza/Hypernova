@@ -157,6 +157,12 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
     /** Home shows every paired computer together (the switcher's "All servers", two or more paired). */
     val allServers: Boolean get() = Core.all
 
+    /** Settings, at [server]'s own section (a notification's tap; null: the one on screen). */
+    fun openServerSettings(server: String?) {
+        nav.reset()
+        com.prudnikweb.hypernova.ui.settings.SettingsJump.show(com.prudnikweb.hypernova.ui.settings.SettingsJump.SERVER, server ?: Core.activeId)
+    }
+
     /** The switcher's "All servers". */
     fun showAll() {
         if (Core.all) return

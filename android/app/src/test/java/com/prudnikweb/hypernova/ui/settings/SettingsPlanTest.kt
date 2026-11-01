@@ -69,6 +69,10 @@ class SettingsPlanTest {
     @Test fun keysForAJump() {
         assertEquals("files", SettingsPlan.keyOf(SettingsJump.FILES, "z2", all = false))
         assertEquals("files:z2", SettingsPlan.keyOf(SettingsJump.FILES, "z2", all = true))
+        // A failed update jumps to the server's card, which has another key with All servers.
+        assertEquals("mac", SettingsPlan.jumpKey(SettingsJump.SERVER, "z2", all = false))
+        assertEquals("server:z2", SettingsPlan.jumpKey(SettingsJump.SERVER, "z2", all = true))
+        assertEquals("files:z2", SettingsPlan.jumpKey(SettingsJump.FILES, "z2", all = true))
         assertTrue("files:z2" in keys(true, listOf(z2, shed)))
     }
 }

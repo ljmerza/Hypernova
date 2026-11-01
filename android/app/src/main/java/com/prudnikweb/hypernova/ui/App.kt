@@ -500,6 +500,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                             n.kind == Notice.Kind.Update -> hub?.appUpdate?.let { com.prudnikweb.hypernova.data.AppUpdater.start(context, it) }
                             // Backpack ending: the button is the point; the banner itself just goes.
                             n.kind == Notice.Kind.Backpack -> Unit
+                            // A server's update that failed: its section of Settings says what and what next.
+                            n.kind == Notice.Kind.ServerUpdateFailed -> opener.settings(com.prudnikweb.hypernova.ui.settings.SettingsJump.SERVER)
                             // A limit or a sign-out: Home's account card says why and what to do.
                             n.kind == Notice.Kind.Limit || n.kind == Notice.Kind.Account -> {
                                 sheet = false

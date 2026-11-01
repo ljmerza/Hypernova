@@ -17,8 +17,8 @@ import kotlinx.coroutines.launch
 
 /**
  * The server section's **Update this server automatically** (docs/PROTOCOL.md, "The server's own
- * update"; owner, 2026-10-31): off unless turned on. Its line says what it does, or why this install
- * can't (a checkout, a container), what it is doing now, and the last update it installed.
+ * update"; owner, 2026-10-31): on unless turned off. Its line says what it does, or why this install
+ * can't (a checkout, a container), what it is doing now or what failed, and the last update it installed.
  */
 @Composable
 internal fun AutoUpdateRow(hub: Hub, update: ServerUpdate) {
@@ -41,6 +41,7 @@ internal fun autoUpdateLine(context: android.content.Context, u: ServerUpdate): 
     val now = when {
         u.state == ServerUpdate.INSTALLING && u.target != null -> context.getString(R.string.su_installing, u.target)
         u.state == ServerUpdate.WAITING && u.target != null -> context.getString(R.string.su_waiting, u.target)
+        u.failure != null -> com.prudnikweb.hypernova.data.serverUpdateFailedText(context.resources, u.failure)
         !u.available && u.reason != null -> context.getString(R.string.su_unavailable, u.reason)
         else -> context.getString(R.string.su_desc)
     }

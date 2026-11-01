@@ -147,9 +147,20 @@ class MacOnlyScreensTest {
     @Test fun theServersOwnUpdateSaysWhyNotAndWhatItIsDoing() {
         assertEquals(str(R.string.su_unavailable, "a git checkout"), autoUpdateLine(context, ServerUpdate(auto = false, available = false, reason = "a git checkout")))
         assertEquals(str(R.string.su_installing, "v0.43.0"), autoUpdateLine(context, ServerUpdate(auto = true, available = true, state = ServerUpdate.INSTALLING, target = "v0.43.0")))
+        // A daemon from before it stopped waiting.
         assertEquals(str(R.string.su_waiting, "v0.43.0"), autoUpdateLine(context, ServerUpdate(auto = true, available = true, state = ServerUpdate.WAITING, target = "v0.43.0")))
+        val failed = autoUpdateLine(context, ServerUpdate(auto = true, available = true, failure = ServerUpdate.Failure("v0.43.0", "the install stopped", 1L, 2L)))
+        assertEquals(str(R.string.su_failed_why, "0.43.0", "the install stopped") + " " + str(R.string.su_failed_again), failed)
+        val gaveUp = autoUpdateLine(context, ServerUpdate(auto = true, available = true, failure = ServerUpdate.Failure("v0.43.0", null, 1L, null)))
+        assertEquals(str(R.string.su_failed, "0.43.0") + " " + str(R.string.su_failed_final), gaveUp)
         val last = autoUpdateLine(context, ServerUpdate(auto = true, available = true, last = ServerUpdate.Last("v0.42.0", "v0.43.0", System.currentTimeMillis() - 3_600_000)))
         assertTrue(last, last.startsWith(str(R.string.su_desc) + "\n") && "v0.43.0" in last && "v0.42.0" in last)
+    }
+
+    @Test fun aFailedUpdateIsOnTheRow() {
+        autoUpdate(ServerHub(), ServerUpdate(auto = true, available = true, failure = ServerUpdate.Failure("v0.43.0", "the new daemon didn’t answer, so the old one is back; still 0.42.0", 1L, 2L)))
+        rule.onNodeWithText(str(R.string.su_failed_again), substring = true).assertExists()
+        rule.snap("settings_auto_update_failed")
     }
 
     @Test fun aRefusedSwitchIsSaid() {

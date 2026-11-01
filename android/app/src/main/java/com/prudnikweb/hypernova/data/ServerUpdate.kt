@@ -15,17 +15,26 @@ data class ServerUpdate(
     /** This install can update itself; else [reason] says why not. */
     val available: Boolean,
     val reason: String? = null,
-    /** [IDLE], [WAITING] (downloaded, for a quiet moment) or [INSTALLING], with the release's tag in [target]. */
+    /** [IDLE] or [INSTALLING], with the release's tag in [target]; [WAITING] from an older daemon only. */
     val state: String = IDLE,
     val target: String? = null,
     /** The last update the server installed by itself. */
     val last: Last? = null,
+    /** The last try failed and the server still runs the older version; null otherwise, and from an older daemon. */
+    val failure: Failure? = null,
 ) {
     @Immutable
     data class Last(val from: String, val to: String, val at: Long)
 
+    /** [next]: when it tries that release again, null when it won't. */
+    @Immutable
+    data class Failure(val tag: String, val why: String?, val at: Long?, val next: Long?) {
+        val version: String get() = tag.removePrefix("v")
+    }
+
     companion object {
         const val IDLE = "idle"
+        /** From a daemon before 2026-11-01 only: downloaded, waiting for a quiet moment. Today's installs at once. */
         const val WAITING = "waiting"
         const val INSTALLING = "installing"
 
@@ -45,6 +54,9 @@ data class ServerUpdate(
                 state = state,
                 target = if (state == IDLE) null else o.str("target")?.takeIf { it.isNotBlank() },
                 last = last,
+                failure = o.obj("failure")?.let { f ->
+                    f.str("tag")?.takeIf { it.isNotBlank() }?.let { Failure(it, f.str("why")?.takeIf { w -> w.isNotBlank() }, f.long("at"), f.long("next")) }
+                },
             )
         }
 

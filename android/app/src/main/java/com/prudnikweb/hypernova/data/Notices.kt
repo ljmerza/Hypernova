@@ -28,7 +28,7 @@ data class Notice(
      * [Limit]: Claude rests at a usage limit (calm, it carries on by itself). [Account]: the
      * account needs the owner (signed out, no plan, out of credits, on hold). One per episode.
      */
-    enum class Kind { Approval, Question, Plan, Waiting, Finished, Error, Update, Limit, Account, Backpack, Automation }
+    enum class Kind { Approval, Question, Plan, Waiting, Finished, Error, Update, Limit, Account, Backpack, Automation, ServerUpdateFailed }
 
     companion object {
         const val ACTION_EXTEND = "extend"
@@ -80,6 +80,34 @@ fun updateNotice(context: Context, u: AppUpdate) = Notice(
     context.getString(R.string.update_title),
     context.getString(R.string.update_body, u.versionName),
 )
+
+/** The id of a server's update-failed notice: one per server, its next taking its place. */
+const val SERVER_UPDATE_NOTICE = "server-update-failed"
+
+/**
+ * True the first time it's asked about this failure of [server]'s update (remembered on the phone,
+ * per server). Said once when a release first fails, and once more when the server gives up on it:
+ * the tries between would say the same again, up to a day apart.
+ */
+fun serverUpdateFailNoticed(context: Context, server: String, f: ServerUpdate.Failure): Boolean {
+    val prefs = context.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
+    val key = Servers.scoped("serverUpdateFailNoticed", server)
+    val episode = "${f.tag}:${f.next == null}"
+    if (prefs.getString(key, null) == episode) return false
+    prefs.edit().putString(key, episode).apply()
+    return true
+}
+
+/** "z2 · Couldn't update to 0.14.0: why. It tries again by itself." */
+fun serverUpdateFailedNotice(res: android.content.res.Resources, macName: String, f: ServerUpdate.Failure) = Notice(
+    SERVER_UPDATE_NOTICE, Notice.Kind.ServerUpdateFailed, null, macName, serverUpdateFailedText(res, f),
+)
+
+/** What failed and what happens next: the notice's text and Settings' line. */
+fun serverUpdateFailedText(res: android.content.res.Resources, f: ServerUpdate.Failure): String {
+    val what = if (f.why != null) res.getString(R.string.su_failed_why, f.version, f.why.trimEnd('.')) else res.getString(R.string.su_failed, f.version)
+    return what + " " + res.getString(if (f.next == null) R.string.su_failed_final else R.string.su_failed_again)
+}
 
 /** A web page (claude.ai's usage or billing, the sign-in page) in the phone's browser. */
 fun openLink(context: Context, url: String) {

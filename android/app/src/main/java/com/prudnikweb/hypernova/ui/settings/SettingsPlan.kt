@@ -62,6 +62,9 @@ object SettingsPlan {
     /** A server part's key: the part's own with one server, the part's and the server's with All servers. */
     fun keyOf(part: String, server: String, all: Boolean): String = if (all) "$part:$server" else part
 
+    /** The list item [SettingsJump] asked for: as [keyOf], but the server's card has a key of its own with All servers. */
+    fun jumpKey(part: String, server: String, all: Boolean): String = keyOf(if (all && part == SettingsJump.SERVER) "server" else part, server, all)
+
     /**
      * The parts in order. [all]: "All servers" is on, [servers] every paired one in the order they
      * were paired; otherwise [servers] is the one on screen (empty: none paired). [testing]: the
