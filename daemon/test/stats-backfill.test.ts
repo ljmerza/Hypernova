@@ -36,6 +36,7 @@ writeFileSync(join(dir, `${sid}.jsonl`), [
 
 const row = (date: string, sessionCount: number, toolCallCount: number, messageCount = 100) => ({ date, sessionCount, toolCallCount, messageCount })
 const tok = (date: string, ...each: number[]) => ({ date, tokensByModel: Object.fromEntries(each.map((n, i) => [`model-${i}`, n])) })
+const STATS_JSON = join(scratch, 'support', 'stats.json')
 const file = {
   version: 5, lastComputedDate: '2026-10-16', dailyModelTokensVersion: 5, firstSessionDate: '2025-12-30T02:48:03.853Z',
   totalSessions: 99_999, totalMessages: 99_999, hourCounts: { 0: 1 }, modelUsage: { 'secret-model': { inputTokens: 1 } },
@@ -54,7 +55,17 @@ const file = {
 }
 const put = (o: unknown) => writeFileSync(CACHE, typeof o === 'string' ? o : JSON.stringify(o))
 const ask = (range: 'today' | 'week' | 'month' | 'ytd' | 'all', now = NOW) => stats.getStats(range, now, { fresh: true })
-beforeEach(() => put(file))
+const restart = () => {
+  stats.flushStatsForTest()
+  stats.reloadStatsForTest()
+}
+// Each test starts with nothing kept: what one read would otherwise stay for the next.
+beforeEach(() => {
+  stats.flushStatsForTest()
+  rmSync(STATS_JSON, { force: true })
+  stats.reloadStatsForTest()
+  put(file)
+})
 
 test('All: only the days before Hypernova\'s first, added up day by day, apart from its own totals', async () => {
   const s = await ask('all')
@@ -63,8 +74,6 @@ test('All: only the days before Hypernova\'s first, added up day by day, apart f
     hoursSince: midnight('2026-09-24'),
     sessions: 1000 + 1 + 2 + 3 + 4,
     toolCalls: 10000 + 10 + 20 + 30 + 40,
-    tokens: 150 + 1000 + 2000,
-    tokensSince: midnight('2026-07-12'),
   })
   // The file's own totals aren't used; every top-level number is Hypernova's, so an older app reads what it did.
   assert.equal(s.sessions, 1)
@@ -78,7 +87,6 @@ test('a day partly counted is Hypernova\'s whole, and so is every day after it',
   const { backfill: b } = await ask('all')
   // Nothing from 24 and 25 September or 14 October, though the file has far more for them.
   assert.equal(b!.sessions, 1010)
-  assert.equal(b!.tokens, 3150)
 })
 
 test('what\'s in hours has no older days to claim: busiest day, longest session, streak, projects', async () => {
@@ -96,7 +104,6 @@ test('YTD: January 1 cuts the older days too', async () => {
   assert.equal(s.from, midnight('2026-01-01'))
   assert.equal(s.backfill?.sessions, 1 + 2 + 3 + 4)
   assert.equal(s.backfill?.toolCalls, 10 + 20 + 30 + 40)
-  assert.equal(s.backfill?.tokensSince, midnight('2026-07-12'))
   // Next year none of them are in it.
   assert.equal((await ask('ytd', Date.parse('2027-01-05T12:00:00Z'))).backfill, undefined)
 })
@@ -106,10 +113,8 @@ test('Today and Week have nothing to add; Month only the days the file alone kno
   assert.equal((await ask('week')).backfill, undefined)
   const m = await ask('month')
   assert.equal(m.backfill?.sessions, 3 + 4)
-  assert.equal(m.backfill?.tokens, 3000)
-  assert.equal(m.backfill?.tokensSince, midnight('2026-09-20'))
   const day = m.days.find((d) => d.day === '2026-09-20')!
-  assert.deepEqual([day.claudeMs, day.sessions, day.tokens, day.prompts], [0, 3, 1000, 0])
+  assert.deepEqual([day.claudeMs, day.sessions, day.tokens, day.prompts], [0, 3, 0, 0])
   // A day of Hypernova's keeps its own numbers.
   assert.equal(m.days.find((d) => d.day === '2026-10-14')!.sessions, 0)
   assert.equal(m.days.filter((d) => d.claudeMs > 0).length, 1)
@@ -123,19 +128,21 @@ test('with no day of Hypernova\'s yet, the file\'s are all there is, and it neve
   assert.equal(s.backfill?.sessions, 1000 + 1 + 2 + 3 + 4)
 })
 
-test('without tokens the days still stand; tokens without activity are still that day\'s', async () => {
+test('the file\'s tokens are never read: not sent, not added, and whatever they look like the days stand', async () => {
+  const s = await ask('all')
+  assert.equal(s.tokens.input + s.tokens.output, 2)
+  assert.deepEqual(Object.keys(s.backfill!).sort(), ['hoursSince', 'sessions', 'since', 'toolCalls'])
   const { dailyModelTokens: _, ...noTokens } = file
-  put(noTokens)
-  const a = await ask('all')
-  assert.equal(a.backfill?.sessions, 1010)
-  assert.equal(a.backfill?.tokens, 0)
-  assert.equal(a.backfill?.tokensSince, null)
-  put({ ...file, dailyModelTokensVersion: 99 })
-  assert.equal((await ask('all')).backfill?.tokensSince, null)
-  put({ ...file, dailyModelTokens: [{ date: '2026-07-12', tokensByModel: { a: 'many' } }] })
-  assert.equal((await ask('all')).backfill?.tokens, 0)
-  put({ ...file, dailyModelTokens: [tok('2026-02-02', 7)] })
-  assert.equal((await ask('all')).backfill?.tokens, 7)
+  for (const other of [noTokens, { ...file, dailyModelTokensVersion: 99 }, { ...file, dailyModelTokens: [{ date: '2026-07-12', tokensByModel: { a: 'many' } }] }]) {
+    put(other)
+    assert.equal((await ask('all')).backfill?.sessions, 1010)
+  }
+  // A day with tokens and no activity is no older day.
+  stats.flushStatsForTest()
+  rmSync(STATS_JSON)
+  stats.reloadStatsForTest()
+  put({ ...file, dailyActivity: [row('2026-07-12', 2, 20)], dailyModelTokens: [tok('2026-02-02', 7)] })
+  assert.equal((await ask('all')).backfill?.since, midnight('2026-07-12'))
 })
 
 test('a missing, unknown or changed file is no older days, said once, and the answer is as ever', async () => {
@@ -160,6 +167,110 @@ test('only counts leave, and the file stays as it was', async () => {
   for (const never of ['the-longest-session-id', 'secret-model', 'firstSessionDate', 'hourCounts', 'modelUsage']) assert.ok(!said.includes(never), never)
   assert.equal(readFileSync(CACHE, 'utf8'), text)
   assert.equal(statSync(CACHE).mtimeMs, at)
+  // Nor is more than the counts kept.
+  stats.flushStatsForTest()
+  const kept = readFileSync(STATS_JSON, 'utf8')
+  for (const never of ['the-longest-session-id', 'secret-model', 'firstSessionDate', 'hourCounts', 'modelUsage', 'messageCount', 'model-0']) assert.ok(!kept.includes(never), never)
+  assert.deepEqual(JSON.parse(kept).backfillDays['2026-07-12'], { sessions: 2, toolCalls: 20 })
+  // Hypernova's own days stay apart from them.
+  assert.equal(JSON.parse(kept).days['2025-12-30'], undefined)
+})
+
+test('the file gone after a first read: the older days are still there', async () => {
+  const first = await ask('all')
+  assert.equal(first.backfill?.sessions, 1010)
+  rmSync(CACHE)
+  assert.deepEqual((await ask('all')).backfill, first.backfill)
+  assert.deepEqual((await ask('ytd')).backfill?.sessions, 1 + 2 + 3 + 4)
+})
+
+test('a file gone bad keeps what was kept, and adds nothing', async () => {
+  const first = await ask('all')
+  for (const bad of ['{ not json', { ...file, version: 6 }, { ...file, dailyActivity: [row('January', 1, 1)] }, { ...file, dailyActivity: [row('2026-02-02', 9, 9), { date: '2026-02-03' }] }]) {
+    put(bad)
+    assert.deepEqual((await ask('all')).backfill, first.backfill, JSON.stringify(bad).slice(0, 60))
+  }
+})
+
+test('new days are added; a day kept stays as it is when the file loses it or says otherwise', async () => {
+  const first = await ask('all')
+  put({ ...file, dailyActivity: [row('2026-01-01', 99, 990), row('2026-02-02', 7, 70)] })
+  const s = await ask('all')
+  // 1 January as first read, 2 February new, and those the file no longer has still there.
+  assert.equal(s.backfill?.sessions, first.backfill!.sessions + 7)
+  assert.equal(s.backfill?.toolCalls, first.backfill!.toolCalls + 70)
+  assert.equal(s.backfill?.since, midnight('2025-12-30'))
+  put({ ...file, dailyActivity: [row('2025-11-11', 5, 50)] })
+  assert.equal((await ask('all')).backfill?.since, midnight('2025-11-11'))
+})
+
+test('a restart keeps them', async () => {
+  const first = await ask('all')
+  restart()
+  rmSync(CACHE)
+  assert.deepEqual((await ask('all')).backfill, first.backfill)
+  assert.equal(JSON.parse(readFileSync(STATS_JSON, 'utf8')).backfillDays['2025-12-30'].sessions, 1000)
+})
+
+test('a day kept that Hypernova then counts itself is Hypernova\'s: nothing counted twice', async () => {
+  const before = await ask('all')
+  assert.equal(before.sessions, 1)
+  // Its transcript turns up: 20 September, which is kept with 3 sessions, is now the first counted.
+  const late = '22222222-2222-4222-8222-222222222222'
+  const path = join(dir, `${late}.jsonl`)
+  const b = { cwd: '/home/me/work', sessionId: late }
+  writeFileSync(path, [
+    { ...b, type: 'user', uuid: 'lp', timestamp: '2026-09-20T09:00:00Z', message: { role: 'user', content: 'Work' } },
+    { ...b, type: 'assistant', uuid: 'lr', timestamp: '2026-09-20T09:05:00Z', message: { id: 'lm', role: 'assistant', model: 'claude-test', content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } },
+  ].map((l) => JSON.stringify(l) + '\n').join(''))
+  try {
+    const s = await ask('all')
+    assert.equal(s.since, midnight('2026-09-20'))
+    assert.equal(s.sessions, 2)
+    assert.equal(s.backfill?.sessions, 1000 + 1 + 2)
+    assert.equal(s.backfill?.hoursSince, midnight('2026-09-20'))
+    assert.equal(s.days.find((d) => d.day === '2026-09-20')!.sessions, 1)
+  } finally {
+    rmSync(path)
+    stats.resetStatsForTest()
+  }
+})
+
+test('an older stats.json, without any kept, still loads and keeps all it had', async () => {
+  stats.flushStatsForTest()
+  const counted = 1_700_000_000_000
+  writeFileSync(STATS_JSON, JSON.stringify({ v: 1, countingSince: counted, counts: { '2026-09-24': { phone: 2 } }, limits: [], days: {}, longest: null }))
+  stats.reloadStatsForTest()
+  rmSync(CACHE)
+  const none = await ask('all')
+  assert.equal(none.countingSince, counted)
+  assert.equal(none.promptsFrom.phone, 2)
+  assert.equal(none.backfill, undefined)
+  put(file)
+  assert.equal((await ask('all')).backfill?.sessions, 1010)
+  assert.equal((await ask('all')).countingSince, counted)
+})
+
+test('a day with only messages still says when it began and adds nothing; an empty one isn\'t kept', async () => {
+  put({ ...file, dailyActivity: [row('2025-11-11', 0, 0, 5), row('2025-11-12', 0, 0, 0), row('2026-07-12', 2, 20)] })
+  const s = await ask('all')
+  assert.equal(s.backfill?.since, midnight('2025-11-11'))
+  assert.equal(s.backfill?.sessions, 2)
+  stats.flushStatsForTest()
+  const kept = JSON.parse(readFileSync(STATS_JSON, 'utf8')).backfillDays
+  assert.deepEqual(kept['2025-11-11'], { sessions: 0, toolCalls: 0 })
+  assert.equal(kept['2025-11-12'], undefined)
+})
+
+test('the daemon\'s own looks keep them too, with nobody opening the statistics', async () => {
+  stats.startStats(1, 2_000_000_000)
+  let kept: Record<string, unknown> | undefined
+  for (let i = 0; i < 200 && !kept; i++) {
+    await new Promise((r) => setTimeout(r, 25))
+    stats.flushStatsForTest()
+    try { kept = JSON.parse(readFileSync(STATS_JSON, 'utf8')).backfillDays['2025-12-30'] } catch { /* not written yet */ }
+  }
+  assert.deepEqual(kept, { sessions: 1000, toolCalls: 10000 })
 })
 
 test('the parser, on its own: sorted, and the reason when it says no', () => {

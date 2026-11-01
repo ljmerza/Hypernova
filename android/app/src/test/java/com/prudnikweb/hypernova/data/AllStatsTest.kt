@@ -130,25 +130,20 @@ class AllStatsTest {
     }
 
     @Test fun olderDaysTakeTheEarliestStartAndTheHoursLineFollowsEachServer() {
-        val z2 = stats(since = 100L, tokens = StatTokens(1, 2, 3, 4, unsplit = 90L)).copy(hoursSince = 500L, tokensSince = 300L)
-        val gym = stats(since = 700L, tokens = StatTokens(1, 1, 1, 1, unsplit = 10L)).copy(hoursSince = 900L, tokensSince = null)
+        val z2 = stats(since = 100L, tokens = StatTokens(1, 2, 3, 4)).copy(hoursSince = 500L)
+        val gym = stats(since = 700L, tokens = StatTokens(1, 1, 1, 1)).copy(hoursSince = 900L)
         val c = AllStats.combine(listOf(z2, gym))!!
         assertEquals(100L, c.since)
         assertEquals(500L, c.hoursSince)
-        assertEquals(300L, c.tokensSince)
-        assertEquals(10L + 4L + 100L, c.tokens.total)
-        assertEquals(100L, c.tokens.unsplit)
+        assertEquals(10L + 4L, c.tokens.total)
         // An older server has no older days: it adds none, and its hours start with it.
         val old = stats(since = 400L)
         val d = AllStats.combine(listOf(z2, old))!!
         assertEquals(100L, d.since)
         assertEquals(400L, d.hoursSince)
-        assertEquals(300L, d.tokensSince)
-        assertEquals(90L, d.tokens.unsplit)
         // None has any: no line to say.
         val e = AllStats.combine(listOf(old, stats(since = 200L)))!!
         assertNull(e.hoursSince)
-        assertNull(e.tokensSince)
     }
 
     @Test fun serversADayApartKeepThirtyDays() {

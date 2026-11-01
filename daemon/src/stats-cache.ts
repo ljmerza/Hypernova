@@ -1,27 +1,27 @@
 // Claude Code's own summary of past days (<claude>/stats-cache.json), read and never written, for
 // the days from before Hypernova counted anything (docs/PROTOCOL.md, "Statistics", "Older days").
 // Its transcripts go after 30 days by default, but this file goes further back. It has counts per
-// day and nothing else that leaves here: its longest session and its models stay in the file.
+// day and nothing else that leaves here: its tokens (2.2 times Hypernova's on the days both cover,
+// docs/DECISIONS.md), its longest session and its models stay in the file. What it has is copied
+// into stats.json (stats.ts, keptOlderDays), so losing the file later loses nothing.
 //
-// The file isn't a contract: any version or shape other than the one known means no older days,
-// said once in the log, and the numbers are Hypernova's own as ever.
+// The file isn't a contract: any version or shape other than the one known means nothing new from
+// it, said once in the log, and the numbers are Hypernova's own as ever.
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CLAUDE_DIR, log } from './util.ts'
 
 const FILE = join(CLAUDE_DIR, 'stats-cache.json')
-/** The one shape read so far: `version` and `dailyModelTokensVersion` both 5. */
+/** The one shape read so far: `version` 5. */
 const KNOWN_VERSION = 5
 /** It's tens of KB; anything like this size is something else. */
 const MAX_BYTES = 16 * 1024 * 1024
 
 /**
- * One day as the file has it. [tokens]: every kind added up, cache reads too (the file doesn't split
- * them by day), null before it started keeping them. [messages] only says the day had activity:
- * it counts every message of a conversation, tens of times the prompts the owner wrote, so it never
- * goes into `prompts`.
+ * One day as the file has it. [messages] only says the day had activity: it counts every message
+ * of a conversation, tens of times the prompts the owner wrote, so it never goes into `prompts`.
  */
-export type CacheDay = { day: string; sessions: number; toolCalls: number; messages: number; tokens: number | null }
+export type CacheDay = { day: string; sessions: number; toolCalls: number; messages: number }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 const count = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
@@ -39,27 +39,9 @@ export function parseCache(text: string): CacheDay[] | string {
   const days = new Map<string, CacheDay>()
   for (const r of o.dailyActivity) {
     if (typeof r?.date !== 'string' || !DAY.test(r.date) || !count(r.sessionCount) || !count(r.toolCallCount) || !count(r.messageCount)) return 'a dailyActivity row changed shape'
-    days.set(r.date, { day: r.date, sessions: r.sessionCount, toolCalls: r.toolCallCount, messages: r.messageCount, tokens: null })
-  }
-  // Tokens are an extra: without them (or changed) the days above still stand.
-  for (const [day, tokens] of tokenDays(o) ?? []) {
-    const d = days.get(day)
-    if (d) d.tokens = tokens
-    else days.set(day, { day, sessions: 0, toolCalls: 0, messages: 0, tokens })
+    days.set(r.date, { day: r.date, sessions: r.sessionCount, toolCalls: r.toolCallCount, messages: r.messageCount })
   }
   return [...days.values()].sort((a, b) => (a.day < b.day ? -1 : 1))
-}
-
-function tokenDays(o: any): [string, number][] | null {
-  if (o.dailyModelTokensVersion !== KNOWN_VERSION || !Array.isArray(o.dailyModelTokens)) return null
-  const out: [string, number][] = []
-  for (const r of o.dailyModelTokens) {
-    if (typeof r?.date !== 'string' || !DAY.test(r.date) || !r.tokensByModel || typeof r.tokensByModel !== 'object') return null
-    const each = Object.values(r.tokensByModel)
-    if (!each.every(count)) return null
-    out.push([r.date, (each as number[]).reduce((a, b) => a + b, 0)])
-  }
-  return out
 }
 
 let seen: { mtimeMs: number; size: number; days: CacheDay[] } | null = null

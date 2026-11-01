@@ -51,9 +51,8 @@ object AllStats {
             to = parts.maxOf { it.to },
             since = parts.mapNotNull { it.since }.minOrNull(),
             // With older days on any server: hours start at the earliest any server has them (one
-            // without older days has them from its own start), and tokens likewise.
+            // without older days has them from its own start).
             hoursSince = if (parts.none { it.hoursSince != null }) null else parts.mapNotNull { it.hoursSince ?: it.since }.minOrNull(),
-            tokensSince = if (parts.none { it.hoursSince != null }) null else parts.mapNotNull { it.tokensSince ?: it.hoursSince ?: it.since }.minOrNull(),
             // From the latest of them on, every server was counting what only it sees.
             countingSince = parts.maxOf { it.countingSince },
             claudeMs = parts.sumOf { it.claudeMs },
@@ -62,7 +61,6 @@ object AllStats {
             tokens = StatTokens(
                 parts.sumOf { it.tokens.input }, parts.sumOf { it.tokens.output },
                 parts.sumOf { it.tokens.cacheRead }, parts.sumOf { it.tokens.cacheWrite },
-                parts.sumOf { it.tokens.unsplit },
             ),
             sessions = parts.sumOf { it.sessions },
             prompts = parts.sumOf { it.prompts },

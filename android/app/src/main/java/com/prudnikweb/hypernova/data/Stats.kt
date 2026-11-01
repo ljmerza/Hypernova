@@ -26,10 +26,8 @@ val ApiException.refusedRange: Boolean get() = status == 400 && code == "bad_ran
 @Immutable
 data class StatTokens(
     val input: Long, val output: Long, val cacheRead: Long, val cacheWrite: Long,
-    /** Tokens from Claude Code's own summary of older days (`backfill.tokens`): every kind, not split by day. */
-    val unsplit: Long = 0L,
 ) {
-    val total: Long get() = input + output + cacheRead + cacheWrite + unsplit
+    val total: Long get() = input + output + cacheRead + cacheWrite
 }
 
 /**
@@ -104,11 +102,10 @@ data class Stats(
     val codex: StatAgent? = null,
     /**
      * With older days from Claude Code's own summary in this answer: when the numbers it hasn't got
-     * start (hours, prompts, projects and the rest: the first day the Mac counted), and tokens, which
-     * it has for less far back. Null without any. [sessions], [toolCalls] and [tokens] include them.
+     * start (hours, prompts, tokens, projects and the rest: the first day the Mac counted). Null
+     * without any. [sessions] and [toolCalls] include them; [tokens] is the Mac's own.
      */
     val hoursSince: Long? = null,
-    val tokensSince: Long? = null,
 ) {
     /**
      * Whose work this is. Codex with work in the range: both agents' (the hero splits them), or
@@ -148,10 +145,10 @@ object StatsWire {
         val busy = o.obj("busiestDay")
         val by = o.obj("byAgent")
         // Older days from Claude Code's own summary, added to what it has numbers for (a server without them: none).
+        // Sessions and tool calls only: an older server's `tokens` here run 2.2 times Hypernova's, so they're ignored.
         val back = o.obj("backfill")
         val backSessions = back?.int("sessions") ?: 0
         val backTools = back?.int("toolCalls") ?: 0
-        val backTokens = back?.long("tokens") ?: 0L
         return Stats(
             range = StatsRange.entries.firstOrNull { it.wire == o.str("range") } ?: StatsRange.Week,
             from = o.long("from") ?: 0L,
@@ -161,7 +158,7 @@ object StatsWire {
             claudeMs = o.long("claudeMs") ?: 0L,
             wallMs = o.long("wallMs") ?: 0L,
             agentMs = o.long("agentMs") ?: 0L,
-            tokens = StatTokens(t?.long("input") ?: 0L, t?.long("output") ?: 0L, t?.long("cacheRead") ?: 0L, t?.long("cacheWrite") ?: 0L, backTokens),
+            tokens = StatTokens(t?.long("input") ?: 0L, t?.long("output") ?: 0L, t?.long("cacheRead") ?: 0L, t?.long("cacheWrite") ?: 0L),
             sessions = (o.int("sessions") ?: 0) + backSessions,
             prompts = o.int("prompts") ?: 0,
             fromPhone = from?.int("phone") ?: 0,
@@ -199,10 +196,9 @@ object StatsWire {
             },
             days = days,
             // The older days are Claude's: its summary is Claude Code's own.
-            claude = by?.obj("claude")?.let(::agent)?.let { it.copy(tokens = it.tokens + backTokens, sessions = it.sessions + backSessions, toolCalls = it.toolCalls + backTools) },
+            claude = by?.obj("claude")?.let(::agent)?.let { it.copy(sessions = it.sessions + backSessions, toolCalls = it.toolCalls + backTools) },
             codex = by?.obj("codex")?.let(::agent),
             hoursSince = back?.long("hoursSince"),
-            tokensSince = back?.long("tokensSince"),
         )
     }
 

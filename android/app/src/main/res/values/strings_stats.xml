@@ -17,10 +17,8 @@
     <!-- Under the title: the days the range covers ("9 – 15 Oct", "since 1 Jan", "since 13 Oct 2026"). -->
     <string name="stats_span">%1$s – %2$s</string>
     <string name="stats_since">since %1$s</string>
-    <!-- Older days from Claude Code's own summary have sessions, tool calls and (some) tokens only: when the rest starts. -->
-    <string name="stats_later">Hours, prompts and projects since %1$s.</string>
-    <string name="stats_later_with_tokens">Hours, tokens, prompts and projects since %1$s.</string>
-    <string name="stats_later_tokens_earlier">Hours, prompts and projects since %1$s; tokens since %2$s.</string>
+    <!-- Older days from Claude Code's own summary have sessions and tool calls only: when the rest starts. -->
+    <string name="stats_later">Hours, prompts, tokens and projects since %1$s.</string>
 
     <!-- Durations: Claude's working time ("34h 26m", "152h", "26m"). -->
     <string name="stats_hm">%1$dh %2$dm</string>
