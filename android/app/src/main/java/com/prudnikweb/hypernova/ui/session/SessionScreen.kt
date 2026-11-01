@@ -395,9 +395,10 @@ fun SessionScreen(
     // item above them.
     val liveAt = items.indexOfLast { !(it is Item.User && (it.queued || it.waiting || it.held)) }
     val tailKey = listOfNotNull(items.getOrNull(liveAt)?.let(::tailOf), items.lastOrNull()?.takeIf { items.lastIndex != liveAt }?.let(::tailOf)).joinToString("|")
-    // Fork: the list's rows (ToolRuns.kt): runs of three or more tool calls fold into one line, and
-    // only the first reply after each message carries Claude's name. A run opens on a tap; the run
-    // Claude is working in stays open by itself until it's tapped shut.
+    // Fork: the list's rows (ToolRuns.kt): runs of three or more tool calls (MCP calls from one)
+    // fold into one line, and only the first reply after each message carries Claude's name. A run
+    // opens on a tap and stays as the owner left it; the run Claude is working in folds too, its
+    // latest call under the line (docs/DECISIONS.md, "MCP and tool runs fold like Claude Code").
     // Fork: a tool's permission card goes once it's answered, as in Claude Code's terminal; only a
     // denial stays (worth seeing later). Questions and plans stay: their answers are the content.
     // Fork: the asks still waiting are one stack, the last row of all, under prompts waiting in the
@@ -546,8 +547,9 @@ fun SessionScreen(
                 when (row) {
                     is ChatRow.One -> TranscriptItem(hub, sessionId, row.item, rowModifier, known = known, onMenu = { menuKey = it.key }, named = row.item.key in labelled)
                     is ChatRow.Run -> {
-                        val open = runOpen[row.key] ?: (row.running || (working && row.key == liveRowKey))
-                        ToolRunRow(row, open, onToggle = { runOpen[row.key] = !open }, modifier = rowModifier) { member ->
+                        val open = runOpen[row.key] ?: false
+                        val live = row.running || (working && row.key == liveRowKey)
+                        ToolRunRow(row, open, live, onToggle = { runOpen[row.key] = !open }, modifier = rowModifier) { member ->
                             TranscriptItem(hub, sessionId, member, Modifier.fillMaxWidth(), known = known, onMenu = { menuKey = it.key })
                         }
                     }

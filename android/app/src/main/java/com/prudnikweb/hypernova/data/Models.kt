@@ -438,6 +438,8 @@ sealed interface Item {
         /** The first lines of the output when the tool failed. */
         val error: String? = null,
         val ports: List<Int> = emptyList(),
+        /** An MCP call's server ("home-assistant" in "mcp__home-assistant__ha_get_state"); null for the rest. */
+        val server: String? = null,
     ) : Item
     /** A Bash call, rendered as a mini terminal. */
     @Immutable data class Terminal(

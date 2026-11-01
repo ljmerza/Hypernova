@@ -86,11 +86,15 @@
         <item quantity="other">%d lines</item>
     </plurals>
     <!-- Fork: a folded run of tool calls in the chat (ui/session/ToolRunRow.kt). -->
-    <plurals name="run_calls">
-        <item quantity="one">%d tool</item>
-        <item quantity="other">%d tools</item>
+    <!-- A folded run of tool calls (ToolRunRow.kt), before the names: while Claude is at it, then once it's done. -->
+    <plurals name="run_calls_now">
+        <item quantity="one">Using %d tool</item>
+        <item quantity="other">Using %d tools</item>
     </plurals>
-    <string name="run_failed">%1$d failed</string>
+    <plurals name="run_calls_done">
+        <item quantity="one">Used %d tool</item>
+        <item quantity="other">Used %d tools</item>
+    </plurals>
     <!-- Fork: Settings → Display (text size for the whole app). -->
     <string name="st_display">Display</string>
     <string name="st_text_size">Text size</string>
