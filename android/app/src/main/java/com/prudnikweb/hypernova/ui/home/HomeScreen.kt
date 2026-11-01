@@ -317,12 +317,19 @@ fun HomeScreen(
     // leads, every session is Codex's). Which usage cards show is usageSlots, below.
     val codexOn = hub.bothAgents
     val sessions = remember(all, filter, quiet) { SkyFilter.apply(all, filter, quiet) }
+    // Home's filter (HomeFilter.kt; owner, 2026-11-01): the sheet's states, agent, project and, with
+    // All servers, server, kept on this phone. After the sky's, before the search: a search looks
+    // only among what it shows. Its server waits outside All servers (kept, not applied).
+    val savedFilter = HomeFilterPref.state(context).value
+    val homeFilter = savedFilter.forServers(everywhere?.servers?.map { it.first.id })
+    val kept = remember(sessions, homeFilter) { homeFilter.apply(sessions) }
+    val narrowBoth: (List<Session>) -> List<Session> = { list -> homeFilter.apply(SkyFilter.apply(list, filter, quiet)) }
     // What the search finds among them (HomeSearch, History's search shared): by title, project,
     // folder, last line and short id, and from 3 characters the words inside the conversations.
     // While words are typed the list is the matches in their groups; the cards above step aside.
     val typed = searchOpen && searchQuery.isNotBlank()
     val full = rememberFullText(hub, if (searchOpen && everywhere == null) searchQuery else "")
-    val shown = remember(sessions, typed, searchQuery, full.hits) { if (typed) HomeSearch.find(sessions, searchQuery, full.hits) else sessions }
+    val shown = remember(kept, typed, searchQuery, full.hits) { if (typed) HomeSearch.find(kept, searchQuery, full.hits) else kept }
     // "All servers" (AllHome.kt): each computer's sessions, filtered and searched on their own (each
     // asked for its full-text hits), then grouped together; each card goes to its own computer.
     val fullBy: Map<String, FullText> = everywhere?.servers?.associate { (st, h) ->
@@ -331,16 +338,25 @@ fun HomeScreen(
     val parts = everywhere?.servers?.map { (st, h) -> ServerPart(st.id, st.name, st.state, h, h.sessions, fullBy[st.id]?.hits) }
     // The usage cards under the sessions: this computer's, or with "All servers" every computer's (AllUsage).
     val usageSlots = if (parts != null) AllUsage.all(parts, { it.claude }, { it.codex }) else AllUsage.of(hub, hub.claude, hub.codex)
-    val narrowed: List<HomeCard<Hub>>? = parts?.let { AllHome.cards(it) { list -> SkyFilter.apply(list, filter, quiet) } }
+    // Before Home's filter (is there anything at all?), then with it (the server's too: HomeFilter.parts).
+    val skyNarrowed: List<HomeCard<Hub>>? = parts?.let { AllHome.cards(it) { list -> SkyFilter.apply(list, filter, quiet) } }
+    val narrowed: List<HomeCard<Hub>>? = parts?.let { AllHome.cards(homeFilter.parts(it), narrow = narrowBoth) }
     val cards: List<HomeCard<Hub>> = when {
         parts == null -> shown.map { HomeCard(null, null, hub, it) }
-        typed -> AllHome.cards(parts, searchQuery) { list -> SkyFilter.apply(list, filter, quiet) }
+        typed -> AllHome.cards(homeFilter.parts(parts), searchQuery, narrowBoth)
         else -> narrowed.orEmpty()
     }
     val searching = if (everywhere != null) fullBy.values.any { it.searching } else full.searching
     val partial = if (everywhere != null) fullBy.values.any { it.hits?.partial == true } else full.hits?.partial == true
     // The matches start at the top.
     LaunchedEffect(searchOpen, searchQuery) { if (searchOpen) list.scrollToItem(0) }
+    // A filter changed: the list from the top, its chip in view (not on coming back to Home).
+    val filterSeen = remember { arrayOf(homeFilter) }
+    LaunchedEffect(homeFilter) {
+        if (filterSeen[0] == homeFilter) return@LaunchedEffect
+        filterSeen[0] = homeFilter
+        list.scrollToItem(0)
+    }
     // The line under the sun's readout ("Tap the sun for your statistics"): the sky keeps room for it.
     val hint = !sunHinted && !eclipsed && !sunUsage.weekLimited && !sunUsage.limited
     androidx.compose.runtime.SideEffect { cosmos.hint = hint }
@@ -348,10 +364,18 @@ fun HomeScreen(
     val troubled = remember(hub.providers, hub.sessions) { troubledProviders(hub.providers, hub.sessions) }
     val opener = LocalOpener.current
     // Who needs you here and elsewhere: the filter chip says how many wait outside it.
-    val waiting = if (narrowed != null) AllHome.needsYou(narrowed) else sessions.count { it.state == SessionState.NeedsYou }
+    val waiting = if (narrowed != null) AllHome.needsYou(narrowed) else kept.count { it.state == SessionState.NeedsYou }
     val waitingAll = if (parts != null) AllHome.needsYou(AllHome.cards(parts)) else all.count { it.state == SessionState.NeedsYou }
-    // Nothing on Home at all (on any computer, with "All servers").
-    val nothing = if (narrowed != null) narrowed.isEmpty() else sessions.isEmpty()
+    // Nothing on Home at all (on any computer, with "All servers"), before Home's filter.
+    val nothing = if (skyNarrowed != null) skyNarrowed.isEmpty() else sessions.isEmpty()
+    // Something is narrowed: the chip over the list says what's shown, and its Clear shows everything.
+    val narrowing = filter != null || homeFilter.on
+    val clearFilters = {
+        onFilter(null)
+        HomeFilterPref.set(context, HomeFilter.NONE)
+    }
+    // The filter sheet (HomeFilterSheet.kt), from the button beside the search.
+    var filtering by rememberSaveable { mutableStateOf(false) }
     // Claude Code's account: only where it's installed (a Mac where Codex leads has no Claude account to fix).
     val showAccount = claudeHere && accountCardShown(account, now)
     // The attention cards above the list, unless swiped away (an Undo stands in for a moment).
@@ -364,7 +388,7 @@ fun HomeScreen(
     val shownTroubled = remember(troubled, gone) { troubled.filter { t -> t.provider.status?.let { AttentionStore.show("provider:${t.provider.id}", providerAttention(it)) } != Attention.Show.Nothing } }
     // Where the account card sits: after the sky, the seam, the filter chip and the offline card
     // when they're there (owner's report: a filter on, the tap landed on the filter chip).
-    fun accountIndex() = homeHeadIndex(filter = filter != null, offline = hub.link.state == LinkState.Offline && AttentionStore.show("offline", offlineAttention(hub.link)) != Attention.Show.Nothing)
+    fun accountIndex() = homeHeadIndex(filter = narrowing, offline = hub.link.state == LinkState.Offline && AttentionStore.show("offline", offlineAttention(hub.link)) != Attention.Show.Nothing)
     // Scrolled to, it sits just under the brand row rather than beneath it.
     val underBar = with(density) { -(top + 72.dp).roundToPx() }
     // An account banner was tapped: the Sessions tab, scrolled to the card that says what to do.
@@ -404,6 +428,21 @@ fun HomeScreen(
         statsOpen = false
     }
 
+    if (filtering && tab == Tab.Sessions) {
+        // Its projects are every one on Home's list (every computer's with All servers), the chosen one too.
+        val listed = parts?.flatMap { AllHome.homeSessions(it.sessions) } ?: all
+        HomeFilterSheet(
+            homeFilter,
+            // Outside All servers the sheet has no server, and the one kept for All stays kept.
+            onChange = { f -> HomeFilterPref.set(context, if (everywhere == null) f.copy(server = savedFilter.server) else f) },
+            onClear = clearFilters,
+            projects = HomeFilter.projects(listed, homeFilter.project),
+            agents = (everywhere?.servers?.any { it.second.bothAgents } ?: hub.bothAgents) || listed.any { it.codex },
+            servers = everywhere?.servers?.map { it.first.id to it.first.name },
+            onDismiss = { filtering = false },
+        )
+    }
+
     if (homeShown) Box(
         Modifier
             .fillMaxSize()
@@ -428,10 +467,14 @@ fun HomeScreen(
             ) {
                 // Fork: no sky (owner, 2026-10-30): Home is the sessions in their groups. Statistics opens
                 // from the mark in the top bar, as it did from the sun.
-                // What the list shows, when it isn't everything: a chip that undoes it.
-                if (filter != null) {
+                // What the list shows, when it isn't everything: a chip that undoes it. The sky's project
+                // alone says its name; Home's filter says "Showing: Needs you + Working", the sky's after.
+                if (narrowing) {
                     item(key = "filter") {
-                        FilterRow(filter, quiet.size, elsewhere = waitingAll - waiting, onClear = { onFilter(null) }, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 8.dp).animateItem())
+                        FilterRow(
+                            filterChipLabel(filter, quiet.size, homeFilter, everywhere), homeFilter.on, elsewhere = waitingAll - waiting, onClear = clearFilters,
+                            modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 8.dp).animateItem(),
+                        )
                     }
                 }
                 // Honest connection state: what's wrong and what to do, above the (stale) list.
@@ -523,6 +566,19 @@ fun HomeScreen(
                 if (nothing && filter == null && !typed) {
                     item(key = "empty") {
                         EmptyCard(hub, onHistory = { tab = Tab.History }, modifier = Modifier.animateItem().padding(horizontal = 16.dp))
+                    }
+                }
+                // Sessions are there, and the filter leaves none: it says so, never an empty list.
+                if (!nothing && narrowing && cards.isEmpty() && !typed) {
+                    item(key = "filter-none") {
+                        Column(Modifier.animateItem().padding(horizontal = 24.dp, vertical = 10.dp)) {
+                            HText(
+                                stringResource(R.string.filter_none), style = Type.small, color = HN.inkDim,
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Pill(stringResource(R.string.filter_clear), clearFilters, kind = PillKind.Outline, height = 40.dp)
+                        }
                     }
                 }
                 // The sessions in three groups, as `claude agents` lists them (owner, 2026-10-29): needs
@@ -633,15 +689,30 @@ fun HomeScreen(
                         .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.stats_open_label), onClick = openStats),
                     contentAlignment = Alignment.CenterStart,
                 ) { NovaMark(size = 22.dp) }
-                Spacer(Modifier.weight(1f))
                 // Fork: the new-session (and new-automation) pill sits up here, small, instead of
                 // over the tabs, so the bottom bar is just the tabs; 30dp, the Mac's chip's height.
                 if (tab == Tab.Sessions) {
-                    // The lens: searching Home's sessions (idea HM8); lit while the field is open.
-                    SearchButton(searchOpen, onClick = { if (searchOpen) closeSearch() else searchOpen = true })
-                    Pill(stringResource(R.string.new_session), newSession, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
+                    // Home's filter (owner, 2026-11-01), the lens and New session, from the end, in the room
+                    // the chip leaves (the Row measures it first). Short of room (a large font, a narrow
+                    // phone) New session keeps only its plus, whole, so the chip's name is never squeezed out.
+                    FitRow(
+                        parts = listOf(
+                            // Home's filter: its sheet; lit while a filter is on.
+                            listOf({ FilterButton(homeFilter.on, onClick = { filtering = true }) }),
+                            // The lens: searching Home's sessions (idea HM8); lit while the field is open.
+                            listOf({ SearchButton(searchOpen, onClick = { if (searchOpen) closeSearch() else searchOpen = true }) }),
+                            listOf(
+                                { Pill(stringResource(R.string.new_session), newSession, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus) },
+                                { NewSessionButton(newSession) },
+                            ),
+                        ),
+                        giveWay = intArrayOf(2),
+                        modifier = Modifier.weight(1f),
+                        gap = 0.dp,
+                        end = true,
+                    )
                     Spacer(Modifier.width(8.dp))
-                }
+                } else Spacer(Modifier.weight(1f))
                 // A Mac with automations: a new one from here (an old Mac's tab only says to update).
                 if (tab == Tab.Automations && hub.automations.state != null) {
                     Pill(stringResource(R.string.au_new), { onAutomation(null, null, false) }, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
@@ -728,12 +799,19 @@ private fun usageIndex(list: androidx.compose.foundation.lazy.LazyListState, slo
     return (last - (slots.size - 1 - at)).coerceAtLeast(0)
 }
 
+/**
+ * The width of the top bar's round buttons (the filter, the lens, New session's plus): their 30dp
+ * circle in a 40dp-wide, 48dp-tall target (Compose widens a touch to 48dp where nothing else is),
+ * so New session keeps its words beside the filter and the lens on a 392dp phone.
+ */
+private val BAR_BUTTON_W = 40.dp
+
 /** How much lower Home's list starts while the search field shows under the top bar (the field and its gap). */
 private val SEARCH_ROOM = 52.dp
 
 /**
  * The top bar's lens (idea HM8): a 30dp circle of dense frosted glass, the Glass pill's family, in a
- * 48dp target; lit mint while the search is open, when a tap closes it.
+ * 40 by 48dp target (BAR_BUTTON_W); lit mint while the search is open, when a tap closes it.
  */
 @Composable
 private fun SearchButton(open: Boolean, onClick: () -> Unit) {
@@ -741,7 +819,7 @@ private fun SearchButton(open: Boolean, onClick: () -> Unit) {
     val label = stringResource(if (open) R.string.home_search_close else R.string.home_search)
     Box(
         Modifier
-            .size(48.dp)
+            .size(width = BAR_BUTTON_W, height = 48.dp)
             .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = label) {
                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                 onClick()
@@ -754,6 +832,73 @@ private fun SearchButton(open: Boolean, onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) { Icon(Glyph.Search, size = 14.dp, color = if (open) HN.accent else HN.ink, stroke = 1.4.dp) }
     }
+}
+
+/**
+ * The top bar's filter button (owner, 2026-11-01): the lens's circle with the filter's lines; lit
+ * mint, with a dot, while a filter is on. A tap opens the filter sheet (HomeFilterSheet.kt).
+ */
+@Composable
+private fun FilterButton(on: Boolean, onClick: () -> Unit) {
+    val view = LocalView.current
+    val label = stringResource(if (on) R.string.filter_button_on else R.string.filter_title)
+    Box(
+        Modifier
+            .size(width = BAR_BUTTON_W, height = 48.dp)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.filter_title)) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onClick()
+            }
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.size(30.dp).clip(CircleShape).frostedGlass(if (on) HN.accent else null, glowX = 15.dp, dense = true),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Glyph.Filter, size = 14.dp, color = if (on) HN.accent else HN.ink, stroke = 1.4.dp) }
+        if (on) Box(Modifier.align(Alignment.Center).offset(x = 11.dp, y = (-11).dp).size(6.dp).background(HN.accent, CircleShape))
+    }
+}
+
+/** New session as the lens's circle with a plus, where the top bar has no room for its words. */
+@Composable
+private fun NewSessionButton(onClick: () -> Unit) {
+    val view = LocalView.current
+    val label = stringResource(R.string.new_session)
+    Box(
+        Modifier
+            .size(width = BAR_BUTTON_W, height = 48.dp)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = label) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onClick()
+            }
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.size(30.dp).clip(CircleShape).frostedGlass(HN.accent, glowX = 15.dp, dense = true),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Glyph.Plus, size = 14.dp, color = HN.accent, stroke = 1.4.dp) }
+    }
+}
+
+/**
+ * What the chip over Home's list says: the sky's project (or "5 quiet projects") alone, as before;
+ * with Home's filter on, "Showing: " and its pieces (HomeFilter.pieces), the sky's last, joined by " · ".
+ */
+@Composable
+private fun filterChipLabel(sky: SkyFilter?, quiet: Int, home: HomeFilter, everywhere: Everywhere?): String {
+    val skyLabel = when (sky) {
+        is SkyFilter.Project -> sky.name
+        SkyFilter.Quiet -> pluralStringResource(R.plurals.filter_quiet, quiet, quiet)
+        null -> null
+    }
+    if (!home.on) return skyLabel.orEmpty()
+    val groups = HomeGroup.entries.associateWith { filterGroupWord(it) }
+    val agents = FilterAgent.entries.associateWith { filterAgentWord(it) }
+    val names = everywhere?.servers?.associate { it.first.id to it.first.name }.orEmpty()
+    val pieces = home.pieces({ groups.getValue(it) }, { agents.getValue(it) }, { names[it] }) + listOfNotNull(skyLabel)
+    return stringResource(R.string.filter_showing, pieces.joinToString(" · "))
 }
 
 /** Home's groups, in the list's order, each with its seam's item key. */
@@ -1756,19 +1901,17 @@ fun SignInPanel(hub: Hub, mac: String, modifier: Modifier = Modifier, more: (@Co
 }
 
 /**
- * What the list shows when it isn't everything (a planet or the belt was tapped): a glass chip with
- * the project's name (or "5 quiet projects") and a cross; tapping it shows everything again. Beside
- * it, in amber, how many sessions elsewhere need you, which also shows everything.
+ * What the list shows when it isn't everything (a project from a shortcut, or Home's filter): a glass
+ * chip with [label] (filterChipLabel) and a cross; tapping it shows everything again. Beside it, in
+ * amber, how many sessions it leaves out need you ("2 need you elsewhere"; [home], Home's filter on:
+ * "2 need you, hidden"), which also shows everything.
  */
 @Composable
-private fun FilterRow(filter: SkyFilter, quiet: Int, elsewhere: Int, onClear: () -> Unit, modifier: Modifier = Modifier) {
-    val label = when (filter) {
-        is SkyFilter.Project -> filter.name
-        SkyFilter.Quiet -> pluralStringResource(R.plurals.filter_quiet, quiet, quiet)
-    }
+private fun FilterRow(label: String, home: Boolean, elsewhere: Int, onClear: () -> Unit, modifier: Modifier = Modifier) {
     val view = LocalView.current
     val clear = stringResource(R.string.a11y_filter_clear)
-    val showing = stringResource(R.string.a11y_filter_showing, label)
+    // Home's filter's label already starts with "Showing:".
+    val showing = if (home) label else stringResource(R.string.a11y_filter_showing, label)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(
             Modifier
@@ -1794,7 +1937,7 @@ private fun FilterRow(filter: SkyFilter, quiet: Int, elsewhere: Int, onClear: ()
         if (elsewhere > 0) {
             Spacer(Modifier.width(12.dp))
             HText(
-                pluralStringResource(R.plurals.filter_waiting_elsewhere, elsewhere, elsewhere),
+                pluralStringResource(if (home) R.plurals.filter_waiting_hidden else R.plurals.filter_waiting_elsewhere, elsewhere, elsewhere),
                 style = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.5f), color = HN.amber, maxLines = 1,
                 modifier = Modifier
                     .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = clear, onClick = onClear)

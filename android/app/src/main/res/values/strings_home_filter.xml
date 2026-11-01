@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home's filter (ui/home/HomeFilterSheet.kt; docs/DECISIONS.md, "Home filters"): the button beside the search, its sheet and the chip over the list. -->
+    <string name="filter_title">Filter sessions</string>
+    <!-- TalkBack on the top bar's filter button while a filter is on. -->
+    <string name="filter_button_on">Filter sessions, on</string>
+    <string name="filter_active">Active: Needs you + Working</string>
+    <string name="filter_state">State</string>
+    <string name="filter_needs_you">Needs you</string>
+    <string name="filter_working">Working</string>
+    <string name="filter_completed">Completed</string>
+    <string name="filter_agent">Agent</string>
+    <string name="filter_agent_claude">Claude</string>
+    <string name="filter_agent_codex">Codex</string>
+    <string name="filter_project">Project</string>
+    <string name="filter_server">Server</string>
+    <string name="filter_all">All</string>
+    <string name="filter_clear">Clear</string>
+    <string name="filter_done">Done</string>
+    <!-- The chip over the list: "Showing: Needs you + Working · hypernova". -->
+    <string name="filter_showing">Showing: %1$s</string>
+    <!-- Beside the chip, in amber: sessions that need you which the filter leaves out. -->
+    <plurals name="filter_waiting_hidden">
+        <item quantity="one">%d needs you, hidden</item>
+        <item quantity="other">%d need you, hidden</item>
+    </plurals>
+    <!-- Nothing left once the filter is on. -->
+    <string name="filter_none">No sessions match this filter</string>
+</resources>
