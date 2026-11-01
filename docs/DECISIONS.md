@@ -3226,3 +3226,14 @@ side."
    the agents, not the to-dos, whose tally stays in the bar's row.
 5. **The progress line stays clear:** the list stops 8dp above it whatever the scroll, and rows fade at
    an edge with more beyond it.
+
+## The status bar closes when you leave it (2026-11-01)
+
+The owner: "when the agents card is open in the session view … if I go to a different agent view and
+then come back to that one, the menu is still open. I don't want it still open; I want it to reset
+closed if I leave the view."
+
+Leaving the session's chat closes its opened bar: to an agent's screen, another session or Home, and a
+process restart starts it closed. Opening the keyboard isn't leaving, and neither is a configuration
+change that recreates the screen (a font size, a split screen; the app is held to portrait, so not a
+rotation). This replaces the bar staying open across a visit, which it did as saved state.

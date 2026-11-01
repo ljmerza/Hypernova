@@ -31,13 +31,15 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -111,6 +113,14 @@ internal class StatusBarState(
 }
 
 /**
+ * The sessions whose bar is opened, while their chat is on screen: leaving it closes the bar (owner,
+ * 2026-11-01). Not saved state, which the screens' state holder (App.kt) would hand back on the way
+ * back, and a restart would too. In memory, as a configuration change recreates the activity and
+ * that's not leaving; a process restart starts with none.
+ */
+private val openBars = mutableStateSetOf<String>()
+
+/**
  * The bar's state for a session. The to-do list is asked of the Mac here. The red error bar
  * folds by itself after [ERROR_SHOW_MS] so a stopped session doesn't wear it forever; a tap on it
  * keeps it until tapped again.
@@ -133,7 +143,12 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     )
     val isError = raw?.tone == BarTone.Error
     // Kept out here so the list stays open (or folded) across short gaps between two steps.
-    var open by rememberSaveable(session.id) { mutableStateOf(false) }
+    val open = session.id in openBars
+    val activity = LocalActivity.current
+    DisposableEffect(session.id) {
+        val id = session.id
+        onDispose { if (activity?.isChangingConfigurations != true) openBars.remove(id) }
+    }
     var kept by remember(session.id) { mutableStateOf(false) }
     var expired by remember(session.id) { mutableStateOf(false) }
     LaunchedEffect(isError, kept) {
@@ -145,7 +160,7 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     // While an approval waits the bar stays, amber, saying what it waits on (owner, 2026-10-18).
     val model = if (raw != null && isError && errorFolded(expired, kept)) null else raw
     return StatusBarState(model, todos, open, {
-        open = !open
+        if (!openBars.remove(session.id)) openBars.add(session.id)
         if (isError) kept = !kept
     }, away = away, workflow = workflow, agents = agents)
 }
