@@ -176,6 +176,10 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
         contentPadding = PaddingValues(top = top + 84.dp, bottom = bottom + 120.dp, start = 16.dp, end = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // Owner, 2026-10-31: the first server's name read as the page's title, "z2", with All chosen.
+        if (allMode) item(key = "allIntro") {
+            HText(stringResource(R.string.st_all_intro), style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 4.dp))
+        }
         for ((index, part) in parts.withIndex()) item(key = part.key) {
             when (part) {
                 is SettingsPlan.Server -> {

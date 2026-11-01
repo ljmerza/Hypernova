@@ -48,6 +48,7 @@
 
     <!-- Settings with "All servers" (ui/settings/SettingsPlan.kt): each server's block under its name, then this phone's. -->
     <string name="st_all_phone">This phone</string>
+    <string name="st_all_intro">All servers: each server\'s settings under its name, then this phone\'s.</string>
     <!-- In a server's block while it isn't connected: its other settings are left out until it is. -->
     <string name="st_all_waiting">Its settings show here once it\'s connected.</string>
 </resources>
