@@ -48,6 +48,23 @@ terminal lines up), links (real tap gestures) and search. By hand: it's in no su
 Chromium. It needs `daemon/node_modules`, and takes Playwright's Chromium or `--chrome <path>`.
 `--measure --webgl <addon-webgl.js> [--gl gpu|swiftshader]` compares the page's drawing with WebGL's.
 
+## The Linux server's tests
+
+- Unit: `cd daemon && npm test` includes `test/platform.test.ts` (where things live, what exists
+  on each system), `test/linux-cli.test.ts` (the command's pieces and commands against a stand-in
+  daemon and system).
+- End to end, in Docker: `scripts/test-linux-docker.sh` builds the image, starts the daemon, and
+  checks `status`, `doctor`, `pair`, the API's health, pairing a stand-in phone, the Mac-only
+  features answering 501, the LAN listener asking for device certificates, a shared terminal
+  started by the `claude` function in bash (running a harmless stand-in, never the real Claude
+  Code), `logs` and `uninstall`. `--no-claude` builds without Claude Code; nothing signs in.
+- The service, in Docker: `scripts/test-linux-systemd.sh` boots Ubuntu 24.04 with systemd (a
+  privileged container, publishing nothing), installs from a tarball as a user with sudo and no
+  login session, and checks lingering, the unit, `status` and `doctor`, systemd starting the daemon
+  again after `kill -9`, a session the daemon started (a stand-in Claude Code) kept through a service
+  restart and an update and found again, the daemon back after a
+  reboot with nobody logged in, and `uninstall`.
+
 ## Fake provider (other providers' limits, without spending anything)
 `daemon/test/fake-provider/` (tests only, never bundled) is a tiny Anthropic-compatible server on
 loopback that streams canned replies ("Fake provider here. Nothing went to a model.") and, told to,
