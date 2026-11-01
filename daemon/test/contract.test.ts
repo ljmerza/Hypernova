@@ -16,6 +16,10 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fakeCodexBin } from './fake-codex/server.ts'
 
+// A zone where it's mid-day, for the whole file: the phone's counts below and the transcripts must all
+// land on one day, whatever the hour this runs (the daemon reads the zone as it counts).
+process.env.TZ = new Date().getUTCHours() >= 1 && new Date().getUTCHours() <= 22 ? 'UTC' : 'Etc/GMT-12'
+
 const FIXTURES = join(import.meta.dirname, '..', '..', 'protocol', 'fixtures')
 const UPDATE = process.env.UPDATE_FIXTURES === '1'
 
@@ -744,10 +748,8 @@ test('signing in from the phone: started, its page, cancelled, started again, it
 })
 
 test('GET /v1/stats: a week of the transcripts above', async () => {
-  // Days are the server's own: a zone where it's mid-day keeps the last ten minutes' transcripts in one day.
+  // Days are the server's own: the file's zone (at its top) keeps these transcripts and counts in one day.
   const tz = process.env.TZ
-  const h = new Date().getUTCHours()
-  process.env.TZ = h >= 1 && h <= 22 ? 'UTC' : 'Etc/GMT-12'
   try {
     const stable = (s: any): any => {
       // The days as dates counted back from the normalised day (2027-01-15), so a fixture keeps its shape whatever today is.
