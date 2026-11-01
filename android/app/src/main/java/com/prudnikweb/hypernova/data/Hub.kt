@@ -281,6 +281,11 @@ interface Hub {
     suspend fun autoContinue(sessionId: String, on: Boolean): Result<Unit> = Result.failure(UnsupportedOperationException())
     /** Carry a session on after a limit it didn't continue from by itself. Succeeds with the session that carries on. */
     suspend fun continueAfterLimit(sessionId: String): Result<String> = Result.failure(UnsupportedOperationException())
+    /**
+     * Claude Code's and Codex's user-level settings on the server, the fixed list (docs/PROTOCOL.md,
+     * "Agent settings"). Fails with [AgentSettingsTooOld] from a server without the route.
+     */
+    suspend fun agentSettings(): Result<AgentSettingsReply> = Result.failure(UnsupportedOperationException())
     /** Read a provider's balance now (OpenRouter); [providers] follows. */
     suspend fun checkProvider(id: String): Result<Provider> = Result.failure(UnsupportedOperationException())
     /**

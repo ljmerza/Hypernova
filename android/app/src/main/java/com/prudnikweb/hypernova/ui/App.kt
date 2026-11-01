@@ -616,7 +616,8 @@ private fun Screens(
                 is Route.Web -> WebScreen(r.url, r.title, onBack = { nav.pop() }, preview = r.preview, port = r.port)
                 is Route.Terminal -> com.prudnikweb.hypernova.ui.term.TerminalScreen(shown, r.sessionId, onBack = { nav.pop() })
                 is Route.Agent -> com.prudnikweb.hypernova.ui.session.AgentScreen(shown, r.sessionId, r.agentId, onBack = { nav.pop() })
-                Route.Providers -> ProvidersScreen(shown, onBack = { nav.pop() }, onEdit = { id, kind -> nav.push(Route.ProviderEdit(id, kind)) })
+                Route.Providers -> ProvidersScreen(shown, onBack = { nav.pop() }, onEdit = { id, kind -> nav.push(Route.ProviderEdit(id, kind)) }, onAgentSettings = { nav.push(Route.AgentSettings(it)) })
+                is Route.AgentSettings -> com.prudnikweb.hypernova.ui.settings.AgentSettingsScreen(shown, r.agent, onBack = { nav.pop() })
                 Route.ConnectionLog -> com.prudnikweb.hypernova.ui.settings.ConnectionLogScreen(onBack = { nav.pop() })
                 is Route.ProviderEdit -> ProviderEditScreen(shown, r.id, r.kind, onBack = { nav.pop() })
                 is Route.AutomationEdit -> com.prudnikweb.hypernova.ui.automations.AutomationEditor(

@@ -545,6 +545,34 @@ class ContractTest {
             assertFalse(list.first().paid)
         },
         "rest-provider-delete" to { o -> assertTrue(o.bool("ok")) },
+        // The agents' settings: the fixed list and the summaries, each agent's own.
+        "rest-agent-settings" to { o ->
+            val r = AgentSettingsReply.wire(o)
+            assertEquals(AgentSettingsFile.OK, r.claude.state)
+            assertEquals(
+                listOf(
+                    ShownSetting("effortLevel", ShownSetting.SET, "high", null),
+                    ShownSetting("permissions.defaultMode", ShownSetting.SET, "acceptEdits", null),
+                    ShownSetting("showThinkingSummaries", ShownSetting.SET, null, true),
+                    ShownSetting("autoDreamEnabled", ShownSetting.UNSET, null, null),
+                    ShownSetting("includeCoAuthoredBy", ShownSetting.SET, null, false),
+                    ShownSetting("autoUpdatesChannel", ShownSetting.UNRECOGNISED, null, null),
+                    ShownSetting("inputNeededNotifEnabled", ShownSetting.UNSET, null, null),
+                    ShownSetting("agentPushNotifEnabled", ShownSetting.UNSET, null, null),
+                ),
+                r.claude.values,
+            )
+            assertEquals(
+                ClaudeSettingsSummary(2, 1, 0, listOf(PluginSetting("formatter", true), PluginSetting("linter", false)), listOf("home-assistant"), listOf("Stop", "PreToolUse"), 0),
+                r.claude.claude,
+            )
+            assertNull(r.claude.codex)
+            assertEquals(AgentSettingsFile.OK, r.codex.state)
+            assertEquals(ShownSetting("model", ShownSetting.SET, "gpt-6.1-sol", null), r.codex.values[0])
+            assertEquals(ShownSetting.UNRECOGNISED, r.codex.values.single { it.key == "approval_policy" }.state)
+            assertEquals(CodexSettingsSummary(2, listOf("fetch"), 0), r.codex.codex)
+            assertNull(r.codex.claude)
+        },
         // A refusal the editor puts under the address (saveProvider's ProviderRefused keeps the code).
         "rest-provider-refused" to { o ->
             val e = Api.errorOf(400, o.toString())

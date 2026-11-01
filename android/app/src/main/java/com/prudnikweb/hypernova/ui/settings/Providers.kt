@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Account
+import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.CodexAccount
 import com.prudnikweb.hypernova.data.CodexState
 import com.prudnikweb.hypernova.data.claudeAvailable
@@ -102,7 +103,7 @@ private fun kindLabel(kind: String): String = when (kind) {
 
 /** Every provider, built-in first; add OpenRouter or a custom endpoint. Keys are never shown. */
 @Composable
-fun ProvidersScreen(hub: Hub, onBack: () -> Unit, onEdit: (id: String?, kind: String) -> Unit) {
+fun ProvidersScreen(hub: Hub, onBack: () -> Unit, onEdit: (id: String?, kind: String) -> Unit, onAgentSettings: (agent: String) -> Unit = {}) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // What's left on each OpenRouter key, read again as the screen opens (quietly: a failure keeps the last reading).
     LaunchedEffect(Unit) {
@@ -118,8 +119,8 @@ fun ProvidersScreen(hub: Hub, onBack: () -> Unit, onEdit: (id: String?, kind: St
             item(key = "agents-seam") {
                 Seam(stringResource(R.string.ag_agents), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp))
             }
-            item(key = "agent-claude") { ClaudeAgentCard(hub) }
-            item(key = "agent-codex") { CodexAgentCard(hub) }
+            item(key = "agent-claude") { ClaudeAgentCard(hub, onSettings = { onAgentSettings(AgentSettingsReply.CLAUDE) }) }
+            item(key = "agent-codex") { CodexAgentCard(hub, onSettings = { onAgentSettings(AgentSettingsReply.CODEX) }) }
             item(key = "providers-seam") {
                 Seam(stringResource(R.string.ag_claude_providers), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 14.dp, bottom = 2.dp))
             }
@@ -177,7 +178,7 @@ private fun AccountPageRow(body: Int, url: String) {
 }
 
 @Composable
-private fun ClaudeAgentCard(hub: Hub) {
+private fun ClaudeAgentCard(hub: Hub, onSettings: () -> Unit) {
     val installed = hub.claudeAvailable
     val version = (hub.claude?.version ?: hub.mac.claudeVersion)?.takeIf { installed }
     val context = LocalContext.current
@@ -199,6 +200,7 @@ private fun ClaudeAgentCard(hub: Hub) {
             val (line, trouble) = claudeAccountLine(hub.account, hub.mac.name)
             HText(line, style = Type.small, color = if (trouble) HN.amber else HN.inkMuted)
             AccountPageRow(R.string.ag_account_claude, CLAUDE_ACCOUNT_PAGE)
+            com.prudnikweb.hypernova.ui.components.NavRow(stringResource(R.string.as_row), stringResource(R.string.as_row_claude), onSettings)
             val agents = hub.claude?.agents ?: return@Column
             Spacer(Modifier.height(12.dp))
             Hairline(Modifier.fillMaxWidth())
@@ -254,7 +256,7 @@ private val PLAN_WORDS = mapOf("prolite" to "Pro Lite", "pro" to "Pro", "plus" t
  * too old, or signed out: the one line to run on the Mac, to copy. It never installs anything.
  */
 @Composable
-private fun CodexAgentCard(hub: Hub) {
+private fun CodexAgentCard(hub: Hub, onSettings: () -> Unit) {
     val c = hub.codex
     val mac = hub.mac.name
     val context = LocalContext.current
@@ -303,6 +305,7 @@ private fun CodexAgentCard(hub: Hub) {
                 HText(stringResource(R.string.ag_codex_reaching, mac), style = Type.small, color = HN.inkDim)
             }
             AccountPageRow(R.string.ag_account_codex, CODEX_ACCOUNT_PAGE)
+            com.prudnikweb.hypernova.ui.components.NavRow(stringResource(R.string.as_row), stringResource(R.string.as_row_codex), onSettings)
             // The switch: only for a Codex that can be used (or to turn off one that's on).
             if (c.available || c.enabled) {
                 Spacer(Modifier.height(12.dp))

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -85,6 +86,7 @@ class ProvidersScreenTest {
     private val spy = AppSpy()
     private val hub = ProvidersHub()
     private val edits = mutableListOf<String>()
+    private val agents = mutableListOf<String>()
     private var back = 0
     private var focus: androidx.compose.ui.focus.FocusManager? = null
 
@@ -105,7 +107,7 @@ class ProvidersScreenTest {
     }
 
     private fun list() {
-        rule.setContent { Harness(spy) { ProvidersScreen(hub, onBack = { back++ }, onEdit = { id, kind -> edits += "$id/$kind" }) } }
+        rule.setContent { Harness(spy) { ProvidersScreen(hub, onBack = { back++ }, onEdit = { id, kind -> edits += "$id/$kind" }, onAgentSettings = { agents += it }) } }
         rule.waitForIdle()
     }
 
@@ -132,6 +134,8 @@ class ProvidersScreenTest {
         rule.onNodeWithText("Gateway refused the key.").assertExists()
         rule.onNodeWithText(str(R.string.providers_intro)).assertExists()
         rule.snap("providers_list")
+        // Codex isn't installed here, so only Claude Code's card has the row.
+        assertEquals(1, rule.onAllNodesWithText(str(R.string.as_row)).fetchSemanticsNodes().size)
         // The built-in one opens nothing; the others their editor; Add opens a new one of its kind.
         click("Claude (your subscription)")
         assertTrue(edits.isEmpty())
@@ -145,7 +149,7 @@ class ProvidersScreenTest {
         val both = object : Hub by hub {
             override val codex get() = com.prudnikweb.hypernova.data.CodexState(available = true, enabled = true, connected = true, version = "0.164.0")
         }
-        rule.setContent { Harness(spy) { ProvidersScreen(both, onBack = {}, onEdit = { _, _ -> }) } }
+        rule.setContent { Harness(spy) { ProvidersScreen(both, onBack = {}, onEdit = { _, _ -> }, onAgentSettings = { agents += it }) } }
         rule.waitForIdle()
         val app = org.robolectric.Shadows.shadowOf(org.robolectric.RuntimeEnvironment.getApplication())
         rule.onNodeWithText(str(R.string.ag_account_claude)).performScrollTo().performClick()
@@ -154,6 +158,12 @@ class ProvidersScreenTest {
         rule.onNodeWithText(str(R.string.ag_account_codex)).performScrollTo().performClick()
         rule.waitForIdle()
         assertEquals("https://chatgpt.com/#settings", app.nextStartedActivity.dataString)
+        // Each card's Settings row opens that agent's.
+        rule.onNodeWithText(str(R.string.as_row_claude)).performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.as_row_codex)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("claude", "codex"), agents)
     }
 
     @Test fun withoutClaudeCodeThereAreNoProvidersToAdd() {

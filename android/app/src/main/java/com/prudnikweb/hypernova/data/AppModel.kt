@@ -32,6 +32,8 @@ sealed interface Route {
     /** One of a session's agents: its own transcript, read-only. */
     data class Agent(val sessionId: String, val agentId: String) : Route { override val key = "agent:$sessionId:$agentId" }
     data object Providers : Route { override val key = "providers" }
+    /** An agent's user-level settings on this server, to view: [agent] is [AgentSettingsReply.CLAUDE] or [AgentSettingsReply.CODEX]. */
+    data class AgentSettings(val agent: String) : Route { override val key = "agent-settings:$agent" }
     /** Settings › Mac › Connection log (data/ConnLog.kt). */
     data object ConnectionLog : Route { override val key = "connection-log" }
     data class ProviderEdit(val id: String?, val kind: String) : Route { override val key = "provider:${id ?: "new-$kind"}" }

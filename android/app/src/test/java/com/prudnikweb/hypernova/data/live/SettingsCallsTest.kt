@@ -1,6 +1,11 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Account
+import com.prudnikweb.hypernova.data.AgentSettingsFile
+import com.prudnikweb.hypernova.data.AgentSettingsReply
+import com.prudnikweb.hypernova.data.AgentSettingsTooOld
+import com.prudnikweb.hypernova.data.ShownSetting
 import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.Balance
 import com.prudnikweb.hypernova.data.ProviderCheck
@@ -17,11 +22,13 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
 /**
  * What Settings asks of the daemon through the real hub (docs/PROTOCOL.md, "Providers", "Account",
@@ -48,6 +55,45 @@ class SettingsCallsTest {
     }
 
     private fun last(method: String, path: String): FakeDaemon.Req = daemon.calls(method, path).last()
+
+    // ─── The agents' settings (docs/PROTOCOL.md, "Agent settings") ───
+
+    @Test fun agentSettingsAreReadFromTheRouteAndParsedPerAgent() {
+        connect()
+        answer("GET", "/v1/agents/settings", "rest-agent-settings")
+        val r = rig.call { rig.hub.agentSettings() }.getOrThrow()
+        assertEquals(1, daemon.count("GET", "/v1/agents/settings"))
+        assertEquals("gpt-6.1-sol", r.of(AgentSettingsReply.CODEX).values.first().text)
+        assertEquals(listOf("home-assistant"), r.of(AgentSettingsReply.CLAUDE).claude?.mcpServers)
+    }
+
+    @Test fun aFilesTroubleIsThatAgentsStateAndAnUnknownOneReadsAsUnreadable() {
+        connect()
+        daemon.on("GET", "/v1/agents/settings") {
+            json(200, JSONObject("""{"scope":"user","claude":{"state":"malformed","values":[],"summary":null},"codex":{"state":"missing","values":[],"summary":null}}"""))
+        }
+        val r = rig.call { rig.hub.agentSettings() }.getOrThrow()
+        assertEquals(AgentSettingsFile.MALFORMED, r.claude.state)
+        assertEquals(AgentSettingsFile.MISSING, r.codex.state)
+        assertNull(r.claude.claude)
+        assertEquals(emptyList<ShownSetting>(), r.codex.values)
+    }
+
+    @Test fun anOlderServerWithoutTheRouteSaysItNeedsUpdating() {
+        connect()
+        daemon.on("GET", "/v1/agents/settings") { refusal(404, "not_found", "Unknown endpoint.") }
+        val e = rig.call { rig.hub.agentSettings() }.exceptionOrNull()
+        assertTrue(e is AgentSettingsTooOld)
+        assertEquals(RuntimeEnvironment.getApplication().getString(R.string.as_too_old), e?.message)
+    }
+
+    @Test fun anotherFailureOfTheSettingsRouteIsNotCalledOld() {
+        connect()
+        daemon.on("GET", "/v1/agents/settings") { refusal(500, "internal", "Something went wrong.") }
+        val e = rig.call { rig.hub.agentSettings() }.exceptionOrNull()
+        assertNotNull(e)
+        assertFalse(e is AgentSettingsTooOld)
+    }
 
     private val gateway = ProviderInput(
         name = " Gateway ", kind = "custom", baseUrl = " https://gateway.example.com/v1 ", apiKey = " gw-key-0123 ",

@@ -2513,6 +2513,13 @@ class LiveHub(
         return ProviderRefused(ex.code, ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(fallback))
     }
 
+    override suspend fun agentSettings(): Result<AgentSettingsReply> = try {
+        Result.success(AgentSettingsReply.wire(api.get("/v1/agents/settings")))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+        // An older server doesn't know the request: it's the server that needs updating, not the phone trying again.
+        Result.failure(if (Net.classify(e).status == 404) AgentSettingsTooOld(res.getString(R.string.as_too_old)) else handle(e, R.string.as_err))
+    }
+
     override suspend fun checklist(): Result<String> = try {
         val url = api.get("/v1/qa").str("url") ?: throw ApiException(Problem.Server, 200, "no_url")
         Result.success(page(url))

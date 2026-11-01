@@ -301,6 +301,12 @@ class SettingsTabTest {
         assertEquals(Route.Providers, vm.nav.top)
         assertEquals(shedId, Core.activeId)
         assertTrue(Core.all)
+        // So its agents' settings are shed's to answer, and z2 isn't asked.
+        shed.ok("GET", "/v1/agents/settings", JSONObject("""{"scope":"user","claude":{"state":"missing","values":[],"summary":null},"codex":{"state":"missing","values":[],"summary":null}}"""))
+        val fromShed = kotlinx.coroutines.runBlocking { vm.hubOf(shedId)!!.agentSettings() }
+        assertEquals(com.prudnikweb.hypernova.data.AgentSettingsFile.MISSING, fromShed.getOrThrow().claude.state)
+        assertEquals(1, shed.count("GET", "/v1/agents/settings"))
+        assertEquals(0, z2.count("GET", "/v1/agents/settings"))
         Core.backToPicked()
         vm.nav.reset()
         rule.waitForIdle()
