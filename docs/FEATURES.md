@@ -6,7 +6,7 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites passed that day:
-940 app tests, 857 daemon tests.
+1029 app tests, 895 daemon tests (891 pass, 4 skipped: Mac-only).
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -20,8 +20,11 @@ Test names, shortened:
 
 - `Class.test` is an app test under `android/app/src/test/java/com/prudnikweb/hypernova/`.
   - Layer 2, the real `LiveHub`/`Core` against `FakeDaemon`: `data/live/` (ActionsTest,
-    AllServersSettingsTest, ConnectTest, CoreServersTest, ErrorsTest, MultiServerTest,
-    ReconnectTest, SocketEventsTest).
+    AllServersSettingsTest, AppUpdaterTest, AutomationNotesTest, ConnectTest, ConnectionServiceTest,
+    CoreServersTest, DeviceCertStoreTest, ErrorsTest, MacOnlyTest, MultiServerTest, MutualTlsTest,
+    NotifyActionsTest, PairTest, ReconnectTest, SocketEventsTest). `FakeDaemon("z2", lan = true)`
+    adds the local listener: HTTPS with its own pinned certificate, a client certificate asked for,
+    and a device CA that signs the phone's request; `FakeKeyStore` stands in for AndroidKeyStore.
   - Layer 3, Robolectric and Roborazzi: `ui/screens/`. Two classes share a name, so they are
     written `screens/SessionSheetTest` and `session/SessionSheetTest`.
   - Every other app class is a plain unit test.
@@ -34,17 +37,17 @@ Test names, shortened:
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| P1 | Pair from the server's QR code or link: its `/pair` page hands over to the app; paste a link; `hypernova://` links; an older `hypernova.observer` link read from its fragment | PairLinksTest (all 11); lan.test.ts › "the pairing page on the listener…", "pairing over the listener: open while a code is shown…", "the pairing links point at this server…"; linux-cli.test.ts › "pair: the QR code and its link…", "pair waits for the phone and names it"; fixture rest-pair.json | **partial**: the app's `Pairer.pair` (POST /v1/pair over the pinned listener, then `u`) never runs against a daemon; the onboarding screen has no test |
+| P1 | Pair from the server's QR code or link: its `/pair` page hands over to the app; paste a link; `hypernova://` links; an older `hypernova.observer` link read from its fragment | PairLinksTest (all 11); PairTest (all 8: `Pairer.pair` against FakeDaemon, the listener first with its pin, then the base URL, each refusal); PairingScreensTest (all 12: the steps, Paste, adding a server, every outcome); lan.test.ts › "the pairing page on the listener…", "pairing over the listener: open while a code is shown…", "the pairing links point at this server…"; linux-cli.test.ts › "pair: the QR code and its link…", "pair waits for the phone and names it"; fixture rest-pair.json (also PairTest's answer) | **covered** |
 | P2 | Pair the same computer again, or another one | ReplacePairingTest (all); ServersTest.pairingAnotherComputerAddsIt, pairingTheSameComputerAgainTakesItsPlace, theSameComputerByIdOrByName; pair.test.ts (all) | **covered** |
-| P3 | Device certificate and mutual TLS on the local route (the CSR, POST /v1/device/cert, the pinned server certificate) | CsrTest (all); LanRouteTest.pinAcceptsTheRightCertificate, pinRefusesAWrongCertificate, pinRefusesAnExpiredCertificate, theDeviceCertificateGoesToTheListenerAlone, theWebViewGoesOnOnlyForThePinnedCertificate; lan.test.ts › "POST /v1/device/cert…", "with its certificate the phone reaches the whole API…", "a new device certificate closes the WebSockets…", "the daemon keeps a device certificate's expiry…" | **partial**: the phone's `DeviceCertStore` (keystore key, request, install, renewal) is untested; FakeDaemon is plain HTTP, so no layer-2 test runs a TLS handshake with a client certificate; /v1/device/cert has no fixture |
+| P3 | Device certificate and mutual TLS on the local route (the CSR, POST /v1/device/cert, the pinned server certificate) | CsrTest (all); DeviceCertStoreTest (all 6); MutualTlsTest (all 6: FakeDaemon's HTTPS listener, a real handshake with the client certificate: asked for, issued, shown, renewed, refused, a 401, a wrong pin); LanRouteTest.pinAcceptsTheRightCertificate, pinRefusesAWrongCertificate, pinRefusesAnExpiredCertificate, theDeviceCertificateGoesToTheListenerAlone, theWebViewGoesOnOnlyForThePinnedCertificate; lan.test.ts › "POST /v1/device/cert…", "with its certificate the phone reaches the whole API…", "a new device certificate closes the WebSockets…", "the daemon keeps a device certificate's expiry…"; fixture rest-device-cert.json | **covered** (the key store is `FakeKeyStore`: AndroidKeyStore exists only on a device, so a hardware-held key is never exercised on the JVM) |
 | P4 | Pick a route: the local listener first, then the base URL; hotspot sweep; recheck back-off | LanRouteTest (probe and chooser tests); LocalFirstTest (all 11); RouteRecheckTest (all); ConnectTest.theRouterProbesTheBaseUrlFirst; lan.test.ts › "only the local network, the hotspot…", "the advertised addresses are private IPv4 and ULA only…", "a phone on another private subnet…"; linux-fixes.test.ts › "the local route skips bridges…" | **covered** |
 | P5 | Connect: the snapshot, then the socket, the token on every request | ConnectTest.theSnapshotFillsSessionsApprovalsAndUsageThenTheSocketOpens, everyRequestCarriesTheToken; fixture snapshot.json; http.test.ts › "/v1/ws takes the token in its query…" | **covered** |
-| P6 | Ping and pong; a silent socket is declared dead | ConnectTest.aPingIsAnsweredWithAPong; ReconnectTest.aSilentSocketIsDeclaredDeadAfterSeventySeconds, backOnScreenASocketSilentForThirtySecondsIsReplacedAtOnce | **partial**: no daemon test that it sends `{t:"ping"}` every 25 s or reads the pong; no fixture |
+| P6 | Ping and pong; a silent socket is declared dead | ConnectTest.aPingIsAnsweredWithAPong; ReconnectTest.aSilentSocketIsDeclaredDeadAfterSeventySeconds, backOnScreenASocketSilentForThirtySecondsIsReplacedAtOnce; ws-ping.test.ts (both: a ping every 25 s after the snapshot, the pong taken, each socket its own interval); fixture ws-ping.json | **covered** |
 | P7 | Reconnect: once at once, then every 30 s; on a new network, screen on, an alarm, Retry now | ReconnectTest (all 13); RetryTest (all); ErrorsTest.aServerThatIsntThereIsOfflineAndTriedAgainAtOnceThenEveryThirtySeconds, aServerErrorOnTheSnapshotIsRetried, anActionWhileTheServerIsAwaySaysItIsntAnswering | **covered** |
 | P8 | A 401 anywhere unpairs | ErrorsTest.a401OnTheSnapshotUnpairsAndNothingIsTriedAgain, a401OnTheSocketUnpairs, a401OnAnActionUnpairs, a401WhileOpeningASessionUnpairs | **covered** |
 | P9 | Forget a server (DELETE /v1/devices/me) | AllServersSettingsTest.eachServersBlockActsOnItsOwnServer; ServersTest.forgettingTheFirstServerClearsTheOldKeysToo, forgettingTheActiveOneShowsTheNext; lan.test.ts › "forgetting a device revokes its certificate…" | **covered** |
-| P10 | Stay connected in the background (`ConnectionService`, its permanent notification and Disconnect, `BootReceiver`) | ReconnectTest.offScreenWithoutTheBackgroundServiceTheNextTryWaitsForTheApp | **partial**: the service, its notification, Disconnect and the boot receiver never run |
-| P11 | Connection log in Settings | ConnLogTest (all) | **partial**: the screen and its Copy have no test |
+| P10 | Stay connected in the background (`ConnectionService`, its permanent notification and Disconnect, `BootReceiver`) | ConnectionServiceTest (all 6); ReconnectTest.offScreenWithoutTheBackgroundServiceTheNextTryWaitsForTheApp | **covered** |
+| P11 | Connection log in Settings | ConnLogTest (all); ConnectionLogScreenTest (both: the screen, TalkBack's sentences, Copy) | **covered** |
 | P12 | Older stores still read (the one-pairing keys, Tailscale-era lists) | ServersTest.theOnePairingBecomesTheFirstServerWithItsOldKeys, aListKeptByABuildWithTailscaleStillReadsWithItsTailnetFieldsLeftOut, aBrokenListIsReadAsEmptyAndBadEntriesAreDropped; PairLinksTest.anOlderComputersTailnetHintsAreIgnored, twoServersPairedTheOldWayStillGetBasesOfTheirOwn | **covered** |
 
 ## 2. Multi-server and All servers
@@ -58,7 +61,7 @@ Test names, shortened:
 | M5 | New session in All servers asks which computer | HomeScreenTest.allServersNewSessionAsksWhichComputer, oneComputerNewSessionGoesStraightToTheSheet; AllHomeTest.theNewSessionPickerListsEveryComputerOnlyLinkedOnesToPick | **covered** |
 | M6 | Opening a session from All visits its computer; Back returns to All | CoreServersTest.twoComputersPairedTheSwitcherAllServersAndAnswersGoingToTheRightOne (`Core.visit`, `backToPicked`) | **covered** |
 | M7 | All servers in Settings: one block per server, then This phone | SettingsPlanTest (all); AllServersSettingsTest.eachServersBlockActsOnItsOwnServer | **covered** |
-| M8 | Automations stay one server's under All ("pick a server") | none | **gap** |
+| M8 | Automations stay one server's under All ("pick a server") | AllServersAutomationsTest (all 3) | **covered** |
 
 ## 3. Home
 
@@ -232,8 +235,9 @@ Test names, shortened:
 |---|---|---|---|
 | W1 | The server fetches GitHub releases and offers the APK | releases.test.ts (all) | **covered** |
 | W2 | The phone's offer: from the snapshot, from `{t:"app"}`, a notification once per version, Settings → About | AboutUpdateTest (all); SocketEventsTest.aNewerAppOnTheServerIsOfferedAndWithdrawnWithoutReconnecting, aNewerAppOffScreenIsANotificationOncePerVersion, anOlderOrSameAppIsNoOffer; SettingsTest.aboutUpdateRowOffersTheUpdate; fixture ws-app.json | **covered** |
-| W3 | Download, check and install | UpdatePolicyTest (all); CoreServersTest.theAppUpdateAsksForThePermissionThenDownloadsAndSaysWhatWentWrong; AllServersSettingsTest.eachServersBlockActsOnItsOwnServer; files.test.ts › "the APK download carries on…" | **partial**: the PackageInstaller hand-off and the real archive check are only modelled as events; neither runs |
+| W3 | Download, check and install | UpdatePolicyTest (all); AppUpdaterTest (all 6: the archive read through PackageManager, a real PackageInstaller session, each of its answers, the next start's note); CoreServersTest.theAppUpdateAsksForThePermissionThenDownloadsAndSaysWhatWentWrong; AllServersSettingsTest.eachServersBlockActsOnItsOwnServer; files.test.ts › "the APK download carries on…" | **covered** (on the JVM Robolectric stands in for what is the system's: it is told what the archive holds, and Android's "Update this app?" dialog and the signature check never run; PackageInstaller's answers are sent as the system would) |
 | W4 | The install page for a browser (/download/android) | UpdatePolicyTest.aBrowserGetsThePageOnlyWhereItCouldOpenIt; files.test.ts, lan.test.ts, linux-cli.test.ts (the download tests) | **covered** |
+| W5 | The server updates itself: Settings' switch, its line (why not here, waiting, installing, the last one) | MacOnlyScreensTest.theServersOwnUpdateIsTurnedOnFromThePhone, theServersOwnUpdateSaysWhyNotAndWhatItIsDoing, aRefusedSwitchIsSaid; ServerUpdateTest (all); fixtures rest-update.json, ws-update.json; server-update.test.ts (all) | **covered** |
 
 ## 17. Widget
 
@@ -248,8 +252,8 @@ Test names, shortened:
 | # | Capability | Tests | Status |
 |---|---|---|---|
 | NT1 | An approval: a notification off screen, a banner on screen | ConnectTest.anApprovalInTheSnapshotIsAnnouncedOnceAsABannerOnScreen, offScreenAnApprovalInTheSnapshotIsANotification, aSnapshotWithoutAnApprovalLetsItsNotificationGo; SocketEventsTest.anApprovalOffScreenIsANotification; MultiServerTest.theWatchedHubsApprovalIsANotificationNotABanner | **covered** |
-| NT2 | Allow, Deny, Reply and Answer from a notification | ServersTest.aNotificationGoesToTheServerItNames, anAnswerGoesWhereTheApprovalWaits; MultiServerTest.aNotificationNamesItsServerAndGoesThereEvenWithTheApprovalGone; WidgetModelTest.denyAndAllowOnlyWhereTheNotificationsRuleSaysSo | **partial**: only the choice of server is tested; the `NotifyActions` receiver (Allow, Deny, inline Reply, Answer) never runs |
-| NT3 | Finished, error, job died, low battery, put-away rules | SocketEventsTest.aTurnThatEndsIsAFinishedNoticeAMomentLater, aTurnThatCarriesOnWithinTheMomentSaysNothing, anErrorIsSaidAtOnceAndOffScreenAsANotification, aDeadJobIsSaidOnce, aLowBatteryIsSaidOnceUntilItHasBeenCharged; PutAwayTest (all); PhrasesTest (all) | **partial**: automation notes and the sleep-soon and Backpack-ending notices are untested on the phone |
+| NT2 | Allow, Deny, Reply and Answer from a notification | NotifyActionsTest (all 12: the receiver as Android delivers it, each way it goes); ServersTest.aNotificationGoesToTheServerItNames, anAnswerGoesWhereTheApprovalWaits; MultiServerTest.aNotificationNamesItsServerAndGoesThereEvenWithTheApprovalGone; WidgetModelTest.denyAndAllowOnlyWhereTheNotificationsRuleSaysSo | **covered** |
+| NT3 | Finished, error, job died, low battery, put-away rules | SocketEventsTest.aTurnThatEndsIsAFinishedNoticeAMomentLater, aTurnThatCarriesOnWithinTheMomentSaysNothing, anErrorIsSaidAtOnceAndOffScreenAsANotification, aDeadJobIsSaidOnce, aLowBatteryIsSaidOnceUntilItHasBeenCharged; MacOnlyTest.theMacSleepingSoonIsABannerOnScreenAndANotificationAway, backpackEndingOffersTwoHoursMore; NotifyActionsTest.backpacksNoticeOffersTwoHoursMoreWithoutOpeningTheApp; AutomationNotesTest (all 4); PutAwayTest (all); PhrasesTest (all) | **covered** |
 | NT4 | A tap opens the right session on the right server | NavTest (all); ServersTest.aNotificationGoesToTheServerItNames | **covered** |
 
 ## 19. Statistics
@@ -264,10 +268,10 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| MO1 | Linux says they are unavailable, each with a sentence | platform.test.ts › "a Mac lacks nothing; Linux lacks the Mac-only features…"; wsl.test.ts › "a WSL snapshot's reasons…" | **partial**: how the phone hides or explains them is untested |
-| MO2 | Stay awake: While working, Backpack, Off, +2 h | AnswersTest.readsWhetherBackpackCanBeExtended; awake.test.ts (all) | **partial**: the app's `setAwake` and `extendAwake`, the Stay awake section and the Backpack notice are untested; no fixtures for `awake`, `mac_sleep_soon` or `mac_backpack_ending` |
-| MO3 | Battery | AnswersTest.lowBatteryIsTwentyPercentOrLessAndNotCharging; SocketEventsTest.aLowBatteryIsSaidOnceUntilItHasBeenCharged; battery.test.ts (all) | **partial**: no fixture for `{t:"battery"}` |
-| MO4 | Open the terminal in a window on the Mac (POST …/open) | none | **gap** |
+| MO1 | Linux says they are unavailable, each with a sentence | platform.test.ts › "a Mac lacks nothing; Linux lacks the Mac-only features…"; wsl.test.ts › "a WSL snapshot's reasons…"; mac-only-routes.test.ts (all 3); MacOnlyTest.aLinuxServerLacksThemAndSaysWhyWhenAskedAnyway, aMacHasEveryFeature; MacOnlyScreensTest.aLinuxServerHasNoWindowToOpen; fixtures rest-mac-awake-unavailable.json, rest-session-open-unavailable.json | **partial**: the Settings tab's own check that hides Stay awake (`mac.has(awake)` in Settings.kt) isn't drawn: the tab takes HubViewModel, which the screen tests have no fake of (SettingsTest says the same); Home's "Sign in on the Mac" is T4's |
+| MO2 | Stay awake: While working, Backpack, Off, +2 h | AnswersTest.readsWhetherBackpackCanBeExtended; MacOnlyTest.aMacsBatteryAndStayAwakeComeFromTheirMessages, stayAwakeIsSetAndExtendedThroughTheMacsRoute, backpackEndingOffersTwoHoursMore; MacOnlyScreensTest.stayAwakeIsPickedOnTheMac, backpackBeforeItsSetupSaysToSetItUpOnTheMac, aMacWithoutALidHasNoBackpack, aRefusalIsSaid; NotifyActionsTest.backpacksNoticeOffersTwoHoursMoreWithoutOpeningTheApp; fixtures ws-awake.json, rest-mac-awake.json, ws-mac-sleep-soon.json, ws-mac-backpack-ending.json; awake.test.ts (all) | **covered** |
+| MO3 | Battery | AnswersTest.lowBatteryIsTwentyPercentOrLessAndNotCharging; SocketEventsTest.aLowBatteryIsSaidOnceUntilItHasBeenCharged; MacOnlyTest.aMacsBatteryAndStayAwakeComeFromTheirMessages; fixture ws-battery.json; battery.test.ts (all) | **covered** |
+| MO4 | Open the terminal in a window on the Mac (POST …/open) | MacOnlyTest.openOnTheMacSaysWhichAppAndWhetherItWasOpenAlready, aLinuxServerLacksThemAndSaysWhyWhenAskedAnyway; MacOnlyScreensTest.aMacsTerminalOpensInAWindowThere, aLinuxServerHasNoWindowToOpen; mac-only-routes.test.ts › "POST …/open on Linux…"; fixture rest-session-open-unavailable.json | **covered** (the daemon's Mac path runs `/usr/bin/open` on app bundles and is fixed at load by `platform.ts`, so only a Mac can run it) |
 
 ## 21. CLI and daemon admin
 
@@ -277,7 +281,7 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | D2 | `pair`, `status`, `doctor`, `logs`, `lan` | linux-cli.test.ts (all) | **covered** |
 | D3 | WSL | wsl.test.ts (all); linux-cli.test.ts (the WSL tests) | **covered** |
 | D4 | Hooks and the status line tap | hooks.test.ts (all) | **covered** |
-| D5 | Shared terminals (the holder) | holder-exit.test.ts, holder-move.test.ts, term-scroll.test.ts (all) | **partial**: only a command's exit, a move and scrolling are tested; `hn ls` and `hn attach` have none |
+| D5 | Shared terminals (the holder) | holder-exit.test.ts, holder-move.test.ts, term-scroll.test.ts (all); hn-cli.test.ts (all 3: `hn ls` and `hn list`, `hn attach` in a pty, typing, Ctrl+\\ detaching, the refusals) | **covered** (a window resize under `hn attach` isn't driven) |
 | D6 | `claude agents` jobs | claude-agents.test.ts (all); job-deaths.test.ts (all) | **covered** |
 | D7 | Claude Code's SDK, fetched not bundled | sdk.test.ts, sdk-missing.test.ts (all) | **covered** |
 | D8 | Usage: the probe, merging readings, the pace | usage-probe.test.ts, usage-probe-pace.test.ts, usage-merge.test.ts, usage-rate.test.ts, usage-screen.test.ts, usage-no-five-hour.test.ts (all) | **covered** |
@@ -290,17 +294,18 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 The daemon already tests most of these in its own suites. What is missing is the shared golden file
 that both sides must agree on.
 
-- **WebSocket:** `battery`, `awake`, `mac_sleep_soon`, `mac_backpack_ending`, `devices`, `speech`,
-  `speech.stop`, `speech.progress` (from the phone), `speaking`, `automation`, `automation.removed`,
-  `automations`, `run`, `note`, `ping`/`pong`.
+- **WebSocket:** `speech`, `speech.stop`, `speech.progress` (from the phone), `speaking`,
+  `automation`, `automation.removed`, `automations`, `run`, `note`, `pong` (the phone's constant
+  answer, which the daemon takes and ignores: ws-ping.test.ts).
 - **REST:** POST /v1/sessions, POST /v1/approvals/{id}, POST …/prompt (without hold),
   PUT/DELETE …/held/{id}, POST /v1/attachments, …/interrupt, …/menu, …/terminal, …/open,
   …/continue, …/auto-continue, …/provider, …/usage, …/todos, …/rewind, …/blocked (and retry,
   dismiss), …/switch/preview, …/switch, GET /v1/commands, /v1/codex (GET, POST, refresh),
   /v1/codex/models, /v1/projects, /v1/providers (all routes), /v1/files, /v1/folders, /v1/file,
-  /v1/preview, /v1/usage, /v1/usage/refresh, /v1/mac/awake, /v1/mac/files, /v1/stats,
-  /v1/account/*, /v1/devices/me, /v1/device/cert, /v1/qa, /v1/speech/*, /v1/automations/*,
-  /v1/health.
+  /v1/preview, /v1/usage, /v1/usage/refresh, /v1/mac/files, /v1/stats, /v1/account/*, /v1/qa,
+  /v1/speech/*, /v1/automations/*. …/open and POST /v1/mac/awake have their Linux refusals only
+  (`rest-session-open-unavailable`, `rest-mac-awake-unavailable`): a Mac's answer can't be made on
+  the Linux machine the daemon's suite runs on.
 
 ## Biggest gaps
 
@@ -313,12 +318,9 @@ Ktor; the screens move to Compose Multiplatform) and how soon the owner would no
 2. **Attachments** (Q7). File reading and the upload body are the most platform-specific HTTP code,
    and neither side tests the route. *Layer 2:* `upload` against FakeDaemon (bytes, name,
    `attachment_gone`); *daemon:* an HTTP test of POST /v1/attachments.
-3. **Mutual TLS and the device certificate** (P3). The move rewrites TLS (Ktor engines, key
-   storage), and every connection depends on it. *Layer 2:* an HTTPS mode for FakeDaemon
-   (MockWebServer's `HeldCertificate`) that asks for a client certificate; *layer 1:* a fixture for
-   /v1/device/cert.
-4. **Pairing end to end** (P1). If it breaks, nothing works on a new install or a new server.
-   *Layer 2:* `Pairer.pair` against FakeDaemon (the listener first, then `u`, a refused code).
+3. ~~**Mutual TLS and the device certificate** (P3).~~ Done: MutualTlsTest, DeviceCertStoreTest,
+   fixture rest-device-cert.json.
+4. ~~**Pairing end to end** (P1).~~ Done: PairTest, PairingScreensTest.
 5. **Load earlier** (C4). A long chat would silently show only its latest events. *Layer 2:* a
    SocketEventsTest-style test of `hasEarlier` and `loadEarlier` with the limit fixture.
 6. **Automations on the phone** (U1, U4, U5). Many REST calls and five messages with no rig test,
@@ -338,5 +340,5 @@ Ktor; the screens move to Compose Multiplatform) and how soon the owner would no
     `agentEvents` with a cursor and `starting`; *layer 3:* AgentScreen.
 
 Just behind them: the sky's drawing (H12, *layer 3:* a Home baseline with the sky on), account
-sign-in (T4, *layer 2*), blocked calls' Allow & retry (S5, *layer 2* plus a fixture), and the
-notification receivers (NT2), which stay Android-only on a desktop-first move.
+sign-in (T4, *layer 2*), and blocked calls' Allow & retry (S5, *layer 2* plus a fixture). (The
+notification receivers, NT2, are done: NotifyActionsTest.)
