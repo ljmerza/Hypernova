@@ -6,7 +6,7 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1328 app tests, 935 daemon tests (931 pass, 4 skipped: Mac-only).
+2026-11-01: 1339 app tests, 953 daemon tests (949 pass, 4 skipped: Mac-only).
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -244,7 +244,7 @@ Test names, shortened:
 | W2 | The phone's offer: from the snapshot, from `{t:"app"}`, a notification once per version, Settings → About | AboutUpdateTest (all); SocketEventsTest.aNewerAppOnTheServerIsOfferedAndWithdrawnWithoutReconnecting, aNewerAppOffScreenIsANotificationOncePerVersion, anOlderOrSameAppIsNoOffer; SettingsTest.aboutUpdateRowOffersTheUpdate; fixture ws-app.json | **covered** |
 | W3 | Download, check and install | UpdatePolicyTest (all); AppUpdaterTest (all 6: the archive read through PackageManager, a real PackageInstaller session, each of its answers, the next start's note); CoreServersTest.theAppUpdateAsksForThePermissionThenDownloadsAndSaysWhatWentWrong; AllServersSettingsTest.eachServersBlockActsOnItsOwnServer; files.test.ts › "the APK download carries on…" | **covered** (on the JVM Robolectric stands in for what is the system's: it is told what the archive holds, and Android's "Update this app?" dialog and the signature check never run; PackageInstaller's answers are sent as the system would) |
 | W4 | The install page for a browser (/download/android) | UpdatePolicyTest.aBrowserGetsThePageOnlyWhereItCouldOpenIt; files.test.ts, lan.test.ts, linux-cli.test.ts (the download tests) | **covered** |
-| W5 | The server updates itself: Settings' switch, its line (why not here, waiting, installing, the last one) | MacOnlyScreensTest.theServersOwnUpdateIsTurnedOnFromThePhone, theServersOwnUpdateSaysWhyNotAndWhatItIsDoing, aRefusedSwitchIsSaid; ServerUpdateTest (all); fixtures rest-update.json, ws-update.json; server-update.test.ts (all) | **covered** |
+| W5 | The server updates itself, at once whatever sessions are doing: Settings' switch, its line (why not here, installing, what failed, the last one) | MacOnlyScreensTest.theServersOwnUpdateIsTurnedOnFromThePhone, theServersOwnUpdateSaysWhyNotAndWhatItIsDoing, aFailedUpdateIsOnTheRow, aRefusedSwitchIsSaid; ServerUpdateTest (all); fixtures rest-update.json, ws-update.json, ws-update-failed.json; server-update.test.ts (all) | **covered** |
 
 ## 17. Widget
 
@@ -259,8 +259,10 @@ Test names, shortened:
 | # | Capability | Tests | Status |
 |---|---|---|---|
 | NT1 | An approval: a notification off screen, a banner on screen | ConnectTest.anApprovalInTheSnapshotIsAnnouncedOnceAsABannerOnScreen, offScreenAnApprovalInTheSnapshotIsANotification, aSnapshotWithoutAnApprovalLetsItsNotificationGo; SocketEventsTest.anApprovalOffScreenIsANotification; MultiServerTest.theWatchedHubsApprovalIsANotificationNotABanner | **covered** |
-| NT2 | Allow, Deny, Reply and Answer from a notification | NotifyActionsTest (all 12: the receiver as Android delivers it, each way it goes); ServersTest.aNotificationGoesToTheServerItNames, anAnswerGoesWhereTheApprovalWaits; MultiServerTest.aNotificationNamesItsServerAndGoesThereEvenWithTheApprovalGone; WidgetModelTest.denyAndAllowOnlyWhereTheNotificationsRuleSaysSo | **covered** |
+| NT2 | Allow, Deny, Reply and Answer from a notification | NotifyActionsTest (all 13: the receiver as Android delivers it, each way it goes); ServersTest.aNotificationGoesToTheServerItNames, anAnswerGoesWhereTheApprovalWaits; MultiServerTest.aNotificationNamesItsServerAndGoesThereEvenWithTheApprovalGone; WidgetModelTest.denyAndAllowOnlyWhereTheNotificationsRuleSaysSo | **covered** |
 | NT3 | Finished, error, job died, low battery, put-away rules | SocketEventsTest.aTurnThatEndsIsAFinishedNoticeAMomentLater, aTurnThatCarriesOnWithinTheMomentSaysNothing, anErrorIsSaidAtOnceAndOffScreenAsANotification, aDeadJobIsSaidOnce, aLowBatteryIsSaidOnceUntilItHasBeenCharged; MacOnlyTest.theMacSleepingSoonIsABannerOnScreenAndANotificationAway, backpackEndingOffersTwoHoursMore; NotifyActionsTest.backpacksNoticeOffersTwoHoursMoreWithoutOpeningTheApp; AutomationNotesTest (all 4); PutAwayTest (all); PhrasesTest (all) | **covered** |
+| NT5 | A server's update that failed: a banner or a notification, once per release and once when it gives up, each server's its own, a tap opening its section of Settings (the jump itself by hand) | ServerUpdateNoticeTest.onScreen_aFailureIsABannerOncePerRelease_andOnceMoreWhenItGivesUp, offScreen_aFailureIsANotification_fromASnapshotToo_andOnceAcrossRestartsOfTheApp, eachWatchedServerSaysItsOwn, anUpdateGoingWell_orAnOlderDaemon_saysNothing; NotifyActionsTest.aFailedServerUpdateOpensThatServersSettings_andGoesOnceItsFine; SettingsPlanTest.keysForAJump | **partial** |
+| NT6 | An approval a daemon restart took away, its session still asking in its own dialog, said again | ServerUpdateNoticeTest.anApprovalARestartTookAway_itsSessionStillAsking_isSaidAgain, anApprovalAnsweredWhileAway_isNotSaidAgain; claude-agents.test.ts "a restart handed a held ask back"; with a real Claude Code by hand (docs/DECISIONS.md, "Servers update without waiting") | **partial** |
 | NT4 | A tap opens the right session on the right server | NavTest (all); ServersTest.aNotificationGoesToTheServerItNames | **covered** |
 
 ## 19. Statistics
