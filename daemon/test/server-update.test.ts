@@ -22,7 +22,7 @@ process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
 process.env.HOME = join(scratch, 'home')
 mkdirSync(process.env.HOME, { recursive: true })
 
-const { serverUpdater, installKind, semver, newer } = await import('../src/server-update.ts')
+const { busyNow, serverUpdater, installKind, semver, newer } = await import('../src/server-update.ts')
 const { releaseChecker, parseNote } = await import('../src/releases.ts')
 const { installSource } = await import('../src/cli/install.ts')
 const { settings } = await import('../src/store.ts')
@@ -109,7 +109,7 @@ function updater(extra: Partial<Parameters<typeof serverUpdater>[0]> = {}) {
   const applied: ApplyJob[] = []
   const u = serverUpdater({
     version: '0.5.0', dir, stateFile, logFile: join(scratch, 'update.log'),
-    enabled: () => true, managed: () => ({ ok: true }), busy: () => ({ working: 0, approvals: 0 }),
+    enabled: () => true, managed: () => ({ ok: true }), busy: () => ({ working: 0, approvals: 0, agents: 0 }),
     apply: async (j) => void applied.push(j),
     quietMs: 0, pollMs: 5, watchMs: 0,
     ...extra,
@@ -236,13 +236,13 @@ test('an install the installer does not manage: skipped, with why', async () => 
 
 test('it waits while a session works or an approval waits, and installs once it is quiet', async () => {
   pkg = tarball('0.9.0')
-  let b = { working: 1, approvals: 0 }
+  let b = { working: 1, approvals: 0, agents: 0 }
   let polls = 0
   const { u, applied } = updater({
     busy: () => {
       polls++
-      if (polls === 4) b = { working: 0, approvals: 1 }
-      if (polls === 8) b = { working: 0, approvals: 0 }
+      if (polls === 4) b = { working: 0, approvals: 1, agents: 0 }
+      if (polls === 8) b = { working: 0, approvals: 0, agents: 0 }
       return b
     },
   })
@@ -253,6 +253,40 @@ test('it waits while a session works or an approval waits, and installs once it 
   assert.equal((await p).kind, 'launched')
   assert.ok(polls >= 8)
   assert.equal(applied.length, 1)
+})
+
+test('it waits while an agent runs, also one waiting on its background command with every session idle', async () => {
+  pkg = tarball('0.9.0')
+  let b = { working: 0, approvals: 0, agents: 1 }
+  let polls = 0
+  const { u, applied } = updater({
+    busy: () => {
+      if (++polls === 6) b = { working: 0, approvals: 0, agents: 0 }
+      return b
+    },
+  })
+  const p = u.consider(release('v0.9.0'))
+  await new Promise((r) => setTimeout(r, 15))
+  assert.equal(applied.length, 0)
+  assert.equal(u.view().state, 'waiting')
+  assert.equal((await p).kind, 'launched')
+  assert.ok(polls >= 6)
+  assert.equal(applied.length, 1)
+})
+
+test('an agent that never ends holds it only up to the cap', async () => {
+  pkg = tarball('0.9.0')
+  let t = 1_000_000
+  const { u, applied } = updater({ now: () => t, sleep: async () => void (t += 3600_000), maxWaitMs: 5 * 3600_000, busy: () => ({ working: 0, approvals: 0, agents: 1 }) })
+  assert.equal((await u.consider(release('v0.9.0'))).kind, 'launched')
+  assert.equal(applied.length, 1)
+})
+
+test('what the gate counts: sessions working or starting, approvals, and running agents of sessions that have not ended', () => {
+  assert.deepEqual(busyNow([], 0), { working: 0, approvals: 0, agents: 0 })
+  assert.deepEqual(busyNow([{ state: 'working', agentsRunning: 0 }, { state: 'starting', agentsRunning: 0 }, { state: 'idle', agentsRunning: 0 }], 2), { working: 2, approvals: 2, agents: 0 })
+  // A main agent idle while its agent waits on a background command is busy too; an ended session's count is stale.
+  assert.deepEqual(busyNow([{ state: 'idle', agentsRunning: 2 }, { state: 'working', agentsRunning: 1 }, { state: 'ended', agentsRunning: 3 }], 0), { working: 1, approvals: 0, agents: 3 })
 })
 
 test('quiet means quiet for a while: a short gap between turns is not enough', async () => {
@@ -266,7 +300,7 @@ test('quiet means quiet for a while: a short gap between turns is not enough', a
     // Quiet for 20 s, working again, then quiet for good.
     busy: () => {
       seen.push(t)
-      return { working: t >= 20_000 && t < 40_000 ? 1 : 0, approvals: 0 }
+      return { working: t >= 20_000 && t < 40_000 ? 1 : 0, approvals: 0, agents: 0 }
     },
   })
   assert.equal((await u.consider(release('v0.9.0'))).kind, 'launched')
@@ -277,7 +311,7 @@ test('quiet means quiet for a while: a short gap between turns is not enough', a
 test('busy for longer than the cap: it goes ahead, and says it was forced', async () => {
   pkg = tarball('0.9.0')
   let t = 0
-  const { u } = updater({ now: () => t, sleep: async () => void (t += 3600_000), maxWaitMs: 5 * 3600_000, busy: () => ({ working: 2, approvals: 0 }) })
+  const { u } = updater({ now: () => t, sleep: async () => void (t += 3600_000), maxWaitMs: 5 * 3600_000, busy: () => ({ working: 2, approvals: 0, agents: 0 }) })
   assert.deepEqual(await u.consider(release('v0.9.0')), { kind: 'launched', tag: 'v0.9.0', forced: true })
 })
 
@@ -285,7 +319,7 @@ test('turned off while it waits: nothing installed', async () => {
   pkg = tarball('0.9.0')
   let on = true
   let polls = 0
-  const { u, applied } = updater({ enabled: () => on, busy: () => (++polls === 3 && (on = false), { working: 1, approvals: 0 }) })
+  const { u, applied } = updater({ enabled: () => on, busy: () => (++polls === 3 && (on = false), { working: 1, approvals: 0, agents: 0 }) })
   assert.equal((await u.consider(release('v0.9.0'))).kind, 'cancelled')
   assert.equal(applied.length, 0)
 })

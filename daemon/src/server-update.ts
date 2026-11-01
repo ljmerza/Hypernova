@@ -9,7 +9,8 @@
 //   2. the release's server package (`hypernova-server-<tag>-linux.tar.gz`) is downloaded and its
 //      SHA-256 checked against the note's `serverSha256` (a note without one: nothing installed),
 //      then unpacked into a new folder and its daemon's version checked against the tag;
-//   3. then it waits for a quiet moment: no session working or starting, no approval waiting, for 2
+//   3. then it waits for a quiet moment: no session working or starting, no agent running (one
+//      waiting on its background command runs too), no approval waiting, for 2
 //      minutes on end (24 hours at most, then it goes ahead: the shared terminals outlive the
 //      restart, docs/PROTOCOL.md, "Shared terminals");
 //   4. and hands the install to a transient systemd unit of its own (`systemd-run --user`,
@@ -47,7 +48,20 @@ const PENDING_FOR = 3600_000
 export const UPDATE_UNIT = 'hypernova-update'
 
 export type Managed = { ok: true } | { ok: false; reason: string }
-export type Busy = { working: number; approvals: number }
+export type Busy = { working: number; approvals: number; agents: number }
+
+/**
+ * What a quiet moment waits for. Agents count on their own: a session whose main agent is idle may
+ * have agents at work, or waiting on a background command that a restart would leave them without
+ * news of. The cap on a stuck agent (agents.ts) and [MAX_WAIT] keep one from holding this for good.
+ */
+export function busyNow(sessions: readonly { state: string; agentsRunning: number }[], approvals: number): Busy {
+  return {
+    working: sessions.filter((s) => s.state === 'working' || s.state === 'starting').length,
+    approvals,
+    agents: sessions.reduce((n, s) => n + (s.state === 'ended' ? 0 : s.agentsRunning), 0),
+  }
+}
 /** What the install needs: the unpacked package and where to write how it went. */
 export type ApplyJob = { tag: string; from: string; to: string; unpacked: string; workDir: string; result: string; logFile: string }
 export type LastUpdate = { from: string; to: string; at: number }
@@ -203,7 +217,7 @@ export function serverUpdater(o: UpdaterOptions = {}) {
   const maxWaitMs = o.maxWaitMs ?? MAX_WAIT
   const pollMs = o.pollMs ?? POLL
   const watchMs = o.watchMs ?? 5000
-  const busy = o.busy ?? (() => ({ working: 0, approvals: 0 }))
+  const busy = o.busy ?? (() => ({ working: 0, approvals: 0, agents: 0 }))
   const apply = o.apply ?? launchUnit
   const changed = o.changed ?? (() => {})
   // The install's verdict is looked at again at most every minute (a stat and a read or two).
@@ -307,21 +321,21 @@ export function serverUpdater(o: UpdaterOptions = {}) {
     return s === 'updated'
   }
 
-  /** Waits for no session working or starting and no approval waiting, [quietMs] on end; [maxWaitMs] at most. */
+  /** Waits for no session working or starting, no agent running and no approval waiting, [quietMs] on end; [maxWaitMs] at most. */
   async function quiet(tag: string): Promise<'quiet' | 'forced' | 'cancelled'> {
     const start = now()
     let since: number | null = null
     for (let told = false; ; ) {
       if (!enabled()) return 'cancelled'
       const b = busy()
-      if (b.working === 0 && b.approvals === 0) {
+      if (b.working === 0 && b.approvals === 0 && b.agents === 0) {
         since ??= now()
         if (now() - since >= quietMs) return 'quiet'
       } else {
         since = null
         if (!told) {
           told = true
-          say(`server update to ${tag}: waiting for a quiet moment (${b.working} working, ${b.approvals} waiting for an answer)`, true)
+          say(`server update to ${tag}: waiting for a quiet moment (${b.working} working, ${b.agents} agents running, ${b.approvals} waiting for an answer)`, true)
         }
       }
       if (now() - start >= maxWaitMs) return 'forced'

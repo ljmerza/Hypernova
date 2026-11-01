@@ -2634,9 +2634,11 @@ server updates itself and then pushes to the client that needs update too." Deci
    version checked against the tag. A failure at any step leaves the server as it was and waits
    before trying that release again: 1 hour, then 6, then 24, then not until the setting is turned
    off and on, or a newer release comes.
-4. **Never in the middle of work.** It waits for no session working or starting and no approval
-   waiting, 2 minutes on end; after 24 hours of waiting it goes ahead anyway (the shared terminals
-   outlive the restart; an approval still waiting then is lost the way any restart loses one).
+4. **Never in the middle of work.** It waits for no session working or starting, no agent running
+   (also one waiting on its background command: z2 restarted under some on 2026-11-01; the owner, the
+   same day) and no approval waiting, 2 minutes on end; after 24 hours of waiting it goes ahead anyway
+   (the shared terminals outlive the restart; an approval still waiting then is lost the way any
+   restart loses one).
 5. **Installed the way `install-linux.sh --from` installs**, by the package's own script, in a
    transient systemd unit of its own (`systemd-run --user`, `hypernova-update`), not as a child of
    the daemon: the service's restart, which ends the daemon, can't cut the install off. Setup swaps

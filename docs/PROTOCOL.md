@@ -249,7 +249,9 @@ ServerUpdate = {
    nothing, logged); the package (128 MB at most, its listed size) into `<support>/updates/`, its
    SHA-256 counted on the way, unpacked with `tar` into a new folder there, which must hold one
    `hypernova-<version>/` with `scripts/install-linux.sh` and a daemon whose version is the tag's.
-4. **A quiet moment**: no session `working` or `starting` and no approval waiting, 2 minutes on end
+4. **A quiet moment**: no session `working` or `starting`, no agent running (`agentsRunning` of any
+   session that hasn't ended, so also an agent waiting on its background command, see Agents and
+   workflows, whose cap keeps a stuck one from holding this) and no approval waiting, 2 minutes on end
    (looked at every 15 s); after 24 hours it goes ahead anyway. Turned off meanwhile: nothing.
 5. **The install**, in a transient systemd unit of the user's (`systemd-run --user
    --unit=hypernova-update`, `daemon/src/server-update.sh`, its output in `<logs>/update.log`), with
