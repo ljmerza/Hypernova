@@ -26,4 +26,16 @@
     </plurals>
     <!-- Nothing left once the filter is on. -->
     <string name="filter_none">No sessions match this filter</string>
+
+    <!-- Home's sort (ui/home/HomeSortSheet.kt; docs/DECISIONS.md, "Sorting Home's sessions"): the button beside the filter and its sheet. -->
+    <string name="sort_title">Sort sessions</string>
+    <!-- TalkBack on the sort button while it isn't by name: "Sort sessions, Recent activity, newest first". -->
+    <string name="sort_button_on">Sort sessions, %1$s</string>
+    <string name="sort_name">Name, A to Z</string>
+    <string name="sort_recent">Recent activity, newest first</string>
+    <string name="sort_project">Project, A to Z, then name</string>
+    <string name="sort_server">Server, then name</string>
+    <string name="sort_within_groups">Within each group: Needs input, Working, Completed.</string>
+    <!-- The top bar's New session pill, short of room for both words. -->
+    <string name="new_session_short">New</string>
 </resources>
