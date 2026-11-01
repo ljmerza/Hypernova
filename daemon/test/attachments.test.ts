@@ -127,6 +127,22 @@ test('a refused upload closes its connection, so the next request on a kept-aliv
   }
 })
 
+test('an upload stopped while a write is on its way to the disk leaves nothing uncaught', async () => {
+  const { saveAttachment } = await import('../src/attachments.ts')
+  async function* stopsMidWrite() {
+    // The file open, then a chunk small enough that the next one is asked for at once: still writing as the phone goes.
+    yield Buffer.from('x')
+    await new Promise((r) => setTimeout(r, 100))
+    yield Buffer.from('y')
+    throw new Error('the phone went away')
+  }
+  await assert.rejects(saveAttachment('gone.bin', stopsMidWrite()), (e: any) => e.status === 400 && e.code === 'aborted')
+  // Anything uncaught fails this test while it waits.
+  await new Promise((r) => setTimeout(r, 100))
+  const { readdirSync } = await import('node:fs')
+  assert.ok(!readdirSync(ATTACH_DIR).flatMap((d) => readdirSync(join(ATTACH_DIR, d))).includes('gone.bin'))
+})
+
 test('only with the token', async () => {
   assert.equal((await upload('a.txt', Buffer.from('x'), null)).status, 401)
   assert.equal((await upload('a.txt', Buffer.from('x'), 'not-the-token')).status, 401)

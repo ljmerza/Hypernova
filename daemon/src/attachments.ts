@@ -44,6 +44,11 @@ export async function saveAttachment(name: string, body: AsyncIterable<Buffer>):
   mkdirSync(dir, { recursive: true, mode: 0o700 })
   const path = join(dir, safeName(name))
   const out = createWriteStream(path, { mode: 0o600 })
+  // Destroyed below with a write still on its way to the disk, the stream emits an error of its own:
+  // with no listener that's an uncaught exception, on every upload stopped at that moment.
+  out.on('error', (e: NodeJS.ErrnoException) => {
+    if (e.code !== 'ERR_STREAM_DESTROYED') log('attachment write failed', e)
+  })
   let size = 0
   try {
     try {
