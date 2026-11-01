@@ -225,6 +225,7 @@ Test names, shortened:
 | T5 | This phone: card swipes, session top bar, typing, display | SettingsTest.cardSwipeRightPicksOpen, topBarToggleMoveAndReset, enterKeyNewLineAndBack; CardSwipeChoiceTest.picksAreKept; TopBarTest.itIsKeptAsOneLineAndReadBack; ServerSwitcherTest.namesStillShowAtALargeFont | **partial**: Display (text size, effects) has no test of its own |
 | T6 | Refresh usage now (POST /v1/usage/refresh) | UsageRefreshTest (all); usage-probe.test.ts, usage-probe-pace.test.ts (all) | **partial**: the route has no HTTP test or fixture; the phone's call never runs |
 | T7 | Testing checklist | http.test.ts › "the checklist needs its key…"; lan.test.ts › "a preview and the checklist…" | **partial**: the app's `checklist()` never runs |
+| T8 | Terminal engine (testing only): the live terminal drawn by Ghostty's core (ghostty-web, `assets/term-ghostty/`) instead of xterm.js, as a trial | SettingsTest.terminalEngineGhosttyAndBack; SettingsPlanTest (all); TermEngineTest (all); `node scripts/term-pages.mjs` (the page in headless Chromium: screen, typing, fit, finger scrolling, fullscreen wheel, colours; and both pages measured) | **partial**: the Ghostty page runs only in desktop headless Chromium, never in a phone's WebView; the script isn't part of any suite |
 
 ## 16. App update
 

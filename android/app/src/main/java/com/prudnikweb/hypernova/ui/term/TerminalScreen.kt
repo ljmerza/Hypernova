@@ -89,9 +89,6 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.IOException
 
-private const val HOST = "appassets.androidplatform.net"
-private const val PAGE = "https://$HOST/term/index.html"
-
 private enum class Status { Connecting, Live, Lost, Ended }
 private data class Info(val cols: Int, val rows: Int, val mac: Int)
 
@@ -100,7 +97,8 @@ private data class Info(val cols: Int, val rows: Int, val mac: Int)
  * (bundled in the app) over a WebSocket from the daemon. The key bar adds what a phone
  * keyboard lacks. The terminal takes the phone's size while you use it here and goes back to
  * the Mac's when you type there. A finger scrolls its history (assets/term/index.html), and
- * "Jump to latest" brings it back.
+ * "Jump to latest" brings it back. Settings → Terminal engine (testing) draws it with Ghostty's
+ * terminal core instead, as a trial (TermEngine, assets/term-ghostty/).
  */
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
@@ -110,6 +108,8 @@ fun TerminalScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
     val toast = LocalToast.current
     val scope = rememberCoroutineScope()
     val session = hub.session(sessionId)
+    // The page is picked as the terminal opens: switching engines takes effect on the next one.
+    val engine = remember { TermEnginePref.state(context).value }
     var web by remember { mutableStateOf<WebView?>(null) }
     // Sticky Ctrl: the next letter typed goes as its control code (Ctrl+R, O, T, B in Claude Code).
     var ctrl by remember { mutableStateOf(false) }
@@ -276,7 +276,7 @@ fun TerminalScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
-                    factory = { ctx -> terminalWebView(ctx, bridge).also { web = it } },
+                    factory = { ctx -> terminalWebView(ctx, bridge, engine).also { web = it } },
                 )
                 // The plain one: inside the Column, ColumnScope's would be picked.
                 androidx.compose.animation.AnimatedVisibility(
@@ -480,7 +480,7 @@ private class TermWebView(ctx: Context) : WebView(ctx) {
 }
 
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
-private fun terminalWebView(ctx: Context, bridge: TermBridge): WebView = TermWebView(ctx).apply {
+private fun terminalWebView(ctx: Context, bridge: TermBridge, engine: TermEngine): WebView = TermWebView(ctx).apply {
     // Without this a WebView in Compose wraps its content, and this page's content is all positioned: 0 px tall.
     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     setBackgroundColor(HN.bg.toArgb())
@@ -501,10 +501,9 @@ private fun terminalWebView(ctx: Context, bridge: TermBridge): WebView = TermWeb
         // The page and its files come from the app's own assets, nothing else.
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             val u = request.url
-            if (u.host != HOST) return null
-            val name = u.path?.removePrefix("/term/")?.takeIf { it.isNotEmpty() && !it.contains("..") && !it.contains('/') }
-                ?: return notFound()
-            val mime = when (name.substringAfterLast('.')) {
+            if (u.host != TERM_HOST) return null
+            val asset = termAsset(u.path) ?: return notFound()
+            val mime = when (asset.substringAfterLast('.')) {
                 "html" -> "text/html"
                 "js" -> "text/javascript"
                 "css" -> "text/css"
@@ -512,7 +511,7 @@ private fun terminalWebView(ctx: Context, bridge: TermBridge): WebView = TermWeb
                 else -> "application/octet-stream"
             }
             return try {
-                WebResourceResponse(mime, "utf-8", view.context.assets.open("term/$name"))
+                WebResourceResponse(mime, "utf-8", view.context.assets.open(asset))
             } catch (_: IOException) {
                 notFound()
             }
@@ -520,7 +519,7 @@ private fun terminalWebView(ctx: Context, bridge: TermBridge): WebView = TermWeb
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = true
     }
-    loadUrl(PAGE)
+    loadUrl(engine.page)
 }
 
 /** Ctrl with [c]: a letter or one of @[\\]^_ as its control code (Ctrl+R is 0x12); null for anything else. */

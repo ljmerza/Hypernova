@@ -104,6 +104,10 @@
     <string name="st_enter_key_desc">Send: Enter sends the message, and Shift+Enter on a hardware keyboard starts a new line. New line: Enter starts a new line and only the send button sends.</string>
     <string name="st_enter_send">Send</string>
     <string name="st_enter_newline">New line</string>
+    <!-- Settings → Terminal engine (testing only: the Ghostty trial; ui/term/TermEngine.kt). -->
+    <string name="st_term_engine">Terminal engine</string>
+    <string name="st_term_ghostty">Draw terminals with Ghostty</string>
+    <string name="st_term_ghostty_desc">A trial: Ghostty\'s terminal core instead of xterm.js. The next terminal you open uses it.</string>
     <!-- Fork: Settings → New sessions (the permission mode a new Claude session starts in; data/NewSessionMemory.kt). -->
     <string name="st_new_sessions">New sessions</string>
     <string name="st_start_mode">New sessions start in</string>

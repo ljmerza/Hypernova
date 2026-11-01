@@ -30,9 +30,12 @@ import com.prudnikweb.hypernova.ui.session.TopBarChoice
 import com.prudnikweb.hypernova.ui.session.TopBarItem
 import com.prudnikweb.hypernova.ui.session.TopBarPref
 import com.prudnikweb.hypernova.ui.settings.CardSwipeSection
+import com.prudnikweb.hypernova.ui.settings.TerminalEngineSection
 import com.prudnikweb.hypernova.ui.settings.TopBarSection
 import com.prudnikweb.hypernova.ui.settings.TypingSection
 import com.prudnikweb.hypernova.ui.settings.VoiceRecognitionSection
+import com.prudnikweb.hypernova.ui.term.TermEngine
+import com.prudnikweb.hypernova.ui.term.TermEnginePref
 import com.prudnikweb.hypernova.ui.update.AboutUpdateRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -85,6 +88,18 @@ class SettingsTest {
         rule.onNodeWithText(str(R.string.st_enter_send)).performScrollTo().performClick()
         rule.waitForIdle()
         assertEquals(EnterKey.Send, EnterKeyPref.state(context).value)
+    }
+
+    @Test fun terminalEngineGhosttyAndBack() {
+        rule.setContent { Harness(spy) { Column(Modifier.padding(16.dp)) { TerminalEngineSection() } } }
+        rule.waitForIdle()
+        assertEquals(TermEngine.Xterm, TermEnginePref.state(context).value)
+        rule.onNode(isSwitch(str(R.string.st_term_ghostty))).performClick()
+        rule.waitForIdle()
+        assertEquals(TermEngine.Ghostty, TermEnginePref.state(context).value)
+        rule.onNode(isSwitch(str(R.string.st_term_ghostty))).performClick()
+        rule.waitForIdle()
+        assertEquals(TermEngine.Xterm, TermEnginePref.state(context).value)
     }
 
     @Test fun voiceEngineOnDevice() {
