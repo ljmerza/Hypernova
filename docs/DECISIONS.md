@@ -2723,3 +2723,37 @@ choice: a filter button in Home's top bar and a small sheet (`ui/home/HomeFilter
    large font, a narrower phone) New session keeps only its plus, so the chip's name ("All",
    "z2") is never squeezed out.
 9. **Unchanged:** the widget, notifications, the session chat screen, History; no daemon change.
+
+## xterm.js add-ons (2026-11-01)
+
+The owner approved taking the phone's live terminal from xterm.js 6 with the fit add-on alone to xterm.js
+6 with its useful add-ons, for now, over making the Ghostty trial the default (docs/LATER.md, L101).
+Exact versions, the npm builds unmodified, in `assets/term/`.
+
+1. **Widths: `@xterm/addon-unicode-graphemes` 0.4.0, on the page and in the holder.** Claude Code
+   2.1.316 lays its screen out with `Bun.stringWidth`: one wide character for a whole emoji sequence,
+   ambiguous characters narrow. xterm's default made 🚀 1 column, `addon-unicode11` makes 👨‍👩‍👧 6
+   and ❤️ 1, and this add-on matched `string-width` 8.3.0 (standing in for Bun, which can't be run
+   here) on 32 of 33 samples; the one miss is the Devanagari conjunct क्ष (2, not 1). Upstream still
+   calls it experimental, so it's pinned. It costs nothing measurable (a 4 MiB burst: 542 ms, 541 ms
+   without). See PROTOCOL, "Shared terminals", **Widths**, for how older holders keep lining up.
+2. **Links: `@xterm/addon-web-links` 0.12.0, and OSC 8.** A tap reaches `HN.link`, which goes where a
+   link in the chat goes (`LinkHandler`): "Open this link?" and then the browser, a dev server on the
+   computer in its preview, anything else nowhere. Never in the terminal's WebView; http and https
+   only, checked on the page and again in the app (`termLink`). xterm.js 6's gesture code takes taps,
+   so no mouse events come: the page plays them to xterm's link finder alone, on the screen element,
+   without bubbling, so a tap selects nothing and claude sees no click.
+3. **Search: `@xterm/addon-search` 0.16.0, without a way to start it yet.** The page has `hn.find`,
+   `findNext`, `findPrevious` and `findClear`, newest first. The terminal screen has no menu to put it
+   in, so where it goes is the owner's choice (docs/LATER.md, L99). It covers the history on the page
+   (a snapshot's 2000 lines and what came since, 5000 at most); in Claude Code's fullscreen view, only
+   what's on the screen, since it keeps its own history.
+4. **GPU drawing: left out for now** (docs/LATER.md, L100). `@xterm/addon-webgl` 0.19.0 against the
+   page, 5 runs each, headless Chromium on this server's RTX 3080: 60 fps either way; a steady
+   full-screen redraw 142 ms of main-thread work a second against 268, a finger scrolling 111 against
+   157, but a 4 MiB burst 876 ms against 542, 247 KB more in the app. Nothing was slow to begin with,
+   those numbers aren't a phone's, and the fallback only covers a lost context: a canvas that draws
+   nothing goes unnoticed (the page's opaque viewport background hid it completely until overridden).
+   Its one visible gain is box-drawing lines without gaps.
+5. **Checked by** `daemon/test/term-widths.test.ts`, including a real holder's snapshot, and
+   `scripts/term-page-check.mjs` by hand in a headless Chromium (docs/DEV-SETUP.md). Not yet on a phone.

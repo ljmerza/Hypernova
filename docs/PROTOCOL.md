@@ -3583,7 +3583,8 @@ keeps the screen in a headless xterm, so anyone joining gets the current screen.
   `{t:"detach"}` (this window leaves on purpose), `{t:"kill"}`, `{t:"screen"}`,
   `{t:"move", to, text?}` (control only: the conversation went on in holder `to`, see Switching agents;
   the holder tells its windows and phones, then ends).
-- Holder → client: `{t:"hello"|"state", cols, rows, title, childPid, tty, phone, started}`,
+- Holder → client: `{t:"hello"|"state", cols, rows, title, childPid, tty, phone, started}` (`hello` also
+  has `unicode`, see **Widths**),
   `{t:"snapshot", data}` (serialized screen and scrollback, before any newer
   output), `{t:"pasted", id, ok, reason?, text?, queued?}`, `{t:"moded", id, ok, mode?, reason?}`,
   `{t:"moved", to: string | null, text: string | null}` (follow to holder `to`: `hn attach` reconnects
@@ -3628,6 +3629,16 @@ keeps the screen in a headless xterm, so anyone joining gets the current screen.
 - **Closing a window**: a session started in a Mac terminal ends 30 seconds after
   its last window closes, as plain claude would, unless a phone has it open or the
   window detached with Ctrl+\. Sessions started on the phone keep running.
+- **Widths**: the holder's headless xterm and the phone's page count a character's columns the same
+  way, with `@xterm/addon-unicode-graphemes` (`term.unicode.activeVersion` `15-graphemes`, ambiguous
+  characters narrow): an emoji is 2, and so is a whole sequence (❤️, 👨‍👩‍👧, 👋🏽, 🇫🇷). That is as close as
+  xterm.js gets to Claude Code's own count (`Bun.stringWidth`), and a snapshot only lines up where
+  the two copies agree. A holder's `hello` says `unicode` before its `snapshot`, and the page takes
+  those rules. A holder started before this has no `unicode` and keeps xterm's default widths (`6`),
+  until its session ends: holders outlive a daemon update, and the page draws its snapshot by the
+  rules it was kept by. A holder that couldn't load the add-on says `6` too. A page from before this
+  with a newer holder is out by a column or so on lines with emoji until Claude Code redraws them.
+  `hn attach` windows draw with whatever widths their own terminal has, as always.
 - Terminal queries (device attributes, cursor position) are answered by the
   attached terminal; the holder answers only when nobody is attached.
 - Which conversation a holder runs: Claude Code's registry
@@ -3662,7 +3673,9 @@ keeps the screen in a headless xterm, so anyone joining gets the current screen.
   history and sends nothing. Each snapshot (opening, reconnecting) starts at the latest: the page's
   history at its end and, when the fullscreen view takes the mouse, one Ctrl+End, which brings
   Claude Code's own view down on the Mac too (the terminal is shared). It stays there through the
-  resizes that follow until the finger scrolls. A phone 8 MB behind is closed
+  resizes that follow until the finger scrolls. A tap on a web address stays on the phone: it opens
+  as one in the chat does (http and https only; docs/DECISIONS.md, "xterm.js add-ons"), and claude
+  sees no click. A phone 8 MB behind is closed
   with 4008 and reconnects. Tickets belong to the phone that asked: forgetting a
   phone (`DELETE /v1/devices/me` or `/local/devices/{id}`) closes its sockets at
   once with 4001, terminals included.

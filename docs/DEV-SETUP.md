@@ -41,6 +41,13 @@ fake hub was asked, and takes a picture of the screen (Roborazzi). The pictures 
   before committing them.
 - The first run downloads Robolectric's Android jar (SDK 35) from Maven Central.
 
+## The terminal page (headless Chromium)
+`node scripts/term-page-check.mjs` loads `assets/term/index.html` in a headless Chromium at the phone's
+size, with a stand-in for the app's bridge, and checks widths (a snapshot from the daemon's own headless
+terminal lines up), links (real tap gestures) and search. By hand: it's in no suite, since CI has no
+Chromium. It needs `daemon/node_modules`, and takes Playwright's Chromium or `--chrome <path>`.
+`--measure --webgl <addon-webgl.js> [--gl gpu|swiftshader]` compares the page's drawing with WebGL's.
+
 ## Fake provider (other providers' limits, without spending anything)
 `daemon/test/fake-provider/` (tests only, never bundled) is a tiny Anthropic-compatible server on
 loopback that streams canned replies ("Fake provider here. Nothing went to a model.") and, told to,
