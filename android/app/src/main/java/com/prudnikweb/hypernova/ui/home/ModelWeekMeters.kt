@@ -12,16 +12,16 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.ModelWeek
 import com.prudnikweb.hypernova.data.ModelWeeks
-import com.prudnikweb.hypernova.data.UsageProjection
-import com.prudnikweb.hypernova.ui.components.ProjectionMeter
-import com.prudnikweb.hypernova.ui.components.projectionSaid
+import com.prudnikweb.hypernova.data.UsageWindow
+import com.prudnikweb.hypernova.ui.components.UsageMeter
+import com.prudnikweb.hypernova.ui.components.usageSaid
 
 /**
  * One meter for each model with a week of its own ("[FABLE] 7 DAYS 41%  ↻ Tue 20:00": the model as
  * its chip before the window's label, never "Fable · week"), under the
- * 5-hour and weekly meters and in their style (ui/components/ProjectionMeter.kt): on Home's usage
- * card and in the chat's usage breakdown. They have no pace (the Mac reads them off /usage every
- * 15 minutes), so they're plain meters: what's used, and the reset as the one tag, a weekday and
+ * 5-hour and weekly meters and in their style (ui/components/UsageMeter.kt): on Home's usage
+ * card and in the chat's usage breakdown. The Mac reads them off /usage every 15 minutes. What's
+ * used, and the reset as the one tag, a weekday and
  * time more than about a day off, a countdown nearer. The sun stays on the 5-hour window. Nothing
  * when the Mac hasn't read any.
  */
@@ -34,15 +34,15 @@ internal fun ModelWeekMeters(weeks: List<ModelWeek>, now: Long, gap: Dp = 14.dp)
     for (w in weeks) {
         Spacer(Modifier.height(gap))
         val trail = ModelWeeks.trail(w, now)
-        val p = UsageProjection.of(w.pct, if (trail == ModelWeeks.Trail.None) 0L else w.resetsAt ?: 0L, now, perMin = null, limited = w.full)
+        val p = UsageWindow.of(w.pct, if (trail == ModelWeeks.Trail.None) 0L else w.resetsAt ?: 0L, now, limited = w.full)
         // A reset more than about a day off reads as a weekday and time; nearer, as a countdown.
         // TalkBack hears the day in full, "on Tuesday at 3:56 PM", not "in Tue 3:56 PM".
         val on = trail as? ModelWeeks.Trail.On
         val resetText = on?.let { ModelWeeks.weekdayTime(it.at, is24) }
         val resetAt = on?.let { ModelWeeks.weekdayTimeSaid(it.at, is24) }?.let { (day, time) -> stringResource(R.string.usage_reset_day_at, day, time) }
-        ProjectionMeter(
+        UsageMeter(
             stringResource(R.string.seven_days), p,
-            projectionSaid(res, stringResource(R.string.usage_name_model, w.label), p, resetAt),
+            usageSaid(res, stringResource(R.string.usage_name_model, w.label), p, resetAt),
             resetText = resetText,
             model = w.label,
         )

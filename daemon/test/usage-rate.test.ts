@@ -8,21 +8,20 @@ const now = 1_800_000_000_000
 const reset5 = now + 3 * 3600_000
 beforeEach(() => resetRateHistory())
 
-test('steady spend gives the pace and the time to the limit', () => {
+test('steady spend gives the pace, and no estimate of when the limit comes', () => {
   // 0.8 %/min, fractional readings; 12 readings over 11 minutes, now at 62%.
   for (let i = 0; i <= 11; i++) recordReading('five', 53.2 + 0.8 * i, reset5, now - (11 - i) * MIN)
   const r = rateFor(true, { pct: 62, resetsAt: reset5 }, null, now)!
   assert.equal(r.working, true)
   assert.ok(Math.abs(r.fiveHour! - 0.8) < 0.01)
-  assert.equal(r.fiveHourEtaMs, Math.round(38 / 0.8) * MIN)
+  assert.deepEqual(Object.keys(r).sort(), ['fiveHour', 'sevenDay', 'working'])
   assert.equal(r.sevenDay, null)
 })
 
-test('idle readings give a zero pace and no ETA; not working gives no rate at all', () => {
+test('idle readings give a zero pace; not working gives no rate at all', () => {
   for (let i = 0; i <= 8; i++) recordReading('five', 40, reset5, now - (8 - i) * MIN)
   const r = rateFor(true, { pct: 40, resetsAt: reset5 }, null, now)!
   assert.equal(r.fiveHour, 0)
-  assert.equal(r.fiveHourEtaMs, null)
   assert.equal(rateFor(false, { pct: 40, resetsAt: reset5 }, null, now), null)
 })
 
@@ -51,11 +50,10 @@ test('too few readings, or too short a span, give null', () => {
   assert.equal(rateFor(true, { pct: 14, resetsAt: reset5 }, null, now)!.fiveHour, null)
 })
 
-test('no ETA when the reset comes first; forced limit readings are ignored', () => {
+test('forced limit readings are ignored', () => {
   for (let i = 0; i <= 10; i++) recordReading('five', 10 + 0.1 * i, now + 30 * MIN, now - (10 - i) * MIN)
   const r = rateFor(true, { pct: 11, resetsAt: now + 30 * MIN }, null, now)!
   assert.ok(r.fiveHour! > 0)
-  assert.equal(r.fiveHourEtaMs, null)
   recordReading('five', 100, now + 30 * MIN, now, true)
   assert.ok(rateFor(true, { pct: 11, resetsAt: now + 30 * MIN }, null, now)!.fiveHour! > 0)
 })

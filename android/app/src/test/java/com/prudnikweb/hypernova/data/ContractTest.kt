@@ -863,7 +863,7 @@ class ContractTest {
         assertEquals("official", u.source)
         assertEquals(T, u.observedAt)
         assertEquals(listOf(WModelWeek("Sonnet", 12.0, T)), u.models)
-        assertEquals(UsageRate(null, null, null, null), u.rate)
+        assertEquals(UsageRate(null, null), u.rate)
     }
 
     private fun workflow(w: WWorkflow) {

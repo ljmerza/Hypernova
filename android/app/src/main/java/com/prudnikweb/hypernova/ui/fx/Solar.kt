@@ -347,13 +347,11 @@ internal class Solar {
     private var rdBottomSent = -1f
     /** Which line the readout is this frame: 0 usage (the ring's number), 1 measuring, 2 refills in, 3 the eclipse's. */
     private var rdMode = -1
-    // The 5-hour window as a ring round the sun (see drawUsageRing): its projection, looked at
-    // again when the usage changes or each second, and its pace and notch, eased.
-    private var proj: com.prudnikweb.hypernova.data.UsageProjection? = null
-    private var projUsage: Usage? = null
-    private var projAt = 0L
-    private var ringLead = Float.NaN
-    private var ringNotch = 0f
+    // The 5-hour window as a ring round the sun (see drawUsageRing), looked at again when the usage
+    // changes or each second.
+    private var ringWindow: com.prudnikweb.hypernova.data.UsageWindow? = null
+    private var ringUsage: Usage? = null
+    private var ringAt = 0L
     private var ringTrack = Stroke(1f)
     private var ringArc = Stroke(2f)
     private var ringTime = Stroke(1f)
@@ -361,8 +359,6 @@ internal class Solar {
     private var rkMode = -1
     private var rkPct = -1
     private var rkLeft = -1L
-    /** The time to the limit the readout was measured for, as [formatDuration] steps it (-1: none). */
-    private var rkLimit = -1L
     private var rkLine: String? = null
     /** The words the readout was last measured for: a countdown in days is rebuilt each second but measured only when its words change. */
     private var rkLabel: String? = null
@@ -667,20 +663,11 @@ internal class Solar {
             else -> usage.fiveHour.coerceIn(0f, 1f)
         }
         uCur = if (uCur.isNaN() || reduced) target else uCur + (target - uCur) * (1f - exp(-dt * 4f))
-        // The window's projection for the ring (no frame builds it: a new reading, or each second).
-        if (usage !== projUsage || now - projAt >= 1000L) {
-            projUsage = usage; projAt = now
-            proj = com.prudnikweb.hypernova.data.UsageProjection.fiveHour(usage, now)
-        }
-        proj?.let { pr ->
-            val lead = pr.projected ?: uCur
-            val notch = if (pr.limitFirst) 1f else 0f
-            if (ringLead.isNaN() || reduced) { ringLead = lead; ringNotch = notch }
-            else {
-                ringLead += (lead - ringLead) * (1f - exp(-dt * 4f))
-                ringNotch = approach(ringNotch, notch, dt * 2f)
-                if (abs(ringLead - lead) < 0.001f) ringLead = lead
-            }
+        if (abs(uCur - target) < 0.001f) uCur = target
+        // The window for the ring (no frame builds it: a new reading, or each second).
+        if (usage !== ringUsage || now - ringAt >= 1000L) {
+            ringUsage = usage; ringAt = now
+            ringWindow = com.prudnikweb.hypernova.data.UsageWindow.fiveHour(usage, now)
         }
 
         // Where each timeline is.
@@ -716,7 +703,8 @@ internal class Solar {
         beltSel = if (reduced) (if (selected == SkyFilter.Quiet) 1f else 0f) else approach(beltSel, if (selected == SkyFilter.Quiet) 1f else 0f, dt * 4f)
         var moving = t - lastBorn < 1.5f || abs(cy - cyT) > 0.3f || abs(beltPres - beltWant) > 0f ||
             abs(selK - (if (anySel) 1f else 0f)) > 0f ||
-            proj.let { pr -> pr != null && (abs(ringLead - (pr.projected ?: uCur)) > 0.001f || ringNotch != (if (pr.limitFirst) 1f else 0f)) } ||
+            // The ring's used arc and its number, easing to a new reading.
+            uCur != target ||
             // Gas flows through the disk: its knots spiral in. Motion means work.
             flow > 0.02f
         var signal = false
@@ -804,13 +792,11 @@ internal class Solar {
 
     /**
      * The 5-hour window as a ring round the sun (owner, 2026-10-18: spending drawn, not written):
-     * a faint track, the **used** arc lit from the top clockwise (mint, amber from 80%), the **pace**
-     * as a faint arc on from it to where the current pace leads by the reset, and outside it a thin
-     * arc of the **window's time** gone, from the top clockwise: the top is the reset. When the pace
-     * reaches the limit before the reset, a **red notch** on that outer arc marks when. The one
-     * number under it is the percentage, or then the time to the limit, in red ("47m"). Drawn as
-     * a gauge, flat on the screen, not in the system's tilted plane. Nothing in it moves on its
-     * own: it changes as the numbers do. The donor, inside it, keeps the same clock.
+     * a faint track, the **used** arc lit from the top clockwise (mint, amber from 80%), and outside
+     * it a thin arc of the **window's time** gone, from the top clockwise: the top is the reset. The
+     * one number under it is the percentage. Drawn as a gauge, flat on the screen, not in the
+     * system's tilted plane. Nothing in it moves on its own: it changes as the numbers do. The
+     * donor, inside it, keeps the same clock.
      */
     private fun DrawScope.drawUsageRing(a: Float, empty: Boolean = false) {
         if (a < 0.01f) return
@@ -823,28 +809,19 @@ internal class Solar {
             drawCircle(HN.inkMuted, r + 4f * dp, c, alpha = 0.12f * a, style = ringTime)
             return
         }
-        val pr = proj ?: return
+        val pr = ringWindow ?: return
         val used = uCur.coerceIn(0f, 1f)
-        val lead = ringLead.takeIf { !it.isNaN() }?.coerceIn(used, 1f) ?: used
         val colour = when { used >= 0.999f -> HN.danger; used >= 0.8f -> HN.amber; else -> HN.accent }
         val tl = Offset(cx - r, cy - r)
         val sz = Size(2f * r, 2f * r)
         drawCircle(HN.ink, r, c, alpha = 0.09f * a, style = ringTrack)
-        if (lead > used + 0.002f) drawArc(colour, -90f + 360f * used, 360f * (lead - used), false, tl, sz, alpha = 0.3f * a, style = ringArc)
         if (used > 0.002f) drawArc(colour, -90f, 360f * used, false, tl, sz, alpha = 0.9f * a, style = ringArc)
         // The window's clock: how much of its five hours has gone (the top is the reset).
         val ro = r + 4f * dp
         val gone = if (pr.resetIn >= 0L) (1f - pr.resetIn / FIVE_HOURS.toFloat()).coerceIn(0f, 1f) else 0f
-        // Its whole five hours a faint circle, so the notch below plainly sits on the clock, not on the usage.
+        // Its whole five hours a faint circle, so the clock plainly isn't the usage.
         drawCircle(HN.inkMuted, ro, c, alpha = 0.12f * a, style = ringTime)
         if (gone > 0.002f) drawArc(HN.inkMuted, -90f, 360f * gone, false, Offset(cx - ro, cy - ro), Size(2f * ro, 2f * ro), alpha = 0.45f * a, style = ringTime)
-        val t = pr.tag
-        if (ringNotch > 0.01f && t is com.prudnikweb.hypernova.data.UsageProjection.Tag.Limit) {
-            val at = (gone + t.ms / FIVE_HOURS.toFloat()).coerceIn(0f, 1f)
-            val ang = (-90f + 360f * at) * PI_F / 180f
-            val dx = cos(ang); val dy = sin(ang)
-            drawLine(HN.danger, Offset(cx + dx * (ro - 3f * dp), cy + dy * (ro - 3f * dp)), Offset(cx + dx * (ro + 3.5f * dp), cy + dy * (ro + 3.5f * dp)), strokeWidth = 1.6f * dp, cap = StrokeCap.Round, alpha = ringNotch * a)
-        }
     }
 
     /** How far [p] steps back (1 = not at all) while the list shows another project, or the belt. */
@@ -886,22 +863,16 @@ internal class Solar {
         // Rebuilt when the text would change: whole seconds, rounded up as every countdown is
         // ([Countdown]), so it reads what the account card under the sky reads; measured again only
         // when its words do (the week's "2d 4h" holds for an hour). The usage line is only its
-        // percentage now (the ring draws the rest), or the time to the limit.
+        // percentage now (the ring draws the rest).
         val leftS = if (mode == 2) Countdown.seconds(left, 0L) else 0L
         val pctK = if (mode == 0) pct else 0
-        // At this pace the limit comes before the reset: the number is the time to it, in red
-        // ("47m"), as the meters' tag has it. Keyed by what it reads: seconds under ten minutes
-        // ("9:59"), minutes above.
-        val toLimit = if (mode == 0) (proj?.tag as? com.prudnikweb.hypernova.data.UsageProjection.Tag.Limit)?.ms else null
-        val limitK = toLimit?.let { Countdown.seconds(it, 0L) }?.let { if (it < 600L) it else 1_000_000L + it / 60L } ?: -1L
-        if (mode != rkMode || leftS != rkLeft || pctK != rkPct || limitK != rkLimit || (mode == 3 && ecl != rkLine)) {
+        if (mode != rkMode || leftS != rkLeft || pctK != rkPct || (mode == 3 && ecl != rkLine)) {
             val styleChanged = (mode >= 2) != (rkMode >= 2)
-            rkMode = mode; rkLeft = leftS; rkPct = pctK; rkLine = ecl; rkLimit = limitK
+            rkMode = mode; rkLeft = leftS; rkPct = pctK; rkLine = ecl
             val label = when {
                 showEcl -> ecl!!.uppercase()
                 down -> txt.refills(txt.duration(left)).uppercase()
                 !known -> txt.unknown
-                toLimit != null -> txt.duration(toLimit)
                 else -> txt.readout(pct)
             }
             if (label != rkLabel || styleChanged || readoutL == null) {
@@ -921,7 +892,6 @@ internal class Solar {
             // The week's wait has no refill to show: the stream is off until its reset.
             low -> HN.inkMuted
             down -> lerp(HN.inkMuted, HN.ink, progress)
-            limitK >= 0L -> HN.danger
             uCur >= 0.8f -> HN.amber
             else -> HN.inkDim
         }
@@ -1233,7 +1203,7 @@ internal class Solar {
      * - At the reset the heating front sweeps in from the rim over [FLARE] s: the hot part is the
      *   outer annulus first, then the whole disk; a flush of extra light settles over [SETTLE] s.
      * - The spent part keeps its gas, cool and red; through the wait the stream thickens it.
-     * - The gas flows as fast as the pace says ([DiskModel.flow]), eased; nothing flows at a
+     * - The gas flows as fast as the spend rate says ([DiskModel.flow]), eased; nothing flows at a
      *   limit, in the low state, or at rest. The knots move only then.
      * - The donor stands at the window's clock. Its stream and bright spot show most in
      *   quiescence; at the weekly limit the stream stops and the disk drains to nothing, the
@@ -1272,8 +1242,8 @@ internal class Solar {
         // The spent gas: there through the window, thicker as the stream refills it through the
         // wait (in steps, so the quiet disk isn't a new picture every slow frame).
         coolDens = (if (dead) 0.75f + 0.45f * steps(progress, 40) else 0.75f) * gas
-        // How hard the gas flows: the spend pace while something works, eased over a second or so.
-        val target = if (dead || low || hotOut <= 0.02f) 0f else DiskModel.flow(proj?.pace)
+        // How hard the gas flows: the spend rate while something works, eased over a second or so.
+        val target = if (dead || low || hotOut <= 0.02f) 0f else DiskModel.flow(ringUsage?.rate?.fiveHour)
         flow = if (reduced) target else flow + (target - flow) * (1f - exp(-dt * 1.5f))
         if (abs(flow - target) < 0.005f) flow = target
         if (!reduced && flow > 0f) disk.advance(dt, flow)
@@ -1283,7 +1253,7 @@ internal class Solar {
         glow = min(1f, flow) * 0.85f + 0.6f * max(flush * (if (weekOutburst) WEEK_FLUSH else 1f), last)
         // The donor keeps the window's clock; its stream shows most while the disk is quiet. In
         // the low state the donor stays and its stream goes out; at the week's reset it comes back first.
-        val pr = proj
+        val pr = ringWindow
         donorAng = DiskModel.donorAngle(if (dead) max(0L, limitReset - now) else pr?.resetIn ?: -1L, FIVE_HOURS)
         val quiet = 1f - diskLight
         val streamK = when {

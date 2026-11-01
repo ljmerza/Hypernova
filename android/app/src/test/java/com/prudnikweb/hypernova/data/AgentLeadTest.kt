@@ -76,7 +76,7 @@ class AgentLeadTest {
         assertEquals(0.6f, u.sevenDay, 0.001f)
         assertEquals(now + 3_600_000L, u.fiveHourResetAt)
         assertFalse(u.anyLimited)
-        // No pace for Codex.
+        // No spend rate for Codex.
         assertNull(u.rate)
     }
 

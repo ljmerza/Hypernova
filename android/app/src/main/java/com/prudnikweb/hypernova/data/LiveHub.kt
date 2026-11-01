@@ -2640,7 +2640,7 @@ class LiveHub(
         val since = account.since?.takeIf { hit != null }
         // The week and no 5-hour window (Max, 2026-10-31): nothing labelled 5H, the sun on the week.
         // The Mac's own windows decide, signed out too (its last ones), not a list of plans.
-        val reported = UsageProjection.fiveHourReported(w?.fiveHour, w?.sevenDay, hit5 != null)
+        val reported = UsageWindow.fiveHourReported(w?.fiveHour, w?.sevenDay, hit5 != null)
         val read = Usage(
             fiveHour = p5, sevenDay = p7, fiveHourResetAt = r5, sevenDayResetAt = r7,
             limitedAt = if (lim5 && reported) prev.limitedAt ?: since ?: w?.observedAt ?: t else null,
@@ -2650,7 +2650,7 @@ class LiveHub(
             models = ModelWeeks.of(w?.models.orEmpty(), account, t),
             rate = w?.rate.takeIf { official },
         )
-        usage = if (reported) read else UsageProjection.weekAsDisk(read)
+        usage = if (reported) read else UsageWindow.weekAsDisk(read)
         // Wake up at the next reset so the disk ignites on time (and the account's limit ends with it).
         // In short steps against the wall clock: a delay doesn't count while the phone sleeps, so one
         // long delay of hours went off long after the reset, and the sun sat at "93% · 0:00".

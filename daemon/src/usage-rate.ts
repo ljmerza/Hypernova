@@ -1,7 +1,9 @@
 // How fast the 5-hour and weekly windows are being spent, in % per minute, from the official
 // readings: the status lines', and the usage probe's look at /usage (every 2 minutes while something
 // works, usage-probe.ts), which keeps them coming while no status line refreshes (agents at work in
-// the background). Pure: hub.ts feeds it readings and asks for the pace.
+// the background). Pure: hub.ts feeds it readings and asks for the pace. The sun's disk on the phone
+// draws it (its gas flows with it); no client gets a time to the limit from here any more (owner,
+// 2026-11-01: that estimate wasn't accurate; docs/DECISIONS.md).
 //
 // The meters are whole percents, so one reading says little; the pace is a least-squares line over
 // the readings of a recent stretch (5-hour: 10 minutes; the week, which moves slowly: 30). With too
@@ -16,7 +18,7 @@ const CONFIG: Record<RateKey, { windowMs: number; minSpanMs: number }> = {
   seven: { windowMs: 30 * 60_000, minSpanMs: 12 * 60_000 },
 }
 const MIN_SAMPLES = 3
-/** Under this the pace counts as standing still: no ETA. */
+/** Under this the pace counts as standing still. */
 const IDLE_PER_MIN = 0.005
 
 const history: Record<RateKey, { resetsAt: number; samples: Sample[] }> = {
@@ -64,47 +66,28 @@ export function paceOf(k: RateKey, now: number): number | null {
   return Math.max(0, (n * sxy - sx * sy) / den)
 }
 
-/**
- * `…EtaMs`: from now, as of now. `…LimitAt`: the same projection as a moment (epoch ms, to the
- * minute), counted from the last reading, so it holds still between readings and every client
- * shows the same time.
- */
 export type Rate = {
   fiveHour: number | null
   sevenDay: number | null
-  fiveHourEtaMs: number | null
-  sevenDayEtaMs: number | null
-  fiveHourLimitAt: number | null
-  sevenDayLimitAt: number | null
   working: boolean
 }
 
 type Win = { pct: number; resetsAt: number } | null
 
 /**
- * The rate block of Usage: null while nothing works. The pace is rounded (0.01 %/min, the ETA to
- * the minute) so an unchanged pace doesn't make a new message every few seconds.
+ * The rate block of Usage: null while nothing works. The pace is rounded (0.01 %/min) so an
+ * unchanged pace doesn't make a new message every few seconds.
  */
 export function rateFor(working: boolean, five: Win, seven: Win, now = Date.now()): Rate | null {
   if (!working) return null
-  const one = (k: RateKey, w: Win): [number | null, number | null, number | null] => {
+  const one = (k: RateKey, w: Win): number | null => {
     // A window that has rolled over or is at its limit has no pace; its history is of the old one.
-    if (!w || w.pct >= 100 || now >= w.resetsAt || Math.abs(w.resetsAt - history[k].resetsAt) > 120_000) return [null, null, null]
+    if (!w || w.pct >= 100 || now >= w.resetsAt || Math.abs(w.resetsAt - history[k].resetsAt) > 120_000) return null
     const p = paceOf(k, now)
-    if (p == null) return [null, null, null]
-    const rate = Math.round(p * 100) / 100
-    if (p < IDLE_PER_MIN) return [0, null, null]
-    const eta = ((100 - w.pct) / p) * 60_000
-    if (now + eta >= w.resetsAt) return [rate, null, null]
-    // From the last reading the meter shows: it doesn't move between readings.
-    const last = history[k].samples.filter((x) => x.t <= now + 5000).at(-1)
-    const from = last ? last.t + ((100 - w.pct) / p) * 60_000 : now + eta
-    const at = Math.round(from / 60_000) * 60_000
-    return [rate, Math.max(60_000, Math.round(eta / 60_000) * 60_000), at < w.resetsAt ? Math.max(at, Math.ceil(now / 60_000) * 60_000) : null]
+    if (p == null) return null
+    return p < IDLE_PER_MIN ? 0 : Math.round(p * 100) / 100
   }
-  const [fr, fe, fa] = one('five', five)
-  const [sr, se, sa] = one('seven', seven)
-  return { fiveHour: fr, sevenDay: sr, fiveHourEtaMs: fe, sevenDayEtaMs: se, fiveHourLimitAt: fa, sevenDayLimitAt: sa, working: true }
+  return { fiveHour: one('five', five), sevenDay: one('seven', seven), working: true }
 }
 
 /** For tests. */

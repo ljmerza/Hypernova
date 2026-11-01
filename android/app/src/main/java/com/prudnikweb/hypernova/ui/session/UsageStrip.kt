@@ -60,14 +60,14 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
-import com.prudnikweb.hypernova.data.UsageProjection
-import com.prudnikweb.hypernova.ui.components.ProjectionMeter
+import com.prudnikweb.hypernova.data.UsageWindow
+import com.prudnikweb.hypernova.ui.components.UsageMeter
 import com.prudnikweb.hypernova.data.ModelNames
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphFigure
 import com.prudnikweb.hypernova.ui.components.ModelChip
-import com.prudnikweb.hypernova.ui.components.ProjectionMeterCompact
-import com.prudnikweb.hypernova.ui.components.projectionSaid
+import com.prudnikweb.hypernova.ui.components.UsageMeterCompact
+import com.prudnikweb.hypernova.ui.components.usageSaid
 import com.prudnikweb.hypernova.ui.components.StatusChip
 import com.prudnikweb.hypernova.ui.fx.formatDuration
 import com.prudnikweb.hypernova.ui.stats.compact
@@ -106,8 +106,8 @@ internal fun rememberSessionUsage(sessionId: String, key: String): SessionUsage?
  * The slim glass strip at the top of the chat, the session's top bar: what the owner chose in
  * Settings → Session top bar, in his order ([TopBarChoice], TopBar.kt; owner, 2026-10-31). By
  * default the context ring and its share, the mode and the effort ("auto · high"), the plan's
- * 5-hour window (only while Claude Code reports one) and the week, as compact projection meters
- * with their resets (ui/components/ProjectionMeter.kt); the model, the tokens, the agents at work
+ * 5-hour window (only while Claude Code reports one) and the week, as compact meters
+ * with their resets (ui/components/UsageMeter.kt); the model, the tokens, the agents at work
  * ([agents]) and this turn's time can be turned on. No cost (owner, 2026-10-30). "≈" marks what's
  * worked out rather than Claude Code's own number. One line: nothing drops for room, the row
  * scrolls sideways under a finger, its edges fading where there's more. A tap (not a drag) opens
@@ -141,8 +141,8 @@ internal fun UsageStrip(
         }
     }
     val parts = choice.visible(facts, maxOf(clock, now))
-    val five = UsageProjection.fiveHour(u, now)
-    val seven = UsageProjection.sevenDay(u, now)
+    val five = UsageWindow.fiveHour(u, now)
+    val seven = UsageWindow.sevenDay(u, now)
     val mode = com.prudnikweb.hypernova.ui.home.modeLabel(session.mode)
     val effort = session.effort?.takeIf { facts.effortShown }?.let { com.prudnikweb.hypernova.ui.home.claudeEffortTitle(it) }
     val model = stripModel(usage, session.model, res.getString(R.string.model_default))
@@ -184,8 +184,8 @@ internal fun UsageStrip(
                     }
                     // The mode's glyph and word, the effort after it: "auto · high"; Codex its mode alone.
                     TopBarItem.MODE -> ModeTag(session.mode, if (effort != null) "$mode · ${effort.lowercase()}" else mode, color = HN.inkMuted)
-                    TopBarItem.FIVE_HOUR -> ProjectionMeterCompact(stringResource(R.string.usage_five_short), five, barWidth = 32.dp)
-                    TopBarItem.SEVEN_DAY -> ProjectionMeterCompact(stringResource(R.string.usage_seven_short), seven, barWidth = 32.dp)
+                    TopBarItem.FIVE_HOUR -> UsageMeterCompact(stringResource(R.string.usage_five_short), five, barWidth = 32.dp)
+                    TopBarItem.SEVEN_DAY -> UsageMeterCompact(stringResource(R.string.usage_seven_short), seven, barWidth = 32.dp)
                     TopBarItem.MODEL -> ModelChip(ModelNames.chip(model))
                     TopBarItem.TOKENS -> GlyphFigure(Glyph.Token, compact(res, usage.tokens))
                     TopBarItem.AGENTS -> Box(
@@ -314,7 +314,7 @@ internal fun money(usd: Double): String = when {
 /** TalkBack's one sentence for the bar: each part it shows ([parts]), in its order. */
 private fun stripDescription(
     res: Resources, parts: List<TopBarItem>, u: SessionUsage, s: Session, model: String, mode: String, effort: String?,
-    five: UsageProjection, seven: UsageProjection, agents: Int, turnMs: Long,
+    five: UsageWindow, seven: UsageWindow, agents: Int, turnMs: Long,
 ): String = parts.joinToString(" ") { part ->
     when (part) {
         TopBarItem.CONTEXT -> {
@@ -326,8 +326,8 @@ private fun stripDescription(
             }
         }
         TopBarItem.MODE -> res.getString(R.string.meta_mode_said, mode) + (effort?.let { " " + res.getString(R.string.ns_effort_said, it) } ?: "")
-        TopBarItem.FIVE_HOUR -> projectionSaid(res, res.getString(R.string.usage_name_five), five)
-        TopBarItem.SEVEN_DAY -> projectionSaid(res, res.getString(R.string.usage_name_seven), seven)
+        TopBarItem.FIVE_HOUR -> usageSaid(res, res.getString(R.string.usage_name_five), five)
+        TopBarItem.SEVEN_DAY -> usageSaid(res, res.getString(R.string.usage_name_seven), seven)
         TopBarItem.MODEL -> res.getString(R.string.meta_model_said, model)
         TopBarItem.TOKENS -> res.getString(R.string.chat_tokens_said, grouped(u.tokens))
         TopBarItem.AGENTS -> res.getQuantityString(R.plurals.session_sheet_agents_said, agents, agents)
@@ -358,12 +358,12 @@ internal fun UsageDetails(hub: Hub) {
     val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(usage.fiveHourResetAt, usage.sevenDayResetAt)
     // The 5-hour window only while Claude Code reports one (owner, 2026-10-31: Max has none).
     if (usage.fiveHourReported) {
-        val five = UsageProjection.fiveHour(usage, now)
-        ProjectionMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(R.string.usage_name_five), five))
+        val five = UsageWindow.fiveHour(usage, now)
+        UsageMeter(stringResource(R.string.five_hours), five, usageSaid(stringResource(R.string.usage_name_five), five))
         Spacer(Modifier.height(12.dp))
     }
-    val seven = UsageProjection.sevenDay(usage, now)
-    ProjectionMeter(stringResource(R.string.seven_days), seven, projectionSaid(stringResource(R.string.usage_name_seven), seven))
+    val seven = UsageWindow.sevenDay(usage, now)
+    UsageMeter(stringResource(R.string.seven_days), seven, usageSaid(stringResource(R.string.usage_name_seven), seven))
     com.prudnikweb.hypernova.ui.home.ModelWeekMeters(usage.models, now, gap = 12.dp)
     Spacer(Modifier.height(6.dp))
     HText(stringResource(R.string.chat_plan_note), style = Type.small, color = HN.inkDim)

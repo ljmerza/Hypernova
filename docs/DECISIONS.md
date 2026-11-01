@@ -1395,7 +1395,8 @@ sequence. And the limit cycle must be periodic, because the window resets.
   - *A planet's day or seasons*: honest periodicity, but time again, not spending; and a horizon
     would have replaced the whole sky.
 - **The meter stays the source of truth.** The ring and its number are unchanged; the disk is the
-  mood. Nothing in the physics forecasts the limit; the pace arc and the notch do.
+  mood. Nothing in the physics forecasts the limit; the pace arc and the notch do. (Those two went
+  on 2026-11-01: "No estimate of when usage runs out".)
 - **Only working things move.** The knots flow only while something spends; a quiet disk through
   the wait and a full disk at rest ask for the far sky's slow frames only (the old hole's disk
   turned at 30 a second through the whole cooldown). Measured idle Home costs the same as before.
@@ -3327,3 +3328,31 @@ Leaving the session's chat closes its opened bar: to an agent's screen, another 
 process restart starts it closed. Opening the keyboard isn't leaving, and neither is a configuration
 change that recreates the screen (a font size, a split screen; the app is held to portrait, so not a
 rotation). This replaces the bar staying open across a visit, which it did as saved state.
+
+## No estimate of when usage runs out (owner, 2026-11-01)
+
+The owner: "the estimated time left until you run out, based on the usage you're using, doesn't seem
+accurate, let's remove it." He saw a red "2d 2h" on Home's usage card, with a red notch at the bar's
+end, at only 12% of a week just after it reset.
+
+This overturns part of the "spending drawn" decision of 2026-10-18 (the projection meters and the
+sun's ring, in `docs/DESIGN.md`, and "The meter stays the source of truth" above). The spending stays
+drawn. What it no longer draws is a guess.
+
+1. **A meter shows facts:** how much is used and when the window resets, with its glyph. A window used
+   up is still full and red until its reset, along with any limit Claude Code or Codex reported.
+2. **Gone everywhere it showed:** the red time-to-limit tag, the red notch at the bar's end, the faint
+   fill to where the pace leads, the pace arc, notch and red number at the sun's ring, and TalkBack's
+   "spending 0.8% a minute: at this pace…" sentences. The chat's top bar and the New session pickers
+   use the same meter. The automation timeline's budget bar never had an estimate.
+3. **The code went too.** `UsageProjection` had little left and became `UsageWindow` (used, and time to
+   the reset); `ProjectionMeter` became `UsageMeter`.
+4. **The daemon stopped sending the estimate, not the rate.** `Usage.rate` loses `fiveHourEtaMs`,
+   `sevenDayEtaMs`, `fiveHourLimitAt` and `sevenDayLimitAt`; nothing else read them. It keeps
+   `fiveHour` and `sevenDay` (% a minute): they are a reading and not a forecast, and the sun's disk
+   flows with them (`DiskModel.flow`). The sky has been hidden on Home since 2026-10-30, so nothing on
+   screen uses them today; they stay so the disk still works if it comes back. An older app, given a
+   rate and no time to the limit, works one out itself until it is updated: nothing breaks, and the
+   estimate lasts only as long as that older app.
+5. **The usage probe's looks stay as they were,** every 2 minutes while something works. They also keep
+   the meters fresh while no status line refreshes.

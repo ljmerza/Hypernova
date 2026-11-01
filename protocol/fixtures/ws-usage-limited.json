@@ -27,10 +27,6 @@
     "rate": {
       "fiveHour": null,
       "sevenDay": null,
-      "fiveHourEtaMs": null,
-      "sevenDayEtaMs": null,
-      "fiveHourLimitAt": null,
-      "sevenDayLimitAt": null,
       "working": true
     }
   }

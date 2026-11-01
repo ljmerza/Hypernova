@@ -85,7 +85,7 @@ import com.prudnikweb.hypernova.data.Project
 import com.prudnikweb.hypernova.data.ProjectPick
 import com.prudnikweb.hypernova.data.Provider
 import com.prudnikweb.hypernova.data.ProviderWords
-import com.prudnikweb.hypernova.data.UsageProjection
+import com.prudnikweb.hypernova.data.UsageWindow
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphButton
@@ -96,7 +96,7 @@ import com.prudnikweb.hypernova.ui.components.Incidents
 import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
-import com.prudnikweb.hypernova.ui.components.ProjectionMeterCompact
+import com.prudnikweb.hypernova.ui.components.UsageMeterCompact
 import com.prudnikweb.hypernova.ui.components.Stamp
 import com.prudnikweb.hypernova.ui.components.TagChip
 import com.prudnikweb.hypernova.ui.components.ThinkTwiceCard
@@ -919,7 +919,7 @@ private fun ModelRow(o: ModelOption, all: List<ModelOption>, selected: Boolean, 
     val priceText = price?.let { if (ModelCatalog.free(it)) stringResource(R.string.ns_free) else "${ModelCatalog.dollars(it.input)} / ${ModelCatalog.dollars(it.output)}" }
     val weekP = week?.let { w ->
         val trail = ModelWeeks.trail(w, now)
-        UsageProjection.of(w.pct, if (trail == ModelWeeks.Trail.None) 0L else w.resetsAt ?: 0L, now, perMin = null, limited = w.full)
+        UsageWindow.of(w.pct, if (trail == ModelWeeks.Trail.None) 0L else w.resetsAt ?: 0L, now, limited = w.full)
     }
     val said = buildString {
         append(res.getString(R.string.ns_row_said, o.name))
@@ -945,7 +945,7 @@ private fun ModelRow(o: ModelOption, all: List<ModelOption>, selected: Boolean, 
             }
             if (weekP != null) {
                 Spacer(Modifier.height(6.dp))
-                ProjectionMeterCompact(stringResource(R.string.seven_days), weekP, barWidth = 48.dp)
+                UsageMeterCompact(stringResource(R.string.seven_days), weekP, barWidth = 48.dp)
             }
         }
         if (o.context != null || priceText != null) {

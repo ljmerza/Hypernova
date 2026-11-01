@@ -920,10 +920,10 @@ object Wire {
         return WUsage(window(o.obj("fiveHour")), window(o.obj("sevenDay")), o.str("source") ?: "none", o.long("observedAt"), ModelWeeks.wire(o.arr("models")), rate(o.obj("rate")))
     }
 
-    /** The spend pace while something works; null idle and from an older Mac. */
+    /** The spend rate while something works; null idle and from an older Mac. An older one's time to the limit (`fiveHourEtaMs` and so on) is ignored. */
     private fun rate(o: JSONObject?): UsageRate? {
         if (o == null) return null
-        return UsageRate(o.dbl("fiveHour")?.toFloat(), o.dbl("sevenDay")?.toFloat(), o.long("fiveHourEtaMs"), o.long("sevenDayEtaMs"))
+        return UsageRate(o.dbl("fiveHour")?.toFloat(), o.dbl("sevenDay")?.toFloat())
     }
 
     fun project(o: JSONObject) = Project(

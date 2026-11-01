@@ -78,7 +78,7 @@ object AgentLead {
 
     /**
      * Codex's limits as the sun's [Usage], for a Mac where Codex leads: its 5-hour window as the
-     * disk (the week where a plan has only that), its week as the far sky's; no pace (the Mac sends
+     * disk (the week where a plan has only that), its week as the far sky's; no rate (the Mac sends
      * none for Codex); a used-up window full and limited, the week's as the low state. Signed out,
      * the numbers are the last ones known ([Usage.stale]). Without numbers: not known yet.
      */

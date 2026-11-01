@@ -54,7 +54,7 @@ test('a later reset still wins over the old window', () => {
 // ── The usage probe's readings (offerScreenUsage): /usage's 5-hour and all-models rows ──
 const MIN = 60_000
 
-test('the pace rises from /usage readings alone, every 2 minutes: a pace by the third look, and the limit before the reset', () => {
+test('the pace rises from /usage readings alone, every 2 minutes: a pace by the third look', () => {
   // No status line: the 5-hour window is known from these looks alone, read in the last four minutes.
   const now = Date.now()
   assert.equal(hub.getUsage().fiveHour, null)
@@ -64,12 +64,11 @@ test('the pace rises from /usage readings alone, every 2 minutes: a pace by the 
   hub.offerScreenUsage({ pct: 60, resetsAt: reset }, null, now - 4 * MIN)
   hub.offerScreenUsage({ pct: 61, resetsAt: reset }, null, now - 2 * MIN)
   assert.equal(hub.getUsage().rate?.fiveHour, null)
-  // Look 3, four minutes after the first: 0.5 %/min, which reaches 100% in 76 minutes, long before the reset.
+  // Look 3, four minutes after the first: 0.5 %/min.
   hub.offerScreenUsage({ pct: 62, resetsAt: reset }, null, now)
   const r = hub.getUsage().rate!
   assert.equal(r.working, true)
   assert.equal(r.fiveHour, 0.5)
-  assert.equal(r.fiveHourEtaMs, 76 * MIN)
   // Nothing working: no rate at all.
   hub.upsertSession('pace-work', { state: 'idle' })
   assert.equal(hub.getUsage().rate, null)
@@ -141,20 +140,3 @@ test("/usage floors to a whole percent: under a point below the status line's re
   assert.equal(hub.getUsage().fiveHour?.pct, 40)
 })
 
-test('the limit as a moment, counted from the last reading: it holds still between readings', async () => {
-  const { rateFor, recordReading, resetRateHistory } = await import('../src/usage-rate.ts')
-  resetRateHistory()
-  const t = Date.UTC(2026, 9, 18, 12, 0, 20)
-  const reset = t + 4 * 3600_000
-  for (const [ago, pct] of [[4, 60], [2, 61], [0, 62]] as const) recordReading('five', pct, reset, t - ago * MIN)
-  const now = rateFor(true, { pct: 62, resetsAt: reset }, null, t)!
-  // 0.5 %/min from 62%: 76 minutes from the last reading, to the minute.
-  assert.equal(now.fiveHourLimitAt, Math.round((t + 76 * MIN) / MIN) * MIN)
-  assert.equal(now.fiveHourEtaMs, 76 * MIN)
-  // Three minutes on with no new reading: the moment stays, the duration shrinks.
-  const later = rateFor(true, { pct: 62, resetsAt: reset }, null, t + 3 * MIN)!
-  assert.equal(later.fiveHourLimitAt, now.fiveHourLimitAt)
-  // Past the reset: none.
-  assert.equal(rateFor(true, { pct: 99, resetsAt: t + MIN }, null, t)!.fiveHourLimitAt, null)
-  assert.equal(now.sevenDayLimitAt, null)
-})

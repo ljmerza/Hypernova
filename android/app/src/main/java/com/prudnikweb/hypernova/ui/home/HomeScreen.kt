@@ -127,9 +127,9 @@ import com.prudnikweb.hypernova.ui.components.Z
 import com.prudnikweb.hypernova.ui.fx.CosmosHit
 import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.fx.SkyFilter
-import com.prudnikweb.hypernova.data.UsageProjection
-import com.prudnikweb.hypernova.ui.components.ProjectionMeter
-import com.prudnikweb.hypernova.ui.components.projectionSaid
+import com.prudnikweb.hypernova.data.UsageWindow
+import com.prudnikweb.hypernova.ui.components.UsageMeter
+import com.prudnikweb.hypernova.ui.components.usageSaid
 import com.prudnikweb.hypernova.ui.components.frostedGlass
 import com.prudnikweb.hypernova.ui.components.FitRow
 import com.prudnikweb.hypernova.ui.components.CountMark
@@ -1102,7 +1102,7 @@ private fun skyDescription(hub: Hub, cosmos: CosmosState, quiet: Int, u: Usage, 
         !u.known -> stringResource(R.string.sun_unknown_said)
         // A plan with only the week (Codex leading on one, or Claude Code reporting no 5-hour
         // window): the sun's window is that week.
-        else -> projectionSaid(res, stringResource(if (!u.fiveHourReported) R.string.usage_name_seven else R.string.usage_name_five), UsageProjection.fiveHour(u, now))
+        else -> usageSaid(res, stringResource(if (!u.fiveHourReported) R.string.usage_name_seven else R.string.usage_name_five), UsageWindow.fiveHour(u, now))
     }
     val needs = hub.sessions.count { it.state == SessionState.NeedsYou }
     val sky = if (quiet > 0) stringResource(R.string.a11y_sky_quiet, usage, cosmos.projects().size, quiet, needs)
@@ -1117,8 +1117,8 @@ private fun skyDescription(hub: Hub, cosmos: CosmosState, quiet: Int, u: Usage, 
         win == null -> stringResource(R.string.a11y_codex_waiting)
         else -> {
             val five = cu?.fiveHour != null
-            val p = UsageProjection.of((win.pct / 100.0).toFloat(), win.resetsAt, now, perMin = null, limited = AgentLead.codexLimitedWindow(cu) === win)
-            projectionSaid(res, stringResource(if (five) R.string.cx_usage_name_five else R.string.cx_usage_name_seven), p)
+            val p = UsageWindow.of((win.pct / 100.0).toFloat(), win.resetsAt, now, limited = AgentLead.codexLimitedWindow(cu) === win)
+            usageSaid(res, stringResource(if (five) R.string.cx_usage_name_five else R.string.cx_usage_name_seven), p)
         }
     }
     val n = hub.sessions.count { it.codex && com.prudnikweb.hypernova.ui.fx.SkySplit.inUse(it, now) && it.switchedTo == null }
@@ -1429,16 +1429,15 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
                 HText(staleNote(hub.account), style = Type.small, color = HN.inkDim)
                 return@Column
             }
-            // Each window as a projection meter: what's used, where the pace leads by its reset, and
-            // one tag (the reset, or the time to the limit when that comes first).
+            // Each window as a meter: what's used, and one tag, its reset.
             // The 5-hour window only while Claude Code reports one (owner, 2026-10-31: Max has none).
             if (u.fiveHourReported) {
-                val five = UsageProjection.fiveHour(u, now)
-                UsageMeter(stringResource(R.string.five_hours), five, projectionSaid(stringResource(cards.claudeFive), five))
+                val five = UsageWindow.fiveHour(u, now)
+                PlanMeter(stringResource(R.string.five_hours), five, usageSaid(stringResource(cards.claudeFive), five))
                 Spacer(Modifier.height(14.dp))
             }
-            val seven = UsageProjection.sevenDay(u, now)
-            UsageMeter(stringResource(R.string.seven_days), seven, projectionSaid(stringResource(cards.claudeSeven), seven))
+            val seven = UsageWindow.sevenDay(u, now)
+            PlanMeter(stringResource(R.string.seven_days), seven, usageSaid(stringResource(cards.claudeSeven), seven))
             // Fable's week and the like, which only /usage on the Mac shows (ModelWeekMeters.kt).
             ModelWeekMeters(u.models, now)
             if (!u.known) {
@@ -1451,8 +1450,8 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
 
 /**
  * Codex's own limits (data/Codex.kt), under Claude's while Codex is in use here: its 5-hour window
- * and its week as the same projection meters (a plan may have only the week), plain (the Mac sends
- * no pace for Codex). A window used up says LIMITED in amber as the seam's trail; signed out, or
+ * and its week as the same meters (a plan may have only the week). A window used up says LIMITED
+ * in amber as the seam's trail; signed out, or
  * with no numbers yet, one quiet line instead. It moves with the live feed, never by asking.
  */
 @Composable
@@ -1481,13 +1480,13 @@ private fun CodexUsageCard(c: CodexState, cards: UsageCards, modifier: Modifier 
                 return@Column
             }
             u.fiveHour?.let { w ->
-                val p = UsageProjection.of((w.pct / 100.0).toFloat(), w.resetsAt, now, perMin = null, limited = w.pct >= 100.0)
-                ProjectionMeter(stringResource(R.string.five_hours), p, projectionSaid(res, stringResource(cards.codexFive), p))
+                val p = UsageWindow.of((w.pct / 100.0).toFloat(), w.resetsAt, now, limited = w.pct >= 100.0)
+                UsageMeter(stringResource(R.string.five_hours), p, usageSaid(res, stringResource(cards.codexFive), p))
             }
             u.sevenDay?.let { w ->
                 if (u.fiveHour != null) Spacer(Modifier.height(14.dp))
-                val p = UsageProjection.of((w.pct / 100.0).toFloat(), w.resetsAt, now, perMin = null, limited = w.pct >= 100.0)
-                ProjectionMeter(stringResource(R.string.seven_days), p, projectionSaid(res, stringResource(cards.codexSeven), p))
+                val p = UsageWindow.of((w.pct / 100.0).toFloat(), w.resetsAt, now, limited = w.pct >= 100.0)
+                UsageMeter(stringResource(R.string.seven_days), p, usageSaid(res, stringResource(cards.codexSeven), p))
             }
         }
     }
@@ -1495,9 +1494,9 @@ private fun CodexUsageCard(c: CodexState, cards: UsageCards, modifier: Modifier 
 
 /** A usage meter that TalkBack reads as progress (it reads [spoken]). */
 @Composable
-private fun UsageMeter(label: String, p: UsageProjection, spoken: String) {
+private fun PlanMeter(label: String, p: UsageWindow, spoken: String) {
     val value = p.used
-    ProjectionMeter(
+    UsageMeter(
         label, p, spoken,
         modifier = Modifier.semantics(mergeDescendants = true) {
             // The meter's own sentence is its description; the progress adds only its value.
