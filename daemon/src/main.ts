@@ -1,11 +1,11 @@
 // Hypernova daemon entry point.
 import { log, VERSION, API_PORT, LOCAL_PORT } from './util.ts'
-import { broadcast, discover, listSessions, pendingApprovals, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'
+import { broadcast, discover, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'
 import { pollStatusLine } from './services.ts'
 import { ensureProjectsRoot } from './files.ts'
 import { announceApp, appInfo, startServers } from './http.ts'
 import { startReleaseCheck } from './releases.ts'
-import { busyNow, serverUpdateHook, startServerUpdate, updateView } from './server-update.ts'
+import { serverUpdateHook, startServerUpdate, updateView } from './server-update.ts'
 import { refreshClaudeCommands, scanTerms, attachWaitingJobs, watchMenus, writeHnBin } from './terms.ts'
 import { refreshHooks, refreshShell } from './hooks.ts'
 import { startAccount } from './account.ts'
@@ -61,10 +61,8 @@ startUsageProbe()
 // After the servers, the account, the battery and Stay awake: automations fire off all of them.
 void startAutomations()
 // The server updating itself (server-update.ts, settings.autoUpdate, on unless turned off): an
-// update this start is the result of is said now; one waits for no session working, no agent running
-// and no approval.
+// update this start is the result of is said now.
 const justUpdated = startServerUpdate({
-  busy: () => busyNow(listSessions(), pendingApprovals().length),
   changed: () => broadcast({ t: 'update', update: updateView() }),
 })
 // The app's GitHub releases (releases.ts): a newer one's APK is fetched, checked and offered to the

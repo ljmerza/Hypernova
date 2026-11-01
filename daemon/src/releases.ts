@@ -274,7 +274,7 @@ export function releaseChecker(o: CheckerOptions) {
     log(line)
   }
 
-  /** The release just read, to the server's own update: not waited for (it may wait for a quiet moment). */
+  /** The release just read, to the server's own update: not waited for (it downloads the package). */
   function toServer(r: Outcome): void {
     if (!o.server || !known || r.kind === 'limited' || r.kind === 'none' || r.kind === 'error') return
     if (r.kind === 'off' && !o.server.enabled()) return

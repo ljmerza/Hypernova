@@ -9,20 +9,18 @@
 //   2. the release's server package (`hypernova-server-<tag>-linux.tar.gz`) is downloaded and its
 //      SHA-256 checked against the note's `serverSha256` (a note without one: nothing installed),
 //      then unpacked into a new folder and its daemon's version checked against the tag;
-//   3. then it waits for a quiet moment: no session working or starting, no agent running (one
-//      waiting on its background command runs too), no approval waiting, for 2
-//      minutes on end (24 hours at most, then it goes ahead: the shared terminals outlive the
-//      restart, docs/PROTOCOL.md, "Shared terminals");
-//   4. and hands the install to a transient systemd unit of its own (`systemd-run --user`,
-//      server-update.sh), outside the daemon's service, so the restart can't cut it off: the
-//      package's own `scripts/install-linux.sh --from <it>`, which swaps the new daemon in only once
-//      its terminal module works and restarts the service; a new daemon that doesn't answer is
-//      swapped back out for the old one.
+//   3. and, at once, whatever sessions are doing (owner, 2026-11-01: the sessions live in Claude
+//      Code, a restart only stops this back end for a moment; docs/DECISIONS.md, "Servers update
+//      without waiting"), hands the install to a transient systemd unit of its own (`systemd-run
+//      --user`, server-update.sh), outside the daemon's service, so the restart can't cut it off:
+//      the package's own `scripts/install-linux.sh --from <it>`, which swaps the new daemon in only
+//      once its terminal module works and restarts the service; a new daemon that doesn't answer
+//      is swapped back out for the old one.
 //
-// Everything before step 4 leaves the running server as it is; a failure is a line in the log and
-// a try again later (1 hour, 6, 24, then not for that release). The new daemon, at start, sees the
-// update it was waiting for (<support>/server-update.json) and says so: the log, and `last` in the
-// snapshot's `mac.update`.
+// Everything before step 3's install leaves the running server as it is; a failure is a line in the
+// log, `failure` in the view (a phone's only way to hear of it) and a try again later (1 hour, 6, 24,
+// then not for that release). The new daemon, at start, sees the update it was waiting for
+// (<support>/server-update.json) and says so: the log, and `last` in the snapshot's `mac.update`.
 import { execFile } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -37,9 +35,6 @@ const run = promisify(execFile)
 
 /** The package is the daemon's sources and the font: a few MB. */
 const TARBALL_MAX = 128 * 1024 * 1024
-export const QUIET_FOR = 2 * 60_000
-export const MAX_WAIT = 24 * 3600_000
-const POLL = 15_000
 /** After a failure, the same release again in 1 hour, then 6, then 24; after the fourth, not again. */
 const BACKOFF = [3600_000, 6 * 3600_000, 24 * 3600_000]
 /** A started install that hasn't come back in this long didn't take. */
@@ -48,23 +43,11 @@ const PENDING_FOR = 3600_000
 export const UPDATE_UNIT = 'hypernova-update'
 
 export type Managed = { ok: true } | { ok: false; reason: string }
-export type Busy = { working: number; approvals: number; agents: number }
-
-/**
- * What a quiet moment waits for. Agents count on their own: a session whose main agent is idle may
- * have agents at work, or waiting on a background command that a restart would leave them without
- * news of. The cap on a stuck agent (agents.ts) and [MAX_WAIT] keep one from holding this for good.
- */
-export function busyNow(sessions: readonly { state: string; agentsRunning: number }[], approvals: number): Busy {
-  return {
-    working: sessions.filter((s) => s.state === 'working' || s.state === 'starting').length,
-    approvals,
-    agents: sessions.reduce((n, s) => n + (s.state === 'ended' ? 0 : s.agentsRunning), 0),
-  }
-}
 /** What the install needs: the unpacked package and where to write how it went. */
 export type ApplyJob = { tag: string; from: string; to: string; unpacked: string; workDir: string; result: string; logFile: string }
 export type LastUpdate = { from: string; to: string; at: number }
+/** An update that failed: the release, why in a sentence, when, and the next try (null: not again). */
+export type UpdateFailure = { tag: string; why: string | null; at: number | null; next: number | null }
 /** The snapshot's `mac.update`, `{t:"update"}` and the routes' answer (docs/PROTOCOL.md). */
 export type UpdateView = {
   /** settings.autoUpdate. */
@@ -72,11 +55,13 @@ export type UpdateView = {
   /** This install can update itself; else [reason] says why not, in a sentence. */
   available: boolean
   reason: string | null
-  /** idle; waiting for a quiet moment with [target] downloaded and checked; installing [target]. */
-  state: 'idle' | 'waiting' | 'installing'
+  /** idle, or installing [target]. */
+  state: 'idle' | 'installing'
   target: string | null
   /** The last update this server installed by itself. */
   last: LastUpdate | null
+  /** The last try failed, and the server still runs the older version; null otherwise. */
+  failure: UpdateFailure | null
 }
 export type ServerOutcome =
   | { kind: 'off' }
@@ -89,14 +74,14 @@ export type ServerOutcome =
   | { kind: 'mismatch'; tag: string }
   | { kind: 'error'; tag: string; message: string }
   | { kind: 'cancelled'; tag: string }
-  | { kind: 'launched'; tag: string; forced: boolean }
+  | { kind: 'launched'; tag: string }
 
 type Saved = {
   /** An install handed to the unit, waiting for the new daemon to start. */
   pending?: { tag: string; from: string; to: string; at: number } | null
   last?: LastUpdate | null
-  /** Failures for one release: how many, and not before when (null: not again). */
-  fails?: { tag: string; count: number; next: number | null } | null
+  /** Failures for one release: how many, not before when (null: not again), and the last one's why and when. */
+  fails?: { tag: string; count: number; next: number | null; why?: string; at?: number } | null
 }
 
 /** `v1.2.3` or `1.2.3` as three numbers; null for anything else (a pre-release, a build, a name). */
@@ -188,16 +173,11 @@ export type UpdaterOptions = {
   /** Default: settings.autoUpdate, unset on (owner, 2026-11-01). */
   enabled?: () => boolean
   managed?: () => Managed
-  busy?: () => Busy
   /** Starts the install outside the daemon (default: [launchUnit]). Throws when it couldn't. */
   apply?: (job: ApplyJob) => Promise<void>
   /** Something in the view changed: the phones hear it (main.ts: {t:"update"}). */
   changed?: () => void
   now?: () => number
-  sleep?: (ms: number) => Promise<void>
-  quietMs?: number
-  maxWaitMs?: number
-  pollMs?: number
   /** The package's download (default 10 minutes). */
   timeoutMs?: number
   /** How often to look for the unit's result while an install runs (default 5 s; 0: not at all). */
@@ -212,12 +192,7 @@ export function serverUpdater(o: UpdaterOptions = {}) {
   const logFile = o.logFile ?? join(LOGS, 'update.log')
   const enabled = o.enabled ?? (() => settings.autoUpdate !== false)
   const now = o.now ?? Date.now
-  const sleep = o.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms).unref()))
-  const quietMs = o.quietMs ?? QUIET_FOR
-  const maxWaitMs = o.maxWaitMs ?? MAX_WAIT
-  const pollMs = o.pollMs ?? POLL
   const watchMs = o.watchMs ?? 5000
-  const busy = o.busy ?? (() => ({ working: 0, approvals: 0, agents: 0 }))
   const apply = o.apply ?? launchUnit
   const changed = o.changed ?? (() => {})
   // The install's verdict is looked at again at most every minute (a stat and a read or two).
@@ -251,18 +226,28 @@ export function serverUpdater(o: UpdaterOptions = {}) {
     log(line)
   }
 
-  function view(): UpdateView {
-    const m = managed()
-    return { auto: enabled(), available: m.ok, reason: m.ok ? null : m.reason, state, target, last: saved.last ?? null }
+  /** The last failure, while it's still the news: nothing being installed, and that release still newer than this daemon. */
+  function failure(): UpdateFailure | null {
+    const f = saved.fails
+    const wanted = f ? semver(f.tag) : null
+    const running = semver(version)
+    if (!f || !enabled() || state !== 'idle' || !wanted || !running || !newer(wanted, running)) return null
+    return { tag: f.tag, why: f.why ?? null, at: f.at ?? null, next: f.next }
   }
 
-  /** A failure for [tag]: the next try waits (1 h, 6 h, 24 h, then never for this release). */
-  function failed(tag: string, why: string): void {
+  function view(): UpdateView {
+    const m = managed()
+    return { auto: enabled(), available: m.ok, reason: m.ok ? null : m.reason, state, target, last: saved.last ?? null, failure: failure() }
+  }
+
+  /** A failure for [tag]: the next try waits (1 h, 6 h, 24 h, then never for this release), and the phones hear it. [where]: for the log only. */
+  function failed(tag: string, why: string, where = ''): void {
     const count = saved.fails?.tag === tag ? saved.fails.count + 1 : 1
     const next = count > BACKOFF.length ? null : now() + BACKOFF[count - 1]!
-    saved.fails = { tag, count, next }
+    saved.fails = { tag, count, next, why, at: now() }
     save()
-    say(`server update to ${tag} failed: ${why}; ${next == null ? 'not trying this release again (turn the setting off and on to try again)' : `trying again after ${new Date(next).toISOString()}`}`, true)
+    say(`server update to ${tag} failed: ${why}${where}; ${next == null ? 'not trying this release again (turn the setting off and on to try again)' : `trying again after ${new Date(next).toISOString()}`}`, true)
+    changed()
   }
 
   /** The unit's verdict, `{tag, code, at}` (server-update.sh), or null while it runs. */
@@ -297,8 +282,9 @@ export function serverUpdater(o: UpdaterOptions = {}) {
       saved.pending = null
       save()
       const why = !r ? 'it didn’t finish within an hour' : r.code === 0 ? 'it installed, but this daemon wasn’t restarted into it' : (RESULT_WORDS[r.code] ?? `the install stopped (exit ${r.code})`)
-      failed(p.tag, `${why}; still ${version} (${logFile})`)
+      // Idle first: what `failed` tells the phones says so.
       set('idle', null)
+      failed(p.tag, `${why}; still ${version}`, ` (${logFile})`)
       return 'failed'
     }
     return 'running'
@@ -321,28 +307,6 @@ export function serverUpdater(o: UpdaterOptions = {}) {
     return s === 'updated'
   }
 
-  /** Waits for no session working or starting, no agent running and no approval waiting, [quietMs] on end; [maxWaitMs] at most. */
-  async function quiet(tag: string): Promise<'quiet' | 'forced' | 'cancelled'> {
-    const start = now()
-    let since: number | null = null
-    for (let told = false; ; ) {
-      if (!enabled()) return 'cancelled'
-      const b = busy()
-      if (b.working === 0 && b.approvals === 0 && b.agents === 0) {
-        since ??= now()
-        if (now() - since >= quietMs) return 'quiet'
-      } else {
-        since = null
-        if (!told) {
-          told = true
-          say(`server update to ${tag}: waiting for a quiet moment (${b.working} working, ${b.agents} agents running, ${b.approvals} waiting for an answer)`, true)
-        }
-      }
-      if (now() - start >= maxWaitMs) return 'forced'
-      await sleep(pollMs)
-    }
-  }
-
   async function attemptFor(r: ServerRelease, wanted: [number, number, number]): Promise<ServerOutcome> {
     const tag = r.tag
     if (!r.tarball || !r.sha256) {
@@ -356,7 +320,6 @@ export function serverUpdater(o: UpdaterOptions = {}) {
     const tmp = join(dir, `.server-${tag}.${process.pid}.download`)
     const tarball = join(work, `hypernova-server-${tag}-linux.tar.gz`)
     const unpacked = join(work, 'package')
-    set('waiting', tag)
     try {
       let digest: string
       try {
@@ -386,12 +349,11 @@ export function serverUpdater(o: UpdaterOptions = {}) {
         failed(tag, `the package isn’t Hypernova’s server ${tag} (its daemon says ${String(pkg?.version ?? 'nothing')})`)
         return { kind: 'error', tag, message: 'not the package' }
       }
-      const q = await quiet(tag)
-      if (q === 'cancelled') {
-        say(`server update to ${tag}: auto-update was turned off while it waited; nothing installed`, true)
+      // Looked at again: the download took a while, and the setting or the install may have changed.
+      if (!enabled()) {
+        say(`server update to ${tag}: auto-update was turned off during the download; nothing installed`, true)
         return { kind: 'cancelled', tag }
       }
-      // Looked at again: the install may have changed while it waited.
       const m = managed()
       if (!m.ok) return { kind: 'unavailable', reason: m.reason }
       const to = wanted.join('.')
@@ -406,13 +368,12 @@ export function serverUpdater(o: UpdaterOptions = {}) {
         failed(tag, `the install couldn’t start: ${e instanceof Error ? e.message.split('\n')[0] : e}`)
         return { kind: 'error', tag, message: 'launch' }
       }
-      say(`server update: installing ${tag} (from ${version}${q === 'forced' ? ', after waiting 24 hours for a quiet moment' : ''}); the service restarts when it's in (${logFile})`, true)
+      say(`server update: installing ${tag} (from ${version}); the service restarts when it's in (${logFile})`, true)
       set('installing', tag)
       watch()
-      return { kind: 'launched', tag, forced: q === 'forced' }
+      return { kind: 'launched', tag }
     } finally {
       rmSync(tmp, { force: true })
-      if (state === 'waiting') set('idle', null)
     }
   }
 
@@ -489,7 +450,7 @@ let daemonUpdater: ReturnType<typeof serverUpdater> | null = null
 const updater = () => (daemonUpdater ??= serverUpdater())
 
 /** The daemon's updater (main.ts), with the hub's counts and the phones to tell. True when this start is an update's. */
-export function startServerUpdate(o: Pick<UpdaterOptions, 'busy' | 'changed'>): boolean {
+export function startServerUpdate(o: Pick<UpdaterOptions, 'changed'>): boolean {
   daemonUpdater?.stop()
   daemonUpdater = serverUpdater(o)
   return daemonUpdater.started()

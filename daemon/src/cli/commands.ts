@@ -466,21 +466,21 @@ export async function lan(cli: Cli, rest: string[]): Promise<number> {
 export async function autoUpdate(cli: Cli, rest: string[]): Promise<number> {
   const want = rest[0]
   if (want !== undefined && want !== 'on' && want !== 'off') {
-    cli.sys.say('hypernova auto-update [on|off]: this server installs newer Hypernova releases by itself, when no session is working.')
+    cli.sys.say('hypernova auto-update [on|off]: this server installs newer Hypernova releases by itself; sessions keep running through its restart.')
     return 2
   }
   try {
     if (want) await local(cli, 'POST', '/local/settings', { autoUpdate: want === 'on' })
     const st = await local(cli, 'GET', '/local/status')
-    const u = st.update as { auto: boolean; available: boolean; reason: string | null; state: string; target: string | null; last: { from: string; to: string; at: number } | null } | undefined
+    const u = st.update as { auto: boolean; available: boolean; reason: string | null; state: string; target: string | null; last: { from: string; to: string; at: number } | null; failure?: { tag: string; why: string | null; next: number | null } | null } | undefined
     if (!u) {
       line(cli, 'fail', 'This daemon is too old to update itself.')
       return 1
     }
-    line(cli, u.auto ? 'ok' : 'info', u.auto ? 'Auto-update is on: newer releases install themselves when no session is working.' : 'Auto-update is off.', u.auto ? undefined : 'hypernova auto-update on turns it on.')
+    line(cli, u.auto ? 'ok' : 'info', u.auto ? 'Auto-update is on: newer releases install themselves; sessions keep running through the restart.' : 'Auto-update is off.', u.auto ? undefined : 'hypernova auto-update on turns it on.')
     if (!u.available) line(cli, u.auto ? 'warn' : 'info', `Auto-update isn’t available here: ${u.reason}`)
-    if (u.state === 'waiting' && u.target) line(cli, 'info', `${u.target} is downloaded and checked, waiting for a quiet moment.`)
     if (u.state === 'installing' && u.target) line(cli, 'doing', `Installing ${u.target}…`)
+    if (u.failure) line(cli, 'warn', `Updating to ${u.failure.tag} failed${u.failure.why ? `: ${u.failure.why}` : ''}.`, u.failure.next == null ? 'It won’t try that release again until auto-update is turned off and on.' : `It tries again after ${new Date(u.failure.next).toLocaleString()}.`)
     if (u.last) line(cli, 'info', `Last updated itself from ${u.last.from} to ${u.last.to}, ${new Date(u.last.at).toLocaleString()}.`)
     return 0
   } catch (e: any) {
