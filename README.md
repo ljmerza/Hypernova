@@ -47,8 +47,8 @@ Install the app from the [latest release](https://github.com/ljmerza/Hypernova/r
 (`hypernova-<tag>.apk`, Android 10 or later) and scan the QR code `hypernova pair` shows.
 `hypernova doctor` checks every piece if something doesn't work.
 
-To update the server run the same `curl` line again. Docker and the manual steps are in
-[`docs/LINUX.md`](docs/LINUX.md).
+The server updates itself to new releases (`hypernova auto-update off` turns that off), and the same
+`curl` line updates it by hand. Docker and the manual steps are in [`docs/LINUX.md`](docs/LINUX.md).
 
 ## What you can do from the phone
 

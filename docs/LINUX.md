@@ -1,269 +1,388 @@
+<!-- Also the server package's README.md (scripts/pack-linux.sh), which has no docs/ folder beside it: link to other docs by full URL. -->
 # Hypernova on Linux
 
-Hypernova's daemon runs on any always-on Linux machine: a VPS, a home server, a PC, or a Docker
-container. There is no menu bar app there; everything is the `hypernova` command, over SSH. Claude
-Code, Codex or both run on the server beside it, and the phone app pairs with it the same way it
-pairs with a Mac. The phone reaches the server on its own network (the local route, port 47323,
-mutual TLS), or over your own VPN into that network (docs/DECISIONS.md, "Tailscale is removed").
-[INSTALL.md](INSTALL.md) walks a first install through; this page has every command and detail.
+The reference for running Hypernova's daemon on a Linux server or PC: every command and flag, where
+things live, ports, the service, updates and logs. To install it, follow
+[INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md).
 
-Supported: Ubuntu and Debian (other distributions work with their packages installed by hand), on
-x86_64 and arm64.
-
-**A Windows PC** runs the same service inside WSL 2 (Ubuntu) or in a Docker Desktop container:
-**experimental**, documented from Microsoft's and Docker's guides but not yet tried on a real Windows
-PC. The steps, what works and what doesn't, are in
-[INSTALL.md, "4. Windows (experimental)"](INSTALL.md#4-windows-experimental-wsl2-or-docker-desktop);
-under WSL, `hypernova doctor`, `pair`, `lan` and `setup` say what differs there (systemd, keeping
-WSL running, no way in for the phone behind WSL's NAT unless its networking is mirrored).
-
-## Install
-
-Run it as the user who will use Claude Code or Codex, not as root. The script asks `sudo` for system
-packages only.
-
-```sh
-# In one line: the latest release's server package, downloaded and installed (scripts/get.sh;
-# HYPERNOVA_TAG=<tag> for another release, `| bash -s -- --yes` for no questions):
-curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
-
-# The same by hand. A release's server package (https://github.com/ljmerza/Hypernova/releases/latest:
-# hypernova-server-<tag>-linux.tar.gz, one package for x86_64 and arm64), on the server:
-gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the page
-tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
-
-# From a checkout of this repository, on the server:
-scripts/install-linux.sh
-
-# A package of your own: on your computer,
-scripts/pack-linux.sh            # writes dist/linux/hypernova-<version>.tar.gz (a release renames it)
-scp dist/linux/hypernova-*.tar.gz you@server:
-# then on the server, from an unpacked copy's script or a checkout's:
-scripts/install-linux.sh --from hypernova-<version>.tar.gz
-```
-
-Options: `--no-claude` (don't install Claude Code: Codex alone), `--yes` (no questions),
-`--no-integration` (leave the hooks and the shell function for the first start: a container image).
-
-What it does:
-
-1. **System packages** it lacks, with `apt-get`: curl, tar, openssl, git, build tools (`make`,
-   `g++`, `python3`: node-pty, which runs the shared terminals, has no prebuilt Linux binary and is
-   built on the server), and `ps` and `lsof`.
-2. **Node.js 24** from nodejs.org, checked against nodejs.org's `SHASUMS256.txt`, unpacked into
-   Hypernova's own folder (`~/.local/share/hypernova/node`). A system Node 24 or newer is used
-   instead when there is one. Nothing outside Hypernova's folder is touched.
-3. **`hypernova setup`**, which does the rest (below).
-
-## Try it in Docker
-
-The quickest way to look, on any machine with Docker:
-
-```sh
-docker build -t hypernova .
-docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped \
-  --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
-docker exec -it hypernova claude            # sign in to Claude once
-docker exec -it hypernova hypernova pair    # the pairing code
-docker exec -it hypernova hypernova doctor
-```
-
-The image is Ubuntu 24.04 with the install script already run in it, as a normal user. The daemon
-is the container's command (`hypernova run`); there is no systemd in a container, so no service.
-Nothing is published to the network. On a Linux host, `--network host` lets a phone on the same
-network (or on a VPN into it) pair over the local route, the phone's only way in.
-`--build-arg CLAUDE=no` leaves Claude Code out. Codex in a container: its npm package needs a Node.js
-on the PATH, which the image doesn't have, so copy Codex's own Linux build in
-(`docker cp codex hypernova:/home/hypernova/.local/bin/codex`), then `docker exec -it hypernova codex
-login --device-auth` and `docker exec -it hypernova hypernova codex on`.
-
-The program (the daemon, its Node.js, the `hypernova` command) is in the image under
-`/opt/hypernova`; only state (paired phones, settings, keys, Claude's login) is in the volume. The
-image holds no identity: each volume makes its own computer id, admin token and hook secret at its
-first start, so two containers from one image are two computers. `--restart unless-stopped` brings
-the daemon back after a host reboot or a crash. A container is no phone's network, so the local
-route is off there; `hypernova lan on` turns it on (with `--network host` on a Linux host).
-
-**Updating the container:** build the image again, remove the container, run it again with the same
-volume. The new image's daemon runs, with your phones and settings:
-
-```sh
-docker build -t hypernova . && docker rm -f hypernova
-docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped -v hypernova-home:/home/hypernova hypernova
-```
+There is no window on a server: everything is the `hypernova` command, over SSH. Run it as the user
+who runs Claude Code or Codex, not as root. Supported: Ubuntu and Debian, on x86_64 and arm64. Other
+distributions work with their packages installed by hand.
 
 ## The commands
 
+Each command's flags are in the rows under it.
+
+| Command or flag | What it does |
+|---|---|
+| **`hypernova setup`** | Checks what's there and installs what's missing: Node.js 24, the daemon, the `hypernova` command, Claude Code (Anthropic's installer), the service with lingering, the hooks and status line, the `claude` shell function. Turns on sessions in `claude agents` unless `settings.json` already says either way (the app: Settings → Agents & providers → Claude Code). Says what it found of Codex. Safe to run again. Never signs in: run `claude` once for that. |
+| `--from <dir>` | Install from a checkout or an unpacked package. |
+| `--no-claude` | Don't install Claude Code (Codex alone). |
+| `--no-service` | Skip the service. |
+| `--no-integration` | Skip the hooks and the shell function (a container image). |
+| **`hypernova pair`** | The pairing QR code and link (the server's own page on the local route), and where to get the app. Waits for the phone and names it. A code works once, for 10 minutes. With the local route off it says so and prints the app's own `hypernova://pair` link. Exit 1 when the daemon isn't running or the code runs out. |
+| `--no-wait`, `--no-wait-phone` | Don't wait for the phone. |
+| `--no-qr` | The link and code only. |
+| **`hypernova status`** | What runs, how phones reach it, Claude Code, Codex, the integration, paired devices, sessions. Exit 1 when the daemon isn't running. |
+| `--json` | As JSON. |
+| **`hypernova doctor`** | Every piece checked, each problem with the command that fixes it. Exit 1 when something stops Hypernova working. With Codex alone, a missing Claude Code is only noted; with neither agent, it fails. |
+| `--json` | As JSON. |
+| **`hypernova logs`** | The daemon's log, its last 100 lines. |
+| `-n <lines>`, `--lines <lines>` | That many lines. |
+| `-f`, `--follow` | Keep following it. |
+| `--terminals` | The shared terminals' log instead. |
+| **`hypernova lan on\|off`** | Turns the local route on or off, at once, and keeps it that way ([Ports](#ports)). |
+| **`hypernova auto-update [on\|off]`** | The server installing newer releases by itself ([Updating](#updating)). Without a word: on or off, whether this install can and why not, what it's doing, a try that failed, the last update. `on` also looks for a release at once. |
+| **`hypernova codex [on\|off]`** | OpenAI's Codex for Hypernova. Without a word: its path, its version against the minimum (0.163.0), on or off, signed in. `on` connects the daemon to Codex's own app server and adds a `codex` shell function; it refuses when Codex is missing or too old. Never installs or signs in Codex ([INSTALL.md, "Codex (optional)"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#codex-optional)). |
+| **`hypernova uninstall`** | Removes the integration, the service, the command, the daemon and the Node.js it downloaded. Keeps paired phones, settings and logs, Claude Code, Codex and their logins, and lingering (it says how to turn that off). Open shared sessions keep running. Asks first; with no terminal it refuses without `--yes`. |
+| `--purge` | Paired phones, settings and logs too. |
+| `--yes` | Don't ask. |
+| **`hypernova run`** | The daemon in the foreground, its log on the terminal too. A container's command, and handy for debugging. Stop the service first: it holds the same ports. |
+| **`hypernova automation fire <id>`** | Fires an automation's webhook trigger on this computer, for git hooks, cron or CI. Exit 0: a run was made. 3: nothing happened (paused, off, fired too often). 1: an error. 2: wrong usage. |
+| `--data <text>` | The payload, as it is. |
+| `--data-file <file>` | The payload from a file; `-` for standard input. Not with `--data`. |
+| `--token <token>` | The automation's own token. Without it, `HYPERNOVA_FIRE_TOKEN`, then the admin token. |
+| **`hypernova integrate`** | Puts the hooks, the status line and the shell function in again. A container runs it at each start. |
+| **`hypernova version`** | The daemon's version. Also `--version`, `-v`. |
+| **`hypernova help`** | The list of commands. Also `--help`, `-h`. |
+
+Other names for the same command: `install` (setup), `log` (logs), `autoupdate` (auto-update),
+`automations` (automation).
+
+Flags take `--from <dir>` or `--from=<dir>`. **Unknown flags are ignored, not refused**, so check the
+spelling: `hypernova uninstall --pruge` still uninstalls, and keeps your state.
+
+### Shared terminals: `hn`
+
+Every phone session runs in a shared terminal. So does `claude` typed in your shell, through a
+function in a marked block in `~/.bashrc` or `~/.zshrc` (`# >>> hypernova shared terminals`), and
+`codex` while it's on. With another login shell they stay plain. `command claude` or `HYPERNOVA_OFF=1`
+skips it for one run. More: [INSTALL.md, "The shell integration"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#the-shell-integration).
+
 | Command | What it does |
 |---|---|
-| `hypernova setup` | Checks and installs what's missing: Node.js 24, the daemon (with node-pty built), the `hypernova` command, Claude Code (Anthropic's installer, `curl -fsSL https://claude.ai/install.sh \| bash`, when it's absent), the systemd service with lingering, the hooks and status line in Claude Code's settings, and the `claude` shell function. It turns on sessions in `claude agents` (`"claudeAgents": true` in `settings.json`) unless that already says either way; the app's Settings → Agents & providers → Claude Code turns it off. Safe to run again. Then it asks you to run `claude` once to sign in: Hypernova never signs in, out or reads Claude Code's login. It also says what it found of Codex (see `hypernova codex`). `--from <dir>`, `--no-claude`, `--no-service`. |
-| `hypernova pair` | The pairing QR code, in the terminal, and the link under it: this server's own pairing page on the local route, `https://<its address>:47323/pair?…` (the phone's camera opens it in the browser, which warns once about the server's own certificate, and the page opens the app; **Paste pairing link** in the app takes the same link), and where to get the app if the phone has none yet. The link carries the local route's addresses, for a phone on the same network or on a VPN into it; nothing outside your network is named. With the local route off it says so (`hypernova lan on`) and prints the app's own `hypernova://pair?…` link instead. Also prints the code and when it expires. Waits for the phone and names it (`--no-wait`, `--no-qr`; `--local` is still accepted and changes nothing). If the window is narrower than the QR code it says so (widen it, or use the link). |
-| `hypernova status` | What runs, how phones reach it, Claude Code and whether it's signed in, Codex (found, on or off, signed in), the integration, paired devices, sessions (`--json`). |
-| `hypernova codex [on\|off]` | OpenAI's Codex for Hypernova: what's found here (path, version against the minimum, 0.163.0), or turning it on or off, as the Mac's Setup switch does. On, the daemon connects to Codex's own app server and the `codex` function joins `claude` in the shell's block; the phone can start Codex sessions. It never installs or signs in Codex: `sudo npm i -g @openai/codex` (or Codex's own Linux build in `~/.local/bin`), then `codex login --device-auth` (a code to enter on any device). |
-| `hypernova doctor` | Every piece checked, each problem with the command that fixes it (`--json`). Exit 1 when something stops Hypernova working. With Codex alone, a missing Claude Code is only noted; with neither agent, it fails. |
-| `hypernova logs` | The daemon's log: the last 100 lines (`-n <lines>`), `-f` to follow, `--terminals` for the shared terminals' log. Both logs roll at 5 MB to `.1`. |
-| `hypernova lan on\|off` | The phone's direct route on the same network (below). |
-| `hypernova auto-update [on\|off]` | The server installing newer releases by itself (below, "Updating"), **on** unless turned off; the app's Settings has the same switch in the server's section (**Update this server automatically**). Without a word, how it stands: on or off, whether this install can (and why not), what it's doing, a try that failed, the last update it installed. |
-| `hypernova uninstall` | Removes the integration, the service, the command, the daemon and its Node. Paired phones and settings stay for a reinstall unless `--purge`. Claude Code, Codex and their logins stay, and so does lingering (other services of yours may use it; it says how to turn it off). With no terminal it refuses unless you pass `--yes`. |
-| `hypernova run` | The daemon in the foreground, its log on the terminal too: what a container runs, and handy for debugging. |
+| `hn ls`, `hn list` | Lists the shared sessions. |
+| `hn attach [id]`, `hn a` | Opens one in this terminal, by id, session id or project name. Ctrl+\ detaches and leaves it running. |
+| `hn run`, `hn run-codex` | What the shell functions call. You don't type these. |
 
-`hn ls` and `hn attach <id>` work as on the Mac (shared terminals, below).
+## Install
+
+The normal way is the `get.sh` line in
+[INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#install). These are the
+other ways. Run them as the user who will run the agents; the script asks `sudo` for system packages
+only.
+
+Each [release](https://github.com/ljmerza/Hypernova/releases/latest) carries:
+
+| Asset | What it is |
+|---|---|
+| `hypernova-server-<tag>-linux.tar.gz` | The server package, one for x86_64 and arm64: Node.js and the terminal module are fetched and built for the server at install. |
+| `hypernova-<tag>.apk` | The Android app. |
+
+A release's package by hand, on the server:
+
+```sh
+gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the page
+tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
+```
+
+From a clone, on the server: `scripts/install-linux.sh`.
+
+A package of your own:
+
+```sh
+scripts/pack-linux.sh                 # in a clone: writes dist/linux/hypernova-<version>.tar.gz
+scp dist/linux/hypernova-*.tar.gz you@server:
+# then on the server:
+tar -xzf hypernova-<version>.tar.gz && hypernova-<version>/scripts/install-linux.sh
+```
+
+The scripts and their options:
+
+| Script or option | What it does |
+|---|---|
+| **`scripts/install-linux.sh`** | System packages, Node.js 24, then `hypernova setup`. It refuses to run under `sudo`, and asks `sudo` for packages itself. |
+| `--from <path>` | A checkout, an unpacked package, or a `.tar.gz` or `.tgz`. Without it, the repository or package the script is in. |
+| `--no-claude`, `--no-integration` | As for `hypernova setup`. |
+| `--yes`, `-y` | For scripts. It asks no questions of its own; `sudo` may still ask for a password. |
+| `--help`, `-h` | Its help. |
+| **`get.sh`** | `curl -fsSL https://ljmerza.github.io/Hypernova/get.sh \| bash` downloads the latest release's server package and runs its install script. It refuses root. Options go after `bash -s --`. |
+| `HYPERNOVA_TAG=<tag>` | Another release, set for `bash`. |
+| **`scripts/pack-linux.sh`** | In a clone: writes `dist/linux/hypernova-<version>.tar.gz`. A release attaches it as `hypernova-server-<tag>-linux.tar.gz`. |
 
 ## Where things live
 
 | What | Where |
 |---|---|
-| State: identity, admin token, paired devices, settings, shared terminals' files | `~/.local/share/hypernova` (`$XDG_DATA_HOME/hypernova`) |
-| The daemon itself, and JetBrains Mono beside it | `~/.local/share/hypernova/app` |
-| Node.js, when Hypernova downloaded it | `~/.local/share/hypernova/node`, named in `~/.local/share/hypernova/node-path` |
-| The log | `~/.local/state/hypernova/logs/daemon.log` (`$XDG_STATE_HOME/hypernova/logs`) |
-| The command | `~/.local/bin/hypernova` (on PATH in Ubuntu's and Debian's default `~/.profile`; Claude Code's installer puts `claude` there too) |
-| The service | `~/.config/systemd/user/hypernova.service` |
+| State | `~/.local/share/hypernova`, mode 0700 (`$XDG_DATA_HOME/hypernova`). Called `<state>` below. |
+| The daemon | `<state>/app/daemon`. Its font is in `<state>/app/Fonts`. |
+| How it was installed | `<state>/app/daemon/install.json` ([Updating](#updating)) |
+| Node.js, when Hypernova downloaded it | `<state>/node/<version>` |
+| The Node.js the service runs | Named in `<state>/node-path`. It can be a system Node 24 or newer. |
+| Logs | `~/.local/state/hypernova/logs` (`$XDG_STATE_HOME/hypernova/logs`) |
+| The command | `~/.local/bin/hypernova`. It's on PATH in Ubuntu's and Debian's default `~/.profile`. |
+| The service | `~/.config/systemd/user/hypernova.service` (`$XDG_CONFIG_HOME/systemd/user`) |
+| Hooks and status line | `~/.claude/settings.json` (`$CLAUDE_CONFIG_DIR`) |
+| The shell block | `~/.bashrc`, or `~/.zshrc` (`$ZDOTDIR`) |
 
-`HYPERNOVA_SUPPORT` and `HYPERNOVA_LOGS` still win over these, as on the Mac (a test daemon's
-folders), and so do the port variables `HYPERNOVA_API_PORT`, `HYPERNOVA_LOCAL_PORT` and
-`HYPERNOVA_LAN_PORT`; setup carries them into the service and the command.
+Inside `<state>`:
+
+| What | Where |
+|---|---|
+| Identity | `daemon.json` |
+| Admin token, for the local API and the `hypernova` command only | `admin-token`, mode 0600 |
+| Secret in the hooks | `hook-secret` |
+| Paired phones | `devices.json` |
+| Settings | `settings.json` |
+| Certificates | `tls/` |
+| Copies of the files the integration changes | `backups/` |
+| Attachments from the phone, kept 30 days | `attachments/` |
+| Shared terminals | `terms/` |
+| `hn`, the status line script, a second `hypernova` for automations | `bin/` |
+| The app, downloaded from the latest release for the phones | `android/` |
+| The server's own update | `updates/`, `server-update.json` |
+
+<a id="security"></a>
+## Ports
+
+| Port | Name | Listens on | For |
+|---|---|---|---|
+| 47321 | Phone API | 127.0.0.1 only | The daemon's API. Phones reach it through the local route. |
+| 47322 | Local API | 127.0.0.1 only | The `hypernova` command and the hooks. |
+| 47323 | Local route | All addresses, while it's on | How phones come in: HTTPS with mutual TLS. |
+
+`hypernova doctor` reads the kernel's socket table and fails if anything listens on 47321 or 47322
+beyond loopback (a port forward, another program).
+
+**The local route** takes connections only from private, link-local, CGNAT and ULA addresses; the
+rest are dropped before TLS. Without a phone's device certificate, only health, pairing, the
+certificate route and the app's download page answer. Nothing is published: a phone's browser opens
+the server's pages at its address, with the server's own certificate. More:
+[SECURITY-MODEL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/SECURITY-MODEL.md).
+
+It's on by default, except where no phone shares the network. `hypernova lan on|off` decides either way.
+
+| Off by default on | Why |
+|---|---|
+| A machine with a public IPv4 address of its own (a VPS) | The port would face the internet. |
+| A cloud VM (AWS, Google, Azure, DigitalOcean, Hetzner and others) | It sits behind a NAT. |
+| A container | Its bridge network has no phones on it. |
+| WSL 2 in any networking mode but mirrored or bridged | It sits behind Windows' NAT. Even when turned on, its addresses are left out of pairing links. |
+
+Pairing links name only the server's private addresses (RFC 1918, else ULA) on real network
+interfaces. Virtual and tunnel interfaces are never named: `docker*`, `br-*`, `virbr*`, `veth*`,
+`tun*`, `wg*` and the like.
+
+**Away from home**, use your own VPN into the server's network (WireGuard, a UniFi VPN). The phone then
+reaches the local route as if it were on the Wi-Fi. A VPS has no home network to join, so it needs
+`hypernova lan on` and a VPN onto its private network, one the server reaches through a normal
+interface. A WireGuard that ends on the VPS itself, with no other private address there, leaves the
+link no address to name (read from the code, not yet tried). Never open port 47323 to the internet.
+
+## Environment variables
+
+`hypernova setup` writes these into the service and the command when they're set. Leave them unset
+on a normal install. There is one `hypernova.service`, so `setup` or `uninstall` with them set still
+replaces or removes it. `HYPERNOVA_APP`, `_NODE_ROOT`, `_NODE_PATH` and `_LAUNCHER` must be absolute
+paths.
+
+| Variable | Default | What it sets |
+|---|---|---|
+| `HYPERNOVA_SUPPORT` | `<state>` | The state folder. A daemon with this set leaves the shell's startup file alone. |
+| `HYPERNOVA_LOGS` | `~/.local/state/hypernova/logs` | The log folder. |
+| `HYPERNOVA_APP` | `<state>/app` | The program, apart from the state. |
+| `HYPERNOVA_NODE_ROOT` | `<state>/node` | Where Node.js is downloaded to. |
+| `HYPERNOVA_NODE_PATH` | `<state>/node-path` | The file naming the Node.js to run. |
+| `HYPERNOVA_LAUNCHER` | `~/.local/bin/hypernova` | The command. |
+| `HYPERNOVA_API_PORT` | 47321 | The phone API. |
+| `HYPERNOVA_LOCAL_PORT` | 47322 | The local API. |
+| `HYPERNOVA_LAN_PORT` | 47323 | The local route. |
+
+The rest are read where they're set. For the service, that means a systemd drop-in
+(`systemctl --user edit hypernova`).
+
+| Variable | What it does |
+|---|---|
+| `HYPERNOVA_TAG` | `get.sh`: the release to install. |
+| `HYPERNOVA_OFF` | `1`: `claude` and `codex` skip the shared terminal for this run. |
+| `HYPERNOVA_FIRE_TOKEN` | `hypernova automation fire`: the automation's own token. |
+| `HYPERNOVA_CODEX` | The Codex program, instead of looking for it. |
+| `HYPERNOVA_LOG_STDOUT` | Log to standard output too. `hypernova run` sets it. |
+| `HYPERNOVA_APK_URL` | Where the pairing page sends a phone for the app. |
+| `HYPERNOVA_CONTAINER` | `1` or `0`: this is, or isn't, a container. The image sets `1`. |
+| `HYPERNOVA_CLOUD` | `1` or `0`: this is, or isn't, a cloud VM. |
+| `HYPERNOVA_WSL` | `1` or `0`: this is, or isn't, WSL. |
+| `HYPERNOVA_WSL_NETWORKING` | WSL's networking mode, instead of asking `wslinfo`. |
+| `CLAUDE_BIN` | The Claude Code program, instead of looking for it. |
+
+Hypernova sets `HYPERNOVA_TERM`, `HYPERNOVA_CLAUDE` and `HYPERNOVA_MANAGED` for its own sessions, and
+gives an automation's shell steps `HYPERNOVA_AUTOMATION`, `_RUN`, `_PROJECT`, `_TIME`, `_BATTERY`,
+`_PREV`, `_OUTPUT`, `_ANSWER`, `_EXIT`, `_PAYLOAD` and `_STEP_<id>`. These are stand-ins for tests:
+`HYPERNOVA_CLAUDE_INSTALLER`, `_NODE_DIST`, `_GITHUB_API`, `_NO_DEV_APK`, `_BOOTED_AT`,
+`_CODEX_SOCKET`, `_SUDO`, `_SUDOERS`, `_CAFFEINATE`, `_PMSET`, `_IOREG`, `_NOTIFYUTIL`, `_E2E_IMAGE`,
+`_E2E_PREFIX`, `_SYSTEMD_IMAGE`.
 
 ## The service
 
-A systemd **user** service, so the daemon and Claude Code run as you, never as root:
-
-- **Lingering** (`loginctl enable-linger`) starts your user's systemd at boot, so the daemon runs
-  with nobody logged in, as a VPS needs. Setup turns it on (with `sudo -n` when loginctl alone
-  isn't allowed); it also starts your user manager when the shell has no login session of its own
-  (`su`, `sudo -u`), which `systemctl --user` needs.
-- `Restart=on-failure` after 5 seconds.
-- `KillMode=process`: stopping or restarting the service ends the daemon alone. The shared
-  terminals' holders, each holding one of your Claude sessions, keep running through an update or
-  a crash, as they do on a Mac.
-- `systemctl --user status|restart|stop hypernova` work as usual; `journalctl --user -u hypernova`
-  has only what escapes the daemon's own log.
-
-## Security
-
-The same as on a Mac (docs/PROTOCOL.md, "Transport and auth", "Local network (direct HTTPS)"):
-
-- The phone API (47321) and the local API (47322) listen on **127.0.0.1 only**. Phones reach the
-  same API through the local route below; nothing listens on a public port.
-  `hypernova doctor` reads the kernel's socket table and fails if anything listens on those ports
-  beyond loopback (a port forward, another program).
-- The **local route** (47323, HTTPS) is for a phone on the same network: connections from
-  anything but private, link-local, CGNAT and ULA addresses are dropped before TLS, and every
-  route but health and pairing needs the phone's device certificate. On a Linux machine with a
-  **public IPv4 address of its own** (a VPS) it is **off by default**: the phone is never on
-  such a server's network, and the port would face the internet. `hypernova lan on` turns it on
-  anyway; `hypernova lan off` turns it off on a PC. No name is registered or published anywhere: a
-  phone's browser opens the server's pages at its address, with the server's own certificate.
-- The admin token (`~/.local/share/hypernova/admin-token`, 0600) is for the local API and the
-  `hypernova` command only.
-- Running as root works but `doctor` warns: Claude Code's sessions would have the whole server.
-  Claude Code also refuses to skip permissions as root, so on a root server phone sessions run
-  without the Bypass mode (the daemon leaves the flag out and refuses a new session started in
-  bypass mode, `bypass_root`) rather than exiting at once. Make a user for it: `adduser claude`,
-  `loginctl enable-linger claude`, `su - claude`, then install there.
-- The local route is **off by default** in a container and on a cloud VM (AWS, Google, Azure,
-  DigitalOcean, Hetzner and others, which sit behind a NAT) as well as on a machine with a public
-  address; bridge interfaces (docker0, br-*, virbr0) are never offered as a phone's address.
-  Behind WSL 2's NAT on a Windows PC (any networking mode but mirrored, as `wslinfo
-  --networking-mode` says) it is off too, and even when turned on its addresses are left out of
-  pairing links: none of them is one a phone can reach.
-
-**Away from home**, use your own VPN into the server's network (a WireGuard or UniFi VPN, say):
-the phone then reaches the local route as if it were on the Wi-Fi. Hypernova carries no VPN or
-Tailscale of its own any more (docs/DECISIONS.md, "Tailscale is removed"). A VPS has no home
-network for the phone to join, so it needs `hypernova lan on` and a VPN that puts the phone on the
-server's private network; never open port 47323 to the internet.
-
-## What a Linux server doesn't have
-
-The Mac's own features are switched off, and say why. The snapshot carries
-`mac.platform: "linux"` and `mac.unavailable`, each feature with its sentence, so a client can
-hide it and show the reason; asked anyway, the API answers 501 `unavailable` with the same
-sentence (docs/PROTOCOL.md, "Types", "Mac-only features").
-
-| Feature | On Linux |
+| | |
 |---|---|
-| Battery | Not shown (`mac.battery` is null). |
-| Stay awake | Off; a server stays on by itself. |
-| The Mac's voice (`say`) | None; the phone reads aloud with its own voice. |
-| Opening a terminal window ("Open on Mac", signing in "on the Mac") | None: no screen. `hn attach` over SSH. |
+| Unit | `hypernova.service`, a systemd **user** service: the daemon and Claude Code run as you, never as root. |
+| At boot | **Lingering** starts your user's systemd at boot, so it runs with nobody logged in. Setup turns it on (`loginctl enable-linger`, else `sudo -n`), and says what to run if it can't. |
+| When it fails | `Restart=on-failure`, after 5 seconds. |
+| When it stops | `KillMode=process`: only the daemon ends. The shared terminals' holders, and your sessions in them, keep running. |
+| Its environment | `PATH` (its Node, `~/.local/bin`, the system's folders), `LANG=C.UTF-8`, and the variables above. |
+| Commands | `systemctl --user status\|start\|restart\|stop hypernova` |
 
-What keeps working on Linux:
-
-- **Shared terminals.** Every phone session runs in a holder with its own PTY (node-pty, built
-  at install). The `claude` shell function goes into **`~/.bashrc`** for bash (the default shell
-  there) or `~/.zshrc` for zsh, the same marked block as on the Mac (`# >>> hypernova shared
-  terminals` … `# <<< hypernova shared terminals`), so `claude` typed over SSH is a session the
-  phone can see and type into; `hn ls`, `hn attach`. Another login shell leaves `claude` plain.
-- **Codex**, as on a Mac: found in the same places (`~/.local/bin`, `/usr/local/bin`, `/usr/bin`,
-  npm's, Volta's, Bun's, pnpm's and nvm's folders, then the login shell), 0.163.0 or later, used only
-  while it's on (`hypernova codex on`, or the phone), its `codex` function in `~/.bashrc` beside
-  `claude`.
-- Everything else the daemon does: sessions, approvals, usage, attachments, automations, agents,
-  statistics, the local route.
+**Running as root** works, but `doctor` warns: sessions would have the whole server, and Claude Code
+refuses to skip permissions as root, so phone sessions run without the Bypass mode (a new session
+asking for it gets `bypass_root`). `get.sh` refuses root, and `install-linux.sh` refuses to run under
+`sudo`. Make a user for it: `adduser claude`, `loginctl enable-linger claude`, `su - claude`, then
+install there.
 
 ## Updating
 
-Run the install script again from the new package (a newer release's
-`hypernova-server-<tag>-linux.tar.gz`, as at the first install), checkout (`git pull`, then
-`scripts/install-linux.sh`) or tarball (or `hypernova setup --from <dir>`).
-The new daemon is prepared beside the old one and swapped in only once its terminal module works,
-then the service restarts; open sessions keep running. (Docker: see "Updating the container" above.)
+| Installed from | How it updates |
+|---|---|
+| A release's package, `get.sh`, or any folder with no `.git` | By itself (below). By hand: the `get.sh` line again, or the install script from a newer package. |
+| A git checkout | `git pull`, then `scripts/install-linux.sh`. Never by itself. |
+| A container | [Updating the container](#updating-the-container). Never by itself. |
 
-**By itself** (`hypernova auto-update on`, or the app's Settings → the server → **Update this server
-automatically**; on unless turned off, owner 2026-11-01; `"autoUpdate": false` in `settings.json` turns it off). The daemon's look at
-GitHub's latest release (30 s after start, then every 6 hours) then also installs a release newer
-than the daemon, never an older or equal one:
+Either way the new daemon is prepared beside the old one and swapped in only once its terminal
+module works, then the service restarts. Open sessions, paired phones and settings stay.
 
-- **Only an install of a release's package** (`get.sh`, or `install-linux.sh` from an unpacked
-  `hypernova-server-<tag>-linux.tar.gz`) in `~/.local/share/hypernova/app`, run by
-  `hypernova.service`. Setup marks the daemon it installs (`app/daemon/install.json`, `package` or
-  `checkout`): an install from a git checkout (`scripts/install-linux.sh` in a clone, or a helper
-  that pulls and runs it) updates from there, never by itself, and says "not available here". So do
-  a container, `hypernova run`, a test copy started from elsewhere, and an install from before the
-  marker (install the latest release once, and it can from then on).
-- **Checked first**: the server package's SHA-256 against the release's note (`serverSha256`;
-  older releases have none, and aren't installed), and its daemon's version against the tag.
-- **At once**, whatever sessions are doing (owner, 2026-11-01): they keep running through the restart, in
-  their shared terminals or `claude agents`, and the daemon is down for a second or two. A hook that fires
-  meanwhile fails without holding the session up (the terminal shows "hook error: connect ECONNREFUSED").
-  An approval that was waiting stays in Claude Code's own dialog, and the phone shows it from there.
-- **Installed as above**, by the package's own `scripts/install-linux.sh --from <it> --yes
-  --no-claude`, in a transient systemd unit of its own (`systemd-run --user`, `hypernova-update`),
-  so the service's restart can't cut it off; its output in
-  `~/.local/state/hypernova/logs/update.log`. If the new daemon doesn't answer within a minute, the
-  old one is put back and the service restarted on it. It installs nothing new, and asks no
-  `sudo`: a system package the new version needs makes it fail (logged); run the install by hand.
-- **A failure** (a download, a checksum, the install) leaves the server as it was and is logged; the
-  same release is tried again after 1 hour, 6, then 24, then not until the setting is turned off and
-  on. The app says so (a notification, and the line under the switch), and so does `hypernova
-  auto-update`. The phones are offered the release's app before the restart, and the new daemon logs "this
-  server updated itself from A to B" (`hypernova logs`; the app shows it under the switch).
+### By itself
+
+On unless turned off: `hypernova auto-update on|off`, or the app's Settings, the server's section,
+**Update this server automatically** (`autoUpdate` in `settings.json`).
+
+| Step | What happens |
+|---|---|
+| The look | The daemon reads GitHub's latest release 30 seconds after it starts, then every 6 hours. Only a `vX.Y.Z` newer than the daemon installs, never an older or equal one. |
+| The checks | The server package's SHA-256 against the release's note (`serverSha256`; a release without one isn't installed), then its daemon's version against the tag. |
+| The phones | They're offered the release's app first, before the restart. |
+| The install | At once, whatever sessions are doing. It runs the package's `scripts/install-linux.sh --from <it> --yes --no-claude` in a transient unit of its own (`hypernova-update`), so the restart can't cut it off. |
+| The restart | The daemon is down for a second or two. Sessions keep running. A hook that fires meanwhile fails without holding the session up (the terminal shows "hook error: connect ECONNREFUSED"). A waiting approval stays in Claude Code's own dialog, and the phone shows it from there. |
+| Rollback | A copy of the old daemon is kept in `<state>/app/daemon.rollback`. If the new daemon doesn't answer within about a minute, the copy goes back and the service restarts on it. |
+| Afterwards | The new daemon logs "this server updated itself from A to B", and the app shows it under the switch. |
+
+**A failure** leaves the server running the version it had, and is logged. The app says so (a
+notification, and the line under the switch), and so does `hypernova auto-update`. That release is
+tried again at the first look after 1 hour, then 6, then 24, then not at all. A newer release starts
+over. `hypernova auto-update on` forgets the failures and looks at once, even when it's already on.
+
+With no terminal, `sudo` can't ask for a password. If the new version needs a system package, the
+install fails and logs why: run it by hand.
+
+The same look downloads the app for the phones (`<state>/android`). Turning that off (`releaseCheck`)
+doesn't stop the server's own update.
+
+### When it says "not available here"
+
+`hypernova auto-update` gives the reason:
+
+| It says | What to do |
+|---|---|
+| "This server runs in a container" | [Updating the container](#updating-the-container). |
+| "This daemon doesn't run from its installed copy" | A checkout or a test copy: update it the way it was started. |
+| "Installed before servers could update themselves" | Install the latest release once (`get.sh`). |
+| "Installed from a checkout" | `git pull`, then `scripts/install-linux.sh`. Or install from a package, and it can from then on. |
+| "This daemon isn't run by its systemd service" | `hypernova run`, or a daemon started by hand: `systemctl --user start hypernova`. |
+| "The systemd service doesn't run this install" | `hypernova setup`. |
+| "No systemd-run here" | Install systemd's `systemd-run`, or update by hand. |
+
+Setup leaves the answer in `install.json`: `checkout` when the folder it installed from, or the one
+above it, has a `.git`, else `package`. So a package you made yourself with `scripts/pack-linux.sh`
+counts as `package`, and the next newer release replaces it.
+
+## Logs
+
+| File, in `~/.local/state/hypernova/logs` | What | Rolls |
+|---|---|---|
+| `daemon.log` | The daemon. `hypernova logs`. | At 5 MB, to `daemon.log.1` |
+| `terminals.log` | The shared terminals' holders. `hypernova logs --terminals`. | At 5 MB, to `terminals.log.1` |
+| `update.log` | The server's own updates. Read the file: `hypernova logs` doesn't show it. | Never |
+
+The folder is 0700 and the logs 0600: they name your devices, so look them over before sharing them.
+
+`journalctl --user -u hypernova` has only what escapes the daemon's own log. `hypernova run` prints
+the log on the terminal too, and in a container `docker logs hypernova` has it.
+
+## Containers and WSL
+
+<a id="try-it-in-docker"></a>
+### Docker
+
+The commands are in
+[INSTALL.md, "In a container"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#in-a-container).
+What differs from a server:
+
+| | |
+|---|---|
+| The daemon | The container's command (`hypernova run`). No systemd, so no service; `--restart unless-stopped` brings it back after a crash or a reboot. |
+| The program | In the image, under `/opt/hypernova`. |
+| State | In the volume, at `/home/hypernova`: paired phones, settings, keys, the agents' logins. |
+| Identity | Each volume makes its own computer id, admin token and hook secret at its first start, so two containers are two computers. The hooks go in at each start (`hypernova integrate`). |
+| The network | Nothing is published, and the local route is off, so a phone has no way in. On a Linux host, `--network host` and `hypernova lan on` let it in, before you pair. The container then uses the host's ports, so don't run it beside a Hypernova installed on that host. |
+| Health | The image's `HEALTHCHECK` asks the phone API, on the container's own loopback. |
+| Building | `--build-arg CLAUDE=no` leaves Claude Code out. |
+
+### Updating the container
+
+Build the image again from a newer clone, remove the container, and run it again with the same volume.
+The new image's daemon runs, with your phones and settings. Use the `docker run` line you started it
+with; on a Linux host, that has `--network host`:
+
+```sh
+docker build -t hypernova . && docker rm -f hypernova
+docker run -d --name hypernova --hostname my-hypernova --network host --restart unless-stopped \
+  --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
+```
+
+### WSL on a Windows PC
+
+**Experimental**: written from Microsoft's and Docker's guides, not yet tried on a real Windows PC.
+The steps are in
+[INSTALL.md, "Windows (experimental)"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#windows-experimental).
+`hypernova setup`, `doctor`, `pair` and `lan` say what differs when they run there:
+
+| | |
+|---|---|
+| systemd | The service needs it, in `/etc/wsl.conf`. Until then: `hypernova run`, in a terminal you keep open. |
+| Staying up | WSL stops this Linux soon after its last Windows terminal closes, unless told otherwise in `.wslconfig`. |
+| The network | Behind WSL's NAT no phone can reach it. Mirrored networking lets a phone on the same Wi-Fi in, with a Hyper-V firewall rule for port 47323. |
+| The agents | Their Linux builds, inside WSL. A Windows install found through Windows' PATH is ignored. |
+
+A Docker Desktop container runs on WSL's kernel, and no phone can reach it either.
+
+## What a Linux server doesn't have
+
+The daemon keeps a few features that are for a Mac, and on Linux they answer as unavailable. The
+snapshot carries `mac.platform: "linux"` and `mac.unavailable`, each feature with its sentence, so a
+client can hide it and show the reason. Asked anyway, the API answers 501 with the same sentence
+([PROTOCOL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/PROTOCOL.md), "Mac-only features").
+
+| Feature | On Linux |
+|---|---|
+| Battery | Not shown. |
+| Stay awake | Off. A server stays on by itself; if a PC suspends, turn that off in its power settings. |
+| The computer's own voice (`say`) | None. The phone reads aloud with its own voice. |
+| Opening a terminal window from the phone | None: there's no screen. Use `hn attach` over SSH. |
+
+Everything else works: sessions, approvals, usage, attachments, automations, agents, statistics,
+shared terminals and Codex.
 
 ## Troubleshooting
 
-`hypernova doctor` first: each problem comes with its fix. Then `hypernova logs`. Common ones:
+`hypernova doctor` first: each problem comes with its fix. Then `hypernova logs`. More in
+[INSTALL.md, "Troubleshooting"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#troubleshooting).
 
-- *"Building the terminal module needs make, g++, python3"*: `sudo apt-get install -y
-  build-essential python3`, then `hypernova setup`.
-- *"systemd's user manager isn't running"*: `sudo loginctl enable-linger $USER`, or log in over
-  SSH, then `hypernova setup`.
-- *`hypernova: command not found`* right after the install: log in again (Ubuntu adds
-  `~/.local/bin` to PATH at login), or run `~/.local/bin/hypernova`.
-
-## Tests
-
-- Unit: `cd daemon && npm test` includes `test/platform.test.ts` (where things live, what exists
-  on each system), `test/linux-cli.test.ts` (the command's pieces and commands against a stand-in
-  daemon and system).
-- End to end, in Docker: `scripts/test-linux-docker.sh` builds the image, starts the daemon, and
-  checks `status`, `doctor`, `pair`, the API's health, pairing a stand-in phone, the Mac-only
-  features answering 501, the LAN listener asking for device certificates, a shared terminal
-  started by the `claude` function in bash (running a harmless stand-in, never the real Claude
-  Code), `logs` and `uninstall`. `--no-claude` builds without Claude Code; nothing signs in.
-- The service, in Docker: `scripts/test-linux-systemd.sh` boots Ubuntu 24.04 with systemd (a
-  privileged container, publishing nothing), installs from a tarball as a user with sudo and no
-  login session, and checks lingering, the unit, `status` and `doctor`, systemd starting the daemon
-  again after `kill -9`, a session the daemon started (a stand-in Claude Code) kept through a service
-  restart and an update and found again, the daemon back after a
-  reboot with nobody logged in, and `uninstall`.
+| Symptom | What to do |
+|---|---|
+| The daemon isn't running | `systemctl --user start hypernova`, and `hypernova logs` says why it stopped. |
+| `hypernova: command not found` right after the install | Log in again (Ubuntu adds `~/.local/bin` to PATH at login), or run `~/.local/bin/hypernova`. |
+| "hypernova: its files are gone" | Install it again with `scripts/install-linux.sh`. |
+| "Building the terminal module needs make, g++, python3" | `sudo apt-get install -y build-essential python3`, then `hypernova setup`. |
+| "systemd's user manager isn't running" | `sudo loginctl enable-linger $USER`, or log in over SSH, then `hypernova setup`. |
+| The service stops when you log out | Lingering is off: `sudo loginctl enable-linger $USER`. |
+| The phone can't reach the server | `hypernova status` shows the local route. `hypernova lan on` if it's off. The phone must be on the server's network, or your VPN into it. See [Ports](#ports). |
+| An update failed | `hypernova auto-update` says why; `update.log` has the rest. See [Updating](#updating). |
