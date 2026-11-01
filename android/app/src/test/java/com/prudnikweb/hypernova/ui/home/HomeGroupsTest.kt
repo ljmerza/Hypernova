@@ -59,17 +59,21 @@ class HomeGroupsTest {
         assertEquals(listOf(HomeGroup.Working to listOf("Alpha", "beta", "zeta")), names(after))
     }
 
-    @Test fun completedNewestFirst() {
-        // The owner, 2026-10-30: the one that finished last at the top, by the time its card says.
-        val groups = homeGroups(
-            listOf(
-                s("1", "alpha", SessionState.Idle, updatedAt = 10),
-                s("2", "zeta", SessionState.Idle, updatedAt = 30),
-                s("3", "Beta", SessionState.Idle, updatedAt = 20),
-                s("4", "cut", SessionState.Idle, Phase.Ended, endedBy = MAC_RESTART, updatedAt = 25),
-            ),
-        )
-        assertEquals(listOf(HomeGroup.Completed to listOf("zeta", "cut", "Beta", "alpha")), names(groups))
+    private val completed = listOf(
+        s("1", "alpha", SessionState.Idle, updatedAt = 10),
+        s("2", "zeta", SessionState.Idle, updatedAt = 30),
+        s("3", "Beta", SessionState.Idle, updatedAt = 20),
+        s("4", "cut", SessionState.Idle, Phase.Ended, endedBy = MAC_RESTART, updatedAt = 25),
+    )
+
+    @Test fun completedByNameByDefault() {
+        // The owner, 2026-11-01: the sort button, Name by default, in every group (Completed was newest first).
+        assertEquals(listOf(HomeGroup.Completed to listOf("alpha", "Beta", "cut", "zeta")), names(homeGroups(completed)))
+    }
+
+    @Test fun completedNewestFirstByRecent() {
+        // The one that finished last at the top, by the time its card says (Completed's order before 2026-11-01).
+        assertEquals(listOf(HomeGroup.Completed to listOf("zeta", "cut", "Beta", "alpha")), names(homeGroups(completed, HomeSort.Recent)))
     }
 
     @Test fun theSameNameFallsBackToTheId() {
@@ -81,9 +85,9 @@ class HomeGroupsTest {
 
     @Test fun completedAtTheSameTimeByName() {
         val list = listOf(s("b", "fix", SessionState.Idle, updatedAt = 5), s("z", "Apply", SessionState.Idle, updatedAt = 5), s("a", "Fix", SessionState.Idle, updatedAt = 5))
-        val ids = homeGroups(list).single().second.map { it.id }
+        val ids = homeGroups(list, HomeSort.Recent).single().second.map { it.id }
         assertEquals(listOf("z", "a", "b"), ids)
-        assertEquals(ids, homeGroups(list.reversed()).single().second.map { it.id })
+        assertEquals(ids, homeGroups(list.reversed(), HomeSort.Recent).single().second.map { it.id })
     }
 
     @Test fun anEmptyGroupHasNoSeam() {

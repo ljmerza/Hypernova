@@ -90,7 +90,7 @@ class HomeSearchTest {
             s("04", "eta notes", "docs", SessionState.Working),
         )
         val groups = homeGroups(HomeSearch.find(done, "notes")).map { (g, list) -> g to list.map { it.name } }
-        // Working A to Z, Completed newest first, as without a search.
+        // Working and Completed A to Z (the default sort), as without a search.
         assertEquals(listOf(HomeGroup.Working to listOf("eta notes", "zeta notes"), HomeGroup.Completed to listOf("alpha notes", "beta notes")), groups)
     }
 

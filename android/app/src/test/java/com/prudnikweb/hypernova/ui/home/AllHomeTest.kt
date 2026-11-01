@@ -54,11 +54,23 @@ class AllHomeTest {
                 // A to Z, any case, whichever computer.
                 HomeGroup.NeedsInput to listOf("z2:asks first", "gym:Backup asks"),
                 HomeGroup.Working to listOf("gym:Alpha work", "z2:zeta work"),
-                // Newest first; what a restart cut short is with them; ended ones are History's.
-                HomeGroup.Completed to listOf("gym:newest done", "gym:cut short", "z2:older done"),
+                // By name too since the sort button (Name by default); what a restart cut short is
+                // with them; ended ones are History's.
+                HomeGroup.Completed to listOf("gym:cut short", "gym:newest done", "z2:older done"),
             ),
             shape(groups),
         )
+        // Recent: newest first, across both computers.
+        assertEquals(
+            listOf("gym:newest done", "gym:cut short", "z2:older done"),
+            shape(AllHome.groups(AllHome.cards(listOf(z2, gym)), HomeSort.Recent)).toMap().getValue(HomeGroup.Completed),
+        )
+    }
+
+    @Test fun byServerGroupsEachComputersCardsTogetherThenByName() {
+        val groups = AllHome.groups(AllHome.cards(listOf(z2, gym)), HomeSort.Server).toMap()
+        assertEquals(listOf("gym:Backup asks", "z2:asks first"), groups.getValue(HomeGroup.NeedsInput).map { "${it.name}:${it.session.name}" })
+        assertEquals(listOf("gym:cut short", "gym:newest done", "z2:older done"), groups.getValue(HomeGroup.Completed).map { "${it.name}:${it.session.name}" })
     }
 
     @Test fun theGroupCountsAreAllOfThem() {
