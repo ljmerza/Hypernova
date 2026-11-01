@@ -60,6 +60,15 @@ let rows = clamp(spec.rows, 6, 300, 30)
 const term = new xterm.Terminal({ cols, rows, scrollback: 10_000, allowProposedApi: true })
 const serializer = new serialize.SerializeAddon()
 term.loadAddon(serializer)
+// Widths as Claude Code counts them (Bun.stringWidth: an emoji sequence is one wide character), and
+// as the phone's page counts them, or a snapshot drawn there shifts its columns. Without the add-on
+// (an install that didn't get it) the screen still works by xterm's own widths, and hello says so.
+try {
+  const { UnicodeGraphemesAddon } = (await import('@xterm/addon-unicode-graphemes')).default
+  term.loadAddon(new UnicodeGraphemesAddon())
+} catch (e) {
+  say('could not load the widths add-on', e)
+}
 
 const clients = new Set<Client>()
 let child: IPty | null = null
@@ -187,7 +196,7 @@ function onFrame(c: Client, type: number, p: Buffer): void {
       c.at = c.role === 'tty' || (c.role === 'phone' && !viewers('tty')) ? Date.now() : 0
       clients.add(c)
       // caps: what this holder can do (the daemon does it itself for holders started before).
-      write(c, msg({ t: 'hello', v: 1, id: spec.id, caps: ['replace', 'mode', 'queued'], ...state() }))
+      write(c, msg({ t: 'hello', v: 1, id: spec.id, caps: ['replace', 'mode', 'queued'], unicode: term.unicode.activeVersion, ...state() }))
       if (c.role === 'control') {
         c.ready = true
       } else {

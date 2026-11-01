@@ -21,9 +21,12 @@
 <div id="zoom"></div>
 <script src="xterm.js"></script>
 <script src="addon-fit.js"></script>
+<script src="addon-unicode-graphemes.js"></script>
+<script src="addon-web-links.js"></script>
+<script src="addon-search.js"></script>
 <script>
 (() => {
-  const native = window.HN || { ready() {}, state() {}, closed() {}, exited() {}, tapped() {}, scrolled() {}, open() { return -1 }, send() {}, sendText() {}, shut() {}, took() {} }
+  const native = window.HN || { ready() {}, state() {}, closed() {}, exited() {}, tapped() {}, link() {}, scrolled() {}, open() { return -1 }, send() {}, sendText() {}, shut() {}, took() {} }
   const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } }
   // The owner's text size. While a Mac window sets the terminal's size, the screen is shown
   // whole at a smaller size ("following"); typing here takes the size back.
@@ -40,6 +43,8 @@
     scrollback: 5000,
     allowProposedApi: true,
     macOptionIsMeta: true,
+    // An address the program marked itself (OSC 8): the same way as one found in the text.
+    linkHandler: { activate: (_, uri) => openLink(uri) },
     theme: {
       background: '#14110E', foreground: '#F5F2EB', cursor: '#7FFFA0', cursorAccent: '#14110E',
       selectionBackground: 'rgba(127,255,160,0.28)',
@@ -49,6 +54,28 @@
   })
   const fit = new FitAddon.FitAddon()
   term.loadAddon(fit)
+  // Widths as Claude Code counts them (an emoji sequence is one wide character). The holder's own
+  // copy of the screen counts the same way: its hello says so, and an older holder's doesn't (see
+  // hello below). docs/PROTOCOL.md, "Shared terminals", "Widths".
+  const GRAPHEMES = '15-graphemes'
+  term.loadAddon(new UnicodeGraphemesAddon.UnicodeGraphemesAddon())
+  // A tapped address goes to the app, which asks and opens it outside this page. Never in here.
+  // Once for a tap, should a phone's WebView also send it the mouse events tapLink stands in for.
+  let linked = { uri: '', at: 0 }
+  function openLink(uri) {
+    if (!/^https?:\/\//i.test(uri)) return
+    const at = performance.now()
+    if (uri === linked.uri && at - linked.at < 600) return
+    linked = { uri, at }
+    native.link(uri)
+  }
+  term.loadAddon(new WebLinksAddon.WebLinksAddon((_, uri) => openLink(uri)))
+  // Finding words in the history kept here (hn.find below).
+  const search = new SearchAddon.SearchAddon()
+  term.loadAddon(search)
+  let results = { index: -1, count: 0 }
+  search.onDidChangeResults((r) => { results = { index: r.resultIndex, count: r.resultCount } })
+  const FOUND = { matchBackground: '#4A4326', matchOverviewRuler: '#E8B341', activeMatchBackground: '#2F7A4A', activeMatchColorOverviewRuler: '#7FFFA0' }
 
   let ws = null
   let macOpen = false
@@ -241,6 +268,25 @@
     }
     glideId = requestAnimationFrame(step)
   }
+  /**
+   * A tap on an address. xterm.js finds links under a mouse, and on a touch screen no mouse events
+   * come (the gesture code inside xterm.js 6 takes the tap). So its link finder alone gets them: they
+   * don't bubble, so they stop at the screen and never reach selection or mouse reports on the
+   * terminal around it, and claude sees no click. Another line first, so the finder looks afresh.
+   */
+  function tapLink(x, y) {
+    const s = term.element && term.element.querySelector('.xterm-screen')
+    if (!s) return
+    const r = s.getBoundingClientRect()
+    if (x < r.left || x >= r.right || y < r.top || y >= r.bottom) return
+    const line = r.height / term.rows
+    const mouse = (type, at) => s.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: at, button: 0 }))
+    mouse('mousemove', y - line >= r.top ? y - line : y + line)
+    mouse('mousemove', y)
+    mouse('mousedown', y)
+    mouse('mouseup', y)
+    mouse('mouseleave', y)
+  }
   /** Typing goes to the latest, as in a desktop terminal. */
   function live() {
     pinned = true
@@ -301,6 +347,7 @@
   document.addEventListener('touchend', (e) => {
     const d = drag
     drag = null
+    if (d && !d.on && !e.touches.length && e.timeStamp - d.time < 500) tapLink(d.x, d.y)
     if (d && d.on && how() === 'lines' && Math.abs(d.v) > 0.3 && e.timeStamp - d.time < 80) glide(d.v)
     // Dragged back to the latest: pinned there again.
     else if (d && d.on && !away) pinned = true
@@ -391,6 +438,8 @@
           pages = 0
           term.write(m.data, opened)
         } else if (m.t === 'hello' || m.t === 'state') {
+          // Before the snapshot that follows it: drawn by the rules it was kept by.
+          if (m.t === 'hello') term.unicode.activeVersion = m.unicode === GRAPHEMES ? GRAPHEMES : '6'
           macOpen = m.tty > 0
           if (m.cols && m.rows) follow(m.cols, m.rows)
           native.state(JSON.stringify({ cols: m.cols, rows: m.rows, mac: m.tty, phone: m.phone, title: m.title || '' }))
@@ -453,6 +502,31 @@
       pages = 0
       where()
     },
+    // Words in the history kept here (in Claude Code's fullscreen view, only what's on the screen:
+    // it keeps its own history). find() starts from the latest and goes back; findNext() goes on
+    // back, findPrevious() the other way. Each answers {found, index, count} and leaves the match
+    // in view, so the screen stops following until "Jump to latest".
+    find(text) { return seek(text, false) },
+    findNext(text) { return seek(text, false) },
+    findPrevious(text) { return seek(text, true) },
+    findClear() {
+      search.clearDecorations()
+      results = { index: -1, count: 0 }
+    },
+    // What's on the screen, for scripts/term-page-check.mjs.
+    peek() {
+      const b = term.buffer.active
+      const lines = []
+      for (let i = 0; i < term.rows; i++) lines.push(b.getLine(b.viewportY + i)?.translateToString(true) ?? '')
+      return { cols: term.cols, rows: term.rows, cursorX: b.cursorX, cursorY: b.cursorY, viewportY: b.viewportY, baseY: b.baseY, unicode: term.unicode.activeVersion, lines, selection: term.getSelection() }
+    },
+  }
+  function seek(text, forward) {
+    if (!text) return { found: false, index: -1, count: 0 }
+    cancelAnimationFrame(glideId)
+    const found = forward ? search.findNext(text, { decorations: FOUND }) : search.findPrevious(text, { decorations: FOUND })
+    if (found) { pinned = false; where() }
+    return { found, ...results }
   }
 
   const el = document.getElementById('t')
