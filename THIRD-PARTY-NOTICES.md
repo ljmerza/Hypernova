@@ -13,6 +13,7 @@ and in `third_party/`.
 | OkHttp and Okio (Square) | Apache-2.0 |
 | Kotlin standard library and kotlinx.coroutines (JetBrains) | Apache-2.0 |
 | xterm.js and its fit addon (the terminal view, `third_party/xterm`) | MIT |
+| ghostty-web 0.4.0-next.21 (Coder; the trial terminal view, `assets/term-ghostty/`, `third_party/ghostty-web`), with the WebAssembly build of Ghostty's terminal core it bundles | MIT; Ghostty MIT |
 | Mermaid 11.17.2 (the chat's diagrams, `third_party/mermaid`), with the libraries its `mermaid.min.js` bundles: D3, dagre-d3-es, cytoscape, KaTeX, marked, lodash-es, Langium, Chevrotain, DOMPurify and others (the notices the bundle kept are at its end) | MIT; D3 ISC, d3-sankey BSD-3-Clause, Chevrotain Apache-2.0, DOMPurify MPL-2.0 or Apache-2.0 |
 | Manrope and JetBrains Mono (`third_party/fonts`) | SIL Open Font License 1.1 |
 
