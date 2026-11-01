@@ -106,6 +106,7 @@ fun resetPrefs() {
     EnterKeyPref.set(context, EnterKey.Send)
     TopBarPref.set(context, TopBarChoice.DEFAULT)
     CardSwipePref.set(context, CardSwipes())
+    com.prudnikweb.hypernova.ui.home.HomeFilterPref.set(context, com.prudnikweb.hypernova.ui.home.HomeFilter.NONE)
     com.prudnikweb.hypernova.data.VoicePrefs.of(context).chooseDictationEngine(com.prudnikweb.hypernova.data.DictationEngine.of(null))
 }
 
