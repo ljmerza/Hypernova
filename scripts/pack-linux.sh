@@ -7,7 +7,7 @@
 # A release (.github/workflows/android-release.yml) attaches it as hypernova-server-<tag>-linux.tar.gz.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="$(sed -n 's/^export const VERSION = .\([0-9.]*\).*/\1/p' "$ROOT/daemon/src/util.ts")"
+VERSION="$(sed -n 's/^  "version": "\([^"]*\)".*/\1/p' "$ROOT/daemon/package.json" | head -n 1)"
 NAME="hypernova-$VERSION"
 OUT="$ROOT/dist/linux"
 STAGE="$(mktemp -d)"
