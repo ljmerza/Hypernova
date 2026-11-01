@@ -1,0 +1,72 @@
+{
+  "run": {
+    "id": "ru_0000000001",
+    "automationId": "au_0000000001",
+    "name": "Deploy check",
+    "fired": {
+      "by": "manual",
+      "at": 1800000000000,
+      "sessionId": null,
+      "detail": null
+    },
+    "state": "needs_you",
+    "reason": null,
+    "until": null,
+    "sessionIds": [],
+    "startedAt": 1800000000000,
+    "endedAt": null,
+    "late": 0,
+    "missed": 0,
+    "lateWhy": null,
+    "result": null,
+    "quiet": false,
+    "skippedTools": [],
+    "permissionMode": null,
+    "depth": 0,
+    "retryOf": null,
+    "steps": [
+      {
+        "id": "st_q",
+        "kind": "ask",
+        "state": "needs_you",
+        "reason": null,
+        "startedAt": 1800000000000,
+        "endedAt": null,
+        "result": null,
+        "quiet": false,
+        "sessionIds": [],
+        "exit": null,
+        "answer": null,
+        "reused": false
+      },
+      {
+        "id": "st_n",
+        "kind": "notify",
+        "state": "pending",
+        "reason": null,
+        "startedAt": null,
+        "endedAt": null,
+        "result": null,
+        "quiet": false,
+        "sessionIds": [],
+        "exit": null,
+        "answer": null,
+        "reused": false
+      }
+    ],
+    "step": 0,
+    "ask": {
+      "stepId": "st_q",
+      "question": "Deploy now?",
+      "answers": [
+        "Deploy",
+        "Not now"
+      ],
+      "default": "Not now",
+      "until": 1800000000000
+    },
+    "outputs": [],
+    "retryFrom": null,
+    "budgetUsed": null
+  }
+}

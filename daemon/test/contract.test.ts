@@ -635,6 +635,154 @@ test('POST /v1/pair', async () => {
   contract('rest-pair', await ok(call('POST', '/v1/pair', { code, deviceName: 'Pixel', model: 'Google Pixel 9', appVersion: '0.42.0', installId: 'install-0123456789abcdef' }, null)))
 })
 
+// ── Automations, Codex, read aloud, files (docs/FEATURES.md, sections 10, 11, 13, 14) ───────────
+/**
+ * The automations engine's own ids ("au_", "ru_", "no_" and 10 hex) as fixed ones, numbered in the
+ * order they first appear; a time trigger's next due time and the check's next three, as [T].
+ */
+function autoIds(v: unknown): unknown {
+  const seen = new Map<string, string>()
+  const walk = (x: any, key: string | null): any => {
+    if (typeof x === 'string') {
+      return x.replace(/\b(au|ru|no)_[0-9a-f]{10}\b/g, (id, kind) => {
+        if (!seen.has(id)) seen.set(id, `${kind}_${String([...seen.keys()].filter((k) => k.startsWith(kind)).length + 1).padStart(10, '0')}`)
+        return seen.get(id)!
+      })
+    }
+    if (typeof x === 'number' && (key === 'nextAt' || key === 'next')) return T
+    if (Array.isArray(x)) return x.map((y) => walk(y, key === 'next' ? 'next' : null))
+    if (x && typeof x === 'object') return Object.fromEntries(Object.entries(x).map(([k, y]) => [k, walk(y, k)]))
+    return x
+  }
+  return walk(v, null)
+}
+
+test('automations: create, an ask run answered, Stop, Retry, Pause all, the check, delete; {t:"automation"}, {t:"run"}, {t:"note"}, {t:"automations"}, {t:"automation.removed"}', async () => {
+  const body = {
+    name: 'Deploy check', enabled: true, onlyOnce: false,
+    trigger: { kind: 'time', at: '09:00', days: [1, 2, 3, 4, 5] },
+    steps: [
+      { id: 'st_q', kind: 'ask', question: 'Deploy now?', answers: ['Deploy', 'Not now'], default: 'Not now', timeoutMin: 10 },
+      { id: 'st_n', kind: 'notify', text: 'Deploying.', if: { on: 'answer', text: 'Deploy' } },
+    ],
+    outputs: [],
+  }
+  const created = await ok(post('/v1/automations', body))
+  const id = created.automation.id
+  contract('rest-automation', autoIds(created))
+  contract('ws-automation', autoIds(heard('automation', (m) => m.automation.id === id)))
+  contract('rest-automation-enabled', autoIds(await ok(post(`/v1/automations/${id}/enabled`, { enabled: false }))))
+  await ok(post(`/v1/automations/${id}/enabled`, { enabled: true }))
+
+  // Run now: it asks, so it needs the owner, and the phone gets a note with the question's answers.
+  const asked = await ok(post(`/v1/automations/${id}/run`, {}))
+  contract('rest-automation-run', autoIds(asked))
+  const runId = asked.run.id
+  contract('ws-note', autoIds(heard('note', (m) => m.note.runId === runId && !!m.note.ask)))
+  const answered = await ok(post(`/v1/automations/runs/${runId}/answer`, { stepId: 'st_q', answer: 'Deploy' }))
+  contract('rest-automation-answer', autoIds(answered))
+  // Answered: the notify step runs, the run ends done.
+  for (let i = 0; i < 100 && !heard('run', (m) => m.run.id === runId && m.run.state === 'done'); i++) await new Promise((r) => setTimeout(r, 20))
+  contract('ws-run', autoIds(heard('run', (m) => m.run.id === runId && m.run.state === 'done')))
+  // Answered again: nothing asks any more (409 not_asking, with the run as it is now).
+  const late = await post(`/v1/automations/runs/${runId}/answer`, { stepId: 'st_q', answer: 'Not now' })
+  assert.equal(late.status, 409)
+  contract('rest-automation-not-asking', autoIds(late.json))
+  contract('rest-automation-runs', autoIds(await ok(get(`/v1/automations/${id}/runs?limit=30`))))
+
+  // Stop a run that asks, then Retry it from its first step.
+  const second = (await ok(post(`/v1/automations/${id}/run`, {}))).run.id
+  contract('rest-automation-stop', autoIds(await ok(post(`/v1/automations/runs/${second}/stop`, {}))))
+  const again = await ok(post(`/v1/automations/runs/${second}/retry`, { fromStep: 'st_q' }))
+  contract('rest-automation-retry', autoIds(again))
+  await ok(post(`/v1/automations/runs/${again.run.id}/stop`, {}))
+
+  contract('rest-automations-paused', await ok(post('/v1/automations/paused', { paused: true })))
+  contract('ws-automations', heard('automations', (m) => m.paused === true))
+  await ok(post('/v1/automations/paused', { paused: false }))
+  contract('rest-automations-check', autoIds(await ok(post('/v1/automations/check', { trigger: { kind: 'time', at: '09:00', days: [1, 2, 3, 4, 5] } }))))
+
+  assert.equal((await call('DELETE', `/v1/automations/${id}`)).status, 200)
+  contract('ws-automation-removed', autoIds(heard('automation.removed', (m) => m.id === id)))
+})
+
+test('Codex: POST /v1/codex, GET /v1/codex/models, a Codex session’s model, a switch’s preview, two refusals and the switch', async () => {
+  const { FakeCodex } = await import('./fake-codex/server.ts')
+  const fake = new FakeCodex()
+  const socket = join(scratch, 'cx.sock')
+  process.env.HYPERNOVA_CODEX_SOCKET = socket
+  await fake.start(socket)
+  try {
+    // Whether its connection is up yet as the answer goes is the moment's: the shape is what counts.
+    const on = await ok(post('/v1/codex', { enabled: true }))
+    assert.equal(typeof on.codex.connected, 'boolean')
+    contract('rest-codex', { ...on, codex: { ...on.codex, connected: false } })
+    contract('rest-codex-models', await ok(get('/v1/codex/models?fresh=1')))
+    fake.reply = 'Made notes.txt'
+    const cx = (await ok(post('/v1/sessions', { agent: 'codex', projectPath: cwd, prompt: '[Hypernova test] make notes.txt', clientId: 'client-cx' }))).session.id
+    const idle = () => hub.listSessions().find((s) => s.id === cx)?.state === 'idle' && hub.listSessions().find((s) => s.id === cx)?.lastText === 'Made notes.txt'
+    for (let i = 0; i < 150 && !idle(); i++) await new Promise((r) => setTimeout(r, 20))
+    assert.ok(idle(), 'the Codex turn ended')
+    contract('rest-codex-session-model', await ok(post(`/v1/sessions/${cx}/model`, { model: 'gpt-other', effort: 'medium' })))
+    const preview = await ok(post(`/v1/sessions/${cx}/switch/preview`, { to: 'claude', context: 'recent' }))
+    contract('rest-switch-preview', preview)
+    const big = await post(`/v1/sessions/${cx}/switch`, { to: 'claude', text: 'x'.repeat(97 * 1024) })
+    assert.equal(big.status, 413)
+    contract('rest-switch-too-large', big.json)
+    contract('rest-switch', await ok(post(`/v1/sessions/${cx}/switch`, { to: 'claude', text: preview.text })))
+    const twice = await post(`/v1/sessions/${cx}/switch`, { to: 'claude', text: preview.text })
+    assert.equal(twice.status, 409)
+    contract('rest-switch-switched', twice.json)
+  } finally {
+    await post('/v1/codex', { enabled: false })
+    delete process.env.HYPERNOVA_CODEX_SOCKET
+    await fake.close()
+  }
+})
+
+test('read aloud: the setting, the voices, a play for this phone and the Mac’s stop of one replaced; {t:"speech"}, {t:"speech.stop"}; the phone’s {t:"speech.progress"}', async () => {
+  const { WebSocket } = await import('ws')
+  // The phone's own live feed: speech.stop goes only to the phone whose play it was.
+  const ws = new WebSocket(`ws://127.0.0.1:${API}/v1/ws?token=${TOKEN}`)
+  const mine: any[] = []
+  ws.on('message', (d) => mine.push(JSON.parse(String(d))))
+  await new Promise((resolve, reject) => (ws.once('open', resolve), ws.once('error', reject)))
+  try {
+    contract('rest-speech-settings', await ok(post('/v1/speech/settings', { rate: 1.15 })))
+    contract('ws-speech', heard('speech', (m) => m.speech.rate === 1.15))
+    contract('rest-speech-voices', await ok(get('/v1/speech/voices')))
+    const first = await ok(post('/v1/speech/play', { text: 'Read this on the phone.', to: 'me', sessionId: MAIN }))
+    // A play's id is the daemon's own pick: one fixed name for it, in each fixture that carries it.
+    const playId = (v: any) => JSON.parse(JSON.stringify(v).split(first.play.id).join('play-0123456789'))
+    contract('rest-speech-play', playId(first))
+    // How the phone says a play went (SpeechPlayer.kt, progressMessage): the daemon takes it as written here.
+    const progress = { t: 'speech.progress', id: first.play.id, state: 'started', ms: 0, level: 0.42 }
+    ws.send(JSON.stringify(progress))
+    contract('ws-speech-progress', playId(progress))
+    // A newer play for the same phone replaces it: the phone is told to stop the first.
+    await ok(post('/v1/speech/play', { text: 'And then this.', to: 'me' }))
+    for (let i = 0; i < 100 && !mine.some((m) => m.t === 'speech.stop'); i++) await new Promise((r) => setTimeout(r, 20))
+    const stop = mine.find((m) => m.t === 'speech.stop')
+    assert.equal(stop?.id, first.play.id)
+    contract('ws-speech-stop', playId(stop))
+    await ok(post('/v1/speech/settings', { rate: 1 }))
+  } finally {
+    ws.close()
+  }
+})
+
+test('GET /v1/files: a project folder, its folders first, a key file greyed', async () => {
+  const dir = join(PROJECTS, 'files-demo')
+  mkdirSync(join(dir, 'src'), { recursive: true })
+  writeFileSync(join(dir, 'README.md'), '# Files demo\n')
+  writeFileSync(join(dir, 'notes.txt'), 'one\ntwo\n')
+  writeFileSync(join(dir, '.env'), 'API_KEY=not-a-real-key\n')
+  const listing = await ok(get(`/v1/files?path=${encodeURIComponent(dir)}`))
+  // A folder's own size is the file system's (40 on tmpfs, 4096 on ext4): the phone never shows it.
+  for (const e of listing.entries) if (e.kind === 'dir') e.size = 0
+  contract('rest-files', listing)
+})
+
 test('every fixture is one this file checks (none left over from a message that went)', (t) => {
   if (mismatched) return t.skip('a fixture above did not match')
   if (UPDATE) {

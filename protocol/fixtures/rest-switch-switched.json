@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "switched",
+    "message": "This conversation already went on in another session.",
+    "to": "00000000-0000-4000-8000-000000000001"
+  }
+}

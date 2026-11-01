@@ -339,7 +339,7 @@ class ContractTest {
             assertEquals("server", o.obj("mac")?.str("name"))
             assertEquals("mac-id", o.obj("mac")?.str("id"))
         },
-    )
+    ) + FeatureContracts.checks
 
     @Test fun everyFixtureHasItsChecksAndEveryCheckItsFixture() {
         val files = dir.listFiles { f -> f.name.endsWith(".json") }!!.map { it.name.removeSuffix(".json") }.toSortedSet()

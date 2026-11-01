@@ -1,0 +1,57 @@
+{
+  "t": "automation",
+  "automation": {
+    "id": "au_0000000001",
+    "name": "Deploy check",
+    "enabled": true,
+    "onlyOnce": false,
+    "trigger": {
+      "kind": "time",
+      "at": "09:00",
+      "days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "action": {
+      "kind": "workflow",
+      "steps": 2
+    },
+    "steps": [
+      {
+        "id": "st_q",
+        "if": null,
+        "kind": "ask",
+        "question": "Deploy now?",
+        "answers": [
+          "Deploy",
+          "Not now"
+        ],
+        "default": "Not now",
+        "timeoutMin": 10
+      },
+      {
+        "id": "st_n",
+        "if": {
+          "on": "answer",
+          "text": "Deploy"
+        },
+        "kind": "notify",
+        "text": "Deploying."
+      }
+    ],
+    "outputs": [],
+    "budget": null,
+    "template": null,
+    "createdAt": 1800000000000,
+    "updatedAt": 1800000000000,
+    "nextAt": 1800000000000,
+    "lastRun": null,
+    "runCount": 0,
+    "paid": false,
+    "problem": null
+  }
+}
