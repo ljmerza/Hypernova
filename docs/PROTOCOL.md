@@ -856,7 +856,7 @@ Usage = { fiveHour: Window | null, sevenDay: Window | null,
           models: ModelWindow[],              // the weeks some models have of their own (Fable,
                                               // Sonnet), from /usage; [] when none or unread; absent
                                               // from an older daemon (see Per-model weeks)
-          rate?: Rate | null,                 // the spend pace, only while a session on the subscription
+          rate?: Rate | null,                 // the spend rate, only while a session on the subscription
                                               // or its agents work (one on another provider doesn't
                                               // spend these windows); null otherwise; absent from an
                                               // older daemon
@@ -875,15 +875,12 @@ Rate = { fiveHour: number | null,            // %/min, a least-squares line over
                                              // null with fewer than 3 readings or under 4 minutes
                                              // of them; 0 when nothing moves
          sevenDay: number | null,            // the same over the last ~30 minutes (min. 12 of them)
-         fiveHourEtaMs: number | null,       // time until 100% at this pace, to the minute; null when
-         sevenDayEtaMs: number | null,       // the pace is ~0, unknown, or the reset comes first
-         fiveHourLimitAt: number | null,     // the same projection as a moment (epoch ms, to the minute),
-         sevenDayLimitAt: number | null,     // counted from the last reading: it holds still between
-                                             // readings, so every client shows the same "limit at 14:05"
-                                             // (never earlier than now); absent from an older daemon
          working: boolean }                  // always true (a Rate exists only then)
 // The history restarts at a window's reset and ignores the forced 100% of a limit Claude Code hit
 // (daemon/src/usage-rate.ts). The pace is rounded to 0.01, so it doesn't change every few seconds.
+// A reading of now, for the sun's disk. No time to the limit: `fiveHourEtaMs`, `sevenDayEtaMs`, `fiveHourLimitAt` and
+// `sevenDayLimitAt` went on 2026-11-01 (DECISIONS, "No estimate of when usage runs out"). An older app reads them
+// with `has()` first, so a missing one is null; a newer app ignores them from an older daemon.
 ModelWindow = { label: string,               // "Fable", "Sonnet": the name in "Current week (…)",
                                              // without " only"
                 pct: number,                 // 0..100, whole (Claude Code floors it)
