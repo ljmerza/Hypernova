@@ -67,7 +67,8 @@ internal fun quoted(text: String, max: Int = 1200): String {
 
 /**
  * What a long-press on a message offers: Copy, Quote (into the prompt box), Read aloud, Select
- * text, and for the owner's own messages Save as quick prompt and Rewind to here. [rewind]: the
+ * text, and for the owner's own messages Rewind to here (no Save as quick prompt: the chips that
+ * showed them left the chat in 8a36f54, so it saved to a list nothing shows). [rewind]: the
  * session can go back to before this message (null when it can't: the first message, one not on
  * the Mac yet); it asks first, saying what's lost.
  */
@@ -112,12 +113,6 @@ internal fun MessageMenu(
                 hint = if (reading) null else stringResource(R.string.chat_read_hint),
             )
             SheetAction(ChatGlyph.Select, stringResource(R.string.chat_select), { page = Page.Select })
-            if (mine) {
-                SheetAction(ChatGlyph.Bookmark, stringResource(R.string.chat_save_prompt), {
-                    toast(context.getString(if (QuickPrompts.add(context, text)) R.string.chat_saved_prompt else R.string.chat_prompts_full))
-                    onDismiss()
-                })
-            }
             if (rewind != null) SheetAction(ChatGlyph.Rewind, stringResource(R.string.chat_rewind), { page = Page.Rewind })
         }
         Page.Select -> ChatSheet(stringResource(R.string.chat_select), onDismiss) {

@@ -743,7 +743,8 @@ The build details go in the sections above as each piece lands; this records wha
     left. It reads both TodoWrite and the newer task list. The header folds it to one line.
   - **Long-press on a message** (yours or Claude's): Copy, Quote, Read aloud (the Mac's voice; the
     phone's own when the Mac can't), Select text (selection moved here), and for your own messages
-    Save as quick prompt and Rewind to here.
+    Rewind to here. (Save as quick prompt left too, 2026-11-01: the chips below left the chat in this
+    fork, so it saved to a list nothing showed.)
   - **Rewind branches, it never cuts in place.** The conversation up to just before the message is
     copied into a new session, "<title> (rewound)", and the message (with its files) comes back
     into the box. The original stays, and files Claude changed stay as they are; the confirm sheet

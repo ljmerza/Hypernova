@@ -108,7 +108,9 @@ class ChatMoreTest {
         val hub = FakeHub(transcripts = mapOf(Samples.ZETA to conversation))
         chat(hub, Samples.ZETA)
         longPress("Sketch the lexer")
-        for (a in listOf(R.string.chat_copy, R.string.chat_quote, R.string.chat_read, R.string.chat_select, R.string.chat_save_prompt)) rule.onNodeWithText(str(a)).assertExists()
+        for (a in listOf(R.string.chat_copy, R.string.chat_quote, R.string.chat_read, R.string.chat_select)) rule.onNodeWithText(str(a)).assertExists()
+        // No Save as quick prompt: nothing on the chat shows quick prompts any more.
+        rule.onNodeWithText(str(R.string.chat_save_prompt)).assertDoesNotExist()
         // The first message has nothing before it to go back to.
         rule.onNodeWithText(str(R.string.chat_rewind)).assertDoesNotExist()
         rule.snap("chat_message_menu")
@@ -116,15 +118,8 @@ class ChatMoreTest {
         rule.waitForIdle()
         assertEquals("Sketch the lexer", context.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString())
 
-        longPress("Sketch the lexer")
-        rule.onNodeWithText(str(R.string.chat_save_prompt)).performClick()
-        rule.waitForIdle()
-        assertTrue(spy.toasts.toString(), str(R.string.chat_saved_prompt) in spy.toasts)
-        assertEquals("Sketch the lexer", QuickPrompts.list(context).first())
-
-        // Claude's reply: Quote puts it in the box as a quote; no Save or Rewind for it.
+        // Claude's reply: Quote puts it in the box as a quote; no Rewind for it.
         longPress("Here is a")
-        rule.onNodeWithText(str(R.string.chat_save_prompt)).assertDoesNotExist()
         rule.onNodeWithText(str(R.string.chat_quote)).performClick()
         rule.waitForIdle()
         rule.onNode(hasSetTextAction()).assertTextContains("> Here is a **sketch**.", substring = true)
@@ -319,8 +314,9 @@ class ChatMoreTest {
 
     // ─── Q9: quick prompts ───
 
-    // The chips aren't on the chat since "no quick prompts" (8a36f54); Save as quick prompt still fills
-    // their list, and the chips themselves are drawn here.
+    // The chips aren't on the chat since "no quick prompts" (8a36f54), and Save as quick prompt left
+    // the message menu (2026-11-01); the chips' tap is kept here, with no picture (their list is the
+    // phone's, so it read differently by which tests ran first).
     @Test fun aQuickPromptIsSentInOneTap() {
         val sent = mutableListOf<String>()
         rule.setContent { Harness(spy) { QuickPromptChips(onSend = { sent += it }) } }
@@ -328,7 +324,6 @@ class ChatMoreTest {
         rule.onNodeWithText(first).performClick()
         rule.waitForIdle()
         assertEquals(listOf(first), sent)
-        rule.snap("chat_quick_prompts")
     }
 
     @Test fun aQuickPromptIsEditedWithALongPressAndTheListIsKept() {
