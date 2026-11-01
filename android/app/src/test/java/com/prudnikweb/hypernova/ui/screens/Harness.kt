@@ -99,10 +99,13 @@ fun str(id: Int, vararg args: Any): String = context.getString(id, *args)
 /**
  * Each test's start: the samples' clock now ([Samples.NOW]), and the settings kept on the phone
  * back to their defaults (each is one state for the whole app, so one test's choice would
- * otherwise reach the next).
+ * otherwise reach the next). And FileProvider's roots forgotten: it keeps them per authority in a
+ * static, for the whole process, which on a phone is right, but here each test has a temp folder of
+ * its own, so the first test's roots would refuse every later test's files.
  */
 fun resetPrefs() {
     Samples.NOW = System.currentTimeMillis()
+    (androidx.core.content.FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }.get(null) as MutableMap<*, *>).clear()
     EnterKeyPref.set(context, EnterKey.Send)
     TopBarPref.set(context, TopBarChoice.DEFAULT)
     CardSwipePref.set(context, CardSwipes())
