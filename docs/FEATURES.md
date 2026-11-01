@@ -21,7 +21,8 @@ Test names, shortened:
 - `Class.test` is an app test under `android/app/src/test/java/com/prudnikweb/hypernova/`.
   - Layer 2, the real `LiveHub`/`Core` against `FakeDaemon`: `data/live/` (ActionsTest,
     AllServersSettingsTest, ConnectTest, CoreServersTest, ErrorsTest, MultiServerTest,
-    ReconnectTest, SocketEventsTest).
+    ReconnectTest, SettingsCallsTest, SocketEventsTest, UsageRefreshCallTest), and
+    `widget/WidgetSyncTest`.
   - Layer 3, Robolectric and Roborazzi: `ui/screens/`. Two classes share a name, so they are
     written `screens/SessionSheetTest` and `session/SessionSheetTest`.
   - Every other app class is a plain unit test.
@@ -75,7 +76,7 @@ Test names, shortened:
 | H9 | "Restart all" for jobs on an older Claude Code | OutdatedJobsTest (all); RestartOfferTest (all); ActionsTest.respawnOutdatedJobsUsesTheSlowRoute; fixture rest-jobs-respawn.json; claude-agents.test.ts › "the respawn-all route…" | **partial**: the Home notice and its confirm aren't drawn in a screen test |
 | H10 | Cards above the sessions (account, providers, prompts for gone sessions, automation questions), dismiss and undo | AttentionTest (all); HomeGroupsTest.theAccountCardFollowsWhatsOverIt; ProvidersTest (all) | **partial**: no screen test draws any of them; starting a new session from an orphaned prompt (`startFromWaiting`) is untested |
 | H11 | Usage cards (Claude, Codex, one per computer) | UsageCardsTest (all); AllUsageTest (all); UsageProjectionTest (all); UsageRateTest (all); FiveHourReportedTest (all); ModelWeeksTest (all) | **partial**: only the `home_groups` baseline shows a usage card; the Codex card and the per-model weeks aren't drawn |
-| H12 | The sky: the sun as usage, planets as projects, Codex's star, companions | SkyPlanTest, SkyLayoutTest, SkyPhysicsTest, SkySplitTest, AgentLeadTest, PaceTest, CountdownTest (all) | **partial**: placement and physics are tested; the Canvas drawing is in no baseline (Home's has no sky) |
+| H12 | The sky: the sun as usage, planets as projects, Codex's star, companions | SkyPlanTest, SkyLayoutTest, SkyPhysicsTest, SkySplitTest, AgentLeadTest, PaceTest, CountdownTest (all); SkyTest.theSunThePlanetsAndTheFarSky (the far sky, the sun's readout, the planets and the belt drawn, baseline `sky`, with the sky's seed and the wall clock pinned) | **covered** (Home hides the system since 2026-10-30; the drawing is guarded on its own. Codex's star and the companion aren't in the baseline: their placement is SkySplitTest's) |
 
 ## 4. Session chat
 
@@ -218,13 +219,13 @@ Test names, shortened:
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| T1 | Settings' parts, one server or All servers | SettingsTest.thePartsAsTheyStart; SettingsPlanTest (all); AllServersSettingsTest.eachServersBlockActsOnItsOwnServer | **covered** |
-| T2 | Providers: add, edit, Check, delete, balance | ProviderFormTest (all); ProvidersTest (all); fixture ws-providers.json; providers-store.test.ts, providers.test.ts, balance.test.ts (all); http.test.ts › "providers: addresses cleaned…" | **partial**: the app's `saveProvider`, `deleteProvider`, `checkProvider` and `checkNewProvider` never run; the providers screens are untested; no fixtures for the provider routes |
+| T1 | Settings' parts, one server or All servers | SettingsTabTest (all 9: the whole tab through the app's own HubViewModel over real hubs and FakeDaemon: one server in order, All servers with its intro line, a block per server then This phone, a server that can't be reached keeping its card alone, nothing paired; baselines `settings_tab_one_server`, `settings_tab_all_servers`, `settings_tab_not_paired`); SettingsTest.thePartsAsTheyStart; SettingsPlanTest (all); AllServersSettingsTest.eachServersBlockActsOnItsOwnServer | **covered** |
+| T2 | Providers: add, edit, Check, delete, balance | ProviderFormTest (all); ProvidersTest (all); SettingsCallsTest (the six provider tests: `saveProvider` new and edited, a refusal's code, `checkNewProvider`, `checkProvider`, `deleteProvider`); ProvidersScreenTest (all 7: the list and the balance read as it opens, the editor's Check, Save, a refusal under its field, a key left behind, Delete; baselines `providers_list`, `provider_edit_checked`); fixtures rest-provider-save.json, rest-provider-save-balance.json, rest-provider-check.json, rest-provider-balance.json, rest-provider-edit.json, rest-providers.json, rest-provider-delete.json, rest-provider-refused.json, ws-providers.json; contract.test.ts › "the providers: saved and checked…"; providers-store.test.ts, providers.test.ts, balance.test.ts (all); http.test.ts › "providers: addresses cleaned…" | **covered** |
 | T3 | Claude Code's card: versions, plan, Sessions in claude agents | AgentCardsTest (all); ActionsTest.claudeAgentsSettingIsPostedAndApplied; SocketEventsTest.theClaudeSettingFollowsItsMessage; fixtures ws-claude.json, rest-claude.json; claude-agents.test.ts › "the setting from the phone…" | **covered** |
-| T4 | Account: check, sign in on the phone or the server, the code, cancel | fixture ws-account.json; account.test.ts (the sign-in tests); http.test.ts › "the account is in the snapshot…" | **partial**: the app's `checkAccount`, `signIn`, `sendSignInCode` and `cancelSignIn` and their sheet are untested |
-| T5 | This phone: card swipes, session top bar, typing, display | SettingsTest.cardSwipeRightPicksOpen, topBarToggleMoveAndReset, enterKeyNewLineAndBack; CardSwipeChoiceTest.picksAreKept; TopBarTest.itIsKeptAsOneLineAndReadBack; ServerSwitcherTest.namesStillShowAtALargeFont | **partial**: Display (text size, effects) has no test of its own |
-| T6 | Refresh usage now (POST /v1/usage/refresh) | UsageRefreshTest (all); usage-probe.test.ts, usage-probe-pace.test.ts (all) | **partial**: the route has no HTTP test or fixture; the phone's call never runs |
-| T7 | Testing checklist | http.test.ts › "the checklist needs its key…"; lan.test.ts › "a preview and the checklist…" | **partial**: the app's `checklist()` never runs |
+| T4 | Account: check, sign in on the phone or the server, the code, cancel | SettingsCallsTest (the five account tests: `checkAccount`, `signIn` here and on the server, signed in meanwhile (`not_needed`), `sendSignInCode`, `cancelSignIn`, a code with no sign-in running); SignInPanelTest (all 5: each step as the server says it, the page, Paste and Send, a refused code, Try again, Cancel; baseline `signin_waiting_code`); fixtures ws-account.json, ws-account-sign-in.json, rest-account-check.json, rest-account-login.json, rest-account-login-cancel.json, rest-account-login-code.json, rest-account-login-code-refused.json; contract.test.ts › "signing in from the phone…" (through fixtures/fake-claude.sh); account.test.ts (the sign-in tests); http.test.ts › "the account is in the snapshot…" | **covered** (the Home account card around the panel is H10's) |
+| T5 | This phone: card swipes, session top bar, typing, display, new sessions, Stay connected | SettingsTest.cardSwipeRightPicksOpen, topBarToggleMoveAndReset, enterKeyNewLineAndBack; SettingsTabTest.thePhonesOwnPartsKeepWhatsPicked (Display's text size, New sessions' mode, Stay connected off and on); CardSwipeChoiceTest.picksAreKept; TopBarTest.itIsKeptAsOneLineAndReadBack; ServerSwitcherTest.namesStillShowAtALargeFont | **covered** (Display has only the text size now) |
+| T6 | Refresh usage now (POST /v1/usage/refresh) | UsageRefreshTest (all); UsageRefreshCallTest (all: the phone's call through Core, once in five minutes, a 404 changing nothing); usage-probe.test.ts › "POST /v1/usage/refresh (refreshUsage)…" (two asks share one look, again within 30 s none); fixtures rest-usage-refresh.json, rest-usage.json; contract.test.ts › "POST /v1/account/check, then GET /v1/usage and POST /v1/usage/refresh" (over HTTP, signed out: no look); usage-probe.test.ts, usage-probe-pace.test.ts (all) | **covered** |
+| T7 | Testing checklist | SettingsCallsTest.theChecklistIsItsPageOnTheRouteInUse; SettingsTabTest.oneServerRowsOpenTheirScreensAndTheChecklistItsPage, allServersEachBlockActsOnItsOwnServer; fixture rest-qa.json; http.test.ts › "the checklist needs its key…"; lan.test.ts › "a preview and the checklist…" | **covered** (unlocking it with seven taps can't run in a debug build, where it's always on) |
 
 ## 16. App update
 
@@ -240,8 +241,8 @@ Test names, shortened:
 | # | Capability | Tests | Status |
 |---|---|---|---|
 | WG1 | Needs you: rows per computer, what each waits on, offline rows open only | WidgetModelTest (all) | **covered** |
-| WG2 | Deny and Allow from the widget, to that row's computer | MultiServerTest.anAnswerFromTheWidgetGoesToTheServerTheApprovalWaitsOn; WidgetModelTest.answeredHereHidesTheRowAndAnsweringShowsOnIt | **partial**: `WidgetSync`, the list's RemoteViews (`WidgetListService`) and its tap intents never run |
-| WG3 | Redraws at most every 1.5 s, never with the screen off | none | **gap** |
+| WG2 | Deny and Allow from the widget, to that row's computer | WidgetSyncTest.allowFromTheWidgetGoesToTheRowsComputerAndTheRowGoes, denyThatDoesntGetThroughSaysSoThenTheButtonsComeBack, claudeCodesOwnDialogIsAnsweredThroughItsMenuOnTheRowsComputer, onALockedPhoneATapOpensTheSessionAndAnswersNothing, openAndTheComputersNameOpenTheApp, theListsRowsAreTheComputerThenWhatEachSessionWaitsOn (`WidgetTap`, `WidgetActions` and `WidgetListService`'s RemoteViews, through Core against FakeDaemon); MultiServerTest.anAnswerFromTheWidgetGoesToTheServerTheApprovalWaitsOn; WidgetModelTest.answeredHereHidesTheRowAndAnsweringShowsOnIt | **covered** |
+| WG3 | Redraws at most every 1.5 s, never with the screen off | WidgetSyncTest.aChangeIsDrawnOnceTheGapIsUpAndABurstIsDrawnOnce (and nothing on a timer), backToWhatsShownIsNoPicture, nothingIsDrawnWithTheScreenOffAndWhatChangedIsDrawnAsItComesOn | **covered** (the alarm that redraws a picture gone out of date by itself, `WidgetSync.tick`, isn't fired) |
 
 ## 18. Notifications
 
@@ -256,7 +257,7 @@ Test names, shortened:
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| ST1 | Totals, ranges, the last 30 days as bars | StatsScreenTest (all); DayBarsTest (all); StatsTest (all); stats.test.ts (all) | **partial**: GET /v1/stats has no fixture (the app reads hand-written JSON) |
+| ST1 | Totals, ranges, the last 30 days as bars | StatsScreenTest (all); DayBarsTest (all); StatsTest (all); SettingsCallsTest.statisticsAreAskedForTheirRangeAndKeptForAMoment, statisticsTheServerRefusesAreItsWords (`StatsSource.load` against FakeDaemon); fixtures rest-stats.json, rest-stats-bad-range.json; contract.test.ts › "GET /v1/stats…"; stats.test.ts (all) | **covered** |
 
 ## 20. Mac-only features
 
@@ -297,10 +298,8 @@ that both sides must agree on.
   PUT/DELETE …/held/{id}, POST /v1/attachments, …/interrupt, …/menu, …/terminal, …/open,
   …/continue, …/auto-continue, …/provider, …/usage, …/todos, …/rewind, …/blocked (and retry,
   dismiss), …/switch/preview, …/switch, GET /v1/commands, /v1/codex (GET, POST, refresh),
-  /v1/codex/models, /v1/projects, /v1/providers (all routes), /v1/files, /v1/folders, /v1/file,
-  /v1/preview, /v1/usage, /v1/usage/refresh, /v1/mac/awake, /v1/mac/files, /v1/stats,
-  /v1/account/*, /v1/devices/me, /v1/device/cert, /v1/qa, /v1/speech/*, /v1/automations/*,
-  /v1/health.
+  /v1/codex/models, /v1/projects, /v1/files, /v1/folders, /v1/file, /v1/preview, /v1/mac/awake,
+  /v1/mac/files, /v1/devices/me, /v1/device/cert, /v1/speech/*, /v1/automations/*, /v1/health.
 
 ## Biggest gaps
 
@@ -337,6 +336,5 @@ Ktor; the screens move to Compose Multiplatform) and how soon the owner would no
     other coroutines breaks easily, and the owner opens agents often. *Layer 2:* `agents()` and
     `agentEvents` with a cursor and `starting`; *layer 3:* AgentScreen.
 
-Just behind them: the sky's drawing (H12, *layer 3:* a Home baseline with the sky on), account
-sign-in (T4, *layer 2*), blocked calls' Allow & retry (S5, *layer 2* plus a fixture), and the
+Just behind them: blocked calls' Allow & retry (S5, *layer 2* plus a fixture), and the
 notification receivers (NT2), which stay Android-only on a desktop-first move.
