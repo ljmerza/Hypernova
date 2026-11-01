@@ -6,7 +6,7 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1424 app tests, 977 daemon tests (973 pass, 4 skipped: Mac-only).
+2026-11-01: 1423 app tests, 985 daemon tests (981 pass, 4 skipped: Mac-only).
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -272,7 +272,7 @@ Test names, shortened:
 |---|---|---|---|
 | ST1 | Totals, ranges (Today, Week, Month, YTD, All), the last 30 days as bars | StatsScreenTest (all); DayBarsTest (all); StatsTest (all); SettingsCallsTest.statisticsAreAskedForTheirRangeAndKeptForAMoment, statisticsTheServerRefusesAreItsWords (`StatsSource.load` against FakeDaemon); fixtures rest-stats.json, rest-stats-bad-range.json; contract.test.ts › "GET /v1/stats…"; stats.test.ts (all); stats-ytd.test.ts (all) | **covered** |
 | ST2 | All servers: every server's statistics added up, the ones not answering named, the ones too old for the range named apart | AllStatsTest (all); StatsScreenTest.allServersAddsTheirStatisticsUp, allServersAsksEachForTheSameRange, aServerThatFailsIsLeftOutAndNamed, noServerAnsweringSaysSo, oneServerIsStillOneServers, allServersYtdIsSinceJanuary1Too, allServersStartsAtTheEarliestOfThoseThatAnswered, allServersNamesTheOneTooOldAndAddsUpTheRest, everyServerTooOldIsNotAnErrorEither | **partial**: asking real servers at once isn't driven (a fake hub has no server to ask, so a linked one with no answer put fails); Home handing the servers to the screen isn't drawn |
-| ST3 | All and YTD reach back to the first use: older days from Claude Code's summary (sessions, tool calls, tokens), a line for what starts later | stats-backfill.test.ts (all); fixture rest-stats-backfill.json; contract.test.ts › "GET /v1/stats…"; ContractTest; AllStatsTest.olderDaysTakeTheEarliestStartAndTheHoursLineFollowsEachServer; StatsScreenTest.allWithOlderDaysStartsAtFirstUseAndSaysWhatStartsLater, ytdWithOlderDaysSaysSoToo, noOlderDaysNoLine, tokensThatReachTheStartArentMentioned, noTokensInTheOlderDaysStartWithTheHours, aDayOnlyTheSummaryKnowsHasNoBarAndSaysNoHoursCounted, allServersLineUsesTheEarliestOfEach | **covered** |
+| ST3 | All and YTD reach back to the first use: older days from Claude Code's summary (sessions, tool calls), kept in stats.json so losing the file loses nothing, a line for what starts later | stats-backfill.test.ts (all); fixture rest-stats-backfill.json; contract.test.ts › "GET /v1/stats…"; ContractTest; StatsTest.anOlderServersBackfillTokensAreIgnored; AllStatsTest.olderDaysTakeTheEarliestStartAndTheHoursLineFollowsEachServer; StatsScreenTest.allWithOlderDaysStartsAtFirstUseAndSaysWhatStartsLater, ytdWithOlderDaysSaysSoToo, noOlderDaysNoLine, aDayOnlyTheSummaryKnowsHasNoBarAndSaysNoHoursCounted, allServersLineUsesTheEarliestOfEach | **covered** |
 
 ## 20. Mac-only features
 

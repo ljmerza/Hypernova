@@ -101,19 +101,13 @@ internal fun litDays(range: StatsRange, today: LocalDate?): Int =
     if (range == StatsRange.Ytd && today != null) minOf(range.days, today.dayOfYear) else range.days
 
 /**
- * When a range's older days ([Stats.hoursSince]: from Claude Code's own summary, which has sessions,
- * tool calls and tokens but no hours) leave the other numbers starting later than the header says:
+ * When a range's older days ([Stats.hoursSince]: from Claude Code's own summary, which has sessions
+ * and tool calls but nothing else) leave the other numbers starting later than the header says:
  * one line to say so, or null where they don't.
  */
 internal fun laterNumbers(res: Resources, s: Stats): String? {
     val hours = s.hoursSince ?: return null
     val start = if (s.range == StatsRange.All) s.since ?: hours else s.from
     if (hours <= start) return null
-    val tokens = s.tokensSince ?: hours
-    val h = dateWithYear(localDate(hours))
-    return when {
-        tokens >= hours -> res.getString(R.string.stats_later_with_tokens, h)
-        tokens <= start -> res.getString(R.string.stats_later, h)
-        else -> res.getString(R.string.stats_later_tokens_earlier, h, dateWithYear(localDate(tokens)))
-    }
+    return res.getString(R.string.stats_later, dateWithYear(localDate(hours)))
 }

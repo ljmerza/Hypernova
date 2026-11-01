@@ -366,8 +366,6 @@
     "since": 1800000000000,
     "hoursSince": 1800000000000,
     "sessions": 3,
-    "toolCalls": 5,
-    "tokens": 7,
-    "tokensSince": 1800000000000
+    "toolCalls": 5
   }
 }

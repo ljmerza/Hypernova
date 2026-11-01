@@ -619,13 +619,14 @@ class ContractTest {
             assertNull(s.codex)
             assertEquals(StatsAgents.Claude, s.agents(codexLeads = false))
         },
-        // Older days from Claude Code's own summary: added to what they have numbers for, and the start moved back.
+        // Older days from Claude Code's own summary: sessions and tool calls added, the start moved back, tokens left out.
         "rest-stats-backfill" to { o ->
             val s = StatsWire.parse(o)
             assertEquals(StatsRange.All, s.range)
             assertTrue(s.hoursSince != null)
             assertTrue(s.since!! <= s.hoursSince!!)
-            assertEquals(7L, s.tokens.unsplit)
+            assertEquals(o.getJSONObject("tokens").let { t -> t.getLong("input") + t.getLong("output") + t.getLong("cacheRead") + t.getLong("cacheWrite") }, s.tokens.total)
+            assertTrue(!o.getJSONObject("backfill").has("tokens"))
             assertEquals(s.sessions, o.getInt("sessions") + 3)
             assertEquals(s.toolCalls, o.getInt("toolCalls") + 5)
             assertEquals(s.claude!!.sessions, o.getJSONObject("byAgent").getJSONObject("claude").getInt("sessions") + 3)

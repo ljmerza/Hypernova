@@ -3570,14 +3570,12 @@ Stats = {
     claude: {ms, tokens, sessions, prompts, toolCalls},
     codex?: {ms, tokens, sessions, prompts, toolCalls}
   }
-  backfill?: {                       // older days from Claude Code's own summary; absent when they add nothing to
+  backfill?: {                       // older days from Claude Code's own summary, as kept; absent when they add nothing to
                                      // this range. Apart from every total above, so an older app reads what it did
     since: number,                   // the first of them, whatever the range
     hoursSince: number,              // the first day this daemon counted (`since` above, or today with none):
                                      // when everything the summary hasn't got starts
-    sessions: number, toolCalls: number,
-    tokens: number,                  // all four kinds together: the summary doesn't split them by day
-    tokensSince: number | null       // the first of this range's older days with tokens
+    sessions: number, toolCalls: number  // only these: an older server also sent `tokens` and `tokensSince`, which the app ignores
   }
 }
 ```
@@ -3634,19 +3632,24 @@ Stats = {
   up to less than the kept copy) is answered from the copy, so `all` keeps growing. Files edited on
   such days are counted per day, not as distinct files.
 - **Older days** (`daemon/src/stats-cache.ts`): `<claude config>/stats-cache.json`, Claude Code's own
-  summary, read and never written, goes back further than its transcripts. Each day there before the
-  first day this daemon counted (kept days, transcripts and Codex's) adds its `sessionCount` and
-  `toolCallCount`, and its `dailyModelTokens` where it has them, to `backfill` for a range that holds
-  the day. A day has one source, whole: the first day counted and every one after it are the daemon's,
-  even one it saw only part of, so that day can read low and nothing counts twice. Their dates are
-  the file's own, which look like UTC days, not the server's calendar: a row can't be cut. The file's
-  totals aren't used. Its `messageCount` isn't `prompts` (every message of a conversation, 33 times the
-  prompts on the owner's overlapping days), so it isn't sent. Nothing else in the file leaves
-  (`longestSession`, `modelUsage`, `hourCounts`). No hours, agent work, projects, files, approvals or
-  limits come from it, so `busiestDay`, `longestSession`, `streak` and days with work stay on the
-  daemon's own days. Of `days`, one only the file knows has its `sessions` and `tokens` and `claudeMs:
-  0`. A missing file, a `version` other than 5 or a changed row: no `backfill`, one line in the log.
-  `dailyModelTokensVersion` other than 5 or changed token rows: the days without tokens.
+  summary, read and never written, goes back further than its transcripts. Each read of a valid file
+  (every answer, and the daemon's own looks) copies the active days not yet kept into `<support>/stats.json`
+  (`backfillDays`: date to `{sessions, toolCalls}`, a day with only messages as zeros; an older
+  `stats.json` has none and loads), written as the rest of that file is. A kept day never changes and
+  is never lost: the file going, changing shape or dropping the day takes nothing away. Each kept day
+  before the first day this daemon counted (kept days, transcripts and Codex's) adds its `sessionCount`
+  and `toolCallCount` to `backfill` for a range that holds the day. A day has one source, whole: the
+  first day counted and every one after it are the daemon's, even one it saw only part of, so that
+  day can read low and nothing counts twice. Their dates are the file's own, which look like UTC days,
+  not the server's calendar: a row can't be cut. The file's totals aren't used. Its `dailyModelTokens`
+  aren't read: 2.2 times the daemon's own tokens on the owner's overlapping days, cause unknown, so
+  every token number starts with the daemon's own. Its `messageCount` isn't `prompts` (every message of
+  a conversation, 33 times the prompts on the owner's overlapping days), so it isn't sent. Nothing else
+  in the file leaves (`longestSession`, `modelUsage`, `hourCounts`). No hours, agent work, projects,
+  files, approvals or limits come from it, so `busiestDay`, `longestSession`, `streak` and days with
+  work stay on the daemon's own days. Of `days`, one only the file knows has its `sessions`, `tokens: 0`
+  and `claudeMs: 0`. A missing file, a `version` other than 5 or a changed row adds nothing new, with
+  one line in the log; what was kept still counts, and with nothing kept there's no `backfill`.
 
 ## Held prompts
 

@@ -9,7 +9,8 @@
 // and per day (no events, no text), and the answer is put together on request, cached briefly.
 //
 // Claude Code deletes transcripts after 30 days by default, so finished days are also kept in
-// <support>/stats.json, and a day whose files are gone still counts.
+// <support>/stats.json, and a day whose files are gone still counts. So are the counts of the days
+// from before Hypernova's first, copied from Claude Code's own summary (stats-cache.ts).
 import { open, readdir, stat } from 'node:fs/promises'
 import { basename, join, sep } from 'node:path'
 import { CLAUDE_DIR, SUPPORT, log, readJson, writeJson } from './util.ts'
@@ -77,10 +78,10 @@ export type Stats = {
   byAgent: { claude: AgentShare; codex?: AgentShare }
   /**
    * What Claude Code's own summary adds to this range, from days before Hypernova counted any
-   * (stats-cache.ts). Apart from every total above, which stay Hypernova's own, so an older app reads
-   * what it always did. Absent when it adds nothing.
+   * (stats-cache.ts, kept in stats.json). Apart from every total above, which stay Hypernova's own,
+   * so an older app reads what it always did. Absent when it adds nothing.
    */
-  backfill?: { since: number; hoursSince: number; sessions: number; toolCalls: number; tokens: number; tokensSince: number | null }
+  backfill?: { since: number; hoursSince: number; sessions: number; toolCalls: number }
 }
 export type AgentShare = { ms: number; tokens: number; sessions: number; prompts: number; toolCalls: number }
 
@@ -508,7 +509,14 @@ type Saved = {
   /** Finished days as they were added up, for when Claude Code has deleted their transcripts. */
   days: Record<string, DaySummary>
   longest: SessionRecord | null
+  /**
+   * Every active day Claude Code's own summary has had, by date, as first read, for when it loses
+   * them (older stats.json files have none). Apart from [days], Hypernova's own exact counts. Which
+   * of them count is decided per answer: a day Hypernova has counted is Hypernova's.
+   */
+  backfillDays: Record<string, OlderDay>
 }
+type OlderDay = { sessions: number; toolCalls: number }
 const STATS_FILE = join(SUPPORT, 'stats.json')
 let saved: Saved | null = null
 let saveTimer: NodeJS.Timeout | null = null
@@ -523,9 +531,28 @@ function store(): Saved {
     limits: Array.isArray(s.limits) ? s.limits.filter((l) => WINDOWS.has(l?.window) && typeof l.at === 'number') : [],
     days: s.days && typeof s.days === 'object' ? s.days : {},
     longest: s.longest ?? null,
+    backfillDays: s.backfillDays && typeof s.backfillDays === 'object' ? s.backfillDays : {},
   }
   if (typeof s.countingSince !== 'number') saveSoon(0)
   return saved
+}
+
+/**
+ * The older days kept, with whatever the summary has that isn't kept yet added first. A day kept
+ * stays as it is, whatever the file says or stops saying later. Only counts: a day with nothing but
+ * messages is kept as zeros, since it still says when the owner first used it.
+ */
+async function keptOlderDays(): Promise<Record<string, OlderDay>> {
+  const cached = await cacheDays()
+  const kept = store().backfillDays
+  let added = false
+  for (const c of cached) {
+    if (kept[c.day] || !(c.sessions > 0 || c.toolCalls > 0 || c.messages > 0)) continue
+    kept[c.day] = { sessions: c.sessions, toolCalls: c.toolCalls }
+    added = true
+  }
+  if (added) saveSoon()
+  return kept
 }
 
 /** Written a moment later, so a burst of answers is one write. */
@@ -869,10 +896,10 @@ function rangeStart(range: StatsRange, now: number, since: number | null): numbe
  * Keep the numbers up without being asked: a first read a while after the daemon starts (so the
  * phone's first look is quick), then every few hours. That also keeps each finished day in
  * stats.json before Claude Code deletes its transcripts, even if nobody opens the statistics for
- * a month. Each look after the first reads only what was added.
+ * a month, and the summary's older days the same. Each look after the first reads only what was added.
  */
 export function startStats(firstMs = 90_000, everyMs = 6 * 3600_000): void {
-  const look = () => current(Date.now(), true).catch((e) => log('stats: look failed', e?.message ?? e))
+  const look = () => current(Date.now(), true).then(keptOlderDays).catch((e) => log('stats: look failed', e?.message ?? e))
   setTimeout(look, firstMs).unref?.()
   setInterval(look, everyMs).unref?.()
 }
@@ -985,25 +1012,23 @@ export async function getStats(range: StatsRange, now = Date.now(), opts: { fres
   // Older days from Claude Code's own summary: only days before the first Hypernova counted, so a
   // day has one source, whole. That first day and any after it are Hypernova's, however little it
   // saw of them (their transcripts may have been going already): low there, never counted twice.
-  const older = new Map((await cacheDays()).filter((c) => c.day <= today && (!active.length || c.day < active[0]!) && (c.sessions > 0 || c.toolCalls > 0 || c.messages > 0 || (c.tokens ?? 0) > 0)).map((c) => [c.day, c]))
+  const older = new Map(Object.entries(await keptOlderDays()).filter(([k]) => k <= today && (!active.length || k < active[0]!)))
 
   const days: Stats['days'] = []
   for (let i = 29; i >= 0; i--) {
     const k = dayKey(daysBefore(now, i))
     const d = merged.get(k)?.d
-    // A day only the summary knows has its sessions and tokens but no hours: no bar is made up for it.
+    // A day only the summary knows has its sessions but no hours: no bar is made up for it.
     const c = older.get(k)
-    days.push({ day: k, claudeMs: d?.claudeMs ?? 0, codexMs: cdays[k]?.ms ?? 0, wallMs: d?.wallMs ?? 0, tokens: (d ? d.tokens.input + d.tokens.output + d.tokens.cacheRead + d.tokens.cacheWrite : 0) + (c?.tokens ?? 0), sessions: (d?.sessions ?? 0) + (c?.sessions ?? 0), prompts: d?.prompts ?? 0 })
+    days.push({ day: k, claudeMs: d?.claudeMs ?? 0, codexMs: cdays[k]?.ms ?? 0, wallMs: d?.wallMs ?? 0, tokens: d ? d.tokens.input + d.tokens.output + d.tokens.cacheRead + d.tokens.cacheWrite : 0, sessions: (d?.sessions ?? 0) + (c?.sessions ?? 0), prompts: d?.prompts ?? 0 })
   }
 
-  const added = [...older.values()].filter((c) => range === 'all' || c.day >= fromKey).sort((a, b) => (a.day < b.day ? -1 : 1))
+  const added = [...older].filter(([k]) => range === 'all' || k >= fromKey).map(([, c]) => c)
   const backfill: Stats['backfill'] = !added.length ? undefined : {
     since: dayStart([...older.keys()].sort()[0]!),
     hoursSince: since ?? startOfDay(now),
     sessions: added.reduce((n, c) => n + c.sessions, 0),
     toolCalls: added.reduce((n, c) => n + c.toolCalls, 0),
-    tokens: added.reduce((n, c) => n + (c.tokens ?? 0), 0),
-    tokensSince: ((t) => (t ? dayStart(t.day) : null))(added.find((c) => (c.tokens ?? 0) > 0)),
   }
 
   return {

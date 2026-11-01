@@ -27,6 +27,18 @@ class StatsTest {
         assertEquals(StatsAgents.Claude, s.agents(codexLeads = false))
     }
 
+    @Test fun anOlderServersBackfillTokensAreIgnored() {
+        val s = parse(extra = ""","byAgent":{"claude":{"ms":7200000,"tokens":10,"sessions":3,"prompts":5,"toolCalls":4}},"backfill":{"since":100,"hoursSince":500,"sessions":7,"toolCalls":70,"tokens":999999,"tokensSince":300}""")
+        assertEquals(10L, s.tokens.total)
+        assertEquals(10L, s.claude?.tokens)
+        // What it adds that is still taken.
+        assertEquals(3 + 7, s.sessions)
+        assertEquals(10, s.claude?.sessions)
+        assertEquals(4 + 70, s.claude?.toolCalls)
+        assertEquals(100L, s.since)
+        assertEquals(500L, s.hoursSince)
+    }
+
     @Test fun readsByAgentAndADaysCodexShare() {
         val s = parse(
             extra = ""","byAgent":{"claude":{"ms":5400000,"tokens":9,"sessions":2,"prompts":4,"toolCalls":30},"codex":{"ms":1800000,"tokens":1,"sessions":1,"prompts":2,"toolCalls":7}}""",

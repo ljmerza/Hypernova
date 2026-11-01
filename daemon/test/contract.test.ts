@@ -783,8 +783,8 @@ test('GET /v1/stats: a week of the transcripts above', async () => {
     }))
     try {
       const all = stable(await ok(get('/v1/stats?range=all')))
-      assert.deepEqual([all.backfill.sessions, all.backfill.toolCalls, all.backfill.tokens], [3, 5, 7])
-      for (const k of ['since', 'hoursSince', 'tokensSince']) all.backfill[k] = T
+      assert.deepEqual([all.backfill.sessions, all.backfill.toolCalls], [3, 5])
+      for (const k of ['since', 'hoursSince']) all.backfill[k] = T
       contract('rest-stats-backfill', all)
     } finally {
       rmSync(cache)
