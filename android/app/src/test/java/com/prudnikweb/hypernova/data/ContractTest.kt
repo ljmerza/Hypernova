@@ -545,6 +545,22 @@ class ContractTest {
             assertFalse(list.first().paid)
         },
         "rest-provider-delete" to { o -> assertTrue(o.bool("ok")) },
+        // A session's folder: what each server may say, never its args, env or whole URL.
+        "rest-session-mcp" to { o ->
+            assertEquals(
+                SessionMcpReply(
+                    AgentSettingsFile.OK,
+                    listOf(
+                        SessionMcpServer("db-tools", "local", "stdio", "uvx", null, null),
+                        SessionMcpServer("docs", "project", "http", null, "docs.example.com", null),
+                    ),
+                    2,
+                    0,
+                    0,
+                ),
+                SessionMcpReply.wire(o),
+            )
+        },
         // The agents' settings: the fixed list and the summaries, each agent's own.
         "rest-agent-settings" to { o ->
             val r = AgentSettingsReply.wire(o)

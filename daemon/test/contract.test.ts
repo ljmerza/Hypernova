@@ -1001,14 +1001,17 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       userID: 'never-sent',
       oauthAccount: { emailAddress: 'never-sent@example.com' },
       mcpServers: { github: { command: 'never-sent', args: ['never-sent'] } },
-      projects: { [cwd]: { history: [{ display: 'never-sent' }], mcpServers: { 'db-tools': { command: 'never-sent', env: { TOKEN: 'never-sent' } } } } },
+      projects: { [cwd]: { history: [{ display: 'never-sent' }], mcpServers: { 'db-tools': { command: '/usr/local/bin/uvx', args: ['never-sent'], env: { TOKEN: 'never-sent' } } } } },
     }),
   )
-  writeFileSync(mcpJson, JSON.stringify({ mcpServers: { docs: { type: 'http', url: 'https://never-sent.example.com/' } } }))
+  writeFileSync(mcpJson, JSON.stringify({ mcpServers: { docs: { type: 'http', url: 'https://user:never-sent@docs.example.com/never-sent?key=never-sent', headers: { Authorization: 'never-sent' } } } }))
   try {
     const r = await ok(get('/v1/agents/settings'))
     assert.ok(!JSON.stringify(r).includes('never-sent'))
     contract('rest-agent-settings', r)
+    const forFolder = await ok(get('/v1/sessions/sess-plan/mcp'))
+    assert.ok(!JSON.stringify(forFolder).includes('never-sent'))
+    contract('rest-session-mcp', forFolder)
   } finally {
     writeFileSync(claudeFile, world)
     rmSync(codexFile, { force: true })

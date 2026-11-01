@@ -1,0 +1,20 @@
+{
+  "state": "ok",
+  "servers": [
+    {
+      "name": "db-tools",
+      "scope": "local",
+      "transport": "stdio",
+      "command": "uvx"
+    },
+    {
+      "name": "docs",
+      "scope": "project",
+      "transport": "http",
+      "host": "docs.example.com"
+    }
+  ],
+  "forAllProjects": 2,
+  "hidden": 0,
+  "foldersNotRead": 0
+}

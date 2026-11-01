@@ -202,6 +202,13 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   (`daemon/src/secretfiles.ts`): this route doesn't change that. `daemon/test/agent-settings.test.ts`
   plants a secret in each of those places and checks the raw HTTP body. Those names and base names do show
   which projects and tools are on the server, to a paired phone, which can already start sessions there.
+- The same files, for one session's folder (`GET /v1/sessions/{id}/mcp`, `docs/PROTOCOL.md`, "A session's MCP
+  servers", 2026-11-01): each server's name and scope, its transport, a stdio command's base name and an http,
+  sse or ws URL's host, each checked. Never args, env, headers, `headersHelper`, OAuth settings, a URL's path,
+  port, query or credentials, or a path; a command name that says the username, or a host that looks like a
+  secret, is left out, and the home folder is `~`. For a device token only. The same test file plants a secret in
+  each of those places, in a command path, and in a URL's query and userinfo, and checks the raw HTTP body. A
+  host does say where a server lives, to a paired phone.
 
 ## 8. Known residual risks
 

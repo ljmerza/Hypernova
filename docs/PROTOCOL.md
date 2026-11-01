@@ -518,6 +518,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `POST /v1/projects` | `{name, git?: true}` → `{project}` creates `<root>/<name>` |
 | `GET /v1/providers` | → `{providers: Provider[]}` |
 | `GET /v1/agents/settings` | → `AgentSettingsReply`: the fixed list of Claude Code's and Codex's user-level settings, read-only, for a paired phone only (401 `unauthorized` for the local API's admin token; see Agent settings). An older daemon answers 404 |
+| `GET /v1/sessions/{id}/mcp` | → `SessionMcpReply`: the MCP servers set up for that session's folder, from an allow-list, read-only, for a paired phone only (401 `unauthorized` for the local API's admin token; 404 `no_session`; 409 `not_claude` for a Codex session; see A session's MCP servers). An older daemon answers 404 `not_found` |
 | `GET /v1/models?provider=` | → `{providers: ModelList[]}`: the models each provider offers (only that one with `provider`), in the providers' order, for the new-session sheet (see Models) |
 | `POST /v1/providers/{id}/check` | `{}` → `{provider}`: reads its balance now (OpenRouter; at most once in 10 s, sooner the last reading). 409 `no_balance` for a provider without a balance to read |
 | `POST /v1/providers/check` | `{kind?, baseUrl?, apiKey?, name?, id?}` → `{check: ProviderCheck}`: an address and a key checked without saving them (the editors' Check; see Providers). `id`: an existing provider, whose saved key is used when none is sent, only at its own host. 400 `bad_kind`, `missing_url`, `bad_url`, `insecure_url`, `bad_key_format`; 404 `no_provider` |
@@ -1066,6 +1067,52 @@ App (`ui/settings/AgentSettings.kt`): a key it has no words for shows its raw na
 server needs updating. The MCP row groups `claude.mcp`: "On this server" (user), then each project's by name (local and
 project), with 12 names per group, 12 projects and "n more". An older daemon's reply has no `mcp`: the row shows
 `summary.mcpServers`. An older app ignores `mcp` and reads that list as before.
+
+## A session's MCP servers
+
+`GET /v1/sessions/{id}/mcp` (`daemon/src/agent-settings.ts`, 2026-11-01; `docs/DECISIONS.md`, "A session's MCP
+servers"). The Home card's menu, MCP servers. Read-only.
+
+```
+SessionMcpReply = {
+  state: "ok" | "missing" | "malformed" | "unreadable",   // Claude Code's config file's (see Agent settings)
+  servers: {
+    name,
+    scope: "local" | "project",
+    transport: "stdio" | "http" | "sse" | "ws" | null,    // null: any other kind
+    command?,   // stdio: the base name only
+    host?,      // http, sse, ws: the host only
+    from?,      // the folder's base name, when it isn't the session's own; ~ for the home folder
+  }[],
+  forAllProjects: number,   // user-level servers: a count, never their names
+  hidden: number,           // names not sent
+  foldersNotRead: number,   // the walk's time limit ran out
+}
+```
+
+**Which servers**, as Claude Code 2.1.316's binary finds them for a folder:
+
+- **Project:** `.mcp.json` in the session's folder and each parent, up to but not including the filesystem's
+  root. The nearer file wins a name.
+- **Local:** the config file's `projects[<path>].mcpServers` for that exact folder and, since Claude Code files
+  it there, for the repository's root (the main checkout's, from a linked worktree). A folder's own entry
+  below a root is listed too, though Claude Code 2.1.316 reads the root's.
+- **Not the user-level ones:** `forAllProjects` counts them, with settings.json's. Plugins' servers aren't
+  known here.
+
+A name set in both scopes is listed in each. Whether a server is connected isn't known to the daemon, so
+nothing here says it: this is what's set up, and a project's server may still be waiting for approval.
+
+**Each detail from an allow-list.** Never args, env, headers, `headersHelper`, OAuth settings or a whole URL.
+`command` passes as a name does, is left out when it says the username, and is cut to its base name. `host`
+comes from a parsed `http(s)` or `ws(s)` URL, with no port, path, query or credentials, in a host's shape and
+through `maskSecrets`, else it's left out. `.mcp.json` follows Agent settings' rules: 256 KiB, no links, a regular
+file. Each read is per request and nothing is kept.
+
+App (`ui/home/SessionMcp.kt`): a sheet from the Home card's menu, for a Claude session with a folder, and not
+from the chat's session sheet. Empty: "No MCP servers for this folder". On a 404 other than `no_session` it says
+the server needs updating. A Codex session has no such item: its binary names a trusted repository's own
+`.codex/config.toml` for a project's MCP servers, not `~/.codex/config.toml`, and this doesn't read that file.
 
 ## Providers
 

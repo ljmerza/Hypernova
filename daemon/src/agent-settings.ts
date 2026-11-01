@@ -19,8 +19,8 @@
 // keys of those `mcpServers` tables are looked at, and each name is checked before it's sent.
 
 import { constants as fsConstants, readFileSync, statSync } from 'node:fs'
-import { open } from 'node:fs/promises'
-import { basename, isAbsolute, join, normalize } from 'node:path'
+import { open, realpath, stat } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, join, normalize, resolve } from 'node:path'
 import { maskSecrets } from './normalize.ts'
 import { OTHER, scanToml } from './toml-reader.ts'
 import { CLAUDE_DIR, HOME } from './util.ts'
@@ -50,6 +50,13 @@ export type AgentSettings<S> = { state: FileState; values: ShownValue[]; summary
 export type McpName = { name: string; scope: 'user' | 'local' | 'project'; project?: string }
 /** Beside the file's state: Claude Code's MCP servers don't depend on settings.json being there. [state] is `~/.claude.json`'s. */
 export type ClaudeMcp = { state: FileState; servers: McpName[]; hidden: number; foldersNotRead: number }
+
+/**
+ * One server of a session's folder: only what's shown. [command] is a base name, [host] a host, either
+ * left out when it doesn't pass the check; [from] is a folder's base name when it isn't the session's own.
+ */
+export type SessionMcpServer = { name: string; scope: 'local' | 'project'; transport: 'stdio' | 'http' | 'sse' | 'ws' | null; command?: string; host?: string; from?: string }
+export type SessionMcpReply = { state: FileState; servers: SessionMcpServer[]; forAllProjects: number; hidden: number; foldersNotRead: number }
 
 export type AgentSettingsReply = { scope: 'user'; claude: AgentSettings<ClaudeSummary> & { mcp: ClaudeMcp }; codex: AgentSettings<CodexSummary> }
 
@@ -95,6 +102,10 @@ const MCP_JSON_MAX = 256 * 1024
 /** Project folders whose `.mcp.json` is read per request, and how long the whole walk may take (a dead network mount doesn't hold the reply up). */
 const PROJECTS_MAX = 200
 const MCP_WALK_MS = 2000
+/** Parent folders walked at most, from a session's own up. */
+const PARENTS_MAX = 64
+/** A host as it comes out of a URL, or an IPv6 address in its brackets. */
+const HOST = /^(?:[A-Za-z0-9][A-Za-z0-9-]{0,62}(?:\.[A-Za-z0-9][A-Za-z0-9-]{0,62})*|\[[0-9A-Fa-f:.]+\])$/
 /** A folder's base name that may leave: a folder can have spaces and any letter, but not a path's or a command's characters. */
 const FOLDER = /^[\p{L}\p{N}][\p{L}\p{N} _.+-]{0,63}$/u
 
@@ -375,6 +386,137 @@ export async function claudeMcp(settingsNames: readonly string[] = [], file: str
     }
   }
   return { state, servers: [...servers.values()], hidden, foldersNotRead }
+}
+
+/**
+ * A command's base name (`npx`, not `/home/me/bin/npx`), or nothing: never its args, and never a name
+ * that isn't one, might be a secret, or says the username.
+ */
+function commandBase(command: unknown): string | undefined {
+  if (typeof command !== 'string') return undefined
+  const base = basename(command)
+  const user = basename(HOME)
+  if (!NAME.test(base) || !clean(base) || base === user || (user.length >= 3 && base.includes(user))) return undefined
+  return base
+}
+
+/** A URL's host, or nothing: never its path, query, port or credentials. */
+function urlHost(url: unknown): string | undefined {
+  if (typeof url !== 'string') return undefined
+  try {
+    const u = new URL(url)
+    if (!['http:', 'https:', 'ws:', 'wss:'].includes(u.protocol)) return undefined
+    return HOST.test(u.hostname) && clean(u.hostname) ? u.hostname : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** What may be said of a server, from named fields only. `type` is optional for stdio alone (Claude Code's own schema). Any other type is null. */
+function serverDetail(v: unknown): Pick<SessionMcpServer, 'transport' | 'command' | 'host'> {
+  if (!isTable(v)) return { transport: null }
+  const type = own(v, 'type')
+  if (type === 'stdio' || (type === undefined && typeof own(v, 'command') === 'string')) {
+    const command = commandBase(own(v, 'command'))
+    return command === undefined ? { transport: 'stdio' } : { transport: 'stdio', command }
+  }
+  if (type === 'http' || type === 'sse' || type === 'ws') {
+    const host = urlHost(own(v, 'url'))
+    return host === undefined ? { transport: type } : { transport: type, host }
+  }
+  return { transport: null }
+}
+
+/**
+ * The folder Claude Code files [cwd]'s local servers under (Claude Code 2.1.316's `projectPathForConfig`,
+ * and its changelog): the repository's root, the main checkout's for a linked worktree, or null out of a repository.
+ */
+async function repoRoot(cwd: string): Promise<string | null> {
+  let d = cwd
+  for (let i = 0; i < PARENTS_MAX; i++) {
+    const dotGit = join(d, '.git')
+    const st = await stat(dotGit).catch(() => null)
+    if (st?.isDirectory()) return d
+    if (st?.isFile()) {
+      const pointer = await readCapped(dotGit, 4096, false)
+      const gitdir = 'text' in pointer ? /^gitdir:\s*(.+)$/m.exec(pointer.text)?.[1]?.trim() : undefined
+      if (!gitdir) return d
+      const at = resolve(d, gitdir)
+      const common = await readCapped(join(at, 'commondir'), 4096, false)
+      const main = 'text' in common && common.text.trim() ? resolve(at, common.text.trim()) : at
+      return basename(main) === '.git' ? dirname(main) : d
+    }
+    const up = dirname(d)
+    if (up === d) return null
+    d = up
+  }
+  return null
+}
+
+/**
+ * GET /v1/sessions/{id}/mcp: the MCP servers set up for one folder, not the user-level ones (only
+ * their count). Project scope is `.mcp.json` in [cwd] and every parent up to, not including, the
+ * filesystem's root, and the nearer file wins a name, as Claude Code does. Local scope is
+ * `~/.claude.json`'s entry for that exact folder and for the repository's root, where Claude Code files it.
+ * What's set up, not what's connected: the daemon doesn't know that, and a project's server may wait
+ * for its approval.
+ */
+export async function sessionMcp(cwd: string, file: string = claudeConfigFile(), settingsDir: string = CLAUDE_DIR): Promise<SessionMcpReply> {
+  const end = Date.now() + MCP_WALK_MS
+  const left = () => end - Date.now()
+  let hidden = 0
+  let foldersNotRead = 0
+  const local = new Map<string, SessionMcpServer>()
+  const project = new Map<string, SessionMcpServer>()
+  const real = (await within(realpath(cwd).catch(() => cwd), left())) ?? cwd
+  const isOwn = (folder: string) => folder === cwd || folder === real
+  const put = (into: Map<string, SessionMcpServer>, scope: SessionMcpServer['scope'], table: unknown, folder: string) => {
+    const servers = isTable(table) ? own(table, 'mcpServers') : undefined
+    if (!isTable(servers)) return
+    const from = isOwn(folder) ? null : folderName(folder)
+    for (const name of Object.keys(servers)) {
+      if (!NAME.test(name) || !clean(name)) {
+        hidden++
+        continue
+      }
+      into.set(name, { name, scope, ...serverDetail(own(servers, name)), ...(from === null ? {} : { from }) })
+    }
+  }
+
+  let state: FileState = 'ok'
+  const names = new Set(claudeSettings(settingsDir).summary?.mcpServers ?? [])
+  const read = await readCapped(file, CONFIG_MAX, true)
+  if ('state' in read) state = read.state
+  else {
+    const root = parseTable(read.text)
+    if (!root) state = 'malformed'
+    else {
+      for (const n of serverNames(root)) names.add(n)
+      const projects = own(root, 'projects')
+      if (isTable(projects)) {
+        const repo = isAbsolute(cwd) ? await within(repoRoot(real), left()) : null
+        for (const key of new Set([cwd, real, ...(repo === null ? [] : [repo])])) put(local, 'local', own(projects, key), key)
+      }
+    }
+  }
+
+  if (isAbsolute(cwd)) {
+    const folders: string[] = []
+    for (let d = normalize(cwd); dirname(d) !== d && folders.length < PARENTS_MAX; d = dirname(d)) folders.push(d)
+    for (const folder of folders.reverse()) {
+      if (left() <= 0) {
+        foldersNotRead++
+        continue
+      }
+      const mcp = await within(readCapped(join(folder, '.mcp.json'), MCP_JSON_MAX, false), left())
+      if (mcp === null) foldersNotRead++
+      else if ('text' in mcp) put(project, 'project', parseTable(mcp.text), folder)
+    }
+  }
+
+  const all = [...local.values(), ...project.values()]
+  const servers = all.slice(0, NAMES_MAX)
+  return { state, servers, forAllProjects: names.size, hidden: hidden + all.length - servers.length, foldersNotRead }
 }
 
 /** GET /v1/agents/settings. It doesn't throw: what's wrong with a file is that agent's state. */

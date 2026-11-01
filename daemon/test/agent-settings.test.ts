@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 const scratch = mkdtempSync(join(tmpdir(), 'hn-agent-settings-'))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
@@ -41,10 +41,12 @@ process.env.HYPERNOVA_API_PORT = String(API)
 process.env.HYPERNOVA_LOCAL_PORT = String(LOCAL)
 process.env.HYPERNOVA_LAN_PORT = '0'
 
-const { agentSettings, claudeConfigFile, claudeMcp, claudeSettings, codexSettings, CLAUDE_SHOWN, CODEX_SHOWN } = await import('../src/agent-settings.ts')
+const { agentSettings, claudeConfigFile, claudeMcp, claudeSettings, codexSettings, sessionMcp, CLAUDE_SHOWN, CODEX_SHOWN } = await import('../src/agent-settings.ts')
 const { scanToml, OTHER, TomlError } = await import('../src/toml-reader.ts')
 const { startServers } = await import('../src/http.ts')
 const { addDevice, settings } = await import('../src/store.ts')
+const { upsertSession } = await import('../src/hub.ts')
+const { saveThread, removeThread } = await import('../src/codex/threads.ts')
 settings.lanAccess = false
 const TOKEN = 'agent-settings-test-device-token-0123456789'
 addDevice({ id: 'phone', name: 'Pixel', model: 'Pixel 9', createdAt: Date.now(), lastSeenAt: Date.now() }, TOKEN)
@@ -629,6 +631,213 @@ test('Claude Code’s own file: in the home folder, or the config folder once th
   mkdirSync(join(home, '.claude'))
   writeFileSync(join(home, '.claude', '.config.json'), '{}')
   assert.equal(claudeConfigFile({}, home), join(home, '.claude', '.config.json'))
+})
+
+// ── One session's folder: GET /v1/sessions/{id}/mcp ─────────────────────
+
+const stdioServer = (place: string, command = '/home/PLANTEDUSER/PLANTEDBIN/npx') => ({
+  command,
+  args: ['--token', secret(`${place}Args`), `--dir=/home/PLANTEDUSER/PLANTEDDIR`],
+  env: { TOKEN: secret(`${place}Env`), PLANTEDENVNAME: 'x' },
+})
+const httpServer = (place: string, type = 'http') => ({
+  type,
+  url: `https://PLANTEDUSER:${secret(`${place}Password`)}@mcp.example.com:8443/PLANTEDPATH/${secret(`${place}Path`)}?token=${secret(`${place}Query`)}#PLANTEDFRAGMENT`,
+  headers: { Authorization: `Bearer ${secret(`${place}Header`)}` },
+  headersHelper: `/home/PLANTEDUSER/${secret(`${place}Helper`)}`,
+})
+
+test('a session’s folder: its .mcp.json and its local servers, with what each may say, and only a count for the user’s', async () => {
+  const cwd = project('session-app', { mcpServers: { docs: stdioServer('Docs'), remote: httpServer('Remote'), stream: httpServer('Stream', 'sse') } })
+  const other = project('session-other', { mcpServers: { 'not-this-folder': stdioServer('Other') } })
+  const file = configFile('session-scopes', plantedConfig(
+    { [cwd]: plantedEntry({ db: stdioServer('Db', 'uvx') }), [other]: plantedEntry({ 'nor-this-one': stdioServer('Other') }) },
+    { 'for-all': stdioServer('User'), 'for-all-too': httpServer('UserTwo') },
+  ))
+  const r = await sessionMcp(cwd, file, dir('session-scopes-claude'))
+  assert.deepEqual(r, {
+    state: 'ok',
+    servers: [
+      { name: 'db', scope: 'local', transport: 'stdio', command: 'uvx' },
+      { name: 'docs', scope: 'project', transport: 'stdio', command: 'npx' },
+      { name: 'remote', scope: 'project', transport: 'http', host: 'mcp.example.com' },
+      { name: 'stream', scope: 'project', transport: 'sse', host: 'mcp.example.com' },
+    ],
+    forAllProjects: 2,
+    hidden: 0,
+    foldersNotRead: 0,
+  })
+  assertNothingPlanted(JSON.stringify(r))
+})
+
+test('parent folders count as Claude Code has them: the nearer file wins a name, and the source’s base name is said', async () => {
+  const parent = project('monorepo', { mcpServers: { 'from-parent': stdioServer('Parent'), shared: stdioServer('Far', 'far') } })
+  const cwd = join(parent, 'pkg', 'web')
+  mkdirSync(cwd, { recursive: true })
+  writeFileSync(join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { shared: stdioServer('Near', 'near') } }))
+  const r = await sessionMcp(cwd, configFile('session-parents', plantedConfig({}, {})), dir('session-parents-claude'))
+  assert.deepEqual(r.servers, [
+    { name: 'from-parent', scope: 'project', transport: 'stdio', command: 'npx', from: 'monorepo' },
+    { name: 'shared', scope: 'project', transport: 'stdio', command: 'near' },
+  ])
+  // The home folder's name is the username: `~`, there too.
+  const atHome = join(process.env.HOME!, 'somewhere')
+  mkdirSync(atHome, { recursive: true })
+  writeFileSync(join(process.env.HOME!, '.mcp.json'), JSON.stringify({ mcpServers: { 'from-home': {} } }))
+  try {
+    const home = await sessionMcp(atHome, configFile('session-at-home', plantedConfig({}, {})), dir('session-parents-claude'))
+    assert.deepEqual(home.servers, [{ name: 'from-home', scope: 'project', transport: null, from: '~' }])
+  } finally {
+    rmSync(join(process.env.HOME!, '.mcp.json'))
+  }
+})
+
+test('local scope is that folder’s entry, and the repository’s root that Claude Code files it under, also from a worktree', async () => {
+  const repo = project('local-repo')
+  mkdirSync(join(repo, '.git', 'worktrees', 'wt'), { recursive: true })
+  const below = join(repo, 'sub')
+  mkdirSync(below)
+  const file = configFile('session-local', plantedConfig({
+    [repo]: plantedEntry({ 'at-root': stdioServer('Root', 'rooted') }),
+    [below]: plantedEntry({ 'at-folder': stdioServer('Folder', 'foldered') }),
+  }, {}))
+  const none = dir('session-local-claude')
+  assert.deepEqual((await sessionMcp(repo, file, none)).servers, [{ name: 'at-root', scope: 'local', transport: 'stdio', command: 'rooted' }])
+  assert.deepEqual((await sessionMcp(below, file, none)).servers, [
+    { name: 'at-folder', scope: 'local', transport: 'stdio', command: 'foldered' },
+    { name: 'at-root', scope: 'local', transport: 'stdio', command: 'rooted', from: 'local-repo' },
+  ])
+  // A linked worktree: its .git is a file pointing into the main repository's.
+  const worktree = project('local-worktree')
+  writeFileSync(join(worktree, '.git'), `gitdir: ${join(repo, '.git', 'worktrees', 'wt')}\n`)
+  writeFileSync(join(repo, '.git', 'worktrees', 'wt', 'commondir'), '../..\n')
+  assert.deepEqual((await sessionMcp(worktree, file, none)).servers, [{ name: 'at-root', scope: 'local', transport: 'stdio', command: 'rooted', from: 'local-repo' }])
+  // Not in a repository: that folder's entry alone.
+  const loose = project('local-loose')
+  assert.deepEqual((await sessionMcp(loose, file, none)).servers, [])
+})
+
+test('what can’t be said is left out: a secret or a username in a command, an odd URL, an unknown type', async () => {
+  const user = basename(process.env.HOME!)
+  const cwd = project('session-odd', {
+    mcpServers: {
+      'secret-command': { command: `/opt/${secret('CommandName')}` },
+      'args-in-command': { command: `npx --token ${secret('InCommand')}` },
+      'user-command': { command: `/opt/bin/${user}-tool` },
+      'user-as-command': { command: `/opt/${user}` },
+      'var-command': { command: '${PLANTEDVAR}' },
+      'no-command': { type: 'stdio' },
+      'number-command': { command: 5 },
+      'secret-host': { type: 'http', url: `https://${secret('Host')}.example.com/` },
+      'var-host': { type: 'http', url: 'https://${PLANTEDHOST}/mcp' },
+      'file-url': { type: 'http', url: 'file:///home/PLANTEDUSER/x' },
+      'bad-url': { type: 'sse', url: `not a url ${secret('Url')}` },
+      'no-url': { type: 'http' },
+      'ipv6': { type: 'http', url: 'http://[::1]:8123/PLANTEDPATH' },
+      'a-socket': { type: 'ws', url: 'wss://sock.example.com/PLANTEDPATH' },
+      'ide-type': { type: 'sse-ide', url: 'http://PLANTEDIDE.example.com/', ideName: 'PLANTEDIDE' },
+      'sdk-type': { type: 'sdk', name: 'PLANTEDSDK' },
+      'odd-type': { type: secret('Type'), url: 'https://PLANTEDODD.example.com/' },
+      'not-a-table': secret('NotATable'),
+      [`bad name ${secret('Name')}`]: stdioServer('BadName'),
+    },
+  })
+  const r = await sessionMcp(cwd, configFile('session-odd', plantedConfig({}, {})), dir('session-odd-claude'))
+  assertNothingPlanted(JSON.stringify(r))
+  assert.equal(r.hidden, 1)
+  const byName = Object.fromEntries(r.servers.map(({ name, scope: _scope, ...rest }) => [name, rest]))
+  assert.deepEqual(byName, {
+    'secret-command': { transport: 'stdio' },
+    'args-in-command': { transport: 'stdio' },
+    'user-command': { transport: 'stdio' },
+    'user-as-command': { transport: 'stdio' },
+    'var-command': { transport: 'stdio' },
+    'no-command': { transport: 'stdio' },
+    'number-command': { transport: null },
+    'secret-host': { transport: 'http' },
+    'var-host': { transport: 'http' },
+    'file-url': { transport: 'http' },
+    'bad-url': { transport: 'sse' },
+    'no-url': { transport: 'http' },
+    ipv6: { transport: 'http', host: '[::1]' },
+    'a-socket': { transport: 'ws', host: 'sock.example.com' },
+    'ide-type': { transport: null },
+    'sdk-type': { transport: null },
+    'odd-type': { transport: null },
+    'not-a-table': { transport: null },
+  })
+})
+
+test('a session’s .mcp.json as a link, a folder, a pipe or malformed is skipped; ~/.claude.json’s trouble is a state', async () => {
+  const outside = join(dir('session-outside'), 'mcp.json')
+  writeFileSync(outside, JSON.stringify({ mcpServers: { 'PLANTEDOUTSIDE': stdioServer('Outside') } }))
+  const none = dir('session-trouble-claude')
+  const noServers = configFile('session-trouble', plantedConfig({}, {}))
+  const linked = project('session-linked')
+  symlinkSync(outside, join(linked, '.mcp.json'))
+  const folder = project('session-folder')
+  mkdirSync(join(folder, '.mcp.json'))
+  const pipe = project('session-pipe')
+  execFileSync('mkfifo', [join(pipe, '.mcp.json')])
+  const broken = project('session-broken', `{ "mcpServers": { "PLANTEDBROKEN": "${secret('Quoted')}"`)
+  const big = project('session-big', `{"mcpServers":{"too-big":{}},"pad":"${'x'.repeat(256 * 1024)}"}`)
+  for (const cwd of [linked, folder, pipe, broken, big]) {
+    const r = await sessionMcp(cwd, noServers, none)
+    assert.deepEqual(r, { state: 'ok', servers: [], forAllProjects: 0, hidden: 0, foldersNotRead: 0 }, cwd)
+  }
+  // Its own .mcp.json still counts with ~/.claude.json gone or broken, and the file isn't quoted.
+  const cwd = project('session-kept', { mcpServers: { kept: stdioServer('Kept', 'kept') } })
+  const kept = [{ name: 'kept', scope: 'project', transport: 'stdio', command: 'kept' }]
+  assert.deepEqual(await sessionMcp(cwd, join(none, 'not-there.json'), none), { state: 'missing', servers: kept, forAllProjects: 0, hidden: 0, foldersNotRead: 0 })
+  const bad = await sessionMcp(cwd, configFile('session-bad', `{"userID":"PLANTEDUSERID","x":"${secret('Quoted')}"`), none)
+  assert.deepEqual(bad, { state: 'malformed', servers: kept, forAllProjects: 0, hidden: 0, foldersNotRead: 0 })
+  // A count of the user's takes settings.json's names too.
+  const settings = dir('session-settings')
+  writeFileSync(join(settings, 'settings.json'), JSON.stringify({ mcpServers: { 'from-settings': {}, both: {} } }))
+  assert.equal((await sessionMcp(cwd, configFile('session-count', { mcpServers: { both: {}, 'for-all': {} } }), settings)).forAllProjects, 3)
+})
+
+test('the route: a paired phone’s, for a session that’s there; nothing planted in the raw body; Codex’s has none', async () => {
+  const cwd = project('session-routed', { mcpServers: { docs: stdioServer('Docs'), remote: httpServer('Remote') } })
+  upsertSession('sess-mcp', { cwd, origin: 'hypernova', title: 'MCP', state: 'idle' })
+  writeFileSync(join(CLAUDE, '.claude.json'), JSON.stringify(plantedConfig({ [cwd]: plantedEntry({ db: stdioServer('Db', 'uvx') }) })))
+  const url = `http://127.0.0.1:${API}/v1/sessions/sess-mcp/mcp`
+  const auth = { headers: { authorization: `Bearer ${TOKEN}` } }
+  try {
+    const r = await fetch(url, auth)
+    assert.equal(r.status, 200)
+    const text = await r.text()
+    assertNothingPlanted(text)
+    assert.ok(!text.includes(scratch), `a path left: ${text}`)
+    for (const leak of ['--token', '--dir', 'Bearer', 'args', 'env"', 'url', 'headers', '8443']) assert.ok(!text.includes(leak), `${leak} left: ${text}`)
+    const body = JSON.parse(text)
+    assert.deepEqual(body.servers.map((s: { name: string }) => s.name), ['db', 'docs', 'remote'])
+    const allowed = new Set(['state', 'servers', 'forAllProjects', 'hidden', 'foldersNotRead', 'name', 'scope', 'transport', 'command', 'host', 'from'])
+    for (const k of everyKey(body)) assert.ok(allowed.has(k), `an unexpected key: ${k}`)
+
+    assert.equal((await fetch(url)).status, 401)
+    assert.equal((await fetch(url, { headers: { authorization: 'Bearer not-a-token' } })).status, 401)
+    const local = await fetch(`http://127.0.0.1:${LOCAL}/v1/sessions/sess-mcp/mcp`)
+    assert.ok(local.status === 401 || local.status === 404, `the local API answered ${local.status}`)
+    const gone = await fetch(`http://127.0.0.1:${API}/v1/sessions/no-such-session/mcp`, auth)
+    assert.equal(gone.status, 404)
+    assert.equal((await gone.json()).error.code, 'no_session')
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      const w = await fetch(url, { method, headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : '{}' })
+      assert.notEqual(w.status, 200, method)
+    }
+  } finally {
+    rmSync(join(CLAUDE, '.claude.json'))
+  }
+  saveThread({ id: 'thr-mcp', cwd, createdAt: Date.now() } as never)
+  upsertSession('thr-mcp', { cwd, origin: 'hypernova', title: 'Codex', state: 'idle' })
+  try {
+    const codex = await fetch(`http://127.0.0.1:${API}/v1/sessions/thr-mcp/mcp`, auth)
+    assert.equal(codex.status, 409)
+    assert.equal((await codex.json()).error.code, 'not_claude')
+  } finally {
+    removeThread('thr-mcp')
+  }
 })
 
 // ── The TOML reader ──────────────────────────────────────────────────────

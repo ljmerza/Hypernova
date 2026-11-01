@@ -288,6 +288,8 @@ interface Hub {
      * "Agent settings"). Fails with [AgentSettingsTooOld] from a server without the route.
      */
     suspend fun agentSettings(): Result<AgentSettingsReply> = Result.failure(UnsupportedOperationException())
+    /** The MCP servers set up for a session's folder (docs/PROTOCOL.md, "A session's MCP servers"). */
+    suspend fun sessionMcp(id: String): Result<SessionMcpReply> = Result.failure(UnsupportedOperationException())
     /** Read a provider's balance now (OpenRouter); [providers] follows. */
     suspend fun checkProvider(id: String): Result<Provider> = Result.failure(UnsupportedOperationException())
     /**

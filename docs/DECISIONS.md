@@ -3141,6 +3141,29 @@ decision.
    the home folder's name is `~`, because it's the username; plugins' servers aren't listed, and the row says
    so.
 
+## A session's MCP servers (2026-11-01)
+
+The owner: "for an agent I want to be able to see the MCPs, so when you hold down an agent card you see that
+menu that pops up; add the feature that you can see the MCP details for a particular agent, not the global
+ones but the ones for that folder."
+
+1. **Where.** MCP servers in the Home card's hold menu, for a Claude session with a folder. A sheet titled with
+   the session. Nothing on the chat screen, so the session sheet's copy of the menu leaves it out.
+2. **The route.** `GET /v1/sessions/{id}/mcp` (`docs/PROTOCOL.md`, "A session's MCP servers"), a paired phone
+   only. Project scope is `.mcp.json` in the folder and each parent; local scope is `~/.claude.json`'s entry.
+   The user-level ones are only a count, as a line.
+3. **A strict allow-list.** Name, scope, transport, a command's base name, a URL's host. Never args, env,
+   headers, a whole URL or a path, and a command's name that says the username is left out too.
+4. **Local scope isn't only the exact path.** Asked for that exact path, but Claude Code 2.1.316 files a
+   folder's local servers under its repository's root, the main checkout's from a worktree (its
+   `projectPathForConfig`, and the changelog's "the project entry … when run below a repository root"). The exact path
+   alone would show none for a session in a subfolder or a worktree, so both are read.
+5. **Set up, not connected.** The daemon doesn't know a session's live MCP status, so the sheet doesn't guess and
+   says so. Showing it would mean asking the running claude.
+6. **Not Codex.** The `projects` table in `~/.codex/config.toml` was only seen holding `trust_level`; Codex's binary
+   names a trusted repository's own `.codex/config.toml` as the place for a project's MCP servers, and this
+   doesn't read that file. So the menu has no such item for a Codex session, and the route answers 409 `not_claude`.
+
 ## Account details in the agents' settings (2026-11-01)
 
 The owner asked for details about the account in Settings, then "in like the Claude Code and Codex

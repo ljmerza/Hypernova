@@ -121,16 +121,17 @@ enum class RestartKind {
  * a Codex session (its turn's interrupt; 2026-10-31). Stop while it works or waits on the owner,
  * or, for a job, idles with its process still running ([Session.agentRunning]; owner, 2026-10-30:
  * idle jobs couldn't be stopped). Not for one stopped or done already, nor, from an older Mac that
- * doesn't say, for an idle one.
+ * doesn't say, for an idle one. MCP servers for a Claude session with a folder (owner, 2026-11-01):
+ * Codex keeps a project's in its repository's own file, which this doesn't read.
  */
-data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean, val restart: Boolean = false) {
-    val any: Boolean get() = rename || stop || delete || restart
+data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean, val restart: Boolean = false, val mcp: Boolean = false) {
+    val any: Boolean get() = rename || stop || delete || restart || mcp
 
     companion object {
         fun of(s: Session): MenuOffer {
             val job = s.agentJob != null
             val live = s.phase != Phase.Ended && (s.state != SessionState.Idle || s.agentRunning == true)
-            return MenuOffer(rename = true, stop = (job || s.codex) && live, delete = DeleteKind.of(s) != DeleteKind.None, restart = RestartKind.of(s) != RestartKind.None)
+            return MenuOffer(rename = true, stop = (job || s.codex) && live, delete = DeleteKind.of(s) != DeleteKind.None, restart = RestartKind.of(s) != RestartKind.None, mcp = !s.codex && !s.cwd.isNullOrBlank())
         }
     }
 }
@@ -154,7 +155,7 @@ internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit, start: Men
             Spacer(Modifier.height(6.dp))
             HText(s.name, style = Type.small, color = HN.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(12.dp))
-            MenuActions(hub, s, { page = it }, onDismiss)
+            MenuActions(hub, s, { page = it }, onDismiss, mcp = true)
         }
         MenuPage.Rename -> RenameSheet(hub, s, onDismiss)
         MenuPage.Delete -> when (val kind = DeleteKind.of(s)) {
@@ -179,10 +180,11 @@ internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit, start: Men
             )
         }
         MenuPage.Restart -> RestartConfirm(hub, s, onDismiss)
+        MenuPage.Mcp -> SessionMcpSheet(hub, s, onDismiss)
     }
 }
 
-internal enum class MenuPage { Actions, Rename, Delete, Restart }
+internal enum class MenuPage { Actions, Rename, Delete, Restart, Mcp }
 
 /** What Delete's confirm says it will do. */
 private fun deleteBody(kind: DeleteKind): Int = when (kind) {
@@ -277,10 +279,11 @@ internal fun OutdatedJobsCard(hub: Hub, jobs: List<Session>, modifier: Modifier 
 
 /**
  * The menu's actions as [MenuOffer] has them, in a sheet: Rename and Delete go to their page
- * ([onPage]), Stop goes at once and closes the sheet ([onDismiss]).
+ * ([onPage]), Stop goes at once and closes the sheet ([onDismiss]). [mcp]: MCP servers too, which the
+ * Home card's menu has and the chat's session sheet doesn't.
  */
 @Composable
-internal fun MenuActions(hub: Hub, s: Session, onPage: (MenuPage) -> Unit, onDismiss: () -> Unit) {
+internal fun MenuActions(hub: Hub, s: Session, onPage: (MenuPage) -> Unit, onDismiss: () -> Unit, mcp: Boolean = false) {
     val context = LocalContext.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
@@ -293,6 +296,7 @@ internal fun MenuActions(hub: Hub, s: Session, onPage: (MenuPage) -> Unit, onDis
     // First on a job that runs an old Claude Code, as the sheet's notice above says so.
     if (offer.restart && s.agentOutdated != null) restart()
     if (offer.rename) SheetAction(ChatGlyph.Edit, stringResource(R.string.session_rename), { onPage(MenuPage.Rename) })
+    if (mcp && offer.mcp) SheetAction(ChatGlyph.Servers, stringResource(R.string.as_mcp), { onPage(MenuPage.Mcp) })
     if (offer.stop) {
         SheetAction(ChatGlyph.Stop, stringResource(R.string.session_stop), {
             onDismiss()
