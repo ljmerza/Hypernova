@@ -46,6 +46,20 @@ after(() => rmSync(scratch, { recursive: true, force: true }))
 const run = () => JSON.parse(readFileSync(join(process.env.FAKE_USAGE_STATE!, 'run.json'), 'utf8')) as { args: string[]; cwd: string; keys: string; pid: number; env: Record<string, string | null> }
 const inProbe = () => hub.listSessions().filter((s) => s.cwd === probe.PROBE_DIR || realpathSync(s.cwd) === realpathSync(probe.PROBE_DIR))
 
+// First in this file: no look has been made yet, so the first ask starts one.
+test('POST /v1/usage/refresh (refreshUsage): two asks at once share one look and answer with what it read; asked again within 30 s, none', async () => {
+  const [a, b] = await Promise.all([probe.refreshUsage(), probe.refreshUsage()])
+  assert.deepEqual(a.models?.map((m) => [m.label, m.pct]), [['Sonnet', 3], ['Fable', 41]])
+  assert.deepEqual(b, a)
+  const first = run().pid
+  // The stand-in's terminal ends a moment after the look returns.
+  for (let i = 0; i < 40 && readdirSync(TERMS).some((f) => f.endsWith('.json')); i++) await new Promise((res) => setTimeout(res, 100))
+  // A look that started in the last 30 s counts: the usage at once, no Claude Code started.
+  const again = await probe.refreshUsage()
+  assert.equal(run().pid, first)
+  assert.deepEqual(again.models, a.models)
+})
+
 test('the probe opens /usage in a hidden terminal, reads the model weeks and closes it; no session ever shows', async () => {
   const sent: any[] = []
   hub.addClient({ send: (s) => sent.push(JSON.parse(s)) })
