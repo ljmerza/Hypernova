@@ -1671,7 +1671,7 @@ with one sentence a client can show. On a Mac it is `{}` (and older daemons send
 |---|---|---|
 | `battery` | the Mac's battery (`mac.battery` is `null`) | "Hypernova shows the battery of a Mac only." |
 | `awake` | Stay awake (`mac.awake` reads Off, nothing held) | "Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings." |
-| `macVoice` | the Mac's voice (`say`) for read aloud | "The Mac’s voice isn’t on Linux. The phone reads aloud with its own voice." |
+| `macVoice` | the Mac's voice (`say`) for read aloud | "The phone reads aloud with its own voice." |
 | `openWindow` | a terminal window on the server's screen | "This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH." |
 
 Clients that know a key hide that feature (or show it disabled with its sentence); a client that
