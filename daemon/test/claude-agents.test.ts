@@ -128,7 +128,7 @@ process.env.HYPERNOVA_LAN_PORT = '0'
 
 const hub = await import('../src/hub.ts')
 const { addDevice, settings } = await import('../src/store.ts')
-const { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
+const { answerMenu, attachAgentsTerm, attachDrifted, attachWaitingJobs, createAgentsSession, createSharedSession, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
 const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
 const { heldReady, promptSession, startServers } = await import('../src/http.ts')
 const { askAside } = await import('../src/aside.ts')
@@ -580,6 +580,40 @@ test('an ask handed back on a claude agents job with no terminal: claude attach 
   }
   assert.equal(handBackNotices('agents-hb-1').length, 0)
   assert.ok(feed.some((m) => m.t === 'event.removed' && m.sessionId === 'agents-hb-1' && m.id === noticeId), 'clients told it went')
+})
+
+test('a restart handed a held ask back: a job waiting with no ask held gets claude attach, its dialog a card; not one still held, nor one at work', async () => {
+  settings.claudeAgents = true
+  writeFileSync(join(process.env.FAKE_AGENTS_DIR!, 'perm-screen.txt'), readFileSync(join(import.meta.dirname, 'fixtures', 'permission-screens', 'subagent-ask.txt')))
+  // Claude Code's own words after the hook's connection dropped (2.1.316, seen against a restarted daemon).
+  job('agents-rs-1', 'hbrs0001', 'waiting')
+  jobState('hbrs0001', 'PermissionRequest hook failed: socket hang up · approve Bash: npm test')
+  job('agents-rs-2', 'hbrs0002', 'busy')
+  job('agents-rs-3', 'hbrs0003', 'waiting')
+  jobState('hbrs0003', 'approve Bash: git status')
+  hub.applyAgentList([...listed.filter((j) => !j.sessionId.startsWith('agents-rs')), { id: 'hbrs0001', sessionId: 'agents-rs-1', cwd: scratch, state: 'blocked' }, { id: 'hbrs0002', sessionId: 'agents-rs-2', cwd: scratch, state: 'working' }, { id: 'hbrs0003', sessionId: 'agents-rs-3', cwd: scratch, state: 'blocked' }])
+  hub.pollRegistry()
+  // What it waits for, in the job's words, not a question typed in words because of the hook's failure.
+  const waiting = hub.listSessions().find((s) => s.id === 'agents-rs-1')!
+  assert.equal(waiting.question ?? null, null)
+  assert.equal(waiting.state, 'needs_you')
+  assert.ok(!String(waiting.activity).includes('hook failed'), String(waiting.activity))
+  // Its ask is still held by this daemon's hook: the card is there already.
+  const held = hub.requestApproval({ sessionId: 'agents-rs-3', kind: 'tool', toolName: 'Bash', summary: 'Bash: git status', input: { command: 'git status' }, reason: null, canAlways: false, questions: null, plan: null }, null)
+  attachWaitingJobs()
+  await settleMenus('agents-rs-1', (m: any) => !!m?.permission)
+  assert.ok(termOf('agents-rs-1'), 'a claude attach holder')
+  assert.equal(attaches('hbrs0001'), 1)
+  assert.ok(hub.getSession('agents-rs-1')?.menu?.permission)
+  assert.equal(hub.getSession('agents-rs-1')?.state, 'needs_you')
+  assert.equal(attaches('hbrs0002'), 0, 'at work: nothing to hand back')
+  assert.equal(attaches('hbrs0003'), 0, 'an ask still held has its card')
+  // Twice is once (a second look at start).
+  attachWaitingJobs()
+  await new Promise((ok) => setTimeout(ok, 300))
+  assert.equal(attaches('hbrs0001'), 1)
+  hub.answerApproval(hub.pendingApprovals().find((a) => a.sessionId === 'agents-rs-3')!.id, { decision: 'allow' }, 'phone')
+  await held
 })
 
 test('an ask handed back while the job’s claude attach shows another session: that holder is never read or answered, a fresh attach is', async () => {

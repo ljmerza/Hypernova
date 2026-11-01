@@ -6,7 +6,7 @@ import { ensureProjectsRoot } from './files.ts'
 import { announceApp, appInfo, startServers } from './http.ts'
 import { startReleaseCheck } from './releases.ts'
 import { busyNow, serverUpdateHook, startServerUpdate, updateView } from './server-update.ts'
-import { refreshClaudeCommands, scanTerms, watchMenus, writeHnBin } from './terms.ts'
+import { refreshClaudeCommands, scanTerms, attachWaitingJobs, watchMenus, writeHnBin } from './terms.ts'
 import { refreshHooks, refreshShell } from './hooks.ts'
 import { startAccount } from './account.ts'
 import { reapAttachments } from './attachments.ts'
@@ -82,6 +82,10 @@ setInterval(tickUsage, 3000) // a window that resets with nothing running is ann
 setInterval(tickCodex, 3000) // and Codex's
 setInterval(scanTerms, 1500)
 setInterval(watchMenus, 800)
+// A `claude agents` job's ask this restart handed back to its own dialog: the phone gets it as a card
+// (terms.ts). A second look for a job the first poll of `claude agents` hadn't found yet.
+setTimeout(attachWaitingJobs, 4000)
+setTimeout(attachWaitingJobs, 20_000)
 setInterval(reapAttachments, 6 * 3600_000)
 
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {

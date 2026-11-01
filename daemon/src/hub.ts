@@ -1519,13 +1519,16 @@ const agentBlocked = (id: string) => agentStates.get(id) === 'blocked'
 
 /**
  * What blocked `claude agents` job [job] waits for, in its own words (`needs` in its state file:
- * "approve Bash: …", "answer: …", or Claude's question). Null when it can't be read.
+ * "approve Bash: …", "answer: …", or Claude's question). Null when it can't be read. An ask this
+ * daemon's restart handed back reads "PermissionRequest hook failed: socket hang up · approve
+ * Bash: …" there (Claude Code 2.1.316): what it waits for is the part after the hook's failure.
  */
 function agentNeeds(job: string | undefined): string | null {
   if (!job) return null
   try {
     const o = JSON.parse(readFileSync(join(CLAUDE_DIR, 'jobs', job, 'state.json'), 'utf8'))
-    return typeof o?.needs === 'string' && o.needs.trim() ? trimText(o.needs.trim(), 300) : null
+    const needs = typeof o?.needs === 'string' ? o.needs.trim().replace(/^\w+ hook failed: [^·]*·\s*/, '') : ''
+    return needs ? trimText(needs, 300) : null
   } catch {
     return null
   }
