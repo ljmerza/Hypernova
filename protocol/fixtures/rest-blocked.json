@@ -1,0 +1,30 @@
+{
+  "blocked": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "sessionId": "sess-blocked",
+      "tool": "Bash",
+      "target": "git push origin main",
+      "input": {
+        "command": "git push origin main"
+      },
+      "reason": "auto_mode",
+      "why": "Pushes to the default branch",
+      "at": 1800000000000,
+      "toolUseId": "toolu_blk1"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "sess-blocked",
+      "tool": "WebFetch",
+      "target": "https://example.com/spec",
+      "input": {
+        "url": "https://example.com/spec"
+      },
+      "reason": "auto_mode",
+      "why": null,
+      "at": 1800000000000,
+      "toolUseId": "toolu_blk2"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "session": {
+    "id": "sess-held",
+    "title": "Answer the question",
+    "cwd": "/home/me/Projects/app-parser-fix",
+    "projectName": "app-parser-fix",
+    "origin": "terminal",
+    "state": "needs_you",
+    "providerId": "anthropic",
+    "model": null,
+    "effort": null,
+    "permissionMode": "default",
+    "bypassAvailable": false,
+    "createdAt": 1800000000000,
+    "lastActivityAt": 1800000000000,
+    "lastText": null,
+    "activity": "Which version?",
+    "pendingApprovalIds": [
+      "00000000-0000-4000-8000-000000000001"
+    ],
+    "stoppedForAway": false,
+    "contextPct": null,
+    "costUsd": null,
+    "queue": [],
+    "queued": 0,
+    "term": null,
+    "menu": null,
+    "agentsRunning": 0,
+    "blocked": null,
+    "automation": null,
+    "turnStartedAt": 1800000000000,
+    "endedBy": null,
+    "browsable": true,
+    "outsideProjects": false,
+    "blockedCalls": 0,
+    "held": [
+      {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "text": "Also run the linter",
+        "at": 1800000000000,
+        "clientId": "client-held-1"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "text": "Then commit it, with a message",
+        "at": 1800000000000,
+        "clientId": "client-held-2"
+      }
+    ],
+    "todo": null
+  }
+}

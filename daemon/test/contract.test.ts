@@ -46,9 +46,24 @@ writeFileSync(
   fake,
   `#!/bin/sh
 S="$FAKE_AGENTS_DIR"
+case " $* " in *" stream-json "*) exec "${process.execPath}" "${join(import.meta.dirname, 'fixtures', 'fake-claude-sdk.mjs')}" ;; esac
 case "$1" in
+  --bg)
+    n=$(cat "$S/bg-n" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$S/bg-n"
+    echo "$*" > "$S/bg-args-$n"
+    sleep 60 >/dev/null 2>&1 &
+    printf '{"pid":%s,"sessionId":"c0ffee00-0000-4000-8000-00000000f00%s","cwd":"%s","kind":"bg","jobId":"f00d000%s","status":"busy","updatedAt":%s000}' "$!" "$n" "$PWD" "$n" "$(date +%s)" > "$CLAUDE_CONFIG_DIR/sessions/$!.json"
+    echo "backgrounded · f00d000$n · fake"
+    ;;
   attach)
     case "$2" in btw*) exec "${process.execPath}" "${join(import.meta.dirname, 'fixtures', 'fake-claude-btw.mjs')}" "$2" ;; esac
+    case "$2" in box*) exec "${process.execPath}" "${join(import.meta.dirname, 'fixtures', 'fake-claude-box.mjs')}" "$2" ;; esac
+    case "$2" in esc*)
+      stty -echo -icanon min 1 time 0 2>/dev/null
+      printf '\\033[2J\\033[H\\033]0;Mine\\007\\n────────────────────\\n❯ \\n────────────────────\\n\\033[3;3H'
+      while k=$(dd bs=1 count=1 2>/dev/null) && [ -n "$k" ]; do printf '%s' "$k" | od -An -tx1 >> "$S/keys-$2"; done
+      exit 0 ;;
+    esac
     case "$2" in mode*)
       m=0
       draw() {
@@ -101,7 +116,7 @@ settings.claudeAgents = true
 // The local listener off until its own test turns it on: whether it starts by itself depends on this machine's network.
 settings.lanAccess = false
 const hub = await import('../src/hub.ts')
-const { handleHook } = await import('../src/hooks.ts')
+const { handleHook, installIntegration } = await import('../src/hooks.ts')
 const { startServers, startPairing, announceApp } = await import('../src/http.ts')
 const { menuOf } = await import('../src/term/shared.ts')
 const { todoNow } = await import('../src/todos.ts')
@@ -188,7 +203,9 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 /** The session ids this file picks itself: kept as they are, so both suites can name them. */
 const MAIN = 'c0ffee00-0000-4000-8000-00000000c0de'
 const LIMITED = 'c0ffee00-0000-4000-8000-00000000beef'
-const KEPT_IDS = new Set([MAIN, LIMITED])
+/** The first session POST /v1/sessions starts (the stand-in's `claude --bg` names it). */
+const STARTED = 'c0ffee00-0000-4000-8000-00000000f001'
+const KEPT_IDS = new Set([MAIN, LIMITED, STARTED])
 
 /**
  * [v] with what changes from run to run made fixed: times (by key), random UUIDs (numbered in the
@@ -203,6 +220,8 @@ function normalise(v: unknown): unknown {
       .split(scratch).join('/tmp/hn')
       // A time inside an id ("qn:1793476377000:9").
       .replace(/\b1[789]\d{11}\b/g, String(T))
+      // An attachment's folder, 12 random hex digits (attachments.ts).
+      .replace(/(\/attachments\/)[0-9a-f]{12}\//g, '$10123456789ab/')
       .replace(UUID, (u) => {
         const k = u.toLowerCase()
         if (KEPT_IDS.has(k)) return u
@@ -633,6 +652,170 @@ test('POST …/stop, …/respawn and /v1/jobs/respawn', async () => {
 test('POST /v1/pair', async () => {
   const { code } = await startPairing(true)
   contract('rest-pair', await ok(call('POST', '/v1/pair', { code, deviceName: 'Pixel', model: 'Google Pixel 9', appVersion: '0.42.0', installId: 'install-0123456789abcdef' }, null)))
+})
+
+// ── Sessions: starting one, its chat, its terminal (docs/FEATURES.md, sections 4 to 9) ──
+/** A refusal as the phone reads it: the status with the daemon's `{error}`. */
+async function refused(p: Promise<{ status: number; json: any }>, status: number): Promise<any> {
+  const r = await p
+  assert.equal(r.status, status, JSON.stringify(r.json))
+  return { status: r.status, ...r.json }
+}
+/** POST /v1/attachments?name=[name] with [bytes] as the body, as the app streams a picked file. */
+function upload(name: string, bytes: Buffer): Promise<{ status: number; json: any }> {
+  return new Promise((resolve, reject) => {
+    const req = request(
+      { host: '127.0.0.1', port: API, method: 'POST', path: `/v1/attachments?name=${encodeURIComponent(name)}`, headers: { host: `127.0.0.1:${API}`, authorization: `Bearer ${TOKEN}`, 'content-type': 'text/plain', 'content-length': bytes.length } },
+      (res) => {
+        let s = ''
+        res.setEncoding('utf8')
+        res.on('data', (c) => (s += c))
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, json: s ? JSON.parse(s) : null }))
+      },
+    )
+    req.on('error', reject)
+    req.end(bytes)
+  })
+}
+const typed = (job: string) => (existsSync(join(process.env.FAKE_AGENTS_DIR!, `typed-${job}`)) ? readFileSync(join(process.env.FAKE_AGENTS_DIR!, `typed-${job}`), 'utf8') : '')
+const until = async (what: string, f: () => boolean, ms = 6000) => {
+  for (const t0 = Date.now(); !f(); await new Promise((r) => setTimeout(r, 50))) if (Date.now() - t0 > ms) assert.fail(`timed out waiting for ${what}`)
+}
+
+test('POST /v1/sessions: a new session in claude agents with the sheet’s choices, a new project folder, and a refusal', async () => {
+  // Hypernova's hooks in the (scratch) Claude Code settings: sessions start in shared terminals, so in claude agents.
+  installIntegration()
+  // As LiveHub.start sends it (the prompt trimmed, no providerId for the subscription).
+  const body = { prompt: 'Tidy the README', projectPath: cwd, permissionMode: 'acceptEdits', model: 'sonnet', effort: 'high' }
+  contract('rest-sessions-start', await ok(post('/v1/sessions', body)))
+  const args = readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'bg-args-1'), 'utf8').trim()
+  assert.equal(args, '--bg --model sonnet --permission-mode acceptEdits --effort high -- Tidy the README')
+  // A new project: its folder made under the projects folder (a git repository), the session in it.
+  const made = await ok(post('/v1/sessions', { prompt: 'Sketch the app', newProject: { name: 'sketchpad', git: true }, permissionMode: 'default' }))
+  assert.equal(made.session.cwd, join(PROJECTS, 'sketchpad'))
+  assert.ok(existsSync(join(PROJECTS, 'sketchpad', '.git')))
+  // The refusals the sheet says in the daemon's words.
+  contract('rest-sessions-bad-project', await refused(post('/v1/sessions', { prompt: 'Fix it', projectPath: join(PROJECTS, 'gone'), permissionMode: 'default' }), 400))
+  assert.equal((await refused(post('/v1/sessions', { prompt: ' ', projectPath: cwd }), 400)).error.code, 'no_prompt')
+  assert.equal((await refused(post('/v1/sessions', { prompt: 'Fix it' }), 400)).error.code, 'no_project')
+  assert.equal((await refused(post('/v1/sessions', { prompt: 'Fix it', projectPath: cwd, agent: 'gpt' }), 400)).error.code, 'bad_agent')
+  assert.equal((await refused(post('/v1/sessions', { prompt: 'Fix it', projectPath: cwd, effort: 'huge' }), 400)).error.code, 'unknown_effort')
+})
+
+test('GET and POST /v1/projects, GET /v1/folders', async () => {
+  const p = await ok(get('/v1/projects'))
+  p.projects.sort((a: { path: string }, b: { path: string }) => a.path.localeCompare(b.path))
+  contract('rest-projects', p)
+  contract('rest-project-new', await ok(post('/v1/projects', { name: 'notebook', git: true })))
+  assert.ok(existsSync(join(PROJECTS, 'notebook', '.git')))
+  contract('rest-folders', await ok(get(`/v1/folders?path=${encodeURIComponent('~/Projects')}`)))
+})
+
+let attached: string
+test('POST /v1/attachments, then a prompt (without hold) that carries it, and one whose file is gone', async () => {
+  const a = await ok(upload('notes "draft".txt', Buffer.from('Trim before splitting.\n')))
+  contract('rest-attachment', a)
+  attached = a.attachment.path
+  assert.equal(readFileSync(attached, 'utf8'), 'Trim before splitting.\n')
+  job('sess-prompt', 'prm00001', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  contract('rest-prompt', await ok(post('/v1/sessions/sess-prompt/prompt', { text: 'Read my notes', clientId: 'client-plain-1', attachments: [attached] })))
+  await until('the prompt typed', () => typed('prm00001').includes('Read my notes'))
+  assert.ok(typed('prm00001').startsWith(`@"${attached}" `), typed('prm00001'))
+  contract('rest-prompt-attachment-gone', await refused(post('/v1/sessions/sess-prompt/prompt', { text: 'Again', attachments: [join(process.env.HYPERNOVA_SUPPORT!, 'attachments', 'ffffffffffff', 'gone.txt')] }), 410))
+})
+
+test('PUT and DELETE …/held/{id}: a held prompt’s new words, then taken back', async () => {
+  const s = (await ok(get('/v1/snapshot'))).sessions.find((x: { id: string }) => x.id === 'sess-held')
+  const [first, second] = s.held
+  contract('rest-held-edit', await ok(call('PUT', `/v1/sessions/sess-held/held/${second.id}`, { text: 'Then commit it, with a message' })))
+  contract('rest-held-remove', await ok(call('DELETE', `/v1/sessions/sess-held/held/${first.id}`)))
+  assert.equal((await refused(call('DELETE', `/v1/sessions/sess-held/held/${first.id}`), 404)).error.code, 'no_held')
+})
+
+test('POST /v1/approvals/{id}: answered, and answered again', async () => {
+  hub.upsertSession('sess-answer', { cwd, origin: 'terminal', title: 'Run the checks', state: 'needs_you' })
+  const a = ask('sess-answer', 'Bash', { command: 'npm run lint' })
+  contract('rest-approval-answer', await ok(post(`/v1/approvals/${a.id}`, { decision: 'deny', message: 'Not now' })))
+  contract('rest-approval-already', await refused(post(`/v1/approvals/${a.id}`, { decision: 'allow' }), 409))
+})
+
+test('POST …/terminal and …/interrupt on a claude agents job: the ticket, then Esc in its terminal', async () => {
+  job('sess-term', 'esc00001', 'busy', { name: 'Mine' })
+  hub.pollRegistry()
+  contract('rest-session-terminal', await ok(post('/v1/sessions/sess-term/terminal')))
+  contract('rest-session-interrupt', await ok(post('/v1/sessions/sess-term/interrupt')))
+  const keys = () => (existsSync(join(process.env.FAKE_AGENTS_DIR!, 'keys-esc00001')) ? readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'keys-esc00001'), 'utf8') : '')
+  await until('Esc pressed', () => /\b1b\b/.test(keys()))
+  // A session with no shared terminal has no ticket to give.
+  assert.equal((await refused(post('/v1/sessions/sess-plan/terminal'), 409)).error.code, 'no_terminal')
+})
+
+test('POST …/continue on a claude agents job: “I’m back” typed in', async () => {
+  job('sess-back', 'bck00001', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  contract('rest-session-continue', await ok(post('/v1/sessions/sess-back/continue', {})))
+  await until('the continue typed', () => typed('bck00001').includes("I'm back. Please continue where you left off."))
+})
+
+test('GET …/usage and …/todos: the chat’s strip and its to-do list', async () => {
+  contract('rest-session-usage', await ok(get(`/v1/sessions/${MAIN}/usage`)))
+  contract('rest-session-todos', await ok(get(`/v1/sessions/${MAIN}/todos`)))
+})
+
+test('POST …/rewind: the conversation goes on from before a message, in a new session', async () => {
+  const id = 'c0ffee00-0000-4000-8000-0000000000aa'
+  const path = hub.transcriptPathFor(cwd, id)
+  const e = (uuid: string, parentUuid: string | null, type: 'user' | 'assistant', content: string) => ({
+    type, uuid, parentUuid, isSidechain: false, timestamp: at(), sessionId: id, cwd, userType: 'external', version: '2.1.314',
+    message: type === 'user' ? { role: 'user', content } : { id: `m-${uuid}`, role: 'assistant', model: 'claude-opus-5-5', type: 'message', content: [{ type: 'text', text: content }] },
+  })
+  writeFileSync(path, [
+    e('11111111-0000-4000-8000-000000000001', null, 'user', 'Sketch the lexer'),
+    e('11111111-0000-4000-8000-000000000002', '11111111-0000-4000-8000-000000000001', 'assistant', 'Here is a sketch.'),
+    e('11111111-0000-4000-8000-000000000003', '11111111-0000-4000-8000-000000000002', 'user', 'Now make it faster'),
+    e('11111111-0000-4000-8000-000000000004', '11111111-0000-4000-8000-000000000003', 'assistant', 'Done.'),
+  ].map(line).join(''))
+  hub.ensureParsed(hub.upsertSession(id, { cwd, transcriptPath: path, origin: 'terminal', title: 'Lexer', state: 'idle' }))
+  const users = (await ok(get(`/v1/sessions/${id}/events?limit=300`))).events.filter((x: { kind: string }) => x.kind === 'user')
+  assert.equal(users.length, 2)
+  contract('rest-session-rewind', await ok(post(`/v1/sessions/${id}/rewind`, { eventId: users[1].id })))
+  assert.equal((await refused(post(`/v1/sessions/${id}/rewind`, { eventId: users[0].id }), 409)).error.code, 'first_message')
+})
+
+test('GET …/blocked, Allow & retry and Dismiss', async () => {
+  const { noteBlocked } = await import('../src/blocked.ts')
+  job('sess-blocked', 'boxblk01', 'idle', { name: 'Mine' })
+  hub.pollRegistry()
+  noteBlocked('sess-blocked', { tool: 'Bash', input: { command: 'git push origin main' }, reason: 'auto_mode', why: 'Pushes to the default branch', toolUseId: 'toolu_blk1' })
+  noteBlocked('sess-blocked', { tool: 'WebFetch', input: { url: 'https://example.com/spec' }, reason: 'auto_mode', why: null, toolUseId: 'toolu_blk2' })
+  const list = await ok(get('/v1/sessions/sess-blocked/blocked'))
+  list.blocked.sort((a: { tool: string }, b: { tool: string }) => a.tool.localeCompare(b.tool))
+  contract('rest-blocked', list)
+  const [bash, web] = list.blocked
+  const retried = await ok(post(`/v1/sessions/sess-blocked/blocked/${bash.id}/retry`))
+  contract('rest-blocked-retry', retried)
+  await until('the approval typed', () => typed('boxblk01').includes('Bash: git push origin main'))
+  contract('rest-blocked-dismiss', await ok(call('DELETE', `/v1/sessions/sess-blocked/blocked/${web.id}`)))
+})
+
+test('POST …/auto-continue and …/provider on a session another provider’s limit stopped', async () => {
+  const { classifyApiError } = await import('../src/blockers.ts')
+  const id = 'c0ffee00-0000-4000-8000-0000000000ab'
+  const p = store.saveProvider({ name: 'OpenRouter', kind: 'openrouter', apiKey: 'test-only-not-a-key', models: {} })
+  store.saveManaged({ id, cwd, providerId: p.id, model: null, permissionMode: 'default', createdAt: Date.now(), engine: 'sdk' })
+  hub.upsertSession(id, { cwd, origin: 'hypernova', providerId: p.id, state: 'idle', title: 'Port the parser' })
+  hub.blockSession(id, classifyApiError({ error: 'rate_limit', status: 429, text: 'API Error: 429 Too many requests. Please try again in 5 minutes.', builtIn: false, at: Date.now() }))
+  // The provider's id is random: named for both suites.
+  const named = (v: unknown) => JSON.parse(JSON.stringify(v).split(p.id).join('openrouter-1'))
+  contract('rest-session-auto-continue', named(await ok(post(`/v1/sessions/${id}/auto-continue`, { on: false }))))
+  assert.equal((await refused(post(`/v1/sessions/${id}/auto-continue`, { on: 'yes' }), 400)).error.code, 'bad_on')
+  assert.equal((await refused(post('/v1/sessions/sess-plan/auto-continue', { on: true }), 409)).error.code, 'not_limited')
+  contract('rest-session-provider', await ok(post(`/v1/sessions/${id}/provider`, { providerId: 'anthropic' })))
+})
+
+test('GET /v1/commands: Claude Code’s commands and skills in a project', async () => {
+  contract('rest-commands', await ok(get(`/v1/commands?project=${encodeURIComponent(cwd)}`)))
 })
 
 test('every fixture is one this file checks (none left over from a message that went)', (t) => {
