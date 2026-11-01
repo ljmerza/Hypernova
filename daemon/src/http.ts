@@ -31,6 +31,7 @@ import { DOWNLOAD_MAX, allowedPath, fileFor, filesState, folderOpens, listDir, l
 import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
 import { agentEvents, endSessionAgents, listAgents, validAgentId } from './agents.ts'
+import { agentSettings } from './agent-settings.ts'
 import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
 import { getBattery } from './battery.ts'
 import { refreshUsage } from './usage-probe.ts'
@@ -569,6 +570,11 @@ async function api(c: Ctx): Promise<void> {
     return json(res, 200, { project: createProject(String(b.name ?? ''), b.git !== false) })
   }
   if (path === '/v1/providers' && m === 'GET') return json(res, 200, { providers: listProviders() })
+  // The fixed list of Claude Code's and Codex's user-level settings, read-only, for a paired phone (agent-settings.ts).
+  if (path === '/v1/agents/settings' && m === 'GET') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
+    return json(res, 200, agentSettings())
+  }
   // The models each provider offers, for the new-session sheet (models.ts): Claude Code's own list,
   // OpenRouter's catalogue, the providers' settings.
   if (path === '/v1/models' && m === 'GET') return json(res, 200, { providers: await listModels(url.searchParams.get('provider')) })

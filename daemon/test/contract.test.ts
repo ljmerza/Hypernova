@@ -23,6 +23,7 @@ const scratch = mkdtempSync(join(tmpdir(), 'hn-contract-'))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
 process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
+process.env.CODEX_HOME = join(scratch, 'codex-home')
 process.env.HOME = join(scratch, 'home')
 process.env.ZDOTDIR = join(scratch, 'zdot')
 process.env.FAKE_AGENTS_DIR = join(scratch, 'fake')
@@ -953,6 +954,53 @@ test('GET …/blocked, Allow & retry and Dismiss', async () => {
   contract('rest-blocked-retry', retried)
   await until('the approval typed', () => typed('boxblk01').includes('Bash: git push origin main'))
   contract('rest-blocked-dismiss', await ok(call('DELETE', `/v1/sessions/sess-blocked/blocked/${web.id}`)))
+})
+
+test('GET /v1/agents/settings: the fixed list and the summaries, from scratch files', async () => {
+  const claudeFile = join(process.env.CLAUDE_CONFIG_DIR!, 'settings.json')
+  const codexFile = join(process.env.CODEX_HOME!, 'config.toml')
+  mkdirSync(process.env.CODEX_HOME!, { recursive: true })
+  // The world's own user settings (for "rules in effect"): back afterwards.
+  const world = readFileSync(claudeFile, 'utf8')
+  writeFileSync(
+    claudeFile,
+    JSON.stringify({
+      effortLevel: 'high',
+      permissions: { defaultMode: 'acceptEdits', allow: ['Read', 'Bash(npm test *)'], ask: ['Bash(git push *)'], deny: [] },
+      showThinkingSummaries: true,
+      includeCoAuthoredBy: false,
+      autoUpdatesChannel: 'not-a-channel',
+      env: { SECRET: 'never-sent' },
+      enabledPlugins: { 'formatter@team-tools': true, 'linter@team-tools': false },
+      mcpServers: { 'home-assistant': { command: 'never-sent' } },
+      hooks: { Stop: [{ hooks: [{ type: 'command', command: 'never-sent' }] }], PreToolUse: [] },
+    }),
+  )
+  writeFileSync(
+    codexFile,
+    [
+      'model = "gpt-6.1-sol"',
+      'model_reasoning_effort = "high"',
+      'approval_policy = { granular = { rules = true } }',
+      'sandbox_mode = "workspace-write"',
+      'web_search = "cached"',
+      '[projects."/home/me/Projects/app"]',
+      'trust_level = "trusted"',
+      '[projects."/home/me/Projects/site"]',
+      'trust_level = "untrusted"',
+      '[mcp_servers.fetch]',
+      'command = "never-sent"',
+      '',
+    ].join('\n'),
+  )
+  try {
+    const r = await ok(get('/v1/agents/settings'))
+    assert.ok(!JSON.stringify(r).includes('never-sent'))
+    contract('rest-agent-settings', r)
+  } finally {
+    writeFileSync(claudeFile, world)
+    rmSync(codexFile, { force: true })
+  }
 })
 
 test('POST …/auto-continue and …/provider on a session another provider’s limit stopped', async () => {

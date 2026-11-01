@@ -1,0 +1,109 @@
+{
+  "scope": "user",
+  "claude": {
+    "state": "ok",
+    "values": [
+      {
+        "key": "effortLevel",
+        "state": "set",
+        "value": "high"
+      },
+      {
+        "key": "permissions.defaultMode",
+        "state": "set",
+        "value": "acceptEdits"
+      },
+      {
+        "key": "showThinkingSummaries",
+        "state": "set",
+        "value": true
+      },
+      {
+        "key": "autoDreamEnabled",
+        "state": "unset"
+      },
+      {
+        "key": "includeCoAuthoredBy",
+        "state": "set",
+        "value": false
+      },
+      {
+        "key": "autoUpdatesChannel",
+        "state": "unrecognised"
+      },
+      {
+        "key": "inputNeededNotifEnabled",
+        "state": "unset"
+      },
+      {
+        "key": "agentPushNotifEnabled",
+        "state": "unset"
+      }
+    ],
+    "summary": {
+      "rules": {
+        "allow": 2,
+        "ask": 1,
+        "deny": 0
+      },
+      "plugins": [
+        {
+          "name": "formatter",
+          "on": true
+        },
+        {
+          "name": "linter",
+          "on": false
+        }
+      ],
+      "mcpServers": [
+        "home-assistant"
+      ],
+      "hookEvents": [
+        "Stop",
+        "PreToolUse"
+      ],
+      "hidden": 0
+    }
+  },
+  "codex": {
+    "state": "ok",
+    "values": [
+      {
+        "key": "model",
+        "state": "set",
+        "value": "gpt-6.1-sol"
+      },
+      {
+        "key": "model_reasoning_effort",
+        "state": "set",
+        "value": "high"
+      },
+      {
+        "key": "approval_policy",
+        "state": "unrecognised"
+      },
+      {
+        "key": "sandbox_mode",
+        "state": "set",
+        "value": "workspace-write"
+      },
+      {
+        "key": "web_search",
+        "state": "set",
+        "value": "cached"
+      },
+      {
+        "key": "personality",
+        "state": "unset"
+      }
+    ],
+    "summary": {
+      "projects": 2,
+      "mcpServers": [
+        "fetch"
+      ],
+      "hidden": 0
+    }
+  }
+}
