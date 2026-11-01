@@ -50,6 +50,24 @@ class DictationChoiceTest {
     }
 
     @Test
+    fun segmented_sessions_are_asked_for_from_android_13_as_long_as_the_cap() {
+        assertEquals(ListenMode.Plain, DictationChoice.firstMode(32))
+        assertEquals(ListenMode.Segmented, DictationChoice.firstMode(33))
+        for (e in DictationEngine.entries) {
+            val x = DictationChoice.extras(e, 33, ListenMode.Segmented)
+            assertEquals("android.speech.extra.SPEECH_INPUT_MINIMUM_LENGTH_MILLIS".replace("extra.", "extras."), x["android.speech.extra.SEGMENTED_SESSION"])
+            assertEquals(120_000, x["android.speech.extras.SPEECH_INPUT_MINIMUM_LENGTH_MILLIS"])
+            // The two lengths the docs say to leave alone, unless they are the segmented session's.
+            assertFalse(x.containsKey("android.speech.extras.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS"))
+            assertFalse(x.containsKey("android.speech.extras.SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS"))
+            assertEquals("quality", x["android.speech.extra.ENABLE_FORMATTING"])
+            // Before Android 13 there is no such thing to ask for.
+            assertFalse(DictationChoice.extras(e, 32, ListenMode.Segmented).containsKey("android.speech.extra.SEGMENTED_SESSION"))
+            assertFalse(DictationChoice.extras(e, 33, ListenMode.Plain).containsKey("android.speech.extra.SEGMENTED_SESSION"))
+        }
+    }
+
+    @Test
     fun only_on_device_asks_to_stay_offline() {
         for (sdk in listOf(29, 33)) {
             assertEquals(true, DictationChoice.extras(onDevice, sdk)["android.speech.extra.PREFER_OFFLINE"])

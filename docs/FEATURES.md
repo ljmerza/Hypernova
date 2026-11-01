@@ -6,7 +6,7 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1328 app tests, 935 daemon tests (931 pass, 4 skipped: Mac-only).
+2026-11-01: 1380 app tests, 935 daemon tests (931 pass, 4 skipped: Mac-only).
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -211,6 +211,7 @@ Test names, shortened:
 | V2 | Which recognizer: the phone's, or on-device only | DictationChoiceTest (all); SettingsTest.voiceEngineOnDevice | **covered** |
 | V3 | Read aloud: the server's voice streamed as PCM, or the phone's own text-to-speech (a Linux server) | ReadAloudLiveTest (all 8: the phone's own engine on a Linux server, in pieces, its Stop and its failure; a play streamed into a fake `AudioTrack` with started and ended said to the server, the server's `speech.stop`, the phone's Stop, the fallback to the phone's voice; the setting); SpeakingBarTest (all 3: the bar, the app's bar following `Speaker`, its Stop); SpeechTest (all); ChatTest.readsARepliesWordsNotItsMarkdown; fixtures rest-speech-play.json, rest-speech-settings.json, rest-speech-voices.json, ws-speech.json, ws-speech-stop.json, ws-speech-progress.json; speech.test.ts (all) | **covered** |
 | V4 | Read aloud settings: voice, speed, Test | SpeechTest.speedsSnapToTheStepsSettingsOffers; speech.test.ts › "the setting: the Mac's voice only…" | **partial**: the Read aloud section isn't drawn and its Test never runs |
+| V5 | Dictation keeps listening through pauses until it's ended: words joined across the recognizer's sessions, segmented sessions from Android 13, a new session otherwise, real errors, the bound on sessions failing at once, the cap, Submit and letting go between sessions | ContinuousDictationTest (all); PhoneDictationTest (all, on Robolectric's stand-in recognizer); DictationChoiceTest.segmented_sessions_are_asked_for_from_android_13_as_long_as_the_cap | **partial**: no real recognizer runs: whether the phone's honours segmented sessions, how seamless a restart is and any beep need a phone (`adb logcat -s Hypernova` says "dictation: Segmented, n segments, n restarts" at each end) |
 
 ## 14. Files and changes
 

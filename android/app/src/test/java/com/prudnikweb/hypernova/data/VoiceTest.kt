@@ -5,8 +5,8 @@ import org.junit.Test
 
 /**
  * Voice's logic on the JVM: the words as the box gets them. The phone's own dictation
- * (PhoneDictation.kt) is Android's recognizer and has no JVM test; its engine choice and extras are
- * DictationChoiceTest's.
+ * (PhoneDictation.kt) is Android's recognizer: its engine choice and extras are DictationChoiceTest's,
+ * its going on through pauses ContinuousDictationTest's and PhoneDictationTest's.
  */
 class VoiceTest {
 
