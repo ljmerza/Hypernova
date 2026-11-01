@@ -115,6 +115,18 @@ class MicGestureTest {
     }
 
     @Test
+    fun hands_free_done_pill_finishes_and_sends() {
+        val r = run(MicEvent.DoneSend, from = MicState.HandsFree)
+        assertEquals(MicState.Idle, r.state)
+        // The words go in, then the send (VoiceInput.sendNow waits for them to settle).
+        r.did(MicEffect.Finish, MicEffect.Send)
+        r.felt(Haptic.Confirm)
+        // Not hands-free (a finger down): nothing.
+        val held = MicState.Holding(0, append = false)
+        assertEquals(MicStep(held), run(MicEvent.DoneSend, from = held))
+    }
+
+    @Test
     fun send_with_text_taps_to_send() {
         val r = run(down(at = 0, send = true), MicEvent.Up(VoiceTiming.SEND_HOLD_MS - 1))
         assertEquals(MicState.Idle, r.state)

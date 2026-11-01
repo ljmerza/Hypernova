@@ -67,6 +67,8 @@ class VoiceInput internal constructor(private val prefs: VoicePrefs, private val
     internal var text: () -> String = { "" }
     internal var setText: (String) -> Unit = {}
     internal var onSend: () -> Unit = {}
+    /** This box sends (the chat's): hands-free's pill says Submit and sends; elsewhere it says Done. */
+    internal var submits by mutableStateOf(false)
     internal var askPermission: () -> Unit = {}
     internal var permitted: () -> Boolean = { false }
     internal var haptic: (Haptic) -> Unit = {}
@@ -281,7 +283,7 @@ class VoiceInput internal constructor(private val prefs: VoicePrefs, private val
  * and Back while hands-free is Done.
  */
 @Composable
-fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, onSend: () -> Unit = {}): VoiceInput {
+fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, onSend: (() -> Unit)? = null): VoiceInput {
     val context = LocalContext.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
@@ -297,7 +299,8 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
     SideEffect {
         voice.text = text
         voice.setText = setText
-        voice.onSend = onSend
+        voice.onSend = onSend ?: {}
+        voice.submits = onSend != null
         voice.permitted = { ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED }
         voice.askPermission = {
             // The first press asks; after a "no", the note offers it again (or Settings, once Android won't).

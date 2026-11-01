@@ -202,7 +202,9 @@ fun DictationCapsule(voice: VoiceInput, modifier: Modifier = Modifier, maxLines:
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Pill(stringResource(R.string.voice_cancel), { voice.on(MicEvent.Cancel) }, kind = PillKind.Ghost, height = 36.dp)
-                    Pill(stringResource(R.string.voice_done), { voice.on(MicEvent.Done) }, kind = PillKind.Primary, height = 36.dp)
+                    // Submit sends what was said (MicEvent.DoneSend), the keyboard kept shut; a box that doesn't send (New session) says Done.
+                    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+                    Pill(stringResource(if (voice.submits) R.string.voice_submit else R.string.voice_done), { if (voice.submits) keyboard?.hide(); voice.on(MicEvent.DoneSend) }, kind = PillKind.Primary, height = 36.dp)
                 }
             } else if (!armed && !compact) {
                 Spacer(Modifier.height(8.dp))

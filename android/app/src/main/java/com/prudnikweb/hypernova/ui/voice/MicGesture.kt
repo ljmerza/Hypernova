@@ -38,8 +38,13 @@ sealed interface MicEvent {
     data object PointerCancel : MicEvent
     /** Send has been held [VoiceTiming.SEND_HOLD_MS]. */
     data class SendHeld(val at: Long) : MicEvent
-    /** Hands-free's Done (the pill), Back, or the app leaving the screen. */
+    /** Back, or the app leaving the screen: the words stay in the box. */
     data object Done : MicEvent
+    /**
+     * Hands-free's Done pill (owner, 2026-11-01: "done should submit what I have to say"): the words
+     * go in and are sent, as Send would send them; no keyboard, no second tap.
+     */
+    data object DoneSend : MicEvent
     /** Hands-free's Cancel, or leaving the screen. */
     data object Cancel : MicEvent
     /** TalkBack's actions: start hands-free (a double tap on the mic; "Dictate more" on Send). */
@@ -92,6 +97,10 @@ object MicGesture {
             s !is MicState.SendPressed || !s.canDictate -> MicStep(s)
             !s.permitted -> MicStep(MicState.Idle, listOf(MicEffect.AskPermission))
             else -> MicStep(MicState.Holding(e.at, append = true), listOf(MicEffect.Start(append = true), MicEffect.Buzz(Haptic.Start)))
+        }
+        is MicEvent.DoneSend -> when (s) {
+            MicState.HandsFree -> MicStep(MicState.Idle, listOf(MicEffect.Finish, MicEffect.Send, MicEffect.Buzz(Haptic.Confirm)))
+            else -> MicStep(s)
         }
         is MicEvent.Done -> when (s) {
             MicState.HandsFree -> MicStep(MicState.Idle, listOf(MicEffect.Finish, MicEffect.Buzz(Haptic.Confirm)))

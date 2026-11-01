@@ -16,6 +16,7 @@
     <string name="voice_left">%1$s left</string>
     <string name="voice_cancel">Cancel</string>
     <string name="voice_done">Done</string>
+    <string name="voice_submit">Submit</string>
     <string name="voice_hint_first">Hold the mic to talk, or tap it for hands-free.</string>
     <string name="voice_hint_more">Hold Send to add more.</string>
     <string name="voice_nothing">Didn\'t catch that.</string>
