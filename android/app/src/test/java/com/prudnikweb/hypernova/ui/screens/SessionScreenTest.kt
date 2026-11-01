@@ -16,6 +16,8 @@ import androidx.compose.ui.test.pressKey
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Aside
 import com.prudnikweb.hypernova.data.EnterKey
+import com.prudnikweb.hypernova.data.Item
+import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.Usage
 import com.prudnikweb.hypernova.ui.components.EnterKeyPref
 import com.prudnikweb.hypernova.ui.session.SessionScreen
@@ -72,6 +74,55 @@ class SessionScreenTest {
         // The header: its name and project.
         rule.onNodeWithText("Fix the build").assertExists()
         rule.snap("chat_rows")
+    }
+
+    // ─── MCP calls fold, named by server ───
+
+    private fun pluralStr(id: Int, n: Int): String = context.resources.getQuantityString(id, n, n)
+
+    /** A session asking Home Assistant about the kitchen: three MCP calls, the last still running while [live]. */
+    private fun lights(live: Boolean): FakeHub {
+        val ha = Samples.session("s-ha", "Kitchen lights", if (live) SessionState.Working else SessionState.Idle, 0, project = "home",
+            activity = if (live) "mcp__home-assistant__ha_get_state: light.kitchen" else "Idle")
+        fun call(k: String, tool: String, target: String, running: Boolean = false) = Item.Tool(k, tool, target, running = running, server = "home-assistant")
+        val items = listOfNotNull(
+            Item.User("u1", "Are the kitchen lights on?"),
+            Item.Assistant("a1", "Let me check Home Assistant."),
+            call("m1", "ha_search", "kitchen"),
+            call("m2", "ha_get_state", "light.kitchen_counter"),
+            call("m3", "ha_get_state", "light.kitchen", running = live),
+            if (live) null else Item.Assistant("a2", "Both kitchen lights are on."),
+        )
+        return FakeHub(sessions = listOf(ha), approvals = emptyMap(), transcripts = mapOf("s-ha" to items))
+    }
+
+    @Test fun aLiveMcpRunFoldsWithItsLatestCallUnderIt() {
+        chat(lights(live = true), "s-ha")
+        rule.onNodeWithText(pluralStr(R.plurals.run_calls_now, 3).uppercase(), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("home-assistant ×3", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("ha_get_state · light.kitchen", useUnmergedTree = true).assertExists()
+        // Folded: the calls' own rows aren't drawn.
+        rule.onNodeWithText("light.kitchen_counter", useUnmergedTree = true).assertDoesNotExist()
+        rule.snap("chat_mcp_live")
+    }
+
+    @Test fun aFinishedMcpRunReadsAsItsServer() {
+        chat(lights(live = false), "s-ha")
+        rule.onNodeWithText(pluralStr(R.plurals.run_calls_done, 3).uppercase(), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("home-assistant ×3", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("ha_get_state · light.kitchen", useUnmergedTree = true).assertDoesNotExist()
+        rule.onNodeWithText("Both kitchen lights are on.", substring = true).assertExists()
+        rule.snap("chat_mcp_done")
+    }
+
+    @Test fun aTapOpensTheFoldToEachCall() {
+        chat(lights(live = false), "s-ha")
+        rule.onNodeWithText("home-assistant ×3", useUnmergedTree = true).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("light.kitchen_counter", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("light.kitchen", useUnmergedTree = true).assertExists()
+        rule.onAllNodesWithText("HA_GET_STATE", useUnmergedTree = true).assertCountEquals(2)
+        rule.snap("chat_mcp_open")
     }
 
     // ─── The approval card ───

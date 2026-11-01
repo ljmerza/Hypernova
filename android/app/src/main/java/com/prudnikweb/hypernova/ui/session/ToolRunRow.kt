@@ -31,14 +31,15 @@ import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 
 /**
- * Fork: a folded run of Claude's work (ToolRuns.kt) as one line, drawn like a tool row: "8 TOOLS
- * Read ×3 · Bash ×2 · Edit ×3", what failed in red, the planet while one still runs. A tap opens it
- * to the rows themselves ([item] draws each, as the chat would), indented under the line.
+ * Fork: a folded run of Claude's work (ToolRuns.kt) as one line, drawn like a tool row: "USED 8
+ * TOOLS  Read ×3 · Bash ×2 · home-assistant ×3". While Claude is still in it ([live]): "USING", the
+ * planet, and the latest call under the line ("ha_get_state · light.kitchen"). A tap opens it to
+ * the rows themselves ([item] draws each, as the chat would), indented under the line.
  */
 @Composable
-internal fun ToolRunRow(run: ChatRow.Run, open: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, item: @Composable (Item) -> Unit) {
+internal fun ToolRunRow(run: ChatRow.Run, open: Boolean, live: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, item: @Composable (Item) -> Unit) {
     Column(modifier) {
-        Row(
+        Column(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 32.dp)
@@ -47,21 +48,29 @@ internal fun ToolRunRow(run: ChatRow.Run, open: Boolean, onToggle: () -> Unit, m
                     onClickLabel = stringResource(if (open) R.string.collapse else R.string.show_all), onClick = onToggle,
                 )
                 .padding(vertical = 2.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            verticalArrangement = Arrangement.Center,
         ) {
-            if (run.running) Planet(Activity.Live)
-            else Icon(Glyph.Chevron, Modifier.rotate(if (open) 90f else 0f), size = 10.dp, color = HN.accentDim)
-            Spacer(Modifier.width(8.dp))
-            HText(pluralStringResource(R.plurals.run_calls, run.calls, run.calls).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
-            Spacer(Modifier.width(10.dp))
-            HText(
-                run.verbs.joinToString(" · ") { (verb, n) -> if (n > 1) "$verb ×$n" else verb },
-                style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            if (run.failed > 0) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                if (live) Planet(Activity.Live)
+                else Icon(Glyph.Chevron, Modifier.rotate(if (open) 90f else 0f), size = 10.dp, color = HN.accentDim)
                 Spacer(Modifier.width(8.dp))
-                HText(stringResource(R.string.run_failed, run.failed), style = Type.monoSmall, color = HN.danger, maxLines = 1)
+                HText(
+                    pluralStringResource(if (live) R.plurals.run_calls_now else R.plurals.run_calls_done, run.calls, run.calls).uppercase(),
+                    style = Type.label, color = HN.inkDim, maxLines = 1,
+                )
+                Spacer(Modifier.width(10.dp))
+                HText(
+                    run.verbs.joinToString(" · ") { (verb, n) -> if (n > 1) "$verb ×$n" else verb },
+                    style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
+            val hint = run.hint
+            if (live && !open && hint != null) {
+                HText(
+                    hint, style = Type.monoSmall, color = HN.inkDim, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 18.dp, top = 2.dp),
+                )
             }
         }
         if (open) {

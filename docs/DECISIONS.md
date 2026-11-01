@@ -2650,3 +2650,41 @@ server updates itself and then pushes to the client that needs update too." Deci
 7. **The phones learn of it**: the new daemon, at start, sees the update it was waiting for and
    logs it; the snapshot's `mac.update.last` says from and to what, and the phone's connection log
    has a line when the server's version changed between two snapshots. No banner or toast.
+
+## MCP and tool runs fold like Claude Code (2026-11-01)
+
+The owner chose option "2+": fold MCP calls and the run Claude is working in, the way Claude Code
+2.1.316's own screen does ("Calling home-assistant 3 times…", then "Called home-assistant 3 times"),
+in the app's own words. Before, the run Claude was in stayed open one row per call, runs of one or
+two calls never folded (Claude often writes a line between MCP calls, so each was its own row), and
+an MCP row said its name twice: `HA_GET_STATE  home-assistant · ha_get_state`
+(`ui/session/ToolRuns.kt`, `ToolRunRow.kt`, `data/Items.kt`, `daemon/src/normalize.ts`).
+
+1. **The run Claude is working in folds too.** Its line says **Using N tools**, keeps the planet,
+   and shows the latest call under it ("ha_get_state · light.kitchen", "Read · parser.ts"); once
+   done it says **Used N tools** with no hint. A tap opens it, and a run the owner opened or shut
+   stays that way (`runOpen`); nothing opens by itself any more.
+2. **Diffs and failed calls are never folded away**: they stand as their own rows and the run
+   folds around them, before and after (a failed terminal, exit code not 0, counts as failed).
+   Chosen over keeping such a run open: an open run is the long list (a) set out to fold, one edit
+   would open everything around it, and a fold that opened and shut as edits came would jump. And
+   it holds for finished runs too, so a diff seen while Claude worked doesn't vanish into the fold
+   when the turn ends; Claude Code shows edits and errors on their own lines as well. The fold
+   line's "N failed" went with it (a fold no longer holds a failure).
+3. **MCP calls fold from one call**: a stretch of work made only of MCP calls, or MCP calls and
+   lookups (Read, Grep, Glob, LS, ToolSearch, WebSearch, WebFetch), folds however short; one with
+   any other built-in (Bash, Write…) or none of MCP keeps `MIN = 3`. Text ends a run, as in
+   Claude Code.
+4. **Named by server, with counts**: "Used 3 tools  home-assistant ×3", or "home-assistant ×2 ·
+   Read" mixed. The server is the part of `mcp__<server>__<tool>` before the next `__`, as written.
+5. **An MCP call says what it was called with** (daemon, docs/PROTOCOL.md "Reading transcripts"):
+   the event's summary is its first argument among `entity_id`, `query`, `url`, `path`,
+   `file_path`, `name`, `id`, `title`, else its first short one-line string; never a key named like
+   a secret (token, password, secret, key, auth, cookie, credential, bearer, signature, private),
+   never a blob or a `data:` URL; masked as titles are, cut to 80 characters; the server's name
+   when nothing qualifies. The row reads `HA_GET_STATE  light.kitchen`. An older daemon's
+   "server · tool" summary, or the server alone, is left off the row rather than repeating the
+   name; an older phone shows the new summary as it shows any (free text). Approvals' summaries
+   and agents' activity lines are unchanged.
+6. **Unchanged:** nothing new on the chat screen (the fold line and rows are the existing ones),
+   approvals and the session's other cards.

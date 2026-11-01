@@ -227,15 +227,23 @@ object Items {
             val path = d.path.ifBlank { e.path.orEmpty() }
             return Item.Diff(e.id, shortPath(path, cwd), d.added, d.removed, shown, path = path.ifBlank { null }, verb = verb)
         }
+        val server = mcpServer(e.name)
         val target = when {
             e.path != null -> shortPath(e.path, cwd)
+            // An MCP call's summary is what it was called with ("light.kitchen"); the server alone,
+            // or an older daemon's "home-assistant · ha_get_state", only repeats the name.
+            server != null -> e.summary?.trim().orEmpty().takeUnless { it == server || it == e.name.removePrefix("mcp__").split("__").joinToString(" · ") }.orEmpty()
             !e.summary.isNullOrBlank() -> e.summary.removePrefix("${e.name}: ").removePrefix("$verb: ")
             else -> e.input["file_path"] ?: e.input["pattern"] ?: e.input["url"] ?: e.input["query"] ?: e.input["description"] ?: ""
         }
         // A history loaded with outputs cut to their end starts them with "…".
         val error = if (failed) e.output?.removePrefix("…\n")?.trim()?.lines()?.filter { it.isNotBlank() }?.take(3)?.joinToString("\n") else null
-        return Item.Tool(e.id, verb, target, path = e.path, running = running, failed = failed, error = error, ports = ports(e.output))
+        return Item.Tool(e.id, verb, target, path = e.path, running = running, failed = failed, error = error, ports = ports(e.output), server = server)
     }
+
+    /** "mcp__home-assistant__ha_get_state" → "home-assistant"; null for a tool that isn't an MCP server's. */
+    fun mcpServer(name: String): String? =
+        name.removePrefix("mcp__").takeIf { name.startsWith("mcp__") && it.contains("__") }?.substringBefore("__")?.takeIf { it.isNotBlank() }
 
     private fun approval(
         key: String, approvalId: String, summary: String?, eventResolution: String?,
