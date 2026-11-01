@@ -909,8 +909,17 @@ test('POST …/rewind: the conversation goes on from before a message, in a new 
   hub.ensureParsed(hub.upsertSession(id, { cwd, transcriptPath: path, origin: 'terminal', title: 'Lexer', state: 'idle' }))
   const users = (await ok(get(`/v1/sessions/${id}/events?limit=300`))).events.filter((x: { kind: string }) => x.kind === 'user')
   assert.equal(users.length, 2)
-  contract('rest-session-rewind', await ok(post(`/v1/sessions/${id}/rewind`, { eventId: users[1].id })))
   assert.equal((await refused(post(`/v1/sessions/${id}/rewind`, { eventId: users[0].id }), 409)).error.code, 'first_message')
+  contract('rest-session-rewind', await ok(post(`/v1/sessions/${id}/rewind`, { eventId: users[1].id })))
+  const rewound = heard('session.removed', (m) => m.id === id)
+  contract('ws-session-replaced', rewound)
+  // What still names the old id is about the session that replaced it; Delete never follows.
+  const now = (await ok(get(`/v1/sessions/${id}/events?limit=300`))).events.filter((x: { kind: string }) => x.kind === 'user')
+  assert.equal(now.length, 1)
+  assert.equal(now[0].text, 'Sketch the lexer')
+  assert.equal((await refused(call('DELETE', `/v1/sessions/${id}`), 404)).error.code, 'no_session')
+  assert.ok(!(await ok(get('/v1/snapshot'))).sessions.some((s: { id: string }) => s.id === id))
+  assert.equal(Object.keys((await ok(get('/v1/snapshot'))).replaced)[0], id)
 })
 
 test('GET …/blocked, Allow & retry and Dismiss', async () => {

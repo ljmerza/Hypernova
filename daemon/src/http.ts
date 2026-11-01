@@ -52,6 +52,7 @@ import { sessionUsage } from './session-usage.ts'
 import { todosOf } from './todos.ts'
 import { searchHistory } from './search.ts'
 import { RewindError, rewindTo } from './rewind.ts'
+import { replacedOf, replacedSessions, wentOn } from './rewound.ts'
 import { SdkMissingError, claudeSdk, sdkState } from './sdk.ts'
 import { AutomationError, FIRE_BODY_MAX, automations, useSessionOps } from './automations.ts'
 import { systemZone } from './schedule.ts'
@@ -337,6 +338,8 @@ function snapshot(deviceId: string | null) {
     },
     usage: getUsage(),
     sessions: listSessions(),
+    // Sessions a rewind replaced and what they are now, for a phone that was away (rewound.ts).
+    replaced: replacedSessions(),
     approvals: pendingApprovals(),
     projects: listProjects(),
     providers: listProviders(),
@@ -367,11 +370,20 @@ const QA_KEY = sha256('qa:' + adminToken).slice(0, 32)
 /** Each asker's latest History search: an older one still running stops (GET /v1/history/search). */
 const searchSeq = new Map<string, number>()
 
+/**
+ * A route about a session a rewind replaced is about the session that replaced it (rewound.ts): a
+ * reply from a notification, a prompt a phone kept while the Mac was away, another phone's screen.
+ */
+function followReplaced(path: string): string {
+  const s = /^\/v1\/sessions\/([\w-]+)(\/.*)?$/.exec(path)
+  return s && !getSession(s[1]!) && replacedOf(s[1]!) ? `/v1/sessions/${wentOn(s[1]!)}${s[2] ?? ''}` : path
+}
+
 // ── The phone API (also usable locally with the admin token) ────────────
 async function api(c: Ctx): Promise<void> {
   const { req, res, url } = c
-  const path = url.pathname
   const m = req.method ?? 'GET'
+  const path = m === 'DELETE' ? url.pathname : followReplaced(url.pathname)
 
   if (path === '/v1/health') return json(res, 200, { ok: true, protocol: PROTOCOL, name: macName() })
   if (path === '/v1/pair' && m === 'POST') {

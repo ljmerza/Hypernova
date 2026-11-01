@@ -445,3 +445,15 @@ test('Don’t while Claude works again presses nothing and says the limit is ove
   await assert.rejects(resume.setAutoContinue(id, false, t.io), (e: any) => e.code === 'not_limited')
   assert.deepEqual(t.keys, [])
 })
+
+test('a session a rewind replaced is never carried on: it would come back to Home', async () => {
+  const id = session()
+  const reset = now + 10 * 60_000
+  hub.blockSession(id, providerError(`API Error: 429 {"error":{"code":429,"message":"Rate limit exceeded: free-models-per-min.","metadata":{"headers":{"X-RateLimit-Limit":"20","X-RateLimit-Remaining":"0","X-RateLimit-Reset":"${reset}"}}}}`, 429), now)
+  assert.equal(blockedOf(id)?.resume?.state, 'armed')
+  hub.replaceSession(id, session(), null)
+  now = reset + 12_500
+  await resume.tick()
+  assert.equal(sent.length, 0)
+  assert.equal(hub.getSession(id), undefined)
+})

@@ -14,6 +14,7 @@ import { isHiddenCwd } from './term/hidden.ts'
 import type { PlanWindow } from './usage-screen.ts'
 import type { Blocked, Blocker, LimitNotice } from './blockers.ts'
 import { cutByRestart, fromBeforeBoot, noteOpen, runsAgain, startAfterBoot } from './reboot.ts'
+import { replacedOf, bringBack, setReplaced, stoppedProcess } from './rewound.ts'
 import { getAccount, noteBlocker, noteHealthy, noteLimitNotice, noteLogin, stillBlocks, usageStale } from './account.ts'
 import { folderView } from './files.ts'
 import { bypassBlockedByRoot } from './platform.ts'
@@ -358,7 +359,9 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
       carry: Buffer.alloc(0),
       pid: null,
     }
-    sessions.set(id, r)
+    // A session a rewind replaced stays out of every list, whatever comes in late about it (a
+    // stopped turn's last words, a claude on its way out): the caller gets a record nobody sees.
+    if (!replacedOf(id)) sessions.set(id, r)
   }
   const turnSoFar = inTurn(r.state) ? (r.turnStartedAt ?? null) : null
   Object.assign(r, patch)
@@ -374,7 +377,7 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
     if (!patch.transcriptPath) r.transcriptPath = transcriptPathFor(patch.cwd, id)
   }
   const after = view(r)
-  if (JSON.stringify(after) !== before) broadcast({ t: 'session', session: after })
+  if (JSON.stringify(after) !== before && sessions.get(id) === r) broadcast({ t: 'session', session: after })
   return r
 }
 
@@ -1344,6 +1347,8 @@ export function discover(): void {
     }
   }
   for (const m of managedSessions()) {
+    // Replaced by a rewind: its record and its transcript stay, and show nowhere (rewound.ts).
+    if (replacedOf(m.id)) continue
     const t = byId.get(m.id)
     // Shared-terminal sessions come back to life through the registry if their terminal still runs.
     // Last active when its transcript was last written, not when it started, or it sinks in the list.
@@ -1351,6 +1356,7 @@ export function discover(): void {
   }
   const files = [...byId].filter(([, f]) => Date.now() - f.mtime < HISTORY_MS).sort((a, b) => b[1].mtime - a[1].mtime)
   for (const [id, f] of files.slice(0, HISTORY_MAX)) {
+    if (replacedOf(id)) continue
     const head = readHead(f.path)
     // The usage probe's, if its transcript outlived it (term/hidden.ts).
     if (!head.cwd || isHiddenCwd(head.cwd)) continue
@@ -1555,7 +1561,8 @@ export function applyAgentList(list: AgentJob[]): void {
   const seen = new Set<string>()
   const watched: JobSeen[] = []
   for (const j of list) {
-    if (!j?.id || !j.sessionId || !j.cwd || isSdk(j.sessionId) || isHiddenCwd(j.cwd)) continue
+    // A job a rewind replaced: stopped, and `claude agents` lists it for good; nothing here does (rewound.ts).
+    if (!j?.id || !j.sessionId || !j.cwd || isSdk(j.sessionId) || isHiddenCwd(j.cwd) || replacedOf(j.sessionId)) continue
     seen.add(j.sessionId)
     agentJobs.set(j.sessionId, j.id)
     agentStates.set(j.sessionId, String(j.state ?? ''))
@@ -1612,6 +1619,26 @@ export function forgetSession(id: string): void {
   if (sessions.delete(id)) broadcast({ t: 'session.removed', id })
 }
 
+/**
+ * A rewind's copy takes over from session [id] (rewind.ts): gone from every list, for clients too,
+ * its transcript left alone and hidden (rewound.ts). [by] is the session that replaced it, [pid]
+ * the claude that was stopped. What the owner allowed for the session goes on with it.
+ */
+export function replaceSession(id: string, by: string, pid: number | null): void {
+  const allowed = sessionAllowed.get(id)
+  if (allowed) sessionAllowed.set(by, new Set(allowed))
+  const always = sessionAlways.get(id)
+  if (always) sessionAlways.set(by, new Set(always))
+  forgetSessionAllowed(id)
+  agentJobs.delete(id)
+  agentStates.delete(id)
+  agentDied.delete(id)
+  forgetBlocked(id)
+  mainEnded(id)
+  setReplaced(id, by, pid)
+  if (sessions.delete(id)) broadcast({ t: 'session.removed', id, replacedBy: by })
+}
+
 /** Live interactive sessions from Claude Code's registry (~/.claude/sessions/<pid>.json). */
 export function pollRegistry(): void {
   const dir = join(CLAUDE_DIR, 'sessions')
@@ -1644,6 +1671,10 @@ export function pollRegistry(): void {
     }
     // The old claude of a restart, still on its way out: not the session's process any more.
     if (replacedProcess(o.sessionId, o.pid)) continue
+    // Replaced by a rewind (rewound.ts): the claude it stopped is on its way out; any other resumed it.
+    const replaced = replacedOf(o.sessionId)
+    if (replaced && stoppedProcess(replaced, o.pid, o.startedAt)) continue
+    if (replaced) bringBack(o.sessionId)
     live.add(o.sessionId)
     if (agents) agentJobs.set(o.sessionId, o.jobId)
     const r = sessions.get(o.sessionId) ?? upsertSession(o.sessionId, { cwd: o.cwd, origin: 'terminal', lastActivityAt: Number(o.statusUpdatedAt ?? o.updatedAt) || Date.now() })

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { LOCAL_PORT, SUPPORT, log, readJson, writeJson } from '../util.ts'
 import { systemZone } from '../schedule.ts'
 import { broadcast, eventsFor, getSession, getUsage, listSessions, pendingApprovals, tapBroadcast, view } from '../hub.ts'
+import { wentOn } from '../rewound.ts'
 import { getAccount, providerStatus } from '../account.ts'
 import { findProvider, hookSecret, isSdk, settings } from '../store.ts'
 import { knownModels, modelsNow } from '../models.ts'
@@ -60,8 +61,9 @@ let timerAt = Infinity
 
 function daemonIO(): AutoIO {
   writeJson(HOOK_FILE, { hooks: { PermissionDenied: [{ matcher: '*', hooks: [{ type: 'http', url: `http://127.0.0.1:${LOCAL_PORT}/hooks/${hookSecret}`, timeout: 10 }] }] } })
+  // A session a rewind replaced is the session that replaced it, for a run or a saved target (rewound.ts).
   const viewOf = (id: string) => {
-    const r = getSession(id)
+    const r = getSession(wentOn(id))
     return r ? view(r) : null
   }
   return {
@@ -79,13 +81,14 @@ function daemonIO(): AutoIO {
     },
     async prompt(id, text, afterLimit) {
       if (!ops) return { ok: false, code: 'terminal_busy' }
-      return ops.promptSession(id, text, afterLimit)
+      return ops.promptSession(wentOn(id), text, afterLimit)
     },
     async move(id, providerId) {
       if (!ops) throw Object.assign(new Error('not ready'), { code: 'busy' })
-      return ops.moveSession(id, providerId)
+      return ops.moveSession(wentOn(id), providerId)
     },
-    async interrupt(id) {
+    async interrupt(raw) {
+      const id = wentOn(raw)
       if (isCodex(id)) return interruptCodex(id)
       const tid = termOf(id)
       if (tid) pressKeys(tid, '\x1b')

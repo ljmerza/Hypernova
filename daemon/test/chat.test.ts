@@ -19,8 +19,10 @@ after(() => rmSync(scratch, { recursive: true, force: true }))
 const { callCost, contextWindow, modelInfo, sessionUsage } = await import('../src/session-usage.ts')
 const { todosOf, todoNow } = await import('../src/todos.ts')
 const { rewindTo, RewindError } = await import('../src/rewind.ts')
-const { emitEvent, ensureParsed, getSession, upsertSession, view } = await import('../src/hub.ts')
-const { getManaged } = await import('../src/store.ts')
+const { addClient, applyAgentList, discover, emitEvent, ensureParsed, getSession, listSessions, pendingApprovals, pollRegistry, requestApproval, setState, upsertSession, view } = await import('../src/hub.ts')
+const { getManaged, saveManaged, settings } = await import('../src/store.ts')
+const { replacedOf, replacedSessions, wentOn } = await import('../src/rewound.ts')
+const { linkOf, addLink } = await import('../src/switch-links.ts')
 const { projectSlug } = await import('../src/util.ts')
 type Ev = import('../src/normalize.ts').Ev
 
@@ -186,7 +188,7 @@ test("a session carries its list in short, and it moves on with Claude's next ca
 })
 
 // ── Rewind to here ───────────────────────────────────────────────────────
-test('rewinds to just before a message, in a new session, leaving the original as it was', async () => {
+test('rewinds to just before a message: the copy replaces the original on every list, its transcript left on disk', async () => {
   const sid = randomUUID()
   const path = join(projectDir, `${sid}.jsonl`)
   const [p1, a1, p2, a2] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()]
@@ -205,7 +207,14 @@ test('rewinds to just before a message, in a new session, leaving the original a
   assert.equal(r.text, 'Second task')
   assert.notEqual(r.session.id, sid)
   assert.equal(r.session.origin, 'hypernova')
-  assert.equal(r.session.title, `${rec.title} (rewound)`)
+  // One card: the title stays, and nothing says it's a copy.
+  assert.equal(r.session.title, 'First task', 'its title, nothing added')
+  assert.equal(r.session.state, 'idle')
+  assert.equal(r.originalStays, null)
+  // The original is on no list, and what names it is followed; its transcript is below.
+  assert.equal(getSession(sid), undefined)
+  assert.ok(!listSessions().some((s) => s.id === sid))
+  assert.equal(wentOn(sid), r.session.id)
   // The new conversation holds the first exchange only.
   const forked = getSession(r.session.id)!
   assert.ok(existsSync(forked.transcriptPath))
@@ -239,4 +248,233 @@ test('finds a prompt the daemon named itself by its words, and shared terminals 
   assert.equal(r.text, 'Same words')
   assert.equal(getManaged(r.session.id)?.engine, 'term')
   assert.deepEqual(ensureParsed(getSession(r.session.id)!).events.filter((e) => e.kind === 'user').length, 1)
+})
+
+// ── Rewind: the copy replaces the original, whatever ran it ──────────────
+/** A conversation of [n] exchanges, on record as Claude Code wrote it; the prompts' ids. */
+function conversation(title: string, n = 2, patch: Parameters<typeof upsertSession>[1] = {}) {
+  const sid = randomUUID()
+  const path = join(projectDir, `${sid}.jsonl`)
+  const prompts: string[] = []
+  const out: object[] = [{ type: 'custom-title', customTitle: title, sessionId: sid }]
+  let parent: string | null = null
+  for (let i = 0; i < n; i++) {
+    const [p, a] = [randomUUID(), randomUUID()]
+    out.push(prompt(sid, p, parent, `Task ${i + 1}`), reply(sid, a, p, `msg_${a}`, `Answer ${i + 1}.`, { input_tokens: 1, output_tokens: 1 }))
+    prompts.push(p)
+    parent = a
+  }
+  writeFileSync(path, lines(...out))
+  upsertSession(sid, { cwd, transcriptPath: path, title, state: 'idle', ...patch })
+  ensureParsed(getSession(sid)!)
+  return { sid, path, prompts, rec: getSession(sid)! }
+}
+
+/** Stops that only say what they were asked to do. */
+function fakeStops(o: { term?: boolean; job?: { ok: boolean; said: string } } = {}) {
+  const calls: string[] = []
+  return {
+    calls,
+    stops: {
+      endTerm: async (id: string) => (calls.push(`term ${id}`), o.term ?? true),
+      stopJob: async (job: string) => (calls.push(`job ${job}`), o.job ?? { ok: true, said: '' }),
+      interrupt: async (id: string) => void calls.push(`interrupt ${id}`),
+    },
+  }
+}
+
+const ask = (sessionId: string) => requestApproval({ sessionId, kind: 'tool', toolName: 'Bash', summary: 'Bash: ls', input: { command: 'ls' }, reason: null, canAlways: false, questions: null, plan: null }, null)
+
+/** What every client hears while [f] runs. */
+async function hearing(f: () => Promise<void>): Promise<any[]> {
+  const heard: any[] = []
+  const stop = addClient({ send: (s) => void heard.push(JSON.parse(s)) })
+  await f()
+  stop()
+  return heard
+}
+
+test('a rewind closes the original’s shared terminal and answers what it waited on; clients hear what replaced it', async () => {
+  const { sid, prompts, rec, path } = conversation('Held', 2, { state: 'working', origin: 'terminal', term: { id: 't-held', mac: 1, phone: 0 } })
+  const asked = ask(sid)
+  assert.equal(view(rec).pendingApprovalIds.length, 1)
+  const original = readFileSync(path, 'utf8')
+  const f = fakeStops()
+  let r!: Awaited<ReturnType<typeof rewindTo>>
+  const heard = await hearing(async () => {
+    r = await rewindTo(rec, prompts[1]!, true, f.stops)
+  })
+  assert.deepEqual(f.calls, ['term t-held'])
+  assert.equal(r.originalStays, null)
+  assert.equal((await asked).decision, 'terminal')
+  assert.ok(!pendingApprovals().some((a) => a.sessionId === sid))
+  assert.deepEqual(heard.filter((m) => m.t === 'session.removed'), [{ t: 'session.removed', id: sid, replacedBy: r.session.id }])
+  assert.ok(heard.some((m) => m.t === 'approval.resolved' && m.sessionId === sid))
+  assert.equal(readFileSync(path, 'utf8'), original, 'its transcript is untouched')
+  // What comes in late never brings it back: a dying claude's words, a stopped turn's "idle".
+  const late = await hearing(async () => {
+    setState(sid, 'idle')
+    upsertSession(sid, { state: 'working', contextPct: 3 })
+  })
+  assert.deepEqual(late, [])
+  assert.equal(getSession(sid), undefined)
+  // Nor does a restart, which would find its transcript and its record.
+  discover()
+  assert.equal(getSession(sid), undefined)
+  assert.equal(replacedSessions()[sid], r.session.id)
+})
+
+test('a rewind stops a claude agents job; its list and its dying process don’t bring it back, a new claude does', async () => {
+  const { sid, prompts, rec } = conversation('A job', 2, { state: 'working', origin: 'terminal', term: { id: 't-attach', mac: 0, phone: 1 }, pid: process.pid })
+  settings.claudeAgents = true
+  const registry = join(scratch, 'claude', 'sessions')
+  mkdirSync(registry, { recursive: true })
+  const entry = join(registry, `${process.pid}.json`)
+  try {
+    applyAgentList([{ id: 'job-1', sessionId: sid, cwd, state: 'working' }])
+    const f = fakeStops()
+    const r = await rewindTo(rec, prompts[1]!, true, f.stops)
+    // The holder first: it only watched, and would hold the job open.
+    assert.deepEqual(f.calls, ['term t-attach', 'job job-1'])
+    assert.equal(r.originalStays, null)
+    assert.equal(getSession(sid), undefined)
+    // `claude agents --all` lists a stopped job for good.
+    applyAgentList([{ id: 'job-1', sessionId: sid, cwd, state: 'done' }])
+    assert.equal(getSession(sid), undefined)
+    // The claude it stopped, still on its way out.
+    writeFileSync(entry, JSON.stringify({ pid: process.pid, sessionId: sid, cwd, kind: 'interactive', status: 'busy', startedAt: Date.now() - 60_000, updatedAt: Date.now() }))
+    pollRegistry()
+    assert.equal(getSession(sid), undefined)
+    // `claude --resume` by hand: another claude, started since. It's an ordinary session again.
+    rmSync(entry)
+    writeFileSync(join(registry, `${process.ppid}.json`), JSON.stringify({ pid: process.ppid, sessionId: sid, cwd, kind: 'interactive', status: 'busy', startedAt: Date.now() + 1000, updatedAt: Date.now() }))
+    pollRegistry()
+    assert.equal(getSession(sid)?.state, 'working')
+    assert.equal(replacedOf(sid), null)
+    assert.equal(wentOn(sid), sid)
+  } finally {
+    settings.claudeAgents = false
+    rmSync(join(registry, `${process.ppid}.json`), { force: true })
+    rmSync(entry, { force: true })
+    upsertSession(sid, { pid: null, state: 'ended' })
+    applyAgentList([])
+  }
+})
+
+test('a job with no process has nothing that can fail to stop', async () => {
+  const { sid, prompts, rec } = conversation('Done job', 2, { state: 'idle', origin: 'terminal' })
+  settings.claudeAgents = true
+  try {
+    applyAgentList([{ id: 'job-2', sessionId: sid, cwd, state: 'done' }])
+    const f = fakeStops({ job: { ok: false, said: 'nothing to stop' } })
+    const r = await rewindTo(rec, prompts[1]!, true, f.stops)
+    assert.deepEqual(f.calls, [], 'not even asked')
+    assert.equal(r.originalStays, null)
+    assert.equal(getSession(sid), undefined)
+  } finally {
+    settings.claudeAgents = false
+    applyAgentList([])
+  }
+})
+
+test('a session the daemon runs: its turn is interrupted, and a restart doesn’t bring it back', async () => {
+  const { sid, prompts, rec } = conversation('SDK', 2, { state: 'working' })
+  saveManaged({ id: sid, cwd, providerId: 'anthropic', model: null, permissionMode: 'default', createdAt: Date.now() })
+  const f = fakeStops()
+  const r = await rewindTo(rec, prompts[1]!, false, f.stops)
+  assert.deepEqual(f.calls, [`interrupt ${sid}`])
+  assert.equal(r.originalStays, null)
+  // The turn's last word, after the interrupt.
+  setState(sid, 'idle')
+  discover()
+  assert.equal(getSession(sid), undefined)
+  assert.ok(getManaged(sid), 'its record stays too')
+})
+
+test('a stop that fails: the rewind stands, the original stays where it is, nothing is deleted', async () => {
+  for (const [patch, stops, words] of [
+    [{ term: { id: 't-stuck', mac: 0, phone: 0 } }, { term: false }, 'terminal didn’t close'],
+    [{ pid: process.pid }, { job: { ok: false, said: 'no' } }, 'claude agents didn’t stop'],
+    [{ term: { id: 't-boom', mac: 0, phone: 0 } }, 'throws', 'couldn’t be stopped'],
+  ] as const) {
+    const { sid, prompts, rec, path } = conversation('Stuck', 2, { state: 'working', origin: 'terminal', ...patch })
+    settings.claudeAgents = true
+    if ('pid' in patch) applyAgentList([{ id: 'job-3', sessionId: sid, cwd, state: 'working' }])
+    const original = readFileSync(path, 'utf8')
+    const f = fakeStops(stops === 'throws' ? {} : stops)
+    if (stops === 'throws') f.stops.endTerm = async () => { throw new Error('boom') }
+    try {
+      const r = await rewindTo(rec, prompts[1]!, true, f.stops)
+      assert.ok(r.originalStays?.includes(words), r.originalStays ?? 'null')
+      assert.ok(r.originalStays?.includes('stays on Home'))
+      assert.equal(r.text, 'Task 2', 'the message still comes back')
+      assert.equal(r.session.title, 'Stuck')
+      assert.ok(existsSync(getSession(r.session.id)!.transcriptPath))
+      assert.equal(getSession(sid)?.state, 'working')
+      assert.equal(replacedOf(sid), null)
+      assert.equal(readFileSync(path, 'utf8'), original)
+    } finally {
+      settings.claudeAgents = false
+      applyAgentList([])
+      upsertSession(sid, { pid: null })
+    }
+  }
+})
+
+test('a session open in a terminal Hypernova doesn’t hold can’t be stopped from here: it stays, and says why', async () => {
+  const { sid, prompts, rec } = conversation('Elsewhere', 2, { state: 'idle', origin: 'terminal', pid: process.pid })
+  const f = fakeStops()
+  const r = await rewindTo(rec, prompts[1]!, true, f.stops)
+  assert.deepEqual(f.calls, [])
+  assert.ok(r.originalStays?.includes('terminal Hypernova doesn’t hold'))
+  assert.equal(getSession(sid)?.state, 'idle')
+  upsertSession(sid, { pid: null })
+})
+
+test('rewinding twice: the title never changes, each original goes, and the first id follows to the last', async () => {
+  const a = conversation('Old one (rewound)', 3)
+  const first = await rewindTo(a.rec, a.prompts[2]!, true, fakeStops().stops)
+  assert.equal(first.session.title, 'Old one (rewound)', 'exactly as it was: not made worse, not rewritten')
+  const b = getSession(first.session.id)!
+  const inB = ensureParsed(b).events.filter((e) => e.kind === 'user').map((e) => e.id)
+  assert.equal(inB.length, 2)
+  const second = await rewindTo(b, inB[1]!, true, fakeStops().stops)
+  assert.equal(second.session.title, 'Old one (rewound)')
+  assert.equal(second.text, 'Task 2')
+  assert.deepEqual(ensureParsed(getSession(second.session.id)!).events.filter((e) => e.kind === 'user').map((e) => (e.kind === 'user' ? e.text : '')), ['Task 1'])
+  assert.equal(getSession(a.sid), undefined)
+  assert.equal(getSession(b.id), undefined)
+  assert.equal(getSession(second.session.id)?.state, 'idle')
+  assert.equal(wentOn(a.sid), second.session.id)
+  assert.equal(replacedSessions()[a.sid], second.session.id)
+})
+
+test('the new session is the same session to look at: everything the card and the chat show', async () => {
+  const automation = { id: 'au_1', name: 'Nightly', runId: 'run_1' }
+  const { prompts, rec, sid, path } = conversation('Carried', 2, { createdAt: 1000, effort: 'high', permissionMode: 'acceptEdits', model: 'claude-opus-5-5', providerId: 'anthropic', automation, costUsd: 1.5 })
+  saveManaged({ id: sid, cwd, providerId: 'anthropic', model: 'opus', permissionMode: 'acceptEdits', createdAt: 1000, engine: 'term', context: 'From Codex.', automation, allowedTools: ['Read'], appendSystemPrompt: 'Be brief.' })
+  addLink('codex-thread', sid)
+  const t0 = Date.now()
+  const r = await rewindTo(rec, prompts[1]!, true, fakeStops().stops)
+  assert.equal(r.session.title, 'Carried')
+  assert.equal(r.session.cwd, cwd)
+  assert.equal(r.session.projectName, rec.projectName)
+  assert.equal(r.session.createdAt, 1000)
+  assert.ok(r.session.lastActivityAt >= t0, 'it sits where a session just used sits')
+  assert.equal(r.session.effort, 'high')
+  assert.equal(r.session.permissionMode, 'acceptEdits')
+  assert.equal(r.session.model, 'claude-opus-5-5')
+  assert.equal(r.session.providerId, 'anthropic')
+  assert.deepEqual(r.session.automation, automation)
+  assert.equal(r.session.costUsd, 1.5)
+  const m = getManaged(r.session.id)!
+  assert.equal(m.context, 'From Codex.')
+  assert.equal(m.effort, 'high')
+  assert.deepEqual(m.automation, automation)
+  assert.deepEqual(m.allowedTools, ['Read'])
+  assert.equal(m.appendSystemPrompt, 'Be brief.')
+  // The switch of agents it came from is the new one's now.
+  assert.equal(linkOf(r.session.id).from, 'codex-thread')
+  assert.equal(linkOf('codex-thread').to, r.session.id)
+  assert.ok(existsSync(path), 'the old transcript stays on disk')
 })
