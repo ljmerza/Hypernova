@@ -627,6 +627,7 @@ class LiveHub(
         class FilesMsg(val browseOutsideProjects: Boolean) : Msg
         /** The server updating itself: the setting, waiting, installing (data/ServerUpdate.kt). */
         class UpdateMsg(val u: ServerUpdate) : Msg
+        data object AgentSettingsChanged : Msg
         class SleepSoonMsg(val s: SleepSoon) : Msg
         class BackpackEndingMsg(val s: BackpackEnding) : Msg
         /** Read aloud: the setting, a stop (SpeechLink.kt). */
@@ -669,6 +670,7 @@ class LiveHub(
         "awake" -> Msg.AwakeMsg(MacAwake.parse(o.obj("awake")))
         "files" -> Msg.FilesMsg(o.obj("files")?.bool("browseOutsideProjects") == true)
         "update" -> ServerUpdate.parse(o.obj("update"))?.let { Msg.UpdateMsg(it) }
+        "agent_settings" -> Msg.AgentSettingsChanged
         "mac_sleep_soon" -> SleepSoon.parse(o)?.let { Msg.SleepSoonMsg(it) }
         "mac_backpack_ending" -> BackpackEnding.parse(o)?.let { Msg.BackpackEndingMsg(it) }
         "speech", "speech.stop" -> Msg.SpeechMsg(o)
@@ -737,6 +739,7 @@ class LiveHub(
             is Msg.AwakeMsg -> macAwake = m.a
             is Msg.FilesMsg -> macBrowse = m.browseOutsideProjects
             is Msg.UpdateMsg -> setServerUpdate(m.u)
+            is Msg.AgentSettingsChanged -> agentSettingsVersion++
             // A newer app now on the Mac, without reconnecting: the banner (App.kt) and Settings follow
             // [appUpdate]; in the background, the notification once per version.
             is Msg.AppMsg -> macInfo?.let { info ->
@@ -2531,6 +2534,27 @@ class LiveHub(
     } catch (e: CancellationException) { throw e } catch (e: Throwable) {
         // An older server doesn't know the request: it's the server that needs updating, not the phone trying again.
         Result.failure(if (Net.classify(e).status == 404) AgentSettingsTooOld(res.getString(R.string.as_too_old)) else handle(e, R.string.as_err))
+    }
+
+    override var agentSettingsVersion by androidx.compose.runtime.mutableIntStateOf(0)
+        private set
+
+    override suspend fun changeAgentSetting(agent: String, key: String, value: Any, expected: String?): Result<SettingChange> = try {
+        val body = JSONObject().put("agent", agent).put("key", key).put("value", value).put("expected", expected ?: JSONObject.NULL)
+        Result.success(SettingChange.wire(api.put("/v1/agents/settings", body)))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(settingFailure(e)) }
+
+    override suspend fun undoAgentSetting(agent: String, expected: String): Result<Unit> = try {
+        api.post("/v1/agents/settings/undo", JSONObject().put("agent", agent).put("expected", expected))
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(settingFailure(e)) }
+
+    /** A 404: a server older than editing. A refusal: its own words and code. Anything else as usual. */
+    private fun settingFailure(e: Throwable): HubException {
+        val ex = Net.classify(e)
+        if (ex.status == 404) return AgentSettingsTooOld(res.getString(R.string.as_edit_too_old))
+        if (ex.problem != Problem.Server) return handle(e, R.string.as_edit_err)
+        return AgentSettingRefused(ex.code, ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(R.string.as_edit_err))
     }
 
     override suspend fun checklist(): Result<String> = try {

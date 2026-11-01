@@ -288,6 +288,16 @@ interface Hub {
      * "Agent settings"). Fails with [AgentSettingsTooOld] from a server without the route.
      */
     suspend fun agentSettings(): Result<AgentSettingsReply> = Result.failure(UnsupportedOperationException())
+    /** Goes up when another phone (or this one) changed one of them: `{t:"agent_settings"}`, a cue to read them again. */
+    val agentSettingsVersion: Int get() = 0
+    /**
+     * One key of the server's fixed list, from [expected], the hash the file was read with (docs/PROTOCOL.md,
+     * "Agent settings"). Fails with [AgentSettingRefused] in the server's words, or [AgentSettingsTooOld].
+     * The screen asks for the owner's fingerprint first when it loosens a permission.
+     */
+    suspend fun changeAgentSetting(agent: String, key: String, value: Any, expected: String?): Result<SettingChange> = Result.failure(UnsupportedOperationException())
+    /** The agent's last change put back, if the file is still what it wrote ([expected]). Fails as [changeAgentSetting] does. */
+    suspend fun undoAgentSetting(agent: String, expected: String): Result<Unit> = Result.failure(UnsupportedOperationException())
     /** Read a provider's balance now (OpenRouter); [providers] follows. */
     suspend fun checkProvider(id: String): Result<Provider> = Result.failure(UnsupportedOperationException())
     /**

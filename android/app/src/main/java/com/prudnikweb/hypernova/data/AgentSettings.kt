@@ -6,8 +6,9 @@ import org.json.JSONObject
 
 /**
  * The fixed list of Claude Code's and Codex's user-level settings on a server (docs/PROTOCOL.md,
- * "Agent settings"). Read-only. The server decides what may leave, so a key the app has no words
- * for is shown with its raw name.
+ * "Agent settings"). The server decides what may leave, so a key the app has no words for is shown
+ * with its raw name, and it decides what may be changed: only [AgentSettingsFile.editable] is, with
+ * only its choices.
  */
 @Immutable
 data class AgentSettingsReply(val claude: AgentSettingsFile, val codex: AgentSettingsFile) {
@@ -27,7 +28,28 @@ data class AgentSettingsReply(val claude: AgentSettingsFile, val codex: AgentSet
                 values = o.arr("values").mapObjects(::shown),
                 claude = summary?.takeIf { it.has("rules") }?.let(::claudeSummary),
                 codex = summary?.takeIf { it.has("projects") }?.let(::codexSummary),
+                hash = o.str("hash"),
+                editable = o.arr("editable").mapObjects(::editable),
+                undo = o.obj("undo")?.let(::undo),
+                whyNot = o.str("whyNot"),
             )
+        }
+
+        private fun editable(o: JSONObject): EditableSetting? {
+            val key = o.str("key") ?: return null
+            return EditableSetting(key, o.arr("choices").mapObjects(::choice)).takeIf { it.choices.isNotEmpty() }
+        }
+
+        private fun choice(o: JSONObject): SettingChoice? = when (val v = o.opt("value")) {
+            is String -> SettingChoice(v, null, o.bool("loosens"), o.str("label"))
+            is Boolean -> SettingChoice(null, v, o.bool("loosens"), null)
+            else -> null
+        }
+
+        private fun undo(o: JSONObject): SettingUndo? {
+            val key = o.str("key") ?: return null
+            val to = o.opt("to")
+            return SettingUndo(key, to as? String, to as? Boolean, o.bool("loosens"))
         }
 
         private fun shown(o: JSONObject): ShownSetting? {
@@ -64,12 +86,65 @@ data class AgentSettingsReply(val claude: AgentSettingsFile, val codex: AgentSet
 
 /** One agent's file: its [state], the shown [values], and one of the summaries when it was read. */
 @Immutable
-data class AgentSettingsFile(val state: String, val values: List<ShownSetting>, val claude: ClaudeSettingsSummary?, val codex: CodexSettingsSummary?) {
+data class AgentSettingsFile(
+    val state: String,
+    val values: List<ShownSetting>,
+    val claude: ClaudeSettingsSummary?,
+    val codex: CodexSettingsSummary?,
+    /** The file as read, sent back with a change. Null: it isn't there, or an older server. */
+    val hash: String? = null,
+    /** What may be changed. Empty: nothing, also from an older server. */
+    val editable: List<EditableSetting> = emptyList(),
+    /** The last change, if it can still be undone. */
+    val undo: SettingUndo? = null,
+    /** Why nothing here can be changed though the file reads fine: [LINK], [READ_ONLY], [NO_FOLDER]. */
+    val whyNot: String? = null,
+) {
     companion object {
         const val OK = "ok"
         const val MISSING = "missing"
         const val MALFORMED = "malformed"
         const val UNREADABLE = "unreadable"
+        const val LINK = "link"
+        const val READ_ONLY = "read_only"
+        const val NO_FOLDER = "no_folder"
+    }
+}
+
+/** A key that can be changed, and the only values the server takes for it. */
+@Immutable
+data class EditableSetting(val key: String, val choices: List<SettingChoice>)
+
+/** A value to pick: its [text] or [on], whether picking it now [loosens] a permission (the server's order), and Codex's name for a model. */
+@Immutable
+data class SettingChoice(val text: String?, val on: Boolean?, val loosens: Boolean, val label: String?) {
+    /** The value as it goes on the wire. */
+    val wire: Any get() = on ?: text.orEmpty()
+
+    /** Whether this is what [v] holds. `manual` is `default`'s other name, and only `default` is offered. */
+    fun isCurrent(v: ShownSetting?): Boolean = when {
+        v == null || v.state != ShownSetting.SET -> false
+        on != null -> v.on == on
+        else -> v.text == text || (v.key == "permissions.defaultMode" && v.text == "manual" && text == "default")
+    }
+}
+
+/** What Undo would do: [key] back to [toText] or [toOn]; both null, to not being set. */
+@Immutable
+data class SettingUndo(val key: String, val toText: String?, val toOn: Boolean?, val loosens: Boolean)
+
+/** What came of a change. [changed] false: it already had that value. */
+@Immutable
+data class SettingChange(val changed: Boolean, val loosened: Boolean, val hash: String?) {
+    companion object {
+        fun wire(o: JSONObject) = SettingChange(o.bool("changed"), o.bool("loosened"), o.str("hash"))
+    }
+}
+
+/** The server refused a change or an undo: its [code], and in [message] its own words to show. */
+class AgentSettingRefused(val code: String?, message: String) : HubException(message) {
+    companion object {
+        const val FILE_CHANGED = "file_changed"
     }
 }
 

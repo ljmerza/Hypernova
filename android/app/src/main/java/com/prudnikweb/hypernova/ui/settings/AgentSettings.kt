@@ -1,6 +1,8 @@
 package com.prudnikweb.hypernova.ui.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,37 +13,54 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
 import com.prudnikweb.hypernova.data.ClaudeSettingsSummary
 import com.prudnikweb.hypernova.data.CodexSettingsSummary
+import com.prudnikweb.hypernova.data.Confirm
+import com.prudnikweb.hypernova.data.EditableSetting
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.SettingChoice
+import com.prudnikweb.hypernova.data.SettingUndo
 import com.prudnikweb.hypernova.data.ShownSetting
+import com.prudnikweb.hypernova.ui.LocalConfirm
+import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.GlassSheet
+import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Hairline
+import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.LoadingLine
+import com.prudnikweb.hypernova.ui.components.NavRow
+import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
@@ -49,23 +68,89 @@ import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
+import kotlinx.coroutines.launch
 
 /**
  * Agents & providers › an agent's Settings: the fixed list from [hub]'s server, in plain words, then
- * the summaries (docs/DECISIONS.md, "The agents' settings, viewed"). Read-only for now. Each server
- * answers for itself, so this is the hub whose card was tapped.
+ * the summaries (docs/DECISIONS.md, "The agents' settings, viewed" and "…, edited"). A row the server
+ * lists as editable opens a picker of its allowed values; the others are only shown. Each server
+ * answers for itself, so this is the hub whose card was tapped, and nothing here changes several at once.
  */
 @Composable
 fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val codex = agent == AgentSettingsReply.CODEX
     val server = hub.mac.name
+    val context = LocalContext.current
+    val toast = LocalToast.current
+    val confirm = LocalConfirm.current
+    val scope = rememberCoroutineScope()
     var attempt by remember { mutableIntStateOf(0) }
     var reply by remember { mutableStateOf<Result<AgentSettingsReply>?>(null) }
-    LaunchedEffect(attempt) {
-        reply = null
+    /** The key whose picker is open. */
+    var picking by remember { mutableStateOf<String?>(null) }
+    /** The key being saved; the Undo row's too. */
+    var saving by remember { mutableStateOf<String?>(null) }
+    /** A failure, in the server's words, under the row it's about. */
+    var trouble by remember { mutableStateOf<Pair<String, String>?>(null) }
+    /** A 404 on a change: this server shows its settings but is older than changing them. */
+    var tooOld by remember { mutableStateOf(false) }
+    LaunchedEffect(attempt, hub.agentSettingsVersion) {
+        // A look again after a change keeps what's on screen until the new answer.
+        if (reply?.isSuccess != true) reply = null
         reply = hub.agentSettings()
     }
+    /** Runs [go], after a confirm saying what it allows and the owner's fingerprint if it [loosens] a permission. */
+    fun gated(loosens: Boolean, what: String, line: String?, go: () -> Unit) {
+        if (!loosens) return go()
+        confirm(
+            Confirm(
+                title = context.getString(R.string.as_loosen_title, server),
+                body = line?.let { context.getString(R.string.as_loosen_body, what, it) } ?: context.getString(R.string.as_loosen_generic),
+                action = context.getString(R.string.as_loosen_action),
+                danger = true,
+            ) {
+                OwnerCheck.ask(
+                    context, context.getString(R.string.as_check_title, server), what, context.getString(R.string.check_no_lock),
+                    onOk = go, onFail = { msg -> if (msg != null) toast(msg) },
+                )
+            },
+        )
+    }
+    /** A failure stays under its row; a refusal may mean the file moved on, so it's read again. */
+    fun failed(key: String, e: Throwable) {
+        if (e is AgentSettingsTooOld) tooOld = true
+        trouble = key to (e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.as_edit_err))
+        if (e is AgentSettingRefused) attempt++
+    }
+    fun save(key: String, choice: SettingChoice, expected: String?) {
+        saving = key
+        trouble = null
+        scope.launch {
+            hub.changeAgentSetting(agent, key, choice.wire, expected)
+                .onSuccess {
+                    if (it.changed) toast(context.getString(R.string.as_saved, server))
+                    attempt++
+                }
+                .onFailure { failed(key, it) }
+            saving = null
+        }
+    }
+    fun undo(key: String, expected: String) {
+        saving = key
+        trouble = null
+        scope.launch {
+            hub.undoAgentSetting(agent, expected)
+                .onSuccess {
+                    toast(context.getString(R.string.as_undone, server))
+                    attempt++
+                }
+                .onFailure { failed(key, it) }
+            saving = null
+        }
+    }
+    val current = reply?.getOrNull()?.of(agent)
+    val editable = if (tooOld) emptyMap() else current?.editable.orEmpty().associateBy { it.key }
     ScreenScaffold(
         sourceKey = "agent-settings:$agent",
         title = stringResource(if (codex) R.string.as_title_codex else R.string.as_title_claude),
@@ -81,8 +166,16 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
             item(key = "account-seam") { Seam(stringResource(R.string.as_account), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 2.dp)) }
             item(key = "account") { if (codex) CodexAccountCard(hub, server) else ClaudeAccountCard(hub, server) }
             item(key = "intro") {
+                // Not until the server's said otherwise is there anything to promise about changing them.
+                val viewOnly = tooOld || (current != null && current.editable.isEmpty())
                 HText(
-                    stringResource(if (codex) R.string.as_intro_codex else R.string.as_intro_claude, server),
+                    stringResource(
+                        when {
+                            codex -> if (viewOnly) R.string.as_intro_codex_view else R.string.as_intro_codex
+                            else -> if (viewOnly) R.string.as_intro_claude_view else R.string.as_intro_claude
+                        },
+                        server,
+                    ),
                     style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                 )
             }
@@ -102,11 +195,28 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
                 }
                 else -> {
                     val file = r.getOrThrow().of(agent)
+                    file.whyNot?.let { why -> whyNotWords(why)?.let { words -> item(key = "why-not") { HText(stringResource(words, server), style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 4.dp)) } } }
                     if (file.state != AgentSettingsFile.OK) {
                         item(key = "state") { FileState(file.state, codex, server) }
-                    } else {
+                    }
+                    // A file that isn't there yet: what can be set by making it, each not set.
+                    val rows = when {
+                        file.state == AgentSettingsFile.OK -> file.values
+                        file.state == AgentSettingsFile.MISSING -> editable.keys.map { ShownSetting(it, ShownSetting.UNSET, null, null) }
+                        else -> emptyList()
+                    }
+                    if (rows.isNotEmpty()) {
                         item(key = "values-seam") { Seam(stringResource(R.string.as_values), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp)) }
-                        item(key = "values") { ValuesCard(file.values) }
+                        item(key = "values") { ValuesCard(rows, editable, saving, trouble, enabled = saving == null) { trouble = null; picking = it } }
+                    }
+                    val offer = file.undo.takeIf { !tooOld }
+                    val hash = file.hash
+                    if (offer != null && hash != null) {
+                        item(key = "undo") {
+                            UndoCard(offer, saving == offer.key) { what, line -> gated(offer.loosens, what, line) { undo(offer.key, hash) } }
+                        }
+                    }
+                    if (file.state == AgentSettingsFile.OK) {
                         item(key = "summary-seam") { Seam(stringResource(R.string.as_summary), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 14.dp, bottom = 2.dp)) }
                         file.claude?.let { s -> item(key = "summary") { ClaudeSummaryCard(s) } }
                         file.codex?.let { s -> item(key = "summary") { CodexSummaryCard(s) } }
@@ -115,6 +225,25 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
             }
         }
     }
+    val key = picking
+    val edit = key?.let { editable[it] }
+    if (key != null && edit != null) {
+        val hash = current?.hash
+        PickerSheet(edit, current?.values?.firstOrNull { it.key == key }, onDismiss = { picking = null }) { choice, what, line ->
+            // The picker closes first: its own window would hide a confirm, or the line said on a phone with no lock.
+            picking = null
+            gated(choice.loosens, what, line) { save(key, choice, hash) }
+        }
+    }
+}
+
+/** Why a file reading fine has nothing to change. */
+@StringRes
+private fun whyNotWords(why: String): Int? = when (why) {
+    AgentSettingsFile.LINK -> R.string.as_why_link
+    AgentSettingsFile.READ_ONLY -> R.string.as_why_read_only
+    AgentSettingsFile.NO_FOLDER -> R.string.as_why_no_folder
+    else -> null
 }
 
 /**
@@ -175,23 +304,115 @@ private fun FileState(state: String, codex: Boolean, server: String) {
 }
 
 @Composable
-private fun ValuesCard(values: List<ShownSetting>) {
+private fun ValuesCard(values: List<ShownSetting>, editable: Map<String, EditableSetting>, saving: String?, trouble: Pair<String, String>?, enabled: Boolean, onPick: (String) -> Unit) {
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
             values.forEachIndexed { i, v ->
                 if (i > 0) Hairline(Modifier.fillMaxWidth())
                 val words = settingWords(v.key)
-                ReadOnlyRow(
-                    // A key without words of its own keeps its name, rather than a guess.
-                    label = words?.let { stringResource(it.first) } ?: v.key,
-                    value = shownValue(v),
-                    valueColor = when (v.state) {
-                        ShownSetting.UNRECOGNISED -> HN.amber
-                        ShownSetting.UNSET -> HN.inkDim
-                        else -> HN.ink
-                    },
-                    body = words?.let { stringResource(it.second) },
-                )
+                // A key without words of its own keeps its name, rather than a guess.
+                val label = words?.let { stringResource(it.first) } ?: v.key
+                val body = words?.let { stringResource(it.second) }
+                val color = when (v.state) {
+                    ShownSetting.UNRECOGNISED -> HN.amber
+                    ShownSetting.UNSET -> HN.inkDim
+                    else -> HN.ink
+                }
+                if (v.key in editable) {
+                    EditableRow(label, if (saving == v.key) stringResource(R.string.as_saving) else shownValue(v), color, body, whenWords(v.key)?.let { stringResource(it) }, enabled) { onPick(v.key) }
+                } else {
+                    ReadOnlyRow(label, shownValue(v), color, body)
+                }
+                if (trouble?.first == v.key) {
+                    HText(trouble.second, style = Type.small, color = HN.amber, modifier = Modifier.padding(bottom = 10.dp))
+                }
+            }
+        }
+    }
+}
+
+/** As [ReadOnlyRow], with a chevron and when a change applies. A tap opens its picker. */
+@Composable
+private fun EditableRow(label: String, value: String, valueColor: Color, body: String?, applies: String?, enabled: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(remember { MutableInteractionSource() }, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(vertical = 10.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            HText(label, style = Type.body, color = HN.ink, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(12.dp))
+            HText(value, style = Type.monoSmall, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 170.dp))
+            Spacer(Modifier.width(8.dp))
+            Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)
+        }
+        if (body != null) {
+            Spacer(Modifier.height(2.dp))
+            HText(body, style = Type.small, color = HN.inkDim)
+        }
+        if (applies != null) {
+            Spacer(Modifier.height(2.dp))
+            HText(applies, style = Type.small, color = HN.inkMuted)
+        }
+    }
+}
+
+/** Undo's row: what it would put back. [onUndo] gets the words for a confirm, should it ask. */
+@Composable
+private fun UndoCard(offer: SettingUndo, busy: Boolean, onUndo: (what: String, line: String?) -> Unit) {
+    val label = settingWords(offer.key)?.let { stringResource(it.first) } ?: offer.key
+    val shown = ShownSetting(offer.key, ShownSetting.SET, offer.toText, offer.toOn)
+    val unset = offer.toText == null && offer.toOn == null
+    val word = if (unset) "" else shownValue(shown)
+    val line = offer.toText?.let { valueLine(offer.key, it) }?.let { stringResource(it) }
+    val body = if (unset) stringResource(R.string.as_undo_to_unset, label) else stringResource(R.string.as_undo_to, label, word)
+    val what = if (unset) label else word
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+            NavRow(stringResource(R.string.as_undo_row), if (busy) stringResource(R.string.as_saving) else body, onClick = { if (!busy) onUndo(what, line) })
+        }
+    }
+}
+
+/** The server's allowed values for a key: the current one ticked, a line on each where it helps. */
+@Composable
+private fun PickerSheet(edit: EditableSetting, now: ShownSetting?, onDismiss: () -> Unit, onPick: (SettingChoice, what: String, line: String?) -> Unit) {
+    val label = settingWords(edit.key)?.let { stringResource(it.first) } ?: edit.key
+    GlassSheet(label, onDismiss) {
+        HText(label, style = Type.title, color = HN.ink)
+        whenWords(edit.key)?.let {
+            Spacer(Modifier.height(4.dp))
+            HText(stringResource(it), style = Type.small, color = HN.inkMuted)
+        }
+        // A permissive value in the file: shown for what it is, and not among the choices. A model's list only says what's on offer today.
+        if (now?.state == ShownSetting.SET && edit.key != "model" && edit.choices.none { it.isCurrent(now) }) {
+            Spacer(Modifier.height(6.dp))
+            HText(stringResource(R.string.as_now_off_list, shownValue(now)), style = Type.small, color = HN.amber)
+        }
+        if (edit.key == "approval_policy") {
+            Spacer(Modifier.height(6.dp))
+            HText(stringResource(R.string.as_approval_note), style = Type.small, color = HN.inkDim)
+        }
+        Spacer(Modifier.height(8.dp))
+        edit.choices.forEach { c ->
+            val word = c.label ?: shownValue(ShownSetting(edit.key, ShownSetting.SET, c.text, c.on))
+            val line = c.text?.let { valueLine(edit.key, it) }?.let { stringResource(it) }
+            val current = c.isCurrent(now)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp)
+                    .selectable(current, interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.RadioButton) { if (current) onDismiss() else onPick(c, word, line) }
+                    .padding(vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    HText(word, style = Type.body, color = if (current) HN.ink else HN.inkMuted)
+                    if (line != null) HText(line, style = Type.small, color = HN.inkDim)
+                }
+                Spacer(Modifier.width(12.dp))
+                if (current) Icon(Glyph.Check, size = 14.dp, color = HN.accent)
             }
         }
     }
@@ -372,6 +593,43 @@ internal fun valueWord(key: String, value: String): Int? = when (key) {
         "none" -> R.string.as_v_none
         "friendly" -> R.string.as_v_friendly
         "pragmatic" -> R.string.as_v_pragmatic
+        else -> null
+    }
+    else -> null
+}
+
+/** When a change to [key] reaches the agent: only what's been checked, else that it may take a new session (docs/DECISIONS.md, "The agents' settings, edited"). */
+@StringRes
+internal fun whenWords(key: String): Int? = when (key) {
+    "permissions.defaultMode" -> R.string.as_when_new_sessions
+    "showThinkingSummaries" -> R.string.as_when_maybe_new_session
+    "autoUpdatesChannel" -> R.string.as_when_next_update
+    "model", "model_reasoning_effort", "web_search" -> R.string.as_when_new_threads
+    // Hypernova's own thread/start names its sandbox and approvals (codex/sessions.ts).
+    "approval_policy", "sandbox_mode" -> R.string.as_when_new_threads_unchosen
+    else -> null
+}
+
+/** What a value does, in a line, where the key's own line doesn't already say. */
+@StringRes
+internal fun valueLine(key: String, value: String): Int? = when (key) {
+    "permissions.defaultMode" -> when (value) {
+        "plan" -> R.string.as_l_plan
+        "default", "manual" -> R.string.as_l_default
+        "dontAsk" -> R.string.as_l_dont_ask
+        "acceptEdits" -> R.string.as_l_accept
+        "auto" -> R.string.as_l_auto
+        else -> null
+    }
+    "autoUpdatesChannel" -> when (value) {
+        "latest" -> R.string.as_l_latest
+        "stable" -> R.string.as_l_stable
+        else -> null
+    }
+    "approval_policy" -> if (value == "on-request") R.string.as_l_on_request else null
+    "sandbox_mode" -> when (value) {
+        "read-only" -> R.string.as_l_read_only
+        "workspace-write" -> R.string.as_l_workspace_write
         else -> null
     }
     else -> null

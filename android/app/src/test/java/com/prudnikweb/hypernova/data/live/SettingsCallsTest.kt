@@ -4,6 +4,7 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
+import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
 import com.prudnikweb.hypernova.data.ShownSetting
 import com.prudnikweb.hypernova.data.ApiException
@@ -93,6 +94,60 @@ class SettingsCallsTest {
         val e = rig.call { rig.hub.agentSettings() }.exceptionOrNull()
         assertNotNull(e)
         assertFalse(e is AgentSettingsTooOld)
+    }
+
+    @Test fun aChangeGoesToTheRouteWithItsValueAndHashAndATimeWithNoFileSendsNull() {
+        connect()
+        answer("PUT", "/v1/agents/settings", "rest-agent-settings-put")
+        val r = rig.call { rig.hub.changeAgentSetting("claude", "permissions.defaultMode", "plan", "hash-1") }.getOrThrow()
+        assertTrue(r.changed)
+        val sent = JSONObject(last("PUT", "/v1/agents/settings").body)
+        assertEquals("claude", sent.getString("agent"))
+        assertEquals("permissions.defaultMode", sent.getString("key"))
+        assertEquals("plan", sent.getString("value"))
+        assertEquals("hash-1", sent.getString("expected"))
+
+        rig.call { rig.hub.changeAgentSetting("claude", "showThinkingSummaries", false, null) }.getOrThrow()
+        val second = JSONObject(last("PUT", "/v1/agents/settings").body)
+        assertEquals(false, second.get("value"))
+        assertTrue(second.isNull("expected"))
+    }
+
+    @Test fun aRefusalKeepsTheServersWordsAndItsCode() {
+        connect()
+        answer("PUT", "/v1/agents/settings", "rest-agent-settings-file-changed", status = 409)
+        val e = rig.call { rig.hub.changeAgentSetting("claude", "autoUpdatesChannel", "stable", "old") }.exceptionOrNull()
+        assertTrue(e is AgentSettingRefused)
+        assertEquals(AgentSettingRefused.FILE_CHANGED, (e as AgentSettingRefused).code)
+        assertTrue(e.message!!.contains("changed on the server"))
+    }
+
+    @Test fun aChangeOnAnOlderServerSaysItNeedsUpdating() {
+        connect()
+        daemon.on("PUT", "/v1/agents/settings") { refusal(404, "not_found", "Unknown endpoint.") }
+        val e = rig.call { rig.hub.changeAgentSetting("claude", "autoUpdatesChannel", "stable", "h") }.exceptionOrNull()
+        assertTrue(e is AgentSettingsTooOld)
+        assertEquals(RuntimeEnvironment.getApplication().getString(R.string.as_edit_too_old), e?.message)
+    }
+
+    @Test fun undoGoesToItsRouteAndARefusalIsTheServersWords() {
+        connect()
+        answer("POST", "/v1/agents/settings/undo", "rest-agent-settings-undo")
+        rig.call { rig.hub.undoAgentSetting("codex", "hash-2") }.getOrThrow()
+        val sent = JSONObject(last("POST", "/v1/agents/settings/undo").body)
+        assertEquals("codex", sent.getString("agent"))
+        assertEquals("hash-2", sent.getString("expected"))
+
+        answer("POST", "/v1/agents/settings/undo", "rest-agent-settings-undo-nothing", status = 409)
+        val e = rig.call { rig.hub.undoAgentSetting("codex", "hash-2") }.exceptionOrNull()
+        assertTrue(e is AgentSettingRefused)
+        assertEquals("nothing_to_undo", (e as AgentSettingRefused).code)
+    }
+
+    @Test fun anotherPhonesChangeIsACueToReadAgain() {
+        connect()
+        val before = rig.hub.agentSettingsVersion
+        rig.push(fixture("ws-agent-settings")) { rig.hub.agentSettingsVersion == before + 1 }
     }
 
     private val gateway = ProviderInput(

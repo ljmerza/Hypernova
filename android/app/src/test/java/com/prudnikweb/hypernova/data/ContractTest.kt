@@ -572,6 +572,36 @@ class ContractTest {
             assertEquals(ShownSetting.UNRECOGNISED, r.codex.values.single { it.key == "approval_policy" }.state)
             assertEquals(CodexSettingsSummary(2, listOf("fetch"), 0), r.codex.codex)
             assertNull(r.codex.claude)
+            // What can be changed: the hash to send back, the allowed values, and what would loosen.
+            assertNotNull(r.claude.hash)
+            assertNull(r.claude.undo)
+            assertNull(r.claude.whyNot)
+            val mode = r.claude.editable.single { it.key == "permissions.defaultMode" }
+            assertEquals(listOf("plan", "default", "dontAsk", "acceptEdits", "auto"), mode.choices.map { it.text })
+            assertEquals(listOf("auto"), mode.choices.filter { it.loosens }.map { it.text })
+            assertEquals(listOf(true, false), r.claude.editable.single { it.key == "showThinkingSummaries" }.choices.map { it.on })
+            assertEquals(listOf("latest", "stable"), r.claude.editable.single { it.key == "autoUpdatesChannel" }.choices.map { it.text })
+            // Nothing view-only is offered, and approvals as a table can't be edited in place.
+            assertEquals(listOf("permissions.defaultMode", "showThinkingSummaries", "autoUpdatesChannel"), r.claude.editable.map { it.key })
+            assertEquals(listOf("model_reasoning_effort", "sandbox_mode", "web_search"), r.codex.editable.map { it.key })
+        },
+        "rest-agent-settings-put" to { o ->
+            val c = SettingChange.wire(o)
+            assertTrue(c.changed)
+            assertFalse(c.loosened)
+            assertNotNull(c.hash)
+        },
+        "rest-agent-settings-undo" to { o -> assertTrue(o.bool("ok")) },
+        "rest-agent-settings-refused-key" to { o -> assertEquals("key_not_editable", Api.errorOf(403, o.toString()).code) },
+        "rest-agent-settings-refused-value" to { o -> assertEquals("value_not_allowed", Api.errorOf(403, o.toString()).code) },
+        "rest-agent-settings-file-changed" to { o ->
+            val e = Api.errorOf(409, o.toString())
+            assertEquals(Problem.Server, e.problem)
+            assertEquals(AgentSettingRefused.FILE_CHANGED, e.code)
+            assertTrue(e.serverMessage!!.contains("changed on the server"))
+        },
+        "rest-agent-settings-undo-nothing" to { o -> assertEquals("nothing_to_undo", Api.errorOf(409, o.toString()).code) },
+        "ws-agent-settings" to { o -> assertEquals("claude", ws(o, "agent_settings").str("agent"))
         },
         // A refusal the editor puts under the address (saveProvider's ProviderRefused keeps the code).
         "rest-provider-refused" to { o ->
