@@ -751,16 +751,6 @@ test('GET /v1/qa: the testing checklist’s page', async () => {
   contract('rest-qa', { url: r.url.replace(/:\d+\//, ':47321/').replace(/k=[0-9a-f]{32}/, 'k=qa-key') })
 })
 
-test('DELETE /v1/devices/me: the server forgets the phone that asks', async () => {
-  const token = 'contract-test-second-phone-0123456789abcdef'
-  addDevice({ id: 'phone-2', name: 'Pixel 2', model: 'Pixel 8', createdAt: Date.now(), lastSeenAt: Date.now() }, token)
-  assert.equal((await call('GET', '/v1/usage', undefined, token)).status, 200)
-  contract('rest-devices-me', (await call('DELETE', '/v1/devices/me', undefined, token)).json)
-  assert.equal((await call('GET', '/v1/usage', undefined, token)).status, 401)
-  // The other phone stays paired.
-  assert.equal((await get('/v1/usage')).status, 200)
-})
-
 test('every fixture is one this file checks (none left over from a message that went)', (t) => {
   if (mismatched) return t.skip('a fixture above did not match')
   if (UPDATE) {

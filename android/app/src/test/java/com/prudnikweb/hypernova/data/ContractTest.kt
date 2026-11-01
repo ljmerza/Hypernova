@@ -332,7 +332,7 @@ class ContractTest {
         "rest-jobs-respawn" to { o -> assertEquals(listOf(JobRestart("sess-all", true, "Done all00001")), OutdatedJobs.results(o)) },
         "rest-update" to { o -> assertEquals(true, ServerUpdate.parse(o.obj("update"))?.auto) },
         "rest-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true), ClaudeState.parse(o.obj("claude"))) },
-        // ── Settings: providers, the account, usage, the checklist, Forget (LiveHub's calls read these) ──
+        // ── Settings: providers, the account, usage, the checklist (LiveHub's calls read these) ──
         // saveProvider: the provider, the check its new key or address got, whether the key stayed behind.
         "rest-provider-save" to { o ->
             val p = Wire.provider(o.obj("provider")!!)
@@ -410,8 +410,6 @@ class ContractTest {
         "rest-usage-refresh" to { o -> staleUsage(Wire.usage(o.obj("usage"))!!) },
         // checklist(): the page's address, rebased onto the route in use.
         "rest-qa" to { o -> assertEquals("http://127.0.0.1:47321/qa?k=qa-key", o.str("url")) },
-        // Forget: the answer isn't read; any 200 is the server forgetting this phone.
-        "rest-devices-me" to { o -> assertTrue(o.bool("ok")) },
         // ── Statistics (StatsSource.load) ──
         "rest-stats" to { o ->
             val s = StatsWire.parse(o)

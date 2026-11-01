@@ -215,7 +215,7 @@ class SettingsCallsTest {
 
     @Test fun forgetAsksTheServerToForgetThisPhone() {
         connect()
-        answer("DELETE", "/v1/devices/me", "rest-devices-me")
+        daemon.ok("DELETE", "/v1/devices/me", JSONObject().put("ok", true))
         assertTrue(rig.call { rig.hub.forget() }.isSuccess)
         assertEquals("Bearer tok-z2", last("DELETE", "/v1/devices/me").auth)
     }
