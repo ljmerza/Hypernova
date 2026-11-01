@@ -50,6 +50,8 @@ enum class Glyph {
     Unlink,
     /** Someone's account (signed out, on hold). */
     Person,
+    /** Narrowing a list (three lines, each shorter, a funnel's outline): Home's filter. */
+    Filter,
 }
 
 @Composable
@@ -261,6 +263,11 @@ fun Icon(glyph: Glyph, modifier: Modifier = Modifier, size: Dp = 14.dp, color: C
             Glyph.Person -> {
                 drawCircle(color, radius = .17f * w, center = p(.5f, .34f), style = st)
                 drawArc(color, startAngle = 180f, sweepAngle = 180f, useCenter = false, topLeft = p(.2f, .62f), size = Size(.6f * w, .5f * h), style = st)
+            }
+            Glyph.Filter -> {
+                drawLine(color, p(.16f, .3f), p(.84f, .3f), st.width, StrokeCap.Round)
+                drawLine(color, p(.3f, .5f), p(.7f, .5f), st.width, StrokeCap.Round)
+                drawLine(color, p(.43f, .7f), p(.57f, .7f), st.width, StrokeCap.Round)
             }
             Glyph.Mic -> {
                 // A capsule on a stand: the body, the cradle round its foot, the stem and the base.
