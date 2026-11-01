@@ -135,6 +135,33 @@ class AgentSettingsScreenTest {
         rule.snap("agent_settings_codex")
     }
 
+    @Test fun accountDetailsComeFirstEvenWhenTheFileCant() {
+        val hub = object : Hub by FakeHub() {
+            override val account get() = com.prudnikweb.hypernova.data.Account(plan = "max")
+            override suspend fun agentSettings() = Result.failure<com.prudnikweb.hypernova.data.AgentSettingsReply>(IllegalStateException("nope"))
+        }
+        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, com.prudnikweb.hypernova.data.AgentSettingsReply.CLAUDE, onBack = {}) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.as_account).uppercase()).assertExists()
+        rule.onNodeWithText(str(R.string.ag_claude_signed_in_plan, "Max")).assertExists()
+    }
+
+    @Test fun codexAccountSaysItsPlanAndUsage() {
+        val hub = object : Hub by FakeHub() {
+            override val codex get() = com.prudnikweb.hypernova.data.CodexState(
+                available = true, enabled = true, connected = true,
+                account = com.prudnikweb.hypernova.data.CodexAccount(signedIn = true, type = "chatgpt", planType = "plus"),
+                usage = com.prudnikweb.hypernova.data.CodexUsage(null, com.prudnikweb.hypernova.data.Window(37.0, 0L), false, null),
+            )
+            override suspend fun agentSettings() = Result.failure<com.prudnikweb.hypernova.data.AgentSettingsReply>(IllegalStateException("nope"))
+        }
+        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, com.prudnikweb.hypernova.data.AgentSettingsReply.CODEX, onBack = {}) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.as_account_week)).assertExists()
+        rule.onNodeWithText("37%").assertExists()
+        rule.onNodeWithText(str(R.string.as_account_five)).assertDoesNotExist()
+    }
+
     @Test fun eachStateOfTheFileIsSaidForItsAgent() {
         hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MALFORMED), file(AgentSettingsFile.UNREADABLE)))
         open(AgentSettingsReply.CLAUDE)

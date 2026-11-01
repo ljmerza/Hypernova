@@ -3135,3 +3135,11 @@ decision.
    and schema keep MCP servers in `~/.claude.json` (with the account's details). The summary reads only
    `settings.json`, as the list says, so it usually shows none, and the row says those servers aren't
    listed. Reading names from `~/.claude.json` as well is a small change, for the owner to choose.
+
+## Account details in the agents' settings (2026-11-01)
+
+The owner asked for details about the account in Settings, then "in like the Claude Code and Codex
+settings, another section for the account details". Each agent's settings screen starts with
+**Account details**: how it's signed in and its plan, and how much of its 5-hour and 7-day windows
+is used, per server. He chose what the server already sends: the email and organization still stay
+on the server, so this can't say which account a server is on.

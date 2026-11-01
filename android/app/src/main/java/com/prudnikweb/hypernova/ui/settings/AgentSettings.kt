@@ -77,6 +77,9 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
             contentPadding = PaddingValues(top = top, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // Whatever the file says: this comes with the server's live state, and the file may be missing.
+            item(key = "account-seam") { Seam(stringResource(R.string.as_account), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 2.dp)) }
+            item(key = "account") { if (codex) CodexAccountCard(hub, server) else ClaudeAccountCard(hub, server) }
             item(key = "intro") {
                 HText(
                     stringResource(if (codex) R.string.as_intro_codex else R.string.as_intro_claude, server),
@@ -112,6 +115,50 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Account details (owner, 2026-11-01): what the server already sends, and no more. The email and
+ * organization stay on the server, as they always have.
+ */
+@Composable
+private fun ClaudeAccountCard(hub: Hub, server: String) {
+    val (line, trouble) = claudeAccountLine(hub.account, server)
+    val u = hub.usage
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            HText(line, style = Type.small, color = if (trouble) HN.amber else HN.inkMuted, modifier = Modifier.padding(vertical = 4.dp))
+            if (u.known) {
+                if (u.fiveHourReported) UsedRow(R.string.as_account_five, (u.fiveHour * 100).toInt())
+                UsedRow(R.string.as_account_week, (u.sevenDay * 100).toInt())
+            }
+        }
+    }
+}
+
+@Composable
+private fun CodexAccountCard(hub: Hub, server: String) {
+    val c = hub.codex
+    val account = c?.account
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            val line = when {
+                c == null -> stringResource(R.string.ag_not_installed, server)
+                account?.signedIn == true -> codexAccountLine(account)
+                account != null -> stringResource(R.string.ag_codex_signed_out, server)
+                else -> stringResource(R.string.as_account_unknown)
+            }
+            HText(line, style = Type.small, color = if (account?.signedIn == false) HN.amber else HN.inkMuted, modifier = Modifier.padding(vertical = 4.dp))
+            c?.usage?.fiveHour?.let { UsedRow(R.string.as_account_five, it.pct.toInt()) }
+            c?.usage?.sevenDay?.let { UsedRow(R.string.as_account_week, it.pct.toInt()) }
+        }
+    }
+}
+
+@Composable
+private fun UsedRow(@StringRes label: Int, percent: Int) {
+    Hairline(Modifier.fillMaxWidth())
+    ReadOnlyRow(stringResource(label), stringResource(R.string.as_account_used, percent), HN.ink, null)
 }
 
 /** The file isn't there (the agent's defaults), isn't valid, or can't be read. Never why in the file's own words: the server sends none. */

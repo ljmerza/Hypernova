@@ -918,6 +918,11 @@
     <string name="as_unrecognised">Unrecognised</string>
     <string name="as_on">On</string>
     <string name="as_off">Off</string>
+    <string name="as_account">Account details</string>
+    <string name="as_account_five">Used in 5 hours</string>
+    <string name="as_account_week">Used in 7 days</string>
+    <string name="as_account_used">%1$d%%</string>
+    <string name="as_account_unknown">Not known yet.</string>
     <string name="as_values">Settings</string>
     <string name="as_summary">Also in the file</string>
     <string name="as_rules">Permission rules</string>

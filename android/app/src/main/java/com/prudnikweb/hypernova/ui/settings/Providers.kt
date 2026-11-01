@@ -230,7 +230,7 @@ private fun ClaudeAgentCard(hub: Hub, onSettings: () -> Unit) {
 
 /** Claude Code's account in a line, and whether it needs the owner (amber). */
 @Composable
-private fun claudeAccountLine(a: Account, mac: String): Pair<String, Boolean> = when (a.state) {
+internal fun claudeAccountLine(a: Account, mac: String): Pair<String, Boolean> = when (a.state) {
     Account.LOGGED_OUT -> stringResource(R.string.ag_claude_signed_out, mac) to true
     Account.NO_SUBSCRIPTION -> stringResource(R.string.ag_claude_no_plan) to true
     Account.ON_HOLD -> stringResource(R.string.ag_claude_on_hold) to true
@@ -337,7 +337,7 @@ private fun CodexAgentCard(hub: Hub, onSettings: () -> Unit) {
 
 /** How Codex is signed in, in a line: ChatGPT and its plan, or an API key (which costs money). */
 @Composable
-private fun codexAccountLine(a: CodexAccount): String = when {
+internal fun codexAccountLine(a: CodexAccount): String = when {
     a.paid -> stringResource(R.string.ag_codex_api_key)
     else -> planWord(a.planType)?.let { stringResource(R.string.ag_codex_chatgpt_plan, it) } ?: stringResource(R.string.ag_codex_chatgpt)
 }
