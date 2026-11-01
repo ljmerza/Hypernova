@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "unavailable",
+    "message": "This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH.",
+    "feature": "openWindow"
+  }
+}

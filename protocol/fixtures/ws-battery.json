@@ -1,0 +1,9 @@
+{
+  "t": "battery",
+  "battery": {
+    "percent": 84,
+    "charging": false,
+    "onAC": false,
+    "minutesLeft": 312
+  }
+}
