@@ -116,7 +116,7 @@ settings.claudeAgents = true
 // The local listener off until its own test turns it on: whether it starts by itself depends on this machine's network.
 settings.lanAccess = false
 const hub = await import('../src/hub.ts')
-const { handleHook, installIntegration } = await import('../src/hooks.ts')
+const { handleHook, installIntegration, integrationStatus, uninstallIntegration } = await import('../src/hooks.ts')
 const { startServers, startPairing, announceApp } = await import('../src/http.ts')
 const { menuOf } = await import('../src/term/shared.ts')
 const { todoNow } = await import('../src/todos.ts')
@@ -997,6 +997,11 @@ test('Codex: POST /v1/codex, GET /v1/codex/models, a Codex session’s model, a 
   const socket = join(scratch, 'cx.sock')
   process.env.HYPERNOVA_CODEX_SOCKET = socket
   await fake.start(socket)
+  // The switch's Claude side is the SDK session that waits with the context (idle, bypass on offer),
+  // not a shared terminal starting up: Hypernova's hooks, which an earlier test here installs (and
+  // which turn shared terminals on), are out for this test and back after it.
+  const hooked = integrationStatus().hooks.installed
+  if (hooked) uninstallIntegration()
   try {
     // Whether its connection is up yet as the answer goes is the moment's: the shape is what counts.
     const on = await ok(post('/v1/codex', { enabled: true }))
@@ -1022,6 +1027,7 @@ test('Codex: POST /v1/codex, GET /v1/codex/models, a Codex session’s model, a 
     await post('/v1/codex', { enabled: false })
     delete process.env.HYPERNOVA_CODEX_SOCKET
     await fake.close()
+    if (hooked) installIntegration()
   }
 })
 
