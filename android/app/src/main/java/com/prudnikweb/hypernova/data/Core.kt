@@ -185,6 +185,7 @@ object Core {
             // A banner only for the computer on screen; a watched one's news are notifications.
             isVisible = { visible && active() },
             onNotice = { notifier.notice(it, server = id) },
+            onSessionReplaced = { notifier.replied(it, server = id) },
             onAccountFine = { notifier.cancelAccount(id) },
             onServerUpdateFine = { notifier.cancelServerUpdate(id) },
             heldOpen = { ConnectionService.running },

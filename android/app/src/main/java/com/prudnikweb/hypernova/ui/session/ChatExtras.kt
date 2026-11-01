@@ -124,7 +124,7 @@ internal fun WithMessageMenu(item: Item, onMenu: ((Item) -> Unit)?, content: @Co
 
 /**
  * The menu of the message [menuKey] names (null: none open). Quote puts the words into the box
- * through [onQuote]; a rewind opens the session that carries on, with the message back in its box.
+ * through [onQuote]; a rewind opens the session that replaces this one, with the message back in its box.
  */
 @Composable
 internal fun ChatMenuHost(hub: Hub, session: Session, items: List<Item>, menuKey: String?, onQuote: (String) -> Unit, onDismiss: () -> Unit) {
@@ -134,7 +134,7 @@ internal fun ChatMenuHost(hub: Hub, session: Session, items: List<Item>, menuKey
     val opener = LocalOpener.current
     val appScope = LocalAppScope.current
     // Codex has no rewind (docs/PROTOCOL.md, "Codex"): its messages' menus don't offer it.
-    val ask = remember(items, item, session.codex) { if (session.codex) null else rewindAsk(session, items, item) }
+    val ask = remember(items, item, session) { if (session.codex) null else rewindAsk(session, items, item) }
     MessageMenu(
         hub, item, ask,
         sessionId = session.id,
@@ -152,7 +152,7 @@ internal fun ChatMenuHost(hub: Hub, session: Session, items: List<Item>, menuKey
                 // opened before it would take it for gone and close.
                 repeat(40) { if (hub.session(r.sessionId) == null) delay(100) }
                 opener.switchSession(r.sessionId)
-                toast(context.getString(R.string.chat_rewound))
+                toast(r.originalStays ?: context.getString(R.string.chat_rewound))
             }
         },
         onDismiss = onDismiss,
@@ -171,5 +171,17 @@ private fun rewindAsk(session: Session, items: List<Item>, item: Item): RewindAs
     if (at < 0 || items.subList(0, at).none { it is Item.User && it.status == null }) return null
     val after = items.subList(at, items.size)
     // A side question's line isn't in the conversation (data/Asides.kt): nothing of it goes.
-    return RewindAsk(session.id, after.count { it is Item.User && it.status == null && !it.key.startsWith(com.prudnikweb.hypernova.data.Asides.KEY) }, after.count { it is Item.Assistant })
+    val gone = session.phase == com.prudnikweb.hypernova.data.Phase.Ended
+    return RewindAsk(
+        session.id, after.count { it is Item.User && it.status == null && !it.key.startsWith(com.prudnikweb.hypernova.data.Asides.KEY) }, after.count { it is Item.Assistant },
+        running = when {
+            gone -> RewindRunning.No
+            session.state == com.prudnikweb.hypernova.data.SessionState.NeedsYou -> RewindRunning.Waiting
+            session.state == com.prudnikweb.hypernova.data.SessionState.Working || session.agentsRunning > 0 || session.queued > 0 -> RewindRunning.Working
+            else -> RewindRunning.No
+        },
+        terminalCloses = !gone && (session.term != null || session.agentJob != null),
+        // Open in a terminal no holder has: nothing here can close it, and the server leaves it.
+        stays = !gone && session.origin == "terminal" && session.term == null && session.agentJob == null,
+    )
 }

@@ -63,6 +63,11 @@ class ContractTest {
             assertEquals("idle", s.state)
         },
         "ws-session-removed" to { o -> assertEquals("sess-gone", ws(o, "session.removed").str("id")) },
+        // LiveHub: a rewind's copy took its place, and whatever names the old id goes there.
+        "ws-session-replaced" to { o ->
+            assertEquals("00000000-0000-4000-8000-000000000001", ws(o, "session.removed").str("id"))
+            assertEquals("00000000-0000-4000-8000-000000000002", o.str("replacedBy"))
+        },
         "ws-job-died" to { o -> assertEquals(JobDied("sess-died", "exit 1 — Error: the API refused the request", T), JobDied.parse(ws(o, "job.died"))) },
         "ws-event-approval" to { o ->
             ws(o, "event")
@@ -449,10 +454,13 @@ class ContractTest {
         // ChatRepo.rewind: the new session, and the message for the prompt box.
         "rest-session-rewind" to { o ->
             val s = Wire.session(o.obj("session")!!)
-            assertEquals("Sketch the lexer (rewound)", s.title)
+            assertEquals("Sketch the lexer", s.title)
             assertNotEquals("c0ffee00-0000-4000-8000-0000000000aa", s.id)
             assertEquals("Now make it faster", o.str("text"))
             assertEquals(0, o.arr("files")!!.length())
+            // Null: the original went. A server older than this says nothing (ChatRepoTest).
+            assertTrue(o.has("originalStays"))
+            assertEquals(null, o.str("originalStays"))
         },
         // LiveHub.blocked, retryBlocked and dismissBlocked.
         "rest-blocked" to { o ->

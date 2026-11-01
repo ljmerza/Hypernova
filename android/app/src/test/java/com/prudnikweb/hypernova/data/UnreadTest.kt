@@ -45,6 +45,18 @@ class UnreadTest {
         assertEquals(1_000L, ReadMarks(kv) { 9_999L }.since())
     }
 
+    @Test fun aRewindMovesTheMarkOnceAndOnlyIfThereWasOne() {
+        val marks = ReadMarks(Map()) { 0L }
+        assertFalse("never opened: nothing to move", marks.moved("old", "new", 500))
+        assertNull(marks.readUpTo("new"))
+        marks.mark("old", 200)
+        assertTrue(marks.moved("old", "new", 500))
+        assertNull(marks.readUpTo("old"))
+        assertFalse(marks.unread(s("new", 500)))
+        assertFalse("told again", marks.moved("old", "new", 900))
+        assertTrue(marks.unread(s("new", 900)))
+    }
+
     @Test fun openingMarksItReadAndNeverBack() {
         val marks = ReadMarks(Map()) { 0L }
         assertNull(marks.readUpTo("a"))

@@ -132,12 +132,23 @@ internal fun MessageMenu(
 
 private enum class Page { Actions, Select, Rewind }
 
-/** What a rewind to a message would leave behind: the owner's messages from it on, and Claude's replies. */
-data class RewindAsk(val sessionId: String, val yours: Int, val replies: Int)
+/** Whether the session is at something a rewind stops: at work, or waiting for the owner's answer. */
+enum class RewindRunning { No, Working, Waiting }
+
+/**
+ * What a rewind to a message would leave behind: the owner's messages from it on, and Claude's
+ * replies. [running]: what it would stop. [terminalCloses]: it has a terminal, which closes.
+ * [stays]: it's open in a terminal nothing here can close, so it stays beside the new one.
+ */
+data class RewindAsk(
+    val sessionId: String, val yours: Int, val replies: Int,
+    val running: RewindRunning = RewindRunning.No, val terminalCloses: Boolean = false, val stays: Boolean = false,
+)
 
 /**
  * Asks before rewinding, saying what goes and what doesn't: the conversation from this message on
- * (in the new session; this one stays as it was), but not the files Claude changed.
+ * goes from the app, anything still running stops and its terminal closes, but the files Claude
+ * changed stay as they are.
  */
 @Composable
 private fun RewindConfirm(item: Item, ask: RewindAsk, onRewound: (Rewound) -> Unit, onDismiss: () -> Unit) {
@@ -147,13 +158,23 @@ private fun RewindConfirm(item: Item, ask: RewindAsk, onRewound: (Rewound) -> Un
     ChatSheet(stringResource(R.string.chat_rewind_title), { if (!busy) onDismiss() }) {
         HText(stringResource(R.string.chat_rewind_title), style = Type.title, color = HN.ink)
         Spacer(Modifier.height(10.dp))
+        when (ask.running) {
+            RewindRunning.No -> null
+            RewindRunning.Working -> R.string.chat_rewind_working
+            RewindRunning.Waiting -> R.string.chat_rewind_waiting
+        }?.takeUnless { ask.stays }?.let {
+            HText(stringResource(it), style = Type.body, color = HN.amber)
+            Spacer(Modifier.height(10.dp))
+        }
         val yours = pluralStringResource(R.plurals.chat_rewind_yours, ask.yours, ask.yours)
         val lost = if (ask.replies > 0) stringResource(R.string.chat_rewind_both, yours, pluralStringResource(R.plurals.chat_rewind_replies, ask.replies, ask.replies)) else yours
         HText(stringResource(R.string.chat_rewind_body, lost), style = Type.body, color = HN.inkMuted)
         Spacer(Modifier.height(10.dp))
         HText(stringResource(R.string.chat_rewind_files), style = Type.small, color = HN.amber)
-        Spacer(Modifier.height(6.dp))
-        HText(stringResource(R.string.chat_rewind_keep), style = Type.small, color = HN.inkDim)
+        if (ask.stays || ask.terminalCloses) {
+            Spacer(Modifier.height(6.dp))
+            HText(stringResource(if (ask.stays) R.string.chat_rewind_stays else R.string.chat_rewind_closes), style = Type.small, color = HN.inkDim)
+        }
         Spacer(Modifier.height(18.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Pill(stringResource(R.string.cancel), { if (!busy) onDismiss() }, Modifier.weight(1f), kind = PillKind.Ghost, height = 48.dp)

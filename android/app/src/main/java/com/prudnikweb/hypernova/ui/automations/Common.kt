@@ -29,7 +29,7 @@ fun summaryContext(hub: Hub, now: Long): SummaryContext = SummaryContext(
     zone = zoneOf(hub.automations.state?.tz),
     now = now,
     projectName = { path -> hub.projects.firstOrNull { it.path == path }?.name ?: path.trimEnd('/').substringAfterLast('/').ifEmpty { path } },
-    sessionName = { id -> hub.session(id)?.name },
+    sessionName = { id -> (hub.session(id) ?: hub.replacedBy(id)?.let(hub::session))?.name },
     providerName = { id -> if (id == com.prudnikweb.hypernova.data.AgentKind.CODEX_PROVIDER) hub.codex?.let { com.prudnikweb.hypernova.data.Core.app.getString(R.string.cx_agent_codex) } else hub.providers.firstOrNull { it.id == id }?.name },
 )
 

@@ -82,6 +82,17 @@ class ReadMarks(private val kv: KeyValue, private val clock: () -> Long = System
 
     fun unread(s: Session): Boolean = Unread.unread(s.updatedAt, readUpTo(s.id), since())
 
+    /**
+     * A rewind replaced session [old] with [to], last active at [at]: a session he had opened is
+     * still one he has read (the rewind added no reply), and the old id's mark goes. Taken once:
+     * nothing happens for an id with no mark, so being told again can't hide a later reply.
+     */
+    fun moved(old: String, to: String, at: Long): Boolean {
+        if (readUpTo(old) == null) return false
+        kv.put(READ + old, null)
+        return mark(to, at)
+    }
+
     companion object {
         private const val SINCE = "since"
         private const val READ = "read."
@@ -112,6 +123,11 @@ object ReadState {
     fun unread(marks: ReadMarks, s: Session): Boolean {
         version
         return marks.unread(s)
+    }
+
+    /** A rewind on [server] replaced session [old] with [to] ([ReadMarks.moved]). */
+    fun moved(context: Context, server: String, old: String, to: String, at: Long) {
+        if (of(context, server).moved(old, to, at)) version++
     }
 
     /** Session [id] on [server] was on screen with its last activity at [at]. */

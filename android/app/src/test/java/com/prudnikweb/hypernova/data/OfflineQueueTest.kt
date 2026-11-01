@@ -15,6 +15,18 @@ class OfflineQueueTest {
 
     private var t = 1_000L
     private fun queue(store: Mem = Mem()) = OfflineQueue(store) { t++ }
+
+    @Test fun whatWaitsForASessionARewindReplacedWaitsForTheNewOne() {
+        val store = Mem()
+        val q = queue(store)
+        q.add("s1", "keep me", emptyList())
+        q.add("other", "not me", emptyList())
+        q.moved("s1", "s2")
+        assertEquals(listOf("keep me"), q.of("s2").map { it.text })
+        assertTrue(q.of("s1").isEmpty())
+        assertEquals(listOf("not me"), q.of("other").map { it.text })
+        assertEquals(listOf("keep me"), OfflineQueue(store) { t++ }.of("s2").map { it.text })
+    }
     private val file = Attachment("/m/att/a.png", "a.png", "image/png", 42)
 
     @Test fun promptsComeOutInTheOrderTheyWereTyped() {

@@ -64,6 +64,8 @@ class LiveHub(
     private val isVisible: () -> Boolean = { true },
     /** A session finished, waits in its terminal or failed while the app isn't on screen. */
     private val onNotice: (Notice) -> Unit = {},
+    /** A rewind replaced this session (docs/PROTOCOL.md, "Rewind"): its notification can go. */
+    private val onSessionReplaced: (String) -> Unit = {},
     /** The account needs nothing from the owner any more: its notification can go. */
     private val onAccountFine: () -> Unit = {},
     /** No update of this server's has failed (any more): its notification can go. */
@@ -603,7 +605,8 @@ class LiveHub(
     private sealed interface Msg {
         class Snap(val s: Snapshot, val speech: JSONObject? = null) : Msg
         class SessionMsg(val s: WSession) : Msg
-        class Removed(val id: String) : Msg
+        /** [replacedBy]: a rewind's copy took its place (docs/PROTOCOL.md, "Rewind"). */
+        class Removed(val id: String, val replacedBy: String? = null) : Msg
         /** A `claude agents` job died (data/JobDied.kt): said once, as a session stopping on an error is. */
         class Died(val d: JobDied) : Msg
         class Event(val sessionId: String, val e: WEvent) : Msg
@@ -644,7 +647,7 @@ class LiveHub(
     private fun parse(o: JSONObject): Msg? = when (o.str("t")) {
         "snapshot" -> o.obj("snapshot")?.let { Msg.Snap(Wire.snapshot(it), it.obj("speech")) }
         "session" -> o.obj("session")?.let { Msg.SessionMsg(Wire.session(it)) }
-        "session.removed" -> o.str("id")?.let { Msg.Removed(it) }
+        "session.removed" -> o.str("id")?.let { Msg.Removed(it, o.str("replacedBy")?.takeIf { to -> to.isNotBlank() }) }
         "job.died" -> JobDied.parse(o)?.let { Msg.Died(it) }
         "event" -> {
             val sid = o.str("sessionId")
@@ -691,7 +694,12 @@ class LiveHub(
                 if (old != null) changed(old, m.s)
                 if (old != null) heldLeft(old, m.s)
             }
-            is Msg.Removed -> { raw = raw - m.id; publish() }
+            is Msg.Removed -> {
+                // First: a screen on it goes to what replaced it the moment the session goes.
+                m.replacedBy?.let { replaced(m.id, it) }
+                raw = raw - m.id
+                publish()
+            }
             is Msg.Died -> {
                 val n = m.d.notice(session(m.d.sessionId)?.name ?: raw[m.d.sessionId]?.title ?: res.getString(R.string.untitled_session), res.getString(R.string.notice_job_died))
                 if (noticed.add(n.id)) notice(n)
@@ -914,6 +922,8 @@ class LiveHub(
         macBrowse = s.mac.browseOutsideProjects
         setServerUpdate(s.mac.update)
         raw = s.sessions.associateBy { it.id }
+        // A rewind on another phone while this one was away (docs/PROTOCOL.md, "Rewind").
+        for ((old, to) in s.replaced) replaced(old, to)
         val before = approvals
         approvals = s.approvals.associateBy { it.id }
         for (gone in before.keys - approvals.keys) onApprovalGone(gone)
@@ -1116,6 +1126,29 @@ class LiveHub(
     override fun approval(sessionId: String): WApproval? = raw[sessionId]?.let(::askOf)
 
     override fun session(id: String): Session? = sessions.firstOrNull { it.id == id }
+
+    /** Sessions a rewind replaced, this run: old id to new. */
+    private val replacements = mutableStateMapOf<String, String>()
+
+    override fun replacedBy(id: String): String? = replacements[id]
+
+    /**
+     * A rewind's copy replaced session [old] (docs/PROTOCOL.md, "Rewind"): what this phone keeps under
+     * the old id goes on under [to], and the old id's notification goes (its Reply would still reach
+     * [to], but it would open a conversation that moved on). Once per id per run; a snapshot says it
+     * again after every reconnect, and it's safe when there's nothing left to move.
+     */
+    private fun replaced(old: String, to: String) {
+        if (replacements[old] == to) return
+        replacements[old] = to
+        // The same card, not a new one: no reveal.
+        knownIds = knownIds?.plus(to)
+        onSessionReplaced(old)
+        SessionCarry.moved(old, to)
+        offline.moved(old, to)
+        // Its last activity, known before this says so; else nothing that could hide a reply.
+        ReadState.moved(app, serverId, old, to, raw[to]?.lastActivityAt ?: 0L)
+    }
 
     override fun consumeReveal(s: Session): Boolean = s.isNew && revealed.add(s.id)
 

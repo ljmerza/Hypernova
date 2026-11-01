@@ -104,6 +104,11 @@ class OfflineQueue(private val store: QueueStore, private val clock: () -> Long 
     /** The Mac has no such session. */
     fun markEnded(id: String) = change(items.map { if (it.id == id) it.copy(ended = true) else it })
 
+    /** A rewind replaced session [old] with [to]: what waits for the one waits for the other. */
+    fun moved(old: String, to: String) {
+        if (items.any { it.sessionId == old }) change(items.map { if (it.sessionId == old) it.copy(sessionId = to) else it })
+    }
+
     /**
      * What to send next, in the order typed: a session's prompts go one after the other, so none
      * overtakes another, and a session whose earlier prompt is on its way waits for it.

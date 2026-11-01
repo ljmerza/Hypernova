@@ -73,6 +73,8 @@ interface Hub {
     val providers: List<Provider>
 
     fun session(id: String): Session?
+    /** What session [id] is now, if a rewind replaced it (docs/PROTOCOL.md, "Rewind"): screens and links on the old id go there. */
+    fun replacedBy(id: String): String? = null
     fun transcript(id: String): List<Item>
     /** True while a session's history is loading for the first time. */
     fun loadingTranscript(id: String): Boolean = false

@@ -38,6 +38,12 @@ object Asides {
         bySession[sessionId] = merged(of(sessionId), a, chat)
     }
 
+    /** A rewind replaced session [old] with [to]: its side questions go on there. */
+    fun moved(old: String, to: String) {
+        val list = bySession.remove(old) ?: return
+        bySession[to] = list + of(to)
+    }
+
     /** The card's swipe: [id] stays in the chat and the tab, its card goes. */
     fun dismiss(sessionId: String, id: String) {
         bySession[sessionId] = of(sessionId).map { if (it.aside.id == id) it.copy(dismissed = true) else it }

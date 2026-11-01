@@ -47,7 +47,9 @@
     <string name="chat_prompts_full">You have 12 quick prompts already. Long-press one to change or delete it.</string>
     <string name="chat_rewind">Rewind to here</string>
     <string name="chat_rewind_title">Rewind to here?</string>
-    <string name="chat_rewind_body">Claude forgets this message and everything after it: %1$s. The message comes back to the prompt box, to change and send again.</string>
+    <string name="chat_rewind_body">The conversation goes back to here, and later messages are gone from the app: %1$s. This message comes back to the prompt box, to change and send again.</string>
+    <string name="chat_rewind_working">This session is still working. Rewinding stops it.</string>
+    <string name="chat_rewind_waiting">This session is waiting for your answer. Rewinding stops it.</string>
     <string name="chat_rewind_both">%1$s and %2$s</string>
     <plurals name="chat_rewind_yours">
         <item quantity="one">%d message from you</item>
@@ -58,10 +60,12 @@
         <item quantity="other">%d replies</item>
     </plurals>
     <string name="chat_rewind_files">Files Claude changed stay as they are.</string>
-    <string name="chat_rewind_keep">It carries on in a new session; this one stays as it was.</string>
+    <string name="chat_rewind_closes">Its terminal closes.</string>
+    <string name="chat_rewind_stays">It’s open in a terminal Hypernova can’t close, so it stays on Home beside the rewound one.</string>
     <string name="chat_rewind_go">Rewind</string>
     <string name="chat_rewinding">Rewinding…</string>
     <string name="chat_rewound">Rewound. Your message is back in the box.</string>
+    <string name="chat_rewound_older">Rewound. This server is older, so the earlier session stays on Home too. Your message is back in the box.</string>
 
     <!-- Quick prompts -->
     <string name="chat_qp_continue">Continue</string>

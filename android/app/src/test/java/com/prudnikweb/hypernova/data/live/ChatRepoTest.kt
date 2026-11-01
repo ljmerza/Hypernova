@@ -83,6 +83,23 @@ class ChatRepoTest {
         assertEquals("u:abc", daemon.calls("POST", "/v1/sessions/s1/rewind").single().json.getString("eventId"))
     }
 
+    @Test fun aRewindSaysWhenTheEarlierSessionStaysInTheServersWordsOrThatTheServerIsOlder() = runBlocking {
+        val f = fixture("rest-session-rewind")
+        // The session it replaces is gone: nothing to say.
+        daemon.ok("POST", "/v1/sessions/s1/rewind", f)
+        assertEquals(null, ChatRepo.rewind("s1", "u:abc").getOrThrow().originalStays)
+        // A stop that failed: the rewind stands, in the server's words.
+        val words = "Rewound. The earlier session’s terminal didn’t close, so it stays on Home too. Your message is back in the box."
+        daemon.ok("POST", "/v1/sessions/s1/rewind", JSONObject(f.toString()).put("originalStays", words))
+        assertEquals(words, ChatRepo.rewind("s1", "u:abc").getOrThrow().originalStays)
+        // An older server's answer has no such field, and it left the old session: said, and nothing breaks.
+        val older = JSONObject(f.toString()).apply { remove("originalStays") }
+        daemon.ok("POST", "/v1/sessions/s1/rewind", older)
+        val r = ChatRepo.rewind("s1", "u:abc").getOrThrow()
+        assertEquals(words(R.string.chat_rewound_older), r.originalStays)
+        assertEquals("Now make it faster", r.text)
+    }
+
     @Test fun whatTheyCantDoIsTheServersWordsOrSaysTheServerIsOlder() = runBlocking {
         daemon.on("POST", "/v1/sessions/s1/rewind") { refusal(409, "first_message", "That’s where the conversation starts. Start a new session instead.") }
         assertEquals("That’s where the conversation starts. Start a new session instead.", ChatRepo.rewind("s1", "u:1").exceptionOrNull()?.message)

@@ -137,6 +137,10 @@ class ChatMoreTest {
         val lost = str(R.string.chat_rewind_both, yours, context.resources.getQuantityString(R.plurals.chat_rewind_replies, 1, 1))
         rule.onNodeWithText(str(R.string.chat_rewind_body, lost)).assertExists()
         rule.onNodeWithText(str(R.string.chat_rewind_files)).assertExists()
+        // A claude agents job: its terminal closes. At rest, nothing warns of stopping.
+        rule.onNodeWithText(str(R.string.chat_rewind_closes)).assertExists()
+        rule.onNodeWithText(str(R.string.chat_rewind_working)).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.chat_rewind_waiting)).assertDoesNotExist()
         rule.snap("chat_rewind_confirm")
         // No computer to ask here: it says so, and nothing moved.
         rule.onNodeWithText(str(R.string.chat_rewind_go)).performClick()

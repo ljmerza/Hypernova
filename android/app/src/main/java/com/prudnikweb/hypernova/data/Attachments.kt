@@ -187,3 +187,24 @@ object AttachDrafts {
     fun givenBack(key: String): String? = returned[key]
     fun takeBack(key: String): String? = returned.remove(key)
 }
+
+/**
+ * What this phone keeps by session id only in memory, moved when a rewind replaces a session
+ * (docs/PROTOCOL.md, "Rewind"): the composer's files, its text, and the side questions. Read marks
+ * and prompts waiting for the Mac are the hub's to move (LiveHub.replaced).
+ */
+object SessionCarry {
+    /** Each open composer's words as last drawn: a closing screen's saved state can't be read from outside. */
+    private val typing = HashMap<String, String>()
+
+    fun typing(sessionId: String, text: String) {
+        if (text.isEmpty()) typing.remove(sessionId) else typing[sessionId] = text
+    }
+
+    fun moved(old: String, to: String) {
+        AttachDrafts.restore(to, AttachDrafts.take(old))
+        AttachDrafts.takeBack(old)?.let { AttachDrafts.giveBack(to, it) }
+        typing.remove(old)?.let { AttachDrafts.giveBack(to, it) }
+        Asides.moved(old, to)
+    }
+}

@@ -64,8 +64,12 @@ enum class TodoStatus { Pending, Active, Done }
 @Immutable
 data class Todo(val id: String, val text: String, val active: String?, val status: TodoStatus)
 
-/** A rewind's result: the session that carries on, and the message for its prompt box. */
-data class Rewound(val sessionId: String, val text: String, val files: List<Attachment>)
+/**
+ * A rewind's result: the session that carries on, the message for its prompt box, and
+ * [originalStays]: why the session it replaces is still there (null when it's gone, as it should be):
+ * the server's words, or the app's for an older server, which always leaves it.
+ */
+data class Rewound(val sessionId: String, val text: String, val files: List<Attachment>, val originalStays: String? = null)
 
 /**
  * The chat's own calls to the Mac: the usage strip, Claude's to-do list, "Rewind to here" and
@@ -108,7 +112,8 @@ object ChatRepo {
         val o = api().post("/v1/sessions/$sessionId/rewind", JSONObject().put("eventId", eventId))
         val id = o.obj("session")?.str("id") ?: throw HubException(Core.app.getString(R.string.chat_err_mac))
         val files = o.arr("files")?.let { a -> (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(Wire::attachment) } }.orEmpty()
-        Result.success(Rewound(id, o.str("text").orEmpty(), files))
+        val stays = if (o.has("originalStays")) o.str("originalStays")?.takeIf { it.isNotBlank() } else Core.app.getString(R.string.chat_rewound_older)
+        Result.success(Rewound(id, o.str("text").orEmpty(), files, stays))
     } catch (e: CancellationException) {
         // Left the screen: not a failure to show ("StandaloneCoroutine was cancelled").
         throw e

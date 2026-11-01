@@ -1,9 +1,13 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.data.AttachDrafts
+import com.prudnikweb.hypernova.data.DraftFile
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Notice
+import com.prudnikweb.hypernova.data.ReadState
 import com.prudnikweb.hypernova.data.Resolution
 import com.prudnikweb.hypernova.data.SendStatus
+import com.prudnikweb.hypernova.data.SessionCarry
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
@@ -63,6 +67,45 @@ class SocketEventsTest {
         connectWith(session("s1"), session("s2"))
         rig.push(msg("session.removed") { put("id", "s1") }) { rig.hub.session("s1") == null }
         assertEquals(listOf("s2"), rig.hub.sessions.map { it.id })
+    }
+
+    @Test fun aRewindsCopyReplacesTheSessionAndWhatThePhoneKeptGoesOnThere() {
+        connectWith(session("s1", title = "Same title"), session("s2", title = "Same title", lastActivityAt = 7_000))
+        val marks = ReadState.of(rig.context, rig.serverId)
+        marks.mark("s1", 1_000)
+        SessionCarry.typing("s1", "half a thought")
+        AttachDrafts.add("s1", DraftFile(AttachDrafts.nextId(), "a.png", true))
+        rig.push(msg("session.removed") { put("id", "s1"); put("replacedBy", "s2") }) { rig.hub.session("s1") == null }
+        assertEquals("s2", rig.hub.replacedBy("s1"))
+        // Its notification goes (Core: Notifier), and an old id's read mark doesn't linger.
+        assertEquals(listOf("s1"), rig.replaced)
+        assertEquals(null, marks.readUpTo("s1"))
+        assertEquals(7_000L, marks.readUpTo("s2"))
+        assertFalse(rig.hub.session("s2")!!.isNew)
+        // The box: its words and files, under the new id.
+        assertEquals("half a thought", AttachDrafts.takeBack("s2"))
+        assertEquals(1, AttachDrafts.take("s2").size)
+        assertTrue(AttachDrafts.of("s1").isEmpty())
+    }
+
+    @Test fun anOlderServersPlainRemovalReplacesNothing() {
+        connectWith(session("s1"), session("s2"))
+        rig.push(msg("session.removed") { put("id", "s1") }) { rig.hub.session("s1") == null }
+        assertEquals(null, rig.hub.replacedBy("s1"))
+        assertTrue(rig.replaced.isEmpty())
+    }
+
+    @Test fun aPhoneThatWasAwayHearsOfTheRewindInTheSnapshotWithoutHidingLaterReplies() {
+        daemon.snapshot = snapshot(sessions = listOf(session("s2", lastActivityAt = 7_000))) { put("replaced", JSONObject().put("s1", "s2")) }
+        val marks = ReadState.of(rig.context, rig.serverId)
+        marks.mark("s1", 1_000)
+        rig.connect()
+        assertEquals("s2", rig.hub.replacedBy("s1"))
+        assertEquals(listOf("s1"), rig.replaced)
+        assertEquals(7_000L, marks.readUpTo("s2"))
+        // Said again on the next reconnect: the mark is taken once, so a later reply stays unread.
+        assertFalse(marks.moved("s1", "s2", 9_000))
+        assertEquals(7_000L, marks.readUpTo("s2"))
     }
 
     @Test fun aNewApprovalIsPendingAndAnnouncedThenResolvedTakesItAway() {

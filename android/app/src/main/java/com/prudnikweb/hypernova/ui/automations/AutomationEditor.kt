@@ -1130,7 +1130,8 @@ internal fun ContinueParams(
         a.target == Action.Continue.LIMITED -> stringResource(R.string.au_t_limited)
         stepNumber != null -> stringResource(R.string.wf_t_step, stepNumber)
         a.target.startsWith(Action.Continue.STEP) -> stringResource(R.string.wf_target_step_short)
-        else -> hub.session(a.target)?.name ?: stringResource(R.string.au_sum_target_gone)
+        // A rewind replaced it: the server follows the old id too (docs/PROTOCOL.md, "Rewind").
+        else -> (hub.session(a.target) ?: hub.replacedBy(a.target)?.let(hub::session))?.name ?: stringResource(R.string.au_sum_target_gone)
     }
     PickRow(stringResource(R.string.au_session), target, { pick = true })
     if (errorField == "target") HText(stringResource(R.string.au_err_target), style = Type.small, color = HN.amber)

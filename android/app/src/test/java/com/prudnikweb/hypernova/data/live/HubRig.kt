@@ -69,6 +69,8 @@ class HubRig(
     /** Approvals the hub asked to notify (off screen). */
     val notified = mutableListOf<Pair<WApproval, Session?>>()
     /** Approvals whose notification can go. */
+    /** Sessions a rewind replaced, as Core takes their notifications away. */
+    val replaced = mutableListOf<String>()
     val gone = mutableListOf<String>()
     /** Notices as system notifications (off screen). */
     val notices = mutableListOf<Notice>()
@@ -80,6 +82,7 @@ class HubRig(
         toast = { toasts += it },
         onApproval = { a, s -> notified += a to s },
         onApprovalGone = { gone += it },
+        onSessionReplaced = { replaced += it },
         isVisible = { visible },
         onNotice = { notices += it },
         heldOpen = { heldOpen },

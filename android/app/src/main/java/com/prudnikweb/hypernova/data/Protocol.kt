@@ -543,6 +543,8 @@ data class Snapshot(
     val codex: CodexState? = null,
     /** Claude Code on the computer (data/AgentLead.kt); null from an older daemon, where it always was. */
     val claude: ClaudeState? = null,
+    /** Sessions a rewind replaced, and what each is now (docs/PROTOCOL.md, "Rewind"); none from an older daemon. */
+    val replaced: Map<String, String> = emptyMap(),
 )
 
 // ─── Parsing ────────────────────────────────────────────────────────────────
@@ -986,5 +988,6 @@ object Wire {
         lan = LanInfo.parse(o.obj("lan")),
         codex = runCatching { CodexWire.state(o.obj("codex")) }.getOrNull(),
         claude = runCatching { ClaudeState.parse(o.obj("claude")) }.getOrNull(),
+        replaced = o.obj("replaced")?.let { r -> r.keys().asSequence().mapNotNull { k -> r.str(k)?.takeIf { it.isNotBlank() }?.let { k to it } }.toMap() }.orEmpty(),
     )
 }

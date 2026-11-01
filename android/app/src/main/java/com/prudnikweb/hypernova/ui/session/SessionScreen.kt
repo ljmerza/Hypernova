@@ -195,6 +195,12 @@ fun SessionScreen(
     val (attach, pickers) = rememberAttach(sessionId, hub)
     val session = hub.session(sessionId)
     if (session == null) {
+        // A rewind replaced it, here or on another phone: this is that session now.
+        val now = hub.replacedBy(sessionId)
+        if (now != null && hub.session(now) != null) {
+            LaunchedEffect(sessionId, now) { opener.switchSession(now) }
+            return
+        }
         // Gone: don't leave an empty screen. The Mac not linked yet (after the app was restarted,
         // opened from a notification with the Mac away): say so, with Back, until it has the sessions.
         if (macAway(hub)) WaitingForMac(hub, onBack) else LaunchedEffect(sessionId) { onBack() }
@@ -232,6 +238,8 @@ fun SessionScreen(
     // The prompt being written, and text that's waiting unsent in the session's terminal (it
     // stopped the last send; the card above the composer shows it and offers to replace it).
     var draft by rememberSaveable(sessionId) { mutableStateOf("") }
+    // Goes on with the session if a rewind replaces it (data/Attachments.kt, SessionCarry).
+    androidx.compose.runtime.SideEffect { com.prudnikweb.hypernova.data.SessionCarry.typing(sessionId, draft) }
     var busy by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     // A send that failed puts its text back, ahead of anything typed since.
     val back = AttachDrafts.givenBack(sessionId)
