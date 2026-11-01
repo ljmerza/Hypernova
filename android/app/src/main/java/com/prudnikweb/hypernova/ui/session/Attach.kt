@@ -2,6 +2,7 @@ package com.prudnikweb.hypernova.ui.session
 
 import android.content.ActivityNotFoundException
 import com.prudnikweb.hypernova.ui.components.glassChoice
+import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -15,10 +16,14 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.content.ReceiveContentListener
+import androidx.compose.foundation.content.TransferableContent
+import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +42,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -68,7 +74,9 @@ import com.prudnikweb.hypernova.data.AttachDrafts
 import com.prudnikweb.hypernova.data.Attachment
 import com.prudnikweb.hypernova.data.DraftFile
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.PasteTo
 import com.prudnikweb.hypernova.data.Pasted
+import com.prudnikweb.hypernova.data.PastedImage
 import com.prudnikweb.hypernova.data.Picked
 import com.prudnikweb.hypernova.data.Thumbs
 import com.prudnikweb.hypernova.data.isImage
@@ -158,17 +166,23 @@ class AttachState(
     }
 
     /**
-     * Images pasted into the box ([uris], a keyboard's or the clipboard's): copied into the app's
-     * cache first, while their grant lasts, then added as the paperclip adds them.
+     * Images pasted into the box ([images], a keyboard's or the clipboard's): copied into the app's
+     * cache first, while their grant lasts, then added as the paperclip adds them. One that can't be
+     * read, or turns out not to be an image, says so.
      */
-    fun paste(uris: List<Uri>) {
+    fun paste(images: List<PastedImage>) {
         val at = Date()
         scope.launch {
-            val kept = uris.mapIndexedNotNull { i, u -> Pasted.keep(context, u, i + 1, at) }
-            if (kept.size < uris.size) toast(context.getString(R.string.paste_failed))
-            if (kept.isNotEmpty()) add(kept, temporary = true)
+            val kept = images.mapIndexed { i, image -> Pasted.keep(context, image, i + 1, at) }
+            if (kept.any { it is Pasted.Kept.Unreadable }) toast(context.getString(R.string.paste_failed))
+            else if (kept.any { it is Pasted.Kept.NotImage }) pasteRefused()
+            val saved = kept.filterIsInstance<Pasted.Kept.Saved>().map { it.uri }
+            if (saved.isNotEmpty()) add(saved, temporary = true)
         }
     }
+
+    /** What was pasted is neither words nor an image. */
+    fun pasteRefused() = toast(context.getString(R.string.paste_unusable))
 
     /** Another try for a file whose upload failed. */
     fun retry(f: DraftFile) {
@@ -184,6 +198,57 @@ class AttachState(
     private companion object {
         /** Two files at a time, however many were picked (each holds a photo's pixels while it's read). */
         val uploads = Semaphore(2)
+    }
+}
+
+/**
+ * What a box with a paperclip takes when something is pasted or a keyboard inserts content, each
+ * item as [Pasted.route] says: images to [onImages], words of an image and web addresses to [onText],
+ * text left for the box's own paste. What nothing can use goes to [onRefused]: unconsumed, Compose
+ * would read it for text, find none, and do nothing at all.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+internal fun pastedImages(
+    resolver: ContentResolver,
+    onImages: (List<PastedImage>) -> Unit,
+    onText: (String) -> Unit,
+    onRefused: () -> Unit,
+): ReceiveContentListener = object : ReceiveContentListener {
+    override fun onReceive(transferableContent: TransferableContent): TransferableContent? {
+        val d = transferableContent.clipMetadata.clipDescription
+        val clip = (0 until d.mimeTypeCount).map { d.getMimeType(it) }
+        val images = ArrayList<PastedImage>()
+        var refused = false
+        val rest = transferableContent.consume { item ->
+            val uri = item.uri
+            val text = item.text?.toString().orEmpty()
+            val kind = uri?.let { Pasted.kind(runCatching { resolver.getType(it) }.getOrNull(), clip) }
+            when (Pasted.route(uri?.scheme, text.isNotEmpty(), kind)) {
+                PasteTo.Box -> false
+                PasteTo.Attach -> { images += PastedImage(uri!!, kind!!); true }
+                PasteTo.AttachAndText -> { images += PastedImage(uri!!, kind!!); onText(text); true }
+                PasteTo.Address -> { onText(uri.toString()); true }
+                PasteTo.Refuse -> { refused = true; true }
+            }
+        }
+        if (images.isNotEmpty()) onImages(images)
+        if (refused) onRefused()
+        return rest
+    }
+}
+
+/** [pastedImages] for [field] and [attach]: words it was handed go in at the cursor. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun rememberPasteReceiver(attach: AttachState, field: TextFieldState): ReceiveContentListener {
+    val context = LocalContext.current
+    return remember(attach, field) {
+        pastedImages(
+            context.contentResolver,
+            onImages = attach::paste,
+            onText = { words -> field.edit { val at = selection.min; replace(at, selection.max, words); placeCursorBeforeCharAt(at + words.length) } },
+            onRefused = attach::pasteRefused,
+        )
     }
 }
 

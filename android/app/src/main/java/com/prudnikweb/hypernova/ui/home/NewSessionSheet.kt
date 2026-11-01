@@ -2,6 +2,7 @@ package com.prudnikweb.hypernova.ui.home
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,11 +31,18 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.content.contentReceiver
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.KeyboardActionHandler
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -44,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -53,9 +62,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.EnterKey
 import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.AccountWords
 import com.prudnikweb.hypernova.data.AgentKind
@@ -77,7 +88,8 @@ import com.prudnikweb.hypernova.data.ProviderWords
 import com.prudnikweb.hypernova.data.healthyOther
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
-import com.prudnikweb.hypernova.ui.components.Field
+import com.prudnikweb.hypernova.ui.components.EnterKeyPref
+import com.prudnikweb.hypernova.ui.components.enterKey
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphButton
 import com.prudnikweb.hypernova.ui.components.Icon
@@ -90,11 +102,16 @@ import com.prudnikweb.hypernova.ui.components.rememberEdgeInput
 import com.prudnikweb.hypernova.ui.components.sheetBlur
 import com.prudnikweb.hypernova.ui.session.CommandHint
 import com.prudnikweb.hypernova.ui.session.CommandSuggestions
+import com.prudnikweb.hypernova.ui.session.AttachState
+import com.prudnikweb.hypernova.ui.session.ComposerLook
 import com.prudnikweb.hypernova.ui.session.DraftStrip
+import com.prudnikweb.hypernova.ui.session.EnterGuard
 import com.prudnikweb.hypernova.ui.session.commandQuery
 import com.prudnikweb.hypernova.ui.session.picked
 import com.prudnikweb.hypernova.ui.session.rememberAttach
 import com.prudnikweb.hypernova.ui.session.rememberCommands
+import com.prudnikweb.hypernova.ui.session.rememberComposerField
+import com.prudnikweb.hypernova.ui.session.rememberPasteReceiver
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Motion
@@ -305,14 +322,14 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                 // Held, the capsule takes exactly the field's place; hands-free it takes the room it
                 // needs, growing the sheet upward, so the mic under the finger at its foot never moves.
                 Box(Modifier.zIndex(if (voice.listening) 1f else 0f)) {
-                    Field(
-                        prompt, { prompt = it; error = null },
+                    PromptField(
+                        prompt, { prompt = it; error = null }, attach,
                         modifier = Modifier
                             .focusRequester(focus)
                             .onFocusChanged { focused = it.isFocused }
                             .graphicsLayer { alpha = fieldAlpha },
-                        placeholder = stringResource(if (onCodex) R.string.cx_prompt_new_hint else R.string.prompt_new_hint), singleLine = false, minLines = 3, maxLines = 8,
-                        label = stringResource(R.string.prompt), commands = true,
+                        placeholder = stringResource(if (onCodex) R.string.cx_prompt_new_hint else R.string.prompt_new_hint),
+                        label = stringResource(R.string.prompt),
                         onSend = { start() }, canSend = ready && !away,
                     )
                     if (voice.listening) DictationCapsule(
@@ -657,6 +674,67 @@ private fun whyLine(a: Account, mac: String, now: Long): String {
             }
         }
     }
+}
+
+/**
+ * The prompt box: [com.prudnikweb.hypernova.ui.components.Field]'s look and Enter key on a TextFieldState
+ * field, the only kind that takes a pasted image or a keyboard's (owner, 2026-11-01: the sheet has a
+ * paperclip, so it takes them as the session's box does; ui/session/Attach.kt).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PromptField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    attach: AttachState,
+    modifier: Modifier,
+    placeholder: String,
+    label: String,
+    onSend: () -> Unit,
+    canSend: Boolean,
+) {
+    val style = Type.body.copy(color = HN.ink)
+    val shape = RoundedCornerShape(14.dp)
+    val field = rememberComposerField(value, onValueChange)
+    val context = LocalContext.current
+    val sends = remember { EnterKeyPref.state(context) }.value == EnterKey.Send
+    val canSendNow by rememberUpdatedState(canSend)
+    val sendNow by rememberUpdatedState(onSend)
+    val scope = rememberCoroutineScope()
+    // A Shift+Enter let through to the field: its one new line goes in.
+    val shiftEnter = remember { booleanArrayOf(false) }
+    val guard = remember(sends) { if (sends) EnterGuard(shiftEnter) { scope.launch { if (canSendNow) sendNow() } } else null }
+    val look = remember { ComposerLook(null, commands = true) }
+    BasicTextField(
+        state = field,
+        textStyle = style,
+        cursorBrush = SolidColor(HN.accent),
+        outputTransformation = look,
+        inputTransformation = guard,
+        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 8),
+        keyboardOptions = if (sends) KeyboardOptions(imeAction = ImeAction.Send) else KeyboardOptions.Default,
+        onKeyboardAction = if (sends) KeyboardActionHandler { if (canSendNow) sendNow() } else null,
+        modifier = modifier
+            .then(if (sends) Modifier.enterKey(EnterKey.Send, { canSendNow }, { sendNow() }, { shiftEnter[0] = it }) else Modifier)
+            .contentReceiver(rememberPasteReceiver(attach, field))
+            .fillMaxWidth()
+            .semantics { contentDescription = label },
+        decorator = { inner ->
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clip(shape)
+                    .background(HN.bg800.copy(alpha = 0.6f))
+                    .border(1.dp, HN.ink.copy(alpha = 0.10f), shape)
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                contentAlignment = Alignment.TopStart,
+            ) {
+                if (value.isEmpty()) HText(placeholder, style = style, color = HN.inkGhost, maxLines = 8)
+                inner()
+            }
+        },
+    )
 }
 
 /** `/Users/me/Programming/x` → `~/Programming/x`. */

@@ -34,7 +34,8 @@
     <string name="aside_card_dismiss">Dismiss the answer</string>
     <string name="aside_no_files">Side questions take no files: they stay in the box.</string>
     <!-- Pasting into the prompt box: an image becomes an attachment, as the paperclip adds one. -->
-    <string name="paste_failed">Couldn\'t paste that image.</string>
+    <string name="paste_failed">Couldn\'t read that image. Attach it with the paperclip instead.</string>
+    <string name="paste_unusable">That can\'t be pasted here. If it\'s a file, attach it with the paperclip.</string>
     <string name="chat_quote">Quote</string>
     <string name="chat_read">Read aloud</string>
     <string name="chat_read_hint">your Mac\'s voice</string>

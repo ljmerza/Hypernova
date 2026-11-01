@@ -63,12 +63,7 @@ import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.foundation.content.MediaType
-import androidx.compose.foundation.content.ReceiveContentListener
-import androidx.compose.foundation.content.TransferableContent
-import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
-import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.ui.text.SpanStyle
 import com.prudnikweb.hypernova.data.CommandRun
 import androidx.compose.runtime.Composable
@@ -1605,7 +1600,8 @@ private fun Composer(
     // A pasted image (the clipboard's, a keyboard's) is an attachment, as the paperclip adds one;
     // anything else pasted is the box's own paste. Not without a paperclip.
     val context = LocalContext.current
-    val receiver = remember(attach, onTray != null) { if (onTray != null) pastedImages(context.contentResolver, attach::paste) else null }
+    val pasted = rememberPasteReceiver(attach, field)
+    val receiver = if (onTray != null) pasted else null
     // Settings' Enter key (EnterKeyPref): on Send, Enter is the button's own send. Hands-free, it's
     // Done and then Send (the words go in first, as Send waits for them); held, the finger decides.
     val enterKey = remember { com.prudnikweb.hypernova.ui.components.EnterKeyPref.state(context) }.value
@@ -1678,7 +1674,7 @@ private fun Composer(
  * did for the field before it took pasted images.
  */
 @Composable
-private fun rememberComposerField(text: String, onText: (String) -> Unit): TextFieldState {
+internal fun rememberComposerField(text: String, onText: (String) -> Unit): TextFieldState {
     val state = remember { TextFieldState(text) }
     // The text this field last handed out (or was given): anything else in [text] came from outside.
     val reported = remember { arrayOf(text) }
@@ -1700,7 +1696,7 @@ private fun rememberComposerField(text: String, onText: (String) -> Unit): TextF
  * look), and dictation's [tail], the words that may still change, dim. Styles only: the text and
  * its offsets stay as typed.
  */
-private data class ComposerLook(val tail: IntRange?, val commands: Boolean) : OutputTransformation {
+internal data class ComposerLook(val tail: IntRange?, val commands: Boolean) : OutputTransformation {
     override fun TextFieldBuffer.transformOutput() {
         if (commands) CommandRun.lead(asCharSequence().toString())?.let { addStyle(CommandHighlight.Lead, it.first, it.last + 1) }
         val t = tail ?: return
@@ -1714,33 +1710,13 @@ private data class ComposerLook(val tail: IntRange?, val commands: Boolean) : Ou
  * Enter on Send, for a keyboard that types a new line instead of pressing Send: that new line is
  * taken back and [typed] (the box's Enter) runs. A Shift+Enter let through ([shiftEnter]) goes in.
  */
-private class EnterGuard(private val shiftEnter: BooleanArray, private val typed: () -> Unit) : InputTransformation {
+internal class EnterGuard(private val shiftEnter: BooleanArray, private val typed: () -> Unit) : InputTransformation {
     override fun TextFieldBuffer.transformInput() {
         if (shiftEnter[0]) { shiftEnter[0] = false; return }
         if (com.prudnikweb.hypernova.data.EnterKeys.typedNewline(originalText, asCharSequence())) {
             revertAllChanges()
             typed()
         }
-    }
-}
-
-/**
- * What the box takes when something is pasted or a keyboard inserts content: images go to
- * [onImages] (data/Pasted.kt says which are), the rest (text) is pasted as text.
- */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-private fun pastedImages(resolver: android.content.ContentResolver, onImages: (List<android.net.Uri>) -> Unit): ReceiveContentListener = object : ReceiveContentListener {
-    override fun onReceive(transferableContent: TransferableContent): TransferableContent? {
-        if (!transferableContent.hasMediaType(MediaType.Image)) return transferableContent
-        val d = transferableContent.clipMetadata.clipDescription
-        val clip = (0 until d.mimeTypeCount).map { d.getMimeType(it) }
-        val images = ArrayList<android.net.Uri>()
-        val rest = transferableContent.consume { item ->
-            val uri = item.uri
-            if (uri != null && com.prudnikweb.hypernova.data.Pasted.isImage(runCatching { resolver.getType(uri) }.getOrNull(), clip)) { images += uri; true } else false
-        }
-        if (images.isNotEmpty()) onImages(images)
-        return rest
     }
 }
 
