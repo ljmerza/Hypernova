@@ -981,7 +981,7 @@ settings, viewed"). Read-only: there is no route that writes. Only a paired phon
 ```
 AgentSettingsReply = {
   scope: "user",          // these are the user-level files; a project's own settings can override them
-  claude: AgentSettings<ClaudeSummary>,   // <CLAUDE_DIR>/settings.json
+  claude: AgentSettings<ClaudeSummary> & { mcp: ClaudeMcp },   // <CLAUDE_DIR>/settings.json; mcp is beside it
   codex:  AgentSettings<CodexSummary>,    // $CODEX_HOME/config.toml, else ~/.codex/config.toml
 }
 AgentSettings = {
@@ -995,11 +995,17 @@ ShownValue = { key, state: "set", value: string | boolean }
 ClaudeSummary = {
   rules: { allow, ask, deny },   // each a count, or null when the file has something else there
   plugins: { name, on: boolean | null }[] | null,   // the name before "@marketplace"; on null: neither
-  mcpServers: string[] | null,   // names in settings.json's `mcpServers`
+  mcpServers: string[] | null,   // names in settings.json's `mcpServers` only: what an older app reads
   hookEvents: string[] | null,   // the keys of `hooks`
   hidden: number,                // names not sent
 }
 CodexSummary = { projects: number | null, mcpServers: string[] | null, hidden: number }
+ClaudeMcp = {            // there whatever settings.json's state; absent from an older daemon
+  state: "ok" | "missing" | "malformed" | "unreadable",   // Claude Code's own config file's, ~/.claude.json
+  servers: { name, scope: "user" | "local" | "project", project? }[],   // project: a folder's base name
+  hidden: number,         // names not sent
+  foldersNotRead: number, // projects past the cap or the time limit, their .mcp.json not read
+}
 ```
 
 **A strict allow-list on the server.** The keys, in this order, and nothing else:
@@ -1022,6 +1028,32 @@ Every string value also has to be 80 characters at most and come through `maskSe
 name in a summary has to look like a name (64 characters at most: letters, digits, `_`, `.`, `-`) and
 pass the same check, with 200 per list at most; the others are only counted in `hidden`.
 
+**Claude Code's MCP servers (`claude.mcp`, 2026-11-01).** Scopes, each checked against Claude Code 2.1.316's
+binary and changelog, and where each name comes from:
+
+| Scope | Where | `project` |
+|---|---|---|
+| `user` | top-level `mcpServers` in Claude Code's config file, and settings.json's `mcpServers` | none |
+| `local` | `projects[<path>].mcpServers` in that file | the folder's base name |
+| `project` | `<path>/.mcp.json`, top-level `mcpServers`, for each key of `projects` | the folder's base name |
+
+The config file is `.claude.json` in `CLAUDE_CONFIG_DIR` when the daemon has that set, else in the home
+folder; an older `<config dir>/.config.json` with something in it wins, as it does for Claude Code.
+`CLAUDE_CONFIG_DIR` set only in a login shell doesn't reach a service. Not read: `.claude-custom-oauth.json`
+(`CLAUDE_CODE_CUSTOM_OAUTH_URL`), plugins' own servers, and a server's approval or trust state.
+
+- **Only those keys.** The file also holds the account's details, OAuth data and history. It's read per
+  request, 16 MiB at most, and nothing of it is kept. Only the keys of those `mcpServers` tables are read:
+  never a server's command, args, env, url or headers. Names pass the check above; a bad one is counted in
+  `hidden`. 200 names at most in all.
+- **Folders.** A base name only, never a path, 64 characters at most (letters, digits, spaces, `_`, `.`,
+  `+`, `-`) and through `maskSecrets`, else its servers are in `hidden`. The home folder, whose name is the
+  username, is `~`.
+- **`.mcp.json`.** 256 KiB per file, 200 folders per request and 2 seconds in all (`foldersNotRead` counts
+  the rest). A link, a folder, a pipe, an unreadable file or bad JSON is skipped, costing that folder alone.
+  A key that isn't a clean absolute path is skipped, and so is a folder under `.claude/worktrees/`, which
+  copies its repository's file.
+
 **A file's trouble is a state.** `missing`: it isn't there (the agent's defaults). `malformed`: not JSON
 or TOML, or not an object. `unreadable`: anything else, also a folder or a pipe in its place, or a file over
 4 MiB. Always a 200, each agent on its own, and never a parse error, which could quote the file.
@@ -1031,7 +1063,9 @@ dependency, so a line inside a multi-line string is never taken for a key. Codex
 own `CODEX_HOME`: a value set only in a login shell doesn't reach a service.
 
 App (`ui/settings/AgentSettings.kt`): a key it has no words for shows its raw name. On a 404 it says the
-server needs updating.
+server needs updating. The MCP row groups `claude.mcp`: "On this server" (user), then each project's by name (local and
+project), with 12 names per group, 12 projects and "n more". An older daemon's reply has no `mcp`: the row shows
+`summary.mcpServers`. An older app ignores `mcp` and reads that list as before.
 
 ## Providers
 

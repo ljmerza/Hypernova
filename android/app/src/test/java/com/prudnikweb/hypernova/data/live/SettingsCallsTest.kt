@@ -65,6 +65,7 @@ class SettingsCallsTest {
         assertEquals(1, daemon.count("GET", "/v1/agents/settings"))
         assertEquals("gpt-6.1-sol", r.of(AgentSettingsReply.CODEX).values.first().text)
         assertEquals(listOf("home-assistant"), r.of(AgentSettingsReply.CLAUDE).claude?.mcpServers)
+        assertEquals(listOf("home-assistant", "github", "db-tools", "docs"), r.of(AgentSettingsReply.CLAUDE).mcp?.servers?.map { it.name })
     }
 
     @Test fun aFilesTroubleIsThatAgentsStateAndAnUnknownOneReadsAsUnreadable() {

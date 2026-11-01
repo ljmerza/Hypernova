@@ -959,6 +959,8 @@ test('GET …/blocked, Allow & retry and Dismiss', async () => {
 test('GET /v1/agents/settings: the fixed list and the summaries, from scratch files', async () => {
   const claudeFile = join(process.env.CLAUDE_CONFIG_DIR!, 'settings.json')
   const codexFile = join(process.env.CODEX_HOME!, 'config.toml')
+  const claudeJson = join(process.env.CLAUDE_CONFIG_DIR!, '.claude.json')
+  const mcpJson = join(cwd, '.mcp.json')
   mkdirSync(process.env.CODEX_HOME!, { recursive: true })
   // The world's own user settings (for "rules in effect"): back afterwards.
   const world = readFileSync(claudeFile, 'utf8')
@@ -993,6 +995,16 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       '',
     ].join('\n'),
   )
+  writeFileSync(
+    claudeJson,
+    JSON.stringify({
+      userID: 'never-sent',
+      oauthAccount: { emailAddress: 'never-sent@example.com' },
+      mcpServers: { github: { command: 'never-sent', args: ['never-sent'] } },
+      projects: { [cwd]: { history: [{ display: 'never-sent' }], mcpServers: { 'db-tools': { command: 'never-sent', env: { TOKEN: 'never-sent' } } } } },
+    }),
+  )
+  writeFileSync(mcpJson, JSON.stringify({ mcpServers: { docs: { type: 'http', url: 'https://never-sent.example.com/' } } }))
   try {
     const r = await ok(get('/v1/agents/settings'))
     assert.ok(!JSON.stringify(r).includes('never-sent'))
@@ -1000,6 +1012,8 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
   } finally {
     writeFileSync(claudeFile, world)
     rmSync(codexFile, { force: true })
+    rmSync(claudeJson, { force: true })
+    rmSync(mcpJson, { force: true })
   }
 })
 

@@ -64,6 +64,31 @@
         "PreToolUse"
       ],
       "hidden": 0
+    },
+    "mcp": {
+      "state": "ok",
+      "servers": [
+        {
+          "name": "home-assistant",
+          "scope": "user"
+        },
+        {
+          "name": "github",
+          "scope": "user"
+        },
+        {
+          "name": "db-tools",
+          "scope": "local",
+          "project": "app-parser-fix"
+        },
+        {
+          "name": "docs",
+          "scope": "project",
+          "project": "app-parser-fix"
+        }
+      ],
+      "hidden": 0,
+      "foldersNotRead": 0
     }
   },
   "codex": {

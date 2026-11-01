@@ -573,7 +573,7 @@ async function api(c: Ctx): Promise<void> {
   // The fixed list of Claude Code's and Codex's user-level settings, read-only, for a paired phone (agent-settings.ts).
   if (path === '/v1/agents/settings' && m === 'GET') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
-    return json(res, 200, agentSettings())
+    return json(res, 200, await agentSettings())
   }
   // The models each provider offers, for the new-session sheet (models.ts): Claude Code's own list,
   // OpenRouter's catalogue, the providers' settings.

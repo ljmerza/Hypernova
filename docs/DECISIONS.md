@@ -3131,10 +3131,15 @@ decision.
 
    Not confirmed: when Codex's keys reach a thread already running. Its docs don't say, and the binary has
    a `reload_user_config` operation that wasn't traced, so the screen says nothing about it for Codex.
-8. **A summary that may read short.** Claude Code's `mcpServers` isn't a key of `settings.json`: its docs
-   and schema keep MCP servers in `~/.claude.json` (with the account's details). The summary reads only
-   `settings.json`, as the list says, so it usually shows none, and the row says those servers aren't
-   listed. Reading names from `~/.claude.json` as well is a small change, for the owner to choose.
+8. **MCP servers from where Claude Code keeps them** (owner, 2026-11-01: "there is a separate MCP JSON file
+   that we'd need to read"). Claude Code's `mcpServers` isn't a key of `settings.json`, so that summary alone
+   usually showed none. `claude.mcp` also lists names from `~/.claude.json` (user and local scope) and each
+   of its projects' `.mcp.json` (project scope), with the folder's base name, beside the older list so an
+   older app keeps working. Only those keys are read of a file that also holds the account's details, and
+   `.claude.json` stays closed to the file viewer. Decided here: a server named in `settings.json` lists as
+   user scope; a folder under `.claude/worktrees/` has its `.mcp.json` skipped, as a copy of the repository's;
+   the home folder's name is `~`, because it's the username; plugins' servers aren't listed, and the row says
+   so.
 
 ## Account details in the agents' settings (2026-11-01)
 

@@ -1,5 +1,5 @@
 // GET /v1/agents/settings (agent-settings.ts): the fixed list of Claude Code's and Codex's user-level
-// settings, from scratch files. Only named keys leave: a secret is planted in each place that must
+// settings, from scratch files. Never the real ones: CLAUDE_CONFIG_DIR and HOME point at the scratch folder. Only named keys leave: a secret is planted in each place that must
 // stay on the server, and none of it may appear in the reply, in a value or in a key's name.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -41,7 +41,7 @@ process.env.HYPERNOVA_API_PORT = String(API)
 process.env.HYPERNOVA_LOCAL_PORT = String(LOCAL)
 process.env.HYPERNOVA_LAN_PORT = '0'
 
-const { agentSettings, claudeSettings, codexSettings, CLAUDE_SHOWN, CODEX_SHOWN } = await import('../src/agent-settings.ts')
+const { agentSettings, claudeConfigFile, claudeMcp, claudeSettings, codexSettings, CLAUDE_SHOWN, CODEX_SHOWN } = await import('../src/agent-settings.ts')
 const { scanToml, OTHER, TomlError } = await import('../src/toml-reader.ts')
 const { startServers } = await import('../src/http.ts')
 const { addDevice, settings } = await import('../src/store.ts')
@@ -243,7 +243,7 @@ test('both files missing: each agent says so, with nothing else', async () => {
   assert.equal(r.status, 200)
   assert.deepEqual(await r.json(), {
     scope: 'user',
-    claude: { state: 'missing', values: [], summary: null },
+    claude: { state: 'missing', values: [], summary: null, mcp: { state: 'missing', servers: [], hidden: 0, foldersNotRead: 0 } },
     codex: { state: 'missing', values: [], summary: null },
   })
 })
@@ -392,12 +392,12 @@ test('an unreadable file, a folder in its place, a pipe and a huge file say unre
   assert.equal(valueOf(claudeSettings(linked), 'effortLevel')?.value, 'low')
 })
 
-test('CODEX_HOME says where Codex’s file is, and agentSettings answers from the folders it’s given', () => {
+test('CODEX_HOME says where Codex’s file is, and agentSettings answers from the folders it’s given', async () => {
   const claude = dir('given-claude')
   const codex = dir('given-codex')
   writeFileSync(join(claude, 'settings.json'), '{"effortLevel":"xhigh"}')
   writeFileSync(join(codex, 'config.toml'), 'sandbox_mode = "read-only"\n')
-  const r = agentSettings({ claude, codex })
+  const r = await agentSettings({ claude, codex })
   assert.equal(valueOf(r.claude, 'effortLevel')?.value, 'xhigh')
   assert.equal(valueOf(r.codex, 'sandbox_mode')?.value, 'read-only')
   writeFileSync(join(CODEX, 'config.toml'), 'web_search = "cached"\n')
@@ -406,6 +406,229 @@ test('CODEX_HOME says where Codex’s file is, and agentSettings answers from th
   } finally {
     rmSync(join(CODEX, 'config.toml'))
   }
+})
+
+// ── MCP servers: `~/.claude.json` and each project's `.mcp.json` ─────────
+
+/** A server with a secret in every place that must stay, each named for [place]. */
+const plantedServer = (place: string) => ({
+  type: 'http',
+  command: `/home/PLANTEDUSER/bin/${secret(`${place}Command`)}`,
+  args: ['--token', secret(`${place}Args`)],
+  env: { TOKEN: secret(`${place}Env`), PLANTEDENVNAME: 'x' },
+  url: `https://PLANTEDUSER:${secret(`${place}Password`)}@PLANTEDHOST.example.com/PLANTEDPATH?token=${secret(`${place}Query`)}`,
+  headers: { Authorization: `Bearer ${secret(`${place}Header`)}` },
+  headersHelper: `echo ${secret(`${place}Helper`)}`,
+  oauth: { clientId: 'PLANTEDCLIENT', clientSecret: secret(`${place}Oauth`) },
+})
+
+/** A `~/.claude.json` with the account's details, OAuth data and history around the MCP tables. */
+const plantedConfig = (projects: Record<string, unknown>, mcpServers: Record<string, unknown> = { 'user-one': plantedServer('User') }) => ({
+  userID: 'PLANTEDUSERID0123456789',
+  numStartups: 1234,
+  primaryApiKey: secret('PrimaryKey'),
+  oauthAccount: { accountUuid: 'PLANTEDACCOUNT', emailAddress: 'PLANTEDEMAIL@example.com', organizationName: 'PLANTEDORG', organizationUuid: 'PLANTEDORGID', displayName: 'PLANTEDNAME' },
+  claudeAiOauth: { accessToken: secret('Access'), refreshToken: secret('Refresh') },
+  customApiKeyResponses: { approved: [secret('Approved')], rejected: [secret('Rejected')] },
+  claudeAiMcpEverConnected: ['PLANTEDCONNECTOR'],
+  cachedChangelog: `PLANTEDCHANGELOG ${secret('Changelog')}`,
+  mcpServers,
+  projects,
+})
+
+const plantedEntry = (mcpServers: Record<string, unknown> = {}) => ({
+  allowedTools: [`Bash(curl ${secret('AllowedTool')})`],
+  history: [{ display: `PLANTEDHISTORY ${secret('History')}`, pastedContents: { a: secret('Pasted') } }],
+  lastSessionId: 'PLANTEDSESSION',
+  exampleFiles: ['PLANTEDEXAMPLE.ts'],
+  hasTrustDialogAccepted: true,
+  enabledMcpjsonServers: ['PLANTEDENABLED'],
+  disabledMcpServers: ['PLANTEDDISABLED'],
+  mcpServers,
+})
+
+/** A project folder in a place that says PLANTED, so its path can't leave unnoticed. */
+function project(name: string, mcpJson?: unknown): string {
+  const d = join(scratch, 'PLANTEDPATH', name)
+  mkdirSync(d, { recursive: true })
+  if (mcpJson !== undefined) writeFileSync(join(d, '.mcp.json'), typeof mcpJson === 'string' ? mcpJson : JSON.stringify(mcpJson))
+  return d
+}
+
+function configFile(name: string, content: unknown): string {
+  const file = join(dir(name), '.claude.json')
+  writeFileSync(file, typeof content === 'string' ? content : JSON.stringify(content))
+  return file
+}
+
+test('MCP: every scope is listed, by name, with the folder’s base name and nothing more', async () => {
+  const app = project('app', { mcpServers: { 'project-one': plantedServer('Project') }, PLANTEDMCPJSONKEY: secret('McpJsonKey') })
+  const site = project('my site', { mcpServers: { 'project-two': plantedServer('ProjectTwo') } })
+  const quiet = project('quiet')
+  const r = await claudeMcp(['from-settings'], configFile('scopes', plantedConfig({
+    [app]: plantedEntry({ 'local-one': plantedServer('Local') }),
+    [site]: plantedEntry(),
+    [quiet]: plantedEntry(),
+  })))
+  assert.deepEqual(r, {
+    state: 'ok',
+    servers: [
+      { name: 'from-settings', scope: 'user' },
+      { name: 'user-one', scope: 'user' },
+      { name: 'local-one', scope: 'local', project: 'app' },
+      { name: 'project-one', scope: 'project', project: 'app' },
+      { name: 'project-two', scope: 'project', project: 'my site' },
+    ],
+    hidden: 0,
+    foldersNotRead: 0,
+  })
+  assertNothingPlanted(JSON.stringify(r))
+})
+
+test('the route: a secret anywhere in ~/.claude.json or a .mcp.json, and none of it in the raw body', async () => {
+  const app = project('routed', { mcpServers: { 'project-one': plantedServer('Project') }, PLANTEDMCPJSONKEY: secret('McpJsonKey') })
+  writeFileSync(join(CLAUDE, '.claude.json'), JSON.stringify(plantedConfig({ [app]: plantedEntry({ 'local-one': plantedServer('Local') }) })))
+  writeFileSync(join(CLAUDE, 'settings.json'), JSON.stringify(PLANTED_CLAUDE))
+  try {
+    const r = await fetch(`http://127.0.0.1:${API}/v1/agents/settings`, { headers: { authorization: `Bearer ${TOKEN}` } })
+    assert.equal(r.status, 200)
+    const text = await r.text()
+    assertNothingPlanted(text)
+    assert.ok(!text.includes(scratch), `a path left: ${text}`)
+    for (const leak of ['example.com', '--token', 'Bearer', 'numStartups', 'userID', 'oauth', 'history', 'command', 'args', 'env"', 'url', 'headers']) assert.ok(!text.includes(leak), `${leak} left: ${text}`)
+    const body = JSON.parse(text)
+    // Beside the older list, which an older app keeps reading as it did.
+    assert.deepEqual(body.claude.summary.mcpServers, ['home-assistant'])
+    assert.deepEqual(body.claude.mcp.servers, [
+      { name: 'home-assistant', scope: 'user' },
+      { name: 'user-one', scope: 'user' },
+      { name: 'local-one', scope: 'local', project: 'routed' },
+      { name: 'project-one', scope: 'project', project: 'routed' },
+    ])
+    const allowed = new Set(['state', 'values', 'summary', 'key', 'value', 'rules', 'allow', 'ask', 'deny', 'plugins', 'name', 'on', 'mcpServers', 'hookEvents', 'hidden', 'mcp', 'servers', 'scope', 'project', 'foldersNotRead'])
+    for (const k of everyKey(body.claude)) assert.ok(allowed.has(k), `an unexpected key: ${k}`)
+  } finally {
+    rmSync(join(CLAUDE, '.claude.json'))
+    rmSync(join(CLAUDE, 'settings.json'))
+  }
+})
+
+test('MCP servers don’t depend on settings.json: with it missing or malformed they’re still listed', async () => {
+  const file = configFile('no-settings', plantedConfig({}))
+  const missing = await agentSettings({ claude: dir('no-settings-claude'), codex: dir('no-settings-codex'), claudeConfig: file })
+  assert.equal(missing.claude.state, 'missing')
+  assert.deepEqual(missing.claude.mcp.servers, [{ name: 'user-one', scope: 'user' }])
+  const bad = dir('bad-settings-claude')
+  writeFileSync(join(bad, 'settings.json'), '{ nope')
+  const malformed = await agentSettings({ claude: bad, codex: dir('no-settings-codex'), claudeConfig: file })
+  assert.equal(malformed.claude.state, 'malformed')
+  assert.deepEqual(malformed.claude.mcp.servers, [{ name: 'user-one', scope: 'user' }])
+})
+
+test('a name that isn’t one, or a folder’s, is counted and never sent; the home folder is ~', async () => {
+  const fine = project('fine', { mcpServers: { [secret('ProjectName')]: {}, 'two words': {}, ok: {} } })
+  const oddFolder = project(`bad;${secret('FolderName')}`, { mcpServers: { a: {}, b: {} } })
+  writeFileSync(join(process.env.HOME!, '.mcp.json'), JSON.stringify({ mcpServers: { 'at-home': {} } }))
+  try {
+    const r = await claudeMcp([], configFile('bad-mcp-names', plantedConfig({
+      [fine]: plantedEntry({ [secret('LocalName')]: {} }),
+      [oddFolder]: plantedEntry({ c: {} }),
+      [process.env.HOME!]: plantedEntry({ 'local-home': {} }),
+    }, { [secret('UserName')]: {}, 'curl https://x.example': {}, good: {} })))
+    assertNothingPlanted(JSON.stringify(r))
+    assert.deepEqual(r.servers, [
+      { name: 'good', scope: 'user' },
+      // The home folder's name is the username: not sent.
+      { name: 'local-home', scope: 'local', project: '~' },
+      { name: 'ok', scope: 'project', project: 'fine' },
+      { name: 'at-home', scope: 'project', project: '~' },
+    ])
+    // Two users', a local one, the folder's local one, two project ones, the folder's two.
+    assert.equal(r.hidden, 2 + 1 + 1 + 2 + 2)
+  } finally {
+    rmSync(join(process.env.HOME!, '.mcp.json'))
+  }
+})
+
+test('MCP’s caps: names, folders walked, and each file’s size; the rest of the reply stands', async () => {
+  const many = Object.fromEntries(Array.from({ length: 205 }, (_, i) => [`s${i}`, {}]))
+  const names = await claudeMcp([], configFile('mcp-many', plantedConfig({}, many)))
+  assert.equal(names.servers.length, 200)
+  assert.equal(names.hidden, 5)
+
+  const projects: Record<string, unknown> = {}
+  for (let i = 0; i < 203; i++) projects[join(scratch, 'PLANTEDPATH', 'walk', `p${i}`)] = {}
+  const walked = await claudeMcp([], configFile('mcp-walk', plantedConfig(projects)))
+  assert.equal(walked.state, 'ok')
+  assert.equal(walked.foldersNotRead, 3)
+
+  const big = project('big', `{"mcpServers":{"too-big":{}},"pad":"${'x'.repeat(256 * 1024)}"}`)
+  const ok = project('ok', { mcpServers: { 'small-enough': {} } })
+  const sized = await claudeMcp([], configFile('mcp-sized', plantedConfig({ [big]: {}, [ok]: {} }, {})))
+  assert.deepEqual(sized.servers, [{ name: 'small-enough', scope: 'project', project: 'ok' }])
+
+  const huge = configFile('mcp-huge', `{"mcpServers":{"past-the-cap":{}},"pad":"${'x'.repeat(16 * 1024 * 1024)}"}`)
+  const past = await agentSettings({ claude: dir('mcp-huge-claude'), codex: dir('mcp-huge-codex'), claudeConfig: huge })
+  assert.deepEqual(past.claude.mcp, { state: 'unreadable', servers: [], hidden: 0, foldersNotRead: 0 })
+  assert.equal(past.codex.state, 'missing')
+})
+
+test('~/.claude.json missing, malformed or the wrong shape: a state, the rest of the reply, and no parse error', async () => {
+  const none = await claudeMcp(['from-settings'], join(dir('mcp-none'), '.claude.json'))
+  assert.deepEqual(none, { state: 'missing', servers: [{ name: 'from-settings', scope: 'user' }], hidden: 0, foldersNotRead: 0 })
+  const bad = await claudeMcp([], configFile('mcp-malformed', `{"oauthAccount":{"emailAddress":"PLANTEDEMAIL@example.com","x":"${secret('Quoted')}"`))
+  assert.deepEqual(bad, { state: 'malformed', servers: [], hidden: 0, foldersNotRead: 0 })
+  for (const notAnObject of ['[]', '"text"', '12', 'null']) assert.equal((await claudeMcp([], configFile(`mcp-odd-${notAnObject.length}`, notAnObject))).state, 'malformed')
+  // Tables that are something else: none, not a crash, and none of the values.
+  const odd = await claudeMcp([], configFile('mcp-shapes', { mcpServers: [secret('Array')], projects: { a: 'x', '/b': { mcpServers: secret('Text') }, '/c': null } }))
+  assert.deepEqual(odd, { state: 'ok', servers: [], hidden: 0, foldersNotRead: 0 })
+  assert.deepEqual((await claudeMcp([], configFile('mcp-empty', ''))).state, 'ok')
+  // A project's own file, malformed or missing, costs that project alone.
+  const broken = project('broken', `{ "mcpServers": { "x": "${secret('QuotedMcpJson')}"`)
+  const gone = join(scratch, 'PLANTEDPATH', 'never-made')
+  const kept = project('kept', { mcpServers: { fine: {} } })
+  const some = await claudeMcp([], configFile('mcp-some', plantedConfig({ [broken]: {}, [gone]: {}, [kept]: {} }, {})))
+  assert.deepEqual(some, { state: 'ok', servers: [{ name: 'fine', scope: 'project', project: 'kept' }], hidden: 0, foldersNotRead: 0 })
+})
+
+test('.mcp.json as a link, a folder or a pipe is skipped; nothing outside the project is read', async () => {
+  const outside = join(dir('outside'), 'mcp.json')
+  writeFileSync(outside, JSON.stringify({ mcpServers: { 'PLANTEDOUTSIDE': {} } }))
+  const linked = project('linked')
+  symlinkSync(outside, join(linked, '.mcp.json'))
+  const folder = project('folder')
+  mkdirSync(join(folder, '.mcp.json'))
+  // A pipe with nobody writing would hang a plain read for good.
+  const pipe = project('pipe')
+  execFileSync('mkfifo', [join(pipe, '.mcp.json')])
+  const kept = project('kept-too', { mcpServers: { fine: {} } })
+  const r = await claudeMcp([], configFile('mcp-links', plantedConfig({ [linked]: {}, [folder]: {}, [pipe]: {}, [kept]: {} }, {})))
+  assert.deepEqual(r, { state: 'ok', servers: [{ name: 'fine', scope: 'project', project: 'kept-too' }], hidden: 0, foldersNotRead: 0 })
+  assertNothingPlanted(JSON.stringify(r))
+})
+
+test('a project’s path that isn’t a clean absolute one, or a worktree’s, has its .mcp.json left alone', async () => {
+  const real = project('real', { mcpServers: { 'through-dots': {} } })
+  const worktree = project(join('repo', '.claude', 'worktrees', 'agent-1'), { mcpServers: { 'a-copy': {} } })
+  const r = await claudeMcp([], configFile('mcp-paths', plantedConfig({ [`${real}/../real`]: {}, 'relative/path': {}, [worktree]: {} }, {})))
+  assert.deepEqual(r, { state: 'ok', servers: [], hidden: 0, foldersNotRead: 0 })
+})
+
+test('Claude Code’s own file: in the home folder, or the config folder once that’s moved, or the old name there', () => {
+  const home = dir('cfg-home')
+  assert.equal(claudeConfigFile({}, home), join(home, '.claude.json'))
+  const moved = dir('cfg-moved')
+  assert.equal(claudeConfigFile({ CLAUDE_CONFIG_DIR: moved }, home), join(moved, '.claude.json'))
+  // As Claude Code's `||`: empty is the home folder.
+  assert.equal(claudeConfigFile({ CLAUDE_CONFIG_DIR: '' }, home), join(home, '.claude.json'))
+  // An empty old file doesn't count, one with something in it does.
+  writeFileSync(join(moved, '.config.json'), '')
+  assert.equal(claudeConfigFile({ CLAUDE_CONFIG_DIR: moved }, home), join(moved, '.claude.json'))
+  writeFileSync(join(moved, '.config.json'), '{}')
+  assert.equal(claudeConfigFile({ CLAUDE_CONFIG_DIR: moved }, home), join(moved, '.config.json'))
+  mkdirSync(join(home, '.claude'))
+  writeFileSync(join(home, '.claude', '.config.json'), '{}')
+  assert.equal(claudeConfigFile({}, home), join(home, '.claude', '.config.json'))
 })
 
 // ── The TOML reader ──────────────────────────────────────────────────────

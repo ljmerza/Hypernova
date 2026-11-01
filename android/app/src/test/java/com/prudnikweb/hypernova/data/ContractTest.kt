@@ -567,6 +567,22 @@ class ContractTest {
                 r.claude.claude,
             )
             assertNull(r.claude.codex)
+            // Beside the summary, each scope's names; an older app reads the summary's own list.
+            assertEquals(
+                ClaudeMcp(
+                    AgentSettingsFile.OK,
+                    listOf(
+                        McpName("home-assistant", "user", null),
+                        McpName("github", "user", null),
+                        McpName("db-tools", "local", "app-parser-fix"),
+                        McpName("docs", "project", "app-parser-fix"),
+                    ),
+                    0,
+                    0,
+                ),
+                r.claude.mcp,
+            )
+            assertNull(r.codex.mcp)
             assertEquals(AgentSettingsFile.OK, r.codex.state)
             assertEquals(ShownSetting("model", ShownSetting.SET, "gpt-6.1-sol", null), r.codex.values[0])
             assertEquals(ShownSetting.UNRECOGNISED, r.codex.values.single { it.key == "approval_policy" }.state)
