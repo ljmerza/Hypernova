@@ -6,7 +6,7 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1463 app tests, 985 daemon tests (981 pass, 4 skipped: Mac-only).
+2026-11-01: 1478 app tests, 1005 daemon tests (1001 pass, 4 skipped: Mac-only).
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -236,6 +236,7 @@ Test names, shortened:
 | T6 | Refresh usage now (POST /v1/usage/refresh) | UsageRefreshTest (all); UsageRefreshCallTest (all: the phone's call through Core, once in five minutes, a 404 changing nothing); usage-probe.test.ts › "POST /v1/usage/refresh (refreshUsage)…" (two asks share one look, again within 30 s none); fixtures rest-usage-refresh.json, rest-usage.json; contract.test.ts › "POST /v1/account/check, then GET /v1/usage and POST /v1/usage/refresh" (over HTTP, signed out: no look); usage-probe.test.ts, usage-probe-pace.test.ts (all) | **covered** |
 | T7 | Testing checklist | SettingsCallsTest.theChecklistIsItsPageOnTheRouteInUse; SettingsTabTest.oneServerRowsOpenTheirScreensAndTheChecklistItsPage, allServersEachBlockActsOnItsOwnServer; fixture rest-qa.json; http.test.ts › "the checklist needs its key…"; lan.test.ts › "a preview and the checklist…" | **covered** (unlocking it with seven taps can't run in a debug build, where it's always on) |
 | T8 | Terminal engine (testing only): the live terminal drawn by Ghostty's core (ghostty-web, `assets/term-ghostty/`) instead of xterm.js, as a trial | SettingsTest.terminalEngineGhosttyAndBack; SettingsPlanTest (all); TermEngineTest (all); `node scripts/term-pages.mjs` (the page in headless Chromium: screen, typing, fit, finger scrolling, fullscreen wheel, colours; and both pages measured) | **partial**: the Ghostty page runs only in desktop headless Chromium, never in a phone's WebView; the script isn't part of any suite |
+| T9 | An agent's settings on the server, to view: the fixed list and summaries, per server, read-only | agent-settings.test.ts (all: a secret planted in every place that must stay, in keys and values; types and shapes; names checked; paired phone only; missing, malformed, unreadable; the TOML reader); contract.test.ts and ContractTest, fixture rest-agent-settings; SettingsCallsTest (the four agent settings tests: the route, a file's state, a 404 saying the server needs updating, another failure); AgentSettingsScreenTest (all); ProvidersScreenTest.theAgentsCardsLinkToTheirAccountPages (each card's row); SettingsTabTest (All servers: shed's hub answers, z2 isn't asked) | **covered** |
 
 ## 16. App update
 

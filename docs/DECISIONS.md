@@ -3080,3 +3080,58 @@ Account settings row, opening the account's page on the web (`claude.ai/settings
 `chatgpt.com/#settings`, the addresses those programs link to themselves). He chose that over opening
 `~/.claude` or `~/.codex` on the server: those stay closed to the phone, as they hold credentials.
 All of them go straight to the browser, with no "Open this link?": they're rows, chosen on purpose.
+
+## The agents' settings, viewed (2026-11-01)
+
+The owner: "view the Claude Code or Codex settings on the server, a JSON or TOML file, but I probably
+don't want everything because it's a very long file; look at the file and see what makes sense for us to
+be able to set locally on the client." He chose a fixed list, **viewed first, then editable**. This is
+step one, the view; step two waits for his review (`docs/LATER.md`, L102). Until then "the daemon never
+edits a settings file" (`daemon/src/always.ts`) stays true. Step two would reverse that, and that is his
+decision.
+
+1. **Where.** A Settings row on each agent's card in Agents & providers opens a read-only screen,
+   `Route.AgentSettings`, for the hub whose card it is, so it works from All servers as Providers does.
+   Nothing on the session's chat screen.
+2. **The route.** `GET /v1/agents/settings` (`docs/PROTOCOL.md`, "Agent settings"), a paired phone only.
+   Only named keys leave, each checked for its type and shape; anything else in that key is
+   "unrecognised" and its value stays on the server. Words-only keys accept the words the agent's own
+   schema names, so a new word from a newer agent reads as unrecognised until the list is updated: the
+   safe way round.
+3. **The user-level file only.** The reply's `scope: "user"` and the screen's first line say so, and that
+   a project's own settings can override it.
+4. **The links' reasoning still holds** (Links out of Settings, above): `~/.claude` and `~/.codex` stay
+   closed to the phone's file browser. This route is the one way out, and only for the list.
+5. **Plugin names without their marketplace.** The table asked for plugin names. The part after `@` isn't
+   a source, but it isn't asked for either.
+6. **A TOML reader, not a dependency** (`daemon/src/toml-reader.ts`). It reads the whole syntax rather than
+   matching lines, so a `model = "…"` inside a multi-line string can't be taken for the key. It keeps
+   nothing but what its caller asks for.
+7. **What each key does**, checked on 2026-11-01 against Claude Code 2.1.316 (its schema's own
+   descriptions, its docs at `code.claude.com/docs/en/settings-reference`) and Codex 0.164.0 (its binary,
+   `--help`, and its docs at `learn.chatgpt.com/docs/config-file/config-reference`, which may describe a newer
+   version than that):
+
+   | Key | What it does | When it applies |
+   |---|---|---|
+   | `effortLevel` | Default effort for models with no saved level. **In the user file it reaches only Opus 5, Fable 5.1 and earlier**: Opus 5.5 and later ignore it there. `/effort` now saves per model under `modelSettings`, not here. | New sessions (read once at session start) |
+   | `permissions.defaultMode` | The permission mode new sessions start in. `manual` is `default`. | New sessions |
+   | `showThinkingSummaries` | Requests thinking summaries and shows them when expanded. Only what you see, not what the model does. | Docs don't name it; settings reload live unless listed otherwise, and it isn't listed |
+   | `autoDreamEnabled` | Background memory consolidation; set, it overrides the server-side default. **In the binary only, not in the docs. Does nothing unless Anthropic's flag offers it to the account.** | Read when it's checked, not only at start (binary) |
+   | `includeCoAuthoredBy` | **Deprecated since 2.0.62.** `false` drops Claude's credit from commits and pull requests; ignored once `attribution.commit` or `.pr` is set. | Docs don't name it; as `showThinkingSummaries` |
+   | `autoUpdatesChannel` | Which releases auto-updates follow: `latest` or `stable`, about a week old. The schema also takes `rc`, undocumented; `claude install rc` saves it as `stable`. Homebrew ignores the key. | Docs don't name it; it only decides what updates fetch |
+   | `inputNeededNotifEnabled` | **Anthropic's push to its Claude phone app**, while Remote Control is connected, when a prompt waits. Not Hypernova's notifications, despite the name. | Docs don't name it |
+   | `agentPushNotifEnabled` | **The same app**: lets Claude push when it decides to. Sessions under `claude remote-control` follow the account's value, not this key. | Docs don't name it |
+   | `model` | The model a thread starts on when not told otherwise. | Codex's docs don't say; new threads at least |
+   | `model_reasoning_effort` | Reasoning effort; the levels depend on the model. | As `model` |
+   | `approval_policy` | When Codex stops to ask. Docs: `on-request`, `never` or a granular table; **`untrusted` is unsupported as a setting and `on-failure` deprecated**, though the binary still parses them. | As `model` |
+   | `sandbox_mode` | What commands may reach: `read-only`, `workspace-write`, `danger-full-access`. | As `model` |
+   | `web_search` | `cached` (the default, OpenAI's index), `indexed`, `live`, `disabled`. | As `model` |
+   | `personality` | **Deprecated: `friendly` and `pragmatic` no longer select a style.** Only `none` does anything, dropping the built-in Personality section. | As `model` |
+
+   Not confirmed: when Codex's keys reach a thread already running. Its docs don't say, and the binary has
+   a `reload_user_config` operation that wasn't traced, so the screen says nothing about it for Codex.
+8. **A summary that may read short.** Claude Code's `mcpServers` isn't a key of `settings.json`: its docs
+   and schema keep MCP servers in `~/.claude.json` (with the account's details). The summary reads only
+   `settings.json`, as the list says, so it usually shows none, and the row says those servers aren't
+   listed. Reading names from `~/.claude.json` as well is a small change, for the owner to choose.

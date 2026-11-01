@@ -184,7 +184,15 @@ another session's reply. All of that is **outside text**, and the daemon treats 
 - The pairing details: only to the server's own pairing page on the local network.
 - Claude Code's settings files (their `env`, `apiKeyHelper`, hooks, MCP servers): a paired device
   gets only their permission lists, for the session's own folder (`docs/PROTOCOL.md`, "Rules in
-  effect", 2026-10-30).
+  effect", 2026-10-30), and, from the user-level `settings.json` and Codex's `config.toml`, the fixed
+  list of `GET /v1/agents/settings` (`docs/PROTOCOL.md`, "Agent settings", 2026-11-01): named values,
+  each checked for its type and shape, and as summaries the counts of permission rules and of Codex's
+  projects, plugin names with on or off, MCP server names and hook event names. Never `env`, hook and
+  status line commands, `awsAuthRefresh`, marketplace sources, `autoMode.environment`, `skip*` keys,
+  or MCP commands, args and env (`daemon/test/agent-settings.test.ts` plants a secret in each). Those
+  names do show what's set up on the server, to a paired phone, which can already start sessions there.
+  The route only reads, for a device token and not the admin token; `~/.claude` and `~/.codex` stay
+  closed to the phone's file browser.
 
 ## 8. Known residual risks
 

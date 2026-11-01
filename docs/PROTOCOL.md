@@ -517,6 +517,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/projects` | → `{projects: Project[], root}` |
 | `POST /v1/projects` | `{name, git?: true}` → `{project}` creates `<root>/<name>` |
 | `GET /v1/providers` | → `{providers: Provider[]}` |
+| `GET /v1/agents/settings` | → `AgentSettingsReply`: the fixed list of Claude Code's and Codex's user-level settings, read-only, for a paired phone only (401 `unauthorized` for the local API's admin token; see Agent settings). An older daemon answers 404 |
 | `GET /v1/models?provider=` | → `{providers: ModelList[]}`: the models each provider offers (only that one with `provider`), in the providers' order, for the new-session sheet (see Models) |
 | `POST /v1/providers/{id}/check` | `{}` → `{provider}`: reads its balance now (OpenRouter; at most once in 10 s, sooner the last reading). 409 `no_balance` for a provider without a balance to read |
 | `POST /v1/providers/check` | `{kind?, baseUrl?, apiKey?, name?, id?}` → `{check: ProviderCheck}`: an address and a key checked without saving them (the editors' Check; see Providers). `id`: an existing provider, whose saved key is used when none is sent, only at its own host. 400 `bad_kind`, `missing_url`, `bad_url`, `insecure_url`, `bad_key_format`; 404 `no_provider` |
@@ -971,6 +972,66 @@ Workflow = { id,                      // the run id, "wf_…"
              startedAt: number, endedAt: number | null,
              tokens: number | null, toolUses: number | null }
 ```
+
+## Agent settings
+
+`GET /v1/agents/settings` (`daemon/src/agent-settings.ts`, 2026-11-01; `docs/DECISIONS.md`, "The agents'
+settings, viewed"). Read-only: there is no route that writes. Only a paired phone may ask.
+
+```
+AgentSettingsReply = {
+  scope: "user",          // these are the user-level files; a project's own settings can override them
+  claude: AgentSettings<ClaudeSummary>,   // <CLAUDE_DIR>/settings.json
+  codex:  AgentSettings<CodexSummary>,    // $CODEX_HOME/config.toml, else ~/.codex/config.toml
+}
+AgentSettings = {
+  state: "ok" | "missing" | "malformed" | "unreadable",
+  values: ShownValue[],   // [] unless "ok"
+  summary: … | null,      // null unless "ok"
+}
+ShownValue = { key, state: "set", value: string | boolean }
+           | { key, state: "unset" }          // not in the file
+           | { key, state: "unrecognised" }   // in the file, not a known shape: the value isn't sent
+ClaudeSummary = {
+  rules: { allow, ask, deny },   // each a count, or null when the file has something else there
+  plugins: { name, on: boolean | null }[] | null,   // the name before "@marketplace"; on null: neither
+  mcpServers: string[] | null,   // names in settings.json's `mcpServers`
+  hookEvents: string[] | null,   // the keys of `hooks`
+  hidden: number,                // names not sent
+}
+CodexSummary = { projects: number | null, mcpServers: string[] | null, hidden: number }
+```
+
+**A strict allow-list on the server.** The keys, in this order, and nothing else:
+
+| Agent | Key | Accepted |
+|---|---|---|
+| Claude Code | `effortLevel` | `low`, `medium`, `high`, `xhigh` |
+| | `permissions.defaultMode` | `default`, `manual`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions` |
+| | `showThinkingSummaries`, `autoDreamEnabled`, `includeCoAuthoredBy` | boolean |
+| | `autoUpdatesChannel` | `latest`, `stable`, `rc` |
+| | `inputNeededNotifEnabled`, `agentPushNotifEnabled` | boolean |
+| Codex | `model` | a model id's shape |
+| | `model_reasoning_effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+| | `approval_policy` | `untrusted`, `on-failure`, `on-request`, `never` (the granular table is `unrecognised`) |
+| | `sandbox_mode` | `read-only`, `workspace-write`, `danger-full-access` |
+| | `web_search` | `disabled`, `cached`, `indexed`, `live` |
+| | `personality` | `none`, `friendly`, `pragmatic` |
+
+Every string value also has to be 80 characters at most and come through `maskSecrets` unchanged. A
+name in a summary has to look like a name (64 characters at most: letters, digits, `_`, `.`, `-`) and
+pass the same check, with 200 per list at most; the others are only counted in `hidden`.
+
+**A file's trouble is a state.** `missing`: it isn't there (the agent's defaults). `malformed`: not JSON
+or TOML, or not an object. `unreadable`: anything else, also a folder or a pipe in its place, or a file over
+4 MiB. Always a 200, each agent on its own, and never a parse error, which could quote the file.
+
+`config.toml` is read by `daemon/src/toml-reader.ts`, a small reader of the whole syntax rather than a
+dependency, so a line inside a multi-line string is never taken for a key. Codex's home is the daemon's
+own `CODEX_HOME`: a value set only in a login shell doesn't reach a service.
+
+App (`ui/settings/AgentSettings.kt`): a key it has no words for shows its raw name. On a 404 it says the
+server needs updating.
 
 ## Providers
 
