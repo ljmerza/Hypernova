@@ -94,6 +94,7 @@ Test names, shortened:
 | C11 | Live terminal: one-minute ticket, xterm in a WebView, the key bar | TermTicketTest (all); TermFramesTest (all); KeyBarTest (all); term-scroll.test.ts (all) | **partial**: POST …/terminal has no daemon test or fixture; `TerminalScreen` never runs |
 | C12 | Never a session over a session: Back goes Home | NavTest (all) | **covered** |
 | C13 | Limits: the PAUSED notice, Continue, carry on by itself | ProvidersTest.aBlockStaysWhileItCarriesOnByItselfOrWaitsForContinue; SessionsTest.readsWhyItEnded; fixtures ws-session-limited.json, ws-usage-limited.json; resume.test.ts (all); account.test.ts (limit tests) | **partial**: the app's Continue (`continueAfterLimit`) and its auto-continue switch never run; POST …/auto-continue has no HTTP test |
+| C14 | Folded runs: 3+ built-in calls fold, MCP calls (alone or with lookups) from 1, named by server ("home-assistant ×3"); the live run folds too ("Using", the planet, its latest call under the line); diffs and failed calls stand between folds; a tap opens one and it stays open; an MCP call's row and summary say what it was called with, secrets never | ToolRunsTest (all); McpRowTest (all); SessionScreenTest.aLiveMcpRunFoldsWithItsLatestCallUnderIt, aFinishedMcpRunReadsAsItsServer, aTapOpensTheFoldToEachCall; mcp-summary.test.ts (all) | **covered** |
 
 ## 5. Session sheet
 
