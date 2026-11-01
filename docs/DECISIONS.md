@@ -3143,3 +3143,41 @@ settings, another section for the account details". Each agent's settings screen
 **Account details**: how it's signed in and its plan, and how much of its 5-hour and 7-day windows
 is used, per server. He chose what the server already sends: the email and organization still stay
 on the server, so this can't say which account a server is on.
+
+## Delete for every finished session (2026-11-01)
+
+The owner, on k1: "I can't delete this completed session for some reason, it's pretty common for me
+not to be able to do this." The card's menu showed only Rename: Delete was for `claude agents` jobs
+and Codex sessions, so a finished session in a plain shared terminal had none, and nothing said why.
+His rule: a completed session can always be deleted.
+
+1. **Delete shows on every session at rest**, whatever made it: Home's Completed, ended ones too, on
+   the card's menu, the session sheet's Actions (the same `MenuOffer`) and the swipes. One at work or
+   waiting on him that is neither a job nor Codex has none, as before. Replaces "nor does a Completed
+   card that isn't a job" in HM2: Smart's swipe deletes it, asked first. Codex's card still doesn't
+   swipe to Delete (that decision's 4).
+2. **Asked first, saying what it does:** a live terminal closes and Claude Code stops there; a job
+   whose process still runs stops; otherwise only where it goes.
+3. **It goes from Hypernova, the transcript stays.** Home, History and search, after a restart too
+   (`<support>/deleted-sessions.json`). This was decided here, not by the owner: Claude Code has no
+   delete of its own for a plain session, the words say plainly what happens, and a jsonl removed
+   can't be got back. `claude --resume <id>` brings one back. The same for a job: `claude rm` leaves
+   the transcript too, so a deleted job used to return to History at the next restart.
+4. **What can't be deleted says why.** Idle in a terminal Hypernova doesn't hold: Delete is there,
+   and tapping it says to close that terminal first. It isn't killed from here, as with a rewind.
+5. **An older server** answers 409 `not_agents` for a session that is no job: the phone says that
+   server needs updating, and the card stays.
+
+## Pasting an image, whatever it says it is (2026-11-01)
+
+The owner: "sometimes I can't paste a screenshot right into the text input." Then he added it by hand
+with the paperclip. Nothing happened, with nothing said.
+
+1. **A clip needn't call itself an image.** The box only looked at clips described as `image/*`, and
+   at items whose resolver type was a specific image. Anything else fell through to the text paste,
+   which finds no text in a Uri and does nothing. Now a file with no specific type is read: its first
+   bytes decide, and name it (`.png`, not `.img`).
+2. **Every box with a paperclip takes one:** the New session sheet's did not take images at all.
+3. **Nothing fails silently:** a file that can't be read, or isn't an image, says so and points at
+   the paperclip. A web address with no text goes in as words; an image with words keeps both.
+4. Nothing else on the chat screen changes.
