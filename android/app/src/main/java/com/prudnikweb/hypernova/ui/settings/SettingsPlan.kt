@@ -55,6 +55,8 @@ object SettingsPlan {
     data object TopBar : Part { override val key = "topBar" }
     data object Typing : Part { override val key = "typing" }
     data object Notifications : Part { override val key = "background" }
+    /** Terminal engine: xterm.js or the Ghostty trial (ui/term/TermEngine.kt), this phone's; testing only. */
+    data object TerminalEngine : Part { override val key = "termEngine" }
     data object About : Part { override val key = "about" }
 
     /** A server part's key: the part's own with one server, the part's and the server's with All servers. */
@@ -63,7 +65,8 @@ object SettingsPlan {
     /**
      * The parts in order. [all]: "All servers" is on, [servers] every paired one in the order they
      * were paired; otherwise [servers] is the one on screen (empty: none paired). [testing]: the
-     * testing checklist is unlocked (a debug build, or seven taps on the build).
+     * testing checklist is unlocked (a debug build, or seven taps on the build), and with it the
+     * Terminal engine trial, just before About.
      */
     fun parts(all: Boolean, servers: List<ServerFacts>, testing: Boolean): List<Part> =
         if (all) allServers(servers, testing) else oneServer(servers.firstOrNull(), testing)
@@ -80,6 +83,7 @@ object SettingsPlan {
             add(Notifications)
             if (testing) add(Checklist(s.id, "qa"))
         }
+        if (testing) add(TerminalEngine)
         add(About)
     }
 
@@ -98,6 +102,7 @@ object SettingsPlan {
         addAll(phoneKept())
         add(Notifications)
         add(ConnectionLog)
+        if (testing) add(TerminalEngine)
         add(About)
     }
 

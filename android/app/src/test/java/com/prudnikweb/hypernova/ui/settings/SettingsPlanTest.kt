@@ -16,7 +16,7 @@ class SettingsPlanTest {
 
     @Test fun oneServerKeepsItsPartsAndOrder() {
         assertEquals(
-            listOf("mac", "providers", "voice", "files", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "qa", "about"),
+            listOf("mac", "providers", "voice", "files", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "qa", "termEngine", "about"),
             keys(false, listOf(z2), testing = true),
         )
         // Read aloud follows Voice in its item, from a server that reads aloud.
@@ -32,7 +32,8 @@ class SettingsPlanTest {
     }
 
     @Test fun notPairedIsTheCardAndThePhonesParts() {
-        assertEquals(listOf("mac", "newSessions", "display", "cardSwipes", "topBar", "typing", "about"), keys(false, emptyList(), testing = true))
+        assertEquals(listOf("mac", "newSessions", "display", "cardSwipes", "topBar", "typing", "termEngine", "about"), keys(false, emptyList(), testing = true))
+        assertEquals(listOf("mac", "newSessions", "display", "cardSwipes", "topBar", "typing", "about"), keys(false, emptyList()))
     }
 
     @Test fun allServersIsOneBlockPerServerThenThePhone() {
@@ -40,7 +41,7 @@ class SettingsPlanTest {
             listOf(
                 "server:z2", "providers:z2", "readAloud:z2", "files:z2", "qa:z2",
                 "server:shed", "providers:shed", "files:shed", "qa:shed",
-                "phone", "voice", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "connectionLog", "about",
+                "phone", "voice", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "connectionLog", "termEngine", "about",
             ),
             keys(true, listOf(z2, shed), testing = true),
         )

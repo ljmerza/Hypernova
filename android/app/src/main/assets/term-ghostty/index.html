@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Terminal</title>
+<style>
+  /*
+   * The trial terminal: the same page as term/index.html (the same bridge, socket, keys, pinch and
+   * finger scrolling), drawn by Ghostty's terminal core (ghostty-web: Ghostty's VT code compiled to
+   * WebAssembly, with a canvas renderer) instead of xterm.js. Settings → Terminal engine (testing).
+   * The font is term/'s, not a second copy.
+   */
+  @font-face { font-family: "JetBrains Mono"; src: url("../term/JetBrainsMono.ttf") format("truetype"); font-weight: 100 800; }
+  html, body { margin: 0; height: 100%; background: #14110E; overflow: hidden; overscroll-behavior: none; }
+  #t { position: absolute; inset: 0 6px 0 8px; outline: none; caret-color: transparent; }
+  #t canvas { touch-action: none; }
+  #zoom { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); font: 500 12px/1 "JetBrains Mono", monospace; color: #B5B0A6; background: rgba(34,31,27,.9); border: 1px solid rgba(245,242,235,.1); border-radius: 999px; padding: 7px 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #zoom.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="t"></div>
+<div id="zoom"></div>
+<script src="ghostty-web.js"></script>
+<script>
+(() => {
+  const native = window.HN || { ready() {}, state() {}, closed() {}, exited() {}, tapped() {}, scrolled() {}, open() { return -1 }, send() {}, sendText() {}, shut() {}, took() {} }
+  const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } }
+  const G = window.GhosttyWeb
+  // xterm.js's lineHeight, which ghostty-web has no option for.
+  const LINE_HEIGHT = 1.12
+
+  // ghostty-web measures a cell as Math.ceil of "M"'s advance and the height from "M"'s own box
+  // (no descenders). With JetBrains Mono that letter-spaces the text (coder/ghostty-web#207) and
+  // packs rows tighter than xterm.js. Measured the way xterm.js lays it out instead: the font's
+  // own ascent and descent times the line height, the advance rounded (not ceiled) to a whole pixel.
+  G.CanvasRenderer.prototype.measureFont = function () {
+    const ctx = document.createElement('canvas').getContext('2d')
+    ctx.font = `${this.fontSize}px ${this.fontFamily}`
+    const m = ctx.measureText('M')
+    const asc = m.fontBoundingBoxAscent || this.fontSize * 1.02
+    const desc = m.fontBoundingBoxDescent || this.fontSize * 0.3
+    const width = Math.max(1, Math.round(m.width))
+    const height = Math.max(1, Math.round((asc + desc) * LINE_HEIGHT))
+    const baseline = Math.round((height - asc - desc) / 2 + asc)
+    return { width, height, baseline }
+  }
+
+  // ghostty-web draws on every frame for as long as it's open, even when nothing changed
+  // (coder/ghostty-web#208), and every row of every frame while scrolled back: a busy core for a
+  // still screen. Drawn on the next frame when something changed instead (output, a scroll, a
+  // resize, the cursor's blink: put(), onScroll and the timer below call draw()).
+  const T = G.Terminal.prototype
+  T.startRenderLoop = function () { this.draw() }
+  T.draw = function () {
+    if (this.animationFrameId) return
+    this.animationFrameId = requestAnimationFrame(() => {
+      this.animationFrameId = undefined
+      if (!this.isDisposed && this.isOpen) this.renderer.render(this.wasmTerm, false, this.viewportY, this, this.scrollbarOpacity)
+    })
+  }
+
+  let userFont = Number(store.get('fontSize')) || 11.5
+  let following = false
+  let quiet = false
+  let pty = null
+  let term = null
+  let fit = null
+
+  let ws = null
+  let macOpen = false
+  let ended = false
+  const enc = new TextEncoder()
+  const REPLY = /^(\x1b\[\??[\d;]*[cRn]|\x1b\[\?[\d;]*\$y|\x1b\][\d;]*;rgb:[^\x07\x1b]*(\x07|\x1b\\)|\x1bP[\s\S]*\x1b\\)$/
+
+  /** Claude asked for the mouse (1000, 1002, 1003: buttons and wheel, not X10's clicks only). */
+  const mouse = () => term.getMode(1000) || term.getMode(1002) || term.getMode(1003)
+  const altScreen = () => term.buffer.active.type === 'alternate'
+  const cellHeight = () => (term.renderer ? term.renderer.getMetrics().height : 0)
+  const canvasRect = () => term.renderer.getCanvas().getBoundingClientRect()
+
+  /** What fits this screen at the owner's text size. */
+  function mine() {
+    const p = fit.proposeDimensions()
+    if (!p || !p.cols) return null
+    const k = term.options.fontSize / userFont
+    return { cols: Math.max(20, Math.floor(p.cols * k)), rows: Math.max(6, Math.floor(p.rows * k)) }
+  }
+  function quietly(f) { quiet = true; try { f() } finally { quiet = false } }
+
+  function follow(cols, rows) {
+    pty = { cols, rows }
+    const m = mine()
+    if (!m) return
+    if (cols === m.cols && rows === m.rows) {
+      following = false
+      quietly(() => { term.options.fontSize = userFont; if (term.cols !== cols || term.rows !== rows) term.resize(cols, rows) })
+      return
+    }
+    following = true
+    const scale = Math.min(1, m.cols / cols, m.rows / rows)
+    quietly(() => {
+      term.options.fontSize = Math.max(4, Math.floor(userFont * scale * 2) / 2)
+      term.resize(cols, rows)
+    })
+  }
+  function takeOver() {
+    if (!following) return
+    following = false
+    quietly(() => { term.options.fontSize = userFont })
+    refit()
+  }
+  function refit() {
+    if (!term) return
+    if (following && pty) return follow(pty.cols, pty.rows)
+    try { fit.fit() } catch {}
+  }
+  let fitTimer = 0
+  window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(refit, 40) })
+
+  // Pinch to change the text size.
+  const zoomEl = document.getElementById('zoom')
+  let pinch = null, zoomTimer = 0
+  function showZoom() {
+    zoomEl.textContent = `${term.cols} × ${term.rows}`
+    zoomEl.classList.add('on')
+    clearTimeout(zoomTimer)
+    zoomTimer = setTimeout(() => zoomEl.classList.remove('on'), 900)
+  }
+  const dist = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 2 || !term) return
+    takeOver()
+    pinch = { d: dist(e), size: userFont }
+  }, { passive: true, capture: true })
+  document.addEventListener('touchmove', (e) => {
+    if (!pinch || e.touches.length !== 2) return
+    e.preventDefault()
+    const next = Math.round(Math.max(7, Math.min(20, pinch.size * dist(e) / pinch.d)) * 2) / 2
+    if (next !== userFont) {
+      userFont = next
+      term.options.fontSize = next
+      refit()
+      showZoom()
+    }
+  }, { passive: false, capture: true })
+  document.addEventListener('touchend', (e) => {
+    if (pinch && e.touches.length < 2) { pinch = null; store.set('fontSize', String(userFont)) }
+  }, { passive: true, capture: true })
+
+  // A finger's drag scrolls the history, as on term/index.html: the history kept here in the
+  // normal screen; in Claude Code's fullscreen view, mouse-wheel turns (encoded here, since
+  // ghostty-web's own wheel sends arrow keys there) or PgUp/PgDn. Never arrow keys.
+  let drag = null, at = null, rest = 0, pages = 0, glideId = 0
+  let up = 0
+  let away = false
+  let pinned = true
+  let lastType = 'normal'
+
+  function how() {
+    if (mouse()) return 'wheel'
+    return altScreen() ? 'pages' : 'lines'
+  }
+  function where() {
+    if (!term) return
+    // ghostty-web counts the viewport from the bottom: 0 is the latest.
+    const now = !pinned && (how() === 'lines' ? term.getViewportY() > 0 : up > 0)
+    if (now !== away) { away = now; native.scrolled(now) }
+  }
+  function scrollKeys(seq) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'scroll', data: seq }))
+  }
+  /** One wheel turn where the finger is ([dy] -1 up, 1 down), as claude asked (SGR or X10). */
+  function wheelSeq(dy) {
+    const r = canvasRect()
+    const m = term.renderer.getMetrics()
+    const x = at ? at.x : r.left + r.width / 2
+    const y = at ? at.y : r.top + r.height / 2
+    const col = Math.min(term.cols, Math.max(1, Math.floor((x - r.left) / m.width) + 1))
+    const row = Math.min(term.rows, Math.max(1, Math.floor((y - r.top) / m.height) + 1))
+    const b = dy < 0 ? 64 : 65
+    if (term.getMode(1006)) return `\x1b[<${b};${col};${row}M`
+    return '\x1b[M' + String.fromCharCode(32 + b, Math.min(255, 32 + col), Math.min(255, 32 + row))
+  }
+  function pull(px) {
+    if (!term) return false
+    const cell = cellHeight()
+    if (!cell) return false
+    rest += px
+    const n = Math.trunc(rest / cell)
+    if (!n) return true
+    rest -= n * cell
+    const way = how()
+    if (way === 'lines') {
+      const before = term.getViewportY()
+      term.scrollLines(-n)
+      where()
+      return term.getViewportY() !== before
+    }
+    if (!ws || ws.readyState !== 1) return false
+    if (way === 'wheel') {
+      for (let i = 0; i < Math.abs(n); i++) scrollKeys(wheelSeq(n > 0 ? -1 : 1))
+      up = Math.max(0, up + n)
+    } else {
+      pages += n
+      const page = Math.max(1, term.rows - 2)
+      while (Math.abs(pages) >= page) {
+        const k = pages > 0 ? 1 : -1
+        pages -= k * page
+        scrollKeys(k > 0 ? '\x1b[5~' : '\x1b[6~')
+        up = Math.max(0, up + k)
+      }
+    }
+    where()
+    return true
+  }
+  function glide(v) {
+    let last = performance.now()
+    const step = (now) => {
+      const dt = now - last
+      last = now
+      v *= Math.pow(0.995, dt)
+      if (Math.abs(v) < 0.05 || !pull(v * dt)) return
+      glideId = requestAnimationFrame(step)
+    }
+    glideId = requestAnimationFrame(step)
+  }
+  function live() {
+    pinned = true
+    up = 0
+    pages = 0
+    term.scrollToBottom()
+    where()
+  }
+  function opened() {
+    pinned = true
+    up = 0
+    pages = 0
+    term.scrollToBottom()
+    if (how() === 'wheel') scrollKeys('\x1b[1;5F')
+    where()
+  }
+  /**
+   * Output, kept where the finger left the history: ghostty-web jumps to the latest on every write
+   * (coder/ghostty-web#127), which would make scrolling back impossible while claude works.
+   */
+  function put(data, done) {
+    const back = pinned || drag ? 0 : term.getViewportY()
+    const before = back ? term.getScrollbackLength() : 0
+    term.write(data, done)
+    if (back) term.scrollLines(-(back + Math.max(0, term.getScrollbackLength() - before)))
+    term.draw()
+    const type = term.buffer.active.type
+    // ghostty-web has the event but never fires it.
+    if (type !== lastType) { lastType = type; up = 0; pages = 0; where() }
+  }
+  document.addEventListener('touchstart', (e) => {
+    cancelAnimationFrame(glideId)
+    if (e.touches.length !== 1) { drag = null; return }
+    const t = e.touches[0]
+    drag = { x: t.clientX, y: t.clientY, last: t.clientY, time: e.timeStamp, v: 0, on: false }
+    at = { x: t.clientX, y: t.clientY }
+    rest = 0
+  }, { passive: true, capture: true })
+  document.addEventListener('touchmove', (e) => {
+    if (!drag || e.touches.length !== 1) return
+    const t = e.touches[0]
+    if (!drag.on) {
+      const dy = t.clientY - drag.y
+      if (Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(t.clientX - drag.x)) return
+      drag.on = true
+      pinned = false
+      drag.last = t.clientY
+      drag.time = e.timeStamp
+      return
+    }
+    e.preventDefault()
+    const dy = t.clientY - drag.last
+    drag.v = 0.8 * (dy / Math.max(1, e.timeStamp - drag.time)) + 0.2 * drag.v
+    drag.last = t.clientY
+    drag.time = e.timeStamp
+    pull(dy)
+  }, { passive: false, capture: true })
+  document.addEventListener('touchend', (e) => {
+    const d = drag
+    drag = null
+    if (d && d.on && how() === 'lines' && Math.abs(d.v) > 0.3 && e.timeStamp - d.time < 80) glide(d.v)
+    else if (d && d.on && !away) pinned = true
+  }, { passive: true, capture: true })
+  document.addEventListener('touchcancel', () => { drag = null }, { passive: true, capture: true })
+
+  // The app's socket, exactly as on term/index.html.
+  const fromB64 = Uint8Array.fromBase64 ? (s) => Uint8Array.fromBase64(s) : (s) => {
+    const t = atob(s)
+    const b = new Uint8Array(t.length)
+    for (let i = 0; i < t.length; i++) b[i] = t.charCodeAt(i)
+    return b
+  }
+  function toB64(b) {
+    if (b.toBase64) return b.toBase64()
+    let s = ''
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000))
+    return btoa(s)
+  }
+  function appSocket(cols, rows) {
+    const s = { app: true, readyState: 0, onmessage: null, onclose: null }
+    s.id = native.open(cols, rows)
+    s.send = (d) => {
+      if (s.readyState !== 1) return
+      if (typeof d === 'string') native.sendText(s.id, d)
+      else native.send(s.id, toB64(d instanceof Uint8Array ? d : new Uint8Array(d)))
+    }
+    s.close = () => {
+      if (s.readyState > 1) return
+      s.readyState = 3
+      native.shut(s.id)
+    }
+    if (s.id < 0) setTimeout(() => take(s.id, ['c1006']), 0)
+    return s
+  }
+  function take(id, items) {
+    const s = ws
+    if (!s || !s.app || s.id !== id) return
+    for (const it of items) {
+      const k = it[0]
+      if (k === 'o') {
+        if (s.readyState === 0) s.readyState = 1
+      } else if (k === 'b') {
+        if (s.onmessage) s.onmessage({ data: fromB64(it.slice(1)).buffer })
+      } else if (k === 't') {
+        if (s.onmessage) s.onmessage({ data: it.slice(1) })
+      } else if (k === 'c') {
+        s.readyState = 3
+        if (s.onclose) s.onclose({ code: Number(it.slice(1)) || 0 })
+        return
+      }
+      if (ws !== s) return
+    }
+  }
+
+  const KEYS = {
+    esc: '\x1b', tab: '\t', stab: '\x1b[Z', enter: '\r', ctrlc: '\x03', slash: '/',
+    up: 'A', down: 'B', right: 'C', left: 'D',
+  }
+  window.hn = {
+    engine: 'ghostty',
+    connect(url) {
+      if (!term) return
+      ended = false
+      pinned = true
+      if (ws) { try { ws.onclose = null; ws.close() } catch {} }
+      refit()
+      const sock = url ? new WebSocket(`${url}&cols=${term.cols}&rows=${term.rows}`) : appSocket(term.cols, term.rows)
+      sock.binaryType = 'arraybuffer'
+      ws = sock
+      sock.onmessage = (ev) => {
+        if (typeof ev.data !== 'string') return void put(new Uint8Array(ev.data))
+        let m
+        try { m = JSON.parse(ev.data) } catch { return }
+        if (m.t === 'snapshot') {
+          term.reset()
+          pinned = true
+          up = 0
+          pages = 0
+          put(m.data, opened)
+        } else if (m.t === 'hello' || m.t === 'state') {
+          macOpen = m.tty > 0
+          if (m.cols && m.rows) follow(m.cols, m.rows)
+          native.state(JSON.stringify({ cols: m.cols, rows: m.rows, mac: m.tty, phone: m.phone, title: m.title || '' }))
+        } else if (m.t === 'exit') {
+          ended = true
+          native.exited(typeof m.code === 'number' ? m.code : 0)
+        }
+      }
+      sock.onclose = (ev) => {
+        if (ws !== sock) return
+        ws = null
+        if (!ended) native.closed(ev.code || 0)
+      }
+    },
+    close() {
+      if (ws) { const s = ws; ws = null; try { s.onclose = null; s.close() } catch {} }
+    },
+    rx(id, items) {
+      try { take(id, items) } finally { native.took() }
+    },
+    key(name) {
+      if (!ws || ws.readyState !== 1) return
+      takeOver()
+      let seq = KEYS[name]
+      if (!seq) return
+      live()
+      if (seq.length === 1 && /[A-D]/.test(seq)) seq = (term.getMode(1) ? '\x1bO' : '\x1b[') + seq
+      ws.send(enc.encode(seq))
+    },
+    text(s) {
+      if (!ws || ws.readyState !== 1 || !s) return
+      takeOver()
+      live()
+      ws.send(enc.encode(s))
+    },
+    paste(s) {
+      if (!ws || ws.readyState !== 1 || !s) return
+      takeOver()
+      live()
+      term.paste(s)
+    },
+    focus() { if (term) term.focus() },
+    blur() { if (term) term.blur() },
+    bottom() { if (term) term.scrollToBottom() },
+    latest() {
+      if (!term) return
+      cancelAnimationFrame(glideId)
+      const way = how()
+      if (way === 'lines') term.scrollToBottom()
+      else if (up > 0) {
+        if (way === 'wheel') scrollKeys('\x1b[1;5F')
+        else for (let i = 0; i < up; i++) scrollKeys('\x1b[6~')
+      }
+      pinned = true
+      up = 0
+      pages = 0
+      where()
+    },
+    // For scripts/term-pages.mjs: what the screen holds, as text, and where the history is.
+    peek() {
+      if (!term) return null
+      const b = term.buffer.active
+      const lines = []
+      for (let i = 0; i < term.rows; i++) {
+        const l = b.getLine(b.length - term.rows - term.getViewportY() + i)
+        lines.push(l ? l.translateToString(true) : '')
+      }
+      const m = term.renderer.getMetrics()
+      return { cols: term.cols, rows: term.rows, cursorX: b.cursorX, viewportY: term.getViewportY(), scrollback: term.getScrollbackLength(), type: b.type, cell: m, lines }
+    },
+  }
+
+  const el = document.getElementById('t')
+  el.addEventListener('click', () => native.tapped())
+  const font = document.fonts ? document.fonts.load(`${userFont}px "JetBrains Mono"`).catch(() => {}) : Promise.resolve()
+  Promise.all([G.init(), font]).then(() => {
+    term = new G.Terminal({
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: userFont,
+      cursorBlink: true,
+      cursorStyle: 'bar',
+      // Bytes in Ghostty (its scrollback limit), not lines as in xterm.js: about 5000 lines here.
+      scrollback: 4 * 1024 * 1024,
+      smoothScrollDuration: 0,
+      theme: {
+        background: '#14110E', foreground: '#F5F2EB', cursor: '#7FFFA0', cursorAccent: '#14110E',
+        selectionBackground: 'rgba(127,255,160,0.28)',
+        black: '#1B1814', red: '#FF7878', green: '#7FFFA0', yellow: '#E8B341', blue: '#8AB4FF', magenta: '#D69CFF', cyan: '#7FE7FF', white: '#B5B0A6',
+        brightBlack: '#7A7468', brightRed: '#FF9C9C', brightGreen: '#B6FFC9', brightYellow: '#F2CC6E', brightBlue: '#AFCBFF', brightMagenta: '#E5BDFF', brightCyan: '#A9F0FF', brightWhite: '#F5F2EB',
+      },
+    })
+    fit = new G.FitAddon()
+    term.loadAddon(fit)
+    // ghostty-web's wheel sends arrow keys in the fullscreen view; the drag above does the scrolling.
+    term.attachCustomWheelEventHandler(() => true)
+    term.onData((d) => {
+      if (!ws || ws.readyState !== 1) return
+      if (macOpen && REPLY.test(d)) return
+      if (d === '\x1b[I' || d === '\x1b[O') return
+      ws.send(enc.encode(d))
+    })
+    term.onResize(({ cols, rows }) => {
+      if (quiet) return
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'resize', cols, rows }))
+    })
+    term.onScroll(() => { term.draw(); where() })
+    term.onSelectionChange(() => term.draw())
+    // The cursor's blink (the renderer flips it every 530 ms and leaves the drawing to the loop).
+    setInterval(() => term.draw(), 530)
+    term.open(el)
+    refit()
+    native.ready()
+  }).catch((e) => {
+    // No WebAssembly (or the module failed): said once, on the page, so the trial isn't a blank screen.
+    el.textContent = `Ghostty didn't start here: ${e && e.message ? e.message : e}. Settings → Terminal engine → xterm.js.`
+    el.style.cssText += ';color:#FF7878;font:13px/1.4 "JetBrains Mono",monospace;padding:16px'
+  })
+})()
+</script>
+</body>
+</html>

@@ -268,6 +268,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                 }
                 // Stay connected in the background: one setting for every server's link (Core.background).
                 SettingsPlan.Notifications -> NotificationsSection(vm)
+                // The Ghostty terminal trial (TerminalEngineSection.kt), with the testing checklist.
+                SettingsPlan.TerminalEngine -> {
+                    Spacer(Modifier.height(10.dp))
+                    TerminalEngineSection()
+                }
                 SettingsPlan.About -> {
                     // A newer app: with All servers, the newest any connected server offers (the one
                     // picked first on a tie), downloaded from that server (AppUpdate.server); else the one on screen's.
