@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,9 +34,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -64,7 +70,7 @@ private val TODO_TOOLS = setOf("TodoWrite", "TaskCreate", "TaskUpdate")
  * tools runs or finishes (they're in the transcript as tool rows), never on a timer.
  */
 @Composable
-internal fun rememberTodos(sessionId: String, items: List<Item>): List<Todo> {
+internal fun rememberTodos(sessionId: String, items: List<Item>, load: suspend (String) -> Result<List<Todo>> = ChatRepo::todos): List<Todo> {
     val key = remember(items) {
         items.filter { it is Item.Tool && it.verb in TODO_TOOLS }.joinToString("|") { "${it.key}:${(it as Item.Tool).running}" }
     }
@@ -72,10 +78,13 @@ internal fun rememberTodos(sessionId: String, items: List<Item>): List<Todo> {
     LaunchedEffect(sessionId, key) {
         // A to-do tool's result lands a moment after its row.
         if (key.isNotEmpty()) delay(300)
-        ChatRepo.todos(sessionId).onSuccess { todos = it }
+        load(sessionId).onSuccess { todos = it }
     }
     return todos
 }
+
+private fun currentTodo(todos: List<Todo>): Todo? =
+    todos.firstOrNull { it.status == TodoStatus.Active } ?: todos.firstOrNull { it.status == TodoStatus.Pending }
 
 /**
  * The checklist inside the status bar's card (StatusBar.kt) once the bar is opened: what's done
@@ -83,20 +92,40 @@ internal fun rememberTodos(sessionId: String, items: List<Item>): List<Todo> {
  */
 @Composable
 internal fun TodoChecklist(todos: List<Todo>, modifier: Modifier = Modifier) {
-    val current = todos.firstOrNull { it.status == TodoStatus.Active } ?: todos.firstOrNull { it.status == TodoStatus.Pending }
     val list = rememberLazyListState()
-    val at = todos.indexOf(current)
+    val at = todos.indexOf(currentTodo(todos))
     // Keep what Claude is on in view as the list moves on.
     LaunchedEffect(at) { if (at > 1) list.animateScrollToItem((at - 1).coerceAtLeast(0)) }
     LazyColumn(
-        modifier.fillMaxWidth().heightIn(max = 164.dp),
+        modifier.fillMaxWidth().heightIn(max = 164.dp).panelViewport(list),
         state = list,
         verticalArrangement = Arrangement.spacedBy(2.dp),
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 8.dp),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp),
     ) {
-        itemsIndexed(todos, key = { _, t -> t.id }) { _, t -> TodoRow(t, t === current) }
+        todoRows(todos)
     }
 }
+
+/** The to-dos as rows of a list, so the opened bar can keep them in one list under its agents. */
+internal fun LazyListScope.todoRows(todos: List<Todo>) {
+    val current = currentTodo(todos)
+    itemsIndexed(todos, key = { _, t -> "todo:${t.id}" }) { _, t -> TodoRow(t, t === current) }
+}
+
+/**
+ * The window of a list in the opened bar. The 8dp under it stays clear whatever the scroll, so a row
+ * is never cut right on the progress line below it (it was: that gap used to scroll with the rows),
+ * and where there's more to scroll to, the rows fade out rather than stop at a hard edge.
+ */
+internal fun Modifier.panelViewport(list: LazyListState): Modifier = this
+    .padding(bottom = 8.dp)
+    .graphicsLayer { compositingStrategy = if (list.canScrollForward || list.canScrollBackward) CompositingStrategy.Offscreen else CompositingStrategy.Auto }
+    .drawWithContent {
+        drawContent()
+        val fade = (16.dp.toPx() / size.height).coerceIn(0f, 0.5f)
+        if (list.canScrollForward) drawRect(Brush.verticalGradient(1f - fade to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+        if (list.canScrollBackward) drawRect(Brush.verticalGradient(0f to Color.Transparent, fade to Color.Black), blendMode = BlendMode.DstIn)
+    }
 
 /** One line: ticked when done, lit while it's the one Claude is on, a hollow ring when it waits. */
 @Composable

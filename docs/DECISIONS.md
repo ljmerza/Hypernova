@@ -3206,3 +3206,23 @@ reloads them all, so that's what it says.
    next prompt loads them). Idle in a terminal Hypernova doesn't hold, it's there and says why, as
    Delete does.
 5. **An older server** answers 404: the phone says that server needs updating.
+
+## The prompt box wins over the status bar (2026-11-01)
+
+The owner: "there's not enough room for the input. Don't allow the pull-up menu to hide the input
+side."
+
+1. **The box is measured first, the bar last.** The bar takes what the box and the rest leave it, so
+   nothing it lists can push the box off or clip it, at its 6 lines, with attachments, or with the
+   keyboard up.
+2. **The opened bar gets half of the room between the header and the box,** with or without the
+   keyboard: a cap, worked out as it's measured, not a fold. It doesn't fold by itself when the
+   keyboard opens: that would move the card under the finger, and a tap on it folds it anyway. Some
+   of the chat stays in view.
+3. **Short of room,** it keeps the folded bar and a row while they fit clear of the header, then the
+   folded bar alone (over the header if it must: Stop is worth more than the header's words, and the
+   header's back with the keyboard down). With less than that it isn't drawn.
+4. **Agents and to-dos scroll as one list,** since a list each couldn't share a small panel. It follows
+   the agents, not the to-dos, whose tally stays in the bar's row.
+5. **The progress line stays clear:** the list stops 8dp above it whatever the scroll, and rows fade at
+   an edge with more beyond it.
