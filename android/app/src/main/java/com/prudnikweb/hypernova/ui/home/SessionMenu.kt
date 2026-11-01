@@ -33,8 +33,10 @@ import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.AttentionAction
 import com.prudnikweb.hypernova.ui.components.AttentionCard
 import com.prudnikweb.hypernova.ui.components.ConfirmDialog
+import com.prudnikweb.hypernova.ui.components.DialogButton
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Field
+import com.prudnikweb.hypernova.ui.components.GlassDialog
 import com.prudnikweb.hypernova.ui.components.GlassSheet
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
@@ -46,9 +48,43 @@ import com.prudnikweb.hypernova.ui.theme.Type
 import kotlinx.coroutines.launch
 
 /**
+ * What the menu's Delete does to a [Session], and so what its confirm says (DECISIONS, "Delete for
+ * every finished session", 2026-11-01). A job and a Codex session have it always, as they did. Any
+ * other session has it once it's at rest (Home's Completed, ended ones too): at work or waiting on the
+ * owner it has none.
+ */
+enum class DeleteKind {
+    /** At work or waiting on the owner, and neither a job nor a Codex session: not offered. */
+    None,
+    /** A job with no process: `claude rm`. */
+    Job,
+    /** A job whose process still runs: `claude rm` stops it, and a terminal open on it closes. */
+    RunningJob,
+    /** Codex's own delete, for good. */
+    Codex,
+    /** At rest in a terminal Hypernova holds: the terminal closes, then Hypernova forgets it. */
+    Terminal,
+    /** Nothing runs: Hypernova forgets it. */
+    Forget,
+    /** Idle in a terminal Hypernova doesn't hold: it can't close that one, and the dialog says so. */
+    OpenElsewhere;
+
+    companion object {
+        fun of(s: Session): DeleteKind = when {
+            s.codex -> Codex
+            s.agentJob != null -> if (s.agentRunning == true && s.phase != Phase.Ended) RunningJob else Job
+            homeGroup(s) != HomeGroup.Completed -> None
+            s.term != null -> Terminal
+            s.origin == "terminal" && s.phase != Phase.Ended -> OpenElsewhere
+            else -> Forget
+        }
+    }
+}
+
+/**
  * What a Home card's long-press menu offers for [Session] (docs/PROTOCOL.md, "Session menu"): Rename
- * for any session; Stop and Delete for a `claude agents` job ([Session.agentJob]) or a Codex session
- * (its turn's interrupt, Codex's own delete; 2026-10-31). Stop while it works or waits on the owner,
+ * for any session; Delete as [DeleteKind] says; Stop for a `claude agents` job ([Session.agentJob]) or
+ * a Codex session (its turn's interrupt; 2026-10-31). Stop while it works or waits on the owner,
  * or, for a job, idles with its process still running ([Session.agentRunning]; owner, 2026-10-30:
  * idle jobs couldn't be stopped). Not for one stopped or done already, nor, from an older Mac that
  * doesn't say, for an idle one.
@@ -60,16 +96,17 @@ data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean
         fun of(s: Session): MenuOffer {
             val job = s.agentJob != null
             val live = s.phase != Phase.Ended && (s.state != SessionState.Idle || s.agentRunning == true)
-            return MenuOffer(rename = true, stop = (job || s.codex) && live, delete = job || s.codex, restart = job && s.agentOutdated != null)
+            return MenuOffer(rename = true, stop = (job || s.codex) && live, delete = DeleteKind.of(s) != DeleteKind.None, restart = job && s.agentOutdated != null)
         }
     }
 }
 
 /**
  * A Home card's long-press menu: Rename (Claude Code's /rename, so claude agents shows it too),
- * Stop and Delete a `claude agents` job or a Codex session (Codex's own name and delete). Delete asks first. The Mac's own words come back when it
- * can't (Claude Code keeps a worktree with unpushed work). [start]: the page it opens on (the chat's
- * session sheet lists the actions itself, then opens Rename or Delete here).
+ * Stop a `claude agents` job or a Codex session, and Delete ([DeleteKind]). Delete asks first, saying
+ * what it will close. The Mac's own words come back when it can't (Claude Code keeps a worktree with
+ * unpushed work). [start]: the page it opens on (the chat's session sheet lists the actions itself,
+ * then opens Rename or Delete here).
  */
 @Composable
 internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit, start: MenuPage = MenuPage.Actions) {
@@ -86,23 +123,41 @@ internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit, start: Men
             MenuActions(hub, s, { page = it }, onDismiss)
         }
         MenuPage.Rename -> RenameSheet(hub, s, onDismiss)
-        MenuPage.Delete -> ConfirmDialog(
-            visible = true,
-            title = stringResource(R.string.session_delete_q, s.name),
-            body = stringResource(if (s.codex) R.string.session_delete_body_codex else R.string.session_delete_body),
-            confirm = stringResource(R.string.delete),
-            danger = true,
-            onConfirm = {
-                onDismiss()
-                appScope.launch { hub.deleteSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_delete_session)) } }
-            },
-            onDismiss = onDismiss,
-        )
+        MenuPage.Delete -> when (val kind = DeleteKind.of(s)) {
+            // There's nothing to ask: it says why, and what would let it go.
+            DeleteKind.OpenElsewhere -> GlassDialog(
+                onDismiss = onDismiss,
+                title = stringResource(R.string.session_delete_cant_q, s.name),
+                line = stringResource(R.string.session_delete_cant_body),
+                primary = DialogButton(stringResource(R.string.fl_ok), onDismiss, PillKind.Primary),
+            )
+            else -> ConfirmDialog(
+                visible = true,
+                title = stringResource(R.string.session_delete_q, s.name),
+                body = stringResource(deleteBody(kind)),
+                confirm = stringResource(R.string.delete),
+                danger = true,
+                onConfirm = {
+                    onDismiss()
+                    appScope.launch { hub.deleteSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_delete_session)) } }
+                },
+                onDismiss = onDismiss,
+            )
+        }
         MenuPage.Restart -> RestartConfirm(hub, s, onDismiss)
     }
 }
 
 internal enum class MenuPage { Actions, Rename, Delete, Restart }
+
+/** What Delete's confirm says it will do. */
+private fun deleteBody(kind: DeleteKind): Int = when (kind) {
+    DeleteKind.Codex -> R.string.session_delete_body_codex
+    DeleteKind.RunningJob -> R.string.session_delete_body_running
+    DeleteKind.Terminal -> R.string.session_delete_body_terminal
+    DeleteKind.Forget -> R.string.session_delete_body_plain
+    DeleteKind.Job, DeleteKind.None, DeleteKind.OpenElsewhere -> R.string.session_delete_body
+}
 
 /**
  * Restart a `claude agents` job on the installed Claude Code (`claude respawn`), asked first: a job

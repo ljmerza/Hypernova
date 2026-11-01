@@ -60,6 +60,7 @@ import { noteHookEvent } from './hookevents.ts'
 import { alwaysUpdates, suggestedRules, suggestedScope } from './always.ts'
 import { rulesInEffect } from './permission-rules.ts'
 import { replacedOf } from './rewound.ts'
+import { deletedOf } from './deleted.ts'
 import { whyFromRules, whyFromSuggestions, type Why } from './why.ts'
 
 // PreToolUse → tool_use_id, to pair with PermissionRequest (which has no id).
@@ -68,8 +69,8 @@ const preKey = (sid: string, tool: string, input: unknown) => `${sid}|${tool}|${
 
 export async function handleHook(ev: any, req: IncomingMessage, res: ServerResponse): Promise<object> {
   const sid: string | undefined = typeof ev?.session_id === 'string' ? ev.session_id : undefined
-  // A session a rewind replaced: what its stopped claude says on its way out isn't news (rewound.ts).
-  if (!sid || isSdk(sid) || replacedOf(sid)) return {}
+  // A session a rewind replaced or the owner deleted: what its stopped claude says on its way out isn't news (rewound.ts, deleted.ts).
+  if (!sid || isSdk(sid) || replacedOf(sid) || deletedOf(sid)) return {}
   const name: string = ev.hook_event_name
   const exists = !!getSession(sid)
   if (!exists && typeof ev.cwd !== 'string') return {}

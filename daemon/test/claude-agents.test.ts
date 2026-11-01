@@ -1273,3 +1273,107 @@ test('the owner’s Stop and Delete from the phone: no job.died, whatever the jo
   hub.applyAgentList([{ ...a, state: 'stopped' }, { ...c, state: 'failed' }])
   assert.deepEqual(feed, [])
 })
+
+// ── Delete for every finished session (docs/PROTOCOL.md, "Session menu") ──────
+
+/** A transcript on disk for session [id], as Claude Code leaves it. */
+function transcript(id: string): void {
+  const dir = join(process.env.CLAUDE_CONFIG_DIR!, 'projects', 'delete-tests')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, `${id}.jsonl`), JSON.stringify({ type: 'user', cwd: scratch, sessionId: id, timestamp: new Date().toISOString(), message: { role: 'user', content: 'hello' } }) + '\n')
+}
+
+test('Delete: a finished session that is no job goes for good, its transcript left; a restart’s look doesn’t bring it back', async () => {
+  const removed: string[] = []
+  hub.addClient({ send: (s) => { const m = JSON.parse(s); if (m.t === 'session.removed') removed.push(m.id) } })
+  for (const id of ['delete-plain-1', 'delete-kept-1']) transcript(id)
+  hub.discover()
+  assert.equal(hub.getSession('delete-plain-1')?.state, 'ended')
+  assert.equal(hub.getSession('delete-kept-1')?.state, 'ended')
+  const r = await del('/v1/sessions/delete-plain-1')
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.deepEqual(r.json, { ok: true })
+  assert.equal(hub.getSession('delete-plain-1'), undefined)
+  assert.ok(removed.includes('delete-plain-1'))
+  assert.ok(existsSync(join(process.env.CLAUDE_CONFIG_DIR!, 'projects', 'delete-tests', 'delete-plain-1.jsonl')), 'the transcript stays')
+  hub.discover()
+  assert.equal(hub.getSession('delete-plain-1'), undefined, 'not back from its transcript')
+  assert.ok(hub.getSession('delete-kept-1'), 'another one is untouched')
+  assert.ok(!hub.listSessions().some((s) => s.id === 'delete-plain-1'))
+  assert.equal((await del('/v1/sessions/delete-plain-1')).json.error.code, 'no_session')
+})
+
+test('Delete: an idle session with a shared terminal closes the terminal first', async () => {
+  const id = createSharedSession({ cwd: scratch, prompt: 'Quick one' })
+  let tid: string | null = null
+  const t0 = Date.now()
+  while (!tid && Date.now() - t0 < 5000) {
+    scanTerms()
+    tid = termOf(id)
+    if (!tid) await new Promise((ok) => setTimeout(ok, 100))
+  }
+  assert.ok(tid, 'its holder runs')
+  hub.upsertSession(id, { state: 'idle' })
+  const r = await del(`/v1/sessions/${id}`)
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(termAlive(tid!, null), false, 'the terminal closed')
+  assert.equal(hub.getSession(id), undefined)
+})
+
+test('Delete: refused with the reason for a terminal Hypernova doesn’t hold and for one at work; nothing is forgotten', async () => {
+  const p = spawn('sleep', ['30'], { stdio: 'ignore' })
+  procs.push(p)
+  const entry = join(registry, `${p.pid}.json`)
+  writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: 'delete-open-1', cwd: scratch, kind: 'interactive', status: 'idle', startedAt: Date.now(), updatedAt: Date.now() }))
+  hub.pollRegistry()
+  assert.equal(hub.getSession('delete-open-1')?.state, 'idle')
+  const open = await del('/v1/sessions/delete-open-1')
+  assert.equal(open.status, 409)
+  assert.equal(open.json.error.code, 'terminal_open')
+  assert.match(open.json.error.message, /terminal Hypernova doesn’t hold/)
+  assert.ok(hub.getSession('delete-open-1'))
+  writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: 'delete-open-1', cwd: scratch, kind: 'interactive', status: 'busy', startedAt: Date.now(), updatedAt: Date.now() }))
+  hub.pollRegistry()
+  const working = await del('/v1/sessions/delete-open-1')
+  assert.equal(working.status, 409)
+  assert.equal(working.json.error.code, 'at_work')
+  assert.ok(hub.getSession('delete-open-1'))
+  rmSync(entry)
+  // Stop and Restart stay a job's own.
+  hub.upsertSession('delete-plain-2', { cwd: scratch, origin: 'terminal' })
+  assert.equal((await post('/v1/sessions/delete-plain-2/stop', {})).json.error.code, 'not_agents')
+  assert.ok(hub.getSession('delete-plain-2'))
+})
+
+test('Delete: what its stopped claude says on the way out doesn’t bring it back; `claude --resume` does', async () => {
+  const sid = 'delete-resume-1'
+  hub.upsertSession(sid, { cwd: scratch, origin: 'terminal', state: 'ended' })
+  assert.equal((await del(`/v1/sessions/${sid}`)).status, 200)
+  hub.upsertSession(sid, { cwd: scratch })
+  assert.equal(hub.getSession(sid), undefined, 'a late word about it finds nothing')
+  const p = spawn('sleep', ['30'], { stdio: 'ignore' })
+  procs.push(p)
+  const entry = join(registry, `${p.pid}.json`)
+  // A claude started before the delete: on its way out.
+  writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: sid, cwd: scratch, kind: 'interactive', status: 'idle', startedAt: Date.now() - 60_000, updatedAt: Date.now() }))
+  hub.pollRegistry()
+  assert.equal(hub.getSession(sid), undefined)
+  // Started since: resumed by hand, an ordinary session again.
+  writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: sid, cwd: scratch, kind: 'interactive', status: 'idle', startedAt: Date.now() + 1000, updatedAt: Date.now() }))
+  hub.pollRegistry()
+  assert.equal(hub.getSession(sid)?.state, 'idle')
+  rmSync(entry)
+})
+
+test('Delete: a job goes with claude rm, and its transcript, which claude rm leaves, doesn’t bring it back', async () => {
+  settings.claudeAgents = true
+  transcript('delete-job-1')
+  hub.applyAgentList([{ id: 'dele0001', sessionId: 'delete-job-1', cwd: scratch, state: 'done' }])
+  const from = verbsSince(0).length
+  const r = await del('/v1/sessions/delete-job-1')
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.deepEqual(verbsSince(from), ['rm dele0001'])
+  assert.equal(hub.getSession('delete-job-1'), undefined)
+  hub.discover()
+  assert.equal(hub.getSession('delete-job-1'), undefined)
+})

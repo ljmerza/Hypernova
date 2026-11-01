@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.TermLink
 import com.prudnikweb.hypernova.data.ClaudeState
 import com.prudnikweb.hypernova.data.CodexState
 import com.prudnikweb.hypernova.data.CodexUsage
@@ -202,6 +203,68 @@ class HomeMoreTest {
         rule.onNode(hasText(str(R.string.delete)) and androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).performClick()
         rule.waitForIdle()
         assertEquals(listOf("deleteSession(${Samples.ALPHA})"), hub.calls)
+    }
+
+    /** Samples' Mid sprint notes (no job), as [how]. */
+    private fun midAs(how: (com.prudnikweb.hypernova.data.Session) -> com.prudnikweb.hypernova.data.Session) =
+        FakeHub(sessions = only(Samples.MID).map(how))
+
+    private fun pressDelete() {
+        rule.onNode(hasText(str(R.string.delete)) and androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).performClick()
+        rule.waitForIdle()
+    }
+
+    @Config(qualifiers = "+h1600dp")
+    @Test fun anIdleTerminalSessionHasDeleteAndSaysItsTerminalCloses() {
+        val hub = midAs { it.copy(origin = "terminal", term = TermLink("t1", mac = 1, phone = 0)) }
+        home(hub)
+        longPress("Mid sprint notes")
+        rule.onNodeWithText(str(R.string.session_rename)).assertExists()
+        pressDelete()
+        rule.onNodeWithText(str(R.string.session_delete_q, "Mid sprint notes")).assertExists()
+        rule.onNodeWithText(str(R.string.session_delete_body_terminal)).assertExists()
+        assertTrue("nothing asked yet", hub.calls.isEmpty())
+        pressDelete()
+        assertEquals(listOf("deleteSession(${Samples.MID})"), hub.calls)
+    }
+
+    @Config(qualifiers = "+h1600dp")
+    @Test fun aRunningJobsDeleteSaysItStops() {
+        home(FakeHub(sessions = only(Samples.ZETA)))
+        longPress("Zeta cleanup")
+        pressDelete()
+        rule.onNodeWithText(str(R.string.session_delete_body_running)).assertExists()
+    }
+
+    @Config(qualifiers = "+h1600dp")
+    @Test fun aSessionWithNothingRunningSaysWhereItGoes() {
+        val hub = midAs { it.copy(origin = "hypernova") }
+        home(hub)
+        longPress("Mid sprint notes")
+        pressDelete()
+        rule.onNodeWithText(str(R.string.session_delete_body_plain)).assertExists()
+        pressDelete()
+        assertEquals(listOf("deleteSession(${Samples.MID})"), hub.calls)
+    }
+
+    @Config(qualifiers = "+h1600dp")
+    @Test fun aTerminalItDoesntHoldSaysWhyItCantBeDeleted() {
+        val hub = midAs { it.copy(origin = "terminal", term = null) }
+        home(hub)
+        longPress("Mid sprint notes")
+        pressDelete()
+        rule.onNodeWithText(str(R.string.session_delete_cant_q, "Mid sprint notes")).assertExists()
+        rule.onNodeWithText(str(R.string.session_delete_cant_body)).assertExists()
+        rule.onNodeWithText(str(R.string.fl_ok)).performClick()
+        rule.waitForIdle()
+        assertTrue("nothing went to the server", hub.calls.isEmpty())
+    }
+
+    @Test fun aSessionAtWorkThatIsNoJobHasNoDelete() {
+        home(FakeHub(sessions = only(Samples.PARSER)))
+        longPress("Refactor parser")
+        rule.onNodeWithText(str(R.string.session_rename)).assertExists()
+        rule.onNodeWithText(str(R.string.delete)).assertDoesNotExist()
     }
 
     @Test fun anOutdatedJobsMenuRestartsItAfterAsking() {

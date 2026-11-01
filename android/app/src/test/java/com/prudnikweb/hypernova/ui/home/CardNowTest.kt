@@ -70,8 +70,8 @@ class CardNowTest {
         assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, job = "j1", running = false)))
         // An older Mac that doesn't say whether it runs: delete, as the menu offers no Stop then.
         assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, job = "j1")))
-        // Not a claude agents job (nothing to stop or delete): none.
-        assertNull(CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle)))
+        // Not a claude agents job, at rest: deleted (owner, 2026-11-01), asked first.
+        assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle)))
         // Cut short by a restart of the Mac: ended, so no Stop; a job is still deleted.
         assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, Phase.Ended, job = "j1", running = true)))
     }

@@ -13,7 +13,7 @@ import { speechFeed, speechRoute, speechState } from './readaloud.ts'
 import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider, isClaudeEffort } from './store.ts'
 import { lanDevice, lanInfo, lanOrigin, pairAllowed, pairFailed, pairingAddresses, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
-import { addClient, agentJobOf, answerApproval, forgetSession, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
+import { addClient, agentJobOf, answerApproval, deleteSessionForGood, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort, setMode } from './runner.ts'
 import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
 import { agentJobCommand, setClaudeAgents } from './claude-agents.ts'
@@ -30,7 +30,7 @@ import { createPreview, createProject, listProjects, sendFile, servePreview } fr
 import { DOWNLOAD_MAX, allowedPath, fileFor, filesState, folderOpens, listDir, listFolders, sendChecked, setBrowseOutside } from './files.ts'
 import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
-import { agentEvents, endSessionAgents, listAgents, validAgentId } from './agents.ts'
+import { agentEvents, backgroundRunning, endSessionAgents, listAgents, validAgentId } from './agents.ts'
 import { agentSettings } from './agent-settings.ts'
 import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
 import { getBattery } from './battery.ts'
@@ -868,8 +868,23 @@ async function api(c: Ctx): Promise<void> {
       await deleteCodex(id!)
       return json(res, 200, { ok: true })
     }
-    if (!job) throw new HttpError(409, 'not_agents', 'Only a session in claude agents can be stopped or deleted here.')
+    // Delete for a session that is no job: one at rest, whatever made it. Its shared terminal closes
+    // first; a terminal Hypernova doesn't hold can't be closed from here, so the owner hears why.
+    if (!job && !action) {
+      if (!['idle', 'ended', 'error'].includes(rec.state) || backgroundRunning(id!)) throw new HttpError(409, 'at_work', 'It’s still at work. Delete it once it has finished.')
+      const pid = rec.pid
+      const tid = termOf(id!)
+      if (tid) {
+        if (!(await endTermAndWait(tid))) throw new HttpError(409, 'terminal_open', 'Its terminal didn’t close. Try again, or close it on the server.')
+      } else if (isLiveTerminal(id!)) {
+        throw new HttpError(409, 'terminal_open', 'It’s open in a terminal Hypernova doesn’t hold. Close it there, then delete it.')
+      }
+      deleteSessionForGood(id!, pid)
+      return json(res, 200, { ok: true })
+    }
+    if (!job) throw new HttpError(409, 'not_agents', 'Only a session in claude agents can be stopped or restarted here.')
     // Its holder (`claude attach`) goes first: it only watched, and would hold the job open.
+    const pid = rec.pid
     const tid = termOf(id!)
     if (tid) await endTermAndWait(tid)
     const r = await agentJobCommand(action === 'stop' ? 'stop' : action === 'respawn' ? 'respawn' : 'rm', job)
@@ -877,7 +892,8 @@ async function api(c: Ctx): Promise<void> {
     // Restarted on the installed Claude Code: the next registry read has its new process.
     if (action === 'respawn') upsertSession(id!, { agentOutdated: undefined })
     if (action === 'stop' || action === 'respawn') return json(res, 200, { session: listSessions().find((x) => x.id === id) })
-    forgetSession(id!)
+    // `claude rm` leaves the transcript: without this it's back in History after the next restart.
+    deleteSessionForGood(id!, pid)
     return json(res, 200, { ok: true })
   }
   // A side question (docs/PROTOCOL.md, "Side questions"; aside.ts): Claude Code's /btw, typed in

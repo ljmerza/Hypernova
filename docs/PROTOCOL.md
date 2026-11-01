@@ -1156,12 +1156,20 @@ Agents & providers → Claude Code); the daemon takes it without a restart (each
   or not. The phone offers Stop while it works, waits on the owner, or idles with `agentRunning`;
   not for one done or stopped (`false`). An older daemon doesn't send it.
 - `POST /v1/sessions/{id}/stop`: `claude stop <job>` (the conversation is kept), whatever its state. `{session}`.
-- `DELETE /v1/sessions/{id}`: `claude rm <job>`, then `session.removed`. `{ok: true}`.
+- `DELETE /v1/sessions/{id}`: `claude rm <job>`, then `session.removed`. `{ok: true}`. **A session
+  that is no job** (2026-11-01) goes too once it's at rest (`idle`, `ended` or `error`, no agents at
+  work): its shared terminal closes first, then `session.removed`. 409 `at_work`; 409 `terminal_open`
+  when the terminal didn't close or is one Hypernova doesn't hold (nothing is killed; its words say
+  so). Either way the transcript stays and `<support>/deleted-sessions.json` keeps it off every list
+  after a restart (`deleted.ts`), for a job too, since `claude rm` leaves the transcript; late hooks
+  about it and the claude on its way out are ignored, and a claude started since (`claude --resume`)
+  makes it an ordinary session again. An older daemon answers 409 `not_agents` for one that is no
+  job, which the phone reads as "update that server".
 - `POST /v1/sessions/{id}/respawn`: `claude respawn <job>`, so the job runs the installed Claude Code
   (Claude Code updates itself; a job keeps its binary until then). Interrupts a job at work. The
   phone offers it (Restart, asked first) only with `session.agentOutdated`. `{session}`, without
   `agentOutdated` (the next registry read has the new process).
-- All three: the `claude attach` holder ends first; 409 `not_agents` for a session with no `agentJob`; 409 `agents_refused` with Claude Code's
+- All three: the `claude attach` holder ends first; 409 `not_agents` for `stop` and `respawn` on a session with no `agentJob`; 409 `agents_refused` with Claude Code's
   own words when it refuses (`rm` keeps a worktree with unpushed work).
 - `POST /v1/jobs/respawn` `{ids?: string[]}` → `{results: [{id, job, ok, said}]}`: Restart all, one
   `claude respawn <job>` after another for every session with `agentOutdated` (with `ids`, only

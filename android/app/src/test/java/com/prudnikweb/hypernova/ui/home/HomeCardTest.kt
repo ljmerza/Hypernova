@@ -3,6 +3,7 @@ package com.prudnikweb.hypernova.ui.home
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.data.TermLink
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.Wire
 import org.json.JSONObject
@@ -55,8 +56,41 @@ class HomeCardTest {
         assertFalse(MenuOffer.of(session(SessionState.Idle, Phase.Idle, "j1")).stop)
         // Ended: never, whatever it says.
         assertFalse(MenuOffer.of(session(SessionState.Idle, Phase.Ended, "j1", running = true)).stop)
-        // Not a claude agents job: only a rename.
+        // Not a claude agents job, at work: only a rename.
         assertEquals(MenuOffer(rename = true, stop = false, delete = false), MenuOffer.of(session(SessionState.Working, Phase.Working, null)))
+        assertEquals(MenuOffer(rename = true, stop = false, delete = false), MenuOffer.of(session(SessionState.NeedsYou, Phase.NeedsYou, null)))
+        // At rest: Delete too, nothing to stop (owner, 2026-11-01: he got only Rename).
+        assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Idle, null)))
+        assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Ended, null)))
+    }
+
+    @Test fun deleteSaysWhatItWillDoForEveryKindOfSession() {
+        fun plain(state: SessionState, phase: Phase, origin: String?, term: TermLink? = null, agents: Int = 0) =
+            session(state, phase, null).copy(origin = origin, term = term, agentsRunning = agents)
+        val link = TermLink("t1", mac = 1, phone = 0)
+        // The card in the owner's report: idle in a shared terminal, no job.
+        assertEquals(DeleteKind.Terminal, DeleteKind.of(plain(SessionState.Idle, Phase.Idle, "terminal", link)))
+        assertEquals(DeleteKind.Terminal, DeleteKind.of(plain(SessionState.Idle, Phase.Idle, "hypernova", link)))
+        // Idle in a terminal Hypernova doesn't hold: offered, and it says why it can't.
+        assertEquals(DeleteKind.OpenElsewhere, DeleteKind.of(plain(SessionState.Idle, Phase.Idle, "terminal")))
+        // Nothing runs: a phone's session at rest, one ended, one a restart cut short, one that failed.
+        assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Idle, "hypernova")))
+        assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Ended, "terminal")))
+        assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Ended, "hypernova")))
+        assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Error, "hypernova")))
+        // At work, however it shows it: none.
+        assertEquals(DeleteKind.None, DeleteKind.of(plain(SessionState.Working, Phase.Working, "terminal", link)))
+        assertEquals(DeleteKind.None, DeleteKind.of(plain(SessionState.NeedsYou, Phase.NeedsYou, "terminal", link)))
+        assertEquals(DeleteKind.None, DeleteKind.of(plain(SessionState.Idle, Phase.Idle, "terminal", link, agents = 2)))
+        // A job, at rest or not, whose process runs or doesn't; ended, it can't be running.
+        assertEquals(DeleteKind.RunningJob, DeleteKind.of(session(SessionState.Idle, Phase.Idle, "j1", running = true)))
+        assertEquals(DeleteKind.RunningJob, DeleteKind.of(session(SessionState.Working, Phase.Working, "j1", running = true)))
+        assertEquals(DeleteKind.Job, DeleteKind.of(session(SessionState.Idle, Phase.Idle, "j1", running = false)))
+        assertEquals(DeleteKind.Job, DeleteKind.of(session(SessionState.Idle, Phase.Idle, "j1")))
+        assertEquals(DeleteKind.Job, DeleteKind.of(session(SessionState.Idle, Phase.Ended, "j1", running = true)))
+        // Codex's own, whatever else it has.
+        assertEquals(DeleteKind.Codex, DeleteKind.of(session(SessionState.Working, Phase.Working, null, AgentKind.CODEX)))
+        assertEquals(DeleteKind.Codex, DeleteKind.of(session(SessionState.Idle, Phase.Idle, null, AgentKind.CODEX).copy(term = link)))
     }
 
     @Test fun theMenuOffersRenameStopAndDeleteForCodex() {

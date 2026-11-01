@@ -15,6 +15,7 @@ import type { PlanWindow } from './usage-screen.ts'
 import type { Blocked, Blocker, LimitNotice } from './blockers.ts'
 import { cutByRestart, fromBeforeBoot, noteOpen, runsAgain, startAfterBoot } from './reboot.ts'
 import { replacedOf, bringBack, setReplaced, stoppedProcess } from './rewound.ts'
+import { deletedOf, setDeleted, undelete } from './deleted.ts'
 import { getAccount, noteBlocker, noteHealthy, noteLimitNotice, noteLogin, stillBlocks, usageStale } from './account.ts'
 import { folderView } from './files.ts'
 import { bypassBlockedByRoot } from './platform.ts'
@@ -361,7 +362,7 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
     }
     // A session a rewind replaced stays out of every list, whatever comes in late about it (a
     // stopped turn's last words, a claude on its way out): the caller gets a record nobody sees.
-    if (!replacedOf(id)) sessions.set(id, r)
+    if (!replacedOf(id) && !deletedOf(id)) sessions.set(id, r)
   }
   const turnSoFar = inTurn(r.state) ? (r.turnStartedAt ?? null) : null
   Object.assign(r, patch)
@@ -1348,7 +1349,7 @@ export function discover(): void {
   }
   for (const m of managedSessions()) {
     // Replaced by a rewind: its record and its transcript stay, and show nowhere (rewound.ts).
-    if (replacedOf(m.id)) continue
+    if (replacedOf(m.id) || deletedOf(m.id)) continue
     const t = byId.get(m.id)
     // Shared-terminal sessions come back to life through the registry if their terminal still runs.
     // Last active when its transcript was last written, not when it started, or it sinks in the list.
@@ -1356,7 +1357,7 @@ export function discover(): void {
   }
   const files = [...byId].filter(([, f]) => Date.now() - f.mtime < HISTORY_MS).sort((a, b) => b[1].mtime - a[1].mtime)
   for (const [id, f] of files.slice(0, HISTORY_MAX)) {
-    if (replacedOf(id)) continue
+    if (replacedOf(id) || deletedOf(id)) continue
     const head = readHead(f.path)
     // The usage probe's, if its transcript outlived it (term/hidden.ts).
     if (!head.cwd || isHiddenCwd(head.cwd)) continue
@@ -1562,7 +1563,7 @@ export function applyAgentList(list: AgentJob[]): void {
   const watched: JobSeen[] = []
   for (const j of list) {
     // A job a rewind replaced: stopped, and `claude agents` lists it for good; nothing here does (rewound.ts).
-    if (!j?.id || !j.sessionId || !j.cwd || isSdk(j.sessionId) || isHiddenCwd(j.cwd) || replacedOf(j.sessionId)) continue
+    if (!j?.id || !j.sessionId || !j.cwd || isSdk(j.sessionId) || isHiddenCwd(j.cwd) || replacedOf(j.sessionId) || deletedOf(j.sessionId)) continue
     seen.add(j.sessionId)
     agentJobs.set(j.sessionId, j.id)
     agentStates.set(j.sessionId, String(j.state ?? ''))
@@ -1617,6 +1618,18 @@ export function forgetSession(id: string): void {
   agentDied.delete(id)
   forgetBlocked(id)
   if (sessions.delete(id)) broadcast({ t: 'session.removed', id })
+}
+
+/**
+ * Deleted by the owner (the Session menu's Delete): as [forgetSession], and it stays gone after a
+ * restart although its transcript is still there (deleted.ts). [pid]: its claude, on its way out.
+ */
+export function deleteSessionForGood(id: string, pid: number | null): void {
+  setDeleted(id, pid)
+  forgetSessionAllowed(id)
+  mainEnded(id)
+  endSessionAgents(id)
+  forgetSession(id)
 }
 
 /**
@@ -1675,6 +1688,10 @@ export function pollRegistry(): void {
     const replaced = replacedOf(o.sessionId)
     if (replaced && stoppedProcess(replaced, o.pid, o.startedAt)) continue
     if (replaced) bringBack(o.sessionId)
+    // Deleted (deleted.ts): the same, the claude it stopped on its way out, any other resumed it.
+    const deleted = deletedOf(o.sessionId)
+    if (deleted && stoppedProcess(deleted, o.pid, o.startedAt)) continue
+    if (deleted) undelete(o.sessionId)
     live.add(o.sessionId)
     if (agents) agentJobs.set(o.sessionId, o.jobId)
     const r = sessions.get(o.sessionId) ?? upsertSession(o.sessionId, { cwd: o.cwd, origin: 'terminal', lastActivityAt: Number(o.statusUpdatedAt ?? o.updatedAt) || Date.now() })

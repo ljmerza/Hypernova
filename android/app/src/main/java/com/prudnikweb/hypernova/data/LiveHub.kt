@@ -2274,7 +2274,10 @@ class LiveHub(
         raw = raw - sessionId
         publish()
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_delete_session)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+        // An older server deletes only jobs: it's the server that needs updating, not the phone trying again.
+        Result.failure(if (Net.classify(e).code == "not_agents") HubException(res.getString(R.string.err_delete_older)) else handle(e, R.string.err_delete_session))
+    }
 
     override suspend fun start(req: NewSessionRequest): Result<String> = try {
         val body = JSONObject().put("prompt", req.prompt.trim()).put("permissionMode", req.permissionMode)

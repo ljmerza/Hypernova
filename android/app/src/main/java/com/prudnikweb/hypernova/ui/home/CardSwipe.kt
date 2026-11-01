@@ -44,13 +44,14 @@ internal enum class CardSwipe { Open, Stop, Delete, Rename, Restart, MarkRead;
     companion object {
         /**
          * [SwipeChoice.Smart], the swipe as first decided (docs/IDEAS.md, HM2): a Needs input card
-         * opens; a Completed `claude agents` job stops while its process still runs, else it's deleted
-         * (asked first, as the menu's Delete); a Working card has none.
+         * opens; a Completed `claude agents` job stops while its process still runs, else it's deleted,
+         * and any other Completed card is deleted (asked first, as the menu's Delete); a Working card
+         * has none.
          */
         fun of(group: HomeGroup, s: Session): CardSwipe? = when (group) {
             HomeGroup.NeedsInput -> Open
             HomeGroup.Working -> null
-            // Only a job swipes (DECISIONS, HM2): a Codex card's Delete is Codex's for good, from the menu only.
+            // Not Codex (DECISIONS, HM2): its card's Delete is Codex's for good, from the menu only.
             HomeGroup.Completed -> if (s.codex) null else {
                 val offer = MenuOffer.of(s)
                 when {

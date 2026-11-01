@@ -51,4 +51,4 @@ export const replacedSessions = (): Record<string, string> => Object.fromEntries
  * A claude Claude Code's registry lists for a replaced session is the one that was stopped, still
  * on its way out: its pid, or started before the stop. Anything else resumed that conversation.
  */
-export const stoppedProcess = (a: Replaced, pid: unknown, startedAt: unknown): boolean => pid === a.pid || (typeof startedAt === 'number' && startedAt > 0 && startedAt <= a.at)
+export const stoppedProcess = (a: Pick<Replaced, 'at' | 'pid'>, pid: unknown, startedAt: unknown): boolean => pid === a.pid || (typeof startedAt === 'number' && startedAt > 0 && startedAt <= a.at)

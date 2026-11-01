@@ -63,9 +63,15 @@
     <string name="session_delete_q">Delete “%1$s”?</string>
     <string name="session_delete_body">The background session goes from claude agents, and its worktree with it when that\'s safe. Claude Code says no while the worktree has unpushed work.</string>
     <string name="session_delete_body_codex">Codex deletes the conversation for good, so codex resume won\'t find it either. A terminal open on it closes.</string>
+    <string name="session_delete_body_running">It\'s still running, so it stops, and a terminal open on it closes. The background session goes from claude agents, and its worktree with it when that\'s safe. Claude Code says no while the worktree has unpushed work.</string>
+    <string name="session_delete_body_terminal">Its live terminal closes, and Claude Code stops there. The session goes from Hypernova: Home, History and search. Its transcript stays on the server, so claude --resume can still find it.</string>
+    <string name="session_delete_body_plain">The session goes from Hypernova: Home, History and search. Its transcript stays on the server, so claude --resume can still find it.</string>
+    <string name="session_delete_cant_q">Can\'t delete “%1$s” yet</string>
+    <string name="session_delete_cant_body">It\'s open in a terminal on the server that Hypernova doesn\'t hold, so it can\'t close it from here. Close it there, then delete it.</string>
     <string name="err_rename">Couldn\'t rename the session. Try again.</string>
     <string name="err_stop_session">Couldn\'t stop the session. Try again.</string>
     <string name="err_delete_session">Couldn\'t delete the session. Try again.</string>
+    <string name="err_delete_older">This server runs an older Hypernova, which can only delete claude agents jobs and Codex sessions. Update it, then try again.</string>
     <!-- A claude agents job on an older Claude Code than the one installed (docs/PROTOCOL.md, Session.agentOutdated): `claude respawn`. -->
     <string name="session_restart">Restart</string>
     <string name="session_restart_q">Restart “%1$s”?</string>

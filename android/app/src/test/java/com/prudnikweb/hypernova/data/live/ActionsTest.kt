@@ -302,6 +302,24 @@ class ActionsTest {
         assertEquals(1, daemon.count("DELETE", "/v1/sessions/s1"))
     }
 
+    @Test fun deleteOnAnOlderServerSaysItNeedsUpdating() {
+        connect(session("s1"))
+        daemon.on("DELETE", "/v1/sessions/s1") { json(409, JSONObject().put("error", JSONObject().put("code", "not_agents").put("message", "Only a session in claude agents can be stopped or deleted here."))) }
+        val r = rig.call { rig.hub.deleteSession("s1") }
+        assertTrue(r.isFailure)
+        assertEquals(rig.context.getString(com.prudnikweb.hypernova.R.string.err_delete_older), r.exceptionOrNull()?.message)
+        // The card stays: nothing was deleted.
+        assertTrue(rig.hub.sessions.any { it.id == "s1" })
+    }
+
+    @Test fun deleteRefusedSaysTheServersOwnWords() {
+        connect(session("s1"))
+        daemon.on("DELETE", "/v1/sessions/s1") { json(409, JSONObject().put("error", JSONObject().put("code", "terminal_open").put("message", "It’s open in a terminal Hypernova doesn’t hold."))) }
+        val r = rig.call { rig.hub.deleteSession("s1") }
+        assertEquals("It’s open in a terminal Hypernova doesn’t hold.", r.exceptionOrNull()?.message)
+        assertTrue(rig.hub.sessions.any { it.id == "s1" })
+    }
+
     @Test fun respawnOutdatedJobsUsesTheSlowRoute() {
         connect(session("s1"), session("s2"))
         daemon.ok("POST", "/v1/jobs/respawn", JSONObject().put("results", JSONArray()))

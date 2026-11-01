@@ -43,7 +43,8 @@ class CardSwipeChoiceTest {
         assertNull(of(SwipeChoice.Smart, HomeGroup.Working, working))
         assertEquals(CardSwipe.Stop, of(SwipeChoice.Smart, HomeGroup.Completed, idleJob))
         assertEquals(CardSwipe.Delete, of(SwipeChoice.Smart, HomeGroup.Completed, doneJob))
-        assertNull(of(SwipeChoice.Smart, HomeGroup.Completed, plain))
+        // Any other finished session deletes too (owner, 2026-11-01), asked first.
+        assertEquals(CardSwipe.Delete, of(SwipeChoice.Smart, HomeGroup.Completed, plain))
         // Smart keeps a Completed Codex card from swiping to its for-good Delete.
         assertNull(of(SwipeChoice.Smart, HomeGroup.Completed, codexIdle))
     }
@@ -63,12 +64,15 @@ class CardSwipeChoiceTest {
         assertNull(of(SwipeChoice.Stop, HomeGroup.Working, session(SessionState.Working, Phase.Working)))
     }
 
-    @Test fun deleteForJobsAndCodexOnly() {
+    @Test fun deleteAsTheMenuOffersIt() {
         assertEquals(CardSwipe.Delete, of(SwipeChoice.Delete, HomeGroup.Completed, doneJob))
         assertEquals(CardSwipe.Delete, of(SwipeChoice.Delete, HomeGroup.Working, working))
         // Picked on purpose, Codex's own delete (asked first, as from the menu).
         assertEquals(CardSwipe.Delete, of(SwipeChoice.Delete, HomeGroup.Completed, codexIdle))
-        assertNull(of(SwipeChoice.Delete, HomeGroup.Completed, plain))
+        // A finished session whatever made it; not one at work that is neither a job nor Codex.
+        assertEquals(CardSwipe.Delete, of(SwipeChoice.Delete, HomeGroup.Completed, plain))
+        assertNull(of(SwipeChoice.Delete, HomeGroup.Working, session(SessionState.Working, Phase.Working)))
+        assertNull(of(SwipeChoice.Delete, HomeGroup.NeedsInput, session(SessionState.NeedsYou, Phase.NeedsYou)))
     }
 
     @Test fun renameForAny() {
