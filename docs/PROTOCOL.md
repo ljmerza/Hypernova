@@ -517,7 +517,9 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/projects` | → `{projects: Project[], root}` |
 | `POST /v1/projects` | `{name, git?: true}` → `{project}` creates `<root>/<name>` |
 | `GET /v1/providers` | → `{providers: Provider[]}` |
-| `GET /v1/agents/settings` | → `AgentSettingsReply`: the fixed list of Claude Code's and Codex's user-level settings, read-only, for a paired phone only (401 `unauthorized` for the local API's admin token; see Agent settings). An older daemon answers 404 |
+| `GET /v1/agents/settings` | → `AgentSettingsReply`: the fixed list of Claude Code's and Codex's user-level settings, what can be changed, for a paired phone only (401 `unauthorized` for the local API's admin token; see Agent settings). An older daemon answers 404 |
+| `PUT /v1/agents/settings` | `{agent, key, value, expected}` → `SettingChange`: one key of the shorter list, a device token only. Goes out as `{t:"agent_settings"}`. 400, 403 and 409 refusals in Agent settings. An older daemon answers 404 |
+| `POST /v1/agents/settings/undo` | `{agent, expected}` → `{ok, agent, key, hash, loosened}`: that agent's last change put back, one step. A device token only. 409 `file_changed`, `nothing_to_undo`, `undo_refused` |
 | `GET /v1/models?provider=` | → `{providers: ModelList[]}`: the models each provider offers (only that one with `provider`), in the providers' order, for the new-session sheet (see Models) |
 | `POST /v1/providers/{id}/check` | `{}` → `{provider}`: reads its balance now (OpenRouter; at most once in 10 s, sooner the last reading). 409 `no_balance` for a provider without a balance to read |
 | `POST /v1/providers/check` | `{kind?, baseUrl?, apiKey?, name?, id?}` → `{check: ProviderCheck}`: an address and a key checked without saving them (the editors' Check; see Providers). `id`: an existing provider, whose saved key is used when none is sent, only at its own host. 400 `bad_kind`, `missing_url`, `bad_url`, `insecure_url`, `bad_key_format`; 404 `no_provider` |
@@ -612,6 +614,7 @@ objects with a `t` field:
 - `{t:"update", update: ServerUpdate}`: the server's own update changed: the setting turned on or
   off, its install begun, a try that failed (see The server's own update). An app from before it
   ignores it.
+- `{t:"agent_settings", agent}`: a phone changed or undid one of that agent's settings: read them again (see Agent settings). The values don't travel here. An app from before it ignores it.
 - `{t:"mac_sleep_soon", inSeconds, reason: "battery" | "hot" | "time", percent: number | null,
   stillAwake: boolean, otherApp: string | null}`: about two minutes before the daemon lets the Mac
   sleep (see Stay awake); `percent` is the battery's. `stillAwake`: another app's SleepDisabled
@@ -976,7 +979,7 @@ Workflow = { id,                      // the run id, "wf_…"
 ## Agent settings
 
 `GET /v1/agents/settings` (`daemon/src/agent-settings.ts`, 2026-11-01; `docs/DECISIONS.md`, "The agents'
-settings, viewed"). Read-only: there is no route that writes. Only a paired phone may ask.
+settings, viewed" and "…, edited"). Only a paired phone may ask, or change anything.
 
 ```
 AgentSettingsReply = {
@@ -988,6 +991,11 @@ AgentSettings = {
   state: "ok" | "missing" | "malformed" | "unreadable",
   values: ShownValue[],   // [] unless "ok"
   summary: … | null,      // null unless "ok"
+  hash: string | null,    // the file's sha256 as it was read, sent back as `expected`; null: no file, or unreadable
+  editable: { key, choices: { value: string | boolean, loosens: boolean, label?: string }[] }[],
+                          // what can be changed now, and to what; [] when nothing can. An older daemon sends none
+  undo: { key, to: string | boolean | null, loosens: boolean } | null,   // to null: back to not being set
+  whyNot: "link" | "read_only" | "no_folder" | "unreadable" | null,      // why nothing's editable, when the file itself isn't the trouble
 }
 ShownValue = { key, state: "set", value: string | boolean }
            | { key, state: "unset" }          // not in the file
@@ -1030,8 +1038,60 @@ or TOML, or not an object. `unreadable`: anything else, also a folder or a pipe 
 dependency, so a line inside a multi-line string is never taken for a key. Codex's home is the daemon's
 own `CODEX_HOME`: a value set only in a login shell doesn't reach a service.
 
-App (`ui/settings/AgentSettings.kt`): a key it has no words for shows its raw name. On a 404 it says the
-server needs updating.
+**Changing one.** `PUT /v1/agents/settings` `{agent, key, value, expected}` (`daemon/src/agent-settings-edit.ts`):
+
+| Agent | Key | Accepted |
+|---|---|---|
+| Claude Code | `permissions.defaultMode` | `plan`, `default`, `dontAsk`, `acceptEdits`, `auto` |
+| | `showThinkingSummaries` | boolean |
+| | `autoUpdatesChannel` | `latest`, `stable` |
+| Codex | `model` | one `GET /v1/codex/models` lists; with no list, not offered, and 409 `models_unavailable` |
+| | `model_reasoning_effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+| | `approval_policy` | `on-request` |
+| | `sandbox_mode` | `read-only`, `workspace-write` |
+| | `web_search` | `disabled`, `cached`, `indexed`, `live` |
+
+`expected` is the reply's `hash`, or null for a file that isn't there yet. The answer:
+
+```
+SettingChange = { ok: true, agent, key, value, changed, hash, loosened, undo }
+```
+
+`changed` false: it already had that value, and nothing was written or backed up. `loosened`: this allows
+more than before (`loosens()`; each choice's `loosens` is the same answer in advance). The server flags it
+and logs it; asking for the owner's fingerprint is the phone's part.
+
+| Status | Code | When (nothing is written in any of them) |
+|---|---|---|
+| 401 | `unauthorized` | No device token, also the admin token and the local API |
+| 400 | `bad_request`, `bad_agent`, `bad_expected` | Not that shape |
+| 403 | `key_not_editable` | Any key off the list: `hooks`, `env`, a nested path, `__proto__`, a view-only key |
+| 403 | `value_not_allowed` | Any value off the list: a permissive one, the wrong type, an array, an object |
+| 409 | `file_changed` | The file isn't what `expected` says, also when looked at again just before the rename |
+| 409 | `file_malformed` | Not JSON or TOML, or not an object |
+| 409 | `unsupported_shape` | The key isn't a plain value on one line (a TOML table, dotted key, inline table, array, number or multi-line string; a JSON object or array), or the file isn't UTF-8 |
+| 409 | `file_is_link`, `file_read_only`, `file_unreadable`, `no_folder` | As they say. A link is refused, not followed; no folder is created |
+| 409 | `models_unavailable` | Codex's list can't be had |
+| 500 | `write_failed` | The write itself failed; the file is as it was |
+
+Words the phone shows, and never a quote of the file or of what it sent.
+
+**The write.** Only that value's bytes change: JSON and TOML alike are edited in place by position, then
+parsed again and compared with the old file. A TOML key that isn't there goes on a new line after the last
+top-level key, before the first table; a JSON one after the last member of its level, in that level's layout.
+A backup of the old bytes first, once per change (`<support>/settings-backups/<agent>-<timestamp>`, 0600, the
+last 20 per agent). A temporary file in the same folder, on disk, then a rename, keeping the mode and owner. A
+new file holds the one key, mode 0600. One log line: `agent settings: <agent> <key> <old> -> <new>`, with
+`(not set)` or `(unrecognised)` for an old value that can't be shown, and no file contents.
+
+**Undo.** `POST /v1/agents/settings/undo` `{agent, expected}` restores the backup, or removes a file the change
+made, if the file is still what that change wrote. One step. 409 `file_changed` otherwise, `nothing_to_undo`
+with nothing to undo, and `undo_refused` when what was there is something a phone can't set: a permissive
+value, `rc`, a word this server doesn't know. Those stay in the backup, for doing by hand.
+
+App (`ui/settings/AgentSettings.kt`): a key it has no words for shows its raw name. A row in `editable` opens a
+picker of its choices; one whose choice `loosens` confirms and asks `OwnerCheck` first. On a 404 to the GET it
+says the server needs updating; on a 404 to a change, the same, and its rows stay view-only.
 
 ## Providers
 

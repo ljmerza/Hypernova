@@ -3086,9 +3086,8 @@ All of them go straight to the browser, with no "Open this link?": they're rows,
 The owner: "view the Claude Code or Codex settings on the server, a JSON or TOML file, but I probably
 don't want everything because it's a very long file; look at the file and see what makes sense for us to
 be able to set locally on the client." He chose a fixed list, **viewed first, then editable**. This is
-step one, the view; step two waits for his review (`docs/LATER.md`, L102). Until then "the daemon never
-edits a settings file" (`daemon/src/always.ts`) stays true. Step two would reverse that, and that is his
-decision.
+step one, the view. Step two, which reverses "the daemon never edits a settings file", was his decision
+and he has made it: "The agents' settings, edited", below.
 
 1. **Where.** A Settings row on each agent's card in Agents & providers opens a read-only screen,
    `Route.AgentSettings`, for the hub whose card it is, so it works from All servers as Providers does.
@@ -3206,3 +3205,66 @@ reloads them all, so that's what it says.
    next prompt loads them). Idle in a terminal Hypernova doesn't hold, it's there and says why, as
    Delete does.
 5. **An older server** answers 404: the phone says that server needs updating.
+
+## The agents' settings, edited (owner, 2026-11-01)
+
+Step two of "The agents' settings, viewed" (`docs/LATER.md`, L102). **The owner reversed "the daemon never
+edits a settings file"**, with these limits. `daemon/src/agent-settings-edit.ts` is the one place it does;
+`daemon/src/always.ts` says so, and the rules still go through Claude Code.
+
+1. **A fixed list, on the server.** Anything else is refused before a file is opened.
+
+   | | Editable, with these values | View only |
+   |---|---|---|
+   | Claude Code | `permissions.defaultMode`: `plan`, `default`, `dontAsk`, `acceptEdits`, `auto`. `showThinkingSummaries`. `autoUpdatesChannel`: `latest`, `stable` | `effortLevel`, `includeCoAuthoredBy`, `autoDreamEnabled`, `inputNeededNotifEnabled`, `agentPushNotifEnabled` |
+   | Codex | `model`: what `/v1/codex/models` lists, view-only without a list. `model_reasoning_effort`: its eight words. `approval_policy`: `on-request`. `sandbox_mode`: `read-only`, `workspace-write`. `web_search`: its four words | `personality` |
+
+2. **Permissive values stay off the phone.** `bypassPermissions`, `approval_policy = "never"` and
+   `danger-full-access` can be seen and not chosen. A file holding one can only move off it. **Undo won't
+   put one back**: it answers `undo_refused`, and the backup stays on the server for doing that by hand.
+   Otherwise a tightening followed by Undo would be a way to set bypass from a phone. The same goes for a
+   word the server doesn't know, which could be one, and for `rc`.
+3. **Decided here, on evidence, narrower than the plan's table: `approval_policy` offers only `on-request`.**
+   The plan ruled out `never` alone. A scratch Codex 0.164.0 refuses to start a thread on `untrusted`
+   ("no longer supported; remove this setting") and reads `on-failure` as `on-request`, so offering either
+   would break Codex or do nothing. The row is the way off any of them. `manual` isn't offered either: it's
+   `default` under another name.
+4. **Loosening asks.** One pure function, `loosens()`, on the server: Claude Code's modes in its own order
+   (2.1.316's table: `plan` 0; `default`, `dontAsk` 1; `acceptEdits` 2; `auto` 3; bypass 4), approvals
+   (`untrusted`, then `on-request` and `on-failure`, then `never`) and the sandbox. A key that isn't set
+   counts as what it means (`default`; a scratch Codex's `on-request` and `read-only`). A value it can't
+   place counts as loosening. Each choice in the reply carries the flag, so the app holds no copy of the
+   order. The app confirms, saying what it allows, then `OwnerCheck`. Tightening asks nothing. The server
+   can't see a fingerprint, so this is the phone's check: `docs/SECURITY-MODEL.md`.
+5. **Only the bytes of one value change.** Both formats are edited in place by position, JSON too, rather
+   than by the re-serialize the plan allowed: a re-serialize changes `1.0`, `\u00e9` and odd spacing. The
+   new text is parsed again and compared with the old, and refused if anything else moved.
+6. **The file.** A link is **refused, not followed** (`file_is_link`): a write through it would land
+   wherever it points, a dotfiles repository say, and the row says so. A read-only file is refused too,
+   though a rename could replace it: whoever made it so meant it. Neither agent's folder is created. A new
+   file is 0600. Backups: `<support>/settings-backups/<agent>-<timestamp>`, 0600, the last 20 per agent.
+7. **When each applies**, checked 2026-11-01 against Claude Code 2.1.316 (its binary; no live session, as a
+   scratch config has no account) and Codex 0.164.0 (a scratch app-server with no account, its proxies
+   pointing nowhere):
+
+   | Key | The screen says | Evidence |
+   |---|---|---|
+   | `permissions.defaultMode` | Applies to new sessions. | **Confirmed** in the binary (read when a session's first mode is worked out) and docs. Whether it reaches a running session: not tested, not claimed. |
+   | `showThinkingSummaries` | May need a new session. | **Unconfirmed.** The binary reads it at the session's start (the thinking display, set once) and again per request (a beta, a transcript mode), so neither "live" nor "new sessions" is safe to say. |
+   | `autoUpdatesChannel` | Applies at the next update. | **Confirmed by reading only**: the updater asks the settings each time. Not seen running. Switching to `stable` can move back a version: Claude Code's own dialog offers to hold with `minimumVersion`, and this doesn't. |
+   | `model`, `model_reasoning_effort`, `web_search` | Applies to new threads. | **Confirmed** on the scratch app-server: a file renamed over it reached `config/read` straight away, and `thread/start` for the model and effort, with no restart. `web_search` was seen only in `config/read`. |
+   | `approval_policy`, `sandbox_mode` | Applies to new threads that don't choose their own. Ones started from this app do. | **Confirmed** the same way, and **`daemon/src/codex/sessions.ts` names both in its own `thread/start`**, so a phone's thread takes the mode picked on its sheet instead. |
+
+   Not confirmed for Codex: a thread already running. The binary has `reload_user_config`, sent through
+   `config/batchWrite`'s `reloadUserConfig`, which a write to the file doesn't do, but a turn can't run
+   without an account, so it wasn't watched. The screen says nothing about running threads.
+
+   Claude Code watches its settings files for atomic saves (the binary's watcher), so a rename is seen.
+8. **The agents can write these too.** Claude Code's `/config` writes `permissions.defaultMode` and
+   `autoUpdatesChannel`, `claude install <channel>` writes the channel, and any of its own settings writes
+   rewrites the file whole. Codex's own settings screens write through `config/batchWrite`. There's no shared
+   lock. The hash looked at again just before the rename makes the gap small, not zero: an agent's write in
+   that last instant can be lost. After one of theirs, the phone's hash is out of date (409, read again) and
+   Undo is off.
+9. **Each server has its own.** The screen is the hub whose card was tapped; All servers never changes them
+   in bulk. Nothing on the session's chat screen. Per-model effort under `modelSettings` is later (`docs/LATER.md`).

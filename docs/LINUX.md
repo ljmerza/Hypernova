@@ -136,6 +136,7 @@ Inside `<state>`:
 | Settings | `settings.json` |
 | Certificates | `tls/` |
 | Copies of the files the integration changes | `backups/` |
+| Copies of an agent's settings before a phone changed them, 0600, the last 20 per agent | `settings-backups/<agent>-<timestamp>` |
 | Attachments from the phone, kept 30 days | `attachments/` |
 | Shared terminals | `terms/` |
 | `hn`, the status line script, a second `hypernova` for automations | `bin/` |

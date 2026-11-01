@@ -191,8 +191,8 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   status line commands, `awsAuthRefresh`, marketplace sources, `autoMode.environment`, `skip*` keys,
   or MCP commands, args and env (`daemon/test/agent-settings.test.ts` plants a secret in each). Those
   names do show what's set up on the server, to a paired phone, which can already start sessions there.
-  The route only reads, for a device token and not the admin token; `~/.claude` and `~/.codex` stay
-  closed to the phone's file browser.
+  The GET only reads, for a device token and not the admin token; `~/.claude` and `~/.codex` stay
+  closed to the phone's file browser. What writes is in section 8, risk 17.
 
 ## 8. Known residual risks
 
@@ -237,6 +237,24 @@ another session's reply. All of that is **outside text**, and the daemon treats 
 
 Out of scope: someone already running code as the user on the machine, Claude Code's own permission
 rules, and weaknesses in the VPN or the operating system.
+17. **Changing the agents' settings from a paired phone** (`PUT /v1/agents/settings`, 2026-11-01; `docs/PROTOCOL.md`,
+    "Agent settings"). The only route that writes those files, so a new surface. The threat is a stolen pairing:
+    a device token and its certificate, taken from a phone or a backup of it. With them, an attacker can move
+    the starting permission mode as far as `auto`, Codex's sandbox as far as `workspace-write`, and pick the update
+    channel, a model and a web search setting, for new sessions on that server. They can undo the last change,
+    unless what it would restore is off the list.
+
+    What holds on the server, whoever is asking: only the listed keys and values. `bypassPermissions`,
+    `approval_policy = "never"` and `danger-full-access` can't be set, nor restored by Undo, and `hooks`, `env`,
+    rules, status line and MCP entries can't be reached, so this route can't be made to run a command. Each change
+    leaves a backup and a log line. A file that changed is refused; a link isn't followed.
+
+    What doesn't hold: **the confirm and the fingerprint before a loosening are the phone's own check, as in risk 11. The
+    server can't see them**, and only flags the change in its reply and its log. A stolen token skips them. Moving to `auto`
+    or `workspace-write` stays possible with one. Nothing here adds to what that token already had: it can start
+    sessions, answer approvals and open terminals on the server, where these files can be edited directly. Forgetting
+    the device ends it. Backups hold whole settings files, secrets in `env` included: 0600 in a 0700 folder under
+    `<support>`, 20 per agent, and they go with the state folder.
 
 ## 9. Reporting
 
