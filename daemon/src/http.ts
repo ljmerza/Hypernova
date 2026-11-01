@@ -548,7 +548,7 @@ async function api(c: Ctx): Promise<void> {
   if (path === '/v1/stats' && m === 'GET') {
     // Statistics: how long Claude worked, tokens, sessions… (see stats.ts).
     const range = parseRange(url.searchParams.get('range') ?? 'week')
-    if (!range) throw new HttpError(400, 'bad_range', 'Ask for today, week, month or all.')
+    if (!range) throw new HttpError(400, 'bad_range', 'Ask for today, week, month, ytd or all.')
     return json(res, 200, await getStats(range))
   }
   if (path === '/v1/history/search' && m === 'GET') {

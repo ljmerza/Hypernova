@@ -114,6 +114,43 @@ class AllStatsTest {
         assertEquals(12L, c.busiestDay?.tokens)
     }
 
+    @Test fun ytdKeepsABusierDayFromBeforeTheLast30ButNotOneFromLastYear() {
+        val inJanuary = LocalDate.of(2027, 1, 10)
+        // January 10: of the chart's 30 days only the last 10 are this year's; the busiest of the 30 is last year's.
+        val a = stats(range = StatsRange.Ytd, days = days(inJanuary) { i -> when (i) { 5 -> 20 * h; 25 -> h; else -> 0L } })
+        val b = stats(range = StatsRange.Ytd, days = days(inJanuary) { i -> if (i == 25) 2 * h else 0L })
+        val c = AllStats.combine(listOf(a, b))!!
+        assertEquals(inJanuary.minusDays(4), c.busiestDay?.day)
+        assertEquals(3 * h, c.busiestDay?.claudeMs)
+        // In October a server's own busiest day from before the last 30 still counts.
+        val march = LocalDate.of(2026, 3, 1)
+        val d = stats(range = StatsRange.Ytd, days = days { i -> if (i == 29) h else 0L }, busiest = StatDay(march, 12 * h, 0, 7, 0, 0))
+        val e = stats(range = StatsRange.Ytd, days = days { i -> if (i == 29) h else 0L }, busiest = StatDay(march, 3 * h, 0, 5, 0, 0))
+        assertEquals(march, AllStats.combine(listOf(d, e))!!.busiestDay?.day)
+    }
+
+    @Test fun olderDaysTakeTheEarliestStartAndTheHoursLineFollowsEachServer() {
+        val z2 = stats(since = 100L, tokens = StatTokens(1, 2, 3, 4, unsplit = 90L)).copy(hoursSince = 500L, tokensSince = 300L)
+        val gym = stats(since = 700L, tokens = StatTokens(1, 1, 1, 1, unsplit = 10L)).copy(hoursSince = 900L, tokensSince = null)
+        val c = AllStats.combine(listOf(z2, gym))!!
+        assertEquals(100L, c.since)
+        assertEquals(500L, c.hoursSince)
+        assertEquals(300L, c.tokensSince)
+        assertEquals(10L + 4L + 100L, c.tokens.total)
+        assertEquals(100L, c.tokens.unsplit)
+        // An older server has no older days: it adds none, and its hours start with it.
+        val old = stats(since = 400L)
+        val d = AllStats.combine(listOf(z2, old))!!
+        assertEquals(100L, d.since)
+        assertEquals(400L, d.hoursSince)
+        assertEquals(300L, d.tokensSince)
+        assertEquals(90L, d.tokens.unsplit)
+        // None has any: no line to say.
+        val e = AllStats.combine(listOf(old, stats(since = 200L)))!!
+        assertNull(e.hoursSince)
+        assertNull(e.tokensSince)
+    }
+
     @Test fun serversADayApartKeepThirtyDays() {
         val a = stats(days = days { i -> if (i == 29) h else 0L })
         val b = stats(days = days(today.plusDays(1)) { i -> if (i == 29) 2 * h else 0L })

@@ -1,9 +1,11 @@
 package com.prudnikweb.hypernova.ui.stats
 
+import com.prudnikweb.hypernova.data.StatsRange
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 
 /** The last 30 days' bar chart without drawing (ui/stats/DayBars.kt): scale, heights, slots, touches, labels. */
 class DayBarsTest {
@@ -104,5 +106,15 @@ class DayBarsTest {
 
     @Test fun oneDayIsTodayAloneUnderItsBar() {
         assertArrayEquals(floatArrayOf(125f), DayBars.labelLefts(1, 300f, floatArrayOf(50f), 8f), 0f)
+    }
+
+    @Test fun ytdLightsOnlyThisYearsDays() {
+        assertEquals(1, litDays(StatsRange.Ytd, LocalDate.of(2027, 1, 1)))
+        assertEquals(10, litDays(StatsRange.Ytd, LocalDate.of(2027, 1, 10)))
+        assertEquals(30, litDays(StatsRange.Ytd, LocalDate.of(2027, 1, 30)))
+        assertEquals(30, litDays(StatsRange.Ytd, LocalDate.of(2026, 11, 1)))
+        assertEquals(30, litDays(StatsRange.Ytd, null))
+        assertEquals(7, litDays(StatsRange.Week, LocalDate.of(2027, 1, 1)))
+        assertEquals(30, litDays(StatsRange.All, LocalDate.of(2027, 1, 1)))
     }
 }

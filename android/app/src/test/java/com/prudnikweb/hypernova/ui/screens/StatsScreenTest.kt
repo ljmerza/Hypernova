@@ -1,19 +1,28 @@
 package com.prudnikweb.hypernova.ui.screens
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AllStats
+import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.Link
 import com.prudnikweb.hypernova.data.LinkState
+import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.StatDay
 import com.prudnikweb.hypernova.data.StatProject
 import com.prudnikweb.hypernova.data.StatTokens
@@ -84,8 +93,15 @@ class StatsScreenTest {
         )
     }
 
-    private fun screen(hub: FakeHub, servers: List<StatsServer>? = null) {
-        rule.setContent { Harness(spy) { StatsScreen(hub, onBack = { backs++ }, servers = servers) } }
+    private fun screen(hub: FakeHub, servers: List<StatsServer>? = null, fontScale: Float? = null) {
+        rule.setContent {
+            Harness(spy) {
+                val d = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale ?: d.fontScale)) {
+                    StatsScreen(hub, onBack = { backs++ }, servers = servers)
+                }
+            }
+        }
         rule.waitForIdle()
     }
 
@@ -162,10 +178,7 @@ class StatsScreenTest {
         val hn = a.projects.first().claudeMs + b.projects.first().claudeMs
         rule.onNodeWithText("hypernova", useUnmergedTree = true).assertExists()
         rule.onNodeWithText(hours(res, hn), useUnmergedTree = true).assertExists()
-        // Each server's part, and the one that isn't answering named.
-        rule.onNodeWithText(str(R.string.stats_servers).uppercase(), useUnmergedTree = true).assertExists()
-        rule.onNodeWithText("gym", useUnmergedTree = true).assertExists()
-        rule.onNodeWithText(hours(res, b.claudeMs), useUnmergedTree = true).assertExists()
+        // The one that isn't answering is named.
         rule.onNodeWithText(res.getQuantityString(R.plurals.stats_all_missing, 1, "k1"), useUnmergedTree = true).assertExists()
         rule.snap("stats_all_servers")
         // The footer, past the bottom of this phone: the servers these came from.
@@ -218,6 +231,256 @@ class StatsScreenTest {
         rule.onNodeWithText(str(R.string.stats_on_server, str(R.string.servers_all), "25 – 31 Oct"), useUnmergedTree = true).assertDoesNotExist()
         rule.onNodeWithText("25 – 31 Oct", useUnmergedTree = true).assertExists()
         rule.onNodeWithText(str(R.string.stats_footer, hub.mac.name), useUnmergedTree = true).assertExists()
+    }
+
+    // ─── YTD ───────────────────────────────────────────────────────────────
+
+    /** [text] is drawn whole, on this 392dp phone. */
+    private fun assertWhole(text: String) {
+        val node = rule.onNode(hasText(text) and SemanticsMatcher("is placed") { it.layoutInfo.isPlaced } and SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult), useUnmergedTree = true).fetchSemanticsNode()
+        val layouts = mutableListOf<TextLayoutResult>()
+        node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        val l = layouts.single()
+        assertTrue("\"$text\" is cut short: ${l.size} of ${l.multiParagraph.intrinsics.maxIntrinsicWidth}, height overflow ${l.didOverflowHeight}", l.size.width >= kotlin.math.ceil(l.multiParagraph.intrinsics.maxIntrinsicWidth) - 0.5f && !l.didOverflowHeight)
+    }
+
+    private val chips get() = listOf(R.string.stats_range_today, R.string.stats_range_week, R.string.stats_range_month, R.string.stats_range_ytd, R.string.stats_range_all).map { str(it) }
+
+    private fun chipsFitInOrder() {
+        assertEquals(392f, rule.onRoot().fetchSemanticsNode().size.width / context.resources.displayMetrics.density, 1f)
+        val lefts = chips.map { assertWhole(it); rule.onNode(hasText(it), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left }
+        assertEquals("Today, Week, Month, YTD, All", lefts.sorted(), lefts)
+    }
+
+    @Test fun theChipsFitInOrderAtTheUsualFont() {
+        val hub = FakeHub()
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        screen(hub)
+        chipsFitInOrder()
+    }
+
+    @Test fun theChipsFitInOrderAtALargerFont() {
+        val hub = FakeHub()
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        screen(hub, fontScale = 1.3f)
+        chipsFitInOrder()
+    }
+
+    @Test fun ytdShowsItsOwnTotalsSinceJanuary1() {
+        val hub = FakeHub()
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        val ytd = stats(StatsRange.Ytd, 2)
+        StatsSource.put(hub, StatsRange.Ytd, ytd)
+        screen(hub)
+        rule.onNode(hasText(str(R.string.stats_range_ytd))).performClick()
+        rule.waitForIdle()
+        val said = heroSaid()
+        assertTrue(said, said.contains(hours(res, ytd.claudeMs)))
+        rule.onNodeWithText(str(R.string.stats_since, "1 Jan"), useUnmergedTree = true).assertExists()
+        rule.snap("stats_ytd")
+    }
+
+    @Test fun allServersYtdIsSinceJanuary1Too() {
+        val (servers, _, _) = allServers()
+        val a = stats(StatsRange.Ytd, 1)
+        val b = stats(StatsRange.Ytd, 3)
+        StatsSource.put(servers[0].hub, StatsRange.Ytd, a)
+        StatsSource.put(servers[1].hub, StatsRange.Ytd, b)
+        screen(servers[0].hub as FakeHub, servers)
+        rule.onNode(hasText(str(R.string.stats_range_ytd))).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.stats_on_server, str(R.string.servers_all), str(R.string.stats_since, "1 Jan")), useUnmergedTree = true).assertExists()
+        assertTrue(heroSaid().contains(hours(res, a.claudeMs + b.claudeMs)))
+    }
+
+    // ─── All: when it starts ───────────────────────────────────────────────
+
+    @Test fun allSaysTheYearItStarts() {
+        val hub = FakeHub()
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        StatsSource.put(hub, StatsRange.All, stats(StatsRange.All, 1))
+        screen(hub)
+        rule.onNode(hasText(str(R.string.stats_range_all))).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.stats_since, "2 Oct 2026"), useUnmergedTree = true).assertExists()
+    }
+
+    /** All servers, All, at [fontScale]: gym's history goes further back than z2's; k1, further still, isn't linked. */
+    private fun allServersAll(fontScale: Float? = null) {
+        val (servers, a, b) = allServers()
+        val zone = ZoneId.systemDefault()
+        val start = LocalDate.of(2026, 1, 8).atStartOfDay(zone).toInstant().toEpochMilli()
+        StatsSource.put(servers[0].hub, StatsRange.All, stats(StatsRange.All, 1).copy(since = a.since))
+        StatsSource.put(servers[1].hub, StatsRange.All, stats(StatsRange.All, 3).copy(since = start))
+        assertNotNull(b)
+        screen(servers[0].hub as FakeHub, servers, fontScale)
+        rule.onNode(hasText(str(R.string.stats_range_all))).performClick()
+        rule.waitForIdle()
+    }
+
+    @Test fun allServersStartsAtTheEarliestOfThoseThatAnswered() {
+        allServersAll()
+        val header = str(R.string.stats_on_server, str(R.string.servers_all), str(R.string.stats_since, "8 Jan 2026"))
+        rule.onNodeWithText(header, useUnmergedTree = true).assertExists()
+        assertWhole(header)
+    }
+
+    @Test fun allServersStartFitsAtALargerFont() {
+        allServersAll(1.3f)
+        assertWhole(str(R.string.stats_on_server, str(R.string.servers_all), str(R.string.stats_since, "8 Jan 2026")))
+    }
+
+    // ─── A server too old for the range ────────────────────────────────────
+
+    private val badRange get() = ApiException(Problem.Server, 400, "bad_range", "Ask for today, week, month or all.")
+
+    @Test fun oneServerTooOldSaysToUpdateItNotAnError() {
+        val hub = FakeHub()
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        StatsSource.refuse(hub, StatsRange.Ytd, badRange)
+        screen(hub)
+        rule.onNode(hasText(str(R.string.stats_range_ytd))).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(res.getQuantityString(R.plurals.stats_needs_update, 1, hub.mac.name), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.stats_error), useUnmergedTree = true).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.try_again), useUnmergedTree = true).assertDoesNotExist()
+        // Another range it does know is as ever.
+        rule.onNode(hasText(str(R.string.stats_range_week))).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(res.getQuantityString(R.plurals.stats_needs_update, 1, hub.mac.name), useUnmergedTree = true).assertDoesNotExist()
+        assertTrue(heroSaid().contains(hours(res, stats(StatsRange.Week, 1).claudeMs)))
+    }
+
+    /** z2 and gym know YTD; k1, linked, is too old for it. */
+    private fun k1TooOld(): List<StatsServer> {
+        val z2 = FakeHub()
+        val gym = FakeHub()
+        val k1 = FakeHub()
+        for ((hub, scale) in listOf(z2 to 1, gym to 3, k1 to 5)) StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, scale))
+        StatsSource.put(z2, StatsRange.Ytd, stats(StatsRange.Ytd, 1))
+        StatsSource.put(gym, StatsRange.Ytd, stats(StatsRange.Ytd, 3))
+        StatsSource.refuse(k1, StatsRange.Ytd, badRange)
+        return listOf(StatsServer("z2", "z2", z2), StatsServer("gym", "gym", gym), StatsServer("k1", "k1", k1))
+    }
+
+    @Test fun allServersNamesTheOneTooOldAndAddsUpTheRest() {
+        val servers = k1TooOld()
+        screen(servers[0].hub as FakeHub, servers)
+        rule.onNode(hasText(str(R.string.stats_range_ytd))).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(res.getQuantityString(R.plurals.stats_needs_update, 1, "k1"), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(res.getQuantityString(R.plurals.stats_all_missing, 1, "k1"), useUnmergedTree = true).assertDoesNotExist()
+        assertTrue(heroSaid().contains(hours(res, stats(StatsRange.Ytd, 1).claudeMs + stats(StatsRange.Ytd, 3).claudeMs)))
+        rule.snap("stats_all_servers_needs_update")
+    }
+
+    @Test fun anAnswerSaysWhoIsTooOldApartFromWhoIsNotAnswering() = runBlocking {
+        val servers = k1TooOld() + StatsServer("nas", "nas", FakeHub(link = Link(LinkState.Offline)))
+        val got = AllStats.load(servers, StatsRange.Ytd)
+        assertEquals(listOf("k1"), got.outdated)
+        assertEquals(listOf("nas"), got.missing)
+        assertEquals(listOf("z2", "gym"), got.each.map { it.first.name })
+        assertEquals(null, got.problem)
+    }
+
+    @Test fun everyServerTooOldIsNotAnErrorEither() {
+        val z2 = FakeHub()
+        val k1 = FakeHub()
+        for (hub in listOf(z2, k1)) {
+            StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+            StatsSource.refuse(hub, StatsRange.Ytd, badRange)
+        }
+        val servers = listOf(StatsServer("z2", "z2", z2), StatsServer("k1", "k1", k1))
+        screen(z2, servers)
+        rule.onNode(hasText(str(R.string.stats_range_ytd))).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(res.getQuantityString(R.plurals.stats_needs_update, 2, "z2, k1"), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.stats_error), useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun aRealFailureStillSaysSoBesideTheOneTooOld() = runBlocking {
+        val k1 = FakeHub()
+        StatsSource.refuse(k1, StatsRange.Ytd, badRange)
+        // gym is linked and has no answer: asking it really fails.
+        val got = AllStats.load(listOf(StatsServer("k1", "k1", k1), StatsServer("gym", "gym", FakeHub())), StatsRange.Ytd)
+        assertEquals(listOf("k1"), got.outdated)
+        assertEquals(listOf("gym"), got.missing)
+        assertEquals("no_stats", got.problem?.code)
+    }
+
+    // ─── Older days, from Claude Code's own summary ────────────────────────
+
+    private fun day(y: Int, m: Int, d: Int) = LocalDate.of(y, m, d).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+    /** Week's fixed numbers, as All's or YTD's, with older days behind them: first use 8 Jan, tokens from 12 Jul, hours from 24 Sep. */
+    private fun withOlderDays(range: StatsRange, scale: Int = 1) = stats(range, scale).copy(
+        since = day(2026, 1, 8), hoursSince = day(2026, 9, 24), tokensSince = day(2026, 7, 12),
+        from = if (range == StatsRange.Ytd) day(2026, 1, 1) else day(2026, 9, 24),
+    )
+
+    private val laterLine get() = str(R.string.stats_later_tokens_earlier, "24 Sep 2026", "12 Jul 2026")
+
+    private fun pick(hub: FakeHub, range: StatsRange, label: Int, answer: Stats, servers: List<StatsServer>? = null) {
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        StatsSource.put(hub, range, answer)
+        screen(hub, servers)
+        rule.onNode(hasText(str(label))).performClick()
+        rule.waitForIdle()
+    }
+
+    @Test fun allWithOlderDaysStartsAtFirstUseAndSaysWhatStartsLater() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All))
+        rule.onNodeWithText(str(R.string.stats_since, "8 Jan 2026"), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(laterLine, useUnmergedTree = true).assertExists()
+        rule.snap("stats_all_older_days")
+    }
+
+    @Test fun ytdWithOlderDaysSaysSoToo() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.Ytd, R.string.stats_range_ytd, withOlderDays(StatsRange.Ytd))
+        rule.onNodeWithText(str(R.string.stats_since, "1 Jan"), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(laterLine, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun noOlderDaysNoLine() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.All, R.string.stats_range_all, stats(StatsRange.All, 1))
+        rule.onNodeWithText(laterLine, useUnmergedTree = true).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.stats_since, "2 Oct 2026"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun tokensThatReachTheStartArentMentioned() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All).copy(tokensSince = day(2026, 1, 8)))
+        rule.onNodeWithText(str(R.string.stats_later, "24 Sep 2026"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun noTokensInTheOlderDaysStartWithTheHours() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All).copy(tokensSince = null))
+        rule.onNodeWithText(str(R.string.stats_later_with_tokens, "24 Sep 2026"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun aDayOnlyTheSummaryKnowsHasNoBarAndSaysNoHoursCounted() {
+        val hub = FakeHub()
+        val week = stats(StatsRange.Week, 1)
+        // The last of the fixed days has no work; here the summary says it had sessions.
+        val days = week.days.dropLast(1) + week.days.last().copy(sessions = 3, tokens = 1000L)
+        assertEquals(0L, days.last().claudeMs)
+        StatsSource.put(hub, StatsRange.Week, week.copy(days = days))
+        screen(hub)
+        rule.onNodeWithText(str(R.string.stats_day_no_hours), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(res.getQuantityString(R.plurals.stats_active_days, 24, 24), substring = true, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun allServersLineUsesTheEarliestOfEach() {
+        val (servers, _, _) = allServers()
+        // gym has no older days: its hours start with it, 1 Aug, ahead of z2's 24 Sep.
+        StatsSource.put(servers[1].hub, StatsRange.All, stats(StatsRange.All, 3).copy(since = day(2026, 8, 1)))
+        pick(servers[0].hub as FakeHub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All), servers)
+        rule.onNodeWithText(str(R.string.stats_on_server, str(R.string.servers_all), str(R.string.stats_since, "8 Jan 2026")), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.stats_later_tokens_earlier, "1 Aug 2026", "12 Jul 2026"), useUnmergedTree = true).assertExists()
     }
 
     private fun <T> assertNotNullAnd(v: T?): T {

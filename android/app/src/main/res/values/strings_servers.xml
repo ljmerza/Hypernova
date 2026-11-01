@@ -41,12 +41,15 @@
     <string name="stats_on_server">%1$s · %2$s</string>
     <!-- Statistics with "All servers" (data/AllStats.kt): every server's added up. -->
     <string name="stats_loading_all">Reading each server\'s history…</string>
-    <!-- Each server's part, under the projects. -->
-    <string name="stats_servers">Servers</string>
     <!-- The servers that didn't answer (not linked, or failing), named (k1, gym). -->
     <plurals name="stats_all_missing">
         <item quantity="one">%1$s isn\'t answering: its numbers aren\'t in these.</item>
         <item quantity="other">%1$s aren\'t answering: their numbers aren\'t in these.</item>
+    </plurals>
+    <!-- A server too old to know the range asked for (it answered bad_range), named; one server's too. -->
+    <plurals name="stats_needs_update">
+        <item quantity="one">%1$s needs updating for this range.</item>
+        <item quantity="other">%1$s need updating for this range.</item>
     </plurals>
 
     <!-- A notification from one of several computers: its name under the title (data/Core.kt, Notifier). -->

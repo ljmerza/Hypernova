@@ -2783,9 +2783,10 @@ each server's `GET /v1/stats` and does the adding.
    its name, so two rows would be two identical planets. Eight at most, as on one server. Tools merge
    the same way, eight then "Other".
 4. **The longest session is any server's longest**, as it is one session; it doesn't name its server.
-5. **A short Servers card under the projects**: each server that answered, in the order paired, as
-   the project rows are without their planets (name, sessions, tokens, hours). Only with two or more
-   answering; with one it would repeat the totals.
+5. **No Servers card** (owner, the same day: "not clear what this servers section tells me that's
+   different from the first section, remove it."). There was one under the projects: each server that
+   answered with its sessions, tokens and hours. The totals are the point here; who was left out stays
+   the amber line, and the footer still names the servers these came from.
 6. **Each server is asked for the same range, at once**, and the numbers change once, when all have
    answered, so they don't climb as answers come in. A half-minute-old answer is used as it is, as on
    one server. With every linked server's answer kept, they show at once while fresh ones come.
@@ -2961,3 +2962,46 @@ Older versions. An older app gets all of this from the server, and nothing break
 (`session.removed`), a screen on it goes back, and its own sheet still says the session stays, which
 is no longer true, with no working warning. A newer app with an older server keeps two cards, and its
 toast says so. Why the copy comes first and files stay: as ever (LATER L46).
+
+## YTD in Statistics, and when All starts (2026-11-01)
+
+The owner: "also do ytd filter", then "also have All tell me when does it start."
+
+1. **Today, Week, Month, YTD, All.** YTD runs from January 1 of the server's own year, by its own
+   calendar as the others go (`range=ytd`), through now. The header says "since 1 Jan".
+2. **The chart stays the last 30 days**, as under All; a year's view wasn't worth a second chart. In
+   January YTD dims the days of last year, as Week dims those before its seven.
+3. **All names the year it starts**: "since 24 Sep 2026", "All servers · since 24 Sep 2026", the
+   earliest of the servers that answered.
+4. **A server too old for a range says so, not an error.** It answers `400 bad_range`: in All servers
+   an amber line, "k1 needs updating for this range.", over the others added up (apart from "isn't
+   answering": it is answering, and updating is what fixes it); with no other answer, or on one
+   server, the same line in a card, with no Try again. The screen asks again each minute anyway, so
+   the numbers come by themselves once it's updated. A real failure elsewhere still gets its error.
+
+## All and YTD reach back to the first use (2026-11-01)
+
+The owner, on All's start date, chose to backfill from Claude Code's own summary. All started on 24 Sep
+because Claude Code deletes transcripts after 30 days by default, and the daemon's first look kept only
+the days still there. His first use was 8 January.
+
+1. **`stats-cache.json` fills in the days before Hypernova's first** (`daemon/src/stats-cache.ts`,
+   `docs/PROTOCOL.md`, "Older days"): sessions, tool calls, and tokens from 12 July where it has them.
+   Read only. Without the file, All means as far back as Hypernova has counted.
+2. **A day has one source.** Hypernova's first counted day and all after it are Hypernova's, even where
+   it saw only part of the day (24, 25 and 28 Sep on z2, short 45 sessions and 3,624 tool calls of the
+   file's). Picking the higher number per field would make every day past it the file's on some counts
+   and Hypernova's on others.
+3. **Messages aren't prompts.** The file's `messageCount` is 33 times the prompts on overlapping days,
+   so the Prompts number starts with the hours.
+4. **The header says the first use, and one line what starts later**: "since 8 Jan 2026", then "Hours,
+   prompts and projects since 24 Sep 2026; tokens since 12 Jul 2026." Only where older days are in the
+   answer: All and YTD; Today, Week and Month only for a day the file alone knows. In All servers each
+   date is the earliest any server has that number from; a server without older days has its own start.
+5. **Records stay in hours.** Busiest day, longest session, streak and days with work come from
+   Hypernova's days only, since a day with no hours can't claim them, and the chart makes up no bars: a
+   day only the file knows reads "no hours counted".
+6. **Known limit:** the file's tokens run higher than Hypernova's for the same days (2.2 times on z2,
+   29 Sep to 16 Oct, while sessions and tool calls agree within 3%). Hypernova counts a message once
+   however many lines log it; why the file's run higher isn't known here. They're added as they are, so
+   a token total reaching back past Hypernova's first day reads high by about that much on the older part.

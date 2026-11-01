@@ -16,9 +16,10 @@ import { CLAUDE_DIR, SUPPORT, log, readJson, writeJson } from './util.ts'
 import { classifyUserText, maskSecrets, promptTitle } from './normalize.ts'
 import { settings } from './store.ts'
 import { codexDays, type CodexDay } from './codex/stats.ts'
+import { cacheDays } from './stats-cache.ts'
 
-export type StatsRange = 'today' | 'week' | 'month' | 'all'
-export const STATS_RANGES: readonly StatsRange[] = ['today', 'week', 'month', 'all']
+export type StatsRange = 'today' | 'week' | 'month' | 'ytd' | 'all'
+export const STATS_RANGES: readonly StatsRange[] = ['today', 'week', 'month', 'ytd', 'all']
 
 type Tokens = { input: number; output: number; cacheRead: number; cacheWrite: number }
 type SessionRecord = { id: string; title: string; project: string; claudeMs: number; startedAt: number }
@@ -74,6 +75,12 @@ export type Stats = {
   days: { day: string; claudeMs: number; codexMs: number; wallMs: number; tokens: number; sessions: number; prompts: number }[]
   /** The range's work per agent; codex only where Codex is in use or has counted anything. */
   byAgent: { claude: AgentShare; codex?: AgentShare }
+  /**
+   * What Claude Code's own summary adds to this range, from days before Hypernova counted any
+   * (stats-cache.ts). Apart from every total above, which stay Hypernova's own, so an older app reads
+   * what it always did. Absent when it adds nothing.
+   */
+  backfill?: { since: number; hoursSince: number; sessions: number; toolCalls: number; tokens: number; tokensSince: number | null }
 }
 export type AgentShare = { ms: number; tokens: number; sessions: number; prompts: number; toolCalls: number }
 
@@ -853,6 +860,8 @@ function rangeStart(range: StatsRange, now: number, since: number | null): numbe
   if (range === 'today') return startOfDay(now)
   if (range === 'week') return daysBefore(now, 6)
   if (range === 'month') return daysBefore(now, 29)
+  // Built from the date, as the others are: January's midnight whatever the clocks do by now.
+  if (range === 'ytd') return new Date(new Date(now).getFullYear(), 0, 1).getTime()
   return since ?? startOfDay(now)
 }
 
@@ -973,11 +982,28 @@ export async function getStats(range: StatsRange, now = Date.now(), opts: { fres
   const rest = ranked.slice(8).reduce((n, [, c]) => n + c, 0)
   if (rest) topTools.push({ name: 'Other', count: rest })
 
+  // Older days from Claude Code's own summary: only days before the first Hypernova counted, so a
+  // day has one source, whole. That first day and any after it are Hypernova's, however little it
+  // saw of them (their transcripts may have been going already): low there, never counted twice.
+  const older = new Map((await cacheDays()).filter((c) => c.day <= today && (!active.length || c.day < active[0]!) && (c.sessions > 0 || c.toolCalls > 0 || c.messages > 0 || (c.tokens ?? 0) > 0)).map((c) => [c.day, c]))
+
   const days: Stats['days'] = []
   for (let i = 29; i >= 0; i--) {
     const k = dayKey(daysBefore(now, i))
     const d = merged.get(k)?.d
-    days.push({ day: k, claudeMs: d?.claudeMs ?? 0, codexMs: cdays[k]?.ms ?? 0, wallMs: d?.wallMs ?? 0, tokens: d ? d.tokens.input + d.tokens.output + d.tokens.cacheRead + d.tokens.cacheWrite : 0, sessions: d?.sessions ?? 0, prompts: d?.prompts ?? 0 })
+    // A day only the summary knows has its sessions and tokens but no hours: no bar is made up for it.
+    const c = older.get(k)
+    days.push({ day: k, claudeMs: d?.claudeMs ?? 0, codexMs: cdays[k]?.ms ?? 0, wallMs: d?.wallMs ?? 0, tokens: (d ? d.tokens.input + d.tokens.output + d.tokens.cacheRead + d.tokens.cacheWrite : 0) + (c?.tokens ?? 0), sessions: (d?.sessions ?? 0) + (c?.sessions ?? 0), prompts: d?.prompts ?? 0 })
+  }
+
+  const added = [...older.values()].filter((c) => range === 'all' || c.day >= fromKey).sort((a, b) => (a.day < b.day ? -1 : 1))
+  const backfill: Stats['backfill'] = !added.length ? undefined : {
+    since: dayStart([...older.keys()].sort()[0]!),
+    hoursSince: since ?? startOfDay(now),
+    sessions: added.reduce((n, c) => n + c.sessions, 0),
+    toolCalls: added.reduce((n, c) => n + c.toolCalls, 0),
+    tokens: added.reduce((n, c) => n + (c.tokens ?? 0), 0),
+    tokensSince: ((t) => (t ? dayStart(t.day) : null))(added.find((c) => (c.tokens ?? 0) > 0)),
   }
 
   return {
@@ -995,6 +1021,7 @@ export async function getStats(range: StatsRange, now = Date.now(), opts: { fres
       claude: { ms: claudeMs - codex.ms, tokens: tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite - codex.tokens, sessions: sessions - codex.sessions, prompts: prompts - codex.prompts, toolCalls: toolCalls - codex.toolCalls },
       ...(settings.codex === true || Object.keys(cdays).length ? { codex } : {}),
     },
+    ...(backfill ? { backfill } : {}),
   }
 }
 

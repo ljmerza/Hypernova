@@ -538,7 +538,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/mac/update` | → `{update: ServerUpdate}` (see The server's own update) |
 | `POST /v1/mac/update` | `{autoUpdate: boolean}` → `{update}`: Update this server automatically on or off, saved at once; on, the releases are looked at now. Goes out as `{t:"update"}`. 400 `bad_value` |
 | `POST /v1/mac/awake` | `{mode?: "working" \| "backpack" \| "off", minBattery?: 5–50}` or `{extend: true}` (Backpack's "+2 h", in its last 10 minutes; 409 `too_early`, `not_backpack`) → `{awake: Awake}`. Backpack starts its 8 hours again each time it's chosen. 400 `bad_mode`, `bad_battery`; 409 `needs_setup` (Backpack's one-time setup isn't done), `no_battery` (a desktop Mac). See Stay awake |
-| `GET /v1/stats?range=today\|week\|month\|all` | → `Stats`: how long Claude worked, tokens, sessions, prompts, tools, files, agents, records, projects and the last 30 days (see Statistics) |
+| `GET /v1/stats?range=today\|week\|month\|ytd\|all` | → `Stats`: how long Claude worked, tokens, sessions, prompts, tools, files, agents, records, projects and the last 30 days (see Statistics) |
 | `POST /v1/account/check` | `{}` → `{account: Account}`: asks `claude auth status` now (at most once in 10 s; sooner, the last answer). See Account |
 | `POST /v1/account/login` | `{where: "phone" \| "mac"}` → `{account}`: signs Claude Code in again in a login holder; `account.login` follows it. 409 `not_needed` when the account is ok, 400 `bad_where`; while one runs, the same one. See Account |
 | `POST /v1/account/login/code` | `{code}` → `{ok}`: the sign-in page's code (`<code>#<state>`), typed into the running sign-in. 409 `no_login`, `not_ready` (the code prompt didn't show within 8 s, or a code is already on its way or being checked); 400 `bad_code` (not a whole code, or one from another sign-in's page) |
@@ -3538,11 +3538,12 @@ Codex's is counted by the daemon as each turn it follows ends (`daemon/src/codex
 day Codex was turned on for Hypernova. A few numbers only the daemon sees, and it counts those from
 the moment it first runs. Every total covers both agents; `byAgent` splits them.
 
-`GET /v1/stats?range=today|week|month|all` (no `range`: `week`; anything else: 400 `bad_range`) →
+`GET /v1/stats?range=today|week|month|ytd|all` (no `range`: `week`; anything else: 400 `bad_range`) →
 
 ```ts
 Stats = {
-  range, from: number, to: number,   // epoch ms: the range's first midnight (all: `since`), and now
+  range, from: number, to: number,   // epoch ms: the range's first midnight (ytd: January 1 of the server's own
+                                     // year; all: `since`), and now
   computedAt: number,                // when the transcripts were last looked at
   since: number | null,              // the first day with any work, kept days included
   countingSince: number,             // when this daemon started counting promptsFrom and approvals
@@ -3568,6 +3569,15 @@ Stats = {
   byAgent: {                         // the range's work per agent; codex absent where Codex isn't installed
     claude: {ms, tokens, sessions, prompts, toolCalls},
     codex?: {ms, tokens, sessions, prompts, toolCalls}
+  }
+  backfill?: {                       // older days from Claude Code's own summary; absent when they add nothing to
+                                     // this range. Apart from every total above, so an older app reads what it did
+    since: number,                   // the first of them, whatever the range
+    hoursSince: number,              // the first day this daemon counted (`since` above, or today with none):
+                                     // when everything the summary hasn't got starts
+    sessions: number, toolCalls: number,
+    tokens: number,                  // all four kinds together: the summary doesn't split them by day
+    tokensSince: number | null       // the first of this range's older days with tokens
   }
 }
 ```
@@ -3623,6 +3633,20 @@ Stats = {
   6-hourly look keeps them even if nobody opens the statistics). A day whose files are gone (it adds
   up to less than the kept copy) is answered from the copy, so `all` keeps growing. Files edited on
   such days are counted per day, not as distinct files.
+- **Older days** (`daemon/src/stats-cache.ts`): `<claude config>/stats-cache.json`, Claude Code's own
+  summary, read and never written, goes back further than its transcripts. Each day there before the
+  first day this daemon counted (kept days, transcripts and Codex's) adds its `sessionCount` and
+  `toolCallCount`, and its `dailyModelTokens` where it has them, to `backfill` for a range that holds
+  the day. A day has one source, whole: the first day counted and every one after it are the daemon's,
+  even one it saw only part of, so that day can read low and nothing counts twice. Their dates are
+  the file's own, which look like UTC days, not the server's calendar: a row can't be cut. The file's
+  totals aren't used. Its `messageCount` isn't `prompts` (every message of a conversation, 33 times the
+  prompts on the owner's overlapping days), so it isn't sent. Nothing else in the file leaves
+  (`longestSession`, `modelUsage`, `hourCounts`). No hours, agent work, projects, files, approvals or
+  limits come from it, so `busiestDay`, `longestSession`, `streak` and days with work stay on the
+  daemon's own days. Of `days`, one only the file knows has its `sessions` and `tokens` and `claudeMs:
+  0`. A missing file, a `version` other than 5 or a changed row: no `backfill`, one line in the log.
+  `dailyModelTokensVersion` other than 5 or changed token rows: the days without tokens.
 
 ## Held prompts
 

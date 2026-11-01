@@ -225,6 +225,7 @@ test('ranges: today is 15 October, the week and month hold both days, 30 days fo
   assert.equal(week.days.at(-1)!.day, '2026-10-15')
   assert.equal(week.days[0]!.day, '2026-09-16')
   assert.equal(stats.parseRange('year'), null)
+  assert.equal(stats.parseRange('ytd'), 'ytd')
 })
 
 test('a busy line too long to parse still counts its time', async () => {

@@ -12,10 +12,15 @@
     <string name="stats_range_today">Today</string>
     <string name="stats_range_week">Week</string>
     <string name="stats_range_month">Month</string>
+    <string name="stats_range_ytd">YTD</string>
     <string name="stats_range_all">All</string>
-    <!-- Under the title: the days the range covers ("9 – 15 Oct", "since 13 Oct"). -->
+    <!-- Under the title: the days the range covers ("9 – 15 Oct", "since 1 Jan", "since 13 Oct 2026"). -->
     <string name="stats_span">%1$s – %2$s</string>
     <string name="stats_since">since %1$s</string>
+    <!-- Older days from Claude Code's own summary have sessions, tool calls and (some) tokens only: when the rest starts. -->
+    <string name="stats_later">Hours, prompts and projects since %1$s.</string>
+    <string name="stats_later_with_tokens">Hours, tokens, prompts and projects since %1$s.</string>
+    <string name="stats_later_tokens_earlier">Hours, prompts and projects since %1$s; tokens since %2$s.</string>
 
     <!-- Durations: Claude's working time ("34h 26m", "152h", "26m"). -->
     <string name="stats_hm">%1$dh %2$dm</string>
@@ -50,6 +55,8 @@
     <string name="stats_today_tick">Today</string>
     <string name="stats_day_tokens">%1$s tokens</string>
     <string name="stats_day_none">no work</string>
+    <!-- A day only Claude Code's own summary knows: it had work, but no hours to show. -->
+    <string name="stats_day_no_hours">no hours counted</string>
     <!-- TalkBack, the whole chart: "…, the most 9 hours 17 minutes on Sat 31 Oct. Sat 31 Oct, 9h 17m, 435M tokens". -->
     <string name="a11y_stats_days">Hours of work over the last 30 days, a bar a day, the most %1$s on %2$s.</string>
     <string name="a11y_stats_days_none">No work in the last 30 days.</string>
