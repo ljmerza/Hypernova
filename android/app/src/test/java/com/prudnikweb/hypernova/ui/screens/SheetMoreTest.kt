@@ -98,7 +98,7 @@ class SheetMoreTest {
         sheet(hub, Samples.ZETA)
         mode(R.string.mode_auto)
         rule.onNodeWithText(str(R.string.think_use_auto)).assertExists()
-        rule.snap("sheet_think_twice_auto")
+        // No picture: the card tells a story picked at random (Incidents.next).
         // Keep asking: nothing changes.
         rule.onNodeWithText(str(R.string.think_keep)).performClick()
         rule.waitForIdle()
