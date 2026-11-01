@@ -136,7 +136,7 @@ fun noticeColor(kind: Notice.Kind): Color = when (kind) {
     // A limit is calm (Claude carries on by itself); what needs the owner stays amber.
     // An automation's note is what it found, never a call to act.
     Notice.Kind.Finished, Notice.Kind.Update, Notice.Kind.Limit, Notice.Kind.Automation -> HN.accent
-    Notice.Kind.Error -> HN.danger
+    Notice.Kind.Error, Notice.Kind.ServerUpdateFailed -> HN.danger
     else -> HN.amber
 }
 
@@ -154,5 +154,6 @@ fun noticeLabel(kind: Notice.Kind): String = stringResource(
         Notice.Kind.Account -> R.string.notice_kind_account
         Notice.Kind.Backpack -> R.string.notice_kind_backpack
         Notice.Kind.Automation -> R.string.au_notice_label
+        Notice.Kind.ServerUpdateFailed -> R.string.su_notice_label
     },
 )

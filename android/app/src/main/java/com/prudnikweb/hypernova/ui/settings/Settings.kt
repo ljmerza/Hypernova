@@ -164,7 +164,7 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
         val key = SettingsJump.wanted() ?: return@LaunchedEffect
         if (hub == null) return@LaunchedEffect
         try {
-            scrollToKey(list, if (allMode) SettingsPlan.keyOf(key, SettingsJump.server ?: live?.serverId.orEmpty(), true) else key)
+            scrollToKey(list, SettingsPlan.jumpKey(key, SettingsJump.server ?: live?.serverId.orEmpty(), allMode))
         } finally {
             if (SettingsJump.asked == jumpAsked) SettingsJump.shown()
         }

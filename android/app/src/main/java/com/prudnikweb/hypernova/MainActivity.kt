@@ -89,8 +89,10 @@ class MainActivity : ComponentActivity() {
         // (data/Servers.kt), then what the notification opens, there.
         // With Home on "All servers" a session opens on its computer and All stays (vm.pendingServer).
         if (intent.action == ACTION_OPEN_SESSION) vm.pendingServer = null
+        // With All servers each has its own section of Settings: a failed update's stays on All too.
         intent.getStringExtra(EXTRA_SERVER)?.let {
-            if (vm.allServers && intent.action == ACTION_OPEN_SESSION) vm.pendingServer = it else vm.switchServer(it)
+            if (vm.allServers && intent.action == ACTION_OPEN_SESSION) vm.pendingServer = it
+            else if (!(vm.allServers && intent.action == ACTION_SERVER_UPDATE)) vm.switchServer(it)
         }
         when {
             // The app link hypernova://pair?…, as the server's pairing page (its QR code) hands it
@@ -108,6 +110,8 @@ class MainActivity : ComponentActivity() {
             }
             // The Backpack notification's "+2 h" button.
             intent.action == ACTION_EXTEND -> vm.extendBackpack()
+            // A server's update that failed: that server's section of Settings.
+            intent.action == ACTION_SERVER_UPDATE -> vm.openServerSettings(intent.getStringExtra(EXTRA_SERVER))
             else -> return
         }
         // Handled once: a recreated Activity or Recents must not run it again.
@@ -143,6 +147,7 @@ class MainActivity : ComponentActivity() {
         const val ACTION_OPEN_SESSION = "com.prudnikweb.hypernova.OPEN_SESSION"
         const val ACTION_UPDATE = "com.prudnikweb.hypernova.UPDATE"
         const val ACTION_EXTEND = "com.prudnikweb.hypernova.EXTEND_BACKPACK"
+        const val ACTION_SERVER_UPDATE = "com.prudnikweb.hypernova.SERVER_UPDATE"
         const val EXTRA_SESSION = "session"
         /** The paired computer a notification came from (data/Servers.kt): a tap switches to it. */
         const val EXTRA_SERVER = "server"

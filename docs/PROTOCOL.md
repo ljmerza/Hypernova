@@ -229,9 +229,15 @@ ServerUpdate = {
   auto: boolean,                 // the setting
   available: boolean,            // this install can update itself…
   reason: string | null,         // …else why not, a sentence to show ("Installed from a checkout: …")
-  state: "idle" | "waiting" | "installing",   // waiting: downloaded and checked, for a quiet moment
-  target: string | null,         // the release's tag while waiting or installing
+  state: "idle" | "installing",  // "waiting" from a daemon before 2026-11-01; an app reads a state it doesn't know as idle
+  target: string | null,         // the release's tag while installing
   last: {from, to, at} | null,   // the last update it installed by itself (versions, epoch ms)
+  failure: {                     // the last try failed and the server still runs the older version; null otherwise,
+    tag: string,                 //   while installing and with the setting off; absent from a daemon before 2026-11-01
+    why: string | null,          //   a sentence, no full stop
+    at: number | null,           //   epoch ms
+    next: number | null,         //   epoch ms of the next try; null: not again
+  } | null,
 }
 ```
 
@@ -249,10 +255,8 @@ ServerUpdate = {
    nothing, logged); the package (128 MB at most, its listed size) into `<support>/updates/`, its
    SHA-256 counted on the way, unpacked with `tar` into a new folder there, which must hold one
    `hypernova-<version>/` with `scripts/install-linux.sh` and a daemon whose version is the tag's.
-4. **A quiet moment**: no session `working` or `starting`, no agent running (`agentsRunning` of any
-   session that hasn't ended, so also an agent waiting on its background command, see Agents and
-   workflows, whose cap keeps a stuck one from holding this) and no approval waiting, 2 minutes on end
-   (looked at every 15 s); after 24 hours it goes ahead anyway. Turned off meanwhile: nothing.
+4. **No waiting** (docs/DECISIONS.md, "Servers update without waiting"): what sessions are doing
+   holds nothing up. Turned off during the download: nothing.
 5. **The install**, in a transient systemd unit of the user's (`systemd-run --user
    --unit=hypernova-update`, `daemon/src/server-update.sh`, its output in `<logs>/update.log`), with
    the service's environment: a copy of the installed daemon is kept, then the package's own
@@ -267,12 +271,24 @@ ServerUpdate = {
    and looks at the releases 5 s after start (rather than 30 s). The old daemon, or one restarted
    on it, reads a failed result (or an install not back within an hour) as a failure.
 7. **Failures** (a download, a checksum, the package, the install) leave the running server as it
-   was, are logged, and wait before the same release is tried again: 1 hour, 6, 24, then not again
-   until the setting is turned off and on or a newer release comes.
+   was, are logged and in `failure` (`{t:"update"}` goes out), and wait before the same release is tried
+   again: 1 hour, 6, 24, then not again until the setting is turned off and on or a newer release comes.
+8. **Across the restart.** The daemon is down for a second or two (the long steps are before the swap);
+   sessions go on in their holders or Claude Code's own background daemon, and a hook that can't connect
+   fails at once without blocking them. An ask a hook was holding isn't denied: its connection drops
+   and Claude Code's own dialog, on the terminal's screen all along, is what's left. The new daemon has no
+   approval for it; the session has `menu.permission` (Approvals, "In the terminal") once the dialog is read: a
+   holder's at the next looks, a `claude agents` job's after `claude attach`, which the daemon runs 4 s and 20 s after
+   every start for a job the registry says is `waiting` with no ask held. A job's `needs` then starts
+   with Claude Code's "PermissionRequest hook failed: socket hang up · ", which is left out. Codex
+   keeps its request and sends it again when the daemon rejoins the thread.
 
 The phone shows the switch only from a daemon that sends `mac.update`, with its line: what it does,
-or `reason`, or what it's doing, and `last`. When the daemon's version changes between two
-snapshots, the phone's connection log says so ("the server updated: A → B").
+or `reason`, or what it's doing, or what failed, and `last`. When the daemon's version changes between
+two snapshots, the phone's connection log says so ("the server updated: A → B"). A `failure` is a banner
+on screen and a notification off it, per server, once when a release first fails and once when `next` is
+null, a tap opening that server's section of Settings; the notification goes once `state` is idle with no
+`failure`. An approval a snapshot no longer has, its session still `needs_you`, is said again as waiting.
 
 ## Local network (direct HTTPS)
 
@@ -591,8 +607,8 @@ objects with a `t` field:
 - `{t:"files", files: {browseOutsideProjects}}`: Browse outside projects was turned on or off (see
   Files); a `{t:"session"}` follows for each session whose `browsable` changed.
 - `{t:"update", update: ServerUpdate}`: the server's own update changed: the setting turned on or
-  off, a release downloaded and waiting for a quiet moment, its install begun (see The server's own
-  update). An app from before it ignores it.
+  off, its install begun, a try that failed (see The server's own update). An app from before it
+  ignores it.
 - `{t:"mac_sleep_soon", inSeconds, reason: "battery" | "hot" | "time", percent: number | null,
   stillAwake: boolean, otherApp: string | null}`: about two minutes before the daemon lets the Mac
   sleep (see Stay awake); `percent` is the battery's. `stillAwake`: another app's SleepDisabled
@@ -3377,7 +3393,7 @@ them in `daemon/src/agents.ts`; the phone shows each under the call that started
   commands", "Waiting for the agents it started", or "Waiting for its background work" when mixed or
   when only Claude Code's word is to go on). No new status and no change on the wire: an older app
   shows a running agent with that line, and everything that counts running agents counts it
-  (`agentsRunning`, Home, the widget, Stay awake, the server's own update).
+  (`agentsRunning`, Home, the widget, Stay awake).
   - **What counts as waiting.** Read from the agent's own file (Claude Code 2.1.316's shapes): its
     turn has ended (its last reply's `stop_reason: "end_turn"`, the SubagentStop hook or its
     `hook_success` line), it hasn't handed back a report, it's a background agent, and work it started

@@ -5,6 +5,7 @@
     "reason": "This daemon doesn’t run from its installed copy (a checkout or a test copy): update it the way it was started.",
     "state": "idle",
     "target": null,
-    "last": null
+    "last": null,
+    "failure": null
   }
 }

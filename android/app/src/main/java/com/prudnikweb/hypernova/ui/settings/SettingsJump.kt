@@ -14,6 +14,9 @@ object SettingsJump {
     /** Settings → Files (Browse outside projects). */
     const val FILES = "files"
 
+    /** Settings → the server's own card (an update that failed): its key with one server on screen. */
+    const val SERVER = "mac"
+
     /** How long an ask stands: a screen that opens later doesn't jump. */
     private const val FRESH_MS = 10_000L
 

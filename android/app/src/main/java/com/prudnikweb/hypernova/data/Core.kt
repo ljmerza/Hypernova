@@ -186,6 +186,7 @@ object Core {
             isVisible = { visible && active() },
             onNotice = { notifier.notice(it, server = id) },
             onAccountFine = { notifier.cancelAccount(id) },
+            onServerUpdateFine = { notifier.cancelServerUpdate(id) },
             heldOpen = { ConnectionService.running },
             serverId = id,
             onScreen = { visible },
@@ -500,10 +501,15 @@ class Notifier(private val context: Context) {
             val i = Intent(context, MainActivity::class.java).setAction(MainActivity.ACTION_UPDATE).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
             PendingIntent.getActivity(context, 7, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        } else if (n.kind == Notice.Kind.ServerUpdateFailed) {
+            val i = Intent(context, MainActivity::class.java).setAction(MainActivity.ACTION_SERVER_UPDATE).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
+            // Each computer's its own: extras don't tell two PendingIntents apart.
+            PendingIntent.getActivity(context, ("server-update:" + keyed(server, n.id)).hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         } else openApp(n.sessionId, keyed(server, n.sessionId ?: n.id).hashCode(), server)
         val notif = NotificationCompat.Builder(context, SESSIONS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(if (n.kind == Notice.Kind.Error) 0xFFFF7878.toInt() else 0xFF7FFFA0.toInt())
+            .setColor(if (n.kind == Notice.Kind.Error || n.kind == Notice.Kind.ServerUpdateFailed) 0xFFFF7878.toInt() else 0xFF7FFFA0.toInt())
             .setContentTitle(title)
             .setContentText(n.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(n.text))
@@ -581,6 +587,11 @@ class Notifier(private val context: Context) {
      */
     fun cancelAccount(server: String? = null) {
         runCatching { nm?.cancel(noticeId(server, AccountWords.NOTICE_ID)) }
+    }
+
+    /** That server's update went through after all, or the setting was turned off: the failure's notification goes. */
+    fun cancelServerUpdate(server: String? = null) {
+        runCatching { nm?.cancel(noticeId(server, SERVER_UPDATE_NOTICE)) }
     }
 
     fun cancelApproval(id: String) {

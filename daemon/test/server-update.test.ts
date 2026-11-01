@@ -2,8 +2,8 @@
 // a local port, with the install and the restart stood in for: off by default; a newer release's
 // package is downloaded, checked against the note's serverSha256, unpacked and handed to the
 // installer; a wrong checksum, an older or equal release, a note without the package's checksum or
-// an install the installer doesn't manage change nothing; it waits while a session works or an
-// approval waits; failures wait before the next try; the new daemon says it updated. Then
+// an install the installer doesn't manage change nothing; nothing sessions do holds it up (owner,
+// 2026-11-01); failures wait before the next try and are said; the new daemon says it updated. Then
 // server-update.sh itself, with stand-ins for install-linux.sh, systemctl and curl: an update that
 // takes, an install that stops before the swap, and a new daemon that doesn't answer (rolled back).
 import { test, before, after, beforeEach } from 'node:test'
@@ -22,7 +22,7 @@ process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
 process.env.HOME = join(scratch, 'home')
 mkdirSync(process.env.HOME, { recursive: true })
 
-const { busyNow, serverUpdater, installKind, semver, newer } = await import('../src/server-update.ts')
+const { serverUpdater, installKind, semver, newer } = await import('../src/server-update.ts')
 const { releaseChecker, parseNote } = await import('../src/releases.ts')
 const { installSource } = await import('../src/cli/install.ts')
 const { settings } = await import('../src/store.ts')
@@ -109,9 +109,9 @@ function updater(extra: Partial<Parameters<typeof serverUpdater>[0]> = {}) {
   const applied: ApplyJob[] = []
   const u = serverUpdater({
     version: '0.5.0', dir, stateFile, logFile: join(scratch, 'update.log'),
-    enabled: () => true, managed: () => ({ ok: true }), busy: () => ({ working: 0, approvals: 0, agents: 0 }),
+    enabled: () => true, managed: () => ({ ok: true }),
     apply: async (j) => void applied.push(j),
-    quietMs: 0, pollMs: 5, watchMs: 0,
+    watchMs: 0,
     ...extra,
   })
   return { u, applied }
@@ -156,7 +156,7 @@ test('a newer release: downloaded, checked, unpacked and handed to the installer
   let changed = 0
   const { u, applied } = updater({ changed: () => changed++ })
   const r = await u.consider(release('v0.9.0'))
-  assert.deepEqual(r, { kind: 'launched', tag: 'v0.9.0', forced: false })
+  assert.deepEqual(r, { kind: 'launched', tag: 'v0.9.0' })
   assert.equal(hits.tgz, 1)
   assert.equal(applied.length, 1)
   const j = applied[0]!
@@ -169,7 +169,7 @@ test('a newer release: downloaded, checked, unpacked and handed to the installer
   assert.deepEqual(readdirSync(dir).filter((f) => f.startsWith('.')), [])
   assert.equal(u.view().state, 'installing')
   assert.equal(u.view().target, 'v0.9.0')
-  assert.ok(changed >= 2)
+  assert.equal(changed, 1)
   // A second look while it installs: nothing more.
   assert.equal((await u.consider(release('v0.9.0'))).kind, 'busy')
   // The new daemon (0.9.0) at start: it updated, and says from what.
@@ -234,94 +234,75 @@ test('an install the installer does not manage: skipped, with why', async () => 
   assert.equal(applied.length, 0)
 })
 
-test('it waits while a session works or an approval waits, and installs once it is quiet', async () => {
+test('nothing sessions do holds it up (owner, 2026-11-01): once the package checks out it installs at once, with no waiting state', async () => {
   pkg = tarball('0.9.0')
-  let b = { working: 1, approvals: 0, agents: 0 }
-  let polls = 0
-  const { u, applied } = updater({
-    busy: () => {
-      polls++
-      if (polls === 4) b = { working: 0, approvals: 1, agents: 0 }
-      if (polls === 8) b = { working: 0, approvals: 0, agents: 0 }
-      return b
-    },
-  })
-  const p = u.consider(release('v0.9.0'))
-  await new Promise((r) => setTimeout(r, 15))
-  assert.equal(applied.length, 0)
-  assert.equal(u.view().state, 'waiting')
-  assert.equal((await p).kind, 'launched')
-  assert.ok(polls >= 8)
+  const states: string[] = []
+  const box: { u?: ReturnType<typeof serverUpdater> } = {}
+  const { u, applied } = updater({ changed: () => void states.push(box.u!.view().state) })
+  box.u = u
+  assert.deepEqual(await u.consider(release('v0.9.0')), { kind: 'launched', tag: 'v0.9.0' })
   assert.equal(applied.length, 1)
+  assert.deepEqual(states, ['installing'])
 })
 
-test('it waits while an agent runs, also one waiting on its background command with every session idle', async () => {
+test('turned off during the download: nothing installed', async () => {
   pkg = tarball('0.9.0')
-  let b = { working: 0, approvals: 0, agents: 1 }
-  let polls = 0
-  const { u, applied } = updater({
-    busy: () => {
-      if (++polls === 6) b = { working: 0, approvals: 0, agents: 0 }
-      return b
-    },
-  })
-  const p = u.consider(release('v0.9.0'))
-  await new Promise((r) => setTimeout(r, 15))
-  assert.equal(applied.length, 0)
-  assert.equal(u.view().state, 'waiting')
-  assert.equal((await p).kind, 'launched')
-  assert.ok(polls >= 6)
-  assert.equal(applied.length, 1)
-})
-
-test('an agent that never ends holds it only up to the cap', async () => {
-  pkg = tarball('0.9.0')
-  let t = 1_000_000
-  const { u, applied } = updater({ now: () => t, sleep: async () => void (t += 3600_000), maxWaitMs: 5 * 3600_000, busy: () => ({ working: 0, approvals: 0, agents: 1 }) })
-  assert.equal((await u.consider(release('v0.9.0'))).kind, 'launched')
-  assert.equal(applied.length, 1)
-})
-
-test('what the gate counts: sessions working or starting, approvals, and running agents of sessions that have not ended', () => {
-  assert.deepEqual(busyNow([], 0), { working: 0, approvals: 0, agents: 0 })
-  assert.deepEqual(busyNow([{ state: 'working', agentsRunning: 0 }, { state: 'starting', agentsRunning: 0 }, { state: 'idle', agentsRunning: 0 }], 2), { working: 2, approvals: 2, agents: 0 })
-  // A main agent idle while its agent waits on a background command is busy too; an ended session's count is stale.
-  assert.deepEqual(busyNow([{ state: 'idle', agentsRunning: 2 }, { state: 'working', agentsRunning: 1 }, { state: 'ended', agentsRunning: 3 }], 0), { working: 1, approvals: 0, agents: 3 })
-})
-
-test('quiet means quiet for a while: a short gap between turns is not enough', async () => {
-  pkg = tarball('0.9.0')
-  let t = 0
-  const seen: number[] = []
-  const { u, applied } = updater({
-    now: () => t,
-    sleep: async () => void (t += 10_000),
-    quietMs: 60_000,
-    // Quiet for 20 s, working again, then quiet for good.
-    busy: () => {
-      seen.push(t)
-      return { working: t >= 20_000 && t < 40_000 ? 1 : 0, approvals: 0, agents: 0 }
-    },
-  })
-  assert.equal((await u.consider(release('v0.9.0'))).kind, 'launched')
-  assert.equal(applied.length, 1)
-  assert.ok(t >= 100_000, `installed at ${t}`)
-})
-
-test('busy for longer than the cap: it goes ahead, and says it was forced', async () => {
-  pkg = tarball('0.9.0')
-  let t = 0
-  const { u } = updater({ now: () => t, sleep: async () => void (t += 3600_000), maxWaitMs: 5 * 3600_000, busy: () => ({ working: 2, approvals: 0, agents: 0 }) })
-  assert.deepEqual(await u.consider(release('v0.9.0')), { kind: 'launched', tag: 'v0.9.0', forced: true })
-})
-
-test('turned off while it waits: nothing installed', async () => {
-  pkg = tarball('0.9.0')
-  let on = true
-  let polls = 0
-  const { u, applied } = updater({ enabled: () => on, busy: () => (++polls === 3 && (on = false), { working: 1, approvals: 0, agents: 0 }) })
+  const { u, applied } = updater({ enabled: () => hits.tgz === 0 })
   assert.equal((await u.consider(release('v0.9.0'))).kind, 'cancelled')
   assert.equal(applied.length, 0)
+  assert.equal(u.view().state, 'idle')
+})
+
+test('no failure to say at first; the view has the field an older daemon lacks', () => {
+  assert.equal(updater().u.view().failure, null)
+})
+
+test('a failed update is said: the release, why, the next try; the phones hear it; the log alone has the path', async () => {
+  pkg = tarball('0.9.0')
+  let t = 7_000_000
+  let told = 0
+  const { u } = updater({ now: () => t, changed: () => told++, apply: async (j) => writeFileSync(j.result, JSON.stringify({ tag: j.tag, code: 4, at: 1 })) })
+  assert.equal((await u.consider(release('v0.9.0'))).kind, 'launched')
+  assert.equal(u.view().failure, null, 'not while it installs')
+  const before = told
+  assert.equal(u.settle(), 'failed')
+  assert.ok(told > before)
+  const f = u.view().failure!
+  assert.equal(f.tag, 'v0.9.0')
+  assert.match(f.why!, /the new daemon didn’t answer, so the old one is back; still 0\.5\.0/)
+  assert.ok(!f.why!.includes('update.log'), f.why!)
+  assert.equal(f.at, t)
+  assert.equal(f.next, t + 3600_000)
+})
+
+test('a failure before the install is said too, and after the last try says no next one', async () => {
+  pkg = tarball('0.9.0')
+  let t = 1_000_000
+  const { u } = updater({ now: () => t })
+  for (let i = 0; i < 4; i++) {
+    assert.equal((await u.consider(release('v0.9.0', 'a'.repeat(64)))).kind, 'mismatch')
+    assert.equal(u.view().failure?.tag, 'v0.9.0')
+    assert.equal(u.view().failure?.next, i < 3 ? t + [3600_000, 6 * 3600_000, 24 * 3600_000][i]! : null)
+    t += 25 * 3600_000
+  }
+})
+
+test('a failure stops being news: turned off, on again, or a server already past that release', async () => {
+  pkg = tarball('0.9.0')
+  let on = true
+  const { u } = updater({ enabled: () => on })
+  await u.consider(release('v0.9.0', 'a'.repeat(64)))
+  assert.ok(u.view().failure)
+  on = false
+  assert.equal(u.view().failure, null, 'off: there is nothing to tell')
+  on = true
+  assert.ok(u.view().failure)
+  // Installed by hand since: this daemon is that release, or later.
+  assert.equal(updater({ version: '0.9.0' }).u.view().failure, null)
+  assert.equal(updater({ version: '0.9.1' }).u.view().failure, null)
+  // An older daemon's file, from before the why: still said, without it.
+  writeFileSync(stateFile, JSON.stringify({ fails: { tag: 'v0.9.0', count: 1, next: 5 } }))
+  assert.deepEqual(updater().u.view().failure, { tag: 'v0.9.0', why: null, at: null, next: 5 })
 })
 
 test('an install that could not start, or that the unit says failed: the server stays, and tries later', async () => {

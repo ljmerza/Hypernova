@@ -560,6 +560,14 @@ test('{t:"update"} and POST /v1/mac/update: the server updating itself', async (
   await ok(post('/v1/mac/update', { autoUpdate: false }))
 })
 
+test('{t:"update"} with a failure: an update that failed, as the phones hear it', async () => {
+  const { serverUpdater } = await import('../src/server-update.ts')
+  const stateFile = join(scratch, 'server-update-failed.json')
+  writeFileSync(stateFile, JSON.stringify({ fails: { tag: 'v0.9.0', count: 1, next: T + 3600_000, why: 'the new daemon didn’t answer, so the old one is back; still 0.5.0', at: T } }))
+  const u = serverUpdater({ version: '0.5.0', stateFile, dir: join(scratch, 'updates-failed'), enabled: () => true, managed: () => ({ ok: true }), watchMs: 0 })
+  contract('ws-update-failed', { t: 'update', update: u.view() })
+})
+
 test('{t:"app"}: a newer app to hand out', () => {
   writeFileSync(join(apkDir, 'hypernova.json'), JSON.stringify({ versionCode: 4300, versionName: '0.43.0' }))
   announceApp()

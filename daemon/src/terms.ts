@@ -789,6 +789,19 @@ export async function watchHandedBack(sessionId: string): Promise<void> {
   }
 }
 
+/**
+ * A daemon restart hands back whatever its hooks were holding: the connection drops, Claude Code asks
+ * in its own dialog and nothing is denied (seen against Claude Code 2.1.316, docs/DECISIONS.md,
+ * "Servers update without waiting"). A session in a holder has its dialog read as ever; a `claude
+ * agents` job has no terminal to read it from, and no hook left to say so. So at start: a job
+ * Claude Code's registry says waits on the owner, with no ask held, gets its `claude attach`.
+ */
+export function attachWaitingJobs(): void {
+  for (const r of listSessionRecs()) {
+    if (r.state !== 'ended' && !view(r).pendingApprovalIds.length && registryWaiting(r.pid)) void watchHandedBack(r.id)
+  }
+}
+
 /** Holder [id]'s title as the program in it last set it ("" when none). */
 const termTitle = (id: string): string => (terms.get(id)?.state?.title ?? terms.get(id)?.meta.title ?? '').trim()
 

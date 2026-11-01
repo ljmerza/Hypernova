@@ -2635,11 +2635,8 @@ server updates itself and then pushes to the client that needs update too." Deci
    version checked against the tag. A failure at any step leaves the server as it was and waits
    before trying that release again: 1 hour, then 6, then 24, then not until the setting is turned
    off and on, or a newer release comes.
-4. **Never in the middle of work.** It waits for no session working or starting, no agent running
-   (also one waiting on its background command: z2 restarted under some on 2026-11-01; the owner, the
-   same day) and no approval waiting, 2 minutes on end; after 24 hours of waiting it goes ahead anyway
-   (the shared terminals outlive the restart; an approval still waiting then is lost the way any
-   restart loses one).
+4. **At once, whatever sessions are doing** (see Servers update without waiting; until 2026-11-01 it
+   waited for a quiet moment).
 5. **Installed the way `install-linux.sh --from` installs**, by the package's own script, in a
    transient systemd unit of its own (`systemd-run --user`, `hypernova-update`), not as a child of
    the daemon: the service's restart, which ends the daemon, can't cut the install off. Setup swaps
@@ -2654,7 +2651,8 @@ server updates itself and then pushes to the client that needs update too." Deci
    the marker or one without the service says "not available here" and why.
 7. **The phones learn of it**: the new daemon, at start, sees the update it was waiting for and
    logs it; the snapshot's `mac.update.last` says from and to what, and the phone's connection log
-   has a line when the server's version changed between two snapshots. No banner or toast.
+   has a line when the server's version changed between two snapshots. No banner or toast, except for
+   an update that failed (Servers update without waiting).
 
 ## MCP and tool runs fold like Claude Code (2026-11-01)
 
@@ -2861,7 +2859,59 @@ terminal still listed it (seen live on 2026-11-01).
    call gets, a wrong end corrects itself at its next hook, and too long a cap costs a wrong count
    and a held update. A Monitor running longer extends it to its end, a persistent one to 12 hours
    at most (the 12 is a judgement: the Monitors seen ran 30 minutes at most, none persistent).
-5. **The server's own update waits for these agents too** (Servers update themselves, point 4).
+5. **The server's own update waited for these agents too** until the same day: it no longer waits for
+   anything (Servers update without waiting).
 
 How it's detected and ended: docs/PROTOCOL.md, "Agents and workflows", **Waiting on its own background
 work**.
+
+## Servers update without waiting (2026-11-01)
+
+The owner: "the daemon can just update without having to wait, because it's not actually killing the
+sessions, they live in Claude Code; it would just be temporarily killing the back end server of this
+application, that's fine because it happens fairly quickly, so let's not wait on agents." Before, a
+busy session could hold a downloaded update for up to 24 hours (z2 held 0.13.1 for almost 3 hours on
+2026-10-31). This replaces "Never in the middle of work" (Servers update
+themselves, point 4), and with it the idea of a "ready, waiting" notification and an Update now
+button, which the owner dropped in the same breath.
+
+1. **No gate at all.** Once the package's checks pass (a managed install, newer only, the SHA-256,
+   the package's own version) it installs. Retries and the rollback are as they were. `state:
+   "waiting"` is gone from the wire; an app that doesn't know a state reads it as idle.
+2. **Nothing is lost for a waiting approval, so nothing waits for one.** Checked rather than assumed,
+   2026-11-01, with Claude Code 2.1.316 and a scratch test daemon (scratch `CLAUDE_CONFIG_DIR` and `HOME`, a
+   scripted model on loopback), SIGTERM while its hook held the ask:
+   - The ask was never denied and the call never ran: the model got no tool result, and the dialog was on
+     the terminal's screen throughout (Claude Code draws it while the hook is held).
+   - A session in a holder: 3 s after the restart the phone's snapshot has no approval, and
+     `menu.permission` with the command and the dialog's options. Answering through
+     `POST /v1/sessions/{id}/menu` ran the command. A question (AskUserQuestion) comes back the same way.
+   - A `claude agents` job (how the owner runs): the ask waits in its dialog too, but it has no terminal to
+     read, so **the phone would have shown no card**, and its state file reads "PermissionRequest hook
+     failed: socket hang up · approve Bash: …", which the daemon took for a question in words. Both
+     fixed: at start the daemon attaches a job Claude Code's registry says is waiting with no ask held
+     (`attachWaitingJobs`, 4 s and 20 s after start), the same way as an ask handed back after 10 minutes,
+     and reads what's after the hook's failure. Answered from the phone route, it ran.
+   - The phone's own approval notification goes with the approval, so the app says the session is waiting
+     once more (`askedAgain`), or `changed` does if it reconnected before the card was back.
+   - Codex 0.164.0 (a scratch app-server, no account): the turn stays `waitingOnApproval` with no client,
+     and `thread/resume` from a new connection gets the same `requestApproval` again; accepted, the turn
+     goes on.
+   - What is lost: an Always rule the phone's card would have offered with its editing sheet (the
+     dialog's own "don't ask again" is still there), and a tap on the old card in the moment the daemon is
+     down, which doesn't reach it (the app says so, and the dialog's card follows).
+3. **Sessions keep working through the restart.** Holders run outside the service's process
+   (`KillMode=process`). Hooks are Claude Code's own `http` hooks: one that can't connect fails at once
+   and isn't blocking. A turn of 8 two-second commands with the daemon stopped from the third on for 25 s: gaps
+   2.07 to 2.31 s between commands, against 2.07 to 2.10 s with it up. The turn finished with the daemon down;
+   the terminal shows the failures ("Stop hook error: connect ECONNREFUSED"), and the restarted daemon
+   read the whole turn from the transcript and had the session idle.
+4. **How long it's down.** Everything long (the copy kept for going back, `npm ci` when the lockfile
+   changed, the terminal module's check) is before the swap, with the old daemon serving. Then renames
+   and a restart. z2's two real ones on 2026-11-01: SIGTERM to listening again in 0.47 s (03:33:28.795 to
+   29.268) and 1.51 s (15:08:42.697 to 44.209). **The phone is slower than that**: its first try again goes at
+   once, likely into that gap, and the next 27 to 30 s later (Retry, owner, 2026-10-31). Left as it is.
+5. **A failed update is still news**, since nobody else would know: `failure` in the view, a banner on
+   screen or a notification off it, once per server for a release's first failure and once when the
+   server gives up on it, each opening that server's section of Settings. It goes when the update goes through
+   or the setting is turned off. With auto-update off the daemon looks for nothing, so there is no news either.

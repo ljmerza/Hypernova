@@ -66,6 +66,8 @@ class LiveHub(
     private val onNotice: (Notice) -> Unit = {},
     /** The account needs nothing from the owner any more: its notification can go. */
     private val onAccountFine: () -> Unit = {},
+    /** No update of this server's has failed (any more): its notification can go. */
+    private val onServerUpdateFine: () -> Unit = {},
     /**
      * True while the background service holds the link open. Off screen without it ("Stay
      * connected" is off, or the process was started for a widget), a failed attempt waits for the
@@ -726,7 +728,7 @@ class LiveHub(
             is Msg.BatteryMsg -> setBattery(m.b)
             is Msg.AwakeMsg -> macAwake = m.a
             is Msg.FilesMsg -> macBrowse = m.browseOutsideProjects
-            is Msg.UpdateMsg -> macUpdate = m.u
+            is Msg.UpdateMsg -> setServerUpdate(m.u)
             // A newer app now on the Mac, without reconnecting: the banner (App.kt) and Settings follow
             // [appUpdate]; in the background, the notification once per version.
             is Msg.AppMsg -> macInfo?.let { info ->
@@ -869,6 +871,37 @@ class LiveHub(
         onNotice(updateNotice(app, u))
     }
 
+    /**
+     * The server's own update as last heard. One that failed is news nobody else would bring (owner,
+     * 2026-11-01): a banner or a notification once per release, and once more when the server gives
+     * up on it; the row in Settings says it for as long as it holds.
+     */
+    private fun setServerUpdate(u: ServerUpdate?) {
+        macUpdate = u
+        val f = u?.failure
+        if (f == null) {
+            if (u?.state == ServerUpdate.IDLE) onServerUpdateFine()
+            return
+        }
+        if (serverUpdateFailNoticed(app, serverId, f)) notice(serverUpdateFailedNotice(res, macInfo?.name ?: pairing.macName, f))
+    }
+
+    /**
+     * Approvals a snapshot no longer has, their sessions still needing the owner: the daemon restarted
+     * and each ask went back to Claude Code's own dialog (docs/DECISIONS.md, "Servers update without
+     * waiting"). The approval's notification has just gone, and the dialog's card comes with no
+     * change of state to announce it, so it's said once more.
+     */
+    private fun askedAgain(was: Collection<WApproval>) {
+        for (id in was.filter { it.id !in approvals }.map { it.sessionId }.toSet()) {
+            val s = raw[id] ?: continue
+            if (s.state != "needs_you" || approvals.values.any { it.sessionId == id }) continue
+            val kind = Notice.Kind.Waiting
+            if (!noticed.add("$kind:$id:${s.lastActivityAt}")) continue
+            notice(Notice("$kind:$id:${s.lastActivityAt}", kind, id, session(id)?.name ?: s.title, s.question ?: s.menu?.title ?: res.getString(R.string.notice_waiting)))
+        }
+    }
+
     private fun applySnapshot(s: Snapshot) {
         // A server that updated itself (or was updated) since the last snapshot: a line in the connection log.
         ServerUpdate.versionChange(macInfo?.daemonVersion, s.mac.daemonVersion)?.let { ConnLog.add(ConnKind.Mac, ConnResult.Info, text = it) }
@@ -879,11 +912,11 @@ class LiveHub(
         setBattery(s.mac.battery)
         macAwake = s.mac.awake
         macBrowse = s.mac.browseOutsideProjects
-        macUpdate = s.mac.update
+        setServerUpdate(s.mac.update)
         raw = s.sessions.associateBy { it.id }
-        val before = approvals.keys
+        val before = approvals
         approvals = s.approvals.associateBy { it.id }
-        for (gone in before - approvals.keys) onApprovalGone(gone)
+        for (gone in before.keys - approvals.keys) onApprovalGone(gone)
         settled = true
         projects = sortProjects(s.projects)
         providers = sortProviders(s.providers)
@@ -900,6 +933,7 @@ class LiveHub(
         recomputeUsage()
         // Approvals created while we were away arrive here, not as {t:"approval"}.
         announce(s.approvals)
+        askedAgain(before.values)
         offerUpdate()
         // After the sessions, so a note found on reconnect can open its run's session.
         automations.applySnapshot(s.automations)
@@ -2056,7 +2090,7 @@ class LiveHub(
 
     override suspend fun setAutoUpdate(on: Boolean): Result<Unit> = try {
         val r = api.post("/v1/mac/update", JSONObject().put("autoUpdate", on))
-        macUpdate = ServerUpdate.parse(r.obj("update")) ?: macUpdate?.copy(auto = on)
+        setServerUpdate(ServerUpdate.parse(r.obj("update")) ?: macUpdate?.copy(auto = on))
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_auto_update)) }
 
