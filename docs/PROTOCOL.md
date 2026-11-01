@@ -480,7 +480,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/sessions/{id}/agents/{agentId}/events?limit=200&after=<cursor>` | → `{events: Event[], cursor: string, full: boolean}`: that agent's own transcript, read like a session's (its task is the first `user` event, kept first whatever the limit; its report is the last `assistant` one); read-only. `full: true`: the last `limit` events (1–1000), which replace what the client has. With `after` (the `cursor` of an earlier answer): `full: false` and only the events added or changed since then, in transcript order (one with an `id` the client has replaces it, a new one goes at the end; none when nothing changed). A cursor from another read (the file was rewritten, the daemon restarted, the cache dropped it), a malformed one, or more changes than `limit` gets `full: true`. An agent the session has as running, started less than 2 minutes ago, whose file Claude Code hasn't written yet answers `{events: [], cursor: "", full: true, starting: true}`: the phone shows "Starting…" and asks again every 1.5 s, keeping nothing of it. 400 `bad_agent` for an id that isn't an agent's (`a` and 16 hex digits), 404 `no_agent` when the session has no such agent file otherwise (its message names this computer: "isn't on the server" on Linux, "on the Mac" on a Mac). The phone sends its cursor while the agent runs, and fetches the transcript whole once more when it ends |
 | `GET /v1/sessions/{id}/usage` | → `{usage: SessionUsage}`: its model, how full its context window is, the tokens it used and what they cost, and the plan's windows (see Session usage, the to-do list and Rewind) |
 | `GET /v1/sessions/{id}/todos` | → `{todos: Todo[], updatedAt: number \| null}`: Claude's to-do list as its last TodoWrite or task tool calls left it; empty when it made none (see Session usage, the to-do list and Rewind) |
-| `POST /v1/sessions/{id}/rewind` | `{eventId}` → `{session: Session, text, files: Attachment[]}`: the conversation goes on in a new session from just before that `user` event; `text` and `files` are the message, for the prompt box. 404 `no_message`; 409 `first_message`, `not_found`, `no_transcript`, `fork_failed` (see Session usage, the to-do list and Rewind), `sdk_missing` (see Claude Code's SDK) |
+| `POST /v1/sessions/{id}/rewind` | `{eventId}` → `{session: Session, text, files: Attachment[], originalStays: string \| null}`: a copy from just before that `user` event replaces the session on every list; `text` and `files` are the message, for the prompt box; `originalStays`: null, or the words to show when the old one couldn't be stopped and stays (an older server has no such field, and always leaves it). 404 `no_message`; 409 `first_message`, `not_found`, `no_transcript`, `fork_failed` (see Session usage, the to-do list and Rewind), `sdk_missing` (see Claude Code's SDK) |
 | `POST /v1/sessions` | `NewSession` → `{session: Session}`. 400 `no_prompt`, `no_project`, `bad_project` (the folder doesn't exist), `bad_agent`, `bad_mode` (a Codex session's mode isn't `read-only` or `workspace-write`); 409 `mac_privacy` (macOS hasn't let the service open that folder, or is asking on the Mac right now: see Files), `unreadable`, `no_codex`, `codex_too_old`, `sdk_missing` (a Claude Code session the daemon would run itself, with no SDK here: see Claude Code's SDK); 503 `codex_unavailable` (see Codex) |
 | `GET /v1/codex` | → `{codex: Codex \| null}` (see Codex) |
 | `POST /v1/codex` | `{enabled: boolean}` → `{codex}`: Codex on or off for Hypernova, from the phone (see Codex). 409 `no_codex` |
@@ -574,8 +574,10 @@ objects with a `t` field:
 
 - `{t:"snapshot", snapshot: Snapshot}` right after connecting (and after resyncs).
 - `{t:"session", session: Session}` a session was added or changed.
-- `{t:"session.removed", id}`: a session deleted for good (a `claude agents` job deleted from the
-  Home card's menu, "Session menu"). A session that ends comes as `session` with `state: "ended"`.
+- `{t:"session.removed", id, replacedBy?: string}`: a session deleted for good (a `claude agents` job
+  deleted from the Home card's menu, "Session menu"), or, with `replacedBy`, one a rewind replaced
+  (see Rewind): what names the old id goes to that one. A session that ends comes as `session` with
+  `state: "ended"`.
 - `{t:"job.died", sessionId, job, reason: string | null, at}`: a `claude agents` job died (a crash,
   an error exit, its process gone mid-turn, an API error that ended it), once per death; `reason` is
   Claude Code's, masked, at most 120 characters; `at` epoch ms (see Session menu, "A job that died").
@@ -651,7 +653,7 @@ Snapshot = { mac: {id, name, daemonVersion, claudeVersion, projectsRoot,
                     platform?: "darwin" | "linux",             // the server's system; absent: an older daemon (a Mac)
                     unavailable?: {[feature]: string}},        // Mac-only features this server lacks, each with
                                                                // the sentence to show (see Mac-only features)
-             usage: Usage, sessions: Session[], approvals: Approval[],
+             usage: Usage, sessions: Session[], replaced?: {[oldId: string]: string}, approvals: Approval[],
              projects: Project[], providers: Provider[],
              account: Account,                                   // see Account
              automations?: Automations,                          // absent: a daemon without automations
@@ -2968,14 +2970,34 @@ Todo = { id, text, active: string | null,         // active: the "-ing" form ("R
 - **The to-do list** is the list the last successful TodoWrite wrote, or the tasks made with TaskCreate (its
   id read from its result, "Task #3 created successfully") and changed with TaskUpdate (`deleted` drops one).
   A list written empty is no list. The phone shows it only while a turn runs and something is left to do.
-- **Rewind** forks, for every kind of session alike: the Agent SDK's `forkSession` copies the transcript up
-  to the entry before the message (its `parentUuid`; a prompt the daemon logged itself under its own id is
-  found by its words, the same occurrence of the same text) into a new session titled "<title> (rewound)".
-  No claude process runs and nothing is typed into a terminal, so a session that's working or open on the
-  Mac is never touched, and the original stays as it was. The new session is the daemon's own (a shared
-  terminal resumes it with its first prompt where the Mac runs them, else the SDK). Files Claude changed
-  stay as they are; Claude Code's file checkpoints aren't copied. The first message has nothing before it:
-  409 `first_message`.
+- **Rewind** copies, for every kind of session alike, and the copy replaces the original (`rewind.ts`,
+  `rewound.ts`; docs/DECISIONS.md, "A rewind replaces the session"):
+  - The Agent SDK's `forkSession` copies the transcript up to the entry before the message (its
+    `parentUuid`; a prompt the daemon logged itself under its own id is found by its words, the same
+    occurrence of the same text) into a new session. No claude process runs for that and nothing is typed
+    into a terminal. It's the daemon's own (a shared terminal resumes it with its first prompt where the
+    Mac runs them, else the SDK), with the original's title exactly, folder, permission mode, model, effort,
+    provider, `createdAt`, automation, carried-over context, switch-of-agents link, "this session" rules and
+    `costUsd`; `lastActivityAt` is now. Files Claude changed stay as they are; Claude Code's file checkpoints
+    aren't copied. The first message has nothing before it: 409 `first_message`, with nothing touched.
+  - Then the original stops, the way Stop and Delete stop one: its holder first
+    (`endTermAndWait`), then `claude stop` for a `claude agents` job with a process, or the SDK's interrupt.
+    Its asks are resolved (`approval.resolved`), its agents end.
+  - It's off every list: `{t:"session.removed", id, replacedBy}`, no card, no History, no search, no restart's
+    discovery, nothing a late hook or `claude agents --all` says about it. `<support>/rewound.json` (0600),
+    `{oldId: {to, at, pid}}`, is what hides it; the snapshot's `replaced: {oldId: newId}` (each old id to the
+    session it is now) tells a phone that was away.
+  - **The old transcript stays on disk**, untouched, at `~/.claude/projects/<folder>/<oldId>.jsonl`, and the
+    daemon's log has a line naming both ids in full and that path ("rewound <old> to before <uuid> as <new>
+    its transcript stays at <path>"). To bring it back: drop its entry from `rewound.json` and restart the daemon
+    (it's in History), or `claude --resume <oldId>` in its folder: a claude started after the rewind makes it an
+    ordinary session again (`stoppedProcess` tells it from the one stopped). A session the daemon ran through the
+    SDK isn't read from the registry, so only the file brings that kind back.
+  - **The old id is followed**: `/v1/sessions/{oldId}…` is about the session it is now, except `DELETE`, which is
+    404 `no_session`; so is an automation's saved target, or a run's session (`automations/daemon.ts`).
+  - **A stop that fails** (the terminal didn't close, `claude stop` failed, an open terminal no holder has, or
+    20 s went by, under the phone's 30 s): the answer is still 200, `originalStays` says why, and the original
+    stays as it is, with nothing in `rewound.json`.
 
 ## Per-model weeks (the usage probe)
 

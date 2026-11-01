@@ -745,13 +745,15 @@ The build details go in the sections above as each piece lands; this records wha
     phone's own when the Mac can't), Select text (selection moved here), and for your own messages
     Rewind to here. (Save as quick prompt left too, 2026-11-01: the chips below left the chat in this
     fork, so it saved to a list nothing showed.)
-  - **Rewind branches, it never cuts in place.** The conversation up to just before the message is
-    copied into a new session, "<title> (rewound)", and the message (with its files) comes back
-    into the box. The original stays, and files Claude changed stay as they are; the confirm sheet
-    says so. No rewind on the first message, one not yet on the Mac, or Claude Code's own commands
-    and "!" lines. Not Claude Code's /rewind in the terminal: its picker lists messages by cut-off
-    text, so the daemon couldn't pick the right one, and it can restore code, which is destructive.
-    Rewinding the code too is LATER L46.
+  - **Rewind copies, and the copy replaces the original on every screen** (changed 2026-11-01, see
+    "A rewind replaces the session"; it used to leave both, the copy titled "<title> (rewound)"). The
+    conversation up to just before the message is copied into a new session with everything the
+    card shows, and the message (with its files) comes back into the box. The original is stopped
+    and shows nowhere; its transcript stays on disk, hidden. Files Claude changed stay as they are;
+    the confirm sheet says so. No rewind on the first message, one not yet on the Mac, or Claude
+    Code's own commands and "!" lines. Not Claude Code's /rewind in the terminal: its picker lists
+    messages by cut-off text, so the daemon couldn't pick the right one, and it can restore code,
+    which is destructive. Rewinding the code too is LATER L46.
   - **Quick prompts**: chips over the box (Continue, Run the tests, Explain the last change, Commit
     this, then your own; 12 at most), kept on the phone. A tap sends at once; a long-press edits
     (emptying one deletes it). They show only while the box is empty and Claude isn't at work,
@@ -2915,3 +2917,47 @@ button, which the owner dropped in the same breath.
    screen or a notification off it, once per server for a release's first failure and once when the
    server gives up on it, each opening that server's section of Settings. It goes when the update goes through
    or the setting is turned off. With auto-update off the daemon looks for nothing, so there is no news either.
+
+## A rewind replaces the session (owner, 2026-11-01)
+
+The owner rewound a session, saw two near-identical cards ("why do I see 2") and said it "shouldn't
+make another session like this". First answer: the copy takes over and the original goes to History.
+Then, the same day, on seeing that plan: "keep everything the same, like the new one completely
+replaced the old", and "don't need to change title". That's the decision:
+
+1. **The new one replaces the old on every screen.** One card, the same title exactly (a "(rewound)"
+   an older version added stays as it is, no worse), with the later messages gone and the message
+   back in the box. The phone lands in it.
+2. **It takes on what the session shows**: title, folder and project, permission mode, model, effort,
+   provider, created time, an automation's badge and rules, what a switch of agents carried over and
+   where it came from, what was allowed "for this session", the cost so far. On the phone: read marks,
+   the box's words and files, prompts waiting for the server, side questions. Last active: now, as a
+   session just used (a Completed card it had read stays read).
+3. **What can't carry over**: its running terminal or `claude agents` job (the copy gets a shared
+   terminal with its next prompt, and isn't a job), its context percentage (the context is shorter
+   now; it returns with the next reply), the "Agents" cards of agents it ran (their files are under
+   the old id), and a block by a limit (it comes back if the limit still holds).
+4. **The old one shows nowhere**: not Home, not History, not search, not after a restart. No note, no
+   marker.
+5. **Nothing is destroyed.** The old transcript stays on disk, untouched; `<support>/rewound.json`
+   is all that hides it (Delete's `claude rm` wasn't used: it deletes the job for good, and can refuse). The daemon
+   log names both ids and the transcript's path. By hand: drop its line from the file and restart
+   the daemon (it's back in History), or `claude --resume <id>` in its folder (back as a running session).
+   Still visible outside the app: Claude Code's own `/resume` list lists it beside the copy, and
+   `claude agents` keeps a stopped job. Statistics read the transcripts on disk, so they still count it.
+6. **Asks first if it's at work.** The confirm sheet says the session is still working (or waiting for
+   an answer) and that rewinding stops it; for every rewind, that the conversation goes back and later
+   messages are gone from the app, and that files Claude changed stay as they are.
+7. **If it can't be stopped** (the terminal didn't close, `claude stop` failed, a terminal no holder
+   has, 20 s passed): the rewind still stands, a toast says why, and the original stays on Home
+   beside the copy, under the same title. Nothing is deleted either way.
+8. **Whatever names the old id follows it.** `session.removed` carries `replacedBy`; a phone that was
+   away hears it in the snapshot's `replaced`. A screen on it lands on the new one; its notification
+   goes; a session route (a notification's Reply, a prompt kept offline) and an automation's saved
+   target reach the new session. Delete doesn't follow: nothing should delete by an old name. Held
+   prompts of the old session go with it: they came after the point it went back to.
+
+Older versions. An older app gets all of this from the server, and nothing breaks: the card goes
+(`session.removed`), a screen on it goes back, and its own sheet still says the session stays, which
+is no longer true, with no working warning. A newer app with an older server keeps two cards, and its
+toast says so. Why the copy comes first and files stay: as ever (LATER L46).
