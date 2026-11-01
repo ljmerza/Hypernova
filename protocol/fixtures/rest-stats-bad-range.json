@@ -1,6 +1,6 @@
 {
   "error": {
     "code": "bad_range",
-    "message": "Ask for today, week, month or all."
+    "message": "Ask for today, week, month, ytd or all."
   }
 }

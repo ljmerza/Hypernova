@@ -18,14 +18,15 @@ class StatsServer(val id: String, val name: String, val hub: Hub)
 /**
  * What All servers' Statistics shows: the servers that answered added up ([stats], null when none
  * did), each one's own answer ([each], in the order paired), and the names of those that didn't
- * ([missing]: not linked, or failed), whose numbers aren't in [stats]. [problem]: why the last of
- * them failed, for when none answered.
+ * ([missing]: not linked, or failed; [outdated]: too old to know this range), whose numbers aren't
+ * in [stats]. [problem]: why the last of them failed, for when none answered.
  */
 class AllStatsAnswer(
     val stats: Stats?,
     val each: List<Pair<StatsServer, Stats>>,
     val missing: List<String>,
     val problem: ApiException?,
+    val outdated: List<String> = emptyList(),
 )
 
 object AllStats {
@@ -93,15 +94,21 @@ object AllStats {
     }
 
     /**
-     * The range's busiest day from the summed days. For All, a server's own busiest day from before
-     * the last 30 days is a candidate too (the others' days that far back aren't sent: those on the
-     * same date are added up, so it's at least that much).
+     * The range's busiest day from the summed days. For All and YTD, a server's own busiest day from
+     * before the last 30 days is a candidate too (the others' days that far back aren't sent: those
+     * on the same date are added up, so it's at least that much). YTD's summed days stop at January 1,
+     * the earliest of the servers' (two servers a timezone apart can be in different years for hours).
      */
     private fun busiest(parts: List<Stats>, days: List<StatDay>, range: StatsRange): StatDay? {
-        val inRange = if (range == StatsRange.All) days else days.takeLast(range.days)
+        val yearStart = parts.mapNotNull { it.days.lastOrNull()?.day }.minOrNull()?.withDayOfYear(1)
+        val inRange = when (range) {
+            StatsRange.All -> days
+            StatsRange.Ytd -> days.filter { yearStart == null || it.day >= yearStart }
+            else -> days.takeLast(range.days)
+        }
         val recent = inRange.filter { it.claudeMs > 0L }.maxByOrNull { it.claudeMs }?.let { StatDay(it.day, it.claudeMs, 0L, it.tokens, 0, 0) }
         val first = days.firstOrNull()?.day
-        val older = if (range != StatsRange.All || first == null) emptyList() else parts.mapNotNull { it.busiestDay }
+        val older = if ((range != StatsRange.All && range != StatsRange.Ytd) || first == null) emptyList() else parts.mapNotNull { it.busiestDay }
             .filter { it.day < first }
             .groupBy { it.day }
             .map { (day, ds) -> StatDay(day, ds.sumOf { it.claudeMs }, 0L, ds.sumOf { it.tokens }, 0, 0) }
@@ -163,10 +170,14 @@ object AllStats {
 
     private fun answer(servers: List<StatsServer>, got: Map<String, Result<Stats>>): AllStatsAnswer {
         val each = servers.mapNotNull { sv -> got[sv.id]?.getOrNull()?.let { sv to it } }
-        val missing = servers.filter { sv -> got[sv.id]?.isSuccess != true }.map { it.name }
+        val refused = { sv: StatsServer -> (got[sv.id]?.exceptionOrNull() as? ApiException)?.refusedRange == true }
+        val outdated = servers.filter(refused).map { it.name }
+        val missing = servers.filter { sv -> got[sv.id]?.isSuccess != true && !refused(sv) }.map { it.name }
+        // None answered: a real failure says why, ahead of a server that only needs updating.
+        val failures = got.values.mapNotNull { it.exceptionOrNull() as? ApiException }
         val problem = if (each.isNotEmpty()) null
-        else got.values.lastOrNull { it.isFailure }?.exceptionOrNull() as? ApiException ?: ApiException(Problem.Unreachable)
-        return AllStatsAnswer(combine(each.map { it.second }), each, missing, problem)
+        else failures.lastOrNull { !it.refusedRange } ?: failures.lastOrNull() ?: ApiException(Problem.Unreachable)
+        return AllStatsAnswer(combine(each.map { it.second }), each, missing, problem, outdated)
     }
 
     /** The last answers for [range], shown at once while fresh ones come: only when every linked server has one. */

@@ -12,10 +12,16 @@ import java.time.LocalDate
  * the sun) draws it.
  */
 
-/** The ranges the Statistics screen offers; [wire] is what `GET /v1/stats?range=` takes. */
+/**
+ * The ranges the Statistics screen offers; [wire] is what `GET /v1/stats?range=` takes, and [days]
+ * how many of the chart's last 30 days it can light (YTD fewer in January: [litDays]).
+ */
 enum class StatsRange(val wire: String, val days: Int) {
-    Today("today", 1), Week("week", 7), Month("month", 30), All("all", 30),
+    Today("today", 1), Week("week", 7), Month("month", 30), Ytd("ytd", 30), All("all", 30),
 }
+
+/** A server too old to know the range asked for (`400 bad_range`): it needs updating, nothing has failed. */
+val ApiException.refusedRange: Boolean get() = status == 400 && code == "bad_range"
 
 @Immutable
 data class StatTokens(val input: Long, val output: Long, val cacheRead: Long, val cacheWrite: Long) {
@@ -216,13 +222,20 @@ object StatsSource {
         cache[key(hub, range)] = Entry(stats, System.currentTimeMillis())
     }
 
+    /** A screen test's refusal: asking [hub] (which has no Mac to ask) for [range] fails with [e]. */
+    @androidx.annotation.VisibleForTesting
+    internal fun refuse(hub: Hub, range: StatsRange, e: ApiException) {
+        refusals[key(hub, range)] = e
+    }
+    private val refusals = HashMap<String, ApiException>()
+
     /** Ask the Mac. A failure is an [ApiException] to explain. */
     suspend fun load(hub: Hub, range: StatsRange): Result<Stats> {
         val k = key(hub, range)
         return try {
             val s = when {
                 hub is LiveHub -> StatsWire.parse(Api(hub.pairing.baseUrl, hub.pairing.token).get("/v1/stats?range=${range.wire}"))
-                else -> throw ApiException(Problem.Server, 0, "no_stats")
+                else -> throw refusals[k] ?: ApiException(Problem.Server, 0, "no_stats")
             }
             cache[k] = Entry(s, System.currentTimeMillis())
             Result.success(s)

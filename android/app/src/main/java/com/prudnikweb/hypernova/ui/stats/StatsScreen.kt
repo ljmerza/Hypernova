@@ -85,6 +85,7 @@ import com.prudnikweb.hypernova.data.StatsSource
 import com.prudnikweb.hypernova.data.bothAgents
 import com.prudnikweb.hypernova.data.codexLeads
 import com.prudnikweb.hypernova.data.problemText
+import com.prudnikweb.hypernova.data.refusedRange
 import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
@@ -126,7 +127,7 @@ private const val STATS_SOURCE = "stats"
 
 /**
  * Statistics, opened by tapping the sun: how much the agents worked on the Mac, in the range picked
- * (Today, Week, Month, All). The hours and the work behind them, the last 30 days as a bar a day,
+ * (Today, Week, Month, YTD, All). The hours and the work behind them, the last 30 days as a bar a day,
  * the projects as planets, and a few records. The Mac adds it up from Claude Code's
  * transcripts and the Codex turns it followed; this asks for it when the screen opens or the range
  * changes (showing the last answer at once), then every minute while open. Back (the arrow or the
@@ -135,7 +136,8 @@ private const val STATS_SOURCE = "stats"
  *
  * With [servers] (Home shows "All servers", two or more paired) it is every server's statistics
  * added up ([AllStats]): each linked one asked for the same range, the header saying "All servers",
- * and a line naming the servers whose numbers aren't in them.
+ * and lines naming the servers whose numbers aren't in them. A server too old to know the range (it
+ * answers `bad_range`) needs updating, which is said as that, not as an error.
  */
 @Composable
 fun StatsScreen(
@@ -158,6 +160,8 @@ fun StatsScreen(
     // All servers: each server's own answer (the ones that answered), and the names of those that didn't.
     var each by remember(hub, combined) { mutableStateOf(all?.let { AllStats.cached(it, range)?.each }.orEmpty()) }
     var missing by remember(hub, combined) { mutableStateOf(all?.let { AllStats.cached(it, range)?.missing }.orEmpty()) }
+    // All servers: the names of those too old to know this range.
+    var outdated by remember(hub, combined) { mutableStateOf(emptyList<String>()) }
     var retry by remember { mutableIntStateOf(0) }
     // The day the last 30 days' readout shows (epoch day); none picked: today.
     var picked by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -167,6 +171,7 @@ fun StatsScreen(
     if (all != null) LaunchedEffect(all.map { it.id }, linkedIds, range, retry) {
         fun take(a: AllStatsAnswer) {
             // Those that answered, added up; none: the last numbers stay (or the error card) and the problem says why.
+            outdated = a.outdated
             if (a.stats != null) {
                 stats = a.stats; each = a.each; missing = a.missing; problem = null
             } else {
@@ -178,6 +183,7 @@ fun StatsScreen(
         if (lastRange[0] != range) {
             lastRange[0] = range
             problem = null
+            outdated = emptyList()
         }
         var asked = retry
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -254,6 +260,7 @@ fun StatsScreen(
                     StatsRange.Today to stringResource(R.string.stats_range_today),
                     StatsRange.Week to stringResource(R.string.stats_range_week),
                     StatsRange.Month to stringResource(R.string.stats_range_month),
+                    StatsRange.Ytd to stringResource(R.string.stats_range_ytd),
                     StatsRange.All to stringResource(R.string.stats_range_all),
                 ),
                 range, { range = it },
@@ -269,7 +276,20 @@ fun StatsScreen(
             when {
                 // No answer for this range and the Mac can't give one: say so, rather than leave
                 // another range's numbers under this one's name.
-                s == null && problem != null -> item(key = "error") { ErrorCard(problem, onRetry = { retry++ }) }
+                // Every server asked is too old for this range: nothing failed, it only needs updating.
+                // It's asked again each minute, so the numbers come on their own once it's updated.
+                s == null && problem?.refusedRange == true -> {
+                    if (missing.isNotEmpty()) item(key = "missing") { MissingLine(missing) }
+                    item(key = "needs-update") {
+                        GlassCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+                            NeedsUpdateLine(outdated.ifEmpty { listOf(hub.mac.name) }, HN.inkMuted, Modifier.padding(16.dp))
+                        }
+                    }
+                }
+                s == null && problem != null -> {
+                    if (outdated.isNotEmpty()) item(key = "outdated") { NeedsUpdateLine(outdated, HN.amber, Modifier.padding(horizontal = 20.dp)) }
+                    item(key = "error") { ErrorCard(problem, onRetry = { retry++ }) }
+                }
                 s == null -> item(key = "loading") {
                     GlassCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                         val reading = when {
@@ -286,14 +306,16 @@ fun StatsScreen(
                         val at = remember(s.to) { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH).format(java.time.Instant.ofEpochMilli(s.to).atZone(java.time.ZoneId.systemDefault())) }
                         HText(stringResource(R.string.stats_stale, at), style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 20.dp))
                     }
-                    // All servers: the ones that didn't answer, whose numbers aren't in these.
-                    if (combined && problem == null && missing.isNotEmpty()) item(key = "missing") {
-                        HText(
-                            pluralStringResource(R.plurals.stats_all_missing, missing.size, missing.joinToString(", ")),
-                            style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 20.dp),
-                        )
+                    // In the hero's item, so a line arriving with the answer pushes it down: an item of
+                    // its own would come in above the list's anchor, out of sight under the top bar.
+                    item(key = "hero") {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            // All servers: the ones that didn't answer, whose numbers aren't in these.
+                            if (combined && problem == null && missing.isNotEmpty()) MissingLine(missing)
+                            if (combined && outdated.isNotEmpty()) NeedsUpdateLine(outdated, HN.amber, Modifier.padding(horizontal = 20.dp))
+                            Hero(s, agents, Modifier.padding(horizontal = 16.dp))
+                        }
                     }
-                    item(key = "hero") { Hero(s, agents, Modifier.padding(horizontal = 16.dp)) }
                     item(key = "days") {
                         val today = s.days.lastOrNull()?.day
                         val day = picked?.let { p -> s.days.firstOrNull { it.day.toEpochDay() == p } } ?: s.days.lastOrNull()
@@ -322,6 +344,21 @@ fun StatsScreen(
             }
         }
     }
+}
+
+/** All servers: the ones that didn't answer, whose numbers aren't in these. */
+@Composable
+private fun MissingLine(names: List<String>) {
+    HText(
+        pluralStringResource(R.plurals.stats_all_missing, names.size, names.joinToString(", ")),
+        style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 20.dp),
+    )
+}
+
+/** The servers too old to know this range, named: "k1 needs updating for this range." */
+@Composable
+private fun NeedsUpdateLine(names: List<String>, colour: Color, modifier: Modifier = Modifier) {
+    HText(pluralStringResource(R.plurals.stats_needs_update, names.size, names.joinToString(", ")), style = Type.small, color = colour, modifier = modifier)
 }
 
 @Composable
@@ -497,7 +534,7 @@ private fun DaysSection(s: Stats, selected: LocalDate?, onSelect: (LocalDate) ->
             Column(Modifier.padding(horizontal = 16.dp).padding(top = 14.dp, bottom = 12.dp)) {
                 DayBarsChart(
                     days = s.days,
-                    lit = if (s.range == StatsRange.All) 30 else s.range.days,
+                    lit = litDays(s.range, s.days.lastOrNull()?.day),
                     selected = day?.day,
                     onSelect = onSelect,
                     description = listOf(summary, picked).filter { it.isNotEmpty() }.joinToString(" "),

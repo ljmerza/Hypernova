@@ -9,6 +9,7 @@ import com.prudnikweb.hypernova.data.ProviderModels
 import com.prudnikweb.hypernova.data.ProviderRefused
 import com.prudnikweb.hypernova.data.StatsRange
 import com.prudnikweb.hypernova.data.StatsSource
+import com.prudnikweb.hypernova.data.refusedRange
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
@@ -244,7 +245,8 @@ class SettingsCallsTest {
         answer("GET", "/v1/stats", "rest-stats-bad-range", status = 400)
         val e = rig.call { StatsSource.load(rig.hub, StatsRange.Today) }.exceptionOrNull() as ApiException
         assertEquals("bad_range", e.code)
-        assertEquals("Ask for today, week, month or all.", e.serverMessage)
+        assertEquals("Ask for today, week, month, ytd or all.", e.serverMessage)
+        assertTrue(e.refusedRange)
         assertNull(StatsSource.cached(rig.hub, StatsRange.Today))
     }
 }

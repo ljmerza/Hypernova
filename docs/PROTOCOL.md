@@ -538,7 +538,7 @@ reaches the computer on its own network, or over the owner's own VPN into that n
 | `GET /v1/mac/update` | → `{update: ServerUpdate}` (see The server's own update) |
 | `POST /v1/mac/update` | `{autoUpdate: boolean}` → `{update}`: Update this server automatically on or off, saved at once; on, the releases are looked at now. Goes out as `{t:"update"}`. 400 `bad_value` |
 | `POST /v1/mac/awake` | `{mode?: "working" \| "backpack" \| "off", minBattery?: 5–50}` or `{extend: true}` (Backpack's "+2 h", in its last 10 minutes; 409 `too_early`, `not_backpack`) → `{awake: Awake}`. Backpack starts its 8 hours again each time it's chosen. 400 `bad_mode`, `bad_battery`; 409 `needs_setup` (Backpack's one-time setup isn't done), `no_battery` (a desktop Mac). See Stay awake |
-| `GET /v1/stats?range=today\|week\|month\|all` | → `Stats`: how long Claude worked, tokens, sessions, prompts, tools, files, agents, records, projects and the last 30 days (see Statistics) |
+| `GET /v1/stats?range=today\|week\|month\|ytd\|all` | → `Stats`: how long Claude worked, tokens, sessions, prompts, tools, files, agents, records, projects and the last 30 days (see Statistics) |
 | `POST /v1/account/check` | `{}` → `{account: Account}`: asks `claude auth status` now (at most once in 10 s; sooner, the last answer). See Account |
 | `POST /v1/account/login` | `{where: "phone" \| "mac"}` → `{account}`: signs Claude Code in again in a login holder; `account.login` follows it. 409 `not_needed` when the account is ok, 400 `bad_where`; while one runs, the same one. See Account |
 | `POST /v1/account/login/code` | `{code}` → `{ok}`: the sign-in page's code (`<code>#<state>`), typed into the running sign-in. 409 `no_login`, `not_ready` (the code prompt didn't show within 8 s, or a code is already on its way or being checked); 400 `bad_code` (not a whole code, or one from another sign-in's page) |
@@ -3516,11 +3516,12 @@ Codex's is counted by the daemon as each turn it follows ends (`daemon/src/codex
 day Codex was turned on for Hypernova. A few numbers only the daemon sees, and it counts those from
 the moment it first runs. Every total covers both agents; `byAgent` splits them.
 
-`GET /v1/stats?range=today|week|month|all` (no `range`: `week`; anything else: 400 `bad_range`) →
+`GET /v1/stats?range=today|week|month|ytd|all` (no `range`: `week`; anything else: 400 `bad_range`) →
 
 ```ts
 Stats = {
-  range, from: number, to: number,   // epoch ms: the range's first midnight (all: `since`), and now
+  range, from: number, to: number,   // epoch ms: the range's first midnight (ytd: January 1 of the server's own
+                                     // year; all: `since`), and now
   computedAt: number,                // when the transcripts were last looked at
   since: number | null,              // the first day with any work, kept days included
   countingSince: number,             // when this daemon started counting promptsFrom and approvals

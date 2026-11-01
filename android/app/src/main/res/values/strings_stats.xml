@@ -12,8 +12,9 @@
     <string name="stats_range_today">Today</string>
     <string name="stats_range_week">Week</string>
     <string name="stats_range_month">Month</string>
+    <string name="stats_range_ytd">YTD</string>
     <string name="stats_range_all">All</string>
-    <!-- Under the title: the days the range covers ("9 – 15 Oct", "since 13 Oct"). -->
+    <!-- Under the title: the days the range covers ("9 – 15 Oct", "since 1 Jan", "since 13 Oct 2026"). -->
     <string name="stats_span">%1$s – %2$s</string>
     <string name="stats_since">since %1$s</string>
 

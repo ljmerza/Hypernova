@@ -114,6 +114,21 @@ class AllStatsTest {
         assertEquals(12L, c.busiestDay?.tokens)
     }
 
+    @Test fun ytdKeepsABusierDayFromBeforeTheLast30ButNotOneFromLastYear() {
+        val inJanuary = LocalDate.of(2027, 1, 10)
+        // January 10: of the chart's 30 days only the last 10 are this year's; the busiest of the 30 is last year's.
+        val a = stats(range = StatsRange.Ytd, days = days(inJanuary) { i -> when (i) { 5 -> 20 * h; 25 -> h; else -> 0L } })
+        val b = stats(range = StatsRange.Ytd, days = days(inJanuary) { i -> if (i == 25) 2 * h else 0L })
+        val c = AllStats.combine(listOf(a, b))!!
+        assertEquals(inJanuary.minusDays(4), c.busiestDay?.day)
+        assertEquals(3 * h, c.busiestDay?.claudeMs)
+        // In October a server's own busiest day from before the last 30 still counts.
+        val march = LocalDate.of(2026, 3, 1)
+        val d = stats(range = StatsRange.Ytd, days = days { i -> if (i == 29) h else 0L }, busiest = StatDay(march, 12 * h, 0, 7, 0, 0))
+        val e = stats(range = StatsRange.Ytd, days = days { i -> if (i == 29) h else 0L }, busiest = StatDay(march, 3 * h, 0, 5, 0, 0))
+        assertEquals(march, AllStats.combine(listOf(d, e))!!.busiestDay?.day)
+    }
+
     @Test fun serversADayApartKeepThirtyDays() {
         val a = stats(days = days { i -> if (i == 29) h else 0L })
         val b = stats(days = days(today.plusDays(1)) { i -> if (i == 29) 2 * h else 0L })

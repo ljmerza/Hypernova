@@ -2916,3 +2916,19 @@ button, which the owner dropped in the same breath.
    screen or a notification off it, once per server for a release's first failure and once when the
    server gives up on it, each opening that server's section of Settings. It goes when the update goes through
    or the setting is turned off. With auto-update off the daemon looks for nothing, so there is no news either.
+
+## YTD in Statistics, and when All starts (2026-11-01)
+
+The owner: "also do ytd filter", then "also have All tell me when does it start."
+
+1. **Today, Week, Month, YTD, All.** YTD runs from January 1 of the server's own year, by its own
+   calendar as the others go (`range=ytd`), through now. The header says "since 1 Jan".
+2. **The chart stays the last 30 days**, as under All; a year's view wasn't worth a second chart. In
+   January YTD dims the days of last year, as Week dims those before its seven.
+3. **All names the year it starts**: "since 24 Sep 2026", "All servers · since 24 Sep 2026", the
+   earliest of the servers that answered.
+4. **A server too old for a range says so, not an error.** It answers `400 bad_range`: in All servers
+   an amber line, "k1 needs updating for this range.", over the others added up (apart from "isn't
+   answering": it is answering, and updating is what fixes it); with no other answer, or on one
+   server, the same line in a card, with no Try again. The screen asks again each minute anyway, so
+   the numbers come by themselves once it's updated. A real failure elsewhere still gets its error.

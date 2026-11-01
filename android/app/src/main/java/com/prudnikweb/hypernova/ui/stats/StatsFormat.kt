@@ -19,10 +19,12 @@ import kotlin.math.abs
 // English only for now (DECISIONS: "English only for now"), so dates use English names.
 private val DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
 private val DATE = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+private val DATE_YEAR = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 private val DATE_ONLY_DAY = DateTimeFormatter.ofPattern("d", Locale.ENGLISH)
 
 internal fun dayName(d: LocalDate): String = DAY.format(d)
 internal fun dateName(d: LocalDate): String = DATE.format(d)
+internal fun dateWithYear(d: LocalDate): String = DATE_YEAR.format(d)
 internal fun localDate(ms: Long): LocalDate = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDate()
 
 /** Claude's working time: "34h 26m", "152h" past 100 hours, "26m" under one. */
@@ -80,13 +82,19 @@ internal fun grouped(n: Long): String = String.format(Locale.ENGLISH, "%,d", n)
 /**
  * What the range covers, under the screen's title: "Wed 15 Oct", "9 – 15 Oct", "since 13 Oct".
  * [today] is the Mac's (the last of an answer's days), since the days are the Mac's calendar, not
- * the phone's; [since] is its first day with work, the same in every answer.
+ * the phone's; [since] is its first day with work, the same in every answer. All names its year
+ * (it answers "since when?"), YTD's is plain from the word.
  */
 internal fun rangeSpan(res: Resources, range: StatsRange, today: LocalDate, since: Long?): String {
     val a = today.minusDays(range.days - 1L)
     return when (range) {
         StatsRange.Today -> dayName(today)
-        StatsRange.All -> res.getString(R.string.stats_since, dateName(since?.let(::localDate) ?: today))
+        StatsRange.Ytd -> res.getString(R.string.stats_since, dateName(today.withDayOfYear(1)))
+        StatsRange.All -> res.getString(R.string.stats_since, dateWithYear(since?.let(::localDate) ?: today))
         else -> res.getString(R.string.stats_span, if (a.month == today.month) DATE_ONLY_DAY.format(a) else dateName(a), dateName(today))
     }
 }
+
+/** How many of the chart's last days [range] covers, [today] being the Mac's: YTD only those of this year. */
+internal fun litDays(range: StatsRange, today: LocalDate?): Int =
+    if (range == StatsRange.Ytd && today != null) minOf(range.days, today.dayOfYear) else range.days

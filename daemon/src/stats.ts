@@ -17,8 +17,8 @@ import { classifyUserText, maskSecrets, promptTitle } from './normalize.ts'
 import { settings } from './store.ts'
 import { codexDays, type CodexDay } from './codex/stats.ts'
 
-export type StatsRange = 'today' | 'week' | 'month' | 'all'
-export const STATS_RANGES: readonly StatsRange[] = ['today', 'week', 'month', 'all']
+export type StatsRange = 'today' | 'week' | 'month' | 'ytd' | 'all'
+export const STATS_RANGES: readonly StatsRange[] = ['today', 'week', 'month', 'ytd', 'all']
 
 type Tokens = { input: number; output: number; cacheRead: number; cacheWrite: number }
 type SessionRecord = { id: string; title: string; project: string; claudeMs: number; startedAt: number }
@@ -853,6 +853,8 @@ function rangeStart(range: StatsRange, now: number, since: number | null): numbe
   if (range === 'today') return startOfDay(now)
   if (range === 'week') return daysBefore(now, 6)
   if (range === 'month') return daysBefore(now, 29)
+  // Built from the date, as the others are: January's midnight whatever the clocks do by now.
+  if (range === 'ytd') return new Date(new Date(now).getFullYear(), 0, 1).getTime()
   return since ?? startOfDay(now)
 }
 
