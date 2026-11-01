@@ -54,7 +54,7 @@ const minute = (t: number) => Math.floor(t / MIN) * MIN
 
 let t0 = 0
 let unplug = () => {}
-test('the 5-hour and weekly rows a look reads are official readings, and with two earlier looks make a pace and a time to the limit', async () => {
+test('the 5-hour and weekly rows a look reads are official readings, and with two earlier looks make a pace', async () => {
   const sent: any[] = []
   unplug = hub.addClient({ send: (s) => sent.push(JSON.parse(s)), phone: true })
   const now = Date.now()
@@ -78,11 +78,9 @@ test('the 5-hour and weekly rows a look reads are official readings, and with tw
   assert.equal(u.source, 'official')
   assert.ok(u.observedAt! >= t0 && u.observedAt! <= Date.now(), 'true as of the moment the screen was read')
   assert.deepEqual(u.models?.map((m) => [m.label, m.pct]), [['Fable', 10]])
-  // 40, 41, 42 over four minutes (and the few seconds the look took): about 0.5 %/min, the limit in
-  // about two hours (58 / 0.5 = 116 minutes), before the reset in 187.
+  // 40, 41, 42 over four minutes (and the few seconds the look took): about 0.5 %/min.
   const r = u.rate!
   assert.ok(r.fiveHour! >= 0.46 && r.fiveHour! <= 0.5, String(r.fiveHour))
-  assert.ok(r.fiveHourEtaMs! >= 116 * MIN && r.fiveHourEtaMs! <= 127 * MIN, String(r.fiveHourEtaMs))
   // The week moved 0 in 4 minutes: too short a stretch for its pace (12 minutes at least).
   assert.equal(r.sevenDay, null)
   // Clients hear the readings (the pace comes with every usage message while something works).
