@@ -2932,3 +2932,30 @@ The owner: "also do ytd filter", then "also have All tell me when does it start.
    answering": it is answering, and updating is what fixes it); with no other answer, or on one
    server, the same line in a card, with no Try again. The screen asks again each minute anyway, so
    the numbers come by themselves once it's updated. A real failure elsewhere still gets its error.
+
+## All and YTD reach back to the first use (2026-11-01)
+
+The owner, on All's start date, chose to backfill from Claude Code's own summary. All started on 24 Sep
+because Claude Code deletes transcripts after 30 days by default, and the daemon's first look kept only
+the days still there. His first use was 8 January.
+
+1. **`stats-cache.json` fills in the days before Hypernova's first** (`daemon/src/stats-cache.ts`,
+   `docs/PROTOCOL.md`, "Older days"): sessions, tool calls, and tokens from 12 July where it has them.
+   Read only. Without the file, All means as far back as Hypernova has counted.
+2. **A day has one source.** Hypernova's first counted day and all after it are Hypernova's, even where
+   it saw only part of the day (24, 25 and 28 Sep on z2, short 45 sessions and 3,624 tool calls of the
+   file's). Picking the higher number per field would make every day past it the file's on some counts
+   and Hypernova's on others.
+3. **Messages aren't prompts.** The file's `messageCount` is 33 times the prompts on overlapping days,
+   so the Prompts number starts with the hours.
+4. **The header says the first use, and one line what starts later**: "since 8 Jan 2026", then "Hours,
+   prompts and projects since 24 Sep 2026; tokens since 12 Jul 2026." Only where older days are in the
+   answer: All and YTD; Today, Week and Month only for a day the file alone knows. In All servers each
+   date is the earliest any server has that number from; a server without older days has its own start.
+5. **Records stay in hours.** Busiest day, longest session, streak and days with work come from
+   Hypernova's days only, since a day with no hours can't claim them, and the chart makes up no bars: a
+   day only the file knows reads "no hours counted".
+6. **Known limit:** the file's tokens run higher than Hypernova's for the same days (2.2 times on z2,
+   29 Sep to 16 Oct, while sessions and tool calls agree within 3%). Hypernova counts a message once
+   however many lines log it; why the file's run higher isn't known here. They're added as they are, so
+   a token total reaching back past Hypernova's first day reads high by about that much on the older part.

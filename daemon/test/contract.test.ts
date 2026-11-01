@@ -748,30 +748,47 @@ test('GET /v1/stats: a week of the transcripts above', async () => {
   const h = new Date().getUTCHours()
   process.env.TZ = h >= 1 && h <= 22 ? 'UTC' : 'Etc/GMT-12'
   try {
-    const s = await ok(get('/v1/stats?range=week'))
-    // The days as dates counted back from the normalised day (2027-01-15), so a fixture keeps its shape whatever today is.
-    const today = s.days.at(-1).day as string
-    const back = (d: string) => Math.round((Date.parse(today) - Date.parse(d)) / 86_400_000)
-    const date = (d: string) => new Date(Date.UTC(2027, 0, 15 - back(d))).toISOString().slice(0, 10)
-    for (const d of s.days) d.day = date(d.day)
-    if (s.busiestDay) s.busiestDay.day = date(s.busiestDay.day)
-    for (const k of ['from', 'to', 'computedAt', 'countingSince']) if (typeof s[k] === 'number') s[k] = T
-    // How long Claude worked runs up to now (a turn still open): any time worked is ten minutes here.
-    const minutes = (x: any): void => {
-      if (Array.isArray(x)) return x.forEach(minutes)
-      if (!x || typeof x !== 'object') return
-      for (const [k, v] of Object.entries(x)) {
-        if ((k === 'ms' || k.endsWith('Ms')) && typeof v === 'number' && v > 0) x[k] = 600_000
-        else minutes(v)
+    const stable = (s: any): any => {
+      // The days as dates counted back from the normalised day (2027-01-15), so a fixture keeps its shape whatever today is.
+      const today = s.days.at(-1).day as string
+      const back = (d: string) => Math.round((Date.parse(today) - Date.parse(d)) / 86_400_000)
+      const date = (d: string) => new Date(Date.UTC(2027, 0, 15 - back(d))).toISOString().slice(0, 10)
+      for (const d of s.days) d.day = date(d.day)
+      if (s.busiestDay) s.busiestDay.day = date(s.busiestDay.day)
+      for (const k of ['from', 'to', 'computedAt', 'countingSince']) if (typeof s[k] === 'number') s[k] = T
+      // How long Claude worked runs up to now (a turn still open): any time worked is ten minutes here.
+      const minutes = (x: any): void => {
+        if (Array.isArray(x)) return x.forEach(minutes)
+        if (!x || typeof x !== 'object') return
+        for (const [k, v] of Object.entries(x)) {
+          if ((k === 'ms' || k.endsWith('Ms')) && typeof v === 'number' && v > 0) x[k] = 600_000
+          else minutes(v)
+        }
       }
+      minutes(s)
+      // Tools with the same count come in the order the files were read: by name here.
+      s.tools.sort((a: any, b: any) => b.count - a.count || a.name.localeCompare(b.name))
+      return s
     }
-    minutes(s)
-    // Tools with the same count come in the order the files were read: by name here.
-    s.tools.sort((a: any, b: any) => b.count - a.count || a.name.localeCompare(b.name))
-    contract('rest-stats', s)
+    contract('rest-stats', stable(await ok(get('/v1/stats?range=week'))))
     const bad = await get('/v1/stats?range=year')
     assert.equal(bad.status, 400)
     contract('rest-stats-bad-range', bad.json)
+    // Older days from Claude Code's own summary: a scratch file, long before the transcripts above.
+    const cache = join(process.env.CLAUDE_CONFIG_DIR!, 'stats-cache.json')
+    writeFileSync(cache, JSON.stringify({
+      version: 5, dailyModelTokensVersion: 5,
+      dailyActivity: [{ date: '2020-03-01', sessionCount: 3, toolCallCount: 5, messageCount: 40 }],
+      dailyModelTokens: [{ date: '2020-03-01', tokensByModel: { 'a-model': 7 } }],
+    }))
+    try {
+      const all = stable(await ok(get('/v1/stats?range=all')))
+      assert.deepEqual([all.backfill.sessions, all.backfill.toolCalls, all.backfill.tokens], [3, 5, 7])
+      for (const k of ['since', 'hoursSince', 'tokensSince']) all.backfill[k] = T
+      contract('rest-stats-backfill', all)
+    } finally {
+      rmSync(cache)
+    }
   } finally {
     if (tz === undefined) delete process.env.TZ
     else process.env.TZ = tz

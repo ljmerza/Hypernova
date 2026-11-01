@@ -408,6 +408,81 @@ class StatsScreenTest {
         assertEquals("no_stats", got.problem?.code)
     }
 
+    // ─── Older days, from Claude Code's own summary ────────────────────────
+
+    private fun day(y: Int, m: Int, d: Int) = LocalDate.of(y, m, d).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+    /** Week's fixed numbers, as All's or YTD's, with older days behind them: first use 8 Jan, tokens from 12 Jul, hours from 24 Sep. */
+    private fun withOlderDays(range: StatsRange, scale: Int = 1) = stats(range, scale).copy(
+        since = day(2026, 1, 8), hoursSince = day(2026, 9, 24), tokensSince = day(2026, 7, 12),
+        from = if (range == StatsRange.Ytd) day(2026, 1, 1) else day(2026, 9, 24),
+    )
+
+    private val laterLine get() = str(R.string.stats_later_tokens_earlier, "24 Sep 2026", "12 Jul 2026")
+
+    private fun pick(hub: FakeHub, range: StatsRange, label: Int, answer: Stats, servers: List<StatsServer>? = null) {
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        StatsSource.put(hub, range, answer)
+        screen(hub, servers)
+        rule.onNode(hasText(str(label))).performClick()
+        rule.waitForIdle()
+    }
+
+    @Test fun allWithOlderDaysStartsAtFirstUseAndSaysWhatStartsLater() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All))
+        rule.onNodeWithText(str(R.string.stats_since, "8 Jan 2026"), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(laterLine, useUnmergedTree = true).assertExists()
+        rule.snap("stats_all_older_days")
+    }
+
+    @Test fun ytdWithOlderDaysSaysSoToo() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.Ytd, R.string.stats_range_ytd, withOlderDays(StatsRange.Ytd))
+        rule.onNodeWithText(str(R.string.stats_since, "1 Jan"), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(laterLine, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun noOlderDaysNoLine() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.All, R.string.stats_range_all, stats(StatsRange.All, 1))
+        rule.onNodeWithText(laterLine, useUnmergedTree = true).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.stats_since, "2 Oct 2026"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun tokensThatReachTheStartArentMentioned() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All).copy(tokensSince = day(2026, 1, 8)))
+        rule.onNodeWithText(str(R.string.stats_later, "24 Sep 2026"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun noTokensInTheOlderDaysStartWithTheHours() {
+        val hub = FakeHub()
+        pick(hub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All).copy(tokensSince = null))
+        rule.onNodeWithText(str(R.string.stats_later_with_tokens, "24 Sep 2026"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun aDayOnlyTheSummaryKnowsHasNoBarAndSaysNoHoursCounted() {
+        val hub = FakeHub()
+        val week = stats(StatsRange.Week, 1)
+        // The last of the fixed days has no work; here the summary says it had sessions.
+        val days = week.days.dropLast(1) + week.days.last().copy(sessions = 3, tokens = 1000L)
+        assertEquals(0L, days.last().claudeMs)
+        StatsSource.put(hub, StatsRange.Week, week.copy(days = days))
+        screen(hub)
+        rule.onNodeWithText(str(R.string.stats_day_no_hours), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(res.getQuantityString(R.plurals.stats_active_days, 24, 24), substring = true, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun allServersLineUsesTheEarliestOfEach() {
+        val (servers, _, _) = allServers()
+        // gym has no older days: its hours start with it, 1 Aug, ahead of z2's 24 Sep.
+        StatsSource.put(servers[1].hub, StatsRange.All, stats(StatsRange.All, 3).copy(since = day(2026, 8, 1)))
+        pick(servers[0].hub as FakeHub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All), servers)
+        rule.onNodeWithText(str(R.string.stats_on_server, str(R.string.servers_all), str(R.string.stats_since, "8 Jan 2026")), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.stats_later_tokens_earlier, "1 Aug 2026", "12 Jul 2026"), useUnmergedTree = true).assertExists()
+    }
+
     private fun <T> assertNotNullAnd(v: T?): T {
         assertNotNull(v)
         return v!!

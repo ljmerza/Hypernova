@@ -313,6 +313,7 @@ fun StatsScreen(
                             // All servers: the ones that didn't answer, whose numbers aren't in these.
                             if (combined && problem == null && missing.isNotEmpty()) MissingLine(missing)
                             if (combined && outdated.isNotEmpty()) NeedsUpdateLine(outdated, HN.amber, Modifier.padding(horizontal = 20.dp))
+                            laterNumbers(res, s)?.let { HText(it, style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(horizontal = 20.dp)) }
                             Hero(s, agents, Modifier.padding(horizontal = 16.dp))
                         }
                     }
@@ -398,7 +399,7 @@ private fun Hero(s: Stats, who: StatsAgents, modifier: Modifier = Modifier) {
     val sessions by animateFloatAsState(s.sessions.toFloat(), spec, label = "sessions")
     val agents by animateFloatAsState(s.agents.toFloat(), spec, label = "agents")
     val sub = buildList {
-        if (s.claudeMs <= 0L) add(stringResource(if (s.range == StatsRange.Today) R.string.stats_quiet_today else R.string.stats_quiet))
+        if (s.claudeMs <= 0L && s.hoursSince == null) add(stringResource(if (s.range == StatsRange.Today) R.string.stats_quiet_today else R.string.stats_quiet))
         // Sessions side by side add up above; by the clock they count once.
         if (s.wallMs > 0 && s.claudeMs - s.wallMs >= 60_000L) add(stringResource(R.string.stats_by_clock, hours(res, s.wallMs)))
         if (s.agentMs >= 60_000L) add(stringResource(R.string.stats_agent_work, hours(res, s.agentMs)))
@@ -515,7 +516,7 @@ private fun DaysSection(s: Stats, selected: LocalDate?, onSelect: (LocalDate) ->
     // With both agents at work, a day's Codex share follows its hours and tokens (a bar is both agents' hours).
     val codexPart = day?.takeIf { d -> agents == StatsAgents.Both && d.codexMs >= 60_000L && d.claudeMs > 0 }?.codexMs
     val readout = day?.let {
-        if (it.claudeMs <= 0) res.getString(R.string.stats_day_none)
+        if (it.claudeMs <= 0) res.getString(if (it.sessions > 0 || it.tokens > 0) R.string.stats_day_no_hours else R.string.stats_day_none)
         else res.getString(R.string.stats_day_said, hours(res, it.claudeMs), compact(res, it.tokens))
             .let { said -> codexPart?.let { c -> res.getString(R.string.stats_day_codex_said, said, hours(res, c)) } ?: said }
     }

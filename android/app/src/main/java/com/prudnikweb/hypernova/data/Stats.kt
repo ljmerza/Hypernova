@@ -24,8 +24,12 @@ enum class StatsRange(val wire: String, val days: Int) {
 val ApiException.refusedRange: Boolean get() = status == 400 && code == "bad_range"
 
 @Immutable
-data class StatTokens(val input: Long, val output: Long, val cacheRead: Long, val cacheWrite: Long) {
-    val total: Long get() = input + output + cacheRead + cacheWrite
+data class StatTokens(
+    val input: Long, val output: Long, val cacheRead: Long, val cacheWrite: Long,
+    /** Tokens from Claude Code's own summary of older days (`backfill.tokens`): every kind, not split by day. */
+    val unsplit: Long = 0L,
+) {
+    val total: Long get() = input + output + cacheRead + cacheWrite + unsplit
 }
 
 /**
@@ -62,7 +66,7 @@ data class Stats(
     val range: StatsRange,
     val from: Long,
     val to: Long,
-    /** The first day with any work on the Mac (null: none yet). */
+    /** The first day with any work on the Mac, older days included (null: none yet). */
     val since: Long?,
     /** When the Mac started counting what only it sees (prompts from the phone, approvals). */
     val countingSince: Long,
@@ -98,6 +102,13 @@ data class Stats(
     val claude: StatAgent? = null,
     /** Codex's part: null where Codex isn't installed (and from an older Mac). */
     val codex: StatAgent? = null,
+    /**
+     * With older days from Claude Code's own summary in this answer: when the numbers it hasn't got
+     * start (hours, prompts, projects and the rest: the first day the Mac counted), and tokens, which
+     * it has for less far back. Null without any. [sessions], [toolCalls] and [tokens] include them.
+     */
+    val hoursSince: Long? = null,
+    val tokensSince: Long? = null,
 ) {
     /**
      * Whose work this is. Codex with work in the range: both agents' (the hero splits them), or
@@ -136,21 +147,26 @@ object StatsWire {
         }
         val busy = o.obj("busiestDay")
         val by = o.obj("byAgent")
+        // Older days from Claude Code's own summary, added to what it has numbers for (a server without them: none).
+        val back = o.obj("backfill")
+        val backSessions = back?.int("sessions") ?: 0
+        val backTools = back?.int("toolCalls") ?: 0
+        val backTokens = back?.long("tokens") ?: 0L
         return Stats(
             range = StatsRange.entries.firstOrNull { it.wire == o.str("range") } ?: StatsRange.Week,
             from = o.long("from") ?: 0L,
             to = o.long("to") ?: System.currentTimeMillis(),
-            since = o.long("since"),
+            since = listOfNotNull(o.long("since"), back?.long("since")).minOrNull(),
             countingSince = o.long("countingSince") ?: System.currentTimeMillis(),
             claudeMs = o.long("claudeMs") ?: 0L,
             wallMs = o.long("wallMs") ?: 0L,
             agentMs = o.long("agentMs") ?: 0L,
-            tokens = StatTokens(t?.long("input") ?: 0L, t?.long("output") ?: 0L, t?.long("cacheRead") ?: 0L, t?.long("cacheWrite") ?: 0L),
-            sessions = o.int("sessions") ?: 0,
+            tokens = StatTokens(t?.long("input") ?: 0L, t?.long("output") ?: 0L, t?.long("cacheRead") ?: 0L, t?.long("cacheWrite") ?: 0L, backTokens),
+            sessions = (o.int("sessions") ?: 0) + backSessions,
             prompts = o.int("prompts") ?: 0,
             fromPhone = from?.int("phone") ?: 0,
             byVoice = from?.int("voice") ?: 0,
-            toolCalls = o.int("toolCalls") ?: 0,
+            toolCalls = (o.int("toolCalls") ?: 0) + backTools,
             tools = buildList {
                 val a = o.arr("tools") ?: return@buildList
                 for (i in 0 until a.length()) {
@@ -182,8 +198,11 @@ object StatsWire {
                 }
             },
             days = days,
-            claude = by?.obj("claude")?.let(::agent),
+            // The older days are Claude's: its summary is Claude Code's own.
+            claude = by?.obj("claude")?.let(::agent)?.let { it.copy(tokens = it.tokens + backTokens, sessions = it.sessions + backSessions, toolCalls = it.toolCalls + backTools) },
             codex = by?.obj("codex")?.let(::agent),
+            hoursSince = back?.long("hoursSince"),
+            tokensSince = back?.long("tokensSince"),
         )
     }
 

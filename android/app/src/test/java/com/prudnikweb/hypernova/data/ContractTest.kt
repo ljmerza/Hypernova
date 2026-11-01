@@ -611,6 +611,17 @@ class ContractTest {
             assertNull(s.codex)
             assertEquals(StatsAgents.Claude, s.agents(codexLeads = false))
         },
+        // Older days from Claude Code's own summary: added to what they have numbers for, and the start moved back.
+        "rest-stats-backfill" to { o ->
+            val s = StatsWire.parse(o)
+            assertEquals(StatsRange.All, s.range)
+            assertTrue(s.hoursSince != null)
+            assertTrue(s.since!! <= s.hoursSince!!)
+            assertEquals(7L, s.tokens.unsplit)
+            assertEquals(s.sessions, o.getInt("sessions") + 3)
+            assertEquals(s.toolCalls, o.getInt("toolCalls") + 5)
+            assertEquals(s.claude!!.sessions, o.getJSONObject("byAgent").getJSONObject("claude").getInt("sessions") + 3)
+        },
         "rest-stats-bad-range" to { o -> assertEquals("bad_range", Api.errorOf(400, o.toString()).code) },
         // Pairing.pair reads these three.
         "rest-pair" to { o ->
