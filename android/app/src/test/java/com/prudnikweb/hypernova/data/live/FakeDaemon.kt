@@ -23,7 +23,7 @@ class FakeDaemon(val name: String = "z2") : AutoCloseable {
     private val server = MockWebServer()
 
     /** A request the phone made. */
-    data class Req(val method: String, val path: String, val body: String, val auth: String?) {
+    data class Req(val method: String, val path: String, val body: String, val auth: String?, val headers: Map<String, String> = emptyMap()) {
         val bare: String get() = path.substringBefore('?')
         val json: JSONObject get() = if (body.isBlank()) JSONObject() else JSONObject(body)
         val query: String get() = path.substringAfter('?', "")
@@ -53,7 +53,7 @@ class FakeDaemon(val name: String = "z2") : AutoCloseable {
             // Down: each request is read (so the tries can be counted), then its connection closes
             // unanswered. (DISCONNECT_AT_START from dispatch() would answer 200: MockWebServer reads it from peek().)
             override fun dispatch(request: RecordedRequest): MockResponse {
-                val r = Req(request.method ?: "GET", request.path ?: "/", request.body.readUtf8(), request.getHeader("Authorization"))
+                val r = Req(request.method ?: "GET", request.path ?: "/", request.body.readUtf8(), request.getHeader("Authorization"), request.headers.associate { (k, v) -> k.lowercase() to v })
                 requests += r
                 if (down) return drop()
                 if (r.bare == "/v1/health") return json(200, JSONObject().put("ok", true))
