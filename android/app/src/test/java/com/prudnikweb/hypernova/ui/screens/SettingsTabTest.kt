@@ -127,6 +127,17 @@ class SettingsTabTest {
 
     // ─── One server ───
 
+    @Test fun aboutLinksToTheProjectsPage() {
+        pair(server("z2", 47391) { files(false) })
+        linked()
+        show()
+        rule.onNodeWithText(str(R.string.about_github_repo)).performScrollTo().performClick()
+        rule.waitForIdle()
+        val page = shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity
+        assertEquals(android.content.Intent.ACTION_VIEW, page.action)
+        assertEquals("https://github.com/ljmerza/Hypernova", page.dataString)
+    }
+
     @Config(qualifiers = "+h3500dp")
     @Test fun oneServerShowsEveryPartInOrder() {
         pair(server("z2", 47391) { files(false) })

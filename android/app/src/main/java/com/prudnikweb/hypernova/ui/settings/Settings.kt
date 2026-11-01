@@ -485,6 +485,8 @@ private fun NotificationsSection(vm: HubViewModel) {
  * and the versions of [versionsOf]'s daemon, Claude Code and Codex (null with All servers: they're
  * in each server's card).
  */
+internal const val GITHUB_REPO = "https://github.com/ljmerza/Hypernova"
+
 @Composable
 private fun AboutSection(offer: com.prudnikweb.hypernova.data.AppUpdate?, versionsOf: com.prudnikweb.hypernova.data.Hub?, testing: Boolean, onTestingUnlocked: () -> Unit) {
     val context = LocalContext.current
@@ -515,6 +517,14 @@ private fun AboutSection(offer: com.prudnikweb.hypernova.data.AppUpdate?, versio
                 com.prudnikweb.hypernova.data.AppUpdater.target,
             )?.let { com.prudnikweb.hypernova.ui.update.AboutUpdateRow(it) }
             if (versionsOf != null) ServerVersions(versionsOf)
+            // The project's page (owner, 2026-11-01), straight to the browser: its own row, nothing to confirm.
+            NavRow(
+                stringResource(R.string.about_github), stringResource(R.string.about_github_repo),
+                {
+                    val page = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(GITHUB_REPO))
+                    runCatching { context.startActivity(page) }.onFailure { toast(res.getString(R.string.about_github_no_browser)) }
+                },
+            )
         }
     }
 }

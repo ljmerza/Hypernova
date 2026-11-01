@@ -475,6 +475,9 @@
     <string name="checklist_desc">The owner\'s test list for this build, served by your Mac.</string>
     <string name="about">About</string>
     <string name="about_app">App</string>
+    <string name="about_github">GitHub</string>
+    <string name="about_github_repo">ljmerza/Hypernova</string>
+    <string name="about_github_no_browser">No browser to open it with.</string>
     <string name="about_daemon">Daemon</string>
     <string name="about_claude">Claude Code</string>
     <string name="unknown">unknown</string>
