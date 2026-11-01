@@ -56,7 +56,7 @@ import com.prudnikweb.hypernova.ui.components.GlassDialog
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphFigure
 import com.prudnikweb.hypernova.ui.components.Icon
-import com.prudnikweb.hypernova.ui.components.projectionBar
+import com.prudnikweb.hypernova.ui.components.usageBar
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.theme.HN
@@ -145,7 +145,7 @@ private fun TimelineRow(name: String, mono: Boolean, line: RunLine, took: String
 // ─── Its budget ────────────────────────────────────────────────────────────
 
 /**
- * A run's budget so far, in the usage meters' style (ui/components/ProjectionMeter.kt): a small
+ * A run's budget so far, in the usage meters' style (ui/components/UsageMeter.kt): a small
  * "BUDGET" label, what it used of what it may in mono ("12 of 30 min", "2.4 of 10 points"), and a
  * hairline bar with its used part: mint, amber from 80%, red once reached. One line each; [budget]
  * is its automation's (null: none now, so just what it used).
@@ -170,7 +170,7 @@ internal fun RunBudget(used: BudgetUsed, budget: Budget?, modifier: Modifier = M
                         l.used >= 0.8f -> HN.amber
                         else -> HN.accent
                     }
-                    Canvas(Modifier.weight(1f).height(9.dp)) { projectionBar(l.used, l.used, 0f, colour) }
+                    Canvas(Modifier.weight(1f).height(9.dp)) { usageBar(l.used, colour) }
                 }
             }
         }

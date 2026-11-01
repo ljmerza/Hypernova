@@ -240,11 +240,11 @@ data class Account(
 }
 
 /**
- * The spend pace in % per minute, with the minutes until 100% at it ([fiveHourEtaMs],
- * [sevenDayEtaMs]: null when the pace is unknown, ~0, or the window resets first).
+ * How fast the windows are being spent right now, in % per minute. Only the sun's disk reads it (its
+ * gas flows with it, [com.prudnikweb.hypernova.ui.fx.DiskModel.flow]); nothing estimates from it.
  */
 @Immutable
-data class UsageRate(val fiveHour: Float?, val sevenDay: Float?, val fiveHourEtaMs: Long?, val sevenDayEtaMs: Long?)
+data class UsageRate(val fiveHour: Float?, val sevenDay: Float?)
 
 /**
  * Claude plan usage, from the status line's rate_limits.
@@ -265,12 +265,12 @@ data class Usage(
     val stale: Boolean = false,
     /** The weeks some models have of their own (Fable, Sonnet), from /usage on the Mac; none until it has looked. */
     val models: List<ModelWeek> = emptyList(),
-    /** How fast the windows are being spent; null while nothing works (and from an older Mac). */
+    /** How fast the windows are being spent, for the sun's disk; null while nothing works (and from an older Mac). */
     val rate: UsageRate? = null,
     /**
      * Claude Code reports a 5-hour window ([fiveHourReported]). False when the Mac has the week and
      * no 5-hour window (Max dropped it, 2026-10-31): [fiveHour], [fiveHourResetAt] and the 5-hour
-     * pace then carry the week, for the sun's disk (as where Codex leads on a week-only plan), and
+     * rate then carry the week, for the sun's disk (as where Codex leads on a week-only plan), and
      * nothing labelled 5H shows.
      */
     val fiveHourReported: Boolean = true,
