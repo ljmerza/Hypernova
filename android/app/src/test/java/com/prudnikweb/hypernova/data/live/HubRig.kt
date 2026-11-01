@@ -43,13 +43,19 @@ class HubRig(
     val deviceId: String? = "dev-1",
     /** Shared by several rigs (several computers), so pumping one runs them all. */
     val dispatcher: TestDispatcher = StandardTestDispatcher(),
+    /** Paired as the pairing link names a [FakeDaemon.lan] listener: its fingerprint, 127.0.0.1 and its port. */
+    viaLan: Boolean = daemon.lan,
+    /** The base URL is that listener, as a pairing link's `u` has been since 2026-10-30 (else the fake's plain-HTTP address, the emulator's kind). */
+    baseIsListener: Boolean = viaLan,
 ) : AutoCloseable {
     val context: Context = RuntimeEnvironment.getApplication().also {
         // A fresh install's words (a Mac's): ComputerWords is process-wide and outlives a test.
         ComputerWords.clear(it)
     }
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
-    val pairing = Pairing(baseUrl = daemon.base, token = token, macName = daemon.name, macId = "m-${daemon.name}", deviceId = deviceId)
+    val pairing = Pairing(baseUrl = if (baseIsListener) "https://127.0.0.1:${daemon.lanPort}" else daemon.base, token = token, macName = daemon.name, macId = "m-${daemon.name}", deviceId = deviceId).let {
+        if (viaLan) it.copy(fingerprint = daemon.fingerprint, lanAddresses = listOf("127.0.0.1"), lanPort = daemon.lanPort) else it
+    }
     private val startedAt = System.currentTimeMillis()
     /** The hub's wall clock: real time at the start, then moving with [advance] only. */
     val now: Long get() = startedAt + dispatcher.scheduler.currentTime

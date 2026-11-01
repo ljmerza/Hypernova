@@ -33,6 +33,8 @@ org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 # The data layer's behaviour tests (app/src/test/.../data/live): a scripted daemon, OkHttp's own (same version), and Android's Context.
 okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
+# Its HTTPS mode: a listener certificate to pin and a device CA that signs the phone's request (mutual TLS).
+okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okhttp" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 # Screen tests on the JVM: Compose's test rule under Robolectric, Roborazzi's screenshots.
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
