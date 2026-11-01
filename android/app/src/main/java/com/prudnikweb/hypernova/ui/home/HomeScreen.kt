@@ -323,6 +323,9 @@ fun HomeScreen(
     val savedFilter = HomeFilterPref.state(context).value
     val homeFilter = savedFilter.forServers(everywhere?.servers?.map { it.first.id })
     val kept = remember(sessions, homeFilter) { homeFilter.apply(sessions) }
+    // Home's sort (HomeSort.kt; owner, 2026-11-01): the order within each group, Name by default,
+    // kept on this phone; Server only with All servers. Search results are sorted the same way.
+    val homeSort = HomeSortPref.state(context).value.forServers(everywhere != null)
     val narrowBoth: (List<Session>) -> List<Session> = { list -> homeFilter.apply(SkyFilter.apply(list, filter, quiet)) }
     // What the search finds among them (HomeSearch, History's search shared): by title, project,
     // folder, last line and short id, and from 3 characters the words inside the conversations.
@@ -350,11 +353,11 @@ fun HomeScreen(
     val partial = if (everywhere != null) fullBy.values.any { it.hits?.partial == true } else full.hits?.partial == true
     // The matches start at the top.
     LaunchedEffect(searchOpen, searchQuery) { if (searchOpen) list.scrollToItem(0) }
-    // A filter changed: the list from the top, its chip in view (not on coming back to Home).
-    val filterSeen = remember { arrayOf(homeFilter) }
-    LaunchedEffect(homeFilter) {
-        if (filterSeen[0] == homeFilter) return@LaunchedEffect
-        filterSeen[0] = homeFilter
+    // A filter or the sort changed: the list from the top, its chip in view (not on coming back to Home).
+    val filterSeen = remember { arrayOf<Any>(homeFilter to homeSort) }
+    LaunchedEffect(homeFilter, homeSort) {
+        if (filterSeen[0] == (homeFilter to homeSort)) return@LaunchedEffect
+        filterSeen[0] = homeFilter to homeSort
         list.scrollToItem(0)
     }
     // The line under the sun's readout ("Tap the sun for your statistics"): the sky keeps room for it.
@@ -376,6 +379,8 @@ fun HomeScreen(
     }
     // The filter sheet (HomeFilterSheet.kt), from the button beside the search.
     var filtering by rememberSaveable { mutableStateOf(false) }
+    // The sort sheet (HomeSortSheet.kt), from the button beside the filter.
+    var sorting by rememberSaveable { mutableStateOf(false) }
     // Claude Code's account: only where it's installed (a Mac where Codex leads has no Claude account to fix).
     val showAccount = claudeHere && accountCardShown(account, now)
     // The attention cards above the list, unless swiped away (an Undo stands in for a moment).
@@ -441,6 +446,10 @@ fun HomeScreen(
             servers = everywhere?.servers?.map { it.first.id to it.first.name },
             onDismiss = { filtering = false },
         )
+    }
+
+    if (sorting && tab == Tab.Sessions) {
+        HomeSortSheet(homeSort, HomeSort.offered(everywhere != null), onPick = { HomeSortPref.set(context, it) }, onDismiss = { sorting = false })
     }
 
     if (homeShown) Box(
@@ -590,7 +599,7 @@ fun HomeScreen(
                 // With "All servers" the groups hold every computer's (their counts all of them), each
                 // card tagged with its computer and everything it does going there (AllHome.kt); an
                 // offline computer's are dimmed and only open.
-                val groups = if (everywhere != null) AllHome.groups(cards) else homeGroupsOf(cards, { it.session })
+                val groups = if (everywhere != null) AllHome.groups(cards, homeSort) else homeGroupsOf(cards, { it.session }, sort = homeSort)
                 for ((group, members) in groups) {
                     item(key = group.key) {
                         GroupSeam(
@@ -699,14 +708,22 @@ fun HomeScreen(
                         parts = listOf(
                             // Home's filter: its sheet; lit while a filter is on.
                             listOf({ FilterButton(homeFilter.on, onClick = { filtering = true }) }),
+                            // Home's sort (owner, 2026-11-01): its sheet; lit while it isn't by name.
+                            listOf({ SortButton(homeSort, onClick = { sorting = true }) }),
                             // The lens: searching Home's sessions (idea HM8); lit while the field is open.
                             listOf({ SearchButton(searchOpen, onClick = { if (searchOpen) closeSearch() else searchOpen = true }) }),
                             listOf(
                                 { Pill(stringResource(R.string.new_session), newSession, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus) },
+                                {
+                                    // "New" short of room; TalkBack still hears "New session".
+                                    val said = stringResource(R.string.new_session)
+                                    Pill(stringResource(R.string.new_session_short), newSession, Modifier.semantics { contentDescription = said }, kind = PillKind.Glass, height = 30.dp, leading = Glyph.Plus)
+                                },
                                 { NewSessionButton(newSession) },
                             ),
                         ),
-                        giveWay = intArrayOf(2),
+                        // New session steps down twice: "New", then its plus alone.
+                        giveWay = intArrayOf(3, 3),
                         modifier = Modifier.weight(1f),
                         gap = 0.dp,
                         end = true,
@@ -860,6 +877,34 @@ private fun FilterButton(on: Boolean, onClick: () -> Unit) {
     }
 }
 
+/**
+ * The top bar's sort button (owner, 2026-11-01): the lens's circle with two arrows, down and up; lit
+ * mint, with a dot, while Home isn't sorted by name. A tap opens the sort sheet (HomeSortSheet.kt).
+ */
+@Composable
+private fun SortButton(sort: HomeSort, onClick: () -> Unit) {
+    val view = LocalView.current
+    val title = stringResource(R.string.sort_title)
+    val label = if (sort.changed) stringResource(R.string.sort_button_on, sortWord(sort)) else title
+    Box(
+        Modifier
+            .size(width = BAR_BUTTON_W, height = 48.dp)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = title) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onClick()
+            }
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        val on = sort.changed
+        Box(
+            Modifier.size(30.dp).clip(CircleShape).frostedGlass(if (on) HN.accent else null, glowX = 15.dp, dense = true),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Glyph.Sort, size = 14.dp, color = if (on) HN.accent else HN.ink, stroke = 1.4.dp) }
+        if (on) Box(Modifier.align(Alignment.Center).offset(x = 11.dp, y = (-11).dp).size(6.dp).background(HN.accent, CircleShape))
+    }
+}
+
 /** New session as the lens's circle with a plus, where the top bar has no room for its words. */
 @Composable
 private fun NewSessionButton(onClick: () -> Unit) {
@@ -913,20 +958,19 @@ internal fun homeGroup(s: Session) = when {
 }
 
 /**
- * Home's sessions by group, empty groups left out. Needs input and Working by name, A to Z (then by
- * id), not by activity: the owner saw cards "keep swapping back and forth", so one moves only when
- * its group changes. Completed by when it finished, newest first (owner, 2026-10-30), the time its
- * card says ("5m ago"); the same time by name.
+ * Home's sessions by group, empty groups left out, each group in [sort]'s order (HomeSort.kt). By
+ * default every group by name, A to Z (then by id), not by activity: the owner saw cards "keep
+ * swapping back and forth", so one moves only when its group changes. Completed sorted newest first
+ * until 2026-11-01, when the sort button made Name the default for every group (Recent gives that back).
  */
-internal fun homeGroups(sessions: List<Session>): List<Pair<HomeGroup, List<Session>>> = homeGroupsOf(sessions, { it })
+internal fun homeGroups(sessions: List<Session>, sort: HomeSort = HomeSort.DEFAULT): List<Pair<HomeGroup, List<Session>>> = homeGroupsOf(sessions, { it }, sort = sort)
 
-/** [homeGroups] for anything that carries a session (a card of "All servers", AllHome.kt); [tie] after the name and id. */
-internal fun <T> homeGroupsOf(items: List<T>, session: (T) -> Session, tie: Comparator<T> = Comparator { _, _ -> 0 }): List<Pair<HomeGroup, List<T>>> {
-    val byName = compareBy<T, String>(String.CASE_INSENSITIVE_ORDER) { session(it).name }.thenBy { session(it).id }.then(tie)
-    val newest = compareByDescending<T> { session(it).updatedAt }.then(byName)
+/** [homeGroups] for anything that carries a session (a card of "All servers", AllHome.kt); [server]: its computer's name. */
+internal fun <T> homeGroupsOf(items: List<T>, session: (T) -> Session, server: (T) -> String? = { null }, sort: HomeSort = HomeSort.DEFAULT): List<Pair<HomeGroup, List<T>>> {
+    val order = sort.comparator(session, server)
     return HomeGroup.entries.mapNotNull { g ->
         items.filter { homeGroup(session(it)) == g }
-            .sortedWith(if (g == HomeGroup.Completed) newest else byName)
+            .sortedWith(order)
             .takeIf { it.isNotEmpty() }?.let { g to it }
     }
 }

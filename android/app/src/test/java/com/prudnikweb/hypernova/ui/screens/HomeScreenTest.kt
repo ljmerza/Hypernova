@@ -79,9 +79,9 @@ class HomeScreenTest {
         assertTrue(rule.topOf("Deploy check") < rule.topOf("Fix the build"))
         assertTrue(rule.topOf("Add widgets") < rule.topOf("Refactor parser"))
         assertTrue(rule.topOf("Fix the build") < working && rule.topOf("Refactor parser") < done)
-        // Completed: newest first, not A to Z (Zeta 2m, Mid 20m, Alpha 1h).
-        assertTrue(rule.topOf("Zeta cleanup") < rule.topOf("Mid sprint notes"))
-        assertTrue(rule.topOf("Mid sprint notes") < rule.topOf("Alpha release"))
+        // Completed: A to Z too, the sort button's default (owner, 2026-11-01; it was newest first).
+        assertTrue(rule.topOf("Alpha release") < rule.topOf("Mid sprint notes"))
+        assertTrue(rule.topOf("Mid sprint notes") < rule.topOf("Zeta cleanup"))
         rule.snap("home_groups")
     }
 
@@ -272,7 +272,7 @@ class HomeScreenTest {
     @Test fun allServersNewSessionAsksWhichComputer() {
         val (z2, e) = everywhere()
         home(z2, e, ServerChoice(e.servers.map { it.first }, {}, {}, all = true))
-        rule.onAllNodesWithText(str(R.string.new_session)).onFirst().performClick()
+        rule.onNode(newSessionButton()).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.servers_new_on).uppercase()).assertExists()
         // Only a linked computer can be picked.
@@ -285,7 +285,7 @@ class HomeScreenTest {
 
     @Test fun oneComputerNewSessionGoesStraightToTheSheet() {
         home(FakeHub(sessions = only(Samples.MID)))
-        rule.onAllNodesWithText(str(R.string.new_session)).onFirst().performClick()
+        rule.onNode(newSessionButton()).performClick()
         assertEquals(listOf("here"), newSessions)
     }
 }

@@ -70,9 +70,12 @@ object AllHome {
             found.map { HomeCard(p.id, p.name, p.hub, it, live) }
         }
 
-    /** Home's groups of [cards], as [homeGroups] has them; the same name and id on two computers by the computer's name. */
-    internal fun <H> groups(cards: List<HomeCard<H>>): List<Pair<HomeGroup, List<HomeCard<H>>>> =
-        homeGroupsOf(cards, { it.session }, compareBy(String.CASE_INSENSITIVE_ORDER) { it.name.orEmpty() })
+    /**
+     * Home's groups of [cards], as [homeGroups] has them, in [sort]'s order across every computer's cards
+     * together; the same name and id on two computers by the computer's name.
+     */
+    internal fun <H> groups(cards: List<HomeCard<H>>, sort: HomeSort = HomeSort.DEFAULT): List<Pair<HomeGroup, List<HomeCard<H>>>> =
+        homeGroupsOf(cards, { it.session }, { it.name }, sort)
 
     /** The card [key] names, so what it does goes to its own computer's hub (null: it's gone). */
     fun <H> cardOf(cards: List<HomeCard<H>>, key: String): HomeCard<H>? = cards.firstOrNull { it.key == key }

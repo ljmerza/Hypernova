@@ -111,6 +111,7 @@ fun resetPrefs() {
     CardSwipePref.set(context, CardSwipes())
     com.prudnikweb.hypernova.ui.home.HomeFilterPref.set(context, com.prudnikweb.hypernova.ui.home.HomeFilter.NONE)
     com.prudnikweb.hypernova.ui.term.TermEnginePref.set(context, com.prudnikweb.hypernova.ui.term.TermEngine.Xterm)
+    com.prudnikweb.hypernova.ui.home.HomeSortPref.set(context, com.prudnikweb.hypernova.ui.home.HomeSort.DEFAULT)
     com.prudnikweb.hypernova.data.VoicePrefs.of(context).chooseDictationEngine(com.prudnikweb.hypernova.data.DictationEngine.of(null))
 }
 
@@ -124,6 +125,13 @@ fun hasClickLabel(label: String) = androidx.compose.ui.test.SemanticsMatcher("cl
  * sheet's chips, ChipRow) leaves the others in the semantics tree, unplaced.
  */
 fun isPlaced() = androidx.compose.ui.test.SemanticsMatcher("is placed") { it.layoutInfo.isPlaced }
+
+/**
+ * Home's New session in the top bar, whichever way it shows (its words, "New", or its plus alone:
+ * the bar gives way short of room), the one placed.
+ */
+fun newSessionButton() = (androidx.compose.ui.test.hasText(str(com.prudnikweb.hypernova.R.string.new_session)) or
+    androidx.compose.ui.test.hasContentDescription(str(com.prudnikweb.hypernova.R.string.new_session))) and isPlaced()
 
 /** A node whose TalkBack sentence starts with [prefix] (a picker's row: "High. Thinks things through."). */
 fun saidStartsWith(prefix: String) = androidx.compose.ui.test.SemanticsMatcher("said starts with '$prefix'") { n ->

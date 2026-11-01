@@ -266,37 +266,69 @@ class HomeFilterScreenTest {
     private fun placed(matcher: SemanticsMatcher) = rule.onNode(matcher and isPlaced(), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
 
     /** At the usual font, on the tests' 392dp phone, New session keeps its words beside the filter and the lens. */
-    @Test fun theTopBarKeepsNewSessionsWordsAtTheUsualFont() {
-        home(FakeHub())
-        assertWhole(str(R.string.new_session))
-        assertWhole("z2")
-        rule.onNode(hasContentDescription(str(R.string.new_session)) and isPlaced()).assertDoesNotExist()
+    /**
+     * The top bar left to right: the filter, the sort, the lens, New session (its words, "New" or its
+     * plus) and the chip, each wholly on screen and none over the next.
+     */
+    private fun assertBarInOrder(chip: String): androidx.compose.ui.geometry.Rect {
+        val filter = placed(hasClickLabel(str(R.string.filter_title)))
+        val sort = placed(hasClickLabel(str(R.string.sort_title)))
+        val lens = placed(hasContentDescription(str(R.string.home_search)))
+        val new = rule.onNode(newSessionButton()).fetchSemanticsNode().boundsInRoot
+        val name = placed(hasText(chip))
+        val width = rule.onNode(isRoot()).fetchSemanticsNode().boundsInRoot.right
+        assertTrue("in order: filter, sort, lens, New session, the chip", filter.right <= sort.left && sort.right <= lens.left && lens.right <= new.left && new.right <= name.left)
+        assertTrue("the chip's name is on screen", name.right <= width && name.width > 0f)
+        assertWhole(chip)
+        return new
     }
 
-    @Test fun theTopBarKeepsNewSessionsWordsWithAllServers() {
+    /**
+     * At the usual font, on the tests' 392dp phone, four round buttons leave New session room for
+     * "New" (TalkBack still hears "New session"), never squeezing the server's name.
+     */
+    @Test fun theTopBarFitsAtTheUsualFont() {
+        home(FakeHub())
+        assertBarInOrder("z2")
+        assertWhole(str(R.string.new_session_short))
+        rule.onNode(hasContentDescription(str(R.string.new_session)) and hasText(str(R.string.new_session_short))).assertExists()
+    }
+
+    @Test fun theTopBarFitsAtTheUsualFontWithAllServers() {
         val (z2, e) = everywhere()
         home(z2, e, ServerChoice(e.servers.map { it.first }, {}, {}, all = true))
+        assertBarInOrder(str(R.string.servers_all_chip))
+        assertWhole(str(R.string.new_session_short))
+    }
+
+    /** At 420dp (the emulator DEV-SETUP sizes as the Nothing Phone 3), "All" leaves room for New session's words. */
+    @Config(qualifiers = "+w420dp")
+    @Test fun aWiderPhoneKeepsTheWordsWithAllServers() {
+        val (z2, e) = everywhere()
+        home(z2, e, ServerChoice(e.servers.map { it.first }, {}, {}, all = true))
+        assertBarInOrder(str(R.string.servers_all_chip))
         assertWhole(str(R.string.new_session))
-        assertWhole(str(R.string.servers_all_chip))
+    }
+
+    /** The same width with one server: its chip is wider ("z2" and the route's glyph), so "New". */
+    @Config(qualifiers = "+w420dp")
+    @Test fun aWiderPhoneSaysNewWithOneServer() {
+        home(FakeHub())
+        assertBarInOrder("z2")
+        assertWhole(str(R.string.new_session_short))
     }
 
     /**
      * The owner's rule (the server menu had names squeezed out before): at a large font, with All,
-     * the filter, the lens and New session, the chip still says "All" whole, on screen. New session
-     * gives way to its plus alone, which still starts one.
+     * the chip still says "All" whole, on screen; New session says "New", whole (its plus alone
+     * comes only when even that doesn't fit).
      */
     @Test fun theTopBarFitsAtALargeFontWithAllServers() {
         val (z2, e) = everywhere()
         home(z2, e, ServerChoice(e.servers.map { it.first }, {}, {}, all = true), fontScale = 1.3f)
-        assertWhole(str(R.string.servers_all_chip))
-        val all = placed(hasText(str(R.string.servers_all_chip)))
-        val plus = placed(hasContentDescription(str(R.string.new_session)))
-        val lens = placed(hasContentDescription(str(R.string.home_search)))
-        val filter = placed(hasClickLabel(str(R.string.filter_title)))
-        val width = rule.onNode(isRoot()).fetchSemanticsNode().boundsInRoot.right
-        assertTrue("in order: filter, lens, New session, All", filter.right <= lens.left && lens.right <= plus.left && plus.right <= all.left)
-        assertTrue("All is on screen", all.right <= width && all.width > 0f)
+        assertBarInOrder(str(R.string.servers_all_chip))
         rule.onNode(hasText(str(R.string.new_session)) and isPlaced(), useUnmergedTree = true).assertDoesNotExist()
+        assertWhole(str(R.string.new_session_short))
         rule.snap("home_filter_top_bar_large_font")
     }
 }

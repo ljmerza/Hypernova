@@ -52,6 +52,8 @@ enum class Glyph {
     Person,
     /** Narrowing a list (three lines, each shorter, a funnel's outline): Home's filter. */
     Filter,
+    /** Ordering a list (an arrow down beside an arrow up): Home's sort. */
+    Sort,
 }
 
 @Composable
@@ -268,6 +270,12 @@ fun Icon(glyph: Glyph, modifier: Modifier = Modifier, size: Dp = 14.dp, color: C
                 drawLine(color, p(.16f, .3f), p(.84f, .3f), st.width, StrokeCap.Round)
                 drawLine(color, p(.3f, .5f), p(.7f, .5f), st.width, StrokeCap.Round)
                 drawLine(color, p(.43f, .7f), p(.57f, .7f), st.width, StrokeCap.Round)
+            }
+            Glyph.Sort -> {
+                drawLine(color, p(.34f, .18f), p(.34f, .82f), st.width, StrokeCap.Round)
+                drawPath(Path().apply { moveTo(.18f * w, .64f * h); lineTo(.34f * w, .82f * h); lineTo(.5f * w, .64f * h) }, color, style = st)
+                drawLine(color, p(.66f, .82f), p(.66f, .18f), st.width, StrokeCap.Round)
+                drawPath(Path().apply { moveTo(.5f * w, .36f * h); lineTo(.66f * w, .18f * h); lineTo(.82f * w, .36f * h) }, color, style = st)
             }
             Glyph.Mic -> {
                 // A capsule on a stand: the body, the cradle round its foot, the stem and the base.
