@@ -2,8 +2,10 @@ package com.prudnikweb.hypernova.ui.screens
 
 import android.app.Application
 import android.content.Intent
+import android.os.Looper
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.prudnikweb.hypernova.R
@@ -108,10 +110,14 @@ class FilesScreensTest {
         rule.waitForIdle()
     }
 
+    /** The viewer reads and decodes off the main thread, which waitForIdle doesn't wait for. */
+    private fun waitForText(text: String) = rule.waitUntil(10_000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+
     @Test fun aTextFileInMonoWithItsLineNumbers() {
         val hub = FeatureHub()
         hub.fileAnswer = { Result.success(FileBytes("export const parse = (s: string) =>\n\ts.trim()\n".toByteArray(), "text/plain")) }
         viewer(hub, "$ROOT/src/parser.ts")
+        waitForText("export const parse = (s: string) =>")
         assertEquals(listOf("file($ROOT/src/parser.ts)"), hub.calls)
         rule.onNodeWithText("export const parse = (s: string) =>").assertExists()
         // Tabs as four spaces.
@@ -125,9 +131,9 @@ class FilesScreensTest {
         var n = 0
         hub.fileAnswer = { if (n++ == 0) Result.failure(FileFailure("The server isn’t answering.", problem = com.prudnikweb.hypernova.data.Problem.Unreachable)) else Result.success(FileBytes("back\n".toByteArray(), "text/plain")) }
         viewer(hub, "$ROOT/notes.txt")
+        waitForText(str(R.string.try_again))
         rule.onNodeWithText(str(R.string.try_again)).performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText("back").assertExists()
+        waitForText("back")
         assertEquals(2, hub.calls.count { it.startsWith("file(") })
     }
 
@@ -135,12 +141,12 @@ class FilesScreensTest {
         val hub = FeatureHub()
         hub.downloadBytes = "%PDF-1.7 not really".toByteArray()
         viewer(hub, "$ROOT/report.pdf")
+        waitForText(str(R.string.fv_noview_title))
         // Not asked for to show: there's no preview of it.
         assertTrue(hub.calls.none { it.startsWith("file(") })
-        rule.onNodeWithText(str(R.string.fv_noview_title)).assertExists()
         rule.snap("file_no_preview")
         rule.onNodeWithText(str(R.string.fv_share)).performClick()
-        rule.waitForIdle()
+        rule.waitUntil(10_000) { shadowOf(Looper.getMainLooper()).idle(); shadowOf(context as Application).peekNextStartedActivity() != null }
         assertEquals(listOf("download($ROOT/report.pdf)"), hub.calls)
         val chooser = shadowOf(context as Application).nextStartedActivity
         assertEquals(Intent.ACTION_CHOOSER, chooser.action)
