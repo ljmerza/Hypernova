@@ -2649,3 +2649,38 @@ server updates itself and then pushes to the client that needs update too." Deci
 7. **The phones learn of it**: the new daemon, at start, sees the update it was waiting for and
    logs it; the snapshot's `mac.update.last` says from and to what, and the phone's connection log
    has a line when the server's version changed between two snapshots. No banner or toast.
+
+## Home filters (2026-11-01)
+
+The owner: "add ability on agents list page to filter… one that comes to mind will be useful is just
+showing the ones that are working or need approval only… I could hide completed or whatever." His
+choice: a filter button in Home's top bar and a small sheet (`ui/home/HomeFilter.kt`,
+`HomeFilterSheet.kt`).
+
+1. **A filter button beside the search**, Sessions tab only: the lens's circle with three lines,
+   lit mint with a dot while a filter is on. It opens a glass sheet, the switcher's kind.
+2. **The sheet:** "Active: Needs you + Working" in one tap (again: every state); **State**, Needs
+   you, Working and Completed, each on or off, never all off; **Agent**, All, Claude or Codex,
+   only while both agents are in use or a Codex session is on Home; **Project**, All or one of
+   Home's projects, only with two or more; **Server**, All or one, only in All servers. The states
+   are Home's groups by Home's own rule (`homeGroup`): starting and agents still running are
+   Working, an error is Completed. Every tap applies at once; Clear and Done at the bottom.
+3. **The chip over the list says what's shown**, Home's one filter row (the one a project from a
+   shortcut used): "SHOWING: NEEDS YOU + WORKING", then the agent, project and server after " · ".
+   Its cross shows everything. Sessions that need you which the filter hides are counted beside
+   it in amber, "2 need you, hidden", and that count clears it too.
+4. **Never an empty list without a word:** sessions are there and the filter leaves none: "No
+   sessions match this filter" and Clear. With no sessions at all, Home's empty card as before.
+5. **Kept on the phone** (SharedPreferences, `hypernova_ui`), not per server, across restarts. A
+   server chosen in All servers waits, kept and not applied, while one server is shown, and comes
+   back with All. A project or server that's gone narrows to nothing and says so (4).
+6. **Search runs within the filter**: the filter comes first, then the words, each computer's own
+   in All servers.
+7. **The sky's project filter stays apart** (`SkyFilter`, from a launcher shortcut or Share: it
+   also picks the New session sheet's project, and Back clears it; it isn't kept). Both apply
+   together; the one chip says both, the sky's last, and its Clear clears both.
+8. **The top bar still fits:** the round buttons are 40dp wide (48dp tall; a touch still reaches
+   48dp), so New session keeps its words on a 392dp phone at the usual font. Short of room (a
+   large font, a narrower phone) New session keeps only its plus, so the chip's name ("All",
+   "z2") is never squeezed out.
+9. **Unchanged:** the widget, notifications, the session chat screen, History; no daemon change.

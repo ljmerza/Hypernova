@@ -76,6 +76,7 @@ Test names, shortened:
 | H10 | Cards above the sessions (account, providers, prompts for gone sessions, automation questions), dismiss and undo | AttentionTest (all); HomeGroupsTest.theAccountCardFollowsWhatsOverIt; ProvidersTest (all) | **partial**: no screen test draws any of them; starting a new session from an orphaned prompt (`startFromWaiting`) is untested |
 | H11 | Usage cards (Claude, Codex, one per computer) | UsageCardsTest (all); AllUsageTest (all); UsageProjectionTest (all); UsageRateTest (all); FiveHourReportedTest (all); ModelWeeksTest (all) | **partial**: only the `home_groups` baseline shows a usage card; the Codex card and the per-model weeks aren't drawn |
 | H12 | The sky: the sun as usage, planets as projects, Codex's star, companions | SkyPlanTest, SkyLayoutTest, SkyPhysicsTest, SkySplitTest, AgentLeadTest, PaceTest, CountdownTest (all) | **partial**: placement and physics are tested; the Canvas drawing is in no baseline (Home's has no sky) |
+| H13 | Home filters: the button and sheet (Active, states, agent, project, server), the chip with its hidden needs-you count, Clear, the empty result, kept on the phone, search within it, the top bar at a large font | HomeFilterTest (all); HomeFilterScreenTest (all) | **partial**: the Agent row (both agents in use) isn't drawn in a screen test; the sky's project filter with Home's together is only reasoned, not tested |
 
 ## 4. Session chat
 
