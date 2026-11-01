@@ -1,0 +1,40 @@
+{
+  "path": "/home/me/Projects/files-demo",
+  "entries": [
+    {
+      "name": "src",
+      "path": "/home/me/Projects/files-demo/src",
+      "kind": "dir",
+      "size": 0,
+      "mtime": 1800000000000,
+      "mime": null
+    },
+    {
+      "name": ".env",
+      "path": "/home/me/Projects/files-demo/.env",
+      "kind": "file",
+      "size": 23,
+      "mtime": 1800000000000,
+      "mime": "text/plain; charset=utf-8",
+      "locked": "secret"
+    },
+    {
+      "name": "notes.txt",
+      "path": "/home/me/Projects/files-demo/notes.txt",
+      "kind": "file",
+      "size": 8,
+      "mtime": 1800000000000,
+      "mime": "text/plain; charset=utf-8"
+    },
+    {
+      "name": "README.md",
+      "path": "/home/me/Projects/files-demo/README.md",
+      "kind": "file",
+      "size": 13,
+      "mtime": 1800000000000,
+      "mime": "text/markdown; charset=utf-8"
+    }
+  ],
+  "truncated": false,
+  "total": 4
+}

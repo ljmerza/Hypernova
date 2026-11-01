@@ -1,0 +1,8 @@
+{
+  "speech": {
+    "engine": "mac",
+    "using": "mac",
+    "macVoice": null,
+    "rate": 1.15
+  }
+}

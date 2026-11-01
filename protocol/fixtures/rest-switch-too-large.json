@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "context_too_large",
+    "message": "That’s more than 96 KB. Shorten it, or pick Recent.",
+    "maxBytes": 98304
+  }
+}

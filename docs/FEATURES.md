@@ -61,7 +61,7 @@ Test names, shortened:
 | M5 | New session in All servers asks which computer | HomeScreenTest.allServersNewSessionAsksWhichComputer, oneComputerNewSessionGoesStraightToTheSheet; AllHomeTest.theNewSessionPickerListsEveryComputerOnlyLinkedOnesToPick | **covered** |
 | M6 | Opening a session from All visits its computer; Back returns to All | CoreServersTest.twoComputersPairedTheSwitcherAllServersAndAnswersGoingToTheRightOne (`Core.visit`, `backToPicked`) | **covered** |
 | M7 | All servers in Settings: one block per server, then This phone | SettingsPlanTest (all); AllServersSettingsTest.eachServersBlockActsOnItsOwnServer | **covered** |
-| M8 | Automations stay one server's under All ("pick a server") | AllServersAutomationsTest (all 3) | **covered** |
+| M8 | Automations stay one server's under All ("pick a server") | AllServersAutomationsTest (all 3); AutomationsScreenTest.inAllServersTheAutomationsTabSaysToPickAServerAndStaysOnSessions | **covered** |
 
 ## 3. Home
 
@@ -171,11 +171,11 @@ Test names, shortened:
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| U1 | The tab: list, switch on and off, pause all, delete | SummaryTest.readsTheSnapshotAndTheSocket; EditorRulesTest.aRunsMessageUpdatesTheBook, theRunsCountsKeepOneWindowAsRunsCome; automations.test.ts › "routes: list, create, replace, enable…"; http.test.ts › "automations: the routes, their errors…" | **partial**: the app's `AutomationsLive` calls never run against a rig; `automation`, `run` and `note` messages are read only from hand-written JSON (no fixtures); the tab has no screen test |
+| U1 | The tab: list, switch on and off, pause all, delete | AutomationsLiveTest (all 13); AutomationsScreenTest (the tab tests, the editor's deleteAsksFirstThenGoesBack); SummaryTest.readsTheSnapshotAndTheSocket; EditorRulesTest.aRunsMessageUpdatesTheBook, theRunsCountsKeepOneWindowAsRunsCome; fixtures rest-automation.json, rest-automation-enabled.json, rest-automations-paused.json, rest-automation-runs.json, rest-automations-check.json, ws-automation.json, ws-automation-removed.json, ws-automations.json, ws-run.json, ws-note.json; automations.test.ts › "routes: list, create, replace, enable…"; http.test.ts › "automations: the routes, their errors…" | **covered** |
 | U2 | Editor: triggers, templates, actions, steps, paid providers | EditorRulesTest, PaidTest, SummaryTest, WorkflowRulesTest, WorkflowWordsTest, WorkflowsTest (all); schedule.test.ts, workflows.test.ts, workflows-contract.test.ts (all) | **partial**: the editor screens are untested; the phone's POST /v1/automations/check never runs |
 | U3 | Runs: following, gates, the account gate, results, notes | automations.test.ts (all); SummaryTest.runLines, run; WorkflowWordsTest.aRunsStepsInWords, aRunsOutputsAndItsNewReasons | **covered** |
-| U4 | Run now, Stop, Retry (from a step) | EditorRulesTest.retryIsForRunsThatEndedBadly; WorkflowWordsTest.whichStepRetryStartsFrom; automations.test.ts › "runs: Retry runs an ended one again…"; workflows.test.ts › "Retry from a step…"; http.test.ts › "workflows: an ask answered over HTTP…" | **partial**: the phone's calls never run |
-| U5 | Ask steps answered from the phone or a notification | WorkflowsTest.answersFlagsAndNotes; workflows.test.ts › "start, ask, answer…", "an ask nobody answers…" | **partial**: answering from the app or a notification never runs |
+| U4 | Run now, Stop, Retry (from a step) | AutomationsLiveTest.runNowShowsItsRunAtOnceAndARefusalIsSaidInTheAppsWords, stopAndRetryFromAStep; AutomationsScreenTest.aSavedWorkflowShowsItsStepsRunsNowAndSavesOnlyWhenChanged; EditorRulesTest.retryIsForRunsThatEndedBadly; WorkflowWordsTest.whichStepRetryStartsFrom; fixtures rest-automation-run.json, rest-automation-stop.json, rest-automation-retry.json; automations.test.ts › "runs: Retry runs an ended one again…"; workflows.test.ts › "Retry from a step…"; http.test.ts › "workflows: an ask answered over HTTP…" | **covered** |
+| U5 | Ask steps answered from the phone or a notification | AutomationsLiveTest.anAnswerFromTheAppEndsTheAskAndOneAnsweredElsewhereFirstPutsTheRunAsItIs, anAnswerTooLateFailsButTheCardShowsTheRunTheMacHas, offScreenANoteIsANotificationAndAnAskOneHasItsAnswersAsButtons, anAnswerFromTheNotificationGoesToTheMacAndTheNotificationGoes (`NotifyActions`, ACTION_ANSWER); AutomationsScreenTest.anAskIsAnsweredFromItsCard, anAskSomeoneElseAnsweredSaysWhatWasTaken; WorkflowsTest.answersFlagsAndNotes; fixtures rest-automation-answer.json, rest-automation-not-asking.json, ws-note.json; workflows.test.ts › "start, ask, answer…", "an ask nobody answers…" | **covered** |
 | U6 | Webhook trigger and outputs | workflows.test.ts (webhook, firing and output tests); http.test.ts › "workflows: a webhook trigger fired…", "the local fire route…", "webhook outputs…" | **partial**: showing and renewing the token on the phone is untested |
 | U7 | Shell steps | workflows.test.ts (the shell tests) | **covered** |
 
@@ -183,11 +183,11 @@ Test names, shortened:
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| X1 | Turn Codex on or off; its card in Settings | AgentCardsTest (all); fixture ws-codex.json; codex-only.test.ts › "the phone turns Codex off and on" | **partial**: the app's `setCodexEnabled` never runs |
+| X1 | Turn Codex on or off; its card in Settings | CodexActionsTest.turningCodexOnPostsItAndTheHubHasWhatTheMacSays, aCodexTooOldIsRefusedInTheMacsWordsAndNothingChanges; AgentCardsTest (all); fixtures ws-codex.json, rest-codex.json; codex-only.test.ts › "the phone turns Codex off and on" | **covered** |
 | X2 | Codex's state, account and windows; its star and usage card | CodexTest.readsCodexWithItsAccountAndWindows, noCodexOnAMacWithoutIt; AgentLeadTest (all); UsageCardsTest (all); SkySplitTest (all); codex.test.ts › "the snapshot says what Codex is…"; codex-units.test.ts › "Codex's windows go by their length…" | **covered** |
 | X3 | A Codex session's chat: turns, queue, Stop | codex.test.ts (all); codex-units.test.ts › "items as the chat's events…", "a thread's history reads as its turns…" | **partial**: no rig test has a Codex session |
-| X4 | Codex model and effort switch | CodexTest.readsCodexModels; codex.test.ts › "mode and model take effect from the next turn…", "the models' default…" | **partial**: the app's `setCodexModel` never runs; no fixture for GET /v1/codex/models |
-| X5 | Switch agents: preview, edit, switch | CodexTest.readsASwitchPreview, readsACodexSessionAndItsSwitch; codex.test.ts › "a switch carries the approved text…", "a busy session can't switch…", "two switches at once…"; codex-units.test.ts › "a switch's text reaches the other agent…" | **partial**: the switch sheet, `switchPreview` and `switchAgent` are untested on the phone; no fixtures for …/switch/preview or …/switch |
+| X4 | Codex model and effort switch | CodexActionsTest.theModelsAreAskedOnceAWhileAndAgainWhenCodexTurnsOn, aCodexSessionsModelAndEffortGoTogetherAndItsChipFollowsAtOnce; AgentSwitchSheetTest.aCodexSessionsModelPickerSwitchesItsModelAndEffort; CodexTest.readsCodexModels; fixtures rest-codex-models.json, rest-codex-session-model.json; codex.test.ts › "mode and model take effect from the next turn…", "the models' default…" | **covered** |
+| X5 | Switch agents: preview, edit, switch | CodexActionsTest.aSwitchsPreviewAsksForTheAgentAndHowMuchToCarry, aSwitchSendsTheTextAndChoicesAndOpensTheNewSession, aSwitchTurnedDownSaysWhyWhereItWentAndTheMostItTakes; AgentSwitchSheetTest (all 7); CodexTest.readsASwitchPreview, readsACodexSessionAndItsSwitch; fixtures rest-switch-preview.json, rest-switch.json, rest-switch-too-large.json, rest-switch-switched.json; codex.test.ts › "a switch carries the approved text…", "a busy session can't switch…", "two switches at once…"; codex-units.test.ts › "a switch's text reaches the other agent…" | **covered** |
 | X6 | Rename, Stop and Delete a Codex session | HomeCardTest.theMenuOffersRenameStopAndDeleteForCodex; CardSwipeChoiceTest.deleteForJobsAndCodexOnly; codex.test.ts (the session-menu tests) | **covered** |
 | X7 | Codex in Statistics | StatsTest (the Codex tests); codex-only.test.ts › "Statistics count Codex's turns…"; codex-units.test.ts › "Codex's tokens in Statistics…" | **covered** |
 
@@ -195,9 +195,9 @@ Test names, shortened:
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| G1 | Agent and workflow cards, live | fixtures ws-agent.json, ws-workflow.json, rest-agents.json; contract.test.ts › "{t:"usage"}, {t:"agent"} and {t:"workflow"}", "GET …/agents and an agent's events…"; agents.test.ts (all) | **partial**: the phone's board (`agents()`, GET …/agents) never runs against a rig; the chat's agent and workflow cards aren't drawn |
+| G1 | Agent and workflow cards, live | AgentsLiveTest.theBoardComesWithTheSessionAndTheSocketKeepsItCurrent, anOlderMacWithoutTheRouteLeavesTheBoardEmpty; AgentCardsChatTest (the chat's cards, drawn); fixtures ws-agent.json, ws-workflow.json, rest-agents.json; contract.test.ts › "{t:"usage"}, {t:"agent"} and {t:"workflow"}", "GET …/agents and an agent's events…"; agents.test.ts (all) | **covered** |
 | G2 | The status bar's agents and the workflow's tally | StatusModelTest (the workflow and agent tests) | **covered** |
-| G3 | An agent's own screen: its transcript, "Starting…", following by cursor | AgentEmptyTest (all); fixtures rest-agent-events.json, rest-agent-events-starting.json; agents.test.ts › "a phone following an agent gets only what changed since its cursor…", "an agent just started…" | **partial**: the phone's polling (`agentEvents` with its cursor, every 1.5 s while starting, a whole read at the end) never runs; `AgentScreen` isn't drawn |
+| G3 | An agent's own screen: its transcript, "Starting…", following by cursor | AgentsLiveTest (the `agentEvents` tests: cursor, merge, a whole read at the end, `starting`, an older Mac); AgentScreenTest (all 5: polling every 1.5 s on the compose clock, once more at the end, Starting, Try again); AgentEmptyTest (all); fixtures rest-agent-events.json, rest-agent-events-starting.json; agents.test.ts › "a phone following an agent gets only what changed since its cursor…", "an agent just started…" | **covered** |
 
 ## 13. Read aloud and voice
 
@@ -205,18 +205,18 @@ Test names, shortened:
 |---|---|---|---|
 | V1 | Dictation: press and hold, hands-free, Send while dictating | MicGestureTest (all); VoiceTest (all) | **partial**: Android's `SpeechRecognizer` (`PhoneDictation`) never runs; the dictation capsule isn't drawn |
 | V2 | Which recognizer: the phone's, or on-device only | DictationChoiceTest (all); SettingsTest.voiceEngineOnDevice | **covered** |
-| V3 | Read aloud: the server's voice streamed as PCM, or the phone's own text-to-speech (a Linux server) | SpeechTest (all); ChatTest.readsARepliesWordsNotItsMarkdown; speech.test.ts (all) | **partial**: `SpeechPlayer`, the phone's own text-to-speech path (the one a Linux server uses), the speaking bar and Stop never run; no fixtures for the speech routes or `speech`, `speech.stop`, `speech.progress` |
+| V3 | Read aloud: the server's voice streamed as PCM, or the phone's own text-to-speech (a Linux server) | ReadAloudLiveTest (all 8: the phone's own engine on a Linux server, in pieces, its Stop and its failure; a play streamed into a fake `AudioTrack` with started and ended said to the server, the server's `speech.stop`, the phone's Stop, the fallback to the phone's voice; the setting); SpeakingBarTest (all 3: the bar, the app's bar following `Speaker`, its Stop); SpeechTest (all); ChatTest.readsARepliesWordsNotItsMarkdown; fixtures rest-speech-play.json, rest-speech-settings.json, rest-speech-voices.json, ws-speech.json, ws-speech-stop.json, ws-speech-progress.json; speech.test.ts (all) | **covered** |
 | V4 | Read aloud settings: voice, speed, Test | SpeechTest.speedsSnapToTheStepsSettingsOffers; speech.test.ts › "the setting: the Mac's voice only…" | **partial**: the Read aloud section isn't drawn and its Test never runs |
 
 ## 14. Files and changes
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| F1 | Browse files (the projects folder; outside it with the setting on) | FileProblemTest (all); files.test.ts (all); secretfiles.test.ts (all) | **partial**: the app's `files()` and the Files screen never run; no fixture for GET /v1/files |
-| F2 | View a file | FileProblemTest (all); files.test.ts › "a file: its codes…" | **partial**: `FileViewer` and `file()` are untested |
-| F3 | Download a file: resume, names, share or save, clean-up | DownloadsTest (all); files.test.ts › "the content disposition keeps any name…" | **partial**: `DownloadJob` and `download()` never run against a server (only the APK's in CoreServersTest) |
+| F1 | Browse files (the projects folder; outside it with the setting on) | FilesLiveTest.aFolderIsAskedForByItsPathAndListedFoldersFirst, aFolderTheMacWontOpenIsAFileFailureWithItsCodeAndSetting; FilesScreensTest (the folder tests); FileProblemTest (all); fixture rest-files.json; files.test.ts (all); secretfiles.test.ts (all) | **covered** |
+| F2 | View a file | FilesLiveTest.aFilesBytesComeWithTheirType; FilesScreensTest.aTextFileInMonoWithItsLineNumbers, aFileTheServerWontShowSaysWhyWithTryAgain; FileProblemTest (all); files.test.ts › "a file: its codes…" | **covered** |
+| F3 | Download a file: resume, names, share or save, clean-up | FilesLiveTest (the download tests: streamed into the cache, carried on after a drop with Range and If-Range, a refusal, Cancel); FilesScreensTest.aFileWithNoPreviewIsDownloadedThenShared; DownloadsTest (all); files.test.ts › "the content disposition keeps any name…" | **covered** |
 | F4 | Previews of a dev server or a file; the in-app web page | WebTitleTest, PageErrorTest, PreviewPortsTest (all); LinksTest.onlyTheWebOpensAndDevServersPreview; LanRouteTest.pagesOpenOnTheActiveRouteAndOutsideByTheBaseUrl; files.test.ts › "previews never serve keys…"; lan.test.ts › "a preview and the checklist asked for over the listener…" | **partial**: the phone's POST /v1/preview and `WebScreen` are untested; no fixture |
-| F5 | What changed: the list, a diff, highlighting | ContractTest (rest-changes.json, rest-changes-diff.json through `ChangesRepo`); SessionInfoTest.theGitPartFromTheChanges; changes.test.ts (all) | **partial**: `ChangesScreen`, the diff's highlighting and `ChangesRepo`'s requests (its scope, `all=1`) never run |
+| F5 | What changed: the list, a diff, highlighting | FilesLiveTest.whatChangedAsksForTheSessionsOwnThenEverythingAndADiffByItsPath; ChangesScreenTest (all 4); HighlightTest (all); ContractTest (rest-changes.json, rest-changes-diff.json through `ChangesRepo`); SessionInfoTest.theGitPartFromTheChanges; changes.test.ts (all) | **covered** |
 | F6 | Browse outside projects setting | AllServersSettingsTest.eachServersBlockActsOnItsOwnServer; FileProblemTest (the "Turn on in Settings" test); fixture ws-files.json; files.test.ts, folders.test.ts | **covered** |
 
 ## 15. Settings
@@ -296,18 +296,17 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 The daemon already tests most of these in its own suites. What is missing is the shared golden file
 that both sides must agree on.
 
-- **WebSocket:** `speech`, `speech.stop`, `speech.progress` (from the phone), `speaking`,
-  `automation`, `automation.removed`, `automations`, `run`, `note`, `pong` (the phone's constant
-  answer, which the daemon takes and ignores: ws-ping.test.ts).
-- **REST:** …/menu, …/switch/preview, …/switch, /v1/codex (GET, POST, refresh), /v1/codex/models,
-  /v1/providers (all routes), /v1/files, /v1/file, /v1/preview, /v1/usage, /v1/usage/refresh,
-  /v1/mac/files, /v1/stats, /v1/account/*, /v1/qa, /v1/speech/*, /v1/automations/*. …/open and
-  POST /v1/mac/awake have their Linux refusals only (`rest-session-open-unavailable`,
-  `rest-mac-awake-unavailable`): a Mac's answer can't be made on the Linux machine the daemon's
-  suite runs on. (POST /v1/sessions, the approvals route, a prompt without hold, held edits,
-  attachments, …/interrupt, …/terminal, …/continue, …/auto-continue, …/provider, …/usage, …/todos,
-  …/rewind, …/blocked with retry and dismiss, GET /v1/commands, /v1/projects, /v1/folders,
-  /v1/health, /v1/devices/me and /v1/device/cert have theirs now.)
+- **WebSocket:** `pong` (the phone's constant answer, which the daemon takes and ignores:
+  ws-ping.test.ts). (`speaking` has none on purpose: it goes to the Mac app alone, which this
+  repository doesn't have, and the phone never reads it.)
+- **REST:** …/menu, GET /v1/codex and POST /v1/codex/refresh (the phone calls neither),
+  /v1/providers (all routes), /v1/file (bytes, not JSON: FilesLiveTest and files.test.ts),
+  /v1/preview, /v1/usage, /v1/usage/refresh, /v1/mac/files, /v1/stats, /v1/account/*, /v1/qa,
+  POST /v1/speech (the older whole clip) and /v1/speech/plays/{id}/stop (the phone stops by
+  `speech.progress`), POST /v1/automations/{id}/token. …/open and POST /v1/mac/awake have their
+  Linux refusals only (`rest-session-open-unavailable`, `rest-mac-awake-unavailable`): a Mac's
+  answer can't be made on the Linux machine the daemon's suite runs on. Everything else has its
+  fixture now.
 
 ## Biggest gaps
 
@@ -325,19 +324,19 @@ Ktor; the screens move to Compose Multiplatform) and how soon the owner would no
 4. ~~**Pairing end to end** (P1).~~ Done: PairTest, PairingScreensTest.
 5. ~~**Load earlier** (C4).~~ Covered 2026-10-31. A long chat would silently show only its latest events. *Layer 2:* a
    SocketEventsTest-style test of `hasEarlier` and `loadEarlier` with the limit fixture.
-6. **Automations on the phone** (U1, U4, U5). Many REST calls and five messages with no rig test,
+6. **Automations on the phone** (U1, U4, U5). **Done, 2026-10-31: covered** (see the rows). Many REST calls and five messages with no rig test,
    no fixture and no screen. *Layer 1:* `ws-automation`, `ws-run`, `ws-note` fixtures; *layer 2:*
    AutomationsLive calls; *layer 3:* the tab and the editor.
-7. **Files and What changed** (F1, F2, F3, F5). Whole screens with no screen test, and their routes
+7. **Files and What changed** (F1, F2, F3, F5). **Done, 2026-10-31: covered** (see the rows). Whole screens with no screen test, and their routes
    never run from the phone. *Layer 3:* Files, FileViewer and ChangesScreen baselines; *layer 2:*
    `files`, `file`, `download` and `ChangesRepo`.
-8. **Read aloud playback** (V3). Audio is per platform (`expect`/`actual`), and on the owner's Linux
+8. **Read aloud playback** (V3). **Done, 2026-10-31: covered** (see the rows). Audio is per platform (`expect`/`actual`), and on the owner's Linux
    server it is the phone's own text-to-speech, which nothing runs. *Layer 2:* the play routes with
    a fake player; *layer 1:* fixtures for the speech routes and messages.
-9. **Codex flows on the phone** (X1, X4, X5). The switch sheet, Codex's model switch and turning it
+9. **Codex flows on the phone** (X1, X4, X5). **Done, 2026-10-31: covered** (see the rows). The switch sheet, Codex's model switch and turning it
    on all go untested on the phone. *Layer 2:* `switchPreview`, `switchAgent`, `setCodexModel`,
    `setCodexEnabled`; *layer 1:* fixtures for …/switch/preview and /v1/codex/models.
-10. **Agent boards and the agent screen** (G1, G3). Cursor polling is timing code that a move to
+10. **Agent boards and the agent screen** (G1, G3). **Done, 2026-10-31: covered** (see the rows). Cursor polling is timing code that a move to
     other coroutines breaks easily, and the owner opens agents often. *Layer 2:* `agents()` and
     `agentEvents` with a cursor and `starting`; *layer 3:* AgentScreen.
 

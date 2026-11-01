@@ -1,0 +1,25 @@
+{
+  "models": [
+    {
+      "value": "gpt-test",
+      "name": "GPT-Test",
+      "description": "The default",
+      "efforts": [
+        "low",
+        "high"
+      ],
+      "defaultEffort": "low",
+      "isDefault": true
+    },
+    {
+      "value": "gpt-other",
+      "name": "GPT-Other",
+      "description": null,
+      "efforts": [
+        "medium"
+      ],
+      "defaultEffort": "medium",
+      "isDefault": false
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "run": {
+    "id": "ru_0000000001",
+    "automationId": "au_0000000001",
+    "name": "Deploy check",
+    "fired": {
+      "by": "manual",
+      "at": 1800000000000,
+      "sessionId": null,
+      "detail": null
+    },
+    "state": "done",
+    "reason": null,
+    "until": null,
+    "sessionIds": [],
+    "startedAt": 1800000000000,
+    "endedAt": 1800000000000,
+    "late": 0,
+    "missed": 0,
+    "lateWhy": null,
+    "result": "Deploy",
+    "quiet": false,
+    "skippedTools": [],
+    "permissionMode": null,
+    "depth": 0,
+    "retryOf": null,
+    "steps": [
+      {
+        "id": "st_q",
+        "kind": "ask",
+        "state": "done",
+        "reason": null,
+        "startedAt": 1800000000000,
+        "endedAt": 1800000000000,
+        "result": "Deploy",
+        "quiet": false,
+        "sessionIds": [],
+        "exit": null,
+        "answer": {
+          "text": "Deploy",
+          "by": "phone",
+          "at": 1800000000000
+        },
+        "reused": false
+      },
+      {
+        "id": "st_n",
+        "kind": "notify",
+        "state": "done",
+        "reason": null,
+        "startedAt": 1800000000000,
+        "endedAt": 1800000000000,
+        "result": "Deploying.",
+        "quiet": false,
+        "sessionIds": [],
+        "exit": null,
+        "answer": null,
+        "reused": false
+      }
+    ],
+    "step": 1,
+    "ask": null,
+    "outputs": [],
+    "retryFrom": null,
+    "budgetUsed": null
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "t": "note",
+  "note": {
+    "automationId": "au_0000000001",
+    "runId": "ru_0000000001",
+    "name": "Deploy check",
+    "text": "Deploy now?",
+    "to": "phone",
+    "ask": {
+      "stepId": "st_q",
+      "question": "Deploy now?",
+      "answers": [
+        "Deploy",
+        "Not now"
+      ],
+      "default": "Not now",
+      "until": 1800000000000,
+      "runId": "ru_0000000001"
+    },
+    "id": "no_0000000001",
+    "at": 1800000000000
+  }
+}

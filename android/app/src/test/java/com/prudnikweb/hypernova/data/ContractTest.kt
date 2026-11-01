@@ -557,7 +557,7 @@ class ContractTest {
             assertTrue(e.serverMessage!!.isNotBlank())
             assertEquals(Mac.FEATURE_OPEN_WINDOW, e.error?.str("feature"))
         },
-    )
+    ) + FeatureContracts.checks
 
     @Test fun everyFixtureHasItsChecksAndEveryCheckItsFixture() {
         val files = dir.listFiles { f -> f.name.endsWith(".json") }!!.map { it.name.removeSuffix(".json") }.toSortedSet()

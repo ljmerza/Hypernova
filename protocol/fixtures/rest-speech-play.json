@@ -1,0 +1,15 @@
+{
+  "play": {
+    "id": "play-0123456789",
+    "sessionId": "c0ffee00-0000-4000-8000-00000000c0de",
+    "source": "phone",
+    "engine": "mac",
+    "sampleRate": 24000,
+    "format": "pcm_s16le",
+    "of": 23,
+    "to": {
+      "id": "phone",
+      "name": "Pixel"
+    }
+  }
+}

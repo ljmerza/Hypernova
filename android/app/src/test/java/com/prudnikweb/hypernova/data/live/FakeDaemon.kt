@@ -61,7 +61,7 @@ class FakeDaemon(val name: String = "z2", val lan: Boolean = false) : AutoClosea
     fun forgetCerts() = issued.clear()
 
     /** A request the phone made; [overLan]: on the listener, with the [clientCert] its handshake presented (if any). */
-    data class Req(val method: String, val path: String, val body: String, val auth: String?, val overLan: Boolean = false, val clientCert: X509Certificate? = null) {
+    data class Req(val method: String, val path: String, val body: String, val auth: String?, val overLan: Boolean = false, val clientCert: X509Certificate? = null, val headers: Map<String, String> = emptyMap()) {
         val bare: String get() = path.substringBefore('?')
         val json: JSONObject get() = if (body.isBlank()) JSONObject() else JSONObject(body)
         val query: String get() = path.substringAfter('?', "")
@@ -95,6 +95,7 @@ class FakeDaemon(val name: String = "z2", val lan: Boolean = false) : AutoClosea
                 val r = Req(
                     request.method ?: "GET", request.path ?: "/", request.body.readUtf8(), request.getHeader("Authorization"),
                     overLan = hs != null, clientCert = hs?.peerCertificates?.firstOrNull() as? X509Certificate,
+                    headers = request.headers.associate { (k, v) -> k.lowercase() to v },
                 )
                 requests += r
                 if (down) return drop()
