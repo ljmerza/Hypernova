@@ -263,6 +263,7 @@ Test names, shortened:
 | # | Capability | Tests | Status |
 |---|---|---|---|
 | ST1 | Totals, ranges, the last 30 days as bars | StatsScreenTest (all); DayBarsTest (all); StatsTest (all); stats.test.ts (all) | **partial**: GET /v1/stats has no fixture (the app reads hand-written JSON) |
+| ST2 | All servers: every server's statistics added up, each one's part, the ones not answering named | AllStatsTest (all); StatsScreenTest.allServersAddsTheirStatisticsUp, allServersAsksEachForTheSameRange, aServerThatFailsIsLeftOutAndNamed, noServerAnsweringSaysSo, oneServerIsStillOneServers | **partial**: asking real servers at once isn't driven (a fake hub has no server to ask, so a linked one with no answer put fails); Home handing the servers to the screen isn't drawn |
 
 ## 20. Mac-only features
 
