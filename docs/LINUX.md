@@ -224,7 +224,7 @@ than the daemon, never an older or equal one:
   marker (install the latest release once, and it can from then on).
 - **Checked first**: the server package's SHA-256 against the release's note (`serverSha256`;
   older releases have none, and aren't installed), and its daemon's version against the tag.
-- **At a quiet moment**: no session working and no approval waiting, for 2 minutes; after 24
+- **At a quiet moment**: no session working, no agent running and no approval waiting, for 2 minutes; after 24
   hours of waiting it goes ahead (the shared terminals keep running through the restart).
 - **Installed as above**, by the package's own `scripts/install-linux.sh --from <it> --yes
   --no-claude`, in a transient systemd unit of its own (`systemd-run --user`, `hypernova-update`),
