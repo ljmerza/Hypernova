@@ -110,7 +110,8 @@ test('hn ls: none running says so; a running one is listed with its id, its fold
   // "<id>  <folder padded>  <age>  where it is open" (a Linux server: "in a terminal").
   assert.match(lines[0]!, new RegExp(`^${id}  parser-app\\s+\\d+s  not open ${process.platform === 'darwin' ? 'on the Mac' : 'in a terminal'}$`))
   // `hn list` is the same command.
-  assert.equal((await hn(['list'])).out, r.out)
+  const age = (out: string) => out.replace(/ +\d+[smhd]  /, ' <age>  ')
+  assert.equal(age((await hn(['list'])).out), age(r.out))
 })
 
 test('hn attach: refused without a terminal; in one it draws the screen, types into it, and Ctrl+\\ detaches leaving it running', async () => {
