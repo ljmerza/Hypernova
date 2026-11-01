@@ -1,5 +1,5 @@
 // The server updating itself (owner, 2026-10-31; docs/PROTOCOL.md, "The server's own update";
-// docs/LINUX.md, "Updating"). Off unless settings.autoUpdate is true. The release check
+// docs/LINUX.md, "Updating"). On unless settings.autoUpdate is false (owner, 2026-11-01). The release check
 // (releases.ts) hands each release it reads here, after the APK's part, so the phones already have
 // the new app on offer. When the release is newer than this daemon's VERSION:
 //
@@ -171,7 +171,7 @@ export type UpdaterOptions = {
   /** <support>/server-update.json */
   stateFile?: string
   logFile?: string
-  /** Default: settings.autoUpdate === true. */
+  /** Default: settings.autoUpdate, unset on (owner, 2026-11-01). */
   enabled?: () => boolean
   managed?: () => Managed
   busy?: () => Busy
@@ -196,7 +196,7 @@ export function serverUpdater(o: UpdaterOptions = {}) {
   const dir = o.dir ?? join(SUPPORT, 'updates')
   const stateFile = o.stateFile ?? join(SUPPORT, 'server-update.json')
   const logFile = o.logFile ?? join(LOGS, 'update.log')
-  const enabled = o.enabled ?? (() => settings.autoUpdate === true)
+  const enabled = o.enabled ?? (() => settings.autoUpdate !== false)
   const now = o.now ?? Date.now
   const sleep = o.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms).unref()))
   const quietMs = o.quietMs ?? QUIET_FOR

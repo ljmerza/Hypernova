@@ -444,7 +444,7 @@ class ContractTest {
         assertEquals(MacAwake.OFF, mac.awake!!.mode)
         assertEquals(Mac.LINUX, mac.platform)
         assertEquals(false, mac.browseOutsideProjects)
-        assertEquals(false, mac.update!!.auto)
+        assertEquals(true, mac.update!!.auto) // on by default (owner, 2026-11-01)
         assertEquals(false, mac.update!!.available)
         assertEquals(setOf("battery", "awake", "macVoice", "openWindow"), mac.unavailable.keys)
         usageWithoutFiveHours(s.usage)

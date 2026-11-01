@@ -211,7 +211,7 @@ The new daemon is prepared beside the old one and swapped in only once its termi
 then the service restarts; open sessions keep running. (Docker: see "Updating the container" above.)
 
 **By itself** (`hypernova auto-update on`, or the app's Settings → the server → **Update this server
-automatically**; off unless turned on; `"autoUpdate": true` in `settings.json`). The daemon's look at
+automatically**; on unless turned off, owner 2026-11-01; `"autoUpdate": false` in `settings.json` turns it off). The daemon's look at
 GitHub's latest release (30 s after start, then every 6 hours) then also installs a release newer
 than the daemon, never an older or equal one:
 

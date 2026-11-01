@@ -60,7 +60,7 @@ startStats()
 startUsageProbe()
 // After the servers, the account, the battery and Stay awake: automations fire off all of them.
 void startAutomations()
-// The server updating itself (server-update.ts, settings.autoUpdate, off unless turned on): an
+// The server updating itself (server-update.ts, settings.autoUpdate, on unless turned off): an
 // update this start is the result of is said now; one waits for no session working and no approval.
 const justUpdated = startServerUpdate({
   busy: () => ({ working: listSessions().filter((s) => s.state === 'working' || s.state === 'starting').length, approvals: pendingApprovals().length }),

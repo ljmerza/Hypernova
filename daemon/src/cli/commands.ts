@@ -460,7 +460,7 @@ export async function lan(cli: Cli, rest: string[]): Promise<number> {
 
 /**
  * `hypernova auto-update [on|off]`: the server updating itself to newer releases (settings.autoUpdate,
- * off unless turned on; daemon/src/server-update.ts), as the phone's switch does. Without a word, how
+ * on unless turned off; daemon/src/server-update.ts), as the phone's switch does. Without a word, how
  * it stands: on or off, whether this install can, and the last update it installed.
  */
 export async function autoUpdate(cli: Cli, rest: string[]): Promise<number> {
@@ -607,7 +607,7 @@ export const HELP = `hypernova: a control room for Claude Code and Codex, on thi
                         OpenAI's Codex for Hypernova: what's found here, or turn it on or off
   hypernova lan on|off  the phone's direct route on the same network
   hypernova auto-update [on|off]
-                        this server installs newer releases by itself (off unless turned on)
+                        this server installs newer releases by itself (on unless turned off)
   hypernova uninstall   remove it (--purge: paired phones and settings too; --yes)
   hypernova run         run the daemon in the foreground (containers, debugging)
   hypernova automation fire <id>

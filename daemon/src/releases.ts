@@ -6,7 +6,7 @@
 // An APK an admin put there (`hnctl apk`, a dev build) with a higher versionCode is never replaced.
 // Never fails the daemon: offline, GitHub down or a rate limit is a line in the log, then the next
 // check. Settings: `releaseCheck` (unset: on). The same look hands the release to the server's own
-// update (server-update.ts, `autoUpdate`, unset: off), after the APK, so the phones are offered the
+// update (server-update.ts, `autoUpdate`, unset: on), after the APK, so the phones are offered the
 // new app before the server restarts into the new version.
 import { createHash } from 'node:crypto'
 import { once } from 'node:events'

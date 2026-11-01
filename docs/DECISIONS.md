@@ -2610,13 +2610,13 @@ acts on the one picked while All servers is on (`ui/settings/SettingsPlan.kt` de
 5. **Unchanged:** Settings with one server picked; nothing on the session chat screen; the update
    banner and the update notification still follow the one on screen.
 
-## Servers update themselves, off by default (2026-10-31)
+## Servers update themselves (2026-10-31; on by default since 2026-11-01)
 
 The owner: "for the server auto updating allow it to be a setting ... default no, and then yeah the
 server updates itself and then pushes to the client that needs update too." Decided
 (`daemon/src/server-update.ts`, docs/PROTOCOL.md, "The server's own update"):
 
-1. **A setting, off by default**: `autoUpdate` (unset: off). On the phone it is one switch in the
+1. **A setting, on by default**: `autoUpdate` (unset: on; owner, 2026-11-01: "change auto update to true by default"; it was off by default the day before). On the phone it is one switch in the
    server's own section of Settings, **Update this server automatically**, with a line saying what
    it does, or why this install can't, what it's doing and the last update it installed; on the
    server `hypernova auto-update on|off`, or `POST /local/settings {autoUpdate}`.

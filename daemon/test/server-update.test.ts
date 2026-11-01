@@ -134,14 +134,21 @@ test('the note: serverSha256 is read when it is one, and an older note still wor
   assert.equal(parseNote({ versionCode: 1, versionName: '0.9.0', sha256: s, serverSha256: 'nope' })?.serverSha256, null)
 })
 
-test('off by default: nothing is downloaded', async () => {
+test('on by default (owner, 2026-11-01); turned off, nothing is downloaded', async () => {
   pkg = tarball('0.9.0')
-  const { u, applied } = updater({ enabled: undefined })
+  const { u } = updater({ enabled: undefined })
   assert.equal(settings.autoUpdate, undefined)
-  assert.deepEqual(await u.consider(release('v0.9.0')), { kind: 'off' })
-  assert.equal(u.view().auto, false)
-  assert.equal(hits.tgz, 0)
-  assert.equal(applied.length, 0)
+  assert.equal(u.view().auto, true)
+  settings.autoUpdate = false
+  try {
+    const off = updater({ enabled: undefined })
+    assert.deepEqual(await off.u.consider(release('v0.9.0')), { kind: 'off' })
+    assert.equal(off.u.view().auto, false)
+    assert.equal(hits.tgz, 0)
+    assert.equal(off.applied.length, 0)
+  } finally {
+    delete settings.autoUpdate
+  }
 })
 
 test('a newer release: downloaded, checked, unpacked and handed to the installer; the new daemon says so', async () => {
