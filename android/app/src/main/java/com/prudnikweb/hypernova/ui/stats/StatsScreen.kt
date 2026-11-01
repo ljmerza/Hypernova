@@ -68,15 +68,19 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AllStats
+import com.prudnikweb.hypernova.data.AllStatsAnswer
 import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Problem
+import com.prudnikweb.hypernova.data.Servers
 import com.prudnikweb.hypernova.data.StatDay
 import com.prudnikweb.hypernova.data.StatProject
 import com.prudnikweb.hypernova.data.Stats
 import com.prudnikweb.hypernova.data.StatsAgents
 import com.prudnikweb.hypernova.data.StatsRange
+import com.prudnikweb.hypernova.data.StatsServer
 import com.prudnikweb.hypernova.data.StatsSource
 import com.prudnikweb.hypernova.data.bothAgents
 import com.prudnikweb.hypernova.data.codexLeads
@@ -128,27 +132,69 @@ private const val STATS_SOURCE = "stats"
  * changes (showing the last answer at once), then every minute while open. Back (the arrow or the
  * gesture) is [onBack]. Every total covers both agents; with Codex at work in the range the hero
  * splits its hours between them ([StatsAgents]); Claude's alone reads exactly as before Codex.
+ *
+ * With [servers] (Home shows "All servers", two or more paired) it is every server's statistics
+ * added up ([AllStats]): each linked one asked for the same range, the header saying "All servers",
+ * a short list of each server's part, and a line naming the servers whose numbers aren't in them.
  */
 @Composable
 fun StatsScreen(
     hub: Hub,
     onBack: () -> Unit,
-    /** Home shows "All servers": whose statistics these are (the one picked last), before the days they cover. */
-    server: String? = null,
+    /** Home shows "All servers": every paired server, in the order paired; their statistics combined. */
+    servers: List<StatsServer>? = null,
 ) {
     val res = LocalContext.current.resources
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val all = servers?.takeIf { it.size >= 2 }
+    val everyServer by rememberUpdatedState(all.orEmpty())
+    val combined = all != null
+    // The servers asked: those linked now. One coming back is asked at once.
+    val linkedIds = all?.filter { Servers.fresh(it.hub.link.state) }?.map { it.id }
     var range by rememberSaveable { mutableStateOf(StatsRange.Week) }
-    var stats by remember(hub) { mutableStateOf(StatsSource.cached(hub, range)) }
-    var loading by remember(hub) { mutableStateOf(false) }
-    var problem by remember(hub) { mutableStateOf<ApiException?>(null) }
+    var stats by remember(hub, combined) { mutableStateOf(if (all != null) AllStats.cached(all, range)?.stats else StatsSource.cached(hub, range)) }
+    var loading by remember(hub, combined) { mutableStateOf(false) }
+    var problem by remember(hub, combined) { mutableStateOf<ApiException?>(null) }
+    // All servers: each server's own answer (the ones that answered), and the names of those that didn't.
+    var each by remember(hub, combined) { mutableStateOf(all?.let { AllStats.cached(it, range)?.each }.orEmpty()) }
+    var missing by remember(hub, combined) { mutableStateOf(all?.let { AllStats.cached(it, range)?.missing }.orEmpty()) }
     var retry by remember { mutableIntStateOf(0) }
     // The day the last 30 days' readout shows (epoch day); none picked: today.
     var picked by rememberSaveable { mutableStateOf<Long?>(null) }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val lastRange = remember(hub) { arrayOf<StatsRange?>(null) }
-    LaunchedEffect(hub, range, retry) {
+    val lastRange = remember(hub, combined) { arrayOf<StatsRange?>(null) }
+    if (all != null) LaunchedEffect(all.map { it.id }, linkedIds, range, retry) {
+        fun take(a: AllStatsAnswer) {
+            // Those that answered, added up; none: the last numbers stay (or the error card) and the problem says why.
+            if (a.stats != null) {
+                stats = a.stats; each = a.each; missing = a.missing; problem = null
+            } else {
+                problem = a.problem ?: ApiException(Problem.Unreachable)
+                missing = a.missing
+            }
+        }
+        AllStats.cached(everyServer, range)?.let(::take)
+        if (lastRange[0] != range) {
+            lastRange[0] = range
+            problem = null
+        }
+        var asked = retry
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                if (asked > 0 || !AllStats.fresh(everyServer, range)) {
+                    loading = true
+                    try {
+                        take(AllStats.load(everyServer, range, again = asked > 0))
+                    } finally {
+                        loading = false
+                    }
+                }
+                asked = 0
+                delay(60_000)
+            }
+        }
+    } else LaunchedEffect(hub, range, retry) {
         StatsSource.cached(hub, range)?.let { stats = it }
         // A new range starts clean: the last one's failure isn't its own. Trying again keeps it,
         // so the error stays up while the Mac is asked again.
@@ -182,10 +228,12 @@ fun StatsScreen(
     // Another range's numbers stay while the Mac answers, and glide to this one's. They never
     // stand in for this range otherwise: not once asking has failed, and not while there's no
     // link to the Mac, when the answer may be seconds away or not come at all.
-    val linked = hub.link.state == LinkState.Connected
+    // All servers: any of them linked.
+    val linked = all?.any { it.hub.link.state == LinkState.Connected } ?: (hub.link.state == LinkState.Connected)
     val s = stats?.takeIf { it.range == range || (linked && problem == null) }
-    // Whose work it is: Claude's alone (as ever), both agents', or Codex's where it leads.
-    val agents = s?.agents(hub.codexLeads) ?: StatsAgents.Claude
+    // Whose work it is: Claude's alone (as ever), both agents', or Codex's where it leads (on every server, for All).
+    val codexLeads = all?.all { it.hub.codexLeads } ?: hub.codexLeads
+    val agents = s?.agents(codexLeads) ?: StatsAgents.Claude
     // The days the range covers, from any answer: the Mac's calendar, and its first day with work.
     // Before the first answer the line holds its place, so the bar doesn't change height.
     val span = stats?.let { rangeSpan(res, range, it.days.lastOrNull()?.day ?: localDate(it.to), it.since) } ?: " "
@@ -193,9 +241,9 @@ fun StatsScreen(
         sourceKey = STATS_SOURCE,
         title = stringResource(R.string.stats_title),
         subtitle = when {
-            server == null -> span
-            span.isBlank() -> server
-            else -> stringResource(R.string.stats_on_server, server, span)
+            !combined -> span
+            span.isBlank() -> stringResource(R.string.servers_all)
+            else -> stringResource(R.string.stats_on_server, stringResource(R.string.servers_all), span)
         },
         onBack = onBack,
         // The activity meter: it turns while an answer loads.
@@ -225,6 +273,7 @@ fun StatsScreen(
                 s == null -> item(key = "loading") {
                     GlassCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                         val reading = when {
+                            combined -> R.string.stats_loading_all
                             hub.bothAgents -> R.string.stats_loading_agents
                             hub.codexLeads -> R.string.stats_loading_codex
                             else -> R.string.stats_loading
@@ -237,6 +286,13 @@ fun StatsScreen(
                         val at = remember(s.to) { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH).format(java.time.Instant.ofEpochMilli(s.to).atZone(java.time.ZoneId.systemDefault())) }
                         HText(stringResource(R.string.stats_stale, at), style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 20.dp))
                     }
+                    // All servers: the ones that didn't answer, whose numbers aren't in these.
+                    if (combined && problem == null && missing.isNotEmpty()) item(key = "missing") {
+                        HText(
+                            pluralStringResource(R.plurals.stats_all_missing, missing.size, missing.joinToString(", ")),
+                            style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 20.dp),
+                        )
+                    }
                     item(key = "hero") { Hero(s, agents, Modifier.padding(horizontal = 16.dp)) }
                     item(key = "days") {
                         val today = s.days.lastOrNull()?.day
@@ -244,6 +300,8 @@ fun StatsScreen(
                         DaysSection(s, day?.day ?: today, onSelect = { picked = it.toEpochDay() }, agents = agents)
                     }
                     if (s.projects.isNotEmpty()) item(key = "projects") { Projects(s) }
+                    // All servers: each one's part, when two or more answered for this range.
+                    if (combined && each.size >= 2 && each.all { it.second.range == s.range }) item(key = "servers") { ServerParts(each) }
                     item(key = "records") { Records(s, agents) }
                     if (s.prompts > 0 || s.toolCalls > 0 || s.approvals > 0) item(key = "work") { Work(s) }
                     item(key = "footer") {
@@ -254,7 +312,8 @@ fun StatsScreen(
                                     StatsAgents.Both -> R.string.stats_footer_agents
                                     StatsAgents.Codex -> R.string.stats_footer_codex
                                 },
-                                hub.mac.name,
+                                // All servers: the ones these came from.
+                                if (combined) each.joinToString(", ") { it.first.name } else hub.mac.name,
                             ),
                             // A quiet note under everything.
                             style = Type.small.copy(textAlign = TextAlign.Center), color = HN.inkDim,
@@ -648,6 +707,45 @@ private fun ProjectRow(p: StatProject, max: Long) {
         }
         Spacer(Modifier.width(12.dp))
         HText(hours(res, p.claudeMs), style = RowNumber, color = HN.ink, maxLines = 1)
+    }
+}
+
+// ─── Each server's part (All servers) ──────────────────────────────────────
+
+/**
+ * All servers: each server that answered, in the order paired, as the projects' rows are without
+ * their planets: its name, its sessions in words and its tokens after a token, its hours on the right.
+ */
+@Composable
+private fun ServerParts(each: List<Pair<StatsServer, Stats>>) {
+    val res = LocalContext.current.resources
+    Column(Modifier.fillMaxWidth()) {
+        Seam(stringResource(R.string.stats_servers), modifier = Modifier.padding(horizontal = 20.dp).padding(top = 18.dp, bottom = 12.dp))
+        GlassCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+            Column(Modifier.padding(vertical = 4.dp)) {
+                each.forEachIndexed { i, (server, st) ->
+                    if (i > 0) Hairline(Modifier.fillMaxWidth().padding(horizontal = 16.dp), HN.lineSoft)
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp).semantics(mergeDescendants = true) {},
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            HText(server.name, style = Type.heading, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (st.sessions > 0 || st.tokens.total > 0) {
+                                Spacer(Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (st.sessions > 0) HText(pluralStringResource(R.plurals.stats_sessions_count, st.sessions, st.sessions), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                                    if (st.sessions > 0 && st.tokens.total > 0) Spacer(Modifier.width(12.dp))
+                                    if (st.tokens.total > 0) GlyphFigure(Glyph.Token, compact(res, st.tokens.total), color = HN.inkDim)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        HText(hours(res, st.claudeMs), style = RowNumber, color = HN.ink, maxLines = 1)
+                    }
+                }
+            }
+        }
     }
 }
 

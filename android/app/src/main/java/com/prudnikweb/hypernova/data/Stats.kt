@@ -201,7 +201,8 @@ object StatsSource {
     /** A Mac answers within the daemon's own 15 s cache; older than this, ask again. */
     private const val FRESH_MS = 30_000L
 
-    private fun key(hub: Hub, range: StatsRange): String = "${(hub as? LiveHub)?.pairing?.baseUrl ?: "none"}|${range.wire}"
+    // A hub with no Mac to ask (a screen test's) is its own entry, so several of them (All servers) keep theirs apart.
+    private fun key(hub: Hub, range: StatsRange): String = "${(hub as? LiveHub)?.pairing?.baseUrl ?: "hub@${System.identityHashCode(hub)}"}|${range.wire}"
 
     /** The last answer for [range], if any (shown at once while a fresh one loads). */
     fun cached(hub: Hub, range: StatsRange): Stats? = cache[key(hub, range)]?.stats
