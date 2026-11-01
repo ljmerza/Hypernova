@@ -33,7 +33,7 @@ Each command's flags are in the rows under it.
 | `--terminals` | The shared terminals' log instead. |
 | **`hypernova lan on\|off`** | Turns the local route on or off, at once, and keeps it that way ([Ports](#ports)). |
 | **`hypernova auto-update [on\|off]`** | The server installing newer releases by itself ([Updating](#updating)). Without a word: on or off, whether this install can and why not, what it's doing, a try that failed, the last update. `on` also looks for a release at once. |
-| **`hypernova codex [on\|off]`** | OpenAI's Codex for Hypernova. Without a word: its path, its version against the minimum (0.163.0), on or off, signed in. `on` connects the daemon to Codex's own app server and adds a `codex` shell function; it refuses when Codex is missing or too old. Never installs or signs in Codex ([INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md), "Sign in to your agents"). |
+| **`hypernova codex [on\|off]`** | OpenAI's Codex for Hypernova. Without a word: its path, its version against the minimum (0.163.0), on or off, signed in. `on` connects the daemon to Codex's own app server and adds a `codex` shell function; it refuses when Codex is missing or too old. Never installs or signs in Codex ([INSTALL.md, "Codex (optional)"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#codex-optional)). |
 | **`hypernova uninstall`** | Removes the integration, the service, the command, the daemon and the Node.js it downloaded. Keeps paired phones, settings and logs, Claude Code, Codex and their logins, and lingering (it says how to turn that off). Open shared sessions keep running. Asks first; with no terminal it refuses without `--yes`. |
 | `--purge` | Paired phones, settings and logs too. |
 | `--yes` | Don't ask. |
@@ -57,7 +57,7 @@ spelling: `hypernova uninstall --pruge` still uninstalls, and keeps your state.
 Every phone session runs in a shared terminal. So does `claude` typed in your shell, through a
 function in a marked block in `~/.bashrc` or `~/.zshrc` (`# >>> hypernova shared terminals`), and
 `codex` while it's on. With another login shell they stay plain. `command claude` or `HYPERNOVA_OFF=1`
-skips it for one run. More: [INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md), "The shell integration".
+skips it for one run. More: [INSTALL.md, "The shell integration"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#the-shell-integration).
 
 | Command | What it does |
 |---|---|
@@ -65,7 +65,39 @@ skips it for one run. More: [INSTALL.md](https://github.com/ljmerza/Hypernova/bl
 | `hn attach [id]`, `hn a` | Opens one in this terminal, by id, session id or project name. Ctrl+\ detaches and leaves it running. |
 | `hn run`, `hn run-codex` | What the shell functions call. You don't type these. |
 
-### The install scripts
+## Install
+
+The normal way is the `get.sh` line in
+[INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#install). These are the
+other ways. Run them as the user who will run the agents; the script asks `sudo` for system packages
+only.
+
+Each [release](https://github.com/ljmerza/Hypernova/releases/latest) carries:
+
+| Asset | What it is |
+|---|---|
+| `hypernova-server-<tag>-linux.tar.gz` | The server package, one for x86_64 and arm64: Node.js and the terminal module are fetched and built for the server at install. |
+| `hypernova-<tag>.apk` | The Android app. |
+
+A release's package by hand, on the server:
+
+```sh
+gh release download -R ljmerza/Hypernova -p 'hypernova-server-*-linux.tar.gz'   # or save it from the page
+tmp=$(mktemp -d) && tar -xzf hypernova-server-*-linux.tar.gz -C "$tmp" && "$tmp"/hypernova-*/scripts/install-linux.sh
+```
+
+From a clone, on the server: `scripts/install-linux.sh`.
+
+A package of your own:
+
+```sh
+scripts/pack-linux.sh                 # in a clone: writes dist/linux/hypernova-<version>.tar.gz
+scp dist/linux/hypernova-*.tar.gz you@server:
+# then on the server:
+tar -xzf hypernova-<version>.tar.gz && hypernova-<version>/scripts/install-linux.sh
+```
+
+The scripts and their options:
 
 | Script or option | What it does |
 |---|---|
@@ -110,6 +142,7 @@ Inside `<state>`:
 | The app, downloaded from the latest release for the phones | `android/` |
 | The server's own update | `updates/`, `server-update.json` |
 
+<a id="security"></a>
 ## Ports
 
 | Port | Name | Listens on | For |
@@ -136,13 +169,15 @@ It's on by default, except where no phone shares the network. `hypernova lan on|
 | A container | Its bridge network has no phones on it. |
 | WSL 2 in any networking mode but mirrored or bridged | It sits behind Windows' NAT. Even when turned on, its addresses are left out of pairing links. |
 
-Pairing links carry the server's private addresses (RFC 1918, else ULA) on real interfaces. Virtual
-and tunnel interfaces are never offered: `docker*`, `br-*`, `virbr*`, `veth*`, `tun*`, `wg*` and the
-like.
+Pairing links name only the server's private addresses (RFC 1918, else ULA) on real network
+interfaces. Virtual and tunnel interfaces are never named: `docker*`, `br-*`, `virbr*`, `veth*`,
+`tun*`, `wg*` and the like.
 
 **Away from home**, use your own VPN into the server's network (WireGuard, a UniFi VPN). The phone then
 reaches the local route as if it were on the Wi-Fi. A VPS has no home network to join, so it needs
-`hypernova lan on` and a VPN onto its private network. Never open port 47323 to the internet.
+`hypernova lan on` and a VPN onto its private network, one the server reaches through a normal
+interface. A WireGuard that ends on the VPS itself, with no other private address there, leaves the
+link no address to name (read from the code, not yet tried). Never open port 47323 to the internet.
 
 ## Environment variables
 
@@ -274,10 +309,12 @@ the log on the terminal too, and in a container `docker logs hypernova` has it.
 
 ## Containers and WSL
 
+<a id="try-it-in-docker"></a>
 ### Docker
 
-The commands are in [INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md),
-"3. In Docker". What differs from a server:
+The commands are in
+[INSTALL.md, "In a container"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#in-a-container).
+What differs from a server:
 
 | | |
 |---|---|
@@ -285,26 +322,28 @@ The commands are in [INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/
 | The program | In the image, under `/opt/hypernova`. |
 | State | In the volume, at `/home/hypernova`: paired phones, settings, keys, the agents' logins. |
 | Identity | Each volume makes its own computer id, admin token and hook secret at its first start, so two containers are two computers. The hooks go in at each start (`hypernova integrate`). |
-| The network | Nothing is published, and the local route is off. On a Linux host, `--network host` and `hypernova lan on` let a phone in. |
+| The network | Nothing is published, and the local route is off, so a phone has no way in. On a Linux host, `--network host` and `hypernova lan on` let it in, before you pair. The container then uses the host's ports, so don't run it beside a Hypernova installed on that host. |
 | Health | The image's `HEALTHCHECK` asks the phone API, on the container's own loopback. |
 | Building | `--build-arg CLAUDE=no` leaves Claude Code out. |
 
 ### Updating the container
 
 Build the image again from a newer clone, remove the container, and run it again with the same volume.
-The new image's daemon runs, with your phones and settings:
+The new image's daemon runs, with your phones and settings. Use the `docker run` line you started it
+with; on a Linux host, that has `--network host`:
 
 ```sh
 docker build -t hypernova . && docker rm -f hypernova
-docker run -d --name hypernova --hostname my-hypernova --restart unless-stopped \
+docker run -d --name hypernova --hostname my-hypernova --network host --restart unless-stopped \
   --log-opt max-size=10m -v hypernova-home:/home/hypernova hypernova
 ```
 
 ### WSL on a Windows PC
 
 **Experimental**: written from Microsoft's and Docker's guides, not yet tried on a real Windows PC.
-The steps are in [INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md),
-"Windows (experimental)". `hypernova setup`, `doctor`, `pair` and `lan` say what differs when they run there:
+The steps are in
+[INSTALL.md, "Windows (experimental)"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#windows-experimental).
+`hypernova setup`, `doctor`, `pair` and `lan` say what differs when they run there:
 
 | | |
 |---|---|
@@ -335,7 +374,7 @@ shared terminals and Codex.
 ## Troubleshooting
 
 `hypernova doctor` first: each problem comes with its fix. Then `hypernova logs`. More in
-[INSTALL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md), "Troubleshooting".
+[INSTALL.md, "Troubleshooting"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#troubleshooting).
 
 | Symptom | What to do |
 |---|---|
