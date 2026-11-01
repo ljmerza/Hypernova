@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "insecure_url",
+    "message": "The key would travel unencrypted. Use the https:// address."
+  }
+}

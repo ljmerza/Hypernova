@@ -1,0 +1,12 @@
+{
+  "check": {
+    "state": "ok",
+    "text": "Key works. 2 models.",
+    "models": [
+      "gateway-large",
+      "gateway-small"
+    ],
+    "balance": null,
+    "checkedAt": 1800000000000
+  }
+}

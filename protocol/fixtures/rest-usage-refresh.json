@@ -1,0 +1,27 @@
+{
+  "usage": {
+    "fiveHour": {
+      "pct": 100,
+      "resetsAt": 1800000000000
+    },
+    "sevenDay": {
+      "pct": 62,
+      "resetsAt": 1800000000000
+    },
+    "models": [
+      {
+        "label": "Sonnet",
+        "pct": 12,
+        "resetsAt": 1800000000000
+      }
+    ],
+    "modelsObservedAt": 1800000000000,
+    "modelsStale": false,
+    "probe": {
+      "ok": true,
+      "since": null
+    },
+    "source": "stale",
+    "observedAt": 1800000000000
+  }
+}

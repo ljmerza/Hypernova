@@ -1,0 +1,365 @@
+{
+  "range": "week",
+  "from": 1800000000000,
+  "to": 1800000000000,
+  "computedAt": 1800000000000,
+  "since": 1800000000000,
+  "countingSince": 1800000000000,
+  "claudeMs": 600000,
+  "wallMs": 600000,
+  "agentMs": 600000,
+  "tokens": {
+    "input": 12,
+    "output": 88,
+    "cacheRead": 20000,
+    "cacheWrite": 0
+  },
+  "sessions": 2,
+  "prompts": 2,
+  "promptsFrom": {
+    "phone": 1,
+    "voice": 0
+  },
+  "toolCalls": 7,
+  "tools": [
+    {
+      "name": "Agent",
+      "count": 2
+    },
+    {
+      "name": "Bash",
+      "count": 1
+    },
+    {
+      "name": "Edit",
+      "count": 1
+    },
+    {
+      "name": "Read",
+      "count": 1
+    },
+    {
+      "name": "TodoWrite",
+      "count": 1
+    },
+    {
+      "name": "Workflow",
+      "count": 1
+    }
+  ],
+  "filesEdited": 1,
+  "agents": 1,
+  "approvals": {
+    "total": 3,
+    "phone": 3,
+    "mac": 0
+  },
+  "limitsHit": {
+    "fiveHour": 1,
+    "sevenDay": 0,
+    "model": 0
+  },
+  "busiestDay": {
+    "day": "2027-01-15",
+    "claudeMs": 600000,
+    "tokens": 20100
+  },
+  "longestSession": {
+    "id": "c0ffee00-0000-4000-8000-00000000c0de",
+    "title": "Fix the parser so it trims its input",
+    "project": "Unknown",
+    "startedAt": 1800000000000,
+    "claudeMs": 600000
+  },
+  "streak": 1,
+  "projects": [
+    {
+      "name": "Unknown",
+      "path": null,
+      "claudeMs": 600000,
+      "tokens": 20100,
+      "sessions": 2
+    }
+  ],
+  "days": [
+    {
+      "day": "2026-12-17",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-18",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-19",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-20",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-21",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-22",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-23",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-24",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-25",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-26",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-27",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-28",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-29",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-30",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2026-12-31",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-01",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-02",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-03",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-04",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-05",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-06",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-07",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-08",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-09",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-10",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-11",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-12",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-13",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-14",
+      "claudeMs": 0,
+      "codexMs": 0,
+      "wallMs": 0,
+      "tokens": 0,
+      "sessions": 0,
+      "prompts": 0
+    },
+    {
+      "day": "2027-01-15",
+      "claudeMs": 600000,
+      "codexMs": 0,
+      "wallMs": 600000,
+      "tokens": 20100,
+      "sessions": 2,
+      "prompts": 2
+    }
+  ],
+  "byAgent": {
+    "claude": {
+      "ms": 600000,
+      "tokens": 20100,
+      "sessions": 2,
+      "prompts": 2,
+      "toolCalls": 7
+    }
+  }
+}

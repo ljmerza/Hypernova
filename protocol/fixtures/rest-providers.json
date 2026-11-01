@@ -1,0 +1,51 @@
+{
+  "providers": [
+    {
+      "id": "anthropic",
+      "name": "Claude (your subscription)",
+      "kind": "anthropic",
+      "baseUrl": null,
+      "models": {},
+      "builtIn": true,
+      "hasKey": false,
+      "paid": false,
+      "status": null,
+      "balance": null
+    },
+    {
+      "id": "prov-openrouter",
+      "name": "OpenRouter",
+      "kind": "openrouter",
+      "baseUrl": "https://openrouter.ai/api",
+      "models": {
+        "default": "anthropic/claude-sonnet-5"
+      },
+      "builtIn": false,
+      "hasKey": true,
+      "paid": true,
+      "status": null,
+      "balance": {
+        "remaining": 4.2,
+        "usedToday": 0.31,
+        "freeLeft": 37,
+        "freeLimit": 50,
+        "checkedAt": 1800000000000,
+        "error": null
+      }
+    },
+    {
+      "id": "prov-gateway",
+      "name": "Gateway",
+      "kind": "custom",
+      "baseUrl": "https://other.example.com",
+      "models": {
+        "default": "gateway-large"
+      },
+      "builtIn": false,
+      "hasKey": false,
+      "paid": true,
+      "status": null,
+      "balance": null
+    }
+  ]
+}

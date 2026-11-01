@@ -1,0 +1,28 @@
+{
+  "provider": {
+    "id": "prov-gateway",
+    "name": "Gateway",
+    "kind": "custom",
+    "baseUrl": "https://gateway.example.com",
+    "models": {
+      "default": "gateway-large",
+      "haiku": "gateway-small"
+    },
+    "builtIn": false,
+    "hasKey": true,
+    "paid": true,
+    "status": null,
+    "balance": null
+  },
+  "check": {
+    "state": "ok",
+    "text": "Key works. 2 models.",
+    "models": [
+      "gateway-large",
+      "gateway-small"
+    ],
+    "balance": null,
+    "checkedAt": 1800000000000
+  },
+  "keyDropped": false
+}

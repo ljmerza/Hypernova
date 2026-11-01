@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "no_login",
+    "message": "No sign-in is running. Start it again."
+  }
+}

@@ -332,6 +332,123 @@ class ContractTest {
         "rest-jobs-respawn" to { o -> assertEquals(listOf(JobRestart("sess-all", true, "Done all00001")), OutdatedJobs.results(o)) },
         "rest-update" to { o -> assertEquals(true, ServerUpdate.parse(o.obj("update"))?.auto) },
         "rest-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true), ClaudeState.parse(o.obj("claude"))) },
+        // ── Settings: providers, the account, usage, the checklist, Forget (LiveHub's calls read these) ──
+        // saveProvider: the provider, the check its new key or address got, whether the key stayed behind.
+        "rest-provider-save" to { o ->
+            val p = Wire.provider(o.obj("provider")!!)
+            assertEquals(Provider("prov-gateway", "Gateway", "custom", "https://gateway.example.com", hasKey = true, models = ProviderModels(default = "gateway-large", haiku = "gateway-small"), builtIn = false, paid = true), p)
+            assertEquals(ProviderCheck("ok", "Key works. 2 models.", listOf("gateway-large", "gateway-small"), null, T), ProviderWire.check(o.obj("check")))
+            assertFalse(o.bool("keyDropped"))
+        },
+        "rest-provider-save-balance" to { o ->
+            val p = Wire.provider(o.obj("provider")!!)
+            assertEquals("openrouter", p.kind)
+            assertEquals(OPENROUTER_BALANCE, p.balance)
+            val c = ProviderWire.check(o.obj("check"))!!
+            assertTrue(c.ok)
+            assertEquals("Key works. \$4.20 left.", c.text)
+            assertNull(c.models)
+            assertEquals(OPENROUTER_BALANCE, c.balance)
+        },
+        // checkNewProvider reads `check`.
+        "rest-provider-check" to { o -> assertEquals(ProviderCheck("ok", "Key works. 2 models.", listOf("gateway-large", "gateway-small"), null, T), ProviderWire.check(o.obj("check"))) },
+        // checkProvider (a balance read now) reads `provider`.
+        "rest-provider-balance" to { o ->
+            val p = Wire.provider(o.obj("provider")!!)
+            assertEquals("prov-openrouter", p.id)
+            assertEquals(OPENROUTER_BALANCE, p.balance)
+        },
+        // Moved to another host without a new key: the key stayed behind (the editor says so).
+        "rest-provider-edit" to { o ->
+            val p = Wire.provider(o.obj("provider")!!)
+            assertEquals("https://other.example.com", p.baseUrl)
+            assertFalse(p.hasKey)
+            assertTrue(o.bool("keyDropped"))
+        },
+        "rest-providers" to { o ->
+            val list = o.arr("providers").mapObjects(Wire::provider)
+            assertEquals(listOf("anthropic", "prov-openrouter", "prov-gateway"), list.map { it.id })
+            assertTrue(list.first().builtIn)
+            assertFalse(list.first().paid)
+        },
+        "rest-provider-delete" to { o -> assertTrue(o.bool("ok")) },
+        // A refusal the editor puts under the address (saveProvider's ProviderRefused keeps the code).
+        "rest-provider-refused" to { o ->
+            val e = Api.errorOf(400, o.toString())
+            assertEquals(Problem.Server, e.problem)
+            assertEquals("insecure_url", e.code)
+            assertEquals("The key would travel unencrypted. Use the https:// address.", e.serverMessage)
+            assertEquals(ProviderField.Address, ProviderForm.field(e.code))
+        },
+        // checkAccount and signIn apply the account an answer carries.
+        "rest-account-check" to { o ->
+            val a = Wire.account(o.obj("account")!!)
+            assertEquals(Account.LOGGED_OUT, a.state)
+            assertEquals("not_logged_in", a.reason)
+            assertEquals(T, a.checkedAt)
+            assertNull(a.login)
+            assertTrue(a.eclipsed)
+        },
+        "rest-account-login" to { o -> assertEquals(Account.Login("starting", null, false, null), Wire.account(o.obj("account")!!).login) },
+        // The sign-in page to open, as the socket brings it.
+        "ws-account-sign-in" to { o ->
+            val l = Wire.account(ws(o, "account").obj("account")!!).login!!
+            assertEquals("waiting_code", l.state)
+            assertFalse(l.onMac)
+            assertTrue(l.url!!.startsWith("https://claude.ai/oauth/authorize?"))
+            assertNull(l.error)
+        },
+        "rest-account-login-cancel" to { o -> assertTrue(o.bool("ok")) },
+        "rest-account-login-code" to { o -> assertTrue(o.bool("ok")) },
+        "rest-account-login-code-refused" to { o ->
+            val e = Api.errorOf(409, o.toString())
+            assertEquals("no_login", e.code)
+            assertEquals("No sign-in is running. Start it again.", e.serverMessage)
+        },
+        // GET /v1/usage is the usage itself; the refresh's answer carries it (the phone leaves it to the socket).
+        "rest-usage" to { o -> staleUsage(Wire.usage(o)!!) },
+        "rest-usage-refresh" to { o -> staleUsage(Wire.usage(o.obj("usage"))!!) },
+        // checklist(): the page's address, rebased onto the route in use.
+        "rest-qa" to { o -> assertEquals("http://127.0.0.1:47321/qa?k=qa-key", o.str("url")) },
+        // Forget: the answer isn't read; any 200 is the server forgetting this phone.
+        "rest-devices-me" to { o -> assertTrue(o.bool("ok")) },
+        // ── Statistics (StatsSource.load) ──
+        "rest-stats" to { o ->
+            val s = StatsWire.parse(o)
+            assertEquals(StatsRange.Week, s.range)
+            assertEquals(T, s.from)
+            assertEquals(T, s.to)
+            assertEquals(T, s.since)
+            assertEquals(T, s.countingSince)
+            assertEquals(600_000L, s.claudeMs)
+            assertEquals(600_000L, s.wallMs)
+            assertEquals(600_000L, s.agentMs)
+            assertEquals(StatTokens(12, 88, 20_000, 0), s.tokens)
+            assertEquals(2, s.sessions)
+            assertEquals(2, s.prompts)
+            assertEquals(1, s.fromPhone)
+            assertEquals(0, s.byVoice)
+            assertEquals(7, s.toolCalls)
+            assertEquals(StatTool("Agent", 2), s.tools.first())
+            assertEquals(setOf("Agent", "Bash", "Edit", "Read", "TodoWrite", "Workflow"), s.tools.map { it.name }.toSet())
+            assertEquals(1, s.filesEdited)
+            assertEquals(1, s.agents)
+            assertEquals(listOf(3, 3, 0), listOf(s.approvals, s.approvalsPhone, s.approvalsMac))
+            assertEquals(listOf(1, 0, 0), listOf(s.limitsFiveHour, s.limitsWeek, s.limitsModel))
+            assertEquals(StatDay(java.time.LocalDate.of(2027, 1, 15), 600_000L, 0L, 20_100L, 0, 0), s.busiestDay)
+            assertEquals(StatSession(MAIN, "Fix the parser so it trims its input", "Unknown", 600_000L, T), s.longestSession)
+            assertEquals(1, s.streak)
+            assertEquals(listOf(StatProject("Unknown", null, 600_000L, 20_100L, 2)), s.projects)
+            // The last 30 days, oldest first, today's the only one worked.
+            assertEquals(30, s.days.size)
+            assertEquals(java.time.LocalDate.of(2026, 12, 17), s.days.first().day)
+            assertEquals(StatDay(java.time.LocalDate.of(2027, 1, 15), 600_000L, 600_000L, 20_100L, 2, 2), s.days.last())
+            assertTrue(s.days.dropLast(1).all { it.claudeMs == 0L && it.tokens == 0L })
+            assertEquals(StatAgent(600_000L, 20_100L, 2, 2, 7), s.claude)
+            assertNull(s.codex)
+            assertEquals(StatsAgents.Claude, s.agents(codexLeads = false))
+        },
+        "rest-stats-bad-range" to { o -> assertEquals("bad_range", Api.errorOf(400, o.toString()).code) },
         // Pairing.pair reads these three.
         "rest-pair" to { o ->
             assertEquals("device-token", o.str("token"))
@@ -357,6 +474,18 @@ class ContractTest {
     }
 
     // ── Shared checks ──
+
+    /** OpenRouter's balance as the contract's stand-in answered it (contract.test.ts, "the providers"). */
+    private val OPENROUTER_BALANCE = Balance(4.2, 0.31, 37, 50, T, null)
+
+    /** Signed out: the last numbers known, no longer moving. */
+    private fun staleUsage(u: WUsage) {
+        assertEquals(Window(100.0, T), u.fiveHour)
+        assertEquals(Window(62.0, T), u.sevenDay)
+        assertEquals("stale", u.source)
+        assertEquals(T, u.observedAt)
+        assertEquals(listOf("Sonnet"), u.models.map { it.label })
+    }
 
     private fun events(o: JSONObject): List<WEvent> {
         val ev = o.arr("events").mapObjects(Wire::event)

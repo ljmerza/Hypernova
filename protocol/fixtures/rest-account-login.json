@@ -1,0 +1,19 @@
+{
+  "account": {
+    "state": "logged_out",
+    "providerId": "anthropic",
+    "plan": null,
+    "limit": null,
+    "reason": "not_logged_in",
+    "text": null,
+    "since": 1800000000000,
+    "sessionId": null,
+    "checkedAt": 1800000000000,
+    "login": {
+      "state": "starting",
+      "url": null,
+      "where": "phone",
+      "error": null
+    }
+  }
+}
