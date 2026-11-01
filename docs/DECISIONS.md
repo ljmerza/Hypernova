@@ -2556,7 +2556,8 @@ that's fine to disable."
    launcher shortcut or Share keeps to the one picked.
 7. **The chip says "All"** on the Sessions and History tabs, its moon the worst of their links;
    Automations and Settings show the one picked last, the chip naming it; Statistics' subtitle
-   names it. Switching tabs doesn't leave All. (Settings no longer: "All servers in Settings" below.)
+   names it. Switching tabs doesn't leave All. (Settings no longer: "All servers in Settings" below.
+   Statistics no longer: "Combined Statistics in All servers" below.)
 8. **Unchanged:** notifications, the widget, the chat screen; no daemon change.
 9. **History works in All servers; Automations doesn't.** History lists every computer's ended
    sessions in one list, most recent first under its days, each row naming its computer in its
@@ -2581,7 +2582,8 @@ that's fine to disable."
     Claude account each keep their card (the phone can't tell one account from two, and the owner
     asked for one per instance). An offline computer's stay, dimmed, `z2 offline`, as its sessions'
     cards do (the last numbers it sent, still worth seeing; dropping them would make cards come and
-    go with the link). Statistics stays the one picked last's; with one computer nothing changes.
+    go with the link). Statistics stays the one picked last's (no longer: "Combined Statistics in All
+    servers" below); with one computer nothing changes.
 
 ### All servers in Settings (2026-10-31)
 
@@ -2757,3 +2759,43 @@ The owner: "also have another icon for sorting with the default the sort by sess
    Nothing Phone 3) All servers keeps "New session" whole and one server says "New". If the owner
    wants the words back everywhere: move Sort into the filter sheet (one button fewer).
 9. **Unchanged:** the widget, notifications, History, the chat screen; no daemon change.
+
+## Combined Statistics in All servers (2026-11-01)
+
+The owner: "when in all view the stats view should be combined of all servers too." Before,
+Statistics showed the one picked last's, its subtitle naming it. Now, with All servers chosen, it adds
+up every server's (`data/AllStats.kt`, `ui/stats/StatsScreen.kt`). No daemon change: the phone asks
+each server's `GET /v1/stats` and does the adding.
+
+1. **Every total is summed**: hours, by the clock, agent work, tokens by kind, sessions, prompts, tool
+   calls, files, agents, approvals, limits, Claude's and Codex's parts. The header says
+   "All servers · 25 – 31 Oct".
+2. **The last 30 days are summed date by date**, each date as its server's calendar has it. "N days
+   with work", the busiest day and the streak come from the summed days: two servers taking turns
+   make one streak. For the All range, a server's own busiest day from before the last 30 days can
+   still win, as its own number (others' days that far back aren't sent), and a streak that fills the
+   chart is at least any server's own.
+3. **Projects of the same name are one project, summed**, not kept apart under server names. It is
+   the same work to the owner, a checkout on two computers, and each project's planet is seeded from
+   its name, so two rows would be two identical planets. Eight at most, as on one server. Tools merge
+   the same way, eight then "Other".
+4. **The longest session is any server's longest**, as it is one session; it doesn't name its server.
+5. **A short Servers card under the projects**: each server that answered, in the order paired, as
+   the project rows are without their planets (name, sessions, tokens, hours). Only with two or more
+   answering; with one it would repeat the totals.
+6. **Each server is asked for the same range, at once**, and the numbers change once, when all have
+   answered, so they don't climb as answers come in. A half-minute-old answer is used as it is, as on
+   one server. With every linked server's answer kept, they show at once while fresh ones come.
+7. **A server that doesn't answer is left out and named**, in amber over the numbers: "k1 isn't
+   answering: its numbers aren't in these." That covers a server not linked (not asked at all, so
+   it doesn't hold the rest up for the connection's timeout) and one whose answer failed; an older
+   answer of its own isn't added in, since the line says its numbers aren't there. One coming back
+   is asked at once. None answering: "Couldn't load statistics" with Try again, or the last numbers
+   with "Couldn't refresh", as on one server.
+8. **Known limits of adding up on the phone:** "by the clock" counts two servers busy at the same
+   moment twice (the answers carry no times to overlap); the same file on two servers counts as two;
+   two servers on one Claude account can each count the same limit (the phone can't tell accounts
+   apart, as with the usage cards); a project outside a server's own eight isn't in that server's
+   answer, so a merged project can read a little low.
+9. **Unchanged:** Statistics with one server, word for word and picture for picture; the session chat
+   screen.

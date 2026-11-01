@@ -266,6 +266,7 @@ Test names, shortened:
 | # | Capability | Tests | Status |
 |---|---|---|---|
 | ST1 | Totals, ranges, the last 30 days as bars | StatsScreenTest (all); DayBarsTest (all); StatsTest (all); SettingsCallsTest.statisticsAreAskedForTheirRangeAndKeptForAMoment, statisticsTheServerRefusesAreItsWords (`StatsSource.load` against FakeDaemon); fixtures rest-stats.json, rest-stats-bad-range.json; contract.test.ts › "GET /v1/stats…"; stats.test.ts (all) | **covered** |
+| ST2 | All servers: every server's statistics added up, each one's part, the ones not answering named | AllStatsTest (all); StatsScreenTest.allServersAddsTheirStatisticsUp, allServersAsksEachForTheSameRange, aServerThatFailsIsLeftOutAndNamed, noServerAnsweringSaysSo, oneServerIsStillOneServers | **partial**: asking real servers at once isn't driven (a fake hub has no server to ask, so a linked one with no answer put fails); Home handing the servers to the screen isn't drawn |
 
 ## 20. Mac-only features
 

@@ -39,6 +39,15 @@
     <string name="servers_new_on_label">New session on %1$s</string>
     <!-- Statistics while Home shows all servers: whose they are, before the days they cover. -->
     <string name="stats_on_server">%1$s · %2$s</string>
+    <!-- Statistics with "All servers" (data/AllStats.kt): every server's added up. -->
+    <string name="stats_loading_all">Reading each server\'s history…</string>
+    <!-- Each server's part, under the projects. -->
+    <string name="stats_servers">Servers</string>
+    <!-- The servers that didn't answer (not linked, or failing), named (k1, gym). -->
+    <plurals name="stats_all_missing">
+        <item quantity="one">%1$s isn\'t answering: its numbers aren\'t in these.</item>
+        <item quantity="other">%1$s aren\'t answering: their numbers aren\'t in these.</item>
+    </plurals>
 
     <!-- A notification from one of several computers: its name under the title (data/Core.kt, Notifier). -->
     <string name="notif_server_from_agent">%1$s, from %2$s</string>

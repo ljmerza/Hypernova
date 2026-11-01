@@ -185,8 +185,8 @@ const val HOME_SOURCE = "home"
  * Home's "All servers" (AllHome.kt): every paired computer with its hub, in the order paired, and
  * where a card's opening and a new session go. History lists them all too (AllHistory.kt), its
  * automation rows opening their runs on their own computer ([onRuns]), and the usage cards are every
- * computer's (AllUsage). The cards above the sessions, Automations, Settings and Statistics stay the
- * one picked last's ([pickedName], the hub Home is given).
+ * computer's (AllUsage), and Statistics adds them all up (data/AllStats.kt). The cards above the
+ * sessions and Automations stay the one picked last's ([pickedName], the hub Home is given).
  */
 class Everywhere(
     val servers: List<Pair<com.prudnikweb.hypernova.data.ServerStatus, Hub>>,
@@ -788,7 +788,7 @@ fun HomeScreen(
                 scaleY = scaleX
             },
     ) {
-        StatsScreen(hub, onBack = { statsOpen = false }, server = everywhere?.pickedName)
+        StatsScreen(hub, onBack = { statsOpen = false }, servers = everywhere?.servers?.map { (st, h) -> com.prudnikweb.hypernova.data.StatsServer(st.id, st.name, h) })
     }
 }
 
