@@ -166,6 +166,8 @@ fun Cosmos(
     /** Both agents in use (data/AgentLead.kt): Codex has a star of its own, and its sessions go round it. */
     codexStar: Boolean = false,
     backdrop: Modifier = Modifier,
+    /** The wall clock the sky reads (countdowns, fades, how long ago): the phone's; a screen test pins it. */
+    wallClock: () -> Long = System::currentTimeMillis,
 ) {
     val clock = LocalAmbient.current
     val motion = LocalMotion.current
@@ -247,7 +249,7 @@ fun Cosmos(
                     val light = solar.galaxyLight(u, reduced)
                     parallax.step(t)
                     val shift = 9.dp.toPx()
-                    val now = System.currentTimeMillis()
+                    val now = wallClock()
                     frame.set(
                         t, now, reduced, solar.bandTopPx() / size.height, solar.bandBottomPx() / size.height, light,
                         behind = 1f - f, parX = parallax.x * shift, parY = parallax.y * shift,
@@ -283,7 +285,7 @@ fun Cosmos(
                 solar.hint = state.hint
                 solar.eclipse = state.eclipse
                 val f = focus().coerceIn(0f, 1f)
-                val now = System.currentTimeMillis()
+                val now = wallClock()
                 // Sessions on other providers orbit the companion, Codex's (while both agents are in use)
                 // Codex's star, both in the bottom row; the rest are the sun's.
                 val star = Snapshot.withoutReadObservation { currentStar.value }
