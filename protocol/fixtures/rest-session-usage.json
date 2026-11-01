@@ -1,0 +1,26 @@
+{
+  "usage": {
+    "model": null,
+    "modelName": null,
+    "context": null,
+    "tokens": {
+      "input": 12,
+      "output": 88,
+      "cacheRead": 20000,
+      "cacheWrite": 0
+    },
+    "agentTokens": 20100,
+    "costUsd": 0.0029,
+    "costExact": false,
+    "fiveHour": {
+      "pct": 100,
+      "resetsAt": 1800000000000
+    },
+    "sevenDay": {
+      "pct": 62,
+      "resetsAt": 1800000000000
+    },
+    "usageSource": "official",
+    "updatedAt": 1800000000000
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "status": 400,
+  "error": {
+    "code": "bad_project",
+    "message": "That project folder doesn’t exist."
+  }
+}

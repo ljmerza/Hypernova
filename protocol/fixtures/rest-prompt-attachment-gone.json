@@ -1,0 +1,7 @@
+{
+  "status": 410,
+  "error": {
+    "code": "attachment_gone",
+    "message": "An attached file is no longer on the server. Attach it again."
+  }
+}

@@ -653,7 +653,9 @@ async function api(c: Ctx): Promise<void> {
     if (b.newProject?.name) cwd = createProject(String(b.newProject.name), b.newProject.git !== false).path
     if (!cwd) throw new HttpError(400, 'no_project', 'Pick a project for the session.')
     const full = allowedPath(cwd) ?? (existsSync(cwd) ? cwd : null)
-    if (!full) throw new HttpError(400, 'bad_project', 'That project folder doesn’t exist.')
+    // A path in the projects folder passes allowedPath whether or not it's there (a typed one, a
+    // folder deleted since): it has to be a folder that exists, or Claude Code can't start in it.
+    if (!full || !isDir(full)) throw new HttpError(400, 'bad_project', 'That project folder doesn’t exist.')
     // A folder macOS guards (Documents, Desktop, iCloud Drive, an external disk) from the service:
     // said now, not as a session stalled on a dialog on the Mac while its owner is away.
     const opens = await folderOpens(full)
@@ -1259,6 +1261,14 @@ async function qa(c: Ctx, macPort: boolean): Promise<void> {
 }
 
 /** Phone sessions run in shared terminals when this Mac can (and hooks bring their approvals to the phone). */
+function isDir(p: string): boolean {
+  try {
+    return statSync(p).isDirectory()
+  } catch {
+    return false
+  }
+}
+
 async function shared(): Promise<boolean> {
   return (await sharedTerminalsAvailable()) && integrationStatus().hooks.installed
 }

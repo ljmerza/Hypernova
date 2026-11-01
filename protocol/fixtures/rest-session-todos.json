@@ -1,0 +1,23 @@
+{
+  "todos": [
+    {
+      "id": "1",
+      "text": "Trim the input",
+      "active": "Trimming the input",
+      "status": "completed"
+    },
+    {
+      "id": "2",
+      "text": "Run the tests",
+      "active": "Running the tests",
+      "status": "in_progress"
+    },
+    {
+      "id": "3",
+      "text": "Update the docs",
+      "active": "Updating the docs",
+      "status": "pending"
+    }
+  ],
+  "updatedAt": 1800000000000
+}

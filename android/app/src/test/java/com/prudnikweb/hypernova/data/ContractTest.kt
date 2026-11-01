@@ -2,10 +2,14 @@ package com.prudnikweb.hypernova.data
 
 import com.prudnikweb.hypernova.ui.changes.ChangesRepo
 import com.prudnikweb.hypernova.ui.changes.LineKind
+import com.prudnikweb.hypernova.ui.session.ChatRepo
+import com.prudnikweb.hypernova.ui.session.Todo
+import com.prudnikweb.hypernova.ui.session.TodoStatus
 import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -34,6 +38,7 @@ class ContractTest {
         const val SURVEYOR = "a2222222222222222"
         const val RUN = "wf_0a1b2c3d-4e5"
         const val CWD = "/home/me/Projects/app-parser-fix"
+        const val STARTED = "c0ffee00-0000-4000-8000-00000000f001"
     }
 
     private val dir: File by lazy {
@@ -332,6 +337,158 @@ class ContractTest {
         "rest-jobs-respawn" to { o -> assertEquals(listOf(JobRestart("sess-all", true, "Done all00001")), OutdatedJobs.results(o)) },
         "rest-update" to { o -> assertEquals(true, ServerUpdate.parse(o.obj("update"))?.auto) },
         "rest-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true), ClaudeState.parse(o.obj("claude"))) },
+        // ── Sessions: starting one, its chat, its terminal ──
+        // LiveHub.start: the session it applies and opens.
+        "rest-sessions-start" to { o ->
+            val s = Wire.session(o.obj("session")!!)
+            assertEquals(STARTED, s.id)
+            assertEquals("Tidy the README", s.title)
+            assertEquals(CWD, s.cwd)
+            assertEquals("starting", s.state)
+            assertEquals("sonnet", s.model)
+            assertEquals("high", s.effort)
+            assertEquals("acceptEdits", s.permissionMode)
+        },
+        // A refusal: Api.errorOf's code and the daemon's words, which LiveHub.start shows as they are.
+        "rest-sessions-bad-project" to { o -> refusal(o, 400, "bad_project") },
+        "rest-projects" to { o ->
+            val p = o.arr("projects").mapObjects(Wire::project)
+            assertEquals(listOf("app", "app-parser-fix", "demo", "sketchpad"), p.map { it.name })
+            assertEquals("/home/me/Projects/sketchpad", p.last().path)
+            assertEquals(1, p.last().sessionCount)
+            assertEquals("/home/me/Projects", o.str("root"))
+        },
+        "rest-project-new" to { o ->
+            val p = Wire.project(o.obj("project")!!)
+            assertEquals("notebook", p.name)
+            assertEquals("/home/me/Projects/notebook", p.path)
+            assertEquals(0, p.sessionCount)
+        },
+        // LiveHub.folders.
+        "rest-folders" to { o ->
+            val f = FolderPick.wire(o)
+            assertEquals("/home/me/Projects", f.path)
+            assertEquals("/home/me", f.parent)
+            assertEquals("/home/me", f.home)
+            assertEquals(listOf("app", "app-parser-fix", "demo", "notebook", "sketchpad"), f.folders.map { it.name })
+            assertEquals("/home/me/Projects/app", f.folders.first().path)
+            assertFalse(f.truncated)
+            assertEquals(5, f.total)
+        },
+        // LiveHub.upload: the attachment the prompt then carries by its path.
+        "rest-attachment" to { o ->
+            val a = Wire.attachment(o.obj("attachment")!!)!!
+            assertEquals("/tmp/hn/support/attachments/0123456789ab/notes -draft-.txt", a.path)
+            assertEquals("notes -draft-.txt", a.name)
+            assertEquals("text/plain", a.mime)
+            assertEquals(23L, a.size)
+        },
+        // LiveHub.sendNow without hold: not held, not queued, the session it went to.
+        "rest-prompt" to { o ->
+            assertFalse(o.bool("held"))
+            assertTrue(o.has("queued") && !o.bool("queued"))
+            val s = Wire.session(o.obj("session")!!)
+            assertEquals("sess-prompt", s.id)
+            assertEquals("prm00001", s.agentJob)
+            assertEquals(TermLink("term-id", 0, 0), s.term)
+        },
+        // The offline queue drops the files of a prompt whose files are gone (LiveHub's flush).
+        "rest-prompt-attachment-gone" to { o -> refusal(o, 410, "attachment_gone") },
+        // LiveHub.editHeld and removeHeld apply the session.
+        "rest-held-edit" to { o ->
+            val s = Wire.session(o.obj("session")!!)
+            assertEquals(listOf("Also run the linter" to "client-held-1", "Then commit it, with a message" to "client-held-2"), s.held.map { it.text to it.clientId })
+        },
+        "rest-held-remove" to { o -> assertEquals(listOf("Then commit it, with a message"), Wire.session(o.obj("session")!!).held.map { it.text }) },
+        "rest-approval-answer" to { o -> assertTrue(o.bool("ok")) },
+        // ErrorsTest.anApprovalAnsweredElsewhereSaysSoAndCountsAsDone: 409 `resolved`.
+        "rest-approval-already" to { o -> refusal(o, 409, "resolved") },
+        // LiveHub.terminal: the ticket's path on the route in use.
+        "rest-session-terminal" to { o ->
+            assertEquals("term-id", o.str("termId"))
+            val t = TermTicket.of(o.getString("url"), NetRoute.remote("http://10.0.2.2:47321"))
+            assertEquals("ws://10.0.2.2:47321/v1/terms/term-id/ws?ticket=ticket", t.url)
+            assertNull(t.client)
+        },
+        "rest-session-interrupt" to { o -> assertTrue(o.bool("ok")) },
+        // LiveHub.resume: the session that carries on (this one: not a fork).
+        "rest-session-continue" to { o ->
+            assertEquals("sess-back", Wire.session(o.obj("session")!!).id)
+            assertFalse(o.bool("forked"))
+        },
+        // ChatRepo.usage and todos.
+        "rest-session-usage" to { o ->
+            val u = ChatRepo.parseUsage(o.getJSONObject("usage"))
+            assertNull(u.contextPct)
+            assertEquals(12L, u.input)
+            assertEquals(88L, u.output)
+            assertEquals(20_000L, u.cacheRead)
+            assertEquals(20_100L, u.agentTokens)
+            assertEquals(20_100L, u.tokens)
+            assertEquals(0.0029, u.costUsd!!, 1e-9)
+            assertFalse(u.costExact)
+        },
+        "rest-session-todos" to { o ->
+            assertEquals(
+                listOf(
+                    Todo("1", "Trim the input", "Trimming the input", TodoStatus.Done),
+                    Todo("2", "Run the tests", "Running the tests", TodoStatus.Active),
+                    Todo("3", "Update the docs", "Updating the docs", TodoStatus.Pending),
+                ),
+                ChatRepo.parseTodos(o),
+            )
+        },
+        // ChatRepo.rewind: the new session, and the message for the prompt box.
+        "rest-session-rewind" to { o ->
+            val s = Wire.session(o.obj("session")!!)
+            assertEquals("Sketch the lexer (rewound)", s.title)
+            assertNotEquals("c0ffee00-0000-4000-8000-0000000000aa", s.id)
+            assertEquals("Now make it faster", o.str("text"))
+            assertEquals(0, o.arr("files")!!.length())
+        },
+        // LiveHub.blocked, retryBlocked and dismissBlocked.
+        "rest-blocked" to { o ->
+            val b = BlockedWire.list(o)
+            assertEquals(setOf("Bash", "WebFetch"), b.map { it.tool }.toSet())
+            val bash = b.first { it.tool == "Bash" }
+            assertEquals("git push origin main", bash.target)
+            assertEquals(BlockedCall.AUTO_MODE, bash.reason)
+            assertEquals("Pushes to the default branch", bash.why)
+            assertEquals(T, bash.at)
+            assertEquals("sess-blocked", bash.sessionId)
+            assertNull(b.first { it.tool == "WebFetch" }.why)
+        },
+        "rest-blocked-retry" to { o ->
+            assertEquals("sess-blocked", Wire.session(o.obj("session")!!).id)
+            assertEquals(listOf("WebFetch"), BlockedWire.list(o).map { it.tool })
+        },
+        "rest-blocked-dismiss" to { o -> assertEquals(emptyList<BlockedCall>(), BlockedWire.list(o)) },
+        // LiveHub.autoContinue and switchProvider apply the session.
+        "rest-session-auto-continue" to { o ->
+            val s = Wire.session(o.obj("session")!!)
+            assertEquals("openrouter-1", s.providerId)
+            val b = s.blocked!!
+            assertEquals(Blocked.PROVIDER, b.kind)
+            assertNull(b.autoResumeAt)
+            assertEquals(Resume(Resume.OFF, T, byClaude = false, canCancel = false, canArm = true, why = "cancelled"), b.resume)
+        },
+        "rest-session-provider" to { o ->
+            val s = Wire.session(o.obj("session")!!)
+            assertEquals("anthropic", s.providerId)
+            assertNull(s.blocked)
+            assertFalse(o.bool("forked"))
+        },
+        // LiveHub.commands: the "/" list (left out on the Mac: terminal-bound and removed ones).
+        "rest-commands" to { o ->
+            assertEquals(
+                listOf(
+                    SlashCommand("review", "Review a pull request", "[pr-number]", emptyList(), false, false),
+                    SlashCommand("compact", "Clear the conversation history but keep a summary in context", "<optional custom summarization instructions>", emptyList(), true, false),
+                    SlashCommand("config", "Open the config panel", "", listOf("settings"), true, true),
+                ),
+                Wire.commands(o),
+            )
+        },
         // Pairing.pair reads these three.
         "rest-pair" to { o ->
             assertEquals("device-token", o.str("token"))
@@ -357,6 +514,16 @@ class ContractTest {
     }
 
     // ── Shared checks ──
+
+    /** A refusal fixture (`{status, error}`) as Api.errorOf reads it: the code, and the daemon's own words. */
+    private fun refusal(o: JSONObject, status: Int, code: String) {
+        assertEquals(status, o.getInt("status"))
+        val e = Api.errorOf(status, JSONObject().put("error", o.getJSONObject("error")).toString())
+        assertEquals(Problem.Server, e.problem)
+        assertEquals(status, e.status)
+        assertEquals(code, e.code)
+        assertTrue(e.serverMessage!!.isNotBlank())
+    }
 
     private fun events(o: JSONObject): List<WEvent> {
         val ev = o.arr("events").mapObjects(Wire::event)

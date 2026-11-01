@@ -465,6 +465,14 @@ test('a session isn’t started in a folder Hypernova can’t open: said at once
   assert.equal(r.json.error.code, 'unreadable')
 })
 
+test('a session isn’t started in a folder that isn’t there, inside the projects folder too (a typed path, one deleted since)', async () => {
+  for (const projectPath of [join(APP, 'no-such-folder'), join(APP, 'README'), join(HOME, 'elsewhere', 'gone')]) {
+    const r = await send('POST', '/v1/sessions', { 'content-type': 'application/json' }, JSON.stringify({ prompt: 'hi', projectPath }))
+    assert.equal(r.status, 400, projectPath)
+    assert.equal(r.json.error.code, 'bad_project', projectPath)
+  }
+})
+
 test('the content disposition keeps any name, and ranges read as RFC 9110 says', () => {
   assert.equal(files.contentDisposition('a "b".txt'), `attachment; filename="a _b_.txt"; filename*=UTF-8''a%20%22b%22.txt`)
   assert.deepEqual(files.parseByteRange('bytes=0-0', 10), { start: 0, end: 0 })

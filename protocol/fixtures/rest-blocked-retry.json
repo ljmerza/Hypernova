@@ -1,0 +1,59 @@
+{
+  "session": {
+    "id": "sess-blocked",
+    "title": "Mine",
+    "cwd": "/home/me/Projects/app-parser-fix",
+    "projectName": "app-parser-fix",
+    "origin": "terminal",
+    "state": "idle",
+    "providerId": "anthropic",
+    "model": null,
+    "effort": null,
+    "permissionMode": "default",
+    "bypassAvailable": false,
+    "createdAt": 1800000000000,
+    "lastActivityAt": 1800000000000,
+    "lastText": null,
+    "activity": null,
+    "pendingApprovalIds": [],
+    "stoppedForAway": false,
+    "contextPct": null,
+    "costUsd": null,
+    "queue": [],
+    "queued": 0,
+    "term": {
+      "id": "term-id",
+      "mac": 0,
+      "phone": 0
+    },
+    "menu": null,
+    "agentsRunning": 0,
+    "blocked": null,
+    "automation": null,
+    "turnStartedAt": null,
+    "question": null,
+    "endedBy": null,
+    "browsable": true,
+    "outsideProjects": false,
+    "agentJob": "boxblk01",
+    "agentRunning": true,
+    "blockedCalls": 1,
+    "todo": null
+  },
+  "queued": false,
+  "blocked": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "sessionId": "sess-blocked",
+      "tool": "WebFetch",
+      "target": "https://example.com/spec",
+      "input": {
+        "url": "https://example.com/spec"
+      },
+      "reason": "auto_mode",
+      "why": null,
+      "at": 1800000000000,
+      "toolUseId": "toolu_blk2"
+    }
+  ]
+}

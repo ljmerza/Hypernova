@@ -87,7 +87,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 /** What the share sheet handed over. */
-private class Shared(val text: String?, val uris: List<Uri>)
+internal class Shared(val text: String?, val uris: List<Uri>)
 
 /** The staged copies of the shared files, kept while the screen turns. */
 class ShareModel : ViewModel() {
@@ -121,27 +121,7 @@ class ShareActivity : ComponentActivity() {
         setContent { HypernovaTheme { Screen(model) } }
     }
 
-    private fun read(i: Intent): Shared {
-        val uris = LinkedHashSet<Uri>()
-        val clip = i.clipData
-        if (clip != null) for (n in 0 until clip.itemCount) clip.getItemAt(n).uri?.let(uris::add)
-        if (Build.VERSION.SDK_INT >= 33) {
-            i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)?.let(uris::add)
-            i.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)?.let(uris::addAll)
-        } else {
-            @Suppress("DEPRECATION")
-            (i.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))?.let(uris::add)
-            @Suppress("DEPRECATION")
-            i.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let(uris::addAll)
-        }
-        val body = i.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.trim().orEmpty()
-        val subject = i.getStringExtra(Intent.EXTRA_SUBJECT)?.trim().orEmpty()
-        // A page shared from a browser: its title and then its link.
-        val text = listOf(subject.takeIf { it.isNotEmpty() && !body.contains(it) }, body.takeIf { it.isNotEmpty() })
-            .filterNotNull().joinToString("\n").takeIf { it.isNotBlank() }
-        // Only content:// and file:// are ours to read.
-        return Shared(text, uris.filter { it.scheme == "content" || it.scheme == "file" })
-    }
+    private fun read(i: Intent): Shared = readShared(i)
 
     /** Puts the shared content in the destination's composer and opens the app there. */
     private fun deliver(model: ShareModel, sessionId: String?, projectPath: String?) {
@@ -259,74 +239,98 @@ class ShareActivity : ComponentActivity() {
             }
         }
     }
-
-    @Composable
-    private fun Destinations(sessions: List<Session>, projects: List<Project>, onSession: (String) -> Unit, onProject: (String?) -> Unit, bottom: androidx.compose.ui.unit.Dp) {
-        // Live sessions first, then the ended ones; each newest first.
-        val recent = remember(sessions) {
-            sessions.filter { it.phase != Phase.Ended }.sortedByDescending { it.updatedAt }.take(8)
-        }
-        val byActivity = remember(projects) { projects.sortedByDescending { it.lastActivityAt ?: 0L }.take(10) }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottom + 96.dp), verticalArrangement = spacedBy(10.dp)) {
-            item("new") {
-                GlassCard(Modifier.fillMaxWidth(), accent = HN.accent, onClick = { onProject(null) }) {
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Glyph.Plus, size = 18.dp, color = HN.accent)
-                        Spacer(Modifier.width(14.dp))
-                        Column(Modifier.weight(1f)) {
-                            HText(stringResource(R.string.share_new_session), style = Type.heading)
-                            HText(stringResource(R.string.share_new_session_body), style = Type.small, color = HN.inkMuted)
-                        }
-                        Icon(Glyph.Chevron, size = 14.dp, color = HN.inkDim)
-                    }
-                }
-            }
-            if (recent.isNotEmpty()) {
-                item("recent-h") { Heading(stringResource(R.string.share_recent)) }
-                item("recent") {
-                    GlassCard(Modifier.fillMaxWidth()) {
-                        recent.forEachIndexed { i, s ->
-                            if (i > 0) Hairline(Modifier.padding(start = 16.dp))
-                            Row(
-                                Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onSession(s.id) }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    HText(s.name, style = Type.body, maxLines = 1)
-                                    HText(s.project, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
-                                }
-                                Spacer(Modifier.width(10.dp))
-                                PhaseChip(s)
-                            }
-                        }
-                    }
-                }
-            }
-            if (byActivity.isNotEmpty()) {
-                item("projects-h") { Heading(stringResource(R.string.share_projects)) }
-                item("projects") {
-                    GlassCard(Modifier.fillMaxWidth()) {
-                        byActivity.forEachIndexed { i, p ->
-                            if (i > 0) Hairline(Modifier.padding(start = 16.dp))
-                            Row(
-                                Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onProject(p.path) }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(Glyph.Folder, size = 14.dp, color = HN.accentDim)
-                                Spacer(Modifier.width(12.dp))
-                                HText(p.name, style = Type.body, modifier = Modifier.weight(1f), maxLines = 1)
-                                HText(pluralStringResource(R.plurals.sessions_count, p.sessionCount, p.sessionCount), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
-                            }
-                        }
-                    }
-                }
-            }
-            if (recent.isEmpty() && byActivity.isEmpty()) item("none") { HText(stringResource(R.string.share_no_sessions), style = Type.small, color = HN.inkDim) }
-        }
-    }
-
-    @Composable
-    private fun Heading(text: String) = HText(text.uppercase(), style = Type.label, color = HN.inkDim, modifier = Modifier.padding(top = 6.dp))
 }
+
+/** What [i], the share sheet's intent, hands over: its files (content:// and file:// only) and its text (a page's title, then its link). */
+internal fun readShared(i: Intent): Shared {
+    val uris = LinkedHashSet<Uri>()
+    val clip = i.clipData
+    if (clip != null) for (n in 0 until clip.itemCount) clip.getItemAt(n).uri?.let(uris::add)
+    if (Build.VERSION.SDK_INT >= 33) {
+        i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)?.let(uris::add)
+        i.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)?.let(uris::addAll)
+    } else {
+        @Suppress("DEPRECATION")
+        (i.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))?.let(uris::add)
+        @Suppress("DEPRECATION")
+        i.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let(uris::addAll)
+    }
+    val body = i.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.trim().orEmpty()
+    val subject = i.getStringExtra(Intent.EXTRA_SUBJECT)?.trim().orEmpty()
+    // A page shared from a browser: its title and then its link.
+    val text = listOf(subject.takeIf { it.isNotEmpty() && !body.contains(it) }, body.takeIf { it.isNotEmpty() })
+        .filterNotNull().joinToString("\n").takeIf { it.isNotBlank() }
+    // Only content:// and file:// are ours to read.
+    return Shared(text, uris.filter { it.scheme == "content" || it.scheme == "file" })
+}
+
+/** Where the shared content goes: a new session (the sheet chooses), a recent session, or a project's new session. */
+@Composable
+internal fun Destinations(sessions: List<Session>, projects: List<Project>, onSession: (String) -> Unit, onProject: (String?) -> Unit, bottom: androidx.compose.ui.unit.Dp) {
+    // Live sessions first, then the ended ones; each newest first.
+    val recent = remember(sessions) {
+        sessions.filter { it.phase != Phase.Ended }.sortedByDescending { it.updatedAt }.take(8)
+    }
+    val byActivity = remember(projects) { projects.sortedByDescending { it.lastActivityAt ?: 0L }.take(10) }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottom + 96.dp), verticalArrangement = spacedBy(10.dp)) {
+        item("new") {
+            GlassCard(Modifier.fillMaxWidth(), accent = HN.accent, onClick = { onProject(null) }) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Glyph.Plus, size = 18.dp, color = HN.accent)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        HText(stringResource(R.string.share_new_session), style = Type.heading)
+                        HText(stringResource(R.string.share_new_session_body), style = Type.small, color = HN.inkMuted)
+                    }
+                    Icon(Glyph.Chevron, size = 14.dp, color = HN.inkDim)
+                }
+            }
+        }
+        if (recent.isNotEmpty()) {
+            item("recent-h") { Heading(stringResource(R.string.share_recent)) }
+            item("recent") {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    recent.forEachIndexed { i, s ->
+                        if (i > 0) Hairline(Modifier.padding(start = 16.dp))
+                        Row(
+                            Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onSession(s.id) }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                HText(s.name, style = Type.body, maxLines = 1)
+                                HText(s.project, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            PhaseChip(s)
+                        }
+                    }
+                }
+            }
+        }
+        if (byActivity.isNotEmpty()) {
+            item("projects-h") { Heading(stringResource(R.string.share_projects)) }
+            item("projects") {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    byActivity.forEachIndexed { i, p ->
+                        if (i > 0) Hairline(Modifier.padding(start = 16.dp))
+                        Row(
+                            Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onProject(p.path) }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Glyph.Folder, size = 14.dp, color = HN.accentDim)
+                            Spacer(Modifier.width(12.dp))
+                            HText(p.name, style = Type.body, modifier = Modifier.weight(1f), maxLines = 1)
+                            HText(pluralStringResource(R.plurals.sessions_count, p.sessionCount, p.sessionCount), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+        if (recent.isEmpty() && byActivity.isEmpty()) item("none") { HText(stringResource(R.string.share_no_sessions), style = Type.small, color = HN.inkDim) }
+    }
+}
+
+@Composable
+private fun Heading(text: String) = HText(text.uppercase(), style = Type.label, color = HN.inkDim, modifier = Modifier.padding(top = 6.dp))

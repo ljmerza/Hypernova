@@ -1,0 +1,29 @@
+{
+  "path": "/home/me/Projects",
+  "parent": "/home/me",
+  "home": "/home/me",
+  "folders": [
+    {
+      "name": "app",
+      "path": "/home/me/Projects/app"
+    },
+    {
+      "name": "app-parser-fix",
+      "path": "/home/me/Projects/app-parser-fix"
+    },
+    {
+      "name": "demo",
+      "path": "/home/me/Projects/demo"
+    },
+    {
+      "name": "notebook",
+      "path": "/home/me/Projects/notebook"
+    },
+    {
+      "name": "sketchpad",
+      "path": "/home/me/Projects/sketchpad"
+    }
+  ],
+  "truncated": false,
+  "total": 5
+}
