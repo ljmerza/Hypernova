@@ -1,6 +1,6 @@
 // What the phone may see of Claude Code's and Codex's user-level settings (docs/PROTOCOL.md, "Agent
-// settings"; docs/DECISIONS.md, "The agents' settings, viewed"). Read-only, like the rest of the
-// daemon: it never edits a settings file (always.ts).
+// settings"; docs/DECISIONS.md, "The agents' settings, viewed"). This file only reads; the one way a
+// value changes is agent-settings-edit.ts, from its own shorter list.
 //
 // A strict allow-list. CLAUDE_SHOWN and CODEX_SHOWN are the only values that leave, each checked
 // for its type and shape; the summaries are counts and names, the names checked too. Nothing else
@@ -45,7 +45,7 @@ export type AgentSettingsReply = { scope: 'user'; claude: AgentSettings<ClaudeSu
 /**
  * A shown key: its path in the file (dots go one table deeper) and what's accepted. [of]: one of
  * these words, from the agent's own schema (checked against Claude Code 2.1.316 and Codex 0.164.0).
- * 'id': free text in a model id's shape. Step two adds what's editable here, per key.
+ * 'id': free text in a model id's shape. What may be set is a list of its own: agent-settings-edit.ts.
  */
 type Shown = { key: string; kind: 'boolean' } | { key: string; kind: 'word'; of: readonly string[] } | { key: string; kind: 'id' }
 
@@ -80,8 +80,10 @@ const FILE_MAX = 4 * 1024 * 1024
 
 /** Whether [s] passes: short, and with nothing in it that maskSecrets would hide. */
 const clean = (s: string) => s.length <= VALUE_MAX && maskSecrets(s) === s
+/** Whether [s] could be shown as a model's id. */
+export const modelIdFits = (s: string) => clean(s) && MODEL_ID.test(s)
 
-function shown(rule: Shown, found: boolean, v: unknown): ShownValue {
+export function shown(rule: Shown, found: boolean, v: unknown): ShownValue {
   const { key } = rule
   if (!found) return { key, state: 'unset' }
   if (rule.kind === 'boolean') return typeof v === 'boolean' ? { key, state: 'set', value: v } : { key, state: 'unrecognised' }

@@ -64,7 +64,63 @@
         "PreToolUse"
       ],
       "hidden": 0
-    }
+    },
+    "hash": "a30b34106f16c9ae5b94a288476e0e47299653e4e45158cc948c2425e7a0d777",
+    "editable": [
+      {
+        "key": "permissions.defaultMode",
+        "choices": [
+          {
+            "value": "plan",
+            "loosens": false
+          },
+          {
+            "value": "default",
+            "loosens": false
+          },
+          {
+            "value": "dontAsk",
+            "loosens": false
+          },
+          {
+            "value": "acceptEdits",
+            "loosens": false
+          },
+          {
+            "value": "auto",
+            "loosens": true
+          }
+        ]
+      },
+      {
+        "key": "showThinkingSummaries",
+        "choices": [
+          {
+            "value": true,
+            "loosens": false
+          },
+          {
+            "value": false,
+            "loosens": false
+          }
+        ]
+      },
+      {
+        "key": "autoUpdatesChannel",
+        "choices": [
+          {
+            "value": "latest",
+            "loosens": false
+          },
+          {
+            "value": "stable",
+            "loosens": false
+          }
+        ]
+      }
+    ],
+    "undo": null,
+    "whyNot": null
   },
   "codex": {
     "state": "ok",
@@ -104,6 +160,82 @@
         "fetch"
       ],
       "hidden": 0
-    }
+    },
+    "hash": "dab080c419d3f4f7dc60b6c08ef9a5be842ee85a8cb149d99effcd5a2fb2e50b",
+    "editable": [
+      {
+        "key": "model_reasoning_effort",
+        "choices": [
+          {
+            "value": "none",
+            "loosens": false
+          },
+          {
+            "value": "minimal",
+            "loosens": false
+          },
+          {
+            "value": "low",
+            "loosens": false
+          },
+          {
+            "value": "medium",
+            "loosens": false
+          },
+          {
+            "value": "high",
+            "loosens": false
+          },
+          {
+            "value": "xhigh",
+            "loosens": false
+          },
+          {
+            "value": "max",
+            "loosens": false
+          },
+          {
+            "value": "ultra",
+            "loosens": false
+          }
+        ]
+      },
+      {
+        "key": "sandbox_mode",
+        "choices": [
+          {
+            "value": "read-only",
+            "loosens": false
+          },
+          {
+            "value": "workspace-write",
+            "loosens": false
+          }
+        ]
+      },
+      {
+        "key": "web_search",
+        "choices": [
+          {
+            "value": "disabled",
+            "loosens": false
+          },
+          {
+            "value": "cached",
+            "loosens": false
+          },
+          {
+            "value": "indexed",
+            "loosens": false
+          },
+          {
+            "value": "live",
+            "loosens": false
+          }
+        ]
+      }
+    ],
+    "undo": null,
+    "whyNot": null
   }
 }

@@ -997,6 +997,26 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
     const r = await ok(get('/v1/agents/settings'))
     assert.ok(!JSON.stringify(r).includes('never-sent'))
     contract('rest-agent-settings', r)
+
+    // A change: its answer, what the other phones hear, and the undo that puts it back.
+    const put = (body: unknown) => call('PUT', '/v1/agents/settings', body)
+    const changed = await ok(put({ agent: 'claude', key: 'permissions.defaultMode', value: 'plan', expected: r.claude.hash }))
+    contract('rest-agent-settings-put', changed)
+    contract('ws-agent-settings', heard('agent_settings'))
+    assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).permissions.defaultMode, 'plan')
+
+    // Refusals, as the phone shows them. None of them writes.
+    const refusedKey = await refused(put({ agent: 'claude', key: 'hooks', value: 'x', expected: changed.hash }), 403)
+    contract('rest-agent-settings-refused-key', refusedKey)
+    const refusedValue = await refused(put({ agent: 'claude', key: 'permissions.defaultMode', value: 'bypassPermissions', expected: changed.hash }), 403)
+    contract('rest-agent-settings-refused-value', refusedValue)
+    const stale = await refused(put({ agent: 'claude', key: 'permissions.defaultMode', value: 'default', expected: r.claude.hash }), 409)
+    contract('rest-agent-settings-file-changed', stale)
+    assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).permissions.defaultMode, 'plan')
+
+    contract('rest-agent-settings-undo', await ok(post('/v1/agents/settings/undo', { agent: 'claude', expected: changed.hash })))
+    assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).permissions.defaultMode, 'acceptEdits')
+    contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))
   } finally {
     writeFileSync(claudeFile, world)
     rmSync(codexFile, { force: true })

@@ -1,0 +1,7 @@
+{
+  "status": 409,
+  "error": {
+    "code": "nothing_to_undo",
+    "message": "There’s no change here to undo."
+  }
+}

@@ -31,7 +31,7 @@ import { DOWNLOAD_MAX, allowedPath, fileFor, filesState, folderOpens, listDir, l
 import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
 import { agentEvents, backgroundRunning, endSessionAgents, listAgents, validAgentId } from './agents.ts'
-import { agentSettings } from './agent-settings.ts'
+import { changeSetting, settingsReply, undoChange, type ModelList } from './agent-settings-edit.ts'
 import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
 import { getBattery } from './battery.ts'
 import { refreshUsage } from './usage-probe.ts'
@@ -137,6 +137,28 @@ async function fireAutomation(res: ServerResponse, req: IncomingMessage, id: str
     throw e
   }
 }
+/**
+ * Codex's models for the agents' settings, or null when they can't be had soon: Codex off, not
+ * connected, or slow. Then its Model row stays view-only rather than holding the whole reply up.
+ */
+async function settingsModels(): Promise<ModelList> {
+  let timer: NodeJS.Timeout | undefined
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), 3000)
+  })
+  try {
+    return await Promise.race([codexModels().catch(() => null), late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** A setting changed: the other phones look again, and the pickers' idea of Codex's own default follows. */
+function afterSettingChange(agent: string, key: string): void {
+  broadcast({ t: 'agent_settings', agent })
+  if (agent === 'codex' && (key === 'model' || key === 'model_reasoning_effort')) void codexModels(true).catch(() => {})
+}
+
 async function readJsonBody(req: IncomingMessage): Promise<any> {
   const b = await readBody(req)
   if (!b.length) return {}
@@ -570,10 +592,23 @@ async function api(c: Ctx): Promise<void> {
     return json(res, 200, { project: createProject(String(b.name ?? ''), b.git !== false) })
   }
   if (path === '/v1/providers' && m === 'GET') return json(res, 200, { providers: listProviders() })
-  // The fixed list of Claude Code's and Codex's user-level settings, read-only, for a paired phone (agent-settings.ts).
+  // The fixed list of Claude Code's and Codex's user-level settings, for a paired phone (agent-settings.ts),
+  // and the shorter list a phone may change, one key at a time (agent-settings-edit.ts).
   if (path === '/v1/agents/settings' && m === 'GET') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
-    return json(res, 200, agentSettings())
+    return json(res, 200, settingsReply(await settingsModels()))
+  }
+  if (path === '/v1/agents/settings' && m === 'PUT') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')
+    const r = await changeSetting(await readJsonBody(req), settingsModels)
+    if (r.changed) afterSettingChange(r.agent, r.key)
+    return json(res, 200, r)
+  }
+  if (path === '/v1/agents/settings/undo' && m === 'POST') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')
+    const r = undoChange(await readJsonBody(req))
+    afterSettingChange(r.agent, r.key)
+    return json(res, 200, r)
   }
   // The models each provider offers, for the new-session sheet (models.ts): Claude Code's own list,
   // OpenRouter's catalogue, the providers' settings.

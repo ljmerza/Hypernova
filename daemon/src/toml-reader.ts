@@ -10,6 +10,14 @@
 export const OTHER = Symbol('other')
 export type TomlValue = string | boolean | typeof OTHER
 
+/**
+ * One statement and its place in the text. A table's header, or a `key = value` directly in [table]:
+ * [valueFrom] to [valueTo] is the value alone, [lineEnd] is past the line's comment and newline.
+ */
+export type TomlStatement =
+  | { kind: 'table'; path: string[]; from: number }
+  | { kind: 'key'; table: string[]; key: string[]; value: TomlValue; valueFrom: number; valueTo: number; lineEnd: number }
+
 /** The file isn't TOML. Its message never quotes the file: callers may not show even that. */
 export class TomlError extends Error {
   constructor() {
@@ -28,8 +36,11 @@ const MAX_DEPTH = 64
  * with the key's whole path (`[mcp_servers.a]` then `command = "x"` is `['mcp_servers', 'a',
  * 'command']`), also for a key inside an inline table. Throws [TomlError] on anything that isn't
  * TOML, and on a top-level key given twice, which Codex's own parser refuses too.
+ *
+ * [onStatement], for the one caller that edits a line (agent-settings-edit.ts): where each statement
+ * of the file is, in the text's own positions.
  */
-export function scanToml(text: string, onKey: (path: string[], value?: TomlValue) => void): void {
+export function scanToml(text: string, onKey: (path: string[], value?: TomlValue) => void, onStatement?: (s: TomlStatement) => void): void {
   let i = text.charCodeAt(0) === 0xfeff ? 1 : 0
   const fail = (): never => {
     throw new TomlError()
@@ -215,12 +226,15 @@ export function scanToml(text: string, onKey: (path: string[], value?: TomlValue
     skipBlank()
     if (i >= text.length) return
     if (text[i] === '[') {
+      const from = i
       const double = text[i + 1] === '['
       i += double ? 2 : 1
       table = key()
       if (text[i] !== ']' || (double && text[i + 1] !== ']')) fail()
       i += double ? 2 : 1
       onKey(table)
+      endOfLine()
+      onStatement?.({ kind: 'table', path: table, from })
     } else {
       const inner = key()
       if (text[i] !== '=') fail()
@@ -230,8 +244,13 @@ export function scanToml(text: string, onKey: (path: string[], value?: TomlValue
         if (seen.has(path[0]!)) fail()
         seen.add(path[0]!)
       }
-      onKey(path, value(path, 0))
+      skipSpaces()
+      const valueFrom = i
+      const v = value(path, 0)
+      const valueTo = i
+      onKey(path, v)
+      endOfLine()
+      onStatement?.({ kind: 'key', table, key: inner, value: v, valueFrom, valueTo, lineEnd: i })
     }
-    endOfLine()
   }
 }

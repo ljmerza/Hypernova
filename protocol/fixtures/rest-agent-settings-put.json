@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "agent": "claude",
+  "key": "permissions.defaultMode",
+  "value": "plan",
+  "changed": true,
+  "hash": "c54d00f443460ebf54576a59f6910dbdb12d89c278124c99289562807e8952ee",
+  "loosened": false,
+  "undo": {
+    "key": "permissions.defaultMode",
+    "to": "acceptEdits",
+    "loosens": true
+  }
+}

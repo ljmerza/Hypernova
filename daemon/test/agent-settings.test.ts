@@ -231,21 +231,25 @@ test('the route is for a paired phone: no token, a wrong one and the local API g
   assert.equal((await fetch(url, { headers: { authorization: 'Bearer not-a-token' } })).status, 401)
   const local = await fetch(`http://127.0.0.1:${LOCAL}/v1/agents/settings`)
   assert.ok(local.status === 401 || local.status === 404, `the local API answered ${local.status}`)
-  // Reading only: nothing writes through it.
-  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+  // PUT is the one way to write (agent-settings-edit.test.ts): an empty body changes nothing.
+  for (const method of ['POST', 'PATCH', 'DELETE']) {
     const w = await fetch(url, { method, headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : '{}' })
     assert.equal(w.status, 404, method)
   }
+  const put = await fetch(url, { method: 'PUT', headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(put.status, 400)
 })
 
 test('both files missing: each agent says so, with nothing else', async () => {
   const r = await fetch(`http://127.0.0.1:${API}/v1/agents/settings`, { headers: { authorization: `Bearer ${TOKEN}` } })
   assert.equal(r.status, 200)
-  assert.deepEqual(await r.json(), {
-    scope: 'user',
-    claude: { state: 'missing', values: [], summary: null },
-    codex: { state: 'missing', values: [], summary: null },
-  })
+  const body = (await r.json()) as any
+  assert.deepEqual(Object.keys(body).sort(), ['claude', 'codex', 'scope'])
+  // What can be set by making the file is agent-settings-edit.test.ts's.
+  for (const agent of ['claude', 'codex']) {
+    const { editable: _editable, ...rest } = body[agent]
+    assert.deepEqual(rest, { state: 'missing', values: [], summary: null, hash: null, undo: null, whyNot: null })
+  }
 })
 
 test('every shown value is its type and shape; anything else is unrecognised, not passed through', () => {

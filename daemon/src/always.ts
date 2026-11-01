@@ -2,7 +2,11 @@
 // rule goes (this session, this project, everywhere) and may edit it first. Claude Code writes the
 // rule itself, as its own "Yes, and don't ask again" does: the hook's allow (and the SDK's
 // canUseTool answer) carries it in `updatedPermissions` with a destination, and Claude Code adds it
-// to the session and, for a settings file, saves it there. The daemon never edits a settings file.
+// to the session and, for a settings file, saves it there. The daemon never writes a rule into a
+// settings file. It edits one in a single place, by the owner's decision of 2026-11-01:
+// agent-settings-edit.ts, for a paired phone, one key at a time, and only the keys and values on its
+// fixed list. Rules, hooks, env and everything else in those files stay out of its reach, and no
+// bypass value can be set (docs/DECISIONS.md, "The agents' settings, edited").
 //
 // Checked against Claude Code 2.1.314 (`grep -a` on the binary): a PermissionRequest hook's allow
 // may hold `updatedPermissions`, each `{type: "addRules", rules: [{toolName, ruleContent?}],

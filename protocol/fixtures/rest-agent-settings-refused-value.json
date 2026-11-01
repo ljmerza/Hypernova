@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "value_not_allowed",
+    "message": "That value can’t be chosen from a phone."
+  }
+}
