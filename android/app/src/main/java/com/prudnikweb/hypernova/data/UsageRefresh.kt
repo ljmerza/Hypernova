@@ -22,6 +22,12 @@ object UsageRefresh {
     /** Whether a look asked at [now] goes out, given the last one went out at [last]. */
     fun due(now: Long, last: Long): Boolean = last == 0L || now - last >= EVERY_MS || now < last
 
+    /** A test's start: no look asked yet from this process. */
+    @androidx.annotation.VisibleForTesting
+    internal fun reset() {
+        last = 0L
+    }
+
     fun ask() {
         val p = Core.pairing ?: return
         val now = System.currentTimeMillis()

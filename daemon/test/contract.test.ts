@@ -26,10 +26,12 @@ process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
 process.env.HOME = join(scratch, 'home')
 process.env.ZDOTDIR = join(scratch, 'zdot')
 process.env.FAKE_AGENTS_DIR = join(scratch, 'fake')
+// `claude auth …` goes to the account tests' stand-in (fixtures/fake-claude.sh), signed out until a sign-in here finishes.
+process.env.FAKE_CLAUDE_STATE = join(scratch, 'fake-auth')
 process.env.HYPERNOVA_NO_DEV_APK = '1'
 process.env.HYPERNOVA_WSL = '0'
 const HOME = process.env.HOME
-for (const d of [HOME, process.env.ZDOTDIR, process.env.FAKE_AGENTS_DIR, join(HOME, 'Projects')]) mkdirSync(d, { recursive: true })
+for (const d of [HOME, process.env.ZDOTDIR, process.env.FAKE_AGENTS_DIR, process.env.FAKE_CLAUDE_STATE, join(HOME, 'Projects')]) mkdirSync(d, { recursive: true })
 const registry = join(process.env.CLAUDE_CONFIG_DIR, 'sessions')
 mkdirSync(registry, { recursive: true })
 // Codex installed (a stand-in that only says its version) and off: the snapshot's `codex`.
@@ -82,6 +84,7 @@ case "$1" in
     exit 0
     ;;
   --version) echo "2.1.314 (Claude Code)" ;;
+  auth) exec /bin/sh "${join(import.meta.dirname, 'fixtures', 'fake-claude.sh')}" "$@" ;;
   stop|rm|respawn) echo "$1 $2" >> "$S/verbs"; echo "Done $2" ;;
   *) exec sleep 30 ;;
 esac
@@ -662,6 +665,117 @@ test('POST /v1/pair', async () => {
   contract('rest-pair', await ok(call('POST', '/v1/pair', { code, deviceName: 'Pixel', model: 'Google Pixel 9', appVersion: '0.42.0', installId: 'install-0123456789abcdef' }, null)))
 })
 
+// ── Settings, the account and Statistics ─────────────────────────────────
+// Before the sessions' section: rest-stats counts the transcripts up to here, and these leave the
+// account signed in and no providers behind, which the sections after them expect too.
+/** [v] with each of [ids] (a provider's random id, say) written as its name, so both suites can name it. */
+function named(v: unknown, ids: Record<string, string>): any {
+  let text = JSON.stringify(v)
+  for (const [id, name] of Object.entries(ids)) text = text.split(id).join(name)
+  return JSON.parse(text)
+}
+
+test('the providers: saved and checked, checked without saving, a balance, an edit that drops the key, the list, deleted, a refusal', async () => {
+  const { useCheckFetch } = await import('../src/providers-check.ts')
+  const balance = await import('../src/balance.ts')
+  // The providers' own servers, answered here: nothing leaves this machine.
+  const answer = (status: number, body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }))
+  useCheckFetch((url) => (url.pathname.endsWith('/v1/models') ? answer(200, { data: [{ id: 'gateway-large' }, { id: 'gateway-small' }] }) : answer(404, {})))
+  balance.useFetch(() => answer(200, { data: { label: 'never kept', limit: 10, limit_remaining: 4.2, usage_daily: 0.31, free_model_daily_requests: { used: 13, limit: 50, remaining: 37 } } }))
+  try {
+    const gw = await ok(post('/v1/providers', { name: 'Gateway', kind: 'custom', baseUrl: 'https://gateway.example.com/v1', apiKey: 'gw-key-0123', models: { default: 'gateway-large', haiku: 'gateway-small' } }))
+    const or = await ok(post('/v1/providers', { name: 'OpenRouter', kind: 'openrouter', apiKey: 'sk-or-0123', models: { default: 'anthropic/claude-sonnet-5' } }))
+    const ids = { [gw.provider.id]: 'prov-gateway', [or.provider.id]: 'prov-openrouter' }
+    contract('rest-provider-save', named(gw, ids))
+    contract('rest-provider-save-balance', named(or, ids))
+    contract('rest-provider-check', await ok(post('/v1/providers/check', { kind: 'custom', baseUrl: 'https://gateway.example.com', apiKey: 'gw-key-0123' })))
+    contract('rest-provider-balance', named(await ok(post(`/v1/providers/${or.provider.id}/check`)), ids))
+    // Moved to another host without a new key: the key stays behind.
+    contract('rest-provider-edit', named(await ok(call('PUT', `/v1/providers/${gw.provider.id}`, { name: 'Gateway', kind: 'custom', baseUrl: 'https://other.example.com', models: { default: 'gateway-large' } })), ids))
+    contract('rest-providers', named(await ok(get('/v1/providers')), ids))
+    contract('rest-provider-delete', await ok(call('DELETE', `/v1/providers/${gw.provider.id}`)))
+    await ok(call('DELETE', `/v1/providers/${or.provider.id}`))
+    // A refusal names its field's code (the editor puts it under that field).
+    const refused = await post('/v1/providers', { name: 'Plain', kind: 'custom', baseUrl: 'http://gateway.example.com', apiKey: 'k' })
+    assert.equal(refused.status, 400)
+    contract('rest-provider-refused', refused.json)
+  } finally {
+    useCheckFetch((u, i) => fetch(u, i))
+    balance.useFetch((u, i) => fetch(u, i))
+  }
+})
+
+// Signed out from here on (fake-claude.sh has no sign-in yet), so the usage refresh below needs no
+// look at /usage (there's nothing to read while signed out) and answers with the usage at once.
+test('POST /v1/account/check, then GET /v1/usage and POST /v1/usage/refresh', async () => {
+  const checked = await ok(post('/v1/account/check'))
+  assert.equal(checked.account.state, 'logged_out')
+  contract('rest-account-check', checked)
+  contract('rest-usage', await ok(get('/v1/usage')))
+  contract('rest-usage-refresh', await ok(post('/v1/usage/refresh')))
+})
+
+test('signing in from the phone: started, its page, cancelled, started again, its code, then a code with none running', async () => {
+  const waiting = (not?: string) => heard('account', (m) => m.account.login?.state === 'waiting_code' && !!m.account.login.url && m.account.login.url !== not)
+  contract('rest-account-login', await ok(post('/v1/account/login', { where: 'phone' })))
+  await until('the sign-in page', () => !!waiting())
+  const first = waiting()
+  contract('ws-account-sign-in', first)
+  contract('rest-account-login-cancel', await ok(call('DELETE', '/v1/account/login')))
+  await ok(post('/v1/account/login', { where: 'phone' }))
+  await until('a new sign-in page', () => !!waiting(first.account.login.url))
+  const state = new URL(waiting(first.account.login.url).account.login.url).searchParams.get('state')
+  contract('rest-account-login-code', await ok(post('/v1/account/login/code', { code: `AuthCode0123456789#${state}` })))
+  // Signed in: the sign-in is over and the plan known (the limit the account was on before comes back with it).
+  await until('signed in', () => getAccount().login === null && getAccount().state !== 'logged_out' && getAccount().plan === 'max')
+  // A code with no sign-in running.
+  const noLogin = await post('/v1/account/login/code', { code: 'AuthCode#state' })
+  assert.equal(noLogin.status, 409)
+  contract('rest-account-login-code-refused', noLogin.json)
+})
+
+test('GET /v1/stats: a week of the transcripts above', async () => {
+  // Days are the server's own: a zone where it's mid-day keeps the last ten minutes' transcripts in one day.
+  const tz = process.env.TZ
+  const h = new Date().getUTCHours()
+  process.env.TZ = h >= 1 && h <= 22 ? 'UTC' : 'Etc/GMT-12'
+  try {
+    const s = await ok(get('/v1/stats?range=week'))
+    // The days as dates counted back from the normalised day (2027-01-15), so a fixture keeps its shape whatever today is.
+    const today = s.days.at(-1).day as string
+    const back = (d: string) => Math.round((Date.parse(today) - Date.parse(d)) / 86_400_000)
+    const date = (d: string) => new Date(Date.UTC(2027, 0, 15 - back(d))).toISOString().slice(0, 10)
+    for (const d of s.days) d.day = date(d.day)
+    if (s.busiestDay) s.busiestDay.day = date(s.busiestDay.day)
+    for (const k of ['from', 'to', 'computedAt', 'countingSince']) if (typeof s[k] === 'number') s[k] = T
+    // How long Claude worked runs up to now (a turn still open): any time worked is ten minutes here.
+    const minutes = (x: any): void => {
+      if (Array.isArray(x)) return x.forEach(minutes)
+      if (!x || typeof x !== 'object') return
+      for (const [k, v] of Object.entries(x)) {
+        if ((k === 'ms' || k.endsWith('Ms')) && typeof v === 'number' && v > 0) x[k] = 600_000
+        else minutes(v)
+      }
+    }
+    minutes(s)
+    // Tools with the same count come in the order the files were read: by name here.
+    s.tools.sort((a: any, b: any) => b.count - a.count || a.name.localeCompare(b.name))
+    contract('rest-stats', s)
+    const bad = await get('/v1/stats?range=year')
+    assert.equal(bad.status, 400)
+    contract('rest-stats-bad-range', bad.json)
+  } finally {
+    if (tz === undefined) delete process.env.TZ
+    else process.env.TZ = tz
+  }
+})
+
+test('GET /v1/qa: the testing checklist’s page', async () => {
+  const r = await ok(get('/v1/qa'))
+  assert.match(r.url, /^http:\/\/127\.0\.0\.1:\d+\/qa\?k=[0-9a-f]{32}$/)
+  contract('rest-qa', { url: r.url.replace(/:\d+\//, ':47321/').replace(/k=[0-9a-f]{32}/, 'k=qa-key') })
+})
+
 // ── Sessions: starting one, its chat, its terminal (docs/FEATURES.md, sections 4 to 9) ──
 /** A refusal as the phone reads it: the status with the daemon's `{error}`. */
 async function refused(p: Promise<{ status: number; json: any }>, status: number): Promise<any> {
@@ -686,7 +800,7 @@ function upload(name: string, bytes: Buffer): Promise<{ status: number; json: an
   })
 }
 const typed = (job: string) => (existsSync(join(process.env.FAKE_AGENTS_DIR!, `typed-${job}`)) ? readFileSync(join(process.env.FAKE_AGENTS_DIR!, `typed-${job}`), 'utf8') : '')
-const until = async (what: string, f: () => boolean, ms = 6000) => {
+const until = async (what: string, f: () => boolean, ms = 15_000) => {
   for (const t0 = Date.now(); !f(); await new Promise((r) => setTimeout(r, 50))) if (Date.now() - t0 > ms) assert.fail(`timed out waiting for ${what}`)
 }
 

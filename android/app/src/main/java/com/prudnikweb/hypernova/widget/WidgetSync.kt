@@ -61,6 +61,14 @@ internal object WidgetSync {
     private const val LIVE_CHECK = 30 * 60_000L
 
     private lateinit var app: Application
+
+    /** The wall clock: a test's runs with the main thread's delays, so the gap passes only when it says. */
+    @androidx.annotation.VisibleForTesting
+    internal var clock: () -> Long = System::currentTimeMillis
+
+    /** Told of every picture as it's drawn: a test counts them (the redraw rule). Null in the app. */
+    @androidx.annotation.VisibleForTesting
+    internal var drawn: ((WidgetModel) -> Unit)? = null
     private val present = MutableStateFlow(false)
     /** Answers sent from the widget, still on their way (or the last try failed), by approval or menu id. */
     private val answering = mutableStateMapOf<String, Answering>()
@@ -133,7 +141,7 @@ internal object WidgetSync {
     }
 
     /** What the list shows now, for its rows ([WidgetListService]): the last picture drawn, else the one kept. */
-    fun current(): WidgetModel = shown ?: stored?.at(System.currentTimeMillis()) ?: WidgetModel.unpaired()
+    fun current(): WidgetModel = shown ?: stored?.at(clock()) ?: WidgetModel.unpaired()
 
     /**
      * What the widget should show right now. Read inside [snapshotFlow], so it runs again when any
@@ -175,7 +183,7 @@ internal object WidgetSync {
         pending?.cancel()
         pendingTook = false
         pending = Core.scope.launch {
-            val wait = due - System.currentTimeMillis()
+            val wait = due - clock()
             if (wait > 0) delay(wait)
             // It went off in the meantime: [latest] stays for the screen coming on.
             if (!awake()) return@launch
@@ -200,7 +208,7 @@ internal object WidgetSync {
 
     /** Stamps [m], keeps it for a cold start, and redraws the widgets. One at a time. */
     private suspend fun push(m: WidgetModel) = lock.withLock {
-        val now = System.currentTimeMillis()
+        val now = clock()
         val stamped = stamp(m, now)
         last = stamped
         lastAt = now
@@ -211,6 +219,7 @@ internal object WidgetSync {
         withContext(drawing) {
             runCatching { WidgetStore.save(app, stamped) }
             draw(view)
+            drawn?.invoke(view)
         }
         schedule(stamped, now)
     }
@@ -313,7 +322,7 @@ internal object WidgetSync {
      */
     private fun wake() {
         val next = latest
-        val due = shown?.live != true && alarmAt in 1..System.currentTimeMillis()
+        val due = shown?.live != true && alarmAt in 1..clock()
         if (next == null && !due) return
         latest = null
         pending?.cancel()
@@ -355,7 +364,7 @@ internal object WidgetSync {
                 val m = model()
                 if (drawn != null && drawn.live && m.live) {
                     // Anything new is already on its way through [offer].
-                    schedule(drawn, System.currentTimeMillis())
+                    schedule(drawn, clock())
                     return@launch
                 }
                 latest = null

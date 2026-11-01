@@ -1,0 +1,20 @@
+{
+  "t": "account",
+  "account": {
+    "state": "logged_out",
+    "providerId": "anthropic",
+    "plan": null,
+    "limit": null,
+    "reason": "not_logged_in",
+    "text": null,
+    "since": 1800000000000,
+    "sessionId": null,
+    "checkedAt": 1800000000000,
+    "login": {
+      "state": "waiting_code",
+      "url": "https://claude.ai/oauth/authorize?code=true&client_id=00000000-0000-4000-8000-000000000001&response_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=user%3Ainference+user%3Aprofile+user%3Asessions%3Aclaude_code&code_challenge=FakeChallenge1x0123456789abcdefghijklmnopqrs&code_challenge_method=S256&state=FakeState1x0123456789abcdefghijklmnopqrstuvw",
+      "where": "phone",
+      "error": null
+    }
+  }
+}

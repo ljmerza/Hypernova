@@ -487,7 +487,7 @@ private fun AboutSection(offer: com.prudnikweb.hypernova.data.AppUpdate?, versio
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             InfoRow(
-                stringResource(R.string.about_app), stringResource(R.string.about_app_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                stringResource(R.string.about_app), stringResource(R.string.about_app_build, AboutBuild.name, AboutBuild.code),
                 Modifier.clickable(remember { MutableInteractionSource() }, indication = null) {
                     if (testing || BuildConfig.DEBUG) return@clickable
                     taps++
@@ -521,6 +521,15 @@ private fun ServerVersions(live: com.prudnikweb.hypernova.data.Hub) {
     InfoRow(stringResource(R.string.about_claude), claude)
     // Codex's, only where it's installed.
     live.codex?.let { c -> InfoRow(stringResource(R.string.ag_about_codex), c.version ?: unknown) }
+}
+
+/**
+ * The app's build as About shows it: this build's. A screen test pins it, since every build has a
+ * versionCode of its own (the minute it was built) and a picture of Settings would differ each time.
+ */
+internal object AboutBuild {
+    var name: String = BuildConfig.VERSION_NAME
+    var code: Int = BuildConfig.VERSION_CODE
 }
 
 /** The testing checklist's switch on the phone: off for everyone but debug builds, until seven taps on the build. */

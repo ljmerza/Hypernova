@@ -31,7 +31,7 @@ import javax.net.ssl.X509ExtendedTrustManager
 /**
  * A scripted daemon (docs/PROTOCOL.md) on plain HTTP: `GET /v1/health` for the router's probe,
  * `GET /v1/snapshot`, the `/v1/ws` socket, and whatever a test [on]s. Everything the phone asks is
- * kept in [requests]; everything it says on the socket in [received].
+ * kept in [requests]; everything it says on the socket in [received]. [port]: 0, any free one.
  *
  * With [lan], also the daemon's local listener (docs/PROTOCOL.md, "Local network (direct HTTPS)"),
  * as daemon/src/lan.ts and http.ts run it: HTTPS on loopback with its own self-signed certificate
@@ -41,7 +41,7 @@ import javax.net.ssl.X509ExtendedTrustManager
  * there (401 `device_cert_required`), and the socket's upgrade is refused. The snapshot then says
  * the listener (`lan`), with `deviceCert` true once a certificate is out.
  */
-class FakeDaemon(val name: String = "z2", val lan: Boolean = false) : AutoCloseable {
+class FakeDaemon(val name: String = "z2", val lan: Boolean = false, port: Int = 0) : AutoCloseable {
     private val server = MockWebServer()
     private val lanServer: MockWebServer? = if (lan) MockWebServer() else null
 
@@ -115,7 +115,8 @@ class FakeDaemon(val name: String = "z2", val lan: Boolean = false) : AutoClosea
                 }
             }
         }
-        server.start()
+        // A fixed [port] only where a picture shows the address (0: any free one).
+        server.start(port)
         lanServer?.let { l ->
             l.dispatcher = server.dispatcher
             l.useHttps(listenerContext().socketFactory, false)
