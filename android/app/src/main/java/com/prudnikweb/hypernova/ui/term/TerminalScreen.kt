@@ -52,12 +52,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -70,6 +72,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.Links
 import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
@@ -100,7 +103,7 @@ private data class Info(val cols: Int, val rows: Int, val mac: Int)
  * (bundled in the app) over a WebSocket from the daemon. The key bar adds what a phone
  * keyboard lacks. The terminal takes the phone's size while you use it here and goes back to
  * the Mac's when you type there. A finger scrolls its history (assets/term/index.html), and
- * "Jump to latest" brings it back.
+ * "Jump to latest" brings it back. A tapped address goes where one in the chat goes.
  */
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
@@ -108,6 +111,7 @@ fun TerminalScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     val toast = LocalToast.current
+    val links by rememberUpdatedState(LocalUriHandler.current)
     val scope = rememberCoroutineScope()
     val session = hub.session(sessionId)
     var web by remember { mutableStateOf<WebView?>(null) }
@@ -159,6 +163,8 @@ fun TerminalScreen(hub: Hub, sessionId: String, onBack: () -> Unit) {
             onExited = { status = Status.Ended },
             onTapped = { view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK) },
             onScrolled = { away = it },
+            // The chat's way: the web asks first and opens in the browser, a dev server in its preview.
+            onLink = { links.openUri(it) },
         )
     }
 
@@ -523,6 +529,13 @@ private fun terminalWebView(ctx: Context, bridge: TermBridge): WebView = TermWeb
     loadUrl(PAGE)
 }
 
+/**
+ * An address tapped in the terminal, if it may go anywhere: http or https only, and of a sane
+ * length, since whatever a program printed can end up here.
+ */
+internal fun termLink(url: String): String? =
+    url.takeIf { it.length <= 8192 && it.startsWith("http", ignoreCase = true) && Links.target(it) != Links.Target.Never }
+
 /** Ctrl with [c]: a letter or one of @[\\]^_ as its control code (Ctrl+R is 0x12); null for anything else. */
 internal fun ctrlCode(c: Char): Char? {
     val u = c.uppercaseChar()
@@ -551,6 +564,7 @@ private class TermBridge(
     private val onExited: (Int) -> Unit,
     private val onTapped: () -> Unit,
     private val onScrolled: (Boolean) -> Unit,
+    private val onLink: (String) -> Unit,
 ) {
     private val main = Handler(Looper.getMainLooper())
     @JavascriptInterface fun ready() { main.post(onReady) }
@@ -559,6 +573,7 @@ private class TermBridge(
     @JavascriptInterface fun exited(code: Int) { main.post { onExited(code) } }
     @JavascriptInterface fun tapped() { main.post(onTapped) }
     @JavascriptInterface fun scrolled(away: Boolean) { main.post { onScrolled(away) } }
+    @JavascriptInterface fun link(url: String) { termLink(url)?.let { main.post { onLink(it) } } }
     @JavascriptInterface fun open(cols: Int, rows: Int): Int = socket.open(cols, rows)
     @JavascriptInterface fun send(id: Int, base64: String) = socket.send(id, base64)
     @JavascriptInterface fun sendText(id: Int, text: String) = socket.sendText(id, text)
