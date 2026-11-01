@@ -378,6 +378,8 @@ private fun ServerCard(
                 if (awake != null) StayAwakeBlock(live, awake, live.mac.battery)
                 // The server updating itself (AutoUpdateRow.kt), from a daemon that can say; not from a last snapshot.
                 if (!waiting) live.mac.update?.let { AutoUpdateRow(live, it) }
+                // Its notifications, kept on the phone: here while it can't be reached too.
+                ServerNotifyRow(live.serverId, live.mac.name.ifBlank { live.pairing.macName })
                 if (link.state == LinkState.Offline || link.state == LinkState.Reconnecting) {
                     Spacer(Modifier.height(6.dp))
                     HText(com.prudnikweb.hypernova.data.linkProblemText(res, link), style = Type.small, color = HN.inkMuted)
@@ -448,7 +450,7 @@ private fun ChecklistCard(hub: com.prudnikweb.hypernova.data.Hub) {
     }
 }
 
-/** Notifications: Stay connected in the background (every server's link), the system's permission, the battery exemption. */
+/** Notifications: which ones (the defaults), Stay connected in the background (every server's link), the system's permission, the battery exemption. */
 @Composable
 private fun NotificationsSection(vm: HubViewModel) {
     val askNotifications = com.prudnikweb.hypernova.ui.LocalAskNotifications.current
@@ -456,6 +458,8 @@ private fun NotificationsSection(vm: HubViewModel) {
     Seam(stringResource(R.string.notifications), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp)) {
+            // Which notifications, on this phone (NotificationControls.kt).
+            NotificationDefaults()
             ToggleRow(stringResource(R.string.bg_title), stringResource(R.string.bg_desc), vm.background, { vm.stayConnected(it) })
             // Re-checked every few seconds: the answer can change in system settings.
             val canPost by produceState(com.prudnikweb.hypernova.data.Core.notifier.canPost()) {

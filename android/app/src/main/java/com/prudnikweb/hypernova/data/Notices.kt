@@ -27,8 +27,9 @@ data class Notice(
     /**
      * [Limit]: Claude rests at a usage limit (calm, it carries on by itself). [Account]: the
      * account needs the owner (signed out, no plan, out of credits, on hold). One per episode.
+     * [Power]: a Mac about to run out of battery or to sleep; on screen, a banner like an approval's.
      */
-    enum class Kind { Approval, Question, Plan, Waiting, Finished, Error, Update, Limit, Account, Backpack, Automation, ServerUpdateFailed }
+    enum class Kind { Approval, Question, Plan, Waiting, Finished, Error, Update, Limit, Account, Power, Backpack, Automation, ServerUpdateFailed }
 
     companion object {
         const val ACTION_EXTEND = "extend"

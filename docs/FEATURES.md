@@ -6,7 +6,7 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1423 app tests, 985 daemon tests (981 pass, 4 skipped: Mac-only).
+2026-11-01: 1463 app tests, 985 daemon tests (981 pass, 4 skipped: Mac-only).
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -22,7 +22,7 @@ Test names, shortened:
   - Layer 2, the real `LiveHub`/`Core` against `FakeDaemon`: `data/live/` (ActionsTest,
     AllServersSettingsTest, AppUpdaterTest, AutomationNotesTest, ConnectTest, ConnectionServiceTest,
     CoreServersTest, DeviceCertStoreTest, ErrorsTest, MacOnlyTest, MultiServerTest, MutualTlsTest,
-    NotifyActionsTest, PairTest, ReconnectTest, SettingsCallsTest, SocketEventsTest,
+    NotificationControlsTest, NotifyActionsTest, PairTest, ReconnectTest, SettingsCallsTest, SocketEventsTest,
     UsageRefreshCallTest), and `widget/WidgetSyncTest`. `FakeDaemon("z2", lan = true)`
     adds the local listener: HTTPS with its own pinned certificate, a client certificate asked for,
     and a device CA that signs the phone's request; `FakeKeyStore` stands in for AndroidKeyStore.
@@ -265,6 +265,7 @@ Test names, shortened:
 | NT5 | A server's update that failed: a banner or a notification, once per release and once when it gives up, each server's its own, a tap opening its section of Settings (the jump itself by hand) | ServerUpdateNoticeTest.onScreen_aFailureIsABannerOncePerRelease_andOnceMoreWhenItGivesUp, offScreen_aFailureIsANotification_fromASnapshotToo_andOnceAcrossRestartsOfTheApp, eachWatchedServerSaysItsOwn, anUpdateGoingWell_orAnOlderDaemon_saysNothing; NotifyActionsTest.aFailedServerUpdateOpensThatServersSettings_andGoesOnceItsFine; SettingsPlanTest.keysForAJump | **partial** |
 | NT6 | An approval a daemon restart took away, its session still asking in its own dialog, said again | ServerUpdateNoticeTest.anApprovalARestartTookAway_itsSessionStillAsking_isSaidAgain, anApprovalAnsweredWhileAway_isNotSaidAgain; claude-agents.test.ts "a restart handed a held ask back"; with a real Claude Code by hand (docs/DECISIONS.md, "Servers update without waiting") | **partial** |
 | NT4 | A tap opens the right session on the right server | NavTest (all); ServersTest.aNotificationGoesToTheServerItNames | **covered** |
+| NT7 | Which notifications: a master and a switch per group as defaults, Same as all / Custom / Off per server, kept on the phone; a switch off clears the shade; banners, cards and the widget unchanged; the warning before a prompt goes silent (docs/DECISIONS.md, "Which notifications") | NotificationPrefsTest (all); NotificationControlsTest (all); NotificationSettingsTest (all); clearing the shade against Robolectric's list of active notifications, not yet on a phone | **covered** |
 
 ## 19. Statistics
 

@@ -72,7 +72,7 @@ class MacOnlyTest {
         val n = rig.banners.single()
         // About the battery: it takes the battery notice's place.
         assertEquals("battery", n.id)
-        assertEquals(Notice.Kind.Approval, n.kind)
+        assertEquals(Notice.Kind.Power, n.kind)
         assertEquals("z2", n.title)
         assertEquals(AwakeWords.sleepSoon(res, 120, MacAwake.BATTERY, 15), n.text)
         assertTrue(n.text, n.text.contains("15"))

@@ -3022,3 +3022,52 @@ exception is the automations view default back to sessions list." Home's tab now
 computer's own Home (`rememberHomeTab`): Sessions, History and Settings stay on screen through a
 switch, to another server or to All servers. Automations goes back to Sessions. Each computer's list
 still starts at the top.
+
+## Which notifications (2026-11-01)
+
+The owner: "ability to control notifications, what kind of notifications, or even notifications at all
+that you would get, on a per server and all server basis." He chose the design; decided
+(`data/NotificationPrefs.kt`, `ui/settings/NotificationControls.kt`):
+
+1. **Kept on the phone, not the server.** Each phone chooses for itself, and it works while a server
+   can't be reached.
+2. **All servers: the defaults.** In Settings' Notifications card, a master **Notifications** switch and
+   a switch per group, folded under one row ("Which ones", "All" or "5 of 7") so the tab stays
+   scannable. Everything is on by default, as before.
+   - **Needs your answer:** `Approval`, `Question`, `Plan`.
+   - **Finished:** `Finished`. **Waiting for you:** `Waiting`. **Errors:** `Error`, a job that died too.
+   - **Limits and account:** `Limit`, `Account`, and what stops the sessions on a Mac from outside:
+     `Backpack` and `Power`, a new kind for its battery and sleeping soon (they were `Approval`, which
+     would have put them under Needs your answer; their banner and words are unchanged). No "This Mac"
+     row: Limits has it, one switch fewer.
+   - **Automations:** `Automation`, notes and questions. **Updates:** `Update`, `ServerUpdateFailed`, and
+     the "updated" notification after the app replaced itself (no server's: the defaults decide).
+3. **Per server: an override.** In each server's card, in both modes and while it can't be reached:
+   **Same as all / Custom / Off**. Custom starts from what the defaults were and shows the same switches
+   for that server alone; going to Same or Off and back keeps its set. Keyed by the server's id;
+   forgetting the server removes it.
+4. **The rule** (`NotificationPrefs.allows(server, kind)`): master off is nothing from any server;
+   otherwise the server's override wins, then the defaults.
+5. **Only alerts change.** Cards, the session screen, the widget and the app's state are untouched: an
+   approval still arrives and can be answered. **Banners in the open app still show**, whatever the
+   switches say: the owner is already looking at the app, and the choice is about what reaches him away from it. A
+   server watched in the background has no banners, so Off means nothing but its cards there.
+6. **One gate, where they're posted:** `Notifier.approval`, `Notifier.notice`, `AutomationNotes.post` and
+   `postAsk`, `AppUpdater.replaced`; not at each caller. `AGENT_ASK_DELAY` and the other delays run as
+   before, the gate is at their end.
+7. **What stays whatever the switches say:** the connection service's permanent notification (Android
+   requires it), the media notification with Stop while the phone reads aloud (the owner started it), and
+   a reply from a notification that failed (it answers what he just did, and Android keeps the notification
+   turning until it changes). Android's own channels and the app's permission still apply on top; the
+   existing ask shows when the permission is off.
+8. **A switch turned off clears the shade.** Each notification carries its server and kind, read back from
+   Android's own list, so it holds for ones posted before the process last ended. Silenced notices also
+   take the last one's place, so "waiting" doesn't stay once its session has moved on. Allow, Deny, Reply
+   and Answer go on working for one tapped a moment before.
+9. **The warning.** Anything that would leave a paired server silent about approvals asks first, through
+   the app's confirm, whichever switch does it (the default, a Custom set, Off, the master, or back to
+   Same as all with defaults that have it off): "A prompt would then wait silently until you look, which
+   is how agents can sit for hours." Already silent, or a default no server follows: no asking.
+10. **Nothing is replayed.** What was silenced is not said later when the switch comes back; its card is
+    there. A new app version is the exception, since it would otherwise be lost to the banner and to
+    other servers: with Updates off the version isn't marked as said.

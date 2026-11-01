@@ -152,6 +152,7 @@ fun noticeLabel(kind: Notice.Kind): String = stringResource(
         Notice.Kind.Update -> R.string.update_title
         Notice.Kind.Limit -> R.string.notice_kind_limit
         Notice.Kind.Account -> R.string.notice_kind_account
+        Notice.Kind.Power -> R.string.notice_kind_needs_you
         Notice.Kind.Backpack -> R.string.notice_kind_backpack
         Notice.Kind.Automation -> R.string.au_notice_label
         Notice.Kind.ServerUpdateFailed -> R.string.su_notice_label

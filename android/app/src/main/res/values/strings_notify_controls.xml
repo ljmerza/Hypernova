@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings → Notifications and each server's card (ui/settings/NotificationControls.kt). -->
+    <string name="nc_master_desc">From every server, on this phone. A server\'s own card can change that.</string>
+    <string name="nc_master_off_desc">Nothing from any server. Home, the banners in the app and the widget still show everything. Android keeps the connection\'s own quiet notification.</string>
+    <string name="nc_which">Which ones</string>
+    <string name="nc_which_all">All</string>
+    <string name="nc_which_some">%1$d of %2$d</string>
+
+    <string name="nc_answers">Needs your answer</string>
+    <string name="nc_answers_desc">Approvals, questions and plans.</string>
+    <string name="nc_finished">Finished</string>
+    <string name="nc_finished_desc">A session ended its turn.</string>
+    <string name="nc_waiting">Waiting for you</string>
+    <string name="nc_waiting_desc">A session waits on something in its terminal.</string>
+    <string name="nc_errors">Errors</string>
+    <string name="nc_errors_desc">A session or a job stopped on an error.</string>
+    <string name="nc_limits">Limits and account</string>
+    <string name="nc_limits_desc">Usage limits, sign-outs, credit, and a Mac about to sleep.</string>
+    <string name="nc_automations">Automations</string>
+    <string name="nc_automations_desc">What they found and what they ask.</string>
+    <string name="nc_updates">Updates</string>
+    <string name="nc_updates_desc">A newer app, or a server\'s update that failed.</string>
+
+    <string name="nc_same">Same as all</string>
+    <string name="nc_custom">Custom</string>
+    <string name="nc_off">Off</string>
+    <string name="nc_server_same_desc">Follows the Notifications section further down.</string>
+    <string name="nc_server_custom_desc">These switches, for this server only.</string>
+    <string name="nc_server_off_desc">Nothing from this server. Its cards still show.</string>
+    <string name="nc_server_master_off">The Notifications switch further down is off, so nothing comes from any server.</string>
+
+    <!-- The confirm, whichever switch would leave a prompt silent. -->
+    <string name="nc_ask_master">Turn off all notifications?</string>
+    <string name="nc_ask_answers">Turn off Needs your answer?</string>
+    <string name="nc_ask_answers_server">Turn off Needs your answer for %1$s?</string>
+    <string name="nc_ask_server">Turn off notifications from %1$s?</string>
+    <string name="nc_ask_body">A prompt would then wait silently until you look, which is how agents can sit for hours. Its card still shows in the app.</string>
+    <string name="nc_ask_action">Turn off</string>
+</resources>

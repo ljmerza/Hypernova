@@ -113,6 +113,7 @@ fun resetPrefs() {
     com.prudnikweb.hypernova.ui.term.TermEnginePref.set(context, com.prudnikweb.hypernova.ui.term.TermEngine.Xterm)
     com.prudnikweb.hypernova.ui.home.HomeSortPref.set(context, com.prudnikweb.hypernova.ui.home.HomeSort.DEFAULT)
     com.prudnikweb.hypernova.data.VoicePrefs.of(context).chooseDictationEngine(com.prudnikweb.hypernova.data.DictationEngine.of(null))
+    com.prudnikweb.hypernova.data.NotificationPrefsStore.set(context, com.prudnikweb.hypernova.data.NotificationPrefs())
 }
 
 /** A node whose click TalkBack names [label] (onClickLabel): buttons drawn without text of their own. */

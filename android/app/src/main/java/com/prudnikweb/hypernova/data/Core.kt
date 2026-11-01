@@ -290,6 +290,7 @@ object Core {
         // The key stays while another computer's certificate is for it.
         DeviceCertStore(app, id).clear(dropKey = left.isEmpty())
         notifier.cancelAllApprovals(id)
+        NotificationPrefsStore.set(app, NotificationPrefsStore.get(app).without(id))
         if (next == null) {
             // Unpaired: the Mac's words again until the next computer says what it is.
             ComputerWords.clear(app)
@@ -299,6 +300,12 @@ object Core {
         } else {
             syncService()
         }
+    }
+
+    /** Settings' notification switches (data/NotificationPrefs.kt): kept, and what they now silence goes from the shade. */
+    fun setNotifications(p: NotificationPrefs) {
+        NotificationPrefsStore.set(app, p)
+        notifier.cancelSilenced()
     }
 
     fun stayConnected(on: Boolean) {
@@ -417,6 +424,7 @@ class Notifier(private val context: Context) {
      */
     fun approval(a: WApproval, s: Session?, failed: Boolean = false, server: String? = null) {
         if (!canPost() || nm == null) return
+        if (!NotificationPrefsStore.get(context).allows(server, Notice.Kind.Approval)) return
         // The session's name, as on its card (owner, 2026-10-31); its folder only when it has none.
         val untitled = context.getString(R.string.untitled_session)
         val project = (s?.name?.takeIf { it.isNotBlank() && it != untitled } ?: s?.project)?.takeIf { it.isNotBlank() }
@@ -453,6 +461,7 @@ class Notifier(private val context: Context) {
             .setOnlyAlertOnce(failed)
             .setAutoCancel(true)
             .setContentIntent(openApp(a.sessionId, a.id.hashCode(), server))
+            .addExtras(silenceable(server, Notice.Kind.Approval))
             .apply {
                 if (a.kind == "tool") {
                     addAction(answer(a.id, allow = false, server))
@@ -484,10 +493,16 @@ class Notifier(private val context: Context) {
 
     /**
      * A session finished, waits in its terminal or failed (or a newer app is on the Mac) while
-     * Hypernova isn't on screen. One notification per session, replaced by its next one.
+     * Hypernova isn't on screen. One notification per session, replaced by its next one; one that's
+     * silenced (data/NotificationPrefs.kt) still takes the last one's place, so a "waiting" doesn't
+     * stay behind once a session has moved on to something the owner turned off.
      */
     fun notice(n: Notice, server: String? = null) {
         if (!canPost() || nm == null) return
+        if (!NotificationPrefsStore.get(context).allows(server, n.kind)) {
+            runCatching { nm.cancel(noticeId(server, n.sessionId ?: n.id)) }
+            return
+        }
         // Its title as a phrase ("cosmos renderer finished"), never "cosmos renderer · Finished". A
         // limit's, the account's, a provider's, an automation's and an update's titles already say it.
         val title = when (n.kind) {
@@ -495,7 +510,7 @@ class Notifier(private val context: Context) {
             Notice.Kind.Waiting -> context.getString(R.string.notice_title_waiting, n.title)
             Notice.Kind.Error -> context.getString(R.string.notice_title_error, n.title)
             Notice.Kind.Backpack -> context.getString(R.string.notice_title_backpack, n.title)
-            Notice.Kind.Approval, Notice.Kind.Question, Notice.Kind.Plan -> context.getString(R.string.notice_title_needs_you, n.title)
+            Notice.Kind.Approval, Notice.Kind.Question, Notice.Kind.Plan, Notice.Kind.Power -> context.getString(R.string.notice_title_needs_you, n.title)
             else -> n.title
         }
         val open = if (n.kind == Notice.Kind.Update && n.text.isNotEmpty()) {
@@ -517,6 +532,7 @@ class Notifier(private val context: Context) {
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setAutoCancel(true)
             .setContentIntent(open)
+            .addExtras(silenceable(server, n.kind))
             // Another computer's (while several are paired): its name under the title.
             .setSubText(Core.notifyLabel(server))
             .apply {
@@ -561,8 +577,27 @@ class Notifier(private val context: Context) {
     }
 
     /**
+     * What the switches now silence goes from the shade: read from Android's own list, each with the
+     * server and kind it was posted with ([silenceable]), so it holds for one posted before the
+     * process last ended. The permanent notification, the voice's and a failed reply carry neither.
+     */
+    fun cancelSilenced() {
+        val manager = nm ?: return
+        val prefs = NotificationPrefsStore.get(context)
+        val active = runCatching { manager.activeNotifications }.getOrNull() ?: return
+        for (sbn in active) {
+            val extras = sbn.notification.extras
+            val kind = extras.getString(EXTRA_KIND)?.let { k -> Notice.Kind.entries.firstOrNull { it.name == k } } ?: continue
+            if (prefs.allows(extras.getString(EXTRA_SERVER), kind)) continue
+            runCatching { manager.cancel(sbn.tag, sbn.id) }
+            shown.keys.removeAll { it.hashCode() == sbn.id }
+        }
+    }
+
+    /**
      * A reply that didn't get through: the notice says so (a notification answered with words
-     * must change, or it keeps turning), and Reply is there again.
+     * must change, or it keeps turning), and Reply is there again. Whatever the switches say: it
+     * answers what the owner just did, and the words would be lost without it.
      */
     fun replyFailed(sessionId: String, title: String, why: String, server: String? = null) {
         if (!canPost() || nm == null) return
@@ -634,5 +669,13 @@ class Notifier(private val context: Context) {
         /** An Allow on a notification needs the whole command in its expanded view: this many characters, this many lines. */
         const val NOTIFY_MAX = 240
         const val NOTIFY_LINES = 4
+        private const val EXTRA_KIND = "hypernova.kind"
+        private const val EXTRA_SERVER = "hypernova.server"
+
+        /** What a notification carries so [cancelSilenced] can tell whose it is and what kind. */
+        fun silenceable(server: String?, kind: Notice.Kind): android.os.Bundle = android.os.Bundle().apply {
+            putString(EXTRA_KIND, kind.name)
+            if (server != null) putString(EXTRA_SERVER, server)
+        }
     }
 }
