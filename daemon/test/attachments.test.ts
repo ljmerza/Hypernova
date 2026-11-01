@@ -4,7 +4,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { request } from 'node:http'
+import { Agent, request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -93,6 +93,38 @@ test('a picked file is kept as it came, under a safe name, for the device alone'
   assert.notEqual(again.path, a.path)
   // No name: "file".
   assert.equal((await upload('', Buffer.from('x'))).json.attachment.name, 'file')
+})
+
+/** One request over [agent] (kept alive): its status and body. */
+function over(agent: Agent, method: string, path: string, body?: Buffer[]): Promise<{ status: number; conn: string | undefined }> {
+  return new Promise((resolve, reject) => {
+    const headers: Record<string, string> = { host: `127.0.0.1:${API}`, authorization: `Bearer ${TOKEN}` }
+    const req = request({ host: '127.0.0.1', port: API, method, path, headers, agent }, (res) => {
+      res.resume()
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, conn: res.headers.connection }))
+    })
+    req.on('error', (e: any) => (e.code === 'EPIPE' || e.code === 'ECONNRESET' ? undefined : reject(e)))
+    if (body) for (const b of body) req.write(b)
+    req.end()
+  })
+}
+
+test('a refused upload closes its connection, so the next request on a kept-alive agent never hangs', async () => {
+  const agent = new Agent({ keepAlive: true, maxSockets: 1 })
+  try {
+    const chunk = Buffer.alloc(1024 * 1024, 7)
+    const refused = await over(agent, 'POST', '/v1/attachments?name=s.bin', Array.from({ length: 31 }, () => chunk))
+    assert.equal(refused.status, 413)
+    assert.equal(refused.conn, 'close')
+    // The next request on the same agent answers (before the fix it waited behind the unread body).
+    const next = await Promise.race([
+      over(agent, 'GET', '/v1/snapshot'),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('the next request hung')), 5_000)),
+    ])
+    assert.equal(next.status, 200)
+  } finally {
+    agent.destroy()
+  }
 })
 
 test('only with the token', async () => {

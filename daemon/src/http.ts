@@ -1840,6 +1840,9 @@ function handler(isLocal: boolean, lan = false) {
       const status = e instanceof HttpError ? e.status : typeof e?.status === 'number' ? e.status : 500
       // 501 is a feature this machine doesn't have (platform.ts): an answer, not a fault to log.
       if (status >= 500 && status !== 501) log('http error', req.method, url.pathname, e)
+      // A refusal before the body was all read (an attachment past 30 MB): this connection is closed
+      // after the answer, so a phone's next request never waits behind the rest of that body.
+      if (!req.complete && !res.headersSent) res.setHeader('connection', 'close')
       if (!res.headersSent) json(res, status, { error: { code: e.code ?? 'error', message: e.message ?? 'Something went wrong.', ...(e.extra ?? {}) } })
       else res.end()
     }
