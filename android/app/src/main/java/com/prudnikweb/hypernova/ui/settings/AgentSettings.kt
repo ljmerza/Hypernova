@@ -43,6 +43,7 @@ import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
+import com.prudnikweb.hypernova.data.ClaudeMcp
 import com.prudnikweb.hypernova.data.ClaudeSettingsSummary
 import com.prudnikweb.hypernova.data.CodexSettingsSummary
 import com.prudnikweb.hypernova.data.Confirm
@@ -198,6 +199,17 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
                     file.whyNot?.let { why -> whyNotWords(why)?.let { words -> item(key = "why-not") { HText(stringResource(words, server), style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 4.dp)) } } }
                     if (file.state != AgentSettingsFile.OK) {
                         item(key = "state") { FileState(file.state, codex, server) }
+                        // Claude Code's MCP servers aren't in that file, so they're there all the same.
+                        file.mcp?.let { m ->
+                            item(key = "mcp") {
+                                GlassCard(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                                        McpRow(m, null)
+                                        Hidden(m.hidden)
+                                    }
+                                }
+                            }
+                        }
                     }
                     // A file that isn't there yet: what can be set by making it, each not set.
                     val rows = when {
@@ -218,7 +230,7 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
                     }
                     if (file.state == AgentSettingsFile.OK) {
                         item(key = "summary-seam") { Seam(stringResource(R.string.as_summary), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 14.dp, bottom = 2.dp)) }
-                        file.claude?.let { s -> item(key = "summary") { ClaudeSummaryCard(s) } }
+                        file.claude?.let { s -> item(key = "summary") { ClaudeSummaryCard(s, file.mcp) } }
                         file.codex?.let { s -> item(key = "summary") { CodexSummaryCard(s) } }
                     }
                 }
@@ -419,7 +431,7 @@ private fun PickerSheet(edit: EditableSetting, now: ShownSetting?, onDismiss: ()
 }
 
 @Composable
-private fun ClaudeSummaryCard(s: ClaudeSettingsSummary) {
+private fun ClaudeSummaryCard(s: ClaudeSettingsSummary, mcp: ClaudeMcp?) {
     val unrecognised = stringResource(R.string.as_unrecognised)
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
@@ -439,10 +451,10 @@ private fun ClaudeSummaryCard(s: ClaudeSettingsSummary) {
                 null,
             )
             Hairline(Modifier.fillMaxWidth())
-            NamesRow(stringResource(R.string.as_mcp), s.mcpServers, stringResource(R.string.as_mcp_claude_body))
+            McpRow(mcp, s.mcpServers)
             Hairline(Modifier.fillMaxWidth())
             NamesRow(stringResource(R.string.as_hooks), s.hookEvents, stringResource(R.string.as_hooks_body))
-            Hidden(s.hidden)
+            Hidden(s.hidden + (mcp?.hidden ?: 0))
         }
     }
 }
@@ -506,6 +518,49 @@ private fun NamesRow(label: String, names: List<String>?, body: String?) {
         if (!names.isNullOrEmpty()) {
             Spacer(Modifier.height(6.dp))
             HText(names.joinToString("\n"), style = Type.monoSmall, color = HN.inkMuted)
+        }
+    }
+}
+
+/**
+ * Claude Code's MCP servers (docs/DECISIONS.md, "The agents' settings, viewed"): the server's own, then
+ * each project's under its name, names only, with a cap per group and on the groups. [older]: the
+ * names in settings.json, all a server without `mcp` sends.
+ */
+@Composable
+private fun McpRow(mcp: ClaudeMcp?, older: List<String>?) {
+    if (mcp == null) {
+        NamesRow(stringResource(R.string.as_mcp), older, stringResource(R.string.as_mcp_claude_body))
+        return
+    }
+    val (groups, moreProjects) = mcp.groups()
+    val trouble = mcp.state == AgentSettingsFile.MALFORMED || mcp.state == AgentSettingsFile.UNREADABLE
+    Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.padding(vertical = 10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            HText(stringResource(R.string.as_mcp), style = Type.body, color = HN.ink, modifier = Modifier.weight(1f))
+            if (mcp.servers.isEmpty()) HText(stringResource(R.string.as_none), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+            else HText(mcp.servers.size.toString(), style = Type.monoSmall, color = HN.ink, maxLines = 1)
+        }
+        Spacer(Modifier.height(2.dp))
+        HText(stringResource(R.string.as_mcp_claude_body), style = Type.small, color = HN.inkDim)
+        if (trouble) {
+            Spacer(Modifier.height(6.dp))
+            HText(stringResource(R.string.as_mcp_trouble), style = Type.small, color = HN.amber)
+        }
+        groups.forEach { g ->
+            Spacer(Modifier.height(10.dp))
+            HText(g.project ?: stringResource(R.string.as_mcp_here), style = Type.small, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(2.dp))
+            HText(g.names.joinToString("\n"), style = Type.monoSmall, color = HN.inkMuted)
+            if (g.more > 0) HText(pluralStringResource(R.plurals.as_mcp_more, g.more, g.more), style = Type.small, color = HN.inkDim)
+        }
+        if (moreProjects > 0) {
+            Spacer(Modifier.height(10.dp))
+            HText(pluralStringResource(R.plurals.as_mcp_more_projects, moreProjects, moreProjects), style = Type.small, color = HN.inkDim)
+        }
+        if (mcp.foldersNotRead > 0) {
+            Spacer(Modifier.height(10.dp))
+            HText(pluralStringResource(R.plurals.as_mcp_not_read, mcp.foldersNotRead, mcp.foldersNotRead), style = Type.small, color = HN.inkDim)
         }
     }
 }

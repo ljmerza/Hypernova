@@ -3130,10 +3130,38 @@ and he has made it: "The agents' settings, edited", below.
 
    Not confirmed: when Codex's keys reach a thread already running. Its docs don't say, and the binary has
    a `reload_user_config` operation that wasn't traced, so the screen says nothing about it for Codex.
-8. **A summary that may read short.** Claude Code's `mcpServers` isn't a key of `settings.json`: its docs
-   and schema keep MCP servers in `~/.claude.json` (with the account's details). The summary reads only
-   `settings.json`, as the list says, so it usually shows none, and the row says those servers aren't
-   listed. Reading names from `~/.claude.json` as well is a small change, for the owner to choose.
+8. **MCP servers from where Claude Code keeps them** (owner, 2026-11-01: "there is a separate MCP JSON file
+   that we'd need to read"). Claude Code's `mcpServers` isn't a key of `settings.json`, so that summary alone
+   usually showed none. `claude.mcp` also lists names from `~/.claude.json` (user and local scope) and each
+   of its projects' `.mcp.json` (project scope), with the folder's base name, beside the older list so an
+   older app keeps working. Only those keys are read of a file that also holds the account's details, and
+   `.claude.json` stays closed to the file viewer. Decided here: a server named in `settings.json` lists as
+   user scope; a folder under `.claude/worktrees/` has its `.mcp.json` skipped, as a copy of the repository's;
+   the home folder's name is `~`, because it's the username; plugins' servers aren't listed, and the row says
+   so.
+
+## A session's MCP servers (2026-11-01)
+
+The owner: "for an agent I want to be able to see the MCPs, so when you hold down an agent card you see that
+menu that pops up; add the feature that you can see the MCP details for a particular agent, not the global
+ones but the ones for that folder."
+
+1. **Where.** MCP servers in the Home card's hold menu, for a Claude session with a folder. A sheet titled with
+   the session. Nothing on the chat screen, so the session sheet's copy of the menu leaves it out.
+2. **The route.** `GET /v1/sessions/{id}/mcp` (`docs/PROTOCOL.md`, "A session's MCP servers"), a paired phone
+   only. Project scope is `.mcp.json` in the folder and each parent; local scope is `~/.claude.json`'s entry.
+   The user-level ones are only a count, as a line.
+3. **A strict allow-list.** Name, scope, transport, a command's base name, a URL's host. Never args, env,
+   headers, a whole URL or a path, and a command's name that says the username is left out too.
+4. **Local scope isn't only the exact path.** Asked for that exact path, but Claude Code 2.1.316 files a
+   folder's local servers under its repository's root, the main checkout's from a worktree (its
+   `projectPathForConfig`, and the changelog's "the project entry … when run below a repository root"). The exact path
+   alone would show none for a session in a subfolder or a worktree, so both are read.
+5. **Set up, not connected.** The daemon doesn't know a session's live MCP status, so the sheet doesn't guess and
+   says so. Showing it would mean asking the running claude.
+6. **Not Codex.** The `projects` table in `~/.codex/config.toml` was only seen holding `trust_level`; Codex's binary
+   names a trusted repository's own `.codex/config.toml` as the place for a project's MCP servers, and this
+   doesn't read that file. So the menu has no such item for a Codex session, and the route answers 409 `not_claude`.
 
 ## Account details in the agents' settings (2026-11-01)
 

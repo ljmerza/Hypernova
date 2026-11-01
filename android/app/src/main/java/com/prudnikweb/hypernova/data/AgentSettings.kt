@@ -32,6 +32,7 @@ data class AgentSettingsReply(val claude: AgentSettingsFile, val codex: AgentSet
                 editable = o.arr("editable").mapObjects(::editable),
                 undo = o.obj("undo")?.let(::undo),
                 whyNot = o.str("whyNot"),
+                mcp = o.obj("mcp")?.let(::mcp),
             )
         }
 
@@ -62,6 +63,16 @@ data class AgentSettingsReply(val claude: AgentSettingsFile, val codex: AgentSet
                 else -> ShownSetting(key, ShownSetting.UNRECOGNISED, null, null)
             }
         }
+
+        private fun mcp(o: JSONObject) = ClaudeMcp(
+            state = o.str("state") ?: AgentSettingsFile.UNREADABLE,
+            servers = o.arr("servers").mapObjects { s ->
+                val name = s.str("name") ?: return@mapObjects null
+                McpName(name, s.str("scope") ?: ClaudeMcp.USER, s.str("project"))
+            },
+            hidden = o.int("hidden") ?: 0,
+            foldersNotRead = o.int("foldersNotRead") ?: 0,
+        )
 
         private fun claudeSummary(o: JSONObject): ClaudeSettingsSummary {
             val rules = o.obj("rules")
@@ -99,6 +110,8 @@ data class AgentSettingsFile(
     val undo: SettingUndo? = null,
     /** Why nothing here can be changed though the file reads fine: [LINK], [READ_ONLY], [NO_FOLDER]. */
     val whyNot: String? = null,
+    /** Claude Code's MCP servers: beside the file, which needn't be there for them. Null from an older server. */
+    val mcp: ClaudeMcp? = null,
 ) {
     companion object {
         const val OK = "ok"
@@ -176,6 +189,37 @@ data class ClaudeSettingsSummary(
 
 @Immutable
 data class CodexSettingsSummary(val projects: Int?, val mcpServers: List<String>?, val hidden: Int)
+
+/** One MCP server's name and where it's set: [project] is a folder's base name, for local and project scope. */
+@Immutable
+data class McpName(val name: String, val scope: String, val project: String?)
+
+/** [names] to show of a group, and how many more it has. [project] null: every project on the server. */
+@Immutable
+data class McpGroup(val project: String?, val names: List<String>, val more: Int)
+
+/** Claude Code's MCP servers on a server (docs/PROTOCOL.md, "Agent settings"). [state] is `~/.claude.json`'s. */
+@Immutable
+data class ClaudeMcp(val state: String, val servers: List<McpName>, val hidden: Int, val foldersNotRead: Int) {
+    /** The servers to show, grouped: the server's own first, then each project's by name, each with a cap. */
+    fun groups(): Pair<List<McpGroup>, Int> {
+        val own = servers.filter { it.scope == USER || it.project == null }.map { it.name }.distinct()
+        val projects = servers.filter { it.scope != USER && it.project != null }
+            .groupBy({ it.project!! }, { it.name })
+            .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+            .map { (project, names) -> group(project, names.distinct()) }
+        val shown = projects.take(GROUPS_SHOWN)
+        return (if (own.isEmpty()) shown else listOf(group(null, own)) + shown) to projects.size - shown.size
+    }
+
+    private fun group(project: String?, names: List<String>) = McpGroup(project, names.take(NAMES_SHOWN), (names.size - NAMES_SHOWN).coerceAtLeast(0))
+
+    companion object {
+        const val USER = "user"
+        const val GROUPS_SHOWN = 12
+        const val NAMES_SHOWN = 12
+    }
+}
 
 /** The server has no `GET /v1/agents/settings`: it's older than this app. */
 class AgentSettingsTooOld(message: String) : HubException(message)

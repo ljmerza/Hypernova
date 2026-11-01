@@ -21,11 +21,13 @@ import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
+import com.prudnikweb.hypernova.data.ClaudeMcp
 import com.prudnikweb.hypernova.data.ClaudeSettingsSummary
 import com.prudnikweb.hypernova.data.CodexSettingsSummary
 import com.prudnikweb.hypernova.data.EditableSetting
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.HubException
+import com.prudnikweb.hypernova.data.McpName
 import com.prudnikweb.hypernova.data.PluginSetting
 import com.prudnikweb.hypernova.data.SettingChange
 import com.prudnikweb.hypernova.data.SettingChoice
@@ -124,6 +126,18 @@ class AgentSettingsScreenTest {
             EditableSetting("showThinkingSummaries", listOf(SettingChoice(null, true, false, null), SettingChoice(null, false, false, null))),
             EditableSetting("autoUpdatesChannel", listOf(SettingChoice("latest", null, false, null), SettingChoice("stable", null, false, null))),
         ),
+        mcp = ClaudeMcp(
+            AgentSettingsFile.OK,
+            listOf(
+                McpName("home-assistant", "user", null),
+                McpName("github", "user", null),
+                McpName("db-tools", "local", "parser"),
+                McpName("docs", "project", "parser"),
+                McpName("search", "project", "app"),
+            ),
+            hidden = 2,
+            foldersNotRead = 0,
+        ),
     )
     private val codex = AgentSettingsFile(
         AgentSettingsFile.OK,
@@ -156,7 +170,7 @@ class AgentSettingsScreenTest {
 
     private fun seen(text: String) = rule.onNodeWithText(text, substring = true).performScrollTo().assertExists()
 
-    @Config(qualifiers = "+h1500dp")
+    @Config(qualifiers = "+h1800dp")
     @Test fun claudeCodesValuesInWordsThenItsSummaries() {
         hub.answer = Result.success(AgentSettingsReply(claude, file(AgentSettingsFile.MISSING)))
         open(AgentSettingsReply.CLAUDE)
@@ -175,8 +189,13 @@ class AgentSettingsScreenTest {
         seen("formatter: ${str(R.string.as_on)}")
         seen("linter: ${str(R.string.as_off)}")
         seen("home-assistant")
+        // The server's own first, then each project's under its name.
+        seen(str(R.string.as_mcp_here))
+        seen(str(R.string.as_mcp_claude_body))
+        seen("db-tools")
+        seen("parser")
         seen("PreToolUse")
-        seen(org.robolectric.RuntimeEnvironment.getApplication().resources.getQuantityString(R.plurals.as_hidden, 1, 1))
+        seen(org.robolectric.RuntimeEnvironment.getApplication().resources.getQuantityString(R.plurals.as_hidden, 3, 3))
         rule.snap("agent_settings_claude")
     }
 
@@ -265,6 +284,56 @@ class AgentSettingsScreenTest {
         seen("someNewKey")
         rule.onNodeWithText("brand-new").performScrollTo().assertExists()
         seen("brand-new-level")
+    }
+
+    private fun quantity(id: Int, n: Int) = org.robolectric.RuntimeEnvironment.getApplication().resources.getQuantityString(id, n, n)
+
+    @Test fun mcpServersAreListedEvenWithNoSettingsFile() {
+        val missing = AgentSettingsFile(AgentSettingsFile.MISSING, emptyList(), null, null, mcp = claude.mcp)
+        hub.answer = Result.success(AgentSettingsReply(missing, codex))
+        open(AgentSettingsReply.CLAUDE)
+        seen(str(R.string.as_missing_claude, hub.mac.name))
+        seen(str(R.string.as_mcp_here))
+        seen("home-assistant")
+        seen("parser")
+        seen("docs")
+        seen(quantity(R.plurals.as_hidden, 2))
+    }
+
+    @Config(qualifiers = "+h1500dp")
+    @Test fun anOlderServersMcpNamesStillShowAndNothingSaysServersArentListed() {
+        val older = claude.copy(mcp = null)
+        hub.answer = Result.success(AgentSettingsReply(older, codex))
+        open(AgentSettingsReply.CLAUDE)
+        seen("home-assistant")
+        rule.onNodeWithText(str(R.string.as_mcp_here)).assertDoesNotExist()
+        rule.onNodeWithText("claude mcp add", substring = true).assertDoesNotExist()
+    }
+
+    @Test fun longMcpListsAreCappedAndSayHowManyMore() {
+        val own = List(ClaudeMcp.NAMES_SHOWN + 3) { McpName("server$it", "user", null) }
+        val folders = List(ClaudeMcp.GROUPS_SHOWN + 2) { McpName("tool", "project", "p%02d".format(it)) }
+        val m = ClaudeMcp(AgentSettingsFile.OK, own + folders, 0, 4)
+        val (groups, more) = m.groups()
+        assertEquals(ClaudeMcp.GROUPS_SHOWN + 1, groups.size)
+        assertEquals(null, groups[0].project)
+        assertEquals(3, groups[0].more)
+        assertEquals("p00", groups[1].project)
+        assertEquals(2, more)
+        hub.answer = Result.success(AgentSettingsReply(AgentSettingsFile(AgentSettingsFile.MISSING, emptyList(), null, null, mcp = m), codex))
+        open(AgentSettingsReply.CLAUDE)
+        seen(quantity(R.plurals.as_mcp_more, 3))
+        seen(quantity(R.plurals.as_mcp_more_projects, 2))
+        seen(quantity(R.plurals.as_mcp_not_read, 4))
+        rule.onNodeWithText("server${ClaudeMcp.NAMES_SHOWN}", substring = true).assertDoesNotExist()
+    }
+
+    @Config(qualifiers = "+h1500dp")
+    @Test fun anUnreadableClaudeJsonSaysTheListMayBeShort() {
+        val m = ClaudeMcp(AgentSettingsFile.MALFORMED, emptyList(), 0, 0)
+        hub.answer = Result.success(AgentSettingsReply(claude.copy(mcp = m), codex))
+        open(AgentSettingsReply.CLAUDE)
+        seen(str(R.string.as_mcp_trouble))
     }
 
     @Test fun everyShownKeyHasItsWords() {
@@ -499,6 +568,17 @@ class AgentSettingsScreenTest {
         choice(R.string.as_v_stable).performClick()
         rule.waitForIdle()
         assertEquals(listOf("claude autoUpdatesChannel stable null"), hub.changes)
+    }
+
+    @Config(qualifiers = "+h1500dp")
+    @Test fun aMissingFileKeepsItsStateItsMcpServersAndWhatCanBeSet() {
+        val missing = AgentSettingsFile(AgentSettingsFile.MISSING, emptyList(), null, null, editable = claude.editable, mcp = claude.mcp)
+        hub.answer = Result.success(AgentSettingsReply(missing, file(AgentSettingsFile.MISSING)))
+        open(AgentSettingsReply.CLAUDE)
+        seen(str(R.string.as_missing_claude, hub.mac.name))
+        seen("home-assistant")
+        seen(str(R.string.as_k_mode))
+        rule.onNodeWithText(str(R.string.as_summary)).assertDoesNotExist()
     }
 
     @Config(qualifiers = "+h1500dp")

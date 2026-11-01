@@ -2557,6 +2557,14 @@ class LiveHub(
         return AgentSettingRefused(ex.code, ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(R.string.as_edit_err))
     }
 
+    override suspend fun sessionMcp(id: String): Result<SessionMcpReply> = try {
+        Result.success(SessionMcpReply.wire(api.get("/v1/sessions/$id/mcp")))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+        // A 404 from an older server doesn't know the request; the session being gone is its own 404.
+        val ex = Net.classify(e)
+        Result.failure(if (ex.status == 404 && ex.code != "no_session") SessionMcpTooOld(res.getString(R.string.sm_too_old)) else handle(e, R.string.sm_err))
+    }
+
     override suspend fun checklist(): Result<String> = try {
         val url = api.get("/v1/qa").str("url") ?: throw ApiException(Problem.Server, 200, "no_url")
         Result.success(page(url))

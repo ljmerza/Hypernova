@@ -1,5 +1,5 @@
 // GET /v1/agents/settings (agent-settings.ts): the fixed list of Claude Code's and Codex's user-level
-// settings, from scratch files. Only named keys leave: a secret is planted in each place that must
+// settings, from scratch files. Never the real ones: CLAUDE_CONFIG_DIR and HOME point at the scratch folder. Only named keys leave: a secret is planted in each place that must
 // stay on the server, and none of it may appear in the reply, in a value or in a key's name.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 const scratch = mkdtempSync(join(tmpdir(), 'hn-agent-settings-'))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
@@ -41,10 +41,12 @@ process.env.HYPERNOVA_API_PORT = String(API)
 process.env.HYPERNOVA_LOCAL_PORT = String(LOCAL)
 process.env.HYPERNOVA_LAN_PORT = '0'
 
-const { agentSettings, claudeSettings, codexSettings, CLAUDE_SHOWN, CODEX_SHOWN } = await import('../src/agent-settings.ts')
+const { agentSettings, claudeConfigFile, claudeMcp, claudeSettings, codexSettings, sessionMcp, CLAUDE_SHOWN, CODEX_SHOWN } = await import('../src/agent-settings.ts')
 const { scanToml, OTHER, TomlError } = await import('../src/toml-reader.ts')
 const { startServers } = await import('../src/http.ts')
 const { addDevice, settings } = await import('../src/store.ts')
+const { upsertSession } = await import('../src/hub.ts')
+const { saveThread, removeThread } = await import('../src/codex/threads.ts')
 settings.lanAccess = false
 const TOKEN = 'agent-settings-test-device-token-0123456789'
 addDevice({ id: 'phone', name: 'Pixel', model: 'Pixel 9', createdAt: Date.now(), lastSeenAt: Date.now() }, TOKEN)
@@ -246,10 +248,10 @@ test('both files missing: each agent says so, with nothing else', async () => {
   const body = (await r.json()) as any
   assert.deepEqual(Object.keys(body).sort(), ['claude', 'codex', 'scope'])
   // What can be set by making the file is agent-settings-edit.test.ts's.
-  for (const agent of ['claude', 'codex']) {
-    const { editable: _editable, ...rest } = body[agent]
-    assert.deepEqual(rest, { state: 'missing', values: [], summary: null, hash: null, undo: null, whyNot: null })
-  }
+  const { editable: _claude, ...claude } = body.claude
+  assert.deepEqual(claude, { state: 'missing', values: [], summary: null, mcp: { state: 'missing', servers: [], hidden: 0, foldersNotRead: 0 }, hash: null, undo: null, whyNot: null })
+  const { editable: _codex, ...codex } = body.codex
+  assert.deepEqual(codex, { state: 'missing', values: [], summary: null, hash: null, undo: null, whyNot: null })
 })
 
 test('every shown value is its type and shape; anything else is unrecognised, not passed through', () => {
@@ -396,12 +398,12 @@ test('an unreadable file, a folder in its place, a pipe and a huge file say unre
   assert.equal(valueOf(claudeSettings(linked), 'effortLevel')?.value, 'low')
 })
 
-test('CODEX_HOME says where Codex’s file is, and agentSettings answers from the folders it’s given', () => {
+test('CODEX_HOME says where Codex’s file is, and agentSettings answers from the folders it’s given', async () => {
   const claude = dir('given-claude')
   const codex = dir('given-codex')
   writeFileSync(join(claude, 'settings.json'), '{"effortLevel":"xhigh"}')
   writeFileSync(join(codex, 'config.toml'), 'sandbox_mode = "read-only"\n')
-  const r = agentSettings({ claude, codex })
+  const r = await agentSettings({ claude, codex })
   assert.equal(valueOf(r.claude, 'effortLevel')?.value, 'xhigh')
   assert.equal(valueOf(r.codex, 'sandbox_mode')?.value, 'read-only')
   writeFileSync(join(CODEX, 'config.toml'), 'web_search = "cached"\n')
@@ -409,6 +411,437 @@ test('CODEX_HOME says where Codex’s file is, and agentSettings answers from th
     assert.equal(valueOf(codexSettings(), 'web_search')?.value, 'cached')
   } finally {
     rmSync(join(CODEX, 'config.toml'))
+  }
+})
+
+// ── MCP servers: `~/.claude.json` and each project's `.mcp.json` ─────────
+
+/** A server with a secret in every place that must stay, each named for [place]. */
+const plantedServer = (place: string) => ({
+  type: 'http',
+  command: `/home/PLANTEDUSER/bin/${secret(`${place}Command`)}`,
+  args: ['--token', secret(`${place}Args`)],
+  env: { TOKEN: secret(`${place}Env`), PLANTEDENVNAME: 'x' },
+  url: `https://PLANTEDUSER:${secret(`${place}Password`)}@PLANTEDHOST.example.com/PLANTEDPATH?token=${secret(`${place}Query`)}`,
+  headers: { Authorization: `Bearer ${secret(`${place}Header`)}` },
+  headersHelper: `echo ${secret(`${place}Helper`)}`,
+  oauth: { clientId: 'PLANTEDCLIENT', clientSecret: secret(`${place}Oauth`) },
+})
+
+/** A `~/.claude.json` with the account's details, OAuth data and history around the MCP tables. */
+const plantedConfig = (projects: Record<string, unknown>, mcpServers: Record<string, unknown> = { 'user-one': plantedServer('User') }) => ({
+  userID: 'PLANTEDUSERID0123456789',
+  numStartups: 1234,
+  primaryApiKey: secret('PrimaryKey'),
+  oauthAccount: { accountUuid: 'PLANTEDACCOUNT', emailAddress: 'PLANTEDEMAIL@example.com', organizationName: 'PLANTEDORG', organizationUuid: 'PLANTEDORGID', displayName: 'PLANTEDNAME' },
+  claudeAiOauth: { accessToken: secret('Access'), refreshToken: secret('Refresh') },
+  customApiKeyResponses: { approved: [secret('Approved')], rejected: [secret('Rejected')] },
+  claudeAiMcpEverConnected: ['PLANTEDCONNECTOR'],
+  cachedChangelog: `PLANTEDCHANGELOG ${secret('Changelog')}`,
+  mcpServers,
+  projects,
+})
+
+const plantedEntry = (mcpServers: Record<string, unknown> = {}) => ({
+  allowedTools: [`Bash(curl ${secret('AllowedTool')})`],
+  history: [{ display: `PLANTEDHISTORY ${secret('History')}`, pastedContents: { a: secret('Pasted') } }],
+  lastSessionId: 'PLANTEDSESSION',
+  exampleFiles: ['PLANTEDEXAMPLE.ts'],
+  hasTrustDialogAccepted: true,
+  enabledMcpjsonServers: ['PLANTEDENABLED'],
+  disabledMcpServers: ['PLANTEDDISABLED'],
+  mcpServers,
+})
+
+/** A project folder in a place that says PLANTED, so its path can't leave unnoticed. */
+function project(name: string, mcpJson?: unknown): string {
+  const d = join(scratch, 'PLANTEDPATH', name)
+  mkdirSync(d, { recursive: true })
+  if (mcpJson !== undefined) writeFileSync(join(d, '.mcp.json'), typeof mcpJson === 'string' ? mcpJson : JSON.stringify(mcpJson))
+  return d
+}
+
+function configFile(name: string, content: unknown): string {
+  const file = join(dir(name), '.claude.json')
+  writeFileSync(file, typeof content === 'string' ? content : JSON.stringify(content))
+  return file
+}
+
+test('MCP: every scope is listed, by name, with the folder’s base name and nothing more', async () => {
+  const app = project('app', { mcpServers: { 'project-one': plantedServer('Project') }, PLANTEDMCPJSONKEY: secret('McpJsonKey') })
+  const site = project('my site', { mcpServers: { 'project-two': plantedServer('ProjectTwo') } })
+  const quiet = project('quiet')
+  const r = await claudeMcp(['from-settings'], configFile('scopes', plantedConfig({
+    [app]: plantedEntry({ 'local-one': plantedServer('Local') }),
+    [site]: plantedEntry(),
+    [quiet]: plantedEntry(),
+  })))
+  assert.deepEqual(r, {
+    state: 'ok',
+    servers: [
+      { name: 'from-settings', scope: 'user' },
+      { name: 'user-one', scope: 'user' },
+      { name: 'local-one', scope: 'local', project: 'app' },
+      { name: 'project-one', scope: 'project', project: 'app' },
+      { name: 'project-two', scope: 'project', project: 'my site' },
+    ],
+    hidden: 0,
+    foldersNotRead: 0,
+  })
+  assertNothingPlanted(JSON.stringify(r))
+})
+
+test('the route: a secret anywhere in ~/.claude.json or a .mcp.json, and none of it in the raw body', async () => {
+  const app = project('routed', { mcpServers: { 'project-one': plantedServer('Project') }, PLANTEDMCPJSONKEY: secret('McpJsonKey') })
+  writeFileSync(join(CLAUDE, '.claude.json'), JSON.stringify(plantedConfig({ [app]: plantedEntry({ 'local-one': plantedServer('Local') }) })))
+  writeFileSync(join(CLAUDE, 'settings.json'), JSON.stringify(PLANTED_CLAUDE))
+  try {
+    const r = await fetch(`http://127.0.0.1:${API}/v1/agents/settings`, { headers: { authorization: `Bearer ${TOKEN}` } })
+    assert.equal(r.status, 200)
+    const text = await r.text()
+    assertNothingPlanted(text)
+    assert.ok(!text.includes(scratch), `a path left: ${text}`)
+    for (const leak of ['example.com', '--token', 'Bearer', 'numStartups', 'userID', 'oauth', 'history', 'command', 'args', 'env"', 'url', 'headers']) assert.ok(!text.includes(leak), `${leak} left: ${text}`)
+    const body = JSON.parse(text)
+    // Beside the older list, which an older app keeps reading as it did.
+    assert.deepEqual(body.claude.summary.mcpServers, ['home-assistant'])
+    assert.deepEqual(body.claude.mcp.servers, [
+      { name: 'home-assistant', scope: 'user' },
+      { name: 'user-one', scope: 'user' },
+      { name: 'local-one', scope: 'local', project: 'routed' },
+      { name: 'project-one', scope: 'project', project: 'routed' },
+    ])
+    // What a phone can change adds only these, each a hash, a word on the fixed list or a flag (agent-settings-edit.ts).
+    const allowed = new Set(['hash', 'editable', 'choices', 'loosens', 'undo', 'whyNot', 'state', 'values', 'summary', 'key', 'value', 'rules', 'allow', 'ask', 'deny', 'plugins', 'name', 'on', 'mcpServers', 'hookEvents', 'hidden', 'mcp', 'servers', 'scope', 'project', 'foldersNotRead'])
+    for (const k of everyKey(body.claude)) assert.ok(allowed.has(k), `an unexpected key: ${k}`)
+  } finally {
+    rmSync(join(CLAUDE, '.claude.json'))
+    rmSync(join(CLAUDE, 'settings.json'))
+  }
+})
+
+test('MCP servers don’t depend on settings.json: with it missing or malformed they’re still listed', async () => {
+  const file = configFile('no-settings', plantedConfig({}))
+  const missing = await agentSettings({ claude: dir('no-settings-claude'), codex: dir('no-settings-codex'), claudeConfig: file })
+  assert.equal(missing.claude.state, 'missing')
+  assert.deepEqual(missing.claude.mcp.servers, [{ name: 'user-one', scope: 'user' }])
+  const bad = dir('bad-settings-claude')
+  writeFileSync(join(bad, 'settings.json'), '{ nope')
+  const malformed = await agentSettings({ claude: bad, codex: dir('no-settings-codex'), claudeConfig: file })
+  assert.equal(malformed.claude.state, 'malformed')
+  assert.deepEqual(malformed.claude.mcp.servers, [{ name: 'user-one', scope: 'user' }])
+})
+
+test('a name that isn’t one, or a folder’s, is counted and never sent; the home folder is ~', async () => {
+  const fine = project('fine', { mcpServers: { [secret('ProjectName')]: {}, 'two words': {}, ok: {} } })
+  const oddFolder = project(`bad;${secret('FolderName')}`, { mcpServers: { a: {}, b: {} } })
+  writeFileSync(join(process.env.HOME!, '.mcp.json'), JSON.stringify({ mcpServers: { 'at-home': {} } }))
+  try {
+    const r = await claudeMcp([], configFile('bad-mcp-names', plantedConfig({
+      [fine]: plantedEntry({ [secret('LocalName')]: {} }),
+      [oddFolder]: plantedEntry({ c: {} }),
+      [process.env.HOME!]: plantedEntry({ 'local-home': {} }),
+    }, { [secret('UserName')]: {}, 'curl https://x.example': {}, good: {} })))
+    assertNothingPlanted(JSON.stringify(r))
+    assert.deepEqual(r.servers, [
+      { name: 'good', scope: 'user' },
+      // The home folder's name is the username: not sent.
+      { name: 'local-home', scope: 'local', project: '~' },
+      { name: 'ok', scope: 'project', project: 'fine' },
+      { name: 'at-home', scope: 'project', project: '~' },
+    ])
+    // Two users', a local one, the folder's local one, two project ones, the folder's two.
+    assert.equal(r.hidden, 2 + 1 + 1 + 2 + 2)
+  } finally {
+    rmSync(join(process.env.HOME!, '.mcp.json'))
+  }
+})
+
+test('MCP’s caps: names, folders walked, and each file’s size; the rest of the reply stands', async () => {
+  const many = Object.fromEntries(Array.from({ length: 205 }, (_, i) => [`s${i}`, {}]))
+  const names = await claudeMcp([], configFile('mcp-many', plantedConfig({}, many)))
+  assert.equal(names.servers.length, 200)
+  assert.equal(names.hidden, 5)
+
+  const projects: Record<string, unknown> = {}
+  for (let i = 0; i < 203; i++) projects[join(scratch, 'PLANTEDPATH', 'walk', `p${i}`)] = {}
+  const walked = await claudeMcp([], configFile('mcp-walk', plantedConfig(projects)))
+  assert.equal(walked.state, 'ok')
+  assert.equal(walked.foldersNotRead, 3)
+
+  const big = project('big', `{"mcpServers":{"too-big":{}},"pad":"${'x'.repeat(256 * 1024)}"}`)
+  const ok = project('ok', { mcpServers: { 'small-enough': {} } })
+  const sized = await claudeMcp([], configFile('mcp-sized', plantedConfig({ [big]: {}, [ok]: {} }, {})))
+  assert.deepEqual(sized.servers, [{ name: 'small-enough', scope: 'project', project: 'ok' }])
+
+  const huge = configFile('mcp-huge', `{"mcpServers":{"past-the-cap":{}},"pad":"${'x'.repeat(16 * 1024 * 1024)}"}`)
+  const past = await agentSettings({ claude: dir('mcp-huge-claude'), codex: dir('mcp-huge-codex'), claudeConfig: huge })
+  assert.deepEqual(past.claude.mcp, { state: 'unreadable', servers: [], hidden: 0, foldersNotRead: 0 })
+  assert.equal(past.codex.state, 'missing')
+})
+
+test('~/.claude.json missing, malformed or the wrong shape: a state, the rest of the reply, and no parse error', async () => {
+  const none = await claudeMcp(['from-settings'], join(dir('mcp-none'), '.claude.json'))
+  assert.deepEqual(none, { state: 'missing', servers: [{ name: 'from-settings', scope: 'user' }], hidden: 0, foldersNotRead: 0 })
+  const bad = await claudeMcp([], configFile('mcp-malformed', `{"oauthAccount":{"emailAddress":"PLANTEDEMAIL@example.com","x":"${secret('Quoted')}"`))
+  assert.deepEqual(bad, { state: 'malformed', servers: [], hidden: 0, foldersNotRead: 0 })
+  for (const notAnObject of ['[]', '"text"', '12', 'null']) assert.equal((await claudeMcp([], configFile(`mcp-odd-${notAnObject.length}`, notAnObject))).state, 'malformed')
+  // Tables that are something else: none, not a crash, and none of the values.
+  const odd = await claudeMcp([], configFile('mcp-shapes', { mcpServers: [secret('Array')], projects: { a: 'x', '/b': { mcpServers: secret('Text') }, '/c': null } }))
+  assert.deepEqual(odd, { state: 'ok', servers: [], hidden: 0, foldersNotRead: 0 })
+  assert.deepEqual((await claudeMcp([], configFile('mcp-empty', ''))).state, 'ok')
+  // A project's own file, malformed or missing, costs that project alone.
+  const broken = project('broken', `{ "mcpServers": { "x": "${secret('QuotedMcpJson')}"`)
+  const gone = join(scratch, 'PLANTEDPATH', 'never-made')
+  const kept = project('kept', { mcpServers: { fine: {} } })
+  const some = await claudeMcp([], configFile('mcp-some', plantedConfig({ [broken]: {}, [gone]: {}, [kept]: {} }, {})))
+  assert.deepEqual(some, { state: 'ok', servers: [{ name: 'fine', scope: 'project', project: 'kept' }], hidden: 0, foldersNotRead: 0 })
+})
+
+test('.mcp.json as a link, a folder or a pipe is skipped; nothing outside the project is read', async () => {
+  const outside = join(dir('outside'), 'mcp.json')
+  writeFileSync(outside, JSON.stringify({ mcpServers: { 'PLANTEDOUTSIDE': {} } }))
+  const linked = project('linked')
+  symlinkSync(outside, join(linked, '.mcp.json'))
+  const folder = project('folder')
+  mkdirSync(join(folder, '.mcp.json'))
+  // A pipe with nobody writing would hang a plain read for good.
+  const pipe = project('pipe')
+  execFileSync('mkfifo', [join(pipe, '.mcp.json')])
+  const kept = project('kept-too', { mcpServers: { fine: {} } })
+  const r = await claudeMcp([], configFile('mcp-links', plantedConfig({ [linked]: {}, [folder]: {}, [pipe]: {}, [kept]: {} }, {})))
+  assert.deepEqual(r, { state: 'ok', servers: [{ name: 'fine', scope: 'project', project: 'kept-too' }], hidden: 0, foldersNotRead: 0 })
+  assertNothingPlanted(JSON.stringify(r))
+})
+
+test('a project’s path that isn’t a clean absolute one, or a worktree’s, has its .mcp.json left alone', async () => {
+  const real = project('real', { mcpServers: { 'through-dots': {} } })
+  const worktree = project(join('repo', '.claude', 'worktrees', 'agent-1'), { mcpServers: { 'a-copy': {} } })
+  const r = await claudeMcp([], configFile('mcp-paths', plantedConfig({ [`${real}/../real`]: {}, 'relative/path': {}, [worktree]: {} }, {})))
+  assert.deepEqual(r, { state: 'ok', servers: [], hidden: 0, foldersNotRead: 0 })
+})
+
+test('Claude Code’s own file: in the home folder, or the config folder once that’s moved, or the old name there', () => {
+  const home = dir('cfg-home')
+  assert.equal(claudeConfigFile({}, home), join(home, '.claude.json'))
+  const moved = dir('cfg-moved')
+  assert.equal(claudeConfigFile({ CLAUDE_CONFIG_DIR: moved }, home), join(moved, '.claude.json'))
+  // As Claude Code's `||`: empty is the home folder.
+  assert.equal(claudeConfigFile({ CLAUDE_CONFIG_DIR: '' }, home), join(home, '.claude.json'))
+  // An empty old file doesn't count, one with something in it does.
+  writeFileSync(join(moved, '.config.json'), '')
+  assert.equal(claudeConfigFile({ CLAUDE_CONFIG_DIR: moved }, home), join(moved, '.claude.json'))
+  writeFileSync(join(moved, '.config.json'), '{}')
+  assert.equal(claudeConfigFile({ CLAUDE_CONFIG_DIR: moved }, home), join(moved, '.config.json'))
+  mkdirSync(join(home, '.claude'))
+  writeFileSync(join(home, '.claude', '.config.json'), '{}')
+  assert.equal(claudeConfigFile({}, home), join(home, '.claude', '.config.json'))
+})
+
+// ── One session's folder: GET /v1/sessions/{id}/mcp ─────────────────────
+
+const stdioServer = (place: string, command = '/home/PLANTEDUSER/PLANTEDBIN/npx') => ({
+  command,
+  args: ['--token', secret(`${place}Args`), `--dir=/home/PLANTEDUSER/PLANTEDDIR`],
+  env: { TOKEN: secret(`${place}Env`), PLANTEDENVNAME: 'x' },
+})
+const httpServer = (place: string, type = 'http') => ({
+  type,
+  url: `https://PLANTEDUSER:${secret(`${place}Password`)}@mcp.example.com:8443/PLANTEDPATH/${secret(`${place}Path`)}?token=${secret(`${place}Query`)}#PLANTEDFRAGMENT`,
+  headers: { Authorization: `Bearer ${secret(`${place}Header`)}` },
+  headersHelper: `/home/PLANTEDUSER/${secret(`${place}Helper`)}`,
+})
+
+test('a session’s folder: its .mcp.json and its local servers, with what each may say, and only a count for the user’s', async () => {
+  const cwd = project('session-app', { mcpServers: { docs: stdioServer('Docs'), remote: httpServer('Remote'), stream: httpServer('Stream', 'sse') } })
+  const other = project('session-other', { mcpServers: { 'not-this-folder': stdioServer('Other') } })
+  const file = configFile('session-scopes', plantedConfig(
+    { [cwd]: plantedEntry({ db: stdioServer('Db', 'uvx') }), [other]: plantedEntry({ 'nor-this-one': stdioServer('Other') }) },
+    { 'for-all': stdioServer('User'), 'for-all-too': httpServer('UserTwo') },
+  ))
+  const r = await sessionMcp(cwd, file, dir('session-scopes-claude'))
+  assert.deepEqual(r, {
+    state: 'ok',
+    servers: [
+      { name: 'db', scope: 'local', transport: 'stdio', command: 'uvx' },
+      { name: 'docs', scope: 'project', transport: 'stdio', command: 'npx' },
+      { name: 'remote', scope: 'project', transport: 'http', host: 'mcp.example.com' },
+      { name: 'stream', scope: 'project', transport: 'sse', host: 'mcp.example.com' },
+    ],
+    forAllProjects: 2,
+    hidden: 0,
+    foldersNotRead: 0,
+  })
+  assertNothingPlanted(JSON.stringify(r))
+})
+
+test('parent folders count as Claude Code has them: the nearer file wins a name, and the source’s base name is said', async () => {
+  const parent = project('monorepo', { mcpServers: { 'from-parent': stdioServer('Parent'), shared: stdioServer('Far', 'far') } })
+  const cwd = join(parent, 'pkg', 'web')
+  mkdirSync(cwd, { recursive: true })
+  writeFileSync(join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { shared: stdioServer('Near', 'near') } }))
+  const r = await sessionMcp(cwd, configFile('session-parents', plantedConfig({}, {})), dir('session-parents-claude'))
+  assert.deepEqual(r.servers, [
+    { name: 'from-parent', scope: 'project', transport: 'stdio', command: 'npx', from: 'monorepo' },
+    { name: 'shared', scope: 'project', transport: 'stdio', command: 'near' },
+  ])
+  // The home folder's name is the username: `~`, there too.
+  const atHome = join(process.env.HOME!, 'somewhere')
+  mkdirSync(atHome, { recursive: true })
+  writeFileSync(join(process.env.HOME!, '.mcp.json'), JSON.stringify({ mcpServers: { 'from-home': {} } }))
+  try {
+    const home = await sessionMcp(atHome, configFile('session-at-home', plantedConfig({}, {})), dir('session-parents-claude'))
+    assert.deepEqual(home.servers, [{ name: 'from-home', scope: 'project', transport: null, from: '~' }])
+  } finally {
+    rmSync(join(process.env.HOME!, '.mcp.json'))
+  }
+})
+
+test('local scope is that folder’s entry, and the repository’s root that Claude Code files it under, also from a worktree', async () => {
+  const repo = project('local-repo')
+  mkdirSync(join(repo, '.git', 'worktrees', 'wt'), { recursive: true })
+  const below = join(repo, 'sub')
+  mkdirSync(below)
+  const file = configFile('session-local', plantedConfig({
+    [repo]: plantedEntry({ 'at-root': stdioServer('Root', 'rooted') }),
+    [below]: plantedEntry({ 'at-folder': stdioServer('Folder', 'foldered') }),
+  }, {}))
+  const none = dir('session-local-claude')
+  assert.deepEqual((await sessionMcp(repo, file, none)).servers, [{ name: 'at-root', scope: 'local', transport: 'stdio', command: 'rooted' }])
+  assert.deepEqual((await sessionMcp(below, file, none)).servers, [
+    { name: 'at-folder', scope: 'local', transport: 'stdio', command: 'foldered' },
+    { name: 'at-root', scope: 'local', transport: 'stdio', command: 'rooted', from: 'local-repo' },
+  ])
+  // A linked worktree: its .git is a file pointing into the main repository's.
+  const worktree = project('local-worktree')
+  writeFileSync(join(worktree, '.git'), `gitdir: ${join(repo, '.git', 'worktrees', 'wt')}\n`)
+  writeFileSync(join(repo, '.git', 'worktrees', 'wt', 'commondir'), '../..\n')
+  assert.deepEqual((await sessionMcp(worktree, file, none)).servers, [{ name: 'at-root', scope: 'local', transport: 'stdio', command: 'rooted', from: 'local-repo' }])
+  // Not in a repository: that folder's entry alone.
+  const loose = project('local-loose')
+  assert.deepEqual((await sessionMcp(loose, file, none)).servers, [])
+})
+
+test('what can’t be said is left out: a secret or a username in a command, an odd URL, an unknown type', async () => {
+  const user = basename(process.env.HOME!)
+  const cwd = project('session-odd', {
+    mcpServers: {
+      'secret-command': { command: `/opt/${secret('CommandName')}` },
+      'args-in-command': { command: `npx --token ${secret('InCommand')}` },
+      'user-command': { command: `/opt/bin/${user}-tool` },
+      'user-as-command': { command: `/opt/${user}` },
+      'var-command': { command: '${PLANTEDVAR}' },
+      'no-command': { type: 'stdio' },
+      'number-command': { command: 5 },
+      'secret-host': { type: 'http', url: `https://${secret('Host')}.example.com/` },
+      'var-host': { type: 'http', url: 'https://${PLANTEDHOST}/mcp' },
+      'file-url': { type: 'http', url: 'file:///home/PLANTEDUSER/x' },
+      'bad-url': { type: 'sse', url: `not a url ${secret('Url')}` },
+      'no-url': { type: 'http' },
+      'ipv6': { type: 'http', url: 'http://[::1]:8123/PLANTEDPATH' },
+      'a-socket': { type: 'ws', url: 'wss://sock.example.com/PLANTEDPATH' },
+      'ide-type': { type: 'sse-ide', url: 'http://PLANTEDIDE.example.com/', ideName: 'PLANTEDIDE' },
+      'sdk-type': { type: 'sdk', name: 'PLANTEDSDK' },
+      'odd-type': { type: secret('Type'), url: 'https://PLANTEDODD.example.com/' },
+      'not-a-table': secret('NotATable'),
+      [`bad name ${secret('Name')}`]: stdioServer('BadName'),
+    },
+  })
+  const r = await sessionMcp(cwd, configFile('session-odd', plantedConfig({}, {})), dir('session-odd-claude'))
+  assertNothingPlanted(JSON.stringify(r))
+  assert.equal(r.hidden, 1)
+  const byName = Object.fromEntries(r.servers.map(({ name, scope: _scope, ...rest }) => [name, rest]))
+  assert.deepEqual(byName, {
+    'secret-command': { transport: 'stdio' },
+    'args-in-command': { transport: 'stdio' },
+    'user-command': { transport: 'stdio' },
+    'user-as-command': { transport: 'stdio' },
+    'var-command': { transport: 'stdio' },
+    'no-command': { transport: 'stdio' },
+    'number-command': { transport: null },
+    'secret-host': { transport: 'http' },
+    'var-host': { transport: 'http' },
+    'file-url': { transport: 'http' },
+    'bad-url': { transport: 'sse' },
+    'no-url': { transport: 'http' },
+    ipv6: { transport: 'http', host: '[::1]' },
+    'a-socket': { transport: 'ws', host: 'sock.example.com' },
+    'ide-type': { transport: null },
+    'sdk-type': { transport: null },
+    'odd-type': { transport: null },
+    'not-a-table': { transport: null },
+  })
+})
+
+test('a session’s .mcp.json as a link, a folder, a pipe or malformed is skipped; ~/.claude.json’s trouble is a state', async () => {
+  const outside = join(dir('session-outside'), 'mcp.json')
+  writeFileSync(outside, JSON.stringify({ mcpServers: { 'PLANTEDOUTSIDE': stdioServer('Outside') } }))
+  const none = dir('session-trouble-claude')
+  const noServers = configFile('session-trouble', plantedConfig({}, {}))
+  const linked = project('session-linked')
+  symlinkSync(outside, join(linked, '.mcp.json'))
+  const folder = project('session-folder')
+  mkdirSync(join(folder, '.mcp.json'))
+  const pipe = project('session-pipe')
+  execFileSync('mkfifo', [join(pipe, '.mcp.json')])
+  const broken = project('session-broken', `{ "mcpServers": { "PLANTEDBROKEN": "${secret('Quoted')}"`)
+  const big = project('session-big', `{"mcpServers":{"too-big":{}},"pad":"${'x'.repeat(256 * 1024)}"}`)
+  for (const cwd of [linked, folder, pipe, broken, big]) {
+    const r = await sessionMcp(cwd, noServers, none)
+    assert.deepEqual(r, { state: 'ok', servers: [], forAllProjects: 0, hidden: 0, foldersNotRead: 0 }, cwd)
+  }
+  // Its own .mcp.json still counts with ~/.claude.json gone or broken, and the file isn't quoted.
+  const cwd = project('session-kept', { mcpServers: { kept: stdioServer('Kept', 'kept') } })
+  const kept = [{ name: 'kept', scope: 'project', transport: 'stdio', command: 'kept' }]
+  assert.deepEqual(await sessionMcp(cwd, join(none, 'not-there.json'), none), { state: 'missing', servers: kept, forAllProjects: 0, hidden: 0, foldersNotRead: 0 })
+  const bad = await sessionMcp(cwd, configFile('session-bad', `{"userID":"PLANTEDUSERID","x":"${secret('Quoted')}"`), none)
+  assert.deepEqual(bad, { state: 'malformed', servers: kept, forAllProjects: 0, hidden: 0, foldersNotRead: 0 })
+  // A count of the user's takes settings.json's names too.
+  const settings = dir('session-settings')
+  writeFileSync(join(settings, 'settings.json'), JSON.stringify({ mcpServers: { 'from-settings': {}, both: {} } }))
+  assert.equal((await sessionMcp(cwd, configFile('session-count', { mcpServers: { both: {}, 'for-all': {} } }), settings)).forAllProjects, 3)
+})
+
+test('the route: a paired phone’s, for a session that’s there; nothing planted in the raw body; Codex’s has none', async () => {
+  const cwd = project('session-routed', { mcpServers: { docs: stdioServer('Docs'), remote: httpServer('Remote') } })
+  upsertSession('sess-mcp', { cwd, origin: 'hypernova', title: 'MCP', state: 'idle' })
+  writeFileSync(join(CLAUDE, '.claude.json'), JSON.stringify(plantedConfig({ [cwd]: plantedEntry({ db: stdioServer('Db', 'uvx') }) })))
+  const url = `http://127.0.0.1:${API}/v1/sessions/sess-mcp/mcp`
+  const auth = { headers: { authorization: `Bearer ${TOKEN}` } }
+  try {
+    const r = await fetch(url, auth)
+    assert.equal(r.status, 200)
+    const text = await r.text()
+    assertNothingPlanted(text)
+    assert.ok(!text.includes(scratch), `a path left: ${text}`)
+    for (const leak of ['--token', '--dir', 'Bearer', 'args', 'env"', 'url', 'headers', '8443']) assert.ok(!text.includes(leak), `${leak} left: ${text}`)
+    const body = JSON.parse(text)
+    assert.deepEqual(body.servers.map((s: { name: string }) => s.name), ['db', 'docs', 'remote'])
+    const allowed = new Set(['state', 'servers', 'forAllProjects', 'hidden', 'foldersNotRead', 'name', 'scope', 'transport', 'command', 'host', 'from'])
+    for (const k of everyKey(body)) assert.ok(allowed.has(k), `an unexpected key: ${k}`)
+
+    assert.equal((await fetch(url)).status, 401)
+    assert.equal((await fetch(url, { headers: { authorization: 'Bearer not-a-token' } })).status, 401)
+    const local = await fetch(`http://127.0.0.1:${LOCAL}/v1/sessions/sess-mcp/mcp`)
+    assert.ok(local.status === 401 || local.status === 404, `the local API answered ${local.status}`)
+    const gone = await fetch(`http://127.0.0.1:${API}/v1/sessions/no-such-session/mcp`, auth)
+    assert.equal(gone.status, 404)
+    assert.equal((await gone.json()).error.code, 'no_session')
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      const w = await fetch(url, { method, headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : '{}' })
+      assert.notEqual(w.status, 200, method)
+    }
+  } finally {
+    rmSync(join(CLAUDE, '.claude.json'))
+  }
+  saveThread({ id: 'thr-mcp', cwd, createdAt: Date.now() } as never)
+  upsertSession('thr-mcp', { cwd, origin: 'hypernova', title: 'Codex', state: 'idle' })
+  try {
+    const codex = await fetch(`http://127.0.0.1:${API}/v1/sessions/thr-mcp/mcp`, auth)
+    assert.equal(codex.status, 409)
+    assert.equal((await codex.json()).error.code, 'not_claude')
+  } finally {
+    removeThread('thr-mcp')
   }
 })
 

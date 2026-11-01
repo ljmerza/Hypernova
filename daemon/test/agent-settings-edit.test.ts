@@ -732,32 +732,47 @@ test('the reply: each file’s hash, what can be picked, and what would loosen',
   assert.deepEqual(r.codex.editable.find((e: any) => e.key === 'sandbox_mode').choices, [{ value: 'read-only', loosens: false }, { value: 'workspace-write', loosens: false }])
 })
 
-test('with Codex’s models known, Model offers them, named; one that can’t be shown as an id isn’t offered', () => {
+test('the reply carries MCP names beside what can be changed, also with settings.json missing', async () => {
+  const claude = dir('with-mcp-claude')
+  const config = join(dir('with-mcp-config'), '.claude.json')
+  writeFileSync(config, JSON.stringify({ mcpServers: { fetch: { command: 'never-sent' } } }))
+  const missing = await settingsReply(null, { claude, codex: dir('with-mcp-codex'), claudeConfig: config })
+  assert.equal(missing.claude.state, 'missing')
+  assert.deepEqual(missing.claude.mcp.servers.map((s) => s.name), ['fetch'])
+  assert.equal(missing.claude.editable.length, 3)
+  writeFileSync(join(claude, 'settings.json'), '{"autoUpdatesChannel":"latest"}')
+  const there = await settingsReply(null, { claude, codex: dir('with-mcp-codex-2'), claudeConfig: config })
+  assert.equal(there.claude.hash, sha('{"autoUpdatesChannel":"latest"}'))
+  assert.deepEqual(there.claude.mcp.servers.map((s) => s.name), ['fetch'])
+  assert.ok(!JSON.stringify(there).includes('never-sent'))
+})
+
+test('with Codex’s models known, Model offers them, named; one that can’t be shown as an id isn’t offered', async () => {
   const d = dir('with-models')
   writeFileSync(join(d, 'config.toml'), 'model = "gpt-6.1-sol"\n')
-  const r = settingsReply([{ value: 'gpt-6.1-sol', name: 'GPT 6.1 Sol' }, { value: 'two words', name: 'Bad' }], { codex: d, claude: dir('with-models-claude') })
+  const r = await settingsReply([{ value: 'gpt-6.1-sol', name: 'GPT 6.1 Sol' }, { value: 'two words', name: 'Bad' }], { codex: d, claude: dir('with-models-claude') })
   assert.deepEqual(r.codex.editable.find((e) => e.key === 'model')?.choices, [{ value: 'gpt-6.1-sol', label: 'GPT 6.1 Sol', loosens: false }])
 })
 
-test('a key in a shape that can’t be edited in place isn’t offered', () => {
+test('a key in a shape that can’t be edited in place isn’t offered', async () => {
   const d = dir('granular')
   writeFileSync(join(d, 'config.toml'), 'approval_policy = { granular = { rules = true } }\n[sandbox_mode]\nx = 1\n')
-  const r = settingsReply(null, { codex: d, claude: dir('granular-claude') })
+  const r = await settingsReply(null, { codex: d, claude: dir('granular-claude') })
   assert.deepEqual(r.codex.editable.map((e) => e.key), ['model_reasoning_effort', 'web_search'])
   const c = dir('nested')
   writeFileSync(join(c, 'settings.json'), '{"permissions":"all","autoUpdatesChannel":{"x":1}}')
-  assert.deepEqual(settingsReply(null, { claude: c, codex: dir('nested-codex') }).claude.editable.map((e) => e.key), ['showThinkingSummaries'])
+  assert.deepEqual((await settingsReply(null, { claude: c, codex: dir('nested-codex') })).claude.editable.map((e) => e.key), ['showThinkingSummaries'])
 })
 
-test('a missing file: no hash, and what can be set when it’s made; no folder: nothing', () => {
-  const r = settingsReply(null, { claude: dir('fresh-claude'), codex: dir('fresh-codex') })
+test('a missing file: no hash, and what can be set when it’s made; no folder: nothing', async () => {
+  const r = await settingsReply(null, { claude: dir('fresh-claude'), codex: dir('fresh-codex') })
   assert.equal(r.claude.state, 'missing')
   assert.equal(r.claude.hash, null)
   assert.deepEqual(r.claude.values, [])
   assert.ok(r.claude.editable.length === 3)
   // Not set means default: going looser than that loosens.
   assert.deepEqual(r.claude.editable[0]!.choices.filter((c) => c.loosens).map((c) => c.value), ['acceptEdits', 'auto'])
-  const gone = settingsReply(null, { claude: join(scratch, 'nope-claude'), codex: join(scratch, 'nope-codex') })
+  const gone = await settingsReply(null, { claude: join(scratch, 'nope-claude'), codex: join(scratch, 'nope-codex') })
   assert.equal(gone.claude.whyNot, 'no_folder')
   assert.deepEqual(gone.claude.editable, [])
   assert.equal(gone.codex.whyNot, 'no_folder')

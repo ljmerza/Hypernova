@@ -298,6 +298,8 @@ interface Hub {
     suspend fun changeAgentSetting(agent: String, key: String, value: Any, expected: String?): Result<SettingChange> = Result.failure(UnsupportedOperationException())
     /** The agent's last change put back, if the file is still what it wrote ([expected]). Fails as [changeAgentSetting] does. */
     suspend fun undoAgentSetting(agent: String, expected: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /** The MCP servers set up for a session's folder (docs/PROTOCOL.md, "A session's MCP servers"). */
+    suspend fun sessionMcp(id: String): Result<SessionMcpReply> = Result.failure(UnsupportedOperationException())
     /** Read a provider's balance now (OpenRouter); [providers] follows. */
     suspend fun checkProvider(id: String): Result<Provider> = Result.failure(UnsupportedOperationException())
     /**

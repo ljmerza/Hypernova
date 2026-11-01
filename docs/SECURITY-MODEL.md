@@ -193,6 +193,22 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   names do show what's set up on the server, to a paired phone, which can already start sessions there.
   The GET only reads, for a device token and not the admin token; `~/.claude` and `~/.codex` stay
   closed to the phone's file browser. What writes is in section 8, risk 17.
+- Claude Code's `~/.claude.json` and projects' `.mcp.json` (the account's details, OAuth data, history, MCP
+  commands, args, env, URLs and headers): a paired device gets only MCP server names from the `mcpServers`
+  tables, each checked as a name, with a scope and a folder's base name (`claude.mcp` of the same route;
+  the home folder is `~`). Each file is read per request, with a size cap, and nothing is kept or logged;
+  a parse error, which could quote the file, is never kept. `.mcp.json` isn't followed through a link and
+  must be a regular file. `.claude.json` stays a blocked file for the phone's file viewer
+  (`daemon/src/secretfiles.ts`): this route doesn't change that. `daemon/test/agent-settings.test.ts`
+  plants a secret in each of those places and checks the raw HTTP body. Those names and base names do show
+  which projects and tools are on the server, to a paired phone, which can already start sessions there.
+- The same files, for one session's folder (`GET /v1/sessions/{id}/mcp`, `docs/PROTOCOL.md`, "A session's MCP
+  servers", 2026-11-01): each server's name and scope, its transport, a stdio command's base name and an http,
+  sse or ws URL's host, each checked. Never args, env, headers, `headersHelper`, OAuth settings, a URL's path,
+  port, query or credentials, or a path; a command name that says the username, or a host that looks like a
+  secret, is left out, and the home folder is `~`. For a device token only. The same test file plants a secret in
+  each of those places, in a command path, and in a URL's query and userinfo, and checks the raw HTTP body. A
+  host does say where a server lives, to a paired phone.
 
 ## 8. Known residual risks
 

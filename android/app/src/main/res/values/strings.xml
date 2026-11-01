@@ -968,7 +968,34 @@
     <string name="as_rules_body">How many of each are in this file. Projects can add more.</string>
     <string name="as_plugins">Plugins</string>
     <string name="as_mcp">MCP servers</string>
-    <string name="as_mcp_claude_body">Only those named in this file. Servers added with claude mcp add are kept in another file and aren\'t listed.</string>
+    <string name="as_mcp_claude_body">From ~/.claude.json, each project\'s .mcp.json and this settings.json. Names only. Plugins can add servers of their own, and those aren\'t listed.</string>
+    <string name="sm_label">%1$s · MCP servers</string>
+    <string name="sm_empty">No MCP servers for this folder</string>
+    <string name="sm_note">What\'s set up for this folder, not whether it\'s connected. One from a project\'s .mcp.json may still be waiting for approval, and plugins\' aren\'t listed.</string>
+    <string name="sm_local">Local</string>
+    <string name="sm_project">Project</string>
+    <string name="sm_other">other</string>
+    <string name="sm_from">From %1$s</string>
+    <string name="sm_too_old">This server needs updating before it can show these.</string>
+    <string name="sm_err">Couldn\'t read these MCP servers.</string>
+    <plurals name="sm_for_all">
+        <item quantity="one">Plus %1$d for all projects.</item>
+        <item quantity="other">Plus %1$d for all projects.</item>
+    </plurals>
+    <string name="as_mcp_here">On this server</string>
+    <string name="as_mcp_trouble">~/.claude.json couldn\'t be read, so this list may be short.</string>
+    <plurals name="as_mcp_more">
+        <item quantity="one">%1$d more</item>
+        <item quantity="other">%1$d more</item>
+    </plurals>
+    <plurals name="as_mcp_more_projects">
+        <item quantity="one">%1$d more project</item>
+        <item quantity="other">%1$d more projects</item>
+    </plurals>
+    <plurals name="as_mcp_not_read">
+        <item quantity="one">%1$d more project folder wasn\'t read.</item>
+        <item quantity="other">%1$d more project folders weren\'t read.</item>
+    </plurals>
     <string name="as_hooks">Hook events</string>
     <string name="as_hooks_body">The events with a hook. What the hooks run isn\'t shown.</string>
     <string name="as_projects">Projects</string>

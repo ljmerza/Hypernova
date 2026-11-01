@@ -85,7 +85,7 @@ const failed = () => new EditRefused(500, 'write_failed', 'That couldn’t be wr
 const FILE_MAX = 4 * 1024 * 1024
 const FILES: Record<Agent, string> = { claude: 'settings.json', codex: 'config.toml' }
 const fileOf = (agent: Agent, dirs: Dirs) => join(agent === 'claude' ? (dirs.claude ?? CLAUDE_DIR) : (dirs.codex ?? codexHome()), FILES[agent])
-export type Dirs = { claude?: string; codex?: string }
+export type Dirs = { claude?: string; codex?: string; claudeConfig?: string }
 
 const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex')
 
@@ -517,10 +517,10 @@ export type EditableReply = { scope: 'user'; claude: AgentSettingsReply['claude'
  * file changes between the two, the phone's `expected` is older than what it saw and gets a 409,
  * never a write over something it didn't see.
  */
-export function settingsReply(models: ModelList, dirs: Dirs = {}): EditableReply {
+export async function settingsReply(models: ModelList, dirs: Dirs = {}): Promise<EditableReply> {
   const claude = fieldsOf('claude', dirs, models)
   const codex = fieldsOf('codex', dirs, models)
-  const view = agentSettings(dirs)
+  const view = await agentSettings(dirs)
   return { ...view, claude: { ...view.claude, ...claude }, codex: { ...view.codex, ...codex } }
 }
 

@@ -66,6 +66,28 @@ class SettingsCallsTest {
         assertEquals(1, daemon.count("GET", "/v1/agents/settings"))
         assertEquals("gpt-6.1-sol", r.of(AgentSettingsReply.CODEX).values.first().text)
         assertEquals(listOf("home-assistant"), r.of(AgentSettingsReply.CLAUDE).claude?.mcpServers)
+        assertEquals(listOf("home-assistant", "github", "db-tools", "docs"), r.of(AgentSettingsReply.CLAUDE).mcp?.servers?.map { it.name })
+    }
+
+    // ─── A session's MCP servers (docs/PROTOCOL.md, "A session's MCP servers") ───
+
+    @Test fun aSessionsMcpServersAreReadFromTheRoute() {
+        connect()
+        answer("GET", "/v1/sessions/sess-plan/mcp", "rest-session-mcp")
+        val r = rig.call { rig.hub.sessionMcp("sess-plan") }.getOrThrow()
+        assertEquals(1, daemon.count("GET", "/v1/sessions/sess-plan/mcp"))
+        assertEquals(listOf("db-tools", "docs"), r.servers.map { it.name })
+        assertEquals(2, r.forAllProjects)
+    }
+
+    @Test fun aSessionsMcpServersOnAnOlderServerSayItNeedsUpdatingButAGoneSessionDoesnt() {
+        connect()
+        daemon.on("GET", "/v1/sessions/old/mcp") { json(404, JSONObject("""{"error":{"code":"not_found","message":"Unknown endpoint."}}""")) }
+        assertTrue(rig.call { rig.hub.sessionMcp("old") }.exceptionOrNull() is com.prudnikweb.hypernova.data.SessionMcpTooOld)
+        daemon.on("GET", "/v1/sessions/gone/mcp") { json(404, JSONObject("""{"error":{"code":"no_session","message":"That session no longer exists."}}""")) }
+        val gone = rig.call { rig.hub.sessionMcp("gone") }.exceptionOrNull()
+        assertFalse(gone is com.prudnikweb.hypernova.data.SessionMcpTooOld)
+        assertEquals("That session no longer exists.", gone?.message)
     }
 
     @Test fun aFilesTroubleIsThatAgentsStateAndAnUnknownOneReadsAsUnreadable() {

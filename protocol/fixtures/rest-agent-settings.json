@@ -65,6 +65,31 @@
       ],
       "hidden": 0
     },
+    "mcp": {
+      "state": "ok",
+      "servers": [
+        {
+          "name": "home-assistant",
+          "scope": "user"
+        },
+        {
+          "name": "github",
+          "scope": "user"
+        },
+        {
+          "name": "db-tools",
+          "scope": "local",
+          "project": "app-parser-fix"
+        },
+        {
+          "name": "docs",
+          "scope": "project",
+          "project": "app-parser-fix"
+        }
+      ],
+      "hidden": 0,
+      "foldersNotRead": 0
+    },
     "hash": "a30b34106f16c9ae5b94a288476e0e47299653e4e45158cc948c2425e7a0d777",
     "editable": [
       {

@@ -31,6 +31,7 @@ import { DOWNLOAD_MAX, allowedPath, fileFor, filesState, folderOpens, listDir, l
 import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
 import { agentEvents, backgroundRunning, endSessionAgents, listAgents, validAgentId } from './agents.ts'
+import { sessionMcp } from './agent-settings.ts'
 import { changeSetting, settingsReply, undoChange, type ModelList } from './agent-settings-edit.ts'
 import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
 import { getBattery } from './battery.ts'
@@ -596,7 +597,7 @@ async function api(c: Ctx): Promise<void> {
   // and the shorter list a phone may change, one key at a time (agent-settings-edit.ts).
   if (path === '/v1/agents/settings' && m === 'GET') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
-    return json(res, 200, settingsReply(await settingsModels()))
+    return json(res, 200, await settingsReply(await settingsModels()))
   }
   if (path === '/v1/agents/settings' && m === 'PUT') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')
@@ -736,6 +737,15 @@ async function api(c: Ctx): Promise<void> {
     const id = agents ? await createAgentsSession(opts) : inTerminal ? createSharedSession(opts) : createSession(opts)
     notePrompt(c.deviceId, c.local, b.via)
     return json(res, 200, { session: listSessions().find((s) => s.id === id) })
+  }
+  // The MCP servers set up for a session's folder, from an allow-list (agent-settings.ts), for a paired phone.
+  const mc = /^\/v1\/sessions\/([\w-]+)\/mcp$/.exec(path)
+  if (mc && m === 'GET') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
+    const rec = getSession(mc[1]!)
+    if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    if (isCodex(rec.id)) throw new HttpError(409, 'not_claude', 'Codex keeps its MCP servers elsewhere.')
+    return json(res, 200, await sessionMcp(rec.cwd))
   }
   // The agents a session's main agent started, and one agent's own transcript (read-only).
   const ag = /^\/v1\/sessions\/([\w-]+)\/agents(?:\/([^/]+)\/events)?$/.exec(path)

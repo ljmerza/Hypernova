@@ -545,6 +545,22 @@ class ContractTest {
             assertFalse(list.first().paid)
         },
         "rest-provider-delete" to { o -> assertTrue(o.bool("ok")) },
+        // A session's folder: what each server may say, never its args, env or whole URL.
+        "rest-session-mcp" to { o ->
+            assertEquals(
+                SessionMcpReply(
+                    AgentSettingsFile.OK,
+                    listOf(
+                        SessionMcpServer("db-tools", "local", "stdio", "uvx", null, null),
+                        SessionMcpServer("docs", "project", "http", null, "docs.example.com", null),
+                    ),
+                    2,
+                    0,
+                    0,
+                ),
+                SessionMcpReply.wire(o),
+            )
+        },
         // The agents' settings: the fixed list and the summaries, each agent's own.
         "rest-agent-settings" to { o ->
             val r = AgentSettingsReply.wire(o)
@@ -567,6 +583,22 @@ class ContractTest {
                 r.claude.claude,
             )
             assertNull(r.claude.codex)
+            // Beside the summary, each scope's names; an older app reads the summary's own list.
+            assertEquals(
+                ClaudeMcp(
+                    AgentSettingsFile.OK,
+                    listOf(
+                        McpName("home-assistant", "user", null),
+                        McpName("github", "user", null),
+                        McpName("db-tools", "local", "app-parser-fix"),
+                        McpName("docs", "project", "app-parser-fix"),
+                    ),
+                    0,
+                    0,
+                ),
+                r.claude.mcp,
+            )
+            assertNull(r.codex.mcp)
             assertEquals(AgentSettingsFile.OK, r.codex.state)
             assertEquals(ShownSetting("model", ShownSetting.SET, "gpt-6.1-sol", null), r.codex.values[0])
             assertEquals(ShownSetting.UNRECOGNISED, r.codex.values.single { it.key == "approval_policy" }.state)
