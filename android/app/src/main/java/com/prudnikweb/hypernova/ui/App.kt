@@ -134,6 +134,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     val nav = vm.nav
     val haze = remember { dev.chrisbanes.haze.HazeState() }
     val screens = rememberSaveableStateHolder()
+    // Home's tab stays as the switcher changes the computer (HomeScreen.kt, rememberHomeTab).
+    val homeTab = com.prudnikweb.hypernova.ui.home.rememberHomeTab(if (vm.allServers) "home:all" else "home:${vm.pairing?.token?.hashCode()}")
     var sheet by rememberSaveable { mutableStateOf(false) }
     // The project the new-session sheet opens on (a path, or the filtered project's name), and the
     // launch that asked for it: its own, not the list's filter, which lets go of a project with
@@ -376,7 +378,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                     )
                 } else if (!covered && hub != null) {
                     Screens(
-                        hub, vm, route, nav.depth, screens, cosmos, skyVisibility, filter, onFilter, plan.value,
+                        hub, vm, route, nav.depth, screens, homeTab, cosmos, skyVisibility, filter, onFilter, plan.value,
                         { sheetProject = focusProject; sheetServer = null; sheet = true }, toAccount, toAutomations,
                         onNewSessionOn = { server -> sheetProject = focusProject; sheetServer = server; sheet = true },
                     )
@@ -543,6 +545,7 @@ private fun Screens(
     route: Route,
     depth: Int,
     screens: androidx.compose.runtime.saveable.SaveableStateHolder,
+    homeTab: androidx.compose.runtime.MutableState<com.prudnikweb.hypernova.ui.home.Tab>,
     cosmos: com.prudnikweb.hypernova.ui.fx.CosmosState,
     skyVisibility: androidx.compose.runtime.MutableFloatState,
     filter: SkyFilter?,
@@ -571,8 +574,8 @@ private fun Screens(
         label = "screen",
     ) { r ->
         // Each screen keeps its saveable state (list scroll, tab) while it's off screen.
-        // Home starts fresh (Sessions tab, top of the list) for each Mac; "All servers" is one Home of
-        // its own, kept while its cards' sessions (on their own computers) come and go.
+        // Home starts at the top of its list for each computer, on the tab it was on (homeTab); "All
+        // servers" is one Home of its own, kept while its cards' sessions (on their own computers) come and go.
         val all = vm.allServers
         val key = if (r == Route.Home) (if (all) "home:all" else "home:${vm.pairing?.token?.hashCode()}") else r.key
         // A screen over Home stays on the computer it opened on (a session from "All servers" is
@@ -585,6 +588,7 @@ private fun Screens(
                     filter = filter, onFilter = onFilter, quiet = plan.quietNames,
                     onOpen = opener.session, onNewSession = onNewSession,
                     settings = { top -> SettingsTab(vm, top) },
+                    tabState = homeTab,
                     toAccount = toAccount,
                     toAutomations = toAutomations,
                     onAutomation = { id, template, runs -> nav.push(Route.AutomationEdit(id, template, runs)) },

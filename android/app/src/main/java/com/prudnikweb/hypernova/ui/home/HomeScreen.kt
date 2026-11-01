@@ -179,6 +179,24 @@ import kotlinx.coroutines.flow.first
  */
 enum class Tab { Sessions, History, Automations, Settings }
 
+/**
+ * Home's tab, kept across the switcher (owner, 2026-11-01: "the current page shouldn't be changed"):
+ * [home] is the computer shown, or All servers, and Home's own saved state is per [home], so the
+ * tab lives above it. The one exception, also the owner's: Automations goes back to Sessions.
+ */
+@Composable
+fun rememberHomeTab(home: String): MutableState<Tab> {
+    val tab = rememberSaveable { mutableStateOf(Tab.Sessions) }
+    var seen by rememberSaveable { mutableStateOf(home) }
+    LaunchedEffect(home) {
+        if (seen != home) {
+            seen = home
+            if (tab.value == Tab.Automations) tab.value = Tab.Sessions
+        }
+    }
+    return tab
+}
+
 const val HOME_SOURCE = "home"
 
 /**
@@ -219,12 +237,14 @@ fun HomeScreen(
     servers: ServerChoice? = null,
     /** "All servers" chosen (two or more paired): the Sessions tab shows every computer's together. */
     everywhere: Everywhere? = null,
+    /** The tab on screen; the app keeps it across computers ([rememberHomeTab]). */
+    tabState: MutableState<Tab> = rememberSaveable { mutableStateOf(Tab.Sessions) },
 ) {
     val haze = LocalHaze.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val screenH = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
-    var tab by rememberSaveable { mutableStateOf(Tab.Sessions) }
+    var tab by tabState
     // The chip's switcher (ui/home/ServerSwitcher.kt) is open.
     var switching by rememberSaveable { mutableStateOf(false) }
     if (switching && servers != null) {

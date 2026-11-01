@@ -3014,3 +3014,11 @@ the days still there. His first use was 8 January.
    so a server nobody opens keeps them too. A kept day is never lost and never changes, and a day
    Hypernova has counted itself still wins, decided per answer. No `backfillFirst`: the first day is
    the map's earliest key, since a day with only messages is kept as zeros.
+
+## The switcher keeps the page (2026-11-01)
+
+The owner: "when I switch servers in the dropdown the current page shouldn't be changed", "only
+exception is the automations view default back to sessions list." Home's tab now lives above each
+computer's own Home (`rememberHomeTab`): Sessions, History and Settings stay on screen through a
+switch, to another server or to All servers. Automations goes back to Sessions. Each computer's list
+still starts at the top.

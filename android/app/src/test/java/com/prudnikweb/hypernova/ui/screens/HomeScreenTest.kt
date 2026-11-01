@@ -67,6 +67,51 @@ class HomeScreenTest {
 
     // ─── The three groups and their sort ───
 
+    /** The switcher changes the computer under Home, which saves its own state per computer, as App does. */
+    private fun homeOverServers(): androidx.compose.runtime.MutableState<String> {
+        val server = androidx.compose.runtime.mutableStateOf("z2")
+        rule.setContent {
+            Harness(spy) {
+                val tab = com.prudnikweb.hypernova.ui.home.rememberHomeTab(server.value)
+                val holder = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+                holder.SaveableStateProvider(server.value) {
+                    HomeScreen(
+                        FakeHub(sessions = Samples.sessions()), CosmosState(), mutableFloatStateOf(1f),
+                        filter = null, onFilter = {}, quiet = emptyList(),
+                        onOpen = {}, onNewSession = {},
+                        settings = { androidx.compose.foundation.text.BasicText("Settings page") },
+                        tabState = tab,
+                    )
+                }
+            }
+        }
+        rule.waitForIdle()
+        return server
+    }
+
+    private fun openTab(name: Int) {
+        rule.onAllNodes(hasText(str(name), ignoreCase = true), useUnmergedTree = true).onFirst().performClick()
+        rule.waitForIdle()
+    }
+
+    @Test fun switchingServersKeepsThePage() {
+        val server = homeOverServers()
+        openTab(R.string.settings)
+        rule.onNodeWithText("Settings page").assertExists()
+        server.value = "k1"
+        rule.waitForIdle()
+        rule.onNodeWithText("Settings page").assertExists()
+    }
+
+    @Config(qualifiers = "+h1900dp")
+    @Test fun switchingServersLeavesAutomationsForSessions() {
+        val server = homeOverServers()
+        openTab(R.string.au_tab)
+        server.value = "k1"
+        rule.waitForIdle()
+        rule.onNodeWithText("Zeta cleanup").assertExists()
+    }
+
     @Config(qualifiers = "+h1900dp")
     @Test fun groupsInOrderEachSorted() {
         home(FakeHub())
