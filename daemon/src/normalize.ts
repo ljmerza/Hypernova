@@ -91,6 +91,65 @@ export function toolSummary(name: string, input: Record<string, unknown>): strin
   }
 }
 
+// ── An MCP call's summary on its tool event ─────────────────────────────
+// The name already says the server and the tool ("mcp__home-assistant__ha_get_state"), so the
+// event's summary says what it was called with instead: "light.kitchen". Approvals and agents'
+// activity keep toolSummary's "home-assistant · ha_get_state" (docs/PROTOCOL.md, "Reading transcripts").
+
+/** Arguments worth naming first, in this order. */
+const MCP_KEYS = ['entity_id', 'query', 'url', 'path', 'file_path', 'name', 'id', 'title']
+/** Keys whose values are never shown, whatever they hold. */
+const MCP_SECRET_KEY = /token|passw|secret|key|auth|cookie|credential|bearer|signature|private/i
+/** A value as long as this or longer, with no spaces, dots or slashes in front, is a blob, not a hint. */
+const MCP_BLOB = /^[A-Za-z0-9+/=_-]{40,}$/
+const MCP_CAP = 80
+/** A value not among [MCP_KEYS] counts only when it's this short. */
+const MCP_SHORT = 120
+
+/** [v] as one short line for a summary; null when it's empty, a blob or not text. */
+function mcpValue(v: unknown, preferred: boolean): string | null {
+  if (preferred && typeof v === 'number' && Number.isFinite(v)) return String(v)
+  if (preferred && Array.isArray(v)) {
+    const first = mcpValue(v[0], true)
+    return first && v.length > 1 ? `${first} +${v.length - 1}` : first
+  }
+  if (typeof v !== 'string') return null
+  if (!preferred && (v.length > MCP_SHORT || v.includes('\n'))) return null
+  const line = v.split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).find(Boolean)
+  if (!line || line.startsWith('data:')) return null
+  if (MCP_BLOB.test(line) && /\d/.test(line) && !line.startsWith('/')) return null
+  const masked = maskSecrets(line)
+  if (masked.replace(/•••/g, '').trim() === '') return null
+  return masked.length > MCP_CAP ? masked.slice(0, MCP_CAP - 1) + '…' : masked
+}
+
+/**
+ * What an MCP call was called with, in a few words: its first argument among [MCP_KEYS]
+ * (`entity_id`, `query`, `url`, `path`…), else its first short one-line string. Never a key
+ * named like a secret (token, password, key, authorization, cookie…), never a blob; what's left
+ * is masked as titles are and cut to 80 characters. Null when nothing qualifies.
+ */
+export function mcpArgument(input: Record<string, unknown>): string | null {
+  const i = input && typeof input === 'object' ? input : {}
+  for (const k of MCP_KEYS) {
+    if (!(k in i)) continue
+    const v = mcpValue(i[k], true)
+    if (v) return v
+  }
+  for (const [k, v] of Object.entries(i)) {
+    if (MCP_SECRET_KEY.test(k) || MCP_KEYS.includes(k)) continue
+    const s = mcpValue(v, false)
+    if (s) return s
+  }
+  return null
+}
+
+/** A tool event's summary: toolSummary's, except an MCP call's, which is its argument (else its server). */
+export function eventSummary(name: string, input: Record<string, unknown>): string {
+  if (!name.startsWith('mcp__')) return toolSummary(name, input)
+  return mcpArgument(input) ?? name.split('__')[1] ?? name
+}
+
 // ── Workflows ────────────────────────────────────────────────────────────
 // A Workflow call's input is a script that starts `export const meta = {name, description,
 // phases: [{title, detail}]}`. Its name and phases are read from there before the input is
@@ -213,7 +272,7 @@ export function newToolEvent(id: string, name: string, input: Record<string, unk
     ts,
     toolUseId: id,
     name,
-    summary: toolSummary(name, input),
+    summary: eventSummary(name, input),
     input: safeTrimInput(input),
     status: 'running',
     output: null,

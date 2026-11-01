@@ -766,7 +766,8 @@ Event =
        clientId?: string}          // the phone send it came from, when the daemon knows it
   | {id, kind: "assistant", ts, text, streaming: boolean}
   | {id, kind: "thinking", ts, chars}
-  | {id, kind: "tool", ts, toolUseId, name, summary, input: object,  // input trimmed
+  | {id, kind: "tool", ts, toolUseId, name, summary, input: object,  // input trimmed; an MCP call's
+                                                                       // summary is its argument (Reading transcripts)
        status: "running" | "done" | "error", output: string | null,   // trimmed (last 64 KB)
        exitCode: number | null, durationMs: number | null,
        diff: Diff | null, path: string | null}    // path: file the tool read/wrote
@@ -3270,6 +3271,19 @@ its transcript, `~/.claude/projects/<folder>/<session id>.jsonl`. Event ids are 
   (`toolUseResult.stdout` is empty, `backgroundTaskId` set): its `output` is the line of its result
   naming its ID and output file ("Command running in background with ID: b8f…. Output is being
   written to: …"), after what it printed so far when it was moved there after a timeout.
+- **An MCP call's `summary`** (a tool named `mcp__<server>__<tool>`, Claude Code's or Codex's) is
+  what it was called with, not its name again (`normalize.ts`, `eventSummary`): its first argument
+  among `entity_id`, `query`, `url`, `path`, `file_path`, `name`, `id`, `title` (in that order; a
+  number, or a list's first item with `+N` for the rest, counts there), else its first other
+  string argument of up to 120 characters on one line. Never one whose key reads like a secret
+  (`token`, `passw…`, `secret`, `key`, `auth…`, `cookie`, `credential`, `bearer`, `signature`,
+  `private`, in any case), never a `data:` URL or a blob (40 or more base64 characters with a
+  digit and no spaces); what's left is its first line, spaces tidied, masked as titles are (below)
+  and cut to 80 characters with "…". Nothing qualifies: the server's name
+  (`"home-assistant"`). So `mcp__home-assistant__ha_get_state {entity_id: "light.kitchen"}` is
+  `"light.kitchen"`, where daemons before 2026-11-01 sent `"home-assistant · ha_get_state"`, which
+  the phone still reads (it shows neither that nor the server alone as the call's target).
+  Approvals' `summary` (`"mcp__…: home-assistant · ha_get_state"`) and agents' activity are as before.
 - **Warnings**: `system` entries of subtype `informational` at level `warning` or `error`
   ("Unknown command: /effot. Did you mean /effort?") are `warn` or `error` notices. Claude Code's
   usage-limit lines are at level `notice` ("Usage limit reached · continuing automatically at 2am
