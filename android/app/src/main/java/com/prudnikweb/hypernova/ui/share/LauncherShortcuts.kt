@@ -31,7 +31,7 @@ object LauncherShortcuts {
     private const val MAX = 3
     private var started = false
 
-    private data class Recent(val path: String, val name: String)
+    internal data class Recent(val path: String, val name: String)
 
     @OptIn(FlowPreview::class)
     fun start(app: Application) {
@@ -50,7 +50,7 @@ object LauncherShortcuts {
     }
 
     /** Folders worked in lately, newest first: sessions' folders, then projects no session names. */
-    private fun recent(sessions: List<Triple<String?, String, Long>>, projects: List<Triple<String, String, Long>>): List<Recent> {
+    internal fun recent(sessions: List<Triple<String?, String, Long>>, projects: List<Triple<String, String, Long>>): List<Recent> {
         val out = LinkedHashMap<String, Recent>()
         val known = projects.associate { it.first to it.second }
         for ((cwd, project, _) in sessions.sortedByDescending { it.third }) {
@@ -63,7 +63,7 @@ object LauncherShortcuts {
         return out.values.take(MAX)
     }
 
-    private fun publish(context: Context, projects: List<Recent>) {
+    internal fun publish(context: Context, projects: List<Recent>) {
         try {
             val shortcuts = projects.mapIndexed { i, p ->
                 ShortcutInfoCompat.Builder(context, "project:${p.path}")
