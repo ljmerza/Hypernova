@@ -5,8 +5,8 @@ depends on, with the tests that guard each one. It is the fourth layer of the sa
 before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.md). The other three
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
-`android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites passed that day:
-1029 app tests, 895 daemon tests (891 pass, 4 skipped: Mac-only).
+`android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
+2026-11-01: 1328 app tests, 935 daemon tests (931 pass, 4 skipped: Mac-only).
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
