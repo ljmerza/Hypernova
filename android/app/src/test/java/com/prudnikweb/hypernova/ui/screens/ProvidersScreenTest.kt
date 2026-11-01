@@ -141,6 +141,21 @@ class ProvidersScreenTest {
         assertEquals(listOf("prov-gateway/custom", "null/openrouter", "null/custom"), edits)
     }
 
+    @Test fun theAgentsCardsLinkToTheirAccountPages() {
+        val both = object : Hub by hub {
+            override val codex get() = com.prudnikweb.hypernova.data.CodexState(available = true, enabled = true, connected = true, version = "0.164.0")
+        }
+        rule.setContent { Harness(spy) { ProvidersScreen(both, onBack = {}, onEdit = { _, _ -> }) } }
+        rule.waitForIdle()
+        val app = org.robolectric.Shadows.shadowOf(org.robolectric.RuntimeEnvironment.getApplication())
+        rule.onNodeWithText(str(R.string.ag_account_claude)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals("https://claude.ai/settings/usage", app.nextStartedActivity.dataString)
+        rule.onNodeWithText(str(R.string.ag_account_codex)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals("https://chatgpt.com/#settings", app.nextStartedActivity.dataString)
+    }
+
     @Test fun withoutClaudeCodeThereAreNoProvidersToAdd() {
         val noClaude = object : Hub by hub {
             override val claude: ClaudeState get() = ClaudeState(available = false, version = null)

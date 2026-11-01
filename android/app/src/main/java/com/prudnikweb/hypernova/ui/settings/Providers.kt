@@ -154,6 +154,28 @@ fun ProvidersScreen(hub: Hub, onBack: () -> Unit, onEdit: (id: String?, kind: St
  * account in one line. Claude Code is always the one sessions use where it's there; its switch is
  * where they run: **Sessions in claude agents** (`POST /v1/claude {agents}`), from a Mac that says.
  */
+/**
+ * The account's settings on the web (owner, 2026-11-01), the addresses Claude Code and Codex
+ * themselves link to. Not the server's settings files: ~/.claude and ~/.codex stay closed to the
+ * phone, as they hold credentials.
+ */
+internal const val CLAUDE_ACCOUNT_PAGE = "https://claude.ai/settings/usage"
+internal const val CODEX_ACCOUNT_PAGE = "https://chatgpt.com/#settings"
+
+/** A row that opens [url] in the browser. */
+@Composable
+private fun AccountPageRow(body: Int, url: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val toast = LocalToast.current
+    com.prudnikweb.hypernova.ui.components.NavRow(
+        stringResource(R.string.ag_account_page), stringResource(body),
+        {
+            val page = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            runCatching { context.startActivity(page) }.onFailure { toast(context.getString(R.string.about_github_no_browser)) }
+        },
+    )
+}
+
 @Composable
 private fun ClaudeAgentCard(hub: Hub) {
     val installed = hub.claudeAvailable
@@ -176,6 +198,7 @@ private fun ClaudeAgentCard(hub: Hub) {
             }
             val (line, trouble) = claudeAccountLine(hub.account, hub.mac.name)
             HText(line, style = Type.small, color = if (trouble) HN.amber else HN.inkMuted)
+            AccountPageRow(R.string.ag_account_claude, CLAUDE_ACCOUNT_PAGE)
             val agents = hub.claude?.agents ?: return@Column
             Spacer(Modifier.height(12.dp))
             Hairline(Modifier.fillMaxWidth())
@@ -279,6 +302,7 @@ private fun CodexAgentCard(hub: Hub) {
                 Spacer(Modifier.height(6.dp))
                 HText(stringResource(R.string.ag_codex_reaching, mac), style = Type.small, color = HN.inkDim)
             }
+            AccountPageRow(R.string.ag_account_codex, CODEX_ACCOUNT_PAGE)
             // The switch: only for a Codex that can be used (or to turn off one that's on).
             if (c.available || c.enabled) {
                 Spacer(Modifier.height(12.dp))

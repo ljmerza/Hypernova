@@ -3071,3 +3071,12 @@ that you would get, on a per server and all server basis." He chose the design; 
 10. **Nothing is replayed.** What was silenced is not said later when the switch comes back; its card is
     there. A new app version is the exception, since it would otherwise be lost to the banner and to
     other servers: with Updates off the version isn't marked as said.
+
+## Links out of Settings (2026-11-01)
+
+The owner: "put a link to the GitHub repo" in About, and links to his settings for Claude Code and
+Codex. About has a GitHub row. The Claude Code and Codex cards in Agents & providers each have an
+Account settings row, opening the account's page on the web (`claude.ai/settings/usage`,
+`chatgpt.com/#settings`, the addresses those programs link to themselves). He chose that over opening
+`~/.claude` or `~/.codex` on the server: those stay closed to the phone, as they hold credentials.
+All of them go straight to the browser, with no "Open this link?": they're rows, chosen on purpose.

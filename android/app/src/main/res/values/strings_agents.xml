@@ -45,5 +45,8 @@
     </plurals>
     <!-- About: Codex's version, or that it's too old. -->
     <string name="ag_about_codex">Codex</string>
+    <string name="ag_account_page">Account settings</string>
+    <string name="ag_account_claude">claude.ai</string>
+    <string name="ag_account_codex">chatgpt.com</string>
     <string name="ag_about_not_installed">not installed</string>
 </resources>
