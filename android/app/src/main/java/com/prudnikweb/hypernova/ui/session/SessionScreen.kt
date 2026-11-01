@@ -174,12 +174,17 @@ import kotlinx.coroutines.launch
 
 private val EDIT_TOOLS = setOf("Write", "Edit", "MultiEdit", "NotebookEdit")
 
+/** The top of the prompt box's bar, where the chat fades under its blur. */
+private val BAR_TOP = 40.dp
+
 /** [opening]: which opening of the session this is (a new one each time it's opened; see below). */
 @Composable
 fun SessionScreen(
     hub: Hub, sessionId: String, onBack: () -> Unit, opening: Int = 0,
     /** The session's usage for its top bar and sheet: the Mac's (ChatRepo); a screen test passes its own. */
     usageOf: @Composable (sessionId: String, key: String) -> SessionUsage? = { id, key -> rememberSessionUsage(id, key) },
+    /** Claude's to-do list for the status bar: the Mac's (ChatRepo); a screen test passes its own. */
+    todosOf: suspend (String) -> Result<List<Todo>> = ChatRepo::todos,
 ) {
     val haze = LocalHaze.current
     val opener = LocalOpener.current
@@ -439,7 +444,7 @@ fun SessionScreen(
     val working = linked && (sending || session.phase == Phase.Starting ||
         (session.state == SessionState.Working && items.none { it is Item.Approval && it.resolved == null }))
     // The status bar above the composer: while it shows, the header line below doesn't repeat it.
-    val statusBar = rememberStatusBar(hub, session, items, sending, away = if (linked) null else linkWord(hub.link.state))
+    val statusBar = rememberStatusBar(hub, session, items, sending, away = if (linked) null else linkWord(hub.link.state), todosOf = todosOf)
     val workingSince = remember(sessionId, working) { System.currentTimeMillis() }
     // The session's usage, for the strip and the sheet: asked again as the transcript settles, and
     // when the session's model changes (/model).
@@ -684,7 +689,7 @@ fun SessionScreen(
                 .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
                 .onSizeChanged { barPx = it.height },
         ) {
-            Column(Modifier.padding(top = 40.dp, bottom = nav + 12.dp, start = 16.dp, end = 16.dp)) {
+            Column(Modifier.padding(top = BAR_TOP, bottom = nav + 12.dp, start = 16.dp, end = 16.dp)) {
                 // A menu or dialog only the terminal shows: its options as buttons here, or (one
                 // that doesn't read as a menu) a way to the terminal.
                 val noCard = items.none { it is Item.Approval && it.resolved == null }
@@ -758,7 +763,12 @@ fun SessionScreen(
                     onDismiss = { Asides.dismiss(sessionId, it.id) },
                 )
                 // The agent status bar and, opened, Claude's to-do list (StatusBar.kt), while a turn runs.
-                ChatStatusBar(hub, session, statusBar)
+                // Of weight, so it's measured last and has only what the box and the rest leave
+                // (owner, 2026-11-01): the box wins, keyboard or not, however long the lists are.
+                ChatStatusBar(
+                    hub, session, statusBar,
+                    Modifier.weight(1f, fill = false).statusPanelRoom(BAR_TOP) { topPx },
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ReadingPill(items)
                     Spacer(Modifier.weight(1f))

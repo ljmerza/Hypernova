@@ -391,4 +391,42 @@ class StatusModelTest {
         assertFalse(errorFolded(expired = true, kept = true))
         assertFalse(errorFolded(expired = false, kept = true))
     }
+
+    // ─── How much room the opened bar may take ───
+
+    /** A phone's numbers in dp: the bar's 40 of fade, the folded bar's 71, a row's 52. */
+    private fun panelMax(remaining: Int, header: Int) = statusPanelMaxPx(remaining, header, columnTopPx = 40, foldedPx = 71, oneRowPx = 52)
+
+    @Test fun thePanelTakesHalfOfTheRoomBetweenTheHeaderAndTheBox() {
+        // 364 left under the bar's 40 of fade, a 100 header: half of the 304 between them.
+        assertEquals(152, panelMax(remaining = 364, header = 100))
+        // A grown box or the keyboard leaves less, and the panel's cap comes down with it.
+        assertEquals(140, panelMax(remaining = 340, header = 100))
+    }
+
+    @Test fun aSmallRoomStillShowsTheFoldedBarAndARow() {
+        // Half of 180 is 90, but the bar and a row fit.
+        assertEquals(123, panelMax(remaining = 240, header = 100))
+        // Only 90 clear of the header: all of it, no more, its fade off the header.
+        assertEquals(90, panelMax(remaining = 190, header = 100))
+    }
+
+    @Test fun noRoomUnderTheHeaderLeavesTheFoldedBarOverItOrNothing() {
+        // Landscape with the keyboard: Stop over the header's words, never the box's room.
+        assertEquals(71, panelMax(remaining = 86, header = 100))
+        assertEquals(71, panelMax(remaining = 71, header = 100))
+        // Not even that: the box wins outright.
+        assertEquals(0, panelMax(remaining = 70, header = 100))
+        assertEquals(0, panelMax(remaining = 0, header = 0))
+    }
+
+    @Test fun beforeTheHeaderIsMeasuredItCountsForNothing() {
+        assertEquals(220, panelMax(remaining = 400, header = 0))
+    }
+
+    @Test fun thePanelNeverAsksForMoreThanIsLeft() {
+        for (remaining in 0..1200) for (header in listOf(0, 60, 100, 140)) {
+            assertTrue("$remaining under a $header header", panelMax(remaining, header) <= remaining)
+        }
+    }
 }

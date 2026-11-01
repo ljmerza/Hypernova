@@ -27,16 +27,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -62,6 +66,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentState
@@ -108,13 +113,21 @@ internal class StatusBarState(
 }
 
 /**
+ * The sessions whose bar is opened, while their chat is on screen: leaving it closes the bar (owner,
+ * 2026-11-01). Not saved state, which the screens' state holder (App.kt) would hand back on the way
+ * back, and a restart would too. In memory, as a configuration change recreates the activity and
+ * that's not leaving; a process restart starts with none.
+ */
+private val openBars = mutableStateSetOf<String>()
+
+/**
  * The bar's state for a session. The to-do list is asked of the Mac here. The red error bar
  * folds by itself after [ERROR_SHOW_MS] so a stopped session doesn't wear it forever; a tap on it
  * keeps it until tapped again.
  */
 @Composable
-internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, sending: Boolean, away: String? = null): StatusBarState {
-    val todos = rememberTodos(session.id, items)
+internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, sending: Boolean, away: String? = null, todosOf: suspend (String) -> Result<List<Todo>> = ChatRepo::todos): StatusBarState {
+    val todos = rememberTodos(session.id, items, todosOf)
     val pending = remember(items) { items.lastOrNull { it is Item.Approval && it.resolved == null } as? Item.Approval }
     val reads = remember(items) { trailingReads(items) }
     val workflow = remember(items) { runningWorkflow(items) }
@@ -130,7 +143,12 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     )
     val isError = raw?.tone == BarTone.Error
     // Kept out here so the list stays open (or folded) across short gaps between two steps.
-    var open by rememberSaveable(session.id) { mutableStateOf(false) }
+    val open = session.id in openBars
+    val activity = LocalActivity.current
+    DisposableEffect(session.id) {
+        val id = session.id
+        onDispose { if (activity?.isChangingConfigurations != true) openBars.remove(id) }
+    }
     var kept by remember(session.id) { mutableStateOf(false) }
     var expired by remember(session.id) { mutableStateOf(false) }
     LaunchedEffect(isError, kept) {
@@ -142,7 +160,7 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     // While an approval waits the bar stays, amber, saying what it waits on (owner, 2026-10-18).
     val model = if (raw != null && isError && errorFolded(expired, kept)) null else raw
     return StatusBarState(model, todos, open, {
-        open = !open
+        if (!openBars.remove(session.id)) openBars.add(session.id)
         if (isError) kept = !kept
     }, away = away, workflow = workflow, agents = agents)
 }
@@ -187,7 +205,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
         if (shown != null) {
             Column {
                 val opener = com.prudnikweb.hypernova.ui.LocalOpener.current
-                StatusCard(shown, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }) {
+                StatusCard(shown, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }, modifier = Modifier.weight(1f, fill = false)) {
                     if (!stopping) {
                         stopping = true
                         hub.interrupt(session.id)
@@ -200,7 +218,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
 }
 
 @Composable
-private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowView?, barAgents: List<BarAgent>, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onOpenAgent: (String) -> Unit, onStop: () -> Unit) {
+private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowView?, barAgents: List<BarAgent>, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onOpenAgent: (String) -> Unit, modifier: Modifier = Modifier, onStop: () -> Unit) {
     // Ticks once a second while the card is on screen and the Mac is linked; gone with it.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(away == null) {
@@ -246,7 +264,7 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowVie
             else -> if (open) R.string.status_fold else R.string.status_expand
         },
     )
-    GlassCard(Modifier.fillMaxWidth().animateContentSize(tween(Motion.DIALOG, easing = Motion.Expo))) {
+    GlassCard(modifier.fillMaxWidth().animateContentSize(tween(Motion.DIALOG, easing = Motion.Expo))) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier
@@ -287,20 +305,21 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowVie
             if (model.canStop && away == null) StopButton(stopping, codex, onStop)
             else Spacer(Modifier.width(8.dp))
         }
+        // The body takes what the row above and the line below leave (weight: measured after them),
+        // so the card's own cap can never squeeze either of those.
         if (open && listsAgents) {
-            WorkflowAgents(agents)
-            // The to-dos stay a tap away under the agents, not in the tally, under their own heading.
-            if (todos.isNotEmpty()) {
-                TodoHeading(todos)
-                TodoChecklist(todos)
+            // The running agent stays in view.
+            val at = agents.indexOfFirst { it.running }
+            PanelList(todos, follow = if (at > 1) at - 1 else 0, Modifier.weight(1f, fill = false).panelBody()) {
+                items(agents, key = { it.id }) { WorkflowAgentRow(it) }
             }
         } else if (open && listsMain) {
-            MainAndAgents(model, turnMs, barAgents, now, onOpenAgent)
-            if (todos.isNotEmpty()) {
-                TodoHeading(todos)
-                TodoChecklist(todos)
+            // The newest agent stays in view, with the one before it.
+            PanelList(todos, follow = if (barAgents.size > 3) barAgents.size - 1 else 0, Modifier.weight(1f, fill = false).panelBody()) {
+                item(key = "main") { MainRow(model, turnMs) }
+                items(barAgents, key = { it.id }) { a -> BarAgentRow(a, now, onOpen = { onOpenAgent(a.id) }) }
             }
-        } else if (open && expandable) TodoChecklist(todos)
+        } else if (open && expandable) TodoChecklist(todos, Modifier.weight(1f, fill = false).panelBody())
         StatusLine(model, tone, Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 10.dp), frozen = away != null)
     }
 }
@@ -421,26 +440,70 @@ private fun sayText(s: Say): String = when (s.kind) {
 }
 
 /**
- * A running workflow's agents inside the opened bar, one line each in the order its card has them:
- * the agent's label, and its state in a word, or what it does now while it runs. The one it's on
- * stays in view. No tap through to an agent yet (LATER L95); its card in the chat opens it.
+ * The opened bar's agents ([rows]) and, under their heading, the to-dos: one list that scrolls as
+ * one, since a list each couldn't share a small panel (the first took all of it, leaving the to-dos
+ * out of reach). It follows the agents ([follow], a row to bring into view; 0 for none), not the
+ * to-dos, whose tally stays in the row above: two things to follow in one list would pull it about.
  */
 @Composable
-private fun WorkflowAgents(agents: List<AgentView>, modifier: Modifier = Modifier) {
+private fun PanelList(todos: List<Todo>, follow: Int, modifier: Modifier = Modifier, rows: LazyListScope.() -> Unit) {
     val list = rememberLazyListState()
-    val at = agents.indexOfFirst { it.running }
-    LaunchedEffect(at) { if (at > 1) list.animateScrollToItem(at - 1) }
+    LaunchedEffect(follow) { if (follow > 0) list.animateScrollToItem(follow) }
     LazyColumn(
-        modifier.fillMaxWidth().heightIn(max = 164.dp),
+        modifier.fillMaxWidth().panelViewport(list),
         state = list,
         verticalArrangement = Arrangement.spacedBy(2.dp),
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 8.dp),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp),
     ) {
-        items(agents, key = { it.id }) { WorkflowAgentRow(it) }
+        rows()
+        if (todos.isNotEmpty()) {
+            item(key = "todo-heading") { TodoHeading(todos) }
+            todoRows(todos)
+        }
     }
 }
 
-/** One agent: a turning planet while it runs (amber while it asks), a tick once done, a cross when it failed, a ring when stopped. */
+/**
+ * The opened bar's list gets no sliver: with less room than a row and its gap it isn't drawn, and
+ * the bar reads as folded until there's room (the chevron still folds and opens it).
+ */
+private fun Modifier.panelBody(): Modifier = layout { measurable, constraints ->
+    if (constraints.maxHeight < StatusPanel.ONE_ROW.roundToPx()) layout(0, 0) {}
+    else {
+        val list = measurable.measure(constraints)
+        layout(list.width, list.height) { list.place(0, 0) }
+    }
+}
+
+/**
+ * Keeps the bar to its share of the room above the prompt box ([statusPanelMaxPx]). For a child of
+ * weight in the box's column: all that column's other children are measured first, so what this
+ * sees is what they left, keyboard and a grown box already taken off. [columnTop]: the padding at
+ * the top of that column; [headerPx]: how tall the session's header is.
+ */
+internal fun Modifier.statusPanelRoom(columnTop: Dp, headerPx: () -> Int): Modifier = layout { measurable, constraints ->
+    val max = statusPanelMaxPx(constraints.maxHeight, headerPx(), columnTop.roundToPx(), StatusPanel.FOLDED.roundToPx(), StatusPanel.ONE_ROW.roundToPx())
+    if (max == 0) layout(0, 0) {}
+    else {
+        val bar = measurable.measure(constraints.copy(minHeight = 0, maxHeight = max))
+        layout(bar.width, bar.height) { bar.place(0, 0) }
+    }
+}
+
+/** The heights the bar's room is reckoned in. */
+private object StatusPanel {
+    /** The folded bar: its 48dp row, the 3dp line and the 10dp under it, and the 10dp between the card and what's below. */
+    val FOLDED = 71.dp
+    /** One row of the list whichever it is (an agent's is 44dp, a to-do's 30dp), and the 8dp under it. */
+    val ONE_ROW = 52.dp
+}
+
+/**
+ * One of a running workflow's agents inside the opened bar: a turning planet while it runs (amber
+ * while it asks), a tick once done, a cross when it failed, a ring when stopped; its label, and its
+ * state in a word, or what it does now while it runs. No tap through to an agent yet (LATER L95);
+ * its card in the chat opens it.
+ */
 @Composable
 private fun WorkflowAgentRow(a: AgentView) {
     val state = when (a.state) {
@@ -504,7 +567,8 @@ private fun TodoHeading(todos: List<Todo>) {
         Modifier
             .fillMaxWidth()
             .clearAndSetSemantics { contentDescription = said; heading() }
-            .padding(start = 20.dp, end = 14.dp, top = 6.dp, bottom = 4.dp),
+            // In the list, which gives 14dp at the sides and 2dp between rows.
+            .padding(start = 6.dp, top = 12.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TodoTally(done, todos.size)
@@ -512,26 +576,10 @@ private fun TodoHeading(todos: List<Todo>) {
 }
 
 /**
- * The main agent and the agents it runs, as Claude Code's footer lists them (owner, 2026-10-30):
- * the main agent's row (what it does, the turn's time), then a row per agent, oldest first. The
- * newest stays in view.
+ * The main agent, first of the rows the opened bar lists as Claude Code's footer does (owner,
+ * 2026-10-30), with what it does and the turn's time: turning while it works, amber when it needs
+ * you, still while it waits on its agents. A row per agent follows, oldest first.
  */
-@Composable
-private fun MainAndAgents(model: BarModel, turnMs: Long, agents: List<BarAgent>, now: Long, onOpen: (String) -> Unit) {
-    val list = rememberLazyListState()
-    LaunchedEffect(agents.size) { if (agents.size > 3) list.animateScrollToItem(agents.size) }
-    LazyColumn(
-        Modifier.fillMaxWidth().heightIn(max = 220.dp),
-        state = list,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 8.dp),
-    ) {
-        item(key = "main") { MainRow(model, turnMs) }
-        items(agents, key = { it.id }) { a -> BarAgentRow(a, now, onOpen = { onOpen(a.id) }) }
-    }
-}
-
-/** The main agent: turning while it works, amber when it needs you, still while it waits on its agents. */
 @Composable
 private fun MainRow(model: BarModel, turnMs: Long) {
     val res = LocalContext.current.resources

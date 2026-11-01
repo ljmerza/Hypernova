@@ -3296,3 +3296,34 @@ edits a settings file"**, with these limits. `daemon/src/agent-settings-edit.ts`
    Undo is off.
 9. **Each server has its own.** The screen is the hub whose card was tapped; All servers never changes them
    in bulk. Nothing on the session's chat screen. Per-model effort under `modelSettings` is later (`docs/LATER.md`).
+
+## The prompt box wins over the status bar (2026-11-01)
+
+The owner: "there's not enough room for the input. Don't allow the pull-up menu to hide the input
+side."
+
+1. **The box is measured first, the bar last.** The bar takes what the box and the rest leave it, so
+   nothing it lists can push the box off or clip it, at its 6 lines, with attachments, or with the
+   keyboard up.
+2. **The opened bar gets half of the room between the header and the box,** with or without the
+   keyboard: a cap, worked out as it's measured, not a fold. It doesn't fold by itself when the
+   keyboard opens: that would move the card under the finger, and a tap on it folds it anyway. Some
+   of the chat stays in view.
+3. **Short of room,** it keeps the folded bar and a row while they fit clear of the header, then the
+   folded bar alone (over the header if it must: Stop is worth more than the header's words, and the
+   header's back with the keyboard down). With less than that it isn't drawn.
+4. **Agents and to-dos scroll as one list,** since a list each couldn't share a small panel. It follows
+   the agents, not the to-dos, whose tally stays in the bar's row.
+5. **The progress line stays clear:** the list stops 8dp above it whatever the scroll, and rows fade at
+   an edge with more beyond it.
+
+## The status bar closes when you leave it (2026-11-01)
+
+The owner: "when the agents card is open in the session view … if I go to a different agent view and
+then come back to that one, the menu is still open. I don't want it still open; I want it to reset
+closed if I leave the view."
+
+Leaving the session's chat closes its opened bar: to an agent's screen, another session or Home, and a
+process restart starts it closed. Opening the keyboard isn't leaving, and neither is a configuration
+change that recreates the screen (a font size, a split screen; the app is held to portrait, so not a
+rotation). This replaces the bar staying open across a visit, which it did as saved state.

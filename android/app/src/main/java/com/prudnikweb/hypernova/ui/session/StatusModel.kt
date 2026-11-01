@@ -86,6 +86,31 @@ internal data class BarModel(
     val progress: Float? get() = progress(done, total)
 }
 
+/** The opened bar's share of the room between the session's header and the prompt box (owner, 2026-11-01). */
+internal const val STATUS_PANEL_SHARE = 0.5f
+
+/**
+ * The most the status bar may take, in pixels, whatever it has to list. [remaining]: what the prompt
+ * box and everything else above the keyboard left it, up to the top of the bar's column, which starts
+ * [columnTopPx] below the bar's own top, where the chat fades under its blur. [headerPx]: how tall the
+ * session's header is.
+ *
+ * Half of the room between the header and the box, or room for the folded bar and a row if that's
+ * more and fits with the fade clear of the header, so a short screen's panel still shows something.
+ * Too little for even that: the folded bar alone, over the header if it has to, as Stop is worth more
+ * than the header's words; and 0 where it doesn't fit at all, the box winning.
+ */
+internal fun statusPanelMaxPx(remaining: Int, headerPx: Int, columnTopPx: Int, foldedPx: Int, oneRowPx: Int): Int {
+    val room = (remaining + columnTopPx - headerPx).coerceAtLeast(0)
+    val clear = (remaining - headerPx).coerceAtLeast(0)
+    val cap = maxOf((room * STATUS_PANEL_SHARE).toInt(), minOf(clear, foldedPx + oneRowPx))
+    return when {
+        cap >= foldedPx -> cap
+        remaining >= foldedPx -> foldedPx
+        else -> 0
+    }
+}
+
 /** How long a red error bar stays before it folds by itself (a tap keeps it). */
 internal const val ERROR_SHOW_MS = 30_000L
 
