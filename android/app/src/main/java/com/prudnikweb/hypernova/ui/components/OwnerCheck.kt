@@ -24,6 +24,9 @@ object OwnerCheck {
      * owner cancelled). [noLock]: what to say on a phone without a screen lock, where there is
      * nothing to check.
      */
+    /** A screen test's stand-in for the system's prompt, after the screen-lock check (null: the real BiometricPrompt). */
+    internal var prompt: ((onOk: () -> Unit, onFail: (String?) -> Unit) -> Unit)? = null
+
     fun ask(context: Context, title: String, subtitle: String, noLock: String, onOk: () -> Unit, onFail: (String?) -> Unit) {
         val activity = context.activity()
         val secure = context.getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
@@ -31,6 +34,7 @@ object OwnerCheck {
             onFail(noLock)
             return
         }
+        prompt?.let { it(onOk, onFail); return }
         val b = BiometricPrompt.Builder(activity).setTitle(title).setSubtitle(subtitle)
         if (Build.VERSION.SDK_INT >= 30) {
             b.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)

@@ -468,6 +468,24 @@ class SessionRoutesTest {
         assertTrue(rig.call { rig.hub.answerApproval("cx-a1", Answer.Allow) })
         assertTrue(rig.hub.pendingApprovals.isEmpty())
     }
+
+    // ─── Q5: Claude Code's own queue ───
+
+    @Test fun promptsInClaudeCodesQueueShowAsQueuedAndGoWhenItTakesThem() {
+        // As the snapshot fixture has the main session's queue: one prompt waiting behind the turn.
+        val q = JSONArray().put(JSONObject().put("id", "q:2").put("text", "Check the lexer as well").put("at", 900L).put("clientId", JSONObject.NULL))
+        connect(session("s1", state = "working") { put("queue", q).put("queued", 1) })
+        daemon.ok("GET", "/v1/sessions/s1/events", JSONObject().put("events", JSONArray().put(JSONObject().put("id", "u1").put("kind", "user").put("ts", 800L).put("text", "Fix the parser"))))
+        rig.hub.opened("s1")
+        rig.until("the queue drawn") { rig.hub.transcript("s1").any { it is Item.User && it.key == "queued:q:2" } }
+        val queued = rig.hub.transcript("s1").filterIsInstance<Item.User>().single { it.key == "queued:q:2" }
+        assertEquals("Check the lexer as well", queued.text)
+        assertTrue(queued.queued)
+        // Claude Code takes it: off the queue, and its own copy is the prompt.
+        rig.push(msg("session") { put("session", session("s1", state = "working") { put("queue", JSONArray()).put("queued", 0) }) }) {
+            rig.hub.transcript("s1").none { it is Item.User && it.key == "queued:q:2" }
+        }
+    }
 }
 
 private const val LIMITED_ID = "c0ffee00-0000-4000-8000-00000000beef"
