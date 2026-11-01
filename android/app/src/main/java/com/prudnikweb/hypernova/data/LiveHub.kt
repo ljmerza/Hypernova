@@ -872,10 +872,12 @@ class LiveHub(
     /**
      * A newer app on the Mac while Hypernova is in the background: a notification, once per
      * version. (On screen, the app shows a banner from [appUpdate] itself: see [updateNoticed].)
+     * With Updates off for this server the version stays unsaid, not used up: the app's banner still
+     * has it, and so does another server whose Updates are on.
      */
     private fun offerUpdate() {
         val u = appUpdate ?: return
-        if (isVisible() || !updateNoticed(app, u.versionCode)) return
+        if (isVisible() || !NotificationPrefsStore.get(app).allows(serverId, Notice.Kind.Update) || !updateNoticed(app, u.versionCode)) return
         onNotice(updateNotice(app, u))
     }
 
@@ -1005,7 +1007,7 @@ class LiveHub(
         if (warned || b.percent > BATTERY_WARN) return
         prefs.edit().putBoolean(key, true).apply()
         // Amber and "Needs you", as an approval: only the owner can plug it in.
-        notice(Notice("battery", Notice.Kind.Approval, null, mac.name, res.getString(R.string.notice_mac_battery, b.percent)))
+        notice(Notice("battery", Notice.Kind.Power, null, mac.name, res.getString(R.string.notice_mac_battery, b.percent)))
     }
 
     /**
@@ -1015,7 +1017,7 @@ class LiveHub(
      */
     private fun sleepSoon(s: SleepSoon) {
         val text = AwakeWords.sleepSoon(res, s.inSeconds.toLong(), s.reason, s.percent ?: macBattery?.percent, s.stillAwake, s.otherApp)
-        notice(Notice(if (s.reason == MacAwake.BATTERY) "battery" else "mac_sleep", Notice.Kind.Approval, null, mac.name, text))
+        notice(Notice(if (s.reason == MacAwake.BATTERY) "battery" else "mac_sleep", Notice.Kind.Power, null, mac.name, text))
     }
 
     /**

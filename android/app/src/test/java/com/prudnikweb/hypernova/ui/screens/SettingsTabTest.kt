@@ -127,7 +127,7 @@ class SettingsTabTest {
 
     // ─── One server ───
 
-    @Config(qualifiers = "+h3300dp")
+    @Config(qualifiers = "+h3500dp")
     @Test fun oneServerShowsEveryPartInOrder() {
         pair(server("z2", 47391) { files(false) })
         linked()

@@ -356,9 +356,12 @@ class AutomationNotes(private val context: Context, private val server: String? 
     private fun canPost(): Boolean = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
+    /** Automations on for this server (data/NotificationPrefs.kt); the note stays in the app's list either way. */
+    private fun allowed(): Boolean = NotificationPrefsStore.get(context).allows(server, Notice.Kind.Automation)
+
     /** [automationId] "" opens the Automations tab (several folded into one). */
     fun post(key: String, title: String, text: String, sessionId: String?, automationId: String?) {
-        if (!canPost() || nm == null) return
+        if (!canPost() || nm == null || !allowed()) return
         val i = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
         when {
             sessionId != null -> i.setAction(MainActivity.ACTION_OPEN_SESSION).putExtra(MainActivity.EXTRA_SESSION, sessionId)
@@ -375,6 +378,7 @@ class AutomationNotes(private val context: Context, private val server: String? 
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setAutoCancel(true)
             .setContentIntent(open)
+            .addExtras(Notifier.silenceable(server, Notice.Kind.Automation))
             .build()
         // One per automation: its next note takes the place of the last.
         runCatching { nm.notify(("automation:${scope()}${automationId ?: key}").hashCode(), n) }
@@ -386,7 +390,7 @@ class AutomationNotes(private val context: Context, private val server: String? 
      * it's answered anywhere ([cancelAsk]).
      */
     fun postAsk(runId: String, automationId: String?, name: String, ask: RunAsk) {
-        if (!canPost() || nm == null) return
+        if (!canPost() || nm == null || !allowed()) return
         val i = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             .setAction(ACTION_OPEN).putExtra(EXTRA_ID, automationId.orEmpty())
         if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
@@ -402,6 +406,7 @@ class AutomationNotes(private val context: Context, private val server: String? 
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(open)
+            .addExtras(Notifier.silenceable(server, Notice.Kind.Automation))
             .setTimeoutAfter((ask.until - System.currentTimeMillis()).coerceAtLeast(60_000L))
         for ((k, answer) in ask.answers.take(3).withIndex()) {
             val act = Intent(context, NotifyActions::class.java).setAction(NotifyActions.ACTION_ANSWER)
