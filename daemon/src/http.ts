@@ -1849,6 +1849,9 @@ function handler(isLocal: boolean, lan = false) {
   }
 }
 
+/** How often a live-feed socket hears `{"t":"ping"}` (the phone declares a silent one dead after 70 s). Tests lower it. */
+export const wsTiming = { pingMs: 25_000 }
+
 // Open sockets per paired phone, so forgetting a phone cuts it off at once (its live terminal too),
 // and the device certificate each one came in with over the LAN listener.
 const byDevice = new Map<string, Set<import('ws').WebSocket>>()
@@ -1926,7 +1929,7 @@ export function startServers(): () => Promise<void> {
       // A phone on the live feed keeps the Mac awake While working (the Mac app's own feed doesn't).
       // After the snapshot, which is always a client's first message.
       const awake = device ? awakeClient() : null
-      const ping = setInterval(() => ws.readyState === ws.OPEN && ws.send('{"t":"ping"}'), 25_000)
+      const ping = setInterval(() => ws.readyState === ws.OPEN && ws.send('{"t":"ping"}'), wsTiming.pingMs)
       ws.on('close', () => {
         clearInterval(ping)
         remove()

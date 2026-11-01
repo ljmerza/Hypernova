@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "unavailable",
+    "message": "Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings.",
+    "feature": "awake"
+  }
+}

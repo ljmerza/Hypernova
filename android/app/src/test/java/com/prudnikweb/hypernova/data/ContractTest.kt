@@ -496,6 +496,67 @@ class ContractTest {
             assertEquals("server", o.obj("mac")?.str("name"))
             assertEquals("mac-id", o.obj("mac")?.str("id"))
         },
+        // ── Connecting, the device certificate, forgetting this phone ──
+        // The router's probe goes by the status alone; the body says it's Hypernova.
+        "rest-health" to { o ->
+            assertTrue(o.bool("ok"))
+            assertEquals(1, o.int("protocol"))
+            assertEquals("server", o.str("name"))
+        },
+        // LiveHub answers it with {"t":"pong"} and reads nothing else.
+        "ws-ping" to { o -> assertEquals(listOf("t"), ws(o, "ping").keys().asSequence().toList()) },
+        // DeviceCertStore.request reads these three (the daemon's DER is normalised away here: its parsing is MutualTlsTest's).
+        "rest-device-cert" to { o ->
+            assertTrue(o.str("cert")!!.isNotBlank())
+            assertTrue(o.str("ca")!!.isNotBlank())
+            assertEquals(64, o.str("fingerprint")!!.length)
+        },
+        // LiveHub.forget only needs the 200.
+        "rest-devices-me" to { o -> assertTrue(o.bool("ok")) },
+        // The Mac app's list of phones changed: nothing on the phone reads it (LiveHub's dispatch ignores the type).
+        "ws-devices" to { o -> assertEquals(listOf("t"), ws(o, "devices").keys().asSequence().toList()) },
+        // ── Mac-only features ──
+        "ws-battery" to { o ->
+            assertEquals(MacBattery(84, charging = false, onAC = false, minutesLeft = 312), Wire.battery(ws(o, "battery").obj("battery")))
+        },
+        "ws-awake" to { o ->
+            val a = MacAwake.parse(ws(o, "awake").obj("awake"))!!
+            assertEquals(MacAwake.BACKPACK, a.mode)
+            assertTrue(a.holding && a.lidClosedOk && a.backpackReady && a.extendable && a.laptop)
+            assertEquals(T, a.until)
+            assertEquals(false, a.lidClosed)
+            assertEquals("backpack", a.sleepDisabledBy)
+            assertNull(a.sleepAt)
+            assertEquals(15, a.minBattery)
+        },
+        "rest-mac-awake" to { o ->
+            val a = MacAwake.parse(o.obj("awake"))!!
+            assertEquals(MacAwake.OFF, a.mode)
+            assertFalse(a.holding)
+            assertFalse(a.laptop)
+            assertNull(a.until)
+        },
+        "ws-mac-sleep-soon" to { o ->
+            assertEquals(SleepSoon(120, MacAwake.BATTERY, 15, stillAwake = false, otherApp = null), SleepSoon.parse(ws(o, "mac_sleep_soon")))
+        },
+        "ws-mac-backpack-ending" to { o ->
+            assertEquals(BackpackEnding(540, T), BackpackEnding.parse(ws(o, "mac_backpack_ending")))
+        },
+        // A Linux server's refusals: Api.errorOf keeps the sentence the phone shows, and the feature.
+        "rest-mac-awake-unavailable" to { o ->
+            val e = Api.errorOf(501, o.toString())
+            assertEquals(Problem.Server, e.problem)
+            assertEquals("unavailable", e.code)
+            assertTrue(e.serverMessage!!.startsWith("Stay awake is for a Mac."))
+            assertEquals(Mac.FEATURE_AWAKE, e.error?.str("feature"))
+        },
+        "rest-session-open-unavailable" to { o ->
+            val e = Api.errorOf(501, o.toString())
+            assertEquals(Problem.Server, e.problem)
+            assertEquals("unavailable", e.code)
+            assertTrue(e.serverMessage!!.isNotBlank())
+            assertEquals(Mac.FEATURE_OPEN_WINDOW, e.error?.str("feature"))
+        },
     )
 
     @Test fun everyFixtureHasItsChecksAndEveryCheckItsFixture() {

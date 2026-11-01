@@ -1,0 +1,18 @@
+{
+  "t": "awake",
+  "awake": {
+    "mode": "backpack",
+    "holding": true,
+    "lidClosedOk": true,
+    "backpackReady": true,
+    "until": 1800000000000,
+    "extendable": true,
+    "reason": null,
+    "sleepAt": null,
+    "lidClosed": false,
+    "laptop": true,
+    "minBattery": 15,
+    "sleepDisabledBy": "backpack",
+    "otherApp": null
+  }
+}

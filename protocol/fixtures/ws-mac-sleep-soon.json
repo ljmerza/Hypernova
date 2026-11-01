@@ -1,0 +1,8 @@
+{
+  "t": "mac_sleep_soon",
+  "inSeconds": 120,
+  "reason": "battery",
+  "percent": 15,
+  "stillAwake": false,
+  "otherApp": null
+}

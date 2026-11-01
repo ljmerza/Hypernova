@@ -125,6 +125,7 @@ dependencies {
     testImplementation(libs.org.json)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.okhttp.tls)
     // Screen tests on the JVM (app/src/test/.../ui/screens): Compose under Robolectric, and Roborazzi's
     // screenshots of them (baselines in app/src/test/snapshots; `verifyRoborazziDebug` compares,
     // `recordRoborazziDebug` writes them again).

@@ -197,7 +197,7 @@ async function ok(p: Promise<{ status: number; json: any }>): Promise<any> {
 const T = 1_800_000_000_000
 const TIMES = new Set([
   'createdAt', 'lastActivityAt', 'ts', 'at', 'since', 'observedAt', 'expiresAt', 'turnStartedAt', 'startedAt', 'endedAt', 'resetsAt',
-  'checkedAt', 'updatedAt', 'askedAt', 'autoResumeAt', 'modelsObservedAt', 'mtime', 'until', 'lastSeenAt', 'answeredAt',
+  'checkedAt', 'updatedAt', 'askedAt', 'autoResumeAt', 'modelsObservedAt', 'mtime', 'until', 'lastSeenAt', 'answeredAt', 'sleepAt',
 ])
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 /** The session ids this file picks itself: kept as they are, so both suites can name them. */
@@ -251,6 +251,14 @@ function fixed(o: Record<string, any>): Record<string, any> {
     if (Array.isArray(o.addresses) && o.addresses.every((a: unknown) => typeof a === 'string')) o.addresses = ['192.168.1.20']
     if (typeof o.fingerprint === 'string' && /^[0-9a-f]{64}$/.test(o.fingerprint)) o.fingerprint = 'ab'.repeat(32)
   }
+  // A device certificate and its CA (base64 DER), and the listener's fingerprint beside them: new keys every run.
+  if ('cert' in o && 'ca' in o && 'fingerprint' in o) {
+    if (typeof o.cert === 'string' && /^MII[\w+/=]+$/.test(o.cert)) o.cert = 'MIIdevice-certificate'
+    if (typeof o.ca === 'string' && /^MII[\w+/=]+$/.test(o.ca)) o.ca = 'MIIdevice-ca'
+    if (typeof o.fingerprint === 'string' && /^[0-9a-f]{64}$/.test(o.fingerprint)) o.fingerprint = 'ab'.repeat(32)
+  }
+  // GET /v1/health names this machine.
+  if ('ok' in o && 'protocol' in o && typeof o.name === 'string') o.name = 'server'
   // A shared terminal's id is the holder's own.
   if ('id' in o && 'mac' in o && 'phone' in o && typeof o.mac === 'number') o.id = 'term-id'
   if ('termId' in o && 'url' in o) Object.assign(o, { termId: 'term-id', url: '/v1/terms/term-id/ws?ticket=ticket' })
@@ -816,6 +824,100 @@ test('POST …/auto-continue and …/provider on a session another provider’s 
 
 test('GET /v1/commands: Claude Code’s commands and skills in a project', async () => {
   contract('rest-commands', await ok(get(`/v1/commands?project=${encodeURIComponent(cwd)}`)))
+})
+
+// ── The connection, the device certificate and the Mac-only features ─────
+test('GET /v1/health, and {t:"ping"} as a phone socket hears it', async () => {
+  contract('rest-health', await ok(call('GET', '/v1/health', undefined, null)))
+  const { wsTiming } = await import('../src/http.ts')
+  const { WebSocket } = await import('ws')
+  const was = wsTiming.pingMs
+  wsTiming.pingMs = 100
+  try {
+    const ping = await new Promise<any>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${API}/v1/ws`, { headers: { authorization: `Bearer ${TOKEN}` } })
+      ws.on('message', (d) => {
+        const m = JSON.parse(String(d))
+        if (m.t === 'ping') {
+          ws.close()
+          resolve(m)
+        }
+      })
+      ws.once('error', reject)
+    })
+    contract('ws-ping', ping)
+  } finally {
+    wsTiming.pingMs = was
+  }
+})
+
+test('POST /v1/device/cert: the phone’s own key signed by the device CA', async () => {
+  // What the phone sends (data/DeviceCert.kt): an EC P-256 request, CN = its deviceId.
+  const dir = join(scratch, 'csr')
+  mkdirSync(dir, { recursive: true })
+  execFileSync('/usr/bin/openssl', ['ecparam', '-genkey', '-name', 'prime256v1', '-noout', '-out', join(dir, 'key.pem')])
+  execFileSync('/usr/bin/openssl', ['req', '-new', '-key', join(dir, 'key.pem'), '-subj', '/CN=phone', '-sha256', '-outform', 'DER', '-out', join(dir, 'csr.der')])
+  contract('rest-device-cert', await ok(post('/v1/device/cert', { csr: readFileSync(join(dir, 'csr.der')).toString('base64') })))
+})
+
+test('{t:"devices"} on a pairing, and DELETE /v1/devices/me (a phone forgetting this computer)', async () => {
+  const { code } = await startPairing(true)
+  const second = await ok(call('POST', '/v1/pair', { code, deviceName: 'Second phone', model: 'Google Pixel 8', appVersion: '0.42.0', installId: 'install-fedcba9876543210' }, null))
+  contract('ws-devices', heard('devices'))
+  contract('rest-devices-me', await ok(call('DELETE', '/v1/devices/me', undefined, second.token)))
+  // Forgotten: its token no longer opens anything; the main phone's still does.
+  assert.equal((await call('GET', '/v1/snapshot', undefined, second.token)).status, 401)
+  assert.equal((await get('/v1/snapshot')).status, 200)
+})
+
+test('Linux: GET /v1/mac/awake reads Off; POST /v1/mac/awake and POST …/open are 501 unavailable with their feature', async () => {
+  contract('rest-mac-awake', await ok(get('/v1/mac/awake')))
+  const awake = await post('/v1/mac/awake', { mode: 'backpack' })
+  assert.equal(awake.status, 501)
+  contract('rest-mac-awake-unavailable', awake.json)
+  // A session in a shared terminal: the feature is checked before the terminal itself.
+  hub.upsertSession('sess-open', { cwd, origin: 'terminal', title: 'Open it on the server', state: 'idle', term: { id: 'f0f0f0f0f0', mac: 0, phone: 0 } })
+  const open = await post('/v1/sessions/sess-open/open')
+  assert.equal(open.status, 501)
+  contract('rest-session-open-unavailable', open.json)
+  hub.forgetSession('sess-open')
+})
+
+test('a Mac’s {t:"battery"}, {t:"awake"}, {t:"mac_backpack_ending"} and {t:"mac_sleep_soon"}, from its battery reading and its keeper', async () => {
+  // The battery as pmset reports it on a MacBook, through the daemon's reading (battery.ts).
+  const { readBattery, noteBattery } = await import('../src/battery.ts')
+  await readBattery(async () => ({ pmset: "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=7209059)\t84%; discharging; 5:12 remaining present: true\n", ioreg: null }))
+  contract('ws-battery', heard('battery', (m) => m.battery))
+  noteBattery(null)
+
+  // Stay awake's keeper (awake.ts) on a stand-in MacBook (the system's programs never run), heard
+  // as the daemon's own keeper is: through the hub's broadcast.
+  const { AwakeKeeper, EXTEND_WINDOW_MS } = await import('../src/awake.ts')
+  const world = { now: Date.now(), battery: { percent: 80, charging: false, onAC: false, minutesLeft: 300 } as import('../src/battery.ts').Battery }
+  let sleepDisabled: 0 | 1 = 0
+  const io: import('../src/awake.ts').AwakeIO = {
+    read: async () => ({ sleepDisabled, lid: false, hot: false, otherApp: null }),
+    sleepDisabled: async () => sleepDisabled,
+    setSleepDisabled: async (v) => ((sleepDisabled = v), true),
+    setSleepDisabledSync: (v) => ((sleepDisabled = v), true),
+    hold: () => {},
+    ruleInstalled: () => true,
+  }
+  const k = new AwakeKeeper(io, { now: () => world.now, battery: () => world.battery, working: () => false, send: hub.broadcast })
+  await k.read()
+  assert.deepEqual(k.setMode('backpack'), { ok: true })
+  await k.settle()
+  // Backpack's last ten minutes: +2 h offered, said once.
+  world.now = k.state().until! - EXTEND_WINDOW_MS + 60_000
+  k.review()
+  contract('ws-mac-backpack-ending', heard('mac_backpack_ending'))
+  contract('ws-awake', heard('awake', (m) => m.awake.extendable))
+  // The battery at its guard's level: two minutes' warning before the Mac is let go.
+  world.battery = { percent: 15, charging: false, onAC: false, minutesLeft: 28 }
+  k.review()
+  contract('ws-mac-sleep-soon', heard('mac_sleep_soon'))
+  k.setMode('off')
+  await k.settle()
 })
 
 test('every fixture is one this file checks (none left over from a message that went)', (t) => {
