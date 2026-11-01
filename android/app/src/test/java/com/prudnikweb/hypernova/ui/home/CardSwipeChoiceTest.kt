@@ -79,11 +79,13 @@ class CardSwipeChoiceTest {
         for (s in listOf(plain, doneJob, codexIdle, working)) assertEquals(CardSwipe.Rename, of(SwipeChoice.Rename, HomeGroup.Completed, s))
     }
 
-    @Test fun restartOnlyForAnOutdatedJob() {
+    @Test fun restartAsTheMenuOffersIt() {
         val old = OutdatedClaude("2.1.312", "2.1.314")
         assertEquals(CardSwipe.Restart, of(SwipeChoice.Restart, HomeGroup.Completed, session(job = "j1", running = true, outdated = old)))
         assertEquals(CardSwipe.Restart, of(SwipeChoice.Restart, HomeGroup.Working, session(SessionState.Working, Phase.Working, job = "j1", outdated = old)))
-        assertNull(of(SwipeChoice.Restart, HomeGroup.Completed, idleJob))
+        // A job whose process runs, on the installed Claude Code too; one with none has nothing to restart.
+        assertEquals(CardSwipe.Restart, of(SwipeChoice.Restart, HomeGroup.Completed, idleJob))
+        assertNull(of(SwipeChoice.Restart, HomeGroup.Completed, doneJob))
         assertNull(of(SwipeChoice.Restart, HomeGroup.Completed, session(outdated = old)))
     }
 

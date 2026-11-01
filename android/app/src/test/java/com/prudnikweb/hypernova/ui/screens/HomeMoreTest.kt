@@ -267,20 +267,75 @@ class HomeMoreTest {
         rule.onNodeWithText(str(R.string.delete)).assertDoesNotExist()
     }
 
-    @Test fun anOutdatedJobsMenuRestartsItAfterAsking() {
+    @Config(qualifiers = "+h1600dp")
+    @Test fun anOutdatedJobsMenuRestartsItAtOnceWhenItsAtRest() {
         val base = FakeHub(sessions = only(Samples.ALPHA).map { it.copy(agentOutdated = OutdatedClaude("2.1.312", "2.1.316")) })
         val hub = HomeHub(base)
         home(hub)
         longPress("Alpha release")
-        // The menu's (Home's notice for the outdated job says Restart too).
-        rule.onAllNodesWithText(str(R.string.session_restart)).onLast().performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.session_restart_q, "Alpha release")).assertExists()
-        assertTrue(base.calls.isEmpty())
-        // The dialog's button (Home's notice for the outdated job says Restart too).
-        rule.onAllNodes(hasText(str(R.string.session_restart)) and androidx.compose.ui.test.hasClickAction()).onLast().performClick()
+        rule.onNodeWithText(str(R.string.session_restart_line)).assertExists()
+        rule.onNodeWithText(str(R.string.session_restart_full)).performClick()
         rule.waitForIdle()
         assertEquals(listOf("respawnSession(${Samples.ALPHA})"), base.calls)
+        assertEquals(listOf(str(R.string.session_restarting, "Alpha release")), spy.toasts)
+    }
+
+    // ─── H5: Restart session ───
+
+    @Config(qualifiers = "+h1600dp")
+    @Test fun anIdleTerminalRestartsAtOnceWithAToast() {
+        val hub = midAs { it.copy(origin = "terminal", term = TermLink("t1", mac = 0, phone = 0)) }
+        home(hub)
+        longPress("Mid sprint notes")
+        rule.onNodeWithText(str(R.string.session_restart_full)).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("restartSession(${Samples.MID})"), hub.calls)
+        assertEquals(listOf(str(R.string.session_restarting, "Mid sprint notes")), spy.toasts)
+    }
+
+    @Config(qualifiers = "+h1600dp")
+    @Test fun aTerminalAtWorkAsksFirstSayingTheTurnStops() {
+        val hub = midAs { it.copy(origin = "terminal", term = TermLink("t1", mac = 0, phone = 0), state = com.prudnikweb.hypernova.data.SessionState.Working, phase = com.prudnikweb.hypernova.data.Phase.Working) }
+        home(hub)
+        longPress("Mid sprint notes")
+        rule.onNodeWithText(str(R.string.session_restart_full)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.session_restart_q, "Mid sprint notes")).assertExists()
+        rule.onNodeWithText(str(R.string.session_restart_body_work)).assertExists()
+        assertTrue("nothing asked yet", hub.calls.isEmpty())
+        rule.onNode(hasText(str(R.string.session_restart)) and androidx.compose.ui.test.hasClickAction()).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("restartSession(${Samples.MID})"), hub.calls)
+    }
+
+    @Config(qualifiers = "+h1600dp")
+    @Test fun aTerminalOpenOnTheServerAsksFirstSayingItCloses() {
+        val hub = midAs { it.copy(origin = "terminal", term = TermLink("t1", mac = 1, phone = 0)) }
+        home(hub)
+        longPress("Mid sprint notes")
+        rule.onNodeWithText(str(R.string.session_restart_full)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.session_restart_body_watched)).assertExists()
+        assertTrue(hub.calls.isEmpty())
+    }
+
+    @Config(qualifiers = "+h1600dp")
+    @Test fun aTerminalItDoesntHoldSaysWhyItCantRestart() {
+        val hub = midAs { it.copy(origin = "terminal", term = null) }
+        home(hub)
+        longPress("Mid sprint notes")
+        rule.onNodeWithText(str(R.string.session_restart_full)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.session_restart_cant_body)).assertExists()
+        rule.onNodeWithText(str(R.string.fl_ok)).performClick()
+        rule.waitForIdle()
+        assertTrue(hub.calls.isEmpty())
+    }
+
+    @Test fun aSessionWithNothingRunningHasNoRestart() {
+        home(midAs { it.copy(origin = "hypernova") })
+        longPress("Mid sprint notes")
+        rule.onNodeWithText(str(R.string.session_restart_full)).assertDoesNotExist()
     }
 
     // ─── H9: Restart all for jobs on an older Claude Code ───

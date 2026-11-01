@@ -3181,3 +3181,28 @@ with the paperclip. Nothing happened, with nothing said.
 3. **Nothing fails silently:** a file that can't be read, or isn't an image, says so and points at
    the paperclip. A web address with no text goes in as words; an image with words keeps both.
 4. Nothing else on the chat screen changes.
+
+## Restart session (2026-11-01)
+
+The owner: "restart or reload all MCPs of a session… hold down a session card to show the existing
+menu, and it says reload MCPs, or restart session if that's what's needed to reload all of them."
+A running Claude Code has no one command that reloads every MCP server: `/mcp reconnect all` only
+retries those that failed or need signing in, and `/reload-plugins` is about plugins. A restart
+reloads them all, so that's what it says.
+
+1. **Restart session in the card's menu,** with one line under it: "Reloads its MCP servers and
+   settings. The conversation carries on." The session sheet's Actions and the swipes have it too
+   (the same `MenuOffer`). Wherever something runs that Hypernova can restart, not only an outdated
+   job: a job whose process runs (`claude respawn`, as before) and a shared terminal (it closes, and
+   `claude --resume <id>` opens in a new one: the provider switch's own path).
+2. **The same session:** `--resume` keeps the id, so it stays one card and its transcript stays. It
+   comes back in the mode it had, on the model it was started on, at its effort; never in bypass
+   (the owner, 2026-10-30: no bypass for agents). A phone's open terminal view closes with the old
+   terminal.
+3. **Asks only if something would stop:** a turn at work, agents running, an approval waiting (a
+   running turn stops), or a terminal open on it on the server (it closes). At rest and unwatched it
+   goes at once with a toast. This replaces "Restart asks first" above for a job at rest too.
+4. **Not where it can't be done:** none for Codex, for an ended session, or where nothing runs (its
+   next prompt loads them). Idle in a terminal Hypernova doesn't hold, it's there and says why, as
+   Delete does.
+5. **An older server** answers 404: the phone says that server needs updating.

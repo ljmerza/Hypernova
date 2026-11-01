@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,8 +84,40 @@ enum class DeleteKind {
 }
 
 /**
+ * What the menu's Restart session does to a [Session] (DECISIONS, "Restart session", 2026-11-01): a
+ * new claude on the same conversation, so its MCP servers and settings load afresh. Where something
+ * runs that Hypernova can restart; nothing running needs none, its next prompt loads them.
+ */
+enum class RestartKind {
+    /** Nothing to restart: ended, no process, or a Codex session. */
+    None,
+    /** A `claude agents` job whose process runs: `claude respawn`. */
+    Job,
+    /** A shared terminal Hypernova holds: it closes and the conversation resumes in a new one. */
+    Terminal,
+    /** A terminal Hypernova doesn't hold: it can't restart that one, and the dialog says so. */
+    OpenElsewhere;
+
+    companion object {
+        fun of(s: Session): RestartKind = when {
+            s.codex || s.phase == Phase.Ended -> None
+            s.agentJob != null -> if (s.agentOutdated != null || s.state != SessionState.Idle || s.agentRunning == true) Job else None
+            s.term != null -> Terminal
+            s.origin == "terminal" -> OpenElsewhere
+            else -> None
+        }
+
+        /**
+         * Whether it asks first: a turn at work, agents running or an approval waiting would stop, and
+         * a terminal open on it on the server would close. At rest and unwatched it just goes.
+         */
+        fun asksFirst(s: Session): Boolean = s.state != SessionState.Idle || s.agentsRunning > 0 || (s.term?.mac ?: 0) > 0
+    }
+}
+
+/**
  * What a Home card's long-press menu offers for [Session] (docs/PROTOCOL.md, "Session menu"): Rename
- * for any session; Delete as [DeleteKind] says; Stop for a `claude agents` job ([Session.agentJob]) or
+ * for any session; Delete as [DeleteKind] says, Restart session as [RestartKind] does; Stop for a `claude agents` job ([Session.agentJob]) or
  * a Codex session (its turn's interrupt; 2026-10-31). Stop while it works or waits on the owner,
  * or, for a job, idles with its process still running ([Session.agentRunning]; owner, 2026-10-30:
  * idle jobs couldn't be stopped). Not for one stopped or done already, nor, from an older Mac that
@@ -96,7 +130,7 @@ data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean
         fun of(s: Session): MenuOffer {
             val job = s.agentJob != null
             val live = s.phase != Phase.Ended && (s.state != SessionState.Idle || s.agentRunning == true)
-            return MenuOffer(rename = true, stop = (job || s.codex) && live, delete = DeleteKind.of(s) != DeleteKind.None, restart = job && s.agentOutdated != null)
+            return MenuOffer(rename = true, stop = (job || s.codex) && live, delete = DeleteKind.of(s) != DeleteKind.None, restart = RestartKind.of(s) != RestartKind.None)
         }
     }
 }
@@ -160,25 +194,42 @@ private fun deleteBody(kind: DeleteKind): Int = when (kind) {
 }
 
 /**
- * Restart a `claude agents` job on the installed Claude Code (`claude respawn`), asked first: a job
- * at work is interrupted, and the dialog says so. The Mac's words come back when it can't.
+ * Restart session ([RestartKind]): `claude respawn` for a job, a new shared terminal otherwise. It
+ * asks first where something would stop ([RestartKind.asksFirst]), else goes at once with a toast; what
+ * it can't restart says why. The Mac's words come back when it can't.
  */
 @Composable
 private fun RestartConfirm(hub: Hub, s: Session, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
-    ConfirmDialog(
-        visible = true,
-        title = stringResource(R.string.session_restart_q, s.name),
-        body = stringResource(R.string.session_restart_body),
-        confirm = stringResource(R.string.session_restart),
-        onConfirm = {
-            onDismiss()
-            appScope.launch { hub.respawnSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_restart_session)) } }
-        },
-        onDismiss = onDismiss,
-    )
+    val kind = RestartKind.of(s)
+    val go = {
+        onDismiss()
+        appScope.launch {
+            (if (kind == RestartKind.Job) hub.respawnSession(s.id) else hub.restartSession(s.id))
+                .onSuccess { toast(context.getString(R.string.session_restarting, s.name)) }
+                .onFailure { toast(it.message ?: context.getString(R.string.err_restart_session)) }
+        }
+        Unit
+    }
+    when {
+        kind == RestartKind.OpenElsewhere -> GlassDialog(
+            onDismiss = onDismiss,
+            title = stringResource(R.string.session_restart_cant_q, s.name),
+            line = stringResource(R.string.session_restart_cant_body),
+            primary = DialogButton(stringResource(R.string.fl_ok), onDismiss, PillKind.Primary),
+        )
+        RestartKind.asksFirst(s) -> ConfirmDialog(
+            visible = true,
+            title = stringResource(R.string.session_restart_q, s.name),
+            body = stringResource(if (s.state != SessionState.Idle || s.agentsRunning > 0) R.string.session_restart_body_work else R.string.session_restart_body_watched),
+            confirm = stringResource(R.string.session_restart),
+            onConfirm = go,
+            onDismiss = onDismiss,
+        )
+        else -> LaunchedEffect(s.id) { go() }
+    }
 }
 
 /** Home's notice about jobs on an older Claude Code: its key in the list and for its dismissal. */
@@ -234,8 +285,13 @@ internal fun MenuActions(hub: Hub, s: Session, onPage: (MenuPage) -> Unit, onDis
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val offer = MenuOffer.of(s)
-    // First when offered: the job runs an old Claude Code, and the sheet's notice above says so.
-    if (offer.restart) SheetAction(ChatGlyph.Restart, stringResource(R.string.session_restart), { onPage(MenuPage.Restart) })
+    val restart: @Composable () -> Unit = {
+        SheetAction(ChatGlyph.Restart, stringResource(R.string.session_restart_full), { onPage(MenuPage.Restart) })
+        // Under its words: the row's own padding and icon, then its gap.
+        HText(stringResource(R.string.session_restart_line), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 38.dp, end = 6.dp, bottom = 6.dp))
+    }
+    // First on a job that runs an old Claude Code, as the sheet's notice above says so.
+    if (offer.restart && s.agentOutdated != null) restart()
     if (offer.rename) SheetAction(ChatGlyph.Edit, stringResource(R.string.session_rename), { onPage(MenuPage.Rename) })
     if (offer.stop) {
         SheetAction(ChatGlyph.Stop, stringResource(R.string.session_stop), {
@@ -243,6 +299,7 @@ internal fun MenuActions(hub: Hub, s: Session, onPage: (MenuPage) -> Unit, onDis
             appScope.launch { hub.stopSession(s.id).onFailure { toast(it.message ?: context.getString(R.string.err_stop_session)) } }
         })
     }
+    if (offer.restart && s.agentOutdated == null) restart()
     if (offer.delete) SheetAction(ChatGlyph.Remove, stringResource(R.string.delete), { onPage(MenuPage.Delete) }, color = HN.danger)
 }
 

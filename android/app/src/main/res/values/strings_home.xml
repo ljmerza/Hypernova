@@ -75,7 +75,14 @@
     <!-- A claude agents job on an older Claude Code than the one installed (docs/PROTOCOL.md, Session.agentOutdated): `claude respawn`. -->
     <string name="session_restart">Restart</string>
     <string name="session_restart_q">Restart “%1$s”?</string>
-    <string name="session_restart_body">Claude Code restarts the background session on the version installed now. If it\'s working, what it\'s doing is interrupted.</string>
+    <string name="session_restart_full">Restart session</string>
+    <string name="session_restart_line">Reloads its MCP servers and settings. The conversation carries on.</string>
+    <string name="session_restart_body_work">A running turn stops, and anything waiting for an answer goes with it. The conversation carries on, and its MCP servers and settings load afresh.</string>
+    <string name="session_restart_body_watched">A terminal open on it on the server closes, and hn attach opens the new one. The conversation carries on, and its MCP servers and settings load afresh.</string>
+    <string name="session_restart_cant_q">Can\'t restart “%1$s” here</string>
+    <string name="session_restart_cant_body">It\'s open in a terminal on the server that Hypernova doesn\'t hold, so it can\'t restart it from here. Restart it there.</string>
+    <string name="session_restarting">Restarting “%1$s”.</string>
+    <string name="err_restart_older">This server runs an older Hypernova, which can\'t restart this session. Update it, then try again.</string>
     <!-- The session sheet's Session tab, above Restart: the version the job runs, then the installed one. -->
     <string name="session_outdated">Runs Claude Code %1$s; %2$s is installed.</string>
     <string name="err_restart_session">Couldn\'t restart the session. Try again.</string>

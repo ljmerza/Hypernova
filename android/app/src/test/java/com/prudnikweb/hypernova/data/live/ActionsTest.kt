@@ -320,6 +320,27 @@ class ActionsTest {
         assertTrue(rig.hub.sessions.any { it.id == "s1" })
     }
 
+    @Test fun restartPostsAndTakesTheSessionBack() {
+        connect(session("s1"))
+        daemon.ok("POST", "/v1/sessions/s1/restart", JSONObject().put("session", session("s1", state = "starting")))
+        assertTrue(rig.call { rig.hub.restartSession("s1") }.isSuccess)
+        assertEquals(1, daemon.count("POST", "/v1/sessions/s1/restart"))
+        assertEquals(1, rig.hub.sessions.count { it.id == "s1" })
+        rig.until("it's starting") { rig.hub.session("s1")?.phase == com.prudnikweb.hypernova.data.Phase.Starting }
+    }
+
+    @Test fun restartOnAnOlderServerSaysItNeedsUpdating() {
+        connect(session("s1"))
+        daemon.on("POST", "/v1/sessions/s1/restart") { json(404, JSONObject().put("error", JSONObject().put("code", "not_found").put("message", "Not found"))) }
+        assertEquals(rig.context.getString(com.prudnikweb.hypernova.R.string.err_restart_older), rig.call { rig.hub.restartSession("s1") }.exceptionOrNull()?.message)
+    }
+
+    @Test fun restartOfASessionGoneSaysSoNotUpdate() {
+        connect(session("s1"))
+        daemon.on("POST", "/v1/sessions/s1/restart") { json(404, JSONObject().put("error", JSONObject().put("code", "no_session").put("message", "That session no longer exists."))) }
+        assertEquals("That session no longer exists.", rig.call { rig.hub.restartSession("s1") }.exceptionOrNull()?.message)
+    }
+
     @Test fun respawnOutdatedJobsUsesTheSlowRoute() {
         connect(session("s1"), session("s2"))
         daemon.ok("POST", "/v1/jobs/respawn", JSONObject().put("results", JSONArray()))

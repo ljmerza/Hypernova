@@ -1169,6 +1169,16 @@ Agents & providers → Claude Code); the daemon takes it without a restart (each
   (Claude Code updates itself; a job keeps its binary until then). Interrupts a job at work. The
   phone offers it (Restart, asked first) only with `session.agentOutdated`. `{session}`, without
   `agentOutdated` (the next registry read has the new process).
+- `POST /v1/sessions/{id}/restart` (2026-11-01): Restart session, so its MCP servers and settings load
+  afresh. A shared terminal (`termOf`) closes and the same conversation opens in a new one with
+  `claude --resume <id>`: the same id, one card, the transcript untouched, its mode (never bypass),
+  the model it was started on and its effort kept. Its held prompts wait; an approval it held goes
+  with the old claude. `{session}` (`starting`, until the registry has the new process). A job: as
+  `respawn`, which the phone keeps using, so an older server restarts jobs too. 409 `terminal_open`
+  for a terminal Hypernova doesn't hold, `not_open` when nothing runs (its next prompt loads them),
+  `busy` while one is under way, `terminal_busy` when the terminal didn't close (nothing changes),
+  `not_agents` for Codex. It doesn't refuse a session at work: the phone asks first. An older daemon
+  answers 404.
 - All three: the `claude attach` holder ends first; 409 `not_agents` for `stop` and `respawn` on a session with no `agentJob`; 409 `agents_refused` with Claude Code's
   own words when it refuses (`rm` keeps a worktree with unpushed work).
 - `POST /v1/jobs/respawn` `{ids?: string[]}` → `{results: [{id, job, ok, said}]}`: Restart all, one

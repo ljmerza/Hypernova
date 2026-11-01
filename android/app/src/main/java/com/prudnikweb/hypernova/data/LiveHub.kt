@@ -2262,6 +2262,16 @@ class LiveHub(
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_restart_session)) }
 
+    // The old terminal closes first, up to six seconds, so the slow client.
+    override suspend fun restartSession(sessionId: String): Result<Unit> = try {
+        applySession(api.postSlow("/v1/sessions/$sessionId/restart", JSONObject()))
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+        // An older server doesn't know the route: it's the server that needs updating, not the phone trying again.
+        val ex = Net.classify(e)
+        Result.failure(if (ex.status == 404 && ex.code != "no_session") HubException(res.getString(R.string.err_restart_older)) else handle(e, R.string.err_restart_session))
+    }
+
     // One after another on the Mac, each up to half a minute: the slow client's two minutes. The
     // sessions' new state comes over the socket.
     override suspend fun respawnOutdated(sessionIds: List<String>): Result<List<JobRestart>> = try {

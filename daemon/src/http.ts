@@ -13,7 +13,7 @@ import { speechFeed, speechRoute, speechState } from './readaloud.ts'
 import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider, isClaudeEffort } from './store.ts'
 import { lanDevice, lanInfo, lanOrigin, pairAllowed, pairFailed, pairingAddresses, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
-import { addClient, agentJobOf, answerApproval, deleteSessionForGood, broadcast, clearRestarting, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
+import { addClient, agentJobOf, answerApproval, deleteSessionForGood, broadcast, clearRestarting, resolveSession, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort, setMode } from './runner.ts'
 import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
 import { agentJobCommand, setClaudeAgents } from './claude-agents.ts'
@@ -834,7 +834,7 @@ async function api(c: Ctx): Promise<void> {
   // `claude agents` job, stop it or delete it there, or restart it on the installed Claude Code
   // (`claude respawn`, for a job on an older one: session.agentOutdated). A Codex session: rename,
   // stop and delete over Codex's app-server (codex/sessions.ts).
-  const menu = /^\/v1\/sessions\/([\w-]+)(?:\/(rename|stop|respawn))?$/.exec(path)
+  const menu = /^\/v1\/sessions\/([\w-]+)(?:\/(rename|stop|respawn|restart))?$/.exec(path)
   if (menu && ((menu[2] && m === 'POST') || (!menu[2] && m === 'DELETE'))) {
     const [, id, action] = menu
     const rec = getSession(id!)
@@ -858,7 +858,7 @@ async function api(c: Ctx): Promise<void> {
     }
     // Codex: Stop is its turn's interrupt; Delete is Codex's own thread/delete, its shared terminal
     // (the `codex` TUI on that thread) ended first. Restart is claude agents' only.
-    if (isCodex(id!) && action !== 'respawn') {
+    if (isCodex(id!) && action !== 'respawn' && action !== 'restart') {
       if (action === 'stop') {
         await interruptCodex(id!)
         return json(res, 200, { session: listSessions().find((x) => x.id === id) })
@@ -882,16 +882,35 @@ async function api(c: Ctx): Promise<void> {
       deleteSessionForGood(id!, pid)
       return json(res, 200, { ok: true })
     }
+    // Restart Session (a shared terminal; a job below): the same conversation in a new claude, so its
+    // MCP servers and settings load afresh. Nothing can restart a terminal it doesn't hold, and a
+    // session with nothing running loads them with its next prompt anyway.
+    if (action === 'restart' && !job) {
+      if (isCodex(id!)) throw new HttpError(409, 'not_agents', 'A Codex session can’t be restarted here.')
+      if (isRestarting(id!)) throw new HttpError(409, 'busy', 'This session is restarting right now. Try again in a moment.')
+      const tid = termOf(id!)
+      if (!tid) {
+        if (isLiveTerminal(id!)) throw new HttpError(409, 'terminal_open', 'It’s open in a terminal Hypernova doesn’t hold. Restart it there.')
+        throw new HttpError(409, 'not_open', 'Nothing is running for this session: it loads its MCP servers with its next prompt.')
+      }
+      // What it was asked goes with the old claude; what the turn had done is in its transcript.
+      resolveSession(id!)
+      const mode = RESTART_MODES.has(rec.permissionMode) ? rec.permissionMode : undefined
+      const model = resumeModels.get(id!) ?? getManaged(id!)?.model ?? undefined
+      await restartInTerminal(rec, tid, () => createSharedSession({ cwd: rec.cwd, resume: id!, ...(mode ? { permissionMode: mode } : {}), ...(model ? { model } : {}) }))
+      resumeModels.delete(id!)
+      return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+    }
     if (!job) throw new HttpError(409, 'not_agents', 'Only a session in claude agents can be stopped or restarted here.')
     // Its holder (`claude attach`) goes first: it only watched, and would hold the job open.
     const pid = rec.pid
     const tid = termOf(id!)
     if (tid) await endTermAndWait(tid)
-    const r = await agentJobCommand(action === 'stop' ? 'stop' : action === 'respawn' ? 'respawn' : 'rm', job)
+    const r = await agentJobCommand(action === 'stop' ? 'stop' : action === 'respawn' || action === 'restart' ? 'respawn' : 'rm', job)
     if (!r.ok) throw new HttpError(409, 'agents_refused', r.said || 'claude agents didn’t do it.')
     // Restarted on the installed Claude Code: the next registry read has its new process.
-    if (action === 'respawn') upsertSession(id!, { agentOutdated: undefined })
-    if (action === 'stop' || action === 'respawn') return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+    if (action === 'respawn' || action === 'restart') upsertSession(id!, { agentOutdated: undefined })
+    if (action) return json(res, 200, { session: listSessions().find((x) => x.id === id) })
     // `claude rm` leaves the transcript: without this it's back in History after the next restart.
     deleteSessionForGood(id!, pid)
     return json(res, 200, { ok: true })
@@ -1674,6 +1693,43 @@ tapBroadcast((msg: any) => {
 /** After a restart onto another provider, how long the old claude's end is still expected (its hook, its registry entry). */
 const RESTART_GRACE_MS = 15_000
 
+/** The modes a restarted terminal is given back; never bypass (owner, 2026-10-30: no bypass for agents). */
+const RESTART_MODES = new Set(['default', 'manual', 'acceptEdits', 'auto', 'plan', 'dontAsk'])
+
+/**
+ * Session [rec]'s shared terminal [tid] closes and [start] opens the conversation in a new one (the
+ * same id: `--resume` keeps it unless told to fork). Its id once started.
+ */
+async function restartInTerminal(rec: NonNullable<ReturnType<typeof getSession>>, tid: string, start: () => string): Promise<string> {
+  const id = rec.id
+  // Its claude process is about to go on purpose: while the terminal closes, its exit, its
+  // SessionEnd hook (it gets SIGHUP) and its registry entry mustn't read as the session ending.
+  // A terminal that stays open is the session's again, found by the next poll.
+  const old = rec.pid ?? termChildPid(tid)
+  // A minute: longer than closing the terminal can take (6 s at most).
+  markRestarting(id, old, 60_000)
+  upsertSession(id, { pid: null })
+  if (!(await endTermAndWait(tid))) {
+    clearRestarting(id)
+    throw new HttpError(409, 'terminal_busy', 'The session’s terminal didn’t close. Try again in a moment.')
+  }
+  // Agents and workflows the old process ran in the background went with it.
+  endSessionAgents(id)
+  let started: string
+  try {
+    started = start()
+  } catch (e) {
+    // The old claude is gone and no new one came: the session has ended (it resumes from the
+    // phone like any other), and nothing it says on its way out is passed over any more.
+    clearRestarting(id)
+    upsertSession(id, { state: 'ended', activity: null })
+    throw e
+  }
+  // The old process's last word (its SessionEnd hook) may still be on its way.
+  markRestarting(id, old, RESTART_GRACE_MS)
+  return started
+}
+
 /**
  * Continue session [rec]'s conversation on another provider (docs/PROTOCOL.md, "Account"). An SDK
  * session takes it with its next prompt. A phone-started shared terminal (idle) restarts on the
@@ -1688,34 +1744,7 @@ async function switchProvider(rec: NonNullable<ReturnType<typeof getSession>>, p
     upsertSession(id, { providerId, model: null, blocked: null })
     return { id, forked: false }
   }
-  if (tid && heldHere(rec)) {
-    // Its claude process is about to go on purpose: while the terminal closes, its exit, its
-    // SessionEnd hook (it gets SIGHUP) and its registry entry mustn't read as the session ending.
-    // A terminal that stays open is the session's again, found by the next poll.
-    const old = rec.pid ?? termChildPid(tid)
-    // A minute: longer than closing the terminal can take (6 s at most).
-    markRestarting(id, old, 60_000)
-    upsertSession(id, { pid: null })
-    if (!(await endTermAndWait(tid))) {
-      clearRestarting(id)
-      throw new HttpError(409, 'terminal_busy', 'The session’s terminal didn’t close. Try again in a moment.')
-    }
-    // Agents and workflows the old process ran in the background went with it.
-    endSessionAgents(id)
-    let started: string
-    try {
-      started = createSharedSession({ cwd: rec.cwd, resume: id, providerId })
-    } catch (e) {
-      // The old claude is gone and no new one came: the session has ended (it resumes from the
-      // phone like any other), and nothing it says on its way out is passed over any more.
-      clearRestarting(id)
-      upsertSession(id, { state: 'ended', activity: null })
-      throw e
-    }
-    // The old process's last word (its SessionEnd hook) may still be on its way.
-    markRestarting(id, old, RESTART_GRACE_MS)
-    return { id: started, forked: false }
-  }
+  if (tid && heldHere(rec)) return { id: await restartInTerminal(rec, tid, () => createSharedSession({ cwd: rec.cwd, resume: id, providerId })), forked: false }
   if (tid || isLiveTerminal(id)) {
     const newId = (await shared()) ? createSharedSession({ cwd: rec.cwd, forkFrom: id, providerId, title: rec.title }) : prepareFork(id, rec.cwd, providerId, rec.title)
     return { id: newId, forked: true }

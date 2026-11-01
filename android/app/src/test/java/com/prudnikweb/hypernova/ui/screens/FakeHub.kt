@@ -136,6 +136,11 @@ class FakeHub(
         return Result.success(Unit)
     }
 
+    override suspend fun restartSession(sessionId: String): Result<Unit> {
+        record("restartSession", sessionId)
+        return Result.success(Unit)
+    }
+
     override suspend fun deleteSession(sessionId: String): Result<Unit> {
         record("deleteSession", sessionId)
         return Result.success(Unit)

@@ -1377,3 +1377,105 @@ test('Delete: a job goes with claude rm, and its transcript, which claude rm lea
   hub.discover()
   assert.equal(hub.getSession('delete-job-1'), undefined)
 })
+
+// ── Restart session (docs/PROTOCOL.md, "Session menu") ───────────────────────
+
+/** The arguments the holder of session [id] started claude with, once it has them. */
+async function restartHolderArgs(id: string, not?: string): Promise<{ term: string; args: string[] }> {
+  const dir = join(process.env.HYPERNOVA_SUPPORT!, 'terms')
+  const t0 = Date.now()
+  while (Date.now() - t0 < 5000) {
+    for (const f of existsSync(dir) ? readdirSync(dir) : []) {
+      if (!f.endsWith('.json') || f === `${not}.json`) continue
+      try {
+        const meta = JSON.parse(readFileSync(join(dir, f), 'utf8'))
+        if (meta.sessionId === id) return { term: f.slice(0, -'.json'.length), args: meta.args }
+      } catch {}
+    }
+    await new Promise((ok) => setTimeout(ok, 50))
+  }
+  throw new Error('no holder for ' + id)
+}
+
+test('Restart: a shared terminal closes and the same conversation resumes in a new one, same id, one session', async () => {
+  const id = createSharedSession({ cwd: scratch, prompt: 'Quick one', permissionMode: 'plan', model: 'sonnet', effort: 'low' })
+  const first = await restartHolderArgs(id)
+  const t0 = Date.now()
+  while (!termOf(id) && Date.now() - t0 < 5000) {
+    scanTerms()
+    await new Promise((ok) => setTimeout(ok, 50))
+  }
+  assert.equal(termOf(id), first.term)
+  // Claude Code has written the conversation down: --resume, not a new one.
+  const transcriptFile = join(process.env.CLAUDE_CONFIG_DIR!, 'projects', 'restart-tests', `${id}.jsonl`)
+  mkdirSync(join(process.env.CLAUDE_CONFIG_DIR!, 'projects', 'restart-tests'), { recursive: true })
+  writeFileSync(transcriptFile, JSON.stringify({ type: 'user', cwd: scratch, sessionId: id, timestamp: new Date().toISOString(), message: { role: 'user', content: 'Quick one' } }) + '\n')
+  hub.upsertSession(id, { state: 'idle', transcriptPath: transcriptFile, permissionMode: 'plan' })
+  const before = hub.listSessions().length
+  const removed: string[] = []
+  hub.addClient({ send: (s) => { const m = JSON.parse(s); if (m.t === 'session.removed') removed.push(m.id) } })
+  const r = await post(`/v1/sessions/${id}/restart`, {})
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.id, id, 'the same id')
+  assert.equal(r.json.session.state, 'starting')
+  assert.equal(hub.listSessions().length, before, 'one card')
+  assert.deepEqual(removed, [])
+  assert.equal(termAlive(first.term, null), false, 'the old terminal closed')
+  assert.ok(existsSync(transcriptFile), 'the conversation stays')
+  const second = await restartHolderArgs(id, first.term)
+  assert.notEqual(second.term, first.term)
+  const a = second.args
+  assert.equal(a[a.indexOf('--resume') + 1], id)
+  assert.ok(!a.includes('--fork-session'))
+  // It runs as it did: mode, model and effort.
+  assert.equal(a[a.indexOf('--permission-mode') + 1], 'plan')
+  assert.equal(a[a.indexOf('--model') + 1], 'sonnet')
+  assert.equal(a[a.indexOf('--effort') + 1], 'low')
+  // The old claude's last word isn't the session ending.
+  assert.equal(hub.isRestarting(id), true)
+  // One at a time: a second would close the terminal this one just opened.
+  const again = await post(`/v1/sessions/${id}/restart`, {})
+  assert.equal(again.status, 409)
+  assert.equal(again.json.error.code, 'busy')
+  hub.clearRestarting(id)
+})
+
+test('Restart: at work it still goes (the phone asked), never a bypass; a job is claude respawn; what can’t says why', async () => {
+  const id = createSharedSession({ cwd: scratch, prompt: 'Quick one' })
+  const first = await restartHolderArgs(id)
+  const t0 = Date.now()
+  while (!termOf(id) && Date.now() - t0 < 5000) {
+    scanTerms()
+    await new Promise((ok) => setTimeout(ok, 50))
+  }
+  hub.upsertSession(id, { state: 'working', permissionMode: 'bypassPermissions' })
+  const r = await post(`/v1/sessions/${id}/restart`, {})
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  const second = await restartHolderArgs(id, first.term)
+  assert.ok(!second.args.includes('bypassPermissions'), JSON.stringify(second.args))
+  hub.clearRestarting(id)
+  // A job: the same route as respawn.
+  settings.claudeAgents = true
+  job('restart-job-1', 'rest0001', 'idle', { version: '2.1.312' })
+  hub.pollRegistry()
+  const from = verbsSince(0).length
+  const j = await post('/v1/sessions/restart-job-1/restart', {})
+  assert.equal(j.status, 200, JSON.stringify(j.json))
+  assert.deepEqual(verbsSince(from), ['respawn rest0001'])
+  // A terminal it doesn't hold.
+  const p = spawn('sleep', ['30'], { stdio: 'ignore' })
+  procs.push(p)
+  const entry = join(registry, `${p.pid}.json`)
+  writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: 'restart-open-1', cwd: scratch, kind: 'interactive', status: 'idle', startedAt: Date.now(), updatedAt: Date.now() }))
+  hub.pollRegistry()
+  const open = await post('/v1/sessions/restart-open-1/restart', {})
+  assert.equal(open.status, 409)
+  assert.equal(open.json.error.code, 'terminal_open')
+  assert.ok(hub.getSession('restart-open-1'), 'nothing forgotten')
+  rmSync(entry)
+  // Nothing running.
+  hub.upsertSession('restart-ended-1', { cwd: scratch, origin: 'terminal', state: 'ended' })
+  const ended = await post('/v1/sessions/restart-ended-1/restart', {})
+  assert.equal(ended.status, 409)
+  assert.equal(ended.json.error.code, 'not_open')
+})

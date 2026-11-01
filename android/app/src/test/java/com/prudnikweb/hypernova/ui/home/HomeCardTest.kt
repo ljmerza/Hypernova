@@ -45,11 +45,11 @@ class HomeCardTest {
     }
 
     @Test fun theMenuOffersWhatTheMacCanDo() {
-        // A claude agents job at work: all three.
-        assertEquals(MenuOffer(rename = true, stop = true, delete = true), MenuOffer.of(session(SessionState.Working, Phase.Working, "j1")))
+        // A claude agents job at work: all of them.
+        assertEquals(MenuOffer(rename = true, stop = true, delete = true, restart = true), MenuOffer.of(session(SessionState.Working, Phase.Working, "j1")))
         assertTrue(MenuOffer.of(session(SessionState.NeedsYou, Phase.NeedsYou, "j1")).stop)
         // Idle with its process still running: Stop too (owner, 2026-10-30), and the rest.
-        assertEquals(MenuOffer(rename = true, stop = true, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Idle, "j1", running = true)))
+        assertEquals(MenuOffer(rename = true, stop = true, delete = true, restart = true), MenuOffer.of(session(SessionState.Idle, Phase.Idle, "j1", running = true)))
         // Done or stopped already (no process): nothing to stop, still deleted from here.
         assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Idle, "j1", running = false)))
         // An older Mac doesn't say: idle offers no Stop, as before.

@@ -212,6 +212,8 @@ interface Hub {
     suspend fun deleteSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
     /** `claude respawn` for a job on an older Claude Code ([Session.agentOutdated]): restarted on the installed one. */
     suspend fun respawnSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /** Restart session for a shared terminal: it closes and the conversation resumes in a new one, same id. */
+    suspend fun restartSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
     /** `claude respawn` for each of [sessionIds] still on an older Claude Code, one after another: what each one did. */
     suspend fun respawnOutdated(sessionIds: List<String>): Result<List<JobRestart>> = Result.failure(UnsupportedOperationException())
 
