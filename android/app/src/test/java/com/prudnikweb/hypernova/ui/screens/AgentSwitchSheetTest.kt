@@ -106,7 +106,7 @@ class AgentSwitchSheetTest {
         assertEquals("interrupt(${Samples.PARSER})", hub.calls.last())
         assertTrue("not before it has stopped", hub.calls.none { it.startsWith("switchAgent") })
         // It rests (the live link says so): the switch goes.
-        hub.base.sessionList = hub.base.sessionList.map { if (it.id == Samples.PARSER) it.copy(state = SessionState.Idle, turnStartedAt = 0L) else it }
+        hub.base.sessionList = hub.base.sessionList.map { if (it.id == Samples.PARSER) it.copy(state = SessionState.Idle, phase = com.prudnikweb.hypernova.data.Phase.of(SessionState.Idle), turnStartedAt = 0L) else it }
         rule.waitForIdle()
         rule.waitUntil(3_000) { switched.isNotEmpty() }
         assertTrue(hub.calls.last().startsWith("switchAgent(${Samples.PARSER}, codex"))
