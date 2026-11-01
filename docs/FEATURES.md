@@ -67,7 +67,7 @@ Test names, shortened:
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| H1 | Three groups and their sorts (A to Z; Completed newest first) | HomeGroupsTest (all); HomeScreenTest.groupsInOrderEachSorted | **covered** |
+| H1 | Three groups and their order (A to Z in each by default since H14; Completed was newest first) | HomeGroupsTest (all); HomeScreenTest.groupsInOrderEachSorted | **covered** |
 | H2 | A Working card says what it does now and "for 12 min" | CardNowTest (all); HomeScreenTest.workingCardSaysItsTodoAndForHowLong; chat.test.ts › "the list in short for Home…"; turn-clock.test.ts (all) | **covered** |
 | H3 | A Needs-you card: Allow and Deny, a terminal dialog denied through the menu, no blind Allow | HomeCardTest.aWholeCommandCanBeAllowedOnTheCard, noBlindAllow, questionsAndPlansOpenTheSession; HomeScreenTest.needsYouCardAllowAnswersItsApproval, needsYouCardDenyAnswersItsApproval, anAnswerThatDidNotGetThroughBringsThePillsBack, terminalDialogCardDeniesThroughTheMenu; TerminalAskTest.homeCardAllowsAndDeniesIt | **covered** |
 | H4 | Unread dot and "finished … ago" on Completed cards | UnreadTest (all); HomeScreenTest.unreadCompletedCardHasTheDot; HomeMoreTest.completedCardsAreUnreadTillOpenedAndAReplyAfterBringsTheDotBack (Home reads the read marks; opening the chat clears the dot, a later reply brings it back, a reply while it's on screen doesn't), aHubWithoutAServerKeepsNoMarksAndShowsNoDots | **covered** |
@@ -80,6 +80,7 @@ Test names, shortened:
 | H11 | Usage cards (Claude, Codex, one per computer) | UsageCardsTest (all); AllUsageTest (all); UsageProjectionTest (all); UsageRateTest (all); FiveHourReportedTest (all); ModelWeeksTest (all); HomeMoreTest.whereOnlyCodexIsInUseHomesUsageCardIsCodexs, eachModelsOwnWeekHasItsMeter; the `home_groups` baseline | **covered** |
 | H12 | The sky: the sun as usage, planets as projects, Codex's star, companions | SkyPlanTest, SkyLayoutTest, SkyPhysicsTest, SkySplitTest, AgentLeadTest, PaceTest, CountdownTest (all) | **partial**: placement and physics are tested; the Canvas drawing is in no baseline: it moves by its own clock and physics, so a picture needs a frozen-frame seam in Cosmos first |
 | H13 | Home filters: the button and sheet (Active, states, agent, project, server), the chip with its hidden needs-you count, Clear, the empty result, kept on the phone, search within it, the top bar at a large font | HomeFilterTest (all); HomeFilterScreenTest (all) | **partial**: the Agent row (both agents in use) isn't drawn in a screen test; the sky's project filter with Home's together is only reasoned, not tested |
+| H14 | Home sort: the button and sheet (Name by default, Recent, Project, Server in All servers), within the groups, across every computer's cards, in search results, kept on the phone, the lit button; the top bar at both fonts | HomeSortTest (all); HomeGroupsTest.completedByNameByDefault, completedNewestFirstByRecent; AllHomeTest.byServerGroupsEachComputersCardsTogetherThenByName; HomeSortScreenTest (all); HomeFilterScreenTest.theTopBarFitsAtTheUsualFont, theTopBarFitsAtTheUsualFontWithAllServers, theTopBarFitsAtALargeFontWithAllServers, aWiderPhoneKeepsTheWordsWithAllServers, aWiderPhoneSaysNewWithOneServer | **covered** |
 
 ## 4. Session chat
 

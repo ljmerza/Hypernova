@@ -2721,5 +2721,39 @@ choice: a filter button in Home's top bar and a small sheet (`ui/home/HomeFilter
 8. **The top bar still fits:** the round buttons are 40dp wide (48dp tall; a touch still reaches
    48dp), so New session keeps its words on a 392dp phone at the usual font. Short of room (a
    large font, a narrower phone) New session keeps only its plus, so the chip's name ("All",
-   "z2") is never squeezed out.
+   "z2") is never squeezed out. (Since the sort button, below, it says "New" first.)
 9. **Unchanged:** the widget, notifications, the session chat screen, History; no daemon change.
+
+## Sorting Home's sessions (2026-11-01)
+
+The owner: "also have another icon for sorting with the default the sort by session name"
+(`ui/home/HomeSort.kt`, `HomeSortSheet.kt`).
+
+1. **A sort button beside the filter**, Sessions tab only, the same round glass button: an arrow
+   down beside an arrow up. Lit mint with a dot while the sort isn't by name, TalkBack saying which
+   ("Sort sessions, Recent activity, newest first").
+2. **Its sheet** is the switcher's glass and rows, one per sort with the one in use ticked; a tap
+   sorts and closes. A glass sheet rather than a small dropdown: the app has no popup menu, and the
+   sheet reads and works as the switcher and the filter do. Under the rows: "Within each group:
+   Needs input, Working, Completed."
+3. **The sorts:** **Name, A to Z** (the default, the owner's words); **Recent activity, newest
+   first** (the time a card says); **Project, A to Z, then name**; **Server, then name** (All
+   servers only; kept but not applied with one server, as the filter's server is). Every one ends
+   with the name, then the id (then the server's name), so equal keys never swap. No other sort
+   was added: none was clearly useful.
+4. **Within Home's groups:** Needs input, Working and Completed keep their order; the sort orders
+   each. With All servers, across every computer's cards together; while searching, the matches.
+5. **This changes Completed's order:** it sorted newest first (owner, 2026-10-30; "Home cards"
+   and "Searching Home's sessions" above); by default it is now A to Z like the other groups.
+   Recent gives newest first back, in every group (cards then move as they work, which Name
+   avoids: the owner's "keep swapping back and forth").
+6. **Kept on the phone** (SharedPreferences, `hypernova_ui`, `home_sort`), not per server.
+7. **Said by the lit button only**, not on the filter chip: the chip says what's shown and its
+   cross clears the filter, and a sort there would ask whether the cross resets it too.
+8. **The top bar with four round buttons:** on the tests' 392dp phone at the usual font there is
+   no room for "New session" beside the filter, the sort and the lens, so New session steps down
+   to "+ New" (TalkBack: "New session"), and to its plus alone when even that doesn't fit; the
+   chip's name ("z2", "All") is never squeezed. At 420dp (the emulator DEV-SETUP sizes as the
+   Nothing Phone 3) All servers keeps "New session" whole and one server says "New". If the owner
+   wants the words back everywhere: move Sort into the filter sheet (one button fewer).
+9. **Unchanged:** the widget, notifications, History, the chat screen; no daemon change.
