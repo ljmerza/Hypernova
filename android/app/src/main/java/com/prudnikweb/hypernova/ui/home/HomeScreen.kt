@@ -648,8 +648,8 @@ fun HomeScreen(
                     Spacer(Modifier.width(8.dp))
                 }
                 // The switcher (owner, 2026-10-30): Settings is the bottom tab's alone now.
-                // "All" on the Sessions and History tabs with "All servers"; the other tabs' chip names the one they show.
-                LinkChip(hub, servers, all = everywhere?.takeIf { tab == Tab.Sessions || tab == Tab.History }, onClick = { if (servers != null) switching = true })
+                // "All" on every tab with "All servers" (owner, 2026-10-31: Settings said z2): Settings shows each server in its own block, Automations stays blocked.
+                LinkChip(hub, servers, all = everywhere, onClick = { if (servers != null) switching = true })
             }
             if (searchShown) {
                 // Under the bar, over the top of the list; the keyboard comes up with it.

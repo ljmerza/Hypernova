@@ -260,6 +260,15 @@ class HomeScreenTest {
         rule.snap("home_all_servers")
     }
 
+    /** Owner, 2026-10-31: with All servers chosen, Settings' chip said "z2". It says All on every tab. */
+    @Test fun allServersChipSaysAllOnSettingsToo() {
+        val (z2, e) = everywhere()
+        home(z2, e, ServerChoice(e.servers.map { it.first }, {}, {}, all = true))
+        rule.onAllNodes(hasText(str(R.string.settings), ignoreCase = true), useUnmergedTree = true).onFirst().performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.servers_all_chip), useUnmergedTree = true).assertExists()
+    }
+
     @Test fun allServersNewSessionAsksWhichComputer() {
         val (z2, e) = everywhere()
         home(z2, e, ServerChoice(e.servers.map { it.first }, {}, {}, all = true))
