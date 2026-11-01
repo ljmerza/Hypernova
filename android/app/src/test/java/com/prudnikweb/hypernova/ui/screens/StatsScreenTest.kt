@@ -162,10 +162,7 @@ class StatsScreenTest {
         val hn = a.projects.first().claudeMs + b.projects.first().claudeMs
         rule.onNodeWithText("hypernova", useUnmergedTree = true).assertExists()
         rule.onNodeWithText(hours(res, hn), useUnmergedTree = true).assertExists()
-        // Each server's part, and the one that isn't answering named.
-        rule.onNodeWithText(str(R.string.stats_servers).uppercase(), useUnmergedTree = true).assertExists()
-        rule.onNodeWithText("gym", useUnmergedTree = true).assertExists()
-        rule.onNodeWithText(hours(res, b.claudeMs), useUnmergedTree = true).assertExists()
+        // The one that isn't answering is named.
         rule.onNodeWithText(res.getQuantityString(R.plurals.stats_all_missing, 1, "k1"), useUnmergedTree = true).assertExists()
         rule.snap("stats_all_servers")
         // The footer, past the bottom of this phone: the servers these came from.

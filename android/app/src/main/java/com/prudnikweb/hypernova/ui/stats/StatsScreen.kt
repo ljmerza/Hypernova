@@ -135,7 +135,7 @@ private const val STATS_SOURCE = "stats"
  *
  * With [servers] (Home shows "All servers", two or more paired) it is every server's statistics
  * added up ([AllStats]): each linked one asked for the same range, the header saying "All servers",
- * a short list of each server's part, and a line naming the servers whose numbers aren't in them.
+ * and a line naming the servers whose numbers aren't in them.
  */
 @Composable
 fun StatsScreen(
@@ -300,8 +300,6 @@ fun StatsScreen(
                         DaysSection(s, day?.day ?: today, onSelect = { picked = it.toEpochDay() }, agents = agents)
                     }
                     if (s.projects.isNotEmpty()) item(key = "projects") { Projects(s) }
-                    // All servers: each one's part, when two or more answered for this range.
-                    if (combined && each.size >= 2 && each.all { it.second.range == s.range }) item(key = "servers") { ServerParts(each) }
                     item(key = "records") { Records(s, agents) }
                     if (s.prompts > 0 || s.toolCalls > 0 || s.approvals > 0) item(key = "work") { Work(s) }
                     item(key = "footer") {
@@ -707,45 +705,6 @@ private fun ProjectRow(p: StatProject, max: Long) {
         }
         Spacer(Modifier.width(12.dp))
         HText(hours(res, p.claudeMs), style = RowNumber, color = HN.ink, maxLines = 1)
-    }
-}
-
-// ─── Each server's part (All servers) ──────────────────────────────────────
-
-/**
- * All servers: each server that answered, in the order paired, as the projects' rows are without
- * their planets: its name, its sessions in words and its tokens after a token, its hours on the right.
- */
-@Composable
-private fun ServerParts(each: List<Pair<StatsServer, Stats>>) {
-    val res = LocalContext.current.resources
-    Column(Modifier.fillMaxWidth()) {
-        Seam(stringResource(R.string.stats_servers), modifier = Modifier.padding(horizontal = 20.dp).padding(top = 18.dp, bottom = 12.dp))
-        GlassCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
-            Column(Modifier.padding(vertical = 4.dp)) {
-                each.forEachIndexed { i, (server, st) ->
-                    if (i > 0) Hairline(Modifier.fillMaxWidth().padding(horizontal = 16.dp), HN.lineSoft)
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp).semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            HText(server.name, style = Type.heading, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (st.sessions > 0 || st.tokens.total > 0) {
-                                Spacer(Modifier.height(2.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (st.sessions > 0) HText(pluralStringResource(R.plurals.stats_sessions_count, st.sessions, st.sessions), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
-                                    if (st.sessions > 0 && st.tokens.total > 0) Spacer(Modifier.width(12.dp))
-                                    if (st.tokens.total > 0) GlyphFigure(Glyph.Token, compact(res, st.tokens.total), color = HN.inkDim)
-                                }
-                            }
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        HText(hours(res, st.claudeMs), style = RowNumber, color = HN.ink, maxLines = 1)
-                    }
-                }
-            }
-        }
     }
 }
 

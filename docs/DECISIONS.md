@@ -2781,9 +2781,10 @@ each server's `GET /v1/stats` and does the adding.
    its name, so two rows would be two identical planets. Eight at most, as on one server. Tools merge
    the same way, eight then "Other".
 4. **The longest session is any server's longest**, as it is one session; it doesn't name its server.
-5. **A short Servers card under the projects**: each server that answered, in the order paired, as
-   the project rows are without their planets (name, sessions, tokens, hours). Only with two or more
-   answering; with one it would repeat the totals.
+5. **No Servers card** (owner, the same day: "not clear what this servers section tells me that's
+   different from the first section, remove it."). There was one under the projects: each server that
+   answered with its sessions, tokens and hours. The totals are the point here; who was left out stays
+   the amber line, and the footer still names the servers these came from.
 6. **Each server is asked for the same range, at once**, and the numbers change once, when all have
    answered, so they don't climb as answers come in. A half-minute-old answer is used as it is, as on
    one server. With every linked server's answer kept, they show at once while fresh ones come.

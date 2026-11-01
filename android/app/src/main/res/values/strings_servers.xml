@@ -41,8 +41,6 @@
     <string name="stats_on_server">%1$s · %2$s</string>
     <!-- Statistics with "All servers" (data/AllStats.kt): every server's added up. -->
     <string name="stats_loading_all">Reading each server\'s history…</string>
-    <!-- Each server's part, under the projects. -->
-    <string name="stats_servers">Servers</string>
     <!-- The servers that didn't answer (not linked, or failing), named (k1, gym). -->
     <plurals name="stats_all_missing">
         <item quantity="one">%1$s isn\'t answering: its numbers aren\'t in these.</item>
