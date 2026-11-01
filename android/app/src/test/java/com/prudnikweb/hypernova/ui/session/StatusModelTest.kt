@@ -429,4 +429,12 @@ class StatusModelTest {
             assertTrue("$remaining under a $header header", panelMax(remaining, header) <= remaining)
         }
     }
+    @Test fun aLineShowsItsStepsWhileEachHasRoomToRead() {
+        assertEquals(false, stepsFit(0, 900f, 4f))
+        assertEquals(false, stepsFit(1, 900f, 4f))
+        assertEquals(true, stepsFit(14, 900f, 4f))
+        // 75 steps leave 12 pixels each, the shortest that still reads; more goes back to one line.
+        assertEquals(true, stepsFit(75, 900f, 4f))
+        assertEquals(false, stepsFit(76, 900f, 4f))
+    }
 }

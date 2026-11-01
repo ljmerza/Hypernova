@@ -370,8 +370,11 @@ private fun StatusLine(model: BarModel, tone: Color, modifier: Modifier = Modifi
         val w = size.width
         val h = size.height
         val r = CornerRadius(h / 2, h / 2)
+        val gap = 1.5.dp.toPx()
+        // A divider for each step (owner, 2026-11-01), while there's room for them to read as steps.
+        val steps = model.total.takeIf { progress != null && !still && stepsFit(it, w, gap) } ?: 0
         // The track.
-        drawRoundRect(HN.ink.copy(alpha = 0.09f), Offset.Zero, size, r)
+        if (steps == 0) drawRoundRect(HN.ink.copy(alpha = 0.09f), Offset.Zero, size, r)
         when {
             // Stopped for you or by an error: the whole line in that colour.
             still -> drawRoundRect(tone.copy(alpha = 0.75f), Offset.Zero, size, r)
@@ -388,20 +391,36 @@ private fun StatusLine(model: BarModel, tone: Color, modifier: Modifier = Modifi
                     translate(x) { drawRect(brush, Offset.Zero, Size(seg, h)) }
                 }
             }
+            steps > 0 -> {
+                val doneSteps = kotlin.math.round(progress!! * steps).toInt()
+                val a = if (moves) 0.25f + 0.6f * clock.pulse(BREATH_S, pace = Pace.Calm) else 0.5f
+                val seg = w / steps
+                for (i in 0 until steps) {
+                    val color = when {
+                        i < doneSteps -> tone
+                        // The item Claude is on, breathing.
+                        i == doneSteps -> tone.copy(alpha = a)
+                        else -> HN.ink.copy(alpha = 0.09f)
+                    }
+                    drawRoundRect(color, Offset(seg * i, 0f), Size(if (i < steps - 1) seg - gap else seg, h), r)
+                }
+            }
             else -> {
-                val done = w * progress
+                val done = w * progress!!
                 if (done > 0f) drawRoundRect(tone, Offset.Zero, Size(done, h), r)
                 // The item Claude is on: the stretch after the done part, breathing.
                 if (progress < 1f && model.total > 0) {
                     val seg = w / model.total
                     val a = if (moves) 0.25f + 0.6f * clock.pulse(BREATH_S, pace = Pace.Calm) else 0.5f
-                    val gap = 1.5.dp.toPx()
                     drawRoundRect(tone.copy(alpha = a), Offset(done + gap, 0f), Size((seg - gap).coerceAtLeast(h), h), r)
                 }
             }
         }
     }
 }
+
+/** Whether [total] steps can each show as their own piece of a line [width] wide: two or more, each at least 3 gaps long. */
+internal fun stepsFit(total: Int, width: Float, gap: Float): Boolean = total >= 2 && width / total >= gap * 3
 
 private fun toneColor(t: BarTone): Color = when (t) {
     BarTone.Working -> HN.accent

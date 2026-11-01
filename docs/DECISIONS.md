@@ -3356,3 +3356,7 @@ drawn. What it no longer draws is a guess.
    estimate lasts only as long as that older app.
 5. **The usage probe's looks stay as they were,** every 2 minutes while something works. They also keep
    the meters fresh while no status line refreshes.
+
+## The status line's steps (2026-11-01)
+
+The owner: "for the workflow green bar at the bottom I like to see tiny little dividers for each step." The chat's status line draws a short gap between steps, for a workflow's agents and for to-dos alike: done ones full, the current one breathing, the rest the track. With too many steps to read (each under about three gaps long) it goes back to one line.
