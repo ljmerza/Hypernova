@@ -24,6 +24,7 @@ import com.prudnikweb.hypernova.desktop.DesktopRig.shell
 import com.prudnikweb.hypernova.desktop.DesktopRig.takesCode
 import com.prudnikweb.hypernova.desktop.DesktopRig.until
 import com.prudnikweb.hypernova.desktop.ui.App
+import com.prudnikweb.hypernova.desktop.ui.Scaled
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -124,6 +125,36 @@ class RendersTest {
         pairedWith(d)
         until("the sessions") { Core.live?.sessions?.size == 7 }
         ok(render("06-list-wide"))
+    }
+
+    // A whole 4K and 1080p screen, as a maximized window: the owner's picture had a small card in a huge window.
+
+    @Test fun thePairScreenOnAWhole4kScreenAt2x() = runDesktopComposeUiTest(3840, 2160) {
+        setContent { Scaled(2f) { App(shell, reduced = true) } }
+        ok(render("11-pair-4k-2x"))
+    }
+
+    @Test fun thePairScreenOnAWhole1080pScreen() = runDesktopComposeUiTest(1920, 1080) {
+        setContent { Scaled(1f) { App(shell, reduced = true) } }
+        ok(render("12-pair-1080p-1x"))
+    }
+
+    @Test fun theListOnAWhole4kScreenAt2x() = runDesktopComposeUiTest(3840, 2160) {
+        val d = daemon()
+        d.snapshot = snapshot("atlas", sessions = sessions(), approvals = approvals())
+        setContent { Scaled(2f) { App(shell, reduced = true) } }
+        pairedWith(d)
+        until("the sessions") { Core.live?.sessions?.size == 7 }
+        ok(render("13-list-4k-2x"))
+    }
+
+    @Test fun theListOnAWhole1080pScreen() = runDesktopComposeUiTest(1920, 1080) {
+        val d = daemon()
+        d.snapshot = snapshot("atlas", sessions = sessions(), approvals = approvals())
+        setContent { Scaled(1f) { App(shell, reduced = true) } }
+        pairedWith(d)
+        until("the sessions") { Core.live?.sessions?.size == 7 }
+        ok(render("14-list-1080p-1x"))
     }
 
     @Test fun aRefusedAnswer() = runDesktopComposeUiTest(960, 720) {

@@ -201,6 +201,8 @@ enum class Ui {
     desk_not_whole,
     desk_answer_failed,
     desk_from_agent,
+    desk_zoom,
+    desk_zoom_auto,
     ;
 
     /** This word, as the computer on screen words things ([ComputerWords]). */

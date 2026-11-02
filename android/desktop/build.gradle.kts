@@ -110,6 +110,20 @@ compose.desktop {
     }
 }
 
+// A system with no menus shouldn't fail the install: packaging/deb-menu-optional.sh says why, and why it's done to the
+// finished package. Compose empties jpackage's resource folder just before it runs, so custom scripts can't go there.
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
+    if (targetFormat == org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb) {
+        val script = project.file("packaging/deb-menu-optional.sh")
+        val out = destinationDir
+        doLast {
+            val deb = checkNotNull(out.get().asFile.listFiles { f -> f.name.endsWith(".deb") }?.singleOrNull()) { "no one .deb in ${out.get()}" }
+            val done = ProcessBuilder("bash", script.path, deb.path).inheritIO().start().waitFor()
+            check(done == 0) { "${script.name} failed: $done" }
+        }
+    }
+}
+
 tasks.withType<Test>().configureEach {
     // No display on CI or here: the screens render with no window (Compose's own test scene).
     systemProperty("java.awt.headless", "true")
