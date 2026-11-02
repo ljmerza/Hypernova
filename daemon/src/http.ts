@@ -32,6 +32,7 @@ import { createPreview, createProject, listProjects, sendFile, servePreview } fr
 import { DOWNLOAD_MAX, allowedPath, fileFor, filesState, folderOpens, listDir, listFolders, sendChecked, setBrowseOutside } from './files.ts'
 import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
+import { MAX_CLIENT_LOG, isClientLogType, saveClientLog, takeClientLogSlot } from './client-logs.ts'
 import { agentEvents, backgroundRunning, endSessionAgents, listAgents, validAgentId } from './agents.ts'
 import { sessionMcp } from './agent-settings.ts'
 import { extrasRoute } from './agent-extras.ts'
@@ -1179,6 +1180,16 @@ async function api(c: Ctx): Promise<void> {
     const a = await saveAttachment(url.searchParams.get('name') || 'file', req)
     log('attachment', a.name, `${Math.round(a.size / 1024)} KB`)
     return json(res, 200, { attachment: a })
+  }
+  // A client's debug log, sent on purpose: kept as text for this server's owner, one way (client-logs.ts).
+  if (path === '/v1/client-logs' && m === 'POST') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired device can send its log.')
+    if (!isClientLogType(req.headers['content-type'])) throw new HttpError(415, 'not_text', 'A log is plain text.')
+    if (Number(req.headers['content-length'] ?? 0) > MAX_CLIENT_LOG) throw new HttpError(413, 'too_large', 'That log is too big (6 MB at most).')
+    takeClientLogSlot(c.deviceId)
+    const saved = await saveClientLog(c.deviceId, req)
+    log('client log saved', c.deviceId, `${Math.round(saved.size / 1024)} KB`)
+    return json(res, 200, { log: saved })
   }
   // Files (files.ts): a folder's entries, and a file to view or (`download=1`) to save, streamed,
   // with ranges. Errors carry codes the phone acts on (docs/PROTOCOL.md, "Files").

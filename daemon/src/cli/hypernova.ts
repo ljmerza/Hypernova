@@ -4,7 +4,7 @@
 // foreground). The installed launcher (~/.local/bin/hypernova) runs this file with Hypernova's
 // own Node.js; from a checkout, `node daemon/src/cli/hypernova.ts setup` installs from there.
 import { cliContext } from './context.ts'
-import { HELP, autoUpdate, automation, codex, doctor, integrate, lan, logs, pair, parseArgs, setup, status, uninstall } from './commands.ts'
+import { HELP, autoUpdate, automation, clientLogs, codex, doctor, integrate, lan, logs, pair, parseArgs, setup, status, uninstall } from './commands.ts'
 
 const { cmd, flags, rest } = parseArgs(process.argv.slice(2))
 const cli = cliContext()
@@ -25,6 +25,8 @@ async function main(): Promise<number> {
     case 'logs':
     case 'log':
       return logs(cli, flags)
+    case 'client-logs':
+      return clientLogs(cli, flags)
     case 'lan':
       return lan(cli, rest)
     case 'codex':

@@ -1,0 +1,8 @@
+{
+  "status": 429,
+  "error": {
+    "code": "too_many_logs",
+    "message": "That’s a lot of logs in an hour. Try again later.",
+    "retryAfterSeconds": 3600
+  }
+}
