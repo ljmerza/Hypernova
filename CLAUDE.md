@@ -78,6 +78,10 @@ patch). A breaking change, the phone and the daemon no longer fitting each other
 is `feat!:` / `fix!:` or a `BREAKING CHANGE: …` line in the body (a major). Merge commits don't
 count, the commits they bring in do.
 
+Licence notices: this is a fork, so a file of the original that changes needs a one-line notice. After changing
+or moving files, run `scripts/license-notices.sh --fix` (CI runs `--check`; docs/DECISIONS.md, "The Apache
+licence's notices"). New files get none. Don't remove an existing copyright or attribution notice.
+
 `skills/hyper-cosmos/` is a versioned copy of the personal skill at
 `~/.claude/skills/hyper-cosmos/` (the copy that actually triggers). When the
 design changes, update the skill too (its `assets/compose/` holds this app's
