@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.SessionUsage
+import com.prudnikweb.hypernova.data.ChatRepo
 import android.content.res.Resources
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import androidx.compose.animation.core.animateFloatAsState

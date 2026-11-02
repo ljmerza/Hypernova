@@ -1,5 +1,8 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Todo
+import com.prudnikweb.hypernova.data.SessionUsage
+import com.prudnikweb.hypernova.data.ChatRepo
 import androidx.compose.ui.text.input.VisualTransformation
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import com.prudnikweb.hypernova.ui.components.rememberFieldValue
@@ -123,6 +126,7 @@ import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.TerminalBusy
 import com.prudnikweb.hypernova.data.knownCommands
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalToast
@@ -961,7 +965,7 @@ internal fun WaitingForMac(hub: Hub, onBack: () -> Unit) {
             if (link.state == LinkState.Connecting || (link.state == LinkState.Reconnecting && link.problem == null) || link.retrying) {
                 LoadingLine(stringResource(R.string.waiting_mac_body))
             } else {
-                HText(com.prudnikweb.hypernova.data.linkProblemText(res, link), style = Type.body, color = HN.inkMuted)
+                HText(com.prudnikweb.hypernova.data.linkProblemText(res.strings, link), style = Type.body, color = HN.inkMuted)
                 Spacer(Modifier.height(14.dp))
                 Pill(stringResource(R.string.waiting_mac_retry), { hub.retry() }, kind = PillKind.Outline, height = 44.dp, leading = Glyph.Reload)
             }
@@ -1168,7 +1172,7 @@ private fun blockLabel(b: Blocked, provider: com.prudnikweb.hypernova.data.Provi
 /** The model a one-model limit rests ("Opus"), from the account or Claude Code's line. */
 @Composable
 private fun restingModel(hub: Hub, b: Blocked): String =
-    AccountWords.label(LocalContext.current, b, hub.account).replace(Regex("\\s+limit$", RegexOption.IGNORE_CASE), "")
+    AccountWords.label(LocalContext.current.strings, b, hub.account).replace(Regex("\\s+limit$", RegexOption.IGNORE_CASE), "")
 
 /**
  * A model block with no reset: not a limit to wait out but a model this plan can't use, or one
@@ -1189,8 +1193,8 @@ private fun otherModel(hub: Hub, b: Blocked): String {
 private fun blockedHint(hub: Hub, s: Session, b: Blocked): String {
     val context = LocalContext.current
     return when (b.kind) {
-        Blocked.LIMIT -> b.resetsAt?.let { stringResource(R.string.hint_blocked_until, AccountWords.clock(context, it)) } ?: stringResource(R.string.hint_blocked_limit)
-        Blocked.MODEL -> b.resetsAt?.let { stringResource(R.string.hint_blocked_model, restingModel(hub, b), AccountWords.clock(context, it)) } ?: stringResource(R.string.hint_blocked_model_any)
+        Blocked.LIMIT -> b.resetsAt?.let { stringResource(R.string.hint_blocked_until, AccountWords.clock(context.strings, it)) } ?: stringResource(R.string.hint_blocked_limit)
+        Blocked.MODEL -> b.resetsAt?.let { stringResource(R.string.hint_blocked_model, restingModel(hub, b), AccountWords.clock(context.strings, it)) } ?: stringResource(R.string.hint_blocked_model_any)
         Blocked.LOGGED_OUT -> stringResource(R.string.hint_blocked_sign_in)
         Blocked.NO_SUBSCRIPTION -> stringResource(R.string.hint_blocked_plan)
         Blocked.ON_HOLD -> stringResource(R.string.hint_blocked_hold)
@@ -1224,7 +1228,7 @@ private fun BlockedCard(hub: Hub, s: Session, b: Blocked, onMoved: (String) -> U
     }
     val provider = hub.providers.firstOrNull { it.id == s.providerId }
     val title = if (b.unavailable()) stringResource(R.string.blocked_model_unavailable) else when (b.kind) {
-        Blocked.LIMIT, Blocked.MODEL -> stringResource(R.string.blocked_limit, AccountWords.label(context, b, hub.account))
+        Blocked.LIMIT, Blocked.MODEL -> stringResource(R.string.blocked_limit, AccountWords.label(context.strings, b, hub.account))
         Blocked.LOGGED_OUT -> stringResource(R.string.blocked_signed_out)
         Blocked.NO_SUBSCRIPTION -> stringResource(R.string.blocked_no_plan)
         Blocked.ON_HOLD -> stringResource(R.string.blocked_on_hold)
@@ -1232,8 +1236,8 @@ private fun BlockedCard(hub: Hub, s: Session, b: Blocked, onMoved: (String) -> U
         else -> stringResource(R.string.blocked_provider, provider?.name ?: s.model)
     }
     val line = when {
-        b.autoResumeAt != null && b.autoResumeAt > now -> stringResource(R.string.blocked_carries_on, AccountWords.atClock(context, b.autoResumeAt, now))
-        b.resetsAt != null && b.resetsAt > now -> stringResource(R.string.blocked_back, AccountWords.atClock(context, b.resetsAt, now))
+        b.autoResumeAt != null && b.autoResumeAt > now -> stringResource(R.string.blocked_carries_on, AccountWords.atClock(context.strings, b.autoResumeAt, now))
+        b.resetsAt != null && b.resetsAt > now -> stringResource(R.string.blocked_back, AccountWords.atClock(context.strings, b.resetsAt, now))
         // The provider's own words: out of credits, the key turned down.
         b.kind == Blocked.PROVIDER -> provider?.status?.text?.takeIf { it.isNotBlank() } ?: b.text.takeIf { it.isNotBlank() }
         // Nothing to wait for. Claude Code's own words are in the notice just above the card, so a

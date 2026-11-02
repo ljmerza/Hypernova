@@ -86,6 +86,7 @@ import com.prudnikweb.hypernova.data.bothAgents
 import com.prudnikweb.hypernova.data.codexLeads
 import com.prudnikweb.hypernova.data.problemText
 import com.prudnikweb.hypernova.data.refusedRange
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
@@ -373,7 +374,7 @@ private fun ErrorCard(problem: ApiException?, onRetry: () -> Unit) {
             val text = when {
                 problem?.status == 404 && problem.code == "not_found" -> stringResource(R.string.stats_old_mac)
                 problem != null && problem.problem == Problem.Server -> problem.serverMessage ?: stringResource(R.string.stats_error)
-                else -> problemText(res, problem?.problem)
+                else -> problemText(res.strings, problem?.problem)
             }
             HText(text, style = Type.small, color = HN.inkMuted)
             Spacer(Modifier.height(14.dp))

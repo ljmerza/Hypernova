@@ -9,6 +9,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.AutomationNotes
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
@@ -21,6 +22,7 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -60,8 +62,8 @@ class NotifyActionsTest {
 
     @Before fun pair() {
         shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        Core.init(app)
-        ComputerWords.clear(app)
+        AndroidCore.init(app)
+        ComputerWords.clear(app.storage)
         z2.snapshot = snapshot("z2", sessions = listOf(session("s1", state = "idle", title = "Fix the parser")), approvals = listOf(approval("a1", "s1")))
         Core.paired(Pairing(z2.base, "tok-z2", "z2", "m-z2", "dev-1"))
         server = Core.activeId!!

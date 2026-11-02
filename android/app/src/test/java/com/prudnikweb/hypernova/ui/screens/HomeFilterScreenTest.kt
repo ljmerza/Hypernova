@@ -95,7 +95,7 @@ class HomeFilterScreenTest {
     private fun chip(said: String) = rule.onNodeWithContentDescription(said)
     private fun showing(what: String) = str(R.string.filter_showing, what)
     private fun hidden(n: Int) = context.resources.getQuantityString(R.plurals.filter_waiting_hidden, n, n)
-    private val saved get() = HomeFilter.load(PrefsKeyValue(context.getSharedPreferences("hypernova_ui", Context.MODE_PRIVATE)))
+    private val saved get() = HomeFilter.load(PrefsKeyValue(com.prudnikweb.hypernova.data.AndroidPrefs(context.getSharedPreferences("hypernova_ui", Context.MODE_PRIVATE))))
 
     @Test fun theButtonOpensTheSheet() {
         home(FakeHub())

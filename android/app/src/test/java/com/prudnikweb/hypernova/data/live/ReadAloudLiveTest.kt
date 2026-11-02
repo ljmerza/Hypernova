@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.data.live
 
 import android.media.AudioTrack
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.Speaker
 import com.prudnikweb.hypernova.data.SpeechOut
@@ -56,7 +57,7 @@ class ReadAloudLiveTest {
     }
 
     private fun connect(linux: Boolean) {
-        Core.init(rig.context as android.app.Application)
+        AndroidCore.init(rig.context as android.app.Application)
         daemon.snapshot = snapshot(sessions = listOf(session("s1"))) {
             put("speech", speech)
             if (linux) getJSONObject("mac").put("unavailable", JSONObject().put("macVoice", linuxSays))

@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.SessionUsage
 import com.prudnikweb.hypernova.data.AgentBoard
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session

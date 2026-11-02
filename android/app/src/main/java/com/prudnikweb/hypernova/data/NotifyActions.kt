@@ -22,7 +22,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 class NotifyActions : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        Core.init(context.applicationContext as Application)
+        AndroidCore.init(context.applicationContext as Application)
         val server = intent.getStringExtra(EXTRA_SERVER)
         when (intent.action) {
             ACTION_SAMPLE -> if (com.prudnikweb.hypernova.BuildConfig.DEBUG) sample()

@@ -20,6 +20,7 @@ import com.prudnikweb.hypernova.data.Mac
 import com.prudnikweb.hypernova.data.MacAwake
 import com.prudnikweb.hypernova.data.MacBattery
 import com.prudnikweb.hypernova.data.ServerUpdate
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.settings.AutoUpdateRow
 import com.prudnikweb.hypernova.ui.settings.StayAwakeBlock
 import com.prudnikweb.hypernova.ui.settings.autoUpdateLine
@@ -64,7 +65,7 @@ class MacOnlyScreensTest {
         rule.waitForIdle()
     }
 
-    private fun mode(m: String) = rule.onNode(hasText(AwakeWords.modeLabel(res, m)), useUnmergedTree = true)
+    private fun mode(m: String) = rule.onNode(hasText(AwakeWords.modeLabel(res.strings, m)), useUnmergedTree = true)
 
     @Test fun stayAwakeIsPickedOnTheMac() {
         val hub = ServerHub()

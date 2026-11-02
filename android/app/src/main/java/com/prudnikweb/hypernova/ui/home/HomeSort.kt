@@ -5,6 +5,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import com.prudnikweb.hypernova.data.KeyValue
+import com.prudnikweb.hypernova.data.AndroidPrefs
 import com.prudnikweb.hypernova.data.PrefsKeyValue
 import com.prudnikweb.hypernova.data.Session
 
@@ -74,7 +75,7 @@ internal object HomeSortPref {
         holder(context).value = value
     }
 
-    private fun store(context: Context): KeyValue = PrefsKeyValue(context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE))
+    private fun store(context: Context): KeyValue = PrefsKeyValue(AndroidPrefs(context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)))
 
     private fun holder(context: Context): MutableState<HomeSort> = current
         ?: mutableStateOf(HomeSort.load(store(context))).also { current = it }

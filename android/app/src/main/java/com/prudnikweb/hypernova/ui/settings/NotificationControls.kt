@@ -30,6 +30,7 @@ import com.prudnikweb.hypernova.data.NotificationPrefs
 import com.prudnikweb.hypernova.data.NotificationPrefsStore
 import com.prudnikweb.hypernova.data.NotifyGroup
 import com.prudnikweb.hypernova.data.ServerNotify
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Hairline
@@ -53,7 +54,7 @@ private fun rememberNotifyChange(): (NotificationPrefs, String) -> Unit {
     val res = context.resources
     return remember(confirm) {
         { next, title ->
-            if (NotificationPrefsStore.get(context).silencesAnswers(next, Core.servers.map { it.id })) {
+            if (NotificationPrefsStore.get(context.storage).silencesAnswers(next, Core.servers.map { it.id })) {
                 confirm(Confirm(title, res.getString(R.string.nc_ask_body), res.getString(R.string.nc_ask_action), danger = true) { Core.setNotifications(next) })
             } else {
                 Core.setNotifications(next)
@@ -100,7 +101,7 @@ private fun GroupSwitches(off: Set<NotifyGroup>, onChange: (NotifyGroup, Boolean
 internal fun NotificationDefaults() {
     val context = LocalContext.current
     val res = context.resources
-    val prefs by remember { NotificationPrefsStore.state(context) }
+    val prefs by remember { NotificationPrefsStore.state(context.storage) }
     val change = rememberNotifyChange()
     var open by rememberSaveable { mutableStateOf(false) }
     ToggleRow(
@@ -144,7 +145,7 @@ internal fun NotificationDefaults() {
 internal fun ServerNotifyRow(server: String, name: String) {
     val context = LocalContext.current
     val res = context.resources
-    val prefs by remember { NotificationPrefsStore.state(context) }
+    val prefs by remember { NotificationPrefsStore.state(context.storage) }
     val change = rememberNotifyChange()
     val mode = prefs.modeOf(server)
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {

@@ -5,7 +5,7 @@ import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.ui.automations.RunWords
 import com.prudnikweb.hypernova.ui.automations.Words
-import com.prudnikweb.hypernova.ui.changes.WorkChanges
+import com.prudnikweb.hypernova.data.WorkChanges
 import java.time.ZoneId
 
 /*

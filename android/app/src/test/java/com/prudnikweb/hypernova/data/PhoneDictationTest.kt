@@ -233,7 +233,7 @@ class PhoneDictationTest {
     /** Hands-free in a box that sends, on this dictation. [sent] gets the box's text at Send. */
     private fun handsFree(box: StringBuilder, sent: MutableList<String>): VoiceInput {
         val scope = CoroutineScope(Dispatchers.Main)
-        val voice = VoiceInput(VoicePrefs.of(ApplicationProvider.getApplicationContext()), scope)
+        val voice = VoiceInput(VoicePrefs.of(ApplicationProvider.getApplicationContext<android.app.Application>().storage), scope)
         voice.text = { box.toString() }
         voice.setText = { box.setLength(0); box.append(it) }
         voice.onSend = { sent += box.toString() }
@@ -294,7 +294,7 @@ class PhoneDictationTest {
     @Test
     fun a_pause_does_not_end_a_hold_and_letting_go_puts_it_all_in_the_box() {
         val box = StringBuilder()
-        val voice = VoiceInput(VoicePrefs.of(ApplicationProvider.getApplicationContext()), CoroutineScope(Dispatchers.Main))
+        val voice = VoiceInput(VoicePrefs.of(ApplicationProvider.getApplicationContext<android.app.Application>().storage), CoroutineScope(Dispatchers.Main))
         voice.text = { box.toString() }
         voice.setText = { box.setLength(0); box.append(it) }
         voice.phoneDictate = { d }

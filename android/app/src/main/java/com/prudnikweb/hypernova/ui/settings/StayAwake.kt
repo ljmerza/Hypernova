@@ -32,6 +32,7 @@ import com.prudnikweb.hypernova.data.AwakeWords
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.MacAwake
 import com.prudnikweb.hypernova.data.MacBattery
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.BatteryMark
 import com.prudnikweb.hypernova.ui.components.FieldLabel
@@ -71,7 +72,7 @@ fun AwakeStatus(a: MacAwake, battery: MacBattery?, modifier: Modifier = Modifier
     val res = LocalContext.current.resources
     val now = awakeClock(a)
     val warn = a.sleepAt != null || a.letGo
-    val words = AwakeWords.status(res, a, now)
+    val words = AwakeWords.status(res.strings, a, now)
     val said = battery?.let { res.getString(R.string.mac_battery_said_short, words, it.percent) } ?: words
     Row(modifier.clearAndSetSemantics { contentDescription = said }, verticalAlignment = Alignment.CenterVertically) {
         HText(words, style = Type.small, color = if (warn) HN.amber else HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
@@ -114,7 +115,7 @@ fun StayAwakeBlock(hub: Hub, a: MacAwake, battery: MacBattery?) {
         Spacer(Modifier.height(8.dp))
         val modes = if (a.laptop) listOf(MacAwake.WORKING, MacAwake.BACKPACK, MacAwake.OFF) else listOf(MacAwake.WORKING, MacAwake.OFF)
         Segmented(
-            modes.map { it to AwakeWords.modeLabel(res, it) },
+            modes.map { it to AwakeWords.modeLabel(res.strings, it) },
             if (needsSetup) MacAwake.BACKPACK else shown,
             { m ->
                 if (m == MacAwake.BACKPACK && !a.backpackReady) {
@@ -133,11 +134,11 @@ fun StayAwakeBlock(hub: Hub, a: MacAwake, battery: MacBattery?) {
             },
         )
         Spacer(Modifier.height(8.dp))
-        val line = AwakeWords.line(res, a, battery, now)
+        val line = AwakeWords.line(res.strings, a, battery, now)
         val (text, color) = when {
             needsSetup -> res.getString(R.string.awake_needs_setup) to HN.amber
             choice == null && line != null -> line.first to if (line.second) HN.amber else HN.inkMuted
-            else -> AwakeWords.modeHelp(res, shown, com.prudnikweb.hypernova.ui.components.byAgents(hub.claude, hub.codex, R.string.awake_help_backpack, R.string.awake_help_backpack_codex, R.string.awake_help_backpack_both)) to HN.inkDim
+            else -> AwakeWords.modeHelp(res.strings, shown, com.prudnikweb.hypernova.ui.components.byAgents(hub.claude, hub.codex, com.prudnikweb.hypernova.data.Str.awake_help_backpack, com.prudnikweb.hypernova.data.Str.awake_help_backpack_codex, com.prudnikweb.hypernova.data.Str.awake_help_backpack_both)) to HN.inkDim
         }
         AnimatedContent(text to color, transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) }, label = "awakeLine") { (t, c) ->
             HText(t, style = Type.small, color = c)

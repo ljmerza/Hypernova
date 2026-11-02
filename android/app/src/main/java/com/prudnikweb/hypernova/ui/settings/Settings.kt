@@ -42,6 +42,8 @@ import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.LiveHub
 import com.prudnikweb.hypernova.data.MacBattery
 import com.prudnikweb.hypernova.data.Route
+import com.prudnikweb.hypernova.data.strings
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.LocalToast
@@ -382,7 +384,7 @@ private fun ServerCard(
                 ServerNotifyRow(live.serverId, live.mac.name.ifBlank { live.pairing.macName })
                 if (link.state == LinkState.Offline || link.state == LinkState.Reconnecting) {
                     Spacer(Modifier.height(6.dp))
-                    HText(com.prudnikweb.hypernova.data.linkProblemText(res, link), style = Type.small, color = HN.inkMuted)
+                    HText(com.prudnikweb.hypernova.data.linkProblemText(res.strings, link), style = Type.small, color = HN.inkMuted)
                     link.tried?.let {
                         Spacer(Modifier.height(10.dp))
                         RouteTriedRow(it, showBase = live.mac.via == com.prudnikweb.hypernova.data.Mac.VIA_REMOTE)
@@ -646,7 +648,7 @@ internal fun TypingSection() {
 @Composable
 private fun NewSessionsSection() {
     val context = LocalContext.current
-    var mode by remember { mutableStateOf(com.prudnikweb.hypernova.data.NewSessionMemory.startMode(context)) }
+    var mode by remember { mutableStateOf(com.prudnikweb.hypernova.data.NewSessionMemory.startMode(context.storage)) }
     Seam(stringResource(R.string.st_new_sessions), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -657,7 +659,7 @@ private fun NewSessionsSection() {
             com.prudnikweb.hypernova.ui.components.ModePicker(
                 mode,
                 { m ->
-                    com.prudnikweb.hypernova.data.NewSessionMemory.setStartMode(context, m)
+                    com.prudnikweb.hypernova.data.NewSessionMemory.setStartMode(context.storage, m)
                     mode = com.prudnikweb.hypernova.data.NewSessionMemory.startMode(m)
                 },
                 bypass = false,

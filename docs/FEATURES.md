@@ -6,7 +6,8 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1569 app tests, 1089 daemon tests (1085 pass, 4 skipped: Mac-only).
+2026-11-01: 1185 app tests and 592 in `android/shared` (each on both of its targets), 1089 daemon tests
+(1085 pass, 4 skipped: Mac-only). The 1569 tests from before the move are all among them.
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -18,7 +19,11 @@ tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens 
 
 Test names, shortened:
 
-- `Class.test` is an app test under `android/app/src/test/java/com/prudnikweb/hypernova/`.
+- `Class.test` is an app test, under `android/app/src/test/java/com/prudnikweb/hypernova/`, or a data
+  test that moved with its code to `android/shared/src/` (docs/PLATFORMS.md, "The shared module"):
+  plain ones and `ContractTest` in `commonTest/`, which run on Android's and the desktop's JVM; the
+  rig tests that need nothing of Android in `hubTest/`, which run off Android in `:shared` and on
+  Robolectric in `:app`.
   - Layer 2, the real `LiveHub`/`Core` against `FakeDaemon`: `data/live/` (ActionsTest,
     AllServersSettingsTest, AppUpdaterTest, AutomationNotesTest, ConnectTest, ConnectionServiceTest,
     CoreServersTest, DeviceCertStoreTest, ErrorsTest, MacOnlyTest, MultiServerTest, MutualTlsTest,

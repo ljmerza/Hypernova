@@ -3,7 +3,8 @@
 Research for the owner's line of 2026-10-15: "I don't want to limit this to platforms for now
 because we will lose potential audience" (DECISIONS, "More platforms, planned before built").
 
-This is a plan only. Nothing is built or migrated, and no product code changed. Read it, pick
+This began as a plan only: nothing here was built or migrated when it was written, except where a
+section says so ("The shared module", the Linux host). Read it, pick
 what you want, and then we start. Facts about outside things (Apple, Kotlin, Tauri) carry a
 source link. Facts about our own code come from reading this repo on 2026-10-16.
 
@@ -25,6 +26,47 @@ The audience argument has two sides: the people who hold the **phone** (Android 
 most of the rest) and the people who own the **computer** that runs Claude Code (Mac now;
 Windows and Linux are most of the rest). The web app helps the first side fast. The hosts help
 the second.
+
+## The shared module (step 1 of the desktop plan, done 2026-11-01)
+
+The owner chose a desktop app that connects, lists sessions and approves, on Android's Kotlin and for
+Android and the desktop JVM only (docs/DECISIONS.md, "A shared Android and desktop module"). Step 1 moved
+the data layer into a Gradle module of its own, with the phone app's behaviour unchanged.
+
+**Layout**, all under `android/` (the Gradle root, so CI's `android/**` paths and the release need nothing new):
+
+| Where | What |
+|---|---|
+| `shared/src/commonMain/kotlin/.../data/` | The data layer, 74 files, package `com.prudnikweb.hypernova.data` as before: `LiveHub`, `Core`, `LanRoute`, `Protocol`, `Models`, `Api`, `Automations`, `ChatRepo`, `ChangesModel`, the words. `Seams.kt` is what it asks of the platform. `Str.kt` names the strings it uses. |
+| `shared/src/commonTest/` | Plain tests (run on both targets), and the off-Android device for the hub's tests: `live/TestDevice.kt`, `live/HubRig.kt`. |
+| `shared/src/hubTest/` | The tests of the real `LiveHub` against `FakeDaemon` that need nothing of Android. They compile twice: in `:shared` on `TestDevice`, and in `:app` on Robolectric with the app's own `HubRig`, so Android's side of every seam stays under them. |
+| `app/src/main/java/.../data/` | What is truly Android: `AndroidPlatform.kt` (the seams), `StringIds.kt` (`Str` to `R.string`), `ComputerResources`, `AndroidCore`, `AndroidNotifier`, `AutomationNotes`, `HubViewModel`, `NotifyActions`, `AppUpdater`, `Pasted`, `Picked` (with `Thumbs`), `PhoneDictation`, `ContinuousDictation`, `SpeechPlayer`, `SpeakingNotice`, `MarkReadOnScreen`, `BackpackExtend`. |
+
+**The toolchain**, checked by building it (the warning in section 2 about Kotlin 2.4.21): Kotlin 2.4.21, AGP 9.2.0 with
+its `com.android.kotlin.multiplatform.library` plugin and `jvm("desktop")` all work together. JetBrains'
+`org.jetbrains.compose.runtime:runtime:1.12.1` gives common code `mutableStateOf`, `Immutable` and snapshots on
+both targets. On Android it resolves to `androidx.compose.runtime` 1.12.1, the version Haze already brought in: the
+app's runtime classpath stayed the same 133 modules when `:shared` was added. With only JVM targets, `commonMain`
+sees the JDK, OkHttp and org.json (the platform's on Android, the library on desktop) as they are. The Compose
+compiler plugin runs on `:shared` too, so its classes keep the stability the screens read. `:app` marks `:shared` as a
+Kotlin friend: without it, a nullable property checked on one line isn't known non-null on the next across
+the module line (dozens of places).
+
+**The seams** (`Seams.kt`), each what the code called on Android before, with the same names where it can be:
+`Strings` (with `Str`, `Plural`), `Storage`/`Prefs`/`PrefsEditor`, `Ticks`, `MainThread`, `Log`, `AppInfo`, `DeviceInfo`,
+`NetworkWatcher`, `ScreenWatcher`, `RetryAlarm`, `DeviceKeys`, `SpeechOutput`, `AutomationNotifier`, `Notifier`,
+`BackgroundLink`, with `Platform` to hand them over and `Watch` to stop a watch. `ComputerWords` is now plain Kotlin;
+its Android half, the Resources that reword themselves, is `ComputerResources`. `readableLine` and the markdown table
+parser came down from `ui/components`, and `ChatRepo` and `ChangesRepo` from `ui`, so `data` imports nothing of `ui`.
+
+**What is left for step 2**, the desktop app itself:
+- A `Platform`: every seam above. There are no desktop implementations yet, not even stubs, since nothing needs them to
+  compile. `TestDevice` shows the shape of each one.
+- `kotlinx-coroutines-swing` (or another `Dispatchers.Main`) on its classpath: `Core.scope` runs on the main dispatcher,
+  and `Core` won't load without one.
+- Words: read the same `res/values` files (the tests' `XmlStrings` does) or move them to shared resources.
+- Where a Linux, Windows or Mac desktop keeps its key and pairing: `DeviceKeys` and `Storage`.
+- The screens: nothing of `ui/` moved. `HubViewModel` is still Android's.
 
 ## 0. What we have to build on
 

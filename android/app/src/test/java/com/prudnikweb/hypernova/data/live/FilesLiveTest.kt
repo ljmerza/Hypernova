@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.data.live
 
 import android.os.Looper
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.DlState
 import com.prudnikweb.hypernova.data.FileFailure
@@ -11,8 +12,8 @@ import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
-import com.prudnikweb.hypernova.ui.changes.ChangesRepo
-import com.prudnikweb.hypernova.ui.changes.LineKind
+import com.prudnikweb.hypernova.data.ChangesRepo
+import com.prudnikweb.hypernova.data.LineKind
 import com.prudnikweb.hypernova.ui.files.DownloadJob
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
@@ -207,7 +208,7 @@ class FilesLiveTest {
     }
 
     @Test fun whatChangedAsksForTheSessionsOwnThenEverythingAndADiffByItsPath() {
-        Core.init(rig.context as android.app.Application)
+        AndroidCore.init(rig.context as android.app.Application)
         val mac = FakeDaemon("gym")
         try {
             mac.snapshot = snapshot("gym", sessions = listOf(session("s1")))

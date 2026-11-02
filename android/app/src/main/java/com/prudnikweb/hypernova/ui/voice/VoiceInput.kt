@@ -41,6 +41,7 @@ import com.prudnikweb.hypernova.data.DictationState
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.VoicePrefs
 import com.prudnikweb.hypernova.data.VoiceProblem
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.theme.HN
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -287,7 +288,7 @@ fun rememberVoiceInput(hub: Hub, text: () -> String, setText: (String) -> Unit, 
     val context = LocalContext.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
-    val prefs = remember { VoicePrefs.of(context) }
+    val prefs = remember { VoicePrefs.of(context.storage) }
     val voice = remember(hub) { VoiceInput(prefs, scope) }
     // Asked once per box and setting (it reads the system's recognizer setup), not on every recomposition.
     val engine = prefs.dictationEngine

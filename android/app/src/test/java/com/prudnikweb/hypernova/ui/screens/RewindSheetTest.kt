@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.screens
 
+import com.prudnikweb.hypernova.data.ChatRepo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyDescendant
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
@@ -39,7 +41,7 @@ class RewindSheetTest {
     @Before fun setUp() {
         resetPrefs()
         // ChatRepo (Rewind) asks Core for the computer: none is paired here.
-        Core.init(RuntimeEnvironment.getApplication())
+        AndroidCore.init(RuntimeEnvironment.getApplication())
     }
 
     private val conversation = listOf(

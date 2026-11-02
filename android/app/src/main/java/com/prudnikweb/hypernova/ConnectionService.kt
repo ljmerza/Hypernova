@@ -12,13 +12,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.content.ContextCompat
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.AccountWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
-import com.prudnikweb.hypernova.data.Notifier
+import com.prudnikweb.hypernova.data.AndroidNotifier
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.strings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -38,7 +40,7 @@ class ConnectionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Core.init(application)
+        AndroidCore.init(application)
         running = true
         goForeground(Summary(getString(R.string.app_name), getString(R.string.notif_connecting)))
         watch = Core.scope.launch {
@@ -46,7 +48,7 @@ class ConnectionService : Service() {
                 .distinctUntilChanged()
                 .collect { s ->
                     if (s == null || !Core.wantsService()) stopSelf()
-                    else runCatching { getSystemService(android.app.NotificationManager::class.java)?.notify(Notifier.CONNECTION_ID, notification(s)) }
+                    else runCatching { getSystemService(android.app.NotificationManager::class.java)?.notify(AndroidNotifier.CONNECTION_ID, notification(s)) }
                 }
         }
     }
@@ -105,7 +107,7 @@ class ConnectionService : Service() {
                 // for a Claude that can't reply). LiveHub wakes this at the reset, so it moves on then.
                 // Claude Code's account, only where it's installed; with Codex in use too, said as Claude's.
                 if (com.prudnikweb.hypernova.data.AgentLead.claudeAvailable(live.claude)) {
-                    AccountWords.headline(this, live.account, live.usage, live.mac.name, both = com.prudnikweb.hypernova.data.AgentLead.both(live.claude, live.codex))?.let { return Summary(it, counts) }
+                    AccountWords.headline(this.strings, live.account, live.usage, live.mac.name, both = com.prudnikweb.hypernova.data.AgentLead.both(live.claude, live.codex))?.let { return Summary(it, counts) }
                 } else if (com.prudnikweb.hypernova.data.AgentLead.codexLeads(live.claude, live.codex)) {
                     // Codex alone: its sign-out or its limit leads the same way.
                     val cx = live.codex
@@ -118,7 +120,7 @@ class ConnectionService : Service() {
         return Summary(title, text)
     }
 
-    private fun notification(s: Summary) = Core.notifier.connection(
+    private fun notification(s: Summary) = AndroidCore.notifier.connection(
         s.title, s.text,
         PendingIntent.getService(
             this, 2, Intent(this, ConnectionService::class.java).setAction(ACTION_DISCONNECT),
@@ -129,9 +131,9 @@ class ConnectionService : Service() {
     private fun goForeground(s: Summary) {
         val n = notification(s)
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(Notifier.CONNECTION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            startForeground(AndroidNotifier.CONNECTION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
-            startForeground(Notifier.CONNECTION_ID, n)
+            startForeground(AndroidNotifier.CONNECTION_ID, n)
         }
     }
 

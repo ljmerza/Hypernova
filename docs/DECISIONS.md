@@ -3384,3 +3384,17 @@ The owner: "make the CI build a deb and img or whatever is needed for Linux and 
 5. **Tarball and an unsigned `.pkg`, no `.dmg`.** A `.dmg` is for dragging an app to Applications, and this is a background service set up per user. The `.pkg` does what the `.deb` does. It's unsigned while there's no Apple account (LATER L107): docs/INSTALL.md says what a person sees, and the `curl` line avoids it.
 6. **The Mac is tested on CI's runners only, and the docs say so.** There's no Mac here. `scripts/test-macos-smoke.sh` is the one real test: install, the LaunchAgent, `status`, `doctor`, the API, restarts, a session surviving them, `uninstall`. What it can't show, what macOS asks a person at the screen, is marked as such.
 7. **A package that fails never stops a release.** `android-release.yml` publishes the APK and the Linux tarball first, as before; `server-packages.yml` runs after, with `needs: apk`, and adds what passes its tests, plus `SHA256SUMS`. The release's queue moved to the `apk` job, so a Mac runner that's slow to come can't hold up the next one. The price is some minutes in which a release has only its first files.
+
+## A shared Android and desktop module, keeping OkHttp (owner, 2026-11-01)
+
+The first step towards a desktop app that can connect, list sessions and approve: `android/shared` holds the data layer, for
+Android and the desktop JVM (docs/PLATFORMS.md, "The shared module").
+
+1. **Android and JVM only.** No iOS or web target, so **OkHttp, org.json, `java.*` and the mutual TLS code stay as they are**: no
+   Ktor, no kotlinx.serialization. This replaces the "OkHttp becomes Ktor" line in PLATFORMS' iOS plan for now; iOS would have to
+   take that up again.
+2. **The package stays `com.prudnikweb.hypernova.data`,** so the app's imports hardly changed.
+3. **No feature changed, and nothing new on the session chat screen.** The tests moved with their code, their names and assertions
+   as they were. The hub's tests run twice: off Android, and on Robolectric with Android's side of the seams.
+4. **`android/shared`, not a top-level `shared/`:** Gradle's root is `android/`, and the release and CI already follow `android/**`.
+5. **No desktop app and no desktop implementations yet.** That is step 2.

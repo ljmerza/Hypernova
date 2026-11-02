@@ -69,7 +69,7 @@ class HomeSortScreenTest {
 
     private fun row(id: Int) = rule.onNode(hasText(str(id)) and isSelectable())
     private fun lit(id: Int) = str(R.string.sort_button_on, str(id))
-    private val saved get() = HomeSort.load(PrefsKeyValue(context.getSharedPreferences("hypernova_ui", Context.MODE_PRIVATE)))
+    private val saved get() = HomeSort.load(PrefsKeyValue(com.prudnikweb.hypernova.data.AndroidPrefs(context.getSharedPreferences("hypernova_ui", Context.MODE_PRIVATE))))
 
     @Test fun theButtonOpensTheSheetWithNameTicked() {
         home(FakeHub())

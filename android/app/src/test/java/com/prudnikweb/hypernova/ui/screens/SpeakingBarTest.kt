@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.PlayInfo
 import com.prudnikweb.hypernova.data.Speaker
@@ -40,7 +41,7 @@ class SpeakingBarTest {
 
     @Before fun setUp() {
         resetPrefs()
-        Core.init(context as android.app.Application)
+        AndroidCore.init(context as android.app.Application)
         server.start()
     }
 

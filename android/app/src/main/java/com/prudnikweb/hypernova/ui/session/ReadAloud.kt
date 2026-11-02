@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.ChatRepo
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Handler
@@ -10,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Speaker
@@ -103,7 +105,7 @@ object ReadAloud {
 
     /** The Mac's clip; false when it won't play (then the phone reads it instead). */
     private suspend fun play(audio: ByteArray, key: String): Boolean {
-        val file = withContext(Dispatchers.IO) { File(Core.app.cacheDir, "read-aloud.m4a").apply { writeBytes(audio) } }
+        val file = withContext(Dispatchers.IO) { File(AndroidCore.app.cacheDir, "read-aloud.m4a").apply { writeBytes(audio) } }
         return try {
             val mp = MediaPlayer()
             mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
@@ -127,7 +129,7 @@ object ReadAloud {
 
     /** The phone's own voice, in pieces it can take (its engine caps each one). */
     private fun onPhone(text: String, key: String, toast: (String) -> Unit) {
-        val failed = { main.post { if (legacy == key) { done(key); toast(Core.app.getString(R.string.chat_read_failed)) } } }
+        val failed = { main.post { if (legacy == key) { done(key); toast(AndroidCore.app.getString(R.string.chat_read_failed)) } } }
         val go: (TextToSpeech) -> Unit = { t ->
             val limit = (TextToSpeech.getMaxSpeechInputLength() - 100).coerceAtLeast(500)
             val parts = pieces(text, limit)
@@ -145,7 +147,7 @@ object ReadAloud {
             return
         }
         var made: TextToSpeech? = null
-        made = TextToSpeech(Core.app) { status ->
+        made = TextToSpeech(AndroidCore.app) { status ->
             if (status == TextToSpeech.SUCCESS && made != null) {
                 tts = made
                 if (legacy == key) go(made!!)

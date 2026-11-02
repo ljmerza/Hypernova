@@ -17,7 +17,9 @@ in the Hyper* family's "digital cosmos" look.
 - `docs/FEATURES.md`: every user-facing feature and the tests that guard it (covered, partial or
   gap). Update it whenever a feature or its tests change.
 
-Layout: `android/` (Gradle, Kotlin, Compose), `daemon/` (TypeScript on Node 22.18 or newer,
+Layout: `android/` (Gradle, Kotlin, Compose: `app/` is the phone app, `shared/` the data layer for Android
+and the desktop JVM, its platform calls behind `Seams.kt`; docs/PLATFORMS.md, "The shared module"),
+`daemon/` (TypeScript on Node 22.18 or newer,
 run directly without a build step; `daemon/src/cli/` is the `hypernova` command), `scripts/`
 (the Linux and Mac installs, the `pack-*.sh` packagers, the Docker entrypoint, end-to-end checks),
 `skills/hyper-cosmos/` (the design language as a Claude Code skill, for reuse in other apps).
@@ -83,3 +85,7 @@ Tokens, Cosmos, Solar and so on), then sync:
 
 Build Android with JDK 21 and the Android SDK (here in `~/Android`), from `android/`:
 `JAVA_HOME=$HOME/Android/jdk-21 ANDROID_HOME=$HOME/Android/sdk ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest`.
+The shared module's tests are their own tasks, on both targets: `:shared:desktopTest :shared:testAndroidHostTest`
+(`:shared:compileKotlinDesktop` alone checks the desktop build). Data code goes in `android/shared`, and never
+imports `android.*`, `R` or `ui`: what it needs from the platform goes through a seam in `Seams.kt`, implemented in
+`app/.../data/AndroidPlatform.kt`. A new string it uses is a line in `Str.kt` and in `StringIds.kt`.

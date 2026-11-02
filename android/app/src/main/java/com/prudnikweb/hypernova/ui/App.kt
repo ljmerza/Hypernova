@@ -74,6 +74,8 @@ import com.prudnikweb.hypernova.ui.fx.SkyPlanner
 import com.prudnikweb.hypernova.data.AgentLead
 import com.prudnikweb.hypernova.data.bothAgents
 import com.prudnikweb.hypernova.data.codexLeads
+import com.prudnikweb.hypernova.data.strings
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.fx.SkySplit
 import kotlinx.coroutines.launch
 
@@ -482,8 +484,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 // A newer app on the Mac: a banner once per version.
                 val update = hub?.appUpdate
                 LaunchedEffect(update?.versionCode) {
-                    if (update != null && com.prudnikweb.hypernova.data.updateNoticed(context, update.versionCode)) {
-                        vm.showNotice(com.prudnikweb.hypernova.data.updateNotice(context, update))
+                    if (update != null && com.prudnikweb.hypernova.data.updateNoticed(context.storage, update.versionCode)) {
+                        vm.showNotice(com.prudnikweb.hypernova.data.updateNotice(context.strings, update))
                     }
                 }
                 // Opening that session (or the chat it's in) takes the banner away; so does Home, for any session's.

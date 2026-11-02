@@ -11,6 +11,7 @@ import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.ProviderWords
 import com.prudnikweb.hypernova.data.Run
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.strings
 import java.time.ZoneId
 
 /** The app's words for the summary and the run lines, in the phone's 12- or 24-hour style. */
@@ -30,7 +31,7 @@ fun summaryContext(hub: Hub, now: Long): SummaryContext = SummaryContext(
     now = now,
     projectName = { path -> hub.projects.firstOrNull { it.path == path }?.name ?: path.trimEnd('/').substringAfterLast('/').ifEmpty { path } },
     sessionName = { id -> (hub.session(id) ?: hub.replacedBy(id)?.let(hub::session))?.name },
-    providerName = { id -> if (id == com.prudnikweb.hypernova.data.AgentKind.CODEX_PROVIDER) hub.codex?.let { com.prudnikweb.hypernova.data.Core.app.getString(R.string.cx_agent_codex) } else hub.providers.firstOrNull { it.id == id }?.name },
+    providerName = { id -> if (id == com.prudnikweb.hypernova.data.AgentKind.CODEX_PROVIDER) hub.codex?.let { com.prudnikweb.hypernova.data.AndroidCore.app.getString(R.string.cx_agent_codex) } else hub.providers.firstOrNull { it.id == id }?.name },
 )
 
 /** What a run that needs you asks: an ask step's question, or its session's line ("Bash: git push"). */
@@ -47,7 +48,7 @@ fun providerTrouble(context: Context, hub: Hub, a: Automation?): String? {
         ?: (a?.action as? Action.Start)?.providerId ?: return null
     val p = hub.providers.firstOrNull { it.id == id } ?: return null
     val st = p.status ?: return context.getString(R.string.provider_card_other, p.name)
-    return ProviderWords.sentence(context, p.name, st)
+    return ProviderWords.sentence(context.strings, p.name, st)
 }
 
 /**

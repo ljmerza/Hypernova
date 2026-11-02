@@ -38,6 +38,7 @@ import com.prudnikweb.hypernova.data.SendStatus
 import com.prudnikweb.hypernova.data.Window
 import com.prudnikweb.hypernova.data.Servers
 import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.components.AttentionStore
 import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.home.HomeScreen
@@ -134,7 +135,7 @@ class HomeMoreTest {
         open = null
         rule.waitForIdle()
         assertEquals(2, dots())
-        assertTrue(ReadState.of(context, server).readUpTo(Samples.MID) != null)
+        assertTrue(ReadState.of(context.storage, server).readUpTo(Samples.MID) != null)
 
         // A reply comes in while he's away from it: unread again.
         hub.sessionList = hub.sessionList.map { if (it.id == Samples.MID) it.copy(updatedAt = Samples.NOW) else it }

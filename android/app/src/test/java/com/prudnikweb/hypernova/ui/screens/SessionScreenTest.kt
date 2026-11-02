@@ -45,9 +45,9 @@ import com.prudnikweb.hypernova.data.Usage
 import com.prudnikweb.hypernova.data.WAgent
 import com.prudnikweb.hypernova.ui.components.EnterKeyPref
 import com.prudnikweb.hypernova.ui.session.SessionScreen
-import com.prudnikweb.hypernova.ui.session.SessionUsage
-import com.prudnikweb.hypernova.ui.session.Todo
-import com.prudnikweb.hypernova.ui.session.TodoStatus
+import com.prudnikweb.hypernova.data.SessionUsage
+import com.prudnikweb.hypernova.data.Todo
+import com.prudnikweb.hypernova.data.TodoStatus
 import com.prudnikweb.hypernova.ui.session.TopBarChoice
 import com.prudnikweb.hypernova.ui.session.TopBarItem
 import com.prudnikweb.hypernova.ui.session.TopBarPref

@@ -34,3 +34,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Hypernova"
 include(":app")
+include(":shared")
