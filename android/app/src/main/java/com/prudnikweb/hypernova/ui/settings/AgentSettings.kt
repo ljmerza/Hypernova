@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
  * answers for itself, so this is the hub whose card was tapped, and nothing here changes several at once.
  */
 @Composable
-fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
+fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val codex = agent == AgentSettingsReply.CODEX
     val server = hub.mac.name
@@ -169,6 +169,14 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
             // Whatever the file says: this comes with the server's live state, and the file may be missing.
             item(key = "account-seam") { Seam(stringResource(R.string.as_account), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 2.dp)) }
             item(key = "account") { if (codex) CodexAccountCard(hub, server) else ClaudeAccountCard(hub, server) }
+            if (!codex) item(key = "extensions-seam") { Seam(stringResource(R.string.as_extensions), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp)) }
+            if (!codex) item(key = "extensions") {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+                        NavRow(stringResource(R.string.as_mcp), stringResource(R.string.as_mcp_manage), onClick = onMcp)
+                    }
+                }
+            }
             item(key = "intro") {
                 // Not until the server's said otherwise is there anything to promise about changing them.
                 val viewOnly = tooOld || (current != null && current.editable.isEmpty())

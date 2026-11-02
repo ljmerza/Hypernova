@@ -1037,7 +1037,7 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       projects: { [cwd]: { history: [{ display: 'never-sent' }], mcpServers: { 'db-tools': { command: '/usr/local/bin/uvx', args: ['never-sent'], env: { TOKEN: 'never-sent' } } } } },
     }),
   )
-  writeFileSync(mcpJson, JSON.stringify({ mcpServers: { docs: { type: 'http', url: 'https://user:never-sent@docs.example.com/never-sent?key=never-sent', headers: { Authorization: 'never-sent' } } } }))
+  writeFileSync(mcpJson, JSON.stringify({ mcpServers: { docs: { type: 'http', url: 'https://user:never-sent@docs.example.com/mcp?key=never-sent', headers: { Authorization: 'never-sent' } } } }))
   try {
     const r = await ok(get('/v1/agents/settings'))
     assert.ok(!JSON.stringify(r).includes('never-sent'))
@@ -1064,6 +1064,38 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
 
     contract('rest-agent-settings-undo', await ok(post('/v1/agents/settings/undo', { agent: 'claude', expected: changed.hash })))
     assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).permissions.defaultMode, 'acceptEdits')
+    // An agent's MCP servers: the list, a folder's status from a stand-in process, one server's page.
+    {
+      const { useProbe } = await import('../src/mcp-probe.ts')
+      const { folderId } = await import('../src/mcp-view.ts')
+      useProbe(async (_cwd, _waiting, work) =>
+        work({
+          mcpServerStatus: async () => [
+            { name: 'github', status: 'connected', source: 'user', serverInfo: { name: 'github-mcp', version: '2.1.0' }, config: { type: 'stdio', command: 'never-used' }, tools: [{ name: 'create_issue', annotations: { destructive: true } }, { name: 'list_issues', annotations: { readOnly: true, openWorld: true } }] },
+            { name: 'plugin:context7:context7', status: 'needs-auth', source: 'plugin', config: { type: 'http', url: 'https://mcp.example.com/mcp?key=never-sent' }, tools: [] },
+          ],
+          toggleMcpServer: async () => {},
+          reconnectMcpServer: async () => {},
+        } as never),
+      )
+      const list = await ok(get('/v1/agents/mcp?agent=claude'))
+      // A row says a command's base name, as a session's list does; this scratch one happens to be called that.
+      assert.ok(!JSON.stringify(list.servers.map(({ summary: _, ...row }: any) => row)).includes('never-sent'))
+      // A folder's id comes from its scratch path, and an entry's hash is keyed per run.
+      const stable = (v: unknown) => {
+        let t = JSON.stringify(v)
+        for (const x of list.folders) if (x.id !== 'home') t = t.replaceAll(x.id, `folder-${x.name}`)
+        return JSON.parse(t.replace(/"hash":"[0-9a-f]{32}"/g, '"hash":"entry-hash"'))
+      }
+      contract('rest-mcp-list', stable(list))
+      const status = await ok(get('/v1/agents/mcp/status?agent=claude&folder=home&fresh=1'))
+      assert.ok(!JSON.stringify(status).includes('never-sent'))
+      contract('rest-mcp-status', stable(status))
+      const page = await ok(get(`/v1/agents/mcp/server?agent=claude&name=docs&scope=project&folder=${folderId(cwd)}`))
+      assert.ok(!JSON.stringify(page).includes('never-sent'))
+      contract('rest-mcp-server', stable(page))
+      contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
+    }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))
   } finally {
     writeFileSync(claudeFile, world)

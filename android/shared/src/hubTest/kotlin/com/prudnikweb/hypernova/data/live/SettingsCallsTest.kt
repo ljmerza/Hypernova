@@ -1,5 +1,9 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.data.Mcp
+import com.prudnikweb.hypernova.data.mcpList
+import com.prudnikweb.hypernova.data.mcpLive
+import com.prudnikweb.hypernova.data.mcpServer
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.AgentSettingsFile
@@ -65,6 +69,33 @@ class SettingsCallsTest {
         assertEquals("gpt-6.1-sol", r.of(AgentSettingsReply.CODEX).values.first().text)
         assertEquals(listOf("home-assistant"), r.of(AgentSettingsReply.CLAUDE).claude?.mcpServers)
         assertEquals(listOf("home-assistant", "github", "db-tools", "docs"), r.of(AgentSettingsReply.CLAUDE).mcp?.servers?.map { it.name })
+    }
+
+    // ─── An agent's MCP servers (docs/specs/spec-mcp-manage.md) ───
+
+    @Test fun anAgentsMcpServersAreReadWithTheirNamesEncoded() {
+        connect()
+        answer("GET", "/v1/agents/mcp", "rest-mcp-list")
+        val l = rig.call { rig.hub.mcpList("claude") }.getOrThrow()
+        assertTrue(l.servers.any { it.name == "docs" })
+        answer("GET", "/v1/agents/mcp/status", "rest-mcp-status")
+        val live = rig.call { rig.hub.mcpLive("claude", "home", fresh = true) }.getOrThrow()
+        assertEquals(Mcp.CONNECTED, live.servers.first().status)
+        assertTrue(last("GET", "/v1/agents/mcp/status").query!!.contains("fresh=1"))
+        answer("GET", "/v1/agents/mcp/server", "rest-mcp-server")
+        val page = rig.call { rig.hub.mcpServer("claude", "plugin:a b", "plugin", "f1") }.getOrThrow()
+        assertEquals("docs", page.name)
+        val q = last("GET", "/v1/agents/mcp/server").query!!
+        assertTrue(q, q.contains("name=plugin%3Aa%20b") || q.contains("name=plugin%3Aa+b"))
+    }
+
+    @Test fun aRefusedMcpCallKeepsItsWordsAndAnOlderServerSaysSo() {
+        connect()
+        answer("GET", "/v1/agents/mcp/server", "rest-mcp-no-server", status = 404)
+        val gone = rig.call { rig.hub.mcpServer("claude", "nope", "user", null) }.exceptionOrNull()
+        assertTrue(gone is AgentSettingRefused)
+        daemon.on("GET", "/v1/agents/mcp") { refusal(404, "not_found", "Unknown endpoint.") }
+        assertTrue(rig.call { rig.hub.mcpList("claude") }.exceptionOrNull() is AgentSettingsTooOld)
     }
 
     // ─── A session's MCP servers (docs/PROTOCOL.md, "A session's MCP servers") ───

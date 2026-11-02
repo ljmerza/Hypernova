@@ -620,6 +620,52 @@ class ContractTest {
             assertTrue(effort.choices.last().clears)
             assertNull(r.codex.effort)
         },
+        "rest-mcp-list" to { o ->
+            val l = McpList.wire(o)
+            assertEquals("claude", l.agent)
+            assertEquals(AgentSettingsFile.OK, l.state)
+            assertEquals("stdio", l.servers.single { it.name == "github" }.transport)
+            assertEquals(Mcp.USER, l.servers.single { it.name == "github" }.scope)
+            assertEquals(Mcp.LOCAL, l.servers.single { it.name == "db-tools" }.scope)
+            val docs = l.servers.single { it.name == "docs" }
+            assertEquals(Mcp.PROJECT, docs.scope)
+            assertEquals("http", docs.transport)
+            assertEquals("docs.example.com", docs.summary)
+            assertEquals("pending", docs.approval)
+            assertNotNull(docs.folder)
+            assertEquals(Mcp.HOME, l.folders.first().id)
+            assertTrue(l.folders.any { it.id == docs.folder })
+        },
+        "rest-mcp-status" to { o ->
+            val r = McpLiveReply.wire(o)
+            assertEquals(Mcp.HOME, r.folder)
+            val gh = r.servers.single { it.name == "github" }
+            assertEquals(Mcp.CONNECTED, gh.status)
+            assertEquals(Mcp.USER, gh.source)
+            assertEquals("github-mcp", gh.serverName)
+            assertEquals("2.1.0", gh.version)
+            assertEquals(listOf("create_issue", "list_issues"), gh.tools.map { it.name })
+            assertTrue(gh.tools[0].destructive)
+            assertTrue(gh.tools[1].readOnly)
+            assertTrue(gh.tools[1].openWorld)
+            assertNull(gh.setup)
+            val p = r.servers.single { it.source == Mcp.PLUGIN }
+            assertEquals(Mcp.NEEDS_AUTH, p.status)
+            assertEquals("https://mcp.example.com/mcp?key=•••", p.setup?.url)
+        },
+        "rest-mcp-server" to { o ->
+            val s = McpServer.wire(o)
+            assertEquals("docs", s.name)
+            assertEquals(Mcp.PROJECT, s.scope)
+            assertEquals("http", s.setup.transport)
+            assertEquals("https://•••@docs.example.com/mcp?key=•••", s.setup.url)
+            assertEquals(listOf("Authorization"), s.setup.headerNames)
+            assertEquals("pending", s.approval)
+            assertNotNull(s.hash)
+            assertTrue(s.editable)
+            assertTrue(s.where!!.endsWith(".mcp.json"))
+        },
+        "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)
             assertTrue(c.changed)

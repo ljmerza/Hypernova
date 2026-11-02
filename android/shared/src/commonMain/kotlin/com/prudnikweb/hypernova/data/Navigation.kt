@@ -25,6 +25,10 @@ sealed interface Route {
     data object Providers : Route { override val key = "providers" }
     /** An agent's user-level settings on this server, to view: [agent] is [AgentSettingsReply.CLAUDE] or [AgentSettingsReply.CODEX]. */
     data class AgentSettings(val agent: String) : Route { override val key = "agent-settings:$agent" }
+    /** An agent's MCP servers on this server: every scope, each to tap (docs/specs/spec-mcp-manage.md). */
+    data class McpServers(val agent: String) : Route { override val key = "mcp:$agent" }
+    /** One MCP server: where it's defined, how it's set up, its status and tools. [folder]: the folder it's looked at from. */
+    data class McpServerPage(val agent: String, val name: String, val scope: String, val folder: String?) : Route { override val key = "mcp:$agent:$scope:$folder:$name" }
     /** Settings › Mac › Connection log (data/ConnLog.kt). */
     data object ConnectionLog : Route { override val key = "connection-log" }
     data class ProviderEdit(val id: String?, val kind: String) : Route { override val key = "provider:${id ?: "new-$kind"}" }

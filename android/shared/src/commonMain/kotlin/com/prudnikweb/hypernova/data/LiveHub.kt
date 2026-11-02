@@ -2492,10 +2492,21 @@ class LiveHub(
     /** A 404: a server older than editing. A refusal: its own words and code. Anything else as usual. */
     private fun settingFailure(e: Throwable): HubException {
         val ex = Net.classify(e)
-        if (ex.status == 404) return AgentSettingsTooOld(res.getString(Str.as_edit_too_old))
+        // "not_found" is the router's own word for a route it doesn't have: any other 404 is about the thing asked for.
+        if (ex.status == 404 && (ex.code == null || ex.code == "not_found")) return AgentSettingsTooOld(res.getString(Str.as_edit_too_old))
         if (ex.problem != Problem.Server) return handle(e, Str.as_edit_err)
         return AgentSettingRefused(ex.code, ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(Str.as_edit_err))
     }
+
+    override suspend fun agentExt(method: String, path: String, body: JSONObject?, slow: Boolean): Result<JSONObject> = try {
+        Result.success(
+            when (method) {
+                "GET" -> api.getSlow(path)
+                "PUT" -> api.put(path, body ?: JSONObject())
+                else -> if (slow) api.postSlow(path, body ?: JSONObject()) else api.post(path, body ?: JSONObject())
+            },
+        )
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(settingFailure(e)) }
 
     override suspend fun sessionMcp(id: String): Result<SessionMcpReply> = try {
         Result.success(SessionMcpReply.wire(api.get("/v1/sessions/$id/mcp")))

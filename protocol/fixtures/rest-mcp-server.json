@@ -1,0 +1,18 @@
+{
+  "agent": "claude",
+  "name": "docs",
+  "scope": "project",
+  "folder": "folder-app-parser-fix",
+  "project": "app-parser-fix",
+  "where": "app-parser-fix/.mcp.json",
+  "transport": "http",
+  "envNames": [],
+  "headerNames": [
+    "Authorization"
+  ],
+  "hidden": 0,
+  "url": "https://•••@docs.example.com/mcp?key=•••",
+  "approval": "pending",
+  "hash": "entry-hash",
+  "editable": true
+}
