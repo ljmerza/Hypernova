@@ -11,7 +11,7 @@ import java.util.UUID
 /**
  * A prompt typed while the Mac was away, waiting on the phone to be sent (docs/DESIGN.md, "The
  * offline queue"). [id] is its idempotency key: it goes to the Mac as the send's `clientId`, so a
- * send repeated after a lost answer is one send there (docs/PROTOCOL.md, "Sending a prompt").
+ * send repeated after a lost answer is one send there (docs/PROTOCOL.md, "POST /v1/sessions/{id}/prompt").
  * [files] were uploaded before the Mac went away. [cwd] and [mode] are what a new session needs
  * when the session it was meant for is gone ([ended]).
  */

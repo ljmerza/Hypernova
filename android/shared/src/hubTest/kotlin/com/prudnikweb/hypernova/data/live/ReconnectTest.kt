@@ -12,8 +12,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The reconnect policy (LiveHub's header, data/Retry.kt; docs/PROTOCOL.md: "Clients reconnect once at
- * once, then every 30 s"): a dropped link tries again at once, then every 30 s; a new network, the
+ * The reconnect policy (LiveHub's header, data/Retry.kt; docs/PROTOCOL.md, "Live feed": clients reconnect once at
+ * once, then every 30 s): a dropped link tries again at once, then every 30 s; a new network, the
  * screen coming on or the app returning try at once; nothing is tried without a network, or off
  * screen without the background service.
  */

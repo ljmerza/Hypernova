@@ -25,7 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** What the live socket pushes (docs/PROTOCOL.md, "WebSocket `GET /v1/ws`") and what the hub makes of it. */
+/** What the live socket pushes (docs/PROTOCOL.md, "Live feed") and what the hub makes of it. */
 @RunWith(RigRunner::class)
 class SocketEventsTest {
     private val daemon = FakeDaemon()

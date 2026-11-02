@@ -1,4 +1,5 @@
-// A send's clientId (docs/PROTOCOL.md, "Sending a prompt"): the same one within the window is one send.
+// Modified by Leonardo Merza, 2026. See NOTICE.
+// A send's clientId (docs/PROTOCOL.md, "POST /v1/sessions/{id}/prompt"): the same one within the window is one send.
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
