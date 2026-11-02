@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <!-- The widget: "Needs you" across every paired computer. A header (NEEDS YOU, the count in amber,
      a hairline, and "Last updated 14:32" while nothing keeps it current), then the list, which
      scrolls: each computer's name and count, then its sessions that need you (widget_need_server,

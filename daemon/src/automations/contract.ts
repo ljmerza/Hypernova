@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Automations' contract (docs/PROTOCOL.md, "Automations"): the shapes clients see, the limits and
 // timings, the errors, and what the engine needs from the daemon (AutoIO). No state, no daemon.
 import { HOUR_MS, MIN_MS } from '../schedule.ts'

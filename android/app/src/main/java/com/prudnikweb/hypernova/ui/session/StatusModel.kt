@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
 import com.prudnikweb.hypernova.data.Todo
@@ -259,10 +260,10 @@ internal fun clockText(ms: Long): String {
  */
 internal data class BarAgent(
     val id: String,
-    /** Its kind ("general-purpose", "Explore"), or what it's for when the Mac knows no kind. */
-    val kind: String,
-    /** What it's for ("Add routing helpers"), when that isn't its kind. */
-    val task: String?,
+    /** What it's for ("Add routing helpers"), or its kind when nothing says what it's for (owner, 2026-11-01). */
+    val title: String,
+    /** Its kind ("general-purpose", "Explore"), when that isn't its [title]. */
+    val kind: String?,
     /** What it does now, in words ("Reading Servers.kt"); null before its first step. */
     val doing: Say?,
     /** When it started, the Mac's clock (epoch ms). */
@@ -279,11 +280,12 @@ internal data class BarAgent(
  */
 internal fun barAgents(board: AgentBoard, asking: Set<String> = emptySet()): List<BarAgent> =
     sheetAgents(board).loose.map { a ->
-        val kind = a.type.takeIf { it.isNotBlank() && it != "agent" } ?: a.label
+        val kind = a.type.takeIf { it.isNotBlank() && it != "agent" }
+        val title = a.label.takeIf { it.isNotBlank() } ?: kind ?: a.label
         BarAgent(
             id = a.id,
-            kind = kind,
-            task = a.label.takeIf { it.isNotBlank() && it != kind },
+            title = title,
+            kind = kind?.takeIf { it != title },
             doing = a.activity?.trim()?.takeIf { it.isNotEmpty() }?.let { agentSay(it) },
             startedAt = a.startedAt,
             tokens = a.tokens,

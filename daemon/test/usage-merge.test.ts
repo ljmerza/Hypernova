@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // How readings of the 5-hour and weekly windows merge: the newest wins, even when lower (a reset on
 // claude.ai), while idle sessions repainting old numbers don't pull the meter back up.
 import { test, after } from 'node:test'

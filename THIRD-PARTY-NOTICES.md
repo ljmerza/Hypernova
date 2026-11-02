@@ -1,8 +1,10 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Third-party notices
 
 Hypernova is Apache-2.0 (`LICENSE`, `NOTICE`). It uses the following software, each under its own
 licence; the full texts are in the packages themselves (`node_modules/*/LICENSE`, the Maven artifacts)
-and in `third_party/`.
+and in `third_party/`, where `LICENSES-mermaid-bundled.txt` and `LICENSES-xterm-bundled.txt` hold those of the
+libraries bundled inside Mermaid's and the unicode-graphemes add-on's single files (in the app, `assets/legal/`).
 
 ## Shipped in the Android app (`Hypernova.apk`)
 

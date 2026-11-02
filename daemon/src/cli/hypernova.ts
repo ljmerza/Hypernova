@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // `hypernova`: Hypernova's command on a server or PC, Linux or a Mac (docs/LINUX.md), where there is no menu
 // bar app: setup, pair, status, doctor, logs, lan, codex, auto-update, uninstall, and run (the daemon in the
 // foreground). The installed launcher (~/.local/bin/hypernova) runs this file with Hypernova's

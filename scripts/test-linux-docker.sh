@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Modified by Leonardo Merza, 2026. See NOTICE.
 # Hypernova on Linux, end to end, in Docker (docs/LINUX.md): builds the image from this checkout
 # (the Dockerfile runs scripts/install-linux.sh in it), starts the daemon as the container's command,
 # and checks from inside the container what a server's owner would use: `hypernova status`,

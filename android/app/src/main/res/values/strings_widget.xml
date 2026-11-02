@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <resources>
     <!-- The home screen widget (its own file, so it stays apart from the app's strings). -->
     <string name="widget_sessions_label">Needs you</string>

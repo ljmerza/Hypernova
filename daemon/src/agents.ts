@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Agents a session's main agent runs, and workflows of them: who they are, what each does now and
 // how it ended, for the phone (docs/PROTOCOL.md, "Agents and workflows").
 //

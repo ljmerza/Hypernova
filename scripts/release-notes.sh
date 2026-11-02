@@ -75,7 +75,7 @@ if [ "$server" = yes ]; then
   sudo apt install ./hypernova-server-$tag-linux-amd64.deb
   hypernova-server-setup
   \`\`\`
-- Mac (tested on CI's Mac runners only so far, and it doesn't update itself yet): the same \`curl\` line, or \`hypernova-server-$tag-macos-arm64.tar.gz\`, \`hypernova-server-$tag-macos-x64.tar.gz\`, \`hypernova-server-$tag-macos-arm64.pkg\` or \`hypernova-server-$tag-macos-x64.pkg\` (unsigned: docs/INSTALL.md, "On a Mac").
+- Mac (run on GitHub's Mac runners on both processors, not yet on a person's own Mac, and it doesn't update itself yet): the same \`curl\` line, or \`hypernova-server-$tag-macos-arm64.tar.gz\`, \`hypernova-server-$tag-macos-x64.tar.gz\`, \`hypernova-server-$tag-macos-arm64.pkg\` or \`hypernova-server-$tag-macos-x64.pkg\` (unsigned: docs/INSTALL.md, "On a Mac").
 
 The \`.deb\` and the Mac's files come a few minutes after the rest. \`SHA256SUMS\` lists every file's checksum.
 

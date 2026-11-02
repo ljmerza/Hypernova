@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <resources>
     <!-- Settings › Agents & providers (ui/settings/Providers.kt): the agents on the Mac first, then Claude Code's providers. -->
     <string name="ag_agents">Agents</string>

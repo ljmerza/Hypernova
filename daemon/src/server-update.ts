@@ -137,7 +137,7 @@ export function installKind(f: InstallFacts): Managed {
   const which = f.which ?? ((n: string) => ['/usr/bin', '/bin', '/usr/local/bin'].some((d) => existsSync(join(d, n))))
   // A Mac doesn't, on purpose (owner, 2026-11-01): the update has never run on one, and a broken
   // update on a machine nobody can reach is worse than none. docs/DECISIONS.md, "The server on a Mac".
-  if (f.platform !== 'linux') return { ok: false, reason: `A Mac doesn’t update itself yet: nobody has tried that on a real Mac. Update it by hand: ${GET_SH}` }
+  if (f.platform !== 'linux') return { ok: false, reason: `A Mac doesn’t update itself yet: that has never been tried on a Mac. Update it by hand: ${GET_SH}` }
   if (inContainer(f.env, exists)) return { ok: false, reason: 'This server runs in a container: build its image again to update it (docs/LINUX.md, "Updating the container").' }
   const installed = join(f.appDir, 'daemon')
   if (real(f.self) !== real(installed)) return { ok: false, reason: 'This daemon doesn’t run from its installed copy (a checkout or a test copy): update it the way it was started.' }

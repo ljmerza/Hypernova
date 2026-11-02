@@ -1,31 +1,53 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova
 
-Hypernova lets you run Claude Code agents on your own Linux server and drive them from an Android
-phone. You approve or deny what they want to do, answer their questions, start new sessions and
-follow along, from the couch or from anywhere you have a VPN into your network. Nothing goes
-through a cloud service of ours, the phone talks straight to your server.
+**Your Claude Code and Codex fleet, in your pocket.**
 
-[Releases](https://github.com/ljmerza/Hypernova/releases/latest) ·
-[Install guide](docs/INSTALL.md) ·
-[Linux server](docs/LINUX.md) ·
-[Protocol](docs/PROTOCOL.md)
+Hypernova is an Android app and a small server you run on your own machines. Pair one server or
+several and all your agents show up in one list, with the ones that need you at the top.
+
+[Releases](https://github.com/ljmerza/Hypernova/releases/latest) · [Install guide](docs/INSTALL.md) ·
+[Linux server](docs/LINUX.md) · [Protocol](docs/PROTOCOL.md)
 
 <table>
   <tr>
-    <td><img src="docs/images/shot-home.jpg" width="180" alt="Home: sessions grouped by what needs you, what's working and what's done"></td>
-    <td><img src="docs/images/shot-chat.jpg" width="180" alt="A session's chat with its workflow status"></td>
-    <td><img src="docs/images/shot-new-session.jpg" width="180" alt="Starting a new session: folder, model, effort and mode"></td>
-    <td><img src="docs/images/shot-statistics.jpg" width="180" alt="Statistics: hours, tokens and the last 30 days"></td>
-    <td><img src="docs/images/shot-automations.jpg" width="180" alt="Automations: work on a schedule or when something happens"></td>
+    <td><img src="docs/images/shot-home.jpg" width="150" alt="Home: sessions grouped by what needs input and what's working, with Allow and Deny on a card that waits for an answer"></td>
+    <td><img src="docs/images/shot-chat.jpg" width="150" alt="A session's chat: a denied push, Claude's report, and the workflow's status line with a divider for each step"></td>
+    <td><img src="docs/images/shot-changes.jpg" width="150" alt="What changed: a file's diff under review, with its syntax coloured"></td>
+    <td><img src="docs/images/shot-all-servers.jpg" width="150" alt="All servers: sessions from several machines in one list, each card naming its machine"></td>
+    <td><img src="docs/images/shot-statistics.jpg" width="150" alt="Statistics: hours, tokens and the last 30 days"></td>
+    <td><img src="docs/images/shot-automations.jpg" width="150" alt="Automations: work on a schedule or when something happens"></td>
   </tr>
   <tr>
     <td>Home</td>
     <td>A session</td>
-    <td>New session</td>
+    <td>Code review</td>
+    <td>All servers</td>
     <td>Statistics</td>
     <td>Automations</td>
   </tr>
 </table>
+
+This is a real interface for your agents, not a terminal on a phone. You do far more than approve,
+with diffs, settings and automations on screens you tap and the live terminal there when you want it.
+
+- **Run a fleet.** Choose All servers and every machine's sessions share one Home and one searchable
+  History. Codex sits next to Claude Code, and a conversation can move from one to the other.
+- **Never block an agent.** Walk away and your phone tells you when one needs you. Allow or deny a
+  command from its card, its notification or a widget, and you only get Allow when you can read the
+  whole command. Claude Code's asks never get auto-denied.
+- **Take the wheel.** Open the live terminal of a `claude` you started at your desk, read its diffs,
+  switch its model or rewind it. You can also see each agent's settings and change a set list of them,
+  or see which MCP servers a Claude Code session has set up and restart it to reload them.
+- **Put it on autopilot.** Each server runs its own automations, on a schedule or when a usage window
+  resets, a session finishes, a file changes or a GitHub PR opens. A run can stop and ask you something.
+- **Know your usage.** Every server gets a meter for each agent's limits, and Statistics adds up your
+  hours and tokens. A Claude Code session stopped by a limit can carry on by itself after the reset.
+- **No cloud in between.** Today's Android app talks straight to your server over your Wi-Fi or your
+  own VPN, with mutual TLS. There's no Hypernova account or server and no push service in the way.
+
+That's only the highlights. Over 160 capabilities are already built, each listed with its tests in
+[`docs/FEATURES.md`](docs/FEATURES.md). Setup is a `curl` line, a sign-in and a QR code.
 
 ## Install
 
@@ -53,25 +75,17 @@ The server updates itself to new releases (`hypernova auto-update off` turns tha
 (`hypernova-server-<tag>-linux-amd64.deb`, then `hypernova-server-setup`). Docker and the manual steps
 are in [`docs/LINUX.md`](docs/LINUX.md).
 
-The same `curl` line installs the server on a Mac, which hasn't been tried on a real one yet and doesn't
-update itself: [`docs/INSTALL.md`, "On a Mac"](docs/INSTALL.md#on-a-mac-untested-on-a-real-one).
+The same `curl` line installs the server on a Mac; it has run on GitHub's Mac runners, but not yet on a person's own Mac, and it doesn't
+update itself: [`docs/INSTALL.md`, "On a Mac"](docs/INSTALL.md#on-a-mac).
 
-## What you can do from the phone
+## Where it's going
 
-- See every session grouped by what needs you, what's working and what's done, with Allow and Deny
-  right on the card
-- Answer Claude Code's own permission prompts and questions, nothing gets auto-denied
-- Send messages while an agent is busy, they're queued and sent when it's ready
-- Open the live terminal of any session
-- Change the mode and effort of a running session, run slash commands and ask `/btw`
-  questions from the session's details
-- Start new sessions in any project folder
-- Search the full text of past sessions
-- Run automations on a schedule, use several servers, and dictate with the phone's own voice
-  recognition
-
-Claude Code's background agents (`claude agents`) show up as sessions too: on by default, and
-Settings → Agents & providers → Claude Code in the app turns it off.
+None of this is built yet, and these aren't promises. A desktop client for Linux, Mac and Windows is
+next, so the same control room sits on your desk, then an Apple version and maybe a web version after
+that. I also want the phone to control all of each agent's settings instead of today's set list. An
+iPhone version's notifications would have to go through Apple's push, so "no cloud in between" is a
+claim about today's Android app. The server on a Mac is a separate thing and has only run on GitHub's
+Mac runners so far, as Install says.
 
 ## Privacy
 
@@ -92,5 +106,11 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest   # the app (J
 
 ## License
 
-Apache License 2.0, see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Claude and Claude Code are
-products of Anthropic, Hypernova isn't affiliated with Anthropic.
+Apache License 2.0, see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Fonts and code in `third_party/`
+keep their own licenses. Modified from the original, see [`CHANGES.md`](CHANGES.md).
+
+Claude and Claude Code are products of Anthropic; Codex is a product of OpenAI. Hypernova is an
+independent project and is not affiliated with Anthropic or OpenAI.
+
+Hypernova began as a fork of [prudnik-web/Hypernova](https://github.com/prudnik-web/Hypernova) by
+Nikita Prudnikov, under the Apache License 2.0.

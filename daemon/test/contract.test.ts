@@ -9,7 +9,7 @@
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -23,7 +23,25 @@ process.env.TZ = new Date().getUTCHours() >= 1 && new Date().getUTCHours() <= 22
 const FIXTURES = join(import.meta.dirname, '..', '..', 'protocol', 'fixtures')
 const UPDATE = process.env.UPDATE_FIXTURES === '1'
 
-const scratch = mkdtempSync(join(tmpdir(), 'hn-contract-'))
+// Its real path: a Mac's temp folder is under a link (/var is /private/var), and the daemon, like Claude
+// Code, works in a project's real path, so it wouldn't say the folder these tests named.
+const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'hn-contract-')))
+/**
+ * The fixtures are a Linux server's, which is what the phone's parsers are checked against. On a Mac this
+ * file still compares everything; the few things a Mac says differently on purpose are checked and then
+ * set to what the fixture has ([fixed], [asLinux]). Written for a desktop Mac, as CI's is: a MacBook's
+ * battery and lid would differ too.
+ */
+const MAC = process.platform === 'darwin'
+const linuxSays = MAC ? JSON.parse(readFileSync(join(FIXTURES, 'snapshot.json'), 'utf8')).mac : null
+/** The daemon's messages call this computer "the Mac" there and "the server" on Linux (platform.ts, machineWord). */
+const asServer = <T>(v: T): T => (MAC ? (JSON.parse(JSON.stringify(v).replaceAll('the Mac', 'the server')) as T) : v)
+/** Stay awake on a Mac reads While working by default; on Linux, Off with nothing held. */
+function asLinux<T extends { awake: Record<string, unknown> }>(v: T): T {
+  if (!MAC) return v
+  assert.equal(v.awake.mode, 'working')
+  return { ...v, awake: { ...v.awake, mode: 'off', holding: false } }
+}
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
 process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
@@ -83,7 +101,9 @@ case "$1" in
       done
       exit 0 ;;
     esac
-    draw() { printf '\\033[2J\\033[H\\033]0;Mine\\007\\n────────────────────\\n❯ \\n────────────────────\\n\\033[3;3H'; }
+    # Room under the first line: a long typed line wraps (a Mac's temp folder makes for one), and with no
+    # room it would type over the rule. Claude Code's own box grows instead.
+    draw() { printf '\\033[2J\\033[H\\033]0;Mine\\007\\n────────────────────\\n❯ \\n\\n\\n────────────────────\\n\\033[3;3H'; }
     stty echo icanon 2>/dev/null; draw
     while IFS= read -r l; do echo "$l" >> "$S/typed-$2"; draw; done
     exit 0
@@ -242,7 +262,9 @@ function normalise(v: unknown): unknown {
     if (Array.isArray(x)) return x.map((y) => walk(y, null))
     if (x && typeof x === 'object') {
       const out: Record<string, unknown> = {}
-      for (const [k, y] of Object.entries(x)) out[k] = walk(y, k)
+      // This machine's name is [fixed]'s to replace: not counted among the UUIDs, as one on a CI runner holds one.
+      const machine = 'daemonVersion' in x && 'projectsRoot' in x
+      for (const [k, y] of Object.entries(x)) out[k] = machine && k === 'name' ? y : walk(y, k)
       return fixed(out)
     }
     return x
@@ -251,6 +273,14 @@ function normalise(v: unknown): unknown {
 }
 /** Values set by this machine (its name, id, the daemon's version, the listener's port and key) or by chance (tokens, terminal ids). */
 function fixed(o: Record<string, any>): Record<string, any> {
+  if (MAC && 'platform' in o && 'unavailable' in o) {
+    // A Mac lacks none of the Mac-only features.
+    assert.equal(o.platform, 'darwin')
+    assert.deepEqual(o.unavailable, {})
+    Object.assign(o, { platform: 'linux', unavailable: linuxSays.unavailable })
+  }
+  // A Mac doesn't update itself yet (server-update.ts), which comes before the reason Linux has here.
+  if (MAC && 'auto' in o && 'available' in o && /^A Mac doesn’t update itself yet/.test(o.reason ?? '')) o.reason = linuxSays.update.reason
   if ('daemonVersion' in o && 'projectsRoot' in o) Object.assign(o, { id: 'mac-id', name: 'server', daemonVersion: '0.0.0' }, 'tz' in o ? { tz: 'UTC' } : {})
   if ('token' in o && 'deviceId' in o) Object.assign(o, { token: 'device-token', deviceId: 'device-id' }, o.mac ? { mac: { id: 'mac-id', name: 'server' } } : {})
   // The listener's: only values of the shape the app takes are replaced, so a change of shape still shows.
@@ -491,7 +521,7 @@ test('GET /v1/snapshot: sessions of every kind, approvals of every kind, usage w
   // The order of sessions and projects is the app's own to choose (it sorts them); ties in time aren't.
   snap.sessions.sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id))
   snap.projects.sort((a: { path: string }, b: { path: string }) => a.path.localeCompare(b.path))
-  contract('snapshot', snap)
+  contract('snapshot', { ...snap, mac: asLinux(snap.mac) })
 })
 
 // ── Live messages ────────────────────────────────────────────────────────
@@ -872,7 +902,7 @@ test('POST /v1/attachments, then a prompt (without hold) that carries it, and on
   contract('rest-prompt', await ok(post('/v1/sessions/sess-prompt/prompt', { text: 'Read my notes', clientId: 'client-plain-1', attachments: [attached] })))
   await until('the prompt typed', () => typed('prm00001').includes('Read my notes'))
   assert.ok(typed('prm00001').startsWith(`@"${attached}" `), typed('prm00001'))
-  contract('rest-prompt-attachment-gone', await refused(post('/v1/sessions/sess-prompt/prompt', { text: 'Again', attachments: [join(process.env.HYPERNOVA_SUPPORT!, 'attachments', 'ffffffffffff', 'gone.txt')] }), 410))
+  contract('rest-prompt-attachment-gone', asServer(await refused(post('/v1/sessions/sess-prompt/prompt', { text: 'Again', attachments: [join(process.env.HYPERNOVA_SUPPORT!, 'attachments', 'ffffffffffff', 'gone.txt')] }), 410)))
 })
 
 test('PUT and DELETE …/held/{id}: a held prompt’s new words, then taken back', async () => {
@@ -1105,8 +1135,14 @@ test('{t:"devices"} on a pairing, and DELETE /v1/devices/me (a phone forgetting 
   assert.equal((await get('/v1/snapshot')).status, 200)
 })
 
-test('Linux: GET /v1/mac/awake reads Off; POST /v1/mac/awake and POST …/open are 501 unavailable with their feature', async () => {
-  contract('rest-mac-awake', await ok(get('/v1/mac/awake')))
+test('Linux: GET /v1/mac/awake reads Off; POST /v1/mac/awake and POST …/open are 501 unavailable with their feature', async (t) => {
+  contract('rest-mac-awake', asLinux(await ok(get('/v1/mac/awake'))))
+  if (MAC) {
+    // A Mac has both features, so these two refusals are Linux's alone: nothing to compare here.
+    for (const name of ['rest-mac-awake-unavailable', 'rest-session-open-unavailable']) checked.add(name)
+    t.diagnostic('a Mac has these features: the 501s are checked on Linux only')
+    return
+  }
   const awake = await post('/v1/mac/awake', { mode: 'backpack' })
   assert.equal(awake.status, 501)
   contract('rest-mac-awake-unavailable', awake.json)
@@ -1276,7 +1312,13 @@ test('read aloud: the setting, the voices, a play for this phone and the Mac’s
   try {
     contract('rest-speech-settings', await ok(post('/v1/speech/settings', { rate: 1.15 })))
     contract('ws-speech', heard('speech', (m) => m.speech.rate === 1.15))
-    contract('rest-speech-voices', await ok(get('/v1/speech/voices')))
+    const voices = await ok(get('/v1/speech/voices'))
+    // `say`'s own list on a Mac: this machine's, so its shape is checked and the fixture's empty one compared.
+    if (MAC) {
+      assert.ok(voices.voices.every((v: { id: string; name: string; lang: string }) => v.id && v.name && v.lang), JSON.stringify(voices.voices.slice(0, 3)))
+      voices.voices = []
+    }
+    contract('rest-speech-voices', voices)
     const first = await ok(post('/v1/speech/play', { text: 'Read this on the phone.', to: 'me', sessionId: MAIN }))
     // A play's id is the daemon's own pick: one fixed name for it, in each fixture that carries it.
     const playId = (v: any) => JSON.parse(JSON.stringify(v).split(first.play.id).join('play-0123456789'))

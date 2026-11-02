@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Spec: Codex as a second agent, the app-server facts it rests on
 
 Owner's mandate (2026-10-21): Claude Code and OpenAI Codex in one app. Start a Codex session from

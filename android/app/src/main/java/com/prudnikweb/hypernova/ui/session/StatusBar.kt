@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
 import com.prudnikweb.hypernova.data.Todo
@@ -640,9 +641,9 @@ private fun MainRow(model: BarModel, turnMs: Long) {
 }
 
 /**
- * One agent at work: its kind in mono, and on the right how long it has run and its tokens as
- * Claude Code writes them (`4m12s · ↓ 81.2k tokens`); under it what it does now in words, or what
- * it's for before its first step. Amber while it asks. A tap opens its screen.
+ * One agent at work: what it's for in mono, on a line of its own so the words fit; under it what it
+ * does now in words, or its kind before its first step, and on the right how long it has run and its
+ * tokens as Claude Code writes them (`4m12s · ↓ 81.2k tokens`). Amber while it asks. A tap opens its screen.
  */
 @Composable
 private fun BarAgentRow(a: BarAgent, now: Long, onOpen: () -> Unit) {
@@ -650,10 +651,10 @@ private fun BarAgentRow(a: BarAgent, now: Long, onOpen: () -> Unit) {
     val ms = (now - a.startedAt).coerceAtLeast(0)
     val doing = when {
         a.asking -> stringResource(R.string.status_wait_you)
-        else -> a.doing?.let { sayText(it) } ?: a.task
+        else -> a.doing?.let { sayText(it) } ?: a.kind
     }
     val figures = listOfNotNull(ccDuration(ms), a.tokens?.let { stringResource(R.string.status_tokens_figure, ccTokens(it)) }).joinToString(" · ")
-    val said = listOfNotNull(a.kind, a.task, a.doing?.let { sayText(it) }?.takeIf { it != a.task }, if (a.asking) doing else null, durationSaid(res, ms), a.tokens?.let { tokensSaid(res, it) })
+    val said = listOfNotNull(a.title, a.kind, a.doing?.let { sayText(it) }, if (a.asking) doing else null, durationSaid(res, ms), a.tokens?.let { tokensSaid(res, it) })
         .joinToString(", ")
     Row(
         Modifier
@@ -669,13 +670,11 @@ private fun BarAgentRow(a: BarAgent, now: Long, onOpen: () -> Unit) {
         Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) { Planet(if (a.asking) Activity.Alert else Activity.Live) }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
+            HText(a.title, style = Type.monoSmall, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                HText(a.kind, style = Type.monoSmall, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                HText(doing.orEmpty(), style = Type.small, color = if (a.asking) HN.amber else HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))
                 HText(figures, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
-            }
-            if (doing != null) {
-                HText(doing, style = Type.small, color = if (a.asking) HN.amber else HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Spacer(Modifier.width(6.dp))

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The platform layer (platform.ts): where state and logs live on a Mac and on Linux, which of the
 // Mac's features a Linux server lacks and the reason each gives, where programs are looked for,
 // which shell file the `claude` function goes in, and when the LAN listener starts by itself.

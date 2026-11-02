@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The usage probe as a source of the spend pace (usage-probe.ts → hub.ts offerScreenUsage →
 // usage-rate.ts), on the stand-in for Claude Code (fixtures/fake-claude-usage.mjs): the 5-hour and
 // all-models rows it reads are official readings as of the moment it read them, with no status line

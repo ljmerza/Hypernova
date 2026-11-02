@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.kmp.library) apply false

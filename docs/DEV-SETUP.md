@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Dev setup notes (this Mac)
 
 On some networks `dl.google.com` serves small files but hangs on large

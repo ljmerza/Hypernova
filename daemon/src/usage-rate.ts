@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // How fast the 5-hour and weekly windows are being spent, in % per minute, from the official
 // readings: the status lines', and the usage probe's look at /usage (every 2 minutes while something
 // works, usage-probe.ts), which keeps them coming while no status line refreshes (agents at work in

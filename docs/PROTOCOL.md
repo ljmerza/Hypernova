@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova protocol (v1)
 
 The contract between the daemon and its clients: the Android app, and the `hypernova` command on

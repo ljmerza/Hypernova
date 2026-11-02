@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 import java.security.KeyStore
 import java.security.MessageDigest
 import java.util.Properties

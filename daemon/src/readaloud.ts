@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Read aloud (docs/PROTOCOL.md, "Read aloud"): the Mac's own voice (`say`) reads replies, and plays:
 // speech made here and played by the Hypernova app on the phone, natively, through whatever the
 // phone plays to (Bluetooth headphones too), screen off or not.

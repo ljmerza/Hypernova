@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Stay awake (docs/PROTOCOL.md, "Stay awake"; docs/DECISIONS.md, "Stay awake"): the Mac stays
 // awake while there is something to stay awake for, and is let go when there's a reason to.
 //

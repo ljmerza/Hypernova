@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Shared terminals, daemon side (docs/PROTOCOL.md, "Shared terminals"): finds the holders,
 // keeps a control connection to each, links them to sessions, starts them for the phone,
 // types into them, relays them to phones and opens them in a terminal window on the Mac.

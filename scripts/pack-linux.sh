@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Modified by Leonardo Merza, 2026. See NOTICE.
 # Packs Hypernova's daemon for a Linux server: dist/linux/hypernova-<version>.tar.gz, holding the
 # daemon's sources and lockfile (no node_modules: the install builds them for the server), the font
 # it draws the terminal with, and the install script. Then, on the server:
@@ -16,8 +17,8 @@ mkdir -p "$STAGE/$NAME/daemon" "$STAGE/$NAME/Fonts" "$STAGE/$NAME/scripts" "$OUT
 cp -R "$ROOT/daemon/src" "$ROOT/daemon/package.json" "$ROOT/daemon/package-lock.json" "$STAGE/$NAME/daemon/"
 cp "$ROOT/android/app/src/main/res/font/jetbrains_mono.ttf" "$STAGE/$NAME/Fonts/JetBrainsMono.ttf"
 cp "$ROOT/third_party/fonts/OFL-JetBrainsMono.txt" "$STAGE/$NAME/Fonts/"
-# The licence, the notice and the third-party notices travel with the package.
-cp "$ROOT/LICENSE" "$ROOT/NOTICE" "$ROOT/THIRD-PARTY-NOTICES.md" "$STAGE/$NAME/"
+# The licence, the notice, the third-party notices and the list of changes travel with the package.
+cp "$ROOT/LICENSE" "$ROOT/NOTICE" "$ROOT/THIRD-PARTY-NOTICES.md" "$ROOT/CHANGES.md" "$STAGE/$NAME/"
 cp "$ROOT/scripts/install-linux.sh" "$STAGE/$NAME/scripts/"
 [ -f "$ROOT/docs/LINUX.md" ] && cp "$ROOT/docs/LINUX.md" "$STAGE/$NAME/README.md"
 # No macOS metadata in a tarball meant for Linux: no ._ files (COPYFILE_DISABLE), and with macOS's

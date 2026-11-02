@@ -4,12 +4,14 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 
-const scratch = mkdtempSync(join(tmpdir(), 'hn-agent-settings-'))
+// Its real path: a Mac's temp folder is under a link (/var is /private/var), and Claude Code files local
+// servers under a repository's real path, as the daemon looks them up.
+const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'hn-agent-settings-')))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
 process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')

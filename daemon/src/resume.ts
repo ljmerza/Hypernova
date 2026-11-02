@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Carrying on after a limit (docs/PROTOCOL.md, "Auto-continue"). Each blocked session that can wait
 // its limit out has a resume: it carries on by itself at a time (`armed`), won't (`off`), or could
 // now and didn't (`ready`, with Continue). Claude Code decides for its own terminal sessions on the

@@ -1,3 +1,4 @@
+# Modified by Leonardo Merza, 2026. See NOTICE.
 # R8 rules for the release build (app/build.gradle.kts), on top of proguard-android-optimize.txt and
 # the libraries' own consumer rules (Compose, AndroidX, Haze, OkHttp and Okio ship theirs). Manifest
 # components (activities, the service, the widgets and other receivers, the FileProvider) are kept

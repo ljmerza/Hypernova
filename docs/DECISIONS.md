@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Decisions
 
 These are product decisions agreed with the owner on 2026-10-13. Change them
@@ -3398,3 +3399,61 @@ Android and the desktop JVM (docs/PLATFORMS.md, "The shared module").
    as they were. The hub's tests run twice: off Android, and on Robolectric with Android's side of the seams.
 4. **`android/shared`, not a top-level `shared/`:** Gradle's root is `android/`, and the release and CI already follow `android/**`.
 5. **No desktop app and no desktop implementations yet.** That is step 2.
+
+## An agent's row says what it's for (2026-11-01)
+
+The owner, of the rows under `main + 3 agents`: instead of "general-purpose", "a short title of what
+they're responsible for". The row's first line is the short description the agent was started with,
+on a line of its own so it fits, and only the agent's kind stands in when there's none. How long it has
+run and its tokens move to the second line, beside what it's doing. Its kind shows there before its
+first step.
+
+## The Apache licence's notices (owner, 2026-11-01)
+
+The owner: "as far as the Apache license we'll have to do what legally have to do". This is a fork of
+`prudnik-web/Hypernova`, forked at `c64bbf9`. Nobody here is a lawyer: this is a careful reading of the licence's section 4, and
+some of its words leave room for doubt (the end of this section).
+
+1. **4(b), a modified file says so:** one line, `Modified by Leonardo Merza, 2026. See NOTICE.`, in a comment at the
+   top of each file of the original that differs now. `scripts/license-notices.sh --fix` adds it and `--check` (CI,
+   `.github/workflows/license-notices.yml`) lists what's missing, so branches that merge later can't lose it. It gets its own
+   workflow with no paths filter: any file can need a notice, and the Android workflow would take 40 minutes for a change to the docs.
+2. **A moved file is the original's file, modified,** even with no other change. The script counts a file git pairs with an original at
+   40% alike (git's default of 50% missed files that were moved and then much changed, like `ChangesModel.kt` at 48%), and one with the same
+   name and parent folder as a file that's gone from where it was, however rewritten (`Voice.kt`, 9% alike). New files get no notice.
+3. **Below the header in `scripts/install-linux.sh`,** not on line 2 as in other scripts: its `--help` prints lines 2 to 19 of itself. The
+   script finds such scripts by that `sed` and keeps their help the same.
+4. **`CHANGES.md` covers what can't hold a comment** (the two JSON files and `NOTICE`) and says that the whole project is modified.
+   It's in the server packages, since `daemon/package.json` is. `third_party/`, its copies in the APK's assets, `skills/hyper-cosmos/` and
+   test data are left alone: none of them has been modified.
+5. **4(d), `NOTICE`:** the original's lines stay, with two lines of ours below them. The APK's copy is the same file, and the script's check keeps it so.
+   The same check covers the third-party notices, `third_party/`'s licences in `assets/legal/` (the Ghostty ones had been left out) and a declared licence for each third-party asset.
+6. **4(c):** the README had lost two of the original's notices that still apply, on `third_party/`'s own licences and on Codex and OpenAI. They're back. The other
+   notices that are gone went with the code they were about: the Mac app, Lens, the website and the Tailscale node.
+7. **Section 6, trademarks:** the name and the package name are left for the rename the owner is choosing separately.
+
+**What stays a matter of judgement:**
+
+- "Prominent" isn't defined. A first-line comment is the usual reading, but Markdown hides it when rendered, and it's below a long header in one script.
+- Comments don't survive compiling. The APK's code and resources can't carry a per-file line, so there `NOTICE` says it for them.
+- A new file can hold code from an original that was split up, too little alike for the script to pair them. `CHANGES.md`'s statement that the
+  whole project is modified is what covers those.
+- Rename detection is a heuristic, and "alike" isn't a legal test. The script's list is a careful one and not a proof that it's complete.
+
+## The daemon's tests on a Mac (2026-11-02)
+
+The owner, of the first `macos-unit` run on GitHub's Mac runner, 13 failures of 1089: sort each into a test that assumes Linux or a real bug a Mac user would hit, and don't skip to make it green without knowing why.
+
+1. **Most were the tests' own Linux assumptions, and were reproduced here without a Mac:** a temp folder under a symlink (what `/var` is on a Mac) brings seven of them back on Linux. The daemon was right each time: it and Claude Code work in a project's real path. The two tests that hadn't taken their scratch folder's real path now do, as `speech.test.ts` and `usage-probe.test.ts` already did.
+2. **The contract tests still compare everything on a Mac.** The fixtures are a Linux server's, because the phone's parsers read them. What a Mac says differently on purpose (`platform`, `unavailable`, Stay awake's default, why it doesn't update itself, "the Mac" for "the server", `say`'s own voices) is checked and then set to the fixture's value. Only the two 501 refusals, which a Mac has no reason to make, aren't run there.
+3. **One real finding, not fixed:** `say --file-format=m4af --data-format=aac` hung on that runner until it was killed, and `POST /v1/speech` answered 502 after 40 seconds, while the same `say` made a play's WAV in a second or two. Nothing says why, or whether a person's Mac does it, and changing the format blind would swap a known failure for an unknown one. A play is what the app uses first, and it works there. The tests now ask the machine, and hold the 502 where it can't; `macos-unit` prints what `say` and `afconvert` can make (LATER L108).
+4. **`macos-unit` keeps `continue-on-error` until a run has shown it green.** Those fixes were checked on Linux with a symlinked temp folder and with `process.platform` set to `darwin`, not on a Mac.
+
+## Screenshots come from a demo server, not from the app (2026-11-01)
+
+The owner wants demo data back for screenshots that show off the app, on Android now and the desktop client later: "our own data", the best six shots. He didn't want a demo mode back in the app for now.
+
+1. **The app still has no demo** ("No demo mode", 2026-10-31, holds): nothing in `android/` or `daemon/src/` knows about any of this.
+2. **Screenshots come from a separate demo server** (`demo/server.ts`, `demo/README.md`). It answers a paired phone like a real server, using the daemon's own pairing and certificate code over the real local route with mutual TLS, from made-up replies, on loopback only. It runs nothing and changes nothing. `scripts/demo-shots.sh` retakes the README's shots. It isn't in the server package or the Docker image.
+3. **The data is protocol-format files** (`demo/data/`: three invented servers, one JSON file per reply, nothing of the owner's). Times are placeholders (`"@now-3m"`) so a shot never looks stale. They hold no server logic, so a later iPhone app's demo mode, which App Store review would probably need, can load the same files (`docs/LATER.md`, L105).
+4. **A protocol change fails loudly:** `daemon/test/demo-data.test.ts` holds every file against the shapes in `protocol/fixtures/`.

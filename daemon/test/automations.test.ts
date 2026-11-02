@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Automations (automations.ts; docs/PROTOCOL.md, "Automations"): what is accepted, when runs fire,
 // the gates in order, following a run's sessions to its result, and what a Mac that slept (or a
 // daemon that was down) catches up on. Against a stand-in world with its own clock: no real

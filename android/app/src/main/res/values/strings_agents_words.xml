@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <resources>
     <!-- Words that name the agent a session runs on: Claude Code, or Codex (data/AgentLead.kt). A Mac
          with Claude Code alone reads exactly as before Codex. -->

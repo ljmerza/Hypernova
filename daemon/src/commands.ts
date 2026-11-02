@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Slash commands and skills for the phone's "/" list: asked of Claude Code itself, per project.
 // An SDK process started in the project's folder answers `initialize` with every command it
 // knows (Claude Code's own, the user's and the project's commands and skills, plugins', MCP

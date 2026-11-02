@@ -1,0 +1,26 @@
+name: license-notices
+# Apache-2.0 section 4(b): every file of the original that differs now says it was modified
+# (scripts/license-notices.sh; docs/DECISIONS.md, "The Apache licence's notices"). A workflow of its own
+# with no paths filter, because any file in the repository can need a notice, and the other workflows'
+# filters would either miss most of them or run a 40-minute Android build for a change to the docs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: license-notices-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The whole history: the list of files is worked out from the fork point.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: scripts/test-license-notices.sh
+      - run: scripts/license-notices.sh --check

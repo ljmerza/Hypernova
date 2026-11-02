@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The chat's own calls: a session's usage (tokens, cost, the context window), Claude's to-do list,
 // and "Rewind to here" (docs/PROTOCOL.md, "Session usage", "Rewind"). Fixtures are written by hand
 // in the shapes Claude Code records; none is copied from a real transcript.

@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova on more platforms
 
 Research for the owner's line of 2026-10-15: "I don't want to limit this to platforms for now
@@ -301,13 +302,13 @@ tried it on a real Windows PC (LATER L93). The native Windows host and its tray 
 only this plan (LATER L92).
 
 **Status (2026-11-01):** the server installs on a Mac again, without an app: `scripts/install-macos.sh`, the
-LaunchAgent in `daemon/src/cli/launchd.ts` ([INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac-untested-on-a-real-one);
+LaunchAgent in `daemon/src/cli/launchd.ts` ([INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac);
 DECISIONS, "The server's packages"). This page's Mac facts, checked against the code that day: state in
 `~/Library/Application Support/Hypernova`, logs in `~/Library/Logs/Hypernova`, `HYPERNOVA_SUPPORT` and
 `HYPERNOVA_LOGS` winning there as on Linux (`XDG_*` is Linux's only), the shell block in `~/.zshrc` (zsh only;
 it now also adds `~/.local/bin` to PATH), and macOS's folder prompts naming `node`. One edge, for test copies:
 the status line's tap (`teeBlock` in `hooks.ts`) writes to the Library folder by name, not `HYPERNOVA_SUPPORT`.
-Only CI's Mac runners have run it.
+It has run on GitHub's Mac runners on both processors, not yet on a person's own Mac.
 
 **The idea.** Let the daemon run on a Linux or Windows computer, and give those computers a
 small tray app like the Mac's menu bar app. Claude Code itself already runs on both
@@ -426,3 +427,7 @@ Not checked: iOS 26's own Web Push behaviour (the sources I found describe iOS 1
 the iOS 26 install change, not a new push rule), Compose Multiplatform's stability label today
 (the version page gives none), and Tauri and Compose Desktop on Windows ARM. Check these in
 the step 0 spikes.
+
+## Desktop dictation (research, 2026-11-01)
+
+`docs/specs/spec-desktop-voice.md`: which local speech models and system recognizers to use when the desktop client gets a prompt box. Nothing is built; voice would be off by default, with the model downloaded on request (LATER L111).

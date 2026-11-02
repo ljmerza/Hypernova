@@ -1,3 +1,4 @@
+# Modified by Leonardo Merza, 2026. See NOTICE.
 # Hypernova's daemon on Ubuntu 24.04: the quick way to try it (docs/LINUX.md). The daemon runs in
 # the foreground as the container's command; nothing is published to the network by default.
 #

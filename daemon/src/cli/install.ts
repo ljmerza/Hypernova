@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The pieces `hypernova setup` puts in place, each one safe to run again: the daemon's
 // files in <support>/app (with node-pty built for this machine), Claude Code through Anthropic's
 // official installer, and the integration (hooks, status line, the `claude` shell function).

@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova
 
 A control room for Claude Code: a native Android app and a daemon on a Linux server,
@@ -64,7 +65,7 @@ Releases: `.github/workflows/android-release.yml` builds the signed APK and the 
 scripts, then `server-packages.yml` adds the `.deb`s and the Mac's packages (docs/RELEASING.md). Names
 say server or client (docs/RELEASING.md, "Names"). There is no Mac app, website or name service in this
 repository, but the server installs on a Mac (`scripts/install-macos.sh`, `daemon/src/cli/launchd.ts`;
-docs/INSTALL.md, "On a Mac"), though only CI's Mac runners have run it. The daemon keeps the `/v1/mac/*`
+docs/INSTALL.md, "On a Mac"); it has run on GitHub's Mac runners on both processors, not yet on a person's own Mac. The daemon keeps the `/v1/mac/*`
 route names and its Mac-only features (battery, Stay awake), which answer as unavailable on Linux
 (docs/PROTOCOL.md, "Mac-only features").
 
@@ -76,6 +77,10 @@ the next release is a minor one), `fix:`, `perf:`, `refactor:`, `docs:`, `test:`
 patch). A breaking change, the phone and the daemon no longer fitting each other's older version,
 is `feat!:` / `fix!:` or a `BREAKING CHANGE: …` line in the body (a major). Merge commits don't
 count, the commits they bring in do.
+
+Licence notices: this is a fork, so a file of the original that changes needs a one-line notice. After changing
+or moving files, run `scripts/license-notices.sh --fix` (CI runs `--check`; docs/DECISIONS.md, "The Apache
+licence's notices"). New files get none. Don't remove an existing copyright or attribution notice.
 
 `skills/hyper-cosmos/` is a versioned copy of the personal skill at
 `~/.claude/skills/hyper-cosmos/` (the copy that actually triggers). When the

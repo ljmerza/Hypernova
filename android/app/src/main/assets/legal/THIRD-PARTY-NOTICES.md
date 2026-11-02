@@ -1,8 +1,10 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Third-party notices
 
 Hypernova is Apache-2.0 (`LICENSE`, `NOTICE`). It uses the following software, each under its own
 licence; the full texts are in the packages themselves (`node_modules/*/LICENSE`, the Maven artifacts)
-and in `third_party/`.
+and in `third_party/`, where `LICENSES-mermaid-bundled.txt` and `LICENSES-xterm-bundled.txt` hold those of the
+libraries bundled inside Mermaid's and the unicode-graphemes add-on's single files (in the app, `assets/legal/`).
 
 ## Shipped in the Android app (`Hypernova.apk`)
 
@@ -13,6 +15,7 @@ and in `third_party/`.
 | OkHttp and Okio (Square) | Apache-2.0 |
 | Kotlin standard library and kotlinx.coroutines (JetBrains) | Apache-2.0 |
 | xterm.js 6.0.0 and its add-ons: fit 0.11.0, unicode-graphemes 0.4.0, web-links 0.12.0, search 0.16.0 (the terminal view, `third_party/xterm`). The unicode-graphemes add-on bundles adapted copies of tiny-inflate and unicode-trie (Devon Govett) and tables made with unicode-properties (Per Bothner) | MIT |
+| ghostty-web 0.4.0-next.21 (Coder; the trial terminal view, `assets/term-ghostty/`, `third_party/ghostty-web`), with the WebAssembly build of Ghostty's terminal core it bundles | MIT; Ghostty MIT |
 | Mermaid 11.17.2 (the chat's diagrams, `third_party/mermaid`), with the libraries its `mermaid.min.js` bundles: D3, dagre-d3-es, cytoscape, KaTeX, marked, lodash-es, Langium, Chevrotain, DOMPurify and others (the notices the bundle kept are at its end) | MIT; D3 ISC, d3-sankey BSD-3-Clause, Chevrotain Apache-2.0, DOMPurify MPL-2.0 or Apache-2.0 |
 | Manrope and JetBrains Mono (`third_party/fonts`) | SIL Open Font License 1.1 |
 

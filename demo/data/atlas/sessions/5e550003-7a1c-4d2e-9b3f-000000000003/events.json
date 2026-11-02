@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "id": "u-1",
+      "kind": "user",
+      "ts": "@now-14m",
+      "text": "When I paste a few lines into a bullet list the cursor jumps to the end of the document. Find out why and fix it."
+    },
+    {
+      "id": "t-1",
+      "kind": "assistant",
+      "ts": "@now-1m",
+      "streaming": false,
+      "text": "Found it: the paste handler re-renders before the selection is restored. I moved the restore into the same transaction and I'm running the editor tests now."
+    }
+  ],
+  "cursor": "demo-cursor",
+  "full": true
+}

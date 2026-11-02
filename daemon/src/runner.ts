@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Sessions Hypernova drives itself, through the Agent SDK: one claude process per prompt,
 // resumed by session id, so they survive daemon restarts and stay normal Claude Code sessions.
 // The SDK is loaded when a prompt first runs (sdk.ts): without it a prompt isn't sent, and says why.

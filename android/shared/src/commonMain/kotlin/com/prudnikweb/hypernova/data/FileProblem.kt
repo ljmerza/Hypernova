@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.data
 
 /** What went wrong opening a folder or file on the Mac, in the terms the screen explains (docs/PROTOCOL.md, "Files"). */

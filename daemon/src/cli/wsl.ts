@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // WSL on a Windows PC, as the `hypernova` command tells it (docs/INSTALL.md, "Windows
 // (experimental)"): Hypernova runs there as on any Linux, but WSL starts and stops this Linux with
 // Windows' terminals, runs systemd only when /etc/wsl.conf says so, and by default keeps it behind

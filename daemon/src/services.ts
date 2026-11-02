@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Usage feed (status line files), projects, files and artifact previews.
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, statSync, unlinkSync, createReadStream, realpathSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
