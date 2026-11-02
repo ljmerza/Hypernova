@@ -3,13 +3,10 @@
 **Your Claude Code and Codex fleet, in your pocket.**
 
 Hypernova is an Android app and a small server you run on your own machines. Pair one server or
-several and every agent you're running lands in one list, grouped by what needs you, what's working
-and what's done, with Allow and Deny right on the card.
+several and every agent lands in one list, with what needs you on top and Allow and Deny on the card.
 
-[Releases](https://github.com/ljmerza/Hypernova/releases/latest) ·
-[Install guide](docs/INSTALL.md) ·
-[Linux server](docs/LINUX.md) ·
-[Protocol](docs/PROTOCOL.md)
+[Releases](https://github.com/ljmerza/Hypernova/releases/latest) · [Install guide](docs/INSTALL.md) ·
+[Linux server](docs/LINUX.md) · [Protocol](docs/PROTOCOL.md)
 
 <table>
   <tr>
@@ -28,48 +25,25 @@ and what's done, with Allow and Deny right on the card.
   </tr>
 </table>
 
-Left alone these agents are separate terminals on separate machines, each with its own limits, and a
-remote terminal only gets you one screen at a time and a phone keyboard to type `y` with. Hypernova
-reads the sessions, so a permission prompt becomes a card with the command on it and a code change
-becomes a diff. The real terminal is still there when you want it.
+On their own these agents are separate terminals, and a remote terminal shows one at a time with a
+phone keyboard to type `y`. Hypernova reads them, so an approval is a card and a code change a diff.
 
-**Run a fleet.** All servers puts every machine's sessions on one Home and in one searchable History.
-Each card names its server and your answer goes straight to it. A new session asks where to start.
-Codex sits next to Claude Code with its own usage meters, and you can hand a conversation from one to
-the other after reading and editing what it carries over.
+- **Run a fleet.** All servers puts every machine's sessions on one Home and in one searchable History.
+  Codex sits next to Claude Code, and a conversation can move from one to the other.
+- **Never block an agent.** Allow or deny a command from its card, its notification or a home screen
+  widget, and Allow only shows when the whole command does. Claude Code's asks never get auto-denied.
+- **Take the wheel.** Run `claude` at your desk and open its live terminal on your phone. Read its
+  diffs, switch its model or rewind it. See each agent's settings and change a set list of them, see
+  which MCP servers a Claude Code session has set up and restart it to reload them.
+- **Put it on autopilot.** Each server runs its own automations, on a schedule or when a usage window
+  resets, a session finishes, a file changes or a GitHub PR opens. A run can stop to ask you.
+- **Know your usage.** Every server gets a meter for each agent's limits, and Statistics adds up your
+  hours and tokens. A Claude Code session stopped by a limit can carry on by itself after the reset.
+- **No cloud in between.** Today's Android app talks straight to your server over your Wi-Fi or your
+  own VPN, with mutual TLS. There's no Hypernova account or server and no push service in the way.
 
-**Never block an agent.** A command that needs you shows up with Allow and Deny on its card, in its
-notification and on a home screen widget, and Allow only shows there when you can read the whole
-command. You can reply to a finished session from its notification too. Claude Code's own terminal
-dialogs become cards, and if you're away its asks wait for you instead of getting auto-denied.
-
-**Take the wheel.** Run `claude` at your desk and it's on your phone too, in the same shared terminal,
-along with your `claude agents` jobs. Send a message mid-turn and it queues. Open the live terminal,
-read the diffs, browse the files, switch model, effort or mode while a session runs, or rewind a
-Claude Code conversation to an earlier message. See each agent's settings per server and change a set
-list of them, with Undo. See which MCP servers a Claude Code session has set up and restart it to
-reload them.
-
-**Put it on autopilot.** Each server runs its own automations, so your phone can be off. Start one on
-a schedule, when a usage window resets, when a session finishes, when a file changes or when a GitHub
-PR opens. String steps together, shell commands included, and a run can stop to ask you something you
-answer right from the notification.
-
-**Know your usage.** Every server gets a meter for each agent's limits. Statistics adds up your hours
-and tokens for today, the week, the month or the year so far, with the last 30 days as bars. When a
-limit stops a Claude Code session it says so and can carry on by itself after the reset, or you can
-move it to another provider.
-
-**No cloud in between.** Today's Android app talks straight to your server over your Wi-Fi or your own
-VPN, with mutual TLS and a certificate per phone. There's no Hypernova account and no Hypernova
-server, and notifications come over that same connection with no push service involved.
-
-This page is the short version and the app already does a lot more. Reading replies aloud and pasting
-a screenshot into a prompt didn't even make the cut. [`docs/FEATURES.md`](docs/FEATURES.md) has the
-whole list, over 160 capabilities with the tests that guard each one and a plain note where they only
-partly do, and it's a long scroll.
-
-Setup is a `curl` line, a sign-in and a QR code.
+This is the short version, the app already does far more. [`docs/FEATURES.md`](docs/FEATURES.md)
+lists over 160 capabilities, each with its tests. Setup is a `curl` line, a sign-in and a QR code.
 
 ## Install
 
