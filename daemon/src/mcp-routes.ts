@@ -7,7 +7,7 @@ import { factsOf, type ServerFacts } from './mcp-tools.ts'
 import { codexAdd, codexEdit, codexList, codexLogin, codexLogout, codexReconnect, codexRemove, codexServer, codexStatus, codexToggle, codexTools, codexUndo } from './mcp-codex.ts'
 import { addServer, editServer, loginCancel, loginFinish, loginStart, logout, McpRefused, removeServer, resetChoices, scopeOf, setApproval, undoLast, undoOffer } from './mcp-edit.ts'
 import { forgetLive, LIVE_NAME, liveServers, reconnectServer, toggleServer, type LiveServer } from './mcp-probe.ts'
-import { approvalOf, claudeList, configHash, findConfig, folderId, HOME_FOLDER, knownFolders, projectServers, readClaudeConfig, setupOf, whereOf, type Scope } from './mcp-view.ts'
+import { approvalOf, claudeList, configHash, findConfig, folderId, heldBack, HOME_FOLDER, knownFolders, readClaudeConfig, setupOf, whereOf, type Scope } from './mcp-view.ts'
 import { dirname } from 'node:path'
 
 export { McpRefused }
@@ -33,20 +33,6 @@ export async function folderPath(id: string | null | undefined, deps: McpDeps): 
     for (let d = dirname(path), i = 0; i < 64 && dirname(d) !== d; d = dirname(d), i++) if (folderId(d) === want) return d
   }
   throw new McpRefused(404, 'no_folder', 'That folder isn’t one this server knows.')
-}
-
-/** A folder's project servers that mustn't start, and those it has turned away. */
-export async function heldBack(folder: string): Promise<{ waiting: string[]; rejected: string[] }> {
-  const { root } = await readClaudeConfig(claudeConfigFile())
-  const { servers } = await projectServers(folder)
-  const waiting: string[] = []
-  const rejected: string[] = []
-  for (const name of servers.keys()) {
-    const a = approvalOf(name, folder, root)
-    if (a === 'pending') waiting.push(name)
-    else if (a === 'rejected') rejected.push(name)
-  }
-  return { waiting, rejected }
 }
 
 /** GET /v1/agents/mcp/server for Claude Code: where it's defined, how it's set up. Never a secret. */

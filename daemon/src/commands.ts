@@ -3,7 +3,8 @@
 // An SDK process started in the project's folder answers `initialize` with every command it
 // knows (Claude Code's own, the user's and the project's commands and skills, plugins', MCP
 // prompts), with descriptions and argument hints. No prompt is sent and its hooks are off, so it
-// costs no tokens and no session shows up anywhere. A list is cached per folder for a few
+// costs no tokens and no session shows up anywhere, and it starts no project server nobody has
+// approved (guardArgs, mcp-probe.ts: nobody chose to run anything by opening a list). A list is cached per folder for a few
 // minutes; an older one is served while a fresh one is fetched. Without Claude Code's SDK (hypernova setup
 // fetches it, sdk.ts) the ask answers 409 `sdk_missing`, and the model list keeps its built-in one.
 import type { SDKControlInitializeResponse } from '@anthropic-ai/claude-agent-sdk'
@@ -12,12 +13,15 @@ import { getProvider, providerEnv } from './store.ts'
 import { childEnv } from './runner.ts'
 import { notePlan } from './account.ts'
 import { claudeSdk } from './sdk.ts'
+import { guardArgs, settled } from './mcp-probe.ts'
 import { MACHINE } from './platform.ts'
 
 /** [terminal]: one of Claude Code's own that opens a screen of its own in the terminal (TERMINAL). */
 export type Command = { name: string; description: string; argumentHint: string; aliases: string[]; builtin: boolean; terminal: boolean }
 
 const FRESH_MS = 5 * 60_000
+/** How long a list waits for servers still connecting, for their prompts. */
+const SERVERS_MS = 3000
 const cache = new Map<string, { at: number; commands: Command[] }>()
 const inflight = new Map<string, Promise<Command[]>>()
 // Claude Code's own settings-like commands, which it records as local commands. Its list marks
@@ -112,7 +116,7 @@ async function fetchCommands(cwd: string): Promise<Command[]> {
       cwd,
       settingSources: ['user', 'project', 'local'],
       // Its hooks would tell the owner's own daemon (and anything else listening) about a session that never happens.
-      extraArgs: { settings: '{"disableAllHooks":true}' },
+      extraArgs: await guardArgs(cwd),
       persistSession: false,
       env: childEnv(providerEnv(getProvider(null))),
       pathToClaudeCodeExecutable: claude,
@@ -127,7 +131,12 @@ async function fetchCommands(cwd: string): Promise<Command[]> {
         f(init)
       } catch {}
     }
-    const commands = init.commands
+    // `initialize` answers before an MCP server has connected, so its prompts only come after (measured on 2.1.316).
+    const all = [...init.commands]
+    try {
+      if ((await settled(q, SERVERS_MS)).length) for (const c of await q.supportedCommands()) if (!all.some((k) => k.name === c.name)) all.push(c)
+    } catch {}
+    const commands = all
       .map((c) => ({ name: c.name, description: (c.description ?? '').trim(), argumentHint: (c.argumentHint ?? '').trim(), aliases: c.aliases ?? [], builtin: !!c.builtin, terminal: !!c.builtin && TERMINAL.has(c.name) }))
       .filter(shown)
     cache.set(cwd, { at: Date.now(), commands })

@@ -3569,7 +3569,7 @@ the server. The owner decided that's allowed, behind a confirm showing the whole
 3. **Status comes from Claude Code, per folder.** A process with no prompt and hooks off (as the "/" list asks) answers `mcpServerStatus()`. It's asked per folder because what's on differs per folder: the screen has a
    "Seen from" row. It costs no tokens, needs no login, and starts each server, as a session would, so an answer is kept 20 seconds.
 4. **A process under the SDK approves every project server** (2.1.316: `non_interactive`). So it's told, in its flag settings, that each one not yet approved is rejected, and it doesn't start.
-   **`daemon/src/commands.ts`'s "/" list has no such guard and does start them**: measured, a marker file written by an unapproved server. That's older than this and wasn't changed here.
+   `daemon/src/commands.ts`'s "/" list had no such guard and did start them: closed in "What opening a list may start", below.
 5. **A tool's detail comes from the server itself.** Claude Code's status gives a tool's name and hints, no description or schema (2.1.316's reply builder; its types offer a `description` it doesn't fill). So
    `daemon/src/mcp-client.ts` is a small MCP client for stdio, Streamable HTTP and SSE: it starts the server as Claude Code would, with its env and `${VAR}` expanded, asks `tools/list`, `prompts/list`, `resources/list`,
    and stops. Tools are never called. Never for a server that's off or not approved. A plugin's, an organization's or a claude.ai connector's has names and hints only: its env isn't in a file this reads.
@@ -3606,6 +3606,16 @@ the server. The owner decided that's allowed, behind a confirm showing the whole
 | SDK `mcp_call` (run a tool) | No: seeing a tool isn't running one, and this is what approvals guard |
 | `enableAllProjectMcpServers`, `allowedMcpServers`, `deniedMcpServers`, `managedMcpServers` | Read where they affect approval; not set here |
 | `alwaysLoad`, `headersHelper`, per-tool policy | Shown or carried over; not on the form |
+
+## What opening a list may start (owner, 2026-11-02)
+
+The "/" list and the model list came from an SDK process that approves every project server, so opening a list in a folder ran that folder's `.mcp.json`: measured, a marker file. Nobody chose to run anything by opening a list. A session a person starts keeps Claude Code's own behaviour.
+
+1. **One guard, `guardArgs` in `mcp-probe.ts`,** for every process that isn't a session: the "/" list, the model list (the same process, in the home folder), status, toggle, reconnect, the skills list. It's worked out as the process starts, so a caller can't forget it. What isn't approved is named as rejected in the flag settings.
+2. **That alone wasn't enough, for status too.** Claude Code also reads a `.mcp.json` that's a link or over the daemon's 256 KB, whose names the daemon won't read, and walks up from the folder's **real** path. All measured with marker files on 2.1.316. So names come from the real path, and a file that can't be read or parsed means `--strict-mcp-config` for that process: no servers at all, the user's too. That costs that one folder's status and list some names, and only in a case this odd.
+3. **An approved server's prompts didn't list before this either.** `initialize` answers in about 0.6 s, before a server has connected, so they were never in its answer (only `alwaysLoad` waits). The list now waits up to 3 s for servers still connecting and adds `supportedCommands()`'s. A judgement call: a folder with a slow server takes up to 3 s longer the first time, then the cache covers it. What a phone sends for such a prompt (`/server:prompt (MCP)`) wasn't run, since that costs a model turn.
+4. **Found and not closed: a folder's `apiKeyHelper`.** Those processes run one from the folder's `.claude/settings.json`, trusted or not, when they start: measured. `"apiKeyHelper": ""` in the flag settings stops it (measured), but it would drop the owner's own helper for those processes as well, so that's his to decide. `awsAuthRefresh`, `awsCredentialExport`, `gcpAuthRefresh`, `otelHeadersHelper`, `statusLine`, hooks, `mcpServers` in that file, and a plugin the folder's settings name from a marketplace of their own all ran nothing.
+5. **Other things that start a process.** A session from the phone and `claude --bg` are a person's choice, and stay as they were. **An automation on the SDK runner approves every project server too, with nobody watching** (`createSession`): reasoned from the same options, not run, and not changed. The usage probe has its own folder and `--strict-mcp-config`. The plugin and skill commands (`plugin list`, `list --available`, `marketplace list`, `details`, `configure`, `prune`, `mcp logout`, `edit-skill-overrides`) left no marker. `mcp-client.ts` only starts what's approved and on.
 
 ## Codex's MCP servers (2026-11-02)
 
