@@ -421,6 +421,7 @@ Snapshot = {
     awake: Awake,                              // see Stay awake
     files: {browseOutsideProjects: boolean},   // see Files, The setting
     update: ServerUpdate,                      // the server updating itself (see The server's own update)
+    debug?: ServerDebug,                       // the server's debug log: on until when (see The server's debug log); absent from an older daemon
     tz: string,                                // the server's time zone (IANA, "Europe/Moscow")
     platform?: "darwin" | "linux",             // the server's system; absent: an older daemon (a Mac)
     unavailable?: {[feature]: string}          // Mac-only features this server lacks, each with the sentence to
@@ -988,6 +989,15 @@ RuleFile = {
   defaultMode: string | null, // permissions.defaultMode, a bare word only
   additionalDirectories: string[],   // 50 at most
   clipped: boolean            // something above was left out or cut
+}
+```
+
+### ServerDebug
+
+```ts
+ServerDebug = {
+  on: boolean,
+  until: number | null,   // epoch ms it turns itself off; null while off
 }
 ```
 
@@ -3325,6 +3335,21 @@ else is 403 `outside_projects`, or `locked_folder` for a key place.
 - **Refusals:** 400 `bad_value`.
 - **Rules:** saved at once. Turned on, the releases are looked at now. Goes out as `update`.
 
+### Routes: the server's debug log
+
+#### GET /v1/mac/debug
+
+- **Body:** none.
+- **Answer:** `200 {debug: ServerDebug}`. See The server's debug log.
+
+#### POST /v1/mac/debug
+
+- **Body:** `{on: boolean}`
+- **Answer:** `200 {debug: ServerDebug}`
+- **Refusals:** 400 `bad_value`.
+- **Rules:** at once, and kept. On is for 24 hours from now, also when it was on already. Goes out as
+  `debug`. No route reads the log itself.
+
 ### Routes: Mac-only
 
 There is no battery route: the battery comes in `Snapshot.mac.battery` and `{t:"battery"}`.
@@ -3565,6 +3590,12 @@ objects with a `t` field. On the WebSocket's auth, see Transport and auth.
 - **Shape:** `{t:"update", update: ServerUpdate}`
 - **When:** the server's own update changed: the setting turned on or off, its install begun, a try
   that failed (see The server's own update). An older app ignores it.
+
+#### `{t:"debug"}`
+
+- **Direction:** daemon → client
+- **Shape:** `{t:"debug", debug: ServerDebug}`
+- **When:** the server's debug log was turned on or off from anywhere, or ran out. An older app ignores it.
 
 #### `{t:"agent_settings"}`
 
@@ -6540,6 +6571,15 @@ The setting `releaseCheck` (default on; `POST /local/settings {releaseCheck}` or
 turns it off; turned on, it looks at once. `HYPERNOVA_GITHUB_API` points it at another API (tests
 use a fake GitHub on a local port). `HYPERNOVA_APK_URL` names a published build, which beats
 anything of the server's as the download address.
+
+### The server's debug log
+
+Off by default, and off by itself within 24 hours (docs/DECISIONS.md, "The server's debug log"; what it
+writes: docs/LINUX.md, "The debug log"; docs/SECURITY-MODEL.md). State: `ServerDebug`, as
+`Snapshot.mac.debug` and the `debug` message; absent from an older daemon, where a client offers no switch.
+Changed by `POST /v1/mac/debug {on}`, `hypernova debug on|off`, or `POST /local/settings {debugLog,
+debugHours?}`, where `debugHours` is more than 0 and up to 24 (default 24; else 400 `bad_value`, and nothing
+in that request changes). `settings.debugUntil` keeps it through a restart. The lines stay on the server.
 
 ### The server's own update
 

@@ -32,6 +32,12 @@ Each command's flags are in the rows under it.
 | `-n <lines>`, `--lines <lines>` | That many lines. |
 | `-f`, `--follow` | Keep following it. |
 | `--terminals` | The shared terminals' log instead. |
+| `--debug` | The debug log instead ([The debug log](#the-debug-log)). |
+| **`hypernova debug on\|off\|status`** | Much more in a log of its own, for finding out why something happens. It's off by default and turns itself off after 24 hours. Without a word: `status`, which says when it ends and where the log is. A change counts at once; with the daemon down, it counts from its next start. |
+| `--hours <n>` | With `on`: for that long, more than 0, up to 24. |
+| `--json` | With `status`: as JSON. |
+| **`hypernova debug bundle`** | One scrubbed file to share: `hypernova doctor`'s result, the version, the platform and the recent logs. It prints the path. |
+| `--out <file>` | Write it there. Otherwise it's in the log folder, which keeps the newest 3. |
 | **`hypernova lan on\|off`** | Turns the local route on or off, at once, and keeps it that way ([Ports](#ports)). |
 | **`hypernova auto-update [on\|off]`** | The server installing newer releases by itself ([Updating](#updating)). Without a word: on or off, whether this install can and why not, what it's doing, a try that failed, the last update. `on` also looks for a release at once. |
 | **`hypernova codex [on\|off]`** | OpenAI's Codex for Hypernova. Without a word: its path, its version against the minimum (0.163.0), on or off, signed in. `on` connects the daemon to Codex's own app server and adds a `codex` shell function; it refuses when Codex is missing or too old. Never installs or signs in Codex ([INSTALL.md, "Codex (optional)"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#codex-optional)). |
@@ -323,11 +329,65 @@ counts as `package`, and the next newer release replaces it.
 | `daemon.log` | The daemon. `hypernova logs`. | At 5 MB, to `daemon.log.1` |
 | `terminals.log` | The shared terminals' holders. `hypernova logs --terminals`. | At 5 MB, to `terminals.log.1` |
 | `update.log` | The server's own updates. Read the file: `hypernova logs` doesn't show it. | Never |
+| `debug.log` | The debug log, only while it's on. `hypernova logs --debug`. | At 5 MB, to `debug.log.1`, `.2`, `.3`: 20 MB at most, the oldest going first |
+| `debug-bundle-<time>.txt` | What `hypernova debug bundle` wrote. | The newest 3 stay |
 
 The folder is 0700 and the logs 0600: they name your devices, so look them over before sharing them.
 
 `journalctl --user -u hypernova` has only what escapes the daemon's own log. `hypernova run` prints
 the log on the terminal too, and in a container `docker logs hypernova` has it.
+
+### The debug log
+
+For when the everyday log doesn't say why. On a Mac it's in the same folder as `daemon.log`,
+`~/Library/Logs/Hypernova`, and the commands are the same.
+
+| To | Do |
+|---|---|
+| Turn it on | `hypernova debug on`, or `on --hours 2`; or the app's Settings, that server's section, **Server debug log**; or `POST /local/settings {debugLog: true, debugHours?}` |
+| See how it stands | `hypernova debug` |
+| Read it | `hypernova logs --debug`, with `-n <lines>` and `-f` as for the other logs |
+| Share it | `hypernova debug bundle`, then look it over and send the file |
+| Turn it off | `hypernova debug off`, or the same switch. Otherwise it stops by itself |
+
+It's kept as `settings.debugUntil` in `settings.json`, so a restart within its time leaves it on. It's
+never on for more than 24 hours from now: asking again starts the 24 hours again, and a time written by
+hand in the file further off than that is cut to it. While it's off nothing is written, and a line costs
+one comparison. What it wrote stays until it rolls away, or `hypernova uninstall --purge`.
+
+A line is a time, a tag and an event, then its fields:
+
+```
+2026-11-02T19:46:12.781Z ws out device=FQSGXtUC type=snapshot size=5098
+```
+
+| Tag | What it says |
+|---|---|
+| `http` | Each request on the phone API, the local route and the local API: method, route, status, how long, device id, sizes. |
+| `ws` | Sockets opening, closing and refused, with the reason. Each live-feed message's type and size. A terminal's bytes, once, when it closes. |
+| `tls`, `pair` | Handshakes, connections dropped, codes shown, wrong or refused, a phone paired, a certificate issued. The first 8 characters of a fingerprint at most. |
+| `session`, `hook` | A session seen, its state changes, taken off Home. Each hook by name, and the tool's name. |
+| `proc` | Claude Code and Codex starting and ending: the program's name, its known sub-commands and its flags, the exit code, how long. Also `claude agents`, sign-in checks, MCP servers and an automation's shell. |
+| `automation` | A run and its steps starting and ending, with why. |
+| `usage`, `release`, `update` | The usage probe, the release check and the server's own update, step by step. |
+| `mcp`, `plugin` | Those routes, with their status. |
+| `error` | Uncaught errors and unhandled rejections with their stacks. A failed request's are under `http`. |
+
+**What it never holds**, whatever a line of code passes it, because the write checks: tokens, certificates,
+keys, pairing codes and links, headers, query strings, env values, prompts, replies, tool arguments,
+commands, file contents, session names and project paths. Sessions and devices are the first 8 characters of
+their ids, never a folder's name. A string in a field that isn't one of the daemon's own words is its size,
+`prompt=[39 chars]`, and an error's message is its size too, unless it's one of V8's own ("Cannot read
+properties of undefined"), because a message can quote anything. Tools are named (`tool=Bash`), and an MCP
+server's program is named by its base name. [SECURITY-MODEL.md](https://github.com/ljmerza/Hypernova/blob/main/docs/SECURITY-MODEL.md), "The server's debug log", says how.
+
+**The bundle** scrubs again, because `daemon.log` and `terminals.log` were never written to be shared: they
+name folders and phones, and can quote what Claude Code said. From those two only the words of the daemon's
+own log lines stay, with numbers and short ids, and the rest is `…`, so some lines read as gaps. Your user's,
+the computer's and your phones' names, and the home folder, are taken out too. Doctor's lines keep their paths
+to programs and the server's own addresses. `update.log` isn't in it. Have a look before you send it.
+
+Nothing is sent anywhere: no route sends these lines to a phone, and the file goes only where you take it.
 
 ## Containers and WSL
 

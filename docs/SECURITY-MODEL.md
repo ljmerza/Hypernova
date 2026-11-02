@@ -37,6 +37,8 @@ There is no Hypernova account and no Hypernova server that carries sessions.
   2026-10-30 may still have a `tsnet/` folder with a Tailscale node key in it, no longer read.
 - The daemon log (`~/Library/Logs/Hypernova/daemon.log`, `0600`, in a `0700` folder): names devices,
   projects and events; never tokens, codes or keys (see `SECURITY.md`).
+- The debug log, beside it, only after someone turned it on, and the bundles made from it: section 7, "The
+  server's debug log".
 
 **The phone.** Its device token (the daemon keeps only its hash), the Mac's base URL and name, and
 sessions' text as the app shows it. The token sits in the app's private preferences, not the
@@ -211,6 +213,24 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   secret, is left out, and the home folder is `~`. For a device token only. The same test file plants a secret in
   each of those places, in a command path, and in a URL's query and userinfo, and checks the raw HTTP body. A
   host does say where a server lives, to a paired phone.
+
+### The server's debug log
+
+`debug.log` (`daemon/src/debug-log.ts`; `docs/LINUX.md`, "The debug log"; owner, 2026-11-02): off by default, off by itself within 24 hours, 20 MB at most, `0600` in a `0700` folder. **It never leaves the computer by itself:** no route reads it, for a phone or anyone. A paired device can turn it on or off (`POST /v1/mac/debug`) and see when it ends, nothing more. So can a stolen token: that fills 20 MB of a disk and writes a line in `daemon.log` naming the device, and shows it nothing.
+
+The rules are at the write (`daemon/src/debug-scrub.ts`), so no call site has to remember them, and `daemon/test/debug-log.test.ts` plants each kind through every field and checks the file itself:
+
+- **An event is one of a fixed list; a field's name is a plain word.** Anything else there is its size or goes.
+- **A string is its size by default**: `[39 chars]`. Only named fields may hold a word, and only one word, short, that doesn't look like a key: a method, a state, a reason, a tool's or a program's name, an address on the network. Ids are their first 8 characters. Lists, objects and buffers are never opened.
+- **Names that mean a secret or the owner's words win:** `token`, `cert`, `code`, `authorization` and the like are `•••`; `prompt`, `command`, `cwd`, `title`, `file`, `url`, `env`, `headers` and the like are their size.
+- **A route is its own words.** Never its query. Only the words of the protocol's routes and a session's UUID (cut to 8) stay, so `/hooks/<secret>`, `/p/<token>/…`, an MCP server's name and a file's are `:x`.
+- **A command is its program's base name, its known sub-commands and its flags' names.** Never a value, `--flag=value`'s included, nothing after `--`, and no other word: a prompt is a positional word.
+- **An error is its class, its code, its system call and its stack's frames**, with any file outside the daemon as `[path]`. Its message only when it's one of V8's own wordings, since a message can quote anything: Node's JSON errors quote the text, file errors the path.
+- **Then the whole line goes through the masks**: live values by name (the admin token, the hook secret, a pairing code being shown), PEM blocks, credential headers, anything after a name that says secret, URLs cut to their host, `maskSecrets` and `maskText`, and paths.
+
+**`hypernova debug bundle`** writes one file meant to be shared, so it's stricter. Debug lines are scrubbed again and any not in the writer's shape is left out. `daemon.log` and `terminals.log` hold what they always held (folders, phones' names, an attachment's name, what Claude Code said on stderr, a terminal's command line), so of those only words that appear in the daemon's own `log()` calls stay, read from its source, with numbers, short ids and masks; every other word is `…`. The user's, the computer's and the phones' names and the home folder are taken out. It's `0600`, and goes nowhere until the owner sends it.
+
+**What doesn't hold.** A word the daemon's log lines also use stays in a bundle's everyday lines: a prompt's "the" and "failed" remain, though not the sentence. A one-word value in a word field can't be told from a word of the daemon's: a tool's name is shown, and an MCP tool's name says which server, and a stdio server's program name is shown. A short secret that a call site passed under a word field's name, with nothing to show what it is, would be written; the calls in this repository don't, and only the owner's code runs there. Masks are heuristics, so the fixed shapes above are what's relied on, not them. Doctor's lines in a bundle keep program paths and the server's own addresses. The log says when things happened and which device did them. The bundle is meant to be looked at before it's sent.
 
 ## 8. Known residual risks
 
