@@ -33,5 +33,8 @@ jobs:
           "$SDKM" "platforms;android-37.0" "build-tools;37.0.0" || "$SDKM" "platforms;android-37"
       # Caches Gradle's downloads and the wrapper; it only saves them from the main branch.
       - uses: gradle/actions/setup-gradle@v4
-      # The app, and the shared data layer on both of its targets (docs/PLATFORMS.md, "The shared module").
-      - run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :shared:compileKotlinDesktop :shared:desktopTest :shared:testAndroidHostTest --stacktrace
+      # What Compose for Desktop's native library links against, even with no display (docs/DEV-SETUP.md, "The desktop app").
+      - name: Desktop libraries
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libgl1 libx11-6 libfontconfig1
+      # The app, the shared data layer on both of its targets (docs/PLATFORMS.md, "The shared module") and the desktop app.
+      - run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :shared:compileKotlinDesktop :shared:desktopTest :shared:testAndroidHostTest :desktop:compileKotlin :desktop:test --stacktrace

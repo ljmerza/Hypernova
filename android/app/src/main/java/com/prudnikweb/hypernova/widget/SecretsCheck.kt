@@ -1,4 +1,7 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.widget
+
+import com.prudnikweb.hypernova.data.Secrets
 
 /**
  * What [Secrets] must get right, checked by a debug build once per install (WidgetSync logs the

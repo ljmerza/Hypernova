@@ -69,12 +69,24 @@ private val JSON = "application/json; charset=utf-8".toMediaType()
 
 /** One client for the app: short connect timeout (a Mac on the phone's own network answers quickly or not at all). */
 object Net {
+    /**
+     * Plain http is refused, every request and socket, with what [classify] calls [Problem.Cleartext]. On a
+     * phone Android's network security config does this (res/xml/network_security_config.xml) and this stays
+     * off. A desktop JVM has no such config and OkHttp would send the token in the clear, so the desktop app
+     * turns this on before it pairs or connects.
+     */
+    @Volatile var httpsOnly = false
+
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         // Detects a dead socket even if the daemon's own pings stop arriving.
         .pingInterval(20, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            if (httpsOnly && !chain.request().isHttps) throw UnknownServiceException("CLEARTEXT communication is not permitted here")
+            chain.proceed(chain.request())
+        }
         .build()
 
     /** Uploads queue on their own, so prompts and approvals never wait behind a big file. */

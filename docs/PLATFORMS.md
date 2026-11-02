@@ -60,14 +60,42 @@ the module line (dozens of places).
 its Android half, the Resources that reword themselves, is `ComputerResources`. `readableLine` and the markdown table
 parser came down from `ui/components`, and `ChatRepo` and `ChangesRepo` from `ui`, so `data` imports nothing of `ui`.
 
-**What is left for step 2**, the desktop app itself:
-- A `Platform`: every seam above. There are no desktop implementations yet, not even stubs, since nothing needs them to
-  compile. `TestDevice` shows the shape of each one.
-- `kotlinx-coroutines-swing` (or another `Dispatchers.Main`) on its classpath: `Core.scope` runs on the main dispatcher,
-  and `Core` won't load without one.
-- Words: read the same `res/values` files (the tests' `XmlStrings` does) or move them to shared resources.
-- Where a Linux, Windows or Mac desktop keeps its key and pairing: `DeviceKeys` and `Storage`.
-- The screens: nothing of `ui/` moved. `HubViewModel` is still Android's.
+Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` is still Android's.
+
+## The desktop app (step 2 of the desktop plan, built 2026-11-02)
+
+`android/desktop`: Compose for Desktop 1.12.1 over `:shared`, a JVM app, Linux first and written to be portable. It pairs by a pasted `hypernova pair` link, lists one server's sessions in the phone's three groups, and answers Allow or Deny on a card. A server switcher is there because `Core` already had the rest. The choices and why: docs/DECISIONS.md, "The desktop app". How to run it: docs/DEV-SETUP.md, "The desktop app". Packaging is LATER L105, its section in FEATURES.md comes after this.
+
+**Run on a display? Not yet.** Everything here has run with no window: Compose's test scene, on real TLS, real files and the real `Core`, the demo server included (`DemoServerTest`). The window itself (`Main.kt`: the focus, the minimum size, the icon, closing) hasn't been opened by anyone. On Linux only; nothing has run on a Mac or Windows, and the ACL path in `OwnerOnly` is the part of that written blind.
+
+| Where | What |
+|---|---|
+| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
+| `desktop/src/main/.../desktop/ui/` | `App.kt`, `PairScreen.kt`, `SessionsScreen.kt`; `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
+| `desktop/src/test/` | `PlatformTest`, `WordsTest`, `CardsTest`; through the real screen, `PairingTest`, `ApproveTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+
+**The seams:**
+
+| Seam | Here | |
+|---|---|---|
+| `Strings` | Real | The phone's `res/values`, read at run time, every key tested; `locale` and the clock's pattern are the JVM's |
+| `Storage`, `Prefs` | Real | JSON files in the client's own folder, 0600 in 0700, atomic, written behind as SharedPreferences does |
+| `DeviceKeys` | Real, weaker than a phone's | An owner-only file: DECISIONS, "The desktop app" |
+| `Ticks` | Real | `nanoTime` plus any sleep the wall clock shows |
+| `MainThread` | Real | Swing's event thread, which is also `Dispatchers.Main` (`kotlinx-coroutines-swing`) |
+| `RetryAlarm` | Real | Checked every second against `Ticks`, so it's due as the computer wakes; it doesn't wake it |
+| `Log` | Real | Standard error: warnings always, the rest with `HYPERNOVA_CLIENT_DEBUG` |
+| `AppInfo` | Real | The version as a local build of the phone app says it; `versionCode` at its top, so a server's APK is never an update |
+| `DeviceInfo` | Real | The host's name, `Desktop, Linux amd64` |
+| `NetworkWatcher` | Real, by polling | The JDK's interfaces, without virtual bridges, every 5 s. `kind` is `Wifi` with any and `None` with none: it can't see more. It says nothing about the internet. No hotspots |
+| `ScreenWatcher` | Nearest thing | The window getting the focus. The JVM isn't told about the screen |
+| `BackgroundLink` | Honest no-op | `running` is true: the process is the link, closing the window ends both |
+| `Notifier`, `AutomationNotifier` | No-op that logs | `canPost` is false. Automations' notes are still marked seen. LATER L113 |
+| `SpeechOutput` | Null | Never speaking; a read-aloud that comes in is ignored |
+| `thumbOf` | Null | Nothing attaches pictures here |
+| `started` | Nothing | No widgets follow it |
+
+**Changed in `:shared` for it**, both with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now) and `Net.httpsOnly` (off on Android).
 
 ## 0. What we have to build on
 

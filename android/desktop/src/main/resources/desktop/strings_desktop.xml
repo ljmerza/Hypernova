@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The words only the desktop app has. Everything else it says is the phone's (app/src/main/res/values). -->
+<resources>
+    <string name="desk_pair_help">On your server, run hypernova pair and copy the link it prints under the code. Paste it here. A link works once and lasts 10 minutes.</string>
+    <string name="desk_pair_field">Pairing link</string>
+    <string name="desk_pair_too_long">That\'s more text than a pairing link.</string>
+    <string name="desk_bad_link_body">That isn\'t a pairing link. Run hypernova pair on your server and paste the link it prints.</string>
+    <string name="desk_expired_body">Codes work once and last 10 minutes. On your server, run hypernova pair again and paste the new link.</string>
+    <string name="desk_closed_body">Your server takes a code only while it shows one. Run hypernova pair on it again and paste the new link.</string>
+    <string name="desk_too_many_body">Your server has stopped taking codes for now. Wait a little, run hypernova pair again and paste the new link.</string>
+    <string name="desk_pair_another">Pair another</string>
+    <string name="desk_link_linked">Linked</string>
+    <string name="desk_link_connecting">Connecting…</string>
+    <string name="desk_link_reconnecting">Reconnecting…</string>
+    <string name="desk_link_offline">Offline</string>
+    <string name="desk_link_unpaired">Not paired</string>
+    <string name="desk_stale">These are the sessions as they were when it last answered.</string>
+    <string name="desk_unpaired_title">%1$s no longer accepts this computer.</string>
+    <string name="desk_unpaired_body">To pair again, run hypernova pair on it and paste the link it prints.</string>
+    <string name="desk_pair_again">Pair again</string>
+    <string name="desk_no_sessions">No sessions yet.</string>
+    <string name="desk_no_sessions_body">They show here as soon as your server has some.</string>
+    <string name="desk_answer_on_phone_question">A question. Answer it on your phone.</string>
+    <string name="desk_answer_on_phone_plan">A plan to review. Answer it on your phone.</string>
+    <string name="desk_not_whole">This can\'t be read whole here, so there\'s no Allow. Deny it, or answer it on your phone.</string>
+    <string name="desk_answer_failed">That answer didn\'t get through. It\'s still waiting: try again.</string>
+    <string name="desk_from_agent">From %1$s</string>
+</resources>
