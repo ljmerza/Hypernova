@@ -1,5 +1,12 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.data.Mcp
+import com.prudnikweb.hypernova.data.mcpList
+import com.prudnikweb.hypernova.data.plugins
+import com.prudnikweb.hypernova.data.pluginInstall
+import com.prudnikweb.hypernova.data.pluginUninstall
+import com.prudnikweb.hypernova.data.mcpLive
+import com.prudnikweb.hypernova.data.mcpServer
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.AgentSettingsFile
@@ -67,6 +74,48 @@ class SettingsCallsTest {
         assertEquals(listOf("home-assistant", "github", "db-tools", "docs"), r.of(AgentSettingsReply.CLAUDE).mcp?.servers?.map { it.name })
     }
 
+    // ─── An agent's MCP servers (docs/specs/spec-mcp-manage.md) ───
+
+    @Test fun anAgentsMcpServersAreReadWithTheirNamesEncoded() {
+        connect()
+        answer("GET", "/v1/agents/mcp", "rest-mcp-list")
+        val l = rig.call { rig.hub.mcpList("claude") }.getOrThrow()
+        assertTrue(l.servers.any { it.name == "docs" })
+        answer("GET", "/v1/agents/mcp/status", "rest-mcp-status")
+        val live = rig.call { rig.hub.mcpLive("claude", "home", fresh = true) }.getOrThrow()
+        assertEquals(Mcp.CONNECTED, live.servers.first().status)
+        assertTrue(last("GET", "/v1/agents/mcp/status").query!!.contains("fresh=1"))
+        answer("GET", "/v1/agents/mcp/server", "rest-mcp-server")
+        val page = rig.call { rig.hub.mcpServer("claude", "plugin:a b", "plugin", "f1") }.getOrThrow()
+        assertEquals("docs", page.name)
+        val q = last("GET", "/v1/agents/mcp/server").query!!
+        assertTrue(q, q.contains("name=plugin%3Aa%20b") || q.contains("name=plugin%3Aa+b"))
+    }
+
+    @Test fun aRefusedMcpCallKeepsItsWordsAndAnOlderServerSaysSo() {
+        connect()
+        answer("GET", "/v1/agents/mcp/server", "rest-mcp-no-server", status = 404)
+        val gone = rig.call { rig.hub.mcpServer("claude", "nope", "user", null) }.exceptionOrNull()
+        assertTrue(gone is AgentSettingRefused)
+        daemon.on("GET", "/v1/agents/mcp") { refusal(404, "not_found", "Unknown endpoint.") }
+        assertTrue(rig.call { rig.hub.mcpList("claude") }.exceptionOrNull() is AgentSettingsTooOld)
+    }
+
+    @Test fun aPluginsCallsGoToTheirRoutesAndAnInstallSaysItsClaim() {
+        connect()
+        answer("GET", "/v1/agents/plugins", "rest-plugins")
+        assertEquals("hello@testmp", rig.call { rig.hub.plugins("claude", "f1") }.getOrThrow().plugins.single().id)
+        assertTrue(last("GET", "/v1/agents/plugins").query.contains("folder=f1"))
+        answer("POST", "/v1/agents/plugins/install", "rest-plugin-installed")
+        rig.call { rig.hub.pluginInstall("claude", "hello@testmp", "user", null) }.getOrThrow()
+        val b = JSONObject(last("POST", "/v1/agents/plugins/install").body)
+        assertEquals(true, b.getBoolean("confirmRun"))
+        assertEquals("user", b.getString("scope"))
+        answer("POST", "/v1/agents/plugins/uninstall", "rest-plugin-installed")
+        rig.call { rig.hub.pluginUninstall("claude", "hello@testmp", "user", null) }.getOrThrow()
+        assertFalse(JSONObject(last("POST", "/v1/agents/plugins/uninstall").body).has("confirmRun"))
+    }
+
     // ─── A session's MCP servers (docs/PROTOCOL.md, "A session's MCP servers") ───
 
     @Test fun aSessionsMcpServersAreReadFromTheRoute() {
@@ -131,6 +180,16 @@ class SettingsCallsTest {
         val second = JSONObject(last("PUT", "/v1/agents/settings").body)
         assertEquals(false, second.get("value"))
         assertTrue(second.isNull("expected"))
+    }
+
+    @Test fun aModelsEffortGoesToTheSameRouteAndTakingItOutSendsNull() {
+        connect()
+        answer("PUT", "/v1/agents/settings", "rest-agent-settings-put")
+        val key = "modelSettings.claude-opus-5-5.effortLevel"
+        rig.call { rig.hub.changeAgentSetting("claude", key, "low", "h") }.getOrThrow()
+        assertEquals("low", JSONObject(last("PUT", "/v1/agents/settings").body).getString("value"))
+        rig.call { rig.hub.changeAgentSetting("claude", key, com.prudnikweb.hypernova.data.SettingChoice(null, null, false, null).wire, "h") }.getOrThrow()
+        assertTrue(JSONObject(last("PUT", "/v1/agents/settings").body).isNull("value"))
     }
 
     @Test fun aRefusalKeepsTheServersWordsAndItsCode() {

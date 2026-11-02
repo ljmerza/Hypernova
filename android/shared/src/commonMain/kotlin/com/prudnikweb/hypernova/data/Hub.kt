@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.data
 
+import org.json.JSONObject
 import androidx.compose.runtime.Immutable
 
 /** How the app is talking to the Mac right now. */
@@ -299,6 +300,12 @@ interface Hub {
     suspend fun changeAgentSetting(agent: String, key: String, value: Any, expected: String?): Result<SettingChange> = Result.failure(UnsupportedOperationException())
     /** The agent's last change put back, if the file is still what it wrote ([expected]). Fails as [changeAgentSetting] does. */
     suspend fun undoAgentSetting(agent: String, expected: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /**
+     * One call of the agents' extension routes: MCP servers, plugins, skills (docs/specs/spec-mcp-manage.md). The typed
+     * calls are McpManage.kt's and AgentExtras.kt's. Fails with [AgentSettingRefused] in the server's words, or
+     * [AgentSettingsTooOld]. [slow]: it may start the agent or its servers, so it's given longer.
+     */
+    suspend fun agentExt(method: String, path: String, body: JSONObject? = null, slow: Boolean = false): Result<JSONObject> = Result.failure(UnsupportedOperationException())
     /** The MCP servers set up for a session's folder (docs/PROTOCOL.md, "A session's MCP servers"). */
     suspend fun sessionMcp(id: String): Result<SessionMcpReply> = Result.failure(UnsupportedOperationException())
     /** Read a provider's balance now (OpenRouter); [providers] follows. */

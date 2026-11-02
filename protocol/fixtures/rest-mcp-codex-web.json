@@ -1,0 +1,18 @@
+{
+  "agent": "codex",
+  "name": "web",
+  "scope": "user",
+  "where": "~/.codex/config.toml",
+  "transport": "http",
+  "envNames": [],
+  "headerNames": [
+    "X-Key"
+  ],
+  "hidden": 0,
+  "url": "https://mcp.example.com/m?key=•••",
+  "bearerEnv": "MY_TOKEN",
+  "enabled": true,
+  "authStatus": "bearer_token",
+  "hash": "entry-hash",
+  "editable": true
+}

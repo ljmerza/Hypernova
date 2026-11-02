@@ -1,0 +1,26 @@
+{
+  "agent": "codex",
+  "name": "fetch",
+  "scope": "user",
+  "where": "~/.codex/config.toml",
+  "transport": "stdio",
+  "envNames": [
+    "API_KEY",
+    "INHERITED"
+  ],
+  "headerNames": [],
+  "hidden": 0,
+  "command": "/usr/bin/fetch-mcp",
+  "args": [
+    "--token",
+    "•••"
+  ],
+  "toolsOff": [
+    "wipe"
+  ],
+  "startupTimeout": 20,
+  "enabled": false,
+  "authStatus": "unsupported",
+  "hash": "entry-hash",
+  "editable": true
+}

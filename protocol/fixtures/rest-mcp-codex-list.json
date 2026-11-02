@@ -1,0 +1,32 @@
+{
+  "agent": "codex",
+  "state": "ok",
+  "servers": [
+    {
+      "name": "fetch",
+      "scope": "user",
+      "transport": "stdio",
+      "summary": "fetch-mcp",
+      "enabled": false
+    },
+    {
+      "name": "web",
+      "scope": "user",
+      "transport": "http",
+      "summary": "mcp.example.com",
+      "enabled": true
+    }
+  ],
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    }
+  ],
+  "hidden": 0,
+  "foldersNotRead": 0,
+  "scopes": [
+    "user"
+  ],
+  "undo": null
+}

@@ -33,6 +33,8 @@ import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
 import { agentEvents, backgroundRunning, endSessionAgents, listAgents, validAgentId } from './agents.ts'
 import { sessionMcp } from './agent-settings.ts'
+import { extrasRoute } from './agent-extras.ts'
+import { mcpRoute } from './mcp-routes.ts'
 import { changeSetting, settingsReply, undoChange, type ModelList } from './agent-settings-edit.ts'
 import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
 import { getBattery } from './battery.ts'
@@ -50,7 +52,7 @@ import { AlwaysError, readAlwaysChoice, type AlwaysChoice } from './always.ts'
 import { CONTINUE_TEXT } from './blockers.ts'
 import { checkBalance, hasBalance, providerSaved } from './balance.ts'
 import { checkProvider, type ProviderCheck } from './providers-check.ts'
-import { listModels } from './models.ts'
+import { claudeModelsNow, listModels } from './models.ts'
 import { sessionUsage } from './session-usage.ts'
 import { todosOf } from './todos.ts'
 import { searchHistory } from './search.ts'
@@ -598,7 +600,7 @@ async function api(c: Ctx): Promise<void> {
   // and the shorter list a phone may change, one key at a time (agent-settings-edit.ts).
   if (path === '/v1/agents/settings' && m === 'GET') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
-    return json(res, 200, await settingsReply(await settingsModels()))
+    return json(res, 200, await settingsReply(await settingsModels(), {}, claudeModelsNow()))
   }
   if (path === '/v1/agents/settings' && m === 'PUT') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')
@@ -611,6 +613,17 @@ async function api(c: Ctx): Promise<void> {
     const r = undoChange(await readJsonBody(req))
     afterSettingChange(r.agent, r.key)
     return json(res, 200, r)
+  }
+  // An agent's MCP servers, to see and manage (mcp-routes.ts), for a paired phone.
+  if (path === '/v1/agents/mcp' || path.startsWith('/v1/agents/mcp/') || path === '/v1/agents/plugins' || path.startsWith('/v1/agents/plugins/') || path === '/v1/agents/skills') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
+    const deps = {
+      folders: () => [...listProjects().map((p) => p.path), ...listSessions().flatMap((s) => (s.cwd ? [s.cwd] : []))],
+      body: () => readJsonBody(req),
+      changed: (agent: 'claude' | 'codex') => broadcast({ t: 'agent_settings', agent }),
+    }
+    if (await mcpRoute(path, m, url, res, json, deps)) return
+    if (await extrasRoute(path, m, url, res, json, deps)) return
   }
   // The models each provider offers, for the new-session sheet (models.ts): Claude Code's own list,
   // OpenRouter's catalogue, the providers' settings.

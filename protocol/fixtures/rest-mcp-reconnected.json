@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "server": {
+    "name": "github",
+    "status": "connected",
+    "source": "user",
+    "serverName": "github-mcp",
+    "version": "2.1.0",
+    "tools": [
+      {
+        "name": "create_issue",
+        "destructive": true
+      },
+      {
+        "name": "list_issues",
+        "readOnly": true,
+        "openWorld": true
+      }
+    ]
+  }
+}

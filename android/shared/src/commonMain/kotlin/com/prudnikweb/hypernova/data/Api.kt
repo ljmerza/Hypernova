@@ -143,6 +143,8 @@ class Api(val base: String, private val token: String?, private val fixed: NetRo
     }
 
     suspend fun get(path: String, max: Long = 8L * 1024 * 1024): JSONObject = json(request(path).get().build(), max)
+    /** A GET the server takes a while to answer (it starts the agent to ask): two minutes, the uploads client's. */
+    suspend fun getSlow(path: String): JSONObject = json(request(path).get().build(), client = route().uploads)
     suspend fun post(path: String, body: JSONObject = JSONObject()): JSONObject = json(request(path).post(body.toString().toRequestBody(JSON)).build())
     /** A POST the Mac takes a while to answer (restarting several jobs one after another): two minutes, the uploads client's. */
     suspend fun postSlow(path: String, body: JSONObject = JSONObject()): JSONObject = json(request(path).post(body.toString().toRequestBody(JSON)).build(), client = route().uploads)

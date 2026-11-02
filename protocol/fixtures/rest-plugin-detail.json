@@ -1,0 +1,36 @@
+{
+  "agent": "claude",
+  "id": "hello@testmp",
+  "skills": [
+    "greet",
+    "hi"
+  ],
+  "agents": [
+    "helper"
+  ],
+  "hooks": [
+    "SessionStart"
+  ],
+  "mcpServers": [
+    "hellomcp"
+  ],
+  "lspServers": [],
+  "commands": [],
+  "alwaysOnTokens": 17,
+  "description": "A test plugin",
+  "options": [
+    {
+      "key": "api_token",
+      "sensitive": true,
+      "set": true,
+      "title": "API token"
+    },
+    {
+      "key": "region",
+      "sensitive": false,
+      "set": true,
+      "title": "Region",
+      "value": "eu"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "agent": "claude",
+  "name": "github",
+  "serverName": "tiny",
+  "version": "1.2.3",
+  "instructions": "A tiny server.",
+  "tools": [
+    {
+      "name": "echo",
+      "description": "Says back what it is sent. Docs: https://x.example/d?key=•••",
+      "annotations": {
+        "title": "Echo",
+        "readOnly": true,
+        "openWorld": false
+      },
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "What to say back"
+        },
+        {
+          "name": "times",
+          "type": "integer",
+          "required": false,
+          "default": "1"
+        },
+        {
+          "name": "mode",
+          "type": "one of",
+          "required": false,
+          "choices": [
+            "plain",
+            "loud"
+          ]
+        }
+      ],
+      "schema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"text\": {\n      \"type\": \"string\",\n      \"description\": \"What to say back\"\n    },\n    \"times\": {\n      \"type\": \"integer\",\n      \"default\": 1\n    },\n    \"mode\": {\n      \"enum\": [\n        \"plain\",\n        \"loud\"\n      ]\n    }\n  },\n  \"required\": [\n    \"text\"\n  ]\n}"
+    },
+    {
+      "name": "wipe",
+      "description": "Pretends to wipe something.",
+      "annotations": {
+        "destructive": true,
+        "idempotent": true
+      },
+      "params": [],
+      "schema": "{\n  \"type\": \"object\",\n  \"properties\": {}\n}"
+    }
+  ],
+  "prompts": [
+    {
+      "name": "hello",
+      "description": "Greets.",
+      "args": [
+        "who"
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "name": "notes",
+      "description": "Some notes.",
+      "uri": "tiny://notes"
+    }
+  ],
+  "moreTools": 0
+}

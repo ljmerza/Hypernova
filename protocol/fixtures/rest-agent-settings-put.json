@@ -4,7 +4,7 @@
   "key": "permissions.defaultMode",
   "value": "plan",
   "changed": true,
-  "hash": "c54d00f443460ebf54576a59f6910dbdb12d89c278124c99289562807e8952ee",
+  "hash": "cad0a681fef5b58cf5a65125816d27af9c4ba65fc16928c345236b35a20be460",
   "loosened": false,
   "undo": {
     "key": "permissions.defaultMode",

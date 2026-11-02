@@ -1,0 +1,33 @@
+{
+  "agent": "codex",
+  "folder": "home",
+  "servers": [
+    {
+      "name": "web",
+      "status": "connected",
+      "source": "user",
+      "serverName": "web",
+      "version": "1",
+      "tools": [
+        {
+          "name": "lookup",
+          "readOnly": true
+        }
+      ]
+    },
+    {
+      "name": "bundled",
+      "status": "connected",
+      "source": "plugin",
+      "serverName": "b",
+      "version": "1",
+      "tools": []
+    },
+    {
+      "name": "fetch",
+      "status": "disabled",
+      "source": "user",
+      "tools": []
+    }
+  ]
+}

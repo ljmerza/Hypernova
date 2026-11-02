@@ -310,6 +310,24 @@ const checked = new Set<string>()
  * The fixture [name] (protocol/fixtures/<name>.json) is [value], normalised. With UPDATE_FIXTURES=1
  * it's written instead.
  */
+/** A tiny stdio MCP server: two tools, a prompt and a resource. */
+const TINY_MCP = `
+import { createInterface } from 'node:readline'
+const send = (o) => process.stdout.write(JSON.stringify(o) + '\\n')
+const tools = [
+  { name: 'echo', description: 'Says back what it is sent. Docs: https://x.example/d?key=never-sent', annotations: { title: 'Echo', readOnlyHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: { text: { type: 'string', description: 'What to say back' }, times: { type: 'integer', default: 1 }, mode: { enum: ['plain', 'loud'] } }, required: ['text'] } },
+  { name: 'wipe', description: 'Pretends to wipe something.', annotations: { destructiveHint: true, idempotentHint: true }, inputSchema: { type: 'object', properties: {} } },
+]
+createInterface({ input: process.stdin }).on('line', (l) => {
+  const m = JSON.parse(l)
+  if (m.method === 'initialize') send({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: m.params.protocolVersion, capabilities: { tools: {}, prompts: {}, resources: {} }, serverInfo: { name: 'tiny', version: '1.2.3' }, instructions: 'A tiny server.' } })
+  else if (m.method === 'tools/list') send({ jsonrpc: '2.0', id: m.id, result: { tools } })
+  else if (m.method === 'prompts/list') send({ jsonrpc: '2.0', id: m.id, result: { prompts: [{ name: 'hello', description: 'Greets.', arguments: [{ name: 'who' }] }] } })
+  else if (m.method === 'resources/list') send({ jsonrpc: '2.0', id: m.id, result: { resources: [{ name: 'notes', uri: 'tiny://notes', description: 'Some notes.' }] } })
+  else if (m.id !== undefined) send({ jsonrpc: '2.0', id: m.id, result: {} })
+})
+`
+
 function contract(name: string, value: unknown): void {
   checked.add(name)
   const got = normalise(value)
@@ -1000,6 +1018,7 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
     claudeFile,
     JSON.stringify({
       effortLevel: 'high',
+      modelSettings: { 'claude-opus-5-5': { effortLevel: 'low' } },
       permissions: { defaultMode: 'acceptEdits', allow: ['Read', 'Bash(npm test *)'], ask: ['Bash(git push *)'], deny: [] },
       showThinkingSummaries: true,
       includeCoAuthoredBy: false,
@@ -1036,7 +1055,7 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       projects: { [cwd]: { history: [{ display: 'never-sent' }], mcpServers: { 'db-tools': { command: '/usr/local/bin/uvx', args: ['never-sent'], env: { TOKEN: 'never-sent' } } } } },
     }),
   )
-  writeFileSync(mcpJson, JSON.stringify({ mcpServers: { docs: { type: 'http', url: 'https://user:never-sent@docs.example.com/never-sent?key=never-sent', headers: { Authorization: 'never-sent' } } } }))
+  writeFileSync(mcpJson, JSON.stringify({ mcpServers: { docs: { type: 'http', url: 'https://user:never-sent@docs.example.com/mcp?key=never-sent', headers: { Authorization: 'never-sent' } } } }))
   try {
     const r = await ok(get('/v1/agents/settings'))
     assert.ok(!JSON.stringify(r).includes('never-sent'))
@@ -1063,6 +1082,137 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
 
     contract('rest-agent-settings-undo', await ok(post('/v1/agents/settings/undo', { agent: 'claude', expected: changed.hash })))
     assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).permissions.defaultMode, 'acceptEdits')
+    // An agent's MCP servers: the list, a folder's status from a stand-in process, one server's page.
+    {
+      const { useProbe } = await import('../src/mcp-probe.ts')
+      const { folderId } = await import('../src/mcp-view.ts')
+      useProbe(async (_cwd, _waiting, work) =>
+        work({
+          mcpServerStatus: async () => [
+            { name: 'github', status: 'connected', source: 'user', serverInfo: { name: 'github-mcp', version: '2.1.0' }, config: { type: 'stdio', command: 'never-used' }, tools: [{ name: 'create_issue', annotations: { destructive: true } }, { name: 'list_issues', annotations: { readOnly: true, openWorld: true } }] },
+            { name: 'plugin:context7:context7', status: 'needs-auth', source: 'plugin', config: { type: 'http', url: 'https://mcp.example.com/mcp?key=never-sent' }, tools: [] },
+          ],
+          toggleMcpServer: async () => {},
+          reconnectMcpServer: async () => {},
+        } as never),
+      )
+      const list = await ok(get('/v1/agents/mcp?agent=claude'))
+      // A row says a command's base name, as a session's list does; this scratch one happens to be called that.
+      assert.ok(!JSON.stringify(list.servers.map(({ summary: _, ...row }: any) => row)).includes('never-sent'))
+      // A folder's id comes from its scratch path, and an entry's hash is keyed per run.
+      const stable = (v: unknown) => {
+        let t = JSON.stringify(v)
+        for (const x of list.folders) if (x.id !== 'home') t = t.replaceAll(x.id, `folder-${x.name}`)
+        return JSON.parse(t.replace(/"hash":"[0-9a-f]{32}"/g, '"hash":"entry-hash"'))
+      }
+      contract('rest-mcp-list', stable(list))
+      const status = await ok(get('/v1/agents/mcp/status?agent=claude&folder=home&fresh=1'))
+      assert.ok(!JSON.stringify(status).includes('never-sent'))
+      contract('rest-mcp-status', stable(status))
+      const page = await ok(get(`/v1/agents/mcp/server?agent=claude&name=docs&scope=project&folder=${folderId(cwd)}`))
+      assert.ok(!JSON.stringify(page).includes('never-sent'))
+      contract('rest-mcp-server', stable(page))
+      // A tool's detail comes from the server itself: a tiny one, with a stray secret in a description.
+      const talker = join(scratch, 'tiny-mcp.mjs')
+      writeFileSync(talker, TINY_MCP)
+      writeFileSync(claudeJson, JSON.stringify({ ...JSON.parse(readFileSync(claudeJson, 'utf8')), mcpServers: { github: { command: process.execPath, args: [talker] } } }))
+      contract('rest-mcp-tools', await ok(get('/v1/agents/mcp/tools?agent=claude&name=github&scope=user')))
+      // Changing them, against a stand-in for Claude Code's own commands that does what they do to the file.
+      const { useCli, forgetLast } = await import('../src/mcp-edit.ts')
+      const onDisk = () => JSON.parse(readFileSync(claudeJson, 'utf8'))
+      useCli(async (args) => {
+        const doc = onDisk()
+        if (args[1] === 'add-json') doc.mcpServers[args.at(-2)!] = JSON.parse(args.at(-1)!)
+        if (args[1] === 'remove') delete doc.mcpServers[args.at(-1)!]
+        writeFileSync(claudeJson, JSON.stringify(doc))
+        return { code: 0, stdout: '', stderr: '' }
+      })
+      const form = { agent: 'claude', scope: 'user', name: 'tiny', transport: 'stdio', command: process.execPath, args: [talker, '--token', 'never-sent'], env: [{ name: 'API_TOKEN', value: 'never-sent' }] }
+      contract('rest-mcp-refused-run', await refused(call('POST', '/v1/agents/mcp/servers', form), 403))
+      const added = await ok(post('/v1/agents/mcp/servers', { ...form, confirmRun: true }))
+      contract('rest-mcp-added', stable(added))
+      contract('rest-mcp-file-changed', await refused(call('PUT', '/v1/agents/mcp/servers', { ...form, expected: 'old', confirmRun: true }), 409))
+      await ok(call('PUT', '/v1/agents/mcp/servers', { ...form, args: [talker, '--token', '•••', 'more'], env: [{ name: 'API_TOKEN', keep: true }], expected: added.hash, confirmRun: true }))
+      const listed = await ok(get('/v1/agents/mcp?agent=claude'))
+      assert.ok(!JSON.stringify(listed.undo).includes('never-sent'))
+      contract('rest-mcp-list-undo', stable({ ...listed, undo: { ...listed.undo, command: 'node tiny-mcp.mjs --token •••' } }))
+      contract('rest-mcp-undone', await ok(post('/v1/agents/mcp/undo', { agent: 'claude', confirmRun: true })))
+      forgetLast('claude')
+      useCli(null)
+      contract('rest-mcp-toggled', await ok(post('/v1/agents/mcp/toggle', { agent: 'claude', name: 'github', folder: 'home', enabled: false })))
+      contract('rest-mcp-reconnected', await ok(post('/v1/agents/mcp/reconnect', { agent: 'claude', name: 'github', folder: 'home' })))
+      contract('rest-mcp-not-trusted', await refused(post('/v1/agents/mcp/approval', { agent: 'claude', name: 'docs', folder: folderId(cwd), approved: true, confirmRun: true }), 409))
+      // Codex's, from a stand-in for its CLI and its app-server.
+      const { useCodex } = await import('../src/mcp-codex.ts')
+      useCodex({
+        cli: async () => ({
+          code: 0,
+          stderr: '',
+          stdout: JSON.stringify([
+            { name: 'fetch', enabled: false, transport: { type: 'stdio', command: '/usr/bin/fetch-mcp', args: ['--token', 'never-sent'], env: { API_KEY: 'never-sent' }, env_vars: ['INHERITED'], cwd: null }, disabled_tools: ['wipe'], startup_timeout_sec: 20, auth_status: 'unsupported' },
+            { name: 'web', enabled: true, transport: { type: 'streamable_http', url: 'https://mcp.example.com/m?key=never-sent', bearer_token_env_var: 'MY_TOKEN', http_headers: { 'X-Key': 'never-sent' } }, auth_status: 'bearer_token' },
+          ]),
+        }),
+        rpc: async (work) =>
+          work(async () => ({
+            data: [
+              { name: 'web', authStatus: 'bearerToken', serverInfo: { name: 'web', version: '1' }, tools: { lookup: { name: 'lookup', description: 'Looks it up.', annotations: { readOnlyHint: true }, inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] } } }, resources: [] },
+              { name: 'bundled', pluginId: 'p@m', authStatus: 'unsupported', serverInfo: { name: 'b', version: '1' }, tools: {}, resources: [] },
+            ],
+          })),
+      })
+      for (const [name, value] of [
+        ['rest-mcp-codex-list', await ok(get('/v1/agents/mcp?agent=codex'))],
+        ['rest-mcp-codex-server', await ok(get('/v1/agents/mcp/server?agent=codex&name=fetch&scope=user'))],
+        ['rest-mcp-codex-web', await ok(get('/v1/agents/mcp/server?agent=codex&name=web&scope=user'))],
+        ['rest-mcp-codex-status', await ok(get('/v1/agents/mcp/status?agent=codex&fresh=1'))],
+        ['rest-mcp-codex-tools', await ok(get('/v1/agents/mcp/tools?agent=codex&name=web&scope=user'))],
+      ] as const) {
+        assert.ok(!JSON.stringify(value).includes('never-sent'), name)
+        contract(name, stable(value))
+      }
+      useCodex(null)
+      // Plugins and skills, from stand-ins for the agents' own commands.
+      const { useExtrasCli } = await import('../src/agent-extras.ts')
+      useExtrasCli(async (agent, args) => {
+        const out = (o: unknown) => ({ code: 0, stderr: '', stdout: JSON.stringify(o) })
+        if (args[1] === 'marketplace' && args[2] === 'list') return agent === 'claude' ? out([{ name: 'testmp', source: 'github', repo: 'acme/plugins', installLocation: '/never-sent' }]) : out({ marketplaces: [{ name: 'testmp', root: '/srv/mp', marketplaceSource: { sourceType: 'local', source: '/srv/mp' } }] })
+        if (args.includes('--available')) return out({ installed: [], available: [{ pluginId: 'hello@testmp', name: 'hello', description: 'A test plugin', marketplaceName: 'testmp', version: '1.0.0', source: './plugins/hello' }] })
+        if (args[1] === 'list') return agent === 'claude' ? out([{ id: 'hello@testmp', version: '1.0.0', scope: 'user', enabled: true, installPath: '/never-sent', mcpServers: { hellomcp: { command: 'never-sent', env: { T: 'never-sent' } } }, hasUserConfig: true }]) : out({ installed: [{ pluginId: 'hello@testmp', name: 'hello', marketplaceName: 'testmp', version: '1.0.0', enabled: true, source: { source: 'local', path: '/srv/mp/hello' } }], available: [] })
+        if (args[1] === 'details') return { code: 0, stderr: '', stdout: 'hello 1.0.0\n  Description: A test plugin\n  Source: hello@testmp\n\nComponent inventory\n  Skills (2)  greet, hi\n  Agents (1)  helper\n  Hooks (1)  SessionStart  (harness-only — no model context cost)\n  MCP servers (1)  hellomcp  (tool schemas resolved at runtime; not counted)\n  LSP servers (0)\n\nProjected token cost\n  Always-on:   ~17 tok   added to every session\n' }
+        if (args[1] === 'configure') return out({ pluginId: 'hello@testmp', schema: { api_token: { type: 'string', title: 'API token', sensitive: true }, region: { type: 'string', title: 'Region' } }, inputs: { api_token: '', region: 'eu' }, configured: ['api_token', 'region'], unconfigured: [] })
+        if (args[1] === 'install') return out({ command: 'install', outcome: 'ok', pluginId: 'hello@testmp', message: 'Successfully installed plugin: hello@testmp' })
+        return out({ outcome: 'ok' })
+      })
+      const pluginList = await ok(get('/v1/agents/plugins?agent=claude'))
+      assert.ok(!JSON.stringify(pluginList).includes('never-sent'))
+      contract('rest-plugins', stable(pluginList))
+      contract('rest-plugins-codex', stable(await ok(get('/v1/agents/plugins?agent=codex'))))
+      contract('rest-plugins-available', await ok(get('/v1/agents/plugins/available?agent=claude&q=hello')))
+      contract('rest-plugin-detail', await ok(get('/v1/agents/plugins/detail?agent=claude&plugin=hello@testmp')))
+      contract('rest-plugin-install-refused', await refused(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user' }), 403))
+      contract('rest-plugin-installed', await ok(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user', confirmRun: true })))
+      // Skills: the same stand-ins, and the process's own menu.
+      useProbe(async (_cwd, _waiting, work) =>
+        work({
+          request: async () => ({ response: { skills: [
+            { name: 'mine', display_name: 'mine', description: 'One of mine.', source: 'user', tokens: 5, state: 'on', advertised: true },
+            { name: 'own', display_name: 'own', description: 'Of this folder.', source: 'project', tokens: 8, state: 'off', advertised: false },
+            { name: 'hello:greet', display_name: 'greet', description: 'Says hello.', source: 'plugin', tokens: 4, state: 'on', locked_by: 'plugin', advertised: true },
+          ] } }),
+        } as never),
+      )
+      contract('rest-skills', stable(await ok(get('/v1/agents/skills?agent=claude'))))
+      contract('rest-skill-set', await ok(post('/v1/agents/skills', { agent: 'claude', name: 'mine', state: 'name-only' })))
+      contract('rest-skill-refused', await refused(post('/v1/agents/skills', { agent: 'claude', name: 'mine', state: 'bogus' }), 400))
+      useCodex({ rpc: async (work) => work(async () => ({ data: [{ cwd: '/', skills: [{ name: 'imagegen', description: 'Makes images.', scope: 'system', enabled: true, path: '/never-sent/SKILL.md', interface: { displayName: 'Image Gen', shortDescription: 'Makes images.' } }] }] })) })
+      const codexSkills = await ok(get('/v1/agents/skills?agent=codex'))
+      assert.ok(!JSON.stringify(codexSkills).includes('never-sent'))
+      contract('rest-skills-codex', stable(codexSkills))
+      useCodex(null)
+      useExtrasCli(null)
+      contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
+    }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))
   } finally {
     writeFileSync(claudeFile, world)

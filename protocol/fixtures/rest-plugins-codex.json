@@ -1,0 +1,32 @@
+{
+  "agent": "codex",
+  "plugins": [
+    {
+      "id": "hello@testmp",
+      "name": "hello",
+      "marketplace": "testmp",
+      "version": "1.0.0",
+      "scope": "user",
+      "enabled": true,
+      "hasConfig": false,
+      "mcpServers": [],
+      "source": "local · /srv/mp/hello"
+    }
+  ],
+  "marketplaces": [
+    {
+      "name": "testmp",
+      "type": "local",
+      "where": "/srv/mp"
+    }
+  ],
+  "scopes": [
+    "user"
+  ],
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    }
+  ]
+}

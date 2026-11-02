@@ -25,6 +25,20 @@ sealed interface Route {
     data object Providers : Route { override val key = "providers" }
     /** An agent's user-level settings on this server, to view: [agent] is [AgentSettingsReply.CLAUDE] or [AgentSettingsReply.CODEX]. */
     data class AgentSettings(val agent: String) : Route { override val key = "agent-settings:$agent" }
+    /** An agent's MCP servers on this server: every scope, each to tap (docs/specs/spec-mcp-manage.md). */
+    data class McpServers(val agent: String) : Route { override val key = "mcp:$agent" }
+    /** One MCP server: where it's defined, how it's set up, its status and tools. [folder]: the folder it's looked at from. */
+    data class McpServerPage(val agent: String, val name: String, val scope: String, val folder: String?) : Route { override val key = "mcp:$agent:$scope:$folder:$name" }
+    /** Add an MCP server, or, with [name], change that one. */
+    data class McpEdit(val agent: String, val name: String?, val scope: String?, val folder: String?) : Route { override val key = "mcp-edit:$agent:$scope:$folder:$name" }
+    /** An agent's plugins and marketplaces on this server. */
+    data class Plugins(val agent: String) : Route { override val key = "plugins:$agent" }
+    /** One plugin: what it brings, its options, on, off, update, uninstall. */
+    data class PluginPage(val agent: String, val id: String, val scope: String, val folder: String?, val enabled: Boolean) : Route { override val key = "plugin:$agent:$scope:$folder:$id" }
+    /** The plugins that can be installed, to search. */
+    data class PluginBrowse(val agent: String, val folder: String?) : Route { override val key = "plugin-browse:$agent:$folder" }
+    /** An agent's skills on this server. */
+    data class Skills(val agent: String) : Route { override val key = "skills:$agent" }
     /** Settings › Mac › Connection log (data/ConnLog.kt). */
     data object ConnectionLog : Route { override val key = "connection-log" }
     data class ProviderEdit(val id: String?, val kind: String) : Route { override val key = "provider:${id ?: "new-$kind"}" }

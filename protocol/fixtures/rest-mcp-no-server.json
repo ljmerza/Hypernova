@@ -1,0 +1,7 @@
+{
+  "status": 404,
+  "error": {
+    "code": "no_server",
+    "message": "That server isn’t there any more."
+  }
+}

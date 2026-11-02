@@ -250,7 +250,7 @@ test('both files missing: each agent says so, with nothing else', async () => {
   const body = (await r.json()) as any
   assert.deepEqual(Object.keys(body).sort(), ['claude', 'codex', 'scope'])
   // What can be set by making the file is agent-settings-edit.test.ts's.
-  const { editable: _claude, ...claude } = body.claude
+  const { editable: _claude, effort: _effort, ...claude } = body.claude
   assert.deepEqual(claude, { state: 'missing', values: [], summary: null, mcp: { state: 'missing', servers: [], hidden: 0, foldersNotRead: 0 }, hash: null, undo: null, whyNot: null })
   const { editable: _codex, ...codex } = body.codex
   assert.deepEqual(codex, { state: 'missing', values: [], summary: null, hash: null, undo: null, whyNot: null })
@@ -514,7 +514,7 @@ test('the route: a secret anywhere in ~/.claude.json or a .mcp.json, and none of
       { name: 'project-one', scope: 'project', project: 'routed' },
     ])
     // What a phone can change adds only these, each a hash, a word on the fixed list or a flag (agent-settings-edit.ts).
-    const allowed = new Set(['hash', 'editable', 'choices', 'loosens', 'undo', 'whyNot', 'state', 'values', 'summary', 'key', 'value', 'rules', 'allow', 'ask', 'deny', 'plugins', 'name', 'on', 'mcpServers', 'hookEvents', 'hidden', 'mcp', 'servers', 'scope', 'project', 'foldersNotRead'])
+    const allowed = new Set(['effort', 'rows', 'model', 'hash', 'editable', 'choices', 'loosens', 'undo', 'whyNot', 'state', 'values', 'summary', 'key', 'value', 'rules', 'allow', 'ask', 'deny', 'plugins', 'name', 'on', 'mcpServers', 'hookEvents', 'hidden', 'mcp', 'servers', 'scope', 'project', 'foldersNotRead'])
     for (const k of everyKey(body.claude)) assert.ok(allowed.has(k), `an unexpected key: ${k}`)
   } finally {
     rmSync(join(CLAUDE, '.claude.json'))

@@ -1,0 +1,26 @@
+{
+  "agent": "codex",
+  "name": "web",
+  "serverName": "web",
+  "version": "1",
+  "tools": [
+    {
+      "name": "lookup",
+      "description": "Looks it up.",
+      "annotations": {
+        "readOnly": true
+      },
+      "params": [
+        {
+          "name": "q",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "schema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"q\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"q\"\n  ]\n}"
+    }
+  ],
+  "prompts": [],
+  "resources": [],
+  "moreTools": 0
+}

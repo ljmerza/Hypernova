@@ -3520,3 +3520,143 @@ The owner: "have another agent start on the step two of the desktop app." Step 2
 7. **Copied rather than shared, for now (LATER L115):** `Palette` and the type scale in `ui/Theme.kt` (`Tokens.kt` loads its fonts through `R`; `WordsTest` compares the colours with that file), the chart's numbers in `ui/AtlasPlate.kt` (`fx/Atlas.kt` draws on `android.graphics`), a few parts of the kit in `ui/Kit.kt`, and short rules from `HomeScreen` and `CardNow` (the groups, the sort, a Working card's line). `Marks.kt` has nothing of Android in it, so it isn't copied: the build compiles the app's own file.
 8. **Left out of Atlas here, on purpose:** the grain, the blur under the bars (no Haze), the chart's jumps and its burn-in reasons, the pulse of a needs-you mark, and the phone's haptics. A monospaced command has its ligatures off, since JetBrains Mono joined `--` into one mark in the first pictures. The phone's `Type.mono` asks for nothing either way, and nobody has looked at this on the phone.
 9. **Not done, and said so on screen or in the code:** no notifications (LATER L113), no reading aloud, no updates. A question or a plan says to answer it on the phone. Closing the window ends the process and the link: there's no background.
+
+## Effort per model (2026-11-02)
+
+The owner: "I should be able to edit the effort." `docs/LATER.md`, L104. Checked against Claude Code 2.1.316 by
+what actually reaches the API: a real `claude -p` in a throwaway home, against a stand-in `ANTHROPIC_BASE_URL` that records
+`output_config.effort` on `/v1/messages`.
+
+| `settings.json` | Model | Effort sent |
+|---|---|---|
+| nothing | `claude-opus-5-5` | medium (the model's own) |
+| `effortLevel: "low"` | `claude-opus-5-5`, `claude-sonnet-5-5` | medium: **ignored** |
+| `effortLevel: "low"` | `claude-opus-5`, `claude-sonnet-5` | low |
+| `modelSettings.claude-opus-5-5.effortLevel: "low"` | `claude-opus-5-5`, its alias `opus`, and `claude-opus-5-5[1m]` | low |
+| the same | `claude-sonnet-5-5` | medium: it's per model |
+| `modelSettings.opus.effortLevel: "low"` | `claude-opus-5-5` | low: a key is put in canonical form when read |
+
+1. **What's written is what `/effort` writes:** `modelSettings.<canonical id>.effortLevel` in the user's `settings.json`
+   (the binary's writer; the id is the `model` of Claude Code's own list, `GET /v1/models`).
+2. **A row per model,** in a section of its own, Effort by model: Claude Code's list, and any other model the file already
+   has a level for. Low, medium, high, extra high, or the model's default, which takes the key out. **`max` isn't offered**: the
+   schema refuses it in a file and `/effort max` only lasts a session. A model that doesn't have a level may clamp it, as `/effort` would;
+   the phone doesn't know each model's levels beyond Claude Code's list, which offers all five on every current model.
+3. **Same route, same care.** `PUT /v1/agents/settings` with the key `modelSettings.<model>.effortLevel`: byte-identity, the hash, the backup and Undo as
+   every other key, and `null` to take it out (`docs/specs/spec-mcp-manage.md`). No fingerprint: effort lets nothing act without asking.
+   The model's shape is checked on the server; the words are its list.
+4. **The top-level `effortLevel` stays view-only,** now labelled for what it does: only older models read it.
+5. **Beside the fixed list, not in it**, so an older app sees nothing new: `claude.effort` in the reply.
+6. **When it applies:** new sessions on that model, measured. A running session that hasn't picked an effort of its own may take it when
+   Claude Code reloads settings (its resolver reads the settings table); that wasn't measured, so the screen only promises new sessions.
+7. **Codex** is unchanged: `model_reasoning_effort` was already editable, and it's one value, not per model.
+
+## Managing MCP servers from the phone (2026-11-02)
+
+The owner: "I want to be able to click on an MCP and see where they're in the global settings or agent settings, and … how it's set
+up and its tools … add new MCPs … on a global or project basis … disable or enable or reconnect. All the features that you can do at MCPs, I want to be
+able to do." This replaces "Names only" and "Never args" of "The agents' settings, viewed" 8 and "A session's MCP servers" 3 for this screen: those routes keep their lists as they were.
+
+**The one place it cuts against "bypass stays off the phone":** adding or changing a stdio server, approving a project's servers, and an Undo that puts one back all run a program on
+the server. The owner decided that's allowed, behind a confirm showing the whole command and his fingerprint. Enable, disable and reconnect of an existing server need neither.
+
+1. **Where.** Agents & providers › an agent's Settings › MCP servers: `Route.McpServers`, then a server's page, then the form. Nothing on the session's chat screen. The session sheet's MCP view still lists names:
+   the phone has no way there to open a screen under the sheet, so the link it may have wasn't added.
+2. **What's shown.** Scope, the file, the type, the command and its arguments or the URL, the **names** of env vars and headers, OAuth client and port, timeout. Values of env and
+   headers never leave, whatever they look like. Arguments and URLs are masked where they look like a secret: by the flag before them (`--token xyz`, `--api-key=…`, `-H "X: y"`), by a secret-named
+   `NAME=value`, a `user:pass@` or a secret-named query value, a `Bearer …`, or a random-looking run (`maskSecrets`). Masks are a heuristic: an argument that holds a secret with no sign of it
+   (`mytool hunter2`) would be shown. Only `mcpServers` and a project's MCP keys are read from `~/.claude.json`, which stays closed to the file viewer.
+3. **Status comes from Claude Code, per folder.** A process with no prompt and hooks off (as the "/" list asks) answers `mcpServerStatus()`. It's asked per folder because what's on differs per folder: the screen has a
+   "Seen from" row. It costs no tokens, needs no login, and starts each server, as a session would, so an answer is kept 20 seconds.
+4. **A process under the SDK approves every project server** (2.1.316: `non_interactive`). So it's told, in its flag settings, that each one not yet approved is rejected, and it doesn't start.
+   **`daemon/src/commands.ts`'s "/" list has no such guard and does start them**: measured, a marker file written by an unapproved server. That's older than this and wasn't changed here.
+5. **A tool's detail comes from the server itself.** Claude Code's status gives a tool's name and hints, no description or schema (2.1.316's reply builder; its types offer a `description` it doesn't fill). So
+   `daemon/src/mcp-client.ts` is a small MCP client for stdio, Streamable HTTP and SSE: it starts the server as Claude Code would, with its env and `${VAR}` expanded, asks `tools/list`, `prompts/list`, `resources/list`,
+   and stops. Tools are never called. Never for a server that's off or not approved. A plugin's, an organization's or a claude.ai connector's has names and hints only: its env isn't in a file this reads.
+   A server signed in through OAuth answers 401 here too, because the tokens are Claude Code's and aren't read: it shows names and hints, saying it needs signing in only if Claude Code also says so.
+6. **Adding goes through Claude Code's commands:** `claude mcp add-json`, as the form's fields become its JSON, so its own validation and its writer (and lock) hold. A client secret goes as `MCP_CLIENT_SECRET`. **Other secrets are on that command's argv for a moment**,
+   visible to `ps` for other local users of that computer: the CLI has no other way in, and the alternative was hand-writing a file many processes rewrite. Output from these commands is never kept: `claude mcp get` prints env values, so it isn't run at all.
+   A failure's line is shown with what was sent and what looks secret taken out.
+7. **Editing is remove then add**, since Claude Code has no edit. If the add fails the old entry goes back. A name can't change, nor a scope: that's remove and add. Fields the form doesn't have (`alwaysLoad`, a helper) carry over.
+   Removing may drop a stored OAuth sign-in with the entry; not checked, so it may ask to sign in again.
+8. **A secret is write-only on the form.** A row already on the server says its value stays, with Replace and Remove. An argument still masked stands for the real one. A mask the server didn't give out is refused rather than written as three dots.
+9. **Undo** of the last add, edit or remove, one step, while the entry is what that change left. It's kept like a settings backup: the whole entry, 0600 in a 0700 folder under `<support>`.
+10. **Enable and disable are per folder**, as in `/mcp`: Claude Code's writer puts the name in that project's `disabledMcpServers`. There's no global off. A session already running keeps what it has, and the page says Restart session picks it up.
+11. **Reconnect** is `reconnectMcpServer()` in a fresh process: it says whether the server connects now. It doesn't reach a running session, which holds its own connections. Typing `/mcp reconnect <name>` in that session still does, and Restart session reloads them all. A per-session reconnect from this screen isn't built.
+12. **Approving** writes `enabledMcpjsonServers` in the folder's `.claude/settings.local.json`, where Claude Code's own dialog writes it (it has no command for this), in place and atomically, a link refused. **Claude Code ignores a folder's own approvals until the folder is trusted**, so Approve on an untrusted folder
+    says so (409 `not_trusted`): the phone doesn't accept the trust dialog, which covers much more than servers. Turning one down needs no check. `claude mcp reset-project-choices` is "Forget this folder's answers".
+13. **OAuth works from the phone**, which wasn't expected: `claude mcp login --no-browser` needs a terminal to take the pasted address, so one runs unseen on the server. The phone opens the page in its browser, which ends at a localhost address that doesn't load; pasted back, only if it's `localhost`, it goes in as typed.
+    Tokens stay with Claude Code. A connector of a claude.ai account is managed on claude.ai.
+
+### Every MCP capability, and whether it's here
+
+| Claude Code | Here |
+|---|---|
+| `claude mcp add`, `add-json` (stdio, http, sse; `-e`, `-H`, `--scope`, `--client-id`, `--client-secret`, `--callback-port`) | Yes, as the form |
+| `add-json` of a `ws` server | Shown, not added or edited: `add` doesn't offer it and the form doesn't |
+| `claude mcp list`, `get` (status) | Yes, from `mcpServerStatus()`, adding hints and tools |
+| `claude mcp remove` | Yes, with Undo |
+| `claude mcp login`, `--no-browser`; `logout` | Yes |
+| `claude mcp reset-project-choices` | Yes |
+| `claude mcp add-from-claude-desktop` | No: Mac and WSL only, and it reads another app's config |
+| `claude mcp serve` | No: it makes Claude Code a server, nothing to manage |
+| `/mcp`: view tools, enable, disable, reconnect, authenticate, re-authenticate, clear authentication, approve | Yes. Reconnect as in 11 |
+| `/mcp`: "Connect on claude.ai", a connector's sign-in | No: it's on claude.ai |
+| SDK `setMcpServers()` | No: it only changes one session's own dynamic set |
+| SDK `mcp_call` (run a tool) | No: seeing a tool isn't running one, and this is what approvals guard |
+| `enableAllProjectMcpServers`, `allowedMcpServers`, `deniedMcpServers`, `managedMcpServers` | Read where they affect approval; not set here |
+| `alwaysLoad`, `headersHelper`, per-tool policy | Shown or carried over; not on the form |
+
+## Codex's MCP servers (2026-11-02)
+
+The same screens for Codex 0.164.0, for what it really has, checked against the real binary in a throwaway `CODEX_HOME`.
+
+| | Claude Code | Codex |
+|---|---|---|
+| Scopes | user, local, project, plugin, managed, claude.ai | **One: `~/.codex/config.toml`.** `codex mcp add` says "global". Its binary names a trusted repository's `.codex/config.toml`, not read or written here, so a server there isn't listed. Plugins' show in the status |
+| Types | stdio, HTTP, SSE; `ws` shown | stdio, streamable HTTP. SSE is refused |
+| Reading | `~/.claude.json`, `.mcp.json` | `codex mcp list --json`, which prints env and header values: read on the server and filtered |
+| Status and tools | `mcpServerStatus()` for names; the daemon's own client for details | `mcpServerStatus/list` from a short-lived `codex app-server`: **tools in full, with schemas**, so no client of ours |
+| Writing | `claude mcp add-json`, secrets on its argv for a moment | `config/value/write`, Codex's own writer, so **secrets never go on a command line**, and comments in the file stay. `codex mcp add` isn't used: it can't set headers |
+| On and off | Per folder | **`enabled` in the server's table: everywhere.** There's no per-folder list, and the page says so |
+| Reconnect | A fresh process's `reconnectMcpServer()` | `config/mcpServer/reload` on the daemon's connection, if it has one, then a fresh look. Reasoned, not run: no test has a live shared app-server |
+| Approval of a project's servers | Yes | **None**: no such thing. 409 `not_for_codex` |
+| Sign-in | `claude mcp login --no-browser` | `codex mcp login --no-browser`, the same paste; Codex takes it through the same hidden terminal |
+| Prompts | Listed | Its answer has none. Resources listed |
+
+`bearer_token_env_var` is on the form for an HTTP server, as a variable's name, never a token. Fields the form doesn't have carry over on an edit (`enabled_tools`, `disabled_tools`, timeouts, `env_vars`, `cwd`, `env_http_headers`), and show on the page.
+Not on the form, though the CLI has them: `--oauth-client-id`, `--oauth-client-secret`, `--oauth-client-registration`, `--oauth-resource`, `login --scopes`.
+
+## Plugins from the phone (2026-11-02)
+
+The owner: "since we're doing MCP management we're going to have to do plugin management as well, adding, removing, etc." Agents & providers › an agent's Settings › Plugins; nothing on the chat screen. Each action is the agent's own command (`claude plugin …`, `codex plugin …`) or Codex's app-server, and what leaves is named fields: `claude plugin list --json` carries a plugin's whole MCP setup, env included, so only its server names are kept.
+
+1. **What runs code, measured.** A plugin's `SessionStart` hook that notes each run, watched through install, disable, enable, update, marketplace update and uninstall: it ran **for none of them**. Its code runs from the next session on.
+2. **So a fingerprint for installing a plugin and adding a marketplace**: the source in full on a confirm first (the marketplace, its source, the plugin's source), because they decide what code arrives. **Not for enable, disable, uninstall, removing a marketplace**: they ran nothing. **Not for update, marketplace update**: they fetch from a source already trusted, as Claude Code's own auto-update does. A decision, and one to look at: an update can bring new hooks. Enabling a plugin lets it run again at the next session, and doesn't ask.
+3. **A plugin that installs by running a command** (a marketplace's command source, or a `headersHelper` for its archive): Claude Code reports the command and its hash and won't go on without them. The phone shows that command on a second confirm with the fingerprint and sends the hash back (`--accept-command`). **Only reasoned and tested with a stand-in**: no such plugin was to hand.
+4. **A plugin's options:** `claude plugin configure --json` and `--values-stdin`, so values aren't on a command line. A sensitive option is write-only: it says it's set. Claude Code keeps those in its own credentials store.
+5. **Details are parsed from text:** `claude plugin details` has no JSON. If its wording changes, the lists come back empty rather than wrong, and the page says it doesn't list anything.
+6. **The full list of what can be installed** is thousands long (the official directory): it's searched on the server, 100 at a time, cached 5 minutes.
+
+| `claude plugin` / `/plugin` | Here |
+|---|---|
+| `list`, `list --available` | Yes |
+| `details` (inventory, projected tokens) | Yes, for what's installed |
+| `install` (`--scope`, `--accept-command`) | Yes. `--marketplace <source>`, `--registry`, `--config` aren't on the screen |
+| `uninstall` (`--scope`, `--keep-data`), `enable`, `disable`, `update`, `prune` | Yes in the route. `--keep-data`, `disable --all`, `uninstall --prune` and `prune` have no button |
+| `configure` | Yes |
+| `marketplace add`, `list`, `remove`, `update` | Yes. `--sparse` and `--claudeai` aren't on the screen |
+| `init`, `tag`, `validate`, `eval`, `test`, `--data-size` | No: for writing plugins, at a terminal |
+
+**Codex's**, checked on 0.164.0 with a local marketplace: `codex plugin list`, `add`, `remove`, `marketplace add`, `list`, `upgrade`, `remove`, and `plugin/read` and `config/value/write` for what a plugin brings and for `plugins."id".enabled`. **What differs:** one scope; no `update` of a plugin; no options; no `prune` (409 `not_for_codex`); it needs `plugin@marketplace`; what a plugin brings comes from its own read, with apps too.
+
+## Skills from the phone (2026-11-02)
+
+The owner: "Also skills, I think you can disable and enable, and something else I don't remember." Found, in Claude Code 2.1.316's binary and Codex 0.164.0's schema:
+
+1. **The something else: Claude Code has four states, not two** (`skillOverrides`, what `/skills` writes): `on`; `name-only`, listed without its description, so it costs almost no context; `user-invocable-only`, hidden from Claude but `/name` still works; `off`, hidden from both. All four are here, in words.
+2. **The list is Claude Code's own `/skills` menu**, from a process in the folder: name, description, source (user, project, plugin, built-in…), token estimate, state, and what locks it (the skill's own author, its plugin, a managed or flag setting). The request (`get_skills_dialog`) is marked internal in its protocol and isn't in the SDK's types, so **a later version may change it**; a missing answer lists none rather than breaking. A locked one says why and has no picker.
+3. **Written through `claude edit-skill-overrides`**, which is what VS Code uses, into the **folder's** `.claude/settings.local.json`: as in `/skills`, it's per folder, and the screen has "Seen from". It reads the user's and a project's too but only writes local.
+4. **Codex: on or off**, through `skills/list` and `skills/config/write`, into `config.toml`, for every folder. Source: user, project, built-in, plugin, managed.
+5. **Found and not built:** `disableBundledSkills` (one setting, all of Claude Code's own skills off), and a skill's own frontmatter (`disable-model-invocation`, `user-invocable`), which is editing its file. Adding or deleting a skill is a file too, and **"no new way to reach files" holds**: a skill's SKILL.md isn't shown or changed. `claude plugin init` scaffolds one at a terminal. Codex's `skills/extraRoots/set` isn't used.
+

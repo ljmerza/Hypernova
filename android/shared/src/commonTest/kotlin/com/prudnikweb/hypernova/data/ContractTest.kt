@@ -611,7 +611,196 @@ class ContractTest {
             // Nothing view-only is offered, and approvals as a table can't be edited in place.
             assertEquals(listOf("permissions.defaultMode", "showThinkingSummaries", "autoUpdatesChannel"), r.claude.editable.map { it.key })
             assertEquals(listOf("model_reasoning_effort", "sandbox_mode", "web_search"), r.codex.editable.map { it.key })
+            // Effort per model, beside the fixed list: a row per model, and null to take one out.
+            val effort = r.claude.effort!!
+            assertEquals(ShownSetting.SET, effort.rows.single { it.model == "claude-opus-5-5" }.shown.state)
+            assertEquals("low", effort.rows.single { it.model == "claude-opus-5-5" }.shown.text)
+            assertEquals(ShownSetting.UNSET, effort.rows.single { it.model == "claude-sonnet-5-5" }.shown.state)
+            assertEquals(listOf("low", "medium", "high", "xhigh", null), effort.choices.map { it.text })
+            assertTrue(effort.choices.last().clears)
+            assertNull(r.codex.effort)
         },
+        "rest-mcp-list" to { o ->
+            val l = McpList.wire(o)
+            assertEquals("claude", l.agent)
+            assertEquals(AgentSettingsFile.OK, l.state)
+            assertEquals("stdio", l.servers.single { it.name == "github" }.transport)
+            assertEquals(Mcp.USER, l.servers.single { it.name == "github" }.scope)
+            assertEquals(Mcp.LOCAL, l.servers.single { it.name == "db-tools" }.scope)
+            val docs = l.servers.single { it.name == "docs" }
+            assertEquals(Mcp.PROJECT, docs.scope)
+            assertEquals("http", docs.transport)
+            assertEquals("docs.example.com", docs.summary)
+            assertEquals("pending", docs.approval)
+            assertNotNull(docs.folder)
+            assertEquals(Mcp.HOME, l.folders.first().id)
+            assertTrue(l.folders.any { it.id == docs.folder })
+        },
+        "rest-mcp-status" to { o ->
+            val r = McpLiveReply.wire(o)
+            assertEquals(Mcp.HOME, r.folder)
+            val gh = r.servers.single { it.name == "github" }
+            assertEquals(Mcp.CONNECTED, gh.status)
+            assertEquals(Mcp.USER, gh.source)
+            assertEquals("github-mcp", gh.serverName)
+            assertEquals("2.1.0", gh.version)
+            assertEquals(listOf("create_issue", "list_issues"), gh.tools.map { it.name })
+            assertTrue(gh.tools[0].destructive)
+            assertTrue(gh.tools[1].readOnly)
+            assertTrue(gh.tools[1].openWorld)
+            assertNull(gh.setup)
+            val p = r.servers.single { it.source == Mcp.PLUGIN }
+            assertEquals(Mcp.NEEDS_AUTH, p.status)
+            assertEquals("https://mcp.example.com/mcp?key=•••", p.setup?.url)
+        },
+        "rest-mcp-server" to { o ->
+            val s = McpServer.wire(o)
+            assertEquals("docs", s.name)
+            assertEquals(Mcp.PROJECT, s.scope)
+            assertEquals("http", s.setup.transport)
+            assertEquals("https://•••@docs.example.com/mcp?key=•••", s.setup.url)
+            assertEquals(listOf("Authorization"), s.setup.headerNames)
+            assertEquals("pending", s.approval)
+            assertNotNull(s.hash)
+            assertTrue(s.editable)
+            assertTrue(s.where!!.endsWith(".mcp.json"))
+        },
+        "rest-mcp-tools" to { o ->
+            val f = McpFacts.wire(o)
+            assertNull(f.whyNot)
+            val echo = f.tools.single { it.name == "echo" }
+            assertEquals("Echo", echo.title)
+            assertEquals(true, echo.readOnly)
+            assertEquals(false, echo.openWorld)
+            assertNull(echo.destructive)
+            assertTrue(echo.description!!.contains("key=•••"))
+            assertEquals(listOf("text", "times", "mode"), echo.params.map { it.name })
+            assertEquals(listOf(true, false, false), echo.params.map { it.required })
+            assertEquals("1", echo.params[1].default)
+            assertEquals(listOf("plain", "loud"), echo.params[2].choices)
+            assertNotNull(echo.schema)
+            assertEquals(true, f.tools.single { it.name == "wipe" }.idempotent)
+            assertEquals("hello", f.prompts.single().name)
+            assertEquals(listOf("who"), f.prompts.single().args)
+            assertEquals("tiny://notes", f.resources.single().uri)
+            assertEquals("A tiny server.", f.instructions)
+        },
+        "rest-mcp-added" to { o -> assertTrue(o.bool("ok")); assertNotNull(o.str("hash")) },
+        "rest-mcp-refused-run" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
+        "rest-mcp-file-changed" to { o -> assertEquals(AgentSettingRefused.FILE_CHANGED, Api.errorOf(409, o.toString()).code) },
+        "rest-mcp-toggled" to { o -> assertTrue(o.bool("ok")); assertFalse(o.bool("enabled")) },
+        "rest-mcp-reconnected" to { o -> assertEquals(Mcp.CONNECTED, o.obj("server")?.let(McpLiveReply::one)?.status) },
+        "rest-mcp-not-trusted" to { o -> assertEquals("not_trusted", Api.errorOf(409, o.toString()).code) },
+        "rest-mcp-list-undo" to { o ->
+            val u = McpList.wire(o).undo!!
+            assertEquals("edit", u.op)
+            assertTrue(u.needsCheck)
+            assertTrue(u.command!!.contains("•••"))
+        },
+        "rest-mcp-undone" to { o -> assertTrue(o.bool("ok")) },
+        "rest-mcp-codex-list" to { o ->
+            val l = McpList.wire(o)
+            assertEquals(AgentSettingsReply.CODEX, l.agent)
+            assertEquals(listOf(Mcp.USER), l.scopes)
+            assertEquals(listOf("fetch", "web"), l.servers.map { it.name })
+            assertEquals(listOf(Mcp.HOME), l.folders.map { it.id })
+        },
+        "rest-mcp-codex-server" to { o ->
+            val s = McpServer.wire(o)
+            assertEquals("~/.codex/config.toml", s.where)
+            assertEquals(listOf("API_KEY", "INHERITED"), s.setup.envNames)
+            assertEquals(false, s.enabled)
+            assertEquals(listOf("--token", "•••"), s.setup.args)
+            assertEquals(listOf("wipe"), s.setup.toolsOff)
+            assertEquals(20, s.setup.startupTimeout)
+            assertEquals("unsupported", s.authStatus)
+        },
+        "rest-mcp-codex-web" to { o ->
+            val s = McpServer.wire(o)
+            assertEquals(Mcp.HTTP, s.setup.transport)
+            assertEquals("MY_TOKEN", s.setup.bearerEnv)
+            assertEquals(listOf("X-Key"), s.setup.headerNames)
+        },
+        "rest-mcp-codex-status" to { o ->
+            val r = McpLiveReply.wire(o)
+            assertEquals(Mcp.DISABLED, r.servers.single { it.name == "fetch" }.status)
+            val web = r.servers.single { it.name == "web" }
+            assertEquals(Mcp.CONNECTED, web.status)
+            assertEquals(listOf("lookup"), web.tools.map { it.name })
+            assertEquals(Mcp.PLUGIN, r.servers.single { it.name == "bundled" }.source)
+        },
+        "rest-mcp-codex-tools" to { o ->
+            val f = McpFacts.wire(o)
+            assertEquals("Looks it up.", f.tools.single().description)
+            assertEquals(listOf("q"), f.tools.single().params.map { it.name })
+        },
+        "rest-plugins" to { o ->
+            val r = PluginsReply.wire(o)
+            val p = r.plugins.single()
+            assertEquals("hello@testmp", p.id)
+            assertEquals("hello", p.name)
+            assertEquals("testmp", p.marketplace)
+            assertEquals(Mcp.USER, p.scope)
+            assertTrue(p.enabled)
+            assertTrue(p.hasConfig)
+            assertEquals(listOf("hellomcp"), p.mcpServers)
+            assertEquals(Marketplace("testmp", "github", "acme/plugins"), r.marketplaces.single())
+            assertEquals(listOf("user", "project", "local"), r.scopes)
+            assertEquals(Mcp.HOME, r.folders.first().id)
+        },
+        "rest-plugins-codex" to { o ->
+            val r = PluginsReply.wire(o)
+            assertEquals(listOf(Mcp.USER), r.scopes)
+            assertEquals("local · /srv/mp/hello", r.plugins.single().source)
+            assertEquals("/srv/mp", r.marketplaces.single().where)
+        },
+        "rest-plugins-available" to { o ->
+            val r = AvailableReply.wire(o)
+            assertEquals(1, r.total)
+            assertEquals("./plugins/hello", r.plugins.single().source)
+            assertEquals("A test plugin", r.plugins.single().description)
+        },
+        "rest-plugin-detail" to { o ->
+            val d = PluginDetail.wire(o)
+            assertEquals(listOf("greet", "hi"), d.skills)
+            assertEquals(listOf("helper"), d.agents)
+            assertEquals(listOf("SessionStart"), d.hooks)
+            assertEquals(listOf("hellomcp"), d.mcpServers)
+            assertEquals(17, d.alwaysOnTokens)
+            assertEquals("A test plugin", d.description)
+            val secret = d.options.single { it.key == "api_token" }
+            assertTrue(secret.sensitive)
+            assertTrue(secret.set)
+            assertNull(secret.value)
+            assertEquals("eu", d.options.single { it.key == "region" }.value)
+        },
+        "rest-plugin-install-refused" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
+        "rest-plugin-installed" to { o ->
+            val c = PluginChange.wire(o)
+            assertTrue(c.ok)
+            assertNull(c.acceptCommand)
+            assertTrue(c.message!!.contains("installed"))
+        },
+        "rest-skills" to { o ->
+            val r = SkillsReply.wire(o)
+            assertEquals(listOf(SkillsReply.ON, SkillsReply.NAME_ONLY, SkillsReply.USER_ONLY, SkillsReply.OFF), r.states)
+            val mine = r.skills.single { it.name == "mine" }
+            assertEquals("One of mine.", mine.description)
+            assertEquals("user", mine.source)
+            assertEquals(5, mine.tokens)
+            assertNull(mine.lockedBy)
+            assertEquals(SkillsReply.OFF, r.skills.single { it.name == "own" }.state)
+            assertEquals("plugin", r.skills.single { it.name == "hello:greet" }.lockedBy)
+        },
+        "rest-skills-codex" to { o ->
+            val r = SkillsReply.wire(o)
+            assertEquals(listOf(SkillsReply.ON, SkillsReply.OFF), r.states)
+            assertEquals("Image Gen", r.skills.single().displayName)
+            assertEquals("built-in", r.skills.single().source)
+        },
+        "rest-skill-set" to { o -> assertTrue(o.bool("ok")); assertEquals(SkillsReply.NAME_ONLY, o.str("state")) },
+        "rest-skill-refused" to { o -> assertEquals("bad_state", Api.errorOf(400, o.toString()).code) },
+        "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)
             assertTrue(c.changed)
