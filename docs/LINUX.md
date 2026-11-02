@@ -81,7 +81,7 @@ Each [release](https://github.com/ljmerza/Hypernova/releases/latest) carries:
 | `hypernova-server-<tag>-linux-amd64.deb`, `…-linux-arm64.deb` | The same server as a Debian package (below). |
 | `hypernova-client-<tag>-android.apk` | The client, the Android app. |
 
-A Mac has its own files: [INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac-untested-on-a-real-one). Every file's
+A Mac has its own files: [INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac). Every file's
 checksum is in the release's `SHA256SUMS`.
 
 The `.deb`, on the server:
@@ -309,7 +309,7 @@ doesn't stop the server's own update.
 | "This daemon isn't run by its systemd service" | `hypernova run`, or a daemon started by hand: `systemctl --user start hypernova`. |
 | "The systemd service doesn't run this install" | `hypernova setup`. |
 | "No systemd-run here" | Install systemd's `systemd-run`, or update by hand. |
-| "A Mac doesn't update itself yet" | The `get.sh` line again. [INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac-untested-on-a-real-one). |
+| "A Mac doesn't update itself yet" | The `get.sh` line again. [INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac). |
 
 Setup leaves the answer in `install.json`: `checkout` when the folder it installed from, or the one
 above it, has a `.git`, else `package`. So a package you made yourself with `scripts/pack-linux.sh`

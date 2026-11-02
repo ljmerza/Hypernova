@@ -54,8 +54,8 @@ The server updates itself to new releases (`hypernova auto-update off` turns tha
 (`hypernova-server-<tag>-linux-amd64.deb`, then `hypernova-server-setup`). Docker and the manual steps
 are in [`docs/LINUX.md`](docs/LINUX.md).
 
-The same `curl` line installs the server on a Mac, which hasn't been tried on a real one yet and doesn't
-update itself: [`docs/INSTALL.md`, "On a Mac"](docs/INSTALL.md#on-a-mac-untested-on-a-real-one).
+The same `curl` line installs the server on a Mac; it has run on GitHub's Mac runners, but not yet on a person's own Mac, and it doesn't
+update itself: [`docs/INSTALL.md`, "On a Mac"](docs/INSTALL.md#on-a-mac).
 
 ## What you can do from the phone
 

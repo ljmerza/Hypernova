@@ -3439,3 +3439,12 @@ some of its words leave room for doubt (the end of this section).
 - A new file can hold code from an original that was split up, too little alike for the script to pair them. `CHANGES.md`'s statement that the
   whole project is modified is what covers those.
 - Rename detection is a heuristic, and "alike" isn't a legal test. The script's list is a careful one and not a proof that it's complete.
+
+## The daemon's tests on a Mac (2026-11-02)
+
+The owner, of the first `macos-unit` run on GitHub's Mac runner, 13 failures of 1089: sort each into a test that assumes Linux or a real bug a Mac user would hit, and don't skip to make it green without knowing why.
+
+1. **Most were the tests' own Linux assumptions, and were reproduced here without a Mac:** a temp folder under a symlink (what `/var` is on a Mac) brings seven of them back on Linux. The daemon was right each time: it and Claude Code work in a project's real path. The two tests that hadn't taken their scratch folder's real path now do, as `speech.test.ts` and `usage-probe.test.ts` already did.
+2. **The contract tests still compare everything on a Mac.** The fixtures are a Linux server's, because the phone's parsers read them. What a Mac says differently on purpose (`platform`, `unavailable`, Stay awake's default, why it doesn't update itself, "the Mac" for "the server", `say`'s own voices) is checked and then set to the fixture's value. Only the two 501 refusals, which a Mac has no reason to make, aren't run there.
+3. **One real finding, not fixed:** `say --file-format=m4af --data-format=aac` hung on that runner until it was killed, and `POST /v1/speech` answered 502 after 40 seconds, while the same `say` made a play's WAV in a second or two. Nothing says why, or whether a person's Mac does it, and changing the format blind would swap a known failure for an unknown one. A play is what the app uses first, and it works there. The tests now ask the machine, and hold the 502 where it can't; `macos-unit` prints what `say` and `afconvert` can make (LATER L108).
+4. **`macos-unit` keeps `continue-on-error` until a run has shown it green.** Those fixes were checked on Linux with a symlinked temp folder and with `process.platform` set to `darwin`, not on a Mac.

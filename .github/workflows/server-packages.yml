@@ -6,10 +6,10 @@ name: server-packages
 #     that fails here can't stop that release, and costs only its own file. It's also why the release
 #     doesn't wait for the Mac runners.
 #   - a pull request that touches these files, or a manual run: everything is built and tested and
-#     kept as the run's artifacts. Nothing is published. This is how to try a change on a real Mac.
+#     kept as the run's artifacts. Nothing is published. This is how to try a change on GitHub's Macs.
 #
-# There's no Mac here to run this on: scripts/test-macos-smoke.sh, on these runners, is the only real
-# Mac test there is (docs/RELEASING.md, "The Mac packages"). No secrets: the .pkg is unsigned.
+# There's no Mac here to run this on: scripts/test-macos-smoke.sh, on these runners, is the only
+# Mac test there is, and no person's Mac (docs/RELEASING.md, "The Mac packages"). No secrets: the .pkg is unsigned.
 on:
   workflow_call:
     inputs:
@@ -152,8 +152,9 @@ jobs:
           path: |
             dist/macos/hypernova-server-*
 
-  # The daemon's whole suite on a Mac, to read: its tests are written on Linux and some may assume
-  # it, so a failure here says something to look at and holds nothing back.
+  # The daemon's whole suite on a Mac. Nothing depends on it, so it never holds a package back. Its
+  # first run failed 13 tests, all sorted out (docs/DECISIONS.md, "The daemon's tests on a Mac");
+  # continue-on-error stays until a run has shown it green, because that hasn't happened yet.
   macos-unit:
     runs-on: macos-latest
     timeout-minutes: 25
@@ -168,6 +169,25 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: daemon/package-lock.json
+      # What this machine's `say` can make, to read: its AAC hung on the macOS 26 image while its WAV
+      # took a second or two. This says which formats it is, and whether afconvert could stand in.
+      - name: What say renders here
+        continue-on-error: true
+        run: |
+          try() {
+            out=$1; shift
+            start=$SECONDS
+            perl -e 'alarm shift; exec @ARGV' 20 "$@" </dev/null
+            echo "exit $? in $((SECONDS - start)) s, $(wc -c <"$out" 2>/dev/null || echo no) bytes: $*"
+          }
+          sw_vers -productVersion
+          t=$RUNNER_TEMP
+          try "$t/a.wav" say -o "$t/a.wav" --file-format=WAVE --data-format=LEI16@24000 'Hello there.'
+          try "$t/b.m4a" say -o "$t/b.m4a" --file-format=m4af --data-format=aac 'Hello there.'
+          try "$t/c.m4a" say -o "$t/c.m4a" --file-format=m4af --data-format=aac@22050 'Hello there.'
+          try "$t/d.m4a" say -o "$t/d.m4a" --file-format=m4af --data-format=alac 'Hello there.'
+          try "$t/e.caf" say -o "$t/e.caf" --file-format=caff --data-format=aac 'Hello there.'
+          try "$t/f.m4a" afconvert -f m4af -d aac "$t/a.wav" "$t/f.m4a"
       - run: npm ci
       - run: npx tsc -p .
       - run: npm test

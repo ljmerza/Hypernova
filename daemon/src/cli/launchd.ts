@@ -1,7 +1,7 @@
 // The daemon as a LaunchAgent on a Mac, the counterpart of service.ts's systemd user service: it
 // starts when its owner logs in, launchd restarts it when it dies, and stopping it leaves the shared
 // terminals' holders running. The texts and the parsing are pure functions; launchctl goes through
-// cli.sys, so the tests see exactly what would run. Only CI's Mac runner runs this for real
+// cli.sys, so the tests see exactly what would run. Only GitHub's Mac runners have run this for real
 // (scripts/test-macos-smoke.sh): this repository's servers are Linux machines.
 //
 // The plist's keys, the retry around `bootstrap` and the wait after `bootout` come from the Mac app's
