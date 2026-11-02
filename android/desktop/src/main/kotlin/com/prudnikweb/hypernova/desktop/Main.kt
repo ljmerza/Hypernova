@@ -1,25 +1,47 @@
 package com.prudnikweb.hypernova.desktop
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.awt.awtEventOrNull
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.Net
 import com.prudnikweb.hypernova.desktop.ui.App
+import com.prudnikweb.hypernova.desktop.ui.Scaled
 import com.prudnikweb.hypernova.ui.components.logo
-import java.awt.Dimension
 import java.awt.GraphicsEnvironment
+import java.awt.Window
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
+import java.awt.event.KeyEvent
+import java.beans.PropertyChangeListener
 import java.nio.channels.FileChannel
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -74,15 +96,41 @@ fun main() {
     Runtime.getRuntime().addShutdownHook(Thread { runCatching { platform.folder.flush() } })
     val shell = startCore(platform)
     application {
-        val state = rememberWindowState(size = DpSize(960.dp, 720.dp))
-        Window(onCloseRequest = ::exitApplication, state = state, title = APP_NAME, icon = remember { WindowIcon }) {
-            LaunchedEffect(Unit) { window.minimumSize = Dimension(MIN_WIDTH, MIN_HEIGHT) }
+        val first = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration }
+        val state = rememberWindowState(
+            position = WindowPosition(Alignment.Center),
+            size = remember {
+                val facts = screenFacts(first)
+                val size = firstWindowSize(shell.zoom.scale(autoScale(facts)), facts.system, usableArea(first))
+                // A window's "dp" here are the JVM's units, whatever the content's scale is.
+                DpSize(size.width.dp, size.height.dp)
+            },
+        )
+        // Read when the keys are pressed, from the composition below: the monitor the window is on now.
+        var auto by remember { mutableFloatStateOf(autoScale(screenFacts(first))) }
+        Window(
+            onCloseRequest = ::exitApplication,
+            state = state,
+            title = APP_NAME,
+            icon = remember { WindowIcon },
+            onPreviewKeyEvent = { e ->
+                val key = zoomKey(e.key, e.isCtrlPressed, e.isAltPressed, e.isMetaPressed)
+                if (key != null && e.type == KeyEventType.KeyDown) shell.zoom(key, auto)
+                val typed = e.awtEventOrNull?.takeIf { it.id == KeyEvent.KEY_TYPED }?.keyChar
+                key != null || (typed != null && zoomKeyTyped(typed, e.isCtrlPressed, e.isAltPressed, e.isMetaPressed))
+            },
+        ) {
+            val facts by rememberScreenFacts(window)
+            val autoHere = autoScale(facts)
+            SideEffect { auto = autoHere }
+            val scale = shell.zoom.scale(autoHere)
+            LaunchedEffect(scale, facts) { window.minimumSize = minimumWindowSize(scale, facts.system, usableArea(window.graphicsConfiguration)) }
             val info = LocalWindowInfo.current
             LaunchedEffect(info) {
                 // The focus coming back is this computer's "the screen came on".
                 snapshotFlow { info.isWindowFocused }.collect { if (it) platform.screenWatch.ownerLooked() }
             }
-            App(shell)
+            Scaled(scale) { App(shell) }
         }
     }
     // OkHttp's threads would keep the process a minute longer.
@@ -90,5 +138,22 @@ fun main() {
     exitProcess(0)
 }
 
-private const val MIN_WIDTH = 520
-private const val MIN_HEIGHT = 420
+/** The monitor this window is on, kept up to date as it's moved to another. */
+@Composable
+private fun rememberScreenFacts(window: Window): State<ScreenFacts> {
+    val facts = remember(window) { mutableStateOf(screenFacts(window.graphicsConfiguration)) }
+    DisposableEffect(window) {
+        val look = { facts.value = screenFacts(window.graphicsConfiguration) }
+        val moved = object : ComponentAdapter() {
+            override fun componentMoved(e: ComponentEvent) = look()
+        }
+        val changed = PropertyChangeListener { look() }
+        window.addComponentListener(moved)
+        window.addPropertyChangeListener("graphicsConfiguration", changed)
+        onDispose {
+            window.removeComponentListener(moved)
+            window.removePropertyChangeListener("graphicsConfiguration", changed)
+        }
+    }
+    return facts
+}

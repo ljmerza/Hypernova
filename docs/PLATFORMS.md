@@ -66,13 +66,13 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 
 `android/desktop`: Compose for Desktop 1.12.1 over `:shared`, a JVM app, Linux first and written to be portable. It pairs by a pasted `hypernova pair` link, lists one server's sessions in the phone's three groups, and answers Allow or Deny on a card. A server switcher is there because `Core` already had the rest. The choices and why: docs/DECISIONS.md, "The desktop app". How to run it: docs/DEV-SETUP.md, "The desktop app". Packaging is LATER L105, its section in FEATURES.md comes after this.
 
-**Run on a display? Not yet.** Everything here has run with no window: Compose's test scene, on real TLS, real files and the real `Core`, the demo server included (`DemoServerTest`). The window itself (`Main.kt`: the focus, the minimum size, the icon, closing) hasn't been opened by anyone. On Linux only; nothing has run on a Mac or Windows, and the ACL path in `OwnerOnly` is the part of that written blind.
+**Run on a display? A virtual one.** The tests have no window: Compose's test scene, on real TLS, real files and the real `Core`, the demo server included (`DemoServerTest`). The window itself (`Main.kt`) has run under Xvfb, and the owner has opened it on a real 4K monitor, which is how its size came up (docs/DECISIONS.md, "The desktop app's size on a big screen"). The scale hasn't been seen on a real monitor, GNOME or Wayland yet. On Linux only; nothing has run on a Mac or Windows, and the ACL path in `OwnerOnly` is the part of that written blind.
 
 | Where | What |
 |---|---|
-| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
+| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
 | `desktop/src/main/.../desktop/ui/` | `App.kt`, `PairScreen.kt`, `SessionsScreen.kt`; `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
-| `desktop/src/test/` | `PlatformTest`, `WordsTest`, `CardsTest`; through the real screen, `PairingTest`, `ApproveTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/test/` | `PlatformTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `ApproveTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 
 **The seams:**
 

@@ -42,8 +42,26 @@ class Shell(private val platform: Platform) {
     var toast by mutableStateOf<String?>(null)
         private set
 
+    /** The owner's own scale, if he has chosen one. */
+    val zoom = Zoom(platform.storage.prefs(Zoom.PREFS))
+    /** The level, on screen for a moment after it changes. */
+    var zoomNote by mutableStateOf<String?>(null)
+        private set
+
     private var pairJob: Job? = null
     private var toastJob: Job? = null
+    private var zoomNoteJob: Job? = null
+
+    /** A zoom key, in a window whose automatic scale is [auto]. */
+    fun zoom(key: ZoomKey, auto: Float) {
+        val percent = Zoom.percent(zoom.press(key, auto))
+        zoomNote = if (zoom.chosen == null) Ui.desk_zoom_auto.format(percent) else Ui.desk_zoom.format(percent)
+        zoomNoteJob?.cancel()
+        zoomNoteJob = Core.scope.launch {
+            delay(ZOOM_NOTE_MS)
+            zoomNote = null
+        }
+    }
 
     /** A hub's refusal or lost link, on screen for a while: a message long enough to read. */
     fun say(text: String) {
@@ -123,6 +141,7 @@ class Shell(private val platform: Platform) {
 
     private companion object {
         const val TOAST_MS = 6_000L
+        const val ZOOM_NOTE_MS = 1_500L
         /** A pairing link is a few hundred characters: no need to run its patterns over a pasted file. */
         const val MAX_LINK = 4_096
     }
