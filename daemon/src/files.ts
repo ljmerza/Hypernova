@@ -243,7 +243,7 @@ export function folderView(cwd: string): FolderView {
 export const browsable = (cwd: string): boolean => folderView(cwd).browsable
 
 /**
- * Turns "Browse outside projects" on or off: saved, and said at once to every phone and the Mac
+ * Turns "Browse outside projects" on or off: saved, and said at once to every connected client
  * (`{t:"files"}`), with each session whose `browsable` it changes.
  */
 export function setBrowseOutside(on: boolean): boolean {

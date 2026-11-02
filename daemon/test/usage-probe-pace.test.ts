@@ -116,7 +116,7 @@ test('looks come every 2 minutes while something works, every 15 otherwise, neve
   assert.equal(due(2 * MIN + 5000), 'while working')
 })
 
-test('idle with only the Mac app’s feed connected, a look an hour; sessions on another provider don’t count as working', async () => {
+test('idle with only the admin feed connected, a look an hour; sessions on another provider don’t count as working', async () => {
   const store = await import('../src/store.ts')
   const due = (after: number) => probe.timedLookDue(t0 + after)
   unplug()

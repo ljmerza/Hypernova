@@ -2,15 +2,15 @@
 // What the owner checks. Order matters: each section builds on the previous one.
 export const CHECKLIST: { title: string; items: { id: string; title: string; how?: string }[] }[] = [
   {
-    title: 'Mac setup',
+    title: 'The server on a Mac (docs/INSTALL.md, "On a Mac")',
     items: [
-      { id: 'mac-open', title: 'Hypernova opens and shows the setup guide', how: 'Finder → Programming → hypernova → dist → Hypernova.app. It is unsigned, so the first time: right-click → Open → Open. It offers to move itself to Applications (say yes). A nova mark appears in the menu bar and the setup window opens.' },
-      { id: 'mac-claude-node', title: 'It finds Claude Code and Node by itself', how: 'The first two steps should turn green without you doing anything.' },
-      { id: 'mac-service', title: 'Installing the background service works', how: 'Step 3, "Start background service". It should turn green within a few seconds. (This checklist page is served by that service, so it opens from the menu bar once this step is done.)' },
-      { id: 'mac-integration', title: 'Connecting Claude Code is clear and works', how: 'Read the explanation, then connect. Your status line in Claude Code should look exactly as before. Then open a new Alacritty tab or window: the shared terminals start there.' },
-      { id: 'mac-tailscale', title: 'Phone access through Tailscale is on, and the expiry warning makes sense', how: 'Step 5 is already on (it was switched on during the night\'s testing). It also warns that this Mac\'s Tailscale key expires on Oct 20: disable key expiry for the Mac and the phone in the Tailscale admin console.' },
-      { id: 'mac-apk', title: 'Getting the app onto the phone with the QR code works', how: 'Step 6, "Get the app": scan it with the phone camera (Tailscale on), download, allow installs from the browser when Android asks, and install. It updates the Hypernova you already have.' },
-      { id: 'mac-pair', title: 'Pairing with the QR code works', how: 'Tap "I have the app", then scan the pairing code with the camera. The link opens a small page that hands over to Hypernova; it pairs, and the Mac shows "Paired with …". If the camera only shows text, use "Paste pairing link" in the app.' },
+      { id: 'mac-install', title: 'The curl line installs the server', how: 'In Terminal at the Mac, run the curl line from the guide. It needs no sudo and shows no Gatekeeper warning. Then open a new terminal: hypernova and claude are on your PATH.' },
+      { id: 'mac-status', title: 'hypernova status and doctor say it runs', how: 'status says the service is active and starts when you log in. doctor marks each piece ok, or says how to fix it.' },
+      { id: 'mac-login', title: 'It comes back after a restart', how: 'Restart the Mac and log in: the service starts at login, not at boot. hypernova status says active again, and the phone reconnects.' },
+      { id: 'mac-asks', title: 'What macOS asks is what the guide says', how: 'The guide\'s "After the install": a Background Items Added notice, "node" asking for a folder, the firewall asking about incoming connections. Note anything that reads differently: none of it has been seen on a person\'s own Mac.' },
+      { id: 'mac-shell', title: 'Claude Code is connected', how: 'Your status line in Claude Code should look exactly as before. In a new terminal, run claude: it starts in a shared terminal, and hn ls lists it.' },
+      { id: 'mac-get-app', title: 'Getting the app onto the phone works', how: 'hypernova pair says where to get it: the releases page, or the server\'s own download page. Download it, allow installs from the browser when Android asks, and install. It updates the Hypernova you already have.' },
+      { id: 'mac-pair-code', title: 'Pairing with the QR code works', how: 'Run hypernova pair and scan the code with the phone on the Mac\'s network. Your browser warns once about the server\'s certificate (Advanced, then Proceed). The page opens Hypernova, it pairs, and Terminal says "Paired with …". If the camera only shows text, use "Paste pairing link" in the app.' },
     ],
   },
   {
@@ -53,9 +53,9 @@ export const CHECKLIST: { title: string; items: { id: string; title: string; how
       { id: 'st-view', title: 'The live terminal on the phone', how: 'In a session, tap the terminal icon at the top right. You should see the real Claude Code screen. Pinch to change the text size.' },
       { id: 'st-keys', title: 'Typing and keys from the phone', how: 'Tap the screen to type. Try the key bar: esc, tab, ⇧tab (cycles modes), arrows in a menu (like /model), ^C, paste, Enter.' },
       { id: 'st-size', title: 'The size follows whoever uses it', how: 'With the session open on both: the phone shows the Mac window whole (small) while you only watch, fits the phone once you type there, and goes back to the Mac when you type on the Mac.' },
-      { id: 'st-close', title: 'Closing a window, and handing a session to the phone', how: 'Close the Alacritty window of a terminal session: it ends about 30 seconds later, like before. Now open another one on the phone first, then close its window: it keeps going on the phone. Or press Ctrl+\\ in the window to detach. The menu bar shows Open next to running sessions; that brings one back, as it is now.' },
+      { id: 'st-close', title: 'Closing a window, and handing a session to the phone', how: 'Close the Alacritty window of a terminal session: it ends about 30 seconds later, like before. Now open another one on the phone first, then close its window: it keeps going on the phone. Or press Ctrl+\\ in the window to detach. hn attach <id> (hn ls lists them) brings one back, as it is now.' },
       { id: 'st-open', title: 'Open on the Mac from the phone', how: 'Start a session on the phone, then in its terminal view tap the laptop icon. It should open in Alacritty on your Mac, live.' },
-      { id: 'st-restart', title: 'Sessions survive the background service restarting', how: 'Menu bar → Restart background service. Running shared sessions keep running and reappear on the phone a few seconds later.' },
+      { id: 'st-restart', title: 'Sessions survive the background service restarting', how: 'On a Mac, launchctl kickstart -k gui/$(id -u)/com.prudnikweb.hypernova.daemon; on Linux, systemctl --user restart hypernova. Running shared sessions keep running and reappear on the phone a few seconds later.' },
     ],
   },
   {
@@ -75,7 +75,7 @@ export const CHECKLIST: { title: string; items: { id: string; title: string; how
       { id: 'nt-banner', title: 'A banner for another session', how: 'Open one session on the phone, and let another one finish, ask for approval or hit an error. A banner slides in at the top; tap it to go there. Swipe it up to dismiss.' },
       { id: 'nt-quiet', title: 'No banner for the session you\'re in', how: 'Stay in a session\'s chat (or its terminal view) while it finishes: no banner for it.' },
       { id: 'nt-background', title: 'Notifications in the background', how: 'Leave the app and let a session finish: a "Session updates" notification. Tap it to open the session.' },
-      { id: 'nt-update', title: 'Update available', how: 'After the Mac gets a newer app (the service update), the phone shows an Update banner once, and Settings shows "A newer Hypernova is on your Mac" with Get the update.' },
+      { id: 'nt-update', title: 'Update available', how: 'After the server fetches a newer app (a release), the phone shows an Update banner once, and Settings shows "A newer Hypernova is on your Mac" with Get the update.' },
       { id: 'nt-commands', title: 'Commands and skills after "/"', how: 'In a session, type / in the prompt box: your skills and commands, then Claude Code\'s, each with a line on what it does. Type a few letters to narrow it; tap one and it goes in the box with what it takes shown above. The new-session prompt has the same list.' },
       { id: 'nt-command-output', title: 'Commands show as sent, with their answer', how: 'In a shared session, send /effort high from the phone: it shows as "/effort high", stops saying Sending, and Claude Code\'s answer appears under it. Then send /doesnotexist: it doesn\'t stay on Sending, and a warning says the command is unknown.' },
       { id: 'nt-menu', title: 'Terminal menus as buttons', how: 'In a shared session, send /model from the phone: the picker shows as a card. Turn on "Use this session only" and pick a model; answer "Switch model?" there too. Also try Cancel. In the terminal, Claude Code says what you picked.' },
@@ -92,9 +92,9 @@ export const CHECKLIST: { title: string; items: { id: string; title: string; how
   {
     title: 'Providers',
     items: [
-      { id: 'pv-add', title: 'Add OpenRouter (or a custom provider)', how: 'Settings → Providers (phone) or Providers… (Mac menu). Add your key and a model, e.g. openai/gpt-5 or anthropic/claude-sonnet-4.5.' },
+      { id: 'pv-add', title: 'Add OpenRouter (or a custom provider)', how: 'Settings → Providers. Add your key and a model, e.g. openai/gpt-5 or anthropic/claude-sonnet-4.5.' },
       { id: 'pv-run', title: 'A session runs on that provider', how: 'Start a new session and pick the provider. It should answer, and use tools.' },
-      { id: 'pv-balance', title: 'OpenRouter shows what\'s left', how: 'Settings → Providers: the OpenRouter row ends in "$4.20 left" (or "$1.10 today" for a key without a cap). Save a new key: "Key works · $… left". On the Mac, Providers… has the same line and a Check button.' },
+      { id: 'pv-balance', title: 'OpenRouter shows what\'s left', how: 'Settings → Providers: the OpenRouter row ends in "$4.20 left" (or "$1.10 today" for a key without a cap). Save a new key: "Key works · $… left".' },
       { id: 'pv-auto', title: 'At a limit, the card says "Continues by itself at …"', how: 'When a session hits the session limit, its card reads "Continues by itself at 2:00" with Don\'t. Don\'t turns it into "Back at 2:00" and "Continue automatically at 2:00"; tapping that turns it back on. In a shared terminal it presses Esc or uses /rate-limit-options there: check the terminal agrees, also after Don\'t then Continue automatically. If the Mac slept through the reset ("press enter to continue", "continue" in the box), Continue on the phone sends it.' },
       { id: 'pv-credits', title: 'Out of credits says so, with the balance', how: 'When OpenRouter runs out: the card reads "OpenRouter · out of credits", "$0.00 left", with Add credits, Try again and Continue on your subscription. A notification says so once.' },
     ],
@@ -105,13 +105,6 @@ export const CHECKLIST: { title: string; items: { id: string; title: string; how
       { id: 'af-files', title: 'Browse a project\'s files', how: 'In a session, the folder icon at the top right; also the "Files changed" strip. Open an image, some code.' },
       { id: 'af-html', title: 'Open a web page the agent made', how: 'Ask for a small HTML page, then open it in the app.' },
       { id: 'af-dev', title: 'Open a running dev server', how: 'Ask it to start a dev server (e.g. Vite). Tap "Open preview" on the localhost link.' },
-    ],
-  },
-  {
-    title: 'Mac menu bar',
-    items: [
-      { id: 'mb-status', title: 'The menu shows sessions, usage and your phone', how: 'Click the nova mark in the menu bar.' },
-      { id: 'mb-providers', title: 'Providers window works', how: 'Providers… from the menu.' },
     ],
   },
   {
@@ -130,7 +123,7 @@ export const CHECKLIST: { title: string; items: { id: string; title: string; how
       { id: 'au-brief', title: 'Morning brief from the template tells you what changed', how: 'Automations tab → Start from → Morning brief, pick a project, and for a quick try set the time two minutes ahead (today\'s day on). Save. When it\'s due, a session titled "Morning brief, <today>" with an AUTO chip starts by itself, and a notification brings its first sentence. Its card shows the result and Next.' },
       { id: 'au-run-now', title: 'Run now', how: 'Open a saved automation and tap Run now. "Started", and its card says RUNNING with a turning mark; tap the status line to watch the session. Stop on its row ends it.' },
       { id: 'au-asleep', title: 'The Mac asleep at the time, then woken', how: 'Set an automation a few minutes ahead, put the Mac to sleep (lid closed on power, or Apple menu → Sleep) past that time, then wake it. Within half a minute it runs, and its row says "Ran late · the Mac was asleep at …". Asleep more than 6 hours: "Missed".' },
-      { id: 'au-pause-mac', title: 'Pause all from the Mac', how: 'Menu bar popover → the automations line, or Settings → Run automations off. The phone\'s tab says Paused; nothing runs until you resume, and what fell due while paused isn\'t run later.' },
+      { id: 'au-pause', title: 'Pause all', how: 'In the Automations tab, Pause all. The tab says Paused; nothing runs until you resume, and what fell due while paused isn\'t run later.' },
       { id: 'au-bypass', title: '"No asking" asks for your fingerprint', how: 'In an automation\'s PERMISSIONS choose No asking: a red warning shows; Save asks for the fingerprint or screen lock first.' },
       { id: 'au-battery', title: 'Wrap up on low battery', how: 'On battery, with a session working, use the Wrap up on low battery template with the level just under the battery now (or wait for 15%). The working session gets "The Mac\'s battery is at …" typed in and wraps up; a notification says so. It fires once per discharge.' },
       { id: 'au-allow-next', title: '"Allow next time" lets the next run through', how: 'Give an Allowed-only automation a prompt that needs a command it isn\'t allowed (say "run the tests"). Its run row shows Allow next time: [Bash(npm test)]. Tap it, then Run now: this time the command runs.' },

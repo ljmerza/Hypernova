@@ -1,6 +1,6 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // Two HTTP servers on loopback: the phone API (phones reach the same routes through the LAN
-// listener, lan.ts) and the local API for the Mac app, Claude Code hooks and the testing checklist.
+// listener, lan.ts) and the local API for the `hypernova` command, Claude Code hooks and the testing checklist.
 import { isImmediateCommand, listCommands } from './commands.ts'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { existsSync, statSync, readdirSync, readFileSync } from 'node:fs'
@@ -319,7 +319,7 @@ async function pairPageExtras(code: string): Promise<string> {
 }
 
 // ── Snapshot ─────────────────────────────────────────────────────────────
-/** The LAN listener as this device sees it: with whether it holds a device certificate that hasn't run out (never the Mac app). */
+/** The LAN listener as this device sees it: with whether it holds a device certificate that hasn't run out (never the admin token). */
 function lanSnapshot(deviceId: string | null) {
   const lan = lanInfo()
   return lan && { ...lan, deviceCert: !!deviceId && hasDeviceCert(getDevice(deviceId)) }
@@ -480,7 +480,7 @@ async function api(c: Ctx): Promise<void> {
     throw new HttpError(404, 'preview_expired', 'This preview link has expired. Open it again from the app.')
   }
 
-  // Everything below needs a paired device (or the Mac app's admin token).
+  // Everything below needs a paired device (or the admin token).
   if (!c.local && !c.deviceId) {
     // Absolute asset paths requested by a previewed page carry the preview cookie.
     const ck = /(?:^|;\s*)hn_preview=([\w-]+)/.exec(req.headers.cookie ?? '')
@@ -509,7 +509,7 @@ async function api(c: Ctx): Promise<void> {
   if (fired && m === 'POST') return fireAutomation(res, req, fired[1]!, null)
   if (path === '/v1/automations' || path.startsWith('/v1/automations/')) {
     try {
-      // Who answers an ask step: the Mac app (its admin token) or a phone.
+      // Who answers an ask step: the admin token (the local API) or a phone.
       const who = c.local ? 'mac' : 'phone'
       return json(res, 200, await automations().api(path, m, url.searchParams, () => readJsonBody(req), who))
     } catch (e) {
@@ -1308,7 +1308,7 @@ async function serveApk(req: IncomingMessage, res: ServerResponse): Promise<void
 /**
  * The testing checklist: its page and the routes the page calls. Each needs its key (`k`, from
  * `GET /v1/qa`, which the page passes on to its own requests) or the admin token. [macPort]: on
- * the Mac app's port, whose menu opens the bare page in a browser: that gets sent on to the page
+ * the local API's port, where the bare page can be opened in a browser: that gets sent on to the page
  * with its key, so a site in the browser can't reach the routes that change anything.
  */
 async function qa(c: Ctx, macPort: boolean): Promise<void> {
@@ -1329,7 +1329,7 @@ async function qa(c: Ctx, macPort: boolean): Promise<void> {
   })()
   if (!okHost || !okOrigin) throw new HttpError(403, 'forbidden', 'Open the checklist from Hypernova.')
   if (!c.local && !safeEqual(url.searchParams.get('k') ?? '', QA_KEY)) {
-    // Opened by hand or by the Mac app (Sec-Fetch-Site "none"; a reload is "same-origin"; a
+    // Opened by hand (Sec-Fetch-Site "none"; a reload is "same-origin"; a
     // browser too old to say sends none): never when another site sent the browser here. That
     // site couldn't read the page anyway, as the host check holds off a rebound domain.
     const site = req.headers['sec-fetch-site']
@@ -1811,7 +1811,7 @@ function adoptTerminal(id: string, cwd: string, model?: string | null): void {
   upsertSession(id, { origin: 'hypernova' })
 }
 
-// ── Local API for the Mac app ────────────────────────────────────────────
+// ── Local API ─────────────────────────────────────────────────────────────
 async function local(c: Ctx): Promise<void> {
   const { req, res, url } = c
   const path = url.pathname
@@ -1855,7 +1855,7 @@ async function local(c: Ctx): Promise<void> {
       // The server updating itself (server-update.ts; `hypernova auto-update`).
       update: updateView(),
       account: getAccount(),
-      // The popover's one line: what's next, what runs (automations.ts).
+      // One line on them: what's next, what runs (automations.ts).
       automations: automations().status(),
       // The local route (lan.ts).
       lan: lanSnapshot(null),
@@ -2031,11 +2031,11 @@ export function startServers(): () => Promise<void> {
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
       keep(ws)
-      // The Mac app's own feed: what's for it alone, such as who is speaking (mac-feed.ts).
+      // The admin feed (`client=mac`): what's for it alone, such as who is speaking (mac-feed.ts).
       if (admin && url.searchParams.get('client') === 'mac') macFeed(ws)
       const remove = addClient({ send: (s) => ws.readyState === ws.OPEN && ws.send(s), phone: !!device })
       ws.send(JSON.stringify({ t: 'snapshot', snapshot: snapshot(device?.id ?? null) }))
-      // A phone on the live feed keeps the Mac awake While working (the Mac app's own feed doesn't).
+      // A phone on the live feed keeps the Mac awake While working (the admin feed doesn't).
       // After the snapshot, which is always a client's first message.
       const awake = device ? awakeClient() : null
       const ping = setInterval(() => ws.readyState === ws.OPEN && ws.send('{"t":"ping"}'), wsTiming.pingMs)

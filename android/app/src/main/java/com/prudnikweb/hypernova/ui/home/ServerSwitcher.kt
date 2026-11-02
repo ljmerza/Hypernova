@@ -63,7 +63,7 @@ class ServerChoice(
 
 /**
  * The Home chip's sheet (data/Servers.kt): each paired computer with its link (the connection
- * chip's word and moon) and how many of its sessions need the owner, the one on screen ticked; a tap
+ * chip's word and mark) and how many of its sessions need the owner, the one on screen ticked; a tap
  * on another shows it. The last row pairs another
  * computer without forgetting these. It opens with one computer too, for that row.
  *

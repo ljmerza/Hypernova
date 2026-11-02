@@ -40,7 +40,7 @@ test('only macOS is the Mac; every other system is treated as Linux', () => {
   assert.equal(platformOf('freebsd'), 'linux')
 })
 
-test('a Mac keeps the folders the menu bar app knows', () => {
+test('a Mac keeps the folders the old Mac app used', () => {
   assert.deepEqual(places('darwin', {}, '/Users/ada'), {
     support: '/Users/ada/Library/Application Support/Hypernova',
     logs: '/Users/ada/Library/Logs/Hypernova',

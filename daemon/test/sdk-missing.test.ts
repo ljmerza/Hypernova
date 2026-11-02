@@ -1,4 +1,5 @@
-// A daemon with no Claude Code SDK in its packages, as the Mac app installs it until Setup has
+// Modified by Leonardo Merza, 2026. See NOTICE.
+// A daemon with no Claude Code SDK in its packages, as it is until hypernova setup has
 // fetched it (src/sdk.ts, docs/PROTOCOL.md "Claude Code's SDK"): it starts and serves; the snapshot
 // and /local/status say the SDK isn't there; what runs through it answers 409 `sdk_missing` in
 // words (the "/" list, a session the daemon would run itself, Rewind) and nothing is made; once
@@ -25,7 +26,7 @@ const home = join(scratch, 'home')
 const claudeDir = join(scratch, 'claude')
 
 // The daemon's sources and package files, and every installed package but the SDK (and its
-// platform builds), linked: as the Mac app's bundle is before Setup fetches it.
+// platform builds), linked: as a daemon is before hypernova setup fetches it.
 cpSync(join(DAEMON, 'src'), join(copy, 'src'), { recursive: true })
 for (const f of ['package.json', 'package-lock.json']) copyFileSync(join(DAEMON, f), join(copy, f))
 const lock = JSON.parse(readFileSync(join(DAEMON, 'package-lock.json'), 'utf8'))
@@ -163,7 +164,7 @@ test('what runs through it answers sdk_missing, and nothing is made', async () =
   assert.doesNotMatch(log, /uncaught|unhandled rejection/)
 })
 
-test('once the SDK is there (Setup fetched it), the status says so without a restart', async () => {
+test('once the SDK is there (hypernova setup fetched it), the status says so without a restart', async () => {
   symlinkSync(join(modules, ...SDK.split('/')), join(copy, 'node_modules', ...SDK.split('/')))
   let sdk: any = null
   // The status reads the folder at most every 5 s.

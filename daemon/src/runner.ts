@@ -261,7 +261,7 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
     setState(id, 'idle', null)
     return
   }
-  // Claude Code's SDK isn't on this Mac (Setup fetches it): the prompt isn't sent, and the notice
+  // Claude Code's SDK isn't on this Mac (hypernova setup fetches it): the prompt isn't sent, and the notice
   // says how to get it, as for a removed provider.
   let query: ClaudeSdk['query']
   try {

@@ -10,7 +10,7 @@
 // its SDK turn) and hidden: on no list, its transcript untouched on disk (rewound.ts). The copy
 // comes first, so a stop that fails loses nothing: the rewind stands, and the original stays where
 // it is. Claude Code's own /rewind in a terminal can also put files back; this doesn't, and the
-// phone says so. Without Claude Code's SDK (Setup fetches it, sdk.ts) a rewind answers 409
+// phone says so. Without Claude Code's SDK (hypernova setup fetches it, sdk.ts) a rewind answers 409
 // `sdk_missing`, with nothing touched.
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

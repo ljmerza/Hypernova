@@ -4,7 +4,7 @@
 // knows (Claude Code's own, the user's and the project's commands and skills, plugins', MCP
 // prompts), with descriptions and argument hints. No prompt is sent and its hooks are off, so it
 // costs no tokens and no session shows up anywhere. A list is cached per folder for a few
-// minutes; an older one is served while a fresh one is fetched. Without Claude Code's SDK (Setup
+// minutes; an older one is served while a fresh one is fetched. Without Claude Code's SDK (hypernova setup
 // fetches it, sdk.ts) the ask answers 409 `sdk_missing`, and the model list keeps its built-in one.
 import type { SDKControlInitializeResponse } from '@anthropic-ai/claude-agent-sdk'
 import { findClaude, log } from './util.ts'

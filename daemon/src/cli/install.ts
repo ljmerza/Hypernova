@@ -247,7 +247,7 @@ export type Integration = { hooks: { installed: boolean }; statusLine: { install
 
 /**
  * Hooks, the status line tap and the `claude` function, put in by the daemon itself (it knows its
- * port and hook secret), as the Mac app asks it to. With no daemon running (a container without
+ * port and hook secret). With no daemon running (a container without
  * systemd, set up before its first start), the daemon's same code runs in a process of its own
  * (integration.ts), from a daemon folder that has its packages: the installed one, else the one
  * this command runs from. Not in this process: a checkout or a tarball has no packages, and the

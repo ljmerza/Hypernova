@@ -108,9 +108,9 @@ test('/v1/ws takes the token in its query (a browser cannot set headers on a Web
   assert.equal(refused, true)
 })
 
-test("the checklist needs its key; the Mac app's bare link is sent on to the page with it", async () => {
+test("the checklist needs its key; a bare link is sent on to the page with it", async () => {
   const shots = join(process.env.HYPERNOVA_SUPPORT!, 'qa', 'shots')
-  // The Mac app's menu opens http://127.0.0.1:47322/qa in the browser (Sec-Fetch-Site "none").
+  // Someone opens http://127.0.0.1:47322/qa in the browser (Sec-Fetch-Site "none").
   const bare = await send(LOCAL, 'GET', '/qa', { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate' })
   assert.equal(bare.status, 302)
   const key = /^\/qa\?k=(\w+)$/.exec(bare.headers.location ?? '')?.[1]
@@ -461,7 +461,7 @@ test('workflows: an ask answered over HTTP (who answered), Retry from a step, an
   const runId = ran.body.run.id
   const wrong = await call(API, 'POST', `/v1/automations/runs/${runId}/answer`, { stepId: 'st_q', answer: 'Maybe' })
   assert.deepEqual([wrong.status, wrong.body.error.code, wrong.body.error.field], [400, 'bad_answer', 'answer'])
-  // The Mac app answers with its admin token.
+  // The admin token answers.
   const ok = await call(LOCAL, 'POST', `/v1/automations/runs/${runId}/answer`, { stepId: 'st_q', answer: 'Wait' }, { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' })
   assert.deepEqual([ok.status, ok.body.run.state, ok.body.run.steps[0].answer.by, ok.body.run.steps[1].state], [200, 'done', 'mac', 'skipped'])
   const again = await call(API, 'POST', `/v1/automations/runs/${runId}/answer`, { stepId: 'st_q', answer: 'Ship' })

@@ -1310,7 +1310,7 @@ private fun PlanMeter(label: String, p: UsageWindow, spoken: String) {
 }
 
 /**
- * The connection in the brand row: the Mac's planet with this phone as its moon, and the Mac's name
+ * The connection in the brand row: the link's mark, and the Mac's name
  * once linked (Reconnecting, Offline… otherwise; always, with several paired), with a MacBook's
  * battery after it, and an amber count while another paired computer needs you. Tap for the
  * switcher (ui/home/ServerSwitcher.kt).
@@ -1324,7 +1324,7 @@ private fun LinkChip(hub: Hub, servers: ServerChoice?, all: Everywhere? = null, 
         contentAlignment = Alignment.Center,
     ) {
         if (all != null) {
-            // "All servers": "All", its moon the worst of their links; every one is on screen, so no count elsewhere.
+            // "All servers": "All", its mark the worst of their links; every one is on screen, so no count elsewhere.
             val states = all.servers.map { it.first.state }
             val down = com.prudnikweb.hypernova.data.Servers.notLinked(states)
             ConnectionChip(
