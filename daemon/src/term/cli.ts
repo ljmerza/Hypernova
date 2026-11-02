@@ -180,7 +180,7 @@ function attach(first: Socket, firstId: string, reattach: boolean): Promise<void
   const follow = async (to: string | null, text: string | null) => {
     if (!to) return quit(0, text ? `\r\n\x1b[2m[hypernova] ${text}\x1b[0m\r\n` : undefined, true)
     const next = await connectWithin(to, 4000, null)
-    if (!next) return quit(1, `\r\n\x1b[2m[hypernova] This conversation moved to another session. Open it from ${ON_MAC ? 'the menu bar or your phone' : 'your phone'}, or \`hn attach ${to}\`.\x1b[0m\r\n`, true)
+    if (!next) return quit(1, `\r\n\x1b[2m[hypernova] This conversation moved to another session. Open it from your phone, or \`hn attach ${to}\`.\x1b[0m\r\n`, true)
     const old = sock
     sock = next
     id = to
@@ -240,9 +240,7 @@ function attach(first: Socket, firstId: string, reattach: boolean): Promise<void
     detached = true
     const i = Math.min(...at)
     if (i > 0) sock.write(frame(DATA, b.subarray(0, i)))
-    // A Linux server has no menu bar to open it from: only the phone and `hn attach` there.
-    const from = ON_MAC ? 'the menu bar or your phone' : 'your phone'
-    const bye = () => quit(0, `\r\n\x1b[2m[hypernova] Detached. The session keeps running: open it from ${from}, or \`hn attach ${id}\`.\x1b[0m\r\n`, true)
+    const bye = () => quit(0, `\r\n\x1b[2m[hypernova] Detached. The session keeps running: open it from your phone, or \`hn attach ${id}\`.\x1b[0m\r\n`, true)
     // The holder must hear "detach" before the socket closes, or it treats this as a closed window.
     sock.write(msg({ t: 'detach' }), () => {
       sock.end()
