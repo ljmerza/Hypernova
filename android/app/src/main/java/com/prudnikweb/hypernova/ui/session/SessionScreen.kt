@@ -120,6 +120,8 @@ import com.prudnikweb.hypernova.ui.home.SignInPanel
 import com.prudnikweb.hypernova.ui.home.continueLabel
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.ChangesRepo
+import com.prudnikweb.hypernova.data.WorkChanges
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Phase
@@ -190,6 +192,8 @@ fun SessionScreen(
     usageOf: @Composable (sessionId: String, key: String) -> SessionUsage? = { id, key -> rememberSessionUsage(id, key) },
     /** Claude's to-do list for the status bar: the Mac's (ChatRepo); a screen test passes its own. */
     todosOf: suspend (String) -> Result<List<Todo>> = ChatRepo::todos,
+    /** The changes route for the top bar's git item: the Mac's (ChangesRepo); a screen test passes its own. */
+    gitOf: suspend (String) -> Result<WorkChanges> = { ChangesRepo.load(it) },
 ) {
     val haze = LocalHaze.current
     val opener = LocalOpener.current
@@ -454,6 +458,9 @@ fun SessionScreen(
     // The session's usage, for the strip and the sheet: asked again as the transcript settles, and
     // when the session's model changes (/model).
     val usage = usageOf(sessionId, "$tailKey|$working|${session.model}")
+    // The top bar's git item, only while it's on: its route is asked when an edit tool has finished, not on a timer.
+    val fileEdits = remember(items) { items.count { it is Item.Diff || (it is Item.Tool && !it.running && !it.failed && it.verb in EDIT_TOOLS) } }
+    val git = rememberTopBarGit(session, fileEdits, linked, gitOf)
     // A limit, a sign-out or the provider stopped it: the card above the composer and its hint say so.
     val block = activeBlock(hub, session)
     // The chat's quick wins (ChatExtras.kt): which message's long-press menu is open, and a quick
@@ -658,7 +665,7 @@ fun SessionScreen(
                     // count its Agents tab. Then the blocked mark while calls wait, a tap to them in the sheet.
                     trailContent = {
                         ChatUsage(
-                            hub, session, usage, atWork, onCompact = { quickSend("/compact") },
+                            hub, session, usage, atWork, git, onCompact = { quickSend("/compact") },
                             onOpen = { sheetAtBlocked = false; sheetAtAgents = false; sheetOpen = true },
                             onAgents = { sheetAtBlocked = false; sheetAtAgents = true; sheetOpen = true },
                             onBlocked = { sheetAtBlocked = true; sheetAtAgents = false; sheetOpen = true },

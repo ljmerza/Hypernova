@@ -140,7 +140,7 @@ class SettingsTabTest {
         assertEquals("https://github.com/ljmerza/Hypernova", page.dataString)
     }
 
-    @Config(qualifiers = "+h3500dp")
+    @Config(qualifiers = "+h3800dp")
     @Test fun oneServerShowsEveryPartInOrder() {
         pair(server("z2", 47391) { files(false) })
         linked()

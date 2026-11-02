@@ -3741,3 +3741,54 @@ should just wrap because I can just click on it and hold to copy". A code block'
 screen's edge, and the block no longer scrolls sideways. A long press still copies the text as written,
 with no breaks added. Tables keep their sideways scroll when wrapping can't fit their columns.
 
+
+## The week's pace in the top bar (2026-11-02)
+
+The owner, on an idea for the session's top bar: "you could see what day you're on and if you're ahead or
+behind". And, choosing which to build: "do the week pace, git and this model's week". **Week pace** is an
+item in Settings → Session top bar, off by default: `Day 2/7 +10%`.
+
+This fits "No estimate of when usage runs out" (2026-11-01), which took away a red "2d 2h" that was a guess:
+
+1. **A meter shows facts, and this is two of them subtracted.** The day is counted from the weekly reset, and
+   the figure is the percentage used less the share of the week gone. No rate (it doesn't read `Usage.rate`), no
+   forecast and no time to the limit. It says where the week stands, never where it's heading.
+2. **It's its own item, not a second tag on the 7-day meter,** whose one tag stays the reset.
+3. **Always a neutral colour, with no words on the bar.** The removed estimate was red, and red says something's
+   wrong; 10 points over an even week may be fine. "Ahead", "behind" and "overcooking" aren't on screen either.
+   TalkBack has to say the sign in words: "Day 2 of 7, 10 points over an even week."
+4. **Only while it's real:** while the plan's week is about this session and known, as the bar's meters
+   (`planShown`), so not stale or on another provider, and never once the reset has passed, until new numbers
+   come. A Codex session uses Codex's own week, as Home's Codex card does, while signed in, and shows nothing
+   on a plan without a week.
+
+## Git in the top bar, asked at calm moments (2026-11-02)
+
+The owner: "do the week pace, git and this model's week". **Git** is an item in Settings → Session top bar,
+off by default: `⎇ main +120 −30`, from what `GET /v1/sessions/{id}/changes` already returns. No daemon change.
+
+1. **The route isn't cheap, so it isn't polled.** Each ask spawns five to seven git processes (`daemon/src/changes.ts`:
+   `rev-parse` twice, `symbolic-ref`, `status -uall`, `diff --numstat`, and the git line's two, which alone have a
+   5-second cache), walks the folder, and reads each untracked file up to 1 MB to count its lines.
+2. **When it's asked:** the chat opening, or the item turning on; a turn ending; an edit tool finishing during a turn, at most
+   once a minute, 1.5 s after the edits settle; activity outside a turn, for a whole turn the phone slept through;
+   and the link coming back. Never with the item off, not even once, and not while the Mac isn't linked.
+3. **Not on a timer.** A composition stays alive with the phone in a pocket, so a slow interval would go on asking
+   from there. A turn that only reads asks nothing.
+4. **Why it differs from the session sheet's GIT part,** which doesn't ask during a turn at all: the sheet is opened to
+   be read, while the bar is there all along, and `+120 −30` standing still for an hour-long turn would be a stale
+   fact on screen. What Bash changes (`sed`, `git commit`) isn't seen as an edit, so it shows when the turn ends.
+5. **Nothing when there's nothing true to say:** a folder that isn't a repository, or the route failing, draws no item and no
+   error. A failed ask clears an earlier answer rather than leaving an old one up.
+6. **The counts are the route's:** `totalAdd` and `totalDel`, so while it can tell, only the files this session's tools
+   touched, as What changed lists them. Colours as What changed's (`+` mint, `−` red). A worktree's name is for TalkBack.
+
+## This model's week in the top bar (2026-11-02)
+
+The owner: "do the week pace, git and this model's week". **This model's week** is an item in Settings → Session top
+bar, off by default: the week of the model the session runs, when it has one of its own (`FABLE 41% ↻ Tue 20:00`),
+in the compact meter the 5-hour window and the week use, with the bar, and the model's short name as its label. The reset is as the
+model's meter on Home has it: a weekday and time more than about a day off, a countdown nearer. It's matched by family
+as the model pickers do (`ModelCatalog.week`). It hides on a model with no week of its own or none known yet, and whenever
+the plan's windows aren't about this session (`planShown`), so never for Codex. `Usage.models` is read off Claude Code's
+/usage screen every 15 minutes, so it can be that old, which Settings says; the bar doesn't ask for a fresh look.
