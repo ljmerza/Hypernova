@@ -896,7 +896,7 @@ class LiveHub(
     }
 
     /**
-     * The account changed: sessions' lines and the sun follow it, and a new episode (a limit, a
+     * The account changed: sessions' lines and the usage card follow it, and a new episode (a limit, a
      * sign-out) is announced once, however many sessions it stopped. A plain limit is a banner
      * only: in the background the permanent notification already leads with it. What needs the
      * owner is a notification too, and it goes once nothing needs the owner any more. One already
@@ -2556,12 +2556,12 @@ class LiveHub(
     // ─── Usage ─────────────────────────────────────────────────────────────
 
     /**
-     * The sun follows the official 5-hour numbers. A window whose reset time has passed is
+     * Usage follows the official numbers. A window whose reset time has passed is
      * fresh again (0%) until Claude Code reports new numbers, and the limit lifts on time
      * even if nothing runs to report it. A 5-hour or weekly limit Claude Code actually hit counts
-     * whatever the status line last said (it can lag behind), so the sun dies when Claude stops;
+     * whatever the status line last said (it can lag behind), so its meter is full when Claude stops;
      * not one Claude runs past on usage credits. Signed out, the numbers are "stale": the last
-     * ones known, not measured, and the sun is eclipsed instead (see the home screen).
+     * ones known, not measured, and the usage card says so instead of showing them (see the home screen).
      */
     private fun recomputeUsage() {
         val w = wusage
@@ -2589,7 +2589,7 @@ class LiveHub(
         val lim5 = p5 >= 0.999f
         val lim7 = p7 >= 0.999f
         val since = account.since?.takeIf { hit != null }
-        // The week and no 5-hour window (Max, 2026-10-31): nothing labelled 5H, the sun on the week.
+        // The week and no 5-hour window (Max, 2026-10-31): nothing labelled 5H, the 5-hour slot follows the week.
         // The Mac's own windows decide, signed out too (its last ones), not a list of plans.
         val reported = UsageWindow.fiveHourReported(w?.fiveHour, w?.sevenDay, hit5 != null)
         val read = Usage(
@@ -2602,9 +2602,9 @@ class LiveHub(
             rate = w?.rate.takeIf { official },
         )
         usage = if (reported) read else UsageWindow.weekAsDisk(read)
-        // Wake up at the next reset so the disk ignites on time (and the account's limit ends with it).
+        // Wake up at the next reset so the meters reset on time (and the account's limit ends with it).
         // In short steps against the wall clock: a delay doesn't count while the phone sleeps, so one
-        // long delay of hours went off long after the reset, and the sun sat at "93% · 0:00".
+        // long delay of hours went off long after the reset, and the meter sat at "93% · 0:00".
         usageTimer?.cancel()
         val next = (listOfNotNull(f5?.resetsAt?.takeIf { it > t }, f7?.resetsAt?.takeIf { it > t }, account.limit?.resetsAt?.takeIf { it > t }) +
             w?.models.orEmpty().mapNotNull { it.resetsAt?.takeIf { r -> r > t } }).minOrNull()
