@@ -256,13 +256,13 @@ class StatusModelTest {
         val list = barAgents(board, asking = setOf("a2"))
         assertEquals(listOf("a1", "a2", "a4"), list.map { it.id })
         assertEquals(BarAgent("a1", "Explore", null, Say(SayKind.Reading, "linux-cli.test.ts"), 10, 81_200), list[0])
+        assertEquals("Add routing helpers", list[1].title)
         assertEquals("general-purpose", list[1].kind)
-        assertEquals("Add routing helpers", list[1].task)
         assertEquals(Say(SayKind.Editing, "Servers.kt"), list[1].doing)
         assertTrue(list[1].asking)
-        // No kind: what it's for stands in, once.
-        assertEquals("Check the docs", list[2].kind)
-        assertNull(list[2].task)
+        // No kind: what it's for, once.
+        assertEquals("Check the docs", list[2].title)
+        assertNull(list[2].kind)
         assertNull(list[2].doing)
         assertNull(list[2].tokens)
     }

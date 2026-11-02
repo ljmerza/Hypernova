@@ -3398,3 +3398,11 @@ Android and the desktop JVM (docs/PLATFORMS.md, "The shared module").
    as they were. The hub's tests run twice: off Android, and on Robolectric with Android's side of the seams.
 4. **`android/shared`, not a top-level `shared/`:** Gradle's root is `android/`, and the release and CI already follow `android/**`.
 5. **No desktop app and no desktop implementations yet.** That is step 2.
+
+## An agent's row says what it's for (2026-11-01)
+
+The owner, of the rows under `main + 3 agents`: instead of "general-purpose", "a short title of what
+they're responsible for". The row's first line is the short description the agent was started with,
+on a line of its own so it fits, and only the agent's kind stands in when there's none. How long it has
+run and its tokens move to the second line, beside what it's doing. Its kind shows there before its
+first step.
