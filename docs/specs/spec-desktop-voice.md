@@ -15,9 +15,12 @@ The owner's idea, in his words:
 > thing built in possibly. Let's just have the agent research this and then add it to our notes
 > locally here, so we reference this idea when we start building the desktop app."
 
+> "what I meant was I think people have released independent models that you can run voice on, like
+> some kind of CLI voice, open source model stuff, maybe we can connect that somehow."
+
 The bar is the phone's (`spec-voice.md`): you talk, and your words are in the box before you've
-finished looking down. The rule here is new: no cloud, audio stays on the machine. That rules out the
-Soniox route for this client.
+finished looking down. The rule here: no cloud, audio stays on the machine. Soniox is already gone
+(`DECISIONS.md`, "Voice stays on the phone", 2026-10-30).
 
 **How far to trust this.** Each number links to where it came from. Pages were read through a
 summarising fetch tool, not line by line, and items marked *(search summary)* were seen only in a search
@@ -30,13 +33,14 @@ a source says. "Not found" means I looked and didn't find it.
 
 | # | Point |
 |---|---|
-| R1 | **Runtime: sherpa-onnx.** It's the only candidate I found with published JVM jars for Linux, Mac and Windows ([jar sizes][sh-rel], [Gradle setup][sh-java]), it's Apache-2.0 ([repo][sh-repo]), and it runs every model below, so swapping models is a config change. |
+| R0 | **First step: bring your own tool (changed 2026-11-01, section 10).** Before any download: check that voice-typing apps already type into our box, then add one setting, a local URL that takes OpenAI's transcription request. R1 to R5 stay the same choices, but become the **later** one-click option, and they're also what to suggest people run behind that URL. |
+| R1 | **When we ship a download, runtime: sherpa-onnx.** It's the only candidate I found with published JVM jars for Linux, Mac and Windows ([jar sizes][sh-rel], [Gradle setup][sh-java]), it's Apache-2.0 ([repo][sh-repo]), and it runs every model below, so swapping models is a config change. |
 | R2 | **Try first: Parakeet TDT 0.6B v3, int8.** Best-evidenced CPU speed, punctuation and capitals built in ([card][pk3]), 25 languages including Russian, which the phone's Language setting already hints ([card][pk3], `DECISIONS.md`). **The catch: words land at each pause, not as you talk.** |
 | R3 | **Test next to it, same harness: Nemotron Speech Streaming EN, 560 ms int8.** The live-words option on the same runtime. If phrase-at-a-pause feels wrong in R2, this becomes first choice. English only, thinner evidence. |
 | R4 | **Fallback for weak machines: Whisper base.en**, through sherpa-onnx or whisper.cpp. Smallest download that still punctuates, and much less memory. Lower accuracy, and it needs a VAD to stop it inventing text in silence. |
 | R5 | **Watch: Moonshine Streaming.** On paper the best fit for this exact job: live words, MIT, documented word boosting whose own example is "Kubernetes". It isn't first only because there's no JVM binding or Intel Mac build, and I couldn't establish whether it punctuates. |
 | R6 | **Built-ins: don't build on them for the first version.** Windows' API for free dictation is cloud, Linux has none. macOS's newer API is good and on-device but needs a Swift helper; a possible later choice (section 3). |
-| R7 | **VAD: yes, Silero**, for R2 and R4. Section 6. |
+| R7 | **VAD: yes, Silero**, for R2 and R4 once we ship a runtime (section 6). The first step can split on plain loudness (section 10.2). |
 
 Why not the top of the leaderboard? Cohere Transcribe, Qwen3-ASR and Granite lead on accuracy but were
 scored on a GPU, and I found no laptop CPU figures for them (section 4).
@@ -153,7 +157,8 @@ are Earnings22 and SPGISpeech (finance names and terms; inferred as a loose prox
 
 ## 5. The optional download
 
-Voice is off, and no model is in the package. Don't go further than this.
+Voice is off, and no model is in the package. Don't go further than this. This is now the later step;
+section 10 is the first.
 
 **The setting.** Settings → Voice: off. Turn it on and it offers three choices, with their sizes, and
 "Audio stays on this computer." Then a progress bar, Cancel, and later Remove.
@@ -216,11 +221,11 @@ Published numbers won't settle this. What decides it:
 - **Machines:** the owner's Linux box; an old 4-core Windows laptop (the one that matters); an M-series Mac; an Intel Mac if one's at hand.
 - **Audio:** the same person, on the laptop's own mic, in a normal room, reading 40 real prompts from past sessions, roughly 100 technical terms in all (`git push`, `kubectl`, TypeScript, Mermaid, `getUserInfo`, real file names). Add a second speaker with a different accent if possible. Keep the recordings local.
 - **Candidates:** Parakeet v3 int8, Nemotron EN 560 ms, Whisper base.en, and Moonshine Medium if the shim is cheap. Greedy first, then hotwords on for each one that allows it, with the release containing the fix.
-- **Run:** feed the WAVs at real speed through the actual sherpa-onnx JVM binding (not its Python, and not faster than real time) from one small Kotlin harness. Threads: 2 and 4.
+- **Run (for the download option):** feed the WAVs at real speed through the actual sherpa-onnx JVM binding (not its Python, and not faster than real time) from one small Kotlin harness. Threads: 2 and 4.
 - **Record:** terms correct, exact and ignoring case; WER with and without punctuation; time to first word; time from last word to final text; peak memory; CPU while talking; cold start.
 - **Suggested bars (mine, adjust):** final text under 1 s after a pause on the old laptop, p50; first words under 1 s for streaming; at least 85 of 100 terms recognisably right; keeps real time with an IDE open.
 - **Then:** the owner dictates for ten minutes live with the top two, because replay doesn't show how it feels. Also try the OS dictation in a Compose field on Windows and Mac (section 3).
-- **Against:** Soniox on the same recordings, if he's fine with that once for a baseline. It's the same audio going to a service, so ask first.
+- **If the URL setting exists first (section 10):** run the candidates through local servers behind it. Same WAVs, same request, no native code in the app. It says less about the JVM binding, and nothing about live words.
 
 ---
 
@@ -235,7 +240,138 @@ Out of scope. sherpa-onnx and Moonshine both include it, so a later read-aloud w
 Moonshine's punctuation. RAM for Nemotron and Moonshine. Any CPU RTF for a current mid-range laptop with
 threads stated for Parakeet through sherpa-onnx. Whether Nemotron's hotwords are in a tagged release. Size
 of the Nemotron packages. Whether a Java VAD API exists in sherpa-onnx. Windows Voice access's availability.
-Whether Compose text fields take OS dictation. Mac signing rules for downloaded native code.
+Whether Compose text fields take OS dictation. Mac signing rules for downloaded native code. Whether
+Compose text fields take typed input from Handy and similar tools. Which whisper.cpp entry point runs
+Parakeet. Which local servers really accept a bare WAV with no `model` field (section 10).
+
+---
+
+## 10. Bring your own tool
+
+The owner's later idea: tools a person installs on their own, which our app then connects to. Nothing
+here is built or was run. "Latest" means the newest release or commit I could see.
+
+### 10.1 What exists
+
+**Servers and command-line tools**
+
+| Tool | Latest | Runs | License | Live words? | How a program talks to it | Install |
+|---|---|---|---|---|---|---|
+| **`whisper-server`** (whisper.cpp) | [v1.9.5, Oct 6 2026][wcpp-latest] | Whisper. [Parakeet not in the server, none planned][wcpp-3735] as of June | [MIT][wcpp] | [Not described][wcpp-srv] | [HTTP POST, multipart, `/inference`, `127.0.0.1:8080`][wcpp-srv]. [`--inference-path` can serve it at `/v1/audio/transcriptions`][wcpp-flag] *(search summary, community configs)*. [Natively takes WAV][wcpp-wav] *(search summary)* | [Latest tag has no binaries][wcpp-latest], only source. Homebrew not verified |
+| **`whisper-cli`** | Same | Whisper; Parakeet since [1.9.0][wcpp-190] (entry point not established) | MIT | No | [File path in; results on the console, or JSON and text files][wcpp-cli]. Stdin not documented | As above |
+| **`whisper-stream`** | Same | Whisper | MIT | Sort of | [Owns the mic through SDL2; rewrites a line with terminal escapes][wcpp-stream]. Not for us | As above |
+| **Speaches** | [v0.9.0-rc.3, Dec 2025][speaches-rel]; [last commit Apr 18 2026][speaches-c]. Slowing | [faster-whisper][speaches] | [MIT][speaches] | [Yes, Realtime WebSocket, `intent=transcription`][speaches-rt], [events listed, audio format not][speaches-rt]. Also [SSE][speaches] | [OpenAI-compatible][speaches] | [Docker][speaches] |
+| **LocalAI** | [4.11.0, Oct 2026][localai-r] | [whisper.cpp by default, Moonshine, faster-whisper, parakeet-cpp, others][localai-a] | [MIT][localai-r] | [SSE deltas as decoded on streaming models; others send one delta][localai-a]. [Realtime API, WebRTC][localai-r] | [`POST /v1/audio/transcriptions`][localai-a] | [Docker; Mac DMG is unsigned][localai-r]. A big general tool |
+| **Lemonade** | [candidate-v2026.45.3, Oct 29 2026][lem-rel], a prerelease | [whisper.cpp, Moonshine][lem-r] | [Apache-2.0][lem-r] | [Yes with Moonshine, `/realtime` WebSocket, base64 PCM16, 16 kHz][lem-m]. [Whisper only per VAD segment][lem-m] | [`/v1/audio/transcriptions`][lem-m], [port 13305][lem-r] | [Installers of 4.4 to 17.1 MB][lem-rel]. Moonshine on [Windows x64, Linux, Mac arm64; not Intel Mac][lem-m] |
+| **WhisperLive** | [Commit Nov 1 2026][wl-c] | [faster-whisper, TensorRT, OpenVINO][wl] | [MIT][wl] | [Yes, WebSocket, port 9090, PCM 16 kHz][wl] | Own WebSocket; [OpenAI REST with `--enable_rest`, takes `hotwords`][wl] | [Linux, Mac, Docker][wl]; Windows not listed |
+| **TranscriptionSuite** | [Commit Sep 24 2026][ts-c]; [a hobby project][ts] | [faster-whisper, NeMo Parakeet and Canary, whisper.cpp, others][ts] | [GPL-3.0+][ts] | [Live Mode, Whisper only][ts], transport not described | [OpenAI `/v1/audio/transcriptions`][ts] | [Docker or Podman; native on Apple Silicon][ts] |
+| **achetronic/parakeet** | [Commit Jul 2 2026][ach-c]; [339 stars][ach] | [Parakeet TDT, ONNX, on CPU by default][ach] | [Page says both MIT and Apache-2.0][ach]; model CC-BY-4.0 | [SSE deltas][ach], on a finished upload (inferred) | [`POST /v1/audio/transcriptions`][ach] | [Go; Docker][ach] |
+| **stt-server** (PhilHem) | [v0.3.1; 0 stars][stts] | [sherpa-onnx: Parakeet, Whisper, others][stts] | [Not stated on the page][stts] | [Not mentioned][stts] | [OpenAI POST; some parameters ignored][stts] | [Docker image about 129 MB][stts]. Too small a project to rely on (my view) |
+| **sherpa-onnx's own programs** | [v2.0.1, Oct 2026][sh-rel] | All in section 2 | [Apache-2.0][sh-repo] | [Yes, `sherpa-onnx-online-websocket-server`, port 6006][sh-ws] | WebSocket; [wire format not on the page][sh-ws]. [Offline one too][sh-wso]; [no HTTP API documented][sh-wso] | Release assets (not checked per OS) |
+| **Wyoming** with **wyoming-faster-whisper** | [v3.8.1, Sep 14 2026][wyfw-rel] | [faster-whisper, sherpa including Parakeet v3, qwen3-asr, others][wyfw-wiki] | [MIT][wy] | Protocol: [`transcript-chunk`, each replaces the last][wy]. Server: [`--sherpa-streaming`, Kroko models][wyfw-wiki]; whether it sends chunks not established | [Raw TCP, JSON lines plus PCM, port 10300][wy]. [**No auth or encryption, by design**][wy] | [Python, or Docker about 1.6 GB][wyfw] |
+| **Vosk server** | [Last commit Jul 2025][vs-c] | Vosk | [Apache-2.0][vs] | Protocol not read | [WebSocket, gRPC, WebRTC, MQTT][vs] | [Docker folder][vs] |
+
+**Voice-typing apps.** These type at the cursor rather than serving other programs.
+
+| Tool | Latest | Runs | License | How to reach it |
+|---|---|---|---|---|
+| **Handy** | [v0.9.8, Oct 3 2026][handy-rel]; [36,528 stars, the largest in one list][awesome] | [Whisper, Parakeet v3][handy-md] | [MIT][handy-md] | [Types for you; `--toggle-transcription` CLI, beta; no API described][handy-md]. Windows, Mac, Linux |
+| **nerd-dictation** | [Commit Oct 2025][nd-c] | [Vosk][nd] | [GPL-3.0][nd] | [`begin` and `end`; types keys, or `--output=STDOUT`][nd]. [Linux only][nd] |
+| **VoxType** | Not checked | [Whisper, Parakeet, Moonshine][voxtype] *(search summary)* | Not checked | [Types with wtype, dotool or ydotool][voxtype] *(search summary)*. Linux |
+
+[A curated list][awesome] has about 50 more, among them FluidVoice and VoiceInk (Mac), OpenWhispr, hyprwhspr, and
+[YazSes][yazses]. I didn't check them one by one. It's a community list, so its picks are opinions.
+
+**My read:** the field splits in two. People who want voice typing use apps like Handy. Local servers are
+mostly for wiring voice into other software. Almost everything cross-platform with an API assumes Docker
+or Python; Lemonade is the exception with [real installers on each OS][lem-rel], but it's a prerelease tag.
+
+### 10.2 How we'd connect
+
+| Shape | What it takes | Covers | Catch |
+|---|---|---|---|
+| **A. Nothing.** The person runs Handy or the like; it types into our box | A ten-minute try | Every typing app (inferred) | **Unverified** that a Compose field takes it, especially on Wayland. No mic button, no Submit in hands-free. [Handy's CLI toggle][handy-md] could give us a button later |
+| **B. A local URL.** Setting: base URL, optional model, optional key. We `POST {url}/audio/transcriptions` with a WAV and read `text` | Mic capture, one multipart request (OkHttp is already in the shared module) | whisper-server (with its flag), Speaches, LocalAI, Lemonade, WhisperLive (with its flag), TranscriptionSuite, achetronic/parakeet, stt-server | No live words. See below |
+| **C. A command.** Setting: a command with `{file}`; we read stdout | Process handling, output cleanup | whisper-cli, `sherpa-onnx-offline` | **It reloads the model for every phrase**: [0.6 to 1.6 s for Whisper tiny to small][yazses], before any decoding. Stray output to clean. Worse than B |
+| **D. Live over WebSocket** | A protocol client, partials in the UI | One family per client | [OpenAI Realtime][oa-rt], Wyoming, WhisperLive, sherpa-onnx and Vosk all differ. Even the OpenAI-style ones differ: [24 kHz in OpenAI's example][oa-rt], [16 kHz in Lemonade's][lem-m]. **No single standard** |
+| **E. Detecting installed tools** | A list to maintain, for each tool and OS | Whatever we list | Grows forever. Skip. A **Test** button on the URL does the useful part |
+
+**One small interface?** For finished audio, yes: B covers most servers above. For live words, no.
+[Whisperio][whisperio] is a working precedent for B: a base URL field, with whisper.cpp, faster-whisper-server,
+LocalAI and Ollama named as compatible, and the key left empty.
+
+**What the plain request gives up, compared with streaming:**
+- **Live words.** Text only arrives after each piece is sent. `stream=true` doesn't fix it: [partial text comes while the file is processed][oa-stt], which starts after the upload. OpenAI itself points [audio still arriving from a mic to the Realtime guide][oa-stt].
+- **Context across phrases.** Each request decodes alone, so sentence joins and capitals may suffer (inferred). The phone already has this problem and [reads on from the last utterance][dec]; the same rule would carry over.
+- **Vocabulary, in most cases.** `prompt` is [in OpenAI's API][oa-stt] and [whisper-server][wcpp-srv], WhisperLive [takes `hotwords`][wl], and others may [accept and ignore parameters][stts]. A replace list in our app works with all of them (section 4.1).
+- **Fast first use.** [Speaches unloads models when idle][speaches], so the first phrase can be slow. Not measured.
+
+**What it doesn't give up, for the model we'd pick anyway:** Parakeet v3 has no live words on sherpa-onnx
+either (section 2). So "one request per phrase" should feel about the same as embedding it, apart from
+the local HTTP round trip (inferred, to be tested).
+
+**Splitting into phrases.** Sending only at Submit would mean a long wait after a long dictation: at
+[RTF 0.255][vidclean], a minute of talk takes about 15 s (my calc, on that 2 vCPU box). So cut at pauses and
+send each piece. Silero needs an ONNX runtime in the app, which defeats the point. Plain loudness is
+enough to try first (inferred); [the phone's design already computes it per 40 ms][sv]. Not sending
+quiet stretches also limits [Whisper inventing text in silence][vidclean], and [whisper-server has its own
+`--vad`][wcpp-srv].
+
+**Size.** [1280 B per 40 ms][sv] is 32 kB/s, or about 1.9 MB a minute (my calc). OpenAI's [limit is 25 MB][oa-stt];
+local servers set their own, and phrases are far below either.
+
+**Privacy.** A URL field would also take a cloud service, which goes against the owner's rule. Choose:
+accept only loopback and private addresses, or warn. Plain `http` to another machine carries audio
+unencrypted (inferred), so loopback should be the normal case.
+
+### 10.3 The model on the person's own Hypernova server
+
+**First, an existing decision stands in the way.** On 2026-10-30 the owner removed speech through the computer:
+[`stt.ts`, `/v1/stt*` and "the phone's streaming of its microphone" are gone][dec], and "dictation's audio still
+never goes to the Mac" was restated [the next day][dec]. That was about removing a cloud service, so a server of
+his own may be a different question, but **it reopens his decision, and it's his to reopen.** It also
+stretches "audio stays on the machine" to "stays on my machines".
+
+**Appealing (all inferred unless linked):**
+- One install serves every device, with no model on each client.
+- The server may be the stronger machine, and a GPU would make the leaderboard's big models realistic ([Qwen3-ASR 5.40%, Cohere 5.77%][pinggy], against Parakeet's 6.18%).
+- **The phone gains most.** Today its default recognizer [may send audio to Google, and on-device "heard noticeably worse"][dec]. This would be a third way: good, and not leaving his machines.
+- [Mutual TLS, and WebSocket upgrades on the same listener, already exist][proto], and the old route's shape is in git history. Not a new kind of problem.
+- The daemon can be the only way in, with the tool on loopback. That matters because [Wyoming has no auth by design][wy].
+
+**Hard:**
+- **Someone has to install the tool and model on the server,** and keep them working. The daemon would need to find it and report when it's missing.
+- **Competition for the machine.** Agents' builds and tests run there, and dictation wants its CPU at once. A busy or small server may be slower than the laptop (inferred). Without a GPU, much of the appeal goes.
+- **Reachability.** The listener [drops anything but private, link-local, CGNAT and ULA addresses, and is off by default in containers, cloud VMs, machines with a public IPv4 and WSL's NAT][proto]. Nothing is open to the internet, so voice works only at home or on a VPN, and a cloud-VM server has no such route at all.
+- **Traffic and latency.** [32 kB/s][sv] while talking is about 115 MB per hour of speech (my calc), which is small on Wi-Fi (inferred). The network hop should be small next to decoding on a LAN, but jitter on phones over a VPN is unmeasured.
+- **Live words mean carrying a stream** through the daemon, and handling drops and a queue when two devices talk at once. That's the machinery removed in October.
+- **The server being down means no voice,** where a local tool would keep working.
+
+**A cheap way to try it without touching the daemon:** the section 10.2 URL can point at an SSH tunnel to a
+tool on the server (inferred). Only people comfortable with that would do it, which fits a trial.
+
+### 10.4 Recommendation
+
+**Bring your own is the cheap first step, and it goes ahead of the sherpa-onnx download, not instead of
+it.** This changes the order at the top of this file (R0), not the model choices.
+
+1. **Now, no code:** when the desktop app can show a text box, try Handy in it on each OS. If it works, voice already exists for anyone who wants it, and it can go in the docs. **That might be enough for a while.**
+2. **First code, only if people want a mic button:** shape B. One URL setting, a Test button, loudness splitting, one request per phrase. No native code, no model catalog, no checksums. In the docs, one tested recipe per OS rather than a list of tools. Inferred: LocalAI or achetronic/parakeet for Parakeet, whisper-server for Whisper, Lemonade if it reaches a stable release.
+3. **Later, only if asked for:** the one-click download (section 5), for people who won't run a server, and for **live words**, which B can't give.
+4. **Later still, and his call:** the server route (10.3). Most interesting for the phone, but it reverses a decision he made days ago.
+
+**Why this order:** it fits "I don't want to go too far with it". Everyone using this already runs agents in a
+terminal, so installing a local tool is a smaller ask here than in a typical app (inferred). And models
+change monthly, as this file shows: with a URL, a better model next year needs nothing from us.
+
+**Not better than bundling on everything.** It adds a setup step, leaves support questions about other
+people's tools, gives no live words, and the Windows choices lean on Docker. If the ten-minute talk test
+in section 7 shows the owner wants words as he speaks, step 2 won't satisfy him: go to the download
+with Nemotron, or to shape D against Lemonade's Moonshine, which would also get around Moonshine's missing
+JVM binding (R5).
+
+**What would decide it:** does typing into a Compose field work (step 1); does per-phrase text feel fast
+enough (step 2); how slow is a real server's first request after idle.
 
 ---
 
@@ -252,6 +388,10 @@ Whether Compose text fields take OS dictation. Mac signing rules for downloaded 
 **Whisper.** [whisper.cpp][wcpp] · [Models][wcpp-m] · [Java binding][wcpp-java] · [v1.9.0][wcpp-190] · [PR #3735][wcpp-3735] · [Prompt limit][wcpp-prompt] · [faster-whisper][fw] · [its releases][fw-rel] · [parakeet.cpp on dev.to][devto-pk] · [LocalAI on parakeet.cpp][localai]
 
 **Others.** [Vosk models][vosk-m] · [Vosk repo][vosk-r] · [Vosk releases][vosk-tag] · [Vosk commits][vosk-c] · [Silero VAD][silero] · [Granite 5.0 card][granite] · [Granite write-up][granite-b] · [Whistle][whistle] · [Whistle article][whistle-rw] · [transcribe.cpp][tcpp] · [Handy][handy] · [OpenWhispr comparison][ow-cmp] · [OpenWhispr streaming][ow-stream]
+
+**Tools you install yourself.** [whisper-server][wcpp-srv] · [whisper-cli][wcpp-cli] · [whisper-stream][wcpp-stream] · [whisper.cpp latest release][wcpp-latest] · [`--inference-path` config][wcpp-flag] · [whisper-server and WAV][wcpp-wav] · [Speaches][speaches] · [its Realtime API][speaches-rt] · [its releases][speaches-rel] · [its commits][speaches-c] · [LocalAI][localai-r] · [LocalAI audio][localai-a] · [Lemonade][lem-r] · [Lemonade Moonshine][lem-m] · [Lemonade releases][lem-rel] · [WhisperLive][wl] · [its commits][wl-c] · [TranscriptionSuite][ts] · [its commits][ts-c] · [achetronic/parakeet][ach] · [its commits][ach-c] · [stt-server][stts] · [sherpa-onnx online server][sh-ws] · [sherpa-onnx offline server][sh-wso] · [Wyoming][wy] · [wyoming-faster-whisper][wyfw] · [its releases][wyfw-rel] · [its wiki][wyfw-wiki] · [Vosk server][vs] · [its commits][vs-c] · [Handy README][handy-md] · [Handy releases][handy-rel] · [nerd-dictation][nd] · [its commits][nd-c] · [VoxType][voxtype] · [awesome-voice-typing][awesome] · [Whisperio][whisperio] · [OpenAI speech to text][oa-stt] · [OpenAI Realtime transcription][oa-rt]
+
+**This repo.** [DECISIONS.md][dec] · [PROTOCOL.md][proto] · [spec-voice.md][sv]
 
 **Hosting.** [GitHub release limits][gh-rel] · [Hugging Face rate limits][hf-rl]
 
@@ -344,3 +484,45 @@ Whether Compose text fields take OS dictation. Mac signing rules for downloaded 
 [yap]: https://github.com/FrigadeHQ/yap/wiki
 [myna]: https://linuxiac.com/ubuntu-26-10-steps-into-ai-with-local-speech-to-text/
 [spokenly]: https://spokenly.app/blog/speech-to-text-linux
+[wcpp-srv]: https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/examples/server/README.md
+[wcpp-cli]: https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/examples/cli/README.md
+[wcpp-stream]: https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/examples/stream/README.md
+[wcpp-latest]: https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest
+[wcpp-flag]: https://glama.ai/mcp/servers/@mbailey/voicemode/blob/748057b353762fab0e43ae63da7ae6e0c86ed512/docs/.archive/whisper.cpp.md
+[wcpp-wav]: https://github.com/derijans/tensors-router/wiki/Whisper.cpp
+[speaches]: https://github.com/speaches-ai/speaches
+[speaches-rt]: https://speaches.ai/usage/realtime-api/
+[speaches-rel]: https://api.github.com/repos/speaches-ai/speaches/releases?per_page=2
+[speaches-c]: https://api.github.com/repos/speaches-ai/speaches/commits?per_page=2
+[localai-r]: https://github.com/mudler/LocalAI
+[localai-a]: https://localai.io/docs/features/audio-to-text/
+[lem-r]: https://github.com/lemonade-sdk/lemonade
+[lem-m]: https://lemonade-server.ai/docs/guide/configuration/moonshine/
+[lem-rel]: https://api.github.com/repos/lemonade-sdk/lemonade/releases?per_page=1
+[wl]: https://github.com/collabora/WhisperLive
+[wl-c]: https://api.github.com/repos/collabora/WhisperLive/commits?per_page=1
+[ts]: https://github.com/homelab-00/TranscriptionSuite
+[ts-c]: https://api.github.com/repos/homelab-00/TranscriptionSuite/commits?per_page=1
+[ach]: https://github.com/achetronic/parakeet
+[ach-c]: https://api.github.com/repos/achetronic/parakeet/commits?per_page=1
+[stts]: https://github.com/PhilHem/stt-server
+[sh-ws]: https://k2-fsa.github.io/sherpa/onnx/websocket/online-websocket.html
+[sh-wso]: https://k2-fsa.github.io/sherpa/onnx/websocket/offline-websocket.html
+[wy]: https://github.com/rhasspy/wyoming
+[wyfw]: https://github.com/OHF-Voice/wyoming-faster-whisper
+[wyfw-rel]: https://api.github.com/repos/OHF-Voice/wyoming-faster-whisper/releases?per_page=2
+[wyfw-wiki]: https://github.com/OHF-Voice/wyoming-faster-whisper/wiki
+[vs]: https://github.com/alphacep/vosk-server
+[vs-c]: https://api.github.com/repos/alphacep/vosk-server/commits?per_page=1
+[handy-md]: https://raw.githubusercontent.com/cjpais/Handy/main/README.md
+[handy-rel]: https://api.github.com/repos/cjpais/Handy/releases?per_page=1
+[nd]: https://github.com/ideasman42/nerd-dictation
+[nd-c]: https://api.github.com/repos/ideasman42/nerd-dictation/commits?per_page=2
+[voxtype]: https://github.com/peteonrails/voxtype/wiki
+[awesome]: https://github.com/primaprashant/awesome-voice-typing
+[whisperio]: https://github.com/draenger/whisperio
+[oa-stt]: https://developers.openai.com/api/docs/guides/speech-to-text
+[oa-rt]: https://developers.openai.com/api/docs/guides/realtime-transcription
+[dec]: ../DECISIONS.md
+[proto]: ../PROTOCOL.md
+[sv]: spec-voice.md
