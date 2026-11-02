@@ -16,8 +16,9 @@ name: android-release
 # the installed app has.
 #
 # After that job has published, the server-packages job (server-packages.yml) builds and tests the
-# .deb and the Mac's packages and adds them, with SHA256SUMS. It `needs` the apk job, so a failure or a
-# stuck runner there can never stop a release: the APK and the Linux server package are out already.
+# .deb and the Mac's packages and adds them, the client-packages job (client-packages.yml) does the same
+# for the desktop client's, and the checksums job adds SHA256SUMS. They `need` the apk job, so a failure or
+# a stuck runner there can never stop a release: the APK and the Linux server package are out already.
 # A failure costs only that file, turns this run red, and leaves a line in the release's notes.
 #
 # Secrets: HYPERNOVA_KEYSTORE_B64 (base64 of the .jks), HYPERNOVA_KEYSTORE_PASSWORD,
@@ -36,6 +37,7 @@ on:
       - 'scripts/server-setup.sh'
       - '.github/workflows/android-release.yml'
       - '.github/workflows/server-packages.yml'
+      - '.github/workflows/client-packages.yml'
   release:
     types: [published]
   workflow_dispatch:
@@ -188,3 +190,42 @@ jobs:
     with:
       tag: ${{ needs.apk.outputs.tag }}
       attach: true
+
+  # The desktop client's files, added the same way (client-packages.yml).
+  client-packages:
+    needs: apk
+    uses: ./.github/workflows/client-packages.yml
+    with:
+      tag: ${{ needs.apk.outputs.tag }}
+      attach: true
+
+  # SHA256SUMS of what the release really carries, whatever got built, and a line in its notes for anything
+  # that didn't. One job, after both of the above, so nothing else writes that file or those notes while
+  # it reads them, and every file is in. Runs when a package job failed too: that's when the line matters. Re-running a
+  # failed job brings this one round again, so a file that comes later is listed and its line goes.
+  checksums:
+    needs: [apk, server-packages, client-packages]
+    if: ${{ always() && needs.apk.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.apk.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: SHA256SUMS
+        run: |
+          mkdir sums
+          gh release download "$TAG" --dir sums --pattern '*'
+          rm -f sums/SHA256SUMS
+          (cd sums && sha256sum -- * > SHA256SUMS)
+          cat sums/SHA256SUMS
+          gh release upload "$TAG" sums/SHA256SUMS --clobber
+      - name: Say what's missing
+        run: |
+          gh release view "$TAG" --json body --jq .body > notes-before.md
+          scripts/release-not-built.sh "$TAG" sums < notes-before.md > notes-after.md
+          if grep -F 'Not built for this release:' notes-after.md; then echo "::warning::This release lacks some files: see its notes"; fi
+          # What `gh --jq` printed ends in one line feed, and so does the script's.
+          cmp -s notes-before.md notes-after.md || gh release edit "$TAG" --notes-file notes-after.md

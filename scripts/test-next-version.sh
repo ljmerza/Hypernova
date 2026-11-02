@@ -123,6 +123,38 @@ check "notes: the server's name" 3 count 'hypernova-server-v3.4.0-linux.tar.gz' 
 check "notes: the short install line" 2 count 'curl -fsSL https://ljmerza.github.io/Hypernova/get.sh |' <<<"$notes"
 check "notes: no server" 0 count 'hypernova-server' <<<"$("$NOTES" v3.4.0 v3.3.0 HEAD --no-server)"
 check "notes: no server, the client still" 1 count 'hypernova-client-v3.4.0-android.apk' <<<"$("$NOTES" v3.4.0 v3.3.0 HEAD --no-server)"
+check "notes: no server, only the APK" 1 count 'hypernova-client' <<<"$("$NOTES" v3.4.0 v3.3.0 HEAD --no-server)"
+for f in linux-amd64.deb linux-x64.tar.gz linux-arm64.deb macos-arm64.dmg macos-x64.dmg windows-x64.msi; do
+  check "notes: the client's $f" 1 count "\`hypernova-client-v3.4.0-$f\`" <<<"$notes"
+done
+check "notes: the client's files come under Client" 0 count 'hypernova-client-v3.4.0-windows-x64.msi' <<<"$(sed -n '/^### Server/,$p' <<<"$notes")"
+check "notes: where a warning is explained" 1 count 'docs/INSTALL.md, "The desktop client"' <<<"$notes"
+
+# The lines for what didn't come, from what the release has.
+NOT_BUILT="$HERE/release-not-built.sh"
+got=$(mktemp -d)
+marks() { grep -c -F 'Not built for this release:' || true; }
+for f in hypernova-client-v3.4.0-{linux-amd64.deb,linux-x64.tar.gz,linux-arm64.deb,macos-arm64.dmg,macos-x64.dmg,windows-x64.msi} \
+         hypernova-server-v3.4.0-{linux-amd64.deb,linux-arm64.deb,macos-arm64.tar.gz,macos-arm64.pkg,macos-x64.tar.gz,macos-x64.pkg}; do
+  : > "$got/$f"
+done
+check "not built: everything came, nothing changes" "$notes" "$NOT_BUILT" v3.4.0 "$got" <<<"$notes"
+rm "$got/hypernova-client-v3.4.0-windows-x64.msi" "$got/hypernova-server-v3.4.0-macos-x64.pkg"
+lacking=$("$NOT_BUILT" v3.4.0 "$got" <<<"$notes")
+check "not built: two lines, one a side" 2 marks <<<"$lacking"
+check "not built: the client's is under Client" '**Not built for this release:** `hypernova-client-v3.4.0-windows-x64.msi`' sed -n '/^### Client/,/^### Server/{/Not built/p;}' <<<"$lacking"
+check "not built: the server's is after Server" '**Not built for this release:** `hypernova-server-v3.4.0-macos-x64.pkg`' sed -n '/^### Server/,${/Not built/p;}' <<<"$lacking"
+check "not built: run again, the same" "$lacking" "$NOT_BUILT" v3.4.0 "$got" <<<"$lacking"
+: > "$got/hypernova-client-v3.4.0-windows-x64.msi"
+lacking2=$("$NOT_BUILT" v3.4.0 "$got" <<<"$lacking")
+check "not built: a file that came later loses its line" 1 marks <<<"$lacking2"
+: > "$got/hypernova-server-v3.4.0-macos-x64.pkg"
+check "not built: when all have come the notes are as they were" "$notes" "$NOT_BUILT" v3.4.0 "$got" <<<"$lacking2"
+empty=$(mktemp -d)
+check "not built: notes by hand, no headings, the lines at the end" 2 marks <<<"$("$NOT_BUILT" v3.4.0 "$empty" <<<'Mine.')"
+check "not built: notes by hand keep their words" Mine. head -n 1 <<<"$("$NOT_BUILT" v3.4.0 "$empty" <<<'Mine.')"
+rmdir "$empty"
+rm -rf "$got"
 notes=$("$NOTES" v3.4.1 HEAD HEAD)
 check "notes: nothing new" "- No app or server changes; rebuilt from $(git rev-parse --short=7 HEAD)." sed -n 3p <<<"$notes"
 

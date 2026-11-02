@@ -1,0 +1,256 @@
+name: client-packages
+# The desktop client's installable files: a .deb for each Linux processor and a folder to unpack, a .dmg for each
+# Mac processor and a Windows .msi, each carrying its own Java, and each installed, opened and paired on a runner
+# of its own before it's attached (scripts/test-client-package.sh). Two ways in, as server-packages.yml:
+#
+#   - android-release.yml calls this after it has published a release (attach: true), so a file that fails here
+#     can't stop that release, and costs only itself. That job's own checksums job then lists what really came,
+#     and says what didn't.
+#   - a pull request that touches these files, or a manual run: everything is built and tested and kept as the run's
+#     artifacts, with screenshots. Nothing is published.
+#
+# No secrets: nothing is signed (docs/RELEASING.md, "The desktop client's packages", and what a person sees:
+# docs/INSTALL.md, "The desktop client"). The names are in android/desktop/packaging/client-names.sh.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release to attach to (vX.Y.Z)
+        type: string
+        required: true
+      attach:
+        description: Attach the packages to that release
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - 'android/desktop/**'
+      - 'android/shared/**'
+      - 'android/gradle/**'
+      - 'android/build.gradle.kts'
+      - 'android/settings.gradle.kts'
+      - 'android/gradle.properties'
+      - 'demo/server.ts'
+      - 'scripts/test-client-package.sh'
+      - '.github/workflows/client-packages.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  # jpackage works out the .deb's dependencies from what this runner has installed, for what the Java and the app
+  # link against, so that's named here instead of left to the image. They're Ubuntu 24.04's names (docs/INSTALL.md).
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      # v6's default cache is a proprietary component; basic keeps it MIT (docs/DECISIONS.md, "The workflows' actions").
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Version
+        env:
+          TAG_IN: ${{ inputs.tag }}
+        run: |
+          # Without a release to attach to, the version in the repository.
+          tag="${TAG_IN:-v$(node -p "require('./daemon/package.json').version")}"
+          { echo "TAG=$tag"; echo "VERSION=${tag#v}"; echo "NUMBERS=$(sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+).*/\1/' <<<"$tag")"; } >> "$GITHUB_ENV"
+      - name: What the build and the test need
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq binutils fakeroot libasound2t64 libfontconfig1 libgl1 libx11-6 libxext6 libxi6 libxrender1 libxtst6 xvfb xdotool imagemagick
+      - name: Build
+        working-directory: android
+        run: ./gradlew :desktop:packageDeb :desktop:createDistributable :desktop:probeJar -PdesktopVersion="$VERSION" --stacktrace
+      - name: Name the .deb
+        run: |
+          . android/desktop/packaging/client-names.sh
+          mkdir -p dist/client
+          deb="dist/client/$CLIENT_PACKAGE-$TAG-linux-${{ matrix.arch }}.deb"
+          cp android/desktop/build/compose/binaries/main/deb/*.deb "$deb"
+          test -s "$deb"
+          echo "DEB=$deb" >> "$GITHUB_ENV"
+      # What the demo server needs of the daemon's: its ws. No node-pty built.
+      - name: For the demo server
+        working-directory: daemon
+        run: npm ci --ignore-scripts
+      - name: Install, open and pair the .deb
+        run: scripts/test-client-package.sh --deb "$DEB" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots
+      - name: Attach the .deb to the release
+        if: ${{ inputs.attach }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$DEB" --clobber
+      - name: The folder to unpack
+        if: ${{ matrix.arch == 'amd64' }}
+        run: |
+          . android/desktop/packaging/client-names.sh
+          tgz="dist/client/$CLIENT_PACKAGE-$TAG-linux-x64.tar.gz"
+          tar -C android/desktop/build/compose/binaries/main/app -czf "$tgz" "$CLIENT_PACKAGE"
+          echo "TGZ=$tgz" >> "$GITHUB_ENV"
+      - name: Unpack, open and pair the folder
+        if: ${{ matrix.arch == 'amd64' }}
+        run: scripts/test-client-package.sh --tarball "$TGZ" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots
+      - name: Attach the folder to the release
+        if: ${{ matrix.arch == 'amd64' && inputs.attach }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$TGZ" --clobber
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: hypernova-client-linux-${{ matrix.arch }}
+          if-no-files-found: ignore
+          path: |
+            dist/client/
+            dist/client-shots/
+
+  # Each is built and tested on its own processor: the .dmg holds that processor's Java and native library.
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+          - arch: x64
+            runner: macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Version
+        env:
+          TAG_IN: ${{ inputs.tag }}
+        run: |
+          tag="${TAG_IN:-v$(node -p "require('./daemon/package.json').version")}"
+          { echo "TAG=$tag"; echo "VERSION=${tag#v}"; echo "NUMBERS=$(sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+).*/\1/' <<<"$tag")"; } >> "$GITHUB_ENV"
+      - name: Build
+        working-directory: android
+        run: ./gradlew :desktop:packageDmg :desktop:probeJar -PdesktopVersion="$VERSION" --stacktrace
+      - name: Name the .dmg
+        run: |
+          . android/desktop/packaging/client-names.sh
+          mkdir -p dist/client
+          dmg="dist/client/$CLIENT_PACKAGE-$TAG-macos-${{ matrix.arch }}.dmg"
+          cp android/desktop/build/compose/binaries/main/dmg/*.dmg "$dmg"
+          test -s "$dmg"
+          echo "DMG=$dmg" >> "$GITHUB_ENV"
+      - name: For the demo server
+        working-directory: daemon
+        run: npm ci --ignore-scripts
+      - name: Install, open and pair the .dmg
+        run: /bin/bash scripts/test-client-package.sh --dmg "$DMG" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots
+      - name: Attach the .dmg to the release
+        if: ${{ inputs.attach }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$DMG" --clobber
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: hypernova-client-macos-${{ matrix.arch }}
+          if-no-files-found: ignore
+          path: |
+            dist/client/
+            dist/client-shots/
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # gradlew has no .sh for .gitattributes to keep it LF, and it runs under this bash.
+      - name: Line endings as they are in the repository
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Version
+        env:
+          TAG_IN: ${{ inputs.tag }}
+        run: |
+          tag="${TAG_IN:-v$(node -p "require('./daemon/package.json').version")}"
+          numbers="$(sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+).*/\1/' <<<"$tag")"
+          # The same release one patch on: what shows that a newer .msi replaces this one.
+          next="${numbers%.*}.$((${numbers##*.} + 1))"
+          { echo "TAG=$tag"; echo "VERSION=${tag#v}"; echo "NUMBERS=$numbers"; echo "NEXT=$next"; } >> "$GITHUB_ENV"
+      # Compose fetches WiX 3.11 for this. This runner's image doesn't list .NET Framework 3.5, which that WiX's
+      # own guide asks for: not known yet whether it needs it here, so a failure gets it and one more try.
+      - name: Build
+        working-directory: android
+        run: |
+          build() { ./gradlew :desktop:packageMsi :desktop:probeJar -PdesktopVersion="$VERSION" --stacktrace; }
+          if ! build; then
+            echo "::warning::packageMsi failed: trying once more with .NET Framework 3.5 on"
+            powershell.exe -NoProfile -Command "Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart"
+            build
+          fi
+      - name: Name the .msi
+        run: |
+          . android/desktop/packaging/client-names.sh
+          mkdir -p dist/client
+          msi="dist/client/$CLIENT_PACKAGE-$TAG-windows-x64.msi"
+          cp android/desktop/build/compose/binaries/main/msi/*.msi "$msi"
+          test -s "$msi"
+          echo "MSI=$msi" >> "$GITHUB_ENV"
+      - name: Build a newer one, to upgrade to
+        working-directory: android
+        run: |
+          rm -f desktop/build/compose/binaries/main/msi/*.msi
+          ./gradlew :desktop:packageMsi -PdesktopVersion="$NEXT" --stacktrace
+          mkdir -p ../dist/client-next
+          cp desktop/build/compose/binaries/main/msi/*.msi ../dist/client-next/next.msi
+      - name: For the demo server
+        working-directory: daemon
+        run: npm ci --ignore-scripts
+      - name: Install, open, pair, upgrade and uninstall the .msi
+        run: scripts/test-client-package.sh --msi "$MSI" --msi-next dist/client-next/next.msi --next-version "$NEXT" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots
+      - name: Attach the .msi to the release
+        if: ${{ inputs.attach }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$MSI" --clobber
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: hypernova-client-windows-x64
+          if-no-files-found: ignore
+          path: |
+            dist/client/
+            dist/client-shots/
