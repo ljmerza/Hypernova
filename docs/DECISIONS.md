@@ -3364,3 +3364,12 @@ The owner: "for the workflow green bar at the bottom I like to see tiny little d
 ## No session id on the cards (2026-11-01)
 
 The owner asked what the two characters on a card were, the start of the session's id, with `1d` reading like an age next to `21d`, and chose to remove them. Home's cards and History's rows show only how long ago; TalkBack says "Active 4 minutes ago." or "Finished …". The session's own header keeps its short id.
+
+## Screenshots come from a demo server, not from the app (2026-11-01)
+
+The owner wants demo data back for screenshots that show off the app, on Android now and the desktop client later: "our own data", the best six shots. He didn't want a demo mode back in the app for now.
+
+1. **The app still has no demo** ("No demo mode", 2026-10-31, holds): nothing in `android/` or `daemon/src/` knows about any of this.
+2. **Screenshots come from a separate demo server** (`demo/server.ts`, `demo/README.md`). It answers a paired phone like a real server, using the daemon's own pairing and certificate code over the real local route with mutual TLS, from made-up replies, on loopback only. It runs nothing and changes nothing. `scripts/demo-shots.sh` retakes the README's shots. It isn't in the server package or the Docker image.
+3. **The data is protocol-format files** (`demo/data/`: three invented servers, one JSON file per reply, nothing of the owner's). Times are placeholders (`"@now-3m"`) so a shot never looks stale. They hold no server logic, so a later iPhone app's demo mode, which App Store review would probably need, can load the same files (`docs/LATER.md`, L105).
+4. **A protocol change fails loudly:** `daemon/test/demo-data.test.ts` holds every file against the shapes in `protocol/fixtures/`.
