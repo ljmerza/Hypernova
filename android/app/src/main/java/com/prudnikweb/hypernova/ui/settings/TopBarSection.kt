@@ -125,10 +125,12 @@ private fun MoveArrow(up: Boolean, enabled: Boolean, name: String, onClick: () -
 private fun itemName(item: TopBarItem): Int = when (item) {
     TopBarItem.CONTEXT -> R.string.st_top_bar_context
     TopBarItem.MODE -> R.string.st_top_bar_mode
+    TopBarItem.EFFORT -> R.string.st_top_bar_effort
     TopBarItem.FIVE_HOUR -> R.string.st_top_bar_five
     TopBarItem.SEVEN_DAY -> R.string.st_top_bar_seven
     TopBarItem.MODEL -> R.string.st_top_bar_model
     TopBarItem.TOKENS -> R.string.st_top_bar_tokens
+    TopBarItem.COST -> R.string.st_top_bar_cost
     TopBarItem.AGENTS -> R.string.st_top_bar_agents
     TopBarItem.TURN -> R.string.st_top_bar_turn
 }
@@ -136,10 +138,12 @@ private fun itemName(item: TopBarItem): Int = when (item) {
 private fun itemBody(item: TopBarItem): Int = when (item) {
     TopBarItem.CONTEXT -> R.string.st_top_bar_context_desc
     TopBarItem.MODE -> R.string.st_top_bar_mode_desc
+    TopBarItem.EFFORT -> R.string.st_top_bar_effort_desc
     TopBarItem.FIVE_HOUR -> R.string.st_top_bar_five_desc
     TopBarItem.SEVEN_DAY -> R.string.st_top_bar_seven_desc
     TopBarItem.MODEL -> R.string.st_top_bar_model_desc
     TopBarItem.TOKENS -> R.string.st_top_bar_tokens_desc
+    TopBarItem.COST -> R.string.st_top_bar_cost_desc
     TopBarItem.AGENTS -> R.string.st_top_bar_agents_desc
     TopBarItem.TURN -> R.string.st_top_bar_turn_desc
 }

@@ -108,7 +108,7 @@ internal fun rememberSessionUsage(sessionId: String, key: String): SessionUsage?
 /**
  * The slim glass strip at the top of the chat, the session's top bar: what the owner chose in
  * Settings → Session top bar, in his order ([TopBarChoice], TopBar.kt; owner, 2026-10-31). By
- * default the context ring and its share, the mode and the effort ("auto · high"), the plan's
+ * default the context ring and its share, the mode, the effort, the plan's
  * 5-hour window (only while Claude Code reports one) and the week, as compact meters
  * with their resets (ui/components/UsageMeter.kt); the model, the tokens, the agents at work
  * ([agents]) and this turn's time can be turned on. No cost (owner, 2026-10-30). "≈" marks what's
@@ -131,7 +131,7 @@ internal fun UsageStrip(
     // Moves when "resets in" would read differently, in step with Home's countdowns (ui/fx/Countdown.kt).
     val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(u.fiveHourResetAt, u.sevenDayResetAt)
     val facts = TopBarFacts(
-        codex = session.codex, effort = session.effort, tokens = usage.tokens, agents = agents,
+        codex = session.codex, effort = session.effort, tokens = usage.tokens, agents = agents, cost = usage.costUsd,
         turnStartedAt = session.turnStartedAt, ended = session.phase == com.prudnikweb.hypernova.data.Phase.Ended,
         plan = planShown(hub, session), fiveHour = u.fiveHourReported,
     )
@@ -185,12 +185,13 @@ internal fun UsageStrip(
                             style = Type.monoSmall, color = ringColor(pct), maxLines = 1,
                         )
                     }
-                    // The mode's glyph and word, the effort after it: "auto · high"; Codex its mode alone.
-                    TopBarItem.MODE -> ModeTag(session.mode, if (effort != null) "$mode · ${effort.lowercase()}" else mode, color = HN.inkMuted)
+                    TopBarItem.MODE -> ModeTag(session.mode, mode, color = HN.inkMuted)
+                    TopBarItem.EFFORT -> HText(effort?.lowercase().orEmpty(), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
                     TopBarItem.FIVE_HOUR -> UsageMeterCompact(stringResource(R.string.usage_five_short), five, barWidth = 32.dp)
                     TopBarItem.SEVEN_DAY -> UsageMeterCompact(stringResource(R.string.usage_seven_short), seven, barWidth = 32.dp)
                     TopBarItem.MODEL -> ModelChip(ModelNames.chip(model))
                     TopBarItem.TOKENS -> GlyphFigure(Glyph.Token, compact(res, usage.tokens))
+                    TopBarItem.COST -> HText(costWords(usage), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
                     TopBarItem.AGENTS -> Box(
                         Modifier
                             .heightIn(min = 26.dp)
@@ -307,6 +308,9 @@ internal fun ContextRing(pct: Int?, size: Dp, stroke: Dp = 2.dp) {
     }
 }
 
+/** The strip's cost: Claude Code's own figure, or "≈" before one worked out here, as the context's share has it. */
+private fun costWords(u: SessionUsage): String = (if (u.costExact) "" else "≈") + money(u.costUsd ?: 0.0)
+
 /** "$0.64", "$7.86", "$142". */
 internal fun money(usd: Double): String = when {
     usd < 0.01 && usd > 0 -> "<$0.01"
@@ -328,11 +332,13 @@ private fun stripDescription(
                 else -> res.getString(R.string.chat_context_about_said, pct)
             }
         }
-        TopBarItem.MODE -> res.getString(R.string.meta_mode_said, mode) + (effort?.let { " " + res.getString(R.string.ns_effort_said, it) } ?: "")
+        TopBarItem.MODE -> res.getString(R.string.meta_mode_said, mode)
+        TopBarItem.EFFORT -> effort?.let { res.getString(R.string.ns_effort_said, it) }.orEmpty()
         TopBarItem.FIVE_HOUR -> usageSaid(res, res.getString(R.string.usage_name_five), five)
         TopBarItem.SEVEN_DAY -> usageSaid(res, res.getString(R.string.usage_name_seven), seven)
         TopBarItem.MODEL -> res.getString(R.string.meta_model_said, model)
         TopBarItem.TOKENS -> res.getString(R.string.chat_tokens_said, grouped(u.tokens))
+        TopBarItem.COST -> res.getString(if (u.costExact) R.string.top_bar_cost_said else R.string.top_bar_cost_about_said, costWords(u).removePrefix("≈"))
         TopBarItem.AGENTS -> res.getQuantityString(R.plurals.session_sheet_agents_said, agents, agents)
         TopBarItem.TURN -> res.getString(R.string.top_bar_turn_said, formatDuration(res, turnMs))
     }

@@ -12,8 +12,10 @@ import androidx.compose.runtime.mutableStateOf
 enum class TopBarItem(val key: String) {
     /** The context ring and its percentage. */
     CONTEXT("context"),
-    /** The permission mode's glyph and word, and the effort after it ("auto · high"). */
+    /** The permission mode's glyph and word. */
     MODE("mode"),
+    /** The effort ("high"), only for a Claude session that has one (owner, 2026-11-02: apart from the mode). */
+    EFFORT("effort"),
     /** The plan's 5-hour window and its reset, only while Claude Code reports one. */
     FIVE_HOUR("fiveHour"),
     /** The plan's week and its reset. */
@@ -22,6 +24,8 @@ enum class TopBarItem(val key: String) {
     MODEL("model"),
     /** The tokens the session has used. */
     TOKENS("tokens"),
+    /** What the session comes to at API prices ("$7.86", "≈$7.86" when worked out here), once there's a price. */
+    COST("cost"),
     /** "3 agents" while agents work for it. */
     AGENTS("agents"),
     /** This turn's time ("4m") while it is in a turn. */
@@ -61,13 +65,13 @@ data class TopBarChoice(val order: List<TopBarItem>, val shown: Set<TopBarItem>)
 
     companion object {
         /**
-         * The owner's default (2026-10-31): the context ring, mode and effort, the 5-hour window
-         * (only when reported) and the week; the model, the tokens, the agents and the turn's time
-         * off, after them.
+         * The owner's default (2026-10-31): the context ring, mode, effort, the 5-hour window
+         * (only when reported) and the week; the model, the tokens, the API cost, the agents and the
+         * turn's time off, after them.
          */
         val DEFAULT = TopBarChoice(
             TopBarItem.entries.toList(),
-            setOf(TopBarItem.CONTEXT, TopBarItem.MODE, TopBarItem.FIVE_HOUR, TopBarItem.SEVEN_DAY),
+            setOf(TopBarItem.CONTEXT, TopBarItem.MODE, TopBarItem.EFFORT, TopBarItem.FIVE_HOUR, TopBarItem.SEVEN_DAY),
         )
 
         /** [s] as [encode] wrote it; null or empty: [DEFAULT]. */
@@ -82,6 +86,11 @@ data class TopBarChoice(val order: List<TopBarItem>, val shown: Set<TopBarItem>)
                 if (item in order) continue
                 order += item
                 if (!off) shown += item
+            }
+            // A line from when one item was both ("mode"): the effort stays where it was, as it was.
+            if (TopBarItem.EFFORT !in order && TopBarItem.MODE in order) {
+                order.add(order.indexOf(TopBarItem.MODE) + 1, TopBarItem.EFFORT)
+                if (TopBarItem.MODE in shown) shown += TopBarItem.EFFORT
             }
             for (item in TopBarItem.entries) if (item !in order) order += item
             return TopBarChoice(order, shown)
@@ -103,8 +112,10 @@ data class TopBarFacts(
     val ended: Boolean,
     val plan: Boolean,
     val fiveHour: Boolean,
+    /** What the session comes to at API prices; null where no price applies. */
+    val cost: Double? = null,
 ) {
-    /** The effort word after the mode: only for a Claude session that has one (Codex shows its mode alone). */
+    /** The effort word: only for a Claude session that has one (Codex shows its mode alone). */
     val effortShown: Boolean get() = !codex && effort != null
 
     /** In a turn: its time shows ("4m"); nothing when idle or ended. */
@@ -114,7 +125,7 @@ data class TopBarFacts(
 /**
  * The items the bar draws now, in the owner's order: the chosen ones that have something to say.
  * The 5-hour window only while Claude Code reports one; the plan's windows only while they're
- * about this session; tokens once some are spent; agents while more than none work; the turn's
+ * about this session; the effort for a Claude session that has one; tokens once some are spent; the cost once there's one; agents while more than none work; the turn's
  * time while in a turn. Nothing drops for room: the bar scrolls sideways instead.
  */
 fun TopBarChoice.visible(f: TopBarFacts, now: Long): List<TopBarItem> = items.filter {
@@ -122,7 +133,9 @@ fun TopBarChoice.visible(f: TopBarFacts, now: Long): List<TopBarItem> = items.fi
         TopBarItem.CONTEXT, TopBarItem.MODE, TopBarItem.MODEL -> true
         TopBarItem.FIVE_HOUR -> f.plan && f.fiveHour
         TopBarItem.SEVEN_DAY -> f.plan
+        TopBarItem.EFFORT -> f.effortShown
         TopBarItem.TOKENS -> f.tokens > 0L
+        TopBarItem.COST -> f.cost != null && f.cost > 0.0
         TopBarItem.AGENTS -> f.agents > 0
         TopBarItem.TURN -> f.inTurn(now)
     }

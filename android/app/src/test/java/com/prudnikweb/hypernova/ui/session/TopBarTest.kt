@@ -3,6 +3,8 @@ package com.prudnikweb.hypernova.ui.session
 import com.prudnikweb.hypernova.ui.session.TopBarItem.AGENTS
 import com.prudnikweb.hypernova.ui.session.TopBarItem.CONTEXT
 import com.prudnikweb.hypernova.ui.session.TopBarItem.FIVE_HOUR
+import com.prudnikweb.hypernova.ui.session.TopBarItem.COST
+import com.prudnikweb.hypernova.ui.session.TopBarItem.EFFORT
 import com.prudnikweb.hypernova.ui.session.TopBarItem.MODE
 import com.prudnikweb.hypernova.ui.session.TopBarItem.MODEL
 import com.prudnikweb.hypernova.ui.session.TopBarItem.SEVEN_DAY
@@ -26,28 +28,28 @@ class TopBarTest {
 
     @Test fun theDefaultIsContextModeThenThePlansWindows() {
         val d = TopBarChoice.DEFAULT
-        assertEquals(listOf(CONTEXT, MODE, FIVE_HOUR, SEVEN_DAY), d.items)
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY), d.items)
         // The rest are there to turn on, off, after them.
-        assertEquals(listOf(CONTEXT, MODE, FIVE_HOUR, SEVEN_DAY, MODEL, TOKENS, AGENTS, TURN), d.order)
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, MODEL, TOKENS, COST, AGENTS, TURN), d.order)
         assertTrue(d.isDefault)
     }
 
     @Test fun theFiveHourWindowShowsOnlyWhileClaudeCodeReportsOne() {
         val d = TopBarChoice.DEFAULT
-        assertEquals(listOf(CONTEXT, MODE, FIVE_HOUR, SEVEN_DAY), d.visible(facts, now))
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY), d.visible(facts, now))
         // Max from 2026-10-31: the week alone.
-        assertEquals(listOf(CONTEXT, MODE, SEVEN_DAY), d.visible(facts.copy(fiveHour = false), now))
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, SEVEN_DAY), d.visible(facts.copy(fiveHour = false), now))
         // A session on another provider, or no numbers yet: no plan windows at all.
-        assertEquals(listOf(CONTEXT, MODE), d.visible(facts.copy(plan = false), now))
+        assertEquals(listOf(CONTEXT, MODE, EFFORT), d.visible(facts.copy(plan = false), now))
     }
 
     @Test fun agentsOnlyWhileAnyWorkAndTheTurnsTimeOnlyInATurn() {
         val all = TopBarChoice.DEFAULT.set(AGENTS, true).set(TURN, true).set(TOKENS, true)
-        assertEquals(listOf(CONTEXT, MODE, FIVE_HOUR, SEVEN_DAY, TOKENS), all.visible(facts, now))
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, TOKENS), all.visible(facts, now))
         val busy = facts.copy(agents = 3, turnStartedAt = now - 4 * 60_000L)
-        assertEquals(listOf(CONTEXT, MODE, FIVE_HOUR, SEVEN_DAY, TOKENS, AGENTS, TURN), all.visible(busy, now))
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, TOKENS, AGENTS, TURN), all.visible(busy, now))
         // Ended: no turn; no tokens spent yet (a rewind's new session): none.
-        assertEquals(listOf(CONTEXT, MODE, FIVE_HOUR, SEVEN_DAY, AGENTS), all.visible(busy.copy(ended = true, tokens = 0), now))
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, AGENTS), all.visible(busy.copy(ended = true, tokens = 0), now))
     }
 
     @Test fun theEffortFollowsTheModeOnlyForAClaudeSessionWithOne() {
@@ -55,6 +57,24 @@ class TopBarTest {
         assertFalse(facts.copy(effort = null).effortShown)
         // Codex shows its mode alone.
         assertFalse(facts.copy(codex = true).effortShown)
+    }
+
+    @Test fun aLineFromWhenModeAndEffortWereOneKeepsTheEffortWhereItWas() {
+        val on = TopBarChoice.decode("context,mode,sevenDay")
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, SEVEN_DAY), on.order.take(4))
+        assertTrue(EFFORT in on.shown)
+        val off = TopBarChoice.decode("context,!mode,sevenDay")
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, SEVEN_DAY), off.order.take(4))
+        assertFalse(EFFORT in off.shown)
+        assertFalse(COST in on.shown)
+    }
+
+    @Test fun theEffortAndTheCostDrawOnlyWithSomethingToSay() {
+        val all = TopBarChoice(TopBarItem.entries.toList(), setOf(MODE, EFFORT, COST))
+        assertEquals(listOf(MODE, EFFORT), all.visible(facts, now))
+        assertEquals(listOf(MODE, EFFORT, COST), all.visible(facts.copy(cost = 7.86), now))
+        assertEquals(listOf(MODE), all.visible(facts.copy(codex = true), now))
+        assertEquals(listOf(MODE), all.visible(facts.copy(effort = null, cost = 0.0), now))
     }
 
     @Test fun movingAndTurningOffKeepTheOwnersOrder() {
@@ -69,7 +89,7 @@ class TopBarTest {
     @Test fun itIsKeptAsOneLineAndReadBack() {
         val c = TopBarChoice.DEFAULT.move(TURN, -7).set(TURN, true).set(FIVE_HOUR, false)
         val line = c.encode()
-        assertEquals("turn,context,mode,!fiveHour,sevenDay,!model,!tokens,!agents", line)
+        assertEquals("turn,context,mode,effort,!fiveHour,sevenDay,!model,!tokens,!cost,!agents", line)
         assertEquals(c, TopBarChoice.decode(line))
         // Nothing kept yet: the default.
         assertEquals(TopBarChoice.DEFAULT, TopBarChoice.decode(null))
@@ -78,7 +98,7 @@ class TopBarTest {
 
     @Test fun anOlderLineGetsNewPartsOffAtTheEndAndUnknownOnesPassedOver() {
         val c = TopBarChoice.decode("sevenDay,context,later,context,!mode")
-        assertEquals(listOf(SEVEN_DAY, CONTEXT, MODE, FIVE_HOUR, MODEL, TOKENS, AGENTS, TURN), c.order)
+        assertEquals(listOf(SEVEN_DAY, CONTEXT, MODE, EFFORT, FIVE_HOUR, MODEL, TOKENS, COST, AGENTS, TURN), c.order)
         assertEquals(setOf(SEVEN_DAY, CONTEXT), c.shown)
     }
 

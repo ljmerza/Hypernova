@@ -3494,3 +3494,12 @@ Code skill, stopped matching the app with Atlas, and it's removed. It's in git h
 personal copy on this machine to keep in step with. Older entries that name it are history, and the
 sample name `/hyper-cosmos` in tests and the protocol's examples stays: any skill's name would do.
 
+## Mode and effort apart, and the API cost, in the session's top bar (2026-11-02)
+
+The owner, of Settings → Session top bar: "split mode and effort also add API costs as an option". The
+bar's Mode and Effort are two items, each with its own switch and place. A choice kept from when they
+were one keeps the effort right after the mode, on or off as it was. **API cost** is a new item, off by
+default: what the session comes to at API prices, even on a plan, from `costUsd` the usage already
+carries, with "≈" when it was worked out here rather than given by Claude Code. It doesn't draw where no
+price applies, such as another provider.
+
