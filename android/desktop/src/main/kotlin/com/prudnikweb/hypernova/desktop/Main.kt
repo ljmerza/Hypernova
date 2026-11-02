@@ -57,7 +57,7 @@ private object WindowIcon : Painter() {
     override val intrinsicSize: Size = Size(64f, 64f)
     override fun DrawScope.onDraw() {
         drawRect(com.prudnikweb.hypernova.desktop.ui.HN.bg)
-        logo(size.minDimension * 0.72f, Color(0xFFF1E9D6))
+        logo(size.minDimension * 0.72f, com.prudnikweb.hypernova.desktop.ui.HN.ink, com.prudnikweb.hypernova.desktop.ui.HN.accent)
     }
 }
 

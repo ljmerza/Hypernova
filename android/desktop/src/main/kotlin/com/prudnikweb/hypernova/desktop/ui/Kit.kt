@@ -189,10 +189,10 @@ fun Mark(kind: MarkKind, modifier: Modifier = Modifier, size: Dp = 12.dp, color:
     }
 }
 
-/** The logo, in ink. */
+/** The logo, in ink with its tips in the accent, as on the phone. */
 @Composable
 fun NovaMark(modifier: Modifier = Modifier, size: Dp = 22.dp) {
-    Canvas(modifier.size(size)) { logo(this.size.minDimension, HN.ink) }
+    Canvas(modifier.size(size)) { logo(this.size.minDimension, HN.ink, HN.accent) }
 }
 
 /** A seam: the mark, the label in tracked caps, a hairline, and a trail. */
