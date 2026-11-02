@@ -146,6 +146,9 @@ function withHeld(servers: LiveServer[], waiting: readonly string[], rejected: r
   return out
 }
 
+/** Any other question for a process in [folder], under the same care. */
+export const askProcess = <T>(folder: string, waiting: readonly string[], work: (q: ProbeQuery) => Promise<T>) => runner(folder, waiting, work)
+
 /** Whether to read them again next time: something changed that a process would see. */
 export const forgetLive = (folder?: string) => (folder ? cache.delete(folder) : cache.clear())
 

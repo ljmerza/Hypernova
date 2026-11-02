@@ -1172,6 +1172,27 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
         contract(name, stable(value))
       }
       useCodex(null)
+      // Plugins and skills, from stand-ins for the agents' own commands.
+      const { useExtrasCli } = await import('../src/agent-extras.ts')
+      useExtrasCli(async (agent, args) => {
+        const out = (o: unknown) => ({ code: 0, stderr: '', stdout: JSON.stringify(o) })
+        if (args[1] === 'marketplace' && args[2] === 'list') return agent === 'claude' ? out([{ name: 'testmp', source: 'github', repo: 'acme/plugins', installLocation: '/never-sent' }]) : out({ marketplaces: [{ name: 'testmp', root: '/srv/mp', marketplaceSource: { sourceType: 'local', source: '/srv/mp' } }] })
+        if (args.includes('--available')) return out({ installed: [], available: [{ pluginId: 'hello@testmp', name: 'hello', description: 'A test plugin', marketplaceName: 'testmp', version: '1.0.0', source: './plugins/hello' }] })
+        if (args[1] === 'list') return agent === 'claude' ? out([{ id: 'hello@testmp', version: '1.0.0', scope: 'user', enabled: true, installPath: '/never-sent', mcpServers: { hellomcp: { command: 'never-sent', env: { T: 'never-sent' } } }, hasUserConfig: true }]) : out({ installed: [{ pluginId: 'hello@testmp', name: 'hello', marketplaceName: 'testmp', version: '1.0.0', enabled: true, source: { source: 'local', path: '/srv/mp/hello' } }], available: [] })
+        if (args[1] === 'details') return { code: 0, stderr: '', stdout: 'hello 1.0.0\n  Description: A test plugin\n  Source: hello@testmp\n\nComponent inventory\n  Skills (2)  greet, hi\n  Agents (1)  helper\n  Hooks (1)  SessionStart  (harness-only — no model context cost)\n  MCP servers (1)  hellomcp  (tool schemas resolved at runtime; not counted)\n  LSP servers (0)\n\nProjected token cost\n  Always-on:   ~17 tok   added to every session\n' }
+        if (args[1] === 'configure') return out({ pluginId: 'hello@testmp', schema: { api_token: { type: 'string', title: 'API token', sensitive: true }, region: { type: 'string', title: 'Region' } }, inputs: { api_token: '', region: 'eu' }, configured: ['api_token', 'region'], unconfigured: [] })
+        if (args[1] === 'install') return out({ command: 'install', outcome: 'ok', pluginId: 'hello@testmp', message: 'Successfully installed plugin: hello@testmp' })
+        return out({ outcome: 'ok' })
+      })
+      const pluginList = await ok(get('/v1/agents/plugins?agent=claude'))
+      assert.ok(!JSON.stringify(pluginList).includes('never-sent'))
+      contract('rest-plugins', stable(pluginList))
+      contract('rest-plugins-codex', stable(await ok(get('/v1/agents/plugins?agent=codex'))))
+      contract('rest-plugins-available', await ok(get('/v1/agents/plugins/available?agent=claude&q=hello')))
+      contract('rest-plugin-detail', await ok(get('/v1/agents/plugins/detail?agent=claude&plugin=hello@testmp')))
+      contract('rest-plugin-install-refused', await refused(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user' }), 403))
+      contract('rest-plugin-installed', await ok(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user', confirmRun: true })))
+      useExtrasCli(null)
       contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
     }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))

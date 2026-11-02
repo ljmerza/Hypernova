@@ -281,6 +281,8 @@ rules, and weaknesses in the VPN or the operating system.
     and neither does seeing its tools. A folder has to be one the daemon knows. Nothing new reaches the file viewer: `~/.claude.json` stays closed to it. A trust dialog isn't accepted from here. No tool can be run from here.
 
     What doesn't hold: masking of arguments is a heuristic, and a secret with no sign of being one is shown. A value typed on the form is on `claude mcp add-json`'s command line for a moment, visible to `ps` for other users of that computer. The Undo file holds a whole entry, secrets too, as settings backups do (0600 in a 0700 folder).
+19. **Plugins and skills from a paired phone** (`docs/specs/spec-mcp-manage.md`, 2026-11-02). Installing a plugin or adding a marketplace is someone else's code on the server, the same way as risk 18, behind the same claim (`confirmRun`). A plugin's hooks are worse than a server: they run on every session, with no permission asked. A stolen token can add a marketplace and install from it. After a lost phone, check the plugin list too. Update, enable and marketplace update don't ask, so a token can also turn back on what was off, or pull a new version of what's installed. Neither runs anything until the next session, measured with a marked hook.
+    What holds: a plugin's MCP env and config never leave, sensitive options are write-only and go over stdin, an id or a source can't read as an option on the command line, and a skill's file isn't reachable from here.
 
 ## 9. Reporting
 

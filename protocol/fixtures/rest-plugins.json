@@ -1,0 +1,55 @@
+{
+  "agent": "claude",
+  "plugins": [
+    {
+      "id": "hello@testmp",
+      "name": "hello",
+      "marketplace": "testmp",
+      "version": "1.0.0",
+      "scope": "user",
+      "enabled": true,
+      "hasConfig": true,
+      "mcpServers": [
+        "hellomcp"
+      ]
+    }
+  ],
+  "marketplaces": [
+    {
+      "name": "testmp",
+      "type": "github",
+      "where": "acme/plugins"
+    }
+  ],
+  "scopes": [
+    "user",
+    "project",
+    "local"
+  ],
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    },
+    {
+      "id": "folder-app-parser-fix",
+      "name": "app-parser-fix"
+    },
+    {
+      "id": "folder-notebook",
+      "name": "notebook"
+    },
+    {
+      "id": "folder-sketchpad",
+      "name": "sketchpad"
+    },
+    {
+      "id": "folder-demo",
+      "name": "demo"
+    },
+    {
+      "id": "folder-app",
+      "name": "app"
+    }
+  ]
+}

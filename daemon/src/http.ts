@@ -33,6 +33,7 @@ import { qaPage, qaSave, qaShot, qaShotPath, qaState } from './qa.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachments } from './attachments.ts'
 import { agentEvents, backgroundRunning, endSessionAgents, listAgents, validAgentId } from './agents.ts'
 import { sessionMcp } from './agent-settings.ts'
+import { extrasRoute } from './agent-extras.ts'
 import { mcpRoute } from './mcp-routes.ts'
 import { changeSetting, settingsReply, undoChange, type ModelList } from './agent-settings-edit.ts'
 import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
@@ -614,7 +615,7 @@ async function api(c: Ctx): Promise<void> {
     return json(res, 200, r)
   }
   // An agent's MCP servers, to see and manage (mcp-routes.ts), for a paired phone.
-  if (path === '/v1/agents/mcp' || path.startsWith('/v1/agents/mcp/')) {
+  if (path === '/v1/agents/mcp' || path.startsWith('/v1/agents/mcp/') || path === '/v1/agents/plugins' || path.startsWith('/v1/agents/plugins/') || path === '/v1/agents/skills') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
     const deps = {
       folders: () => [...listProjects().map((p) => p.path), ...listSessions().flatMap((s) => (s.cwd ? [s.cwd] : []))],
@@ -622,6 +623,7 @@ async function api(c: Ctx): Promise<void> {
       changed: (agent: 'claude' | 'codex') => broadcast({ t: 'agent_settings', agent }),
     }
     if (await mcpRoute(path, m, url, res, json, deps)) return
+    if (await extrasRoute(path, m, url, res, json, deps)) return
   }
   // The models each provider offers, for the new-session sheet (models.ts): Claude Code's own list,
   // OpenRouter's catalogue, the providers' settings.

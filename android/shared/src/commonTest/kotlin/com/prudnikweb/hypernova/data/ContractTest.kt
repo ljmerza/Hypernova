@@ -734,6 +734,53 @@ class ContractTest {
             assertEquals("Looks it up.", f.tools.single().description)
             assertEquals(listOf("q"), f.tools.single().params.map { it.name })
         },
+        "rest-plugins" to { o ->
+            val r = PluginsReply.wire(o)
+            val p = r.plugins.single()
+            assertEquals("hello@testmp", p.id)
+            assertEquals("hello", p.name)
+            assertEquals("testmp", p.marketplace)
+            assertEquals(Mcp.USER, p.scope)
+            assertTrue(p.enabled)
+            assertTrue(p.hasConfig)
+            assertEquals(listOf("hellomcp"), p.mcpServers)
+            assertEquals(Marketplace("testmp", "github", "acme/plugins"), r.marketplaces.single())
+            assertEquals(listOf("user", "project", "local"), r.scopes)
+            assertEquals(Mcp.HOME, r.folders.first().id)
+        },
+        "rest-plugins-codex" to { o ->
+            val r = PluginsReply.wire(o)
+            assertEquals(listOf(Mcp.USER), r.scopes)
+            assertEquals("local · /srv/mp/hello", r.plugins.single().source)
+            assertEquals("/srv/mp", r.marketplaces.single().where)
+        },
+        "rest-plugins-available" to { o ->
+            val r = AvailableReply.wire(o)
+            assertEquals(1, r.total)
+            assertEquals("./plugins/hello", r.plugins.single().source)
+            assertEquals("A test plugin", r.plugins.single().description)
+        },
+        "rest-plugin-detail" to { o ->
+            val d = PluginDetail.wire(o)
+            assertEquals(listOf("greet", "hi"), d.skills)
+            assertEquals(listOf("helper"), d.agents)
+            assertEquals(listOf("SessionStart"), d.hooks)
+            assertEquals(listOf("hellomcp"), d.mcpServers)
+            assertEquals(17, d.alwaysOnTokens)
+            assertEquals("A test plugin", d.description)
+            val secret = d.options.single { it.key == "api_token" }
+            assertTrue(secret.sensitive)
+            assertTrue(secret.set)
+            assertNull(secret.value)
+            assertEquals("eu", d.options.single { it.key == "region" }.value)
+        },
+        "rest-plugin-install-refused" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
+        "rest-plugin-installed" to { o ->
+            val c = PluginChange.wire(o)
+            assertTrue(c.ok)
+            assertNull(c.acceptCommand)
+            assertTrue(c.message!!.contains("installed"))
+        },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)

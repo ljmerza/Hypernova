@@ -47,3 +47,21 @@ Changes answer `{ok: true, …}` and broadcast `{t:"agent_settings", agent}`.
 
 The same routes with `agent=codex`. `scope` is `user`, `scopes` `["user"]`, `folders` the home folder alone, and rows add `enabled`. The page adds `bearerEnv?`, `cwd?`, `toolsOn?`, `toolsOff?`, `startupTimeout?`, `enabled`, `disabledReason?`, `authStatus?` (`unsupported`, `not_logged_in`, `bearer_token`, `o_auth`, `unknown`). A form may send `bearerEnv` (a variable's name, or null), and no `oauth`; `transport: sse` is 400 `bad_transport`. `POST .../approval` and `.../reset-choices` are 409 `not_for_codex`. `no_codex`, 409: not installed.
 
+## An agent's plugins
+
+`agent` as above; `folder` for Claude Code: a project's or local install shows from its folder. Each change answers `{ok, id?, message?}`, broadcasts `agent_settings`, and is 502 `cli_failed` with what the command said, cleaned.
+
+- `GET /v1/agents/plugins?agent=&folder=`: `{agent, plugins: [{id, name, marketplace?, version?, scope, enabled, hasConfig, mcpServers: [name], source?, problem?}], marketplaces: [{name, type?, where?}], scopes, folders}`.
+- `GET /v1/agents/plugins/available?agent=&folder=&q=&marketplace=`: `{agent, total, plugins: [{id, description?, marketplace?, version?, source?, marketplaceSource?}]}`, at most 100.
+- `GET /v1/agents/plugins/detail?agent=&plugin=&folder=`: `{agent, id, description?, skills, agents, hooks, mcpServers, lspServers, commands, apps?, alwaysOnTokens?, options: [{key, title?, description?, sensitive, set, value?}]}`. `value` never for a sensitive option.
+- `POST /v1/agents/plugins/install`: `{agent, plugin, scope, folder?, confirmRun, acceptCommand?}`. 403 `confirm_run`. May answer `{ok: false, needsAccept: {command, sha256}}`: send again with `acceptCommand`.
+- `POST /v1/agents/plugins/update`: `{agent, plugin, scope, folder?, acceptCommand?, confirmRun?}`, likewise. Not for Codex.
+- `POST /v1/agents/plugins/uninstall`: `{agent, plugin, scope, folder?, keepData?}`. `POST .../toggle`: `{agent, plugin, scope, folder?, enabled}`.
+- `POST /v1/agents/plugins/configure`: `{agent, plugin, folder?, values: {key: value}}`, one line each. `POST .../prune`: `{agent, scope, folder?}`. Neither for Codex (409 `not_for_codex`).
+- `POST /v1/agents/plugins/marketplaces/add`: `{agent, source, scope?, folder?, confirmRun}`: `owner/repo`, a URL or a path, never reading as an option (400 `bad_source`). 403 `confirm_run`. `.../remove`: `{agent, name, folder?}`. `.../update`: `{agent, name?, folder?}`.
+
+## An agent's skills
+
+- `GET /v1/agents/skills?agent=&folder=`: `{agent, folder, states, folders, skills: [{name, displayName?, description?, source?, state, tokens?, lockedBy?}]}`. `states`: Claude Code's `on`, `name-only`, `user-invocable-only`, `off`; Codex's `on`, `off`. `lockedBy`: `author`, `plugin`, `policy`, `flag`, `reserved-name`.
+- `POST /v1/agents/skills`: `{agent, folder?, name, state}`. 400 `bad_skill`, `bad_state`.
+

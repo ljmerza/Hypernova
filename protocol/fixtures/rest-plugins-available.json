@@ -1,0 +1,13 @@
+{
+  "agent": "claude",
+  "total": 1,
+  "plugins": [
+    {
+      "id": "hello@testmp",
+      "description": "A test plugin",
+      "marketplace": "testmp",
+      "version": "1.0.0",
+      "source": "./plugins/hello"
+    }
+  ]
+}

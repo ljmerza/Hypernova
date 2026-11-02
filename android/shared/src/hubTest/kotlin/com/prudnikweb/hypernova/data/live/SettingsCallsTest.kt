@@ -2,6 +2,9 @@ package com.prudnikweb.hypernova.data.live
 
 import com.prudnikweb.hypernova.data.Mcp
 import com.prudnikweb.hypernova.data.mcpList
+import com.prudnikweb.hypernova.data.plugins
+import com.prudnikweb.hypernova.data.pluginInstall
+import com.prudnikweb.hypernova.data.pluginUninstall
 import com.prudnikweb.hypernova.data.mcpLive
 import com.prudnikweb.hypernova.data.mcpServer
 import com.prudnikweb.hypernova.data.Str
@@ -96,6 +99,21 @@ class SettingsCallsTest {
         assertTrue(gone is AgentSettingRefused)
         daemon.on("GET", "/v1/agents/mcp") { refusal(404, "not_found", "Unknown endpoint.") }
         assertTrue(rig.call { rig.hub.mcpList("claude") }.exceptionOrNull() is AgentSettingsTooOld)
+    }
+
+    @Test fun aPluginsCallsGoToTheirRoutesAndAnInstallSaysItsClaim() {
+        connect()
+        answer("GET", "/v1/agents/plugins", "rest-plugins")
+        assertEquals("hello@testmp", rig.call { rig.hub.plugins("claude", "f1") }.getOrThrow().plugins.single().id)
+        assertTrue(last("GET", "/v1/agents/plugins").query.contains("folder=f1"))
+        answer("POST", "/v1/agents/plugins/install", "rest-plugin-installed")
+        rig.call { rig.hub.pluginInstall("claude", "hello@testmp", "user", null) }.getOrThrow()
+        val b = JSONObject(last("POST", "/v1/agents/plugins/install").body)
+        assertEquals(true, b.getBoolean("confirmRun"))
+        assertEquals("user", b.getString("scope"))
+        answer("POST", "/v1/agents/plugins/uninstall", "rest-plugin-installed")
+        rig.call { rig.hub.pluginUninstall("claude", "hello@testmp", "user", null) }.getOrThrow()
+        assertFalse(JSONObject(last("POST", "/v1/agents/plugins/uninstall").body).has("confirmRun"))
     }
 
     // ─── A session's MCP servers (docs/PROTOCOL.md, "A session's MCP servers") ───

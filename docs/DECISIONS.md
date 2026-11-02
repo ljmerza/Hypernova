@@ -3600,3 +3600,36 @@ The same screens for Codex 0.164.0, for what it really has, checked against the 
 `bearer_token_env_var` is on the form for an HTTP server, as a variable's name, never a token. Fields the form doesn't have carry over on an edit (`enabled_tools`, `disabled_tools`, timeouts, `env_vars`, `cwd`, `env_http_headers`), and show on the page.
 Not on the form, though the CLI has them: `--oauth-client-id`, `--oauth-client-secret`, `--oauth-client-registration`, `--oauth-resource`, `login --scopes`.
 
+## Plugins from the phone (2026-11-02)
+
+The owner: "since we're doing MCP management we're going to have to do plugin management as well, adding, removing, etc." Agents & providers › an agent's Settings › Plugins; nothing on the chat screen. Each action is the agent's own command (`claude plugin …`, `codex plugin …`) or Codex's app-server, and what leaves is named fields: `claude plugin list --json` carries a plugin's whole MCP setup, env included, so only its server names are kept.
+
+1. **What runs code, measured.** A plugin's `SessionStart` hook that notes each run, watched through install, disable, enable, update, marketplace update and uninstall: it ran **for none of them**. Its code runs from the next session on.
+2. **So a fingerprint for installing a plugin and adding a marketplace**: the source in full on a confirm first (the marketplace, its source, the plugin's source), because they decide what code arrives. **Not for enable, disable, uninstall, removing a marketplace**: they ran nothing. **Not for update, marketplace update**: they fetch from a source already trusted, as Claude Code's own auto-update does. A decision, and one to look at: an update can bring new hooks. Enabling a plugin lets it run again at the next session, and doesn't ask.
+3. **A plugin that installs by running a command** (a marketplace's command source, or a `headersHelper` for its archive): Claude Code reports the command and its hash and won't go on without them. The phone shows that command on a second confirm with the fingerprint and sends the hash back (`--accept-command`). **Only reasoned and tested with a stand-in**: no such plugin was to hand.
+4. **A plugin's options:** `claude plugin configure --json` and `--values-stdin`, so values aren't on a command line. A sensitive option is write-only: it says it's set. Claude Code keeps those in its own credentials store.
+5. **Details are parsed from text:** `claude plugin details` has no JSON. If its wording changes, the lists come back empty rather than wrong, and the page says it doesn't list anything.
+6. **The full list of what can be installed** is thousands long (the official directory): it's searched on the server, 100 at a time, cached 5 minutes.
+
+| `claude plugin` / `/plugin` | Here |
+|---|---|
+| `list`, `list --available` | Yes |
+| `details` (inventory, projected tokens) | Yes, for what's installed |
+| `install` (`--scope`, `--accept-command`) | Yes. `--marketplace <source>`, `--registry`, `--config` aren't on the screen |
+| `uninstall` (`--scope`, `--keep-data`), `enable`, `disable`, `update`, `prune` | Yes in the route. `--keep-data`, `disable --all`, `uninstall --prune` and `prune` have no button |
+| `configure` | Yes |
+| `marketplace add`, `list`, `remove`, `update` | Yes. `--sparse` and `--claudeai` aren't on the screen |
+| `init`, `tag`, `validate`, `eval`, `test`, `--data-size` | No: for writing plugins, at a terminal |
+
+**Codex's**, checked on 0.164.0 with a local marketplace: `codex plugin list`, `add`, `remove`, `marketplace add`, `list`, `upgrade`, `remove`, and `plugin/read` and `config/value/write` for what a plugin brings and for `plugins."id".enabled`. **What differs:** one scope; no `update` of a plugin; no options; no `prune` (409 `not_for_codex`); it needs `plugin@marketplace`; what a plugin brings comes from its own read, with apps too.
+
+## Skills from the phone (2026-11-02)
+
+The owner: "Also skills, I think you can disable and enable, and something else I don't remember." Found, in Claude Code 2.1.316's binary and Codex 0.164.0's schema:
+
+1. **The something else: Claude Code has four states, not two** (`skillOverrides`, what `/skills` writes): `on`; `name-only`, listed without its description, so it costs almost no context; `user-invocable-only`, hidden from Claude but `/name` still works; `off`, hidden from both. All four are here, in words.
+2. **The list is Claude Code's own `/skills` menu**, from a process in the folder: name, description, source (user, project, plugin, built-in…), token estimate, state, and what locks it (the skill's own author, its plugin, a managed or flag setting). The request (`get_skills_dialog`) is marked internal in its protocol and isn't in the SDK's types, so **a later version may change it**; a missing answer lists none rather than breaking. A locked one says why and has no picker.
+3. **Written through `claude edit-skill-overrides`**, which is what VS Code uses, into the **folder's** `.claude/settings.local.json`: as in `/skills`, it's per folder, and the screen has "Seen from". It reads the user's and a project's too but only writes local.
+4. **Codex: on or off**, through `skills/list` and `skills/config/write`, into `config.toml`, for every folder. Source: user, project, built-in, plugin, managed.
+5. **Found and not built:** `disableBundledSkills` (one setting, all of Claude Code's own skills off), and a skill's own frontmatter (`disable-model-invocation`, `user-invocable`), which is editing its file. Adding or deleting a skill is a file too, and **"no new way to reach files" holds**: a skill's SKILL.md isn't shown or changed. `claude plugin init` scaffolds one at a terminal. Codex's `skills/extraRoots/set` isn't used.
+
