@@ -102,11 +102,11 @@ const hasOwn = (list: { name: string }[], name: string) => list.some((c) => c.na
 test('the flags name what isn’t approved, and read no .mcp.json whose names can’t be known', async () => {
   writeFileSync(join(CLAUDE, 'settings.json'), JSON.stringify({ enabledMcpjsonServers: ['flags-yes'], disabledMcpjsonServers: ['flags-off'] }))
   const plain = await guardArgs(folder('flags-plain', mcpJson('flags-yes', 'flags-no', 'flags-off')))
-  assert.deepEqual(JSON.parse(plain.settings!), { disableAllHooks: true, disabledMcpjsonServers: ['flags-no', 'flags-off'] })
+  assert.deepEqual(JSON.parse(plain.settings!), { disableAllHooks: true, apiKeyHelper: '', disabledMcpjsonServers: ['flags-no', 'flags-off'] })
   assert.equal('strict-mcp-config' in plain, false)
 
   const none = await guardArgs(folder('flags-none'))
-  assert.deepEqual(JSON.parse(none.settings!), { disableAllHooks: true })
+  assert.deepEqual(JSON.parse(none.settings!), { disableAllHooks: true, apiKeyHelper: '' })
   assert.equal('strict-mcp-config' in none, false)
 
   const big = await guardArgs(folder('flags-big', JSON.stringify({ mcpServers: { x: entry('x') }, pad: 'x'.repeat(300 * 1024) })))
@@ -125,6 +125,9 @@ test('the flags name what isn’t approved, and read no .mcp.json whose names ca
   mkdirSync(join(real, 'sub'))
   symlinkSync(join(real, 'sub'), join(scratch, 'flags-cwd'))
   assert.deepEqual(JSON.parse((await guardArgs(join(scratch, 'flags-cwd'))).settings!).disabledMcpjsonServers, ['flags-above'])
+  // The user's own helper stays theirs, whatever a folder names.
+  writeFileSync(join(CLAUDE, 'settings.json'), JSON.stringify({ apiKeyHelper: '/home/me/key.sh' }))
+  assert.equal(JSON.parse((await guardArgs(folder('flags-none'))).settings!).apiKeyHelper, '/home/me/key.sh')
   writeFileSync(join(CLAUDE, 'settings.json'), '{}')
 })
 
@@ -161,6 +164,36 @@ test('the "/" list: not from a parent’s .mcp.json, one through a linked folder
 
   await settle()
   for (const name of ['above', 'through', 'linkedfile', 'big']) assert.equal(started(name), false, `${name} started`)
+})
+
+const helperIn = (name: string, file: 'settings.json' | 'settings.local.json' = 'settings.json') => {
+  const dir = folder(name)
+  mkdirSync(join(dir, '.claude'), { recursive: true })
+  writeFileSync(join(dir, '.claude', file), JSON.stringify({ apiKeyHelper: `touch ${join(MARKS, name)}` }))
+  return dir
+}
+
+test('a folder’s apiKeyHelper doesn’t run for the "/" list or a status, and the list still answers with no way to sign in at all', { skip, timeout: 120_000 }, async () => {
+  const shared = helperIn('helper-project')
+  const local = helperIn('helper-local', 'settings.local.json')
+  assert.ok(hasOwn(await commandsIn(shared), 'compact'))
+  assert.ok(hasOwn(await commandsIn(local), 'compact'))
+  const config = join(CLAUDE, '.claude.json')
+  const status = helperIn('helper-status')
+  writeFileSync(config, JSON.stringify({ ...(existsSync(config) ? JSON.parse(readFileSync(config, 'utf8')) : {}), projects: { [status]: {} } }))
+  await get(`/v1/agents/mcp/status?agent=claude&fresh=1&folder=${folderId(status)}`)
+  await settle()
+  for (const name of ['helper-project', 'helper-local', 'helper-status']) assert.equal(started(name), false, `${name}’s helper ran`)
+})
+
+test('the user’s own apiKeyHelper still runs for the "/" list, and a folder’s doesn’t take its place', { skip, timeout: 120_000 }, async () => {
+  writeFileSync(join(CLAUDE, 'settings.json'), JSON.stringify({ apiKeyHelper: `touch ${join(MARKS, 'helper-own')}` }))
+  const list = await commandsIn(helperIn('helper-beside-own'))
+  await settle()
+  writeFileSync(join(CLAUDE, 'settings.json'), '{}')
+  assert.ok(hasOwn(list, 'compact'))
+  assert.equal(started('helper-own'), true, 'the user’s own helper didn’t run')
+  assert.equal(started('helper-beside-own'), false, 'the folder’s helper ran')
 })
 
 test('a status doesn’t start one through a linked file or a big one either', { skip, timeout: 120_000 }, async () => {

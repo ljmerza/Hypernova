@@ -2132,7 +2132,8 @@ daemon doesn't know.
   the project's, plugins', MCP prompts), asked of an SDK process started there with hooks off and no
   prompt; cached 5 minutes per folder. **Asking starts no project server nobody approved**: only what's
   approved starts, and the answer waits up to 3 seconds for those still connecting, for their prompts
-  (`name`: `server:prompt (MCP)`, Claude Code's own word for it). A `.mcp.json` whose names can't be read
+  (`name`: `server:prompt (MCP)`, Claude Code's own word for it). A folder's own `apiKeyHelper` doesn't run for it
+  either; the user's does. A `.mcp.json` whose names can't be read
   here (a link, over 256 KB, unparsable) means no MCP servers at all for that one process: see
   An agent's MCP servers, "Status and tools". Commands bound to a terminal on the server (vim, statusline,
   …), internal, removed and renamed ones are left out. `terminal`: one of Claude Code's own that
@@ -5459,7 +5460,7 @@ config file only `mcpServers` and a project's MCP keys are read, per request, an
 starts each server as a session would. A process under the SDK would treat every project server as approved, so
 each one not approved is named to it as rejected and doesn't start; the reply lists those as `waiting` or
 `rejected`. Names come from the `.mcp.json` of the folder's real path and each parent. If one of those can't be read here (a link, over 256 KB, unparsable,
-too slow), Claude Code may still read it, so that process is told to read no MCP config at all: the reply then lacks that file's servers and the user's. It waits up to 12 s for a server still `pending`. Nothing here reaches a running session, which holds
+too slow), Claude Code may still read it, so that process is told to read no MCP config at all: the reply then lacks that file's servers and the user's. Its flag settings also name the user's own `apiKeyHelper`, or none, so a folder's doesn't run. It waits up to 12 s for a server still `pending`. Nothing here reaches a running session, which holds
 its own connections.
 
 **A tool's detail comes from the server itself** (`mcp-client.ts`, for stdio, Streamable HTTP and SSE): it's

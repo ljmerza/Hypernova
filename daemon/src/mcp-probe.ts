@@ -15,7 +15,7 @@ import { claudeSdk } from './sdk.ts'
 import { getProvider, providerEnv } from './store.ts'
 import { findClaude, log } from './util.ts'
 import { MACHINE } from './platform.ts'
-import { heldBack, maskText, setupOf, type ServerSetup } from './mcp-view.ts'
+import { heldBack, maskText, ownApiKeyHelper, setupOf, type ServerSetup } from './mcp-view.ts'
 
 export type LiveStatus = 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled' | 'waiting' | 'rejected'
 export type LiveTool = { name: string; readOnly?: boolean; destructive?: boolean; openWorld?: boolean }
@@ -39,12 +39,16 @@ export const LIVE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _.:@/+-]{0,127}$/u
  * The flags of any process that isn't a person's session, looked up as it starts: hooks off, and no project server that isn't approved.
  * Claude Code still reads a `.mcp.json` these names can't come from (through a link, or past the size read here: measured on 2.1.316),
  * so there it's told to read none: nothing but what's approved may start, and that costs this one process the others' names.
+ *
+ * A folder's `.claude/settings.json` or `settings.local.json` can also name an `apiKeyHelper`, a command such a process runs as it starts,
+ * trusted or not (measured on 2.1.316). Flag settings beat both, so the helper named there is the user's own, or none: nobody chose the
+ * folder's by opening a list. The user's still runs as it always did. It's on this process's command line while it lives.
  */
 export async function guardArgs(cwd: string, also: readonly string[] = []): Promise<Record<string, string | null>> {
   const held = await heldBack(cwd)
   const names = [...new Set([...also, ...held.waiting, ...held.rejected])]
   return {
-    settings: JSON.stringify({ disableAllHooks: true, ...(names.length ? { disabledMcpjsonServers: names } : {}) }),
+    settings: JSON.stringify({ disableAllHooks: true, apiKeyHelper: ownApiKeyHelper() ?? '', ...(names.length ? { disabledMcpjsonServers: names } : {}) }),
     ...(held.unread ? { 'strict-mcp-config': null } : {}),
   }
 }

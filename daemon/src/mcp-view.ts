@@ -240,6 +240,12 @@ function settingsTable(file: string): Record<string, unknown> {
   }
 }
 
+/** The `apiKeyHelper` of the user's own settings, if there's one. */
+export function ownApiKeyHelper(dirs: { claude?: string } = {}): string | null {
+  const helper = own(settingsTable(join(dirs.claude ?? CLAUDE_DIR, 'settings.json')), 'apiKeyHelper')
+  return typeof helper === 'string' && helper.trim() ? helper : null
+}
+
 const listHas = (t: Record<string, unknown>, key: string, name: string) => {
   const l = own(t, key)
   return Array.isArray(l) && l.includes(name)
