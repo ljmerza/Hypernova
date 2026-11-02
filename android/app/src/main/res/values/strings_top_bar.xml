@@ -8,6 +8,17 @@
     <string name="top_bar_agents_open">Show the agents</string>
     <!-- TalkBack: this turn's time so far ("This turn: 4:05 so far."). -->
     <string name="top_bar_turn_said">This turn: %1$s so far.</string>
+    <!-- The week's pace: the day of the week, then its use less the share of the week gone ("Day 2/7 +10%"). -->
+    <string name="top_bar_week_pace">Day %1$d/7 %2$s</string>
+    <plurals name="top_bar_week_pace_over_said">
+        <item quantity="one">Day %1$d of 7, %2$d point over an even week.</item>
+        <item quantity="other">Day %1$d of 7, %2$d points over an even week.</item>
+    </plurals>
+    <plurals name="top_bar_week_pace_under_said">
+        <item quantity="one">Day %1$d of 7, %2$d point under an even week.</item>
+        <item quantity="other">Day %1$d of 7, %2$d points under an even week.</item>
+    </plurals>
+    <string name="top_bar_week_pace_even_said">Day %1$d of 7, level with an even week.</string>
 
     <!-- Settings → Session top bar (ui/settings/TopBarSection.kt). -->
     <string name="st_top_bar">Session top bar</string>
@@ -38,4 +49,6 @@
     <string name="st_top_bar_agents_desc">How many agents work for it, while any do. A tap shows them.</string>
     <string name="st_top_bar_turn">This turn’s time</string>
     <string name="st_top_bar_turn_desc">How long the turn under way has run.</string>
+    <string name="st_top_bar_week_pace">Week pace</string>
+    <string name="st_top_bar_week_pace_desc">The day of the week and its use in points against an even week. Not a limit or a forecast.</string>
 </resources>

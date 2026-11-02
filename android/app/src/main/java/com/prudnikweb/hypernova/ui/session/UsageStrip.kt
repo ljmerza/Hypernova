@@ -130,10 +130,12 @@ internal fun UsageStrip(
     val u = hub.usage
     // Moves when "resets in" would read differently, in step with Home's countdowns (ui/fx/Countdown.kt).
     val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(u.fiveHourResetAt, u.sevenDayResetAt)
+    val plan = planShown(hub, session)
     val facts = TopBarFacts(
         codex = session.codex, effort = session.effort, tokens = usage.tokens, agents = agents, cost = usage.costUsd,
         turnStartedAt = session.turnStartedAt, ended = session.phase == com.prudnikweb.hypernova.data.Phase.Ended,
-        plan = planShown(hub, session), fiveHour = u.fiveHourReported,
+        plan = plan, fiveHour = u.fiveHourReported,
+        weekPace = weekPaceOf(session.codex, plan, u, hub.codex, now),
     )
     // This turn's time, to the minute, while it's shown.
     val turnOn = TopBarItem.TURN in choice.items && facts.inTurn(System.currentTimeMillis())
@@ -150,7 +152,7 @@ internal fun UsageStrip(
     val effort = session.effort?.takeIf { facts.effortShown }?.let { com.prudnikweb.hypernova.ui.home.claudeEffortTitle(it) }
     val model = stripModel(usage, session.model, res.getString(R.string.model_default))
     val turnMs = (maxOf(clock, now) - session.turnStartedAt).coerceAtLeast(0L)
-    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, turnMs) + more
+    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, turnMs, facts.weekPace) + more
     val agentsLabel = stringResource(R.string.top_bar_agents_open)
     val shape = RoundedCornerShape(12.dp)
     val scroll = rememberScrollState()
@@ -201,6 +203,8 @@ internal fun UsageStrip(
                         HText(pluralStringResource(R.plurals.top_bar_agents, agents, agents), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
                     }
                     TopBarItem.TURN -> GlyphFigure(Glyph.Timer, turnShort(turnMs))
+                    // Always this neutral colour, never red or amber: a meter shows facts (docs/DECISIONS.md).
+                    TopBarItem.WEEK_PACE -> facts.weekPace?.let { HText(stringResource(R.string.top_bar_week_pace, it.day, it.figure), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1) }
                 }
             }
         }
@@ -321,7 +325,7 @@ internal fun money(usd: Double): String = when {
 /** TalkBack's one sentence for the bar: each part it shows ([parts]), in its order. */
 private fun stripDescription(
     res: Resources, parts: List<TopBarItem>, u: SessionUsage, s: Session, model: String, mode: String, effort: String?,
-    five: UsageWindow, seven: UsageWindow, agents: Int, turnMs: Long,
+    five: UsageWindow, seven: UsageWindow, agents: Int, turnMs: Long, pace: WeekPace?,
 ): String = parts.joinToString(" ") { part ->
     when (part) {
         TopBarItem.CONTEXT -> {
@@ -341,6 +345,17 @@ private fun stripDescription(
         TopBarItem.COST -> res.getString(if (u.costExact) R.string.top_bar_cost_said else R.string.top_bar_cost_about_said, costWords(u).removePrefix("≈"))
         TopBarItem.AGENTS -> res.getQuantityString(R.plurals.session_sheet_agents_said, agents, agents)
         TopBarItem.TURN -> res.getString(R.string.top_bar_turn_said, formatDuration(res, turnMs))
+        TopBarItem.WEEK_PACE -> pace?.let { weekPaceSaid(res, it) }.orEmpty()
+    }
+}
+
+/** "Day 2 of 7, 10 points over an even week.", "… 8 points under an even week.", "… level with an even week." */
+private fun weekPaceSaid(res: Resources, p: WeekPace): String {
+    val n = kotlin.math.abs(p.points)
+    return when {
+        p.points > 0 -> res.getQuantityString(R.plurals.top_bar_week_pace_over_said, n, p.day, n)
+        p.points < 0 -> res.getQuantityString(R.plurals.top_bar_week_pace_under_said, n, p.day, n)
+        else -> res.getString(R.string.top_bar_week_pace_even_said, p.day)
     }
 }
 

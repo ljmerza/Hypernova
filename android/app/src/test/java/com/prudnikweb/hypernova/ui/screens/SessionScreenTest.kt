@@ -278,6 +278,20 @@ class SessionScreenTest {
         rule.snap("chat_top_bar_model_first")
     }
 
+    @Test fun topBarWeekPaceSaysTheDayAndThePoints() {
+        TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
+        // Samples.usage: 18% used, three days left of the week, so 57% of it gone.
+        chat(FakeHub(), Samples.ZETA)
+        val said = stripSaid()
+        assertTrue(said, said.contains("Day 4 of 7, 39 points under an even week."))
+    }
+
+    @Test fun topBarWeekPaceHidesWhenThePlanIsStale() {
+        TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
+        chat(FakeHub(usage = Samples.usage().copy(stale = true)), Samples.ZETA)
+        rule.onNode(hasContentDescription("Day ", substring = true)).assertDoesNotExist()
+    }
+
     @Test fun topBarOpensTheSessionSheet() {
         chat(FakeHub(), Samples.ZETA)
         strip().performClick()

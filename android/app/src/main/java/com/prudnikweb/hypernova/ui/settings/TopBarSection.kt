@@ -133,6 +133,7 @@ private fun itemName(item: TopBarItem): Int = when (item) {
     TopBarItem.COST -> R.string.st_top_bar_cost
     TopBarItem.AGENTS -> R.string.st_top_bar_agents
     TopBarItem.TURN -> R.string.st_top_bar_turn
+    TopBarItem.WEEK_PACE -> R.string.st_top_bar_week_pace
 }
 
 private fun itemBody(item: TopBarItem): Int = when (item) {
@@ -146,4 +147,5 @@ private fun itemBody(item: TopBarItem): Int = when (item) {
     TopBarItem.COST -> R.string.st_top_bar_cost_desc
     TopBarItem.AGENTS -> R.string.st_top_bar_agents_desc
     TopBarItem.TURN -> R.string.st_top_bar_turn_desc
+    TopBarItem.WEEK_PACE -> R.string.st_top_bar_week_pace_desc
 }

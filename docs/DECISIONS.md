@@ -3731,3 +3731,23 @@ should just wrap because I can just click on it and hold to copy". A code block'
 screen's edge, and the block no longer scrolls sideways. A long press still copies the text as written,
 with no breaks added. Tables keep their sideways scroll when wrapping can't fit their columns.
 
+
+## The week's pace in the top bar (2026-11-02)
+
+The owner, on an idea for the session's top bar: "you could see what day you're on and if you're ahead or
+behind". And, choosing which to build: "do the week pace, git and this model's week". **Week pace** is an
+item in Settings → Session top bar, off by default: `Day 2/7 +10%`.
+
+This fits "No estimate of when usage runs out" (2026-11-01), which took away a red "2d 2h" that was a guess:
+
+1. **A meter shows facts, and this is two of them subtracted.** The day is counted from the weekly reset, and
+   the figure is the percentage used less the share of the week gone. No rate (it doesn't read `Usage.rate`), no
+   forecast and no time to the limit. It says where the week stands, never where it's heading.
+2. **It's its own item, not a second tag on the 7-day meter,** whose one tag stays the reset.
+3. **Always a neutral colour, with no words on the bar.** The removed estimate was red, and red says something's
+   wrong; 10 points over an even week may be fine. "Ahead", "behind" and "overcooking" aren't on screen either.
+   TalkBack has to say the sign in words: "Day 2 of 7, 10 points over an even week."
+4. **Only while it's real:** while the plan's week is about this session and known, as the bar's meters
+   (`planShown`), so not stale or on another provider, and never once the reset has passed, until new numbers
+   come. A Codex session uses Codex's own week, as Home's Codex card does, while signed in, and shows nothing
+   on a plan without a week.
