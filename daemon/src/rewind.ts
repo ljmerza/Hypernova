@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // "Rewind to here" (docs/PROTOCOL.md, "Rewind"): the conversation goes back to just before one of
 // the owner's messages, and goes on from there; the message comes back to the phone's prompt box
 // to change and send again.

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The daemon's two HTTP servers, on free ports with scratch state: no CORS on the phone API, and the
 // testing checklist's key.
 import { test, before, after } from 'node:test'

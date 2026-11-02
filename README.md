@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova
 
 Hypernova lets you run Claude Code agents on your own Linux server and drive them from an Android
@@ -92,5 +93,8 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest   # the app (J
 
 ## License
 
-Apache License 2.0, see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Claude and Claude Code are
-products of Anthropic, Hypernova isn't affiliated with Anthropic.
+Apache License 2.0, see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Fonts and code in `third_party/`
+keep their own licenses. Modified from the original, see [`CHANGES.md`](CHANGES.md).
+
+Claude and Claude Code are products of Anthropic; Codex is a product of OpenAI. Hypernova is an
+independent project and is not affiliated with Anthropic, OpenAI or Even Realities.

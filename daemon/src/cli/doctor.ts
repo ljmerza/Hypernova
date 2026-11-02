@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // `hypernova doctor`: every piece a server needs, checked, each with a plain fix. A failure
 // is something that stops Hypernova working (exit 1); a warning is something worth doing; info is
 // only worth knowing. The same checks feed `hypernova status`.

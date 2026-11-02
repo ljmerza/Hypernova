@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // What the owner checks. Order matters: each section builds on the previous one.
 export const CHECKLIST: { title: string; items: { id: string; title: string; how?: string }[] }[] = [
   {

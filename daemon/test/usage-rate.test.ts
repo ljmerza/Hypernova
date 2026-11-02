@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The spend rate of the 5-hour and weekly windows: a least-squares pace over recent readings.
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'

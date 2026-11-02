@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Decisions
 
 These are product decisions agreed with the owner on 2026-10-13. Change them
@@ -3406,3 +3407,35 @@ they're responsible for". The row's first line is the short description the agen
 on a line of its own so it fits, and only the agent's kind stands in when there's none. How long it has
 run and its tokens move to the second line, beside what it's doing. Its kind shows there before its
 first step.
+
+## The Apache licence's notices (owner, 2026-11-01)
+
+The owner: "as far as the Apache license we'll have to do what legally have to do". This is a fork of
+`prudnik-web/Hypernova`, forked at `c64bbf9`. Nobody here is a lawyer: this is a careful reading of the licence's section 4, and
+some of its words leave room for doubt (the end of this section).
+
+1. **4(b), a modified file says so:** one line, `Modified by Leonardo Merza, 2026. See NOTICE.`, in a comment at the
+   top of each file of the original that differs now. `scripts/license-notices.sh --fix` adds it and `--check` (CI,
+   `.github/workflows/license-notices.yml`) lists what's missing, so branches that merge later can't lose it. It gets its own
+   workflow with no paths filter: any file can need a notice, and the Android workflow would take 40 minutes for a change to the docs.
+2. **A moved file is the original's file, modified,** even with no other change. The script counts a file git pairs with an original at
+   40% alike (git's default of 50% missed files that were moved and then much changed, like `ChangesModel.kt` at 48%), and one with the same
+   name and parent folder as a file that's gone from where it was, however rewritten (`Voice.kt`, 9% alike). New files get no notice.
+3. **Below the header in `scripts/install-linux.sh`,** not on line 2 as in other scripts: its `--help` prints lines 2 to 19 of itself. The
+   script finds such scripts by that `sed` and keeps their help the same.
+4. **`CHANGES.md` covers what can't hold a comment** (the two JSON files and `NOTICE`) and says that the whole project is modified.
+   It's in the server packages, since `daemon/package.json` is. `third_party/`, its copies in the APK's assets, `skills/hyper-cosmos/` and
+   test data are left alone: none of them has been modified.
+5. **4(d), `NOTICE`:** the original's lines stay, with two lines of ours below them. The APK's copy is the same file, and the script's check keeps it so.
+   The same check covers the third-party notices, `third_party/`'s licences in `assets/legal/` (the Ghostty ones had been left out) and a declared licence for each third-party asset.
+6. **4(c):** the README had lost two of the original's notices that still apply, on `third_party/`'s own licences and on Codex and OpenAI. They're back. The other
+   notices that are gone went with the code they were about: the Mac app, Lens, the website and the Tailscale node.
+7. **Section 6, trademarks:** the name and the package name are left for the rename the owner is choosing separately.
+
+**What stays a matter of judgement:**
+
+- "Prominent" isn't defined. A first-line comment is the usual reading, but Markdown hides it when rendered, and it's below a long header in one script.
+- Comments don't survive compiling. The APK's code and resources can't carry a per-file line, so there `NOTICE` says it for them.
+- A new file can hold code from an original that was split up, too little alike for the script to pair them. `CHANGES.md`'s statement that the
+  whole project is modified is what covers those.
+- Rename detection is a heuristic, and "alike" isn't a legal test. The script's list is a careful one and not a proof that it's complete.

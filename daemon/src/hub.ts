@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The daemon's in-memory model: sessions, their events, approvals and usage, plus the
 // broadcast to every connected client (docs/PROTOCOL.md).
 import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync, fstatSync, lstatSync } from 'node:fs'

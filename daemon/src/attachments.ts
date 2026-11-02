@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Files attached on the phone (docs/PROTOCOL.md, "Attachments"). They're saved on the Mac and
 // handed to Claude Code as @"path" mentions before the prompt: Claude Code reads a mentioned
 // file itself (images as images, PDFs as documents), with no permission prompt, in a shared

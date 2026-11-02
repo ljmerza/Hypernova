@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <resources>
     <!-- The background notification: the working sessions and the agents behind them, "2 working with 11 agents". -->
     <plurals name="notif_with_agents">

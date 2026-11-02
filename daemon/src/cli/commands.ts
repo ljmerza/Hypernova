@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The `hypernova` commands on a server, Linux or a Mac (docs/LINUX.md): setup, pair, status, doctor, logs,
 // lan, uninstall, run. Each returns its exit code; what it prints is for a person reading a
 // terminal over SSH: one line a step, what's wrong in plain words, and the command that fixes it.

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Shared terminals: what the holder, the `hn` CLI and the daemon have in common
 // (docs/PROTOCOL.md, "Shared terminals").
 //

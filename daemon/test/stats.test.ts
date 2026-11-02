@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Statistics (docs/PROTOCOL.md, "Statistics"): Claude's working time, tokens, sessions, prompts,
 // tools, files and agents from transcripts, read incrementally; what only the daemon counts; days
 // kept after Claude Code deletes their files; and the phone's route. Every fixture is written by

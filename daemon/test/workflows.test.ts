@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Workflows (automations/; docs/PROTOCOL.md, "Automations", "Workflows"): webhook triggers and
 // their tokens, outputs, steps with guards, ask steps, Retry from a step, the new triggers, the
 // budget and shell steps, and what a client without steps still sees. Against a stand-in world with

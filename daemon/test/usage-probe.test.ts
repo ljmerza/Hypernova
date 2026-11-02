@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The usage probe (usage-probe.ts) end to end, on a stand-in for Claude Code
 // (fixtures/fake-claude-usage.mjs): a hidden shared terminal in a folder of its own, past the trust
 // prompt, "/usage" typed and nothing else, the per-model weeks read into Usage, the terminal gone

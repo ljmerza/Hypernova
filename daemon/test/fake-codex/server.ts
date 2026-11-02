@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // A stand-in for Codex's shared app-server on a scratch unix socket (docs/specs/codex-app-server.md):
 // it keeps what clients asked, answers as 0.163.0 did, plays a turn out by itself, and can push
 // notifications and requests to every connection, as the real one does to clients on a thread.

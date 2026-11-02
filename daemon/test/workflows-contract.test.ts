@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Workflows' contract (automations/contract.ts; docs/PROTOCOL.md, "Automations", "Workflows"): the
 // rule that decides what a client without steps reads as `action`, `then` as outputs, and a 400's
 // field. Pure functions, no engine.

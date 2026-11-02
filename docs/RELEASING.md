@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Releasing
 
 How a release of Hypernova is made: the client (the Android APK), the server's packages, and the
@@ -262,7 +263,9 @@ scripts/test-macos-smoke.sh --tarball …  # on a Mac runner only: the real Laun
 
 The licence, `NOTICE` and `THIRD-PARTY-NOTICES.md` travel inside every file: each server package's
 top folder and the APK's `assets/legal/` (a copy there of the root files and of `third_party/`'s
-licences: update them together when a dependency changes).
+licences: update them together when a dependency changes). The server packages hold `CHANGES.md` too.
+Before a release, `scripts/license-notices.sh --check` says whether those copies match and every modified file of the original
+says so (CI's `license-notices` workflow runs it; docs/DECISIONS.md, "The Apache licence's notices").
 
 Rules that keep a release clean: never attach a debug APK, never reuse a tag, and never commit
 `dist/` or a release key.

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.voice
 
 import android.view.HapticFeedbackConstants

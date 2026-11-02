@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // WSL on a Windows PC (platform.ts, lan.ts; docs/INSTALL.md, "Windows (experimental)"): WSL told
 // apart from other Linuxes by its kernel and its variables, its networking mode read from wslinfo,
 // the LAN listener off by default behind WSL's NAT and its unreachable addresses never advertised

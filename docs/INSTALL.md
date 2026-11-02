@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Install Hypernova
 
 Hypernova is a control room for Claude Code and Codex. Two parts: **the server**, a small service on a

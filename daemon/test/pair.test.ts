@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Pairing the same phone again (docs/PROTOCOL.md, "Pairing"): an install that sends its installId
 // takes its old place in the device list instead of adding a twin; another install doesn't.
 import { test, before, after } from 'node:test'

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Node.js for the daemon: the one Hypernova downloaded (<support>/node/<version>), else the
 // one running this command, when either is Node 24 or newer; otherwise the newest Node 24 from
 // nodejs.org, checked against nodejs.org's SHASUMS256.txt and unpacked into Hypernova's own folder.

@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Later: ideas parked "for now"
 
 Every time we decide "not now, but later", it goes here, with the reason it

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The automations engine wired to the daemon: its AutoIO (sessions, the account, the disk, one
 // timer), the engine made once, and its taps at start.
 import { existsSync, statSync } from 'node:fs'

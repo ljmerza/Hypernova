@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <resources>
     <!-- A session's metadata drawn as chips and glyphs (ui/components/SessionMeta.kt): what TalkBack hears for each. -->
     <string name="meta_model_said">Model: %1$s.</string>

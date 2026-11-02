@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // A shared terminal's holder (docs/PROTOCOL.md, "Shared terminals"). One per session: it owns
 // claude's PTY, keeps the screen in a headless emulator so anyone can join mid-session, and
 // serves clients on a unix socket: the `hn` CLI in a Mac terminal, and the daemon for phones.

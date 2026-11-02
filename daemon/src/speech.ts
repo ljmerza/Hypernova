@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The Mac's voices (docs/PROTOCOL.md, "Read aloud"): the Mac renders a reply with `say` and the
 // phone plays the bytes.
 import { execFile, type ChildProcess } from 'node:child_process'

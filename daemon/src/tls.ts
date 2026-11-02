@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Certificates for the LAN listener (docs/PROTOCOL.md, "Local network (direct HTTPS)"): the
 // daemon's own self-signed server certificate (the phone pins it), its device CA, and the device
 // certificates it signs from a phone's CSR (mutual TLS). Everything lives in <support>/tls/, made

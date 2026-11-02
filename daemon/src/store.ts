@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Persistent state in <support>: identity, admin token, paired devices, providers, settings.
 import { join } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'

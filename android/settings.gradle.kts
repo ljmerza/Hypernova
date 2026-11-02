@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Google's Maven can be swapped for a mirror on networks where dl.google.com is
 // slow or blocked. Enable per machine in ~/.gradle/gradle.properties:
 //   hypernova.googleMirror=https://maven.aliyun.com/repository/google

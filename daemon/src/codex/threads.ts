@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The Codex threads Hypernova knows, kept in <support>/codex-threads.json. A thread's id is its
 // session's id on the phone. The conversation itself is Codex's own; this keeps what Hypernova
 // needs before Codex is reached (its folder, title, settings) and whether it can be resumed.

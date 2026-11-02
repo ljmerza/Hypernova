@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // One connection to Codex's app-server: JSON-RPC 2.0 (without the `jsonrpc` field) in WebSocket
 // text frames over a unix socket (docs/specs/codex-app-server.md).
 import WebSocket from 'ws'

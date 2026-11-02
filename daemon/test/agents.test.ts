@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Agents and workflows a session's main agent starts (docs/PROTOCOL.md, "Agents and workflows"):
 // the main transcript's links and task notifications, the session's subagents folder (meta files,
 // agent transcripts, a workflow's journal and run summary), hooks, and the phone's routes. Every

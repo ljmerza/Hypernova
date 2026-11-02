@@ -1,3 +1,4 @@
+# Modified by Leonardo Merza, 2026. See NOTICE.
 [versions]
 agp = "9.2.0"
 kotlin = "2.4.21"

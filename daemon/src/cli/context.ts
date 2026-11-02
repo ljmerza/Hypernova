@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // What every `hypernova` command works from: the machine, where Hypernova's files go on it, the
 // daemon's ports, and the few ways it touches the system (running a program, printing), passed in
 // so the tests can stand in for systemctl, loginctl and the rest. Nothing here imports the daemon:

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The LAN listener (docs/PROTOCOL.md, "Local network (direct HTTPS)"): the phone API over HTTPS on
 // the local network (or the owner's own VPN into it), the phone's only route. The phone pins the daemon's own certificate and
 // presents its device certificate (tls.ts); this file decides which connections get in at all,

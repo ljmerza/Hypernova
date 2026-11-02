@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The automations engine: the store, firing through the gates, following runs, and the routes.
 // Everything that touches the daemon goes through an AutoIO (contract.ts; the daemon's is daemon.ts).
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'

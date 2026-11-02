@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Reading Claude Code transcripts: prompts, slash commands and their output, "!" mode, and
 // session titles (docs/PROTOCOL.md, "Reading transcripts"). Every fixture is written by hand
 // in the shapes Claude Code 2.1 records; none is copied from a real transcript.

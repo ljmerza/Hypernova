@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The machine the daemon runs on: a Mac or a Linux server or PC (WSL on a Windows PC too,
 // experimental), run from the command line only (docs/DECISIONS.md, "Direction: open source, self-hosted";
 // docs/LINUX.md). Where state and logs live, which of the Mac's features exist here and

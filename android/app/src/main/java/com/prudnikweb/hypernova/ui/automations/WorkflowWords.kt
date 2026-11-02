@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.automations
 
 import com.prudnikweb.hypernova.R

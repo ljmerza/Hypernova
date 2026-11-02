@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Contributing
 
 Thanks for looking. Hypernova is alpha and moves fast, so for anything bigger than a small fix,

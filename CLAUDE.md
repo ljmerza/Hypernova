@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova
 
 A control room for Claude Code: a native Android app and a daemon on a Linux server,
@@ -76,6 +77,10 @@ the next release is a minor one), `fix:`, `perf:`, `refactor:`, `docs:`, `test:`
 patch). A breaking change, the phone and the daemon no longer fitting each other's older version,
 is `feat!:` / `fix!:` or a `BREAKING CHANGE: …` line in the body (a major). Merge commits don't
 count, the commits they bring in do.
+
+Licence notices: this is a fork, so a file of the original that changes needs a one-line notice. After changing
+or moving files, run `scripts/license-notices.sh --fix` (CI runs `--check`; docs/DECISIONS.md, "The Apache
+licence's notices"). New files get none. Don't remove an existing copyright or attribution notice.
 
 `skills/hyper-cosmos/` is a versioned copy of the personal skill at
 `~/.claude/skills/hyper-cosmos/` (the copy that actually triggers). When the

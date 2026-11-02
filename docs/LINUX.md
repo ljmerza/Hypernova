@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <!-- Also the server package's README.md (scripts/pack-linux.sh), which has no docs/ folder beside it: link to other docs by full URL. -->
 # Hypernova on Linux
 

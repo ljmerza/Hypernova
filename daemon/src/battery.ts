@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The Mac's own battery, for the phone (docs/PROTOCOL.md, "Battery"): `pmset -g
 // batt` and the battery's own time estimate from `ioreg` (averaged over five minutes) at start and
 // once a minute, run without blocking. A Mac without one (Mac mini, iMac, Mac Studio, Mac Pro) has none, `null`, and the

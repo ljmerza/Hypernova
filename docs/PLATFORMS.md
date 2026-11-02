@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova on more platforms
 
 Research for the owner's line of 2026-10-15: "I don't want to limit this to platforms for now

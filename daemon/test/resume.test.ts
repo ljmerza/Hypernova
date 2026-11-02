@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Carrying on after a limit (resume.ts; docs/PROTOCOL.md, "Auto-continue"): another provider's rate
 // limit arms at its announced reset and fires; Don't and Continue automatically; hitting it again
 // re-arms twice at most; out of credit never carries on by itself, and says when it's back; the

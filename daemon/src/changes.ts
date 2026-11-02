@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // "What changed" (docs/PROTOCOL.md, "What changed"): the files a session's folder has changed
 // since the last commit, each with its +/- counts, and one file's diff as unified text. Read-only:
 // git status and git diff, nothing written. The phone's Commit button is a prompt to Claude, so
