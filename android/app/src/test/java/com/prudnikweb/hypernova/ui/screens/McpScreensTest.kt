@@ -468,6 +468,8 @@ class McpScreensTest {
         tap("HTTP")
         type(str(R.string.mcp_url), "https://x.example/m")
         type(str(R.string.mcp_bearer), "MY_TOKEN")
+        rule.onNodeWithText(str(R.string.mcp_f_oauth)).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.mcp_f_client_secret)).assertDoesNotExist()
         tap(str(R.string.mcp_f_save))
         val b = sent("POST", "/v1/agents/mcp/servers")
         assertEquals("codex", b.getString("agent"))

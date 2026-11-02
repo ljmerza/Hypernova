@@ -1800,8 +1800,8 @@ McpForm = {
   transport: "stdio" | "http" | "sse",   // Codex: no "sse"
   command?, args?: string[], env?: McpPair[],   // stdio
   url?, headers?: McpPair[],             // http, sse
-  oauth?: {clientId?, callbackPort?, clientSecret?} | null,   // Claude Code's, http and sse only
-  timeout?: number | null,  // milliseconds, 1,000 to 86,400,000; null takes it out; Claude Code's
+  oauth?: {clientId?, callbackPort?, clientSecret?} | null,   // Claude Code's, http and sse only; Codex: 400 `codex_no_oauth`
+  timeout?: number | null,  // milliseconds, 1,000 to 86,400,000; null takes it out; Codex: its `tool_timeout_sec`
   bearerEnv?: string | null,   // Codex's, http only: a variable's name; null or "" takes it out
   confirmRun?: boolean,     // the phone's claim of a check
   expected?,                // PUT: the page's hash
@@ -2829,8 +2829,8 @@ A change answers once it's done, and goes out as `{t:"agent_settings", agent}`. 
 - **Answer:** `200 {ok: true, name, scope, hash}`
 - **Refusals:** 400 `bad_scope` (Claude Code), `bad_name`, `bad_transport`, `bad_command`, `bad_args`,
   `bad_url`, `bad_pairs`, `bad_pair_name`, `bad_pair_value`, `nothing_to_keep`, `masked_unknown`,
-  `bad_oauth`, `bad_timeout`, `too_big`, `bad_bearer` (Codex); 403 `confirm_run`; 409 `exists`,
-  `file_is_link`
+  `bad_oauth`, `bad_timeout`, `too_big`, `bad_bearer` (Codex), `codex_no_oauth` (Codex); 403 `confirm_run`;
+  409 `exists`, `file_is_link`
 - **Rules:** see An agent's MCP servers, "The form" and "What a change runs".
 
 #### PUT /v1/agents/mcp/servers
@@ -5391,6 +5391,9 @@ Code's to expand; the whole entry 64 KiB. What the form doesn't speak of carries
 **What's still masked stands for the real value.** An argument the same as one the page gave out, a command or URL
 holding a mask, each means what's on the server. A mask this server didn't give out is 400 `masked_unknown`, never
 written as three dots. `keep` with no value there is 400 `nothing_to_keep`.
+
+For Codex an `oauth` that says anything is 400 `codex_no_oauth`, with nothing written (one that's empty or all nulls is
+ignored), and `timeout` is written as `tool_timeout_sec`, in seconds, kept on a `PUT` that doesn't speak of it.
 
 `oauth.clientId` or `.callbackPort` null takes it out; a port is 1 to 65535. On a stdio server `oauth` is 400
 `bad_oauth`. A client secret goes as `MCP_CLIENT_SECRET`, not on the command line. Everything else in a Claude Code

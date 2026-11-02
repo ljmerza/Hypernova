@@ -321,15 +321,21 @@ async function reloadShared(): Promise<void> {
   }
 }
 
-/** The table a form means, over what [before] already has that the form doesn't speak of. */
+/** Whether a form's `oauth` says anything: an empty one, or all nulls, is a form that has no such fields. */
+const saysOauth = (o: unknown) => isTable(o) && Object.values(o).some((v) => v !== null && v !== undefined && v !== '')
+
+/** The table a form means, over what [before] already has that the form doesn't speak of. A `timeout` is Codex's `tool_timeout_sec`. */
 function tableFromForm(body: Record<string, unknown>, before: RawConfig | null) {
   if (body.transport === 'sse') throw new McpRefused(400, 'bad_transport', 'Codex takes stdio or streamable HTTP servers.')
+  if (saysOauth(body.oauth)) throw new McpRefused(400, 'codex_no_oauth', 'Sign-in settings can’t be set on a Codex server from here. Save it without them, then sign in from its page.')
   const form = formConfig(body, before ? formShape(before) : null)
   const sameType = before !== null && (typeof before.command === 'string') === (body.transport === 'stdio')
   const kept: RawConfig = {}
   if (before) for (const k of ['enabled', 'startup_timeout_sec', 'tool_timeout_sec', 'enabled_tools', 'disabled_tools']) if (before[k] !== undefined) kept[k] = before[k]
   if (sameType && before) for (const k of ['env_vars', 'cwd', 'env_http_headers', 'http_headers_helper', 'bearer_token_env_var']) if (before[k] !== undefined) kept[k] = before[k]
   const out: RawConfig = { ...kept }
+  if (typeof form.config.timeout === 'number') out.tool_timeout_sec = form.config.timeout / 1000
+  else if (body.timeout === null) delete out.tool_timeout_sec
   if (body.transport === 'stdio') {
     out.command = form.config.command
     if (form.config.args) out.args = form.config.args
