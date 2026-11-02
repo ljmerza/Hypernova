@@ -167,7 +167,10 @@ export function releaseChecker(o: CheckerOptions) {
       const a = assets.find((x) => x && x.name === name && okUrl(x.browser_download_url))
       return a ? { url: a.browser_download_url as string, size: typeof a.size === 'number' ? a.size : null } : null
     }
-    return { tag, note: find(`hypernova-${tag}.json`), apk: find(`hypernova-${tag}.apk`), server: find(`hypernova-server-${tag}-linux.tar.gz`) }
+    // The client's name since 2026-11-01, else the name a release before it has (the same file: a
+    // release keeps both for servers that only know the old one). One is read, never both.
+    const apk = find(`hypernova-client-${tag}-android.apk`) ?? find(`hypernova-${tag}.apk`)
+    return { tag, note: find(`hypernova-${tag}.json`), apk, server: find(`hypernova-server-${tag}-linux.tar.gz`) }
   }
 
   async function readNote(url: string): Promise<ReleaseNote | null> {
@@ -265,7 +268,7 @@ export function releaseChecker(o: CheckerOptions) {
       r.kind === 'published' ? `release ${r.tag}: its APK (${r.versionName}, ${r.versionCode}) is now the one the phones are offered`
       : r.kind === 'mismatch' ? `release ${r.tag}: the APK's SHA-256 isn't the one its note gives; not offered`
       : r.kind === 'not-newer' ? `release ${r.tag} (${r.versionCode}) isn't newer than the APK handed out (${r.offered})`
-      : r.kind === 'no-note' ? `release ${r.tag} has no hypernova-${r.tag}.json and .apk; nothing to offer from it`
+      : r.kind === 'no-note' ? `release ${r.tag} has no hypernova-${r.tag}.json and APK; nothing to offer from it`
       : r.kind === 'limited' ? `GitHub's rate limit: no release check until ${new Date(r.until).toISOString()}`
       : r.kind === 'error' ? `release check failed: ${r.message}`
       : ''
