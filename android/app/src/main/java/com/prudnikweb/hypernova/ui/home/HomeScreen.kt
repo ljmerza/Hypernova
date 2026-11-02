@@ -1,7 +1,6 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.home
 
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,12 +21,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
@@ -36,24 +35,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -63,22 +55,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import android.content.Context
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.prudnikweb.hypernova.ui.components.clipboardText
 import com.prudnikweb.hypernova.ui.stats.StatsScreen
-import kotlin.math.roundToInt
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.Answer
@@ -96,7 +82,6 @@ import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Phase
-import com.prudnikweb.hypernova.data.problemText
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.Finished
@@ -106,7 +91,6 @@ import com.prudnikweb.hypernova.data.AgentLead
 import com.prudnikweb.hypernova.data.Usage
 import com.prudnikweb.hypernova.data.bothAgents
 import com.prudnikweb.hypernova.data.claudeAvailable
-import com.prudnikweb.hypernova.data.codexLeads
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.AttentionAction
@@ -125,9 +109,6 @@ import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.StatusChip
 import com.prudnikweb.hypernova.ui.components.Z
-import com.prudnikweb.hypernova.ui.fx.CosmosHit
-import com.prudnikweb.hypernova.ui.fx.CosmosState
-import com.prudnikweb.hypernova.ui.fx.SkyFilter
 import com.prudnikweb.hypernova.data.UsageWindow
 import com.prudnikweb.hypernova.ui.components.UsageMeter
 import com.prudnikweb.hypernova.ui.components.usageSaid
@@ -149,13 +130,11 @@ import com.prudnikweb.hypernova.ui.fx.formatDuration
 import com.prudnikweb.hypernova.ui.fx.rememberCountdownNow
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.font.FontWeight
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -163,6 +142,7 @@ import com.prudnikweb.hypernova.data.HomeSearch
 import com.prudnikweb.hypernova.data.TextHit
 import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.data.storage
+import com.prudnikweb.hypernova.data.problemText
 import com.prudnikweb.hypernova.ui.components.Icon
 import kotlinx.coroutines.launch
 import com.prudnikweb.hypernova.ui.fx.rememberScrambled
@@ -177,7 +157,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 
 /**
- * Home's bottom bar. Statistics isn't one of them: the sun opens it, as a screen of its own.
+ * Home's bottom bar. Statistics isn't one of them: the mark in the top bar opens it, as a screen of its own.
  * Automations sit next to Sessions (docs/specs/spec-automations.md §5).
  */
 enum class Tab { Sessions, History, Automations, Settings }
@@ -220,13 +200,9 @@ class Everywhere(
 @Composable
 fun HomeScreen(
     hub: Hub,
-    cosmos: CosmosState,
-    skyVisibility: MutableFloatState,
-    /** What the list shows: a project, the quiet ones, or everything (null). */
-    filter: SkyFilter?,
-    onFilter: (SkyFilter?) -> Unit,
-    /** The projects in the sky's belt (no planet of their own now). */
-    quiet: List<String>,
+    /** The one project the list shows (from a launcher shortcut or Share, ui/App.kt), or null for everything. */
+    project: String?,
+    onClearProject: () -> Unit,
     onOpen: (String) -> Unit,
     onNewSession: () -> Unit,
     settings: @Composable (top: Dp) -> Unit,
@@ -259,7 +235,7 @@ fun HomeScreen(
         ServerPicker(AllHome.picks(everywhere.servers.map { it.first }), everywhere.onNewSession, onDismiss = { pickingServer = false })
     }
     val newSession = if (everywhere != null) ({ pickingServer = true }) else onNewSession
-    // Statistics, opened by tapping the sun: a screen of its own over Home, which fades back as it
+    // Statistics, opened by tapping the mark: a screen of its own over Home, which fades back as it
     // comes forward (the way a session opens), and Back returns. Only what Home draws leaves, so
     // its tab and scroll are where they were.
     var statsOpen by rememberSaveable { mutableStateOf(false) }
@@ -286,52 +262,17 @@ fun HomeScreen(
     val closeSearch = { searchOpen = false; searchQuery = "" }
     BackHandler(enabled = !statsOpen && tab == Tab.Sessions && searchOpen) { closeSearch() }
     LaunchedEffect(tab) { if (tab != Tab.Sessions) closeSearch() }
-    // The sun's tap is shown once ("Tap the sun for your statistics"), until Statistics is first opened.
     val context = LocalContext.current
-    var sunHinted by remember { mutableStateOf(sunHintDone(context)) }
-    val openStats = {
-        statsOpen = true
-        if (!sunHinted) {
-            sunHinted = true
-            markSunHintDone(context)
-        }
-    }
+    val openStats = { statsOpen = true }
     val list = rememberLazyListState()
     // "2m ago" labels refresh on their own, not only when a session changes.
     val now by produceState(System.currentTimeMillis()) {
         while (true) { delay(30_000); value = System.currentTimeMillis() }
     }
-    // Fork: no sky on Home (owner, 2026-10-30): its systems stay hidden; only the starfield shows.
-    LaunchedEffect(Unit) { skyVisibility.floatValue = 0f }
     val scope = rememberCoroutineScope()
-    // Something happens in the sky while you watch (a limit, the week's low state, the outburst at
-    // a reset): bring the sky into view, so it isn't missed behind the cards. Events from before
-    // this screen appeared don't count.
-    val skyEvents = cosmos.eventCount
-    val eventsBefore = remember { intArrayOf(-1) }
-    LaunchedEffect(skyEvents) {
-        if (eventsBefore[0] < 0) { eventsBefore[0] = skyEvents; return@LaunchedEffect }
-        eventsBefore[0] = skyEvents
-        val away = list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 0
-        if (tab == Tab.Sessions && !statsOpen && away && !list.isScrollInProgress) list.animateScrollToItem(0)
-    }
-    // The sun is eclipsed while the app can't follow usage (signed out, no plan, on hold), with
-    // the reason under it; the eclipse ends with a diamond ring when the account is back. Leaving
-    // for a session keeps it.
     val account = hub.account
-    // The sun is the leading agent's (data/AgentLead.kt): Claude Code's account eclipses it only where
-    // Claude Code is installed; where Codex leads, Codex signed out does.
     val claudeHere = hub.claudeAvailable
-    val codexLeads = hub.codexLeads
-    val codexSignedOut = hub.codex?.account?.signedIn == false
-    val eclipse = if (claudeHere) eclipseLine(account) else if (codexLeads && codexSignedOut) stringResource(R.string.eclipse_signed_out) else null
-    val eclipsed = if (claudeHere) account.eclipsed else codexLeads && codexSignedOut
-    // The usage the sun shows: Claude's, or Codex's where Codex leads.
-    val sunUsage = remember(codexLeads, hub.codex, hub.usage) { if (codexLeads) AgentLead.codexSunUsage(hub.codex, System.currentTimeMillis()) else hub.usage }
-    LaunchedEffect(cosmos, eclipse) { cosmos.eclipse = eclipse }
     val density = LocalDensity.current
-    // Tap a planet (or the belt's "+5 quiet"): the list shows only that project (or the quiet ones),
-    // and a chip over it says so; tap the chip, the planet again, or Back for everything.
     // Ended sessions move to History; the home list is what's alive, and what a restart of the Mac
     // ended lately (nobody ended it): those stay here, to pick up where they left off. A conversation
     // that switched agents is its newest session; the one before it opens from there ("Continued from").
@@ -339,9 +280,9 @@ fun HomeScreen(
     // Both agents in use (data/AgentLead.kt): Codex's sessions say CODEX. Never otherwise (where Codex
     // leads, every session is Codex's). Which usage cards show is usageSlots, below.
     val codexOn = hub.bothAgents
-    val sessions = remember(all, filter, quiet) { SkyFilter.apply(all, filter, quiet) }
+    val sessions = remember(all, project) { ofProject(all, project) }
     // Home's filter (HomeFilter.kt; owner, 2026-11-01): the sheet's states, agent, project and, with
-    // All servers, server, kept on this phone. After the sky's, before the search: a search looks
+    // All servers, server, kept on this phone. After the shortcut's project, before the search: a search looks
     // only among what it shows. Its server waits outside All servers (kept, not applied).
     val savedFilter = HomeFilterPref.state(context).value
     val homeFilter = savedFilter.forServers(everywhere?.servers?.map { it.first.id })
@@ -349,7 +290,7 @@ fun HomeScreen(
     // Home's sort (HomeSort.kt; owner, 2026-11-01): the order within each group, Name by default,
     // kept on this phone; Server only with All servers. Search results are sorted the same way.
     val homeSort = HomeSortPref.state(context).value.forServers(everywhere != null)
-    val narrowBoth: (List<Session>) -> List<Session> = { list -> homeFilter.apply(SkyFilter.apply(list, filter, quiet)) }
+    val narrowBoth: (List<Session>) -> List<Session> = { list -> homeFilter.apply(ofProject(list, project)) }
     // What the search finds among them (HomeSearch, History's search shared): by title, project,
     // folder, last line and short id, and from 3 characters the words inside the conversations.
     // While words are typed the list is the matches in their groups; the cards above step aside.
@@ -365,7 +306,7 @@ fun HomeScreen(
     // The usage cards under the sessions: this computer's, or with "All servers" every computer's (AllUsage).
     val usageSlots = if (parts != null) AllUsage.all(parts, { it.claude }, { it.codex }) else AllUsage.of(hub, hub.claude, hub.codex)
     // Before Home's filter (is there anything at all?), then with it (the server's too: HomeFilter.parts).
-    val skyNarrowed: List<HomeCard<Hub>>? = parts?.let { AllHome.cards(it) { list -> SkyFilter.apply(list, filter, quiet) } }
+    val ofItsProject: List<HomeCard<Hub>>? = parts?.let { AllHome.cards(it) { list -> ofProject(list, project) } }
     val narrowed: List<HomeCard<Hub>>? = parts?.let { AllHome.cards(homeFilter.parts(it), narrow = narrowBoth) }
     val cards: List<HomeCard<Hub>> = when {
         parts == null -> shown.map { HomeCard(null, null, hub, it) }
@@ -383,21 +324,18 @@ fun HomeScreen(
         filterSeen[0] = homeFilter to homeSort
         list.scrollToItem(0)
     }
-    // The line under the sun's readout ("Tap the sun for your statistics"): the sky keeps room for it.
-    val hint = !sunHinted && !eclipsed && !sunUsage.weekLimited && !sunUsage.limited
-    androidx.compose.runtime.SideEffect { cosmos.hint = hint }
-    // A provider in trouble: a card that says what's wrong and how to fix it (not words in the sky).
+    // A provider in trouble: a card that says what's wrong and how to fix it.
     val troubled = remember(hub.providers, hub.sessions) { troubledProviders(hub.providers, hub.sessions) }
     val opener = LocalOpener.current
     // Who needs you here and elsewhere: the filter chip says how many wait outside it.
     val waiting = if (narrowed != null) AllHome.needsYou(narrowed) else kept.count { it.state == SessionState.NeedsYou }
     val waitingAll = if (parts != null) AllHome.needsYou(AllHome.cards(parts)) else all.count { it.state == SessionState.NeedsYou }
     // Nothing on Home at all (on any computer, with "All servers"), before Home's filter.
-    val nothing = if (skyNarrowed != null) skyNarrowed.isEmpty() else sessions.isEmpty()
+    val nothing = if (ofItsProject != null) ofItsProject.isEmpty() else sessions.isEmpty()
     // Something is narrowed: the chip over the list says what's shown, and its Clear shows everything.
-    val narrowing = filter != null || homeFilter.on
+    val narrowing = project != null || homeFilter.on
     val clearFilters = {
-        onFilter(null)
+        onClearProject()
         HomeFilterPref.set(context, HomeFilter.NONE)
     }
     // The filter sheet (HomeFilterSheet.kt), from the button beside the search.
@@ -414,7 +352,7 @@ fun HomeScreen(
     val orphans = remember(hub.providers, all) { removedProviderSessions(hub.providers, all) }
     val showOrphans = orphans.isNotEmpty() && AttentionStore.show(REMOVED_CARD, orphans.size.toString()) != Attention.Show.Nothing
     val shownTroubled = remember(troubled, gone) { troubled.filter { t -> t.provider.status?.let { AttentionStore.show("provider:${t.provider.id}", providerAttention(it)) } != Attention.Show.Nothing } }
-    // Where the account card sits: after the sky, the seam, the filter chip and the offline card
+    // Where the account card sits: after the filter chip and the offline card
     // when they're there (owner's report: a filter on, the tap landed on the filter chip).
     fun accountIndex() = homeHeadIndex(filter = narrowing, offline = hub.link.state == LinkState.Offline && AttentionStore.show("offline", offlineAttention(hub.link)) != Attention.Show.Nothing)
     // Scrolled to, it sits just under the brand row rather than beneath it.
@@ -492,19 +430,19 @@ fun HomeScreen(
             Tab.Sessions -> androidx.compose.runtime.CompositionLocalProvider(com.prudnikweb.hypernova.ui.components.LocalAttentionFrom provides everywhere?.pickedName) { LazyColumn(
                 Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = HOME_SOURCE),
                 state = list,
-                // The first card starts under the top bar (fork: no sky above it any more); the last
+                // The first card starts under the top bar; the last
                 // clears the bottom bar (fork: tabs only).
                 contentPadding = PaddingValues(top = top + 80.dp + (if (searchOpen) SEARCH_ROOM else 0.dp), bottom = bottom + 84.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // Fork: no sky (owner, 2026-10-30): Home is the sessions in their groups. Statistics opens
-                // from the mark in the top bar, as it did from the sun.
-                // What the list shows, when it isn't everything: a chip that undoes it. The sky's project
-                // alone says its name; Home's filter says "Showing: Needs you + Working", the sky's after.
+                // Home is the sessions in their groups (owner, 2026-10-30). Statistics opens
+                // from the mark in the top bar.
+                // What the list shows, when it isn't everything: a chip that undoes it. A shortcut's project
+                // alone says its name; Home's filter says "Showing: Needs you + Working", the project after.
                 if (narrowing) {
                     item(key = "filter") {
                         FilterRow(
-                            filterChipLabel(filter, quiet.size, homeFilter, everywhere), homeFilter.on, elsewhere = waitingAll - waiting, onClear = clearFilters,
+                            filterChipLabel(project, homeFilter, everywhere), homeFilter.on, elsewhere = waitingAll - waiting, onClear = clearFilters,
                             modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 8.dp).animateItem(),
                         )
                     }
@@ -581,8 +519,8 @@ fun HomeScreen(
                         )
                     }
                 }
-                if (filter is SkyFilter.Project && !typed) {
-                    val name = filter.name
+                if (project != null && !typed) {
+                    val name = project
                     val path = hub.projects.firstOrNull { it.name == name }?.path ?: sessions.firstOrNull { it.cwd != null }?.cwd
                     if (path != null) {
                         item(key = "browse") {
@@ -595,7 +533,7 @@ fun HomeScreen(
                         }
                     }
                 }
-                if (nothing && filter == null && !typed) {
+                if (nothing && project == null && !typed) {
                     item(key = "empty") {
                         EmptyCard(hub, onHistory = { tab = Tab.History }, modifier = Modifier.animateItem().padding(horizontal = 16.dp))
                     }
@@ -714,7 +652,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Fork: the mark alone (owner, 2026-10-30); the word "hypernova" made the bar crowded.
-                // With the sky gone, it's the way into Statistics.
+                // It's the way into Statistics.
                 Box(
                     Modifier
                         .size(48.dp)
@@ -815,15 +753,8 @@ fun HomeScreen(
     }
 }
 
-/** Whether the sun's hint has done its job: Statistics has been opened on this phone. */
-private fun sunHintDone(c: Context): Boolean = c.getSharedPreferences("ui", Context.MODE_PRIVATE).getBoolean("sunStatsHinted", false)
-
-private fun markSunHintDone(c: Context) {
-    c.getSharedPreferences("ui", Context.MODE_PRIVATE).edit().putBoolean("sunStatsHinted", true).apply()
-}
-
 /**
- * Where the account card is in Home's list: after the sky, then the filter chip and the offline
+ * Where the account card is in Home's list: after the filter chip and the offline
  * card when they're there. The groups' seams come later, with their sessions.
  */
 internal fun homeHeadIndex(filter: Boolean, offline: Boolean): Int = (if (filter) 1 else 0) + (if (offline) 1 else 0)
@@ -831,7 +762,7 @@ internal fun homeHeadIndex(filter: Boolean, offline: Boolean): Int = (if (filter
 /**
  * The list index of a usage card ([agent]'s, on [picked] with "All servers"; AllUsage.jumpTo picks
  * which), wherever the list has put it: [slots] are the list's last items, in their order. Where
- * Codex leads, its card is the sun's.
+ * Codex leads, its card is the leading one.
  */
 private fun usageIndex(list: androidx.compose.foundation.lazy.LazyListState, slots: List<UsageSlot<Hub>>, agent: UsageAgent, picked: String? = null): Int {
     val last = list.layoutInfo.totalItemsCount - 1
@@ -951,21 +882,16 @@ private fun NewSessionButton(onClick: () -> Unit) {
 }
 
 /**
- * What the chip over Home's list says: the sky's project (or "5 quiet projects") alone, as before;
- * with Home's filter on, "Showing: " and its pieces (HomeFilter.pieces), the sky's last, joined by " · ".
+ * What the chip over Home's list says: the shortcut's project alone; with Home's filter on,
+ * "Showing: " and its pieces (HomeFilter.pieces), the project last, joined by " · ".
  */
 @Composable
-private fun filterChipLabel(sky: SkyFilter?, quiet: Int, home: HomeFilter, everywhere: Everywhere?): String {
-    val skyLabel = when (sky) {
-        is SkyFilter.Project -> sky.name
-        SkyFilter.Quiet -> pluralStringResource(R.plurals.filter_quiet, quiet, quiet)
-        null -> null
-    }
-    if (!home.on) return skyLabel.orEmpty()
+private fun filterChipLabel(project: String?, home: HomeFilter, everywhere: Everywhere?): String {
+    if (!home.on) return project.orEmpty()
     val groups = HomeGroup.entries.associateWith { filterGroupWord(it) }
     val agents = FilterAgent.entries.associateWith { filterAgentWord(it) }
     val names = everywhere?.servers?.associate { it.first.id to it.first.name }.orEmpty()
-    val pieces = home.pieces({ groups.getValue(it) }, { agents.getValue(it) }, { names[it] }) + listOfNotNull(skyLabel)
+    val pieces = home.pieces({ groups.getValue(it) }, { agents.getValue(it) }, { names[it] }) + listOfNotNull(project)
     return stringResource(R.string.filter_showing, pieces.joinToString(" · "))
 }
 
@@ -996,137 +922,6 @@ internal fun <T> homeGroupsOf(items: List<T>, session: (T) -> Session, server: (
             .sortedWith(order)
             .takeIf { it.isNotEmpty() }?.let { g to it }
     }
-}
-
-@Composable
-private fun SkyWindow(
-    height: Dp, cosmos: CosmosState,
-    filter: SkyFilter?, a11y: String, projects: List<String>, quiet: Boolean,
-    onFilter: (SkyFilter?) -> Unit, onJumpToUsage: () -> Unit,
-    onStats: () -> Unit, hint: Boolean, visibility: () -> Float,
-    /** Codex's star is in the sky (both agents in use): TalkBack can go to its usage card. */
-    codexStar: Boolean = false,
-    onCodexUsage: () -> Unit = {},
-    onHit: (CosmosHit) -> Unit,
-) {
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    val hit = rememberUpdatedState(onHit)
-    val showOnly = stringResource(R.string.a11y_show_only)
-    val showQuiet = stringResource(R.string.a11y_show_quiet)
-    val showAll = stringResource(R.string.a11y_filter_clear)
-    val jump = stringResource(R.string.a11y_jump_usage)
-    val stats = stringResource(R.string.a11y_open_stats)
-    val codexUsage = stringResource(R.string.a11y_codex_usage)
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(height)
-            .onGloballyPositioned { origin = it.positionInRoot() }
-            // TalkBack: what the sky says, and the same actions as tapping it.
-            .semantics {
-                contentDescription = a11y
-                customActions = listOf(CustomAccessibilityAction(stats) { onStats(); true }) +
-                    projects.map { p -> CustomAccessibilityAction(showOnly.format(p)) { onFilter(SkyFilter.Project(p)); true } } +
-                    listOfNotNull(
-                        if (quiet) CustomAccessibilityAction(showQuiet) { onFilter(SkyFilter.Quiet); true } else null,
-                        filter?.let { CustomAccessibilityAction(showAll) { onFilter(null); true } },
-                        CustomAccessibilityAction(jump) { onJumpToUsage(); true },
-                        if (codexStar) CustomAccessibilityAction(codexUsage) { onCodexUsage(); true } else null,
-                    )
-            }
-            .pointerInput(cosmos) {
-                detectTapGestures { p -> cosmos.hitAt(origin + p)?.let { hit.value(it) } }
-            },
-    ) {
-        SunHint(hint, cosmos, { origin.y }, visibility, onStats)
-    }
-}
-
-/**
- * The hint's line: quiet, a size between the readout's 10sp and the app's small text, so it reads
- * as the readout's second line rather than a caption of its own, with the readout's dark halo so
- * stars and orbits behind don't cut through it.
- */
-private val HintStyle = Type.small.copy(fontSize = 11.sp, lineHeight = 14.sp, textAlign = TextAlign.Center, shadow = Shadow(Color(0xE014110E), Offset.Zero, 10f))
-
-/**
- * Once, until Statistics is first opened: the sun's readout gains a second line, "Tap the sun for
- * your statistics" (a tap on the line opens it too). It comes once the sky has settled, stays
- * with the sun as cards scroll over the sky and fades with it, and goes for good with the first tap.
- * [windowTop] is where the sky window's top is on screen now. The sky keeps room for it
- * ([CosmosState.hint]) and says where its readout ends ([CosmosState.readoutBottomPx]).
- */
-@Composable
-private fun BoxScope.SunHint(
-    shown: Boolean, cosmos: CosmosState, windowTop: () -> Float,
-    visibility: () -> Float, onClick: () -> Unit,
-) {
-    val alpha = remember { Animatable(0f) }
-    LaunchedEffect(shown) {
-        if (shown) {
-            delay(1_500)
-            alpha.animateTo(1f, tween(1_200, easing = Motion.Expo))
-        } else alpha.animateTo(0f, tween(Motion.DIALOG))
-    }
-    val present by remember { derivedStateOf { alpha.value > 0f } }
-    if (!shown && !present) return
-    // Only a line you can see takes taps: faded out under scrolled cards, it mustn't catch theirs.
-    val tappable by remember { derivedStateOf { alpha.value > 0.5f && visibility() > 0.5f } }
-    val label = stringResource(R.string.a11y_open_stats)
-    HText(
-        stringResource(R.string.sun_stats_hint), style = HintStyle, color = HN.inkMuted, maxLines = 1,
-        modifier = Modifier
-            .align(Alignment.TopCenter)
-            // Just under the readout, which the sky draws on the screen, not in this window: so it
-            // stays put while the window scrolls, and so does this line.
-            .offset { IntOffset(0, (cosmos.readoutBottomPx - windowTop() - 1.dp.toPx()).roundToInt()) }
-            .graphicsLayer { this.alpha = alpha.value * visibility() }
-            .then(
-                if (tappable) Modifier.clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = label, onClick = onClick)
-                else Modifier,
-            )
-            .padding(horizontal = 16.dp, vertical = 2.dp),
-    )
-}
-
-/**
- * One sentence for TalkBack about the sky: the sun's usage ([u]: the leading agent's), limits and
- * projects; then Codex's star while both agents are in use, its window and its sessions.
- */
-@Composable
-private fun skyDescription(hub: Hub, cosmos: CosmosState, quiet: Int, u: Usage, eclipsed: Boolean): String {
-    val res = LocalContext.current.resources
-    val now = System.currentTimeMillis()
-    val usage = when {
-        eclipsed && hub.claudeAvailable -> stringResource(R.string.a11y_eclipse, accountStateName(hub.account))
-        eclipsed -> stringResource(R.string.a11y_eclipse, stringResource(R.string.state_signed_out))
-        u.weekLimited -> stringResource(R.string.a11y_week_limit, formatDuration(res, (u.sevenDayResetAt - now).coerceAtLeast(0)))
-        u.limited -> stringResource(R.string.a11y_limit, formatDuration(res, (u.fiveHourResetAt - now).coerceAtLeast(0)))
-        !u.known -> stringResource(R.string.sun_unknown_said)
-        // A plan with only the week (Codex leading on one, or Claude Code reporting no 5-hour
-        // window): the sun's window is that week.
-        else -> usageSaid(res, stringResource(if (!u.fiveHourReported) R.string.usage_name_seven else R.string.usage_name_five), UsageWindow.fiveHour(u, now))
-    }
-    val needs = hub.sessions.count { it.state == SessionState.NeedsYou }
-    val sky = if (quiet > 0) stringResource(R.string.a11y_sky_quiet, usage, cosmos.projects().size, quiet, needs)
-    else stringResource(R.string.a11y_sky, usage, cosmos.projects().size, needs)
-    if (!hub.bothAgents) return sky
-    // Codex's star: its window (the 5-hour one, or the week), and how many of its sessions go round it.
-    val c = hub.codex
-    val cu = c?.usage
-    val win = AgentLead.codexWindow(cu)
-    val star = when {
-        c?.account?.signedIn == false -> stringResource(R.string.a11y_codex_signed_out)
-        win == null -> stringResource(R.string.a11y_codex_waiting)
-        else -> {
-            val five = cu?.fiveHour != null
-            val p = UsageWindow.of((win.pct / 100.0).toFloat(), win.resetsAt, now, limited = AgentLead.codexLimitedWindow(cu) === win)
-            usageSaid(res, stringResource(if (five) R.string.cx_usage_name_five else R.string.cx_usage_name_seven), p)
-        }
-    }
-    val n = hub.sessions.count { it.codex && com.prudnikweb.hypernova.ui.fx.SkySplit.inUse(it, now) && it.switchedTo == null }
-    val starSaid = if (n == 0) star else res.getQuantityString(R.plurals.a11y_codex_star, n, star, n)
-    return "$sky $starSaid"
 }
 
 /**
@@ -1410,7 +1205,7 @@ private fun agentAndPlan(agent: Int, withPlan: Int, plan: String?): String =
 private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier, from: String? = null) {
     val u = hub.usage
     val res = LocalContext.current.resources
-    // Each meter's countdown moves when its text changes, in step with the sky's and the account card's.
+    // Each meter's countdown moves when its text changes, in step with the account card's.
     val now = rememberCountdownNow(u.fiveHourResetAt, u.sevenDayResetAt)
     // Announce limits as they happen (TalkBack), not only by colour.
     GlassCard(modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }) {
@@ -1660,27 +1455,6 @@ private fun staleNote(a: Account): String = stringResource(
     },
 )
 
-/** The line under the eclipsed sun, or null when the sun isn't eclipsed. */
-@Composable
-private fun eclipseLine(a: Account): String? = when (a.state) {
-    Account.LOGGED_OUT -> stringResource(R.string.eclipse_signed_out)
-    Account.NO_SUBSCRIPTION -> stringResource(R.string.eclipse_no_plan)
-    Account.ON_HOLD -> stringResource(R.string.eclipse_on_hold)
-    else -> null
-}
-
-/** "Signed out", "No plan", "On hold": the account's state as its chips say it. */
-@Composable
-private fun accountStateName(a: Account): String = stringResource(
-    when (a.state) {
-        Account.LOGGED_OUT -> R.string.state_signed_out
-        Account.NO_SUBSCRIPTION -> R.string.state_no_plan
-        Account.ON_HOLD -> R.string.state_on_hold
-        Account.NO_CREDIT -> R.string.state_no_credit
-        else -> R.string.state_paused
-    },
-)
-
 /** The account card's key in the list and for its dismissal. */
 internal const val ACCOUNT_CARD = "account"
 
@@ -1723,8 +1497,8 @@ private fun AccountCard(hub: Hub, onOpen: (String) -> Unit, onNewSession: () -> 
     val opener = LocalOpener.current
     val appScope = LocalAppScope.current
     val toast = LocalToast.current
-    // The countdown in the seam moves exactly when its text changes, as the sky's does
-    // (ui/fx/Countdown.kt): it used to look every 20 s and read 6:06 under the sky's 5:59.
+    // The countdown in the seam moves exactly when its text changes
+    // (ui/fx/Countdown.kt): it used to look every 20 s and read 6:06 beside another's 5:59.
     val now = rememberCountdownNow(a.limit?.resetsAt)
     val mac = hub.mac.name
     val limit = a.resting(now)
@@ -1886,7 +1660,7 @@ private fun AccountCard(hub: Hub, onOpen: (String) -> Unit, onNewSession: () -> 
 /**
  * Signing Claude Code in again, from here: Sign in opens its sign-in page on this phone and takes
  * the code the page shows back to the Mac; or it runs in a terminal on the Mac. Each step of the
- * sign-in shows as it happens; once it works, the account card goes and the sun comes back.
+ * sign-in shows as it happens; once it works, the account card goes.
  * [more]: pills for another way on (another provider), beside Sign in until a sign-in starts.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -2089,7 +1863,7 @@ internal fun providerAttention(st: com.prudnikweb.hypernova.data.ProviderStatus)
 
 /**
  * A provider's trouble on Home, as an attention card (owner, 2026-10-18: errors are a card with a
- * way to fix them, not words in the sky): what's wrong, what it means for the sessions on it, and
+ * way to fix them): what's wrong, what it means for the sessions on it, and
  * its one fix as the pill (Fix the key, Add credits). A tap on the card opens that provider's
  * settings. Amber while it's the owner's to fix; a rate limit or an outage passes by itself, calm.
  */
@@ -2213,3 +1987,7 @@ private fun finishedSaid(res: android.content.res.Resources, t: Long, now: Long)
     }
     return res.getString(R.string.meta_finished_said, ago)
 }
+
+/** The sessions of [project] (a launcher shortcut's), or all of them when there's none. */
+private fun ofProject(sessions: List<Session>, project: String?): List<Session> =
+    if (project == null) sessions else sessions.filter { it.project == project }

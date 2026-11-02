@@ -179,7 +179,7 @@ class PaceTest {
             val due = l.tick(t)
             // Its frames are its own: no pace (sky, chips) is due.
             assertEquals(1 shl Lanes.GRAIN, due)
-            if (g.step(t, laneDue = true, wide = false, moves = true)) patterns++
+            if (g.step(laneDue = true, moves = true)) patterns++
             // It drew the new pattern, so it asks for the next.
             l.want(Lanes.GRAIN)
         }
@@ -208,22 +208,7 @@ class PaceTest {
             assertEquals(0, l.tick(1f))
         }
         val g = GrainSteps()
-        assertFalse(g.step(1f, laneDue = true, wide = true, moves = false))
+        assertFalse(g.step(laneDue = true, moves = false))
         assertEquals(0, g.index)
-    }
-
-    @Test fun whileTheSkyDrawsTheGrainChangesWithItTwentyFourTimesASecond() {
-        val g = GrainSteps()
-        var changes = 0
-        var t = 0f
-        // Home: the sky draws 30 frames a second; the grain's own lane is due on some of them.
-        repeat(30) { i ->
-            t += 1f / 30f
-            if (g.step(t, laneDue = i % 3 == 0, wide = true, moves = true)) changes++
-        }
-        assertTrue("$changes changes in a second", changes in 23..25)
-        // The sky stops (another screen): the lane carries on alone.
-        assertTrue(g.step(t + 0.1f, laneDue = true, wide = false, moves = true))
-        assertFalse(g.step(t + 0.15f, laneDue = false, wide = false, moves = true))
     }
 }

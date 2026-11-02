@@ -17,18 +17,7 @@
     <string name="usage">Usage</string>
     <string name="percent">%1$d%%</string>
     <string name="resets_in">resets in %1$s</string>
-    <!-- Under the quiet disk while a limit holds: through the 5-hour wait the stream refills it until the
-         reset; through the week's low state the disk refills when the stream returns at the week's reset. -->
-    <string name="refills_in">refills in %1$s</string>
-    <!-- Under the sun's empty ring before the Mac's first numbers; TalkBack's is sun_unknown_said. -->
-    <string name="sun_unknown">waiting for numbers</string>
-    <string name="sun_unknown_said">Usage: waiting for the first numbers from your Mac.</string>
     <string name="show_all">show all</string>
-    <string name="a11y_sky">%1$s. %2$d projects in orbit, %3$d need you.</string>
-    <string name="a11y_limit">5-hour limit reached, resets in %1$s</string>
-    <string name="a11y_week_limit">Weekly limit reached, resets in %1$s</string>
-    <string name="a11y_show_only">Show only %1$s</string>
-    <string name="a11y_jump_usage">Jump to usage</string>
     <plurals name="sessions_count">
         <item quantity="one">%d session</item>
         <item quantity="other">%d sessions</item>
@@ -760,11 +749,6 @@
     <string name="headline_no_plan">No Claude plan</string>
     <string name="headline_on_hold">Account on hold</string>
     <string name="headline_no_credit">Out of usage credits</string>
-    <!-- Under the eclipsed sun (it draws them in capitals), and what TalkBack says about it. -->
-    <string name="eclipse_signed_out">signed out</string>
-    <string name="eclipse_no_plan">no plan</string>
-    <string name="eclipse_on_hold">on hold</string>
-    <string name="a11y_eclipse">%1$s: usage isn\'t measured</string>
     <!-- Usage card while the account is signed out or stopped: the last numbers, not measured. -->
     <string name="usage_stale_trail">not measured</string>
     <string name="usage_dash">—</string>

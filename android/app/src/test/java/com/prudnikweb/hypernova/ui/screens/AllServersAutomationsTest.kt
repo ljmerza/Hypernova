@@ -1,7 +1,6 @@
 package com.prudnikweb.hypernova.ui.screens
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasText
@@ -12,7 +11,6 @@ import androidx.compose.ui.test.performClick
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.ServerStatus
-import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.home.Everywhere
 import com.prudnikweb.hypernova.ui.home.HomeScreen
 import com.prudnikweb.hypernova.ui.home.ServerChoice
@@ -50,7 +48,7 @@ class AllServersAutomationsTest {
         rule.setContent {
             Harness(spy) {
                 HomeScreen(
-                    z2, CosmosState(), mutableFloatStateOf(1f), filter = null, onFilter = {}, quiet = emptyList(),
+                    z2, project = null, onClearProject = {},
                     onOpen = {}, onNewSession = {}, settings = {},
                     servers = ServerChoice(everywhere.servers.map { it.first }, {}, {}, all = all),
                     everywhere = everywhere.takeIf { all },

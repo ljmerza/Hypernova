@@ -83,6 +83,4 @@
     <string name="notice_provider_answering_title">%1$s is answering again</string>
     <string name="notice_provider_back">Paused sessions can carry on.</string>
 
-    <!-- The companion star in the sky: sessions on other providers orbit it. -->
-    <string name="companion_providers">%1$d providers</string>
 </resources>
