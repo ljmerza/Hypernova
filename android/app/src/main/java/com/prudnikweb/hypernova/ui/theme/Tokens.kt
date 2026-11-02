@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.theme
 
 import androidx.compose.animation.core.CubicBezierEasing

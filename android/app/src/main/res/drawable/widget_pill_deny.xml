@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <!-- Deny: the danger pill, red text on a red hairline. -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33EE4468">
     <item android:id="@android:id/mask">

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <!-- Allow: the primary pill, the accent's fill with a brighter rim. -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33060A17">
     <item>
