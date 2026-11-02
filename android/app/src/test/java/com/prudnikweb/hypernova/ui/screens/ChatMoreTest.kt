@@ -105,7 +105,6 @@ class ChatMoreTest {
 
     // ─── C10, Q9: the message menu ───
 
-    @Config(qualifiers = "+h1600dp")
     @Test fun aCodeBlocksLongLinesWrapAndItCopiesAsWritten() {
         val line = "Hello team, a long line in a drafted email that would never fit across a phone in one go, so it has to wrap."
         rule.setContent { Harness(spy) { com.prudnikweb.hypernova.ui.components.CodeBlock(line) } }
@@ -117,6 +116,7 @@ class ChatMoreTest {
         org.junit.Assert.assertTrue("it takes more than one line: ${text.size.height}", text.size.height > oneLine)
     }
 
+    @Config(qualifiers = "+h1600dp")
     @Test fun aMessagesMenuCopiesQuotesAndSavesItAsAQuickPrompt() {
         val hub = FakeHub(transcripts = mapOf(Samples.ZETA to conversation))
         chat(hub, Samples.ZETA)
