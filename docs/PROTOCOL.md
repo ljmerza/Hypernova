@@ -1800,8 +1800,8 @@ McpForm = {
   transport: "stdio" | "http" | "sse",   // Codex: no "sse"
   command?, args?: string[], env?: McpPair[],   // stdio
   url?, headers?: McpPair[],             // http, sse
-  oauth?: {clientId?, callbackPort?, clientSecret?} | null,   // Claude Code's, http and sse only
-  timeout?: number | null,  // milliseconds, 1,000 to 86,400,000; null takes it out; Claude Code's
+  oauth?: {clientId?, callbackPort?, clientSecret?} | null,   // Claude Code's, http and sse only; Codex: 400 `codex_no_oauth`
+  timeout?: number | null,  // milliseconds, 1,000 to 86,400,000; null takes it out; Codex: its `tool_timeout_sec`
   bearerEnv?: string | null,   // Codex's, http only: a variable's name; null or "" takes it out
   confirmRun?: boolean,     // the phone's claim of a check
   expected?,                // PUT: the page's hash
@@ -2130,7 +2130,11 @@ daemon doesn't know.
   Claude Code's SDK); 502 `error` when Claude Code didn't list them
 - **Rules:** The slash commands and skills Claude Code offers in that folder (its own, the owner's,
   the project's, plugins', MCP prompts), asked of an SDK process started there with hooks off and no
-  prompt; cached 5 minutes per folder. Commands bound to a terminal on the server (vim, statusline,
+  prompt; cached 5 minutes per folder. **Asking starts no project server nobody approved**: only what's
+  approved starts, and the answer waits up to 3 seconds for those still connecting, for their prompts
+  (`name`: `server:prompt (MCP)`, Claude Code's own word for it). A `.mcp.json` whose names can't be read
+  here (a link, over 256 KB, unparsable) means no MCP servers at all for that one process: see
+  An agent's MCP servers, "Status and tools". Commands bound to a terminal on the server (vim, statusline,
   …), internal, removed and renamed ones are left out. `terminal`: one of Claude Code's own that
   opens a screen of its own in the terminal, which a client can't work (/config, /permissions,
   /resume, /mcp, /status…; a list the daemon keeps by hand in `commands.ts`, since Claude Code's
@@ -2827,6 +2831,7 @@ Every entry below can also refuse with what's common to them, not repeated:
 | 400 | `bad_json`, `bad_request` | A body that isn't JSON, or isn't an object |
 | 404 | `no_folder` | A `folder` the daemon doesn't know (An agent's MCP servers, "Folders"). Not for Codex, which doesn't look at it |
 | 409 | `no_claude`, `no_codex` | That agent isn't installed, for a route that runs it |
+| 409 | `codex_too_old` | The Codex found is older than Hypernova's floor (`CODEX_MIN`, 0.163.0), or won't say its version. With `version` (a string, or null) and `min` beside `code` and `message`. It isn't run, except for `--version` |
 | 502 | `cli_failed` | The agent's command failed: its own line, cleaned |
 | 502, 504 | `codex_failed`, `codex_refused`; `too_slow` | Codex's short-lived app-server stopped or refused, or took over 30 s |
 
@@ -2874,8 +2879,8 @@ A change answers once it's done, and goes out as `{t:"agent_settings", agent}`. 
 - **Answer:** `200 {ok: true, name, scope, hash}`
 - **Refusals:** 400 `bad_scope` (Claude Code), `bad_name`, `bad_transport`, `bad_command`, `bad_args`,
   `bad_url`, `bad_pairs`, `bad_pair_name`, `bad_pair_value`, `nothing_to_keep`, `masked_unknown`,
-  `bad_oauth`, `bad_timeout`, `too_big`, `bad_bearer` (Codex); 403 `confirm_run`; 409 `exists`,
-  `file_is_link`
+  `bad_oauth`, `bad_timeout`, `too_big`, `bad_bearer` (Codex), `codex_no_oauth` (Codex); 403 `confirm_run`;
+  409 `exists`, `file_is_link`
 - **Rules:** see An agent's MCP servers, "The form" and "What a change runs".
 
 #### PUT /v1/agents/mcp/servers
@@ -3002,8 +3007,8 @@ plugins. A POST to a route Claude Code has and Codex doesn't is 409 `not_for_cod
 
 #### POST /v1/agents/plugins/update
 
-- **Body:** `{agent, plugin, scope?, folder?, acceptCommand?, confirmRun?}`. `scope` is `user` if it's
-  not there. `confirmRun` is only needed with `acceptCommand`.
+- **Body:** `{agent, plugin, scope?, folder?, confirmRun, acceptCommand?}`. `scope` is `user` if it's
+  not there. A new version can bring new hooks.
 - **Answer:** `200 {ok: true, id, message?, newVersion?}`, or `needsAccept` as for install
 - **Refusals:** 400 `bad_plugin`, `bad_scope`, `bad_accept`; 403 `confirm_run`; 409 `not_for_codex`
 
@@ -3049,9 +3054,10 @@ plugins. A POST to a route Claude Code has and Codex doesn't is 409 `not_for_cod
 
 #### POST /v1/agents/plugins/marketplaces/update
 
-- **Body:** `{agent, name?, folder?}`. No `name`: all of them.
+- **Body:** `{agent, name?, folder?, confirmRun?}`. No `name`: all of them. `confirmRun` is Codex's only: there this also
+  updates the plugins installed from it.
 - **Answer:** `200 {ok: true}`
-- **Refusals:** 400 `bad_marketplace`
+- **Refusals:** 400 `bad_marketplace`; 403 `confirm_run` (Codex)
 
 ### Routes: JSON mode
 
@@ -5452,7 +5458,8 @@ config file only `mcpServers` and a project's MCP keys are read, per request, an
 **The status comes from a process in that folder,** with no prompt and hooks off, which costs no tokens and
 starts each server as a session would. A process under the SDK would treat every project server as approved, so
 each one not approved is named to it as rejected and doesn't start; the reply lists those as `waiting` or
-`rejected`. It waits up to 12 s for a server still `pending`. Nothing here reaches a running session, which holds
+`rejected`. Names come from the `.mcp.json` of the folder's real path and each parent. If one of those can't be read here (a link, over 256 KB, unparsable,
+too slow), Claude Code may still read it, so that process is told to read no MCP config at all: the reply then lacks that file's servers and the user's. It waits up to 12 s for a server still `pending`. Nothing here reaches a running session, which holds
 its own connections.
 
 **A tool's detail comes from the server itself** (`mcp-client.ts`, for stdio, Streamable HTTP and SSE): it's
@@ -5471,6 +5478,9 @@ Code's to expand; the whole entry 64 KiB. What the form doesn't speak of carries
 **What's still masked stands for the real value.** An argument the same as one the page gave out, a command or URL
 holding a mask, each means what's on the server. A mask this server didn't give out is 400 `masked_unknown`, never
 written as three dots. `keep` with no value there is 400 `nothing_to_keep`.
+
+For Codex an `oauth` that says anything is 400 `codex_no_oauth`, with nothing written (one that's empty or all nulls is
+ignored), and `timeout` is written as `tool_timeout_sec`, in seconds, kept on a `PUT` that doesn't speak of it.
 
 `oauth.clientId` or `.callbackPort` null takes it out; a port is 1 to 65535. On a stdio server `oauth` is 400
 `bad_oauth`. A client secret goes as `MCP_CLIENT_SECRET`, not on the command line. Everything else in a Claude Code
@@ -5537,13 +5547,14 @@ Routes: agents' plugins. Types: `PluginList`, `PluginCatalogue`, `PluginDetail`.
 
 #### What needs the claim
 
-Installing a plugin and adding a marketplace are someone else's code on the server: 403 `confirm_run` without
-`confirmRun`, as for an MCP server. Not enable, disable, uninstall or removing a marketplace, which run nothing at that
-moment, and not update or marketplace update. A plugin's code runs from the next session on.
+Installing or updating a plugin and adding a marketplace are someone else's code on the server: 403 `confirm_run` without
+`confirmRun`, as for an MCP server. So is updating a marketplace **for Codex**, where that also moves its installed plugins to
+their new versions. Not for Claude Code, where it only fetches: what's installed stays until the plugin is updated. Not enable,
+disable, uninstall or removing a marketplace, which run nothing at that moment. A plugin's code runs from the next session on.
 
 A plugin that installs by running a command (Claude Code's): the answer is `{ok: false, needsAccept: {command, sha256}}`,
 with nothing done. The client shows the command, confirms, and sends the hash back as `acceptCommand`, 64 hex digits, else
-400 `bad_accept`. On update, `acceptCommand` also needs `confirmRun`. Only tested with a stand-in. A `needsAccept` answer
+400 `bad_accept`. Only tested with a stand-in. A `needsAccept` answer
 goes out as `{t:"agent_settings"}` like any other.
 
 #### Where it runs

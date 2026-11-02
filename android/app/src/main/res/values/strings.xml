@@ -1063,6 +1063,9 @@
     <string name="pl_run_title">Run someone else\'s code on %1$s?</string>
     <string name="pl_run_install">%1$s can run its own hooks and MCP servers on the server, with your account\'s access.\n\nFrom: %2$s</string>
     <string name="pl_run_market">Plugins from here can run their own hooks and MCP servers on the server, with your account\'s access.\n\n%1$s</string>
+    <string name="pl_run_update">%1$s gets its newest version. That can bring new hooks and MCP servers, which run on the server with your account\'s access from its next session.</string>
+    <string name="pl_run_market_update">Updating %1$s also moves its installed plugins to their newest versions. That can bring new hooks and MCP servers, which run on the server with your account\'s access.</string>
+    <string name="pl_market_every">every marketplace</string>
     <string name="pl_run_command">Installing this runs a command on the server, as its marketplace declares it:\n\n%1$s</string>
     <string name="pl_run_unknown">its marketplace</string>
     <string name="pl_run_action">Continue</string>

@@ -4,7 +4,8 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer as httpServer } from 'node:http'
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -140,9 +141,20 @@ test('Claude Code: a marketplace and a plugin, in full, and what runs code when'
   await ok(call('POST', '/v1/agents/plugins/toggle', { ...claude, plugin: 'hello@testmp', scope: 'user', enabled: false }))
   assert.equal((await ok(call('GET', `/v1/agents/plugins${q({ agent: 'claude' })}`))).plugins[0].enabled, false)
   await ok(call('POST', '/v1/agents/plugins/toggle', { ...claude, plugin: 'hello@testmp', scope: 'user', enabled: true }))
-  await ok(call('POST', '/v1/agents/plugins/update', { ...claude, plugin: 'hello@testmp', scope: 'user' }))
+  assert.equal((await call('POST', '/v1/agents/plugins/update', { ...claude, plugin: 'hello@testmp', scope: 'user' })).body.error.code, 'confirm_run')
+  await ok(call('POST', '/v1/agents/plugins/update', { ...claude, plugin: 'hello@testmp', scope: 'user', confirmRun: true }))
   await ok(call('POST', '/v1/agents/plugins/marketplaces/update', { ...claude, name: 'testmp' }))
   assert.equal(hookRuns(), 0, 'a change ran the plugin’s hook')
+
+  // What the two updates can do: the marketplace's leaves what's installed where it was, and only the plugin's moves it.
+  write(join(mp, '.claude-plugin/marketplace.json'), JSON.stringify({ name: 'testmp', owner: { name: 'me' }, plugins: [{ name: 'hello', source: './plugins/hello', description: 'A test plugin', version: '2.0.0' }] }))
+  write(join(mp, 'plugins/hello/.claude-plugin/plugin.json'), JSON.stringify({ name: 'hello', version: '2.0.0', description: 'A test plugin' }))
+  const installed = async () => (await ok(call('GET', `/v1/agents/plugins${q({ agent: 'claude' })}`))).plugins[0].version
+  await ok(call('POST', '/v1/agents/plugins/marketplaces/update', { ...claude, name: 'testmp' }))
+  assert.equal(await installed(), '1.0.0', 'Claude Code’s marketplace update moved an installed plugin: it needs the fingerprint now')
+  await ok(call('POST', '/v1/agents/plugins/update', { ...claude, plugin: 'hello@testmp', scope: 'user', confirmRun: true }))
+  assert.equal(await installed(), '2.0.0')
+  assert.equal(hookRuns(), 0, 'an update ran the plugin’s hook')
 
   // Its skill shows; a plugin's is locked to the plugin.
   const app = join(scratch, 'home/app')
@@ -219,6 +231,61 @@ test('Codex: a marketplace and a plugin, off and on, its skills', { skip: skipCo
   await ok(call('POST', '/v1/agents/plugins/toggle', { ...codex, plugin: 'hello@testmp', enabled: true }))
   await ok(call('POST', '/v1/agents/plugins/uninstall', { ...codex, plugin: 'hello@testmp' }))
   assert.deepEqual((await ok(call('GET', `/v1/agents/plugins${q({ agent: 'codex' })}`))).plugins, [])
+  assert.equal((await call('POST', '/v1/agents/plugins/marketplaces/update', { ...codex, name: 'testmp' })).body.error.code, 'confirm_run')
   await ok(call('POST', '/v1/agents/plugins/marketplaces/remove', { ...codex, name: 'testmp' }))
   assert.equal((await call('POST', '/v1/agents/plugins/prune', { ...codex, scope: 'user' })).body.error.code, 'not_for_codex')
+})
+
+test('Codex: updating a marketplace from git moves an installed plugin to its new version and hooks, so it takes the claim', { skip: skipCodex, timeout: 180_000 }, async () => {
+  // A git source only, on this machine alone: Codex's upgrade refuses a local path.
+  const served = join(scratch, 'served')
+  mkdirSync(served)
+  const srv = httpServer((req, res) => {
+    const file = join(served, decodeURIComponent(req.url!.split('?')[0]!))
+    try {
+      if (statSync(file).isFile()) return void createReadStream(file).pipe(res)
+    } catch {}
+    res.statusCode = 404
+    res.end()
+  })
+  await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r))
+  try {
+    const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_AUTHOR_NAME: 'x', GIT_AUTHOR_EMAIL: 'x@x.invalid', GIT_COMMITTER_NAME: 'x', GIT_COMMITTER_EMAIL: 'x@x.invalid' }
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, env: gitEnv })
+    const work = join(scratch, 'gitmp')
+    mkdirSync(work)
+    git(work, 'init', '-q', '-b', 'main')
+    git(served, 'init', '-q', '--bare', '-b', 'main', 'gitmp.git')
+    git(work, 'remote', 'add', 'origin', join(served, 'gitmp.git'))
+    const publish = (version: string, extra: Record<string, string> = {}) => {
+      write(join(work, '.agents/plugins/marketplace.json'), JSON.stringify({ name: 'gitmp', interface: { displayName: 'Git' }, plugins: [{ name: 'moved', source: { source: 'local', path: './plugins/moved' }, policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' }, category: 'Productivity' }] }))
+      write(join(work, 'plugins/moved/.codex-plugin/plugin.json'), JSON.stringify({ name: 'moved', version, description: 'Moves', skills: './skills/', interface: { displayName: 'Moved', shortDescription: 'Moves' }, ...extra }))
+      write(join(work, 'plugins/moved/skills/hi/SKILL.md'), `---\nname: hi\ndescription: Says hi.\n---\nVersion ${version}.\n`)
+      git(work, 'add', '.')
+      git(work, 'commit', '-qm', version)
+      git(work, 'push', '-q', 'origin', 'main')
+      git(join(served, 'gitmp.git'), 'update-server-info')
+    }
+    publish('1.0.0')
+    const codex = { agent: 'codex' }
+    const source = `http://127.0.0.1:${(srv.address() as { port: number }).port}/gitmp.git`
+    await ok(call('POST', '/v1/agents/plugins/marketplaces/add', { ...codex, source, confirmRun: true }))
+    await ok(call('POST', '/v1/agents/plugins/install', { ...codex, plugin: 'moved@gitmp', confirmRun: true }))
+    const version = async () => (await ok(call('GET', `/v1/agents/plugins${q({ agent: 'codex' })}`))).plugins.find((p: any) => p.id === 'moved@gitmp').version
+    assert.equal(await version(), '1.0.0')
+
+    write(join(work, 'plugins/moved/hooks.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: `echo ran >> ${HOOK_LOG}` }] }] } }))
+    publish('2.0.0', { hooks: './hooks.json' })
+    assert.equal((await call('POST', '/v1/agents/plugins/marketplaces/update', { ...codex, name: 'gitmp' })).body.error.code, 'confirm_run')
+    assert.equal(await version(), '1.0.0', 'a refused update changed something')
+    await ok(call('POST', '/v1/agents/plugins/marketplaces/update', { ...codex, name: 'gitmp', confirmRun: true }))
+    assert.equal(await version(), '2.0.0', 'Codex’s marketplace update no longer moves a plugin: it may not need the fingerprint now')
+    assert.ok(existsSync(join(CODEX, 'plugins/cache/gitmp/moved/2.0.0/hooks.json')), 'the new version’s hooks came with it')
+    assert.equal(hookRuns(), 0, 'the update ran the plugin’s hook')
+    await ok(call('POST', '/v1/agents/plugins/uninstall', { ...codex, plugin: 'moved@gitmp' }))
+    await ok(call('POST', '/v1/agents/plugins/marketplaces/remove', { ...codex, name: 'gitmp' }))
+  } finally {
+    srv.closeAllConnections()
+    srv.close()
+  }
 })

@@ -11,7 +11,9 @@ import com.prudnikweb.hypernova.data.rawFile
 import com.prudnikweb.hypernova.data.rawSave
 import com.prudnikweb.hypernova.data.rawUndo
 import com.prudnikweb.hypernova.data.plugins
+import com.prudnikweb.hypernova.data.marketplaceUpdate
 import com.prudnikweb.hypernova.data.pluginInstall
+import com.prudnikweb.hypernova.data.pluginUpdate
 import com.prudnikweb.hypernova.data.pluginUninstall
 import com.prudnikweb.hypernova.data.mcpLive
 import com.prudnikweb.hypernova.data.mcpServer
@@ -122,6 +124,22 @@ class SettingsCallsTest {
         answer("POST", "/v1/agents/plugins/uninstall", "rest-plugin-installed")
         rig.call { rig.hub.pluginUninstall("claude", "hello@testmp", "user", null) }.getOrThrow()
         assertFalse(JSONObject(last("POST", "/v1/agents/plugins/uninstall").body).has("confirmRun"))
+        answer("POST", "/v1/agents/plugins/update", "rest-plugin-installed")
+        rig.call { rig.hub.pluginUpdate("claude", "hello@testmp", "user", null) }.getOrThrow()
+        assertEquals(true, JSONObject(last("POST", "/v1/agents/plugins/update").body).getBoolean("confirmRun"))
+        answer("POST", "/v1/agents/plugins/marketplaces/update", "rest-plugin-installed")
+        rig.call { rig.hub.marketplaceUpdate("claude", "testmp", null) }.getOrThrow()
+        assertFalse(JSONObject(last("POST", "/v1/agents/plugins/marketplaces/update").body).has("confirmRun"))
+        rig.call { rig.hub.marketplaceUpdate("codex", "testmp", null) }.getOrThrow()
+        assertEquals(true, JSONObject(last("POST", "/v1/agents/plugins/marketplaces/update").body).getBoolean("confirmRun"))
+    }
+
+    @Test fun anOldCodexComesBackAsARefusalInItsOwnWords() {
+        connect()
+        answer("GET", "/v1/agents/mcp", "rest-codex-too-old", 409)
+        val e = rig.call { rig.hub.mcpList("codex") }.exceptionOrNull() as AgentSettingRefused
+        assertEquals("codex_too_old", e.code)
+        assertTrue(e.message!!, e.message!!.contains("0.39.0") && e.message!!.contains("0.163.0"))
     }
 
     @Test fun anAgentsEnvironmentGoesToItsRoutesAndAskingForTheCheckIsARefusalWithItsWords() {

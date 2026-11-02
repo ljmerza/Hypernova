@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The Codex CLI on this computer and the shared app-server it runs (docs/specs/codex-app-server.md).
 import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
@@ -20,10 +21,23 @@ const candidates = () => [
 
 /** Where `command -v codex` in a login shell pointed, looked up once (it takes a moment). */
 let fromShell: string | null | undefined
-/** The codex binary: HYPERNOVA_CODEX, the usual places, then the login shell's PATH. Null when there's none. */
+/** Of several installs, the newest by what each says it is: a Node's own version says nothing of its Codex's. The first on a tie, one that doesn't answer last. */
+export function newestCodex(found: readonly string[], versionOf: (bin: string) => string | null = codexVersion): string | null {
+  let best: { bin: string; version: string | null } | null = null
+  for (const bin of found) {
+    const version = versionOf(bin)
+    if (!best || (version && (!best.version || (!atLeast(best.version, version) && atLeast(version, best.version))))) best = { bin, version }
+  }
+  return best?.bin ?? null
+}
+
+/** The codex binary: HYPERNOVA_CODEX, the newest in the usual places, then the login shell's PATH. Null when there's none. */
 export function findCodex(): string | null {
-  for (const c of [process.env.HYPERNOVA_CODEX, ...candidates()]) if (c && existsSync(c)) return c
-  if (process.env.HYPERNOVA_CODEX) return null
+  const named = process.env.HYPERNOVA_CODEX
+  if (named && existsSync(named)) return named
+  const found = candidates().filter((c) => existsSync(c))
+  if (found.length) return found.length === 1 ? found[0]! : newestCodex(found)
+  if (named) return null
   if (fromShell === undefined) {
     try {
       const p = execFileSync(loginShell(PLATFORM), ['-lc', 'command -v codex'], { encoding: 'utf8', timeout: 5000 }).trim()

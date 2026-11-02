@@ -1,0 +1,9 @@
+{
+  "status": 409,
+  "error": {
+    "code": "codex_too_old",
+    "message": "The Codex on the server is version 0.39.0. This needs 0.163.0 or newer, so update Codex there and try again.",
+    "version": "0.39.0",
+    "min": "0.163.0"
+  }
+}

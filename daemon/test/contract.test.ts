@@ -1192,6 +1192,7 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       contract('rest-plugin-detail', await ok(get('/v1/agents/plugins/detail?agent=claude&plugin=hello@testmp')))
       contract('rest-plugin-install-refused', await refused(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user' }), 403))
       contract('rest-plugin-installed', await ok(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user', confirmRun: true })))
+      contract('rest-plugin-update-refused', await refused(post('/v1/agents/plugins/update', { agent: 'claude', plugin: 'hello@testmp', scope: 'user' }), 403))
       // Skills: the same stand-ins, and the process's own menu.
       useProbe(async (_cwd, _waiting, work) =>
         work({
@@ -1255,6 +1256,10 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
         contract('rest-raw-undone', { ...(await ok(post('/v1/agents/raw/undo', { agent: 'claude' }))), hash: 'file-hash' })
         writeFileSync(claudeFile, before)
       }
+      const usual = process.env.HYPERNOVA_CODEX
+      process.env.HYPERNOVA_CODEX = fakeCodexBin(join(scratch, 'old-codex'), '0.39.0')
+      contract('rest-codex-too-old', asServer(await refused(get('/v1/agents/mcp?agent=codex'), 409)))
+      process.env.HYPERNOVA_CODEX = usual
       contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
     }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))

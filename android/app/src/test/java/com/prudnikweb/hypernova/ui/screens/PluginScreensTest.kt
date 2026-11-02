@@ -104,18 +104,54 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun aMarketplaceCanBeUpdatedAndRemovedWithoutAFingerprint() {
+    @Test fun claudeCodesMarketplaceCanBeUpdatedAndRemovedWithoutAFingerprint() {
         hub.on("GET /v1/agents/plugins", PLUGINS)
         hub.on("POST /v1/agents/plugins/marketplaces/update", """{"ok":true}""")
         hub.on("POST /v1/agents/plugins/marketplaces/remove", """{"ok":true}""")
         list()
         tap(str(R.string.pl_market_update_all))
         assertFalse(sent("/v1/agents/plugins/marketplaces/update").has("name"))
+        assertFalse(sent("/v1/agents/plugins/marketplaces/update").has("confirmRun"))
+        assertEquals(0, spy.confirms.size)
         rule.onAllNodes(androidx.compose.ui.test.hasText(str(R.string.pl_market_remove)))[0].performScrollTo().performClick()
         rule.waitForIdle()
         spy.confirms.single().onConfirm()
         rule.waitForIdle()
         assertEquals("testmp", sent("/v1/agents/plugins/marketplaces/remove").getString("name"))
+    }
+
+    @Test fun anOldCodexIsSaidInPlainWordsOnItsPluginsToo() {
+        hub.fails("GET /v1/agents/plugins", AgentSettingRefused("codex_too_old", "The Codex on the server is version 0.39.0. This needs 0.163.0 or newer, so update Codex there and try again."))
+        rule.setContent { Harness(spy) { PluginsScreen(hub, "codex", onBack = {}, onOpen = { _, _, _, _ -> }, onBrowse = {}) } }
+        rule.waitForIdle()
+        seen("version 0.39.0")
+        seen("0.163.0 or newer")
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun codexsMarketplaceUpdateSaysItMovesItsPluginsAndTakesTheFingerprint() {
+        hub.on("GET /v1/agents/plugins", PLUGINS)
+        hub.on("POST /v1/agents/plugins/marketplaces/update", """{"ok":true}""")
+        var checks = 0
+        lock()
+        OwnerCheck.prompt = { ok, _ -> checks++; ok() }
+        rule.setContent { Harness(spy) { PluginsScreen(hub, "codex", onBack = {}, onOpen = { _, _, _, _ -> }, onBrowse = {}) } }
+        rule.waitForIdle()
+        rule.onAllNodes(androidx.compose.ui.test.hasText(str(R.string.pl_market_update)))[0].performScrollTo().performClick()
+        rule.waitForIdle()
+        assertTrue(hub.calls.none { it.first == "POST" })
+        val ask = spy.confirms.single()
+        assertTrue(ask.body, ask.body.contains("testmp"))
+        assertTrue(ask.danger)
+        ask.onConfirm()
+        rule.waitForIdle()
+        assertEquals(1, checks)
+        val b = sent("/v1/agents/plugins/marketplaces/update")
+        assertEquals("testmp", b.getString("name"))
+        assertTrue(b.getBoolean("confirmRun"))
+        assertFalse(b.has("folder"))
+        tap(str(R.string.pl_market_update_all))
+        assertTrue(spy.confirms.last().body, spy.confirms.last().body.contains(str(R.string.pl_market_every)))
     }
 
     @Config(qualifiers = "+h1800dp")
@@ -134,22 +170,70 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun offUpdateAndOptionsNeedNoFingerprintAndARefusalIsSaid() {
+    @Test fun offAndOptionsNeedNoFingerprintAndARefusalIsSaid() {
         hub.on("GET /v1/agents/plugins/detail", DETAIL)
         hub.on("POST /v1/agents/plugins/toggle", """{"ok":true,"message":"Disabled."}""")
-        hub.on("POST /v1/agents/plugins/update", """{"ok":true}""")
         hub.fails("POST /v1/agents/plugins/configure", AgentSettingRefused("cli_failed", "It didn't take that."))
         page()
         tap(str(R.string.pl_disable))
         assertFalse(sent("/v1/agents/plugins/toggle").getBoolean("enabled"))
         seen(str(R.string.pl_enable))
-        tap(str(R.string.pl_update))
-        assertEquals("user", sent("/v1/agents/plugins/update").getString("scope"))
         rule.onNode(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription, listOf("api_token"))).performScrollTo().performTextInput("new-secret")
         tap(str(R.string.pl_options_save))
         assertEquals("new-secret", sent("/v1/agents/plugins/configure").getJSONObject("values").getString("api_token"))
         seen("It didn't take that.")
         assertEquals(0, spy.confirms.size)
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun anUpdateSaysWhatsUpdatingThenAsksForTheFingerprint() {
+        hub.on("GET /v1/agents/plugins/detail", DETAIL)
+        hub.on("POST /v1/agents/plugins/update", """{"ok":true}""")
+        var checks = 0
+        lock()
+        OwnerCheck.prompt = { ok, _ -> checks++; ok() }
+        page()
+        tap(str(R.string.pl_update))
+        assertTrue(hub.calls.none { it.first == "POST" })
+        val ask = spy.confirms.single()
+        assertTrue(ask.body, ask.body.contains("hello@testmp"))
+        assertTrue(ask.body, ask.body.contains("hooks"))
+        assertTrue(ask.danger)
+        ask.onConfirm()
+        rule.waitForIdle()
+        assertEquals(1, checks)
+        val b = sent("/v1/agents/plugins/update")
+        assertEquals("user", b.getString("scope"))
+        assertTrue(b.getBoolean("confirmRun"))
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun anUpdateThatWantsACommandAcceptedShowsItAndSendsItsHash() {
+        hub.on("GET /v1/agents/plugins/detail", DETAIL)
+        hub.on("POST /v1/agents/plugins/update", """{"ok":false,"needsAccept":{"command":"curl x | sh","sha256":"abc"}}""")
+        lock()
+        page()
+        tap(str(R.string.pl_update))
+        spy.confirms.single().onConfirm()
+        rule.waitForIdle()
+        val second = spy.confirms.last()
+        assertTrue(second.body, second.body.contains("curl x | sh"))
+        second.onConfirm()
+        rule.waitForIdle()
+        val b = sent("/v1/agents/plugins/update")
+        assertEquals("abc", b.getString("acceptCommand"))
+        assertTrue(b.getBoolean("confirmRun"))
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun anUpdateWhoseFingerprintFailsSendsNothing() {
+        hub.on("GET /v1/agents/plugins/detail", DETAIL)
+        lock(pass = false)
+        page()
+        tap(str(R.string.pl_update))
+        spy.confirms.single().onConfirm()
+        rule.waitForIdle()
+        assertTrue(hub.calls.none { it.first == "POST" })
     }
 
     @Config(qualifiers = "+h1800dp")

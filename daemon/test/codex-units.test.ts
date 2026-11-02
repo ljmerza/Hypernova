@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Codex's pieces on their own (docs/specs/codex-app-server.md): which command lines a shared
 // terminal takes, the TUI's arguments, the version floor, items as events, usage windows, approval
 // cards and answers, the switch's framing, and the shell function that comes with Codex.
@@ -19,11 +20,25 @@ after(() => rmSync(scratch, { recursive: true, force: true }))
 
 const { codexLaunch } = await import('../src/codex/launch.ts')
 const { codexTuiArgs, codexProxyPath } = await import('../src/term/shared.ts')
-const { atLeast } = await import('../src/codex/binary.ts')
+const { atLeast, newestCodex } = await import('../src/codex/binary.ts')
 const { itemEvents, historyEvents, diffOf, turnEnd } = await import('../src/codex/events.ts')
 const { usageOf, codexState } = await import('../src/codex/account.ts')
 const { askOf, replyOf } = await import('../src/codex/approvals.ts')
 const { framed } = await import('../src/switch.ts')
+
+test('of several Codex installs the newest is used, whatever order they’re found in', () => {
+  const versions: Record<string, string | null> = { old: '0.39.0', new: '0.164.0', newer: '0.170.1', silent: null, same: '0.164.0' }
+  const of = (b: string) => versions[b]!
+  assert.equal(newestCodex(['old', 'new'], of), 'new')
+  assert.equal(newestCodex(['new', 'old'], of), 'new')
+  assert.equal(newestCodex(['old', 'new', 'newer'], of), 'newer')
+  assert.equal(newestCodex(['silent', 'old'], of), 'old')
+  assert.equal(newestCodex(['old', 'silent'], of), 'old')
+  assert.equal(newestCodex(['new', 'same'], of), 'new')
+  assert.equal(newestCodex(['same', 'new'], of), 'same')
+  assert.equal(newestCodex(['silent'], of), 'silent')
+  assert.equal(newestCodex([], of), null)
+})
 
 test('only the TUI’s own command lines go into a shared terminal', () => {
   assert.deepEqual(codexLaunch([]), { resume: null })

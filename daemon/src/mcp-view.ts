@@ -7,6 +7,7 @@
 
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { dirname, isAbsolute, join, normalize } from 'node:path'
 import { claudeConfigFile, folderName, isTable, MCP_CONFIG_MAX, MCP_JSON_MAX, MCP_NAME, nameIsClean, own, parseTable, projectFolder, readCapped, repoRoot, within, type FileState } from './agent-settings.ts'
 import { maskSecrets } from './normalize.ts'
@@ -273,7 +274,7 @@ export function approvalOf(name: string, folder: string, root: Record<string, un
   return 'pending'
 }
 
-/** The `.mcp.json` in [folder] and each parent, nearest last so its entry wins a name, as Claude Code reads them. */
+/** The `.mcp.json` in [folder] and each parent, nearest last so its entry wins a name, as Claude Code reads them. [notRead]: how many are there and couldn't be read or parsed here (a link, too big, too slow), which Claude Code may still read. */
 export async function projectServers(folder: string, left: () => number = () => WALK_MS): Promise<{ servers: Map<string, { config: unknown; from: string }>; notRead: number }> {
   const servers = new Map<string, { config: unknown; from: string }>()
   let notRead = 0
@@ -289,12 +290,34 @@ export async function projectServers(folder: string, left: () => number = () => 
       notRead++
       continue
     }
-    if (!('text' in read)) continue
+    if (!('text' in read)) {
+      if (read.state !== 'missing') notRead++
+      continue
+    }
     const table = parseTable(read.text)
+    if (!table) notRead++
     const t = table ? own(table, 'mcpServers') : undefined
     if (isTable(t)) for (const name of Object.keys(t)) servers.set(name, { config: own(t, name), from: dir })
   }
   return { servers, notRead }
+}
+
+/**
+ * A folder's project servers that mustn't start, and those it has turned away, from its real path: Claude Code runs there, and reads
+ * the `.mcp.json` of that path's parents. [unread]: there's a `.mcp.json` whose names can't be known here.
+ */
+export async function heldBack(folder: string): Promise<{ waiting: string[]; rejected: string[]; unread: boolean }> {
+  const real = await realpath(folder).catch(() => folder)
+  const { root } = await readClaudeConfig(claudeConfigFile())
+  const { servers, notRead } = await projectServers(real)
+  const waiting: string[] = []
+  const rejected: string[] = []
+  for (const name of servers.keys()) {
+    const a = approvalOf(name, real, root)
+    if (a === 'pending') waiting.push(name)
+    else if (a === 'rejected') rejected.push(name)
+  }
+  return { waiting, rejected, unread: notRead > 0 }
 }
 
 /** GET /v1/agents/mcp, for Claude Code: every server in every scope a file says, with what shows on its row. Nothing is started. */

@@ -150,6 +150,38 @@ test('Codex: add, see, its tools in full, off and on, change keeping the secret,
   assert.equal((await call('POST', '/v1/agents/mcp/servers', { agent: 'codex', scope: 'user', name: 'old', transport: 'sse', url: 'https://x.example/m' })).body.error.code, 'bad_transport')
 })
 
+test('Codex: a timeout is its tool_timeout_sec, kept and taken out; sign-in settings are refused by name, with nothing written', { skip, timeout: 120_000 }, async () => {
+  const web = { agent: 'codex', scope: 'user', transport: 'http', url: 'https://mcp.example.invalid/m' }
+  for (const oauth of [{ clientId: 'cid' }, { callbackPort: 3118 }, { clientSecret: SECRET }]) {
+    const r = await call('POST', '/v1/agents/mcp/servers', { ...web, name: 'noauth', oauth })
+    assert.equal(r.status, 400, JSON.stringify(r.body))
+    assert.equal(r.body.error.code, 'codex_no_oauth')
+  }
+  assert.ok(!existsSync(join(CODEX, 'config.toml')) || !toml().includes('noauth'), 'a refused server was written')
+  assert.equal((await call('POST', '/v1/agents/mcp/servers', { ...web, name: 'noauth', oauth: { clientId: null, callbackPort: null } })).status, 200, 'a form with nothing to say about sign-in is fine')
+  assert.equal((await call('POST', '/v1/agents/mcp/servers/remove', { agent: 'codex', scope: 'user', name: 'noauth', expected: (await page('noauth')).hash })).status, 200)
+
+  assert.equal((await call('POST', '/v1/agents/mcp/servers', { ...web, name: 'timed', timeout: 5 })).body.error.code, 'bad_timeout')
+  const added = await call('POST', '/v1/agents/mcp/servers', { ...web, name: 'timed', timeout: 2500 })
+  assert.equal(added.status, 200, JSON.stringify(added.body))
+  assert.match(toml(), /tool_timeout_sec = 2\.5/)
+  const p = await page('timed')
+  assert.equal(p.timeout, 2500, 'Codex’s own list reads it back')
+  assert.equal(p.toolTimeout, 2.5)
+
+  const kept = await call('PUT', '/v1/agents/mcp/servers', { ...web, name: 'timed', expected: p.hash })
+  assert.equal(kept.status, 200, JSON.stringify(kept.body))
+  assert.equal((await page('timed')).timeout, 2500, 'a form that doesn’t speak of it keeps it')
+  const changed = await call('PUT', '/v1/agents/mcp/servers', { ...web, name: 'timed', expected: (await page('timed')).hash, timeout: 60_000 })
+  assert.equal(changed.status, 200, JSON.stringify(changed.body))
+  assert.equal((await page('timed')).toolTimeout, 60)
+  const off = await call('PUT', '/v1/agents/mcp/servers', { ...web, name: 'timed', expected: (await page('timed')).hash, timeout: null })
+  assert.equal(off.status, 200, JSON.stringify(off.body))
+  assert.equal((await page('timed')).timeout, undefined)
+  assert.ok(!toml().includes('tool_timeout_sec'))
+  assert.equal((await call('POST', '/v1/agents/mcp/servers/remove', { agent: 'codex', scope: 'user', name: 'timed', expected: (await page('timed')).hash })).status, 200)
+})
+
 test('Codex: an HTTP server with headers and a bearer variable, and OAuth from the phone against a local authorization server', { skip, timeout: 120_000 }, async () => {
   const srv = httpServer((req, res) => {
     let b = ''

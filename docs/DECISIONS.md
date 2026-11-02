@@ -3569,7 +3569,7 @@ the server. The owner decided that's allowed, behind a confirm showing the whole
 3. **Status comes from Claude Code, per folder.** A process with no prompt and hooks off (as the "/" list asks) answers `mcpServerStatus()`. It's asked per folder because what's on differs per folder: the screen has a
    "Seen from" row. It costs no tokens, needs no login, and starts each server, as a session would, so an answer is kept 20 seconds.
 4. **A process under the SDK approves every project server** (2.1.316: `non_interactive`). So it's told, in its flag settings, that each one not yet approved is rejected, and it doesn't start.
-   **`daemon/src/commands.ts`'s "/" list has no such guard and does start them**: measured, a marker file written by an unapproved server. That's older than this and wasn't changed here.
+   `daemon/src/commands.ts`'s "/" list had no such guard and did start them: closed in "What opening a list may start", below.
 5. **A tool's detail comes from the server itself.** Claude Code's status gives a tool's name and hints, no description or schema (2.1.316's reply builder; its types offer a `description` it doesn't fill). So
    `daemon/src/mcp-client.ts` is a small MCP client for stdio, Streamable HTTP and SSE: it starts the server as Claude Code would, with its env and `${VAR}` expanded, asks `tools/list`, `prompts/list`, `resources/list`,
    and stops. Tools are never called. Never for a server that's off or not approved. A plugin's, an organization's or a claude.ai connector's has names and hints only: its env isn't in a file this reads.
@@ -3607,6 +3607,16 @@ the server. The owner decided that's allowed, behind a confirm showing the whole
 | `enableAllProjectMcpServers`, `allowedMcpServers`, `deniedMcpServers`, `managedMcpServers` | Read where they affect approval; not set here |
 | `alwaysLoad`, `headersHelper`, per-tool policy | Shown or carried over; not on the form |
 
+## What opening a list may start (owner, 2026-11-02)
+
+The "/" list and the model list came from an SDK process that approves every project server, so opening a list in a folder ran that folder's `.mcp.json`: measured, a marker file. Nobody chose to run anything by opening a list. A session a person starts keeps Claude Code's own behaviour.
+
+1. **One guard, `guardArgs` in `mcp-probe.ts`,** for every process that isn't a session: the "/" list, the model list (the same process, in the home folder), status, toggle, reconnect, the skills list. It's worked out as the process starts, so a caller can't forget it. What isn't approved is named as rejected in the flag settings.
+2. **That alone wasn't enough, for status too.** Claude Code also reads a `.mcp.json` that's a link or over the daemon's 256 KB, whose names the daemon won't read, and walks up from the folder's **real** path. All measured with marker files on 2.1.316. So names come from the real path, and a file that can't be read or parsed means `--strict-mcp-config` for that process: no servers at all, the user's too. That costs that one folder's status and list some names, and only in a case this odd.
+3. **An approved server's prompts didn't list before this either.** `initialize` answers in about 0.6 s, before a server has connected, so they were never in its answer (only `alwaysLoad` waits). The list now waits up to 3 s for servers still connecting and adds `supportedCommands()`'s. A judgement call: a folder with a slow server takes up to 3 s longer the first time, then the cache covers it. What a phone sends for such a prompt (`/server:prompt (MCP)`) wasn't run, since that costs a model turn.
+4. **Found and not closed: a folder's `apiKeyHelper`.** Those processes run one from the folder's `.claude/settings.json`, trusted or not, when they start: measured. `"apiKeyHelper": ""` in the flag settings stops it (measured), but it would drop the owner's own helper for those processes as well, so that's his to decide. `awsAuthRefresh`, `awsCredentialExport`, `gcpAuthRefresh`, `otelHeadersHelper`, `statusLine`, hooks, `mcpServers` in that file, and a plugin the folder's settings name from a marketplace of their own all ran nothing.
+5. **Other things that start a process.** A session from the phone and `claude --bg` are a person's choice, and stay as they were. **An automation on the SDK runner approves every project server too, with nobody watching** (`createSession`): reasoned from the same options, not run, and not changed. The usage probe has its own folder and `--strict-mcp-config`. The plugin and skill commands (`plugin list`, `list --available`, `marketplace list`, `details`, `configure`, `prune`, `mcp logout`, `edit-skill-overrides`) left no marker. `mcp-client.ts` only starts what's approved and on.
+
 ## Codex's MCP servers (2026-11-02)
 
 The same screens for Codex 0.164.0, for what it really has, checked against the real binary in a throwaway `CODEX_HOME`.
@@ -3624,19 +3634,34 @@ The same screens for Codex 0.164.0, for what it really has, checked against the 
 | Sign-in | `claude mcp login --no-browser` | `codex mcp login --no-browser`, the same paste; Codex takes it through the same hidden terminal |
 | Prompts | Listed | Its answer has none. Resources listed |
 
+**`oauth` and `timeout` on a Codex form (owner, 2026-11-02).** The route checked both and then dropped them, so a setting just vanished. `timeout` is implemented: Codex's `tool_timeout_sec`, written with its own writer and read back by its own list, tested on 0.164.0 (that it's Codex that then stops a slow tool isn't run: no model turn). `oauth` is refused by name, 400 `codex_no_oauth`, because it isn't simple: `codex mcp add --oauth-client-id` writes an `[mcp_servers.x.oauth]` table with a client secret in `config.toml`, `codex mcp list --json` doesn't show that table so a page couldn't say it's set, and there's no per-server port, only a `callback_url` it makes up. The app's Codex form never had those fields; neither form has a timeout, so that's for the route and for what's already in the file, which the page shows. **Found and not fixed:** because that list doesn't show the table, an edit from the phone drops an `oauth` table someone set with `codex mcp add` (measured on 0.164.0: gone after one `PUT`).
+
 `bearer_token_env_var` is on the form for an HTTP server, as a variable's name, never a token. Fields the form doesn't have carry over on an edit (`enabled_tools`, `disabled_tools`, timeouts, `env_vars`, `cwd`, `env_http_headers`), and show on the page.
 Not on the form, though the CLI has them: `--oauth-client-id`, `--oauth-client-secret`, `--oauth-client-registration`, `--oauth-resource`, `login --scopes`.
+
+## Codex's version on these routes (owner, 2026-11-02)
+
+Two Codexes can be on one machine, here 0.39.0 and 0.164.0 under nvm, and the MCP, plugin and skill routes ran `codexBinary().path` without looking at the version.
+
+1. **The floor is `CODEX_MIN`, the one Hypernova already has, 0.163.0.** There isn't a second number. What these routes use: `codex mcp list --json`, `plugin`, and an `app-server` with `mcpServerStatus/list`, `config/value/write`, `plugin/list`, `skills/list`. Measured: 0.164.0 has all of them; 0.39.0 has `mcp list` alone, says `unexpected argument` to `plugin`, and takes `app-server` for a prompt and stops with "No such device or address". **Those are the only two versions on hand, so the exact first version with all of it isn't known:** one between them could work and be refused. Finding out means fetching others, which wasn't done.
+2. **A refusal, not a failure:** 409 `codex_too_old` with `version` and `min`, on every route, before anything but `--version` runs. One that won't say its version is refused too. The app shows the server's words, as it does any refusal here. They don't say `codex update`, as the older message does: 0.39.0 has no such command.
+3. **Which one runs.** `findCodex` took the first it found: `~/.local/bin`, `/usr/local/bin`, `/usr/bin`, then nvm's Nodes, newest Node first. That goes by the Node's version, not Codex's: 0.39.0 on Node 24 would have beaten 0.164.0 on Node 20. This machine got the right one because 0.164.0 happens to be on the newer Node. **It now takes the newest Codex of those it finds.** `HYPERNOVA_CODEX` still wins as named, and the login shell's PATH is still only asked when none of those places has one, so a newer one only on that PATH isn't seen.
 
 ## Plugins from the phone (2026-11-02)
 
 The owner: "since we're doing MCP management we're going to have to do plugin management as well, adding, removing, etc." Agents & providers › an agent's Settings › Plugins; nothing on the chat screen. Each action is the agent's own command (`claude plugin …`, `codex plugin …`) or Codex's app-server, and what leaves is named fields: `claude plugin list --json` carries a plugin's whole MCP setup, env included, so only its server names are kept.
 
 1. **What runs code, measured.** A plugin's `SessionStart` hook that notes each run, watched through install, disable, enable, update, marketplace update and uninstall: it ran **for none of them**. Its code runs from the next session on.
-2. **So a fingerprint for installing a plugin and adding a marketplace**: the source in full on a confirm first (the marketplace, its source, the plugin's source), because they decide what code arrives. **Not for enable, disable, uninstall, removing a marketplace**: they ran nothing. **Not for update, marketplace update**: they fetch from a source already trusted, as Claude Code's own auto-update does. A decision, and one to look at: an update can bring new hooks. Enabling a plugin lets it run again at the next session, and doesn't ask.
+2. **So a fingerprint for installing a plugin and adding a marketplace**: the source in full on a confirm first (the marketplace, its source, the plugin's source), because they decide what code arrives. **Not for enable, disable, uninstall, removing a marketplace**: they ran nothing. Enabling a plugin lets it run again at the next session, and doesn't ask. **Updating a plugin** didn't ask at first, then did: see 7.
 3. **A plugin that installs by running a command** (a marketplace's command source, or a `headersHelper` for its archive): Claude Code reports the command and its hash and won't go on without them. The phone shows that command on a second confirm with the fingerprint and sends the hash back (`--accept-command`). **Only reasoned and tested with a stand-in**: no such plugin was to hand.
 4. **A plugin's options:** `claude plugin configure --json` and `--values-stdin`, so values aren't on a command line. A sensitive option is write-only: it says it's set. Claude Code keeps those in its own credentials store.
 5. **Details are parsed from text:** `claude plugin details` has no JSON. If its wording changes, the lists come back empty rather than wrong, and the page says it doesn't list anything.
 6. **The full list of what can be installed** is thousands long (the official directory): it's searched on the server, 100 at a time, cached 5 minutes.
+
+7. **The fingerprint on an update (owner, 2026-11-02).** A new version can bring new hooks, which run on every session, so updating a plugin now takes `confirmRun` and a confirm saying which plugin. **A marketplace's update was decided by what it does, measured on real git sources, and the two agents differ:**
+   - **Claude Code 2.1.316: no fingerprint.** It fetches the new version into its cache, and `plugin list` still says the old one. A new process with hooks on ran none of the new version's hook or MCP server; after `plugin update`, it ran both. `autoUpdate` set on that marketplace changed nothing for this command. It has no `--accept-command`, so no declared command runs from it (reasoned from its `--help`). What it changes is what a later install or update gets, and each of those asks.
+   - **Codex 0.164.0: the fingerprint.** `plugin marketplace upgrade` moved the installed plugin from 1.0.0 to 2.0.0 with its new hooks file, there and then, as Codex has no other update of a plugin. So it's a plugin's update under another name. That a Codex session then runs those hooks isn't run: it took no model turn to see the version move.
+   Enable stays as it was.
 
 | `claude plugin` / `/plugin` | Here |
 |---|---|

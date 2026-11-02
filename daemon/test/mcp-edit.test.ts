@@ -14,6 +14,7 @@ process.env.HOME = join(scratch, 'home')
 
 const { changesWhatRuns, cliWords, commandLine, formConfig, loginFinish, McpRefused, scopeOf } = await import('../src/mcp-edit.ts')
 const { MASK } = await import('../src/mcp-view.ts')
+const { codexAdd, useCodex } = await import('../src/mcp-codex.ts')
 
 const refused = (f: () => unknown, code: string) => assert.throws(f, (e: any) => e instanceof McpRefused && e.code === code, code)
 const stdio = { name: 'tiny', transport: 'stdio', command: 'node', args: ['a.js'] }
@@ -100,4 +101,26 @@ test('a command\'s words: what was typed and what looks secret are gone; a failu
 
 test('a sign-in\'s address has to be one a sign-in ends at', async () => {
   await assert.rejects(loginFinish({ login: 'nope', address: 'http://localhost/x' }), (e: any) => e.code === 'no_login')
+})
+
+test('a Codex form: a timeout goes in as its tool_timeout_sec, and sign-in settings are refused with nothing written', async () => {
+  const written: { keyPath: string; value: any }[] = []
+  useCodex({
+    cli: async () => ({ code: 0, stderr: '', stdout: JSON.stringify(written.map(({ value }) => ({ name: 'web', enabled: true, transport: { type: 'streamable_http', url: value.url }, tool_timeout_sec: value.tool_timeout_sec ?? null }))) }),
+    rpc: (work) => work(async (method: string, params: any) => (method === 'config/value/write' ? void written.push(params) : undefined)) as never,
+  })
+  try {
+    const web = { agent: 'codex', name: 'web', transport: 'http', url: 'https://x.example/m' }
+    for (const oauth of [{ clientId: 'cid' }, { callbackPort: 3118 }, { clientSecret: 'shh' }]) {
+      await assert.rejects(codexAdd({ ...web, oauth }), (e: any) => e instanceof McpRefused && e.code === 'codex_no_oauth' && e.status === 400)
+    }
+    await assert.rejects(codexAdd({ ...web, timeout: 5 }), (e: any) => e.code === 'bad_timeout')
+    assert.equal(written.length, 0)
+    await codexAdd({ ...web, oauth: { clientId: null, callbackPort: null }, timeout: 2500 })
+    assert.equal(written.at(-1)!.keyPath, 'mcp_servers.web')
+    assert.equal(written.at(-1)!.value.tool_timeout_sec, 2.5)
+    assert.equal('oauth' in written.at(-1)!.value, false)
+  } finally {
+    useCodex(null)
+  }
 })

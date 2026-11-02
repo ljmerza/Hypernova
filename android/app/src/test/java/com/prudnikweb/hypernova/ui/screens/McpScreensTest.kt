@@ -425,6 +425,15 @@ class McpScreensTest {
       "servers":[{"name":"fetch","scope":"user","transport":"http","summary":"mcp.example.com","enabled":true}]}"""
     private val codexPage = """{"agent":"codex","name":"fetch","scope":"user","where":"~/.codex/config.toml","transport":"http","url":"https://mcp.example.com/m","envNames":[],"headerNames":["X-Key"],"hidden":0,"bearerEnv":"MY_TOKEN","toolsOff":["wipe"],"startupTimeout":20,"enabled":true,"authStatus":"not_logged_in","hash":"h9","editable":true}"""
 
+    @Test fun anOldCodexIsSaidInPlainWordsWithBothVersions() {
+        hub.fails("GET /v1/agents/mcp?", AgentSettingRefused("codex_too_old", "The Codex on the server is version 0.39.0. This needs 0.163.0 or newer, so update Codex there and try again."))
+        rule.setContent { Harness(spy) { McpServersScreen(hub, "codex", onBack = {}, onOpen = { _, _, _ -> }) } }
+        rule.waitForIdle()
+        seen("version 0.39.0")
+        seen("0.163.0 or newer")
+        seen(str(R.string.try_again))
+    }
+
     @Test fun codexHasNoFolderToPick() {
         hub.on("GET /v1/agents/mcp?", codexList)
         hub.on("GET /v1/agents/mcp/status", """{"folder":"home","servers":[{"name":"fetch","status":"connected","source":"user","tools":[]}]}""")
@@ -462,6 +471,8 @@ class McpScreensTest {
         tap("HTTP")
         type(str(R.string.mcp_url), "https://x.example/m")
         type(str(R.string.mcp_bearer), "MY_TOKEN")
+        rule.onNodeWithText(str(R.string.mcp_f_oauth)).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.mcp_f_client_secret)).assertDoesNotExist()
         tap(str(R.string.mcp_f_save))
         val b = sent("POST", "/v1/agents/mcp/servers")
         assertEquals("codex", b.getString("agent"))

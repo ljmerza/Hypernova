@@ -22,10 +22,13 @@ import { MACHINE } from './platform.ts'
 export class McpRefused extends Error {
   status: number
   code: string
-  constructor(status: number, code: string, message: string) {
+  /** More of the refusal, beside its code and message in the answer. */
+  extra?: Record<string, unknown>
+  constructor(status: number, code: string, message: string, extra?: Record<string, unknown>) {
     super(message)
     this.status = status
     this.code = code
+    if (extra) this.extra = extra
   }
 }
 

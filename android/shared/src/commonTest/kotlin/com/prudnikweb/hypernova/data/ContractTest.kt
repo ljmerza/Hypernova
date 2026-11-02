@@ -775,6 +775,12 @@ class ContractTest {
             assertEquals("eu", d.options.single { it.key == "region" }.value)
         },
         "rest-plugin-install-refused" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
+        "rest-plugin-update-refused" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
+        "rest-codex-too-old" to { o ->
+            val e = Api.errorOf(409, o.toString())
+            assertEquals("codex_too_old", e.code)
+            assertTrue(e.message!!, e.message!!.contains("0.39.0") && e.message!!.contains("0.163.0"))
+        },
         "rest-plugin-installed" to { o ->
             val c = PluginChange.wire(o)
             assertTrue(c.ok)

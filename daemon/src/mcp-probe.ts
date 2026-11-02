@@ -4,7 +4,7 @@
 //
 // A process under the SDK treats every project server as approved (2.1.316: `non_interactive`), and would
 // start a `.mcp.json` nobody has said yes to. So what isn't approved is named in its flag settings as
-// rejected: Claude Code won't start it, and the phone says it's waiting.
+// rejected: Claude Code won't start it, and the phone says it's waiting (guardArgs, for the "/" list too).
 //
 // Nothing here reaches a running session: each session holds its own connections, and this process's are its own.
 
@@ -15,7 +15,7 @@ import { claudeSdk } from './sdk.ts'
 import { getProvider, providerEnv } from './store.ts'
 import { findClaude, log } from './util.ts'
 import { MACHINE } from './platform.ts'
-import { maskText, setupOf, type ServerSetup } from './mcp-view.ts'
+import { heldBack, maskText, setupOf, type ServerSetup } from './mcp-view.ts'
 
 export type LiveStatus = 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled' | 'waiting' | 'rejected'
 export type LiveTool = { name: string; readOnly?: boolean; destructive?: boolean; openWorld?: boolean }
@@ -35,6 +35,20 @@ const NAME_MAX = 128
 /** A name from Claude Code's own list may be `plugin:x:y` or `claude.ai Gmail`, so it's wider than a name a person adds. */
 export const LIVE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _.:@/+-]{0,127}$/u
 
+/**
+ * The flags of any process that isn't a person's session, looked up as it starts: hooks off, and no project server that isn't approved.
+ * Claude Code still reads a `.mcp.json` these names can't come from (through a link, or past the size read here: measured on 2.1.316),
+ * so there it's told to read none: nothing but what's approved may start, and that costs this one process the others' names.
+ */
+export async function guardArgs(cwd: string, also: readonly string[] = []): Promise<Record<string, string | null>> {
+  const held = await heldBack(cwd)
+  const names = [...new Set([...also, ...held.waiting, ...held.rejected])]
+  return {
+    settings: JSON.stringify({ disableAllHooks: true, ...(names.length ? { disabledMcpjsonServers: names } : {}) }),
+    ...(held.unread ? { 'strict-mcp-config': null } : {}),
+  }
+}
+
 const realRunner: Runner = async (cwd, waiting, work) => {
   const claude = findClaude()
   if (!claude) throw Object.assign(new Error(`Claude Code isn’t installed on this ${MACHINE}.`), { status: 409, code: 'no_claude' })
@@ -49,7 +63,7 @@ const realRunner: Runner = async (cwd, waiting, work) => {
     options: {
       cwd,
       settingSources: ['user', 'project', 'local'],
-      extraArgs: { settings: JSON.stringify({ disableAllHooks: true, ...(waiting.length ? { disabledMcpjsonServers: waiting } : {}) }) },
+      extraArgs: await guardArgs(cwd, waiting),
       persistSession: false,
       env: childEnv(providerEnv(getProvider(null))),
       pathToClaudeCodeExecutable: claude,
@@ -104,7 +118,7 @@ function liveOf(raw: any): LiveServer | null {
 }
 
 /** Waits out a server that's still connecting, for as long as a phone will. */
-async function settled(q: ProbeQuery, ms: number = SETTLE_MS): Promise<any[]> {
+export async function settled(q: Pick<ProbeQuery, 'mcpServerStatus'>, ms: number = SETTLE_MS): Promise<any[]> {
   const end = Date.now() + ms
   for (;;) {
     const s: any[] = await q.mcpServerStatus()
