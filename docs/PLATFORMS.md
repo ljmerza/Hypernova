@@ -97,7 +97,7 @@ This is the part that makes the plan cheap in some places and costly in others.
   of its 64 Kotlin files touch Android classes directly, and the cosmos effects are drawn with
   Compose's own drawing code, not Android views. That is why iOS through shared Compose is
   realistic (section 2).
-- **The look is already written for the web.** `skills/hyper-cosmos/assets/web/` holds
+- **The look was already written for the web** (the old look, before Atlas; the skill was removed on 2026-11-02, so this is in git history). `skills/hyper-cosmos/assets/web/` held
   `hyper-cosmos.css`, `cosmos.js` (the living background) and a React version
   (`DigitalCosmos.tsx`, `GrainField.tsx`). The web app starts with the right look on day one.
 

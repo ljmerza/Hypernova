@@ -2,7 +2,7 @@
 # Hypernova
 
 A control room for Claude Code: a native Android app and a daemon on a Linux server,
-in the Hyper* family's "digital cosmos" look.
+in its own star chart look, Atlas (`docs/DESIGN.md`).
 
 - `docs/DECISIONS.md`: agreed product decisions. Follow them.
 - `docs/LATER.md`: ideas parked "for now". **Whenever the owner says "for now",
@@ -22,8 +22,7 @@ Layout: `android/` (Gradle, Kotlin, Compose: `app/` is the phone app, `shared/` 
 and the desktop JVM, its platform calls behind `Seams.kt`; docs/PLATFORMS.md, "The shared module"),
 `daemon/` (TypeScript on Node 22.18 or newer,
 run directly without a build step; `daemon/src/cli/` is the `hypernova` command), `scripts/`
-(the Linux and Mac installs, the `pack-*.sh` packagers, the Docker entrypoint, end-to-end checks),
-`skills/hyper-cosmos/` (the design language as a Claude Code skill, for reuse in other apps).
+(the Linux and Mac installs, the `pack-*.sh` packagers, the Docker entrypoint, end-to-end checks).
 `docs/PROTOCOL.md` is the contract between them.
 
 Daemon: `cd daemon && node src/main.ts` (Node from nvm). Typecheck with `npx tsc -p .`, test with
@@ -81,12 +80,6 @@ count, the commits they bring in do.
 Licence notices: this is a fork, so a file of the original that changes needs a one-line notice. After changing
 or moving files, run `scripts/license-notices.sh --fix` (CI runs `--check`; docs/DECISIONS.md, "The Apache
 licence's notices"). New files get none. Don't remove an existing copyright or attribution notice.
-
-`skills/hyper-cosmos/` is a versioned copy of the personal skill at
-`~/.claude/skills/hyper-cosmos/` (the copy that actually triggers). When the
-design changes, update the skill too (its `assets/compose/` holds this app's
-Tokens, Cosmos, Solar and so on), then sync:
-`rsync -a --delete ~/.claude/skills/hyper-cosmos/ skills/hyper-cosmos/`.
 
 Build Android with JDK 21 and the Android SDK (here in `~/Android`), from `android/`:
 `JAVA_HOME=$HOME/Android/jdk-21 ANDROID_HOME=$HOME/Android/sdk ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest`.

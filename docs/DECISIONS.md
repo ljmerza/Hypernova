@@ -3486,3 +3486,11 @@ The owner chose Atlas's quiet version from `docs/concepts/art/` (branch `art-con
 4. **Colours also repeat, as text, where Kotlin can't reach:** the widget's resources, the terminal's and Mermaid's pages, notifications' tints. The terminal's ANSI blues, magentas and bright reds, and Mermaid's other categorical colours, are as they were. `HN` is still fixed values: the selector (L109) still has to make it switchable.
 5. **Measured, on an emulator with a software GPU (`hn-art`, Android 36, `swangle_indirect`), so these say what was asked for and not what a phone costs:** Reduce Motion: Home with four sessions working, 2 frames in 30 s; Settings, 0. Animations on: Settings, 139 frames in 30 s, the grain's own lane alone (it only moves its layer; the chart doesn't redraw for it); Home, 45, as the software GPU gives what it can to the working marks and grain. AtlasTest shows the chart's `draw` running once and not again over a minute of the clock. Nothing was measured on a real phone: no battery or heat figure.
 6. **Not tested:** hairlines at low brightness on a real panel. The grid is ink at 15%: about 1.4:1 against the page by arithmetic, so it may vanish on a dim phone, which leaves the page plainer and loses nothing. There's nothing in it to band: no gradient. The emulator can't show either.
+
+## The hyper-cosmos skill is gone (2026-11-02)
+
+The owner: "remove skill". `skills/hyper-cosmos/`, the original project's design language as a Claude
+Code skill, stopped matching the app with Atlas, and it's removed. It's in git history. There's no
+personal copy on this machine to keep in step with. Older entries that name it are history, and the
+sample name `/hyper-cosmos` in tests and the protocol's examples stays: any skill's name would do.
+

@@ -16,7 +16,7 @@ folder it touches.
 | `android/` | The Android app, Kotlin and Jetpack Compose | JDK 21 (Android Studio's works), Gradle wrapper |
 | `scripts/` | The Linux install, the server package (`pack-linux.sh`), the Docker image's entrypoint and end-to-end checks | bash |
 | `docs/` | [`PROTOCOL.md`](docs/PROTOCOL.md) is the contract between the layers; [`DECISIONS.md`](docs/DECISIONS.md) is what is agreed; [`LATER.md`](docs/LATER.md) is what is parked; [`specs/`](docs/specs) are designs; [`INSTALL.md`](docs/INSTALL.md) is the install guide; [`RELEASING.md`](docs/RELEASING.md) is how a release is made | |
-| `skills/`, `third_party/` | The design language as a skill; fonts, xterm.js and Mermaid | |
+| `third_party/` | Fonts, xterm.js and Mermaid | |
 
 Read `docs/PROTOCOL.md` before changing anything the layers say to each other, and
 `docs/DECISIONS.md` before changing behaviour: follow what is agreed there or raise it in the issue.
@@ -77,8 +77,7 @@ node src/main.ts
   failed. Don't narrate what the next line does.
 - **User-facing words live in resources**: Android's `res/values/strings_*.xml`, never literals in
   Kotlin. Keep them short, plain and kind; say what happened and what to do, not an error code.
-- Keep to the look in [`docs/DESIGN.md`](docs/DESIGN.md) (the `skills/hyper-cosmos` skill has
-  the tokens).
+- Keep to the look in [`docs/DESIGN.md`](docs/DESIGN.md).
 - TypeScript is strict and erasable-syntax only (no enums, no namespaces), because the daemon runs
   without a build step: imports end in `.ts`.
 - New logic goes in a new file with a test, not into a file that is already long. Secrets, tokens

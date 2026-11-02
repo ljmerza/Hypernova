@@ -54,7 +54,7 @@ are new files.
 - **Third-party code** in `third_party/` and its copies in `android/app/src/main/assets/` keep their own
   licences and notices. The third-party files the original shipped are unchanged, and those added since
   are new files.
-- **`skills/hyper-cosmos/`** is unchanged from the original.
+- **`skills/hyper-cosmos/`**, the original's design language as a skill, has been removed.
 - **Built packages:** comments don't survive compiling, so the APK's code and resources don't carry the
   line. `NOTICE`, which the APK and every server package hold, says the same thing for them, and the
   server packages hold this file too.
