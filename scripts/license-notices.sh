@@ -129,10 +129,11 @@ asset_licence() {
   case "$1" in
     legal/*|term/index.html|term-ghostty/index.html|mermaid/index.html|mermaid/render.js|mermaid/frames.js) echo own ;;
     term/xterm.js|term/xterm.css) echo LICENSE-xterm ;;
+    term/addon-unicode-graphemes.js) echo LICENSE-addon-unicode-graphemes LICENSES-xterm-bundled.txt ;;
     term/addon-*.js) echo "LICENSE-${name%.js}" ;;
     term/JetBrainsMono.ttf) echo OFL-JetBrainsMono.txt ;;
     term-ghostty/ghostty-web.js) echo LICENSE-ghostty-web LICENSE-ghostty ;;
-    mermaid/mermaid.min.js) echo LICENSE-mermaid ;;
+    mermaid/mermaid.min.js) echo LICENSE-mermaid LICENSES-mermaid-bundled.txt ;;
     *) echo unknown ;;
   esac
 }
