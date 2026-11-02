@@ -251,7 +251,7 @@ test('the setting: the Mac’s voice only, checked and kept; an older Soniox eng
   assert.equal(voices.engine, 'mac')
 })
 
-test('a play is the asking phone’s: only it may fetch or stop it, besides the Mac app', async () => {
+test('a play is the asking phone’s: only it may fetch or stop it, besides the admin token', async () => {
   const r = await send('POST', '/v1/speech/play', AUTH, { text: 'Read on this phone.', to: 'me' })
   assert.equal(r.status, 200)
   const play = json(r).play

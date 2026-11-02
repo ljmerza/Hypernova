@@ -328,7 +328,7 @@ class Play {
     }
   }
 
-  /** The Mac app shows it speaking (a few times a second at most). */
+  /** Who is speaking, for the admin feeds (a few times a second at most). */
   private relay(now: boolean): void {
     const t = Date.now()
     if (now || t - this.macAt >= playLimits.macMs) {
@@ -407,7 +407,7 @@ async function produce(p: Play, text: string, s: SpeechState): Promise<void> {
   }
 }
 
-/** `GET /v1/speech/plays/<id>/audio`: only the phone playing it (or the Mac app). */
+/** `GET /v1/speech/plays/<id>/audio`: only the phone playing it (or the admin token). */
 async function streamPlay(id: string, who: string, res: ServerResponse): Promise<void> {
   const p = plays.get(id)
   if (!p || (who !== p.target && who !== 'mac')) throw fail(404, 'no_play', 'That reading is over.')
@@ -417,7 +417,7 @@ async function streamPlay(id: string, who: string, res: ServerResponse): Promise
   p.stream(res)
 }
 
-/** `POST /v1/speech/plays/<id>/stop`: the phone playing it, or the Mac app. */
+/** `POST /v1/speech/plays/<id>/stop`: the phone playing it, or the admin token. */
 function stopPlay(id: string, who: string): { ok: true; state: PlayState } {
   const p = plays.get(id)
   if (!p || (who !== p.target && who !== 'mac')) throw fail(404, 'no_play', 'That reading is over.')
@@ -442,7 +442,7 @@ export async function speakClip(b: any, who: string, gone: AbortSignal): Promise
 
 /**
  * Every `/v1/speech…` route: true when it answered. [who] is the paired device, or "mac" for the
- * Mac app's admin token.
+ * admin token.
  */
 export async function speechRoute(path: string, method: string, req: IncomingMessage, res: ServerResponse, who: string, body: () => Promise<any>): Promise<boolean> {
   const json = (status: number, v: unknown) => {

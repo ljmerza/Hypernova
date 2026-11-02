@@ -267,7 +267,7 @@ test('what only the daemon counts: prompts from the phone, spoken ones, approval
   addDevice({ id: 'phone1', name: 'Phone', model: 'NP3', createdAt: 0, lastSeenAt: 0 }, 'phone-token-0123456789abcdef0123')
   stats.notePrompt('phone1', false)
   stats.notePrompt('phone1', false, 'voice')
-  // The Mac app's own prompts are in the transcripts already.
+  // The local API's prompts are in the transcripts already.
   stats.notePrompt(null, true)
   stats.noteApproval('phone1', false)
   stats.noteApproval(null, true)

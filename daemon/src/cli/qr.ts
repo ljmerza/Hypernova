@@ -1,5 +1,5 @@
 // QR codes for `hypernova pair` on a server's terminal: the pairing link, scanned by the phone's
-// camera, as the Mac app shows it in its popover. A small encoder (ISO/IEC 18004, model 2): byte
+// camera. A small encoder (ISO/IEC 18004, model 2): byte
 // mode, versions 1 to 40, error correction L, M, Q or H, the mask with the lowest penalty, drawn
 // with half blocks so two rows of modules fit one line of text. No dependency: the install fetches
 // nothing it doesn't need.

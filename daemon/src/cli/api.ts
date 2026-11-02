@@ -1,6 +1,6 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // The running daemon, as the `hypernova` command reaches it: its local API on 127.0.0.1 with the
-// admin token from <support>/admin-token, the way the Mac app did (docs/PROTOCOL.md, "Local
+// admin token from <support>/admin-token (docs/PROTOCOL.md, "Local
 // API"). Every call has a short timeout and says plainly when the daemon isn't there.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'

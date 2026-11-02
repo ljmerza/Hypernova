@@ -49,7 +49,7 @@ export type Settings = {
    * network or the tailnet. Set by hand in settings.json (the daemon reads it at start). Unset: none.
    */
   webhookPrivateHosts?: string[]
-  /** Codex as a second agent (codex/client.ts): Setup turns it on, or the first Codex session from the phone. Unset: off. */
+  /** Codex as a second agent (codex/client.ts): `hypernova codex on`, or the first Codex session from the phone. Unset: off. */
   codex?: boolean
   /**
    * The app's GitHub releases (releases.ts): the daemon looks for a newer one at start and every 6

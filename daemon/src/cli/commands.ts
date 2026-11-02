@@ -216,7 +216,7 @@ function hostName(): string {
 // ── pair ──────────────────────────────────────────────────────────────────
 
 /**
- * The pairing QR code in the terminal: the same link the Mac app shows (the daemon makes it), for
+ * The pairing QR code in the terminal: the link the daemon makes, for
  * the local network (the LAN listener, reached on the Wi-Fi or over the owner's own VPN). Then
  * waits for the phone (10 minutes, the code's life) unless --no-wait. `--local` is still accepted
  * (scripts pass it) but changes nothing: every code is local now.
@@ -511,7 +511,7 @@ export async function autoUpdate(cli: Cli, rest: string[]): Promise<number> {
 
 /**
  * `hypernova codex [on|off]`: OpenAI's Codex for Hypernova (docs/PROTOCOL.md, "Codex"): what is found
- * here, or turning it on or off (`POST /local/settings {codex}`), as Setup's switch on a Mac. On, the
+ * here, or turning it on or off (`POST /local/settings {codex}`). On, the
  * daemon connects to Codex's own app server and `codex` joins `claude` in the shell's block. It
  * never installs or signs in Codex: it says the lines to run.
  */

@@ -214,12 +214,12 @@ test('the listener speaks TLS with the pinned certificate, and without a device 
   // A browser's preflight gets nothing.
   const o = await lan(LAN, 'OPTIONS', '/v1/snapshot', { headers: { origin: 'https://plugin.example', 'access-control-request-method': 'GET' } })
   assert.equal(o.status, 404)
-  // The Mac app's local API is not here.
+  // The local API is not here.
   const l = await lan(LAN, 'GET', '/local/status', { token: adminToken })
   assert.equal(l.status, 401)
 })
 
-test('the snapshot says deviceCert false until the phone asks for its certificate, then true; the Mac app never', async () => {
+test('the snapshot says deviceCert false until the phone asks for its certificate, then true; the admin token never', async () => {
   const s0 = await loop(API, 'GET', '/v1/snapshot', { authorization: `Bearer ${TOKEN_A}` })
   assert.deepEqual(Object.keys(s0.json.lan).sort(), ['addresses', 'deviceCert', 'fingerprint', 'port'])
   assert.equal(s0.json.lan.deviceCert, false)
@@ -251,7 +251,7 @@ test('POST /v1/device/cert: a certificate from the device CA, CN the device id, 
   const days = (new Date(cert.validTo).getTime() - Date.now()) / 86400_000
   assert.ok(days > 729 && days < 731, String(days))
   assert.equal(ca.toString(), serverIdentity()!.ca)
-  // Not a phone: the Mac app's admin token gets none.
+  // Not a phone: the admin token gets none.
   const m = await loop(API, 'POST', '/v1/device/cert', { authorization: `Bearer ${adminToken}` }, JSON.stringify({ csr }))
   assert.equal(m.status, 401)
   // Another device's name in the request, a wrong curve, garbage: 400 bad_csr, nothing issued.

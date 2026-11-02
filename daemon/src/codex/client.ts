@@ -6,7 +6,7 @@ import { CODEX_MIN, atLeast, codexVersion, daemonSocket, findCodex } from './bin
 import { CODEX_STATE, type CodexStateFile } from './launch.ts'
 import { CodexRpc, type RpcMessage } from './rpc.ts'
 
-/** The owner uses Codex here: Setup turned it on, or a session was started on it. */
+/** The owner uses Codex here: `hypernova codex on`, or a session was started on it. */
 export const codexEnabled = () => settings.codex === true
 
 /** An error a route answers as it is (http.ts reads `status` and `code`). */
@@ -32,7 +32,7 @@ let connecting: Promise<CodexRpc> | null = null
 let socketPath: string | null = null
 let backoff = 1000
 let retry: NodeJS.Timeout | null = null
-/** Why the last connection failed (shown in Setup and on the phone), null while it's fine. */
+/** Why the last connection failed (shown on the phone), null while it's fine. */
 let problem: string | null = null
 export const codexProblem = () => problem
 export const codexConnected = () => !!conn?.open
@@ -147,7 +147,7 @@ export function startCodex(): void {
   else writeState(false)
 }
 
-/** Codex on or off for Hypernova (Setup, or the first Codex session from the phone). */
+/** Codex on or off for Hypernova (`hypernova codex`, or the first Codex session from the phone). */
 export function setCodexEnabled(on: boolean): void {
   if (codexEnabled() === on) return
   settings.codex = on

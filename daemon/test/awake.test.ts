@@ -468,7 +468,7 @@ test('Backpack’s extend: offered in the last 10 minutes (said once), +2 h each
   world.now = end - EXTEND_WINDOW_MS + 1000
   k.review()
   assert.equal(k.state().extendable, true)
-  assert.equal(states().at(-1).extendable, true, 'the awake message carries it, for the Mac popover')
+  assert.equal(states().at(-1).extendable, true, 'the awake message carries it')
   assert.deepEqual(ending().map((m) => [m.inSeconds, m.until, m.extendBy]), [[Math.round(EXTEND_WINDOW_MS / 1000) - 1, end, 7200]])
   k.review()
   assert.equal(ending().length, 1, 'said once per end')

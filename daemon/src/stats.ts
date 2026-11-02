@@ -578,7 +578,7 @@ function bump(field: keyof Counts, at = Date.now()): void {
 }
 
 /**
- * A prompt went to a session from a paired device (or the Mac app, which isn't counted: the
+ * A prompt went to a session from a paired device (or the local API, which isn't counted: the
  * transcripts count every prompt). `via: "voice"` from a client that dictated it counts it as
  * spoken too.
  */
@@ -588,7 +588,7 @@ export function notePrompt(deviceId: string | null, local: boolean, via?: unknow
   if (via === 'voice') bump('voice')
 }
 
-/** An approval answered through Hypernova: on a phone, or the Mac app. */
+/** An approval answered through Hypernova: on a phone, or through the local API. */
 export function noteApproval(deviceId: string | null, local: boolean): void {
   if (local && !deviceId) return bump('apMac')
   bump('apPhone')

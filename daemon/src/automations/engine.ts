@@ -775,7 +775,7 @@ export class Automations {
       hasBattery: this.io.battery() !== null ? true : this.noBattery() ? false : null,
     }
   }
-  /** `/local/status`'s `automations`: the Mac popover's one line. */
+  /** `/local/status`'s `automations`: one line on what's next and what runs. */
   status() {
     let next: { id: string; name: string; at: number } | null = null
     for (const d of this.s.automations) {
