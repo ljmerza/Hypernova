@@ -110,7 +110,7 @@ internal fun mermaidFile(scheme: String?, host: String?, path: String?, viewer: 
 }
 
 /** Raised when the page draws differently (its theme, its sizes), so diagrams already drawn are drawn again. */
-private const val DRAWING = 1
+private const val DRAWING = 2
 
 /** The cache key for a diagram: its source (trimmed) and how the page draws. */
 internal fun mermaidKey(source: String): String {

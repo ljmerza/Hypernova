@@ -13,7 +13,7 @@
   const DEEP = ['#24574F', '#5A4618', '#283C5E', '#47305C', '#1E4A52', '#5C2828']
   const series = {}
   BRIGHT.forEach((c, i) => { series['pie' + (i + 1)] = c; if (i < 8) { series['git' + i] = c; series['gitBranchLabel' + i] = C.bg } })
-  for (let i = 0; i < 12; i++) { series['cScale' + i] = DEEP[i % DEEP.length]; series['cScaleLabel' + i] = C.ink }
+  for (let i = 0; i < 12; i++) { series['cScale' + i] = DEEP[i % DEEP.length]; series['cScaleInv' + i] = DEEP[i % DEEP.length]; series['cScaleLabel' + i] = C.ink }
   const FONT = 'Manrope, sans-serif'
   mermaid.initialize({
     startOnLoad: false,
@@ -46,12 +46,15 @@
       labelBoxBkgColor: C.bg800, labelBoxBorderColor: C.accentDim, labelTextColor: C.ink, loopTextColor: C.muted,
       activationBkgColor: C.bg700, activationBorderColor: C.lineStrong, sequenceNumberColor: C.bg,
       errorBkgColor: C.danger, errorTextColor: C.bg,
+      // Mermaid 12's neo look without its shadow and gradient: hairlines on tokens, as the rest of Atlas.
+      dropShadow: 'none', useGradient: false,
       pieStrokeColor: C.bg950, pieOuterStrokeColor: C.lineStrong, pieSectionTextColor: C.bg, pieOpacity: '0.9',
       pieTitleTextColor: C.ink, pieLegendTextColor: C.muted,
       ...series,
     },
-    // Journey's section names would take their section's own colour.
-    themeCSS: 'text.journey-section { fill: #F1E9D6; }',
+    // Journey's section names would take their section's own colour. The neo look's shadows in the sequence
+    // diagram are an SVG filter the theme doesn't reach, and WebView 133 cut a shadowed box off in the picture.
+    themeCSS: 'text.journey-section { fill: #F1E9D6; } [filter], .actor, .note, .labelBox { filter: none !important; }',
   })
 
   // Manrope as a data: URL: an SVG drawn as a picture can't load a font by its URL.

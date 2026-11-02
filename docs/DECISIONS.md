@@ -1636,7 +1636,7 @@ APK and draw each ```` ```mermaid ```` block in a small offline WebView, themed 
 colours, with a tap to open it full screen with pinch-zoom, a way to see the code, and the normal code
 block when it can't be drawn. Nothing leaves the phone.
 
-1. **Mermaid 11.17.2 is bundled** (`third_party/mermaid`, `assets/mermaid`; about 1.2 MB more APK).
+1. **Mermaid is bundled** (`third_party/mermaid`, `assets/mermaid`; 11.17.2 then, about 1.2 MB more APK; since 2026-11-02, "Mermaid 12").
    Its page loads only its own files: a content security policy allows scripts from itself alone, the
    app answers every other request with a 404, navigation is blocked, and mermaid runs with
    `securityLevel: 'strict'`. The source goes in as a JSON string, never as markup.
@@ -3755,3 +3755,12 @@ The actions move to their current majors, all on Node 24: checkout 7, setup-java
 AGP 9.5.0 and Gradle 9.8.2 move together. The wrapper keeps its checksum, the one services.gradle.org publishes for that zip. The build scripts' own deprecations are gone: `directories` for `srcDir`, `android { }` for `androidLibrary { }`.
 
 Left for AGP 10 and Gradle 10, since none of it is ours to change in a line or two: Compose's hot-reload plugin sets a `Configuration.setVisible` (gone in Gradle 11) and uses an attribute type that fails in Gradle 10, which needs a Compose Multiplatform that fixes it; and `compose.desktop.uiTestJUnit4` wants the dependency named directly.
+
+## Mermaid 12 (owner, 2026-11-02)
+
+The owner: "also bump up Mermaid". 12.2.0 replaces 11.17.2, its file checked against npm's published checksum.
+
+1. **The look: ELK's layout and the `neo` look, with `neo`'s shadows and gradient off.** Compared on our dark theme against `layout: 'dagre', look: 'classic'`. ELK's edges run square and stay clear of nodes and labels, where dagre's curves cross labels. It is also narrower, and that decides it on a phone, since a diagram wider than the column shrinks along with its text: 380 wide against 461 for a small flowchart, 744 against 886 for 40 nodes, 1020 against 1132 for a long left-to-right one. `neo`'s default soft shadow reads as a glow and isn't Atlas, so it's off (`dropShadow`, `useGradient`, and CSS for the filter the sequence diagram sets itself). That filter was also a bug: on WebView 133, the picture cut the shadowed box off.
+2. **The cost.** `mermaid.min.js` carries ELK whether or not it's used: 3.6 MB becomes 5.5 MB, and the release APK grows by about 0.6 MB. The page got ready in 0.8 to 1.1 s against about 0.7 s on a desktop. A slow phone may show the code a little longer before the picture; past 20 seconds, the picture waits until the chat is opened again, as before. A diagram with an explicit `layout` of its own keeps it.
+3. **ELK's licence is new here:** elkjs is EPL-2.0, weak copyleft, the only such licence in the bundle. Its text is in `third_party/mermaid/LICENSES-mermaid-bundled.txt` and `THIRD-PARTY-NOTICES.md` says where its source is.
+4. **An old WebView gets the code, not a blank.** Mermaid 12 is built for ES2024, and `minSdk` is 29, whose first WebView is far older, though Play updates it. A page that can't load Mermaid or `render.js` used to say nothing, so the code showed but the app waited 20 seconds each time. `frames.js`, in syntax any WebView reads, now answers every diagram as failed once the page has loaded. Tested by breaking each file in turn in current Chromium, and with `Object.groupBy` removed, where only the use case diagram fails and shows its code. A missing call inside a drawing is already a failure.

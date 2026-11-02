@@ -126,6 +126,7 @@ Colour-blind safety: the concept measured working against needs you in OKLab und
   - TalkBack reads each row as one stop ("System prompt. Tokens: 3.2k"), with a Copy table action. `---` draws as a hairline.
 - **Diagram** (`components/Mermaid.kt`): a ```` ```mermaid ```` block in a reply or a plan, once its closing fence is in (until then, and when mermaid can't draw it, it's the plain code block).
   - Drawn in the code block's frame (radius 10, bg950 86%, line ring) on mermaid's `base` theme with these tokens: nodes bg800 ringed in accent-dim, ink labels in Manrope 14, edges in ink-dim, clusters bg900; pie slices and git branches in the terminal's bright palette, mindmap and timeline sections in deep tints of it under ink.
+  - Mermaid 12's defaults for the shape, ELK's layout and the `neo` look, with its drop shadow and gradient off: square-cornered edges that stay clear of nodes and labels, on the same hairlines as the rest of Atlas (DECISIONS, "Mermaid 12").
   - Never wider than drawn, scaled down to fit the column; a wide one shrinks rather than scrolling sideways (a sideways scroll inside the chat fights its scroll, and the whole shape reads at a glance). At most 400dp tall: a taller one is cut under a fade to bg950 with `TAP TO EXPAND`.
   - A tap opens it full screen on bg, the SVG itself, fitted to the width: pinch to zoom (up to 8×), drag to move, × to close. A long-press is still the message's (its menu, or selecting text).
   - `</>` in its top corner (a glassChoice toggle, mint when on) swaps the diagram for its code and back.
