@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.SharedPreferences
 import androidx.compose.runtime.Immutable
 import org.json.JSONArray
 import org.json.JSONObject
@@ -31,7 +30,7 @@ interface KeyValue {
     fun put(key: String, value: String?)
 }
 
-class PrefsKeyValue(private val prefs: SharedPreferences) : KeyValue {
+class PrefsKeyValue(private val prefs: Prefs) : KeyValue {
     override fun get(key: String): String? = prefs.getString(key, null)
     override fun put(key: String, value: String?) {
         prefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()

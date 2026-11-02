@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.ServerUpdate
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.ToggleRow
 import kotlinx.coroutines.launch
@@ -41,7 +42,7 @@ internal fun autoUpdateLine(context: android.content.Context, u: ServerUpdate): 
     val now = when {
         u.state == ServerUpdate.INSTALLING && u.target != null -> context.getString(R.string.su_installing, u.target)
         u.state == ServerUpdate.WAITING && u.target != null -> context.getString(R.string.su_waiting, u.target)
-        u.failure != null -> com.prudnikweb.hypernova.data.serverUpdateFailedText(context.resources, u.failure)
+        u.failure != null -> com.prudnikweb.hypernova.data.serverUpdateFailedText(context.resources.strings, u.failure)
         !u.available && u.reason != null -> context.getString(R.string.su_unavailable, u.reason)
         else -> context.getString(R.string.su_desc)
     }

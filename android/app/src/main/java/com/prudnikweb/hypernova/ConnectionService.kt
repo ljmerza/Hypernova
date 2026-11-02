@@ -19,6 +19,7 @@ import com.prudnikweb.hypernova.data.Notifier
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.strings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -105,7 +106,7 @@ class ConnectionService : Service() {
                 // for a Claude that can't reply). LiveHub wakes this at the reset, so it moves on then.
                 // Claude Code's account, only where it's installed; with Codex in use too, said as Claude's.
                 if (com.prudnikweb.hypernova.data.AgentLead.claudeAvailable(live.claude)) {
-                    AccountWords.headline(this, live.account, live.usage, live.mac.name, both = com.prudnikweb.hypernova.data.AgentLead.both(live.claude, live.codex))?.let { return Summary(it, counts) }
+                    AccountWords.headline(this.strings, live.account, live.usage, live.mac.name, both = com.prudnikweb.hypernova.data.AgentLead.both(live.claude, live.codex))?.let { return Summary(it, counts) }
                 } else if (com.prudnikweb.hypernova.data.AgentLead.codexLeads(live.claude, live.codex)) {
                     // Codex alone: its sign-out or its limit leads the same way.
                     val cx = live.codex

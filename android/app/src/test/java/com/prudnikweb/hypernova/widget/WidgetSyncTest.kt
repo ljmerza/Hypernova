@@ -21,6 +21,7 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -55,7 +56,7 @@ class WidgetSyncTest {
 
     @Before fun setUp() {
         Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(app)
+        ComputerWords.clear(app.storage)
         // The widget's wall clock moves with the main thread's delays: the gap passes only as a test lets it.
         val base = System.currentTimeMillis() - SystemClock.uptimeMillis()
         WidgetSync.clock = { base + SystemClock.uptimeMillis() }

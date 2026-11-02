@@ -1,8 +1,7 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
 import androidx.compose.runtime.Immutable
-import com.prudnikweb.hypernova.R
+
 import org.json.JSONObject
 import java.util.Locale
 
@@ -159,13 +158,13 @@ object ProviderWords {
     fun usd(v: Double): String = String.format(Locale.US, "$%.2f", v.coerceAtLeast(0.0))
 
     /** "Out of credits", "Budget reached", "Key refused", "Rate limited", "Not answering". */
-    fun state(context: Context, st: ProviderStatus): String = context.getString(
+    fun state(res: Strings, st: ProviderStatus): String = res.getString(
         when (st.state) {
-            ProviderStatus.NO_CREDIT -> if (st.budget) R.string.provider_state_budget else R.string.provider_state_no_credit
-            ProviderStatus.BAD_KEY -> R.string.provider_state_bad_key
-            ProviderStatus.LIMITED -> R.string.provider_state_limited
-            ProviderStatus.DOWN -> R.string.provider_state_down
-            else -> R.string.provider_state_other
+            ProviderStatus.NO_CREDIT -> if (st.budget) Str.provider_state_budget else Str.provider_state_no_credit
+            ProviderStatus.BAD_KEY -> Str.provider_state_bad_key
+            ProviderStatus.LIMITED -> Str.provider_state_limited
+            ProviderStatus.DOWN -> Str.provider_state_down
+            else -> Str.provider_state_other
         },
     )
 
@@ -184,14 +183,14 @@ object ProviderWords {
      * What's left, in a few words: "$4.20 left", "$1.10 today" (no cap), "37 of 50 free today".
      * Null when nothing's known. [st]: the provider's trouble, if any (see [capLeft]).
      */
-    fun balance(context: Context, b: Balance?, st: ProviderStatus? = null): String? {
+    fun balance(res: Strings, b: Balance?, st: ProviderStatus? = null): String? {
         if (b == null) return null
         val left = capLeft(b, st)
         return when {
-            left != null -> context.getString(R.string.balance_left, usd(left))
-            b.usedToday != null && b.usedToday > 0.0 -> context.getString(R.string.balance_today, usd(b.usedToday))
-            b.freeLeft != null && b.freeLimit != null && b.freeLimit > 0 -> context.getString(R.string.balance_free, b.freeLeft, b.freeLimit)
-            b.usedToday != null -> context.getString(R.string.balance_today, usd(b.usedToday))
+            left != null -> res.getString(Str.balance_left, usd(left))
+            b.usedToday != null && b.usedToday > 0.0 -> res.getString(Str.balance_today, usd(b.usedToday))
+            b.freeLeft != null && b.freeLimit != null && b.freeLimit > 0 -> res.getString(Str.balance_free, b.freeLeft, b.freeLimit)
+            b.usedToday != null -> res.getString(Str.balance_today, usd(b.usedToday))
             else -> null
         }
     }
@@ -200,22 +199,22 @@ object ProviderWords {
      * A provider row's trail: its trouble (amber when it needs the owner), else what's left. The
      * second value: amber.
      */
-    fun trail(context: Context, p: Provider, now: Long = System.currentTimeMillis()): Pair<String, Boolean>? {
+    fun trail(res: Strings, p: Provider, now: Long = System.currentTimeMillis()): Pair<String, Boolean>? {
         val st = p.status
         if (st != null) {
             if (st.state == ProviderStatus.LIMITED && st.resetsAt != null && st.resetsAt > now) {
-                return context.getString(R.string.provider_limited_back, AccountWords.clock(context, st.resetsAt, now)) to true
+                return res.getString(Str.provider_limited_back, AccountWords.clock(res, st.resetsAt, now)) to true
             }
-            return state(context, st) to true
+            return state(res, st) to true
         }
-        return balance(context, p.balance)?.let { it to false }
+        return balance(res, p.balance)?.let { it to false }
     }
 
     /** After a new key is saved, what the Mac's read of it says: "Key works. $4.20 left.", or "Key refused". Null when it couldn't tell. */
-    fun keyVerdict(context: Context, p: Provider): String? = when {
-        p.status?.state == ProviderStatus.BAD_KEY || p.balance?.error == "bad_key" -> context.getString(R.string.provider_state_bad_key)
+    fun keyVerdict(res: Strings, p: Provider): String? = when {
+        p.status?.state == ProviderStatus.BAD_KEY || p.balance?.error == "bad_key" -> res.getString(Str.provider_state_bad_key)
         p.balance != null && p.balance.error == null ->
-            balance(context, p.balance)?.let { context.getString(R.string.balance_key_works, it) } ?: context.getString(R.string.balance_key_works_plain)
+            balance(res, p.balance)?.let { res.getString(Str.balance_key_works, it) } ?: res.getString(Str.balance_key_works_plain)
         else -> null
     }
 
@@ -223,33 +222,33 @@ object ProviderWords {
      * The provider's trouble as a sentence: "OpenRouter is out of credits", "… refused its key",
      * "… is rate limited", "… isn't answering", "… can't reply" (Home's provider card says the same).
      */
-    fun sentence(context: Context, name: String, st: ProviderStatus): String = context.getString(
+    fun sentence(res: Strings, name: String, st: ProviderStatus): String = res.getString(
         when (st.state) {
-            ProviderStatus.NO_CREDIT -> if (st.budget) R.string.provider_card_budget else R.string.provider_card_no_credit
-            ProviderStatus.BAD_KEY -> R.string.provider_is_bad_key
-            ProviderStatus.LIMITED -> R.string.provider_card_limited
-            ProviderStatus.DOWN -> R.string.provider_card_down
-            else -> R.string.provider_card_other
+            ProviderStatus.NO_CREDIT -> if (st.budget) Str.provider_card_budget else Str.provider_card_no_credit
+            ProviderStatus.BAD_KEY -> Str.provider_is_bad_key
+            ProviderStatus.LIMITED -> Str.provider_card_limited
+            ProviderStatus.DOWN -> Str.provider_card_down
+            else -> Str.provider_card_other
         },
         name,
     )
 
     /** "OpenRouter is out of credits": the blocked card's title. */
-    fun title(context: Context, name: String, st: ProviderStatus?): String =
-        if (st == null) context.getString(R.string.blocked_provider, name) else sentence(context, name, st)
+    fun title(res: Strings, name: String, st: ProviderStatus?): String =
+        if (st == null) res.getString(Str.blocked_provider, name) else sentence(res, name, st)
 
     /**
      * A session's activity line while its provider stops it, a short phrase: "OpenRouter is out of
      * credits", "OpenRouter carries on by itself at 14:05", "OpenRouter is ready to continue".
      */
-    fun activity(context: Context, b: Blocked, provider: Provider?, now: Long = System.currentTimeMillis()): String {
+    fun activity(res: Strings, b: Blocked, provider: Provider?, now: Long = System.currentTimeMillis()): String {
         val name = provider?.name ?: return b.text
         val r = b.resume
         return when {
-            r?.armed == true && r.at != null -> context.getString(R.string.activity_provider_auto, name, AccountWords.clock(context, r.at, now))
-            r?.ready == true -> context.getString(R.string.activity_provider_ready, name)
-            provider.status != null -> sentence(context, name, provider.status)
-            else -> context.getString(R.string.activity_provider, name)
+            r?.armed == true && r.at != null -> res.getString(Str.activity_provider_auto, name, AccountWords.clock(res, r.at, now))
+            r?.ready == true -> res.getString(Str.activity_provider_ready, name)
+            provider.status != null -> sentence(res, name, provider.status)
+            else -> res.getString(Str.activity_provider, name)
         }
     }
 
@@ -258,38 +257,38 @@ object ProviderWords {
      * once per episode (provider and since); null when there's nothing to say. [paused]: sessions
      * on it that can't reply now.
      */
-    fun notice(context: Context, before: Provider?, after: Provider, paused: Int, now: Long = System.currentTimeMillis()): Notice? {
+    fun notice(res: Strings, storage: Storage, before: Provider?, after: Provider, paused: Int, now: Long = System.currentTimeMillis()): Notice? {
         if (after.builtIn) return null
-        val r = context.resources
+        val r = res
         val st = after.status
         val was = before?.status
         val name = after.name
         if (st == null) {
             // Over, said once, when sessions were waiting on it.
             if (was?.state != ProviderStatus.NO_CREDIT || paused == 0) return null
-            if (!episodeNoticed(context, "${after.id}:back:${was.since}")) return null
+            if (!episodeNoticed(storage, "${after.id}:back:${was.since}")) return null
             // Only a budget's end is the balance saying there's credit: anything else (a reply on a
             // free model, an edited key) just says it answers again.
-            val title = if (was.budget) R.string.notice_provider_back_title else R.string.notice_provider_answering_title
-            return Notice("provider:${after.id}", Notice.Kind.Limit, null, r.getString(title, name), r.getString(R.string.notice_provider_back))
+            val title = if (was.budget) Str.notice_provider_back_title else Str.notice_provider_answering_title
+            return Notice("provider:${after.id}", Notice.Kind.Limit, null, r.getString(title, name), r.getString(Str.notice_provider_back))
         }
         if (was != null && was.state == st.state && was.since == st.since) return null
         // Old news (a reconnect bringing an episode long begun) says nothing.
         if (st.since != null && now - st.since > 10 * 60_000L) return null
         if (!worthNotice(st, now)) return null
-        if (!episodeNoticed(context, "${after.id}:${st.state}:${st.since}")) return null
+        if (!episodeNoticed(storage, "${after.id}:${st.state}:${st.since}")) return null
         val n = { kind: Notice.Kind, title: String, text: String -> Notice("provider:${after.id}", kind, null, title, text) }
         return when (st.state) {
             ProviderStatus.NO_CREDIT -> n(
                 Notice.Kind.Account,
-                r.getString(if (st.budget) R.string.notice_provider_budget_title else R.string.notice_provider_no_credit_title, name),
-                if (paused > 0) r.getQuantityString(R.plurals.notice_provider_no_credit, paused, paused) else r.getString(R.string.notice_provider_no_credit_none),
+                r.getString(if (st.budget) Str.notice_provider_budget_title else Str.notice_provider_no_credit_title, name),
+                if (paused > 0) r.getQuantityString(Plural.notice_provider_no_credit, paused, paused) else r.getString(Str.notice_provider_no_credit_none),
             )
-            ProviderStatus.BAD_KEY -> n(Notice.Kind.Account, r.getString(R.string.notice_provider_bad_key_title, name), r.getString(R.string.notice_provider_bad_key))
+            ProviderStatus.BAD_KEY -> n(Notice.Kind.Account, r.getString(Str.notice_provider_bad_key_title, name), r.getString(Str.notice_provider_bad_key))
             ProviderStatus.LIMITED -> n(
                 Notice.Kind.Limit,
-                r.getString(R.string.notice_provider_limited_title, name),
-                st.resetsAt?.let { r.getString(R.string.notice_provider_limited, AccountWords.atClock(context, it, now)) } ?: r.getString(R.string.notice_provider_limited_unknown),
+                r.getString(Str.notice_provider_limited_title, name),
+                st.resetsAt?.let { r.getString(Str.notice_provider_limited, AccountWords.atClock(res, it, now)) } ?: r.getString(Str.notice_provider_limited_unknown),
             )
             // Not answering comes and goes: the card says so, no notification.
             else -> null
@@ -307,8 +306,8 @@ object ProviderWords {
     private const val SHORT_LIMIT_MS = 5 * 60_000L
 
     /** True the first time it's asked about this episode (remembered on the phone, the last 20). */
-    private fun episodeNoticed(context: Context, episode: String): Boolean {
-        val prefs = context.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
+    private fun episodeNoticed(storage: Storage, episode: String): Boolean {
+        val prefs = storage.prefs("hypernova")
         val seen = prefs.getString("providerNoticed", "").orEmpty().split('\n').filter { it.isNotBlank() }
         if (episode in seen) return false
         prefs.edit().putString("providerNoticed", (seen + episode).takeLast(20).joinToString("\n")).apply()

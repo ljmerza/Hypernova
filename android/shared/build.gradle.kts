@@ -32,6 +32,8 @@ kotlin {
         getByName("desktopMain").dependencies {
             api(libs.org.json)
         }
+        // The protocol's contract fixtures, shared with the daemon's tests (docs/PROTOCOL.md, "Contract fixtures").
+        commonTest.get().resources.srcDir("../../protocol")
         commonTest.dependencies {
             implementation(libs.junit)
             implementation(libs.kotlinx.coroutines.test)

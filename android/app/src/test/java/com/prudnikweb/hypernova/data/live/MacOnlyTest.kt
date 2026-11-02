@@ -7,6 +7,7 @@ import com.prudnikweb.hypernova.data.Notice
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.strings
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -74,14 +75,14 @@ class MacOnlyTest {
         assertEquals("battery", n.id)
         assertEquals(Notice.Kind.Power, n.kind)
         assertEquals("z2", n.title)
-        assertEquals(AwakeWords.sleepSoon(res, 120, MacAwake.BATTERY, 15), n.text)
+        assertEquals(AwakeWords.sleepSoon(res.strings, 120, MacAwake.BATTERY, 15), n.text)
         assertTrue(n.text, n.text.contains("15"))
         assertTrue(rig.notices.isEmpty())
 
         rig.visible = false
         rig.push(fx("ws-mac-sleep-soon").put("reason", "hot")) { rig.notices.isNotEmpty() }
         assertEquals("mac_sleep", rig.notices.single().id)
-        assertEquals(AwakeWords.sleepSoon(res, 120, MacAwake.HOT, 15), rig.notices.single().text)
+        assertEquals(AwakeWords.sleepSoon(res.strings, 120, MacAwake.HOT, 15), rig.notices.single().text)
     }
 
     @Test fun backpackEndingOffersTwoHoursMore() {

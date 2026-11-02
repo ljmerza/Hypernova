@@ -1,24 +1,10 @@
 package com.prudnikweb.hypernova.data
 
-import android.app.AlarmManager
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
-import android.os.SystemClock
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.content.ContextCompat
-import com.prudnikweb.hypernova.BuildConfig
-import com.prudnikweb.hypernova.R
-import com.prudnikweb.hypernova.ui.components.readableLine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -53,9 +39,9 @@ import kotlin.random.Random
  * All state is Compose snapshot state, written on the main thread only.
  */
 class LiveHub(
-    context: Context,
+    private val platform: Platform,
     private val scope: CoroutineScope,
-    val pairing: Pairing,
+    override val pairing: Pairing,
     private val toast: (String) -> Unit,
     /** A new approval while the app isn't on screen (from the socket or a fresh snapshot). */
     private val onApproval: (WApproval, Session?) -> Unit,
@@ -77,7 +63,7 @@ class LiveHub(
      */
     private val heldOpen: () -> Boolean = { true },
     /** Which paired computer this is (data/Servers.kt): its offline queue, certificate and notifications are its own. */
-    val serverId: String = Servers.LEGACY_ID,
+    override val serverId: String = Servers.LEGACY_ID,
     /**
      * True while the app is on screen, whichever computer it shows: how soon a failed attempt goes
      * again. [isVisible] is whether it shows this one (banners, not notifications; approvals seen).
@@ -87,21 +73,20 @@ class LiveHub(
     private val isActive: () -> Boolean = { true },
     /** The wall clock (epoch ms). Tests pass their own, so the watchdog and the usage timers can be driven. */
     private val clock: () -> Long = System::currentTimeMillis,
-) : Hub {
-    private val app = context.applicationContext
+) : Hub, PairedHub {
     // Read each time, worded for this hub's own computer (ComputerWords.wordedFor): kept from when the
     // hub was made, they said "Mac" for a Linux server until the app restarted.
-    private val res: android.content.res.Resources
-        get() = ComputerWords.wordedFor(app.resources, macInfo?.platform ?: if (isActive()) ComputerWords.platform else Mac.DARWIN)
+    private val res: Strings
+        get() = ComputerWords.wordedFor(platform.strings, macInfo?.platform ?: if (isActive()) ComputerWords.platform else Mac.DARWIN)
     private val api = Api(pairing.baseUrl, pairing.token)
     private val now get() = clock()
     /** This phone's device certificate for the Mac's local listener (data/DeviceCert.kt). */
-    private val certs = DeviceCertStore(context, serverId)
+    private val certs = DeviceCertStore(platform.storage, platform.deviceKeys, serverId)
     /**
      * The route to the Mac (data/LanRoute.kt): its own address on this network, or the base URL.
      * A change of route reconnects: the socket is bound to the old one.
      */
-    private val router = LanRouter(context, scope, pairing, certs) { r ->
+    private val router = LanRouter(platform.network, platform.ticks, scope, pairing, certs) { r ->
         // An attempt waiting on the route takes it as it comes; anything else reconnects over it.
         if (!closed && !paused && link.state != LinkState.Unpaired && choosing == null) {
             ConnLog.add(ConnKind.Link, ConnResult.Info, r.kind, ConnScrub.hostPort(r.base), "the route changed: reconnecting over it")
@@ -128,17 +113,17 @@ class LiveHub(
     /** The server updating itself as last heard (the snapshot, then `{t:"update"}`); null from a daemon too old to. */
     private var macUpdate by mutableStateOf<ServerUpdate?>(null)
     /** Read aloud: the Mac's voice setting and this phone's own reads (SpeechLink.kt). */
-    override val speech = PhoneSpeech(pairing, api, send = { ws?.send(it) == true }, labelOf = { id -> id?.let { i -> sessions.firstOrNull { it.id == i }?.project } })
+    override val speech = PhoneSpeech(pairing, api, send = { ws?.send(it) == true }, labelOf = { id -> id?.let { i -> sessions.firstOrNull { it.id == i }?.project } }, speaker = platform.speech)
 
     private val noticeFlow = MutableSharedFlow<Notice>(extraBufferCapacity = 16)
     override val notices: SharedFlow<Notice> = noticeFlow
     /** Automations (data/AutomationsLive.kt): the snapshot's, then the socket's; their notes as banners or notifications. */
-    override val automations = LiveAutomations(context, api, isVisible, banner = { noticeFlow.tryEmit(it) }, fail = { e, r -> handle(e, r) }, sessionOf = { session(it) }, server = serverId)
+    override val automations = LiveAutomations(platform.strings, platform.automationNotes(serverId), api, isVisible, banner = { noticeFlow.tryEmit(it) }, fail = { e, r -> handle(e, r) }, sessionOf = { session(it) })
     override val appUpdate: AppUpdate?
         get() {
             val m = macInfo ?: return null
             val code = m.appVersionCode ?: return null
-            if (code <= BuildConfig.VERSION_CODE) return null
+            if (code <= platform.appInfo.versionCode) return null
             return AppUpdate(m.appVersionName ?: "", code, pairing.baseUrl.trimEnd('/') + "/download/android", server = serverId)
         }
     override val mac: Mac
@@ -219,7 +204,7 @@ class LiveHub(
     val synced: Boolean get() = settled
     private val itemCaches = HashMap<String, Items.Cache>()
     /** Prompts typed while the Mac was away (data/OfflineQueue.kt), kept across restarts. */
-    private val offline = OfflineQueue(PrefsQueueStore(app.getSharedPreferences("hypernova", Context.MODE_PRIVATE), Servers.scoped("offlineQueue", serverId)))
+    private val offline = OfflineQueue(PrefsQueueStore(platform.storage.prefs("hypernova"), Servers.scoped("offlineQueue", serverId)))
     private var flushing = false
     private var knownIds: Set<String>? = null
     private val revealed = HashSet<String>()
@@ -253,69 +238,27 @@ class LiveHub(
     /** When the last attempt started ([SystemClock.elapsedRealtime]). */
     private var triedAt = 0L
 
-    private val connectivity = app.getSystemService(ConnectivityManager::class.java)
-    private val alarms = app.getSystemService(AlarmManager::class.java)
 
-    /**
-     * Hears a network worth trying again on: a new default network, the same one becoming another
-     * kind or reaching the internet, or a VPN coming up or moving to another network under it. A
-     * VPN that carries only the home network's addresses needn't become the default network: it
-     * has a watch of its own. Signal strength and speed estimates change all
-     * the time and aren't news, hence the key. A watch's callbacks come one at a time on one
-     * thread, which is the only one reading its key.
-     */
-    private inner class NetWatch : ConnectivityManager.NetworkCallback() {
-        private var key: List<Any>? = null
-        private var blocked = false
-
-        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-            val k = listOf(
-                network,
-                TRANSPORTS.filter(caps::hasTransport),
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
-            )
-            if (k == key) return
-            key = k
-            scope.launch { networkChanged() }
-        }
-
-        // Data Saver or a battery restriction let the app back onto the network.
-        override fun onBlockedStatusChanged(network: Network, blocked: Boolean) {
-            val freed = this.blocked && !blocked
-            this.blocked = blocked
-            if (freed) scope.launch { networkChanged() }
-        }
-    }
-    private val defaultNet = NetWatch()
-    private val vpnNet = NetWatch()
 
     /**
      * The screen came on: the phone is awake anyway, and its owner may be about to look. Not within
      * [RETRY_CAP_ON_SCREEN] of the last attempt, so a screen switched on and off again and again
      * doesn't ask again and again.
      */
-    private val screenOn = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            scope.launch {
-                if (waiting && SystemClock.elapsedRealtime() - triedAt >= RETRY_CAP_ON_SCREEN) connect("the screen came on")
-            }
+    private fun screenCameOn() {
+        scope.launch {
+            if (waiting && platform.ticks.elapsed() - triedAt >= RETRY_CAP_ON_SCREEN) connect("the screen came on")
         }
     }
-
+    private var netWatch: Watch? = null
+    private var screenWatch: Watch? = null
     /** The scheduled attempt's alarm (see [schedule]), on the main thread. */
-    private val alarm = AlarmManager.OnAlarmListener { if (waiting) connect("the next try") }
+    private val alarm = platform.retryAlarm()
+
 
     fun start() {
-        runCatching { connectivity?.registerDefaultNetworkCallback(defaultNet) }
-        runCatching {
-            val vpn = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
-                .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-                .build()
-            connectivity?.registerNetworkCallback(vpn, vpnNet)
-        }
-        runCatching { ContextCompat.registerReceiver(app, screenOn, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED) }
+        netWatch = platform.network.watchLink { scope.launch { networkChanged() } }
+        screenWatch = platform.screen.watch(::screenCameOn)
         ConnLog.add(ConnKind.Link, ConnResult.Info, text = "starting the link to ${pairing.macName}")
         router.start()
         connect("start")
@@ -324,7 +267,7 @@ class LiveHub(
     override fun close() {
         closed = true
         // Another Mac, or none: what this one was reading stops.
-        if (Speaker.now != null) Speaker.stop("closed")
+        if (platform.speech.speaking) platform.speech.stop("closed")
         unschedule()
         loop?.cancel(); watchdog?.cancel(); usageTimer?.cancel()
         ws?.cancel(); ws = null
@@ -334,9 +277,8 @@ class LiveHub(
     /** Stops hearing the network and the screen: this hub won't connect again. */
     private fun unwatch() {
         router.close()
-        runCatching { connectivity?.unregisterNetworkCallback(defaultNet) }
-        runCatching { connectivity?.unregisterNetworkCallback(vpnNet) }
-        runCatching { app.unregisterReceiver(screenOn) }
+        netWatch?.stop()
+        screenWatch?.stop()
     }
 
     override fun retry() {
@@ -392,13 +334,10 @@ class LiveHub(
      */
     private fun freshTry(): Boolean =
         !waiting && link.state != LinkState.Connected && (loop?.isActive == true || ws != null) &&
-            SystemClock.elapsedRealtime() - triedAt < FRESH_TRY
+            platform.ticks.elapsed() - triedAt < FRESH_TRY
 
-    private fun hasNetwork(): Boolean {
-        val cm = connectivity ?: return true
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    }
+    private fun hasNetwork(): Boolean = platform.network.hasNetwork()
+
 
     /**
      * One attempt: the route first (a probe round, Local first, unless one has just settled:
@@ -410,7 +349,7 @@ class LiveHub(
         unschedule()
         loop?.cancel()
         ws?.cancel(); ws = null
-        triedAt = SystemClock.elapsedRealtime()
+        triedAt = platform.ticks.elapsed()
         // Offline stays Offline while a retry is in flight ("trying again now"), so the card
         // doesn't flicker away and back.
         link = if (link.state == LinkState.Offline) link.copy(retrying = true, retryAt = null)
@@ -514,14 +453,14 @@ class LiveHub(
             delay(wait)
             connect("the next try")
         }
-        runCatching { alarms?.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + wait, ALARM_TAG, alarm, null) }
+        alarm.set(wait) { if (waiting) connect("the next try") }
     }
 
     /** Drops the scheduled attempt's alarm; its coroutine goes with [loop]. */
     private fun unschedule() {
         if (!waiting) return
         waiting = false
-        runCatching { alarms?.cancel(alarm) }
+        alarm.cancel()
     }
 
     /** The Mac forgot this phone: nothing is tried again until it's paired anew (a new hub). */
@@ -703,7 +642,7 @@ class LiveHub(
                 publish()
             }
             is Msg.Died -> {
-                val n = m.d.notice(session(m.d.sessionId)?.name ?: raw[m.d.sessionId]?.title ?: res.getString(R.string.untitled_session), res.getString(R.string.notice_job_died))
+                val n = m.d.notice(session(m.d.sessionId)?.name ?: raw[m.d.sessionId]?.title ?: res.getString(Str.untitled_session), res.getString(Str.notice_job_died))
                 if (noticed.add(n.id)) notice(n)
             }
             is Msg.Event -> appendEvent(m.sessionId, m.e)
@@ -783,7 +722,7 @@ class LiveHub(
                 // The Mac doesn't know this token (it forgot this phone): unpaired, and no asking again.
                 if (Net.classify(e).problem == Problem.Unauthorized) { if (!closed) unpaired(); return@launch }
                 // Next connection asks again; meanwhile the remote route is the one to use.
-                if (BuildConfig.DEBUG) android.util.Log.w("Hypernova", "device cert: ${e.message}")
+                platform.log.w("Hypernova", "device cert: ${e.message}")
                 // Not linked (the local route wanted the certificate first): another route instead.
                 if (link.state != LinkState.Connected) {
                     router.hold(RouteKind.Local, CERT_HOLD, "no device certificate from the Mac")
@@ -831,7 +770,7 @@ class LiveHub(
         if (!seenApprovals.add(a.id)) return
         if (!isVisible()) { onApproval(a, session(a.sessionId)); return }
         val kind = when (a.kind) { "question" -> Notice.Kind.Question; "plan" -> Notice.Kind.Plan; else -> Notice.Kind.Approval }
-        val text = a.agentLabel?.let { res.getString(R.string.notice_agent_asks, it, a.summary) } ?: a.summary
+        val text = a.agentLabel?.let { res.getString(Str.notice_agent_asks, it, a.summary) } ?: a.summary
         noticeFlow.tryEmit(Notice("a:${a.id}", kind, a.sessionId, session(a.sessionId)?.name ?: a.summary, text))
     }
 
@@ -859,16 +798,16 @@ class LiveHub(
             if (!still(s) || !noticed.add("$kind:$id:${s.lastActivityAt}")) return@launch
             val name = session(id)?.name ?: s.title
             val text = when (kind) {
-                Notice.Kind.Finished -> s.lastText?.let(::readableLine) ?: res.getString(R.string.notice_finished)
+                Notice.Kind.Finished -> s.lastText?.let(::readableLine) ?: res.getString(Str.notice_finished)
                 // A question in words: the question itself, not "waiting in the terminal".
-                else -> s.question ?: s.menu?.title ?: res.getString(R.string.notice_waiting)
+                else -> s.question ?: s.menu?.title ?: res.getString(Str.notice_waiting)
             }
             notice(Notice("$kind:$id:${s.lastActivityAt}", kind, id, name, text))
         }
         when (new.state) {
             "idle" -> if (old.state == "working") later(Notice.Kind.Finished) { it.state == "idle" && it.agentsRunning == 0 && it.blocked == null }
             "needs_you" -> later(Notice.Kind.Waiting) { s -> s.state == "needs_you" && approvals.values.none { it.sessionId == id } }
-            "error" -> if (new.blocked == null) notice(Notice("error:$id:${new.lastActivityAt}", Notice.Kind.Error, id, session(id)?.name ?: new.title, new.lastText ?: res.getString(R.string.activity_error)))
+            "error" -> if (new.blocked == null) notice(Notice("error:$id:${new.lastActivityAt}", Notice.Kind.Error, id, session(id)?.name ?: new.title, new.lastText ?: res.getString(Str.activity_error)))
         }
     }
 
@@ -880,8 +819,8 @@ class LiveHub(
      */
     private fun offerUpdate() {
         val u = appUpdate ?: return
-        if (isVisible() || !NotificationPrefsStore.get(app).allows(serverId, Notice.Kind.Update) || !updateNoticed(app, u.versionCode)) return
-        onNotice(updateNotice(app, u))
+        if (isVisible() || !NotificationPrefsStore.get(platform.storage).allows(serverId, Notice.Kind.Update) || !updateNoticed(platform.storage, u.versionCode)) return
+        onNotice(updateNotice(platform.strings, u))
     }
 
     /**
@@ -896,7 +835,7 @@ class LiveHub(
             if (u?.state == ServerUpdate.IDLE) onServerUpdateFine()
             return
         }
-        if (serverUpdateFailNoticed(app, serverId, f)) notice(serverUpdateFailedNotice(res, macInfo?.name ?: pairing.macName, f))
+        if (serverUpdateFailNoticed(platform.storage, serverId, f)) notice(serverUpdateFailedNotice(res, macInfo?.name ?: pairing.macName, f))
     }
 
     /**
@@ -911,7 +850,7 @@ class LiveHub(
             if (s.state != "needs_you" || approvals.values.any { it.sessionId == id }) continue
             val kind = Notice.Kind.Waiting
             if (!noticed.add("$kind:$id:${s.lastActivityAt}")) continue
-            notice(Notice("$kind:$id:${s.lastActivityAt}", kind, id, session(id)?.name ?: s.title, s.question ?: s.menu?.title ?: res.getString(R.string.notice_waiting)))
+            notice(Notice("$kind:$id:${s.lastActivityAt}", kind, id, session(id)?.name ?: s.title, s.question ?: s.menu?.title ?: res.getString(Str.notice_waiting)))
         }
     }
 
@@ -921,7 +860,7 @@ class LiveHub(
         macInfo = s.mac
         // A Linux server's words instead of a Mac's, on every screen (data/ComputerWords.kt): the
         // active computer's (Core says the next one's when the switcher changes it).
-        if (isActive()) ComputerWords.set(app, s.mac.platform)
+        if (isActive()) ComputerWords.set(platform.storage, s.mac.platform)
         setBattery(s.mac.battery)
         macAwake = s.mac.awake
         macBrowse = s.mac.browseOutsideProjects
@@ -981,8 +920,8 @@ class LiveHub(
         // Claude Code's account: nothing to say where it isn't installed (a Mac with Codex alone).
         // While Codex is in use too, its words say it's Claude Code's, not every session's.
         if (!AgentLead.claudeAvailable(claude)) return
-        val n = AccountWords.notice(app, a, mac.name, both = AgentLead.both(claude, codex)) ?: return
-        if (!accountNoticed(app, a.episode)) return
+        val n = AccountWords.notice(platform.strings, a, mac.name, both = AgentLead.both(claude, codex)) ?: return
+        if (!accountNoticed(platform.storage, a.episode)) return
         when {
             isVisible() -> if (live) noticeFlow.tryEmit(n)
             n.kind == Notice.Kind.Account -> onNotice(n)
@@ -999,7 +938,7 @@ class LiveHub(
     private fun setBattery(b: MacBattery?) {
         macBattery = b
         if (b == null) return
-        val prefs = app.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
+        val prefs = platform.storage.prefs("hypernova")
         // Each computer's battery its own (data/Servers.kt).
         val key = Servers.scoped(BATTERY_WARNED, serverId)
         val warned = prefs.getBoolean(key, false)
@@ -1010,7 +949,7 @@ class LiveHub(
         if (warned || b.percent > BATTERY_WARN) return
         prefs.edit().putBoolean(key, true).apply()
         // Amber and "Needs you", as an approval: only the owner can plug it in.
-        notice(Notice("battery", Notice.Kind.Power, null, mac.name, res.getString(R.string.notice_mac_battery, b.percent)))
+        notice(Notice("battery", Notice.Kind.Power, null, mac.name, res.getString(Str.notice_mac_battery, b.percent)))
     }
 
     /**
@@ -1030,7 +969,7 @@ class LiveHub(
      */
     private fun backpackEnding(b: BackpackEnding) {
         val mins = ((b.inSeconds + 30) / 60).coerceAtLeast(1)
-        val text = res.getQuantityString(R.plurals.notice_backpack_ends, mins, mins)
+        val text = res.getQuantityString(Plural.notice_backpack_ends, mins, mins)
         notice(Notice("backpack-ending", Notice.Kind.Backpack, null, mac.name, text, action = Notice.ACTION_EXTEND))
     }
 
@@ -1062,14 +1001,14 @@ class LiveHub(
             else -> SessionState.Idle
         }
         val activity = when {
-            ask != null -> ask.summary.ifBlank { res.getString(R.string.activity_needs_you) }
-            phase == Phase.NeedsYou -> w.activity ?: res.getString(R.string.activity_needs_you)
-            w.stoppedForAway -> res.getString(R.string.activity_paused_away)
-            phase == Phase.Starting -> w.activity ?: res.getString(R.string.activity_starting)
-            phase == Phase.Working -> w.activity ?: res.getString(R.string.activity_working)
-            phase == Phase.Error -> w.lastText ?: res.getString(R.string.activity_error)
-            phase == Phase.Ended -> w.lastText ?: res.getString(R.string.activity_ended)
-            else -> w.lastText ?: res.getString(R.string.activity_waiting)
+            ask != null -> ask.summary.ifBlank { res.getString(Str.activity_needs_you) }
+            phase == Phase.NeedsYou -> w.activity ?: res.getString(Str.activity_needs_you)
+            w.stoppedForAway -> res.getString(Str.activity_paused_away)
+            phase == Phase.Starting -> w.activity ?: res.getString(Str.activity_starting)
+            phase == Phase.Working -> w.activity ?: res.getString(Str.activity_working)
+            phase == Phase.Error -> w.lastText ?: res.getString(Str.activity_error)
+            phase == Phase.Ended -> w.lastText ?: res.getString(Str.activity_ended)
+            else -> w.lastText ?: res.getString(Str.activity_waiting)
         }
         val provider = providers.firstOrNull { it.id == w.providerId }
         // Stopped by a limit or a sign-out: say that, not Claude Code's error line as if it were Claude's.
@@ -1077,12 +1016,12 @@ class LiveHub(
         val blockedLine = w.blocked
             ?.takeIf { state == SessionState.Idle && phase != Phase.Ended }
             ?.takeIf { (it.kind != Blocked.LIMIT && it.kind != Blocked.MODEL) || it.resetsAt == null || it.resetsAt > now || it.resume?.armed == true || it.resume?.ready == true }
-            ?.let { AccountWords.activity(app, it, account, provider?.name, p = provider) }
-        val model = w.model ?: provider?.models?.default?.takeIf { provider.kind != "anthropic" } ?: res.getString(R.string.model_default)
+            ?.let { AccountWords.activity(platform.strings, it, account, provider?.name, p = provider) }
+        val model = w.model ?: provider?.models?.default?.takeIf { provider.kind != "anthropic" } ?: res.getString(Str.model_default)
         return Session(
             hex = w.id.filter { it.isLetterOrDigit() }.take(2).lowercase().ifEmpty { "··" },
             id = w.id,
-            name = w.title.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: res.getString(R.string.untitled_session),
+            name = w.title.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: res.getString(Str.untitled_session),
             project = w.projectName,
             state = state,
             model = model,
@@ -1152,7 +1091,7 @@ class LiveHub(
         SessionCarry.moved(old, to)
         offline.moved(old, to)
         // Its last activity, known before this says so; else nothing that could hide a reply.
-        ReadState.moved(app, serverId, old, to, raw[to]?.lastActivityAt ?: 0L)
+        ReadState.moved(platform.storage, serverId, old, to, raw[to]?.lastActivityAt ?: 0L)
     }
 
     override fun consumeReveal(s: Session): Boolean = s.isNew && revealed.add(s.id)
@@ -1226,7 +1165,7 @@ class LiveHub(
         }
         agentLogs[key] = log
         Result.success(log.events)
-    } catch (e: CancellationException) { throw e } catch (e: AgentStarting) { Result.failure(e) } catch (e: Throwable) { Result.failure(handle(e, R.string.err_agent)) }
+    } catch (e: CancellationException) { throw e } catch (e: AgentStarting) { Result.failure(e) } catch (e: Throwable) { Result.failure(handle(e, Str.err_agent)) }
 
     /**
      * [changed] events into [old]: one it has is replaced where it is, a new one goes at the end (the
@@ -1506,7 +1445,7 @@ class LiveHub(
             AttachDrafts.giveBack(sessionId, c.item.text)
             AttachDrafts.restore(sessionId, c.item.files.map { a -> DraftFile(AttachDrafts.nextId(), a.name, a.isImage).apply { attachment = a; thumb = Thumbs.get(a.path) } })
         }
-        toast(res.getString(if (u.returned) R.string.queued_returned else R.string.queued_dropped))
+        toast(res.getString(if (u.returned) Str.queued_returned else Str.queued_dropped))
     }
 
     override fun sending(id: String): Boolean = pendingSlot(id).value.any { it.stage == Stage.InFlight || it.stage == Stage.Posted }
@@ -1567,7 +1506,7 @@ class LiveHub(
                 val ex = Net.classify(e)
                 if (ex.problem == Problem.Unauthorized) unpaired()
                 else {
-                    val msg = message(ex, R.string.err_history)
+                    val msg = message(ex, Str.err_history)
                     loadErrors[id] = msg
                     if (slot(id).value.isNotEmpty()) toast(msg)
                 }
@@ -1610,7 +1549,7 @@ class LiveHub(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                toast(handle(e, R.string.err_history).message.orEmpty())
+                toast(handle(e, Str.err_history).message.orEmpty())
             } finally {
                 loadingMore.remove(id)
             }
@@ -1920,7 +1859,7 @@ class LiveHub(
                             // The Mac has no such session any more.
                             e.status == 404 && e.code == "no_session" -> { offline.failed(w.id); offline.markEnded(w.id) }
                             // A file it was meant to carry is gone: the words go without it.
-                            e.code == "attachment_gone" -> { offline.failed(w.id); offline.dropFiles(w.id); toast(res.getString(R.string.waiting_files_gone)) }
+                            e.code == "attachment_gone" -> { offline.failed(w.id); offline.dropFiles(w.id); toast(res.getString(Str.waiting_files_gone)) }
                             // Nothing answered: the link is going; the next connect sends it.
                             e.network -> { offline.failed(w.id); return@launch }
                             // The session can't take it now (an approval is open, the terminal is busy): later.
@@ -1951,7 +1890,7 @@ class LiveHub(
     override suspend fun editHeld(sessionId: String, heldId: String, text: String): Result<Unit> = try {
         applySession(api.put("/v1/sessions/$sessionId/held/$heldId", JSONObject().put("text", text)))
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.held_err_edit)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.held_err_edit)) }
 
     override suspend fun removeHeld(sessionId: String, heldId: String): Result<Unit> {
         // Before the call: the Mac's session update may come over the socket first.
@@ -1961,14 +1900,14 @@ class LiveHub(
             Result.success(Unit)
         } catch (e: CancellationException) { throw e } catch (e: Throwable) {
             heldRemoved -= heldId
-            Result.failure(handle(e, R.string.held_err_remove))
+            Result.failure(handle(e, Str.held_err_remove))
         }
     }
 
     override suspend fun startFromWaiting(waitingId: String): Result<String> {
-        val w = offline.get(waitingId) ?: return Result.failure(HubException(res.getString(R.string.err_start)))
-        val cwd = w.cwd ?: return Result.failure(HubException(res.getString(R.string.waiting_no_folder)))
-        if (!offline.sending(waitingId)) return Result.failure(HubException(res.getString(R.string.err_start)))
+        val w = offline.get(waitingId) ?: return Result.failure(HubException(res.getString(Str.err_start)))
+        val cwd = w.cwd ?: return Result.failure(HubException(res.getString(Str.waiting_no_folder)))
+        if (!offline.sending(waitingId)) return Result.failure(HubException(res.getString(Str.err_start)))
         val r = start(NewSessionRequest(projectPath = cwd, newProject = null, prompt = w.text, providerId = null, model = null, permissionMode = w.mode ?: "default", files = w.files))
         if (r.isSuccess) offline.sent(waitingId) else offline.failed(waitingId)
         return r
@@ -2017,9 +1956,9 @@ class LiveHub(
             if (pending != null) return Result.failure(TerminalBusy(e.message ?: "", pending))
             // The conversation went on with the other agent (docs/PROTOCOL.md, "Switching agents"): the chat goes there.
             val moved = (e as? ApiException)?.takeIf { it.code == "switched" }?.error?.str("to")?.takeIf { it.isNotBlank() }
-            if (moved != null) return Result.failure(SessionSwitched(e.message ?: res.getString(R.string.cx_went_on), moved))
+            if (moved != null) return Result.failure(SessionSwitched(e.message ?: res.getString(Str.cx_went_on), moved))
             val ex = Net.classify(e)
-            val err = handle(e, R.string.err_send)
+            val err = handle(e, Str.err_send)
             return Result.failure(SendFailed(err.message.orEmpty(), ex.status, ex.code, network = ex.problem == Problem.Unreachable || ex.problem == Problem.NoNetwork))
         } finally {
             // Failed or cancelled: the bubble goes (and the composer gets the text back).
@@ -2030,11 +1969,11 @@ class LiveHub(
     override suspend fun upload(file: Upload): Result<Attachment> = try {
         val o = api.upload("/v1/attachments?name=${Api.q(file.name)}", file)
         Result.success(Wire.attachment(o.obj("attachment") ?: throw ApiException(Problem.Server, 200, "no_attachment")) ?: throw ApiException(Problem.Server, 200, "no_attachment"))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_upload)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_upload)) }
 
     override fun interrupt(sessionId: String) {
         scope.launch {
-            try { api.post("/v1/sessions/$sessionId/interrupt") } catch (e: CancellationException) { throw e } catch (e: Throwable) { toast(handle(e, R.string.err_interrupt).message.orEmpty()) }
+            try { api.post("/v1/sessions/$sessionId/interrupt") } catch (e: CancellationException) { throw e } catch (e: Throwable) { toast(handle(e, Str.err_interrupt).message.orEmpty()) }
         }
     }
 
@@ -2044,7 +1983,7 @@ class LiveHub(
         // The daemon clears the parent's stoppedForAway; until its update arrives, hide Continue here.
         raw[sessionId]?.let { if (it.stoppedForAway) { raw = raw + (sessionId to it.copy(stoppedForAway = false)); publish() } }
         Result.success(s?.id ?: sessionId)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_continue)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_continue)) }
 
     /** The providers' models as the Mac last listed them, and when; dropped when the providers change. */
     @Volatile private var modelCache: Pair<Long, List<ModelList>>? = null
@@ -2061,7 +2000,7 @@ class LiveHub(
             Result.success(list)
         } catch (e: CancellationException) { throw e } catch (e: Throwable) {
             // An older Mac doesn't know the request: no list, and the sheet offers what it knows.
-            if (Net.classify(e).status == 404) Result.success(emptyList()) else Result.failure(handle(e, R.string.err_models))
+            if (Net.classify(e).status == 404) Result.success(emptyList()) else Result.failure(handle(e, Str.err_models))
         }
     }
 
@@ -2081,21 +2020,21 @@ class LiveHub(
             val list = Wire.commands(api.get("/v1/commands" + (if (cwd != null) "?project=${Api.q(cwd)}" else "")))
             commandCache[key] = System.currentTimeMillis() to list
             Result.success(list)
-        } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_commands)) }
+        } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_commands)) }
     }
 
     override suspend fun askAside(sessionId: String, question: String): Result<Aside> = try {
         val a = AsideWire.of(api.post("/v1/sessions/$sessionId/btw", JSONObject().put("question", question.trim())))
-        if (a != null) Result.success(a) else Result.failure(HubException(res.getString(R.string.aside_err_ask)))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.aside_err_ask)) }
+        if (a != null) Result.success(a) else Result.failure(HubException(res.getString(Str.aside_err_ask)))
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.aside_err_ask)) }
 
     override suspend fun aside(sessionId: String): Result<Aside?> = try {
         Result.success(AsideWire.of(api.get("/v1/sessions/$sessionId/btw")))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.aside_err_read)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.aside_err_read)) }
 
     override suspend fun permissionRules(sessionId: String): Result<PermissionRules> = try {
         Result.success(PermissionRulesWire.of(api.get("/v1/sessions/$sessionId/permissions")))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.rules_err)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.rules_err)) }
 
     override suspend fun answerMenu(sessionId: String, menuId: String, choice: Int?, alt: Boolean): Result<Unit> = try {
         // Whatever opened the menu has landed, logged or not (a picker closed with Esc isn't).
@@ -2105,44 +2044,44 @@ class LiveHub(
         if (choice == null) body.put("cancel", true) else body.put("choice", choice).put("alt", alt)
         api.post("/v1/sessions/$sessionId/menu", body)
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_generic)) }
 
     override suspend fun menuStep(sessionId: String, menuId: String, move: Int?, step: Int?): Result<Unit> = try {
         val body = JSONObject().put("menuId", menuId)
         if (step != null) body.put("step", step) else body.put("move", if ((move ?: 1) < 0) -1 else 1)
         api.post("/v1/sessions/$sessionId/menu", body)
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_generic)) }
 
     override suspend fun extendAwake(): Result<Unit> = try {
         val r = api.post("/v1/mac/awake", JSONObject().put("extend", true))
         MacAwake.parse(r.obj("awake"))?.let { macAwake = it }
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_awake)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_awake)) }
 
     override suspend fun setBrowseOutsideProjects(on: Boolean): Result<Unit> = try {
         val r = api.post("/v1/mac/files", JSONObject().put("browseOutsideProjects", on))
         macBrowse = r.obj("files")?.bool("browseOutsideProjects") ?: on
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_browse_setting)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_browse_setting)) }
 
     override suspend fun setAutoUpdate(on: Boolean): Result<Unit> = try {
         val r = api.post("/v1/mac/update", JSONObject().put("autoUpdate", on))
         setServerUpdate(ServerUpdate.parse(r.obj("update")) ?: macUpdate?.copy(auto = on))
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_auto_update)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_auto_update)) }
 
     override suspend fun setAwake(mode: String): Result<Unit> = try {
         val r = api.post("/v1/mac/awake", JSONObject().put("mode", mode))
         MacAwake.parse(r.obj("awake"))?.let { macAwake = it }
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_awake)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_awake)) }
 
     override suspend fun setMode(sessionId: String, mode: String): Result<Boolean> = try {
         val r = api.post("/v1/sessions/$sessionId/mode", JSONObject().put("permissionMode", mode))
         applySession(r)
         Result.success(r.str("applies") == "next_turn")
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_generic)) }
 
     override suspend fun setModel(sessionId: String, model: String?, confirmPaid: Boolean): Result<ModelSwitch> = try {
         val body = JSONObject().put("model", model ?: JSONObject.NULL)
@@ -2156,11 +2095,11 @@ class LiveHub(
     } catch (e: CancellationException) { throw e } catch (e: Throwable) {
         val ex = Net.classify(e)
         when {
-            ex.status == 409 && ex.code == "confirm_paid" -> Result.failure(PaidModel(ex.serverMessage ?: res.getString(R.string.model_paid_q)))
+            ex.status == 409 && ex.code == "confirm_paid" -> Result.failure(PaidModel(ex.serverMessage ?: res.getString(Str.model_paid_q)))
             // A Mac from before the call: a shared terminal still takes Claude Code's own command.
             ex.status == 404 && ex.code == "not_found" && raw[sessionId]?.term != null ->
                 send(sessionId, "/model ${model ?: "default"}").map { ModelSwitch(model, nextTurn = false) }
-            else -> Result.failure(handle(e, R.string.err_model))
+            else -> Result.failure(handle(e, Str.err_model))
         }
     }
 
@@ -2168,7 +2107,7 @@ class LiveHub(
         val r = api.post("/v1/sessions/$sessionId/effort", JSONObject().put("effort", effort))
         applySession(r)
         Result.success(r.str("applies") == "next_turn")
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_effort)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_effort)) }
 
     override fun answer(sessionId: String, item: Item.Approval, answer: Answer) {
         answerAsync(item.approvalId ?: return, answer)
@@ -2191,7 +2130,7 @@ class LiveHub(
             Answer.Session -> { body.put("decision", "session"); Resolution.AllowedSession }
             Answer.Deny -> { body.put("decision", "deny"); Resolution.Denied }
             Answer.ApprovePlan -> { body.put("decision", "allow"); Resolution.PlanApproved }
-            Answer.KeepPlanning -> { body.put("decision", "deny").put("message", res.getString(R.string.plan_keep_message)); Resolution.KeptPlanning }
+            Answer.KeepPlanning -> { body.put("decision", "deny").put("message", res.getString(Str.plan_keep_message)); Resolution.KeptPlanning }
             is Answer.Answers -> {
                 body.put("decision", "allow").put("answers", JSONObject(answer.answers as Map<*, *>))
                 Resolution.Answered
@@ -2215,11 +2154,11 @@ class LiveHub(
                     approvals = approvals - id
                     if (id !in resolved) resolved = resolved + (id to Resolved("elsewhere", null))
                     publish()
-                    toast(res.getString(R.string.err_already_answered))
+                    toast(res.getString(Str.err_already_answered))
                     true
                 } else {
                     answered = answered - id
-                    toast(handle(e, R.string.err_answer).message.orEmpty())
+                    toast(handle(e, Str.err_answer).message.orEmpty())
                     false
                 }
             }
@@ -2244,7 +2183,7 @@ class LiveHub(
             throw e
         } catch (e: Throwable) {
             answered = answered - ids.toSet()
-            Result.failure(handle(e, R.string.err_answer))
+            Result.failure(handle(e, Str.err_answer))
         }
     }
 
@@ -2253,17 +2192,17 @@ class LiveHub(
     override suspend fun renameSession(sessionId: String, name: String): Result<Unit> = try {
         applySession(api.post("/v1/sessions/$sessionId/rename", JSONObject().put("name", name.trim())))
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_rename)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_rename)) }
 
     override suspend fun stopSession(sessionId: String): Result<Unit> = try {
         applySession(api.post("/v1/sessions/$sessionId/stop"))
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_stop_session)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_stop_session)) }
 
     override suspend fun respawnSession(sessionId: String): Result<Unit> = try {
         applySession(api.post("/v1/sessions/$sessionId/respawn"))
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_restart_session)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_restart_session)) }
 
     // The old terminal closes first, up to six seconds, so the slow client.
     override suspend fun restartSession(sessionId: String): Result<Unit> = try {
@@ -2272,14 +2211,14 @@ class LiveHub(
     } catch (e: CancellationException) { throw e } catch (e: Throwable) {
         // An older server doesn't know the route: it's the server that needs updating, not the phone trying again.
         val ex = Net.classify(e)
-        Result.failure(if (ex.status == 404 && ex.code != "no_session") HubException(res.getString(R.string.err_restart_older)) else handle(e, R.string.err_restart_session))
+        Result.failure(if (ex.status == 404 && ex.code != "no_session") HubException(res.getString(Str.err_restart_older)) else handle(e, Str.err_restart_session))
     }
 
     // One after another on the Mac, each up to half a minute: the slow client's two minutes. The
     // sessions' new state comes over the socket.
     override suspend fun respawnOutdated(sessionIds: List<String>): Result<List<JobRestart>> = try {
         Result.success(OutdatedJobs.results(api.postSlow("/v1/jobs/respawn", JSONObject().put("ids", org.json.JSONArray(sessionIds)))))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_restart_jobs)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_restart_jobs)) }
 
     override suspend fun deleteSession(sessionId: String): Result<Unit> = try {
         api.delete("/v1/sessions/$sessionId")
@@ -2289,7 +2228,7 @@ class LiveHub(
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) {
         // An older server deletes only jobs: it's the server that needs updating, not the phone trying again.
-        Result.failure(if (Net.classify(e).code == "not_agents") HubException(res.getString(R.string.err_delete_older)) else handle(e, R.string.err_delete_session))
+        Result.failure(if (Net.classify(e).code == "not_agents") HubException(res.getString(Str.err_delete_older)) else handle(e, Str.err_delete_session))
     }
 
     override suspend fun start(req: NewSessionRequest): Result<String> = try {
@@ -2309,7 +2248,7 @@ class LiveHub(
         if (req.files.isNotEmpty()) body.put("attachments", JSONArray(req.files.map { it.path }))
         val s = applySession(api.post("/v1/sessions", body)) ?: throw ApiException(Problem.Server, 200, "no_session")
         Result.success(s.id)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_start)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_start)) }
 
     override suspend fun terminal(sessionId: String): Result<TermTicket> = try {
         val o = api.post("/v1/sessions/$sessionId/terminal")
@@ -2317,12 +2256,12 @@ class LiveHub(
         // opens it with the pinned client and the device certificate (the terminal page's own
         // WebSocket can do neither), so the ticket carries that client (TermTicket).
         Result.success(TermTicket.of(o.getString("url"), api.route()))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_terminal)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_terminal)) }
 
     override suspend fun openOnMac(sessionId: String): Result<Pair<String, Boolean>> = try {
         val o = api.post("/v1/sessions/$sessionId/open")
         Result.success((o.str("app") ?: "Terminal") to o.bool("already"))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_open_on_mac)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_open_on_mac)) }
 
     // ─── Codex, a second agent (docs/PROTOCOL.md, "Codex (a second agent)"; data/Codex.kt) ───
 
@@ -2337,13 +2276,13 @@ class LiveHub(
         val c = ClaudeState.parse(api.post("/v1/claude", JSONObject().put("agents", on)).obj("claude"))
         if (c != null) claude = c
         Result.success(c)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.ag_claude_agents_err)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.ag_claude_agents_err)) }
 
     override suspend fun setCodexEnabled(on: Boolean): Result<CodexState?> = try {
         val c = CodexWire.state(api.post("/v1/codex", JSONObject().put("enabled", on)).obj("codex"))
         codexChanged(c)
         Result.success(c)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, if (on) R.string.cx_err_turn_on else R.string.cx_err_turn_off)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, if (on) Str.cx_err_turn_on else Str.cx_err_turn_off)) }
 
     /** Codex's models as the Mac last listed them, and when; dropped when Codex turns on or off. */
     @Volatile private var codexModelCache: Pair<Long, List<CodexModel>>? = null
@@ -2354,7 +2293,7 @@ class LiveHub(
             val list = CodexWire.models(api.get("/v1/codex/models"))
             codexModelCache = System.currentTimeMillis() to list
             Result.success(list)
-        } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.cx_err_models)) }
+        } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.cx_err_models)) }
     }
 
     override suspend fun setCodexModel(sessionId: String, model: String?, effort: String?): Result<ModelSwitch> = try {
@@ -2366,11 +2305,11 @@ class LiveHub(
         // The chip follows at once; the Mac's broadcast says the same a moment later.
         if (applied != null) raw[sessionId]?.let { if (it.model != applied) { raw = raw + (sessionId to it.copy(model = applied)); publish() } }
         Result.success(ModelSwitch(applied, nextTurn = r.str("applies") == "next_turn"))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_model)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_model)) }
 
     override suspend fun switchPreview(sessionId: String, to: String, context: String): Result<SwitchPreview> = try {
         Result.success(CodexWire.preview(api.post("/v1/sessions/$sessionId/switch/preview", JSONObject().put("to", to).put("context", context))))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.cx_err_preview)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.cx_err_preview)) }
 
     override suspend fun switchAgent(sessionId: String, to: String, text: String, model: String?, effort: String?, mode: String?): Result<String> = try {
         val body = JSONObject().put("to", to).put("text", text)
@@ -2381,7 +2320,7 @@ class LiveHub(
         Result.success(s.id)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) {
         val ex = Net.classify(e)
-        val err = handle(e, R.string.cx_err_switch)
+        val err = handle(e, Str.cx_err_switch)
         // What the Mac said no to, and where it points (the session it went on in, the most it takes).
         if (ex.problem == Problem.Server && ex.code != null) Result.failure(SwitchRefused(err.message.orEmpty(), ex.code, ex.error?.str("to"), ex.error?.int("maxBytes")))
         else Result.failure(err)
@@ -2397,7 +2336,7 @@ class LiveHub(
     override suspend fun checkAccount(): Result<Unit> = try {
         accountFrom(api.post("/v1/account/check"))
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_check_account)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_check_account)) }
 
     override suspend fun signIn(onMac: Boolean): Result<Unit> = try {
         accountFrom(api.post("/v1/account/login", JSONObject().put("where", if (onMac) "mac" else "phone")))
@@ -2407,66 +2346,66 @@ class LiveHub(
     } catch (e: Throwable) {
         // Signed in meanwhile (on the Mac, say): look again rather than show an error.
         if ((e as? ApiException)?.code == "not_needed") { checkAccount(); Result.success(Unit) }
-        else Result.failure(handle(e, R.string.err_sign_in))
+        else Result.failure(handle(e, Str.err_sign_in))
     }
 
     override suspend fun sendSignInCode(code: String): Result<Unit> = try {
         api.post("/v1/account/login/code", JSONObject().put("code", code.trim()))
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_sign_in_code)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_sign_in_code)) }
 
     override suspend fun cancelSignIn(): Result<Unit> = try {
         api.delete("/v1/account/login")
         // The Mac broadcasts the account without its sign-in; until then, take it off here.
         account.login?.let { setAccount(account.copy(login = null), live = true) }
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_generic)) }
 
     override suspend fun switchProvider(sessionId: String, providerId: String): Result<String> = try {
         val s = applySession(api.post("/v1/sessions/$sessionId/provider", JSONObject().put("providerId", providerId)))
         Result.success(s?.id ?: sessionId)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_switch_provider)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_switch_provider)) }
 
     // ─── A session's blocked calls (data/Blocked.kt) ─────────────────────
 
     override suspend fun blocked(sessionId: String): Result<List<BlockedCall>> = try {
         Result.success(BlockedWire.list(api.get("/v1/sessions/$sessionId/blocked")))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.blocked_err_load)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.blocked_err_load)) }
 
     override suspend fun retryBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = try {
         val r = api.post("/v1/sessions/$sessionId/blocked/$id/retry")
         applySession(r)
         Result.success(BlockedWire.list(r))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.blocked_err_retry)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.blocked_err_retry)) }
 
     override suspend fun dismissBlocked(sessionId: String, id: String): Result<List<BlockedCall>> = try {
         Result.success(BlockedWire.list(api.delete("/v1/sessions/$sessionId/blocked/$id")))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.blocked_err_dismiss)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.blocked_err_dismiss)) }
 
     // ─── Carrying on after a limit, other providers (data/Providers.kt) ───
 
     override suspend fun autoContinue(sessionId: String, on: Boolean): Result<Unit> = try {
         applySession(api.post("/v1/sessions/$sessionId/auto-continue", JSONObject().put("on", on)))
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.resume_failed)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.resume_failed)) }
 
     override suspend fun continueAfterLimit(sessionId: String): Result<String> = try {
         val s = applySession(api.post("/v1/sessions/$sessionId/continue", JSONObject().put("reason", "limit")))
         Result.success(s?.id ?: sessionId)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_continue)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_continue)) }
 
     override suspend fun checkProvider(id: String): Result<Provider> = try {
         val p = Wire.provider(api.post("/v1/providers/$id/check").obj("provider") ?: throw ApiException(Problem.Server, 200, "no_provider"))
         providers = sortProviders(providers.filter { it.id != p.id } + p)
         publish()
         Result.success(p)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_generic)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_generic)) }
 
     /** A provider's new trouble, or its credit back: a banner or a notification, once per episode. */
     private fun providerNotices(before: List<Provider>) {
         for (p in providers) {
             val paused = raw.values.count { it.providerId == p.id && it.blocked != null }
-            ProviderWords.notice(app, before.firstOrNull { it.id == p.id }, p, paused)?.let { notice(it) }
+            ProviderWords.notice(platform.strings, platform.storage, before.firstOrNull { it.id == p.id }, p, paused)?.let { notice(it) }
         }
     }
 
@@ -2475,22 +2414,22 @@ class LiveHub(
         val entries = o.arr("entries").mapObjects(Wire::entry)
             .sortedWith(compareByDescending<FileEntry> { it.isDir }.thenBy { it.name.lowercase() })
         Result.success(Listing(o.str("path") ?: path, entries, o.optBoolean("truncated"), o.optInt("total", entries.size)))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, R.string.err_files)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, Str.err_files)) }
 
     override suspend fun folders(path: String?, hidden: Boolean): Result<Folders> = try {
         val q = listOfNotNull(path?.let { "path=${Api.q(it)}" }, "hidden=1".takeIf { hidden }).joinToString("&")
         Result.success(FolderPick.wire(api.get("/v1/folders" + if (q.isEmpty()) "" else "?$q")))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, R.string.err_files)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, Str.err_files)) }
 
     override suspend fun file(path: String): Result<FileBytes> = try {
         // Attachments can be up to 30 MB.
         Result.success(api.bytes("/v1/file?path=${Api.q(path)}", max = 32L * 1024 * 1024))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, R.string.err_file)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, Str.err_file)) }
 
     override suspend fun download(source: String, target: java.io.File, resume: DownloadResume?, onStart: (String?) -> Unit, onProgress: (Long, Long) -> Unit): Result<Downloaded> = try {
         val from = if (source.startsWith("http")) source else "/v1/file?path=${Api.q(source)}&download=1"
         Result.success(api.download(from, target, resume, onStart, onProgress))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, R.string.err_download)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleFile(e, Str.err_download)) }
 
     override suspend fun preview(path: String?, port: Int?): Result<String> = try {
         val body = JSONObject()
@@ -2498,14 +2437,14 @@ class LiveHub(
         if (port != null) body.put("port", port)
         val url = api.post("/v1/preview", body).str("url") ?: throw ApiException(Problem.Server, 200, "no_url")
         Result.success(page(url))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_preview)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_preview)) }
 
     override suspend fun saveProvider(id: String?, input: ProviderInput): Result<ProviderSaved> = try {
         val o = if (id == null) api.post("/v1/providers", input.toJson()) else api.put("/v1/providers/$id", input.toJson())
         val p = Wire.provider(o.obj("provider") ?: throw ApiException(Problem.Server, 200, "no_provider"))
         providers = sortProviders(providers.filter { it.id != p.id } + p)
         Result.success(ProviderSaved(p, ProviderWire.check(o.obj("check")), o.bool("keyDropped")))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleProvider(e, R.string.err_provider_save)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleProvider(e, Str.err_provider_save)) }
 
     override suspend fun checkNewProvider(kind: String, baseUrl: String?, apiKey: String?, id: String?): Result<ProviderCheck> = try {
         val body = JSONObject().put("kind", kind)
@@ -2514,16 +2453,16 @@ class LiveHub(
         id?.let { body.put("id", it) }
         val c = ProviderWire.check(api.post("/v1/providers/check", body).obj("check")) ?: throw ApiException(Problem.Server, 200, "no_check")
         Result.success(c)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleProvider(e, R.string.err_provider_check)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handleProvider(e, Str.err_provider_check)) }
 
     override suspend fun deleteProvider(id: String): Result<Unit> = try {
         api.delete("/v1/providers/$id")
         providers = providers.filter { it.id != id }
         Result.success(Unit)
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_provider_delete)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_provider_delete)) }
 
     /** Like [handle], but a refusal keeps the Mac's code, so the provider editor puts it under its field. */
-    private fun handleProvider(e: Throwable, fallback: Int): HubException {
+    private fun handleProvider(e: Throwable, fallback: Str): HubException {
         val ex = Net.classify(e)
         if (ex.problem != Problem.Server) return handle(e, fallback)
         return ProviderRefused(ex.code, ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(fallback))
@@ -2533,7 +2472,7 @@ class LiveHub(
         Result.success(AgentSettingsReply.wire(api.get("/v1/agents/settings")))
     } catch (e: CancellationException) { throw e } catch (e: Throwable) {
         // An older server doesn't know the request: it's the server that needs updating, not the phone trying again.
-        Result.failure(if (Net.classify(e).status == 404) AgentSettingsTooOld(res.getString(R.string.as_too_old)) else handle(e, R.string.as_err))
+        Result.failure(if (Net.classify(e).status == 404) AgentSettingsTooOld(res.getString(Str.as_too_old)) else handle(e, Str.as_err))
     }
 
     override var agentSettingsVersion by androidx.compose.runtime.mutableIntStateOf(0)
@@ -2552,9 +2491,9 @@ class LiveHub(
     /** A 404: a server older than editing. A refusal: its own words and code. Anything else as usual. */
     private fun settingFailure(e: Throwable): HubException {
         val ex = Net.classify(e)
-        if (ex.status == 404) return AgentSettingsTooOld(res.getString(R.string.as_edit_too_old))
-        if (ex.problem != Problem.Server) return handle(e, R.string.as_edit_err)
-        return AgentSettingRefused(ex.code, ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(R.string.as_edit_err))
+        if (ex.status == 404) return AgentSettingsTooOld(res.getString(Str.as_edit_too_old))
+        if (ex.problem != Problem.Server) return handle(e, Str.as_edit_err)
+        return AgentSettingRefused(ex.code, ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(Str.as_edit_err))
     }
 
     override suspend fun sessionMcp(id: String): Result<SessionMcpReply> = try {
@@ -2562,13 +2501,13 @@ class LiveHub(
     } catch (e: CancellationException) { throw e } catch (e: Throwable) {
         // A 404 from an older server doesn't know the request; the session being gone is its own 404.
         val ex = Net.classify(e)
-        Result.failure(if (ex.status == 404 && ex.code != "no_session") SessionMcpTooOld(res.getString(R.string.sm_too_old)) else handle(e, R.string.sm_err))
+        Result.failure(if (ex.status == 404 && ex.code != "no_session") SessionMcpTooOld(res.getString(Str.sm_too_old)) else handle(e, Str.sm_err))
     }
 
     override suspend fun checklist(): Result<String> = try {
         val url = api.get("/v1/qa").str("url") ?: throw ApiException(Problem.Server, 200, "no_url")
         Result.success(page(url))
-    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, R.string.err_checklist)) }
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_checklist)) }
 
     /** `DELETE /v1/devices/me`: the Mac forgets this phone. */
     suspend fun forget(): Result<Unit> = try {
@@ -2584,20 +2523,20 @@ class LiveHub(
     private fun page(url: String): String = RoutePolicy.rebase(url, api.url(""))
 
     /** A failure becomes a [HubException] with a human message; a 401 also unpairs. */
-    private fun handle(e: Throwable, fallback: Int): HubException {
+    private fun handle(e: Throwable, fallback: Str): HubException {
         val ex = Net.classify(e)
         if (ex.problem == Problem.Unauthorized) unpaired()
         return HubException(message(ex, fallback))
     }
 
     /** Like [handle], but keeps what the Mac said (status, code, sizes) for the files screens to explain. */
-    private fun handleFile(e: Throwable, fallback: Int): FileFailure {
+    private fun handleFile(e: Throwable, fallback: Str): FileFailure {
         val ex = Net.classify(e)
         if (ex.problem == Problem.Unauthorized) unpaired()
         return FileFailure.of(ex, message(ex, fallback)).let { if (ex.problem != Problem.Server && !hasNetwork()) FileFailure(it.message.orEmpty(), Problem.NoNetwork, ex.status, ex.code) else it }
     }
 
-    private fun message(ex: ApiException, fallback: Int): String = when (ex.problem) {
+    private fun message(ex: ApiException, fallback: Str): String = when (ex.problem) {
         Problem.Server -> ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(fallback)
         else -> problemText(res, if (!hasNetwork()) Problem.NoNetwork else ex.problem)
     }
@@ -2727,16 +2666,10 @@ class LiveHub(
         private const val RETRY_CAP_ON_SCREEN = Retry.EVERY
         /** How long a try that has just begun is left alone by the network or the app (see [freshTry]). */
         private const val FRESH_TRY = 3_000L
-        private const val ALARM_TAG = "hypernova:retry"
         /** An attempt's error code when no route answered the round ([LanRouter.prepare]): nothing was asked of the base URL. */
         private const val NO_ROUTE = "no_route"
         /** How long Local is tried after the others while the Mac won't take this phone's device certificate there. */
         private const val CERT_HOLD = 60_000L
-        /** The kinds of network whose change is worth a try (see [NetWatch]). */
-        private val TRANSPORTS = intArrayOf(
-            NetworkCapabilities.TRANSPORT_VPN, NetworkCapabilities.TRANSPORT_WIFI,
-            NetworkCapabilities.TRANSPORT_CELLULAR, NetworkCapabilities.TRANSPORT_ETHERNET,
-        )
         /** How long a typed prompt may take to reach the transcript before its copy settles. */
         private const val SETTLE = 8_000L
         /** How long a queued copy waits for the Mac's copy once its prompt has left the queue. */
@@ -2778,17 +2711,17 @@ private val WHITESPACE = Regex("\\s+")
  * Claude Code's that rewrites prompts (a spellcheck plugin made "clip board" "clipboard"), or bash
  * mode, which logs "! ls" as "!ls".
  */
-internal fun sameSentText(mine: String, theirs: String): Boolean = mine.replace(WHITESPACE, "") == theirs.replace(WHITESPACE, "")
+fun sameSentText(mine: String, theirs: String): Boolean = mine.replace(WHITESPACE, "") == theirs.replace(WHITESPACE, "")
 
 /** `{t:"event.removed", sessionId, id}`: the session and the event the Mac took back; null when either is missing. */
-internal fun removedEvent(o: JSONObject): Pair<String, String>? {
+fun removedEvent(o: JSONObject): Pair<String, String>? {
     val sid = o.str("sessionId")?.takeIf { it.isNotBlank() } ?: return null
     val id = o.str("id")?.takeIf { it.isNotBlank() } ?: return null
     return sid to id
 }
 
 /** [list] without the events the Mac took back ([gone], by id): a notice that no longer holds. */
-internal fun withoutEvents(list: List<WEvent>, gone: Collection<String>): List<WEvent> =
+fun withoutEvents(list: List<WEvent>, gone: Collection<String>): List<WEvent> =
     if (gone.isEmpty() || list.none { it.id in gone }) list else list.filterNot { it.id in gone }
 
 /**
@@ -2796,32 +2729,32 @@ internal fun withoutEvents(list: List<WEvent>, gone: Collection<String>): List<W
  * Mac doesn't answer on this Wi‑Fi"), the route that failed in use when one answered and then
  * failed, else the problem's own words.
  */
-fun linkProblemText(res: android.content.res.Resources, link: Link): String {
+fun linkProblemText(res: Strings, link: Link): String {
     val p = link.problem
     if (p == Problem.NoNetwork || p == Problem.Unauthorized || p == Problem.Server || p == Problem.Cleartext) return problemText(res, p)
     when (RouteWords.problem(link.tried)) {
-        RouteProblem.LocalOnly -> return res.getString(R.string.problem_route_local)
-        RouteProblem.WrongMac -> return res.getString(R.string.problem_route_wrong_mac)
+        RouteProblem.LocalOnly -> return res.getString(Str.problem_route_local)
+        RouteProblem.WrongMac -> return res.getString(Str.problem_route_wrong_mac)
         null -> Unit
     }
     return when (link.failedOver) {
-        RouteKind.Local -> res.getString(R.string.problem_route_local)
+        RouteKind.Local -> res.getString(Str.problem_route_local)
         RouteKind.Remote -> problemWords(res, p)
         null -> problemText(res, p)
     }
 }
 
 /** One sentence per problem, with what to do about it. */
-fun problemText(res: android.content.res.Resources, p: Problem?): String = problemWords(res, p)
+fun problemText(res: Strings, p: Problem?): String = problemWords(res, p)
 
-private fun problemWords(res: android.content.res.Resources, p: Problem?): String = when (p) {
-    Problem.NoNetwork -> res.getString(R.string.problem_no_network)
-    Problem.NoName -> res.getString(R.string.problem_no_name)
-    Problem.Unreachable, null -> res.getString(R.string.problem_unreachable)
-    Problem.NotRunning -> res.getString(R.string.problem_not_running)
-    Problem.Tls -> res.getString(R.string.problem_tls)
-    Problem.Cleartext -> res.getString(R.string.problem_cleartext)
-    Problem.Unauthorized -> res.getString(R.string.problem_unpaired)
-    Problem.CodeExpired -> res.getString(R.string.problem_code_expired)
-    Problem.Server -> res.getString(R.string.problem_server)
+private fun problemWords(res: Strings, p: Problem?): String = when (p) {
+    Problem.NoNetwork -> res.getString(Str.problem_no_network)
+    Problem.NoName -> res.getString(Str.problem_no_name)
+    Problem.Unreachable, null -> res.getString(Str.problem_unreachable)
+    Problem.NotRunning -> res.getString(Str.problem_not_running)
+    Problem.Tls -> res.getString(Str.problem_tls)
+    Problem.Cleartext -> res.getString(Str.problem_cleartext)
+    Problem.Unauthorized -> res.getString(Str.problem_unpaired)
+    Problem.CodeExpired -> res.getString(Str.problem_code_expired)
+    Problem.Server -> res.getString(Str.problem_server)
 }

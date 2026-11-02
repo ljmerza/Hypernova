@@ -9,6 +9,9 @@ import com.prudnikweb.hypernova.data.Pairer
 import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
+import com.prudnikweb.hypernova.data.storage
+import com.prudnikweb.hypernova.data.AndroidPlatform
+import com.prudnikweb.hypernova.data.AndroidDevice
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -41,7 +44,7 @@ class PairTest {
         return PairLinks.parse("hypernova://pair?v=1&u=$base&c=$code&n=z2$lan")!!
     }
 
-    private fun pair(l: PairLink): Pairing = runBlocking { Pairer.pair(context, l) }
+    private fun pair(l: PairLink): Pairing = runBlocking { Pairer.pair(AndroidPlatform(context), l) }
 
     private fun refused(l: PairLink): ApiException = try {
         pair(l)
@@ -60,12 +63,12 @@ class PairTest {
             assertEquals(null, req.auth)
             val body = req.json
             assertEquals("c0de-1234", body.getString("code"))
-            assertEquals(Pairer.deviceName(context), body.getString("deviceName"))
+            assertEquals(AndroidDevice(context).name, body.getString("deviceName"))
             assertTrue(body.getString("deviceName").isNotBlank())
             assertTrue(body.getString("model").isNotBlank())
             assertEquals(BuildConfig.VERSION_NAME, body.getString("appVersion"))
             // This install's own id, the same every time (pairing again replaces its old device).
-            assertEquals(Pairer.installId(context), body.getString("installId"))
+            assertEquals(Pairer.installId(context.storage), body.getString("installId"))
             assertEquals(Pairing(d.base, "device-token", "server", "mac-id", "device-id"), p)
 
             pair(link(d, fp = null))

@@ -11,6 +11,7 @@ import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.ProviderWords
 import com.prudnikweb.hypernova.data.Run
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.strings
 import java.time.ZoneId
 
 /** The app's words for the summary and the run lines, in the phone's 12- or 24-hour style. */
@@ -47,7 +48,7 @@ fun providerTrouble(context: Context, hub: Hub, a: Automation?): String? {
         ?: (a?.action as? Action.Start)?.providerId ?: return null
     val p = hub.providers.firstOrNull { it.id == id } ?: return null
     val st = p.status ?: return context.getString(R.string.provider_card_other, p.name)
-    return ProviderWords.sentence(context, p.name, st)
+    return ProviderWords.sentence(context.strings, p.name, st)
 }
 
 /**

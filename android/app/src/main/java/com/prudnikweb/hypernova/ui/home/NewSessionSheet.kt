@@ -86,6 +86,8 @@ import com.prudnikweb.hypernova.data.ProjectPick
 import com.prudnikweb.hypernova.data.Provider
 import com.prudnikweb.hypernova.data.ProviderWords
 import com.prudnikweb.hypernova.data.healthyOther
+import com.prudnikweb.hypernova.data.strings
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.components.EnterKeyPref
@@ -165,7 +167,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val projects = hub.projects
     val providers = hub.providers
-    val memory = remember { NewSessionMemory.load(context) }
+    val memory = remember { NewSessionMemory.load(context.storage) }
     var project by rememberSaveable { mutableStateOf(ProjectPick.initial(projects, initialProject, memory.project) ?: NEW_PROJECT) }
     var newName by rememberSaveable { mutableStateOf("") }
     // A folder chosen in the folder browser that isn't a project (yet): kept though the list doesn't have it.
@@ -453,8 +455,8 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                                 ).onSuccess { id ->
                                     started = true
                                     val kept = path ?: hub.projectsRoot?.let { "${it.trimEnd('/')}/$name" }
-                                    if (onCodex) NewSessionMemory.saveCodex(context, kept, codexModel, codexEffort, codexMode)
-                                    else NewSessionMemory.save(context, kept, provider?.id, choice.value, effort)
+                                    if (onCodex) NewSessionMemory.saveCodex(context.storage, kept, codexModel, codexEffort, codexMode)
+                                    else NewSessionMemory.save(context.storage, kept, provider?.id, choice.value, effort)
                                     prompt = ""
                                     newName = ""
                                     starting = null
@@ -652,7 +654,7 @@ private fun providerTrail(p: Provider, account: Account, hub: Hub, now: Long): P
         if (!account.stopsNewSessions(now)) return null
         return whyLine(account, hub.mac.name, now) to true
     }
-    return ProviderWords.trail(context, p, now)
+    return ProviderWords.trail(context.strings, p, now)
 }
 
 /** Why the subscription can't take a session now: "Your subscription rests until 2:00". */
@@ -668,9 +670,9 @@ private fun whyLine(a: Account, mac: String, now: Long): String {
             val l = a.resting(now)
             val at = l?.resetsAt
             when {
-                at == null -> AccountWords.label(context, l)
-                l.window == "seven_day" -> stringResource(R.string.why_week, AccountWords.clock(context, at, now))
-                else -> stringResource(R.string.why_limit, AccountWords.clock(context, at, now))
+                at == null -> AccountWords.label(context.strings, l)
+                l.window == "seven_day" -> stringResource(R.string.why_week, AccountWords.clock(context.strings, at, now))
+                else -> stringResource(R.string.why_limit, AccountWords.clock(context.strings, at, now))
             }
         }
     }

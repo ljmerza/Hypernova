@@ -1,13 +1,9 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
-import com.prudnikweb.hypernova.BuildConfig
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -232,15 +228,18 @@ object ConnLog {
     var version by mutableIntStateOf(0)
         private set
     private var file: File? = null
-    private val main by lazy { runCatching { Handler(Looper.getMainLooper()) }.getOrNull() }
+    private var main: MainThread? = null
+    private var log: Log? = null
     private val io = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "connlog").apply { isDaemon = true } }
     private val bumpPosted = AtomicBoolean(false)
     private val savePosted = AtomicBoolean(false)
 
     /** Reads the tail kept on disk (in the background); entries added meanwhile stay after it. */
-    fun init(context: Context) {
+    fun init(filesDir: File, main: MainThread, log: Log) {
+        this.main = main
+        this.log = log
         if (file != null) return
-        val f = File(context.applicationContext.filesDir, "connlog.jsonl")
+        val f = File(filesDir, "connlog.jsonl")
         file = f
         io.execute {
             val older = runCatching { f.readLines().mapNotNull(ConnText::decode) }.getOrDefault(emptyList())
@@ -254,7 +253,7 @@ object ConnLog {
     fun add(e: ConnEntry) {
         val clean = ConnScrub.entry(e)
         ring.add(clean)
-        if (BuildConfig.DEBUG) runCatching { android.util.Log.d("HypernovaConn", ConnText.line(clean)) }
+        log?.let { l -> runCatching { l.d("HypernovaConn", ConnText.line(clean)) } }
         bump()
         save()
     }
@@ -266,8 +265,7 @@ object ConnLog {
     fun entries(): List<ConnEntry> = ring.newestFirst()
 
     /** A screen test's clean start: the log is one for the whole process, and the tests before it wrote in it. */
-    @androidx.annotation.VisibleForTesting
-    internal fun clear() = ring.clear()
+    fun clear() = ring.clear()
 
     private fun bump() {
         val h = main ?: return

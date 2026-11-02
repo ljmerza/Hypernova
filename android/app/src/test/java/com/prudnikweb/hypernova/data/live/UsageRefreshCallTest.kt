@@ -9,6 +9,7 @@ import com.prudnikweb.hypernova.data.UsageRefresh
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -50,7 +51,7 @@ class UsageRefreshCallTest {
 
     @Before fun setUp() {
         Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(Core.app)
+        ComputerWords.clear(Core.app.storage)
         UsageRefresh.reset()
     }
 

@@ -15,23 +15,6 @@ import androidx.annotation.RequiresApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * Which recognizer hears a dictation (Settings → Voice, docs/DECISIONS.md, "The phone's recognizer
- * for dictation", 2026-10-31). [Phone]: the phone's default recognition service, the one the
- * keyboard's voice typing uses (normally Google's; it may send the audio to Google's servers).
- * [OnDevice]: Android's on-device recognizer only; the audio never leaves the phone.
- */
-enum class DictationEngine(val key: String) {
-    Phone("phone"),
-    OnDevice("onDevice");
-
-    companion object {
-        /** The setting's default: the phone's recognizer, as accurate as the keyboard's. */
-        val DEFAULT = Phone
-        fun of(key: String?): DictationEngine = entries.firstOrNull { it.key == key } ?: DEFAULT
-    }
-}
-
 /** The engine choice and the recognizer's extras, pure, so the JVM tests them (DictationChoiceTest). */
 object DictationChoice {
     /**

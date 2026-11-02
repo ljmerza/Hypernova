@@ -324,7 +324,7 @@ object AppUpdater {
         prefs.edit().remove(KEY_SELF_UPDATE).apply()
         if (from == 0 || from >= BuildConfig.VERSION_CODE || !Core.notifier.canPost()) return
         // The phone's own news, no server's: the default Updates switch and the master decide.
-        if (!NotificationPrefsStore.get(c).allows(null, Notice.Kind.Update)) return
+        if (!NotificationPrefsStore.get(c.storage).allows(null, Notice.Kind.Update)) return
         val open = PendingIntent.getActivity(c, 9, Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(c, Notifier.SESSIONS)
             .setSmallIcon(R.drawable.ic_notification)

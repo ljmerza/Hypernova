@@ -30,9 +30,9 @@ object Items {
 
     /** Converted items by event id; reused while the event (an immutable instance) is unchanged. */
     class Cache {
-        internal val byId = HashMap<String, Pair<WEvent, Item?>>()
-        internal var cwd: String? = null
-        internal var active = true
+        val byId = HashMap<String, Pair<WEvent, Item?>>()
+        var cwd: String? = null
+        var active = true
     }
 
     fun build(

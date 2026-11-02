@@ -223,7 +223,7 @@ object StatsSource {
     private const val FRESH_MS = 30_000L
 
     // A hub with no Mac to ask (a screen test's) is its own entry, so several of them (All servers) keep theirs apart.
-    private fun key(hub: Hub, range: StatsRange): String = "${(hub as? LiveHub)?.pairing?.baseUrl ?: "hub@${System.identityHashCode(hub)}"}|${range.wire}"
+    private fun key(hub: Hub, range: StatsRange): String = "${(hub as? PairedHub)?.pairing?.baseUrl ?: "hub@${System.identityHashCode(hub)}"}|${range.wire}"
 
     /** The last answer for [range], if any (shown at once while a fresh one loads). */
     fun cached(hub: Hub, range: StatsRange): Stats? = cache[key(hub, range)]?.stats
@@ -232,14 +232,12 @@ object StatsSource {
         cache[key(hub, range)]?.let { now - it.at < FRESH_MS } == true
 
     /** A screen test's answer for [range] of [hub] (which has no Mac to ask): kept as one just received. */
-    @androidx.annotation.VisibleForTesting
-    internal fun put(hub: Hub, range: StatsRange, stats: Stats) {
+    fun put(hub: Hub, range: StatsRange, stats: Stats) {
         cache[key(hub, range)] = Entry(stats, System.currentTimeMillis())
     }
 
     /** A screen test's refusal: asking [hub] (which has no Mac to ask) for [range] fails with [e]. */
-    @androidx.annotation.VisibleForTesting
-    internal fun refuse(hub: Hub, range: StatsRange, e: ApiException) {
+    fun refuse(hub: Hub, range: StatsRange, e: ApiException) {
         refusals[key(hub, range)] = e
     }
     private val refusals = HashMap<String, ApiException>()
@@ -249,7 +247,7 @@ object StatsSource {
         val k = key(hub, range)
         return try {
             val s = when {
-                hub is LiveHub -> StatsWire.parse(Api(hub.pairing.baseUrl, hub.pairing.token).get("/v1/stats?range=${range.wire}"))
+                hub is PairedHub -> StatsWire.parse(Api(hub.pairing.baseUrl, hub.pairing.token).get("/v1/stats?range=${range.wire}"))
                 else -> throw refusals[k] ?: ApiException(Problem.Server, 0, "no_stats")
             }
             cache[k] = Entry(s, System.currentTimeMillis())

@@ -7,6 +7,8 @@ import com.prudnikweb.hypernova.data.Mac
 import com.prudnikweb.hypernova.data.RouteKind
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
+import com.prudnikweb.hypernova.data.AndroidDeviceKeys
 import kotlinx.coroutines.cancel
 import org.json.JSONArray
 import org.json.JSONObject
@@ -81,7 +83,7 @@ class MutualTlsTest {
         // Nothing went to the plain base URL: the base is the listener.
         assertTrue(daemon.requests.filter { !it.overLan }.joinToString { it.method + " " + it.path }, daemon.requests.all { it.overLan })
         // Kept for this computer: its chain, then the CA, and the key behind it.
-        val id = DeviceCertStore(r.context, r.serverId).identity()!!
+        val id = DeviceCertStore(r.context.storage, AndroidDeviceKeys, r.serverId).identity()!!
         assertEquals(cert, id.chain[0])
         assertEquals(daemon.deviceCa!!.certificate, id.chain[1])
         assertArrayEquals(cert.encoded, id.keyManager().getCertificateChain("hypernova-device")[0].encoded)
@@ -125,7 +127,7 @@ class MutualTlsTest {
         linkedWithCert(r, "linked with the new one")
         val renewed = daemon.issued.single()
         assertTrue(!renewed.encoded.contentEquals(old.encoded))
-        assertEquals(renewed, DeviceCertStore(r.context, r.serverId).identity()!!.chain[0])
+        assertEquals(renewed, DeviceCertStore(r.context.storage, AndroidDeviceKeys, r.serverId).identity()!!.chain[0])
         assertTrue(r.hub.link.state != LinkState.Unpaired)
     }
 
@@ -138,7 +140,7 @@ class MutualTlsTest {
             r.hub.link.state == LinkState.Connected && daemon.count("POST", "/v1/device/cert") > 0 && routeOf(r).kind == RouteKind.Remote
         }
         assertEquals(Mac.VIA_REMOTE, r.hub.mac.via)
-        assertNull(DeviceCertStore(r.context, r.serverId).identity())
+        assertNull(DeviceCertStore(r.context.storage, AndroidDeviceKeys, r.serverId).identity())
         // The socket is the base URL's, without a certificate.
         assertTrue(!daemon.calls("GET", "/v1/ws").last().overLan)
     }

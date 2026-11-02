@@ -91,6 +91,7 @@ import com.prudnikweb.hypernova.ui.components.Incidents
 import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.data.flow
 import com.prudnikweb.hypernova.data.flowSteps
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
@@ -1057,7 +1058,7 @@ internal fun StartParams(hub: Hub, a: Action.Start, template: String?, onChange:
         val context = LocalContext.current
         com.prudnikweb.hypernova.ui.home.ModelPicker(
             hub.providers, lists, loadingModels, provider?.id, a.model, hub.usage.models, System.currentTimeMillis(),
-            providerTrail = { p -> if (p.builtIn) null else com.prudnikweb.hypernova.data.ProviderWords.trail(context, p) },
+            providerTrail = { p -> if (p.builtIn) null else com.prudnikweb.hypernova.data.ProviderWords.trail(context.strings, p) },
             onPick = { id, value -> pickModel = false; onChange(a.copy(providerId = id, model = value)) },
             onDismiss = { pickModel = false },
         )

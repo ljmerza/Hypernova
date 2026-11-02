@@ -1,7 +1,5 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +34,7 @@ fun unsettledFrom(final: String, interim: String): Int {
  * The one-time hints and the microphone's permission, kept in their own preferences file (spec
  * 3.7). Compose state, so the composers follow each other.
  */
-class VoicePrefs private constructor(private val prefs: SharedPreferences) {
+class VoicePrefs private constructor(private val prefs: Prefs) {
     /** Dictations that ended with words, for the hints. */
     var dictations by mutableIntStateOf(prefs.getInt("dictations", 0))
         private set
@@ -59,8 +57,25 @@ class VoicePrefs private constructor(private val prefs: SharedPreferences) {
 
     companion object {
         @Volatile private var one: VoicePrefs? = null
-        fun of(context: Context): VoicePrefs = one ?: synchronized(this) {
-            one ?: VoicePrefs(context.applicationContext.getSharedPreferences("voice", Context.MODE_PRIVATE)).also { one = it }
+        fun of(storage: Storage): VoicePrefs = one ?: synchronized(this) {
+            one ?: VoicePrefs(storage.prefs("voice")).also { one = it }
         }
+    }
+}
+
+/**
+ * Which recognizer hears a dictation (Settings → Voice, docs/DECISIONS.md, "The phone's recognizer
+ * for dictation", 2026-10-31). [Phone]: the phone's default recognition service, the one the
+ * keyboard's voice typing uses (normally Google's; it may send the audio to Google's servers).
+ * [OnDevice]: Android's on-device recognizer only; the audio never leaves the phone.
+ */
+enum class DictationEngine(val key: String) {
+    Phone("phone"),
+    OnDevice("onDevice");
+
+    companion object {
+        /** The setting's default: the phone's recognizer, as accurate as the keyboard's. */
+        val DEFAULT = Phone
+        fun of(key: String?): DictationEngine = entries.firstOrNull { it.key == key } ?: DEFAULT
     }
 }

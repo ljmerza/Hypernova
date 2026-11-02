@@ -549,15 +549,15 @@ data class Snapshot(
 
 // ─── Parsing ────────────────────────────────────────────────────────────────
 
-internal fun JSONObject.str(key: String): String? = if (has(key) && !isNull(key)) optString(key) else null
-internal fun JSONObject.long(key: String): Long? = if (has(key) && !isNull(key)) optDouble(key).takeIf { !it.isNaN() }?.toLong() else null
-internal fun JSONObject.int(key: String): Int? = long(key)?.toInt()
-internal fun JSONObject.dbl(key: String): Double? = if (has(key) && !isNull(key)) optDouble(key).takeIf { !it.isNaN() } else null
-internal fun JSONObject.bool(key: String): Boolean = optBoolean(key, false)
-internal fun JSONObject.obj(key: String): JSONObject? = if (has(key) && !isNull(key)) optJSONObject(key) else null
-internal fun JSONObject.arr(key: String): JSONArray? = if (has(key) && !isNull(key)) optJSONArray(key) else null
+fun JSONObject.str(key: String): String? = if (has(key) && !isNull(key)) optString(key) else null
+fun JSONObject.long(key: String): Long? = if (has(key) && !isNull(key)) optDouble(key).takeIf { !it.isNaN() }?.toLong() else null
+fun JSONObject.int(key: String): Int? = long(key)?.toInt()
+fun JSONObject.dbl(key: String): Double? = if (has(key) && !isNull(key)) optDouble(key).takeIf { !it.isNaN() } else null
+fun JSONObject.bool(key: String): Boolean = optBoolean(key, false)
+fun JSONObject.obj(key: String): JSONObject? = if (has(key) && !isNull(key)) optJSONObject(key) else null
+fun JSONObject.arr(key: String): JSONArray? = if (has(key) && !isNull(key)) optJSONArray(key) else null
 
-internal inline fun <T> JSONArray?.mapObjects(f: (JSONObject) -> T?): List<T> {
+inline fun <T> JSONArray?.mapObjects(f: (JSONObject) -> T?): List<T> {
     if (this == null) return emptyList()
     val out = ArrayList<T>(length())
     for (i in 0 until length()) {
@@ -568,7 +568,7 @@ internal inline fun <T> JSONArray?.mapObjects(f: (JSONObject) -> T?): List<T> {
     return out
 }
 
-internal fun JSONArray?.strings(): List<String> {
+fun JSONArray?.strings(): List<String> {
     if (this == null) return emptyList()
     return (0 until length()).mapNotNull { i -> if (isNull(i)) null else optString(i) }
 }

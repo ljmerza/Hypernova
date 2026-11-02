@@ -11,6 +11,7 @@ import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.UpdatePolicy
 import com.prudnikweb.hypernova.data.UpdateState
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.settings.SettingsPlan
 import kotlinx.coroutines.async
 import org.json.JSONObject
@@ -43,7 +44,7 @@ class AllServersSettingsTest {
     @Test fun eachServersBlockActsOnItsOwnServer() {
         Core.init(RuntimeEnvironment.getApplication())
         val app = Core.app
-        ComputerWords.clear(app)
+        ComputerWords.clear(app.storage)
         val z2 = FakeDaemon("z2")
         val shed = FakeDaemon("shed")
         try {

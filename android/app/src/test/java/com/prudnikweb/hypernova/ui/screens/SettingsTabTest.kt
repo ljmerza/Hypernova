@@ -22,6 +22,7 @@ import com.prudnikweb.hypernova.data.Route
 import com.prudnikweb.hypernova.data.live.FakeDaemon
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.settings.AboutBuild
 import com.prudnikweb.hypernova.ui.settings.SettingsTab
 import com.prudnikweb.hypernova.ui.theme.TextSize
@@ -63,7 +64,7 @@ class SettingsTabTest {
     @Before fun setUp() {
         resetPrefs()
         Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(Core.app)
+        ComputerWords.clear(Core.app.storage)
         AboutBuild.name = "1.2.3"
         AboutBuild.code = 4242
     }
@@ -74,7 +75,7 @@ class SettingsTabTest {
         shadowOf(Looper.getMainLooper()).idle()
         daemons.forEach { it.close() }
         TextSize.set(context, TextSize.SMALL)
-        NewSessionMemory.setStartMode(context, "default")
+        NewSessionMemory.setStartMode(context.storage, "default")
         AboutBuild.name = build.first
         AboutBuild.code = build.second
     }
@@ -209,7 +210,7 @@ class SettingsTabTest {
         assertEquals(TextSize.LARGE, TextSize.state(context).value)
         // New sessions start in Plan.
         clickText(str(R.string.mode_plan))
-        assertEquals("plan", NewSessionMemory.startMode(context))
+        assertEquals("plan", NewSessionMemory.startMode(context.storage))
         // Stay connected in the background: off, and back on.
         assertTrue(vm.background)
         rule.onNode(isSwitch(str(R.string.bg_title))).performScrollTo().performClick()

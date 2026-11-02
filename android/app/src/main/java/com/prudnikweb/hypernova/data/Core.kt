@@ -48,6 +48,7 @@ object Core {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     lateinit var store: PairingStore
         private set
+    private val platform by lazy { AndroidPlatform(app) }
     lateinit var notifier: Notifier
         private set
 
@@ -119,9 +120,9 @@ object Core {
     fun init(a: Application) {
         if (::app.isInitialized) return
         app = a
-        ConnLog.init(a)
+        ConnLog.init(a.filesDir, AndroidMainThread, AndroidLog)
         announceWrites()
-        store = PairingStore(a)
+        store = PairingStore(a.storage)
         notifier = Notifier(a)
         background = store.background
         // The list of computers; the first run after the update makes it from the one pairing kept before.
@@ -177,7 +178,7 @@ object Core {
         val id = s.id
         val active = { activeId == id }
         hubs[id] = LiveHub(
-            app, scope, s.pairing,
+            platform, scope, s.pairing,
             // A watched computer's errors aren't the screen's: only the active one's toast.
             toast = { if (active()) toastSink?.invoke(it) },
             onApproval = { a, session -> notifier.approval(a, session, server = id) },
@@ -261,7 +262,7 @@ object Core {
     private fun activated(id: String) {
         val h = hubs[id]
         if (h != null) {
-            if (h.synced) ComputerWords.set(app, h.mac.platform)
+            if (h.synced) ComputerWords.set(app.storage, h.mac.platform)
             h.foreground(visible)
         }
         if (visible) notifier.cancelAllApprovals(id)
@@ -288,12 +289,12 @@ object Core {
         pick(next)
         save()
         // The key stays while another computer's certificate is for it.
-        DeviceCertStore(app, id).clear(dropKey = left.isEmpty())
+        DeviceCertStore(app.storage, AndroidDeviceKeys, id).clear(dropKey = left.isEmpty())
         notifier.cancelAllApprovals(id)
-        NotificationPrefsStore.set(app, NotificationPrefsStore.get(app).without(id))
+        NotificationPrefsStore.set(app.storage, NotificationPrefsStore.get(app.storage).without(id))
         if (next == null) {
             // Unpaired: the Mac's words again until the next computer says what it is.
-            ComputerWords.clear(app)
+            ComputerWords.clear(app.storage)
             syncService()
         } else if (switched) {
             activated(next)
@@ -304,7 +305,7 @@ object Core {
 
     /** Settings' notification switches (data/NotificationPrefs.kt): kept, and what they now silence goes from the shade. */
     fun setNotifications(p: NotificationPrefs) {
-        NotificationPrefsStore.set(app, p)
+        NotificationPrefsStore.set(app.storage, p)
         notifier.cancelSilenced()
     }
 
@@ -424,7 +425,7 @@ class Notifier(private val context: Context) {
      */
     fun approval(a: WApproval, s: Session?, failed: Boolean = false, server: String? = null) {
         if (!canPost() || nm == null) return
-        if (!NotificationPrefsStore.get(context).allows(server, Notice.Kind.Approval)) return
+        if (!NotificationPrefsStore.get(context.storage).allows(server, Notice.Kind.Approval)) return
         // The session's name, as on its card (owner, 2026-10-31); its folder only when it has none.
         val untitled = context.getString(R.string.untitled_session)
         val project = (s?.name?.takeIf { it.isNotBlank() && it != untitled } ?: s?.project)?.takeIf { it.isNotBlank() }
@@ -499,7 +500,7 @@ class Notifier(private val context: Context) {
      */
     fun notice(n: Notice, server: String? = null) {
         if (!canPost() || nm == null) return
-        if (!NotificationPrefsStore.get(context).allows(server, n.kind)) {
+        if (!NotificationPrefsStore.get(context.storage).allows(server, n.kind)) {
             runCatching { nm.cancel(noticeId(server, n.sessionId ?: n.id)) }
             return
         }
@@ -583,7 +584,7 @@ class Notifier(private val context: Context) {
      */
     fun cancelSilenced() {
         val manager = nm ?: return
-        val prefs = NotificationPrefsStore.get(context)
+        val prefs = NotificationPrefsStore.get(context.storage)
         val active = runCatching { manager.activeNotifications }.getOrNull() ?: return
         for (sbn in active) {
             val extras = sbn.notification.extras

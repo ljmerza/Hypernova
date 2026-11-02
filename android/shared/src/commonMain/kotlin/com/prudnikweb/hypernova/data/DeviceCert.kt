@@ -1,21 +1,15 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import android.util.Base64
 import org.json.JSONObject
+import java.util.Base64
 import java.io.ByteArrayOutputStream
 import java.net.Socket
-import java.security.KeyPairGenerator
-import java.security.KeyStore
 import java.security.Principal
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.Signature
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.security.spec.ECGenParameterSpec
 import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
 
@@ -102,35 +96,18 @@ class DeviceIdentity(val chain: Array<X509Certificate>, val key: PrivateKey) {
 }
 
 /**
- * The key in AndroidKeyStore and the certificates in app-private storage. One key per phone, shared
+ * The key ([DeviceKeys], in AndroidKeyStore on a phone) and the certificates in app-private storage. One key per phone, shared
  * by every computer this phone pairs with; each signs its own certificate for it, kept per paired
  * computer ([server], data/Servers.kt: the first one's in the file it always had).
  */
-class DeviceCertStore(context: Context, server: String = Servers.LEGACY_ID) {
-    private val prefs = context.applicationContext.getSharedPreferences(Servers.scoped("hypernova.cert", server), Context.MODE_PRIVATE)
+class DeviceCertStore(storage: Storage, private val keys: DeviceKeys, server: String = Servers.LEGACY_ID) {
+    private val prefs = storage.prefs(Servers.scoped("hypernova.cert", server))
 
-    private fun keyStore(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-
-    /** The key, made once. TLS needs the raw (NONE) digest too: Android's TLS signs the handshake itself. */
-    private fun ensureKey(): Pair<PublicKey, PrivateKey> {
-        val ks = keyStore()
-        val have = runCatching { ks.getEntry(DeviceIdentity.ALIAS, null) as? KeyStore.PrivateKeyEntry }.getOrNull()
-        if (have != null) return have.certificate.publicKey to have.privateKey
-        val gen = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore")
-        gen.initialize(
-            KeyGenParameterSpec.Builder(DeviceIdentity.ALIAS, KeyProperties.PURPOSE_SIGN)
-                .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-                .setDigests(KeyProperties.DIGEST_NONE, KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA384, KeyProperties.DIGEST_SHA512)
-                .build(),
-        )
-        val kp = gen.generateKeyPair()
-        return kp.public to kp.private
-    }
 
     /** A request for a certificate naming [deviceId], as base64 DER for `POST /v1/device/cert`. */
     fun csr(deviceId: String): String {
-        val (pub, priv) = ensureKey()
-        return Base64.encodeToString(Csr.build(deviceId, pub, priv), Base64.NO_WRAP)
+        val (pub, priv) = keys.ensure()
+        return Base64.getEncoder().encodeToString(Csr.build(deviceId, pub, priv))
     }
 
     /** The certificate the Mac signed, kept with the CA that signed it and its listener's fingerprint. */
@@ -143,7 +120,7 @@ class DeviceCertStore(context: Context, server: String = Servers.LEGACY_ID) {
     /** This computer's certificate goes; the key too when [dropKey] (no other computer's certificate is for it any more). */
     fun clear(dropKey: Boolean = true) {
         prefs.edit().clear().apply()
-        if (dropKey) runCatching { keyStore().deleteEntry(DeviceIdentity.ALIAS) }
+        if (dropKey) runCatching { keys.delete() }
     }
 
     /** The chain and key to present, or null while the Mac hasn't signed one yet. */
@@ -151,13 +128,13 @@ class DeviceCertStore(context: Context, server: String = Servers.LEGACY_ID) {
         val cert = prefs.getString("cert", null) ?: return null
         val ca = prefs.getString("ca", null) ?: return null
         return runCatching {
-            val entry = keyStore().getEntry(DeviceIdentity.ALIAS, null) as? KeyStore.PrivateKeyEntry ?: return null
-            DeviceIdentity(arrayOf(parse(cert), parse(ca)), entry.privateKey)
+            val key = keys.privateKey() ?: return null
+            DeviceIdentity(arrayOf(parse(cert), parse(ca)), key)
         }.getOrNull()
     }
 
     private fun parse(b64: String): X509Certificate =
-        CertificateFactory.getInstance("X.509").generateCertificate(Base64.decode(b64, Base64.NO_WRAP).inputStream()) as X509Certificate
+        CertificateFactory.getInstance("X.509").generateCertificate(Base64.getMimeDecoder().decode(b64).inputStream()) as X509Certificate
 
     /**
      * `POST /v1/device/cert` with a fresh request (over whichever route is active; the bearer token

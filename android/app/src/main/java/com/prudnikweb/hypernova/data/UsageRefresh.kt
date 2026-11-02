@@ -23,8 +23,7 @@ object UsageRefresh {
     fun due(now: Long, last: Long): Boolean = last == 0L || now - last >= EVERY_MS || now < last
 
     /** A test's start: no look asked yet from this process. */
-    @androidx.annotation.VisibleForTesting
-    internal fun reset() {
+    fun reset() {
         last = 0L
     }
 

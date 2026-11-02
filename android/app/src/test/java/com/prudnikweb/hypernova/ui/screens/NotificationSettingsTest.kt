@@ -37,6 +37,7 @@ import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.ServerNotify
 import com.prudnikweb.hypernova.data.live.FakeDaemon
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.components.ConfirmDialog
 import com.prudnikweb.hypernova.ui.components.GlassCard
@@ -72,7 +73,7 @@ class NotificationSettingsTest {
     @Before fun setUp() {
         resetPrefs()
         Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(Core.app)
+        ComputerWords.clear(Core.app.storage)
     }
 
     @After fun tearDown() {
@@ -82,7 +83,7 @@ class NotificationSettingsTest {
         daemons.forEach { it.close() }
     }
 
-    private fun prefs() = NotificationPrefsStore.get(Core.app)
+    private fun prefs() = NotificationPrefsStore.get(Core.app.storage)
 
     private fun pair(name: String): String {
         val d = FakeDaemon(name).also(daemons::add)
@@ -284,7 +285,7 @@ class NotificationSettingsTest {
     @Test fun withTheMasterOffAServerSaysSo() {
         val id = pair("z2")
         linked()
-        NotificationPrefsStore.set(Core.app, prefs().copy(master = false))
+        NotificationPrefsStore.set(Core.app.storage, prefs().copy(master = false))
         serverRow(id, "z2")
         rule.onNodeWithText(str(R.string.nc_server_master_off)).assertExists()
     }

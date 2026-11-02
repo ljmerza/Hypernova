@@ -160,6 +160,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import com.prudnikweb.hypernova.data.HomeSearch
 import com.prudnikweb.hypernova.data.TextHit
+import com.prudnikweb.hypernova.data.strings
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.components.Icon
 import kotlinx.coroutines.launch
 import com.prudnikweb.hypernova.ui.fx.rememberScrambled
@@ -630,7 +632,7 @@ fun HomeScreen(
                     items(members, key = { it.key }) { c ->
                         val s = c.session
                         val hub = c.hub
-                        val readMarks = ReadState.server(hub)?.let { ReadState.of(context, it) }
+                        val readMarks = ReadState.server(hub)?.let { ReadState.of(context.storage, it) }
                         val hits = if (!typed) null else if (c.server == null) full.hits else fullBy[c.server]?.hits
                         val server = c.server
                         // Opening it: on its own computer (which is visited for the session's screens) with "All servers".
@@ -656,7 +658,7 @@ fun HomeScreen(
                                 CardSwipe.Delete -> page = MenuPage.Delete
                                 CardSwipe.Rename -> page = MenuPage.Rename
                                 CardSwipe.Restart -> page = MenuPage.Restart
-                                CardSwipe.MarkRead -> ReadState.server(hub)?.let { ReadState.mark(context, it, s.id, s.updatedAt) }
+                                CardSwipe.MarkRead -> ReadState.server(hub)?.let { ReadState.mark(context.storage, it, s.id, s.updatedAt) }
                             }
                         }
                         SessionCard(
@@ -1613,7 +1615,7 @@ private fun OfflineCard(hub: Hub, modifier: Modifier = Modifier) {
     AttentionCard(
         id = "offline", state = offlineAttention(link), tone = HN.danger, glyph = Glyph.Unlink,
         title = stringResource(R.string.cant_reach, hub.mac.name),
-        line = com.prudnikweb.hypernova.data.linkProblemText(res, link),
+        line = com.prudnikweb.hypernova.data.linkProblemText(res.strings, link),
         stamp = retry,
         action = AttentionAction(stringResource(R.string.retry_now), hub::retry),
         links = listOfNotNull(
@@ -1732,12 +1734,12 @@ private fun AccountCard(hub: Hub, onOpen: (String) -> Unit, onNewSession: () -> 
         }
     }
     val left = limit?.resetsAt?.let { formatDuration(res, (it - now).coerceAtLeast(0)) }
-    fun at(t: Long) = AccountWords.atClock(context, t, now)
-    fun clock(t: Long) = AccountWords.clock(context, t, now)
+    fun at(t: Long) = AccountWords.atClock(context.strings, t, now)
+    fun clock(t: Long) = AccountWords.clock(context.strings, t, now)
     val text = when (a.state) {
         Account.LIMITED -> {
             val l = limit ?: return
-            val label = AccountWords.label(context, l)
+            val label = AccountWords.label(context.strings, l)
             val until = l.resetsAt
             when {
                 l.usingCredits -> AccountText(label, left?.let { stringResource(R.string.resets_in, it) }, stringResource(R.string.account_on_credits_title), until?.let { stringResource(R.string.account_on_credits_body, clock(it)) })
@@ -2103,7 +2105,7 @@ private fun ProviderCard(t: Troubled, modifier: Modifier = Modifier) {
         com.prudnikweb.hypernova.data.ProviderStatus.BAD_KEY -> stringResource(R.string.provider_card_bad_key_body)
         com.prudnikweb.hypernova.data.ProviderStatus.NO_CREDIT -> stringResource(R.string.provider_card_no_credit_body)
         com.prudnikweb.hypernova.data.ProviderStatus.LIMITED -> st.resetsAt?.takeIf { it > now }
-            ?.let { stringResource(R.string.provider_card_limited_body, com.prudnikweb.hypernova.data.AccountWords.atClock(context, it, now)) }
+            ?.let { stringResource(R.string.provider_card_limited_body, com.prudnikweb.hypernova.data.AccountWords.atClock(context.strings, it, now)) }
             ?: stringResource(R.string.provider_no_reset)
         com.prudnikweb.hypernova.data.ProviderStatus.DOWN -> stringResource(R.string.provider_down_line)
         else -> st.text.takeIf { it.isNotBlank() }

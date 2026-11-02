@@ -1,15 +1,9 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.LinkProperties
-import android.net.Network
-import android.net.NetworkCapabilities
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.prudnikweb.hypernova.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -664,14 +658,13 @@ object RouteWords {
  * along. What it sees and decides goes to [ConnLog].
  */
 class LanRouter(
-    context: Context,
+    private val network: NetworkWatcher,
+    private val ticks: Ticks,
     private val scope: CoroutineScope,
     private val pairing: Pairing,
     private val certs: DeviceCertStore,
     private val onRoute: (NetRoute) -> Unit,
 ) {
-    private val app = context.applicationContext
-    private val connectivity = app.getSystemService(ConnectivityManager::class.java)
     private val chooser = RouteChooser(pairing.baseUrl, pairing.lanPort)
 
     /** The Mac's latest word on its listener; null until a snapshot says (then the pairing link's addresses serve). */
@@ -710,46 +703,25 @@ class LanRouter(
     private var closed = false
     /** The clients built for the current pin and device certificate (rebuilt when either changes). */
     private var pinned: Pinned? = null
+    private var watch: Watch? = null
+
+    private fun elapsed(): Long = ticks.elapsed()
 
     private class Pinned(val fingerprint: String, val identity: DeviceIdentity?, val client: OkHttpClient) {
         /** The hotspot sweep's own ([PinnedTls.sweep]). */
         val sweep: OkHttpClient by lazy { PinnedTls.sweep(client) }
     }
 
-    /**
-     * Hears the default network come, go, become another kind (Wi-Fi to mobile, a VPN over it) or
-     * get other addresses (another Wi-Fi's subnet). Capabilities follow every onAvailable, so they
-     * are the one signal for a network's arrival; signal strength and the like change all the time
-     * and aren't news, hence the key. Each change is a round at once, Local first.
-     */
-    private val watch = object : ConnectivityManager.NetworkCallback() {
-        private var key: Any? = null
-        private var addrsOf: Network? = null
-        private var addrs: List<String>? = null
-        override fun onLost(network: Network) { changed(listOf("down", network), "network lost") }
-        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-            changed(listOf(network, TRANSPORTS_WATCHED.filter(caps::hasTransport), caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)), "the network changed")
-        }
-        override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) {
-            val a = lp.linkAddresses.map { it.toString() }.sorted()
-            // The same network with other addresses (not its first ones arriving): another subnet, say.
-            val again = addrsOf == network && addrs?.isNotEmpty() == true && addrs != a
-            addrsOf = network
-            addrs = a
-            if (again) scope.launch { recheck("the phone's addresses changed"); tick() }
-        }
-        private fun changed(k: Any, why: String) {
-            if (k == key) return
-            key = k
-            scope.launch { recheck(why); tick() }
-        }
-    }
 
     fun start() {
         ActiveRoutes.register(pairing.baseUrl, this)
-        // The watch reports the current network at once, which is the first probe round; without
-        // one (no network) a round says so.
-        if (runCatching { connectivity?.registerDefaultNetworkCallback(watch) }.isFailure) recheck("start")
+        // Hears the default network come, go, become another kind (Wi-Fi to mobile, a VPN over it) or get
+        // other addresses (another Wi-Fi's subnet); each change is a round at once, Local first. The watch
+        // reports the current network at once, which is the first probe round; without one (no network)
+        // a round says so.
+        val made = runCatching { network.watchRoute { why -> scope.launch { recheck(why); tick() } } }.getOrNull()
+        watch = made
+        if (made == null) recheck("start")
         tick()
     }
 
@@ -766,7 +738,7 @@ class LanRouter(
             while (isActive) {
                 delay(RoutePolicy.TICK_MS)
                 if (chooser.kind == RouteKind.Local) continue
-                val (net, gateways, look) = withContext(Dispatchers.IO) { Triple(netKind(), hotspotGateways(), connectivity?.activeNetwork to phoneSubnets()) }
+                val (net, gateways, look) = withContext(Dispatchers.IO) { Triple(network.kind(), hotspotGateways(), network.active() to phoneSubnets()) }
                 val known = knownAddresses()
                 val near = net == NetKind.Wifi && RoutePolicy.sameSubnet(look.second, chooser.known(known))
                 if (backoff.due(elapsed(), gateways, look.first, near) && chooser.wantsRecheck(net, gateways.isNotEmpty(), known, gateways)) {
@@ -779,7 +751,7 @@ class LanRouter(
     fun close() {
         closed = true
         ActiveRoutes.unregister(pairing.baseUrl, this)
-        runCatching { connectivity?.unregisterNetworkCallback(watch) }
+        runCatching { watch?.stop() }
         round?.job?.cancel(); ticker?.cancel()
     }
 
@@ -888,7 +860,7 @@ class LanRouter(
     private suspend fun runRound(r: Round) {
         val t0 = elapsed()
         // The key store and the interfaces are read off the main thread.
-        val env = withContext(Dispatchers.IO) { Env(pinnedClient(), netKind(), hotspotGateways(), phoneSubnets(), netWords()) }
+        val env = withContext(Dispatchers.IO) { Env(pinnedClient(), network.kind(), hotspotGateways(), phoneSubnets(), network.words()) }
         val known = chooser.known(knownAddresses())
         val hotspot = env.gateways.isNotEmpty()
         val near = env.net == NetKind.Wifi && RoutePolicy.sameSubnet(env.subnets, known)
@@ -1039,43 +1011,10 @@ class LanRouter(
         })
     }
 
-    private fun netKind(): NetKind {
-        val cm = connectivity ?: return NetKind.None
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return NetKind.None
-        return when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetKind.Wifi
-            // A VPN over whatever carries it, mobile data included: a VPN into the Mac's own network
-            // (WireGuard, UniFi) reaches its local addresses, so the local route is worth probing.
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> NetKind.Wifi
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetKind.Mobile
-            else -> NetKind.None
-        }
-    }
-
-    /** The default network in a few words, for the log: "Wi-Fi", "VPN over mobile data, not validated". */
-    private fun netWords(): String {
-        val cm = connectivity ?: return "no network"
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return "no network"
-        return capsWords(caps)
-    }
 
     companion object {
-        private val TRANSPORTS_WATCHED = listOf(NetworkCapabilities.TRANSPORT_WIFI, NetworkCapabilities.TRANSPORT_CELLULAR, NetworkCapabilities.TRANSPORT_ETHERNET, NetworkCapabilities.TRANSPORT_VPN)
         /** How many newer rounds an attempt to connect follows before it takes what it has. */
         private const val MAX_JOINS = 20
-
-        private fun elapsed(): Long = android.os.SystemClock.elapsedRealtime()
-
-        private fun capsWords(caps: NetworkCapabilities): String {
-            val under = listOfNotNull(
-                "Wi-Fi".takeIf { caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) },
-                "Ethernet".takeIf { caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) },
-                "mobile data".takeIf { caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) },
-            ).joinToString(" and ").ifEmpty { "a network" }
-            val vpn = caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-            val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-            return (if (vpn) "a VPN over $under" else under) + if (validated) "" else ", not validated yet"
-        }
 
         /** This phone's IPv4 addresses with their prefix lengths (Wi-Fi's, a hotspot's), for [RoutePolicy.sameSubnet]. */
         fun phoneSubnets(): List<Pair<String, Int>> = runCatching {

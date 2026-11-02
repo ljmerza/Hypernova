@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
@@ -33,7 +32,7 @@ interface QueueStore {
     fun write(json: String)
 }
 
-class PrefsQueueStore(private val prefs: SharedPreferences, private val key: String = "offlineQueue") : QueueStore {
+class PrefsQueueStore(private val prefs: Prefs, private val key: String = "offlineQueue") : QueueStore {
     override fun read(): String? = prefs.getString(key, null)
     override fun write(json: String) { prefs.edit().putString(key, json).apply() }
 }

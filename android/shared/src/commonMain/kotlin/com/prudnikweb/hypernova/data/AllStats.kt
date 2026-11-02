@@ -87,7 +87,7 @@ object AllStats {
     }
 
     /** Each date's work on every server added up, oldest first, as many days as the longest answer has (the last 30). */
-    internal fun days(parts: List<Stats>): List<StatDay> {
+    fun days(parts: List<Stats>): List<StatDay> {
         val by = sortedMapOf<LocalDate, StatDay>()
         for (s in parts) for (d in s.days) by.merge(d.day, d) { a, b ->
             StatDay(a.day, a.claudeMs + b.claudeMs, a.wallMs + b.wallMs, a.tokens + b.tokens, a.sessions + b.sessions, a.prompts + b.prompts, a.codexMs + b.codexMs)

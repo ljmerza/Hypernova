@@ -16,6 +16,7 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import kotlinx.coroutines.async
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -90,7 +91,7 @@ class CoreServersTest {
 
     @Test fun twoComputersPairedTheSwitcherAllServersAndAnswersGoingToTheRightOne() {
         Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(Core.app)
+        ComputerWords.clear(Core.app.storage)
         val z2 = FakeDaemon("z2")
         val gym = FakeDaemon("gym")
         try {

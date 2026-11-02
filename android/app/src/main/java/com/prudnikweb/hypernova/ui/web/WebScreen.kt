@@ -48,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.id
 import com.prudnikweb.hypernova.data.ActiveRoutes
 import com.prudnikweb.hypernova.data.Api
 import com.prudnikweb.hypernova.data.Core
@@ -174,12 +175,12 @@ fun WebScreen(url: String, title: String, onBack: () -> Unit, preview: Boolean =
                                 }
 
                                 override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                                    if (request.isForMainFrame) failed = PageError.text(error.errorCode)
+                                    if (request.isForMainFrame) failed = PageError.text(error.errorCode).id
                                 }
 
                                 // A dev server that stopped answers the server's proxy with a 502/503/504.
                                 override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
-                                    if (request.isForMainFrame && errorResponse.statusCode in 502..504) failed = PageError.text(0, errorResponse.statusCode, port)
+                                    if (request.isForMainFrame && errorResponse.statusCode in 502..504) failed = PageError.text(0, errorResponse.statusCode, port).id
                                 }
 
                                 // The server's listener has a self-signed certificate: go on for the pinned one

@@ -41,6 +41,7 @@ import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.SwitchRefused
 import com.prudnikweb.hypernova.data.pick
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.LocalToast
@@ -201,7 +202,7 @@ internal fun AgentSwitchSheet(hub: Hub, s: Session, to: String, onSwitched: (Str
     // the session then says "Continued in" under its title).
     val scope = rememberCoroutineScope()
     val toCodex = to == AgentKind.CODEX
-    val memory = remember { NewSessionMemory.load(context) }
+    val memory = remember { NewSessionMemory.load(context.storage) }
     var carry by rememberSaveable { mutableStateOf(RECENT) }
     var text by remember { mutableStateOf("") }
     var messages by remember { mutableIntStateOf(0) }

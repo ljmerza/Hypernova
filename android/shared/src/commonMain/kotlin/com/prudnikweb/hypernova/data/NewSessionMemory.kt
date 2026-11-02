@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
 
 /**
  * What the new-session sheet starts with next time: the project, provider, model and Claude Code's
@@ -56,11 +55,11 @@ object NewSessionMemory {
     fun startMode(saved: String?): String = saved?.takeIf { it in START_MODES } ?: "default"
 
     /** Settings → New sessions: the mode the sheet opens on; a session's own pick doesn't change it. */
-    fun startMode(context: Context): String =
-        startMode(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(START_MODE, null))
+    fun startMode(storage: Storage): String =
+        startMode(storage.prefs(PREFS).getString(START_MODE, null))
 
-    fun setStartMode(context: Context, mode: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(START_MODE, startMode(mode)).apply()
+    fun setStartMode(storage: Storage, mode: String) {
+        storage.prefs(PREFS).edit().putString(START_MODE, startMode(mode)).apply()
     }
 
     /**
@@ -78,8 +77,8 @@ object NewSessionMemory {
     /** Codex's mode carried over: either of its two (nothing it does goes without asking); anything else is Read only. */
     fun keptCodexMode(mode: String?): String = if (mode == AgentKind.CAN_EDIT) AgentKind.CAN_EDIT else AgentKind.READ_ONLY
 
-    fun load(context: Context): Remembered {
-        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    fun load(storage: Storage): Remembered {
+        val p = storage.prefs(PREFS)
         val models = HashMap<String, String?>()
         for ((k, v) in p.all) if (k.startsWith(MODEL) && v is String) models[k.removePrefix(MODEL)] = v.ifEmpty { null }
         return Remembered(
@@ -97,8 +96,8 @@ object NewSessionMemory {
      * A session started on these: the sheet opens on them next time. [project] null: a new one, which
      * isn't a path yet. Its mode isn't kept (Fork: [startMode]); its [effort] is (null: the default).
      */
-    fun save(context: Context, project: String?, provider: String?, model: String?, effort: String?) {
-        val e = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+    fun save(storage: Storage, project: String?, provider: String?, model: String?, effort: String?) {
+        val e = storage.prefs(PREFS).edit()
         if (project != null) e.putString(PROJECT, project)
         if (provider != null) {
             e.putString(PROVIDER, provider)
@@ -110,8 +109,8 @@ object NewSessionMemory {
     }
 
     /** A Codex session started on these: the sheet opens on Codex with them next time; Claude's choices stay as they were. */
-    fun saveCodex(context: Context, project: String?, model: String?, effort: String?, mode: String) {
-        val e = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+    fun saveCodex(storage: Storage, project: String?, model: String?, effort: String?, mode: String) {
+        val e = storage.prefs(PREFS).edit()
         if (project != null) e.putString(PROJECT, project)
         e.putString(AGENT, AgentKind.CODEX)
         e.putString(CODEX_MODEL, model.orEmpty())

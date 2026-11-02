@@ -1,10 +1,7 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Immutable
-import com.prudnikweb.hypernova.R
+
 
 /**
  * Something to tell the owner: a session needs them, finished, stopped on an error, or the
@@ -69,17 +66,17 @@ class PutAway {
 data class AppUpdate(val versionName: String, val versionCode: Int, val url: String, val server: String? = null)
 
 /** True the first time it's asked about this version (remembered on the phone), so an update is announced once. */
-fun updateNoticed(context: Context, versionCode: Int): Boolean {
-    val prefs = context.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
+fun updateNoticed(storage: Storage, versionCode: Int): Boolean {
+    val prefs = storage.prefs("hypernova")
     if (prefs.getInt("updateNoticed", 0) >= versionCode) return false
     prefs.edit().putInt("updateNoticed", versionCode).apply()
     return true
 }
 
-fun updateNotice(context: Context, u: AppUpdate) = Notice(
+fun updateNotice(res: Strings, u: AppUpdate) = Notice(
     "update:${u.versionCode}", Notice.Kind.Update, null,
-    context.getString(R.string.update_title),
-    context.getString(R.string.update_body, u.versionName),
+    res.getString(Str.update_title),
+    res.getString(Str.update_body, u.versionName),
 )
 
 /** The id of a server's update-failed notice: one per server, its next taking its place. */
@@ -90,8 +87,8 @@ const val SERVER_UPDATE_NOTICE = "server-update-failed"
  * per server). Said once when a release first fails, and once more when the server gives up on it:
  * the tries between would say the same again, up to a day apart.
  */
-fun serverUpdateFailNoticed(context: Context, server: String, f: ServerUpdate.Failure): Boolean {
-    val prefs = context.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
+fun serverUpdateFailNoticed(storage: Storage, server: String, f: ServerUpdate.Failure): Boolean {
+    val prefs = storage.prefs("hypernova")
     val key = Servers.scoped("serverUpdateFailNoticed", server)
     val episode = "${f.tag}:${f.next == null}"
     if (prefs.getString(key, null) == episode) return false
@@ -100,27 +97,23 @@ fun serverUpdateFailNoticed(context: Context, server: String, f: ServerUpdate.Fa
 }
 
 /** "z2 · Couldn't update to 0.14.0: why. It tries again by itself." */
-fun serverUpdateFailedNotice(res: android.content.res.Resources, macName: String, f: ServerUpdate.Failure) = Notice(
+fun serverUpdateFailedNotice(res: Strings, macName: String, f: ServerUpdate.Failure) = Notice(
     SERVER_UPDATE_NOTICE, Notice.Kind.ServerUpdateFailed, null, macName, serverUpdateFailedText(res, f),
 )
 
 /** What failed and what happens next: the notice's text and Settings' line. */
-fun serverUpdateFailedText(res: android.content.res.Resources, f: ServerUpdate.Failure): String {
-    val what = if (f.why != null) res.getString(R.string.su_failed_why, f.version, f.why.trimEnd('.')) else res.getString(R.string.su_failed, f.version)
-    return what + " " + res.getString(if (f.next == null) R.string.su_failed_final else R.string.su_failed_again)
+fun serverUpdateFailedText(res: Strings, f: ServerUpdate.Failure): String {
+    val what = if (f.why != null) res.getString(Str.su_failed_why, f.version, f.why.trimEnd('.')) else res.getString(Str.su_failed, f.version)
+    return what + " " + res.getString(if (f.next == null) Str.su_failed_final else Str.su_failed_again)
 }
 
-/** A web page (claude.ai's usage or billing, the sign-in page) in the phone's browser. */
-fun openLink(context: Context, url: String) {
-    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-}
 
 /**
  * True the first time it's asked about this account episode (remembered on the phone), so a
  * limit or a sign-out is announced once, not once per session nor again after a restart.
  */
-fun accountNoticed(context: Context, episode: String): Boolean {
-    val prefs = context.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
+fun accountNoticed(storage: Storage, episode: String): Boolean {
+    val prefs = storage.prefs("hypernova")
     if (prefs.getString("accountNoticed", null) == episode) return false
     prefs.edit().putString("accountNoticed", episode).apply()
     return true
@@ -146,28 +139,26 @@ object AccountWords {
     private fun soon(at: Long, now: Long) = at - now < 20 * HOUR
 
     /** "2:00", or "Fri 10:00" when it isn't soon. */
-    fun clock(context: Context, at: Long, now: Long = System.currentTimeMillis()): String {
-        val h24 = android.text.format.DateFormat.is24HourFormat(context)
-        val skeleton = (if (soon(at, now)) "" else "EEE") + (if (h24) "Hm" else "hm")
+    fun clock(res: Strings, at: Long, now: Long = System.currentTimeMillis()): String {
         val locale = java.util.Locale.getDefault()
-        val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton)
+        val pattern = res.timePattern(withDay = !soon(at, now))
         return java.text.SimpleDateFormat(pattern, locale).format(java.util.Date(at))
     }
 
     /** "at 2:00" or "Fri 10:00", to follow "back" or "carries on". */
-    fun atClock(context: Context, at: Long, now: Long = System.currentTimeMillis()): String =
-        if (soon(at, now)) context.getString(R.string.at_clock, clock(context, at, now)) else clock(context, at, now)
+    fun atClock(res: Strings, at: Long, now: Long = System.currentTimeMillis()): String =
+        if (soon(at, now)) res.getString(Str.at_clock, clock(res, at, now)) else clock(res, at, now)
 
     /** "Session limit", "Weekly limit", "Opus limit": Claude Code's own words when it gave them. */
-    fun label(context: Context, limit: Account.Limit?): String {
+    fun label(res: Strings, limit: Account.Limit?): String {
         val own = limit?.label?.trim()?.takeIf { it.isNotEmpty() }
         if (own != null) return own.replaceFirstChar { it.uppercase() }
-        return context.getString(
+        return res.getString(
             when (limit?.window) {
-                "seven_day" -> R.string.limit_weekly
-                "model" -> R.string.limit_model
-                "credits" -> R.string.limit_credits
-                else -> R.string.limit_session
+                "seven_day" -> Str.limit_weekly
+                "model" -> Str.limit_model
+                "credits" -> Str.limit_credits
+                else -> Str.limit_session
             },
         )
     }
@@ -180,11 +171,11 @@ object AccountWords {
     }
 
     /** The limit a session's block names: the account's when it's the same one, else Claude Code's line ("hit your session limit"). */
-    fun label(context: Context, b: Blocked, account: Account): String {
+    fun label(res: Strings, b: Blocked, account: Account): String {
         val own = account.limit?.takeIf { (b.kind == Blocked.MODEL) == (it.window == "model") }
-        if (own != null) return label(context, own)
+        if (own != null) return label(res, own)
         HIT.find(b.text)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it.replaceFirstChar { c -> c.uppercase() } }
-        return context.getString(if (b.kind == Blocked.MODEL) R.string.limit_model else R.string.limit_session)
+        return res.getString(if (b.kind == Blocked.MODEL) Str.limit_model else Str.limit_session)
     }
 
     /** The page Claude Code named ("View details or appeal: https://…"), else [fallback]. */
@@ -196,26 +187,26 @@ object AccountWords {
      * Mac". [provider]: the session's provider's name, for its own trouble; [p]: that provider,
      * whose state it tells (data/Providers.kt).
      */
-    fun activity(context: Context, b: Blocked, account: Account, provider: String?, now: Long = System.currentTimeMillis(), p: Provider? = null): String {
-        val r = context.resources
+    fun activity(res: Strings, b: Blocked, account: Account, provider: String?, now: Long = System.currentTimeMillis(), p: Provider? = null): String {
+        val r = res
         return when (b.kind) {
             Blocked.LIMIT, Blocked.MODEL -> {
-                val l = label(context, b, account).lowercase()
+                val l = label(res, b, account).lowercase()
                 when {
                     // The limit is over and it didn't carry on by itself: it waits for Continue.
-                    b.resume?.ready == true -> r.getString(R.string.activity_limit_ready, l)
-                    b.autoResumeAt != null && b.autoResumeAt > now -> r.getString(R.string.activity_limit_auto, l, clock(context, b.autoResumeAt, now))
-                    b.resetsAt != null && b.resetsAt > now -> r.getString(R.string.activity_limit, l, clock(context, b.resetsAt, now))
+                    b.resume?.ready == true -> r.getString(Str.activity_limit_ready, l)
+                    b.autoResumeAt != null && b.autoResumeAt > now -> r.getString(Str.activity_limit_auto, l, clock(res, b.autoResumeAt, now))
+                    b.resetsAt != null && b.resetsAt > now -> r.getString(Str.activity_limit, l, clock(res, b.resetsAt, now))
                     // A model this plan can't use, or one that needs usage credits: no reset to wait for.
-                    b.kind == Blocked.MODEL && b.resetsAt == null -> r.getString(R.string.activity_model_unavailable)
-                    else -> r.getString(R.string.activity_limit_paused, l)
+                    b.kind == Blocked.MODEL && b.resetsAt == null -> r.getString(Str.activity_model_unavailable)
+                    else -> r.getString(Str.activity_limit_paused, l)
                 }
             }
-            Blocked.LOGGED_OUT -> r.getString(R.string.activity_signed_out)
-            Blocked.NO_SUBSCRIPTION -> r.getString(R.string.activity_no_plan)
-            Blocked.ON_HOLD -> r.getString(R.string.activity_on_hold)
-            Blocked.NO_CREDIT -> r.getString(R.string.activity_no_credit)
-            else -> if (p != null) ProviderWords.activity(context, b, p, now) else provider?.let { r.getString(R.string.activity_provider, it) } ?: b.text
+            Blocked.LOGGED_OUT -> r.getString(Str.activity_signed_out)
+            Blocked.NO_SUBSCRIPTION -> r.getString(Str.activity_no_plan)
+            Blocked.ON_HOLD -> r.getString(Str.activity_on_hold)
+            Blocked.NO_CREDIT -> r.getString(Str.activity_no_credit)
+            else -> if (p != null) ProviderWords.activity(res, b, p, now) else provider?.let { r.getString(Str.activity_provider, it) } ?: b.text
         }
     }
 
@@ -224,27 +215,27 @@ object AccountWords {
      * "Session limit until 2:00", "Weekly limit until Fri 10:00", "Signed out on Mac".
      * [usage] covers a limit the status line reports before any session hit it. Null when all's well.
      */
-    fun headline(context: Context, account: Account, usage: Usage, macName: String, now: Long = System.currentTimeMillis(), both: Boolean = false): String? {
-        val r = context.resources
+    fun headline(res: Strings, account: Account, usage: Usage, macName: String, now: Long = System.currentTimeMillis(), both: Boolean = false): String? {
+        val r = res
         // [both]: Codex is in use too, so the trouble is said as Claude's ("Claude Code signed out on Mac"), not the app's.
         when (account.state) {
-            Account.LOGGED_OUT -> return r.getString(if (both) R.string.headline_signed_out_claude else R.string.headline_signed_out, macName)
-            Account.NO_SUBSCRIPTION -> return r.getString(R.string.headline_no_plan)
-            Account.ON_HOLD -> return r.getString(if (both) R.string.headline_on_hold_claude else R.string.headline_on_hold)
-            Account.NO_CREDIT -> return r.getString(if (both) R.string.headline_no_credit_claude else R.string.headline_no_credit)
+            Account.LOGGED_OUT -> return r.getString(if (both) Str.headline_signed_out_claude else Str.headline_signed_out, macName)
+            Account.NO_SUBSCRIPTION -> return r.getString(Str.headline_no_plan)
+            Account.ON_HOLD -> return r.getString(if (both) Str.headline_on_hold_claude else Str.headline_on_hold)
+            Account.NO_CREDIT -> return r.getString(if (both) Str.headline_no_credit_claude else Str.headline_no_credit)
         }
         // Running on usage credits past a limit, Claude carries on: nothing to lead with, not even
         // the 100% the status line still shows for that window.
         if (account.state == Account.LIMITED && account.limit?.usingCredits == true) return null
         val rest = account.resting(now)
-        fun back(label: String, at: Long) = r.getString(if (both) R.string.headline_limit_claude else R.string.headline_limit, label, clock(context, at, now))
+        fun back(label: String, at: Long) = r.getString(if (both) Str.headline_limit_claude else Str.headline_limit, label, clock(res, at, now))
         // The weekly limit first: it outlasts the 5-hour one.
-        if (rest?.window == "seven_day" && rest.resetsAt != null) return back(label(context, rest), rest.resetsAt)
-        if (usage.weekLimited && usage.sevenDayResetAt > now) return back(r.getString(R.string.limit_weekly), usage.sevenDayResetAt)
-        if (rest?.window == "five_hour" && rest.resetsAt != null) return back(label(context, rest), rest.resetsAt)
-        if (usage.limited && usage.fiveHourResetAt > now) return back(r.getString(R.string.limit_session), usage.fiveHourResetAt)
+        if (rest?.window == "seven_day" && rest.resetsAt != null) return back(label(res, rest), rest.resetsAt)
+        if (usage.weekLimited && usage.sevenDayResetAt > now) return back(r.getString(Str.limit_weekly), usage.sevenDayResetAt)
+        if (rest?.window == "five_hour" && rest.resetsAt != null) return back(label(res, rest), rest.resetsAt)
+        if (usage.limited && usage.fiveHourResetAt > now) return back(r.getString(Str.limit_session), usage.fiveHourResetAt)
         // A one-model limit, or the extra usage's own.
-        if (rest?.resetsAt != null) return back(label(context, rest), rest.resetsAt)
+        if (rest?.resetsAt != null) return back(label(res, rest), rest.resetsAt)
         return null
     }
 
@@ -252,27 +243,27 @@ object AccountWords {
      * The banner (or, for what needs the owner, the notification) for a new account episode, or
      * null when there's nothing to say. Once per episode: see [accountNoticed].
      */
-    fun notice(context: Context, account: Account, macName: String, now: Long = System.currentTimeMillis(), both: Boolean = false): Notice? {
-        val r = context.resources
+    fun notice(res: Strings, account: Account, macName: String, now: Long = System.currentTimeMillis(), both: Boolean = false): Notice? {
+        val r = res
         fun n(kind: Notice.Kind, text: String) = Notice(NOTICE_ID, kind, null, macName, text)
         // [both]: Codex is in use too and carries on, so the words say whose sessions can't reply.
         return when (account.state) {
-            Account.LOGGED_OUT -> n(Notice.Kind.Account, r.getString(if (both) R.string.notice_signed_out_both else R.string.notice_signed_out))
-            Account.NO_SUBSCRIPTION -> n(Notice.Kind.Account, r.getString(R.string.notice_no_plan))
-            Account.ON_HOLD -> n(Notice.Kind.Account, r.getString(if (both) R.string.notice_on_hold_both else R.string.notice_on_hold))
-            Account.NO_CREDIT -> n(Notice.Kind.Account, r.getString(if (both) R.string.notice_no_credit_both else R.string.notice_no_credit))
+            Account.LOGGED_OUT -> n(Notice.Kind.Account, r.getString(if (both) Str.notice_signed_out_both else Str.notice_signed_out))
+            Account.NO_SUBSCRIPTION -> n(Notice.Kind.Account, r.getString(Str.notice_no_plan))
+            Account.ON_HOLD -> n(Notice.Kind.Account, r.getString(if (both) Str.notice_on_hold_both else Str.notice_on_hold))
+            Account.NO_CREDIT -> n(Notice.Kind.Account, r.getString(if (both) Str.notice_no_credit_both else Str.notice_no_credit))
             Account.LIMITED -> {
                 val l = account.resting(now)?.takeIf { !it.usingCredits } ?: return null
-                val label = label(context, l)
+                val label = label(res, l)
                 val auto = l.autoResumeAt?.takeIf { it > now }
                 val at = auto ?: l.resetsAt
                 n(
                     Notice.Kind.Limit,
                     when {
-                        l.window == "model" -> if (at != null) r.getString(R.string.notice_model, label, atClock(context, at, now)) else label
+                        l.window == "model" -> if (at != null) r.getString(Str.notice_model, label, atClock(res, at, now)) else label
                         at == null -> label
-                        auto != null -> r.getString(R.string.notice_limit_auto, label, atClock(context, at, now))
-                        else -> r.getString(R.string.notice_limit, label, atClock(context, at, now))
+                        auto != null -> r.getString(Str.notice_limit_auto, label, atClock(res, at, now))
+                        else -> r.getString(Str.notice_limit, label, atClock(res, at, now))
                     },
                 )
             }

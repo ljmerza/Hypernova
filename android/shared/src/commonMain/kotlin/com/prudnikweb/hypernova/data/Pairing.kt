@@ -1,10 +1,6 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
-import android.os.Build
-import android.provider.Settings
 import androidx.compose.runtime.Immutable
-import com.prudnikweb.hypernova.BuildConfig
 import org.json.JSONObject
 import java.net.URLDecoder
 
@@ -168,8 +164,8 @@ object PairLinks {
  * Pairing and app preferences, in app-private storage. The single pairing's keys are where the
  * list of paired computers ([ServerBook]) came from, and still hold the first computer's pairing.
  */
-class PairingStore(context: Context) : LegacyPairing {
-    private val prefs = context.applicationContext.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
+class PairingStore(storage: Storage) : LegacyPairing {
+    private val prefs = storage.prefs("hypernova")
 
     /** The paired computers and the active one (data/Servers.kt), kept next to the rest. */
     val servers = ServerBook(PrefsKeyValue(prefs), this)
@@ -218,17 +214,13 @@ class PairingStore(context: Context) : LegacyPairing {
 }
 
 object Pairer {
-    /** The name the Mac shows for this phone, e.g. "Nothing Phone (3)". */
-    fun deviceName(context: Context): String =
-        runCatching { Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME) }.getOrNull()?.takeIf { it.isNotBlank() }
-            ?: "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
 
     /**
      * The app install's stable id (8–64 of letters, digits, "_" and "-"): made once, kept with the
      * app's data (not with a pairing, so forgetting a computer keeps it), gone with an uninstall.
      */
-    fun installId(context: Context): String {
-        val prefs = context.applicationContext.getSharedPreferences("hypernova", Context.MODE_PRIVATE)
+    fun installId(storage: Storage): String {
+        val prefs = storage.prefs("hypernova")
         prefs.getString("installId", null)?.takeIf { INSTALL_ID.matches(it) }?.let { return it }
         val id = java.util.UUID.randomUUID().toString()
         prefs.edit().putString("installId", id).apply()
@@ -247,16 +239,16 @@ object Pairer {
      * and have that one turn down a code it never showed. Any 4xx means the code is no good
      * (expired, used, mistyped, or no code shown).
      */
-    suspend fun pair(context: Context, link: PairLink): Pairing {
+    suspend fun pair(platform: Platform, link: PairLink): Pairing {
         val body = JSONObject()
             .put("code", link.code)
-            .put("deviceName", deviceName(context))
-            .put("model", "${Build.MANUFACTURER} ${Build.MODEL}")
-            .put("appVersion", BuildConfig.VERSION_NAME)
+            .put("deviceName", platform.device.name)
+            .put("model", platform.device.model)
+            .put("appVersion", platform.appInfo.versionName)
             // This install's own id: pairing it again replaces its old device on the computer
             // rather than adding a twin to its list (docs/PROTOCOL.md, Pairing).
-            .put("installId", installId(context))
-        if (BuildConfig.DEBUG) android.util.Log.d("Hypernova", "pair: base=${link.baseUrl} lan=${link.hasLan}")
+            .put("installId", installId(platform.storage))
+        platform.log.d("Hypernova", "pair: base=${link.baseUrl} lan=${link.hasLan}")
         val local = if (link.hasLan) pairOverLan(link, body) else null
         val res = local?.first ?: run {
             // The base URL is the listener itself (the link's own page): nobody answered there already.

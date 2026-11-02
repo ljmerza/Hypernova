@@ -7,6 +7,8 @@ import com.prudnikweb.hypernova.data.DeviceCertStore
 import com.prudnikweb.hypernova.data.DeviceIdentity
 import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.b64
+import com.prudnikweb.hypernova.data.storage
+import com.prudnikweb.hypernova.data.AndroidDeviceKeys
 import kotlinx.coroutines.runBlocking
 import okhttp3.tls.HeldCertificate
 import org.json.JSONObject
@@ -39,7 +41,7 @@ class DeviceCertStoreTest {
     @Before fun keys() = FakeKeyStore.install()
     @After fun clean() = FakeKeyStore.reset()
 
-    private fun store(server: String = "srv-a") = DeviceCertStore(context, server).also { it.clear(dropKey = false) }
+    private fun store(server: String = "srv-a") = DeviceCertStore(context.storage, AndroidDeviceKeys, server).also { it.clear(dropKey = false) }
 
     private fun csr(s: DeviceCertStore, deviceId: String) = FakeDaemon.Csr.read(Base64.getDecoder().decode(s.csr(deviceId)))
 
@@ -81,7 +83,7 @@ class DeviceCertStoreTest {
         assertNull(km.getCertificateChain("other"))
         assertNull(km.chooseServerAlias("EC", null, null))
         // Kept: a store made again (the app restarted) has it.
-        assertEquals(cert, DeviceCertStore(context, "srv-a").identity()!!.chain[0])
+        assertEquals(cert, DeviceCertStore(context.storage, AndroidDeviceKeys, "srv-a").identity()!!.chain[0])
     }
 
     @Test fun aBadAnswerLeavesWhatWasThere() {

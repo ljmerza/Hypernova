@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
@@ -112,11 +111,11 @@ object ReadState {
     fun server(hub: Hub): String? = serverOf(hub)
 
     /** How [server] tells: a test's hub names a server of its own here. */
-    internal var serverOf: (Hub) -> String? = { (it as? LiveHub)?.serverId }
+    var serverOf: (Hub) -> String? = { (it as? PairedHub)?.serverId }
 
     @Synchronized
-    fun of(context: Context, server: String): ReadMarks = marks.getOrPut(server) {
-        ReadMarks(PrefsKeyValue(context.applicationContext.getSharedPreferences(Servers.scoped("hypernova.read", server), Context.MODE_PRIVATE)))
+    fun of(storage: Storage, server: String): ReadMarks = marks.getOrPut(server) {
+        ReadMarks(PrefsKeyValue(storage.prefs(Servers.scoped("hypernova.read", server))))
     }
 
     /** [s] has a reply not read on this phone ([marks]). Read in a composition, a new mark redraws it. */
@@ -126,26 +125,13 @@ object ReadState {
     }
 
     /** A rewind on [server] replaced session [old] with [to] ([ReadMarks.moved]). */
-    fun moved(context: Context, server: String, old: String, to: String, at: Long) {
-        if (of(context, server).moved(old, to, at)) version++
+    fun moved(storage: Storage, server: String, old: String, to: String, at: Long) {
+        if (of(storage, server).moved(old, to, at)) version++
     }
 
     /** Session [id] on [server] was on screen with its last activity at [at]. */
-    fun mark(context: Context, server: String, id: String, at: Long) {
-        if (of(context, server).mark(id, at)) version++
+    fun mark(storage: Storage, server: String, id: String, at: Long) {
+        if (of(storage, server).mark(id, at)) version++
     }
 }
 
-/**
- * A session's chat on screen ([sessionId], null when none is) is read up to its last activity, and
- * stays read while replies come in: its Completed card on Home has no unread dot (App.kt).
- */
-@androidx.compose.runtime.Composable
-fun MarkReadOnScreen(hub: Hub?, sessionId: String?) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val readAt = sessionId?.let { hub?.session(it)?.updatedAt }
-    androidx.compose.runtime.LaunchedEffect(hub, sessionId, readAt) {
-        val server = hub?.let(ReadState::server)
-        if (server != null && sessionId != null && readAt != null) ReadState.mark(context, server, sessionId, readAt)
-    }
-}

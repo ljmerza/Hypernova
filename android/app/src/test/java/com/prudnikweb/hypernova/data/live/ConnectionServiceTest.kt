@@ -18,6 +18,7 @@ import com.prudnikweb.hypernova.data.Phrases
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -69,7 +70,7 @@ class ConnectionServiceTest {
             })
         }
         Core.init(app)
-        ComputerWords.clear(app)
+        ComputerWords.clear(app.storage)
         Core.stayConnected(true)
         z2.snapshot = snapshot(
             "z2",

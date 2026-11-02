@@ -18,6 +18,7 @@ import org.robolectric.RuntimeEnvironment
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.prudnikweb.hypernova.data.Confirm
 import com.prudnikweb.hypernova.data.EnterKey
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.LocalOpener
@@ -112,8 +113,8 @@ fun resetPrefs() {
     com.prudnikweb.hypernova.ui.home.HomeFilterPref.set(context, com.prudnikweb.hypernova.ui.home.HomeFilter.NONE)
     com.prudnikweb.hypernova.ui.term.TermEnginePref.set(context, com.prudnikweb.hypernova.ui.term.TermEngine.Xterm)
     com.prudnikweb.hypernova.ui.home.HomeSortPref.set(context, com.prudnikweb.hypernova.ui.home.HomeSort.DEFAULT)
-    com.prudnikweb.hypernova.data.VoicePrefs.of(context).chooseDictationEngine(com.prudnikweb.hypernova.data.DictationEngine.of(null))
-    com.prudnikweb.hypernova.data.NotificationPrefsStore.set(context, com.prudnikweb.hypernova.data.NotificationPrefs())
+    com.prudnikweb.hypernova.data.VoicePrefs.of(context.storage).chooseDictationEngine(com.prudnikweb.hypernova.data.DictationEngine.of(null))
+    com.prudnikweb.hypernova.data.NotificationPrefsStore.set(context.storage, com.prudnikweb.hypernova.data.NotificationPrefs())
 }
 
 /** A node whose click TalkBack names [label] (onClickLabel): buttons drawn without text of their own. */

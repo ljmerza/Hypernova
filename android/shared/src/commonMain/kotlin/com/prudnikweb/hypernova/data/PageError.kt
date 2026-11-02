@@ -1,6 +1,6 @@
 package com.prudnikweb.hypernova.data
 
-import com.prudnikweb.hypernova.R
+
 
 /** A web view's failure in plain words (never "net::ERR_CONNECTION_REFUSED"): the string to show, from the view's error codes. */
 object PageError {
@@ -16,14 +16,14 @@ object PageError {
      * loaded with one (0 if none); [port]: the dev server's, for a localhost preview (its string then
      * takes the port as its argument).
      */
-    fun text(code: Int, httpStatus: Int = 0, port: Int? = null): Int = when {
-        httpStatus in intArrayOf(502, 503, 504) -> if (port != null) R.string.pg_dev_server_port else R.string.pg_dev_server
-        httpStatus == 404 -> R.string.pg_gone
-        httpStatus != 0 -> R.string.pg_other
-        code == HOST_LOOKUP -> R.string.pg_dns
-        code == CONNECT || code == IO -> R.string.pg_connect
-        code == TIMEOUT -> R.string.pg_timeout
-        code == FAILED_SSL -> R.string.pg_ssl
-        else -> R.string.pg_other
+    fun text(code: Int, httpStatus: Int = 0, port: Int? = null): Str = when {
+        httpStatus in intArrayOf(502, 503, 504) -> if (port != null) Str.pg_dev_server_port else Str.pg_dev_server
+        httpStatus == 404 -> Str.pg_gone
+        httpStatus != 0 -> Str.pg_other
+        code == HOST_LOOKUP -> Str.pg_dns
+        code == CONNECT || code == IO -> Str.pg_connect
+        code == TIMEOUT -> Str.pg_timeout
+        code == FAILED_SSL -> Str.pg_ssl
+        else -> Str.pg_other
     }
 }

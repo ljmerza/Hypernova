@@ -25,6 +25,7 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
 import com.prudnikweb.hypernova.data.updateNoticed
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.widget.WidgetSync
 import org.json.JSONArray
 import org.json.JSONObject
@@ -72,8 +73,8 @@ class NotificationControlsTest {
     @Before fun pair() {
         shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         Core.init(app)
-        ComputerWords.clear(app)
-        NotificationPrefsStore.set(app, NotificationPrefs())
+        ComputerWords.clear(app.storage)
+        NotificationPrefsStore.set(app.storage, NotificationPrefs())
         Core.setVisible(false)
         z2.snapshot = snapshot("z2", sessions = listOf(session("z1", state = "working", title = "Fix the parser")))
         gym.snapshot = snapshot("gym", sessions = listOf(session("g1", state = "working", title = "Nightly build")))
@@ -97,7 +98,7 @@ class NotificationControlsTest {
         gym.close()
     }
 
-    private fun prefs() = NotificationPrefsStore.get(app)
+    private fun prefs() = NotificationPrefsStore.get(app.storage)
 
     /** The id of a session's notice on [server] (Notifier.noticeId). */
     private fun noticeId(server: String, key: String) = ("session:" + (if (server == Servers.LEGACY_ID) key else "$server:$key")).hashCode()
@@ -306,7 +307,7 @@ class NotificationControlsTest {
     }
 
     @Test fun aBannerStillShowsWithTheServerOffAndTheApprovalStaysInTheHub() = rig { rig, d ->
-        NotificationPrefsStore.set(app, prefs().withMode("shed", ServerNotify.Off).copy(master = false))
+        NotificationPrefsStore.set(app.storage, prefs().withMode("shed", ServerNotify.Off).copy(master = false))
         rig.push(msg("approval") { put("approval", approval("a1", "s1")) }) { rig.banners.any { it.id == "a:a1" } }
         assertEquals(listOf("a1"), rig.hub.pendingApprovals.map { it.id })
         // An error on screen too.
@@ -315,12 +316,12 @@ class NotificationControlsTest {
     }
 
     @Test fun anUpdateSilencedOffScreenIsntUsedUpForTheBannerOrAnotherServer() = rig { rig, _ ->
-        NotificationPrefsStore.set(app, prefs().withCustom("shed", NotifyGroup.Updates, on = false))
+        NotificationPrefsStore.set(app.storage, prefs().withCustom("shed", NotifyGroup.Updates, on = false))
         rig.visible = false
         val code = 2_000_000_101
         val offer = JSONObject().put("versionCode", code).put("versionName", "9.9.11")
         rig.push(msg("app") { put("app", offer) }) { rig.hub.appUpdate != null }
         assertTrue(rig.notices.none { it.kind == Notice.Kind.Update })
-        assertTrue("the app's banner still has it", updateNoticed(rig.context, code))
+        assertTrue("the app's banner still has it", updateNoticed(rig.context.storage, code))
     }
 }

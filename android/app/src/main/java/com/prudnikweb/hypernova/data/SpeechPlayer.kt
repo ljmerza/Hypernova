@@ -33,7 +33,9 @@ import kotlin.math.max
  *
  * One play at a time; a new one stops the last. [now] and [level] are what the screens draw.
  */
-object Speaker {
+object Speaker : SpeechOutput {
+    override val speaking: Boolean get() = now != null
+
     /** What plays now (Compose state, written on the main thread). */
     var now by mutableStateOf<Speaking?>(null)
         private set
@@ -49,7 +51,7 @@ object Speaker {
      * (`{t:"speech.progress"}`), [label] names it in the notification. [key]: the message being
      * read, for this phone's own Read aloud.
      */
-    fun play(info: PlayInfo, key: String?, label: String?, open: () -> Call, report: (String) -> Unit) = onMain {
+    override fun play(info: PlayInfo, key: String?, label: String?, open: () -> Call, report: (String) -> Unit) = onMain {
         current?.stop("replaced")
         val run = Run(info, key, label, open, report)
         current = run
@@ -58,10 +60,10 @@ object Speaker {
     }
 
     /** Stop button, notification: stop whatever plays. */
-    fun stop(why: String = "phone") = onMain { current?.stop(why) }
+    override fun stop(why: String) = onMain { current?.stop(why) }
 
     /** The Mac stopped play [id] (a newer one replaced it). */
-    fun stopPlay(id: String) = onMain { if (current?.info?.id == id) current?.stop("mac") }
+    override fun stopPlay(id: String) = onMain { if (current?.info?.id == id) current?.stop("mac") }
 
     /** At once on the main thread (so a screen never sees a frame without it), else posted there. */
     private fun onMain(block: () -> Unit) {

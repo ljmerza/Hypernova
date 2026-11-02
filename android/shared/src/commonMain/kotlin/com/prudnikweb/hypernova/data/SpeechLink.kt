@@ -22,6 +22,8 @@ class PhoneSpeech(
     private val send: (String) -> Boolean,
     /** A session's project, for the notification. */
     private val labelOf: (String?) -> String?,
+    /** Where this device reads aloud. */
+    private val speaker: SpeechOutput,
 ) {
     /** The Mac's setting; null until it says, or from a Mac too old to read aloud this way. */
     var settings by mutableStateOf<SpeechOut?>(null)
@@ -36,7 +38,7 @@ class PhoneSpeech(
     fun message(o: JSONObject) {
         when (o.str("t")) {
             "speech" -> SpeechOut.parse(o.obj("speech"))?.let { settings = it }
-            "speech.stop" -> o.str("id")?.let(Speaker::stopPlay)
+            "speech.stop" -> o.str("id")?.let(speaker::stopPlay)
         }
     }
 
@@ -62,7 +64,7 @@ class PhoneSpeech(
     }
 
     private fun start(play: PlayInfo, key: String?) {
-        Speaker.play(play, key, labelOf(play.sessionId), open = {
+        speaker.play(play, key, labelOf(play.sessionId), open = {
             // By the route active as it opens (data/LanRoute.kt): the Mac's own address, or the base URL.
             val route = ActiveRoutes.route(pairing.baseUrl)
             val req = Request.Builder()

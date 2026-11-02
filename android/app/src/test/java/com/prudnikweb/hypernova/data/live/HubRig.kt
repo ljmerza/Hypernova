@@ -13,6 +13,8 @@ import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.Servers
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.WApproval
+import com.prudnikweb.hypernova.data.storage
+import com.prudnikweb.hypernova.data.AndroidPlatform
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,7 +52,7 @@ class HubRig(
 ) : AutoCloseable {
     val context: Context = RuntimeEnvironment.getApplication().also {
         // A fresh install's words (a Mac's): ComputerWords is process-wide and outlives a test.
-        ComputerWords.clear(it)
+        ComputerWords.clear(it.storage)
     }
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
     val pairing = Pairing(baseUrl = if (baseIsListener) "https://127.0.0.1:${daemon.lanPort}" else daemon.base, token = token, macName = daemon.name, macId = "m-${daemon.name}", deviceId = deviceId).let {
@@ -78,7 +80,7 @@ class HubRig(
     val banners = mutableListOf<Notice>()
 
     val hub = LiveHub(
-        context, scope, pairing,
+        com.prudnikweb.hypernova.data.AndroidPlatform(context), scope, pairing,
         toast = { toasts += it },
         onApproval = { a, s -> notified += a to s },
         onApprovalGone = { gone += it },

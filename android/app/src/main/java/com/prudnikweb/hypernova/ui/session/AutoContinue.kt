@@ -31,6 +31,7 @@ import com.prudnikweb.hypernova.data.ProviderWords
 import com.prudnikweb.hypernova.data.Resume
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.openLink
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.LocalToast
@@ -82,7 +83,7 @@ internal fun ResumeLine(hub: Hub, s: Session, r: Resume, amber: Boolean, resetsA
     fun observed(text: String) = if (inTerminal) context.getString(R.string.resume_in_terminal, text) else text
     when {
         r.armed -> Column {
-            val text = r.at?.let { if (it > now) context.getString(R.string.resume_carries_on, AccountWords.atClock(context, it, now)) else null }
+            val text = r.at?.let { if (it > now) context.getString(R.string.resume_carries_on, AccountWords.atClock(context.strings, it, now)) else null }
                 ?: context.getString(R.string.resume_carries_on_soon)
             HText(observed(text), style = Type.monoSmall, color = tone, maxLines = 2, overflow = TextOverflow.Ellipsis)
             // Both ways out of waiting (owner, 2026-10-16): leave it, or go now. Continue now is the
@@ -108,7 +109,7 @@ internal fun ResumeLine(hub: Hub, s: Session, r: Resume, amber: Boolean, resetsA
         }
         r.off -> Column {
             val back = (r.at ?: resetsAt)?.takeIf { it > now }
-            if (back != null) HText(observed(context.getString(R.string.resume_back, AccountWords.atClock(context, back, now))), style = Type.monoSmall, color = tone, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (back != null) HText(observed(context.getString(R.string.resume_back, AccountWords.atClock(context.strings, back, now))), style = Type.monoSmall, color = tone, maxLines = 2, overflow = TextOverflow.Ellipsis)
             whyLine(r.why)?.let {
                 Spacer(Modifier.height(2.dp))
                 HText(it, style = Type.small, color = HN.inkDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -117,7 +118,7 @@ internal fun ResumeLine(hub: Hub, s: Session, r: Resume, amber: Boolean, resetsA
                 Spacer(Modifier.height(10.dp))
                 val label = when {
                     asking == true -> stringResource(R.string.resume_turning_on)
-                    back != null -> stringResource(R.string.resume_arm, AccountWords.atClock(context, back, now))
+                    back != null -> stringResource(R.string.resume_arm, AccountWords.atClock(context.strings, back, now))
                     else -> stringResource(R.string.resume_arm_plain)
                 }
                 Pill(label, { flip(true) }, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Reload)
@@ -173,11 +174,11 @@ internal fun LimitCard(hub: Hub, s: Session, b: Blocked, other: Provider?, onMov
         ready && r?.why == "slept" -> stringResource(R.string.resume_ready_slept)
         ready && r?.why == "dropped" -> stringResource(R.string.resume_ready_dropped)
         ready -> stringResource(R.string.resume_ready_limit)
-        else -> ProviderWords.title(context, name, st)
+        else -> ProviderWords.title(context.strings, name, st)
     }
-    val balance = ProviderWords.balance(context, provider?.balance, provider?.status)
+    val balance = ProviderWords.balance(context.strings, provider?.balance, provider?.status)
     val line: String? = when {
-        ready -> balance?.takeIf { b.kind == Blocked.PROVIDER } ?: r?.at?.let { stringResource(R.string.resume_ready_line, AccountWords.clock(context, it, now)) }
+        ready -> balance?.takeIf { b.kind == Blocked.PROVIDER } ?: r?.at?.let { stringResource(R.string.resume_ready_line, AccountWords.clock(context.strings, it, now)) }
         r != null && (r.armed || r.off) && r.why != "no_reset" -> null // the resume line says it
         st?.state == ProviderStatus.NO_CREDIT -> balance ?: st.text.takeIf { it.isNotBlank() }
         st?.state == ProviderStatus.BAD_KEY -> stringResource(R.string.provider_key_line)

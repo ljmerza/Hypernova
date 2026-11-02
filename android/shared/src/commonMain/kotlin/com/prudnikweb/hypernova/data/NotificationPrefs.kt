@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.data
 
-import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
@@ -140,17 +139,17 @@ data class NotificationPrefs(
 object NotificationPrefsStore {
     private var current: MutableState<NotificationPrefs>? = null
 
-    fun state(context: Context): State<NotificationPrefs> = holder(context)
+    fun state(storage: Storage): State<NotificationPrefs> = holder(storage)
 
-    fun get(context: Context): NotificationPrefs = holder(context).value
+    fun get(storage: Storage): NotificationPrefs = holder(storage).value
 
-    fun set(context: Context, value: NotificationPrefs) {
-        value.save(store(context))
-        holder(context).value = value
+    fun set(storage: Storage, value: NotificationPrefs) {
+        value.save(store(storage))
+        holder(storage).value = value
     }
 
-    private fun store(context: Context): KeyValue = PrefsKeyValue(context.applicationContext.getSharedPreferences("hypernova", Context.MODE_PRIVATE))
+    private fun store(storage: Storage): KeyValue = PrefsKeyValue(storage.prefs("hypernova"))
 
-    private fun holder(context: Context): MutableState<NotificationPrefs> = current
-        ?: mutableStateOf(NotificationPrefs.load(store(context))).also { current = it }
+    private fun holder(storage: Storage): MutableState<NotificationPrefs> = current
+        ?: mutableStateOf(NotificationPrefs.load(store(storage))).also { current = it }
 }

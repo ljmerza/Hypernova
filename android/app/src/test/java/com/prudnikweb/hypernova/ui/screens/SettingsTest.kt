@@ -22,6 +22,7 @@ import com.prudnikweb.hypernova.data.AppUpdate
 import com.prudnikweb.hypernova.data.DictationEngine
 import com.prudnikweb.hypernova.data.EnterKey
 import com.prudnikweb.hypernova.data.VoicePrefs
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.components.EnterKeyPref
 import com.prudnikweb.hypernova.ui.home.CardSwipePref
 import com.prudnikweb.hypernova.ui.home.CardSwipes
@@ -106,7 +107,7 @@ class SettingsTest {
         parts()
         rule.onNodeWithText(str(R.string.voice_engine_on_device)).performClick()
         rule.waitForIdle()
-        assertEquals(DictationEngine.OnDevice, VoicePrefs.of(context).dictationEngine)
+        assertEquals(DictationEngine.OnDevice, VoicePrefs.of(context.storage).dictationEngine)
     }
 
     @Test fun cardSwipeRightPicksOpen() {

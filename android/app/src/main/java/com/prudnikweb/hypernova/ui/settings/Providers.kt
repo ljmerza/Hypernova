@@ -68,6 +68,7 @@ import com.prudnikweb.hypernova.data.ProviderModels
 import com.prudnikweb.hypernova.data.ProviderRefused
 import com.prudnikweb.hypernova.data.ProviderStatus
 import com.prudnikweb.hypernova.data.ProviderWords
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.Field
@@ -392,7 +393,7 @@ internal fun versionBelow(v: String, min: String): Boolean {
 @Composable
 private fun troubleLabel(p: Provider, account: Account): String? {
     // Its own trouble, with when a rate limit lifts when it said (data/Providers.kt).
-    if (p.status != null) return ProviderWords.trail(LocalContext.current, p)?.first
+    if (p.status != null) return ProviderWords.trail(LocalContext.current.strings, p)?.first
     if (!p.builtIn || account.ok) return null
     return when (account.state) {
         Account.LOGGED_OUT -> stringResource(R.string.state_signed_out)
@@ -456,7 +457,7 @@ private fun ProviderCard(p: Provider, account: Account, onClick: (() -> Unit)?) 
                 }
                 // What's left on it, where its API says (OpenRouter): "$4.20 left", "$1.10 today".
                 // After a banknote, as the chat's strip draws what a session cost.
-                val left = ProviderWords.balance(LocalContext.current, p.balance, p.status)
+                val left = ProviderWords.balance(LocalContext.current.strings, p.balance, p.status)
                 if (left != null) {
                     Spacer(Modifier.weight(1f))
                     GlyphFigure(Glyph.Note, left, color = if (p.status?.state == ProviderStatus.NO_CREDIT) HN.amber else HN.inkMuted)
@@ -575,7 +576,7 @@ fun ProviderEditScreen(hub: Hub, id: String?, kind: String, onBack: () -> Unit) 
                 keyDropped = saved.keyDropped
                 // A new key the Mac tried at once: whether it works, and what's left ("Key works. $4.20 left.").
                 val verdict = saved.check?.let { checkWords(context, it) }
-                    ?: if (typedKey) ProviderWords.keyVerdict(context, saved.provider) else null
+                    ?: if (typedKey) ProviderWords.keyVerdict(context.strings, saved.provider) else null
                 if (ProviderForm.staysOpen(saved)) {
                     // The verdict stays in view, where the key goes.
                     check = saved.check
@@ -732,7 +733,7 @@ private fun checkWords(context: android.content.Context, c: ProviderCheck): Stri
     if (c.text.isNotBlank()) return c.text
     val res = context.resources
     return when (c.state) {
-        ProviderCheck.OK -> ProviderWords.balance(context, c.balance)?.let { res.getString(R.string.balance_key_works, it) } ?: res.getString(R.string.pv_check_ok)
+        ProviderCheck.OK -> ProviderWords.balance(context.strings, c.balance)?.let { res.getString(R.string.balance_key_works, it) } ?: res.getString(R.string.pv_check_ok)
         ProviderCheck.BAD_KEY -> res.getString(R.string.pv_check_bad_key)
         ProviderCheck.NO_CREDIT -> res.getString(R.string.pv_check_no_credit)
         ProviderCheck.LIMITED -> res.getString(R.string.pv_check_limited)
