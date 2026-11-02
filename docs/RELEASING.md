@@ -49,7 +49,7 @@ That job's release is then added to by `.github/workflows/server-packages.yml`, 
 |---|---|---|
 | `deb` (matrix) | `ubuntu-24.04`, `ubuntu-24.04-arm` | `hypernova-server-vX.Y.Z-linux-<arch>.deb`, after `scripts/test-server-deb.sh` on Ubuntu 24.04 and Debian 12 |
 | `macos` (matrix) | `macos-latest` (arm64), `macos-26-intel` (x64) | `hypernova-server-vX.Y.Z-macos-<arch>.tar.gz`, then `.pkg`, each after `scripts/test-macos-smoke.sh` |
-| `macos-unit` | `macos-latest` | nothing: the daemon's whole suite on a Mac. `continue-on-error` until a run has shown it green; nothing depends on it either way |
+| `macos-unit` | `macos-latest` | nothing: the daemon's whole suite on a Mac, through `scripts/test-with-limits.mjs` (5 minutes a test, 10 a file, 19 the run, and a summary). `continue-on-error` until a run has shown it green; nothing depends on it either way |
 | `checksums` | `ubuntu-latest` | `SHA256SUMS`, from what the release really has, and a line in the notes for anything it lacks. Runs even when a job above failed |
 
 **A failure there can't stop a release.** The APK and the Linux tarball are published before any of it
