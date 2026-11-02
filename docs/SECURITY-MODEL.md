@@ -30,6 +30,8 @@ There is no Hypernova account and no Hypernova server that carries sessions.
 - Hypernova's state: the device list (`devices.json`: for each phone its name, the SHA-256 of its
   token, the fingerprint of its certificate), settings, session records and titles.
 - Attachments the phone uploaded (`attachments/`, kept 30 days).
+- Debug logs a client sent on purpose (`client-logs/<device>/`, the newest 5 per device, kept 30 days, untrusted text;
+  see "Client debug logs").
 - Tokens and keys: the **admin token**, the **hook secret**, TLS keys (`tls/`: the server key and the
   device CA), provider keys, automations'
   **fire tokens** (only their SHA-256, in `automations.json`) and their webhook outputs' addresses
@@ -129,6 +131,44 @@ hook's answer; the daemon reads and writes no settings file for it, and the answ
 allow rule, never a deny, ask, mode or folder of the phone's. The daemon itself asks for them on every save that needs them,
 including a save that keeps the steps as they were.
 
+### Client debug logs
+
+**Off by default on both clients.** Settings → Debug logging turns on a detailed log, for 24 hours at most
+(a clock that says it's further off than that counts as over). It's for finding what went wrong, and the
+rules are the owner's (docs/DECISIONS.md, "A debug log"):
+
+- **Kept on the device,** in the app's private folder on a phone (`files/debug-logs`, excluded from backup
+  like the rest), or `files/debug-logs` under the desktop app's folder, 0700 and 0600. About 5 MB at most,
+  the oldest going first. Crashes go in a file of their own, 64 KB at most, **with the switch off too**:
+  stack trace, app version, time and thread name, no exception's message.
+- **It leaves on a tap, to where the tap says:** Send logs, to the server picked, over its own link
+  (below); or Share, Android's share sheet, with a read grant for one `FileProvider` URI, one file in a
+  folder that holds nothing else, so whatever app the owner picks gets that file and only that. On a desktop
+  there's Open folder and Copy path, and it's up to him. No cloud service, no automatic upload, nothing
+  sent in the background.
+- **On the server,** `<support>/client-logs/<device>/`, 0700 and 0600, the server's own file names, the
+  newest 5 per device, 30 days, stored as untrusted bytes and never parsed, served or run (`docs/PROTOCOL.md`,
+  "Client logs"). Anyone who can read the support folder can read them. No route reads them back, so a
+  stolen device token can't read what was sent, only send more (6 MB, 10 an hour, and 5 kept).
+- **One scrubbing layer, for every line** (`data/DebugScrub.kt`), applied just before the disk, the crash
+  file included. It cuts: the secrets this run actually holds (device tokens and pairing codes, by value);
+  certificates and keys (PEM, long base64); `Authorization`, cookie and other header values; tokens by name
+  and by shape (`hn_`, `hnf_`, `sk-`, `ghp_`, JWTs and so on); env-style `NAME=value`; pairing links, ticket
+  URLs and every URL down to its host and port; query strings; fingerprints; long random runs; email addresses;
+  file paths. `DebugScrubTest` plants each and looks in the files.
+- **No conversation content, by construction, since a prompt has no shape to scrub:** call sites log ids,
+  sizes and fixed words. A route keeps only segments that can be a word or an id, and a preview's link goes
+  whole (`DebugScrub.route`). A feed message logs its type, size and session id. A screen logs its kind and
+  ids (`Route.debugWords`, which every new route has to fill in). An exception's message can quote what it
+  failed on, so it's left out unless it's the network's own. `DebugLogHubTest` plants session and project
+  names, prompts, replies, tool arguments, file names and the server's own words in a real feed and real
+  requests, and looks in the file. An "include content" option isn't built. **What this can't promise:** a
+  future call site that logs a title in a sentence would get past the scrubber; the test catches it only for
+  what the test drives.
+- **What a log does show:** session and agent ids, the routes a device used and when, its model and system,
+  the server's name and addresses, the network kind. Enough to see how someone uses the app, and the reason
+  it stays on the device until he sends it.
+
 ### Automations and words from outside
 
 Automations act with nobody watching, on events from outside: a webhook's body, the names of files
@@ -183,6 +223,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
 - The admin token, the hook secret, the TLS keys.
 - Automations' fire tokens (only their hashes are kept) and webhook outputs' addresses and bot
   tokens: a webhook's secret goes only to its own host.
+- A client's debug log leaves the device only on a tap, to the server picked or where its owner shares it.
 - Transcripts, attachments and files: they leave the computer only to a paired device, over the routes above,
   and (for Anthropic) as Claude Code itself sends them.
 - The pairing details: only to the server's own pairing page on the local network.

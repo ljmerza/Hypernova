@@ -57,6 +57,8 @@ object SettingsPlan {
     data object Notifications : Part { override val key = "background" }
     /** Terminal engine: xterm.js or the Ghostty trial (ui/term/TermEngine.kt), this phone's; testing only. */
     data object TerminalEngine : Part { override val key = "termEngine" }
+    /** Debug logging (DebugLogSection.kt): this device's, off by default. */
+    data object DebugLog : Part { override val key = "debugLog" }
     data object About : Part { override val key = "about" }
 
     /** A server part's key: the part's own with one server, the part's and the server's with All servers. */
@@ -87,6 +89,7 @@ object SettingsPlan {
             if (testing) add(Checklist(s.id, "qa"))
         }
         if (testing) add(TerminalEngine)
+        add(DebugLog)
         add(About)
     }
 
@@ -106,6 +109,7 @@ object SettingsPlan {
         add(Notifications)
         add(ConnectionLog)
         if (testing) add(TerminalEngine)
+        add(DebugLog)
         add(About)
     }
 

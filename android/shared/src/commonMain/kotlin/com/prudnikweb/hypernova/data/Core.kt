@@ -104,6 +104,8 @@ object Core {
     fun init(p: Platform) {
         if (::platform.isInitialized) return
         platform = p
+        // First: from here on a crash is kept, the debug log's switch or not.
+        DebugLog.init(p)
         ConnLog.init(p.storage.filesDir, p.main, p.log)
         announceWrites()
         store = PairingStore(p.storage)
@@ -309,6 +311,7 @@ object Core {
 
     fun setVisible(v: Boolean) {
         onScreen = v
+        DebugLog.i("app") { if (v) "came to the foreground" else "went to the background" }
         if (v) {
             disconnected = false
             // The active computer's approvals are on screen now; a watched one's stay notifications.

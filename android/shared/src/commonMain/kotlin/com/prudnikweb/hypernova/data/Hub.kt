@@ -141,6 +141,8 @@ interface Hub {
 
     /** Puts a picked file on the Mac, to attach to a prompt. */
     suspend fun upload(file: Upload): Result<Attachment>
+    /** This device's debug log, sent on a tap (data/DebugSend.kt; docs/PROTOCOL.md, "Client logs"). Where the server kept it. */
+    suspend fun sendClientLog(file: Upload): Result<ClientLogSaved> = Result.failure(ClientLogTooOld())
     /** The "/" list: Claude Code's commands and skills in the project at [cwd] (cached a few minutes). */
     suspend fun commands(cwd: String?): Result<List<SlashCommand>> = Result.success(emptyList())
     /**

@@ -8,6 +8,7 @@ import { hostname, userInfo } from 'node:os'
 import { LAUNCH_LABEL, RELEASES, machineWord, shellRc } from '../platform.ts'
 import { createInterface } from 'node:readline'
 import { ApiError, health, local, localText, waitHealthy } from './api.ts'
+import { clientLogLines, listClientLogs } from './client-logs.ts'
 import { bold, line, tilde, type Cli, UNIT } from './context.ts'
 import { CODEX_LOGIN, codexChecks, doctorChecks, type CodexState, type DoctorOptions } from './doctor.ts'
 import { claudeSignedIn, claudeVersionOf, defaultClaudeAgents, findClaudeBin, installClaude, installDaemon, setIntegration } from './install.ts'
@@ -438,6 +439,21 @@ export async function logs(cli: Cli, flags: Flags): Promise<number> {
   return 0
 }
 
+/** `hypernova client-logs`: what clients sent here, and where it is, never what's in it (cli/client-logs.ts). */
+export async function clientLogs(cli: Cli, flags: Flags): Promise<number> {
+  const rows = listClientLogs(cli.support)
+  if (flags.json) {
+    cli.sys.say(JSON.stringify(rows, null, 2))
+    return 0
+  }
+  if (flags.latest) {
+    if (rows[0]) cli.sys.say(rows[0].path)
+    return rows[0] ? 0 : 1
+  }
+  for (const l of clientLogLines(rows, cli.support)) cli.sys.say(l)
+  return 0
+}
+
 /** The last [max] bytes of a file (a log can grow large), as text. */
 function readTail(file: string, max: number): string {
   const size = statSync(file).size
@@ -621,6 +637,8 @@ export const HELP = `hypernova: a control room for Claude Code and Codex, on thi
   hypernova debug on|off|status|bundle
                         much more in a log of its own, off by itself after 24 hours (on --hours <n>);
                         bundle: one scrubbed file to share (--out <file>)
+  hypernova client-logs the debug logs phones and desktop apps sent here, newest first, with their
+                        paths (--latest: just the newest's path; --json)
   hypernova codex [on|off]
                         OpenAI's Codex for Hypernova: what's found here, or turn it on or off
   hypernova lan on|off  the phone's direct route on the same network

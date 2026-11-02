@@ -151,6 +151,9 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     if (hub == null && sheet) sheet = false
 
     val route = nav.top
+    // The debug log's line for each screen and tab: by kind and ids (Route.debugWords), never a title or a path.
+    androidx.compose.runtime.LaunchedEffect(route.key) { com.prudnikweb.hypernova.data.DebugLog.screen(route) }
+    androidx.compose.runtime.LaunchedEffect(homeTab.value) { com.prudnikweb.hypernova.data.DebugLog.i("screen") { "Home's ${homeTab.value.name} tab" } }
     val unpaired = vm.live?.link?.state == LinkState.Unpaired
     // The chart steps back behind a screen of text, as the far sky did (fx/Atlas.kt).
     val chartStrength by animateFloatAsState(if (route == Route.Home && hub != null) 1f else 0.45f, tween(Motion.SECTION, easing = Motion.Expo), label = "chart")

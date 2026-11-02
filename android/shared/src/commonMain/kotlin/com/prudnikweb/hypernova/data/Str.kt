@@ -133,6 +133,7 @@ enum class Str {
     cx_err_turn_off,
     cx_err_turn_on,
     cx_went_on,
+    debuglog_send_failed,
     err_agent,
     err_already_answered,
     err_answer,

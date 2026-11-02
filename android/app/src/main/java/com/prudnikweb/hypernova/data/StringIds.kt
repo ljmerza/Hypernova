@@ -129,6 +129,7 @@ val Str.id: Int
         Str.cx_err_turn_off -> R.string.cx_err_turn_off
         Str.cx_err_turn_on -> R.string.cx_err_turn_on
         Str.cx_went_on -> R.string.cx_went_on
+        Str.debuglog_send_failed -> R.string.debuglog_send_failed
         Str.err_agent -> R.string.err_agent
         Str.err_already_answered -> R.string.err_already_answered
         Str.err_answer -> R.string.err_answer

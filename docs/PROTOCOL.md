@@ -53,7 +53,7 @@ the Android app's own.
    - Account and limits: [Account](#account), [Auto-continue](#auto-continue), [Session usage and
      Rewind](#session-usage-the-to-do-list-and-rewind), [Per-model
      weeks](#per-model-weeks-the-usage-probe)
-   - Content: [Read aloud](#read-aloud), [Attachments](#attachments), [Files](#files), [Artifacts
+   - Content: [Read aloud](#read-aloud), [Attachments](#attachments), [Client logs](#client-logs), [Files](#files), [Artifacts
      and previews](#artifacts-and-previews), [What changed](#what-changed)
    - Updates: [The app update](#the-app-update), [The server's own update](#the-servers-own-update)
    - Reading: [Reading transcripts](#reading-transcripts), [History search](#history-search),
@@ -3207,6 +3207,16 @@ else is 403 `outside_projects`, or `locked_folder` for a key place.
 - **Refusals:** 400 `empty_file`; 400 `aborted` (the upload stopped); 413 `too_large`
 - **Rules:** see Attachments.
 
+#### POST /v1/client-logs
+
+- **Body:** a client's debug log as text, `Content-Type: text/plain`, at most 6 MB. No query or header
+  says anything about where it goes.
+- **Answer:** `200 {log: {path, name, size, at}}`: where this server kept it
+- **Refusals:** 400 `empty_log`; 400 `aborted` (the upload stopped); 401 `unauthorized` (not a paired
+  device, the admin token included); 413 `too_large`; 415 `not_text`; 429 `too_many_logs`, with
+  `retryAfterSeconds`
+- **Rules:** see Client logs. There is no route that reads one back.
+
 #### POST /v1/preview
 
 - **Body:** `{path}` or `{port}`
@@ -6336,6 +6346,32 @@ uploaded the same way, copied into the app's cache first while the keyboard's gr
 needn't say it's an image: a file with no specific type is read, and its first bytes decide
 (`data/Pasted.kt`). A file that can't be read or isn't an image says so; other pasted content stays
 text, and an image with words of its own keeps both. The server sees only an ordinary upload.
+
+### Client logs
+
+A client's debug log (Settings → Debug logging; docs/DECISIONS.md, "A debug log"), sent to a server only
+when its owner taps Send logs and picks that server. Lets him say "check the logs" to an agent there.
+
+- **What's sent:** one text file: a heading, the crash file if there is one, then the log, oldest first
+  (about 5 MB of log and 64 KB of crashes at most). It goes by `POST /v1/client-logs` over that server's
+  own link, the route every other request takes, with the device's token and, on the local route, its
+  certificate. **Nothing is sent by itself**, at any time.
+- **Kept** in `<support>/client-logs/<device>/<time>-<6 hex>.log`, folders 0700, files 0600. The server
+  chooses the whole path: `<device>` is the id its own token is for, and nothing in the request's query or
+  headers counts. It takes its name only once it's all here, so a stopped upload never looks like a log.
+- **Untrusted text:** the daemon stores the bytes. It never parses or runs them, never serves them and
+  never writes them to its own log, which only says one came in, from which device and how big.
+- **One way:** no route reads one back, or lists them. A `GET` is an unknown route.
+- **Limits:** 6 MB (413 `too_large`, by its length or as it passes that), plain text only (415 `not_text`,
+  before anything else is read), 10 tries a device an hour (429 `too_many_logs`, kept in memory only).
+- **Removed:** past the newest 5 per device, at each save; past 30 days, at the daemon's start and every 6
+  hours, a stopped upload's leftovers too. Forgetting a device leaves its logs until then.
+- **Finding them:** `hypernova client-logs` lists them on the server, newest first, with their paths,
+  never what's in them (`--latest`: just the newest's path; `--json`).
+- **A server older than this:** 404, and the app says that server needs updating. Share and, on a desktop,
+  Open folder still work.
+
+What a log holds and what keeps secrets out: `docs/SECURITY-MODEL.md`, "Client debug logs".
 
 ### Files
 

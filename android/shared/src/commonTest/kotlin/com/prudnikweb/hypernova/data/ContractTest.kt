@@ -395,6 +395,21 @@ class ContractTest {
             assertFalse(f.truncated)
             assertEquals(5, f.total)
         },
+        // LiveHub.sendClientLog: where the server kept a client's debug log.
+        "rest-client-log" to { o ->
+            val l = ClientLogSaved.wire(o.obj("log"))!!
+            assertEquals("/tmp/hn/support/client-logs/phone/2027-01-15T08-00-00-000Z-0a1b2c.log", l.path)
+            assertEquals("2027-01-15T08-00-00-000Z-0a1b2c.log", l.name)
+            assertEquals(39L, l.size)
+            assertEquals(1800000000000L, l.at)
+        },
+        // LiveHub.sendClientLog: the rate limit's refusal, its words shown as they are.
+        "rest-client-log-too-many" to { o ->
+            val e = Api.errorOf(429, o.toString())
+            assertEquals("too_many_logs", e.code)
+            assertEquals(Problem.Server, e.problem)
+            assertTrue(e.serverMessage!!.isNotBlank())
+        },
         // LiveHub.upload: the attachment the prompt then carries by its path.
         "rest-attachment" to { o ->
             val a = Wire.attachment(o.obj("attachment")!!)!!

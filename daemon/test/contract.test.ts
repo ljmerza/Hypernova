@@ -248,6 +248,8 @@ function normalise(v: unknown): unknown {
       .split(scratch).join('/tmp/hn')
       // A time inside an id ("qn:1793476377000:9").
       .replace(/\b1[789]\d{11}\b/g, String(T))
+      // A client log's name, the moment it came in and 6 random hex digits (client-logs.ts).
+      .replace(/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[0-9a-f]{6}\.log/g, '2027-01-15T08-00-00-000Z-0a1b2c.log')
       // An attachment's folder, 12 random hex digits (attachments.ts).
       .replace(/(\/attachments\/)[0-9a-f]{12}\//g, '$10123456789ab/')
       .replace(UUID, (u) => {
@@ -930,6 +932,35 @@ test('POST /v1/attachments, then a prompt (without hold) that carries it, and on
   await until('the prompt typed', () => typed('prm00001').includes('Read my notes'))
   assert.ok(typed('prm00001').startsWith(`@"${attached}" `), typed('prm00001'))
   contract('rest-prompt-attachment-gone', asServer(await refused(post('/v1/sessions/sess-prompt/prompt', { text: 'Again', attachments: [join(process.env.HYPERNOVA_SUPPORT!, 'attachments', 'ffffffffffff', 'gone.txt')] }), 410)))
+})
+
+/** POST /v1/client-logs with [text] as the body, as a client sends its debug log. */
+function sendClientLog(text: string): Promise<{ status: number; json: any }> {
+  const bytes = Buffer.from(text)
+  return new Promise((resolve, reject) => {
+    const req = request(
+      { host: '127.0.0.1', port: API, method: 'POST', path: '/v1/client-logs', headers: { host: `127.0.0.1:${API}`, authorization: `Bearer ${TOKEN}`, 'content-type': 'text/plain; charset=utf-8', 'content-length': bytes.length } },
+      (res) => {
+        let s = ''
+        res.setEncoding('utf8')
+        res.on('data', (c) => (s += c))
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, json: s ? JSON.parse(s) : null }))
+      },
+    )
+    req.on('error', reject)
+    req.end(bytes)
+  })
+}
+
+test('POST /v1/client-logs: where it was kept, and the refusal past the rate limit', async () => {
+  const { RATE_MAX, resetClientLogSlots } = await import('../src/client-logs.ts')
+  resetClientLogSlots()
+  contract('rest-client-log', await ok(sendClientLog('2026-11-02 10:00:00.000 I app  started\n')))
+  for (let i = 1; i < RATE_MAX; i++) await ok(sendClientLog('again\n'))
+  const r = await refused(sendClientLog('once more\n'), 429)
+  r.error.retryAfterSeconds = 3600
+  contract('rest-client-log-too-many', r)
+  resetClientLogSlots()
 })
 
 test('PUT and DELETE …/held/{id}: a held prompt’s new words, then taken back', async () => {

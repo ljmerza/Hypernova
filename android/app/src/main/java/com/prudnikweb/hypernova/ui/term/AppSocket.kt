@@ -142,6 +142,7 @@ internal class AppSocket(
         }
 
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            com.prudnikweb.hypernova.data.DebugLog.i("ws") { "terminal socket open: HTTP ${response.code}, ${com.prudnikweb.hypernova.data.DebugNet.tlsWords(response.handshake)}" }
             opened = true
             frames.opened()
             wake()
@@ -164,11 +165,13 @@ internal class AppSocket(
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            com.prudnikweb.hypernova.data.DebugLog.i("ws") { "terminal socket closed: $code" }
             frames.closed(code)
             wake()
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            com.prudnikweb.hypernova.data.DebugLog.w("ws", t) { "terminal socket failed${response?.let { " with HTTP ${it.code}" }.orEmpty()}" }
             // What a page's own WebSocket reports for a link that broke without a closing frame.
             frames.closed(1006)
             wake()

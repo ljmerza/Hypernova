@@ -140,14 +140,14 @@ class SettingsTabTest {
         assertEquals("https://github.com/ljmerza/Hypernova", page.dataString)
     }
 
-    @Config(qualifiers = "+h3800dp")
+    @Config(qualifiers = "+h4400dp")
     @Test fun oneServerShowsEveryPartInOrder() {
         pair(server("z2", 47391) { files(false) })
         linked()
         show()
         val headings = listOf(
             R.string.mac, R.string.providers, R.string.voice_settings, R.string.st_files, R.string.st_new_sessions, R.string.st_display,
-            R.string.st_card_swipes, R.string.st_top_bar, R.string.st_typing, R.string.notifications, R.string.testing_checklist, R.string.about,
+            R.string.st_card_swipes, R.string.st_top_bar, R.string.st_typing, R.string.notifications, R.string.testing_checklist, R.string.debuglog_title, R.string.about,
         ).map { str(it).uppercase() }
         val tops = headings.map { h -> rule.topOf(h) }
         assertEquals("Settings' parts top down", tops.sorted(), tops)

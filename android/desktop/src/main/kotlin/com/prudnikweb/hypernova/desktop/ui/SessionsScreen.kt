@@ -131,6 +131,7 @@ private fun TopBar(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
             HText(APP_NAME, style = Type.wordmark, maxLines = 1)
             ConnectionChip(hub)
             Spacer(Modifier.weight(1f))
+            Pill(Ui.desk_settings.text(), { shell.settings = true }, kind = PillKind.Ghost, height = 32.dp)
             Pill(Ui.desk_pair_another.text(), { shell.adding = true }, kind = PillKind.Ghost, height = 32.dp)
         }
         if (statuses.size > 1) {

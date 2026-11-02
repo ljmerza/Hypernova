@@ -11,6 +11,7 @@ import { refreshClaudeCommands, scanTerms, attachWaitingJobs, watchMenus, writeH
 import { refreshHooks, refreshShell } from './hooks.ts'
 import { startAccount } from './account.ts'
 import { reapAttachments } from './attachments.ts'
+import { reapClientLogs } from './client-logs.ts'
 import { pollAgents } from './agents.ts'
 import { pollClaudeAgents } from './claude-agents.ts'
 import { cleanSpeechTemp } from './speech.ts'
@@ -63,6 +64,7 @@ startAccount()
 if (has('battery')) startBattery()
 startAwake()
 reapAttachments()
+reapClientLogs()
 cleanSpeechTemp()
 startStats()
 // The per-model weeks (Fable, Sonnet) only Claude Code's /usage screen shows, and readings of the
@@ -96,6 +98,7 @@ setInterval(watchMenus, 800)
 setTimeout(attachWaitingJobs, 4000)
 setTimeout(attachWaitingJobs, 20_000)
 setInterval(reapAttachments, 6 * 3600_000)
+setInterval(reapClientLogs, 6 * 3600_000)
 
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => {

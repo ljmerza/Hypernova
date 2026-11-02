@@ -276,6 +276,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                     Spacer(Modifier.height(10.dp))
                     TerminalEngineSection()
                 }
+                // Debug logging (DebugLogSection.kt): this phone's, whichever server is on screen.
+                SettingsPlan.DebugLog -> {
+                    Spacer(Modifier.height(10.dp))
+                    DebugLogSection()
+                }
                 SettingsPlan.About -> {
                     // A newer app: with All servers, the newest any connected server offers (the one
                     // picked first on a tie), downloaded from that server (AppUpdate.server); else the one on screen's.

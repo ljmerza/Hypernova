@@ -94,19 +94,30 @@ object AndroidMainThread : MainThread {
     }
 }
 
-/** Logcat, in a debug build only. */
+/** Logcat, in a debug build only; and the debug log, in any build, while it's on (data/DebugLog.kt). */
 object AndroidLog : Log {
     override fun d(tag: String, message: String) {
         if (BuildConfig.DEBUG) android.util.Log.d(tag, message)
+        if (tag != ConnLog.TAG) DebugLog.d(tag.lowercase()) { message }
+    }
+    override fun i(tag: String, message: String) {
+        if (BuildConfig.DEBUG) android.util.Log.i(tag, message)
+        DebugLog.i(tag.lowercase()) { message }
     }
     override fun w(tag: String, message: String) {
         if (BuildConfig.DEBUG) android.util.Log.w(tag, message)
+        DebugLog.w(tag.lowercase()) { message }
+    }
+    override fun e(tag: String, message: String, t: Throwable?) {
+        if (BuildConfig.DEBUG) android.util.Log.e(tag, message)
+        DebugLog.e(tag.lowercase(), t) { message }
     }
 }
 
 object AndroidAppInfo : AppInfo {
     override val versionCode: Int get() = BuildConfig.VERSION_CODE
     override val versionName: String get() = BuildConfig.VERSION_NAME
+    override val build: String get() = "${BuildConfig.BUILD_TYPE} build"
 }
 
 class AndroidDevice(private val context: Context) : DeviceInfo {
@@ -114,6 +125,7 @@ class AndroidDevice(private val context: Context) : DeviceInfo {
         get() = runCatching { Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME) }.getOrNull()?.takeIf { it.isNotBlank() }
             ?: "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
     override val model: String get() = "${Build.MANUFACTURER} ${Build.MODEL}"
+    override val os: String get() = "Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})"
 }
 
 class AndroidNetwork(context: Context) : NetworkWatcher {

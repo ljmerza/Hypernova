@@ -84,7 +84,7 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | `Ticks` | Real | `nanoTime` plus any sleep the wall clock shows |
 | `MainThread` | Real | Swing's event thread, which is also `Dispatchers.Main` (`kotlinx-coroutines-swing`) |
 | `RetryAlarm` | Real | Checked every second against `Ticks`, so it's due as the computer wakes; it doesn't wake it |
-| `Log` | Real | Standard error: warnings always, the rest with `HYPERNOVA_CLIENT_DEBUG` |
+| `Log` | Real | Standard error: warnings always, the rest with `HYPERNOVA_CLIENT_DEBUG`; and the debug log while it's on (DECISIONS, "A debug log") |
 | `AppInfo` | Real | The version as a local build of the phone app says it; `versionCode` at its top, so a server's APK is never an update |
 | `DeviceInfo` | Real | The host's name, `Desktop, Linux amd64` |
 | `NetworkWatcher` | Real, by polling | The JDK's interfaces, without virtual bridges, every 5 s. `kind` is `Wifi` with any and `None` with none: it can't see more. It says nothing about the internet. No hotspots |

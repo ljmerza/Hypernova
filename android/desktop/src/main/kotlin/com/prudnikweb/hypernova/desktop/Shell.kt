@@ -32,9 +32,11 @@ sealed interface PairState {
  * phone's ([Pairer], then [Core.paired]): the link's code over the pinned local route, then a device certificate on
  * this computer's own key, then mutual TLS for everything after it. HubViewModel does the same on a phone.
  */
-class Shell(private val platform: Platform) {
+class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
     /** "Pair another" over a server that's already paired. */
     var adding by mutableStateOf(false)
+    /** The Settings screen is up: it goes over whatever was there, and goes back to it. */
+    var settings by mutableStateOf(false)
     var pair by mutableStateOf<PairState>(PairState.Idle)
         private set
     /** What's typed or pasted in the pairing field. */
