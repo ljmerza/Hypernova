@@ -3743,3 +3743,9 @@ The owner: "the Node minimum". The floor moves to the October 2026 security rele
 ## A blank answer to a GET is a failure (owner, 2026-11-02)
 
 `Api.json` read a blank 2xx as `{}`, so a blank `GET /v1/snapshot` (a proxy, a reply cut short) emptied the session list. Now a blank answer to any GET fails with `empty_body`, so the phone keeps what it has and reconnects. Every JSON GET in the daemon goes through `json()` and has a body, so none relies on the old reading. A blank answer to a POST, PUT or DELETE still reads as `{}`: there it says only that it's done, and callers that need more already check for it (`no_session`, `no_url`).
+
+## The workflows' actions (2026-11-02)
+
+The actions move to their current majors, all on Node 24: checkout 7, setup-java 6, setup-node 7, upload-artifact 7, configure-pages 6, deploy-pages 5, upload-pages-artifact 5. Their release notes were read for what breaks our use, and none does: no job pushes with checkout's saved credentials, and no job checks out a fork on `pull_request_target`; a `package.json` without `packageManager` doesn't get setup-node's automatic cache, and these jobs name `cache: npm` themselves; the Pages site has no dotfiles for upload-pages-artifact to drop.
+
+`gradle/actions/setup-gradle` is 6 with `cache-provider: basic`. Since 6, its default cache is `gradle-actions-caching`, a proprietary component under Gradle's own terms, which using it accepts. `basic` is the MIT provider, a thin wrapper on `actions/cache`. What it costs: it has no restore keys, so a change to a build file or the version catalog starts from an empty cache and downloads everything once, and it has no cleanup or deduplication. Whether it saves only from `main` as before is only known once it has run on GitHub.

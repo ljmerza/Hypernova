@@ -53,8 +53,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - name: Version
@@ -73,7 +73,7 @@ jobs:
       # Boots systemd in a container for each system: install, a user's setup, upgrade, remove, purge.
       - name: Test on Ubuntu and Debian
         run: scripts/test-server-deb.sh --deb "$DEB" ubuntu:24.04 debian:12
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: hypernova-server-linux-${{ matrix.arch }}-deb
           path: dist/deb/hypernova-server_*.deb
@@ -100,8 +100,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - name: Version
@@ -144,7 +144,7 @@ jobs:
           named="dist/hypernova-server-$TAG-macos-${{ matrix.arch }}.pkg"
           cp "$PKG" "$named"
           gh release upload "$TAG" "$named" --clobber
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
           name: hypernova-server-macos-${{ matrix.arch }}
@@ -163,8 +163,8 @@ jobs:
       run:
         working-directory: daemon
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm

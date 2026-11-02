@@ -20,8 +20,8 @@ jobs:
       run:
         working-directory: android
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -32,7 +32,10 @@ jobs:
           yes | "$SDKM" --licenses > /dev/null || true
           "$SDKM" "platforms;android-37.0" "build-tools;37.0.0" || "$SDKM" "platforms;android-37"
       # Caches Gradle's downloads and the wrapper; it only saves them from the main branch.
-      - uses: gradle/actions/setup-gradle@v4
+      # v6's default cache is a proprietary component; basic keeps it MIT (docs/DECISIONS.md, "The workflows' actions").
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
       # What Compose for Desktop's native library links against, even with no display (docs/DEV-SETUP.md, "The desktop app").
       - name: Desktop libraries
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libgl1 libx11-6 libfontconfig1
