@@ -1,4 +1,4 @@
-// The pieces `hypernova setup` puts in place on Linux, each one safe to run again: the daemon's
+// The pieces `hypernova setup` puts in place, each one safe to run again: the daemon's
 // files in <support>/app (with node-pty built for this machine), Claude Code through Anthropic's
 // official installer, and the integration (hooks, status line, the `claude` shell function).
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -13,8 +13,15 @@ import type { Cli } from './context.ts'
 /** The programs node-pty needs to build on Linux (it ships prebuilt binaries for macOS and Windows only). */
 export const BUILD_TOOLS = ['make', 'g++', 'python3'] as const
 
-/** Build tools that are missing, by name. */
-export const missingBuildTools = (cli: Cli): string[] => BUILD_TOOLS.filter((t) => !cli.sys.which(t))
+/**
+ * Build tools that are missing, by name. None on a Mac: node-pty comes prebuilt for both of its
+ * processors, and /usr/bin/make and friends exist there even without Xcode (they only offer to
+ * install it), so looking for them would say nothing. If it has to be built after all, [macBuildHint] says what's needed.
+ */
+export const missingBuildTools = (cli: Cli): string[] => (cli.platform === 'darwin' ? [] : BUILD_TOOLS.filter((t) => !cli.sys.which(t)))
+
+/** What a Mac needs when node-pty's prebuilt binary doesn't do. */
+export const macBuildHint = (cli: Pick<Cli, 'platform'>): string => (cli.platform === 'darwin' ? '\nOn a Mac the terminal module comes prebuilt; building it needs Apple’s Command Line Tools: xcode-select --install, then hypernova setup.' : '')
 
 /** JetBrains Mono beside a daemon folder: an unpacked tarball's Fonts/, or the repository's Android copy. */
 export function fontNear(daemon: string): string | null {
@@ -65,7 +72,7 @@ async function npmCi(cli: Cli, node: string, dir: string): Promise<void> {
   const r = await cli.sys.run(npm, ['ci', '--omit=dev', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: dir, env, timeout: 20 * 60_000 })
   if (r.code !== 0) {
     const tail = (r.err || r.out).trim().split('\n').slice(-12).join('\n')
-    throw new Error(`npm ci failed in ${dir}:\n${tail}`)
+    throw new Error(`npm ci failed in ${dir}:\n${tail}${macBuildHint(cli)}`)
   }
 }
 
@@ -92,7 +99,7 @@ export async function installDaemon(cli: Cli, node: string, from: string, say: (
     say('Installing the daemon’s packages and building its terminal module (a minute or two)…')
     await npmCi(cli, node, cli.daemonDir)
     const pty = await ptyWorks(cli, node, cli.daemonDir)
-    if (!pty.ok) throw new Error(`The terminal module (node-pty) doesn’t work after building: ${pty.why}`)
+    if (!pty.ok) throw new Error(`The terminal module (node-pty) doesn’t work after building: ${pty.why}${macBuildHint(cli)}`)
     return { copied: false, built: true }
   }
   const staging = join(cli.appDir, 'daemon.new')
@@ -137,9 +144,9 @@ export async function installDaemon(cli: Cli, node: string, from: string, say: (
   const pty = await ptyWorks(cli, node, staging)
   if (!pty.ok) {
     rmSync(staging, { recursive: true, force: true })
-    throw new Error(`The terminal module (node-pty) doesn’t work after building: ${pty.why}`)
+    throw new Error(`The terminal module (node-pty) doesn’t work after building: ${pty.why}${macBuildHint(cli)}`)
   }
-  // Swapped in by renames. Holders started from the old copy keep running: Linux keeps a file
+  // Swapped in by renames. Holders started from the old copy keep running: the system keeps a file
   // that's open (or mapped) until its last user lets go.
   const old = join(cli.appDir, 'daemon.old')
   rmSync(old, { recursive: true, force: true })

@@ -688,14 +688,6 @@ test('setup turns on sessions in claude agents only while settings.json doesn’
   assert.equal(read(), '{ broken')
 })
 
-test('setup and pair point a Mac to its menu bar app', async () => {
-  for (const f of [setup, pair, uninstall]) {
-    const sys = fakeSys(() => ({}))
-    assert.equal(await f(ctx(sys, { platform: 'darwin' }), { yes: true }), 1)
-    assert.match(sys.out.join('\n'), /menu bar app/)
-  }
-})
-
 test('setup stops at a missing build tool with the apt line that fixes it', async () => {
   const sys = fakeSys((cmd, args) => (cmd === 'node' && args[0] === '-e' ? { code: 1, err: 'Cannot find module node-pty' } : claudeAnswers(false)(cmd === process.execPath.split('/').pop() ? 'node' : cmd, args)), ['systemctl'])
   const c = ctx(sys, { apiPort: daemon.api, localPort: daemon.local })

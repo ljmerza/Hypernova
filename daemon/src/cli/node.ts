@@ -1,19 +1,20 @@
-// Node.js for the daemon on Linux: the one Hypernova downloaded (<support>/node/<version>), else the
+// Node.js for the daemon: the one Hypernova downloaded (<support>/node/<version>), else the
 // one running this command, when either is Node 24 or newer; otherwise the newest Node 24 from
 // nodejs.org, checked against nodejs.org's SHASUMS256.txt and unpacked into Hypernova's own folder.
 // Nothing outside that folder is touched.
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import type { Platform } from '../platform.ts'
 import type { Cli } from './context.ts'
 
-/** The oldest Node major the Linux installer accepts, and the line it downloads: 24, the LTS the daemon is tested on (the Mac app downloads the newest LTS the same way). */
+/** The oldest Node major the installers accept, and the line they download: 24, the LTS the daemon is tested on. */
 export const NODE_MAJOR = 24
 
 /** nodejs.org's downloads (HYPERNOVA_NODE_DIST points the tests at a stand-in). */
 export const nodeDist = (cli: Pick<Cli, 'env'>) => (cli.env.HYPERNOVA_NODE_DIST ?? 'https://nodejs.org/dist').replace(/\/$/, '')
 
-/** nodejs.org's name for this machine's processor; null for one it has no Linux build for. */
+/** nodejs.org's name for this machine's processor; null for one Hypernova doesn't take. */
 export const nodeArch = (arch: string): string | null => (arch === 'x64' ? 'x64' : arch === 'arm64' ? 'arm64' : null)
 
 export const majorOf = (version: string): number => Number(/^v?(\d+)\./.exec(version.trim())?.[1] ?? 0)
@@ -43,18 +44,19 @@ export function recordNode(cli: Cli, node: string): void {
 export type Release = { version: string; file: string; url: string }
 
 /**
- * The newest Node [major] release with a Linux build for [arch], from nodejs.org's index
- * (`files` lists "linux-arm64", "linux-x64").
+ * The newest Node [major] release with a build for this system and [arch], from nodejs.org's index
+ * (`files` lists "linux-arm64", "linux-x64", and for a Mac's tarballs "osx-arm64-tar", "osx-x64-tar").
  */
-export function pickRelease(index: unknown, arch: string, major = NODE_MAJOR, dist = 'https://nodejs.org/dist'): Release | null {
+export function pickRelease(index: unknown, arch: string, major = NODE_MAJOR, dist = 'https://nodejs.org/dist', platform: Platform = 'linux'): Release | null {
   const a = nodeArch(arch)
   if (!a || !Array.isArray(index)) return null
-  const fits = index.filter((r: any) => typeof r?.version === 'string' && majorOf(r.version) === major && Array.isArray(r.files) && r.files.includes(`linux-${a}`))
+  const listed = platform === 'darwin' ? `osx-${a}-tar` : `linux-${a}`
+  const fits = index.filter((r: any) => typeof r?.version === 'string' && majorOf(r.version) === major && Array.isArray(r.files) && r.files.includes(listed))
   // The index is newest first, but don't count on it.
   fits.sort((x: any, y: any) => cmpVersion(y.version, x.version))
   const r = fits[0] as { version: string } | undefined
   if (!r) return null
-  const file = `node-${r.version}-linux-${a}.tar.gz`
+  const file = `node-${r.version}-${platform === 'darwin' ? 'darwin' : 'linux'}-${a}.tar.gz`
   return { version: r.version, file, url: `${dist}/${r.version}/${file}` }
 }
 
@@ -92,8 +94,8 @@ export async function downloadNode(cli: Cli, say: (s: string) => void = () => {}
   } catch (e: any) {
     throw new Error(`Couldn’t read Node.js’s release list (${e?.message ?? e}). Check this server’s internet connection.`)
   }
-  const rel = pickRelease(index, cli.arch, NODE_MAJOR, dist)
-  if (!rel) throw new Error(`nodejs.org has no Node.js ${NODE_MAJOR} for Linux on ${cli.arch}.`)
+  const rel = pickRelease(index, cli.arch, NODE_MAJOR, dist, cli.platform)
+  if (!rel) throw new Error(`nodejs.org has no Node.js ${NODE_MAJOR} for ${cli.platform === 'darwin' ? 'macOS' : 'Linux'} on ${cli.arch}.`)
   const want = shaFor((await get(`${dist}/${rel.version}/SHASUMS256.txt`, 30_000)).toString('utf8'), rel.file)
   if (!want) throw new Error(`nodejs.org’s checksum list has no entry for ${rel.file}.`)
   say(`Downloading Node.js ${rel.version} from ${new URL(dist).host}…`)
