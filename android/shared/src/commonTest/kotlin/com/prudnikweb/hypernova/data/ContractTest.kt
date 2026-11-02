@@ -839,6 +839,41 @@ class ContractTest {
             assertEquals("DISABLE_TELEMETRY: 0 → 1", u.change)
         },
         "rest-env-undone" to { o -> assertTrue(o.bool("ok")) },
+        "rest-raw" to { o ->
+            val r = RawFile.wire(o)
+            assertEquals(Mcp.USER, r.scope)
+            assertEquals(RawFile.OK, r.state)
+            assertEquals("<hidden on the server>", r.placeholder)
+            assertTrue(r.text!!.contains("<hidden on the server>"))
+            assertNotNull(r.hash)
+            assertTrue(r.hidden >= 1)
+            assertEquals(Mcp.HOME, r.folder)
+            assertEquals(Mcp.HOME, r.folders.first().id)
+            assertNull(r.undo)
+            assertTrue(JsonFold.parse(r.text!!) is JsonFold.Parsed.Ok)
+        },
+        "rest-raw-saved" to { o ->
+            val s = RawSaved.wire(o)
+            assertTrue(s.changed)
+            assertEquals("file-hash", s.hash)
+        },
+        "rest-raw-bad-json" to { o ->
+            val e = Api.errorOf(400, o.toString())
+            assertEquals("bad_json", e.code)
+            assertTrue(e.serverMessage!!.startsWith("Line 2, column"))
+        },
+        "rest-raw-refused" to { o ->
+            val e = Api.errorOf(403, o.toString())
+            assertEquals("raw_refused", e.code)
+            assertTrue(e.serverMessage!!.contains("permissions.defaultMode"))
+        },
+        "rest-raw-confirm" to { o ->
+            val e = Api.errorOf(403, o.toString())
+            assertEquals(EnvReply.CONFIRM_RUN, e.code)
+            assertTrue(e.serverMessage!!.contains("statusLine"))
+        },
+        "rest-raw-stale" to { o -> assertEquals(AgentSettingRefused.FILE_CHANGED, Api.errorOf(409, o.toString()).code) },
+        "rest-raw-undone" to { o -> assertTrue(o.bool("ok")) },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)

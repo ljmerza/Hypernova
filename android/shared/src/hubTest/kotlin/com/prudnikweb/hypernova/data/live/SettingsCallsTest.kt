@@ -7,6 +7,9 @@ import com.prudnikweb.hypernova.data.envRemove
 import com.prudnikweb.hypernova.data.envSet
 import com.prudnikweb.hypernova.data.envUndo
 import com.prudnikweb.hypernova.data.mcpList
+import com.prudnikweb.hypernova.data.rawFile
+import com.prudnikweb.hypernova.data.rawSave
+import com.prudnikweb.hypernova.data.rawUndo
 import com.prudnikweb.hypernova.data.plugins
 import com.prudnikweb.hypernova.data.pluginInstall
 import com.prudnikweb.hypernova.data.pluginUninstall
@@ -147,6 +150,31 @@ class SettingsCallsTest {
         answer("POST", "/v1/agents/env/undo", "rest-env-undone")
         rig.call { rig.hub.envUndo("claude") }.getOrThrow()
         assertEquals(1, daemon.count("POST", "/v1/agents/env/undo"))
+    }
+
+    @Test fun aRawFileGoesToItsRouteWithItsHashAndAFolderOnlyWhereItCounts() {
+        connect()
+        answer("GET", "/v1/agents/raw", "rest-raw")
+        val f = rig.call { rig.hub.rawFile("claude", "local", "f1") }.getOrThrow()
+        assertTrue(f.text!!.contains(f.placeholder))
+        val q = last("GET", "/v1/agents/raw").query
+        assertTrue(q, q.contains("scope=local") && q.contains("folder=f1"))
+        answer("POST", "/v1/agents/raw", "rest-raw-saved")
+        rig.call { rig.hub.rawSave("claude", "user", null, "{}", "h") }.getOrThrow()
+        val sent = JSONObject(last("POST", "/v1/agents/raw").body)
+        assertEquals("{}", sent.getString("text"))
+        assertEquals("h", sent.getString("expected"))
+        assertFalse(sent.has("folder"))
+        assertFalse(sent.has("confirmRun"))
+        rig.call { rig.hub.rawSave("claude", "user", null, "{}", null, confirmRun = true) }.getOrThrow()
+        val again = JSONObject(last("POST", "/v1/agents/raw").body)
+        assertTrue(again.isNull("expected"))
+        assertTrue(again.getBoolean("confirmRun"))
+        answer("POST", "/v1/agents/raw", "rest-raw-stale", status = 409)
+        val e = rig.call { rig.hub.rawSave("claude", "user", null, "{}", "old") }.exceptionOrNull()
+        assertEquals(AgentSettingRefused.FILE_CHANGED, (e as AgentSettingRefused).code)
+        answer("POST", "/v1/agents/raw/undo", "rest-raw-undone")
+        rig.call { rig.hub.rawUndo("claude") }.getOrThrow()
     }
 
     // ─── A session's MCP servers (docs/PROTOCOL.md, "A session's MCP servers") ───

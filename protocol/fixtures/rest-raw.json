@@ -1,0 +1,38 @@
+{
+  "agent": "claude",
+  "scope": "user",
+  "where": "~/.claude/settings.json",
+  "placeholder": "<hidden on the server>",
+  "undo": null,
+  "state": "ok",
+  "hash": "file-hash",
+  "text": "{\n  \"theme\": \"dark\",\n  \"env\": { \"SECRET\": \"<hidden on the server>\" }\n}\n",
+  "hidden": 1,
+  "folder": "home",
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    },
+    {
+      "id": "folder-app-parser-fix",
+      "name": "app-parser-fix"
+    },
+    {
+      "id": "folder-notebook",
+      "name": "notebook"
+    },
+    {
+      "id": "folder-sketchpad",
+      "name": "sketchpad"
+    },
+    {
+      "id": "folder-demo",
+      "name": "demo"
+    },
+    {
+      "id": "folder-app",
+      "name": "app"
+    }
+  ]
+}

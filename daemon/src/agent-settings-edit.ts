@@ -247,6 +247,10 @@ function leadOf(t: string, keyFrom: number): string {
   return t.slice(i, keyFrom)
 }
 const indentOf = (lead: string) => lead.slice(lead.lastIndexOf('\n') + 1)
+/** For a walk of a whole file: agent-raw.ts. */
+export const jsonMembers = (t: string, open: number) => membersOf(t, open).members
+export const jsonValueEnd = valueEnd
+export const skipJsonSpace = skipSpace
 const splice = (t: string, from: number, to: number, text: string) => t.slice(0, from) + text + t.slice(to)
 
 /** [t] with [path] (one or two keys) set to [value]. A duplicate key's last one is the one JSON.parse takes, so that's the one. */

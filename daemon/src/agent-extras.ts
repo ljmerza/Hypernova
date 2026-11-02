@@ -9,6 +9,7 @@
 import type { ServerResponse } from 'node:http'
 import { isTable } from './agent-settings.ts'
 import { claudeEnv, claudeRemove, claudeSet, claudeUndo, claudeUndoOffer, codexEnv, codexRemove, codexSet, codexUndo } from './agent-env.ts'
+import { rawRead, rawSave, rawUndo } from './agent-raw.ts'
 import { cliWords, McpRefused, runCli, serial } from './mcp-edit.ts'
 import { codexBinary } from './codex/client.ts'
 import { withAppServer } from './mcp-codex.ts'
@@ -455,6 +456,24 @@ async function envList(agent: 'claude' | 'codex', id: string | null, deps: McpDe
 
 export async function extrasRoute(path: string, m: string, url: URL, res: ServerResponse, json: (res: ServerResponse, status: number, body: unknown) => void, deps: McpDeps): Promise<boolean> {
   const folderParam = async () => folderPath(param(url, 'folder'), deps)
+  if (path === '/v1/agents/raw' && m === 'GET') {
+    if (agentOf(param(url, 'agent')) === 'codex') throw new McpRefused(409, 'not_for_codex', 'Codex’s file isn’t offered as raw text: its inline tables can’t be masked safely.')
+    const folder = await folderPath(param(url, 'folder'), deps)
+    const folders = await foldersOf(deps)
+    const label = folders.find((f) => f.id === folderId(folder))?.name ?? '~'
+    json(res, 200, { ...rawRead(param(url, 'scope'), folder, label, folderId), folder: folderId(folder), folders })
+    return true
+  }
+  if (path === '/v1/agents/raw' || path === '/v1/agents/raw/undo') {
+    if (m !== 'POST') return false
+    const b = await deps.body()
+    if (!isTable(b)) throw new McpRefused(400, 'bad_request', 'Send what to change.')
+    if (agentOf(typeof b.agent === 'string' ? b.agent : null) === 'codex') throw new McpRefused(409, 'not_for_codex', 'Codex’s file isn’t offered as raw text.')
+    const out = path === '/v1/agents/raw' ? await rawSave(b, await folderPath(typeof b.folder === 'string' ? b.folder : null, deps)) : await rawUndo(b)
+    deps.changed('claude')
+    json(res, 200, out)
+    return true
+  }
   if (path === '/v1/agents/env' && m === 'GET') {
     json(res, 200, await envList(agentOf(param(url, 'agent')), param(url, 'folder'), deps))
     return true

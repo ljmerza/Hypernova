@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
  * answers for itself, so this is the hub whose card was tapped, and nothing here changes several at once.
  */
 @Composable
-fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}) {
+fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}, onJson: () -> Unit = {}) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val codex = agent == AgentSettingsReply.CODEX
     val server = hub.mac.name
@@ -166,6 +166,8 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
             contentPadding = PaddingValues(top = top, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // Codex's file is TOML with inline tables that can't be masked safely, so it has no raw mode.
+            if (!codex) item(key = "mode") { SettingsModeSwitch(json = false, onSettings = {}, onJson = onJson, modifier = Modifier.padding(horizontal = 4.dp)) }
             // Whatever the file says: this comes with the server's live state, and the file may be missing.
             item(key = "account-seam") { Seam(stringResource(R.string.as_account), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 2.dp)) }
             item(key = "account") { if (codex) CodexAccountCard(hub, server) else ClaudeAccountCard(hub, server) }

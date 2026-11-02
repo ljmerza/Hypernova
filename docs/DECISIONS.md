@@ -3671,3 +3671,18 @@ The owner: "add ability to add and toggle environmental variables … like a lis
 5. **Codex's real equivalent is narrower.** `shell_environment_policy.set` only reaches the commands Codex runs: not Codex, not its MCP servers. So `OPENAI_BASE_URL` set here wouldn't move Codex itself. `inherit`, `exclude` and `include_only` beside it aren't touched. Codex's writer turns an inline `set = { … }` into a table when it writes, and keeps comments. Measured with `codex sandbox` and `command/exec`. There's one scope.
 6. **Codex's file isn't edited byte by byte.** Claude Code's `settings.json` is, by `jsonEditPath`, with a backup per change. Codex's goes through its own writer with `expectedVersion`, so a change elsewhere is refused by Codex itself; Undo writes the value back rather than the file.
 
+## JSON mode (2026-11-02)
+
+The owner: "there should be like a JSON mode where instead of a nice settings view, click on JSON mode and it'll just show you the raw JSON that you can edit, and it has simple JSON validation when you try to save." And: "you should also be able to collapse JSON in the JSON view, so it's a lot easier to go through a large amount of data."
+
+1. **Where.** A List and JSON switch on Claude Code's settings screen. JSON is its own screen, `Route.AgentRaw`, per scope: user, project, local. Nothing on the chat screen.
+2. **Secrets are spliced out by position, not by re-serializing,** so what's shown is the file's own text and a save can keep every byte the owner didn't touch. Saving what was shown changes nothing. The classes and what's masked: `docs/SECURITY-MODEL.md`, 21.
+3. **The server judges the change, not the text.** Parse, hash, placeholders back, then compare old and new. A key that was already bypass and hasn't changed passes: otherwise a file holding one couldn't be edited at all, and on the list screens it can move off too.
+4. **Unknown keys ask.** The plain list is short, and anything off it needs the fingerprint, so a key added by a later Claude Code doesn't slip through as plain. This means some harmless settings ask. The cost is one tap.
+5. **The app also validates,** with its own small strict parser (`data/JsonFold.kt`), for the folding and for an answer before sending. The server's is its own, and it decides. Each gives a line and a column; neither quotes the text.
+6. **Folding only decides what's drawn.** The text is a list of rows, each a piece of it, with a folded row keeping what it hides whole beside it. What's saved is those joined, and `JsonFoldTest` holds that this is the text back byte for byte whatever's folded. While typing, the rows stay as they are; they're rebuilt only when something folds or unfolds, and then the whole text is parsed again.
+7. **If it isn't valid JSON when a fold is asked for,** everything comes back as one plain row with what was folded in it and a line saying why and where, and folding returns by itself when the text is valid. Nothing typed is lost. Folding off at the moment of an edit would have moved the cursor, so a broken text with folds on just says where it stops until the next fold.
+8. **A long file opens folded:** over 40 lines, the top level shows and every level below is folded, so opening one shows its children folded in turn. Short ones open open. Every fold control is 44 by 44.
+9. **A file that doesn't parse isn't shown at all,** since nothing in it could be masked. The screen says the line and column, and it's fixed on the server.
+10. **Codex is left out.** The TOML reader doesn't look inside inline tables, so `env = { KEY = "…" }` couldn't be masked, and Codex's writer changes one key at a time, so a whole file wouldn't go through it. Its `set` and its model and permission keys are on the list screens.
+

@@ -48,7 +48,7 @@ the Android app's own.
    - Agents and models: [Codex](#codex-a-second-agent), [Switching agents](#switching-agents),
      [Providers](#providers), [Models](#models), [Agent settings](#agent-settings), [A session's MCP
      servers](#a-sessions-mcp-servers), [An agent's MCP servers](#an-agents-mcp-servers), [An agent's
-     plugins](#an-agents-plugins), [An agent's skills](#an-agents-skills), [An agent's environment variables](#an-agents-environment-variables), [Session menu](#session-menu), [A session's
+     plugins](#an-agents-plugins), [An agent's skills](#an-agents-skills), [An agent's environment variables](#an-agents-environment-variables), [JSON mode](#json-mode), [Session menu](#session-menu), [A session's
      model](#a-sessions-model), [A session's effort](#a-sessions-effort)
    - Account and limits: [Account](#account), [Auto-continue](#auto-continue), [Session usage and
      Rewind](#session-usage-the-to-do-list-and-rewind), [Per-model
@@ -1863,6 +1863,26 @@ PluginDetail = {
 }
 ```
 
+### RawFile
+
+The answer to `GET /v1/agents/raw`. Rules: see JSON mode.
+
+```ts
+RawFile = {
+  agent, scope,
+  folder,                   // an id
+  folders: McpFolder[],
+  where,                    // in words, a folder by its base name
+  placeholder,              // "<hidden on the server>"
+  state: "ok" | "missing" | "malformed" | "link" | "unreadable" | "too_big",
+  hash: string | null,      // what a save sends back as `expected`
+  text: string | null,      // null unless ok or missing; missing: an empty object
+  hidden: number,           // how many places were kept back
+  line?: number, column?: number,   // malformed: where
+  undo: { scope, folder, needsCheck: boolean } | null,
+}
+```
+
 ### EnvList
 
 The answer to `GET /v1/agents/env`. Rules: see An agent's environment variables.
@@ -3032,6 +3052,22 @@ plugins. A POST to a route Claude Code has and Codex doesn't is 409 `not_for_cod
 - **Body:** `{agent, name?, folder?}`. No `name`: all of them.
 - **Answer:** `200 {ok: true}`
 - **Refusals:** 400 `bad_marketplace`
+
+### Routes: JSON mode
+
+A paired phone only. Rules: see JSON mode. An older daemon answers 404.
+
+#### GET /v1/agents/raw
+
+Query: `agent`, `scope`, `folder` (else the home folder). Answers `RawFile`. 400 `bad_scope`, 404 `no_folder`, 409 `not_for_codex`.
+
+#### POST /v1/agents/raw
+
+`{agent, scope, folder?, text, expected, confirmRun?}`. Answers `{ok, changed, hash, changes: [{path, take}]}`, `take` being `plain` or `check`. 400 `bad_json`, `not_an_object`, `bad_text` (over 256 KB), `placeholder_unknown`, `bad_scope`. 403 `raw_refused`, `confirm_run`. 409 `file_changed`, `file_is_link`, `file_unreadable`, `file_malformed`, `not_for_codex`. Sends `agent_settings`.
+
+#### POST /v1/agents/raw/undo
+
+`{agent, confirmRun?}`. The file as it was before the last save, byte for byte, while it's what that save left. Going back is judged as a change: 403 `confirm_run`, 409 `undo_refused`, `nothing_to_undo`, `file_changed`.
 
 ### Routes: agents' environment variables
 
@@ -5565,6 +5601,20 @@ The Android app: `ui/settings/SkillScreens.kt`, `Route.Skills`: Agents & provide
 **Guarded names** (`guardOf`): setting or removing one needs `confirmRun`, else 403 `confirm_run`, whose message is the exact change (`PATH: /a → /b`) with secrets masked. **Refused names** can't be set at all, 403 `env_refused`, confirmed or not; they can be removed, and Undo won't put one back. The lists: docs/SECURITY-MODEL.md, 20.
 
 The Android app: `ui/settings/EnvScreens.kt`, `Route.AgentEnv`: Agents & providers › an agent's Settings › Environment variables.
+
+### JSON mode
+
+(`daemon/src/agent-raw.ts`; docs/DECISIONS.md, "JSON mode"; the risk and every key's class: docs/SECURITY-MODEL.md, 21.) Routes: see Routes: JSON mode. Type: `RawFile`.
+
+Claude Code's three `settings*.json` files, named by scope (user, project, local). No other file can be asked for, and `~/.claude.json` stays closed. **Not Codex** (409 `not_for_codex`): its `config.toml` has inline tables the TOML reader doesn't look inside, so a secret in one couldn't be masked, and its writer changes one key at a time.
+
+**What leaves.** The file's own text, with `placeholder` (`<hidden on the server>`) spliced in by position over: a top-level `env` value the environment list would mask; every value in any other `env` or `headers` table; a string under a secret-named key; a string that looks like a secret, an element of a list whose flag before it says so (`--token`, `x`). A key that looks like a secret becomes `<hidden on the server 1>`, with everything under it. Everything else is byte for byte. A file that doesn't parse sends no text, because nothing could be masked in it: `state: malformed` with `line` and `column`.
+
+**On save,** in this order, nothing written unless all pass: it parses (400 `bad_json`, "Line 3, column 8: …", never quoting the text) and is one object; `expected` is the file's hash (409 `file_changed`); each placeholder is where a hidden value is stored, and goes back as it (400 `placeholder_unknown`, naming the path; in a list, by index); the change is allowed. Then a single atomic write of what was sent, with the secrets back, keeping everything typed as typed, unknown keys too. Saving exactly what was shown is `changed: false` and leaves the file alone.
+
+**What's allowed.** The old and new documents are compared key by key. A change that would turn on bypass is refused, 403 `raw_refused`, with the key named, confirmed or not; the same key unchanged isn't a change, and moving off one is fine. A change that runs code or widens a permission needs `confirmRun`, else 403 `confirm_run`, whose message lists each path with its new value, secrets kept back. Any key not on the plain list counts, so a key this daemon has never heard of asks.
+
+The Android app: `ui/settings/RawScreens.kt`, `Route.AgentRaw`, from the List and JSON switch on Claude Code's settings screen. Folding is the app's alone (`data/JsonFold.kt`): what's saved is always the whole text.
 
 ### Session menu
 

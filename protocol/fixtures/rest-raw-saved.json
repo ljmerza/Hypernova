@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "changed": true,
+  "hash": "file-hash",
+  "changes": [
+    {
+      "path": "theme",
+      "take": "plain"
+    }
+  ]
+}
