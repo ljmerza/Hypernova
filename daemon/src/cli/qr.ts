@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // QR codes for `hypernova pair` on a server's terminal: the pairing link, scanned by the phone's
 // camera. A small encoder (ISO/IEC 18004, model 2): byte
 // mode, versions 1 to 40, error correction L, M, Q or H, the mask with the lowest penalty, drawn

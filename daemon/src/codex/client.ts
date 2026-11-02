@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The daemon's one connection to Codex's shared app-server, kept only while the owner uses Codex
 // (settings.codex). It reconnects by itself, waiting longer each time (1 s up to a minute).
 import { log, writeJson } from '../util.ts'

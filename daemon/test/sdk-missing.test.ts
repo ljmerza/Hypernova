@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // A daemon with no Claude Code SDK in its packages, as it is until hypernova setup has
 // fetched it (src/sdk.ts, docs/PROTOCOL.md "Claude Code's SDK"): it starts and serves; the snapshot
 // and /local/status say the SDK isn't there; what runs through it answers 409 `sdk_missing` in
