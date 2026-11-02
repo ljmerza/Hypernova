@@ -12,6 +12,7 @@ class HypernovaApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Core.applicationStarted()
         // The paired computer's words ("your Mac", "your server") before anything is said.
         com.prudnikweb.hypernova.data.ComputerWords.load(this.storage)
         AndroidCore.init(this)

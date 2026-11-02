@@ -118,7 +118,7 @@ class HubRig(
         while (true) {
             pump()
             if (cond()) return
-            if (System.nanoTime() > deadline) fail("timed out waiting for: $what (link ${hub.link})")
+            if (System.nanoTime() > deadline) fail("timed out waiting for: $what (link ${hub.link}; ${linkStory()})")
             Thread.sleep(3)
         }
     }

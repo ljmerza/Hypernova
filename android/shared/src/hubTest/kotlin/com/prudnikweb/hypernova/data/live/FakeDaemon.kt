@@ -12,6 +12,7 @@ import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.InetAddress
 import java.net.Socket
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
@@ -42,6 +43,7 @@ import javax.net.ssl.X509ExtendedTrustManager
  * the listener (`lan`), with `deviceCert` true once a certificate is out.
  */
 class FakeDaemon(val name: String = "z2", val lan: Boolean = false, port: Int = 0) : AutoCloseable {
+    private val named = port != 0
     private val server = MockWebServer()
     private val lanServer: MockWebServer? = if (lan) MockWebServer() else null
 
@@ -84,7 +86,12 @@ class FakeDaemon(val name: String = "z2", val lan: Boolean = false, port: Int = 
     /** How many sockets the phone has opened. */
     val opened = AtomicInteger()
 
-    val base: String get() = server.url("/").toString().trimEnd('/')
+    /**
+     * By its address, as a paired computer is. By the name `localhost` a dropped request goes on to the
+     * other address the name may have (`::1`, in a dual-stack hosts file), where nothing listens, and "refused" reads
+     * as Hypernova not running. The name only where a picture shows the address ([port]: the one case).
+     */
+    val base: String get() = "http://${if (named) "localhost" else LOOPBACK.hostAddress}:${server.port}"
 
     init {
         server.dispatcher = object : Dispatcher() {
@@ -116,13 +123,13 @@ class FakeDaemon(val name: String = "z2", val lan: Boolean = false, port: Int = 
             }
         }
         // A fixed [port] only where a picture shows the address (0: any free one).
-        server.start(port)
+        server.start(LOOPBACK, port)
         lanServer?.let { l ->
             l.dispatcher = server.dispatcher
             l.useHttps(listenerContext().socketFactory, false)
             // Asked for, not required: a phone without one still reaches health, pairing and the certificate route.
             l.requestClientAuth()
-            l.start()
+            l.start(LOOPBACK, 0)
         }
     }
 
@@ -256,6 +263,8 @@ class FakeDaemon(val name: String = "z2", val lan: Boolean = false, port: Int = 
     }
 
     companion object {
+        private val LOOPBACK: InetAddress = InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))
+
         /** No answer at all: the connection closes once the request is read (nothing answered, for the phone). */
         fun drop() = MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
 

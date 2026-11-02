@@ -106,6 +106,10 @@ interface NetworkWatcher {
     fun kind(): NetKind
     /** The default network in a few words, for the log: "Wi-Fi", "a VPN over mobile data, not validated yet". */
     fun words(): String
+    /** This device's own addresses with their prefix lengths, for the route choice ([RoutePolicy.sameSubnet]). */
+    fun subnets(): List<Pair<String, Int>> = LanRouter.phoneSubnets()
+    /** The gateways of hotspots this device seems to host. */
+    fun hotspotGateways(): List<String> = LanRouter.hotspotGateways()
     /** Which network is the default one, as something to compare; null with none. */
     fun active(): Any?
 

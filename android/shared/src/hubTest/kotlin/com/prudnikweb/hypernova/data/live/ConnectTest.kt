@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.data.LanRouter
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Mac
 import com.prudnikweb.hypernova.data.SessionState
@@ -8,6 +9,8 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.usage
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -67,6 +70,19 @@ class ConnectTest {
         val first = daemon.requests.indexOfFirst { it.bare == "/v1/health" }
         val snap = daemon.requests.indexOfFirst { it.bare == "/v1/snapshot" }
         assertTrue("health probe before the snapshot: ${daemon.requests.map { it.bare }}", first in 0 until snap)
+    }
+
+    /**
+     * An attempt to connect waits on the router's round, and a change of network replaces that round
+     * before it has run at all: the attempt goes on with the newer round. It once waited for good, and
+     * the link stayed on "trying again".
+     */
+    @Test fun aRoundReplacedBeforeItBeganLetsTheAttemptWaitingOnItGoOn() {
+        val router = LanRouter(rig.platform.network, rig.platform.ticks, rig.scope, rig.pairing, rig.certs()) {}
+        val attempt = rig.scope.async { router.prepare("the attempt") }
+        rig.scope.launch { router.recheck("the network changed") }
+        rig.until("the attempt goes on") { attempt.isCompleted }
+        router.close()
     }
 
     @Test fun aPingIsAnsweredWithAPong() {

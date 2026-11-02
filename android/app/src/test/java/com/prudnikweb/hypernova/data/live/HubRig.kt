@@ -10,6 +10,7 @@ import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.DeviceCertStore
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.LiveHub
+import com.prudnikweb.hypernova.data.NetworkWatcher
 import com.prudnikweb.hypernova.data.Notice
 import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.Platform
@@ -19,6 +20,7 @@ import com.prudnikweb.hypernova.data.Storage
 import com.prudnikweb.hypernova.data.Strings
 import com.prudnikweb.hypernova.data.WApproval
 import com.prudnikweb.hypernova.data.storage
+import com.prudnikweb.hypernova.data.AndroidNetwork
 import com.prudnikweb.hypernova.data.AndroidPlatform
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -60,7 +62,14 @@ class HubRig(
         // A fresh install's words (a Mac's): ComputerWords is process-wide and outlives a test.
         ComputerWords.clear(it.storage)
     }
-    val platform: Platform = AndroidPlatform(context)
+    // Android's seams, but for this machine's own interfaces, which aren't the test's: a Docker bridge at .1 looks like a
+    // hotspot, and the router then re-checks and sweeps it.
+    val platform: Platform = object : Platform by AndroidPlatform(context) {
+        override val network: NetworkWatcher = object : NetworkWatcher by AndroidNetwork(context) {
+            override fun subnets(): List<Pair<String, Int>> = emptyList()
+            override fun hotspotGateways(): List<String> = emptyList()
+        }
+    }
     val res: Strings get() = platform.strings
     val storage: Storage get() = platform.storage
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -139,7 +148,7 @@ class HubRig(
         while (true) {
             pump()
             if (cond()) return
-            if (System.nanoTime() > deadline) fail("timed out waiting for: $what (link ${hub.link})")
+            if (System.nanoTime() > deadline) fail("timed out waiting for: $what (link ${hub.link}; ${linkStory()})")
             Thread.sleep(3)
         }
     }
