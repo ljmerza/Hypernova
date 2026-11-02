@@ -1,10 +1,11 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // `hypernova`: Hypernova's command on a server or PC, Linux or a Mac (docs/LINUX.md), where there is no menu
-// bar app: setup, pair, status, doctor, logs, lan, codex, auto-update, uninstall, and run (the daemon in the
+// bar app: setup, pair, status, doctor, logs, debug, lan, codex, auto-update, uninstall, and run (the daemon in the
 // foreground). The installed launcher (~/.local/bin/hypernova) runs this file with Hypernova's
 // own Node.js; from a checkout, `node daemon/src/cli/hypernova.ts setup` installs from there.
 import { cliContext } from './context.ts'
 import { HELP, autoUpdate, automation, codex, doctor, integrate, lan, logs, pair, parseArgs, setup, status, uninstall } from './commands.ts'
+import { debug } from './debug.ts'
 
 const { cmd, flags, rest } = parseArgs(process.argv.slice(2))
 const cli = cliContext()
@@ -25,6 +26,8 @@ async function main(): Promise<number> {
     case 'logs':
     case 'log':
       return logs(cli, flags)
+    case 'debug':
+      return debug(cli, flags, rest)
     case 'lan':
       return lan(cli, rest)
     case 'codex':

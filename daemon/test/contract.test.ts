@@ -613,6 +613,15 @@ test('{t:"update"} and POST /v1/mac/update: the server updating itself', async (
   await ok(post('/v1/mac/update', { autoUpdate: false }))
 })
 
+test('{t:"debug"} and POST /v1/mac/debug: the server\'s debug log', async () => {
+  contract('rest-debug', await ok(post('/v1/mac/debug', { on: true })))
+  for (let i = 0; i < 100 && !heard('debug', (m) => m.debug.on === true); i++) await new Promise((r) => setTimeout(r, 50))
+  contract('ws-debug', heard('debug', (m) => m.debug.on === true))
+  contract('rest-debug-off', await ok(post('/v1/mac/debug', { on: false })))
+  for (let i = 0; i < 100 && !heard('debug', (m) => m.debug.on === false); i++) await new Promise((r) => setTimeout(r, 50))
+  contract('ws-debug-off', heard('debug', (m) => m.debug.on === false))
+})
+
 test('{t:"update"} with a failure: an update that failed, as the phones hear it', async () => {
   const { serverUpdater } = await import('../src/server-update.ts')
   const stateFile = join(scratch, 'server-update-failed.json')

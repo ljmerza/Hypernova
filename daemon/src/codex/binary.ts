@@ -1,5 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // The Codex CLI on this computer and the shared app-server it runs (docs/specs/codex-app-server.md).
+import { dbg, exitOf } from '../debug-log.ts'
+import { flagsOf, subOf } from '../debug-scrub.ts'
 import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -79,7 +81,7 @@ export function codexVersion(bin: string): string | null {
 }
 
 const run = (bin: string, args: string[], ms: number) =>
-  new Promise<string>((resolve, reject) => execFile(bin, args, { timeout: ms, encoding: 'utf8' }, (e, out, err) => (e ? reject(new Error((err || e.message).trim())) : resolve(out))))
+  new Promise<string>((resolve, reject) => execFile(bin, args, { timeout: ms, encoding: 'utf8' }, (e, out, err) => (dbg('proc', 'exit', { bin: 'codex', sub: subOf(args), flags: flagsOf(args), exit: exitOf(e) }), e ? reject(new Error((err || e.message).trim())) : resolve(out))))
 
 /**
  * The shared app-server's socket, starting it when it isn't running (`codex app-server daemon

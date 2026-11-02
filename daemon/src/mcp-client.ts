@@ -6,6 +6,7 @@
 // Only for a server the owner already has switched on (mcp-manage.ts checks approval and disabled first).
 // What comes back is someone else's text: capped and masked before it leaves (mcp-tools.ts).
 
+import { dbgProc } from './debug-log.ts'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { childEnv } from './runner.ts'
 import { HOME } from './util.ts'
@@ -38,6 +39,8 @@ function stdioWire(command: string, args: string[], env: Record<string, string>,
   let child: ChildProcess
   try {
     child = spawn(command, args, { cwd, env: { ...childEnv({}), ...env }, stdio: ['pipe', 'pipe', 'ignore'] })
+    const started = dbgProc(command, args, { via: 'mcp' })
+    child.once('exit', (code, signal) => started(code, signal))
   } catch {
     throw new TalkFailed('failed')
   }

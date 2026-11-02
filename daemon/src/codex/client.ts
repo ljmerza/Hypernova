@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // The daemon's one connection to Codex's shared app-server, kept only while the owner uses Codex
 // (settings.codex). It reconnects by itself, waiting longer each time (1 s up to a minute).
+import { dbg } from '../debug-log.ts'
 import { log, writeJson } from '../util.ts'
 import { saveSettings, settings } from '../store.ts'
 import { CODEX_MIN, atLeast, codexVersion, daemonSocket, findCodex } from './binary.ts'
@@ -89,6 +90,7 @@ async function open(): Promise<CodexRpc> {
     if (conn !== c) return
     conn = null
     log('codex: disconnected')
+    dbg('proc', 'codex-disconnected')
     writeState(false)
     each(changes, undefined)
     later()
@@ -117,6 +119,7 @@ async function open(): Promise<CodexRpc> {
   backoff = 1000
   problem = null
   log('codex: connected', b.version, socketPath)
+  dbg('proc', 'codex-connected', { version: b.version })
   writeState(true)
   each(joined, c)
   each(changes, undefined)

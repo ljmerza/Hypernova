@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // The daemon's in-memory model: sessions, their events, approvals and usage, plus the
 // broadcast to every connected client (docs/PROTOCOL.md).
+import { dbg } from './debug-log.ts'
 import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync, fstatSync, lstatSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -329,6 +330,7 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
   // last words, a claude on its way out), until something resumes it.
   if (deletedOf(id) && patch.state !== 'ended') patch = { ...patch, state: 'ended', activity: null }
   let r = sessions.get(id)
+  const was = r?.state ?? null
   // A session seen for the first time is news in itself, changed or not.
   let before = ''
   if (r && !quietUpserts) before = JSON.stringify(view(r))
@@ -374,6 +376,8 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
   }
   const turnSoFar = inTurn(r.state) ? (r.turnStartedAt ?? null) : null
   Object.assign(r, patch)
+  if (was === null && !quietUpserts) dbg('session', 'new', { session: id, origin: r.origin, state: r.state })
+  else if (was !== null && was !== r.state) dbg('session', 'state', { session: id, from: was, to: r.state })
   // The turn's clock: from the moment it went into a turn (or the better time the patch brings:
   // Claude Code's registry stamp), kept through a stop for the owner's answer, until it's out of it.
   if (patch.state) r.turnStartedAt = !inTurn(patch.state) ? null : (patch.turnStartedAt ?? turnSoFar ?? Date.now())
@@ -1705,6 +1709,7 @@ export function forgetSession(id: string): void {
  * after a restart too, until something resumes it (deleted.ts). [pid]: its claude, on its way out.
  */
 export function removeFromHome(id: string, pid: number | null): void {
+  dbg('session', 'removed', { session: id })
   setDeleted(id, pid)
   resolveSession(id)
   forgetSessionAllowed(id)

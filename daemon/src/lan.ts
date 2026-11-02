@@ -14,6 +14,7 @@ import { log } from './util.ts'
 import { deviceForCert, saveSettings, settings, type Device } from './store.ts'
 import { certFingerprint, serverIdentity } from './tls.ts'
 import { broadcast } from './hub.ts'
+import { dbg, debugOn } from './debug-log.ts'
 import { PLATFORM, lanByDefault, virtualInterface, wslBehindNatHere } from './platform.ts'
 
 /** 0 takes a free port (tests); the snapshot says which. */
@@ -235,7 +236,13 @@ function innerServer(): Server | null {
     },
     onRequest,
   )
-  s.on('tlsClientError', () => {})
+  s.on('tlsClientError', (e: NodeJS.ErrnoException, sock) => dbg('tls', 'failed', { ip: plainIp(sock.remoteAddress), errno: e.code }))
+  // A handshake that's done: a certificate or none, and of it only the start of its fingerprint.
+  s.on('secureConnection', (sock: TLSSocket) => {
+    if (!debugOn()) return
+    const raw = sock.getPeerCertificate()?.raw
+    dbg('tls', 'ok', { ip: plainIp(sock.remoteAddress), proto: sock.getProtocol(), authorized: sock.authorized, fp: raw ? certFingerprint(raw) : undefined })
+  })
   s.on('upgrade', onUpgrade)
   s.emit('listening')
   return s
@@ -255,7 +262,10 @@ function listen(): void {
   const s = createTcpServer((sock: Socket) => {
     const ip = plainIp(sock.remoteAddress)
     const n = (open.get(ip) ?? 0) + 1
-    if (!privateAddress(ip) || n > L.perSource) return void sock.destroy()
+    if (!privateAddress(ip) || n > L.perSource) {
+      dbg('tls', 'dropped', { ip, reason: privateAddress(ip) ? 'too-many' : 'not-private' })
+      return void sock.destroy()
+    }
     open.set(ip, n)
     sock.once('close', () => {
       const left = (open.get(ip) ?? 1) - 1

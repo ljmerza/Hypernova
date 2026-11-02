@@ -26,6 +26,7 @@ function stripBlock(text: string): string {
   return text.slice(0, i) + text.slice(j + END.length + 1)
 }
 import { hookSecret, isSdk, isSubscription, settings } from './store.ts'
+import { dbg } from './debug-log.ts'
 import { onCodexChange, onCodexEnabled } from './codex/client.ts'
 import { classifyApiError } from './blockers.ts'
 import {
@@ -70,6 +71,7 @@ const preKey = (sid: string, tool: string, input: unknown) => `${sid}|${tool}|${
 
 export async function handleHook(ev: any, req: IncomingMessage, res: ServerResponse): Promise<object> {
   const sid: string | undefined = typeof ev?.session_id === 'string' ? ev.session_id : undefined
+  dbg('hook', 'received', { hook: ev?.hook_event_name, session: sid, tool: ev?.tool_name })
   // A session a rewind replaced or the owner took off Home: what its stopped claude says on its way out isn't news (rewound.ts, deleted.ts).
   if (!sid || isSdk(sid) || replacedOf(sid) || deletedOf(sid)) return {}
   const name: string = ev.hook_event_name

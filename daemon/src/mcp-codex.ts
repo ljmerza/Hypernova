@@ -6,6 +6,7 @@
 // The CLI's JSON holds env and header values, so it's read here and nothing of it leaves unfiltered. There's one
 // scope: the user's `config.toml`. A trusted repository's own `.codex/config.toml` isn't read or written.
 
+import { dbgProc } from './debug-log.ts'
 import { spawn } from 'node:child_process'
 import { isDeepStrictEqual } from 'node:util'
 import { isTable, own } from './agent-settings.ts'
@@ -52,6 +53,8 @@ export function withAppServer<T>(work: (req: Req) => Promise<T>): Promise<T> {
   if (stand.rpc) return stand.rpc(work)
   return new Promise<T>((resolve, reject) => {
     const child = spawn(codexBin(), ['app-server'], { cwd: HOME, env: childEnv({}), stdio: ['pipe', 'pipe', 'ignore'] })
+    const started = dbgProc(codexBin(), ['app-server'], { via: 'mcp' })
+    child.once('exit', (code, signal) => started(code, signal))
     let next = 1
     let buf = ''
     const waiting = new Map<number, { resolve: (v: any) => void; reject: (e: unknown) => void }>()

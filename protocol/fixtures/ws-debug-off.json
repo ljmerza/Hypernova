@@ -1,0 +1,7 @@
+{
+  "t": "debug",
+  "debug": {
+    "on": false,
+    "until": null
+  }
+}

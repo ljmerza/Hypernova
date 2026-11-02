@@ -8,6 +8,7 @@
 //
 // Nothing here reaches a running session: each session holds its own connections, and this process's are its own.
 
+import { dbgProc } from './debug-log.ts'
 import type { Query } from '@anthropic-ai/claude-agent-sdk'
 import { maskSecrets } from './normalize.ts'
 import { childEnv } from './runner.ts'
@@ -62,6 +63,7 @@ const realRunner: Runner = async (cwd, waiting, work) => {
     await new Promise<void>((r) => (release = r))
   })()
   const abort = new AbortController()
+  const started = dbgProc(claude, [], { via: 'sdk-probe' })
   const q = query({
     prompt: idle as AsyncIterable<never>,
     options: {
@@ -82,6 +84,7 @@ const realRunner: Runner = async (cwd, waiting, work) => {
     clearTimeout(timer)
     release()
     abort.abort()
+    started(0)
   }
 }
 

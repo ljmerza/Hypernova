@@ -62,6 +62,11 @@ export type Settings = {
    * auto-update on|off`, `POST /local/settings`. Unset: off.
    */
   autoUpdate?: boolean
+  /**
+   * The server's debug log runs until this time, epoch ms (debug-log.ts; owner, 2026-11-02): `hypernova
+   * debug on`, `POST /local/settings`, the phone. Never more than 24 hours ahead. Unset: off.
+   */
+  debugUntil?: number
 }
 /**
  * A session started from Hypernova. `engine` "term" runs in a shared terminal; "sdk" (or none, from

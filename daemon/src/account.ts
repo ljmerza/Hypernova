@@ -6,6 +6,7 @@
 //
 // An episode is one (state, window, reset): many sessions hitting the same limit make one, sent
 // once. It lives in <support>/account.json, so a restart doesn't forget a limit or a sign-out.
+import { dbgProc, exitOf } from './debug-log.ts'
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 import { SUPPORT, findClaude, log, readJson, sleep, writeJson } from './util.ts'
@@ -424,7 +425,9 @@ function authStatus(): Promise<AuthStatus | null> {
   if (!bin) return Promise.resolve(null)
   return new Promise((resolve) => {
     // Exit 1 means "not logged in", with the same JSON. Its output is never logged (it names the owner).
+    const started = dbgProc(bin, ['auth', 'status', '--json'])
     execFile(bin, ['auth', 'status', '--json'], { timeout: 10_000, encoding: 'utf8', maxBuffer: 1 << 20, env: childEnv(providerEnv(getProvider(null))) }, (e, out) => {
+      started(exitOf(e))
       const r = readAuthStatus(out ?? '')
       if (!r) log('account check failed', e ? `(${(e as NodeJS.ErrnoException).code ?? 'error'})` : '(unreadable)')
       resolve(r)

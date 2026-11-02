@@ -7,6 +7,7 @@
 // Adding or changing a stdio server is running a program on the server. The server can't see a fingerprint,
 // so the phone's check is only a claim (`confirmRun`), as `confirmShell` is for an automation; it's refused without one.
 
+import { dbgProc } from './debug-log.ts'
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -187,8 +188,10 @@ export const useCli = (f: typeof cliHook) => {
 
 export function runCli(bin: string, args: string[], cwd: string, env: Record<string, string> = {}, input?: string, timeout: number = CLI_MS): Promise<CliResult> {
   return new Promise((resolve) => {
+    const started = dbgProc(bin, args)
     const child = execFile(bin, args, { cwd, env: childEnv(env), timeout, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
       const code = err ? (typeof (err as NodeJS.ErrnoException).code === 'number' ? ((err as NodeJS.ErrnoException).code as unknown as number) : 1) : 0
+      started(code)
       resolve({ code, stdout: String(stdout), stderr: String(stderr) })
     })
     if (input !== undefined) child.stdin?.end(input)
