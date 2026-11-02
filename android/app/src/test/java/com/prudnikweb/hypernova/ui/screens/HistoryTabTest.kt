@@ -6,11 +6,17 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.HubException
+import com.prudnikweb.hypernova.data.Link
+import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Phase
+import com.prudnikweb.hypernova.data.ServerStatus
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionAutomation
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.ui.fx.formatDuration
+import com.prudnikweb.hypernova.ui.home.AllHistoryTab
+import com.prudnikweb.hypernova.ui.home.Everywhere
 import com.prudnikweb.hypernova.ui.home.HistoryTab
 import com.prudnikweb.hypernova.ui.session.TimePart
 import org.junit.Assert.assertEquals
@@ -23,7 +29,7 @@ import org.robolectric.RobolectricTestRunner
 
 /**
  * History (FEATURES Y1): ended sessions under their day, an automation's runs folded into one row,
- * each opening what it is; and the session sheet's TIME part (S11), checked by its words, never
+ * each opening what it is, a session's tap resuming it as /resume does; and the session sheet's TIME part (S11), checked by its words, never
  * pictured (its Started is a wall-clock time).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -55,12 +61,63 @@ class HistoryTabTest {
         // Only ended sessions: none of Home's live ones.
         rule.onNodeWithText("Fix the build").assertDoesNotExist()
         rule.onNodeWithText("Tidy the README").performClick()
+        rule.waitForIdle()
         assertEquals(listOf("h-today"), opened)
+        assertEquals("a tap resumes it, as /resume", listOf("resumeFromHistory(h-today)"), hub.calls)
         // The automation's two runs are one row, which opens its runs.
         rule.onNode(hasText(context.resources.getQuantityString(R.plurals.au_history_runs, 2, 2), substring = true)).performClick()
         rule.waitForIdle()
         assertEquals(listOf("au_1"), runs)
         assertTrue(opened.size == 1)
+        assertEquals("an automation's runs aren't resumed", listOf("resumeFromHistory(h-today)"), hub.calls)
+    }
+
+    @Test fun aSessionRunningElsewhereGoesOnInACopyWhichOpens() {
+        val hub = FakeHub(sessions = listOf(ended("h-today", "Tidy the README", 1)))
+        hub.resumeAnswer = Result.success("h-copy")
+        val opened = mutableListOf<String>()
+        rule.setContent { Harness(spy) { HistoryTab(hub, top = 0.dp, bottom = 0.dp, now = Samples.NOW, onOpen = { opened += it }, onRuns = {}) } }
+        rule.onNodeWithText("Tidy the README").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("h-today", "h-copy"), opened)
+    }
+
+    @Test fun aResumeRefusedSaysWhyAndItsChatStillOpens() {
+        val hub = FakeHub(sessions = listOf(ended("h-today", "Tidy the README", 1)))
+        hub.resumeAnswer = Result.failure(HubException("The folder it ran in is gone."))
+        val opened = mutableListOf<String>()
+        rule.setContent { Harness(spy) { HistoryTab(hub, top = 0.dp, bottom = 0.dp, now = Samples.NOW, onOpen = { opened += it }, onRuns = {}) } }
+        rule.onNodeWithText("Tidy the README").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("h-today"), opened)
+        assertEquals(listOf("The folder it ran in is gone."), spy.toasts)
+    }
+
+    @Test fun offTheLinkItOnlyOpens() {
+        val hub = FakeHub(sessions = listOf(ended("h-today", "Tidy the README", 1)), link = Link(LinkState.Reconnecting))
+        val opened = mutableListOf<String>()
+        rule.setContent { Harness(spy) { HistoryTab(hub, top = 0.dp, bottom = 0.dp, now = Samples.NOW, onOpen = { opened += it }, onRuns = {}) } }
+        rule.onNodeWithText("Tidy the README").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("h-today"), opened)
+        assertTrue(hub.calls.isEmpty())
+    }
+
+    @Test fun allServersResumesOnTheRowsOwnComputerAndLeavesAnOfflineOneAlone() {
+        val z2 = FakeHub(sessions = listOf(ended("h-z2", "Removed on z2", 1)))
+        val k1 = FakeHub(sessions = listOf(ended("h-k1", "Removed on k1", 2)), link = Link(LinkState.Reconnecting))
+        val opened = mutableListOf<Pair<String, String>>()
+        val e = Everywhere(
+            servers = listOf(ServerStatus("z2", "z2", LinkState.Connected, needsYou = 0, active = true) to z2, ServerStatus("k1", "k1", LinkState.Reconnecting, needsYou = 0, active = false) to k1),
+            pickedName = "z2", onOpen = { s, id -> opened += s to id }, onNewSession = {}, onRuns = { _, _ -> },
+        )
+        rule.setContent { Harness(spy) { AllHistoryTab(e, top = 0.dp, bottom = 0.dp, now = Samples.NOW) } }
+        rule.onNodeWithText("Removed on z2").performClick()
+        rule.onNodeWithText("Removed on k1").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("z2" to "h-z2", "k1" to "h-k1"), opened)
+        assertEquals(listOf("resumeFromHistory(h-z2)"), z2.calls)
+        assertTrue(k1.calls.isEmpty())
     }
 
     @Test fun nothingEndedYetSaysSo() {

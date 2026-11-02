@@ -17,6 +17,7 @@ import type { Blocked, Blocker, LimitNotice } from './blockers.ts'
 import { cutByRestart, fromBeforeBoot, noteOpen, runsAgain, startAfterBoot } from './reboot.ts'
 import { replacedOf, bringBack, setReplaced, stoppedProcess } from './rewound.ts'
 import { deletedOf, setDeleted, undelete } from './deleted.ts'
+import { offeredByResume } from './resume-offer.ts'
 import { getAccount, noteBlocker, noteHealthy, noteLimitNotice, noteLogin, stillBlocks, usageStale } from './account.ts'
 import { folderView } from './files.ts'
 import { bypassBlockedByRoot } from './platform.ts'
@@ -239,8 +240,8 @@ export type Usage = { fiveHour: Window | null; sevenDay: Window | null; rate?: R
 export type ProbeHealth = { ok: boolean; since: number | null }
 
 // ── Clients ───────────────────────────────────────────────────────────────
-/** `phone`: a paired device's feed, not the admin feed. */
-type Client = { send: (s: string) => void; phone?: boolean }
+/** `phone`: a paired device's feed, not the admin feed. `resync`: sends it a fresh snapshot. */
+type Client = { send: (s: string) => void; phone?: boolean; resync?: () => void }
 const clients = new Set<Client>()
 export function addClient(c: Client): () => void {
   clients.add(c)
@@ -284,7 +285,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), ...(agentDied.has(r.id) ? { died: { reason: agentDied.get(r.id) ?? null } } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null }
+  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && !deletedOf(r.id) && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), ...(agentDied.has(r.id) ? { died: { reason: agentDied.get(r.id) ?? null } } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
@@ -316,16 +317,22 @@ onBlockedChange((id) => {
   if (r) broadcast({ t: 'session', session: view(r) })
 })
 
+/** Sessions added in bulk (History's older transcripts): no message for each, a snapshot once they're all in. */
+let quietUpserts = false
+
 export function listSessions(): Session[] {
   return [...sessions.values()].map(view).sort((a, b) => b.lastActivityAt - a.lastActivityAt)
 }
 
 export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }): Rec {
+  // Taken off Home (deleted.ts): it's History's, whatever comes in late about it (a stopped turn's
+  // last words, a claude on its way out), until something resumes it.
+  if (deletedOf(id) && patch.state !== 'ended') patch = { ...patch, state: 'ended', activity: null }
   let r = sessions.get(id)
   // A session seen for the first time is news in itself, changed or not.
   let before = ''
-  if (r) before = JSON.stringify(view(r))
-  else {
+  if (r && !quietUpserts) before = JSON.stringify(view(r))
+  else if (!r) {
     const cwd = patch.cwd ?? process.env.HOME ?? '/'
     const m = getManaged(id)
     r = {
@@ -363,7 +370,7 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
     }
     // A session a rewind replaced stays out of every list, whatever comes in late about it (a
     // stopped turn's last words, a claude on its way out): the caller gets a record nobody sees.
-    if (!replacedOf(id) && !deletedOf(id)) sessions.set(id, r)
+    if (!replacedOf(id)) sessions.set(id, r)
   }
   const turnSoFar = inTurn(r.state) ? (r.turnStartedAt ?? null) : null
   Object.assign(r, patch)
@@ -378,6 +385,7 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
     r.projectName = projectNameOf(patch.cwd)
     if (!patch.transcriptPath) r.transcriptPath = transcriptPathFor(patch.cwd, id)
   }
+  if (quietUpserts) return r
   const after = view(r)
   if (JSON.stringify(after) !== before && sessions.get(id) === r) broadcast({ t: 'session', session: after })
   return r
@@ -1321,8 +1329,9 @@ export function forceUsage(window: 'five_hour' | 'seven_day', resetsAt: number, 
 
 // ── Discovery ─────────────────────────────────────────────────────────────
 /**
- * How far back History reaches: conversations touched in the last 30 days, the 300 most recent.
- * (It was a week and 40, which the owner's Mac passes in four or five days.)
+ * What's read while the daemon starts: conversations touched in the last 30 days, the 300 most recent.
+ * (It was a week and 40, which the owner's Mac passes in four or five days.) The rest of what /resume
+ * would offer comes in just after, without holding the start up ([discoverOlder]).
  */
 const HISTORY_MS = 30 * 24 * 3600_000
 const HISTORY_MAX = 300
@@ -1332,8 +1341,32 @@ const HISTORY_MAX = 300
  * the Mac cut short (reboot.ts), now that each one's last activity is known.
  */
 export function discover(): void {
-  // Every transcript by its session id. A managed session's is used wherever Claude Code wrote it
-  // (the folder is named after the real path, which a symlinked cwd doesn't give) and however old.
+  const byId = transcriptsById()
+  for (const m of managedSessions()) {
+    // Replaced by a rewind: its record and its transcript stay, and show nowhere (rewound.ts).
+    if (replacedOf(m.id)) continue
+    const t = byId.get(m.id)
+    // Shared-terminal sessions come back to life through the registry if their terminal still runs.
+    // Last active when its transcript was last written, not when it started, or it sinks in the list.
+    upsertSession(m.id, { cwd: m.cwd, origin: 'hypernova', state: m.engine === 'term' || deletedOf(m.id) ? 'ended' : 'idle', createdAt: m.createdAt, lastActivityAt: Math.max(m.createdAt, t?.mtime ?? 0), ...(t ? { transcriptPath: t.path } : {}) })
+  }
+  const files = [...byId].filter(([, f]) => Date.now() - f.mtime < HISTORY_MS).sort((a, b) => b[1].mtime - a[1].mtime)
+  for (const [id, f] of files.slice(0, HISTORY_MAX)) {
+    if (!replacedOf(id)) fromTranscript(id, f)
+  }
+  // Nothing runs yet (the registry and the terminals come next): an ended session's last activity
+  // says whether a restart of the Mac cut it short recently. One the owner took off Home stays off.
+  startAfterBoot(
+    (id) => {
+      const r = sessions.get(id)
+      return r && r.state === 'ended' && !isSdk(id) && !deletedOf(id) ? r.lastActivityAt : undefined
+    },
+    () => managedSessions().filter((m) => m.engine === 'term' && !deletedOf(m.id)).map((m) => m.id),
+  )
+}
+
+/** Every transcript by its session id. A managed session's is used wherever Claude Code wrote it (the folder is named after the real path, which a symlinked cwd doesn't give) and however old. */
+function transcriptsById(): Map<string, { path: string; mtime: number }> {
   const root = join(CLAUDE_DIR, 'projects')
   const byId = new Map<string, { path: string; mtime: number }>()
   for (const slug of safeReaddir(root)) {
@@ -1348,38 +1381,58 @@ export function discover(): void {
       } catch {}
     }
   }
-  for (const m of managedSessions()) {
-    // Replaced by a rewind: its record and its transcript stay, and show nowhere (rewound.ts).
-    if (replacedOf(m.id) || deletedOf(m.id)) continue
-    const t = byId.get(m.id)
-    // Shared-terminal sessions come back to life through the registry if their terminal still runs.
-    // Last active when its transcript was last written, not when it started, or it sinks in the list.
-    upsertSession(m.id, { cwd: m.cwd, origin: 'hypernova', state: m.engine === 'term' ? 'ended' : 'idle', createdAt: m.createdAt, lastActivityAt: Math.max(m.createdAt, t?.mtime ?? 0), ...(t ? { transcriptPath: t.path } : {}) })
-  }
-  const files = [...byId].filter(([, f]) => Date.now() - f.mtime < HISTORY_MS).sort((a, b) => b[1].mtime - a[1].mtime)
-  for (const [id, f] of files.slice(0, HISTORY_MAX)) {
-    if (replacedOf(id) || deletedOf(id)) continue
-    const head = readHead(f.path)
-    // The usage probe's, if its transcript outlived it (term/hidden.ts).
-    if (!head.cwd || isHiddenCwd(head.cwd)) continue
-    const r = upsertSession(id, { cwd: head.cwd, transcriptPath: f.path })
-    if (!isSdk(id)) r.state = 'ended'
-    r.lastActivityAt = f.mtime
-    if (r.createdAt > f.mtime) r.createdAt = head.ts ?? f.mtime
-    if (head.title && r.title === 'New session') r.title = trimText(head.title, 80) ?? r.title
-    // Where it left off, for its card, before anyone opens it.
-    if (head.lastText && !r.lastText) r.lastText = trimText(head.lastText, 200)
-  }
-  // Nothing runs yet (the registry and the terminals come next): an ended session's last activity
-  // says whether a restart of the Mac cut it short recently.
-  startAfterBoot(
-    (id) => {
-      const r = sessions.get(id)
-      return r && r.state === 'ended' && !isSdk(id) ? r.lastActivityAt : undefined
-    },
-    () => managedSessions().filter((m) => m.engine === 'term').map((m) => m.id),
-  )
+  return byId
 }
+
+/** Claude Code has a transcript of [r], where its folder says or (a symlinked cwd) in another project's. */
+function hasTranscript(r: Rec): boolean {
+  if (existsSync(r.transcriptPath)) return true
+  const root = join(CLAUDE_DIR, 'projects')
+  return safeReaddir(root).some((slug) => existsSync(join(root, slug, `${r.id}.jsonl`)))
+}
+
+/** Session [id] as its transcript [f] has it, for History; false for one that lists nothing. */
+function fromTranscript(id: string, f: { path: string; mtime: number }): boolean {
+  const head = readHead(f.path)
+  // The usage probe's, if its transcript outlived it (term/hidden.ts).
+  if (!head.cwd || isHiddenCwd(head.cwd)) return false
+  const r = upsertSession(id, { cwd: head.cwd, transcriptPath: f.path })
+  if (!isSdk(id) || deletedOf(id)) r.state = 'ended'
+  r.lastActivityAt = f.mtime
+  if (r.createdAt > f.mtime) r.createdAt = head.ts ?? f.mtime
+  if (head.title && r.title === 'New session') r.title = trimText(head.title, 80) ?? r.title
+  // Where it left off, for its card, before anyone opens it.
+  if (head.lastText && !r.lastText) r.lastText = trimText(head.lastText, 200)
+  return true
+}
+
+/**
+ * The rest of History (docs/PROTOCOL.md, "History"), after [discover]: every other transcript /resume
+ * would offer, from every project, however old, and every session the owner took off Home, whatever
+ * /resume makes of it. Never one a rewind replaced. Read a few at a time so the daemon goes on answering
+ * meanwhile, silently, then the phones get one fresh snapshot. How many came in.
+ */
+export async function discoverOlder(): Promise<number> {
+  const rest = [...transcriptsById()].filter(([id]) => !sessions.has(id)).sort((a, b) => b[1].mtime - a[1].mtime)
+  let added = 0
+  let i = 0
+  for (const [id, f] of rest) {
+    if (++i % OLDER_BATCH === 0) await new Promise((go) => setImmediate(go))
+    if (sessions.has(id) || replacedOf(id)) continue
+    if (!deletedOf(id) && !offeredByResume(f.path)) continue
+    quietUpserts = true
+    try {
+      if (fromTranscript(id, f)) added++
+    } finally {
+      quietUpserts = false
+    }
+  }
+  if (added) for (const c of clients) c.resync?.()
+  return added
+}
+
+/** How many of the older transcripts are looked at between two turns of the event loop. */
+const OLDER_BATCH = 20
 
 /** A transcript's start is read until its folder and first prompt are known, this far at most. */
 const HEAD_MAX = 8 * 1024 * 1024
@@ -1516,7 +1569,7 @@ export function sessionOfAgentJob(job: string): string | null {
 }
 
 /** A `claude agents` job as `claude agents --json --all` lists it (claude-agents.ts). */
-export type AgentJob = { id: string; sessionId: string; cwd: string; name?: string | null; state?: string | null; startedAt?: number | null }
+export type AgentJob = { id: string; sessionId: string; cwd: string; name?: string | null; state?: string | null; startedAt?: number | null; pid?: number | null }
 
 /** Each listed job's state there ("working", "blocked", "done"), by session id: the list `claude agents` shows. */
 const agentStates = new Map<string, string>()
@@ -1542,6 +1595,20 @@ function agentNeeds(job: string | undefined): string | null {
   }
 }
 
+/** A job resumed with no prompt (`claude --bg --resume <id>`) says this; it waits on nothing. */
+const FIRST_PROMPT = 'send a prompt to start'
+
+/** When a job this daemon just started was noted: a list read before it started doesn't count against it. */
+const jobNoted = new Map<string, number>()
+const JOB_NOTED_MS = 15_000
+
+/** Job [job] was just started for session [id]: known at once, so a prompt typed now reaches it through `claude attach` rather than a second claude. */
+export function noteAgentJob(id: string, job: string): void {
+  agentJobs.set(id, job)
+  agentStates.set(id, 'working')
+  jobNoted.set(id, Date.now())
+}
+
 /** A dialog's `needs` (a permission, AskUserQuestion's options, a plan): not a question in words. */
 const dialogNeeds = (n: string) => /^(approve |answer: |awaiting input)/.test(n)
 
@@ -1564,10 +1631,17 @@ export function applyAgentList(list: AgentJob[]): void {
   const watched: JobSeen[] = []
   for (const j of list) {
     // A job a rewind replaced: stopped, and `claude agents` lists it for good; nothing here does (rewound.ts).
-    if (!j?.id || !j.sessionId || !j.cwd || isSdk(j.sessionId) || isHiddenCwd(j.cwd) || replacedOf(j.sessionId) || deletedOf(j.sessionId)) continue
+    if (!j?.id || !j.sessionId || !j.cwd || isSdk(j.sessionId) || isHiddenCwd(j.cwd) || replacedOf(j.sessionId)) continue
+    // Taken off Home here, so `claude rm` has run (deleted.ts): a list read before it did still names
+    // the job. Started since: `claude --resume <id> --bg` or /resume in the agent view brought it back.
+    const removed = deletedOf(j.sessionId)
+    if (removed && (typeof j.startedAt !== 'number' || stoppedProcess(removed, j.pid, j.startedAt))) continue
+    if (removed) undelete(j.sessionId)
     seen.add(j.sessionId)
     agentJobs.set(j.sessionId, j.id)
-    agentStates.set(j.sessionId, String(j.state ?? ''))
+    // Resumed with no prompt yet: `claude agents` calls that blocked, and nothing is asked of the owner.
+    const waitsForNothing = j.state === 'blocked' && agentNeeds(j.id) === FIRST_PROMPT
+    agentStates.set(j.sessionId, waitsForNothing ? 'idle' : String(j.state ?? ''))
     let r = sessions.get(j.sessionId)
     if (!r) {
       // Older than History reaches back (discover): last active when its transcript was last written.
@@ -1591,18 +1665,23 @@ export function applyAgentList(list: AgentJob[]): void {
     }
     // Its process runs: the registry has its state (pollRegistry). Stopped: the list's.
     if (r.pid) continue
-    const state: SessionState = j.state === 'blocked' ? 'needs_you' : j.state === 'working' ? 'starting' : 'idle'
+    const state: SessionState = waitsForNothing ? 'idle' : j.state === 'blocked' ? 'needs_you' : j.state === 'working' ? 'starting' : 'idle'
     // Stopped on the owner: no dialog can show without a process, so what it waits for is a reply.
     const question = state === 'needs_you' ? (agentNeeds(j.id) ?? null) : null
     if (r.state !== state || (r.question ?? null) !== question) upsertSession(r.id, { state, activity: question, question })
   }
   for (const [id] of agentJobs) {
-    if (seen.has(id)) continue
+    if (seen.has(id) || Date.now() - (jobNoted.get(id) ?? 0) < JOB_NOTED_MS) continue
+    jobNoted.delete(id)
     agentJobs.delete(id)
     agentStates.delete(id)
     agentDied.delete(id)
     const r = sessions.get(id)
-    if (r && !r.pid && r.state !== 'ended') upsertSession(id, { state: 'ended', activity: null })
+    if (!r || r.pid || r.state === 'ended') continue
+    // `claude rm` in a terminal goes to History, as a removal here does. A shell job (`claude --bg
+    // --exec`, gone by itself minutes after it ends) never was a conversation: nothing to resume.
+    if (hasTranscript(r) || getManaged(id)) upsertSession(id, { state: 'ended', activity: null })
+    else forgetSession(id)
   }
   // A job that died since it was last seen alive: the phone says so once (a banner or a
   // notification, docs/PROTOCOL.md, "Session menu"). Finished, stopped or deleted ones never.
@@ -1612,7 +1691,7 @@ export function applyAgentList(list: AgentJob[]): void {
   }
 }
 
-/** A session deleted for good (a `claude agents` job removed with `claude rm`): gone from every list. */
+/** A session that no longer exists anywhere (a Codex thread deleted in Codex; a shell job that left `claude agents`): gone from every list. */
 export function forgetSession(id: string): void {
   agentJobs.delete(id)
   agentStates.delete(id)
@@ -1622,15 +1701,22 @@ export function forgetSession(id: string): void {
 }
 
 /**
- * Deleted by the owner (the Session menu's Delete): as [forgetSession], and it stays gone after a
- * restart although its transcript is still there (deleted.ts). [pid]: its claude, on its way out.
+ * Taken off Home by the owner (the Session menu's Remove from list): it ends here and goes to History,
+ * after a restart too, until something resumes it (deleted.ts). [pid]: its claude, on its way out.
  */
-export function deleteSessionForGood(id: string, pid: number | null): void {
+export function removeFromHome(id: string, pid: number | null): void {
   setDeleted(id, pid)
+  resolveSession(id)
   forgetSessionAllowed(id)
   mainEnded(id)
   endSessionAgents(id)
-  forgetSession(id)
+  agentJobs.delete(id)
+  agentStates.delete(id)
+  agentDied.delete(id)
+  jobNoted.delete(id)
+  forgetBlocked(id)
+  runsAgain(id)
+  upsertSession(id, { state: 'ended', activity: null, question: null, pid: null, stoppedForAway: false, agentOutdated: undefined, blocked: null })
 }
 
 /**
@@ -1723,6 +1809,15 @@ export function pollRegistry(): void {
     upsertSession(r.id, patch)
   }
   for (const r of sessions.values()) {
+    // Its SessionEnd came first: once its process has gone too, the session has none, so
+    // `claude agents`' list decides where a job is (applyAgentList), and it's still on Home.
+    if (r.pid && !live.has(r.id) && r.state === 'ended' && !isSdk(r.id) && !replacedProcess(r.id, r.pid)) {
+      try {
+        process.kill(r.pid, 0)
+      } catch {
+        r.pid = null
+      }
+    }
     if (r.pid && !live.has(r.id) && r.state !== 'ended' && !isSdk(r.id) && !replacedProcess(r.id, r.pid)) {
       const pid = r.pid
       upsertSession(r.id, { state: 'ended', activity: null, pid: null, agentOutdated: undefined })

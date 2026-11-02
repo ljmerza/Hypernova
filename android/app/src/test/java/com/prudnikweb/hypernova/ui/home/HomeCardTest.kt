@@ -61,7 +61,8 @@ class HomeCardTest {
         assertEquals(MenuOffer(rename = true, stop = false, delete = false), MenuOffer.of(session(SessionState.NeedsYou, Phase.NeedsYou, null)))
         // At rest: Delete too, nothing to stop (owner, 2026-11-01: he got only Rename).
         assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Idle, null)))
-        assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(session(SessionState.Idle, Phase.Ended, null)))
+        // Already in History: nothing to take it off.
+        assertEquals(MenuOffer(rename = true, stop = false, delete = false), MenuOffer.of(session(SessionState.Idle, Phase.Ended, null)))
     }
 
     @Test fun deleteSaysWhatItWillDoForEveryKindOfSession() {
@@ -73,10 +74,13 @@ class HomeCardTest {
         assertEquals(DeleteKind.Terminal, DeleteKind.of(plain(SessionState.Idle, Phase.Idle, "hypernova", link)))
         // Idle in a terminal Hypernova doesn't hold: offered, and it says why it can't.
         assertEquals(DeleteKind.OpenElsewhere, DeleteKind.of(plain(SessionState.Idle, Phase.Idle, "terminal")))
-        // Nothing runs: a phone's session at rest, one ended, one a restart cut short, one that failed.
+        // Nothing runs: a phone's session at rest, one a restart cut short (on Home still), one that failed.
         assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Idle, "hypernova")))
-        assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Ended, "terminal")))
-        assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Ended, "hypernova")))
+        assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Ended, "terminal").copy(endedBy = "mac_restart")))
+        // Ended, in History already: nothing to take it off.
+        assertEquals(DeleteKind.None, DeleteKind.of(plain(SessionState.Idle, Phase.Ended, "terminal")))
+        assertEquals(DeleteKind.None, DeleteKind.of(plain(SessionState.Idle, Phase.Ended, "hypernova")))
+        assertEquals(DeleteKind.None, DeleteKind.of(session(SessionState.Idle, Phase.Ended, null, AgentKind.CODEX)))
         assertEquals(DeleteKind.Forget, DeleteKind.of(plain(SessionState.Idle, Phase.Error, "hypernova")))
         // At work, however it shows it: none.
         assertEquals(DeleteKind.None, DeleteKind.of(plain(SessionState.Working, Phase.Working, "terminal", link)))
@@ -88,7 +92,7 @@ class HomeCardTest {
         assertEquals(DeleteKind.Job, DeleteKind.of(session(SessionState.Idle, Phase.Idle, "j1", running = false)))
         assertEquals(DeleteKind.Job, DeleteKind.of(session(SessionState.Idle, Phase.Idle, "j1")))
         assertEquals(DeleteKind.Job, DeleteKind.of(session(SessionState.Idle, Phase.Ended, "j1", running = true)))
-        // Codex's own, whatever else it has.
+        // Codex's, whatever else it has.
         assertEquals(DeleteKind.Codex, DeleteKind.of(session(SessionState.Working, Phase.Working, null, AgentKind.CODEX)))
         assertEquals(DeleteKind.Codex, DeleteKind.of(session(SessionState.Idle, Phase.Idle, null, AgentKind.CODEX).copy(term = link)))
     }
@@ -98,12 +102,12 @@ class HomeCardTest {
         // At work or waiting on the owner: Stop (its turn's interrupt) with the rest.
         assertEquals(MenuOffer(rename = true, stop = true, delete = true), MenuOffer.of(codex(SessionState.Working, Phase.Working)))
         assertTrue(MenuOffer.of(codex(SessionState.NeedsYou, Phase.NeedsYou)).stop)
-        // At rest or ended: nothing to stop; renamed and deleted all the same.
+        // At rest: nothing to stop; renamed and taken off the list all the same. In History: renamed.
         assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(codex(SessionState.Idle, Phase.Idle)))
-        assertEquals(MenuOffer(rename = true, stop = false, delete = true), MenuOffer.of(codex(SessionState.Idle, Phase.Ended)))
+        assertEquals(MenuOffer(rename = true, stop = false, delete = false), MenuOffer.of(codex(SessionState.Idle, Phase.Ended)))
         // Never Restart: that's claude agents' own.
         assertFalse(MenuOffer.of(codex(SessionState.Working, Phase.Working)).restart)
-        // The menu's Delete is for good: a Completed Codex card doesn't swipe to it.
+        // A Completed Codex card still doesn't swipe to it, as decided when it was for good.
         assertNull(CardSwipe.of(HomeGroup.Completed, codex(SessionState.Idle, Phase.Idle)))
         assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, Phase.Idle, "j1", running = false)))
     }

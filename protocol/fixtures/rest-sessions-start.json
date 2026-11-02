@@ -30,6 +30,8 @@
     "endedBy": null,
     "browsable": true,
     "outsideProjects": false,
+    "agentJob": "f00d0001",
+    "agentRunning": false,
     "blockedCalls": 0,
     "todo": null
   }

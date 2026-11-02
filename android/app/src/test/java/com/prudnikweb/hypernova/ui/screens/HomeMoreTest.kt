@@ -193,13 +193,13 @@ class HomeMoreTest {
         val hub = FakeHub(sessions = only(Samples.ALPHA))
         home(hub)
         longPress("Alpha release")
-        rule.onNodeWithText(str(R.string.delete)).performClick()
+        rule.onNodeWithText(str(R.string.session_remove)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.session_delete_q, "Alpha release")).assertExists()
+        rule.onNodeWithText(str(R.string.session_delete_body)).assertExists()
         assertTrue("nothing asked yet", hub.calls.isEmpty())
         rule.snap("home_menu_delete_confirm")
-        rule.onAllNodesWithText(str(R.string.delete)).fetchSemanticsNodes().let { assertTrue(it.isNotEmpty()) }
-        rule.onNode(hasText(str(R.string.delete)) and androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).performClick()
+        rule.onNode(hasText(str(R.string.session_remove_short)) and androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).performClick()
         rule.waitForIdle()
         assertEquals(listOf("deleteSession(${Samples.ALPHA})"), hub.calls)
     }
@@ -209,7 +209,13 @@ class HomeMoreTest {
         FakeHub(sessions = only(Samples.MID).map(how))
 
     private fun pressDelete() {
-        rule.onNode(hasText(str(R.string.delete)) and androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).performClick()
+        rule.onNode(hasText(str(R.string.session_remove)) and androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).performClick()
+        rule.waitForIdle()
+    }
+
+    /** The confirm's button. */
+    private fun confirmRemove() {
+        rule.onNode(hasText(str(R.string.session_remove_short)) and androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).performClick()
         rule.waitForIdle()
     }
 
@@ -223,7 +229,7 @@ class HomeMoreTest {
         rule.onNodeWithText(str(R.string.session_delete_q, "Mid sprint notes")).assertExists()
         rule.onNodeWithText(str(R.string.session_delete_body_terminal)).assertExists()
         assertTrue("nothing asked yet", hub.calls.isEmpty())
-        pressDelete()
+        confirmRemove()
         assertEquals(listOf("deleteSession(${Samples.MID})"), hub.calls)
     }
 
@@ -242,7 +248,7 @@ class HomeMoreTest {
         longPress("Mid sprint notes")
         pressDelete()
         rule.onNodeWithText(str(R.string.session_delete_body_plain)).assertExists()
-        pressDelete()
+        confirmRemove()
         assertEquals(listOf("deleteSession(${Samples.MID})"), hub.calls)
     }
 
@@ -263,7 +269,7 @@ class HomeMoreTest {
         home(FakeHub(sessions = only(Samples.PARSER)))
         longPress("Refactor parser")
         rule.onNodeWithText(str(R.string.session_rename)).assertExists()
-        rule.onNodeWithText(str(R.string.delete)).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.session_remove)).assertDoesNotExist()
     }
 
     @Config(qualifiers = "+h1600dp")

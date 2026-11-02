@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url'
 import type { WebSocket } from 'ws'
 import { CLAUDE_DIR, HOME, SUPPORT, findClaude, log, randomToken, readJson, trimText, writeText } from './util.ts'
 import { getManaged, getProvider, isClaudeEffort, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
-import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, notePaste, noteTermDialog, sessionAllowedTools, sessionAlwaysRules, sessionOfAgentJob, upsertSession, view } from './hub.ts'
+import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, noteAgentJob, notePaste, noteTermDialog, sessionAllowedTools, sessionAlwaysRules, sessionOfAgentJob, upsertSession, view } from './hub.ts'
+import { undelete } from './deleted.ts'
 import { rulesInEffect } from './permission-rules.ts'
 import { whyFromRules, type Why } from './why.ts'
 import { promptTitle, typedCommand } from './normalize.ts'
@@ -833,12 +834,17 @@ function registryWaiting(pid: number | null | undefined): boolean {
  * A new session from the phone in Claude Code's background daemon (settings.claudeAgents):
  * `claude --bg`, so it shows in `claude agents` like one started there. Claude Code picks the
  * session id itself (--bg passes over --session-id), so it's read from the registry by the job id
- * --bg prints. Returns the session id.
+ * --bg prints. Returns the session id. [resume]: an ended conversation goes on as a job under its own
+ * id, as /resume in the agent view does (`--bg --resume <id>`, no prompt needed; a copy under a new id
+ * when it's running already, which Claude Code says, and whose id this returns).
  */
-export async function createAgentsSession(o: { cwd: string; model?: string | null; permissionMode?: string; effort?: string | null; prompt?: string }): Promise<string> {
+export async function createAgentsSession(o: { cwd: string; model?: string | null; permissionMode?: string; effort?: string | null; prompt?: string; resume?: string; name?: string }): Promise<string> {
   const file = findClaude()
   if (!file) throw Object.assign(new Error('Claude Code isn’t installed on this computer.'), { status: 409 })
   const args = ['--bg']
+  if (o.resume) args.push('--resume', o.resume)
+  // A job resumed without a prompt has no words of its own for `claude agents`' row: it would read "new session".
+  if (o.resume && o.name) args.push('--name', o.name)
   if (o.model) args.push('--model', o.model)
   if (o.permissionMode) args.push('--permission-mode', o.permissionMode)
   if (o.effort) args.push('--effort', o.effort)
@@ -856,8 +862,12 @@ export async function createAgentsSession(o: { cwd: string; model?: string | nul
     if (!sid) await sleep(250)
   }
   if (!sid) throw Object.assign(new Error('The background session didn’t start. Look in claude agents.'), { status: 409 })
+  noteAgentJob(sid, job)
+  // The conversation it goes on keeps what it had; its process's stamps say the rest.
   const title = trimText(o.prompt ? promptTitle(o.prompt) : null, 80) ?? 'New session'
-  const r = upsertSession(sid, { cwd: o.cwd, origin: 'terminal', state: 'starting', activity: null, stoppedForAway: false, lastActivityAt: Date.now(), title, model: o.model || null, ...(o.effort ? { effort: o.effort } : {}), permissionMode: o.permissionMode ?? 'default', createdAt: Date.now() })
+  const r = sid === o.resume
+    ? upsertSession(sid, { cwd: o.cwd, origin: 'terminal', state: 'starting', activity: null, stoppedForAway: false, lastActivityAt: Date.now(), pid: null })
+    : upsertSession(sid, { cwd: o.cwd, origin: 'terminal', state: 'starting', activity: null, stoppedForAway: false, lastActivityAt: Date.now(), title, model: o.model || null, ...(o.effort ? { effort: o.effort } : {}), permissionMode: o.permissionMode ?? 'default', createdAt: Date.now() })
   ensureParsed(r)
   log('started claude agents job', job, 'for', sid.slice(0, 8), 'in', o.cwd)
   return sid
@@ -890,6 +900,8 @@ export type AutomationStart = {
  */
 export function createSharedSession(o: { cwd: string; providerId?: string; model?: string | null; permissionMode?: string; effort?: string | null; prompt?: string; forkFrom?: string; resume?: string; title?: string; context?: string } & AutomationStart): string {
   const id = o.resume ?? randomUUID()
+  // Resumed: an ordinary session again, if the owner had taken it off Home (deleted.ts).
+  if (o.resume) undelete(o.resume)
   // A resume keeps the provider it had, unless it's moving to another one (the phone's
   // "Continue on <provider>"): then its record says so, for its next restart too.
   // A provider deleted since: 404 `no_provider`, never the subscription instead.

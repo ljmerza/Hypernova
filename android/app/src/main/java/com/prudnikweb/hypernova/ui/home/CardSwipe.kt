@@ -86,7 +86,7 @@ internal enum class CardSwipe { Open, Stop, Delete, Rename, Restart, MarkRead;
 private fun word(a: CardSwipe): Int = when (a) {
     CardSwipe.Open -> R.string.swipe_open
     CardSwipe.Stop -> R.string.session_stop
-    CardSwipe.Delete -> R.string.delete
+    CardSwipe.Delete -> R.string.session_remove_short
     CardSwipe.Rename -> R.string.session_rename
     CardSwipe.Restart -> R.string.session_restart
     CardSwipe.MarkRead -> R.string.swipe_mark_read

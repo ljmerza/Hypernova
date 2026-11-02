@@ -70,7 +70,7 @@ const preKey = (sid: string, tool: string, input: unknown) => `${sid}|${tool}|${
 
 export async function handleHook(ev: any, req: IncomingMessage, res: ServerResponse): Promise<object> {
   const sid: string | undefined = typeof ev?.session_id === 'string' ? ev.session_id : undefined
-  // A session a rewind replaced or the owner deleted: what its stopped claude says on its way out isn't news (rewound.ts, deleted.ts).
+  // A session a rewind replaced or the owner took off Home: what its stopped claude says on its way out isn't news (rewound.ts, deleted.ts).
   if (!sid || isSdk(sid) || replacedOf(sid) || deletedOf(sid)) return {}
   const name: string = ev.hook_event_name
   const exists = !!getSession(sid)

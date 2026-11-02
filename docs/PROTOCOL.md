@@ -2213,14 +2213,25 @@ daemon doesn't know.
 #### DELETE /v1/sessions/{id}
 
 - **Body:** none
-- **Answer:** `200 {ok: true}`; `session.removed` goes out
+- **Answer:** `200 {ok: true, session}`, the session `ended` now, in History; `{t:"session"}` goes out. An
+  older daemon answers `{ok: true}` and sends `session.removed`.
 - **Refusals:** 404 `no_session`; 409 `at_work` (a session that is no job and isn't at rest),
   `terminal_open` (its terminal didn't close, or is one Hypernova doesn't hold; nothing is killed),
-  `agents_refused` (Claude Code's own words; `rm` keeps a worktree with unpushed work); for Codex 409
-  `codex_too_old` (nothing is forgotten), 502 `codex_refused`. An older daemon answers 409
-  `not_agents` for a session that is no job, which a client reads as "update that server".
-- **Rules:** `claude rm <job>`; Codex's `thread/delete`; for any other session, only once it's at
-  rest. The transcript stays, and it stays off every list. See Session menu.
+  `agents_refused` (Claude Code's own words; `rm` keeps a worktree with unpushed work). An older daemon
+  answers 409 `not_agents` for a session that is no job, which a client reads as "update that server".
+- **Rules:** takes it off Home: `claude rm <job>`; for Codex a running turn stops; for any other session,
+  only once it's at rest. The transcript or thread stays and shows in History. See Session menu.
+
+#### POST /v1/sessions/{id}/resume
+
+- **Body:** none
+- **Answer:** `200 {session, forked}`: `starting` (or `idle`) on Home; `forked: true` with a copy's id when
+  Claude Code says it runs somewhere already. For one running, or one that went on with another agent,
+  it just answers as it is.
+- **Refusals:** 404 `no_session`; 409 `folder_gone` (the folder it ran in has gone, a removed job's
+  worktree say; it stays in History), and what starting a session can say (`no_provider`). An older
+  daemon answers 404 `not_found`: a client just opens it, and writing in it resumes it there.
+- **Rules:** History's tap, as /resume: no prompt, so no turn. See History.
 
 #### POST /v1/jobs/respawn
 
@@ -3578,8 +3589,9 @@ objects with a `t` field. On the WebSocket's auth, see Transport and auth.
 
 - **Direction:** daemon → client
 - **Shape:** `{t:"session.removed", id, replacedBy?: string}`
-- **When:** A session deleted from the menu (see Session menu), or, with `replacedBy`, one a rewind
-  replaced (see Rewind).
+- **When:** A session that no longer exists anywhere (a Codex thread `codex delete` took, a shell job
+  that left `claude agents`; an older daemon: one deleted from the menu), or, with `replacedBy`, one a
+  rewind replaced (see Rewind). Removed from the menu it's a `{t:"session"}`, ended.
 - **Client:** With `replacedBy`, what names the old id goes to that one.
 
 #### `{t:"job.died"}`
@@ -5128,7 +5140,7 @@ refuses that.
   no price. The snapshot's `codex.usage` is the meter.
 - **Not for Codex.** `rewind`, `provider`, `auto-continue`, `menu`, `effort`, `permissions` and a
   `continue` after a limit answer 409 `unsupported_for_agent` (its effort goes with `model`).
-  `agents` and `todos` are empty. Rename, Stop and Delete: see Session menu.
+  `agents` and `todos` are empty. Rename, Stop and Remove from list: see Session menu.
 - **Terminals.** `POST /v1/sessions/{id}/terminal` and `open` start `codex resume` in a shared
   terminal when the session has none (409 `not_started` before Codex wrote the thread down). See
   Shared terminals for the Codex holder and the shell's `codex`.
@@ -5641,7 +5653,10 @@ The Home card's long-press menu in the Android app. Routes: `POST /v1/sessions/{
 
 A session has `agentJob` (the job id) when it is a `claude agents` job (settings.claudeAgents). With
 that setting the daemon lists every job `claude agents --json --all` shows, finished ones too
-(`idle`, on Home rather than History; one blocked on the owner is `needs_you`). `hypernova setup`
+(`idle`, on Home rather than History; one blocked on the owner is `needs_you`; one resumed with no prompt,
+which that list calls blocked, is `idle`), so Home has every row `claude agents` has but for what was
+removed here and a rewind's replaced original. Home also has what that list's screen doesn't: a plain
+`claude` in a terminal, a shared terminal's, the daemon's own, Codex's, one a restart cut short. `hypernova setup`
 turns the setting on while settings.json doesn't say, never over a `false`, and a client turns it on
 or off (`POST /v1/claude {agents}`); the daemon takes it without a restart (each poll reads it).
 
@@ -5658,35 +5673,38 @@ or off (`POST /v1/claude {agents}`); the daemon takes it without a restart (each
   kept. Its held prompts wait; an approval it held goes with the old claude, and the agents it ran in
   the background end. A job goes as `respawn`, which the Android app keeps using for jobs, so an older
   server restarts them too.
-- **Delete:** a job's `claude rm`, or, for a session that is no job, once it's at rest (`idle`, `ended`
-  or `error`, no agents at work), its shared terminal closed first; then `session.removed`. Nothing
-  kills a terminal Hypernova doesn't hold. Either way the transcript stays, and
-  `<support>/deleted-sessions.json` keeps the session off every list after a restart (`deleted.ts`), a
-  job too, since `claude rm` leaves its transcript. Late hooks about it and the claude on its way out
-  are ignored. A claude started since (`claude --resume`) makes it an ordinary session again; so does
-  dropping its entry from the file and restarting the daemon.
-- **Stop, delete and restart of a job:** the `claude attach` holder ends first.
+- **Remove from list (`DELETE`):** takes it off Home, into History. A job's `claude rm`, or, for a session
+  that is no job, once it's at rest (`idle`, `ended` or `error`, no agents at work), its shared terminal
+  closed first; then `{t:"session"}`, ended. Nothing kills a terminal Hypernova doesn't hold. Either way
+  the transcript stays, and `<support>/deleted-sessions.json` (the name is from when it hid a session
+  everywhere; lines from then show in History too) keeps it ended after a restart (`deleted.ts`). Late
+  hooks about it and the claude on its way out are ignored. History's tap (`…/resume`), a prompt typed
+  into it, or a claude started since (`claude --resume`, `--bg`, /resume in the agent view) makes it an
+  ordinary session again and takes its line out. A `claude rm` in a terminal goes to History too. **No
+  route deletes a transcript or a thread for good.**
+- **Stop, remove and restart of a job:** the `claude attach` holder ends first.
 - **Restart all (`POST /v1/jobs/respawn`):** Home shows "N jobs run an older Claude Code" with
   Restart all (asked first: a job at work is interrupted), swiped away until another job falls
   behind.
 
 #### A Codex session
 
-`daemon/src/codex/sessions.ts`. It takes rename, stop and delete over Codex's app-server, with or
-without a terminal. The Android app offers Rename and Delete always, Stop while it works or waits on
-the owner, never Restart (409 `not_agents`, for `respawn` and `restart` alike).
+`daemon/src/codex/sessions.ts`. It takes rename and stop over Codex's app-server, with or without a
+terminal. The Android app offers Rename always, Remove from list while it's on Home, Stop while it works
+or waits on the owner, never Restart (409 `not_agents`, for `respawn` and `restart` alike).
 
 - **Rename:** Codex's `thread/name/set {threadId, name}`, so `codex resume` shows it too.
   `kept: "codex"`. `kept: "hypernova"`: the name is in `codex-threads.json` only, for a thread Codex
   never wrote down or a Codex that doesn't know the call.
 - **Stop:** the `interrupt` route's Stop (the turn ends, the queue comes back named).
-- **Delete:** Codex's `thread/delete {threadId}`, for good (as `codex delete`; not
-  `thread/archive`), after its shared terminal ends and a running turn is stopped; then the thread
-  leaves `codex-threads.json` and `session.removed` goes out. A thread Codex never wrote down is
-  only forgotten. From a Codex without the call, 409 `codex_too_old` and nothing is forgotten.
+- **Remove from list:** its shared terminal ends and a running turn is stopped; the thread stays in Codex
+  (`codex resume` finds it) and in `codex-threads.json`, and the session is ended, in History. `…/resume`
+  follows it again (`thread/resume`), with no turn. History lists the threads Hypernova knows, not the
+  whole of `codex resume`'s list.
 - Codex's `thread/deleted` (a `codex delete` elsewhere) makes the daemon forget the session the same
   way.
-- Home's swipe doesn't delete a Codex card: the menu and the session sheet do.
+- Home's Smart swipe doesn't remove a Codex card: the menu, the session sheet and a swipe picked in
+  Settings do.
 
 #### A job that died
 
@@ -7180,12 +7198,24 @@ stop). The name stays for the wire value `endedBy: "mac_restart"`; it applies on
 - Leftovers from before the boot don't count as running: a holder's meta (`createdAt`) or a Claude
   Code registry entry (`startedAt`) from before it is stale even when its pid is alive (another
   process's now).
-- **History** reaches back 30 days, the 300 most recently written transcripts (a client session's
-  own transcript however old, found by its id in any project folder). A transcript is read from its
+- **History** is what /resume would offer, for every project on the server (DECISIONS, "Delete takes a
+  session off Home, History brings it back"). At start, the 300 most recently written transcripts of
+  the last 30 days (a client session's own however old, found by its id in any project folder). Right
+  after, a few at a time so the daemon goes on answering, every other transcript /resume would offer
+  (`resume-offer.ts`, as Claude Code 2.1.316 decides: not an agent's or a teammate's, not its service's
+  own, not `-p` or the Agent SDK's, not a /loop session, not a file with no message, not one that went
+  on in another session) and every line of `deleted-sessions.json`; never a rewind's replaced one. Then
+  one fresh `{t:"snapshot"}` to each phone, no message for each. About 800 bytes a session in the
+  snapshot. What's in the first 300 stays whatever /resume makes of it, as it always showed. A transcript is read from its
   start until its folder and first prompt are known (past 256 KB the folder alone will do; 8 MB at
   most: a first prompt with pasted pictures can be one line of megabytes), and from its end for the
   title, Claude's last reply (`lastText`, so a card says where it left off before anyone opens it)
   and, failing the start, the folder.
+- **A tap resumes it** (`POST /v1/sessions/{id}/resume`), as /resume: the same id, with no prompt, so no
+  turn. With settings.claudeAgents and on the subscription it's a job again (`claude --bg --resume <id>
+  --name <its title>`, and `claude agents` lists it), as /resume in the agent view; else a new shared
+  terminal; with no shared terminals, the daemon's own at its next prompt. A session's chat can be opened
+  without resuming it from everywhere else (a notification, say); writing in one resumes it too.
 - Resuming a session Claude Code never wrote a transcript for (its claude ended before taking a
   prompt) starts it afresh under its id (`--session-id`): `--resume` refuses an unknown id.
 

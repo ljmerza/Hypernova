@@ -14,16 +14,17 @@ import { speechFeed, speechRoute, speechState } from './readaloud.ts'
 import { adminToken, addDevice, deviceForToken, deleteProvider, editProvider, cleanBaseUrl, cleanKey, findProvider, getDevice, hasDeviceCert, identity, isSdk, listDevices, listProviders, removeDevice, setDeviceCert, settings, getManaged, saveManaged, saveSettings, setManagedProvider, OPENROUTER_URL, type ProviderSaved, getProvider, isClaudeEffort } from './store.ts'
 import { lanDevice, lanInfo, lanOrigin, pairAllowed, pairFailed, pairingAddresses, pickLanAddress, plainIp, setLanAccess, startLan, stopLan } from './lan.ts'
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
-import { addClient, agentJobOf, answerApproval, deleteSessionForGood, broadcast, clearRestarting, resolveSession, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
+import { addClient, agentJobOf, answerApproval, removeFromHome, broadcast, clearRestarting, resolveSession, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort, setMode } from './runner.ts'
 import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
 import { agentJobCommand, setClaudeAgents } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
 import { codexModels, codexSessionUsage, codexState, refreshCodexAccount } from './codex/account.ts'
 import { isCodex, isCodexMode } from './codex/threads.ts'
-import { createCodexSession, deleteCodex, ensureCodexHistory, interruptCodex, promptCodex, renameCodex, setCodexMode, setCodexModel } from './codex/sessions.ts'
+import { createCodexSession, ensureCodexHistory, interruptCodex, promptCodex, removeCodex, renameCodex, resumeCodex, setCodexMode, setCodexModel } from './codex/sessions.ts'
 import { SwitchError, commitSwitch, previewSwitch, useShared } from './switch.ts'
 import { linkOf } from './switch-links.ts'
+import { undelete } from './deleted.ts'
 import { boxLines, boxText } from './term/shared.ts'
 import { cancelLogin, clearProviderStatus, getAccount, noteProviderRemoved, providerKeyRefused, requestCheck, sendLoginCode, startLogin } from './account.ts'
 import { handleHook, hookPathOk, installIntegration, integrationStatus, uninstallIntegration } from './hooks.ts'
@@ -888,11 +889,16 @@ async function api(c: Ctx): Promise<void> {
     }
     return json(res, 200, { results })
   }
+  // History's tap (docs/PROTOCOL.md, "History"): as /resume does, the conversation runs again, with no
+  // prompt and no turn, and it's back on Home.
+  const rs = /^\/v1\/sessions\/([\w-]+)\/resume$/.exec(path)
+  if (rs && m === 'POST') return json(res, 200, await resumeFromHistory(rs[1]!))
   // The Home card's long-press menu (docs/PROTOCOL.md, "Session menu"): rename it (Claude Code's
   // /rename, typed in, so it shows in `claude agents` and the transcript keeps it), and for a
-  // `claude agents` job, stop it or delete it there, or restart it on the installed Claude Code
-  // (`claude respawn`, for a job on an older one: session.agentOutdated). A Codex session: rename,
-  // stop and delete over Codex's app-server (codex/sessions.ts).
+  // `claude agents` job, stop it or take it out of there, or restart it on the installed Claude Code
+  // (`claude respawn`, for a job on an older one: session.agentOutdated). A Codex session: rename
+  // and stop over Codex's app-server (codex/sessions.ts). DELETE takes any of them off Home: the
+  // conversation stays, in History (deleted.ts).
   const menu = /^\/v1\/sessions\/([\w-]+)(?:\/(rename|stop|respawn|restart))?$/.exec(path)
   if (menu && ((menu[2] && m === 'POST') || (!menu[2] && m === 'DELETE'))) {
     const [, id, action] = menu
@@ -915,8 +921,8 @@ async function api(c: Ctx): Promise<void> {
       upsertSession(id!, { title: name })
       return json(res, 200, { session: listSessions().find((x) => x.id === id) })
     }
-    // Codex: Stop is its turn's interrupt; Delete is Codex's own thread/delete, its shared terminal
-    // (the `codex` TUI on that thread) ended first. Restart is claude agents' only.
+    // Codex: Stop is its turn's interrupt; DELETE ends its shared terminal (the `codex` TUI on that
+    // thread) and any turn, and the thread stays in Codex. Restart is claude agents' only.
     if (isCodex(id!) && action !== 'respawn' && action !== 'restart') {
       if (action === 'stop') {
         await interruptCodex(id!)
@@ -924,22 +930,22 @@ async function api(c: Ctx): Promise<void> {
       }
       const tid = termOf(id!)
       if (tid) await endTermAndWait(tid)
-      await deleteCodex(id!)
-      return json(res, 200, { ok: true })
+      await removeCodex(id!)
+      return json(res, 200, { ok: true, session: listSessions().find((x) => x.id === id) })
     }
-    // Delete for a session that is no job: one at rest, whatever made it. Its shared terminal closes
+    // Off Home, for a session that is no job: one at rest, whatever made it. Its shared terminal closes
     // first; a terminal Hypernova doesn't hold can't be closed from here, so the owner hears why.
     if (!job && !action) {
-      if (!['idle', 'ended', 'error'].includes(rec.state) || backgroundRunning(id!)) throw new HttpError(409, 'at_work', 'It’s still at work. Delete it once it has finished.')
+      if (!['idle', 'ended', 'error'].includes(rec.state) || backgroundRunning(id!)) throw new HttpError(409, 'at_work', 'It’s still at work. Remove it once it has finished.')
       const pid = rec.pid
       const tid = termOf(id!)
       if (tid) {
         if (!(await endTermAndWait(tid))) throw new HttpError(409, 'terminal_open', 'Its terminal didn’t close. Try again, or close it on the server.')
       } else if (isLiveTerminal(id!)) {
-        throw new HttpError(409, 'terminal_open', 'It’s open in a terminal Hypernova doesn’t hold. Close it there, then delete it.')
+        throw new HttpError(409, 'terminal_open', 'It’s open in a terminal Hypernova doesn’t hold. Close it there, then remove it.')
       }
-      deleteSessionForGood(id!, pid)
-      return json(res, 200, { ok: true })
+      removeFromHome(id!, pid)
+      return json(res, 200, { ok: true, session: listSessions().find((x) => x.id === id) })
     }
     // Restart Session (a shared terminal; a job below): the same conversation in a new claude, so its
     // MCP servers and settings load afresh. Nothing can restart a terminal it doesn't hold, and a
@@ -970,9 +976,9 @@ async function api(c: Ctx): Promise<void> {
     // Restarted on the installed Claude Code: the next registry read has its new process.
     if (action === 'respawn' || action === 'restart') upsertSession(id!, { agentOutdated: undefined })
     if (action) return json(res, 200, { session: listSessions().find((x) => x.id === id) })
-    // `claude rm` leaves the transcript: without this it's back in History after the next restart.
-    deleteSessionForGood(id!, pid)
-    return json(res, 200, { ok: true })
+    // `claude rm` stopped it and took it from `claude agents`; its transcript stays, for History.
+    removeFromHome(id!, pid)
+    return json(res, 200, { ok: true, session: listSessions().find((x) => x.id === id) })
   }
   // A side question (docs/PROTOCOL.md, "Side questions"; aside.ts): Claude Code's /btw, typed in
   // at once (never held), its answer read off the terminal's screen and asked for with GET.
@@ -1427,6 +1433,8 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
   // A conversation that switched agents goes on in its new session (switch.ts).
   const moved = linkOf(id).to
   if (moved) throw new HttpError(409, 'switched', 'This conversation went on in another session. Write there.', { to: moved })
+  // Written to from History, say, after the owner took it off Home: it's back (deleted.ts).
+  undelete(id)
   // Codex takes prompts over its app-server, whether or not a terminal shows the session.
   if (isCodex(id)) {
     upsertSession(id, { stoppedForAway: false })
@@ -1487,6 +1495,55 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
       : (adoptTerminal(id, rec.cwd, resumeModels.get(id)), sendPrompt(id, text, undefined, o.clientId), id)
   if (!live) resumeModels.delete(id)
   return { id: newId, queued: false, forked: live }
+}
+
+/**
+ * `POST /v1/sessions/{id}/resume`, History's tap: the ended conversation runs again under its own id,
+ * with no prompt, so no turn and nothing spent, and shows on Home; as /resume in the agent view, a
+ * `claude agents` job with settings.claudeAgents (not on another provider, whose environment is the
+ * holder's to give, nor one that carries a switch's context), else in a new shared terminal, or with no
+ * shared terminals the daemon's own at its next prompt. Never for a session that's running already or
+ * that went on in another one (the chat says where): those just answer. 409 `folder_gone` when the
+ * folder it ran in has gone (`claude rm` takes a job's worktree with it), and it stays in History.
+ */
+async function resumeFromHistory(id: string): Promise<{ session: ReturnType<typeof listSessions>[number] | undefined; forked: boolean }> {
+  const rec = getSession(id)
+  if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+  const answer = (at = id, forked = false) => ({ session: listSessions().find((x) => x.id === at), forked })
+  if (linkOf(id).to) return answer()
+  if (isCodex(id)) {
+    await resumeCodex(id)
+    return answer()
+  }
+  if (rec.state !== 'ended') {
+    undelete(id)
+    return answer()
+  }
+  if (isSdk(id)) {
+    undelete(id)
+    upsertSession(id, { state: 'idle', activity: null, lastActivityAt: Date.now() })
+    return answer()
+  }
+  if (!existsSync(rec.cwd)) throw new HttpError(409, 'folder_gone', `The folder it ran in is gone from the ${MACHINE}: ${rec.cwd}`)
+  undelete(id)
+  const useShared = await shared()
+  if (!useShared) {
+    await needSdk()
+    adoptTerminal(id, rec.cwd, resumeModels.get(id))
+    resumeModels.delete(id)
+    upsertSession(id, { state: 'idle', activity: null, lastActivityAt: Date.now() })
+    return answer()
+  }
+  const model = resumeModels.get(id) ?? getManaged(id)?.model ?? undefined
+  const mode = RESTART_MODES.has(rec.permissionMode) ? rec.permissionMode : undefined
+  const provider = getManaged(id)?.providerId ?? rec.providerId
+  const asJob = settings.claudeAgents === true && (provider == null || provider === 'anthropic') && !getManaged(id)?.context && existsSync(rec.transcriptPath)
+  const effort = isClaudeEffort(rec.effort) ? rec.effort : undefined
+  const at = asJob
+    ? await createAgentsSession({ cwd: rec.cwd, resume: id, ...(rec.title && rec.title !== 'New session' ? { name: rec.title } : {}), ...(model ? { model } : {}), ...(mode ? { permissionMode: mode } : {}), ...(effort ? { effort } : {}) })
+    : createSharedSession({ cwd: rec.cwd, resume: id, ...(model ? { model } : {}), ...(mode ? { permissionMode: mode } : {}) })
+  resumeModels.delete(id)
+  return answer(at, at !== id)
 }
 
 /**
@@ -2046,8 +2103,9 @@ export function startServers(): () => Promise<void> {
       keep(ws)
       // The admin feed (`client=mac`): what's for it alone, such as who is speaking (mac-feed.ts).
       if (admin && url.searchParams.get('client') === 'mac') macFeed(ws)
-      const remove = addClient({ send: (s) => ws.readyState === ws.OPEN && ws.send(s), phone: !!device })
-      ws.send(JSON.stringify({ t: 'snapshot', snapshot: snapshot(device?.id ?? null) }))
+      const sendSnapshot = () => ws.readyState === ws.OPEN && ws.send(JSON.stringify({ t: 'snapshot', snapshot: snapshot(device?.id ?? null) }))
+      const remove = addClient({ send: (s) => ws.readyState === ws.OPEN && ws.send(s), phone: !!device, ...(device ? { resync: () => void sendSnapshot() } : {}) })
+      sendSnapshot()
       // A phone on the live feed keeps the Mac awake While working (the admin feed doesn't).
       // After the snapshot, which is always a client's first message.
       const awake = device ? awakeClient() : null

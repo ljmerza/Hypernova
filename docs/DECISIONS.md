@@ -3175,6 +3175,8 @@ on the server, so this can't say which account a server is on.
 
 ## Delete for every finished session (2026-11-01)
 
+(Item 3 is replaced: see "Delete takes a session off Home, History brings it back", 2026-11-02.)
+
 The owner, on k1: "I can't delete this completed session for some reason, it's pretty common for me
 not to be able to do this." The card's menu showed only Rename: Delete was for `claude agents` jobs
 and Codex sessions, so a finished session in a plain shared terminal had none, and nothing said why.
@@ -3792,3 +3794,55 @@ model's meter on Home has it: a weekday and time more than about a day off, a co
 as the model pickers do (`ModelCatalog.week`). It hides on a model with no week of its own or none known yet, and whenever
 the plan's windows aren't about this session (`planShown`), so never for Codex. `Usage.models` is read off Claude Code's
 /usage screen every 15 minutes, so it can be that old, which Settings says; the bar doesn't ask for a fresh look.
+
+## Delete takes a session off Home, History brings it back (2026-11-02)
+
+The owner, reversing "Delete for every finished session", item 3 (which was decided here, not by him):
+"no, delete means remove from the active agents view, but I can always pull it back from history,
+otherwise how would agents go to history? The main list view should always have all items Claude agents
+view would have, and history acts like the resume slash command for all." This replaces that item 3,
+and in "Rename, Stop and Delete for Codex sessions" its item 2.
+
+1. **Home mirrors `claude agents`.** Every background job `claude agents` lists is a card, whatever its
+   state and however old, but for what the owner removed here and the rewind's replaced original
+   ("Rewind": his decision that the new one fully replaces the old). What 2.1.316 lists (its code and
+   https://code.claude.com/docs/en/agent-view): every folder in `~/.claude/jobs`, finished, failed and
+   stopped ones too, until `claude rm`; a shell job (`claude --bg --exec`) goes by itself minutes after
+   it ends. Two gaps closed: a job whose SessionEnd hook came before its process went stayed `ended`,
+   so a stopped job sat in History while `claude agents` still listed it; and a job resumed with no
+   prompt reads "blocked" there and would have asked for the owner as if Claude had a question.
+   **Not fewer, kinds kept:** Home also keeps what it showed before and `claude agents` doesn't: a plain
+   `claude` open in a terminal (`claude agents --json` lists those, its screen doesn't until it's
+   backgrounded), a session in a shared terminal, one the daemon runs, Codex's, and one a restart cut
+   short. Nothing visible today was dropped. Not on Home: `claude agents`' cloud sessions, which its
+   `--json` doesn't give. With `settings.claudeAgents` off, jobs aren't read at all, as that switch says.
+2. **Remove from list.** "Delete" misled now, so the menu and the swipes say Remove from list, the
+   confirm says "Remove “x” from the list?", and each body says what it stops and that "the
+   conversation stays in History: a tap there resumes it". What it does to a process is as before: a
+   job's `claude rm` (it stops first, and takes the job from `claude agents`, and its worktree when
+   that's safe; Claude Code's refusal still comes back), a shared terminal closes first, a terminal
+   Hypernova doesn't hold still says to close it there. A session already in History offers none.
+   `<support>/deleted-sessions.json` keeps its name and means "removed from Home": it keeps a late word
+   from its stopped claude, or a restart's look at its transcript, from putting it back on Home. Clients
+   get `{t:"session"}` ended, not `session.removed`. A `claude rm` in a terminal goes to History too.
+3. **Codex too:** nothing here deletes a thread any more (`thread/delete` was for good). A turn running
+   stops, its terminal closes, and the thread stays in Codex and in History. A `codex delete` elsewhere
+   still makes Hypernova forget it: that one is gone. Smart's swipe still passes a Codex card over.
+4. **History is /resume for all.** Every transcript /resume would offer, from every project, however
+   old: past the start's 30 days and 300, the rest come in just after the daemon starts, read a few at
+   a time, then one fresh snapshot goes to the phones (`discoverOlder`). Past that reach only what
+   /resume offers comes in, so `claude -p` and Agent SDK runs, agents' and teammates' transcripts,
+   `/loop` sessions and files with no message don't flood it; those inside the old reach stay, as they
+   were visible before. An automation's runs are as they were: one folded row per automation. Search
+   covers them all. A rewind's replaced transcript stays hidden.
+5. **A tap resumes,** as /resume: `POST /v1/sessions/{id}/resume`, no prompt, no turn, its chat opening
+   meanwhile, and it's on Home. A `claude agents` job under the same id with the setting on (as /resume
+   in the agent view: `claude --bg --resume <id>`), else a shared terminal. Resuming takes its line out
+   of the file, as a prompt typed into it and `claude --resume <id>` from a terminal do. Its folder gone
+   (`claude rm` takes a worktree): it says so and stays in History.
+6. **What was deleted before comes back:** every line already in the file shows in History on the first
+   start, however old, even one /resume wouldn't offer. The upgrade writes nothing to the file.
+7. **There's no way from the phone to delete a transcript for good now.** He didn't ask for one; none
+   was added.
+8. **All servers:** History lists each computer's the same way, and a tap resumes on the row's own
+   computer; a row offline only opens as last seen.

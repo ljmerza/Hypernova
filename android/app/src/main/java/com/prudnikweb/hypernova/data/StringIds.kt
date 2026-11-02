@@ -141,6 +141,7 @@ val Str.id: Int
         Str.err_continue -> R.string.err_continue
         Str.err_delete_older -> R.string.err_delete_older
         Str.err_delete_session -> R.string.err_delete_session
+        Str.err_resume_history -> R.string.err_resume_history
         Str.err_download -> R.string.err_download
         Str.err_effort -> R.string.err_effort
         Str.err_file -> R.string.err_file

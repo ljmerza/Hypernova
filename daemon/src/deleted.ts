@@ -1,21 +1,23 @@
-// Sessions the owner deleted (docs/PROTOCOL.md, "Session menu"; DECISIONS, "Delete for every finished
-// session"): gone from Home, History and search. Claude Code keeps a transcript of each, `claude rm`
-// too, so only this list (<support>/deleted-sessions.json) keeps the next start from finding it there
-// and putting it back. No imports from the hub, which asks this file about every session it first sees.
+// Sessions the owner took off Home (docs/PROTOCOL.md, "Session menu"; DECISIONS, "Delete takes a session
+// off Home, History brings it back"): the menu's Remove from list. The conversation stays, in History and
+// search, and nothing about it is lost. Only this list (<support>/deleted-sessions.json, named for what
+// it meant before) keeps a late word from its stopped claude, or a restart's look at its transcript,
+// from putting it back on Home as if it ran. No imports from the hub, which asks this file about every
+// session it sees.
 //
-// `claude --resume <id>` brings one back: its claude is a running session again. By hand: drop its
-// line from the file and restart the daemon, and it's back in History.
+// Resuming it takes its line out: History's tap, a prompt typed into it, or `claude --resume <id>`,
+// its claude a running session again.
 import { join } from 'node:path'
 import { SUPPORT, readJson, writeJson } from './util.ts'
 
-/** [at]: when it was deleted. [pid]: its claude then, if it had one, on its way out. */
+/** [at]: when it was taken off Home. [pid]: its claude then, if it had one, on its way out. */
 export type Deleted = { at: number; pid: number | null }
 
 const FILE = join(SUPPORT, 'deleted-sessions.json')
 let deleted = readJson<Record<string, Deleted>>(FILE, {})
 if (!deleted || typeof deleted !== 'object' || Array.isArray(deleted)) deleted = {}
 
-/** Session [id] was deleted (a session's id comes from outside: own keys only). */
+/** Session [id] was taken off Home (a session's id comes from outside: own keys only). */
 export const deletedOf = (id: string): Deleted | null => (Object.hasOwn(deleted, id) ? deleted[id]! : null)
 
 export function setDeleted(id: string, pid: number | null, at = Date.now()): void {
@@ -23,7 +25,7 @@ export function setDeleted(id: string, pid: number | null, at = Date.now()): voi
   writeJson(FILE, deleted)
 }
 
-/** A claude resumed it: an ordinary session again. */
+/** Resumed: an ordinary session again. */
 export function undelete(id: string): void {
   if (!Object.hasOwn(deleted, id)) return
   delete deleted[id]

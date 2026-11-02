@@ -2222,14 +2222,28 @@ class LiveHub(
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_restart_jobs)) }
 
     override suspend fun deleteSession(sessionId: String): Result<Unit> = try {
-        api.delete("/v1/sessions/$sessionId")
-        // The Mac sends session.removed as well; the card goes now, not when that arrives.
-        raw = raw - sessionId
-        publish()
+        // Off Home, into History: the answer has it ended, and the card goes now, not when its message
+        // arrives. An older server answers with nothing, and sends session.removed: gone there.
+        if (applySession(api.delete("/v1/sessions/$sessionId")) == null) {
+            raw = raw - sessionId
+            publish()
+        }
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) {
         // An older server deletes only jobs: it's the server that needs updating, not the phone trying again.
         Result.failure(if (Net.classify(e).code == "not_agents") HubException(res.getString(Str.err_delete_older)) else handle(e, Str.err_delete_session))
+    }
+
+    override suspend fun resumeFromHistory(sessionId: String): Result<String> = try {
+        // On Home now, not when the Mac has it started.
+        raw[sessionId]?.let { raw = raw + (sessionId to it.copy(state = "starting")); publish() }
+        val s = applySession(api.post("/v1/sessions/$sessionId/resume"))
+        Result.success(s?.id ?: sessionId)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+        // It didn't start: back in History.
+        raw[sessionId]?.let { if (it.state == "starting") { raw = raw + (sessionId to it.copy(state = "ended")); publish() } }
+        // An older server has no such route: writing in it resumes it there, as it always did.
+        if (Net.classify(e).code == "not_found") Result.success(sessionId) else Result.failure(handle(e, Str.err_resume_history))
     }
 
     override suspend fun start(req: NewSessionRequest): Result<String> = try {

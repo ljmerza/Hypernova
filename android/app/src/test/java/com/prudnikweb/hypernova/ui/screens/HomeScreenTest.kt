@@ -238,7 +238,7 @@ class HomeScreenTest {
     @Test fun smartSwipeDeletesAStoppedJobAfterAsking() {
         val hub = FakeHub(sessions = only(Samples.ALPHA))
         home(hub)
-        rule.onNode(hasText("Alpha release")).performCustomAccessibilityActionWithLabel(str(R.string.delete))
+        rule.onNode(hasText("Alpha release")).performCustomAccessibilityActionWithLabel(str(R.string.session_remove_short))
         rule.waitForIdle()
         // Delete always asks first: nothing has gone to the Mac yet.
         rule.onNodeWithText(str(R.string.session_delete_q, "Alpha release")).assertExists()
