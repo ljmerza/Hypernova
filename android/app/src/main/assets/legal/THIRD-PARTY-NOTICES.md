@@ -19,17 +19,18 @@ libraries bundled inside Mermaid's and the unicode-graphemes add-on's single fil
 | Mermaid 12.2.0 (the chat's diagrams, `third_party/mermaid`), with the libraries its `mermaid.min.js` bundles: D3, dagre-d3-es, ELK (elkjs), cytoscape, KaTeX, marked, lodash-es, Langium, Chevrotain, DOMPurify and others (the notices the bundle kept are at its end) | MIT; D3 ISC, d3-sankey BSD-3-Clause, Chevrotain Apache-2.0, DOMPurify MPL-2.0 or Apache-2.0, elkjs 0.9.3 EPL-2.0, unmodified (its source code is available under that license: tag `0.9.3` of https://github.com/kieler/elkjs) |
 | Manrope and JetBrains Mono (`third_party/fonts`) | SIL Open Font License 1.1 |
 
-## In the desktop client (`android/desktop`; there are no packages of it yet, docs/LATER.md L105)
+## In the desktop client's packages (`hypernova-client-*`: `.deb`, `.tar.gz`, `.dmg`, `.msi`)
 
-Read from the Maven POMs of its runtime classpath, 2026-11-02.
+Read from the Maven POMs of its runtime classpath, 2026-11-02. Each package holds these in its `resources/legal` folder, beside the app's jars.
 
 | Component | Licence |
 | --- | --- |
 | Compose Multiplatform for Desktop and what it brings (JetBrains: `org.jetbrains.compose.*`, `org.jetbrains.androidx.*`; AndroidX: `androidx.*`) | Apache-2.0 |
-| Skiko (JetBrains: `org.jetbrains.skiko`, its native library included), with the Skia graphics library inside it | Apache-2.0; Skia BSD-3-Clause |
+| Skiko (JetBrains: `org.jetbrains.skiko`, its native library included), with the Skia graphics library inside it, and what's built into that: HarfBuzz, FreeType, ICU, libpng, libjpeg-turbo, libwebp, Expat, zlib, Wuffs, PIEX | Apache-2.0; the others' own licences, in `LICENSES-skia-bundled.txt` |
 | OkHttp and Okio (Square), Kotlin standard library and kotlinx.coroutines with `kotlinx-coroutines-swing`, jetbrains-annotations, JSpecify | Apache-2.0 |
 | JSON-java (`org.json`) | Public domain |
-| Manrope and JetBrains Mono (`third_party/fonts`) | SIL Open Font License 1.1 |
+| Manrope and JetBrains Mono (`third_party/fonts`) | SIL Open Font License 1.1 (`OFL-*.txt`) |
+| The Java runtime each package carries, all of its modules: OpenJDK, as Eclipse Temurin 21's build (source: https://github.com/adoptium/jdk21u) | GPL-2.0 with the Classpath Exception, and the licences of what it holds: its own `legal` folder |
 
 ## Shipped in the Mac app (`Hypernova.dmg`) and the Linux package (`Hypernova-linux.tar.gz`)
 
