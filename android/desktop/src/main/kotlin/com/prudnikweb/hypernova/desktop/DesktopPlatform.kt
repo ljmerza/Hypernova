@@ -4,6 +4,8 @@ import com.prudnikweb.hypernova.data.AppInfo
 import com.prudnikweb.hypernova.data.AutomationNotifier
 import com.prudnikweb.hypernova.data.BackgroundLink
 import com.prudnikweb.hypernova.data.ComputerWords
+import com.prudnikweb.hypernova.data.ConnLog
+import com.prudnikweb.hypernova.data.DebugLog
 import com.prudnikweb.hypernova.data.DeviceInfo
 import com.prudnikweb.hypernova.data.DeviceKeys
 import com.prudnikweb.hypernova.data.Log
@@ -52,6 +54,7 @@ object DesktopAppInfo : AppInfo {
      */
     override val versionCode: Int = Int.MAX_VALUE
     override val versionName: String get() = props.getProperty("version") ?: "0.0.0-dev"
+    override val build: String get() = "desktop app"
 }
 
 /** This computer's name, and its system, for the server's list of devices. */
@@ -64,19 +67,33 @@ class DesktopDevice(
         host?.substringBefore('.') ?: System.getProperty("os.name").orEmpty().ifBlank { "Desktop" }
     }
     override val model: String get() = "Desktop, ${System.getProperty("os.name").orEmpty()} ${System.getProperty("os.arch").orEmpty()}".trim()
+    override val os: String get() = listOf("os.name", "os.version", "os.arch").joinToString(" ") { System.getProperty(it).orEmpty() }.trim() + ", Java ${System.getProperty("java.version").orEmpty()}"
 }
 
 /**
  * The developer's log, on standard error: warnings always, the rest with [debug]
  * (HYPERNOVA_CLIENT_DEBUG=1). Never a secret, as on a phone: nothing in the data layer logs one.
+ * Every line also goes to the debug log while it's on (data/DebugLog.kt).
  */
 class DesktopLog(private val debug: Boolean = !System.getenv("HYPERNOVA_CLIENT_DEBUG").isNullOrBlank()) : Log {
     override fun d(tag: String, message: String) {
         if (debug) System.err.println("D/$tag: $message")
+        if (tag != ConnLog.TAG) DebugLog.d(tag.lowercase()) { message }
+    }
+
+    override fun i(tag: String, message: String) {
+        if (debug) System.err.println("I/$tag: $message")
+        DebugLog.i(tag.lowercase()) { message }
     }
 
     override fun w(tag: String, message: String) {
         System.err.println("W/$tag: $message")
+        DebugLog.w(tag.lowercase()) { message }
+    }
+
+    override fun e(tag: String, message: String, t: Throwable?) {
+        System.err.println("E/$tag: $message")
+        DebugLog.e(tag.lowercase(), t) { message }
     }
 }
 

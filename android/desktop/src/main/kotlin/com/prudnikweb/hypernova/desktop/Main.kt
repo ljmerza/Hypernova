@@ -32,6 +32,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
+import com.prudnikweb.hypernova.data.DebugLog
 import com.prudnikweb.hypernova.data.Net
 import com.prudnikweb.hypernova.desktop.ui.App
 import com.prudnikweb.hypernova.desktop.ui.Scaled
@@ -93,7 +94,12 @@ fun main() {
         System.err.println("$APP_NAME is already running with ${platform.folder.home}.")
         exitProcess(1)
     }
-    Runtime.getRuntime().addShutdownHook(Thread { runCatching { platform.folder.flush() } })
+    Runtime.getRuntime().addShutdownHook(
+        Thread {
+            DebugLog.stopped("the app is closing")
+            runCatching { platform.folder.flush() }
+        },
+    )
     val shell = startCore(platform)
     application {
         val first = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration }
@@ -128,7 +134,10 @@ fun main() {
             val info = LocalWindowInfo.current
             LaunchedEffect(info) {
                 // The focus coming back is this computer's "the screen came on".
-                snapshotFlow { info.isWindowFocused }.collect { if (it) platform.screenWatch.ownerLooked() }
+                snapshotFlow { info.isWindowFocused }.collect {
+                    DebugLog.i("app") { if (it) "the window got the focus" else "the window lost the focus" }
+                    if (it) platform.screenWatch.ownerLooked()
+                }
             }
             Scaled(scale) { App(shell) }
         }

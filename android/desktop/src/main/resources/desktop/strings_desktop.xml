@@ -27,4 +27,8 @@
     <string name="desk_from_agent">From %1$s</string>
     <string name="desk_zoom">Zoom %1$d%%</string>
     <string name="desk_zoom_auto">Zoom %1$d%% (automatic)</string>
+    <string name="desk_settings">Settings</string>
+    <string name="desk_open_folder">Open folder</string>
+    <string name="desk_folder_failed">The folder couldn\'t be opened here. Copy its path instead.</string>
+    <string name="desk_folder_copied">Folder path copied</string>
 </resources>

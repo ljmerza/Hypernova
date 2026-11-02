@@ -240,7 +240,9 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
-        // Tab goes through what can take the focus, in order: Pair another, then Deny, then Allow.
+        // Tab goes through what can take the focus, in order: Settings, Pair another, then Deny, then Allow.
+        onRoot().performKeyInput { pressKey(Key.Tab) }
+        onNodeWithText(Ui.desk_settings.text()).assertIsFocused()
         onRoot().performKeyInput { pressKey(Key.Tab) }
         onNodeWithText(Ui.desk_pair_another.text()).assertIsFocused()
         onRoot().performKeyInput { pressKey(Key.Tab) }

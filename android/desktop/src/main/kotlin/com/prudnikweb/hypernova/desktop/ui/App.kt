@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -19,6 +20,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Core
+import com.prudnikweb.hypernova.data.DebugLog
 import com.prudnikweb.hypernova.desktop.Shell
 
 /**
@@ -32,7 +34,11 @@ fun App(shell: Shell, reduced: Boolean = false) {
             val hub = Core.live
             val pairing = hub == null || shell.adding
             AtlasBackground(week = hub?.usage?.sevenDay ?: 0f, strength = if (pairing) 0.45f else 1f)
-            if (hub == null || shell.adding) PairScreen(shell, canCancel = hub != null)
+            // The debug log's line for each screen, as on a phone.
+            val screen = if (shell.settings) "settings" else if (pairing) "pairing" else "sessions"
+            LaunchedEffect(screen) { DebugLog.i("screen") { screen } }
+            if (shell.settings) SettingsScreen(shell)
+            else if (hub == null || shell.adding) PairScreen(shell, canCancel = hub != null)
             else SessionsScreen(hub, Core.statuses, shell)
             shell.toast?.let { Toast(it, shell, Modifier.align(Alignment.BottomCenter)) }
             shell.zoomNote?.let { ZoomNote(it, Modifier.align(Alignment.TopCenter)) }

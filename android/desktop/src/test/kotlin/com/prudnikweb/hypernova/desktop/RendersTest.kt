@@ -187,7 +187,7 @@ class RendersTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
-        onRoot().performKeyInput { pressKey(Key.Tab); pressKey(Key.Tab); pressKey(Key.Tab) }
+        onRoot().performKeyInput { pressKey(Key.Tab); pressKey(Key.Tab); pressKey(Key.Tab); pressKey(Key.Tab) }
         onNodeWithText(Ui.allow.text()).assertIsFocused()
         ok(render("10-focus"))
     }

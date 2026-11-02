@@ -1,0 +1,222 @@
+package com.prudnikweb.hypernova.desktop.ui
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.unit.dp
+import com.prudnikweb.hypernova.data.Core
+import com.prudnikweb.hypernova.data.DebugLog
+import com.prudnikweb.hypernova.data.DebugLogger
+import com.prudnikweb.hypernova.data.DebugSendFlow
+import com.prudnikweb.hypernova.data.DebugSendState
+import com.prudnikweb.hypernova.desktop.DesktopStrings
+import com.prudnikweb.hypernova.desktop.Shell
+import com.prudnikweb.hypernova.desktop.Ui
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+
+/** How wide its column gets. */
+private val COLUMN = 640.dp
+
+/**
+ * Settings on this computer: for now just Debug logging, as on a phone (data/DebugLog.kt), except that
+ * there's no share sheet here: Open folder and Copy path instead.
+ */
+@Composable
+fun SettingsScreen(shell: Shell) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.widthIn(max = COLUMN).fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                HText(Ui.desk_settings.text(), Modifier.weight(1f).semantics { heading() }, style = Type.title)
+                Pill(Ui.back.text(), { shell.settings = false }, kind = PillKind.Ghost, height = 32.dp)
+            }
+            Spacer(Modifier.height(16.dp))
+            DebugLogging(shell)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DebugLogging(shell: Shell) {
+    val l = DebugLog.logger ?: return
+    val scope = rememberCoroutineScope()
+    val flow = remember(l) { DebugSendFlow(scope, { l }) }
+    LaunchedEffect(l) { withContext(Dispatchers.IO) { l.refresh() } }
+    val confirming = remember { androidx.compose.runtime.mutableStateOf(false) }
+    Seam(Ui.debuglog_title.text(), MarkKind.Idle)
+    Spacer(Modifier.height(10.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            LogSwitch(l)
+            Spacer(Modifier.height(8.dp))
+            HText(Ui.debuglog_holds.text(), style = Type.small, color = HN.inkMuted)
+            Spacer(Modifier.height(8.dp))
+            HText(Ui.debuglog_crash_note.text(), style = Type.small, color = HN.inkMuted)
+            Spacer(Modifier.height(12.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(HN.line))
+            Spacer(Modifier.height(12.dp))
+            val size = when {
+                l.empty -> Ui.debuglog_none.text()
+                l.hasCrash -> Ui.debuglog_size_crash.format(DebugLog.size(l.sizeBytes))
+                else -> Ui.debuglog_size.format(DebugLog.size(l.sizeBytes))
+            }
+            HText(size, style = Type.small)
+            Spacer(Modifier.height(12.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (Core.servers.isNotEmpty()) {
+                    Pill(Ui.debuglog_send.text(), flow::send, kind = PillKind.Primary, height = 36.dp, enabled = !l.empty && flow.state !is DebugSendState.Sending)
+                }
+                Pill(
+                    Ui.desk_open_folder.text(),
+                    {
+                        scope.launch {
+                            val opened = withContext(Dispatchers.IO) {
+                                l.flush()
+                                shell.desk.openFolder(l.folder)
+                            }
+                            if (!opened) shell.say(Ui.desk_folder_failed.text())
+                        }
+                    },
+                    height = 36.dp, enabled = !l.empty,
+                )
+                Pill(
+                    Ui.debuglog_copy_path.text(),
+                    {
+                        shell.desk.copy(l.folder.path)
+                        shell.say(Ui.desk_folder_copied.text())
+                    },
+                    height = 36.dp, enabled = !l.empty,
+                )
+                Pill(Ui.debuglog_clear.text(), { confirming.value = true }, kind = PillKind.Ghost, height = 36.dp, enabled = !l.empty)
+            }
+            if (confirming.value) {
+                Spacer(Modifier.height(12.dp))
+                HText(Ui.debuglog_clear_q.text(), style = Type.small)
+                Spacer(Modifier.height(4.dp))
+                HText(Ui.debuglog_clear_body.text(), style = Type.small, color = HN.inkMuted)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill(
+                        Ui.debuglog_clear.text(),
+                        {
+                            confirming.value = false
+                            scope.launch {
+                                withContext(Dispatchers.IO) { l.clear() }
+                                flow.dismiss()
+                                shell.say(Ui.debuglog_cleared.text())
+                            }
+                        },
+                        kind = PillKind.Danger, height = 36.dp,
+                    )
+                    Pill(Ui.cancel.text(), { confirming.value = false }, kind = PillKind.Ghost, height = 36.dp)
+                }
+            }
+            SendState(flow, shell)
+        }
+    }
+}
+
+/** The switch: its words say until when, and a click anywhere on the row turns it over. */
+@Composable
+private fun LogSwitch(l: DebugLogger) {
+    val on = l.until > 0
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Switch) { if (on) l.turnOff() else l.turnOn() }
+            .semantics { toggleableState = ToggleableState(on) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            HText(Ui.debuglog_switch.text(), style = Type.body)
+            Spacer(Modifier.height(2.dp))
+            val body = if (on) Ui.debuglog_on_until.format(SimpleDateFormat(DesktopStrings.timePattern(withDay = true), DesktopStrings.locale).format(Date(l.until))) else Ui.debuglog_off.text()
+            HText(body, style = Type.small, color = HN.inkDim)
+        }
+        Spacer(Modifier.width(12.dp))
+        Canvas(Modifier.size(width = 36.dp, height = 20.dp)) {
+            val r = size.height / 2
+            drawRoundRect(if (on) HN.accent.copy(alpha = 0.55f) else HN.ink.copy(alpha = 0.16f), Offset.Zero, Size(size.width, size.height), CornerRadius(r))
+            drawCircle(if (on) HN.accent else HN.inkMuted, r * 0.72f, Offset(if (on) size.width - r else r, r))
+        }
+    }
+}
+
+/** Where Send logs stands: which server, sending, where it landed, or what stopped it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SendState(flow: DebugSendFlow, shell: Shell) {
+    val state = flow.state
+    if (state == DebugSendState.Idle) return
+    Spacer(Modifier.height(12.dp))
+    Column(Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }) {
+        when (state) {
+            DebugSendState.Idle -> Unit
+            is DebugSendState.Choosing -> {
+                HText(Ui.debuglog_send_to.text(), style = Type.small)
+                Spacer(Modifier.height(8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (s in state.servers) Pill(s.name, { flow.sendTo(s.id) }, height = 36.dp)
+                    Pill(Ui.cancel.text(), flow::dismiss, kind = PillKind.Ghost, height = 36.dp)
+                }
+            }
+            is DebugSendState.Sending -> HText(Ui.debuglog_sending.format(state.server), style = Type.small, color = HN.inkMuted)
+            is DebugSendState.Sent -> {
+                HText(Ui.debuglog_sent.format(state.server), style = Type.small, color = HN.accent)
+                Spacer(Modifier.height(4.dp))
+                SelectionContainer { HText(state.saved.path, style = Type.monoSmall) }
+                Spacer(Modifier.height(8.dp))
+                Pill(
+                    Ui.debuglog_copy_path.text(),
+                    {
+                        shell.desk.copy(state.saved.path)
+                        shell.say(Ui.debuglog_copied.text())
+                    },
+                    height = 36.dp,
+                )
+            }
+            is DebugSendState.TooOld -> HText(Ui.debuglog_too_old.format(state.server), style = Type.small, color = HN.amber)
+            is DebugSendState.Failed -> HText(state.why.ifBlank { Ui.debuglog_send_failed.text() }, style = Type.small, color = HN.danger)
+        }
+    }
+}

@@ -42,6 +42,8 @@ import com.prudnikweb.hypernova.desktop.Ui
 @Composable
 fun PairScreen(shell: Shell, canCancel: Boolean) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        // Settings, for the debug log: a pairing that won't go is one of the things it's for.
+        Pill(Ui.desk_settings.text(), { shell.settings = true }, Modifier.align(Alignment.BottomCenter), kind = PillKind.Ghost, height = 32.dp)
         GlassCard(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
             Column(Modifier.padding(24.dp)) {
                 Seam(Ui.pair_label.text(), MarkKind.Idle)
