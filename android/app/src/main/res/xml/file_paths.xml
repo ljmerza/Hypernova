@@ -7,4 +7,6 @@
     <cache-path name="shared" path="shared/" />
     <!-- Images pasted into the prompt box, copied here while the keyboard's grant lasts (data/Pasted.kt). -->
     <cache-path name="pasted" path="pasted/" />
+    <!-- The debug log to share (ui/settings/DebugLogSection.kt): one file at a time, nothing else ever in this folder. -->
+    <cache-path name="debuglog" path="debuglog/" />
 </paths>

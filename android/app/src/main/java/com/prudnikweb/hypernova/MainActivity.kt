@@ -80,6 +80,12 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
+    // A phone rarely says when a process ends: Android just stops it. This is the one stop there is to see.
+    override fun onDestroy() {
+        if (isFinishing) com.prudnikweb.hypernova.data.DebugLog.stopped("the last screen closed; the background link may go on")
+        super.onDestroy()
+    }
+
     /** A pairing link (camera or another app), or a tap on a notification. */
     private fun handle(intent: Intent?) {
         if (intent == null) return

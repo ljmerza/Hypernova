@@ -16,7 +16,7 @@ class SettingsPlanTest {
 
     @Test fun oneServerKeepsItsPartsAndOrder() {
         assertEquals(
-            listOf("mac", "providers", "voice", "files", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "qa", "termEngine", "about"),
+            listOf("mac", "providers", "voice", "files", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "qa", "termEngine", "debugLog", "about"),
             keys(false, listOf(z2), testing = true),
         )
         // Read aloud follows Voice in its item, from a server that reads aloud.
@@ -24,7 +24,7 @@ class SettingsPlanTest {
         assertEquals(SettingsPlan.Voice(null), SettingsPlan.parts(false, listOf(shed), false).single { it is SettingsPlan.Voice })
         // No Files from a server without the setting; no checklist until it's unlocked.
         assertEquals(
-            listOf("mac", "providers", "voice", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "about"),
+            listOf("mac", "providers", "voice", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "debugLog", "about"),
             keys(false, listOf(z2.copy(files = false))),
         )
         // An offline server on screen keeps its parts, as before.
@@ -32,8 +32,8 @@ class SettingsPlanTest {
     }
 
     @Test fun notPairedIsTheCardAndThePhonesParts() {
-        assertEquals(listOf("mac", "newSessions", "display", "cardSwipes", "topBar", "typing", "termEngine", "about"), keys(false, emptyList(), testing = true))
-        assertEquals(listOf("mac", "newSessions", "display", "cardSwipes", "topBar", "typing", "about"), keys(false, emptyList()))
+        assertEquals(listOf("mac", "newSessions", "display", "cardSwipes", "topBar", "typing", "termEngine", "debugLog", "about"), keys(false, emptyList(), testing = true))
+        assertEquals(listOf("mac", "newSessions", "display", "cardSwipes", "topBar", "typing", "debugLog", "about"), keys(false, emptyList()))
     }
 
     @Test fun allServersIsOneBlockPerServerThenThePhone() {
@@ -41,7 +41,7 @@ class SettingsPlanTest {
             listOf(
                 "server:z2", "providers:z2", "readAloud:z2", "files:z2", "qa:z2",
                 "server:shed", "providers:shed", "files:shed", "qa:shed",
-                "phone", "voice", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "connectionLog", "termEngine", "about",
+                "phone", "voice", "newSessions", "display", "cardSwipes", "topBar", "typing", "background", "connectionLog", "termEngine", "debugLog", "about",
             ),
             keys(true, listOf(z2, shed), testing = true),
         )
