@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Claude Code's SDK, loaded when first needed (src/sdk.ts): missing, it's a coded 409 (`sdk_missing`)
 // that says how to get it; fetched meanwhile, the next ask loads it without a restart; a broken copy
 // fetched again loads too; and the version this daemon pins comes from `sdk-version`, else the lock.

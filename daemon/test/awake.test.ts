@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Stay awake (docs/PROTOCOL.md, "Stay awake"): what macOS prints, read; the assertion held while
 // there's work or a phone, and let go after; the guards and their two-minute warning; Backpack
 // putting back the SleepDisabled it found; and the API, against stand-ins for sudo, pmset, ioreg
