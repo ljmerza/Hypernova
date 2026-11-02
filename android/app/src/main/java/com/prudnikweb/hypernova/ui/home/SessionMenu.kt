@@ -50,29 +50,30 @@ import com.prudnikweb.hypernova.ui.theme.Type
 import kotlinx.coroutines.launch
 
 /**
- * What the menu's Delete does to a [Session], and so what its confirm says (DECISIONS, "Delete for
- * every finished session", 2026-11-01). A job and a Codex session have it always, as they did. Any
- * other session has it once it's at rest (Home's Completed, ended ones too): at work or waiting on the
- * owner it has none.
+ * What the menu's Remove from list does to a [Session], and so what its confirm says (DECISIONS,
+ * "Delete takes a session off Home, History brings it back", 2026-11-02). A job and a Codex session on
+ * Home have it always. Any other session has it once it's at rest (Home's Completed, one a restart cut
+ * short too): at work or waiting on the owner it has none. A session already in History has none.
  */
 enum class DeleteKind {
-    /** At work or waiting on the owner, and neither a job nor a Codex session: not offered. */
+    /** Already in History; or at work or waiting on the owner, and neither a job nor a Codex session: not offered. */
     None,
     /** A job with no process: `claude rm`. */
     Job,
     /** A job whose process still runs: `claude rm` stops it, and a terminal open on it closes. */
     RunningJob,
-    /** Codex's own delete, for good. */
+    /** A Codex session: a turn running stops, a terminal closes, and the thread stays in Codex. */
     Codex,
-    /** At rest in a terminal Hypernova holds: the terminal closes, then Hypernova forgets it. */
+    /** At rest in a terminal Hypernova holds: the terminal closes, and it goes to History. */
     Terminal,
-    /** Nothing runs: Hypernova forgets it. */
+    /** Nothing runs: it goes to History. */
     Forget,
     /** Idle in a terminal Hypernova doesn't hold: it can't close that one, and the dialog says so. */
     OpenElsewhere;
 
     companion object {
         fun of(s: Session): DeleteKind = when {
+            s.agentJob == null && s.phase == Phase.Ended && !s.cutByRestart -> None
             s.codex -> Codex
             s.agentJob != null -> if (s.agentRunning == true && s.phase != Phase.Ended) RunningJob else Job
             homeGroup(s) != HomeGroup.Completed -> None
@@ -117,7 +118,7 @@ enum class RestartKind {
 
 /**
  * What a Home card's long-press menu offers for [Session] (docs/PROTOCOL.md, "Session menu"): Rename
- * for any session; Delete as [DeleteKind] says, Restart session as [RestartKind] does; Stop for a `claude agents` job ([Session.agentJob]) or
+ * for any session; Remove from list as [DeleteKind] says, Restart session as [RestartKind] does; Stop for a `claude agents` job ([Session.agentJob]) or
  * a Codex session (its turn's interrupt; 2026-10-31). Stop while it works or waits on the owner,
  * or, for a job, idles with its process still running ([Session.agentRunning]; owner, 2026-10-30:
  * idle jobs couldn't be stopped). Not for one stopped or done already, nor, from an older Mac that
@@ -138,8 +139,8 @@ data class MenuOffer(val rename: Boolean, val stop: Boolean, val delete: Boolean
 
 /**
  * A Home card's long-press menu: Rename (Claude Code's /rename, so claude agents shows it too),
- * Stop a `claude agents` job or a Codex session, and Delete ([DeleteKind]). Delete asks first, saying
- * what it will close. The Mac's own words come back when it can't (Claude Code keeps a worktree with
+ * Stop a `claude agents` job or a Codex session, and Remove from list ([DeleteKind]), which asks first,
+ * saying what it will close and that the conversation stays in History. The Mac's own words come back when it can't (Claude Code keeps a worktree with
  * unpushed work). [start]: the page it opens on (the chat's session sheet lists the actions itself,
  * then opens Rename or Delete here).
  */
@@ -170,7 +171,7 @@ internal fun SessionMenu(hub: Hub, s: Session, onDismiss: () -> Unit, start: Men
                 visible = true,
                 title = stringResource(R.string.session_delete_q, s.name),
                 body = stringResource(deleteBody(kind)),
-                confirm = stringResource(R.string.delete),
+                confirm = stringResource(R.string.session_remove_short),
                 danger = true,
                 onConfirm = {
                     onDismiss()
@@ -304,7 +305,7 @@ internal fun MenuActions(hub: Hub, s: Session, onPage: (MenuPage) -> Unit, onDis
         })
     }
     if (offer.restart && s.agentOutdated == null) restart()
-    if (offer.delete) SheetAction(ChatGlyph.Remove, stringResource(R.string.delete), { onPage(MenuPage.Delete) }, color = HN.danger)
+    if (offer.delete) SheetAction(ChatGlyph.Remove, stringResource(R.string.session_remove), { onPage(MenuPage.Delete) }, color = HN.danger)
 }
 
 /** The new name, prefilled with the old one. It stays open while the Mac renames it, and says why when it can't. */

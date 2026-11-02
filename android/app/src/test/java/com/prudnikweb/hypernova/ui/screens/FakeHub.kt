@@ -146,6 +146,14 @@ class FakeHub(
         return Result.success(Unit)
     }
 
+    /** What [resumeFromHistory] answers (null: its own id). */
+    var resumeAnswer: Result<String>? = null
+
+    override suspend fun resumeFromHistory(sessionId: String): Result<String> {
+        record("resumeFromHistory", sessionId)
+        return resumeAnswer ?: Result.success(sessionId)
+    }
+
     override suspend fun renameSession(sessionId: String, name: String): Result<Unit> {
         record("renameSession", sessionId, name)
         return Result.success(Unit)

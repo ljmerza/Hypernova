@@ -9,13 +9,13 @@
     <string name="st_swipe_left">Swipe left</string>
     <string name="st_swipe_right">Swipe right</string>
     <string name="st_swipe_smart">Smart</string>
-    <string name="st_swipe_smart_desc">Needs input opens. A finished claude agents job stops while it runs, else it\'s deleted, asking first. Working cards don\'t swipe.</string>
+    <string name="st_swipe_smart_desc">Needs input opens. A finished claude agents job stops while it runs, else it goes from the list, asking first. Working cards don\'t swipe.</string>
     <string name="st_swipe_open">Open</string>
     <string name="st_swipe_open_desc">Opens the session.</string>
     <string name="st_swipe_stop">Stop</string>
     <string name="st_swipe_stop_desc">Stops a job or a Codex session while it works or waits, as the menu\'s Stop.</string>
-    <string name="st_swipe_delete">Delete</string>
-    <string name="st_swipe_delete_desc">Deletes a job or a Codex session, always asking first.</string>
+    <string name="st_swipe_delete">Remove from list</string>
+    <string name="st_swipe_delete_desc">Takes a job or a Codex session off the list, always asking first. It stays in History.</string>
     <string name="st_swipe_rename">Rename</string>
     <string name="st_swipe_rename_desc">Opens Rename for the session.</string>
     <string name="st_swipe_restart">Restart</string>
