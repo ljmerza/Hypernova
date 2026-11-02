@@ -249,6 +249,7 @@ object Pairer {
             // This install's own id: pairing it again replaces its old device on the computer
             // rather than adding a twin to its list (docs/PROTOCOL.md, Pairing).
             .put("installId", installId(platform.storage))
+        DebugScrub.remember(link.code)
         platform.log.d("Hypernova", "pair: base=${link.baseUrl} lan=${link.hasLan}")
         val local = if (link.hasLan) pairOverLan(link, body) else null
         val res = local?.first ?: run {

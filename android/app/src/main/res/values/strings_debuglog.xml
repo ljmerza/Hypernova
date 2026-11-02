@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings: Debug logging (data/DebugLog.kt). The desktop app reads these too, "this phone" becoming "this computer". -->
+<resources>
+    <string name="debuglog_title">Debug logging</string>
+    <string name="debuglog_switch">Keep a detailed log</string>
+    <string name="debuglog_off">Off. It turns itself off 24 hours after you turn it on.</string>
+    <string name="debuglog_on_until">On until %1$s, then it turns itself off.</string>
+    <string name="debuglog_holds">A log holds how the app connects, each request\'s route and ids, its status, time and size, the live feed\'s event types and sizes, the screens you open, and errors with their stack traces. It never holds prompts, replies, commands, file contents, file names, tool arguments, session or project names, tokens, certificates, keys or pairing codes. It stays on this phone until you send or share it.</string>
+    <string name="debuglog_crash_note">Crashes are saved even with this off, stack trace only, in a small file of their own, and go along when you send or share.</string>
+    <string name="debuglog_size">Log size: %1$s of 5 MB</string>
+    <string name="debuglog_size_crash">Log size: %1$s of 5 MB, with a crash saved</string>
+    <string name="debuglog_none">Nothing logged yet.</string>
+    <string name="debuglog_send">Send logs</string>
+    <string name="debuglog_share">Share</string>
+    <string name="debuglog_clear">Clear</string>
+    <string name="debuglog_send_to">Send them to which server?</string>
+    <string name="debuglog_sending">Sending to %1$s…</string>
+    <string name="debuglog_sent">Saved on %1$s:</string>
+    <string name="debuglog_copy_path">Copy path</string>
+    <string name="debuglog_copied">Path copied</string>
+    <string name="debuglog_too_old">%1$s needs updating before it can take logs. Share still works.</string>
+    <string name="debuglog_send_failed">The log couldn\'t be sent.</string>
+    <string name="debuglog_clear_q">Clear the debug log?</string>
+    <string name="debuglog_clear_body">The log and any saved crash go from this phone. Logs you already sent stay where they are.</string>
+    <string name="debuglog_cleared">Debug log cleared</string>
+    <string name="debuglog_share_title">Hypernova debug log</string>
+    <string name="debuglog_share_failed">The log couldn\'t be shared.</string>
+</resources>

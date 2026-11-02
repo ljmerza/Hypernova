@@ -258,7 +258,10 @@ class LiveHub(
 
 
     fun start() {
-        netWatch = platform.network.watchLink { scope.launch { networkChanged() } }
+        netWatch = platform.network.watchLink {
+            DebugLog.i("net") { "the network changed for ${pairing.macName}: now ${platform.network.words()}" }
+            scope.launch { networkChanged() }
+        }
         screenWatch = platform.screen.watch(::screenCameOn)
         ConnLog.add(ConnKind.Link, ConnResult.Info, text = "starting the link to ${pairing.macName}")
         router.start()
@@ -476,6 +479,7 @@ class LiveHub(
     private fun openSocket() {
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                DebugLog.i("ws") { "live socket to ${pairing.macName} open: HTTP ${response.code}, ${DebugNet.tlsWords(response.handshake)}" }
                 scope.launch {
                     if (ws !== webSocket) return@launch
                     attempt = 0
@@ -491,7 +495,14 @@ class LiveHub(
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 // Parse on OkHttp's thread; apply on the main thread.
-                val msg = runCatching { parse(JSONObject(text)) }.getOrNull()
+                val msg = runCatching {
+                    val o = JSONObject(text)
+                    DebugLog.feed(text, o)
+                    parse(o)
+                }.getOrElse {
+                    DebugLog.feed(text, null)
+                    null
+                }
                 scope.launch {
                     if (ws !== webSocket) return@launch
                     lastMessageAt = now
@@ -500,6 +511,7 @@ class LiveHub(
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                DebugLog.i("ws") { "live socket to ${pairing.macName} closing: the server said $code" }
                 webSocket.close(1000, null)
             }
 
@@ -512,6 +524,7 @@ class LiveHub(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                DebugLog.w("ws", t) { "live socket to ${pairing.macName} failed${response?.let { " with HTTP ${it.code}" }.orEmpty()}" }
                 val status = response?.code
                 scope.launch {
                     if (ws !== webSocket) return@launch
@@ -1967,6 +1980,15 @@ class LiveHub(
         }
     }
 
+    /** The debug log, where the server chooses the name and the folder: all it's told is the bytes. An older server has no such route. */
+    override suspend fun sendClientLog(file: Upload): Result<ClientLogSaved> = try {
+        val saved = ClientLogSaved.wire(api.upload("/v1/client-logs", file).obj("log")) ?: throw ApiException(Problem.Server, 200, "no_log")
+        DebugLog.i("log") { "logs sent, ${DebugLog.size(file.length)}" }
+        Result.success(saved)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+        Result.failure(if (Net.classify(e).status == 404) ClientLogTooOld() else handle(e, Str.debuglog_send_failed))
+    }
+
     override suspend fun upload(file: Upload): Result<Attachment> = try {
         val o = api.upload("/v1/attachments?name=${Api.q(file.name)}", file)
         Result.success(Wire.attachment(o.obj("attachment") ?: throw ApiException(Problem.Server, 200, "no_attachment")) ?: throw ApiException(Problem.Server, 200, "no_attachment"))
@@ -2478,6 +2500,7 @@ class LiveHub(
 
     /** Like [handle], but a refusal keeps the Mac's code, so the provider editor puts it under its field. */
     private fun handleProvider(e: Throwable, fallback: Str): HubException {
+        DebugLog.w("error", e) { "a provider request didn't go through" }
         val ex = Net.classify(e)
         if (ex.problem != Problem.Server) return handle(e, fallback)
         return ProviderRefused(ex.code, ex.serverMessage?.takeIf { it.isNotBlank() } ?: res.getString(fallback))
@@ -2550,6 +2573,7 @@ class LiveHub(
 
     /** A failure becomes a [HubException] with a human message; a 401 also unpairs. */
     private fun handle(e: Throwable, fallback: Str): HubException {
+        DebugLog.w("error", e) { "a request didn't go through" }
         val ex = Net.classify(e)
         if (ex.problem == Problem.Unauthorized) unpaired()
         return HubException(message(ex, fallback))
@@ -2557,6 +2581,7 @@ class LiveHub(
 
     /** Like [handle], but keeps what the Mac said (status, code, sizes) for the files screens to explain. */
     private fun handleFile(e: Throwable, fallback: Str): FileFailure {
+        DebugLog.w("error", e) { "a file request didn't go through" }
         val ex = Net.classify(e)
         if (ex.problem == Problem.Unauthorized) unpaired()
         return FileFailure.of(ex, message(ex, fallback)).let { if (ex.problem != Problem.Server && !hasNetwork()) FileFailure(it.message.orEmpty(), Problem.NoNetwork, ex.status, ex.code) else it }

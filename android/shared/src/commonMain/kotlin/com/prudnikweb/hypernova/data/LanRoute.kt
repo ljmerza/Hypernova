@@ -203,6 +203,7 @@ object PinnedTls {
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .pingInterval(20, TimeUnit.SECONDS)
+            .eventListenerFactory(DebugNet.events)
             .build()
     }
 

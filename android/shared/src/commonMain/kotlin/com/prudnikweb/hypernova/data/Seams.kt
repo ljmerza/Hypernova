@@ -73,16 +73,23 @@ fun interface MainThread {
     fun post(block: () -> Unit)
 }
 
-/** The developer's log: logcat in a debug build on Android, nothing in a release. Never a secret, as ever. */
+/**
+ * The developer's log: logcat in a debug build on Android, nothing in a release. Never a secret, as ever.
+ * Each platform's also hands every line on to the debug log (data/DebugLog.kt), which is off by default.
+ */
 interface Log {
     fun d(tag: String, message: String)
     fun w(tag: String, message: String)
+    fun i(tag: String, message: String) = d(tag, message)
+    fun e(tag: String, message: String, t: Throwable? = null) = w(tag, message)
 }
 
 /** Which build this is. */
 interface AppInfo {
     val versionCode: Int
     val versionName: String
+    /** What kind of build, for a debug log's head: "debug build", "release build", "desktop app". */
+    val build: String get() = "unknown build"
 }
 
 /** How this device is named when it pairs with a computer. */
@@ -91,6 +98,8 @@ interface DeviceInfo {
     val name: String
     /** Its maker and model. */
     val model: String
+    /** The system and its version, for a debug log's head. */
+    val os: String get() = "${System.getProperty("os.name").orEmpty()} ${System.getProperty("os.version").orEmpty()}".trim()
 }
 
 /** Stops a watch ([NetworkWatcher], [ScreenWatcher]). */

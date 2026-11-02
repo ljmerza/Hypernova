@@ -83,6 +83,7 @@ object Net {
         .writeTimeout(30, TimeUnit.SECONDS)
         // Detects a dead socket even if the daemon's own pings stop arriving.
         .pingInterval(20, TimeUnit.SECONDS)
+        .eventListenerFactory(DebugNet.events)
         .addInterceptor { chain ->
             if (httpsOnly && !chain.request().isHttps) throw UnknownServiceException("CLEARTEXT communication is not permitted here")
             chain.proceed(chain.request())
@@ -130,6 +131,10 @@ object Net {
  * instead (pairing over the local network, before there is a hub).
  */
 class Api(val base: String, private val token: String?, private val fixed: NetRoute? = null) {
+    init {
+        // Whatever else goes wrong, this device's token never reaches the debug log.
+        DebugScrub.remember(token)
+    }
 
     /** The route requests go by right now (the terminal's socket takes its client too: [TermTicket]). */
     fun route(): NetRoute = fixed ?: ActiveRoutes.route(base)

@@ -184,6 +184,16 @@ object ConnText {
         e.text,
     ).joinToString("  ").trimEnd()
 
+    /** One line for the debug log, which has its own time: what kind, the route, the answer, where, how long, the phrase. */
+    fun said(e: ConnEntry): String = listOfNotNull(
+        e.kind.name.lowercase(),
+        e.route?.let(::routeName),
+        e.result.takeIf { it != ConnResult.Info }?.name?.lowercase(),
+        e.target,
+        e.ms?.let { "${it} ms" },
+        e.text,
+    ).joinToString(", ")
+
     /** The whole log, oldest first (the order a reader follows a story in), under a header. */
     fun copy(entries: List<ConnEntry>, header: String, time: (Long) -> String = ::clock): String =
         buildString {
@@ -219,6 +229,8 @@ object ConnText {
 
 /** The app's one connection log. Entries may come from any thread. */
 object ConnLog {
+    /** The developer's log's tag for these. The debug log has them already, in its own words ([ConnText.said]). */
+    const val TAG = "HypernovaConn"
     const val CAPACITY = 600
     /** How many of the newest are kept on disk. */
     const val KEPT = 250
@@ -254,7 +266,8 @@ object ConnLog {
     fun add(e: ConnEntry) {
         val clean = ConnScrub.entry(e)
         ring.add(clean)
-        log?.let { l -> runCatching { l.d("HypernovaConn", ConnText.line(clean)) } }
+        log?.let { l -> runCatching { l.d(TAG, ConnText.line(clean)) } }
+        if (DebugLog.on) DebugLog.put(if (clean.result.failed) DebugLevel.W else DebugLevel.I, "conn", ConnText.said(clean), null)
         bump()
         save()
     }
