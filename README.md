@@ -34,8 +34,8 @@ with diffs, settings and automations on screens you tap and the live terminal th
 - **Run a fleet.** Choose All servers and every machine's sessions share one Home and one searchable
   History. Codex sits next to Claude Code, and a conversation can move from one to the other.
 - **Never block an agent.** Walk away and your phone tells you when one needs you. Allow or deny a
-  command from its card, its notification or a widget, and you only get Allow when you can read the
-  whole command. Claude Code's asks never get auto-denied.
+  command from its card, its notification or a widget, and a notification or widget only offers Allow
+  when you can read the whole command. Claude Code's asks never get auto-denied.
 - **Take the wheel.** Open the live terminal of a `claude` you started at your desk, read its diffs,
   switch its model or rewind it. You can also see each agent's settings and change a set list of them,
   or see which MCP servers a Claude Code session has set up and restart it to reload them.
