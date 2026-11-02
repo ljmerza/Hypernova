@@ -1,6 +1,16 @@
 package com.prudnikweb.hypernova.ui.screens
 
 import androidx.compose.foundation.Canvas
+import com.prudnikweb.hypernova.R
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -141,5 +151,36 @@ class AtlasTest {
         }
         rule.waitForIdle()
         rule.snap("atlas_marks")
+    }
+
+    @Test fun theIconsAtRealSizeOnDarkAndLight() {
+        @androidx.compose.runtime.Composable
+        fun Icons(ground: Color) {
+            Row(Modifier.background(ground).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                // The launcher's: its two parts in a circle and a squircle, at 52dp.
+                for (shape in listOf(CircleShape, RoundedCornerShape(14.dp))) Box(Modifier.size(52.dp).clip(shape)) {
+                    val zoom = Modifier.requiredSize(52.dp * 108f / 72f)
+                    Image(painterResource(R.drawable.ic_launcher_background), null, zoom.align(Alignment.Center))
+                    Image(painterResource(R.drawable.ic_launcher_foreground), null, zoom.align(Alignment.Center))
+                }
+                // Themed: the monochrome one, tinted, on a tint.
+                Box(Modifier.size(52.dp).clip(CircleShape).background(Color(0xFF263040))) {
+                    Image(painterResource(R.drawable.ic_launcher_monochrome), null, Modifier.requiredSize(52.dp * 108f / 72f).align(Alignment.Center), colorFilter = ColorFilter.tint(Color(0xFFB9CCF5)))
+                }
+                // The status bar's and the shortcut's.
+                Image(painterResource(R.drawable.ic_notification), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(if (ground == HN.bg) Color.White else Color.Black))
+                Box(Modifier.size(40.dp).clip(CircleShape)) { Image(painterResource(R.drawable.ic_shortcut_new), null, Modifier.requiredSize(60.dp).align(Alignment.Center)) }
+            }
+        }
+        rule.setContent {
+            Harness(spy) {
+                Column(Modifier.fillMaxSize()) {
+                    Icons(HN.bg)
+                    Icons(Color(0xFFEDEFF4))
+                }
+            }
+        }
+        rule.waitForIdle()
+        rule.snap("atlas_icons")
     }
 }

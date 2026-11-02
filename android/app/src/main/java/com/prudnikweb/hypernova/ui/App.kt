@@ -6,6 +6,7 @@ import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -151,6 +152,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
 
     val route = nav.top
     val unpaired = vm.live?.link?.state == LinkState.Unpaired
+    // The chart steps back behind a screen of text, as the far sky did (fx/Atlas.kt).
+    val chartStrength by animateFloatAsState(if (route == Route.Home && hub != null) 1f else 0.45f, tween(Motion.SECTION, easing = Motion.Expo), label = "chart")
     // The usage that counts: the leading agent's, Claude Code's or Codex's where Claude Code isn't installed.
     val codexLeads = hub?.codexLeads == true
     val codexState = hub?.codex
@@ -303,8 +306,9 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
         ) {
             Box(Modifier.fillMaxSize()) {
                 AtlasBackground(
-                    week = (leadUsage?.sevenDay ?: 0f),
+                    week = leadUsage?.sevenDay ?: 0f,
                     modifier = Modifier.fillMaxSize(),
+                    strength = { chartStrength },
                     // The bars blur only this (and their screen): it hardly ever changes.
                     backdrop = Modifier.hazeSource(haze, zIndex = Z.COSMOS),
                 )

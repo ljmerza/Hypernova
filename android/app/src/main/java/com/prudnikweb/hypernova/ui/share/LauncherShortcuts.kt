@@ -7,9 +7,9 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.RadialGradient
-import android.graphics.Shader
+import android.graphics.Path
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -17,6 +17,7 @@ import com.prudnikweb.hypernova.MainActivity
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.Phase
+import com.prudnikweb.hypernova.ui.theme.HN
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -70,7 +71,7 @@ object LauncherShortcuts {
                 ShortcutInfoCompat.Builder(context, "project:${p.path}")
                     .setShortLabel(p.name)
                     .setLongLabel(context.getString(R.string.shortcut_project_long, p.name))
-                    .setIcon(IconCompat.createWithAdaptiveBitmap(planet(context)))
+                    .setIcon(IconCompat.createWithAdaptiveBitmap(mark(context)))
                     .setRank(i)
                     .setIntent(
                         Intent(context, MainActivity::class.java)
@@ -85,25 +86,23 @@ object LauncherShortcuts {
         }
     }
 
-    /** A small mint planet on the app's dark ground, drawn in the safe middle of an adaptive icon. */
-    private fun planet(context: Context): Bitmap {
+    /** Atlas's working mark on the app's dark ground, drawn in the safe middle of an adaptive icon: a project's shortcut. */
+    private fun mark(context: Context): Bitmap {
         val size = (108 * context.resources.displayMetrics.density).toInt().coerceAtLeast(108)
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
-        c.drawColor(0xFF1B1814.toInt())
-        val r = size * 0.19f
+        c.drawColor(HN.bg.toArgb())
+        val r = size * 0.11f
         val cx = size / 2f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.shader = RadialGradient(cx - r * 0.35f, cx - r * 0.4f, r * 1.5f, intArrayOf(0xFFB6FFC9.toInt(), 0xFF7FFFA0.toInt(), 0xFF2A5A38.toInt()), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
-        c.drawCircle(cx, cx, r, paint)
-        paint.shader = null
+        paint.color = HN.accent.toArgb()
+        c.drawPath(Path().apply { moveTo(cx, cx - r); lineTo(cx + r, cx); lineTo(cx, cx + r); lineTo(cx - r, cx); close() }, paint)
         paint.style = Paint.Style.STROKE
-        paint.strokeWidth = size * 0.012f
-        paint.color = 0x667FFFA0
-        c.save()
-        c.rotate(-18f, cx, cx)
-        c.drawOval(cx - r * 1.75f, cx - r * 0.5f, cx + r * 1.75f, cx + r * 0.5f, paint)
-        c.restore()
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.strokeWidth = size * 0.04f
+        val arc = size * 0.21f
+        c.drawArc(cx - arc, cx - arc, cx + arc, cx + arc, -60f, 120f, false, paint)
+        c.drawArc(cx - arc, cx - arc, cx + arc, cx + arc, 120f, 120f, false, paint)
         return bmp
     }
 }

@@ -1,19 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The planet for themed icons (only its alpha counts). -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
+<!-- The logo for themed icons (only its alpha counts): the N a little heavier, as it's drawn on one flat colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- the sphere, bright toward the light and into shadow on the far side -->
-    <path android:pathData="M32.00,54.00a22.00,22.00 0,1 1,44.00,0a22.00,22.00 0,1 1,-44.00,0">
-        <aapt:attr name="android:fillColor">
-            <gradient android:type="radial" android:centerX="44.04" android:centerY="44.04" android:gradientRadius="37.40">
-                <item android:offset="0" android:color="#CCFFFFFF"/>
-                <item android:offset="0.5" android:color="#3DFFFFFF"/>
-                <item android:offset="1" android:color="#0DFFFFFF"/>
-            </gradient>
-        </aapt:attr>
-    </path>
-    <!-- meridians: it turns -->
-    <path android:strokeColor="#3CFFFFFF" android:strokeWidth="1.6" android:fillColor="#00000000" android:pathData="M54.00,32.00 A15.56,22.00 0 0,1 54.00,76.00"/>
-    <path android:strokeColor="#9EFFFFFF" android:strokeWidth="1.6" android:fillColor="#00000000" android:pathData="M54.00,76.00 A15.56,22.00 0 0,1 54.00,32.00"/>
-    <path android:strokeColor="#6BFFFFFF" android:strokeWidth="1.6" android:fillColor="#00000000" android:pathData="M32.00,54.00a22.00,22.00 0,1 1,44.00,0a22.00,22.00 0,1 1,-44.00,0"/>
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.82" android:scaleY="0.82" android:translateX="-0.2" android:translateY="1.4">
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="4.6" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"
+            android:pathData="M36,81L39,27L69,80L73,29"/>
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M36,75L42,81L36,87L30,81ZM39,17.5L48.5,27L39,36.5L29.5,27ZM69,73L76,80L69,87L62,80ZM73,23L79,29L73,35L67,29Z"/>
+    </group>
 </vector>

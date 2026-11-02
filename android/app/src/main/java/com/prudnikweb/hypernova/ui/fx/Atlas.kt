@@ -221,10 +221,12 @@ internal class AtlasChart {
  * week) or when the app comes back to the front with a new [Atlas.notch]. That notch is the concept's
  * slow turn, taken in jumps nobody watches, so its lines don't sit on the same pixels of an OLED for
  * days and never shimmer as a slow move would. Reduce Motion needs nothing more: nothing moves. Only
- * this feeds the edge bars' blur ([backdrop]), as the far sky did.
+ * this feeds the edge bars' blur ([backdrop]), as the far sky did. [strength] steps it back behind a
+ * screen of plain text (a chat, onboarding), its dense band otherwise under a line of words; read in
+ * the layer, so it redraws nothing.
  */
 @Composable
-internal fun AtlasBackground(week: Float, modifier: Modifier = Modifier, backdrop: Modifier = Modifier, chart: AtlasChart = remember { AtlasChart() }) {
+internal fun AtlasBackground(week: Float, modifier: Modifier = Modifier, strength: () -> Float = { 1f }, backdrop: Modifier = Modifier, chart: AtlasChart = remember { AtlasChart() }) {
     val currentWeek = rememberUpdatedState(week)
     val thin by remember { derivedStateOf { Atlas.thin(currentWeek.value) } }
     var notch by remember { mutableIntStateOf(Atlas.notch(System.currentTimeMillis())) }
@@ -238,7 +240,10 @@ internal fun AtlasBackground(week: Float, modifier: Modifier = Modifier, backdro
         modifier
             .fillMaxSize()
             .then(backdrop)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .graphicsLayer {
+                compositingStrategy = CompositingStrategy.Offscreen
+                alpha = strength()
+            }
             .drawBehind { chart.draw(this, thin, notch) },
     )
 }
