@@ -167,10 +167,21 @@ export const askProcess = <T>(folder: string, waiting: readonly string[], work: 
 export const forgetLive = (folder?: string) => (folder ? cache.delete(folder) : cache.clear())
 
 /** Switch [name] on or off for [folder], through Claude Code's own writer (`disabledMcpServers` of that project's entry). */
-export async function toggleServer(folder: string, waiting: readonly string[], name: string, enabled: boolean): Promise<void> {
+export async function toggleServer(folder: string, waiting: readonly string[], name: string, enabled: boolean, waitMs = 8000): Promise<void> {
   await runner(folder, waiting, async (q) => {
     await settled(q, 3000)
-    await q.toggleMcpServer(name, enabled)
+    // A busy machine can answer this before the new process has taken the server in, so a server
+    // it doesn't know yet gets a few more tries; one that's really gone still fails after them.
+    const until = Date.now() + waitMs
+    for (;;) {
+      try {
+        await q.toggleMcpServer(name, enabled)
+        return
+      } catch (e) {
+        if (!/server not found/i.test(String((e as Error)?.message ?? e)) || Date.now() >= until) throw e
+        await new Promise((r) => setTimeout(r, 250))
+      }
+    }
   })
   cache.delete(folder)
 }
