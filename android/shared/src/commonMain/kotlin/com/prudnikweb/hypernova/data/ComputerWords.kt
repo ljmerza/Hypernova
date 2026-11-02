@@ -47,7 +47,7 @@ object ComputerWords {
     fun clear(storage: Storage) = set(storage, Mac.DARWIN)
 
     /**
-     * Strings that say what to do on a Mac (its menu bar), and the server's own way, used in their
+     * Strings that say what to do on a Mac (hypernova doctor or pair, in Terminal there), and the server's own way, used in their
      * place on Linux. The rest only change their word ([reword]).
      */
     val INSTEAD: Map<Str, Str> = mapOf(

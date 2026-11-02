@@ -318,7 +318,7 @@ data class Mac(
      */
     val unavailable: Map<String, String> = emptyMap(),
 ) {
-    /** A Mac: its menu bar app, its windows, its voice and its battery are there. */
+    /** A Mac: its windows, its voice and its battery are there. */
     val isMac: Boolean get() = platform != LINUX
 
     /** Whether this computer has [feature] (a Mac has them all). */

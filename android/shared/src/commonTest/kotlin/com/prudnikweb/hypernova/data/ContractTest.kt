@@ -741,7 +741,7 @@ class ContractTest {
         },
         // LiveHub.forget only needs the 200.
         "rest-devices-me" to { o -> assertTrue(o.bool("ok")) },
-        // The Mac app's list of phones changed: nothing on the phone reads it (LiveHub's dispatch ignores the type).
+        // The old Mac app's list of phones changed: nothing on the phone reads it (LiveHub's dispatch ignores the type).
         "ws-devices" to { o -> assertEquals(listOf("t"), ws(o, "devices").keys().asSequence().toList()) },
         // ── Mac-only features ──
         "ws-battery" to { o ->

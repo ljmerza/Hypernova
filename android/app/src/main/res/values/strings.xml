@@ -148,11 +148,11 @@
     <string name="problem_no_network">This phone is offline. Connect to Wi‑Fi or mobile data.</string>
     <string name="problem_no_name">Can\'t find your Mac by its name on this network. Join its Wi‑Fi or your VPN into it, or pair again.</string>
     <string name="problem_unreachable">Your Mac isn\'t answering. Check that it\'s awake and that this phone is on its network: the same Wi‑Fi, or your VPN into it.</string>
-    <string name="problem_not_running">Hypernova isn\'t running on your Mac. Open it from the menu bar.</string>
+    <string name="problem_not_running">Hypernova isn\'t running on your Mac. In Terminal there, run hypernova doctor: it says what stopped and how to start it.</string>
     <string name="problem_tls">The secure connection to your Mac failed. Check that Hypernova runs there; if it keeps failing, pair again.</string>
     <string name="problem_cleartext">This link uses plain http, which only development builds allow.</string>
-    <string name="problem_unpaired">This phone was unpaired. Pair it again from your Mac.</string>
-    <string name="problem_code_expired">Codes work once and last 10 minutes. On your Mac, choose Pair a phone again and scan the new code.</string>
+    <string name="problem_unpaired">This phone was unpaired. Pair it again: run hypernova pair on your Mac.</string>
+    <string name="problem_code_expired">Codes work once and last 10 minutes. On your Mac, run hypernova pair again and scan the new code.</string>
     <string name="problem_server">Your Mac couldn\'t do that. Try again.</string>
 
     <!-- Errors (toasts) -->
@@ -231,7 +231,7 @@
 
     <!-- Unpaired -->
     <string name="unpaired_title">This phone was unpaired.</string>
-    <string name="unpaired_body">%1$s no longer accepts this phone. To pair again, open Hypernova on your Mac, choose Pair a phone and scan the code.</string>
+    <string name="unpaired_body">%1$s no longer accepts this phone. To pair again, run hypernova pair on your Mac and scan the code.</string>
     <string name="unpaired_pair">Pair again</string>
 
     <!-- Home (live) -->
@@ -460,7 +460,7 @@
     <string name="mac_battery_said_short">%1$s, battery %2$d%%</string>
     <string name="forget_mac">Forget this Mac</string>
     <string name="forget_q">Forget %1$s?</string>
-    <string name="forget_body">This phone stops seeing its sessions. To pair again, scan a new code from Hypernova on your Mac.</string>
+    <string name="forget_body">This phone stops seeing its sessions. To pair again, run hypernova pair on your Mac and scan the new code.</string>
     <string name="forget">Forget</string>
     <string name="forgot_offline">Forgotten on this phone. Your Mac still lists it until you remove it there.</string>
     <string name="not_paired">Not paired with a Mac.</string>

@@ -15,7 +15,7 @@
     <string name="notif_reply_hint">Tell %1$s what\'s next</string>
     <string name="notif_reply_failed">Your reply didn\'t reach your Mac. Open the session to send it again.</string>
 
-    <!-- A Linux server or PC paired (data/ComputerWords.kt): its own way where a Mac's menu bar is meant. -->
+    <!-- A Linux server or PC paired (data/ComputerWords.kt): its own words in place of a Mac's. -->
     <string name="problem_not_running_linux">Hypernova isn\'t running on your server. On it, run hypernova doctor: it says what stopped and how to start it.</string>
     <string name="problem_tls_linux">The secure connection to your server failed. On it, run hypernova doctor to see what\'s wrong; if it keeps failing, pair again.</string>
     <string name="unpaired_body_linux">%1$s no longer accepts this phone. To pair again, run hypernova pair on it and scan the code.</string>
