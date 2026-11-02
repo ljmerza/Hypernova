@@ -23,6 +23,10 @@
 // Claude Code); backing off while it can't read the screen; when a client asks (POST
 // /v1/usage/refresh); right after a limit is hit.
 //
+// Each look first asks the Agent SDK's usage call (usage-api.ts), which reads the same rows with no
+// terminal and isn't held back when the screen's breakdown is rate limited. The screen below is the
+// fallback, whenever that call is missing, throws or answers anything unexpected.
+//
 // Claude Code starts for it as quietly as it can: no auto-update (a download it starts would be
 // killed seconds later), no telemetry or error reports, and an English locale (the screen's times
 // are read as English; a Russian locale changes them).
@@ -36,6 +40,7 @@ import { endTermAndWait, ensureTerm, pressKeys, termAlive, termScreen, typeInto 
 import { boxLines, menuOf, newTermId, sessionEnv, spawnHolder } from './term/shared.ts'
 import { deleteHiddenTranscript, hiddenDir, transcriptDirs } from './term/hidden.ts'
 import { modelWeeks, planWindows, readUsageScreen, type UsageScreen } from './usage-screen.ts'
+import { readUsageApi } from './usage-api.ts'
 
 export const PROBE_DIR = join(SUPPORT, 'usage-probe')
 /**
@@ -197,6 +202,19 @@ export function probeUsage(why: string): Promise<boolean> {
   if (running) return running
   lastStart = Date.now()
   running = (async () => {
+    const look = await readUsageApi(hiddenDir(PROBE_DIR), PROBE_ENV)
+    if (look.ok) {
+      offerScreenUsage(look.fiveHour, look.sevenDay, look.at, look.noFive && !look.fiveHour && !!look.sevenDay)
+      offerModelUsage(look.models, look.at)
+      fails = 0
+      soon = false
+      failingSince = null
+      setProbeHealth(true, null)
+      const said = [look.fiveHour ? `5-hour ${look.fiveHour.pct}%` : look.sevenDay && look.noFive && 'no 5-hour window', look.sevenDay && `week ${look.sevenDay.pct}%`, ...look.models.map((m) => `${m.label} ${m.pct}%`)].filter(Boolean).join(', ')
+      log(`usage probe (${why}), by the SDK: ${said}`)
+      return true
+    }
+    log(`usage probe (${why}): the SDK's usage call gave nothing (${look.why}), so reading the screen`)
     const r = await runProbe()
     // The 5-hour window and the week, as of the moment the screen was read: for the meters and the pace.
     const plan = r.ok && r.screen && r.at ? planWindows(r.screen.rows) : null

@@ -319,7 +319,7 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | D5 | Shared terminals (the holder) | holder-exit.test.ts, holder-move.test.ts, term-scroll.test.ts (all); hn-cli.test.ts (all 3: `hn ls` and `hn list`, `hn attach` in a pty, typing, Ctrl+\\ detaching, the refusals) | **covered** (a window resize under `hn attach` isn't driven) |
 | D6 | `claude agents` jobs | claude-agents.test.ts (all); job-deaths.test.ts (all) | **covered** |
 | D7 | Claude Code's SDK, fetched not bundled | sdk.test.ts, sdk-missing.test.ts (all) | **covered** |
-| D8 | Usage: the probe, merging readings, the spend rate | usage-probe.test.ts, usage-probe-pace.test.ts, usage-merge.test.ts, usage-rate.test.ts, usage-screen.test.ts, usage-no-five-hour.test.ts (all) | **covered** |
+| D8 | Usage: the probe (the SDK's usage call first, the /usage screen as its fallback), merging readings, the spend rate | usage-api.test.ts, usage-probe.test.ts, usage-probe-pace.test.ts, usage-merge.test.ts, usage-rate.test.ts, usage-screen.test.ts, usage-no-five-hour.test.ts (all) | **covered** |
 | D9 | Account and limits | account.test.ts, account-restart.test.ts, restart.test.ts, provider-env.test.ts (all) | **covered** |
 | D10 | Where state and logs live; log rotation | platform.test.ts, linux-fixes.test.ts, util.test.ts (all) | **covered** |
 | D11 | Security: no CORS, the hooks' secret, keys masked, credential files kept back | http.test.ts › "no web page may read the phone API…"; hooks.test.ts › "the hooks' route takes its own secret only…"; normalize.test.ts (the masking tests); secretfiles.test.ts (all); permission-rules.test.ts › "secrets in a settings file never leave…" | **covered** |
