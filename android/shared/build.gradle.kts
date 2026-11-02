@@ -10,7 +10,7 @@ plugins {
 }
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "com.prudnikweb.hypernova.shared"
         compileSdk = 37
         minSdk = 29

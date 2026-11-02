@@ -3749,3 +3749,9 @@ The owner: "the Node minimum". The floor moves to the October 2026 security rele
 The actions move to their current majors, all on Node 24: checkout 7, setup-java 6, setup-node 7, upload-artifact 7, configure-pages 6, deploy-pages 5, upload-pages-artifact 5. Their release notes were read for what breaks our use, and none does: no job pushes with checkout's saved credentials, and no job checks out a fork on `pull_request_target`; a `package.json` without `packageManager` doesn't get setup-node's automatic cache, and these jobs name `cache: npm` themselves; the Pages site has no dotfiles for upload-pages-artifact to drop.
 
 `gradle/actions/setup-gradle` is 6 with `cache-provider: basic`. Since 6, its default cache is `gradle-actions-caching`, a proprietary component under Gradle's own terms, which using it accepts. `basic` is the MIT provider, a thin wrapper on `actions/cache`. What it costs: it has no restore keys, so a change to a build file or the version catalog starts from an empty cache and downloads everything once, and it has no cleanup or deduplication. Whether it saves only from `main` as before is only known once it has run on GitHub.
+
+## AGP 9.5 with Gradle 9.8 (2026-11-02)
+
+AGP 9.5.0 and Gradle 9.8.2 move together. The wrapper keeps its checksum, the one services.gradle.org publishes for that zip. The build scripts' own deprecations are gone: `directories` for `srcDir`, `android { }` for `androidLibrary { }`.
+
+Left for AGP 10 and Gradle 10, since none of it is ours to change in a line or two: Compose's hot-reload plugin sets a `Configuration.setVisible` (gone in Gradle 11) and uses an attribute type that fails in Gradle 10, which needs a Compose Multiplatform that fixes it; and `compose.desktop.uiTestJUnit4` wants the dependency named directly.
