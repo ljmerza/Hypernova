@@ -1045,6 +1045,14 @@
         <item quantity="other">%1$d more tools aren\'t listed.</item>
     </plurals>
     <string name="mcp_err">Couldn\'t read this server.</string>
+    <string name="mcp_bearer">Bearer token from this variable</string>
+    <string name="mcp_cwd">Working folder</string>
+    <string name="mcp_tools_on">Only these tools</string>
+    <string name="mcp_tools_off">Not these tools</string>
+    <string name="mcp_startup">Time to start</string>
+    <string name="mcp_startup_s">%1$d s</string>
+    <string name="mcp_actions_note_codex">Codex has one list for every folder, so on and off count everywhere. A thread already running keeps what it has until Codex is told to reload.</string>
+    <string name="mcp_f_codex_note">Codex keeps servers for all projects in ~/.codex/config.toml. It reads this variable from the environment it runs in.</string>
     <string name="mcp_add">Add a server</string>
     <string name="mcp_undo_add">Takes %1$s out again</string>
     <string name="mcp_undo_remove">Puts %1$s back</string>

@@ -43,3 +43,7 @@ Changes answer `{ok: true, …}` and broadcast `{t:"agent_settings", agent}`.
 - `POST /v1/agents/mcp/login/finish`: `{agent, login, address}`. `address` must be on localhost; 400 `bad_address`, 404 `no_login`, 409 `still_waiting`.
 - `POST /v1/agents/mcp/login/cancel`: `{agent, login}`. `POST /v1/agents/mcp/logout`: `{agent, name, folder}`.
 
+### For Codex
+
+The same routes with `agent=codex`. `scope` is `user`, `scopes` `["user"]`, `folders` the home folder alone, and rows add `enabled`. The page adds `bearerEnv?`, `cwd?`, `toolsOn?`, `toolsOff?`, `startupTimeout?`, `enabled`, `disabledReason?`, `authStatus?` (`unsupported`, `not_logged_in`, `bearer_token`, `o_auth`, `unknown`). A form may send `bearerEnv` (a variable's name, or null), and no `oauth`; `transport: sse` is 400 `bad_transport`. `POST .../approval` and `.../reset-choices` are 409 `not_for_codex`. `no_codex`, 409: not installed.
+

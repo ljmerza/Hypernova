@@ -59,6 +59,12 @@ data class McpSetup(
     val callbackPort: Int?,
     val timeout: Int?,
     val hidden: Int,
+    /** Codex: the variable its bearer token comes from, its working folder, the tools it lets through or holds back, how long it may take to start. */
+    val bearerEnv: String? = null,
+    val cwd: String? = null,
+    val toolsOn: List<String> = emptyList(),
+    val toolsOff: List<String> = emptyList(),
+    val startupTimeout: Int? = null,
 ) {
     companion object {
         fun wire(o: JSONObject): McpSetup {
@@ -75,6 +81,11 @@ data class McpSetup(
                 callbackPort = oauth?.int("callbackPort"),
                 timeout = o.int("timeout"),
                 hidden = o.int("hidden") ?: 0,
+                bearerEnv = o.str("bearerEnv"),
+                cwd = o.str("cwd"),
+                toolsOn = McpWire.strings(o.arr("toolsOn")),
+                toolsOff = McpWire.strings(o.arr("toolsOff")),
+                startupTimeout = o.int("startupTimeout"),
             )
         }
     }
@@ -222,6 +233,9 @@ object Mcp {
     const val STDIO = "stdio"
     const val HTTP = "http"
     const val SSE = "sse"
+    /** Codex's words for how a server signs in: only these two have an OAuth sign-in to start or end. */
+    const val CODEX_OAUTH = "o_auth"
+    const val CODEX_SIGNED_OUT = "not_logged_in"
 }
 
 internal object McpWire {
@@ -267,6 +281,8 @@ data class McpForm(
     val clientSecret: String?,
     val confirmRun: Boolean,
     val expected: String?,
+    /** Codex: the variable a bearer token comes from. */
+    val bearerEnv: String? = null,
 ) {
     fun wire(): JSONObject {
         val pairs = { list: List<McpPair> ->
@@ -282,6 +298,10 @@ data class McpForm(
             o.put("command", command).put("args", JSONArray().also { a -> args.forEach { x -> a.put(x) } }).put("env", pairs(env))
         } else {
             o.put("url", url).put("headers", pairs(headers))
+            if (agent == AgentSettingsReply.CODEX) {
+                o.put("bearerEnv", bearerEnv ?: JSONObject.NULL)
+                return o
+            }
             val oauth = JSONObject().put("clientId", clientId ?: JSONObject.NULL).put("callbackPort", callbackPort ?: JSONObject.NULL)
             clientSecret?.takeIf { it.isNotEmpty() }?.let { oauth.put("clientSecret", it) }
             o.put("oauth", oauth)

@@ -3580,3 +3580,23 @@ the server. The owner decided that's allowed, behind a confirm showing the whole
 | `enableAllProjectMcpServers`, `allowedMcpServers`, `deniedMcpServers`, `managedMcpServers` | Read where they affect approval; not set here |
 | `alwaysLoad`, `headersHelper`, per-tool policy | Shown or carried over; not on the form |
 
+## Codex's MCP servers (2026-11-02)
+
+The same screens for Codex 0.164.0, for what it really has, checked against the real binary in a throwaway `CODEX_HOME`.
+
+| | Claude Code | Codex |
+|---|---|---|
+| Scopes | user, local, project, plugin, managed, claude.ai | **One: `~/.codex/config.toml`.** `codex mcp add` says "global". Its binary names a trusted repository's `.codex/config.toml`, not read or written here, so a server there isn't listed. Plugins' show in the status |
+| Types | stdio, HTTP, SSE; `ws` shown | stdio, streamable HTTP. SSE is refused |
+| Reading | `~/.claude.json`, `.mcp.json` | `codex mcp list --json`, which prints env and header values: read on the server and filtered |
+| Status and tools | `mcpServerStatus()` for names; the daemon's own client for details | `mcpServerStatus/list` from a short-lived `codex app-server`: **tools in full, with schemas**, so no client of ours |
+| Writing | `claude mcp add-json`, secrets on its argv for a moment | `config/value/write`, Codex's own writer, so **secrets never go on a command line**, and comments in the file stay. `codex mcp add` isn't used: it can't set headers |
+| On and off | Per folder | **`enabled` in the server's table: everywhere.** There's no per-folder list, and the page says so |
+| Reconnect | A fresh process's `reconnectMcpServer()` | `config/mcpServer/reload` on the daemon's connection, if it has one, then a fresh look. Reasoned, not run: no test has a live shared app-server |
+| Approval of a project's servers | Yes | **None**: no such thing. 409 `not_for_codex` |
+| Sign-in | `claude mcp login --no-browser` | `codex mcp login --no-browser`, the same paste; Codex takes it through the same hidden terminal |
+| Prompts | Listed | Its answer has none. Resources listed |
+
+`bearer_token_env_var` is on the form for an HTTP server, as a variable's name, never a token. Fields the form doesn't have carry over on an edit (`enabled_tools`, `disabled_tools`, timeouts, `env_vars`, `cwd`, `env_http_headers`), and show on the page.
+Not on the form, though the CLI has them: `--oauth-client-id`, `--oauth-client-secret`, `--oauth-client-registration`, `--oauth-resource`, `login --scopes`.
+

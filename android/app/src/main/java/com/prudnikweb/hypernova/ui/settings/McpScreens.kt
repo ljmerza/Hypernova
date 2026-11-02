@@ -245,7 +245,15 @@ private fun LazyListScope.mcpListItems(
     val others = states.filter { it.source !in fromFiles }
     val common = list.servers.filter { it.folder == null }
     val byFolder = list.servers.filter { it.folder != null }.groupBy { it.project ?: it.folder!! }.toSortedMap(String.CASE_INSENSITIVE_ORDER)
-    item(key = "folder") {
+    // Codex has one list, for every folder: only whether it's checking is worth a line.
+    if (list.agent == AgentSettingsReply.CODEX) item(key = "checking") {
+        val line = when {
+            live == null -> stringResource(R.string.mcp_status_checking)
+            live.isFailure -> live.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: stringResource(R.string.mcp_status_err)
+            else -> null
+        }
+        if (line != null) HText(line, style = Type.small, color = if (live?.isFailure == true) HN.amber else HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
+    } else item(key = "folder") {
         GlassCard(Modifier.fillMaxWidth(), onClick = onPickFolder) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -543,6 +551,11 @@ internal fun SetupCard(setup: McpSetup) {
             row(stringResource(R.string.mcp_oauth_client), setup.clientId)
             row(stringResource(R.string.mcp_oauth_port), setup.callbackPort?.toString())
             row(stringResource(R.string.mcp_timeout), setup.timeout?.let { stringResource(R.string.mcp_timeout_ms, it) })
+            row(stringResource(R.string.mcp_bearer), setup.bearerEnv)
+            row(stringResource(R.string.mcp_cwd), setup.cwd)
+            row(stringResource(R.string.mcp_tools_on), setup.toolsOn.joinToString("\n").ifBlank { null })
+            row(stringResource(R.string.mcp_tools_off), setup.toolsOff.joinToString("\n").ifBlank { null })
+            row(stringResource(R.string.mcp_startup), setup.startupTimeout?.let { stringResource(R.string.mcp_startup_s, it) })
             if (setup.envNames.isNotEmpty() || setup.headerNames.isNotEmpty()) {
                 HText(stringResource(R.string.mcp_values_stay), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(bottom = 8.dp))
             }
@@ -582,7 +595,9 @@ private fun ToolsCard(facts: Result<McpFacts>?, mine: McpLive?, onTool: (McpTool
                         if (i > 0) Hairline(Modifier.fillMaxWidth())
                         ToolRow(t.name, null, toolMarks(t.readOnly.takeIf { it }, t.destructive.takeIf { it })) { onLive(t) }
                     }
-                    if (f?.whyNot != null || facts.isFailure) HText(stringResource(whyNoTools(f?.whyNot)), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp))
+                    // Claude Code's sign-in is its own, so a connected server can still say no to the daemon.
+                    val why = if (f?.whyNot == "needs_auth" && mine?.status == Mcp.CONNECTED) "no_direct" else f?.whyNot
+                    if (why != null || facts.isFailure) HText(stringResource(whyNoTools(why)), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp))
                     else if (names.isEmpty()) HText(stringResource(R.string.mcp_no_tools), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp))
                 }
             }
@@ -747,7 +762,8 @@ private fun ActionsCard(
     val status = mine?.status
     val waiting = status == Mcp.WAITING || status == Mcp.REJECTED || s.approval == "pending" || s.approval == "rejected"
     val hasAddress = s.setup.transport == Mcp.HTTP || s.setup.transport == Mcp.SSE
-    val canSignIn = hasAddress && s.setup.headerNames.none { it.equals("Authorization", ignoreCase = true) }
+    val codex = s.agent == AgentSettingsReply.CODEX
+    val canSignIn = hasAddress && if (codex) s.authStatus == Mcp.CODEX_OAUTH || s.authStatus == Mcp.CODEX_SIGNED_OUT || status == Mcp.NEEDS_AUTH else s.setup.headerNames.none { it.equals("Authorization", ignoreCase = true) }
     FlowRow(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (s.scope == Mcp.PROJECT && waiting) {
             Pill(stringResource(R.string.mcp_approve), onApprove, kind = PillKind.Primary, height = 40.dp, enabled = !busy)
@@ -772,7 +788,7 @@ private fun ActionsCard(
         if (busy) LoadingLine(stringResource(R.string.as_saving), Modifier.padding(top = 8.dp))
         trouble?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 8.dp)) }
         Spacer(Modifier.height(6.dp))
-        HText(stringResource(R.string.mcp_actions_note), style = Type.small, color = HN.inkDim)
+        HText(stringResource(if (codex) R.string.mcp_actions_note_codex else R.string.mcp_actions_note), style = Type.small, color = HN.inkDim)
     }
 }
 
@@ -878,6 +894,7 @@ fun McpEditScreen(hub: Hub, agent: String, name: String?, scope: String?, folder
     var clientId by remember { mutableStateOf("") }
     var port by remember { mutableStateOf("") }
     var clientSecret by remember { mutableStateOf("") }
+    var bearerEnv by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var trouble by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
@@ -893,6 +910,7 @@ fun McpEditScreen(hub: Hub, agent: String, name: String?, scope: String?, folder
                 headers = s.setup.headerNames.map { PairRow(it, "", true) }
                 clientId = s.setup.clientId.orEmpty()
                 port = s.setup.callbackPort?.toString().orEmpty()
+                bearerEnv = s.setup.bearerEnv.orEmpty()
             }
             loaded = r
         }
@@ -931,8 +949,12 @@ fun McpEditScreen(hub: Hub, agent: String, name: String?, scope: String?, folder
             } else {
                 FieldLabel(stringResource(R.string.mcp_url), Modifier.padding(top = 10.dp))
                 Field(url, { url = it }, placeholder = "https://mcp.example.com/mcp", mono = true, label = stringResource(R.string.mcp_url))
-                if (!codex) {
-                    PairsEditor(stringResource(R.string.mcp_headers), headers) { headers = it }
+                PairsEditor(stringResource(R.string.mcp_headers), headers) { headers = it }
+                if (codex) {
+                    FieldLabel(stringResource(R.string.mcp_bearer), Modifier.padding(top = 10.dp))
+                    Field(bearerEnv, { bearerEnv = it }, placeholder = "MY_API_TOKEN", mono = true, label = stringResource(R.string.mcp_bearer))
+                    HText(stringResource(R.string.mcp_f_codex_note), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
+                } else {
                     FieldLabel(stringResource(R.string.mcp_f_oauth), Modifier.padding(top = 10.dp))
                     Field(clientId, { clientId = it }, placeholder = stringResource(R.string.mcp_oauth_client), mono = true, label = stringResource(R.string.mcp_oauth_client))
                     Spacer(Modifier.height(4.dp))
@@ -963,6 +985,7 @@ fun McpEditScreen(hub: Hub, agent: String, name: String?, scope: String?, folder
                     clientSecret = clientSecret.ifEmpty { null },
                     confirmRun = check,
                     expected = before?.hash,
+                    bearerEnv = bearerEnv.trim().ifEmpty { null },
                 )
             }
             val runs = transport == Mcp.STDIO && (before == null || before.setup.transport != Mcp.STDIO || before.setup.command != command.trim() || before.setup.args != args || env.any { !it.kept } || env.map { it.name } != before.setup.envNames)

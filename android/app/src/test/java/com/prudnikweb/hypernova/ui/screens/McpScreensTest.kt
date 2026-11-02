@@ -415,4 +415,55 @@ class McpScreensTest {
         rule.waitForIdle()
         assertTrue(sent("POST", "/v1/agents/mcp/undo").getBoolean("confirmRun"))
     }
+
+    // ─── Codex: one list, one scope ───
+
+    private val codexList = """{"agent":"codex","state":"ok","folders":[{"id":"home","name":"~"}],"hidden":0,"foldersNotRead":0,"scopes":["user"],"undo":null,
+      "servers":[{"name":"fetch","scope":"user","transport":"http","summary":"mcp.example.com","enabled":true}]}"""
+    private val codexPage = """{"agent":"codex","name":"fetch","scope":"user","where":"~/.codex/config.toml","transport":"http","url":"https://mcp.example.com/m","envNames":[],"headerNames":["X-Key"],"hidden":0,"bearerEnv":"MY_TOKEN","toolsOff":["wipe"],"startupTimeout":20,"enabled":true,"authStatus":"not_logged_in","hash":"h9","editable":true}"""
+
+    @Test fun codexHasNoFolderToPick() {
+        hub.on("GET /v1/agents/mcp?", codexList)
+        hub.on("GET /v1/agents/mcp/status", """{"folder":"home","servers":[{"name":"fetch","status":"connected","source":"user","tools":[]}]}""")
+        rule.setContent { Harness(spy) { McpServersScreen(hub, "codex", onBack = {}, onOpen = { n, s, f -> opened += "$n $s $f" }) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.mcp_folder)).assertDoesNotExist()
+        seen("fetch")
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun codexsPageSaysItsBearerVariableAndToolListsAndOffersItsSignIn() {
+        hub.on("GET /v1/agents/mcp/server", codexPage)
+        hub.on("GET /v1/agents/mcp/status", """{"folder":"home","servers":[{"name":"fetch","status":"needs-auth","source":"user","tools":[]}]}""")
+        hub.on("GET /v1/agents/mcp/tools", """{"name":"fetch","whyNot":"needs_auth","tools":[],"prompts":[],"resources":[]}""")
+        rule.setContent { Harness(spy) { McpServerScreen(hub, "codex", "fetch", "user", "home", onBack = {}) } }
+        rule.waitForIdle()
+        seen("~/.codex/config.toml")
+        seen("MY_TOKEN")
+        seen("wipe")
+        seen("20 s")
+        seen(str(R.string.mcp_sign_in))
+        seen(str(R.string.mcp_actions_note_codex))
+        rule.onRoot().snap("mcp_server_codex")
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun codexsFormHasNoScopeAndNoSseAndSendsItsBearerVariable() {
+        hub.on("GET /v1/agents/mcp?", codexList)
+        hub.on("POST /v1/agents/mcp/servers", """{"ok":true}""")
+        rule.setContent { Harness(spy) { McpEditScreen(hub, "codex", null, null, null, onBack = {}) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.mcp_f_project)).assertDoesNotExist()
+        rule.onNodeWithText("SSE").assertDoesNotExist()
+        type(str(R.string.mcp_f_name), "web")
+        tap("HTTP")
+        type(str(R.string.mcp_url), "https://x.example/m")
+        type(str(R.string.mcp_bearer), "MY_TOKEN")
+        tap(str(R.string.mcp_f_save))
+        val b = sent("POST", "/v1/agents/mcp/servers")
+        assertEquals("codex", b.getString("agent"))
+        assertEquals("user", b.getString("scope"))
+        assertEquals("MY_TOKEN", b.getString("bearerEnv"))
+        assertFalse(b.has("oauth"))
+    }
 }

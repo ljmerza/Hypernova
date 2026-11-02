@@ -1142,6 +1142,36 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       contract('rest-mcp-toggled', await ok(post('/v1/agents/mcp/toggle', { agent: 'claude', name: 'github', folder: 'home', enabled: false })))
       contract('rest-mcp-reconnected', await ok(post('/v1/agents/mcp/reconnect', { agent: 'claude', name: 'github', folder: 'home' })))
       contract('rest-mcp-not-trusted', await refused(post('/v1/agents/mcp/approval', { agent: 'claude', name: 'docs', folder: folderId(cwd), approved: true, confirmRun: true }), 409))
+      // Codex's, from a stand-in for its CLI and its app-server.
+      const { useCodex } = await import('../src/mcp-codex.ts')
+      useCodex({
+        cli: async () => ({
+          code: 0,
+          stderr: '',
+          stdout: JSON.stringify([
+            { name: 'fetch', enabled: false, transport: { type: 'stdio', command: '/usr/bin/fetch-mcp', args: ['--token', 'never-sent'], env: { API_KEY: 'never-sent' }, env_vars: ['INHERITED'], cwd: null }, disabled_tools: ['wipe'], startup_timeout_sec: 20, auth_status: 'unsupported' },
+            { name: 'web', enabled: true, transport: { type: 'streamable_http', url: 'https://mcp.example.com/m?key=never-sent', bearer_token_env_var: 'MY_TOKEN', http_headers: { 'X-Key': 'never-sent' } }, auth_status: 'bearer_token' },
+          ]),
+        }),
+        rpc: async (work) =>
+          work(async () => ({
+            data: [
+              { name: 'web', authStatus: 'bearerToken', serverInfo: { name: 'web', version: '1' }, tools: { lookup: { name: 'lookup', description: 'Looks it up.', annotations: { readOnlyHint: true }, inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] } } }, resources: [] },
+              { name: 'bundled', pluginId: 'p@m', authStatus: 'unsupported', serverInfo: { name: 'b', version: '1' }, tools: {}, resources: [] },
+            ],
+          })),
+      })
+      for (const [name, value] of [
+        ['rest-mcp-codex-list', await ok(get('/v1/agents/mcp?agent=codex'))],
+        ['rest-mcp-codex-server', await ok(get('/v1/agents/mcp/server?agent=codex&name=fetch&scope=user'))],
+        ['rest-mcp-codex-web', await ok(get('/v1/agents/mcp/server?agent=codex&name=web&scope=user'))],
+        ['rest-mcp-codex-status', await ok(get('/v1/agents/mcp/status?agent=codex&fresh=1'))],
+        ['rest-mcp-codex-tools', await ok(get('/v1/agents/mcp/tools?agent=codex&name=web&scope=user'))],
+      ] as const) {
+        assert.ok(!JSON.stringify(value).includes('never-sent'), name)
+        contract(name, stable(value))
+      }
+      useCodex(null)
       contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
     }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))

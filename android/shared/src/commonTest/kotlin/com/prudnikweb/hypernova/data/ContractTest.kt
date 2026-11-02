@@ -698,6 +698,42 @@ class ContractTest {
             assertTrue(u.command!!.contains("•••"))
         },
         "rest-mcp-undone" to { o -> assertTrue(o.bool("ok")) },
+        "rest-mcp-codex-list" to { o ->
+            val l = McpList.wire(o)
+            assertEquals(AgentSettingsReply.CODEX, l.agent)
+            assertEquals(listOf(Mcp.USER), l.scopes)
+            assertEquals(listOf("fetch", "web"), l.servers.map { it.name })
+            assertEquals(listOf(Mcp.HOME), l.folders.map { it.id })
+        },
+        "rest-mcp-codex-server" to { o ->
+            val s = McpServer.wire(o)
+            assertEquals("~/.codex/config.toml", s.where)
+            assertEquals(listOf("API_KEY", "INHERITED"), s.setup.envNames)
+            assertEquals(false, s.enabled)
+            assertEquals(listOf("--token", "•••"), s.setup.args)
+            assertEquals(listOf("wipe"), s.setup.toolsOff)
+            assertEquals(20, s.setup.startupTimeout)
+            assertEquals("unsupported", s.authStatus)
+        },
+        "rest-mcp-codex-web" to { o ->
+            val s = McpServer.wire(o)
+            assertEquals(Mcp.HTTP, s.setup.transport)
+            assertEquals("MY_TOKEN", s.setup.bearerEnv)
+            assertEquals(listOf("X-Key"), s.setup.headerNames)
+        },
+        "rest-mcp-codex-status" to { o ->
+            val r = McpLiveReply.wire(o)
+            assertEquals(Mcp.DISABLED, r.servers.single { it.name == "fetch" }.status)
+            val web = r.servers.single { it.name == "web" }
+            assertEquals(Mcp.CONNECTED, web.status)
+            assertEquals(listOf("lookup"), web.tools.map { it.name })
+            assertEquals(Mcp.PLUGIN, r.servers.single { it.name == "bundled" }.source)
+        },
+        "rest-mcp-codex-tools" to { o ->
+            val f = McpFacts.wire(o)
+            assertEquals("Looks it up.", f.tools.single().description)
+            assertEquals(listOf("q"), f.tools.single().params.map { it.name })
+        },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)

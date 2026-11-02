@@ -169,8 +169,8 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
             // Whatever the file says: this comes with the server's live state, and the file may be missing.
             item(key = "account-seam") { Seam(stringResource(R.string.as_account), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 2.dp)) }
             item(key = "account") { if (codex) CodexAccountCard(hub, server) else ClaudeAccountCard(hub, server) }
-            if (!codex) item(key = "extensions-seam") { Seam(stringResource(R.string.as_extensions), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp)) }
-            if (!codex) item(key = "extensions") {
+            item(key = "extensions-seam") { Seam(stringResource(R.string.as_extensions), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp)) }
+            item(key = "extensions") {
                 GlassCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
                         NavRow(stringResource(R.string.as_mcp), stringResource(R.string.as_mcp_manage), onClick = onMcp)
