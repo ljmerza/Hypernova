@@ -2229,9 +2229,10 @@ daemon doesn't know.
   Claude Code says it runs somewhere already. For one running, or one that went on with another agent,
   it just answers as it is.
 - **Refusals:** 404 `no_session`; 409 `folder_gone` (the folder it ran in has gone, a removed job's
-  worktree say; it stays in History), and what starting a session can say (`no_provider`). An older
-  daemon answers 404 `not_found`: a client just opens it, and writing in it resumes it there.
-- **Rules:** History's tap, as /resume: no prompt, so no turn. See History.
+  worktree say; it stays in History; `…/prompt` on an ended session says the same), and what starting a
+  session can say (`no_provider`). An older daemon answers 404 `not_found`.
+- **Rules:** as /resume: no prompt, so no turn. The Android app doesn't call it: its History opens a
+  session to read, and writing in it resumes it. See History.
 
 #### POST /v1/jobs/respawn
 
@@ -5678,8 +5679,8 @@ or off (`POST /v1/claude {agents}`); the daemon takes it without a restart (each
   closed first; then `{t:"session"}`, ended. Nothing kills a terminal Hypernova doesn't hold. Either way
   the transcript stays, and `<support>/deleted-sessions.json` (the name is from when it hid a session
   everywhere; lines from then show in History too) keeps it ended after a restart (`deleted.ts`). Late
-  hooks about it and the claude on its way out are ignored. History's tap (`…/resume`), a prompt typed
-  into it, or a claude started since (`claude --resume`, `--bg`, /resume in the agent view) makes it an
+  hooks about it and the claude on its way out are ignored. A prompt typed into it, `…/resume`, or a
+  claude started since (`claude --resume`, `--bg`, /resume in the agent view) makes it an
   ordinary session again and takes its line out. A `claude rm` in a terminal goes to History too. **No
   route deletes a transcript or a thread for good.**
 - **Stop, remove and restart of a job:** the `claude attach` holder ends first.
@@ -5703,8 +5704,7 @@ or waits on the owner, never Restart (409 `not_agents`, for `respawn` and `resta
   whole of `codex resume`'s list.
 - Codex's `thread/deleted` (a `codex delete` elsewhere) makes the daemon forget the session the same
   way.
-- Home's Smart swipe doesn't remove a Codex card: the menu, the session sheet and a swipe picked in
-  Settings do.
+- Smart's swipe removes a Completed Codex card as any other, asked first.
 
 #### A job that died
 
@@ -7211,11 +7211,13 @@ stop). The name stays for the wire value `endedBy: "mac_restart"`; it applies on
   most: a first prompt with pasted pictures can be one line of megabytes), and from its end for the
   title, Claude's last reply (`lastText`, so a card says where it left off before anyone opens it)
   and, failing the start, the folder.
-- **A tap resumes it** (`POST /v1/sessions/{id}/resume`), as /resume: the same id, with no prompt, so no
-  turn. With settings.claudeAgents and on the subscription it's a job again (`claude --bg --resume <id>
+- **Opening one starts nothing** (`…/events` reads its transcript). **Writing in it resumes it**
+  (`…/prompt`): the same id, in a new shared terminal, back on Home; 409 `folder_gone` when the folder it
+  ran in has gone, and it stays in History. In the Android app the box's hint says so on an ended session.
+- **`POST /v1/sessions/{id}/resume`** resumes with no prompt, so no turn, for a client that wants that.
+  With settings.claudeAgents and on the subscription it's a job again (`claude --bg --resume <id>
   --name <its title>`, and `claude agents` lists it), as /resume in the agent view; else a new shared
-  terminal; with no shared terminals, the daemon's own at its next prompt. A session's chat can be opened
-  without resuming it from everywhere else (a notification, say); writing in one resumes it too.
+  terminal; with no shared terminals, the daemon's own at its next prompt.
 - Resuming a session Claude Code never wrote a transcript for (its claude ended before taking a
   prompt) starts it afresh under its id (`--session-id`): `--resume` refuses an unknown id.
 
