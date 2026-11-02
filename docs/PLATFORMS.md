@@ -84,8 +84,8 @@ This is the part that makes the plan cheap in some places and costly in others.
   that. The daemon doesn't change much for it.
 - **A browser already works as a client.** The daemon sends the open CORS headers a browser
   needs, accepts the token as `?token=` on a WebSocket (a browser can't set a header there),
-  and hands a terminal a one-minute ticket URL. All three were added for Lens, which is a web
-  app running in the glasses' WebView. So the protocol is already browser-ready.
+  and hands a terminal a one-minute ticket URL. All three were added for Lens, which was a web
+  app running in the glasses' WebView (since removed). So the protocol is already browser-ready.
 - **The daemon is mostly portable.** About 12,000 lines of TypeScript. The Mac-only parts are
   few and sit in known files: `battery.ts` (`pmset`, `ioreg`), `awake.ts` (`caffeinate`,
   `pmset`), `hooks.ts` and `util.ts` (`~/Library` folders, `zsh`), `shots.ts` (Chrome as a Mac
@@ -100,9 +100,9 @@ This is the part that makes the plan cheap in some places and costly in others.
   `hyper-cosmos.css`, `cosmos.js` (the living background) and a React version
   (`DigitalCosmos.tsx`, `GrainField.tsx`). The web app starts with the right look on day one.
 
-Lens has a ready-made browser client of the daemon (`lens/src/data/api.ts`, `hub.ts`). Since
+Lens had a ready-made browser client of the daemon (`lens/src/data/api.ts`, `hub.ts`, in git history now). Since
 Lens became Apache-2.0 like the rest of the repo (2026-10-18, it dropped Hyperscribe Companion's
-AGPL client), the web app can start from it instead of writing one fresh from `PROTOCOL.md`.
+AGPL client), the web app could start from it instead of writing one fresh from `PROTOCOL.md`.
 
 ## 1. A web app, served by your own Mac
 
@@ -123,7 +123,7 @@ browser, or "Add to Home Screen" and it looks and acts like an app.
   page only needs xterm.js to draw it. Nothing new on the daemon side.
 
 ### What is new
-1. **Signing in.** Use the pairing we have. The Mac app shows a QR code; scanning it opens a
+1. **Signing in.** Use the pairing we have. `hypernova pair` shows a QR code, as the Mac app did; scanning it opens a
    page that today hands over to the Android app. For the web it simply stays on that page:
    it calls `POST /v1/pair` with the code and keeps the device token. Two things to decide:
    - Where the token lives. `localStorage` is simplest. The page and the API share one
@@ -131,8 +131,8 @@ browser, or "Add to Home Screen" and it looks and acts like an app.
      "a script steals the token" risk is small. Still, the token would be the key to a
      machine that runs commands, so keep it in IndexedDB behind a service worker only if the
      review later asks for it.
-   - Pairing from the same computer. The Mac app's own pairing page needs no QR code when the
-     browser is on the Mac itself.
+   - Pairing from the same computer. The Mac app's own pairing page, gone since, needed no QR code when the
+     browser was on the Mac itself.
 2. **A service worker and a manifest.** These two small files make it installable and let it
    open offline to a "Mac is away" screen instead of a browser error.
 3. **Push (Web Push).** The daemon would hold a signing key pair (VAPID, a standard for
@@ -253,13 +253,13 @@ This is the part to take seriously. I read the current guidelines
   say how to switch it on in the review notes. This is the usual reason apps like this are
   rejected the first time.
 - **A paid developer account** (about 99 USD a year) and a Mac with Xcode. We have the Mac;
-  CLAUDE.md says the Mac app builds with Command Line Tools only, so Xcode itself is a new
+  the Mac app, gone since, built with Command Line Tools only, so Xcode itself is a new
   large install.
 
 ### The SwiftUI-native alternative, and its cost
-Write a second app in SwiftUI. The Mac app already shows the way: it has its own client
+Write a second app in SwiftUI. The Mac app, gone since, showed the way: it had its own client
 (`DaemonClient.swift`, `LiveFeed.swift`, `Models.swift`) and the look in Swift
-(`HyperCosmos.swift`; `skills/hyper-cosmos/assets/swiftui/`).
+(`HyperCosmos.swift`; `skills/hyper-cosmos/assets/swiftui/`), all in git history now.
 - **For:** the most "iPhone" result, real widgets and Live Activities without a bridge,
   Metal shaders directly, no Kotlin-on-iOS surprises.
 - **Against:** every screen again, then a second copy of every future change. The Android
@@ -310,7 +310,7 @@ the status line's tap (`teeBlock` in `hooks.ts`) writes to the Library folder by
 It has run on GitHub's Mac runners on both processors, not yet on a person's own Mac.
 
 **The idea.** Let the daemon run on a Linux or Windows computer, and give those computers a
-small tray app like the Mac's menu bar app. Claude Code itself already runs on both
+small tray app like the Mac's menu bar app was. Claude Code itself already runs on both
 ([ON-DEVICE.md](ON-DEVICE.md) lists the official builds: `linux-x64`, `linux-arm64`,
 `win32-x64`, `win32-arm64`).
 
@@ -331,7 +331,7 @@ interface and never `pmset` directly.
 | Run at login, restart if it dies | LaunchAgent | a systemd **user** service | a Scheduled Task at logon (no admin needed) |
 | Where files live | `~/Library/Application Support/Hypernova` | `~/.local/share/hypernova`, logs in `~/.local/state/hypernova` | `%APPDATA%\Hypernova` |
 | Hooks and the `claude` shell function | zsh | bash and zsh (L15 becomes real) | PowerShell profile |
-| Tailscale | the Mac app helps | the `tailscale` command | the Tailscale app |
+| Tailscale | the Mac app helped (Tailscale was removed since) | the `tailscale` command | the Tailscale app |
 
 What the layer does **not** need to chase on day one: window capture, Backpack with the lid
 closed on Windows, "Open on the Mac" (hide the button; the phone is told which host it is).
@@ -344,11 +344,11 @@ Do Linux first and Windows will go faster for the shape it leaves.
 
 ### The tray app
 Three honest options. All three show an icon, a small popover or menu, a setup window and the
-pairing QR code, the same as the Mac app.
+pairing QR code, as the Mac app did.
 
 | | Compose Desktop | Tauri 2 | Native on each system |
 |---|---|---|---|
-| What it is | The same Kotlin and Compose as the phone app, on the JVM | A small shell (Rust) around a web page | SwiftUI on Mac (have it), GTK on Linux, WinUI on Windows |
+| What it is | The same Kotlin and Compose as the phone app, on the JVM | A small shell (Rust) around a web page | SwiftUI on Mac (we had it), GTK on Linux, WinUI on Windows |
 | Reuses | Phone screens and the cosmos effects, direct | The web app from section 1, direct | Nothing |
 | Size | A JVM comes with it, roughly 50 to 100 MB | Small, uses the system's web view | Smallest |
 | Tray | Has a tray API, but a popover under the icon is hand-built | A tray icon with a menu is built in; on **Linux, click events on the icon are not delivered**, only the right-click menu works ([Tauri docs](https://v2.tauri.app/learn/system-tray/)) | Full control |
