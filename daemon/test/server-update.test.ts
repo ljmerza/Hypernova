@@ -392,7 +392,7 @@ test('managed: a release package\'s install, in <support>/app, run by its system
   assert.deepEqual(install({ marker: { source: 'package' } }), { ok: true })
 })
 
-test('not managed: a checkout\'s install (hnctl update), one from before the marker, a test copy, a container, no service', () => {
+test('not managed: a checkout\'s install, one from before the marker, a test copy, a container, no service', () => {
   const why = (m: ReturnType<typeof install>) => (m.ok ? 'ok' : m.reason)
   assert.match(why(install({ marker: { source: 'checkout' } })), /checkout/)
   assert.match(why(install({})), /Installed before servers could update themselves/)

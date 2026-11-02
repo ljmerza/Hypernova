@@ -20,7 +20,7 @@ abstract class BuildMinute : ValueSource<Int, ValueSourceParameters.None> {
 val buildMinute: Int = providers.of(BuildMinute::class) {}.get()
 /**
  * The versionName. A release passes its own, `-PappVersion=0.3.1` (scripts/next-version.sh, from
- * the commits since the last release; docs/RELEASING.md, "Versions"). A local build (`hnctl apk`, a
+ * the commits since the last release; docs/RELEASING.md, "Versions"). A local build (an admin's APK, a
  * dev build) says where it stands from git: the last release's tag, and after it the commits since,
  * the commit and whether it had changes (`git describe`: "0.5.0", "0.5.0-3-g1a2b3c4-dirty"), so
  * Settings → About names the version it really is. Without git or a tag: "0.0.0-dev".

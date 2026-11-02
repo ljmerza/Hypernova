@@ -125,8 +125,8 @@ export type InstallFacts = {
  * Whether this install can update itself, and if not, why (a sentence for the log, the phone and
  * `hypernova auto-update`). It must be the installer's own: on Linux, outside a container, this
  * daemon running from <app>/daemon, which `hypernova setup` put there from a release's package
- * (its install.json says `package`: a checkout installed with `scripts/install-linux.sh` or
- * `hnctl update` says `checkout`, and an install from before the marker has none), started by
+ * (its install.json says `package`: a checkout installed with `scripts/install-linux.sh`
+ * says `checkout`, and an install from before the marker has none), started by
  * its systemd user service (INVOCATION_ID, and the unit running this daemon's main.ts), with
  * systemd-run to run the update outside it.
  */
@@ -136,7 +136,7 @@ export function installKind(f: InstallFacts): Managed {
   const real = f.real ?? ((p: string) => { try { return realpathSync(p) } catch { return resolve(p) } })
   const which = f.which ?? ((n: string) => ['/usr/bin', '/bin', '/usr/local/bin'].some((d) => existsSync(join(d, n))))
   // A Mac doesn't, on purpose (owner, 2026-11-01): the update has never run on one, and a broken
-  // update on a machine nobody can reach is worse than none. docs/DECISIONS.md, "The server on a Mac".
+  // update on a machine nobody can reach is worse than none. docs/DECISIONS.md, "The server's packages".
   if (f.platform !== 'linux') return { ok: false, reason: `A Mac doesn’t update itself yet: that has never been tried on a Mac. Update it by hand: ${GET_SH}` }
   if (inContainer(f.env, exists)) return { ok: false, reason: 'This server runs in a container: build its image again to update it (docs/LINUX.md, "Updating the container").' }
   const installed = join(f.appDir, 'daemon')

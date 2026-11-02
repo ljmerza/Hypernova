@@ -2975,7 +2975,7 @@ objects with a `t` field. On the WebSocket's auth, see Transport and auth.
 - **Direction:** daemon → client
 - **Shape:** `{t:"app", app: {versionCode, versionName} | null}`, as `Snapshot.mac.app` would say it
   now.
-- **When:** the APK the server hands out changed (a GitHub release fetched, `hnctl apk`, a dev
+- **When:** the APK the server hands out changed (a GitHub release fetched, an admin's APK, a dev
   build, or none any more). Looked at every 5 s and at once after a release is fetched; said only
   when it changed.
 - **Client:** updates its offer without reconnecting (see The app update). An older app ignores it
@@ -5708,7 +5708,7 @@ name (never an address, whose certificate only the app pins).
 #### Where the offered APK comes from
 
 The APK in `<support>/android/` (`hypernova.apk`, with its note `hypernova.json`
-`{versionCode, versionName}`; no note, no offer) is either an admin's (`hnctl apk`; a dev build in a
+`{versionCode, versionName}`; no note, no offer) is either an admin's (put there by hand or by a tool on the server; a dev build in a
 checkout's `dist/` counts when `<support>/android/` has none) or the latest GitHub release's, which
 the daemon fetches itself (`daemon/src/releases.ts`):
 
@@ -5721,7 +5721,7 @@ the daemon fetches itself (`daemon/src/releases.ts`):
    docs/RELEASING.md): `{versionCode, versionName, sha256, serverSha256}`, `sha256` the APK's and
    `serverSha256` the server package's (hex). A release without a note offers nothing.
 3. **Newer only.** Its `versionCode` must be higher than the APK handed out now; else nothing is
-   downloaded. So an admin's build with a higher versionCode (`hnctl apk`, versionCodes are build
+   downloaded. So an admin's build with a higher versionCode (versionCodes are build
    minutes) is never replaced by an older release, nor an equal one.
 4. **The APK.** The release's `hypernova-client-<tag>-android.apk`, else, for a release without that
    name, `hypernova-<tag>.apk` (the same file; docs/RELEASING.md, "Names"), into
@@ -5729,7 +5729,7 @@ the daemon fetches itself (`daemon/src/releases.ts`):
    at most, its size as the release lists it), its SHA-256 counted on the way. A different SHA-256
    than the note's: deleted, nothing offered, tried again at the next look. The versionCode handed
    out is read again (an admin may have published meanwhile).
-5. **Published** as `hnctl apk` does it: the old `hypernova.json` goes, the APK is renamed into
+5. **Published** in place: the old `hypernova.json` goes, the APK is renamed into
    place, then the new note (`{versionCode, versionName, sha256, tag, source: "github"}`) is renamed
    into place; each rename is atomic in the same folder, so no note ever names another build's file.
    Then `app` goes out.
@@ -5751,7 +5751,7 @@ this alone), so clients are offered the release's app before the server restarts
 1. **Only an install the installer manages:** Linux, not in a container, this daemon running from
    `<app>/daemon` (`HYPERNOVA_APP`, else `<support>/app`), which `hypernova setup` put there from a
    release's package: its `install.json` says `{"source": "package"}` (setup writes `checkout` when
-   it installs from a git checkout: `scripts/install-linux.sh` in a clone, `hnctl update`; an
+   it installs from a git checkout: `scripts/install-linux.sh` in a clone; an
    install from before the marker has none), started by its systemd user service (`INVOCATION_ID`,
    and `hypernova.service` running this daemon's `main.ts`), with `systemd-run` there. Anything else
    is `available: false` with its reason, in the log once. A Mac is that too, on purpose: it has never

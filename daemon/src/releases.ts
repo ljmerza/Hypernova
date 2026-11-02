@@ -3,7 +3,7 @@
 // note the release workflow attaches (`hypernova-vX.Y.Z.json`: versionCode, versionName, the APK's
 // SHA-256), and when that release is newer than the APK it hands out, downloads its APK into
 // <support>/android/, checks the SHA-256, and only then puts it where the phone's update comes from.
-// An APK an admin put there (`hnctl apk`, a dev build) with a higher versionCode is never replaced.
+// An APK an admin put there, or a dev build, with a higher versionCode is never replaced.
 // Never fails the daemon: offline, GitHub down or a rate limit is a line in the log, then the next
 // check. Settings: `releaseCheck` (unset: on). The same look hands the release to the server's own
 // update (server-update.ts, `autoUpdate`, unset: on), after the APK, so the phones are offered the
@@ -196,7 +196,7 @@ export function releaseChecker(o: CheckerOptions) {
   const download = (url: string, tmp: string, size: number | null): Promise<string> => downloadTo(url, tmp, { size, max: APK_MAX, what: 'the APK', signal: timeout(true) })
 
   /**
-   * In place, as `hnctl apk` does it: no note = no offer, so the old note goes first, then the new
+   * In place: no note = no offer, so the old note goes first, then the new
    * APK, then its note; each rename is atomic in the same folder, so the daemon never pairs one
    * build's version with another's file.
    */

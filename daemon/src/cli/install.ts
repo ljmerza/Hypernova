@@ -48,7 +48,7 @@ export function daemonIn(from: string): string | null {
 /**
  * Where an install comes from, for the server's own update (server-update.ts, `install.json` in the
  * installed daemon): `checkout` when [src] is a git checkout's daemon (`scripts/install-linux.sh` in
- * a clone, `hnctl update`), which updates from there and never by itself; `package` otherwise (a
+ * a clone), which updates from there and never by itself; `package` otherwise (a
  * release's unpacked package, get.sh).
  */
 export function installSource(src: string, exists: (p: string) => boolean = existsSync): 'package' | 'checkout' {

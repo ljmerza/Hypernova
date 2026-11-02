@@ -1236,7 +1236,7 @@ export function appInfo(): { versionCode: number; versionName: string } | null {
  */
 let saidApp: string | null = null
 /**
- * The APK handed out changed (a GitHub release fetched, `hnctl apk`, a dev build, removed): every
+ * The APK handed out changed (a GitHub release fetched, an admin's APK, a dev build, removed): every
  * connected client hears `{t:"app", app}` (null: none any more), without reconnecting. Looked at
  * every few seconds by the servers, and at once after a release is fetched (releases.ts).
  */

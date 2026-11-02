@@ -2340,14 +2340,14 @@ The owner: after a release nothing told the phone, and Settings showed no update
    30 s after start and every 6 hours, with the ETag, waiting out a rate limit), reads the
    release's `hypernova-vX.Y.Z.json` (versionCode, versionName, the APK's SHA-256; the release
    workflow now attaches it), and only when that versionCode is higher than the APK it hands out,
-   downloads the APK, checks the SHA-256, and puts it in `<support>/android/` the way `hnctl apk`
-   does (the note last). Never fails the daemon: offline or an error is a line in the log.
-2. **A local build wins when it's newer.** An APK an admin put there (`hnctl apk`, a dev build)
+   downloads the APK, checks the SHA-256, and puts it in `<support>/android/` with the note
+   last. Never fails the daemon: offline or an error is a line in the log.
+2. **A local build wins when it's newer.** An APK an admin put there, or a dev build,
    with a higher versionCode is never replaced by an older or equal release.
 3. **On by default**, the setting `releaseCheck` turns it off (`POST /local/settings` or
    settings.json). docs/SECURITY-MODEL.md says what GitHub sees and how the APK is checked.
-4. **Connected phones hear of it**: `{t:"app", app}` when the offered APK changes (a release, `hnctl
-   apk`, removed), so no daemon restart or reconnect is needed. Older apps ignore it.
+4. **Connected phones hear of it**: `{t:"app", app}` when the offered APK changes (a release, an admin's
+   APK, removed), so no daemon restart or reconnect is needed. Older apps ignore it.
 5. **Settings → About** shows "Update available · 0.6.0" with **Update** under the App row while a
    newer app is offered, the same flow as the banner (downloading with its percent, checking,
    Allow, Install, Try again); nothing when there's none. The App row names the installed version as
@@ -2650,7 +2650,7 @@ server updates itself and then pushes to the client that needs update too." Deci
    (`--no-claude`; no `sudo` without a terminal).
 6. **Only an install the installer manages**: a Linux install in `<support>/app` that `hypernova
    setup` put there from a release's package (its `install.json`; setup writes `checkout` for a
-   git checkout, so `hnctl update` and `scripts/install-linux.sh` in a clone are never replaced),
+   git checkout, so `scripts/install-linux.sh` in a clone is never replaced),
    run by its systemd user service. A checkout, a test copy, a container, an install from before
    the marker or one without the service says "not available here" and why.
 7. **The phones learn of it**: the new daemon, at start, sees the update it was waiting for and

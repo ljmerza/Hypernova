@@ -111,7 +111,7 @@ const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex')
 function publishRelease(tag: string, code: number, apk: Buffer, sum = sha(apk)): void {
   release = { tag, apk, note: { versionCode: code, versionName: tag.slice(1), sha256: sum } }
 }
-/** What an admin's `hnctl apk` leaves: the APK and its note. */
+/** What an admin puts there: the APK and its note. */
 function localApk(code: number, bytes: Buffer): void {
   mkdirSync(DIR, { recursive: true })
   writeFileSync(join(DIR, 'hypernova.apk'), bytes)
@@ -218,7 +218,7 @@ test('an older or equal release is ignored, without downloading its APK', async 
   assert.equal(published, 0)
 })
 
-test('a local build with a higher versionCode (hnctl apk, a dev build) is never replaced by a release', async () => {
+test('a local build with a higher versionCode (an admin\'s, a dev build) is never replaced by a release', async () => {
   const dev = Buffer.from('dev build 900')
   localApk(900, dev)
   publishRelease('v0.6.0', 300, Buffer.from('release 300'))
@@ -247,7 +247,7 @@ test('the ETag is sent again: an unchanged release is a 304, and a later local r
   publishRelease('v0.6.0', 300, apk)
   const c = checker()
   assert.equal((await c.check()).kind, 'not-newer')
-  // `hnctl apk-clear`: nothing offered any more, and the same release (304) is now newer.
+  // Taken away by hand: nothing offered any more, and the same release (304) is now newer.
   rmSync(DIR, { recursive: true, force: true })
   assert.equal((await c.check()).kind, 'published')
   assert.equal(hits.conditional, 1)
@@ -335,7 +335,7 @@ test('a connected phone hears {t:"app"} when the offer changes, and nothing whil
   assert.deepEqual(got.slice(before).filter((m) => m.t === 'app'), [{ t: 'app', app: { versionCode: 700, versionName: '0.7.0' } }])
   // Said once: the same offer again says nothing.
   announceApp()
-  // An admin taking it away (`hnctl apk-clear`): the phones hear null.
+  // An admin taking it away: the phones hear null.
   rmSync(DIR, { recursive: true, force: true })
   announceApp()
   await waitFor(() => got.slice(before).filter((m) => m.t === 'app').length === 2)
