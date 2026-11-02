@@ -1,7 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // Hypernova daemon entry point.
 import { log, VERSION, API_PORT, LOCAL_PORT } from './util.ts'
-import { broadcast, discover, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'
+import { broadcast, discover, discoverOlder, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'
 import { pollStatusLine } from './services.ts'
 import { ensureProjectsRoot } from './files.ts'
 import { announceApp, appInfo, startServers } from './http.ts'
@@ -39,6 +39,8 @@ refreshShell()
 refreshHooks()
 refreshClaudeCommands()
 discover()
+// The rest of what /resume would offer, for History, without holding the start up.
+void discoverOlder().then((n) => n && log('history: read', n, 'older conversations')).catch((e) => log('history: reading older conversations failed', e))
 // Codex's threads Hypernova knows (codex/sessions.ts), before the terminals link to them.
 restoreCodex()
 scanTerms()

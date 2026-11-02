@@ -6,7 +6,8 @@
 import { test, after, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -128,7 +129,9 @@ process.env.HYPERNOVA_LAN_PORT = '0'
 
 const hub = await import('../src/hub.ts')
 const { addDevice, settings } = await import('../src/store.ts')
-const { answerMenu, attachAgentsTerm, attachDrifted, attachWaitingJobs, createAgentsSession, createSharedSession, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
+const { answerMenu, attachAgentsTerm, attachDrifted, attachWaitingJobs, createAgentsSession, createSharedSession, endTermAndWait, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
+const { setDeleted } = await import('../src/deleted.ts')
+const { setReplaced } = await import('../src/rewound.ts')
 const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
 const { heldReady, promptSession, startServers } = await import('../src/http.ts')
 const { askAside } = await import('../src/aside.ts')
@@ -294,6 +297,7 @@ test('parseAgentList: the background jobs of claude agents --json --all, nothing
 
 test('applyAgentList: every job is a session, finished and stopped ones too, with its job id; a job gone from the list ends', () => {
   settings.claudeAgents = true
+  transcript('agents-done-1')
   hub.applyAgentList([
     { id: 'eeee0001', sessionId: 'agents-done-1', cwd: scratch, name: 'Finished one', state: 'done', startedAt: 1000 },
     { id: 'eeee0002', sessionId: 'agents-blocked-1', cwd: scratch, name: 'Stopped on a question', state: 'blocked', startedAt: 1000 },
@@ -1274,7 +1278,7 @@ test('the owner’s Stop and Delete from the phone: no job.died, whatever the jo
   assert.deepEqual(feed, [])
 })
 
-// ── Delete for every finished session (docs/PROTOCOL.md, "Session menu") ──────
+// ── Off Home, back from History (docs/PROTOCOL.md, "Session menu", "History") ──────
 
 /** A transcript on disk for session [id], as Claude Code leaves it. */
 function transcript(id: string): void {
@@ -1283,24 +1287,31 @@ function transcript(id: string): void {
   writeFileSync(join(dir, `${id}.jsonl`), JSON.stringify({ type: 'user', cwd: scratch, sessionId: id, timestamp: new Date().toISOString(), message: { role: 'user', content: 'hello' } }) + '\n')
 }
 
-test('Delete: a finished session that is no job goes for good, its transcript left; a restart’s look doesn’t bring it back', async () => {
+test('Remove: a finished session that is no job goes to History, its transcript left, and stays there through a restart’s look', async () => {
   const removed: string[] = []
-  hub.addClient({ send: (s) => { const m = JSON.parse(s); if (m.t === 'session.removed') removed.push(m.id) } })
+  const heard: any[] = []
+  hub.addClient({ send: (s) => { const m = JSON.parse(s); if (m.t === 'session.removed') removed.push(m.id); if (m.t === 'session' && m.session.id === 'delete-plain-1') heard.push(m.session) } })
   for (const id of ['delete-plain-1', 'delete-kept-1']) transcript(id)
   hub.discover()
-  assert.equal(hub.getSession('delete-plain-1')?.state, 'ended')
-  assert.equal(hub.getSession('delete-kept-1')?.state, 'ended')
+  // An SDK-less idle one at rest on Home: it leaves Home by this, not by already being ended.
+  hub.upsertSession('delete-plain-1', { state: 'idle' })
   const r = await del('/v1/sessions/delete-plain-1')
   assert.equal(r.status, 200, JSON.stringify(r.json))
-  assert.deepEqual(r.json, { ok: true })
-  assert.equal(hub.getSession('delete-plain-1'), undefined)
-  assert.ok(removed.includes('delete-plain-1'))
+  assert.equal(r.json.ok, true)
+  assert.equal(r.json.session.state, 'ended', 'the answer says where it is now')
+  assert.equal(hub.getSession('delete-plain-1')?.state, 'ended')
+  assert.ok(!removed.includes('delete-plain-1'), 'no client is told it has gone')
+  assert.equal(heard.at(-1).state, 'ended', 'every client hears it ended')
   assert.ok(existsSync(join(process.env.CLAUDE_CONFIG_DIR!, 'projects', 'delete-tests', 'delete-plain-1.jsonl')), 'the transcript stays')
   hub.discover()
-  assert.equal(hub.getSession('delete-plain-1'), undefined, 'not back from its transcript')
+  assert.equal(hub.getSession('delete-plain-1')?.state, 'ended', 'still in History after a restart’s look')
   assert.ok(hub.getSession('delete-kept-1'), 'another one is untouched')
-  assert.ok(!hub.listSessions().some((s) => s.id === 'delete-plain-1'))
-  assert.equal((await del('/v1/sessions/delete-plain-1')).json.error.code, 'no_session')
+  assert.ok(hub.listSessions().some((s) => s.id === 'delete-plain-1'))
+  // Nothing late about it puts it back on Home.
+  hub.upsertSession('delete-plain-1', { state: 'idle' })
+  hub.setState('delete-plain-1', 'working', 'Thinking')
+  assert.equal(hub.getSession('delete-plain-1')?.state, 'ended')
+  assert.equal((await del('/v1/sessions/delete-plain-1')).status, 200, 'asked again it stays put')
 })
 
 test('Delete: an idle session with a shared terminal closes the terminal first', async () => {
@@ -1317,7 +1328,7 @@ test('Delete: an idle session with a shared terminal closes the terminal first',
   const r = await del(`/v1/sessions/${id}`)
   assert.equal(r.status, 200, JSON.stringify(r.json))
   assert.equal(termAlive(tid!, null), false, 'the terminal closed')
-  assert.equal(hub.getSession(id), undefined)
+  assert.equal(hub.getSession(id)?.state, 'ended')
 })
 
 test('Delete: refused with the reason for a terminal Hypernova doesn’t hold and for one at work; nothing is forgotten', async () => {
@@ -1345,19 +1356,19 @@ test('Delete: refused with the reason for a terminal Hypernova doesn’t hold an
   assert.ok(hub.getSession('delete-plain-2'))
 })
 
-test('Delete: what its stopped claude says on the way out doesn’t bring it back; `claude --resume` does', async () => {
+test('Remove: what its stopped claude says on the way out doesn’t bring it back; `claude --resume` does', async () => {
   const sid = 'delete-resume-1'
   hub.upsertSession(sid, { cwd: scratch, origin: 'terminal', state: 'ended' })
   assert.equal((await del(`/v1/sessions/${sid}`)).status, 200)
   hub.upsertSession(sid, { cwd: scratch })
-  assert.equal(hub.getSession(sid), undefined, 'a late word about it finds nothing')
+  assert.equal(hub.getSession(sid)?.state, 'ended', 'a late word about it leaves it in History')
   const p = spawn('sleep', ['30'], { stdio: 'ignore' })
   procs.push(p)
   const entry = join(registry, `${p.pid}.json`)
   // A claude started before the delete: on its way out.
   writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: sid, cwd: scratch, kind: 'interactive', status: 'idle', startedAt: Date.now() - 60_000, updatedAt: Date.now() }))
   hub.pollRegistry()
-  assert.equal(hub.getSession(sid), undefined)
+  assert.equal(hub.getSession(sid)?.state, 'ended')
   // Started since: resumed by hand, an ordinary session again.
   writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: sid, cwd: scratch, kind: 'interactive', status: 'idle', startedAt: Date.now() + 1000, updatedAt: Date.now() }))
   hub.pollRegistry()
@@ -1365,17 +1376,165 @@ test('Delete: what its stopped claude says on the way out doesn’t bring it bac
   rmSync(entry)
 })
 
-test('Delete: a job goes with claude rm, and its transcript, which claude rm leaves, doesn’t bring it back', async () => {
+test('Remove: a job goes with claude rm to History, and a list read before the rm doesn’t put it back on Home', async () => {
   settings.claudeAgents = true
   transcript('delete-job-1')
-  hub.applyAgentList([{ id: 'dele0001', sessionId: 'delete-job-1', cwd: scratch, state: 'done' }])
+  const job = { id: 'dele0001', sessionId: 'delete-job-1', cwd: scratch, state: 'done', startedAt: Date.now() - 60_000 }
+  hub.applyAgentList([job])
+  assert.equal(hub.getSession('delete-job-1')?.state, 'idle', 'a finished job is on Home')
   const from = verbsSince(0).length
   const r = await del('/v1/sessions/delete-job-1')
   assert.equal(r.status, 200, JSON.stringify(r.json))
   assert.deepEqual(verbsSince(from), ['rm dele0001'])
-  assert.equal(hub.getSession('delete-job-1'), undefined)
+  assert.equal(hub.getSession('delete-job-1')?.state, 'ended')
+  assert.equal(hub.view(hub.getSession('delete-job-1')!).agentJob, undefined)
+  hub.applyAgentList([job])
+  assert.equal(hub.getSession('delete-job-1')?.state, 'ended', 'that list was read before the rm')
   hub.discover()
-  assert.equal(hub.getSession('delete-job-1'), undefined)
+  assert.equal(hub.getSession('delete-job-1')?.state, 'ended')
+  // Started since (`claude --resume <id> --bg`, /resume in the agent view): on Home again.
+  hub.applyAgentList([{ ...job, state: 'working', startedAt: Date.now() + 1000 }])
+  assert.equal(hub.getSession('delete-job-1')?.state, 'starting')
+  hub.applyAgentList([])
+  assert.equal(hub.getSession('delete-job-1')?.state, 'ended', 'a `claude rm` in a terminal: to History too')
+})
+
+test('Home mirrors `claude agents`: every job it lists, a stopped one included, even one whose SessionEnd came before its process went', async () => {
+  settings.claudeAgents = true
+  transcript('mirror-job-1')
+  const p = spawn('sleep', ['30'], { stdio: 'ignore' })
+  procs.push(p)
+  const entry = join(registry, `${p.pid}.json`)
+  writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: 'mirror-job-1', cwd: scratch, kind: 'bg', jobId: 'mirr0001', status: 'idle', startedAt: Date.now(), updatedAt: Date.now() }))
+  const job = { id: 'mirr0001', sessionId: 'mirror-job-1', cwd: scratch, state: 'working', startedAt: Date.now() }
+  hub.applyAgentList([job])
+  hub.pollRegistry()
+  assert.equal(hub.getSession('mirror-job-1')?.state, 'idle')
+  // `claude stop`: its SessionEnd hook, then its process and registry entry go.
+  hub.setState('mirror-job-1', 'ended')
+  rmSync(entry)
+  await new Promise<void>((ok) => { p.once('exit', () => ok()); p.kill() })
+  hub.pollRegistry()
+  hub.applyAgentList([{ ...job, state: 'stopped' }])
+  assert.equal(hub.getSession('mirror-job-1')?.state, 'idle', 'still listed, so still on Home')
+  hub.applyAgentList([])
+})
+
+test('Home mirrors `claude agents`: a job resumed with no prompt waits on nothing; a shell job that leaves the list leaves no History row', async () => {
+  settings.claudeAgents = true
+  transcript('mirror-job-2')
+  const jobDir = join(process.env.CLAUDE_CONFIG_DIR!, 'jobs', 'mirr0002')
+  mkdirSync(jobDir, { recursive: true })
+  writeFileSync(join(jobDir, 'state.json'), JSON.stringify({ state: 'working', tempo: 'blocked', needs: 'send a prompt to start' }))
+  hub.applyAgentList([{ id: 'mirr0002', sessionId: 'mirror-job-2', cwd: scratch, state: 'blocked', startedAt: Date.now() }])
+  assert.equal(hub.getSession('mirror-job-2')?.state, 'idle')
+  assert.equal(hub.getSession('mirror-job-2')?.question ?? null, null)
+  hub.applyAgentList([])
+  // `claude --bg --exec`: a row with no conversation behind it, which Claude Code drops by itself.
+  hub.applyAgentList([{ id: 'mirr0003', sessionId: 'mirror-shell-1', cwd: scratch, state: 'done', startedAt: Date.now() }])
+  assert.equal(hub.getSession('mirror-shell-1')?.state, 'idle')
+  hub.applyAgentList([])
+  assert.equal(hub.getSession('mirror-shell-1'), undefined)
+  assert.equal(hub.getSession('mirror-job-2')?.state, 'ended')
+})
+
+test('Resume from History: a removed session goes on as a job under its own id with no prompt, its line gone from the file', async () => {
+  settings.claudeAgents = true
+  hooks.installIntegration()
+  const sid = 'feedbeef-0000-4000-8000-000000000001'
+  transcript(sid)
+  hub.discover()
+  hub.upsertSession(sid, { state: 'idle', title: 'A conversation' })
+  assert.equal((await del(`/v1/sessions/${sid}`)).status, 200)
+  assert.ok(Object.hasOwn(JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'deleted-sessions.json'), 'utf8')), sid))
+  assert.equal(hub.getSession(sid)?.state, 'ended')
+  const r = await post(`/v1/sessions/${sid}/resume`, {})
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.id, sid)
+  assert.equal(r.json.forked, false)
+  assert.notEqual(r.json.session.state, 'ended')
+  assert.equal(r.json.session.title, 'A conversation', 'it keeps its name')
+  assert.equal(r.json.session.agentJob, 'feedbeef', 'a prompt typed now goes through claude attach')
+  const args = readFileSync(join(process.env.FAKE_AGENTS_DIR!, 'bg-args'), 'utf8').trim()
+  assert.match(args, new RegExp(`^--bg --resume ${sid} --name A conversation`))
+  assert.ok(!args.split(' ').includes('--'), 'no prompt')
+  assert.ok(!Object.hasOwn(JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'deleted-sessions.json'), 'utf8')), sid))
+  // The list hasn't caught up yet: the job isn't taken for gone.
+  hub.applyAgentList([])
+  assert.notEqual(hub.getSession(sid)?.state, 'ended')
+  hooks.uninstallIntegration()
+})
+
+test('Resume from History: refused while its folder is gone, and it stays in History; a session that went on elsewhere or runs just answers', async () => {
+  transcript('delete-gone-1')
+  hub.upsertSession('delete-gone-1', { cwd: join(scratch, 'worktree-gone'), state: 'ended' })
+  assert.equal((await del('/v1/sessions/delete-gone-1')).status, 200)
+  const gone = await post('/v1/sessions/delete-gone-1/resume', {})
+  assert.equal(gone.status, 409)
+  assert.equal(gone.json.error.code, 'folder_gone')
+  assert.equal(hub.getSession('delete-gone-1')?.state, 'ended')
+  assert.equal((await post('/v1/sessions/no-such-one/resume', {})).json.error.code, 'no_session')
+  hub.upsertSession('delete-live-1', { cwd: scratch, state: 'idle' })
+  const live = await post('/v1/sessions/delete-live-1/resume', {})
+  assert.equal(live.status, 200)
+  assert.equal(live.json.session.state, 'idle')
+})
+
+test('Resume from History: not a job on another provider, nor with the setting off: a shared terminal on the same id, off the removed list too', async () => {
+  settings.claudeAgents = false
+  hooks.installIntegration()
+  const sid = randomUUID()
+  transcript(sid)
+  hub.discover()
+  assert.equal((await del(`/v1/sessions/${sid}`)).status, 200)
+  const r = await post(`/v1/sessions/${sid}/resume`, {})
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.state, 'starting')
+  const { args } = await restartHolderArgs(sid)
+  assert.ok(args.includes('--resume') && args.includes(sid), args.join(' '))
+  settings.claudeAgents = true
+  hooks.uninstallIntegration()
+  const tid = await new Promise<string | null>((ok) => { scanTerms(); ok(termOf(sid)) })
+  if (tid) await endTermAndWait(tid)
+})
+
+test('History reaches what /resume would offer: older than the start’s look, from any project, removed ones whatever /resume makes of them; never a rewind’s, nor -p runs; search finds them', async () => {
+  const dir = join(process.env.CLAUDE_CONFIG_DIR!, 'projects', 'older-tests')
+  mkdirSync(dir, { recursive: true })
+  const line = (id: string, extra: object = {}) => JSON.stringify({ parentUuid: null, type: 'user', cwd: scratch, sessionId: id, entrypoint: 'cli', uuid: randomUUID(), timestamp: '2026-01-01T00:00:00.000Z', message: { role: 'user', content: `needleword from ${id}` }, ...extra }) + '\n'
+  const old = (id: string, text: string) => {
+    const p = join(dir, `${id}.jsonl`)
+    writeFileSync(p, text)
+    const t = new Date(Date.now() - 200 * 24 * 3600_000)
+    utimesSync(p, t, t)
+  }
+  old('older-plain-1', line('older-plain-1'))
+  old('older-print-1', line('older-print-1', { entrypoint: 'sdk-cli' }))
+  old('older-side-1', line('older-side-1', { isSidechain: true }))
+  old('older-removed-1', line('older-removed-1', { entrypoint: 'sdk-cli' }))
+  old('older-rewound-1', line('older-rewound-1'))
+  setDeleted('older-removed-1', null)
+  setReplaced('older-rewound-1', 'older-plain-1', null)
+  const resynced: number[] = []
+  const stop = hub.addClient({ send: () => {}, resync: () => resynced.push(hub.listSessions().length) })
+  const heard: string[] = []
+  const stop2 = hub.addClient({ send: (s) => { const m = JSON.parse(s); if (m.t === 'session') heard.push(m.session.id) } })
+  hub.discover()
+  assert.equal(hub.getSession('older-plain-1'), undefined, 'not in the start’s look: 200 days old')
+  assert.ok((await hub.discoverOlder()) >= 2)
+  assert.equal(hub.getSession('older-plain-1')?.state, 'ended')
+  assert.equal(hub.getSession('older-plain-1')?.title, 'needleword from older-plain-1')
+  assert.equal(hub.getSession('older-removed-1')?.state, 'ended', 'removed: always in History')
+  assert.equal(hub.getSession('older-print-1'), undefined, '/resume doesn’t offer a -p run')
+  assert.equal(hub.getSession('older-side-1'), undefined, 'nor an agent’s transcript')
+  assert.equal(hub.getSession('older-rewound-1'), undefined, 'a rewind’s stays hidden')
+  assert.equal(resynced.length, 1, 'one snapshot for the lot')
+  assert.ok(!heard.includes('older-plain-1'), 'no message for each')
+  assert.equal(await hub.discoverOlder(), 0, 'read once')
+  stop()
+  stop2()
+  const found = await get('/v1/history/search?q=needleword')
+  assert.deepEqual(found.json.results.map((x: { id: string }) => x.id).sort(), ['older-plain-1', 'older-removed-1'])
 })
 
 // ── Restart session (docs/PROTOCOL.md, "Session menu") ───────────────────────

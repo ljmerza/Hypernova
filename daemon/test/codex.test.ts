@@ -395,33 +395,32 @@ test('the session menu’s Stop on a Codex session interrupts its turn; Restart 
   }
 })
 
-test('the session menu deletes a Codex session with Codex’s own thread/delete, and Hypernova forgets it', async () => {
-  const id = (await call('POST', '/v1/sessions', { agent: 'codex', projectPath: project, prompt: 'delete me' })).body.session.id
+test('Remove from list takes a Codex session to History with its thread left in Codex; History’s tap has it back on Home, no turn started', async () => {
+  const id = (await call('POST', '/v1/sessions', { agent: 'codex', projectPath: project, prompt: 'remove me' })).body.session.id
   await until(() => session(id)?.state === 'idle')
-  // A Codex that can't delete: refused, and nothing is forgotten.
-  const real = codex.handlers['thread/delete']!
-  codex.handlers['thread/delete'] = () => {
-    throw { code: -32600, message: 'Invalid request: unknown variant `thread/delete`' }
-  }
-  try {
-    const old = await call('DELETE', `/v1/sessions/${id}`)
-    assert.equal(old.status, 409)
-    assert.equal(old.body.error.code, 'codex_too_old')
-    assert.ok(session(id))
-  } finally {
-    codex.handlers['thread/delete'] = real
-  }
+  const deletes = codex.count('thread/delete')
   const r = await call('DELETE', `/v1/sessions/${id}`)
   assert.equal(r.status, 200, JSON.stringify(r.body))
-  assert.deepEqual(r.body, { ok: true })
-  assert.equal((await codex.waitFor('thread/delete', (p) => p.threadId === id)).params.threadId, id)
-  assert.equal(session(id), undefined)
-  assert.equal(threadsFile().some((t) => t.id === id), false)
-  assert.equal((await call('DELETE', `/v1/sessions/${id}`)).status, 404)
-  assert.equal(codex.count('thread/archive'), 0, 'deleted, not archived')
+  assert.equal(r.body.ok, true)
+  assert.equal(r.body.session.state, 'ended')
+  assert.equal(session(id)?.state, 'ended', 'in History')
+  assert.equal(codex.count('thread/delete'), deletes, 'nothing is deleted in Codex')
+  assert.equal(codex.count('thread/archive'), 0, 'nor archived')
+  assert.equal(threadsFile().some((t) => t.id === id), true)
+  const turns = codex.count('turn/start')
+  const back = await call('POST', `/v1/sessions/${id}/resume`, {})
+  assert.equal(back.status, 200, JSON.stringify(back.body))
+  assert.notEqual(back.body.session.state, 'ended')
+  assert.equal(session(id)?.state, 'idle', 'on Home')
+  assert.equal(codex.count('turn/start'), turns, 'no turn')
+  // Taken off Home again, a prompt typed into it brings it back too.
+  assert.equal((await call('DELETE', `/v1/sessions/${id}`)).status, 200)
+  assert.equal(session(id)?.state, 'ended')
+  assert.equal((await call('POST', `/v1/sessions/${id}/prompt`, { text: 'once more' })).status, 200)
+  await until(() => session(id)?.state === 'idle' || session(id)?.state === 'working')
 })
 
-test('a Codex session Codex never wrote down is only forgotten by Delete, and renamed in Hypernova', async () => {
+test('a Codex session Codex never wrote down goes to History by Remove, and is renamed in Hypernova', async () => {
   const real = codex.handlers['turn/start']!
   codex.handlers['turn/start'] = () => {
     throw { code: -32603, message: 'nope' }
@@ -440,8 +439,8 @@ test('a Codex session Codex never wrote down is only forgotten by Delete, and re
   const deletes = codex.count('thread/delete')
   assert.equal((await call('DELETE', `/v1/sessions/${id}`)).status, 200)
   assert.equal(codex.count('thread/delete'), deletes, 'nothing of Codex’s to delete')
-  assert.equal(session(id), undefined)
-  assert.equal(threadsFile().some((t) => t.id === id), false)
+  assert.equal(session(id)?.state, 'ended')
+  assert.equal((await call('POST', `/v1/sessions/${id}/resume`, {})).body.session.state, 'idle', 'its next prompt starts it')
 })
 
 test('a Codex thread deleted elsewhere (`codex delete` in a terminal) goes from Hypernova too', async () => {

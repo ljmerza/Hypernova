@@ -3,7 +3,8 @@
 // or found in a shared terminal; prompted, stopped and set up over Codex's app-server. A thread
 // is never resumed before Codex has written it down (docs/specs/codex-app-server.md, 1.2).
 import { randomUUID } from 'node:crypto'
-import { ensureParsed, forgetSession, getSession, loadHistory, notice, putEvent, setState, upsertSession } from '../hub.ts'
+import { ensureParsed, forgetSession, getSession, loadHistory, notice, putEvent, removeFromHome, setState, upsertSession } from '../hub.ts'
+import { deletedOf, undelete } from '../deleted.ts'
 import { promptTitle, queueView, unsentPrompts, type QueueEntry } from '../normalize.ts'
 import { splitAttachments } from '../attachments.ts'
 import { log, trimText } from '../util.ts'
@@ -41,7 +42,7 @@ onCodexConnected(() => {
   // Those that may be running (a terminal's, one the phone started just before a restart) are
   // followed again: Codex sends a thread's approvals only to the clients on it.
   const now = Date.now()
-  for (const t of listThreads()) if (getSession(t.id)?.term || (t.started && now - t.lastActivityAt < RECENT_MS)) void join(t.id).catch(() => {})
+  for (const t of listThreads()) if (!deletedOf(t.id) && (getSession(t.id)?.term || (t.started && now - t.lastActivityAt < RECENT_MS))) void join(t.id).catch(() => {})
   for (const [id, w] of waiting) void followTerminal(id, w.cwd, w.origin).catch(() => {})
 })
 
@@ -420,24 +421,28 @@ function forgetCodex(id: string): void {
 }
 
 /**
- * Delete: Codex's own thread/delete, for good (`codex delete`: gone from `codex resume` too), then
- * Hypernova forgets it. A turn running is stopped first. A thread Codex never wrote down has
- * nothing to delete there: Hypernova only forgets it.
+ * Off Home (the Session menu's Remove from list): a turn running stops and the thread goes to History.
+ * It stays in Codex, so `codex resume` finds it too; nothing here calls thread/delete any more.
  */
-export async function deleteCodex(id: string): Promise<void> {
+export async function removeCodex(id: string): Promise<void> {
   const t = getThread(id)
   if (!t || !getSession(id)) throw new CodexError(404, 'no_session', 'That session no longer exists.')
-  if (t.started) {
-    const c = await rpc()
-    if (runningTurn(id)) await interruptCodex(id).catch(() => {})
-    try {
-      await c.call('thread/delete', { threadId: id })
-    } catch (e) {
-      if (unknownMethod(e)) throw new CodexError(409, 'codex_too_old', 'This Codex can’t delete conversations. Run `codex update`.')
-      throw new CodexError(502, 'codex_refused', (e as Error).message)
-    }
-  } else if (joined.has(id)) void connected()?.call('thread/unsubscribe', { threadId: id }).catch(() => {})
-  forgetCodex(id)
+  if (runningTurn(id)) await interruptCodex(id).catch(() => {})
+  leave(id)
+  removeFromHome(id, null)
+}
+
+/**
+ * History's tap: the thread again, followed as one the phone opened is, and on Home. A thread Codex
+ * never wrote down has nothing to join: its next prompt starts it.
+ */
+export async function resumeCodex(id: string): Promise<void> {
+  const t = getThread(id)
+  if (!t || !getSession(id)) throw new CodexError(404, 'no_session', 'That session no longer exists.')
+  undelete(id)
+  if (t.started) await join(id, true)
+  if (getSession(id)?.state === 'ended') upsertSession(id, { state: 'idle', activity: null })
+  upsertSession(id, { lastActivityAt: Date.now() })
 }
 
 // Deleted elsewhere (`codex delete` in a terminal): Hypernova forgets it too.

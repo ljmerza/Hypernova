@@ -956,6 +956,17 @@ test('POST …/continue on a claude agents job: “I’m back” typed in', asyn
   await until('the continue typed', () => typed('bck00001').includes("I'm back. Please continue where you left off."))
 })
 
+test('DELETE …/{id}, POST …/resume: off Home into History, and back', async () => {
+  const id = 'sess-history'
+  hub.upsertSession(id, { cwd, origin: 'terminal', state: 'idle', title: 'Parked for now', createdAt: 1800000000000, lastActivityAt: 1800000000000 })
+  contract('rest-session-remove', await ok(call('DELETE', `/v1/sessions/${id}`)))
+  assert.equal(hub.getSession(id)?.state, 'ended')
+  assert.ok((await ok(get('/v1/snapshot'))).sessions.some((s: { id: string }) => s.id === id), 'still listed, for History')
+  contract('rest-session-resume', await ok(post(`/v1/sessions/${id}/resume`, {})))
+  assert.notEqual(hub.getSession(id)?.state, 'ended')
+  assert.equal((await refused(post('/v1/sessions/no-such/resume', {}), 404)).error.code, 'no_session')
+})
+
 test('GET …/usage and …/todos: the chat’s strip and its to-do list', async () => {
   contract('rest-session-usage', await ok(get(`/v1/sessions/${MAIN}/usage`)))
   contract('rest-session-todos', await ok(get(`/v1/sessions/${MAIN}/todos`)))
