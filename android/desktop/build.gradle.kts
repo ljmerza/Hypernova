@@ -84,10 +84,29 @@ dependencies {
     testImplementation(libs.okhttp.tls)
 }
 
-// `./gradlew :desktop:run` (docs/DEV-SETUP.md, "The desktop app"). Installers come later (docs/LATER.md, L105).
+// `./gradlew :desktop:run` (docs/DEV-SETUP.md, "The desktop app"). `:desktop:packageDeb` and
+// `:desktop:createDistributable` build a Linux package and a folder to run, each with its own Java,
+// by hand for now; CI builds nothing yet (docs/LATER.md, L105).
 compose.desktop {
     application {
         mainClass = "com.prudnikweb.hypernova.desktop.MainKt"
+        nativeDistributions {
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb)
+            packageName = "hypernova-client"
+            packageVersion = providers.gradleProperty("desktopVersion").getOrElse("0.22.0")
+            description = "A desktop client for Hypernova servers"
+            vendor = "Leonardo Merza"
+            licenseFile.set(rootProject.file("../LICENSE"))
+            // The whole runtime, not a guessed list of modules: pairing needs TLS and its EC keys.
+            includeAllModules = true
+            linux {
+                iconFile.set(project.file("icons/hypernova-client.png"))
+                packageName = "hypernova-client"
+                debMaintainer = "ljmerza@users.noreply.github.com"
+                menuGroup = "Development"
+                shortcut = true
+            }
+        }
     }
 }
 
