@@ -56,7 +56,7 @@ expect "its control fields" "$(dpkg-deb -f "$NEW")" '^Package: hypernova-server$
 listing="$(dpkg-deb -c "$NEW")"
 expect "its files: the release in /usr/lib, the setup command, all root's" "$listing" \
   'root/root .* \./usr/lib/hypernova-server/daemon/src/main\.ts$' 'root/root .* \./usr/lib/hypernova-server/scripts/install-linux\.sh$' \
-  '^-rwxr-xr-x root/root .* \./usr/bin/hypernova-server-setup$' '\./usr/lib/hypernova-server/LICENSE$' '\./usr/share/doc/hypernova-server/copyright$'
+  '^-rwxr-xr-x root/root .* \./usr/bin/hypernova-server-setup$' '\./usr/lib/hypernova-server/LICENSE$' '\./usr/lib/hypernova-server/NOTICE$' '\./usr/share/doc/hypernova-server/copyright$'
 refuse "nothing outside those folders, no node_modules" "$listing" '\./(etc|home|root|var|lib/systemd|usr/lib/systemd)/|node_modules'
 refuse "no file owned by the packer" "$listing" "$(id -un)/"
 
