@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.data
 
 /** How an approval ended, as the daemon reported it (`approval.resolved`). */

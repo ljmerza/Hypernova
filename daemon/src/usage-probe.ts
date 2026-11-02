@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The usage probe: the weeks some models have of their own (Fable 5.1, Sonnet), which Claude
 // Code's status line doesn't report (2.1.302: only `five_hour` and `seven_day`) but its /usage
 // screen shows. docs/PROTOCOL.md, "Per-model weeks". The same screen's 5-hour and all-models rows

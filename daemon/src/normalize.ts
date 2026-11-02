@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Claude Code transcript lines and Agent SDK messages → Hypernova events (docs/PROTOCOL.md).
 import { basename, dirname } from 'node:path'
 import { tail, trimText } from './util.ts'

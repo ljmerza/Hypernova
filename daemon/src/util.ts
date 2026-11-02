@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Paths, logging and small helpers shared by the daemon.
 import { appendFileSync, statSync, closeSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, writeFileSync, chmodSync, existsSync } from 'node:fs'
 import { homedir, hostname } from 'node:os'

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The permission-mode route: a session the daemon runs can switch to Bypass, a shared terminal
 // only when it was started with bypass allowed, and the snapshot says which before the tap.
 import { test, before, after } from 'node:test'

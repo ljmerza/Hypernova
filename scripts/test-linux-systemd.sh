@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Modified by Leonardo Merza, 2026. See NOTICE.
 # Hypernova's systemd user service, end to end, in Docker (docs/LINUX.md, "The service"): an Ubuntu
 # 24.04 machine with systemd as its first process and a normal user with sudo, like a fresh VPS.
 # It installs from a tarball (scripts/pack-linux.sh) the documented way, as that user and with no

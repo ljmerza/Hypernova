@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova
 
 Hypernova lets you run Claude Code agents on your own Linux server and drive them from an Android

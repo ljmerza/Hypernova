@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <!-- The widget: "Needs you" across every paired computer, a list that scrolls. 4×3 by default, as
      small as 3×2 and as tall as you like. No update period: the app pushes every real change itself,
      and redraws a picture that goes out of date by itself with a non-waking alarm

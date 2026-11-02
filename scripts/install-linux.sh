@@ -17,6 +17,7 @@
 #   3. then `hypernova setup`, which installs the daemon, Claude Code (Anthropic's installer), the
 #      hooks, the shell integration and the systemd service.
 # Nothing listens on a public port: phones use the local route (47323, mutual TLS) on your network.
+# Modified by Leonardo Merza, 2026. See NOTICE.
 set -euo pipefail
 
 FROM=""

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The phone's files (docs/PROTOCOL.md, "Files"): which folders it may browse (`session.browsable`),
 // listings (huge folders cut, secrets and outside links marked), a file to view or download
 // (ranges, names, types), previews that never serve keys, and error codes the phone acts on.

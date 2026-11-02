@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Claude Code hooks for sessions started in a terminal, and the reversible integration
 // installer (hooks in ~/.claude/settings.json + a status line tap).
 import { existsSync, mkdirSync, readFileSync, copyFileSync, statSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs'

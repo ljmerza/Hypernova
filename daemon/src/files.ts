@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The phone's files (docs/PROTOCOL.md, "Files"): which folders it may browse, the listing, a file
 // to view or download, and why not when it can't, in codes it can act on.
 //

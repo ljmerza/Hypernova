@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Codex as a second agent (docs/PROTOCOL.md, "Codex"; docs/specs/codex-app-server.md), end to end
 // through the daemon's routes against a stand-in for Codex's app-server, on scratch state.
 import { test, before, after } from 'node:test'

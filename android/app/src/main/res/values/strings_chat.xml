@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <resources>
     <!-- The chat's quick wins: the usage strip, Claude's to-do list, a message's long-press menu and quick prompts (their own file, apart from the app's strings). -->
     <string name="chat_err_mac">Couldn\'t reach your Mac. Check that it\'s online.</string>

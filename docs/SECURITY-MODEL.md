@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Security model
 
 What runs where, what data lives where, who can reach what, and what is still not closed. This is

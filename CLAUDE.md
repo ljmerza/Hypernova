@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova
 
 A control room for Claude Code: a native Android app and a daemon on a Linux server,

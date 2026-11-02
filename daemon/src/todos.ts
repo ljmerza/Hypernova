@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Claude's to-do list in a session (docs/PROTOCOL.md, "Session usage and the to-do list"), as its
 // own tool calls left it: the TodoWrite list it last wrote, or the tasks it made with TaskCreate
 // and moved on with TaskUpdate (Claude Code's newer task list). The phone pins it over the

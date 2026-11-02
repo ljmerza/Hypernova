@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The daemon as a systemd user service on Linux, the counterpart of the Mac's LaunchAgent (launchd.ts): started
 // at boot without anyone logged in (lingering), restarted when it fails, and stopped on its own when
 // asked, leaving the shared terminals' holders (the owner's Claude sessions) running, as launchd

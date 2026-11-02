@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // A computer with Codex and no Claude Code (docs/PROTOCOL.md, "Codex", Which agent leads): the
 // snapshot says Claude Code isn't here, a session with no agent named goes to Codex, the phone turns
 // Codex on and off, and Statistics count Codex's turns, split per agent.

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Codex sessions (docs/PROTOCOL.md, "Codex"): started from the phone, an automation or a switch,
 // or found in a shared terminal; prompted, stopped and set up over Codex's app-server. A thread
 // is never resumed before Codex has written it down (docs/specs/codex-app-server.md, 1.2).

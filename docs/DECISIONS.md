@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Decisions
 
 These are product decisions agreed with the owner on 2026-10-13. Change them

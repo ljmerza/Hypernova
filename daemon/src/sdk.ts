@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Claude Code's Agent SDK (@anthropic-ai/claude-agent-sdk), loaded the first time something needs
 // it. It is Anthropic's ("All rights reserved"), so the Mac app doesn't carry it: Setup fetches the
 // version the lockfile pins from npm into the installed daemon, once (docs/DECISIONS.md, "Going

@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Security
 
 Hypernova is alpha software (see the README). This page says what it can do to your computer,

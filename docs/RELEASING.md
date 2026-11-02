@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Releasing
 
 How a release of Hypernova is made: the client (the Android APK), the server's packages, and the

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Modified by Leonardo Merza, 2026. See NOTICE.
 # Packs Hypernova's daemon for a Linux server: dist/linux/hypernova-<version>.tar.gz, holding the
 # daemon's sources and lockfile (no node_modules: the install builds them for the server), the font
 # it draws the terminal with, and the install script. Then, on the server:

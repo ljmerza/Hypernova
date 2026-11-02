@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Third-party notices
 
 Hypernova is Apache-2.0 (`LICENSE`, `NOTICE`). It uses the following software, each under its own

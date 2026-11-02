@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Two HTTP servers on loopback: the phone API (phones reach the same routes through the LAN
 // listener, lan.ts) and the local API for the Mac app, Claude Code hooks and the testing checklist.
 import { isImmediateCommand, listCommands } from './commands.ts'

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The Claude account behind the built-in provider: whether Claude can reply, and why not (a usage
 // limit, credit run out, signed out, the plan's end, a hold), as one Account the phone and the
 // Mac show; other providers' trouble (Provider.status); signing in again from the phone (a login

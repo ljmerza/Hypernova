@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Hypernova daemon entry point.
 import { log, VERSION, API_PORT, LOCAL_PORT } from './util.ts'
 import { broadcast, discover, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'

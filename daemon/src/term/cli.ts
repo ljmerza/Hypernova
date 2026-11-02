@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // `hn`: Hypernova's shared terminals from a shell (docs/PROTOCOL.md, "Shared terminals").
 //
 //   hn run [claude args]   what `claude` does in your shell once Hypernova is connected

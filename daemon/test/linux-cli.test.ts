@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The `hypernova` command for Linux (daemon/src/cli/): its arguments, the systemd unit and the
 // launcher it writes, lingering, Node.js picked and downloaded (checksum checked), the QR code, and
 // setup, pair, status, doctor, logs and uninstall run against a stand-in daemon (a small HTTP

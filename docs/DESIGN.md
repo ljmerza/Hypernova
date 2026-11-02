@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Hypernova design system
 
 The base comes from 0stems (atmosphere, colour, type), the structure from

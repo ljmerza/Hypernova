@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The LAN listener (lan.ts, tls.ts; docs/PROTOCOL.md, "Local network (direct HTTPS)"): who gets
 // in, the certificates made once and kept, mutual TLS gating, device certificates issued, replaced
 // and run out, the snapshot's `lan`, the {t:"lan"} message, the pairing limits, a WebSocket over

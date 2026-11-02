@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Statistics (docs/PROTOCOL.md, "Statistics"): how long Claude worked on this Mac, the tokens it
 // used, sessions, prompts, tools, files, agents and usage limits reached, read from Claude Code's
 // own transcripts, plus what only the daemon sees (prompts from the phone, approvals
