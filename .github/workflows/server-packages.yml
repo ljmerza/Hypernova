@@ -4,7 +4,8 @@ name: server-packages
 #
 #   - android-release.yml calls this after it has published a release (attach: true), so a package
 #     that fails here can't stop that release, and costs only its own file. It's also why the release
-#     doesn't wait for the Mac runners.
+#     doesn't wait for the Mac runners. Its checksums job then lists what really came, from here and
+#     from client-packages.yml together.
 #   - a pull request that touches these files, or a manual run: everything is built and tested and
 #     kept as the run's artifacts. Nothing is published. This is how to try a change on GitHub's Macs.
 #
@@ -198,36 +199,3 @@ jobs:
       - name: The tests, with time limits and a summary
         timeout-minutes: 20
         run: node ../scripts/test-with-limits.mjs 300 600 1140
-
-  # SHA256SUMS of what the release really carries, whatever got built, and a line in its notes for
-  # anything that didn't. Runs when a package job failed too: that's when the line matters.
-  checksums:
-    needs: [deb, macos]
-    if: ${{ always() && inputs.attach }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      TAG: ${{ inputs.tag }}
-    steps:
-      - name: SHA256SUMS
-        run: |
-          mkdir sums
-          gh release download "$TAG" --dir sums --pattern '*'
-          rm -f sums/SHA256SUMS
-          (cd sums && sha256sum -- * > SHA256SUMS)
-          cat sums/SHA256SUMS
-          gh release upload "$TAG" sums/SHA256SUMS --clobber
-      - name: Say what's missing
-        run: |
-          missing=""
-          for f in "hypernova-server-$TAG-linux-amd64.deb" "hypernova-server-$TAG-linux-arm64.deb" \
-                   "hypernova-server-$TAG-macos-arm64.tar.gz" "hypernova-server-$TAG-macos-arm64.pkg" \
-                   "hypernova-server-$TAG-macos-x64.tar.gz" "hypernova-server-$TAG-macos-x64.pkg"; do
-            [ -e "sums/$f" ] || missing="$missing \`$f\`"
-          done
-          if [ -n "$missing" ]; then
-            echo "::warning::This release lacks:$missing"
-            { gh release view "$TAG" --json body --jq .body; printf '\n\n**Not built for this release:**%s\n' "$missing"; } | gh release edit "$TAG" --notes-file -
-          fi

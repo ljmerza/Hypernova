@@ -63,7 +63,7 @@ the branch `archive/chatgpt-codex-2026-10-19`: reference only, never merge it.
 
 Releases: `.github/workflows/android-release.yml` builds the signed APK and the Linux server package
 (`scripts/pack-linux.sh`) on each push to `main` that touches the app, the daemon or the install
-scripts, then `server-packages.yml` adds the `.deb`s and the Mac's packages (docs/RELEASING.md). Names
+scripts, then `server-packages.yml` adds the `.deb`s and the Mac's packages, and `client-packages.yml` the desktop client's (docs/RELEASING.md). Names
 say server or client (docs/RELEASING.md, "Names"). There is no Mac app, website or name service in this
 repository, but the server installs on a Mac (`scripts/install-macos.sh`, `daemon/src/cli/launchd.ts`;
 docs/INSTALL.md, "On a Mac"); it has run on GitHub's Mac runners on both processors, not yet on a person's own Mac. The daemon keeps the `/v1/mac/*`

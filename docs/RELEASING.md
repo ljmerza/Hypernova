@@ -1,7 +1,7 @@
 <!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Releasing
 
-How a release of Hypernova is made: the client (the Android APK), the server's packages, and the
+How a release of Hypernova is made: the client (the Android APK and the desktop packages), the server's packages, and the
 GitHub release that carries them. Each section says what to build, how to check it, and what must
 never leak.
 
@@ -12,7 +12,7 @@ Every download says whether it's the server or the client (owner, 2026-11-01):
 | | File | Status |
 |---|---|---|
 | Client | `hypernova-client-vX.Y.Z-android.apk` | built |
-| Client | `hypernova-client-vX.Y.Z-linux-amd64.deb`, `…-macos-arm64.dmg`, `…-windows-x64.msi` | **reserved** for the desktop client, not built yet |
+| Client | `hypernova-client-vX.Y.Z-linux-amd64.deb`, `…-linux-arm64.deb`, `…-linux-x64.tar.gz` (a folder to unpack), `…-macos-arm64.dmg`, `…-macos-x64.dmg`, `…-windows-x64.msi` | built, the desktop client; the Debian package is called `hypernova-client` |
 | Server | `hypernova-server-vX.Y.Z-linux.tar.gz` | built; the name servers update themselves from, and `get.sh`'s |
 | Server | `hypernova-server-vX.Y.Z-linux-amd64.deb`, `…-linux-arm64.deb` | built; the Debian package is called `hypernova-server` |
 | Server | `hypernova-server-vX.Y.Z-macos-arm64.tar.gz`, `…-macos-x64.tar.gz`, `…-macos-arm64.pkg`, `…-macos-x64.pkg` | built |
@@ -22,6 +22,13 @@ Every download says whether it's the server or the client (owner, 2026-11-01):
 The `hypernova` command on a server keeps its name: it's used
 everywhere, and renaming it would break every install. The note keeps its name too: it describes the client and
 the server's package together.
+
+**A rename of the desktop client** (Nebrio, later) starts in two lines, `android/desktop/packaging/client-names.sh`: the
+package name, which every file's name also starts with, and the title with a space that a Mac and Windows show. The Gradle
+build, `client-packages.yml`, `release-notes.sh`, `release-not-built.sh` and `test-client-package.sh` all read them. What
+stays: the APK's and the server's names above, which servers look for; Windows' `upgradeUuid` and the Mac's `bundleID`
+in `android/desktop/build.gradle.kts`, which say it's the same app; and the data folders in `DesktopStorage.kt`, so that a
+key already paired isn't stranded. The name in the window is one line of its own, `AppName.kt`.
 
 ## Releases
 
@@ -50,7 +57,12 @@ That job's release is then added to by `.github/workflows/server-packages.yml`, 
 | `deb` (matrix) | `ubuntu-24.04`, `ubuntu-24.04-arm` | `hypernova-server-vX.Y.Z-linux-<arch>.deb`, after `scripts/test-server-deb.sh` on Ubuntu 24.04 and Debian 12 |
 | `macos` (matrix) | `macos-latest` (arm64), `macos-26-intel` (x64) | `hypernova-server-vX.Y.Z-macos-<arch>.tar.gz`, then `.pkg`, each after `scripts/test-macos-smoke.sh` |
 | `macos-unit` | `macos-latest` | nothing: the daemon's whole suite on a Mac, through `scripts/test-with-limits.mjs` (5 minutes a test, 10 a file, 19 the run, and a summary). `continue-on-error` until a run has shown it green; nothing depends on it either way |
-| `checksums` | `ubuntu-latest` | `SHA256SUMS`, from what the release really has, and a line in the notes for anything it lacks. Runs even when a job above failed |
+
+Then `android-release.yml`'s own `checksums` job, on `ubuntu-latest`, once this workflow and `client-packages.yml` have
+both finished, however they finished: `SHA256SUMS`, from what the release really has, and a "Not built" line in the notes for
+anything it lacks (`scripts/release-not-built.sh`). It's one job after both because two would each read the release and
+write the file, and the slower would leave out the other's files. Re-running a failed package job brings it round again, so
+the file is whole and the line goes.
 
 **A failure there can't stop a release.** The APK and the Linux tarball are published before any of it
 starts, and it only runs if they were. The queue for the release moved from the whole run to the `apk` job,
@@ -99,6 +111,76 @@ A Mac doesn't update itself until it's been run on a person's own Mac (`installK
 `daemon/src/server-update.ts`). A whole clip of read aloud, `POST /v1/speech`, hung on that runner's `say`:
 docs/LATER.md, L108.
 
+### The desktop client's packages
+
+`.github/workflows/client-packages.yml`, called like `server-packages.yml` with `needs: apk`, so all of "A failure there
+can't stop a release" holds for it, and tried the same way: a pull request that touches `android/desktop`, `android/shared`
+and so on, or a manual run, attaches nothing and keeps the files and screenshots as the run's artifacts.
+
+| Job | Runner | Attaches, once `scripts/test-client-package.sh` has passed |
+|---|---|---|
+| `linux` (matrix) | `ubuntu-24.04`, `ubuntu-24.04-arm` | `hypernova-client-vX.Y.Z-linux-<arch>.deb`; on amd64 also `…-linux-x64.tar.gz`, the folder `:desktop:createDistributable` makes |
+| `macos` (matrix) | `macos-latest` (arm64), `macos-26-intel` (x64) | `hypernova-client-vX.Y.Z-macos-<arch>.dmg` |
+| `windows` | `windows-latest` | `hypernova-client-vX.Y.Z-windows-x64.msi` |
+
+Each carries its own Java, all of its modules (`includeAllModules`). A package can only be built on its own system. No job
+installs the Android SDK: `:desktop` builds without it, and `ubuntu-24.04-arm` hasn't got one.
+
+**The test** (`scripts/test-client-package.sh`, from `android/`'s `:desktop:probeJar`): it installs on a person's path
+(`apt-get install -y ./x.deb`; the `.dmg` mounted and the `.app` copied to `/Applications`; `msiexec /i … /qn`; the
+tarball unpacked), checks the version and the licences, opens it and waits for its window (Xvfb on Linux, the
+runner's screen elsewhere), says on Linux that with no display it stops, then pairs with the demo server inside the
+installed launcher. `PackageProbe`, which is in no package, goes in by `JAVA_TOOL_OPTIONS=-javaagent:`, so the runtime and the
+jars are those installed, and it has to report a `java.home` inside the install. It makes the EC key, gets the certificate and
+reaches the feed over mutual TLS. The real app is then started on that pairing, and the demo server has to say a
+certified device connected. On Windows a second `.msi` a patch newer goes over the first, and only one entry may be left.
+Then it's removed, and nothing may be left. The screenshots are in the run's artifacts: **look at them**, as a test can't.
+
+To try it on Linux here: in a throwaway `ubuntu:24.04` with `sudo`, `CI=true`, node on the path, `npm ci --ignore-scripts`
+in `daemon/`, and `xvfb xdotool imagemagick openssl`. `--tarball` needs no `CI`, as it installs nothing.
+
+**The versions.** The tag gives `-PdesktopVersion`, and each system takes it its own way (`android/desktop/build.gradle.kts`;
+`./gradlew -q :desktop:packageVersions -PdesktopVersion=…` prints them):
+
+| | v0.23.0 | v0.256.1 | v1.0.0 | Why |
+|---|---|---|---|---|
+| What the app says it is (`AppInfo`, to a server as it pairs) | 0.23.0 | 0.256.1 | 1.0.0 | The release it is |
+| `.deb`, tarball | 0.23.0 | 0.256.1 | 1.0.0 | |
+| `.dmg` (`CFBundleShortVersionString`) | **1**.23.0 | 1.256.1 | **2**.0.0 | jpackage refuses a first number of 0 (`CFBundleVersion.java` in JDK 21). One higher keeps them ordered, with no two releases alike |
+| `.msi` | 0.23.0 | **0.255.65** | 1.0.0 | Windows Installer takes 255.255.65535 at most, and minors are counted quickly here (20 of them from 2026-10-31 to 2026-11-02). From 255 the minor folds into the third number, minor-255 times 64 plus the patch, still ordered. It runs out at 0.1279.0, or at a patch of 64 in that stretch, where the `.msi` fails to build by name and costs only itself; a major step starts it again |
+
+Anything after the numbers (a tag by hand, `v0.30.0-rc1`) stays in the file's name and the app's own version, and not in the package's.
+
+**Windows upgrades** come from one fixed `upgradeUuid`. Never change it, a rename included: every install would stay beside the new one.
+
+**Icons.** `android/desktop/icons/`: `.icns` and `.ico` are checked in, made by `make-icons.py` (Pillow) from the 512 px
+`hypernova-client.png`, a stopgap crop (LATER L120). Run it again when that picture changes.
+
+**The licences.** `:desktop:clientLegal` puts `LICENSE`, `NOTICE`, `THIRD-PARTY-NOTICES.md`, the fonts' licences and
+`packaging/legal/LICENSES-skia-bundled.txt` in every package's `resources/legal` folder, beside the app's jars
+(`/opt/hypernova-client/lib/app/resources/legal` on Linux, `Contents/app/resources/legal` on a Mac, `app\resources\legal` on Windows). The Java carries its own in `legal`
+under its runtime. The other libraries' are inside their jars. What Skiko's native library holds was read from the strings
+in the Linux x64 library: when Skiko moves, look again.
+
+**Unsigned.** There are no secrets, so nothing is signed: what a person sees is in [INSTALL.md, "The desktop client"](INSTALL.md#the-desktop-client).
+Compose signs a Mac's native code ad hoc, with no identity, and not for Gatekeeper. Signing would need:
+
+- **Mac:** a paid Apple Developer Program membership and a **Developer ID Application** certificate (not Installer, as the `.pkg`'s);
+  secrets for it as a base64 `.p12`, its password, and an Apple ID's app-specific password with the team's ID, or an App Store Connect API key; on the runner, a
+  temporary keychain holding the certificate; and Compose's own `macOS { signing { sign.set(true); identity.set("…") } notarization { … } }`, then `:desktop:notarizeDmg`.
+  The app may then need entitlements of its own, for a Java runtime under the hardened runtime: not tried. LATER L119.
+- **Windows:** a code-signing certificate (from a certificate authority, or Azure's Trusted Signing), and `signtool sign` on the
+  launcher before the `.msi` is made and on the `.msi` after. jpackage has no option for it, so that launcher means
+  building from `createDistributable` with a step between. SmartScreen's warning goes with reputation, which a new certificate has to earn. LATER L119.
+
+**What's proven, and how.** Nobody here has a Mac or a Windows PC, and on them it has run nowhere yet:
+
+| Proven | Not yet |
+|---|---|
+| On Ubuntu 24.04 and Debian 13 in containers, amd64, as a user with `sudo`, under Xvfb: the `.deb` and the tarball, all of the test above, with the screenshots looked at (2026-11-02). The `.deb` also with apt's recommended packages off, so what it `Depends` on is enough | **All of the `.dmg` and the `.msi`, the arm64 `.deb`, the job's own steps, and attaching:** until the first run on GitHub's runners |
+| | A person's Mac or Windows: Gatekeeper, SmartScreen, macOS's local network question |
+| | A real Linux desktop's menu entry (a container has no menus) |
+
 ### Versions
 
 Semantic versions, counted from the commits the way semantic-release does it, by
@@ -139,7 +221,9 @@ optional, the subject in the repo's plain style (what changed, in words, no peri
 before, grouped into **Features** (`feat`), **Fixes** (`fix`) and **Other** (the rest, and messages
 without a type), each with its `type(scope):` taken off, then how to install, under **Client** and
 **Server** headings, with the one-line `get.sh` install and the files' own names, and a line saying the
-old-named files are only there for older servers.
+old-named files are only there for older servers. They're written before the desktop and Mac files exist, so
+they name them all; `scripts/release-not-built.sh` then adds a **Not built for this release:** line for what never came, the
+client's under Client and the server's at the end, and takes the line away when a re-run brings the file.
 
 ### Renaming the old releases
 
@@ -273,8 +357,8 @@ scripts/test-macos-smoke.sh --tarball …  # on a Mac runner only: the real Laun
 ```
 
 The licence, `NOTICE` and `THIRD-PARTY-NOTICES.md` travel inside every file: each server package's
-top folder and the APK's `assets/legal/` (a copy there of the root files and of `third_party/`'s
-licences: update them together when a dependency changes). The server packages hold `CHANGES.md` too.
+top folder, the APK's `assets/legal/` (a copy there of the root files and of `third_party/`'s
+licences: update them together when a dependency changes) and each desktop package's `resources/legal`. The server packages hold `CHANGES.md` too.
 Before a release, `scripts/license-notices.sh --check` says whether those copies match and every modified file of the original
 says so (CI's `license-notices` workflow runs it; docs/DECISIONS.md, "The Apache licence's notices").
 

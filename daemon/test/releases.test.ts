@@ -46,7 +46,7 @@ addDevice({ id: 'device', name: 'Pixel', model: 'Pixel 9', createdAt: Date.now()
 const DIR = join(process.env.HYPERNOVA_SUPPORT, 'android')
 
 // ── The fake GitHub ──────────────────────────────────────────────────────
-type Release = { tag: string; note: unknown; apk: Buffer; noAssets?: boolean; names?: 'old' | 'client' | 'both' }
+type Release = { tag: string; note: unknown; apk: Buffer; noAssets?: boolean; names?: 'old' | 'client' | 'both'; desktop?: boolean }
 let release: Release | null = null
 /** An answer to the latest-release call instead of the release (a rate limit, an outage). */
 let latestAnswer: { status: number; headers?: Record<string, string> } | null = null
@@ -74,6 +74,8 @@ function fake(req: IncomingMessage, res: ServerResponse): void {
     }
     const t = release.tag
     const assets = release.noAssets ? [] : [
+      // The desktop client's files, first, as the worst case: nothing of theirs is ever fetched, and this would fail if it were.
+      ...(release.desktop ? ['linux-amd64.deb', 'linux-x64.tar.gz', 'linux-arm64.deb', 'macos-arm64.dmg', 'macos-x64.dmg', 'windows-x64.msi'].map((f) => ({ name: `hypernova-client-${t}-${f}`, size: 3, browser_download_url: `${GH}/dl/no-such-file` })) : []),
       ...(release.names === 'client' || release.names === 'both' ? [{ name: `hypernova-client-${t}-android.apk`, size: release.apk.length, browser_download_url: `${GH}/dl/apk-client` }] : []),
       ...(release.names !== 'client' ? [{ name: `hypernova-${t}.apk`, size: release.apk.length, browser_download_url: `${GH}/dl/apk` }] : []),
       { name: `hypernova-server-${t}-linux.tar.gz`, size: 3, browser_download_url: `${GH}/dl/tgz` },
@@ -180,6 +182,15 @@ test('the client’s name is read first, the old name only when there’s no oth
   publishRelease('v0.7.2', 302, apk)
   assert.equal((await checker().check()).kind, 'published')
   assert.deepEqual([hits.apkClient, hits.apk], [0, 1])
+})
+
+test('the desktop client’s files on a release are never taken for the phone’s or the server’s', async () => {
+  const apk = Buffer.from('the v0.7.3 apk')
+  publishRelease('v0.7.3', 303, apk)
+  release!.names = 'both'
+  release!.desktop = true
+  assert.equal((await checker().check()).kind, 'published')
+  assert.deepEqual(offeredApk(), apk)
 })
 
 test('with no APK on the server yet, the release is the one offered', async () => {

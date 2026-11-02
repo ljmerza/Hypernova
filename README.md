@@ -69,7 +69,8 @@ hypernova pair
 **The client**: install the Android app from the
 [latest release](https://github.com/ljmerza/Hypernova/releases/latest)
 (`hypernova-client-<tag>-android.apk`, Android 10 or later) and scan the QR code `hypernova pair` shows.
-`hypernova doctor` checks every piece if something doesn't work.
+`hypernova doctor` checks every piece if something doesn't work. A small desktop client for Linux, Mac and Windows is on
+each release too; it's unsigned, so a Mac and Windows warn: [`docs/INSTALL.md`, "The desktop client"](docs/INSTALL.md#the-desktop-client).
 
 The server updates itself to new releases (`hypernova auto-update off` turns that off), and the same
 `curl` line updates it by hand. Each release also has the server as a `.deb`
@@ -81,8 +82,8 @@ update itself: [`docs/INSTALL.md`, "On a Mac"](docs/INSTALL.md#on-a-mac).
 
 ## Where it's going
 
-None of this is built yet, and these aren't promises. A desktop client for Linux, Mac and Windows is
-next, so the same control room sits on your desk, then an Apple version and maybe a web version after
+None of this is built yet, and these aren't promises. The desktop client only pairs, lists and approves so
+far; making it the same control room on your desk is next, then an Apple version and maybe a web version after
 that. I also want the phone to control all of each agent's settings instead of today's set list. An
 iPhone version's notifications would have to go through Apple's push, so "no cloud in between" is a
 claim about today's Android app. The server on a Mac is a separate thing and has only run on GitHub's
