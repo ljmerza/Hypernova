@@ -3739,3 +3739,7 @@ The owner: "the Node minimum". The floor moves to the October 2026 security rele
 1. **Each line has its own floor, not one number.** "24.22.1 or newer" would have let in 25.x and 26.0 to 26.12.0, which don't have the fixes. 25 is past its end of life with no October release, so it's out.
 2. **The installers and the doctor stay on 24 and up,** as they were, and the 22 line is only for running from a checkout. A server on an older 24 downloads the newest 24 at its next install or update, and `hypernova doctor` fails until then. The old one is left where it is.
 3. **The download can't land below it.** `pickRelease` skips releases under the floor, and `install-linux.sh` and `install-macos.sh` check the Node they just unpacked. This only matters for a mirror (`HYPERNOVA_NODE_DIST`): `latest-v24.x` is already past it. A new floor is a change in three places, `node.ts`, both scripts' `node_ok` and `engines`, and `test/node-floor.test.ts` holds them together.
+
+## A blank answer to a GET is a failure (owner, 2026-11-02)
+
+`Api.json` read a blank 2xx as `{}`, so a blank `GET /v1/snapshot` (a proxy, a reply cut short) emptied the session list. Now a blank answer to any GET fails with `empty_body`, so the phone keeps what it has and reconnects. Every JSON GET in the daemon goes through `json()` and has a body, so none relies on the old reading. A blank answer to a POST, PUT or DELETE still reads as `{}`: there it says only that it's done, and callers that need more already check for it (`no_session`, `no_url`).

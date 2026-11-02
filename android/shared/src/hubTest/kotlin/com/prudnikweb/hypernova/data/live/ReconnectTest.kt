@@ -1,8 +1,14 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Problem
+import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
+import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
+import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
+import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -78,6 +84,30 @@ class ReconnectTest {
         assertEquals(snaps + 1, daemon.count("GET", "/v1/snapshot"))
         assertEquals(2, daemon.opened.get())
         assertNull(rig.hub.link.problem)
+    }
+
+    @Test fun aBlankSnapshotKeepsTheSessionsAndReconnects() {
+        daemon.snapshot = snapshot(sessions = listOf(session("s1")))
+        rig.connect()
+        assertEquals(listOf("s1"), rig.hub.sessions.map { it.id })
+        val good = daemon.snapshot
+        daemon.on("GET", "/v1/snapshot") { MockResponse().setResponseCode(200) }
+        daemon.closeSocket()
+        rig.until("the blank snapshot is a failure") { rig.hub.link.problem == Problem.Server && rig.hub.link.retryAt != null }
+        assertEquals("the phone keeps what it has", listOf("s1"), rig.hub.sessions.map { it.id })
+
+        daemon.on("GET", "/v1/snapshot") { json(200, good) }
+        rig.advance(30_100)
+        rig.until("linked again") { rig.hub.link.state == LinkState.Connected }
+        assertEquals(listOf("s1"), rig.hub.sessions.map { it.id })
+    }
+
+    @Test fun aBlankAnswerToAPostStillCountsAsDone() {
+        daemon.snapshot = snapshot(sessions = listOf(session("s1")), approvals = listOf(approval("a1", "s1")))
+        rig.connect()
+        daemon.on("POST", "/v1/approvals/a1") { MockResponse().setResponseCode(200) }
+        assertTrue(rig.call { rig.hub.answerApproval("a1", Answer.Allow) })
+        assertEquals(LinkState.Connected, rig.hub.link.state)
     }
 
     @Test fun theRetryHasAnAlarmTooWhichTriesWhenThePhoneSleptThroughTheDelay() {
