@@ -9,6 +9,7 @@
 import { spawn } from 'node:child_process'
 import { isDeepStrictEqual } from 'node:util'
 import { isTable, own } from './agent-settings.ts'
+import { CODEX_MIN } from './codex/binary.ts'
 import { codexBinary, connected } from './codex/client.ts'
 import { changesWhatRuns, cliWords, commandLine, formConfig, loginStart, McpRefused, readLast, rememberLast, forgetLast, runCli, serial, type McpUndo } from './mcp-edit.ts'
 import { factsOf, type ServerFacts } from './mcp-tools.ts'
@@ -31,13 +32,18 @@ export const useCodex = (s: Stand | null) => {
   liveCache = null
 }
 
-function bin(): string {
-  const b = codexBinary().path
-  if (!b) throw new McpRefused(409, 'no_codex', `Codex isn’t installed on this ${MACHINE}.`)
-  return b
+/**
+ * The Codex these routes can run. Older than CODEX_MIN it would fail in ways that say nothing: 0.39.0 has no `plugin`, and no `app-server`, which it
+ * takes for a prompt and stops with "No such device or address", so a status would say only that Codex stopped.
+ */
+export function codexBin(): string {
+  const b = codexBinary()
+  if (!b.path) throw new McpRefused(409, 'no_codex', `Codex isn’t installed on this ${MACHINE}.`)
+  if (!b.ok) throw new McpRefused(409, 'codex_too_old', `The Codex on the ${MACHINE} is ${b.version ? `version ${b.version}` : 'an old one that doesn’t say its version'}. This needs ${CODEX_MIN} or newer, so update Codex there and try again.`, { version: b.version, min: CODEX_MIN })
+  return b.path
 }
 
-const cli = (args: string[]) => (stand.cli ? stand.cli(args) : runCli(bin(), args, HOME))
+const cli = (args: string[]) => (stand.cli ? stand.cli(args) : runCli(codexBin(), args, HOME))
 
 const RPC_MS = 30_000
 
@@ -45,7 +51,7 @@ const RPC_MS = 30_000
 export function withAppServer<T>(work: (req: Req) => Promise<T>): Promise<T> {
   if (stand.rpc) return stand.rpc(work)
   return new Promise<T>((resolve, reject) => {
-    const child = spawn(bin(), ['app-server'], { cwd: HOME, env: childEnv({}), stdio: ['pipe', 'pipe', 'ignore'] })
+    const child = spawn(codexBin(), ['app-server'], { cwd: HOME, env: childEnv({}), stdio: ['pipe', 'pipe', 'ignore'] })
     let next = 1
     let buf = ''
     const waiting = new Map<number, { resolve: (v: any) => void; reject: (e: unknown) => void }>()
@@ -425,7 +431,7 @@ export async function codexReconnect(name: string) {
   return { ok: true, server: status.servers.find((s) => s.name === name) ?? null }
 }
 
-export const codexLogin = (name: string) => loginStart(name, HOME, { bin: bin(), args: ['mcp', 'login', name, '--no-browser'] })
+export const codexLogin = (name: string) => loginStart(name, HOME, { bin: codexBin(), args: ['mcp', 'login', name, '--no-browser'] })
 
 export async function codexLogout(name: string) {
   const r = await cli(['mcp', 'logout', name])

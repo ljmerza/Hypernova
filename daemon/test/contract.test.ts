@@ -1211,6 +1211,10 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       contract('rest-skills-codex', stable(codexSkills))
       useCodex(null)
       useExtrasCli(null)
+      const usual = process.env.HYPERNOVA_CODEX
+      process.env.HYPERNOVA_CODEX = fakeCodexBin(join(scratch, 'old-codex'), '0.39.0')
+      contract('rest-codex-too-old', asServer(await refused(get('/v1/agents/mcp?agent=codex'), 409)))
+      process.env.HYPERNOVA_CODEX = usual
       contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
     }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))

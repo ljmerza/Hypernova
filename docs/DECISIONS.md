@@ -3637,6 +3637,14 @@ The same screens for Codex 0.164.0, for what it really has, checked against the 
 `bearer_token_env_var` is on the form for an HTTP server, as a variable's name, never a token. Fields the form doesn't have carry over on an edit (`enabled_tools`, `disabled_tools`, timeouts, `env_vars`, `cwd`, `env_http_headers`), and show on the page.
 Not on the form, though the CLI has them: `--oauth-client-id`, `--oauth-client-secret`, `--oauth-client-registration`, `--oauth-resource`, `login --scopes`.
 
+## Codex's version on these routes (owner, 2026-11-02)
+
+Two Codexes can be on one machine, here 0.39.0 and 0.164.0 under nvm, and the MCP, plugin and skill routes ran `codexBinary().path` without looking at the version.
+
+1. **The floor is `CODEX_MIN`, the one Hypernova already has, 0.163.0.** There isn't a second number. What these routes use: `codex mcp list --json`, `plugin`, and an `app-server` with `mcpServerStatus/list`, `config/value/write`, `plugin/list`, `skills/list`. Measured: 0.164.0 has all of them; 0.39.0 has `mcp list` alone, says `unexpected argument` to `plugin`, and takes `app-server` for a prompt and stops with "No such device or address". **Those are the only two versions on hand, so the exact first version with all of it isn't known:** one between them could work and be refused. Finding out means fetching others, which wasn't done.
+2. **A refusal, not a failure:** 409 `codex_too_old` with `version` and `min`, on every route, before anything but `--version` runs. One that won't say its version is refused too. The app shows the server's words, as it does any refusal here. They don't say `codex update`, as the older message does: 0.39.0 has no such command.
+3. **Which one runs.** `findCodex` took the first it found: `~/.local/bin`, `/usr/local/bin`, `/usr/bin`, then nvm's Nodes, newest Node first. That goes by the Node's version, not Codex's: 0.39.0 on Node 24 would have beaten 0.164.0 on Node 20. This machine got the right one because 0.164.0 happens to be on the newer Node. **It now takes the newest Codex of those it finds.** `HYPERNOVA_CODEX` still wins as named, and the login shell's PATH is still only asked when none of those places has one, so a newer one only on that PATH isn't seen.
+
 ## Plugins from the phone (2026-11-02)
 
 The owner: "since we're doing MCP management we're going to have to do plugin management as well, adding, removing, etc." Agents & providers › an agent's Settings › Plugins; nothing on the chat screen. Each action is the agent's own command (`claude plugin …`, `codex plugin …`) or Codex's app-server, and what leaves is named fields: `claude plugin list --json` carries a plugin's whole MCP setup, env included, so only its server names are kept.

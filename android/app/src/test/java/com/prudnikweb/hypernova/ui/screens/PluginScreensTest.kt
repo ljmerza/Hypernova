@@ -118,6 +118,14 @@ class PluginScreensTest {
         assertEquals("testmp", sent("/v1/agents/plugins/marketplaces/remove").getString("name"))
     }
 
+    @Test fun anOldCodexIsSaidInPlainWordsOnItsPluginsToo() {
+        hub.fails("GET /v1/agents/plugins", AgentSettingRefused("codex_too_old", "The Codex on the server is version 0.39.0. This needs 0.163.0 or newer, so update Codex there and try again."))
+        rule.setContent { Harness(spy) { PluginsScreen(hub, "codex", onBack = {}, onOpen = { _, _, _, _ -> }, onBrowse = {}) } }
+        rule.waitForIdle()
+        seen("version 0.39.0")
+        seen("0.163.0 or newer")
+    }
+
     @Config(qualifiers = "+h1800dp")
     @Test fun aPluginsPageSaysWhatItBringsAndItsOptionsNeverASecret() {
         hub.on("GET /v1/agents/plugins/detail", DETAIL)

@@ -2781,6 +2781,7 @@ Every entry below can also refuse with what's common to them, not repeated:
 | 400 | `bad_json`, `bad_request` | A body that isn't JSON, or isn't an object |
 | 404 | `no_folder` | A `folder` the daemon doesn't know (An agent's MCP servers, "Folders"). Not for Codex, which doesn't look at it |
 | 409 | `no_claude`, `no_codex` | That agent isn't installed, for a route that runs it |
+| 409 | `codex_too_old` | The Codex found is older than Hypernova's floor (`CODEX_MIN`, 0.163.0), or won't say its version. With `version` (a string, or null) and `min` beside `code` and `message`. It isn't run, except for `--version` |
 | 502 | `cli_failed` | The agent's command failed: its own line, cleaned |
 | 502, 504 | `codex_failed`, `codex_refused`; `too_slow` | Codex's short-lived app-server stopped or refused, or took over 30 s |
 

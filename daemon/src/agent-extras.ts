@@ -9,8 +9,7 @@
 import type { ServerResponse } from 'node:http'
 import { isTable } from './agent-settings.ts'
 import { cliWords, McpRefused, runCli, serial } from './mcp-edit.ts'
-import { codexBinary } from './codex/client.ts'
-import { withAppServer } from './mcp-codex.ts'
+import { codexBin, withAppServer } from './mcp-codex.ts'
 import { askProcess } from './mcp-probe.ts'
 import { folderPath, type McpDeps, agentOf } from './mcp-routes.ts'
 import { claudeConfigFile } from './agent-settings.ts'
@@ -45,8 +44,9 @@ export const useExtrasCli = (f: typeof stand) => {
 }
 
 function binOf(agent: 'claude' | 'codex'): string {
-  const b = agent === 'claude' ? findClaude() : codexBinary().path
-  if (!b) throw new McpRefused(409, agent === 'claude' ? 'no_claude' : 'no_codex', `${agent === 'claude' ? 'Claude Code' : 'Codex'} isn’t installed on this ${MACHINE}.`)
+  if (agent === 'codex') return codexBin()
+  const b = findClaude()
+  if (!b) throw new McpRefused(409, 'no_claude', `Claude Code isn’t installed on this ${MACHINE}.`)
   return b
 }
 const run = (agent: 'claude' | 'codex', args: string[], cwd: string, input?: string, timeout = LIST_MS) => (stand ? stand(agent, args, cwd, input) : runCli(binOf(agent), args, cwd, {}, input, timeout))

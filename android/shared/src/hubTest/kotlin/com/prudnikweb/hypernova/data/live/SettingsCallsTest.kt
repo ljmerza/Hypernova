@@ -116,6 +116,14 @@ class SettingsCallsTest {
         assertFalse(JSONObject(last("POST", "/v1/agents/plugins/uninstall").body).has("confirmRun"))
     }
 
+    @Test fun anOldCodexComesBackAsARefusalInItsOwnWords() {
+        connect()
+        answer("GET", "/v1/agents/mcp", "rest-codex-too-old", 409)
+        val e = rig.call { rig.hub.mcpList("codex") }.exceptionOrNull() as AgentSettingRefused
+        assertEquals("codex_too_old", e.code)
+        assertTrue(e.message!!, e.message!!.contains("0.39.0") && e.message!!.contains("0.163.0"))
+    }
+
     // ─── A session's MCP servers (docs/PROTOCOL.md, "A session's MCP servers") ───
 
     @Test fun aSessionsMcpServersAreReadFromTheRoute() {
