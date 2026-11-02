@@ -101,7 +101,8 @@ class ErrorsTest {
         connect(session("s1", state = "needs_you"), approvals = listOf(approval("a1", "s1")))
         daemon.ok("GET", "/v1/sessions/s1/events", JSONObject().put("events", JSONArray().put(JSONObject().put("id", "ev").put("kind", "approval").put("ts", 1L).put("approvalId", "a1"))))
         rig.hub.opened("s1")
-        rig.until("history") { rig.hub.transcript("s1").isNotEmpty() }
+        // The waiting approval has its card from the snapshot alone: the history is in when its load is over.
+        rig.until("history") { !rig.hub.loadingTranscript("s1") }
         daemon.on("POST", "/v1/approvals/a1") { refusal(409, "already_resolved", "Already resolved") }
         assertTrue("the widget's Allow is done", rig.call { rig.hub.answerApproval("a1", Answer.Allow) })
         assertTrue(rig.hub.pendingApprovals.isEmpty())

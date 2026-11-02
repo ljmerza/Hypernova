@@ -108,6 +108,9 @@ class TestNetwork : NetworkWatcher {
     override fun kind(): NetKind = if (online) NetKind.Wifi else NetKind.None
     override fun words(): String = if (online) "Wi-Fi" else "no network"
     override fun active(): Any? = current.takeIf { online }
+    // This machine's own interfaces aren't the test's: a Docker bridge at .1 looks like a hotspot, and the router then re-checks.
+    override fun subnets(): List<Pair<String, Int>> = emptyList()
+    override fun hotspotGateways(): List<String> = emptyList()
 
     override fun watchLink(onChange: () -> Unit): Watch {
         link += onChange

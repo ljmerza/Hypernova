@@ -123,6 +123,13 @@ object Core {
     private val applyPosted = AtomicBoolean(false)
 
     /**
+     * A new Application: nothing is posted for it yet. Once per process on a phone. Robolectric makes one per
+     * test and drops what was left on the main thread at the last one's end, the note in [announceWrites]
+     * with it, which would otherwise keep every later write from being announced.
+     */
+    fun applicationStarted() = applyPosted.set(false)
+
+    /**
      * Makes state written outside a snapshot (the hub's, from the socket) reach its readers'
      * [androidx.compose.runtime.snapshotFlow]s. Compose UI does this itself (GlobalSnapshotManager),
      * but only once an Activity shows something; a process the system starts for the background

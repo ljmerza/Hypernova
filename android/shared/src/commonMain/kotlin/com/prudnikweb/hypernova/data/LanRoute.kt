@@ -739,7 +739,7 @@ class LanRouter(
             while (isActive) {
                 delay(RoutePolicy.TICK_MS)
                 if (chooser.kind == RouteKind.Local) continue
-                val (net, gateways, look) = withContext(Dispatchers.IO) { Triple(network.kind(), hotspotGateways(), network.active() to phoneSubnets()) }
+                val (net, gateways, look) = withContext(Dispatchers.IO) { Triple(network.kind(), network.hotspotGateways(), network.active() to network.subnets()) }
                 val known = knownAddresses()
                 val near = net == NetKind.Wifi && RoutePolicy.sameSubnet(look.second, chooser.known(known))
                 if (backoff.due(elapsed(), gateways, look.first, near) && chooser.wantsRecheck(net, gateways.isNotEmpty(), known, gateways)) {
@@ -845,10 +845,10 @@ class LanRouter(
             } catch (e: Throwable) {
                 ConnLog.add(ConnKind.Route, ConnResult.Failed, text = "the round stopped: ${e.javaClass.simpleName}")
                 if (round === r) r.decided.complete(RouteReport(System.currentTimeMillis(), NetKind.None, false, emptyList(), null))
-            } finally {
-                r.decided.complete(null)
             }
         }
+        // However it ends, also cancelled before it began (its body never runs then): what waits on it goes on.
+        r.job?.invokeOnCompletion { r.decided.complete(null) }
         return r
     }
 
@@ -861,7 +861,7 @@ class LanRouter(
     private suspend fun runRound(r: Round) {
         val t0 = elapsed()
         // The key store and the interfaces are read off the main thread.
-        val env = withContext(Dispatchers.IO) { Env(pinnedClient(), network.kind(), hotspotGateways(), phoneSubnets(), network.words()) }
+        val env = withContext(Dispatchers.IO) { Env(pinnedClient(), network.kind(), network.hotspotGateways(), network.subnets(), network.words()) }
         val known = chooser.known(knownAddresses())
         val hotspot = env.gateways.isNotEmpty()
         val near = env.net == NetKind.Wifi && RoutePolicy.sameSubnet(env.subnets, known)
