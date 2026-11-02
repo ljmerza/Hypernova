@@ -70,7 +70,7 @@ export const connected = (): CodexRpc | null => (conn?.open ? conn : null)
 /** The connection, made now when there's none (one attempt at a time). Throws a CodexError. */
 export function rpc(): Promise<CodexRpc> {
   if (conn?.open) return Promise.resolve(conn)
-  if (!codexEnabled()) return Promise.reject(new CodexError(409, 'codex_off', 'Codex is turned off for Hypernova. Turn it on in Setup on your computer.'))
+  if (!codexEnabled()) return Promise.reject(new CodexError(409, 'codex_off', 'Codex is turned off for Hypernova. On your computer, run hypernova codex on.'))
   connecting ??= open().finally(() => {
     connecting = null
   })

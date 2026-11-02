@@ -375,7 +375,7 @@ export async function startPlay(b: any, who: string): Promise<{ play: ReturnType
   const text = typeof b?.text === 'string' ? b.text : ''
   if (!text.trim()) throw fail(400, 'empty', 'There’s nothing to read.')
   if (text.length > MAX_PLAY) throw fail(413, 'too_long', `At most ${MAX_PLAY} characters at a time.`)
-  if (who === 'mac') throw fail(400, 'bad_target', 'The Mac app doesn’t play speech.')
+  if (who === 'mac') throw fail(400, 'bad_target', 'The local API doesn’t play speech: only a paired device does.')
   const target = who
   const s = speechState()
   const sessionId = typeof b?.sessionId === 'string' && /^[\w-]{1,80}$/.test(b.sessionId) ? b.sessionId : null
