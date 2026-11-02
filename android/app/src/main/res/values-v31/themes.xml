@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <resources>
     <style name="Theme.Hypernova" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/hn_bg</item>
@@ -6,6 +7,6 @@
         <item name="android:windowLayoutInDisplayCutoutMode">always</item>
         <item name="android:colorAccent">@color/hn_accent</item>
         <item name="android:windowSplashScreenBackground">@color/hn_bg</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 </resources>
