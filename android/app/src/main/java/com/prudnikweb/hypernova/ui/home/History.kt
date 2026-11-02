@@ -278,7 +278,7 @@ private fun HitCard(s: Session, hit: TextHit, now: Long, onClick: () -> Unit, mo
             Seam(
                 label = s.project,
                 after = server,
-                trailContent = { SessionStamp(s.hex, ago(s.updatedAt, now), sessionSaid(res, s.hex, s.updatedAt, now)) },
+                trailContent = { SessionStamp(ago(s.updatedAt, now), sessionSaid(res, s.updatedAt, now)) },
             )
             Spacer(Modifier.height(12.dp))
             HText(s.name, style = Type.heading, color = HN.ink, maxLines = 1)

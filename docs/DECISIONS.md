@@ -3360,3 +3360,7 @@ drawn. What it no longer draws is a guess.
 ## The status line's steps (2026-11-01)
 
 The owner: "for the workflow green bar at the bottom I like to see tiny little dividers for each step." The chat's status line draws a short gap between steps, for a workflow's agents and for to-dos alike: done ones full, the current one breathing, the rest the track. With too many steps to read (each under about three gaps long) it goes back to one line.
+
+## No session id on the cards (2026-11-01)
+
+The owner asked what the two characters on a card were, the start of the session's id, with `1d` reading like an age next to `21d`, and chose to remove them. Home's cards and History's rows show only how long ago; TalkBack says "Active 4 minutes ago." or "Finished …". The session's own header keeps its short id.

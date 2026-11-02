@@ -1168,10 +1168,10 @@ fun SessionCard(
             Seam(
                 label = s.project,
                 after = server?.let { if (offline) stringResource(R.string.servers_tag_offline, it) else it },
-                // Its short id and age as quiet marks, not "c7 · 1m". Completed: when it finished.
+                // Its age as a quiet mark (no short id: owner, 2026-11-01, "1d" read like an age). Completed: when it finished.
                 trailContent = {
-                    if (completed) SessionStamp(s.hex, finishedAgo(s.updatedAt, now), finishedSaid(res, s.hex, s.updatedAt, now))
-                    else SessionStamp(s.hex, ago(s.updatedAt, now), sessionSaid(res, s.hex, s.updatedAt, now))
+                    if (completed) SessionStamp(finishedAgo(s.updatedAt, now), finishedSaid(res, s.updatedAt, now))
+                    else SessionStamp(ago(s.updatedAt, now), sessionSaid(res, s.updatedAt, now))
                 },
                 activity = when {
                     needs -> Activity.Alert
@@ -2194,7 +2194,7 @@ private fun finishedAgo(t: Long, now: Long): String = when (val f = Finished.of(
 }
 
 /** "Session c7, finished 5 minutes ago." */
-private fun finishedSaid(res: android.content.res.Resources, hex: String, t: Long, now: Long): String {
+private fun finishedSaid(res: android.content.res.Resources, t: Long, now: Long): String {
     val ago = when (val f = Finished.of(t, now)) {
         Finished.Now -> res.getString(R.string.meta_ago_now)
         is Finished.Minutes -> res.getQuantityString(R.plurals.meta_ago_minutes, f.n, f.n)
@@ -2202,5 +2202,5 @@ private fun finishedSaid(res: android.content.res.Resources, hex: String, t: Lon
         Finished.Yesterday -> res.getString(R.string.done_ago_yesterday)
         is Finished.Days -> res.getQuantityString(R.plurals.meta_ago_days, f.n, f.n)
     }
-    return res.getString(R.string.meta_finished_said, hex, ago)
+    return res.getString(R.string.meta_finished_said, ago)
 }
