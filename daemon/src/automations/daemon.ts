@@ -1,11 +1,13 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // The automations engine wired to the daemon: its AutoIO (sessions, the account, the disk, one
 // timer), the engine made once, and its taps at start.
+import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { LOCAL_PORT, SUPPORT, log, readJson, writeJson } from '../util.ts'
 import { systemZone } from '../schedule.ts'
-import { broadcast, eventsFor, getSession, getUsage, listSessions, pendingApprovals, tapBroadcast, view } from '../hub.ts'
+import { broadcast, eventsFor, getSession, getUsage, listSessions, pendingApprovals, putEvent, tapBroadcast, view } from '../hub.ts'
+import { automationHold, holdWords } from '../mcp-view.ts'
 import { wentOn } from '../rewound.ts'
 import { getAccount, providerStatus } from '../account.ts'
 import { findProvider, hookSecret, isSdk, settings } from '../store.ts'
@@ -60,6 +62,27 @@ let codexModelList: string[] | null = null
 let timer: NodeJS.Timeout | null = null
 let timerAt = Infinity
 
+/**
+ * An automation's Claude Code session, holding back the project servers nobody approved, and saying so in its chat. In a shared terminal an
+ * unapproved one would stop the run at Claude Code's "New MCP server found" with nobody to answer (measured on 2.1.316); under the SDK it would start (runner.ts holds it there, turn by turn).
+ */
+export async function startHeld(opts: Parameters<typeof createSession>[0], shared: boolean): Promise<string> {
+  const hold = await automationHold(opts.cwd)
+  let sid: string
+  if (shared) {
+    let settingsFile = HOOK_FILE
+    if (hold.names.length) {
+      const names = [...hold.names].sort()
+      settingsFile = join(SUPPORT, `automation-hooks-${createHash('sha256').update(names.join('\0')).digest('hex').slice(0, 16)}.json`)
+      writeJson(settingsFile, { ...readJson<Record<string, unknown>>(HOOK_FILE, {}), disabledMcpjsonServers: names })
+    }
+    sid = createSharedSession({ ...opts, settingsFile, strictMcp: hold.unread })
+  } else sid = createSession(opts)
+  const words = holdWords(hold)
+  if (words) putEvent(sid, { id: `e:${randomUUID()}`, kind: 'notice', ts: Date.now(), text: words, tone: 'warn' })
+  return sid
+}
+
 function daemonIO(): AutoIO {
   writeJson(HOOK_FILE, { hooks: { PermissionDenied: [{ matcher: '*', hooks: [{ type: 'http', url: `http://127.0.0.1:${LOCAL_PORT}/hooks/${hookSecret}`, timeout: 10 }] }] } })
   // A session a rewind replaced is the session that replaced it, for a run or a saved target (rewound.ts).
@@ -78,8 +101,9 @@ function daemonIO(): AutoIO {
       const shared = (await sharedTerminalsAvailable()) && integrationStatus().hooks.installed
       // The SDK's run needs Claude Code's SDK (sdk.ts): without it the step fails at its start, saying why.
       if (!shared) await claudeSdk()
-      return shared ? createSharedSession({ ...opts, settingsFile: HOOK_FILE }) : createSession(opts)
+      return startHeld(opts, shared)
     },
+    heldWords: async (cwd) => holdWords(await automationHold(cwd)),
     async prompt(id, text, afterLimit) {
       if (!ops) return { ok: false, code: 'terminal_busy' }
       return ops.promptSession(wentOn(id), text, afterLimit)

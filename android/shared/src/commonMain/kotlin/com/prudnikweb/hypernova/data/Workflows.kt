@@ -162,6 +162,8 @@ data class RunStep(
     val answer: StepAnswer? = null,
     /** Retry from a later step: taken over from the run it retries. */
     val reused: Boolean = false,
+    /** A start step: what it went without, in the server's words (its folder's MCP servers nobody approved). */
+    val note: String? = null,
 ) {
     val active: Boolean get() = state == Run.RUNNING || state == Run.NEEDS_YOU || state == Run.WAITING
 
@@ -398,6 +400,7 @@ object WorkflowWire {
             exit = o.int("exit"),
             answer = a?.str("text")?.let { StepAnswer(it, a.str("by") ?: "phone", a.long("at") ?: 0L) },
             reused = o.bool("reused"),
+            note = o.str("note")?.takeIf { it.isNotBlank() },
         )
     }
 
@@ -406,6 +409,7 @@ object WorkflowWire {
         .put("quiet", s.quiet).put("sessionIds", JSONArray(s.sessionIds)).put("exit", s.exit ?: JSONObject.NULL)
         .put("answer", s.answer?.let { JSONObject().put("text", it.text).put("by", it.by).put("at", it.at) } ?: JSONObject.NULL)
         .put("reused", s.reused)
+        .also { o -> s.note?.let { o.put("note", it) } }
 
     fun runAsk(o: JSONObject?): RunAsk? {
         if (o == null) return null

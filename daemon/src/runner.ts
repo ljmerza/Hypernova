@@ -34,6 +34,7 @@ import { MACHINE, bypassBlockedByRoot } from './platform.ts'
 import { agentLabel, applyLinks, sdkTask } from './agents.ts'
 import { attachmentReadInput, readsAttachment } from './attachments.ts'
 import { isBuiltinCommand } from './commands.ts'
+import { automationHold, holdArgs } from './mcp-view.ts'
 import { noteDenied } from './denied.ts'
 import { noteHookEvent } from './hookevents.ts'
 import type { AutomationStart } from './terms.ts'
@@ -281,6 +282,8 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
   run.interrupted = false
   run.stopSaid = false
   const sessionOpts = forkFrom ? { resume: forkFrom, forkSession: true, sessionId: id } : exists ? { resume: id } : { sessionId: id }
+  // An automation has nobody to say yes for a project's servers, and under the SDK they'd all count as approved: checked at each turn, so an approval since counts.
+  const hold = m.automation ? holdArgs(await automationHold(m.cwd)) : {}
   const q = query({
     prompt: text,
     options: {
@@ -300,6 +303,7 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
       // Bypass later, from its next turn, without a restart. It starts in the mode chosen.
       allowDangerouslySkipPermissions: !bypassBlockedByRoot(),
       settingSources: ['user', 'project', 'local'],
+      ...(Object.keys(hold).length ? { extraArgs: hold } : {}),
       includePartialMessages: true,
       env: childEnv(providerEnv(provider)),
       pathToClaudeCodeExecutable: claude,

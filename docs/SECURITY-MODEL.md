@@ -168,6 +168,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   from a pull request is ever an argument.
 - **Hook triggers** come from Claude Code's hooks on the hook secret's route, or from the daemon's
   own SDK sessions. Anything on the machine without the secret can't send one.
+- **A project's MCP servers:** a run starts only what the owner has already approved, whichever way it runs (`daemon/test/automation-mcp-e2e.test.ts`: marker files, real Claude Code), and says what it went without. So a `.mcp.json` a pull brought in doesn't run with nobody watching. Its folder's `apiKeyHelper` still does, as in a session there (`docs/DECISIONS.md`, "What an automation may start", 5).
 - **Limits** hold whatever fires them: one run at a time per automation, 2 working and 10 waiting in
   all, 24 runs a day per automation (200 for one that only tells), 10 fires a minute per webhook
   trigger, and the per-run budget.

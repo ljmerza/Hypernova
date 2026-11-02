@@ -879,6 +879,8 @@ export type AutomationStart = {
   appendSystemPrompt?: string
   /** The run's own hooks (PermissionDenied), a settings file passed with --settings. */
   settingsFile?: string
+  /** An automation's run in a folder with a `.mcp.json` that can't be read: no MCP config at all. */
+  strictMcp?: boolean
 }
 
 /**
@@ -924,6 +926,7 @@ export function createSharedSession(o: { cwd: string; providerId?: string; model
     if (o.title) args.push('--name', o.title)
     if (o.appendSystemPrompt) args.push('--append-system-prompt', o.appendSystemPrompt)
     if (o.settingsFile) args.push('--settings', o.settingsFile)
+    if (o.strictMcp) args.push('--strict-mcp-config')
   }
   // What a switch from another agent carried over (switch.ts): at its start, and every resume.
   const context = o.context ?? (o.resume ? getManaged(o.resume)?.context : undefined)

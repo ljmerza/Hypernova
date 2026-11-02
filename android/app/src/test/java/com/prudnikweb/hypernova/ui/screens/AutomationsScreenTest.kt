@@ -140,6 +140,21 @@ class AutomationsScreenTest {
         assertEquals(listOf(str(R.string.wf_not_asking_by, "Not now")), spy.toasts)
     }
 
+    private fun heldRun(vararg steps: com.prudnikweb.hypernova.data.RunStep) = FakeAutomations(AutoSamples.state(list = AutoSamples.list().map { a ->
+        if (a.id == Samples.DEPLOY_GATE) a.copy(lastRun = Samples.run("ru-held", a.id, com.prudnikweb.hypernova.data.Run.DONE).copy(steps = steps.toList())) else a.copy(lastRun = null)
+    }))
+    private val heldWords = "These MCP servers in its folder aren’t approved, so this run goes without them: tiny."
+
+    @Test fun aRunSaysWhatItWentWithoutOnItsStep() {
+        editor(hub(heldRun(com.prudnikweb.hypernova.data.RunStep("st_a", "start", "done", note = heldWords), com.prudnikweb.hypernova.data.RunStep("st_b", "ask", "done"))), Samples.DEPLOY_GATE)
+        rule.onNodeWithText(heldWords).performScrollTo().assertExists()
+    }
+
+    @Test fun aRunWithOneStepSaysWhatItWentWithoutToo() {
+        editor(hub(heldRun(com.prudnikweb.hypernova.data.RunStep("st_a", "start", "done", note = heldWords))), Samples.DEPLOY_GATE)
+        rule.onNodeWithText(heldWords).performScrollTo().assertExists()
+    }
+
     @Test fun aCardOpensItsEditorAndATemplateANewOne() {
         tab(hub())
         // The cards in their order (the ask's run first): the second is Nightly digest.

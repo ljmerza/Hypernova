@@ -108,11 +108,14 @@ class World {
   freeProviders = new Set<string>()
   /** Each provider's model list as read (absent: no list to go by). */
   modelLists: Record<string, string[]> = {}
+  /** What a start says it goes without. */
+  held: string | null = null
 
   io(): AutoIO {
     return {
       now: () => this.now,
       tz: () => MSK,
+      heldWords: async () => this.held,
       start: async (o) => {
         if (this.startFails) throw new Error('Claude Code isn’t installed on this Mac.')
         this.started.push(o)
@@ -390,6 +393,36 @@ test('gates: paused and off record nothing; Run now still runs; overlap is skipp
   e.setEnabled(a.id, false)
   await at(w, e, msk('2026-10-16T11:00') + SEC)
   assert.equal(e.runsPage(a.id, null, 30).length, 2)
+})
+
+test('a start that goes without a server says so on its step every run, and to the phone only when that changes', async () => {
+  const { w, e } = setup()
+  e.create(brief())
+  const WORDS = 'These MCP servers in its folder aren’t approved, so this run goes without them: tiny.'
+  w.held = WORDS
+  await at(w, e, msk('2026-10-16T09:00') + 10 * SEC)
+  assert.equal(w.started.length, 1, 'it still runs')
+  const step = () => e.list()[0]!.lastRun!.steps[0]!
+  assert.equal(step().note, WORDS)
+  const said = () => w.notes().filter((n) => n.text === WORDS)
+  assert.equal(said().length, 1)
+  assert.equal(said()[0].to, 'phone')
+  await finish(w, e, 's-run-1', 'Done.')
+  await at(w, e, msk('2026-10-19T09:00') + 10 * SEC)
+  assert.equal(w.started.length, 2, 'the next one ran')
+  assert.equal(step().note, WORDS, 'each run’s step says it')
+  assert.equal(said().length, 1, 'the phone isn’t told again for the same thing')
+  // Approved since: nothing to say, on the step or to the phone. Should it come back, that's news again.
+  w.held = null
+  await finish(w, e, 's-run-2', 'Done.')
+  await at(w, e, msk('2026-10-20T09:00') + 10 * SEC)
+  assert.equal(w.started.length, 3)
+  assert.equal('note' in step(), false)
+  w.held = WORDS
+  await finish(w, e, 's-run-3', 'Done.')
+  await at(w, e, msk('2026-10-21T09:00') + 10 * SEC)
+  assert.equal(w.started.length, 4)
+  assert.equal(said().length, 2)
 })
 
 test('gates: two at once, ten in line, then queue_full; a queued run starts when a slot frees, or goes stale', async () => {

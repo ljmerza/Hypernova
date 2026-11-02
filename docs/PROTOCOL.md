@@ -1456,6 +1456,7 @@ RunStep = {
   exit: number | null,          // shell
   answer: { text: string, by: "phone" | "mac" | "timeout", at: number } | null,   // ask; "mac": the admin token
   reused: boolean,              // Retry from a later step: taken over from the run it retries
+  note?: string,                // a start: what it went without, in words (its folder's MCP servers nobody approved). Absent when nothing
 }
 
 RunAsk = {
@@ -4561,6 +4562,9 @@ A run that starts a session starts an ordinary shared-terminal session, titled
     it was saved with `confirmPaid` (a run that left out every one says so: "1 session on OpenRouter
     was left alone: it costs money."). Each session it continues goes by its own provider's limit,
     credits and key.
+- **A project's MCP servers.** A run starts only what's approved (An agent's MCP servers, "Status and tools"), under the SDK at each
+  turn, in a shared terminal at its start, through `<support>/automation-hooks-<hash>.json`. It still runs, and says what it went
+  without: the step's `note`, a note to the phone when that changes, a notice in its chat. One the owner turned down isn't said.
 - **Store.** `<support>/automations.json` (0600, written on every change): the definitions, `paused`
   and each one's firing state (the occurrence it last fired for, so one never fires twice, across
   restarts and clock changes). `<support>/automation-runs.json` (0600): the newest 50 runs per

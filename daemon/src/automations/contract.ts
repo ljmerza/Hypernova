@@ -236,6 +236,8 @@ export type RunStep = {
   answer: { text: string; by: AnswerBy; at: number } | null
   /** Retry from a later step: taken over from the run it retries. */
   reused: boolean
+  /** A start step: what it went without, in words (its folder's MCP servers nobody approved). Absent when nothing. */
+  note?: string
 }
 export type AnswerBy = 'phone' | 'mac' | 'timeout'
 /** The question a run waits on (state needs_you); [until]: when its default is taken. */
@@ -485,6 +487,8 @@ export type AutoIO = {
   /** The Mac's time zone now. */
   tz(): string
   start(o: StartSpec): Promise<string>
+  /** What a start in [cwd] will go without, in words; null when nothing. */
+  heldWords?(cwd: string): Promise<string | null>
   prompt(id: string, text: string, afterLimit: boolean): Promise<Sent>
   /** Move a session to another provider first ("Switch provider at the limit"); the id it goes on under. */
   move(id: string, providerId: string): Promise<string>

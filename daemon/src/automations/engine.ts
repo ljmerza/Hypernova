@@ -430,6 +430,8 @@ export class Automations {
   private waits: { automationId: string; sessionId: string; key: string; ask: string | null; due: number }[] = []
   private prevBattery: Battery | null | undefined = undefined
   private loopTold = new Set<string>()
+  /** What each automation last said it went without (sayHeld). */
+  private heldSaid = new Map<string, string>()
   /** The problem each automation's last note was about (tellOnce); gone once it gets past it. */
   private told = new Map<string, string>()
   /**
@@ -1763,6 +1765,19 @@ export class Automations {
     this.told.set(r.automationId, problem)
     this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text, to: 'phone' })
   }
+  /**
+   * What a start goes without: on its step every run, and a note to the phone when that changes, not on every firing.
+   */
+  private sayHeld(r: RunRec, rs: RunStep, words: string | null): void {
+    if (!words) {
+      this.heldSaid.delete(r.automationId)
+      return
+    }
+    rs.note = maskSecrets(words)
+    if (this.heldSaid.get(r.automationId) === words) return
+    this.heldSaid.set(r.automationId, words)
+    this.addNote({ automationId: r.automationId, runId: r.id, name: r.name, text: words, to: 'phone' })
+  }
   /** One note per account episode, for all automations together (a provider removed is the run's own failure, not an episode). */
   private tell(g: { why: string; episode: string; reason?: RunReason }): void {
     if (g.reason === 'no_provider' || this.s.toldFor === g.episode) return
@@ -1919,6 +1934,7 @@ export class Automations {
         const since = this.io.now()
         this.inFlight.add(r.id)
         try {
+          this.sayHeld(r, rs, await this.io.heldWords?.(cwd) ?? null)
           const sid = await this.io.start({
             cwd,
             prompt: fill(st.prompt, r.ctx, { quote: true }),

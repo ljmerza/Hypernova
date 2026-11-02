@@ -326,6 +326,26 @@ export async function heldBack(folder: string): Promise<{ waiting: string[]; rej
   return { waiting, rejected, unread: notRead > 0 }
 }
 
+/** What an automation's run in a folder goes without: nobody is there to say yes, so only what's already approved may start. [waiting]: what it would have asked about. */
+export type McpHold = { names: string[]; waiting: string[]; unread: boolean }
+export async function automationHold(folder: string): Promise<McpHold> {
+  const { waiting, rejected, unread } = await heldBack(folder)
+  return { names: [...waiting, ...rejected], waiting, unread }
+}
+/** That, as flags: the run's own hooks and everything else stay as a session has them. */
+export function holdArgs(h: McpHold): Record<string, string | null> {
+  return { ...(h.names.length ? { settings: JSON.stringify({ disabledMcpjsonServers: h.names }) } : {}), ...(h.unread ? { 'strict-mcp-config': null } : {}) }
+}
+const NAMES_SAID = 8
+/** That, in plain words for the run, or null when it goes without nothing anyone hasn't already turned down. */
+export function holdWords(h: McpHold): string | null {
+  const shown = h.waiting.slice(0, NAMES_SAID).map((n) => maskText(n).slice(0, 64))
+  const more = h.waiting.length - shown.length
+  const said = shown.length ? `These MCP servers in its folder aren’t approved, so this run goes without them: ${shown.join(', ')}${more ? `, and ${more} more` : ''}. Approve them under its agent’s MCP servers for the next run.` : ''
+  const unread = h.unread ? 'A .mcp.json in its folder can’t be read, so this run has no MCP servers at all.' : ''
+  return [said, unread].filter(Boolean).join(' ') || null
+}
+
 /** GET /v1/agents/mcp, for Claude Code: every server in every scope a file says, with what shows on its row. Nothing is started. */
 export async function claudeList(others: readonly string[] = [], file: string = claudeConfigFile(), dirs: { claude?: string } = {}): Promise<McpList> {
   const { root, state } = await readClaudeConfig(file)

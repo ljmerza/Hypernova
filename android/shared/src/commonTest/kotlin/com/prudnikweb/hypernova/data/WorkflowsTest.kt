@@ -117,6 +117,15 @@ class WorkflowsTest {
           "outputs":[],"retryFrom":null,"budgetUsed":{"minutes":1.5,"windowPct":null}}}""",
     )
 
+    @Test fun aStepSaysWhatItWentWithoutWhenItWentWithoutSomething() {
+        val held = WorkflowWire.runStep(JSONObject("""{"id":"st_a","kind":"start","state":"done","note":"These MCP servers aren’t approved."}"""))!!
+        assertEquals("These MCP servers aren’t approved.", held.note)
+        assertEquals("These MCP servers aren’t approved.", WorkflowWire.runStep(WorkflowWire.json(held))!!.note)
+        val plain = WorkflowWire.runStep(JSONObject("""{"id":"st_a","kind":"start","state":"done"}"""))!!
+        assertEquals(null, plain.note)
+        assertFalse(WorkflowWire.json(plain).has("note"))
+    }
+
     @Test fun anAutomationWithSteps() {
         val a = AutomationWire.automation(workflow)!!
         assertEquals(Trigger.Github(hyper, listOf(Trigger.PR_OPENED, Trigger.CHECKS_FAILED), 15), a.trigger)

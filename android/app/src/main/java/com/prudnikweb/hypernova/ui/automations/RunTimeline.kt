@@ -92,6 +92,7 @@ internal fun RunTimeline(hub: Hub, run: Run, a: Automation?, w: Words, now: Long
                 asking = s.state == Run.NEEDS_YOU,
                 last = i == run.steps.lastIndex,
                 onOpen = session?.let { { onOpenSession(it) } },
+                note = s.note,
             )
         }
         if (run.outputs.isNotEmpty() && !run.active) {
@@ -113,7 +114,7 @@ internal fun RunTimeline(hub: Hub, run: Run, a: Automation?, w: Words, now: Long
 }
 
 @Composable
-private fun TimelineRow(name: String, mono: Boolean, line: RunLine, took: String?, atWork: Boolean, last: Boolean, onOpen: (() -> Unit)?, asking: Boolean = false) {
+private fun TimelineRow(name: String, mono: Boolean, line: RunLine, took: String?, atWork: Boolean, last: Boolean, onOpen: (() -> Unit)?, asking: Boolean = false, note: String? = null) {
     val shape = RoundedCornerShape(10.dp)
     Row(
         Modifier
@@ -123,7 +124,7 @@ private fun TimelineRow(name: String, mono: Boolean, line: RunLine, took: String
             // The step at work on a faint wash: mint while it works, amber while it waits for you.
             .then(if (atWork) Modifier.background((if (asking) HN.amber else HN.accent).copy(alpha = 0.07f)) else Modifier)
             .then(if (onOpen != null) Modifier.clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.au_open_run), onClick = onOpen) else Modifier)
-            .semantics(mergeDescendants = true) { contentDescription = listOfNotNull(name, line.text, took, line.late).joinToString(". ") },
+            .semantics(mergeDescendants = true) { contentDescription = listOfNotNull(name, line.text, took, line.late, note).joinToString(". ") },
     ) {
         // The rail: the step's mark, and a hairline down to the next.
         Column(Modifier.width(16.dp).fillMaxHeight().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -135,6 +136,7 @@ private fun TimelineRow(name: String, mono: Boolean, line: RunLine, took: String
             HText(name, style = if (mono) Type.monoSmall else Type.small, color = if (atWork) HN.ink else HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             HText(line.text, style = Type.small, color = line.tone.color(), maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (line.late != null) HText(line.late, style = Type.small, color = HN.inkDim, maxLines = 1)
+            if (note != null) HText(note, style = Type.small, color = HN.amber)
         }
         if (took != null) {
             Spacer(Modifier.width(8.dp))

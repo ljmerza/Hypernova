@@ -99,6 +99,8 @@ internal fun Runs(hub: Hub, a: Automation, w: Words, ctx: SummaryContext, now: L
             val steps = r.steps.size > 1
             val shown = steps && (r.id in opened || (i == 0 && r.id !in closed))
             val used = r.budgetUsed
+            // What a start went without: its step's row says so when the steps show, and this does when they don't.
+            val wentWithout = if (shown) null else r.steps.firstNotNullOfOrNull { it.note }
             RunRow(
                 r, w, now, ctx.zone, askOf(hub, r), providerTrouble(context, hub, a), codex = startsOnCodex(a),
                 onOpen = if (steps) ({
@@ -119,7 +121,12 @@ internal fun Runs(hub: Hub, a: Automation, w: Words, ctx: SummaryContext, now: L
                             used?.let { RunBudget(it, a.budget, Modifier.padding(bottom = 8.dp)) }
                         }
                     })
-                    used != null -> ({ RunBudget(used, a.budget, Modifier.padding(bottom = 8.dp)) })
+                    used != null || wentWithout != null -> ({
+                        Column {
+                            wentWithout?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(bottom = 8.dp)) }
+                            used?.let { RunBudget(it, a.budget, Modifier.padding(bottom = 8.dp)) }
+                        }
+                    })
                     else -> null
                 },
                 onStop = { scope.launch { autos.stop(r.id).onFailure { toast(it.message.orEmpty()) } } },
