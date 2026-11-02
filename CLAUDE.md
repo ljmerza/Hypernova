@@ -8,8 +8,8 @@ in its own star chart look, Atlas (`docs/DESIGN.md`).
 - `docs/LATER.md`: ideas parked "for now". **Whenever the owner says "for now",
   "later" or "not yet" about something, add a row there.** Read it at the start
   of each milestone.
-- `docs/DESIGN.md`: design tokens and effects, ported from 0stems
-  (`~/Programming/0stems`), Hyperscribe and Hypernavigate.
+- `docs/DESIGN.md`: design tokens and effects: Atlas's colours and marks, on a base from 0stems,
+  Hyperscribe and Hypernavigate.
 - `docs/ON-DEVICE.md`: research only, nothing built: Claude Code and the daemon running on the
   phone itself, with no server (a Debian userland under `proot`, not Docker).
 - `docs/INSTALL.md`: the one install guide, for strangers. When setup's steps, their words or the

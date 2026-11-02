@@ -94,7 +94,8 @@ hypernova-server-setup     # as the user who will run the agents
 It puts the release in `/usr/lib/hypernova-server`, declares what `install-linux.sh` would otherwise ask
 `sudo` for, and adds `/usr/bin/hypernova-server-setup`, which runs `install-linux.sh --from` that folder. So
 the install itself is the per-user one on this page: `~/.local/share/hypernova`, your own Node.js, a
-user service, updating itself. Upgrading, removing or purging the package changes none of that.
+user service, updating itself. Upgrading, removing or purging the package changes none of that. Only one
+user's server can run on a machine at a time, because its ports are fixed ([Ports](#ports)).
 
 A release's package by hand, on the server:
 

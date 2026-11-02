@@ -65,7 +65,8 @@ hypernova-server-setup        # as the user who will run the agents, not root
 The package only puts the release in `/usr/lib/hypernova-server` and adds that command: it starts no
 service and touches no home folder. `hypernova-server-setup` is the install above, from that folder, and
 everything after it is the same, including the server updating itself. Upgrading or removing the package
-never touches a server that's already set up: [Uninstall](#uninstall).
+never touches a server that's already set up: [Uninstall](#uninstall). Only one user's server can run on
+a machine at a time, because its ports are fixed.
 
 ### 2. Sign in to Claude Code
 
