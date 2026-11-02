@@ -3869,7 +3869,8 @@ The owner took the coordinator's suggestions on what "Delete takes a session off
    claude, and every tap would have put the session back on Home. Replaces that section's item 5. All
    servers and offline rows the same: a row opens on its own computer.
 2. **Resuming is writing in it,** the way an ended session's chat already had: a prompt from the box
-   (`POST …/prompt`), the same id, in a new shared terminal, back on Home. Its line in
+   (`POST …/prompt`), the same id, in a new shared terminal (one that was a job as a job: see "A resumed
+   job comes back as a job", the same day), back on Home. Its line in
    `deleted-sessions.json` goes then. No button: nothing new on the chat screen.
 3. **It's plain that it isn't running:** the header already says Ended, and the only change on the chat
    screen is the words of the box's existing hint on an ended session, "It isn't running. Write to resume
@@ -3883,6 +3884,17 @@ The owner took the coordinator's suggestions on what "Delete takes a session off
    is no longer for good. Replaces "Smart still keeps a Completed Codex card from swiping" (2026-10-31).
 7. **Left as they are:** no delete for good from the phone, older Codex threads not in History
    (docs/LATER.md); recent `claude -p` and SDK runs stay in History; `claudeAgents` off still hides jobs.
+
+## A resumed job comes back as a job (owner, 2026-11-02)
+
+The main list mirrors `claude agents`, and History works like `/resume`. Item 2 above put every session written in back in a shared terminal, so a job came back on Home and in `claude agents --json` but not on the agents screen. Now one that was a job comes back as a job.
+
+1. **Writing in one that was a job (`POST …/prompt`, settings.claudeAgents on)** takes the path `…/resume` takes: `claude --bg --resume <id> --name <its title>`, then the words through `claude attach`. Same id, same transcript. Everything else, a plain terminal's or a phone session's, stays in a shared terminal. So do a session on another provider and one carrying a switch's context, as `…/resume` already had it.
+2. **How it's known: Claude Code's own stamp, not a list of ours.** Each message a job writes has `sessionKind: "bg"`, measured on 2.1.316: a plain terminal writes none, a job later resumed in a plain terminal keeps its old lines' stamps, and a `--fork-session` copy has none. Keeping a file of job ids was the other choice, but it would miss every job from before it existed, or that came and went while the daemon was down or the setting was off, and it's more state to keep right. `agentJob` can't say, as it goes with `claude rm`.
+3. **The cost of that:** the stamp isn't documented, though the daemon already reads `sessionKind` for /resume's list (`resume-offer.ts`). If Claude Code stops writing it, jobs quietly come back in shared terminals, which is today's behaviour and loses nothing. `test/resume-job-e2e.test.ts` runs the real Claude Code and fails if it does. The whole transcript may be read to answer, but only when someone writes in an ended session.
+4. **One gap, left:** a plain session resumed as a job with no prompt, then removed, wrote no message as a job, so it has no stamp and comes back in a shared terminal.
+5. **What stays:** `folder_gone` and the session staying in History, the words back in the box on any refusal, its line leaving `deleted-sessions.json`. A failure after the job started leaves a job: writing again attaches and doesn't start a second one. A held prompt still never resumes anything.
+6. **It takes longer than a shared terminal's answer,** since the route waits for the job and for `claude attach` to show its box: about 4 s measured here, and the words are in the conversation when it answers.
 
 ## Node's floor (2026-11-02)
 
