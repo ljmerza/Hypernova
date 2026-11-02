@@ -1,0 +1,7 @@
+{
+  "status": 400,
+  "error": {
+    "code": "bad_state",
+    "message": "That isn’t a state for a skill."
+  }
+}

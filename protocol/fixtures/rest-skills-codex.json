@@ -1,0 +1,23 @@
+{
+  "agent": "codex",
+  "folder": "home",
+  "states": [
+    "on",
+    "off"
+  ],
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    }
+  ],
+  "skills": [
+    {
+      "name": "imagegen",
+      "displayName": "Image Gen",
+      "description": "Makes images.",
+      "source": "built-in",
+      "state": "on"
+    }
+  ]
+}

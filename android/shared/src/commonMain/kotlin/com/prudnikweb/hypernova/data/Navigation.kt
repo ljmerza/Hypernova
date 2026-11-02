@@ -37,6 +37,8 @@ sealed interface Route {
     data class PluginPage(val agent: String, val id: String, val scope: String, val folder: String?, val enabled: Boolean) : Route { override val key = "plugin:$agent:$scope:$folder:$id" }
     /** The plugins that can be installed, to search. */
     data class PluginBrowse(val agent: String, val folder: String?) : Route { override val key = "plugin-browse:$agent:$folder" }
+    /** An agent's skills on this server. */
+    data class Skills(val agent: String) : Route { override val key = "skills:$agent" }
     /** Settings › Mac › Connection log (data/ConnLog.kt). */
     data object ConnectionLog : Route { override val key = "connection-log" }
     data class ProviderEdit(val id: String?, val kind: String) : Route { override val key = "provider:${id ?: "new-$kind"}" }

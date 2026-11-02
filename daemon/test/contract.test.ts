@@ -1192,6 +1192,24 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       contract('rest-plugin-detail', await ok(get('/v1/agents/plugins/detail?agent=claude&plugin=hello@testmp')))
       contract('rest-plugin-install-refused', await refused(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user' }), 403))
       contract('rest-plugin-installed', await ok(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user', confirmRun: true })))
+      // Skills: the same stand-ins, and the process's own menu.
+      useProbe(async (_cwd, _waiting, work) =>
+        work({
+          request: async () => ({ response: { skills: [
+            { name: 'mine', display_name: 'mine', description: 'One of mine.', source: 'user', tokens: 5, state: 'on', advertised: true },
+            { name: 'own', display_name: 'own', description: 'Of this folder.', source: 'project', tokens: 8, state: 'off', advertised: false },
+            { name: 'hello:greet', display_name: 'greet', description: 'Says hello.', source: 'plugin', tokens: 4, state: 'on', locked_by: 'plugin', advertised: true },
+          ] } }),
+        } as never),
+      )
+      contract('rest-skills', stable(await ok(get('/v1/agents/skills?agent=claude'))))
+      contract('rest-skill-set', await ok(post('/v1/agents/skills', { agent: 'claude', name: 'mine', state: 'name-only' })))
+      contract('rest-skill-refused', await refused(post('/v1/agents/skills', { agent: 'claude', name: 'mine', state: 'bogus' }), 400))
+      useCodex({ rpc: async (work) => work(async () => ({ data: [{ cwd: '/', skills: [{ name: 'imagegen', description: 'Makes images.', scope: 'system', enabled: true, path: '/never-sent/SKILL.md', interface: { displayName: 'Image Gen', shortDescription: 'Makes images.' } }] }] })) })
+      const codexSkills = await ok(get('/v1/agents/skills?agent=codex'))
+      assert.ok(!JSON.stringify(codexSkills).includes('never-sent'))
+      contract('rest-skills-codex', stable(codexSkills))
+      useCodex(null)
       useExtrasCli(null)
       contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
     }

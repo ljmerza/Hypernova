@@ -129,3 +129,34 @@ suspend fun Hub.marketplaceRemove(agent: String, name: String, folder: String?):
     agentExt("POST", "/v1/agents/plugins/marketplaces/remove", JSONObject().put("agent", agent).put("name", name).at(null, folder), slow = true).map(PluginChange::wire)
 suspend fun Hub.marketplaceUpdate(agent: String, name: String?, folder: String?): Result<PluginChange> =
     agentExt("POST", "/v1/agents/plugins/marketplaces/update", JSONObject().put("agent", agent).also { o -> name?.let { o.put("name", it) } }.at(null, folder), slow = true).map(PluginChange::wire)
+
+/** One skill. [source]: the agent's word for where it's from. [lockedBy]: why it can't be changed here; null: it can. */
+@Immutable
+data class SkillRow(val name: String, val displayName: String?, val description: String?, val source: String?, val state: String, val tokens: Int?, val lockedBy: String?)
+
+/** [states]: what a skill can be set to on this agent. Claude Code has four, Codex two. */
+@Immutable
+data class SkillsReply(val agent: String, val folder: String, val states: List<String>, val skills: List<SkillRow>, val folders: List<McpFolder>) {
+    companion object {
+        const val ON = "on"
+        const val NAME_ONLY = "name-only"
+        const val USER_ONLY = "user-invocable-only"
+        const val OFF = "off"
+
+        fun wire(o: JSONObject) = SkillsReply(
+            agent = o.str("agent") ?: AgentSettingsReply.CLAUDE,
+            folder = o.str("folder") ?: Mcp.HOME,
+            states = McpWire.strings(o.arr("states")),
+            skills = o.arr("skills").mapObjects { s ->
+                val name = s.str("name") ?: return@mapObjects null
+                SkillRow(name, s.str("displayName"), s.str("description"), s.str("source"), s.str("state") ?: ON, s.int("tokens"), s.str("lockedBy"))
+            },
+            folders = PluginsReply.folders(o),
+        )
+    }
+}
+
+suspend fun Hub.skills(agent: String, folder: String?): Result<SkillsReply> =
+    agentExt("GET", "/v1/agents/skills" + McpWire.query("agent" to agent, "folder" to folder), slow = true).map(SkillsReply::wire)
+suspend fun Hub.skillState(agent: String, name: String, folder: String?, state: String): Result<JSONObject> =
+    agentExt("POST", "/v1/agents/skills", JSONObject().put("agent", agent).put("name", name).put("state", state).at(null, folder), slow = true)

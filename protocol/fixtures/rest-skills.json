@@ -1,0 +1,63 @@
+{
+  "agent": "claude",
+  "folder": "home",
+  "states": [
+    "on",
+    "name-only",
+    "user-invocable-only",
+    "off"
+  ],
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    },
+    {
+      "id": "folder-app-parser-fix",
+      "name": "app-parser-fix"
+    },
+    {
+      "id": "folder-notebook",
+      "name": "notebook"
+    },
+    {
+      "id": "folder-sketchpad",
+      "name": "sketchpad"
+    },
+    {
+      "id": "folder-demo",
+      "name": "demo"
+    },
+    {
+      "id": "folder-app",
+      "name": "app"
+    }
+  ],
+  "skills": [
+    {
+      "name": "mine",
+      "displayName": "mine",
+      "description": "One of mine.",
+      "source": "user",
+      "state": "on",
+      "tokens": 5
+    },
+    {
+      "name": "own",
+      "displayName": "own",
+      "description": "Of this folder.",
+      "source": "project",
+      "state": "off",
+      "tokens": 8
+    },
+    {
+      "name": "hello:greet",
+      "displayName": "greet",
+      "description": "Says hello.",
+      "source": "plugin",
+      "state": "on",
+      "tokens": 4,
+      "lockedBy": "plugin"
+    }
+  ]
+}

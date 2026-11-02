@@ -781,6 +781,25 @@ class ContractTest {
             assertNull(c.acceptCommand)
             assertTrue(c.message!!.contains("installed"))
         },
+        "rest-skills" to { o ->
+            val r = SkillsReply.wire(o)
+            assertEquals(listOf(SkillsReply.ON, SkillsReply.NAME_ONLY, SkillsReply.USER_ONLY, SkillsReply.OFF), r.states)
+            val mine = r.skills.single { it.name == "mine" }
+            assertEquals("One of mine.", mine.description)
+            assertEquals("user", mine.source)
+            assertEquals(5, mine.tokens)
+            assertNull(mine.lockedBy)
+            assertEquals(SkillsReply.OFF, r.skills.single { it.name == "own" }.state)
+            assertEquals("plugin", r.skills.single { it.name == "hello:greet" }.lockedBy)
+        },
+        "rest-skills-codex" to { o ->
+            val r = SkillsReply.wire(o)
+            assertEquals(listOf(SkillsReply.ON, SkillsReply.OFF), r.states)
+            assertEquals("Image Gen", r.skills.single().displayName)
+            assertEquals("built-in", r.skills.single().source)
+        },
+        "rest-skill-set" to { o -> assertTrue(o.bool("ok")); assertEquals(SkillsReply.NAME_ONLY, o.str("state")) },
+        "rest-skill-refused" to { o -> assertEquals("bad_state", Api.errorOf(400, o.toString()).code) },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)
