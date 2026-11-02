@@ -33,6 +33,7 @@ on:
       - 'scripts/test-install-macos.sh'
       - 'scripts/test-macos-smoke.sh'
       - 'scripts/test-server-deb.sh'
+      - 'scripts/test-with-limits.mjs'
       - 'daemon/src/cli/**'
       - '.github/workflows/server-packages.yml'
   workflow_dispatch:
@@ -190,7 +191,13 @@ jobs:
           try "$t/f.m4a" afconvert -f m4af -d aac "$t/a.wav" "$t/f.m4a"
       - run: npm ci
       - run: npx tsc -p .
-      - run: npm test
+      # Not plain `npm test`: a run that hung took the job's 25 minutes with it, and every result. Here a
+      # hang fails by name after 5 minutes (the slowest test takes about a minute on a busy machine), its
+      # file stops at 10, and the run at 19, leaving the rest of the job's time to say so (docs/DECISIONS.md,
+      # "A time limit on each of macos-unit's tests"). The step's own limit is only for the script failing to stop.
+      - name: The tests, with time limits and a summary
+        timeout-minutes: 20
+        run: node ../scripts/test-with-limits.mjs 300 600 1140
 
   # SHA256SUMS of what the release really carries, whatever got built, and a line in its notes for
   # anything that didn't. Runs when a package job failed too: that's when the line matters.

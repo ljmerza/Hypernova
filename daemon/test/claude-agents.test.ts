@@ -34,13 +34,17 @@ S="$FAKE_AGENTS_DIR"
 case "$1" in
   --bg)
     echo "$*" > "$S/bg-args"
+    if [ -e "$S/bg-refuses" ]; then echo "Couldn't start" >&2; exit 1; fi
+    # bg-as: "<job> <session id>" for this one, in place of the usual pair.
+    J=feedbeef; I=feedbeef-0000-4000-8000-000000000001
+    if [ -e "$S/bg-as" ]; then read -r J I < "$S/bg-as"; fi
     sleep 30 >/dev/null 2>&1 &
-    printf '{"pid":%s,"sessionId":"feedbeef-0000-4000-8000-000000000001","cwd":"%s","kind":"bg","jobId":"feedbeef","status":"idle","updatedAt":%s000}' "$!" "$PWD" "$(date +%s)" > "$CLAUDE_CONFIG_DIR/sessions/$!.json"
-    echo "backgrounded · feedbeef · fake"
+    printf '{"pid":%s,"sessionId":"%s","cwd":"%s","kind":"bg","jobId":"%s","status":"idle","updatedAt":%s000}' "$!" "$I" "$PWD" "$J" "$(date +%s)" > "$CLAUDE_CONFIG_DIR/sessions/$!.json"
+    echo "backgrounded · $J · fake"
     ;;
   attach)
     echo "$2" > "$S/attached"
-    if [ "$2" = "gone0000" ]; then echo "No background session $2" >&2; exit 1; fi
+    if [ "$2" = "gone0000" ] || [ "$2" = "dead0000" ]; then echo "No background session $2" >&2; exit 1; fi
     # btw*: Claude Code's /btw panel (fixtures/fake-claude-btw.mjs).
     case "$2" in btw*) exec "${process.execPath}" "${join(import.meta.dirname, 'fixtures', 'fake-claude-btw.mjs')}" "$2" ;; esac
     if [ "$2" = "drift000" ]; then printf '\\033]0;Some other session\\007\\n────────────────────\\n❯ \\n────────────────────\\n'; exec sleep 30; fi
@@ -132,7 +136,7 @@ const { addDevice, settings } = await import('../src/store.ts')
 const { answerMenu, attachAgentsTerm, attachDrifted, attachWaitingJobs, createAgentsSession, createSharedSession, endTermAndWait, scanTerms, termOf, watchMenus } = await import('../src/terms.ts')
 const { setDeleted } = await import('../src/deleted.ts')
 const { setReplaced } = await import('../src/rewound.ts')
-const { agentJobCommand, parseAgentList } = await import('../src/claude-agents.ts')
+const { agentJobCommand, parseAgentList, ranAsJob } = await import('../src/claude-agents.ts')
 const { heldReady, promptSession, startServers } = await import('../src/http.ts')
 const { askAside } = await import('../src/aside.ts')
 const { heldOf } = await import('../src/held.ts')
@@ -1536,6 +1540,196 @@ test('Resume from History: not a job on another provider, nor with the setting o
   hooks.uninstallIntegration()
   const tid = await new Promise<string | null>((ok) => { scanTerms(); ok(termOf(sid)) })
   if (tid) await endTermAndWait(tid)
+})
+
+// ── Writing in an ended session that was a job (docs/PROTOCOL.md, "History") ─
+// The real Claude Code doing this: resume-job-e2e.test.ts.
+
+/** A transcript with [lines] (written as they are), for session [id]; its path. */
+function transcriptOf(id: string, ...lines: string[]): string {
+  const dir = join(process.env.CLAUDE_CONFIG_DIR!, 'projects', 'delete-tests')
+  mkdirSync(dir, { recursive: true })
+  const path = join(dir, `${id}.jsonl`)
+  writeFileSync(path, lines.map((l) => l + '\n').join(''))
+  return path
+}
+/** A message as a job writes it. */
+const jobLine = (id: string) => JSON.stringify({ type: 'user', sessionKind: 'bg', cwd: scratch, sessionId: id, timestamp: new Date().toISOString(), message: { role: 'user', content: 'hello' } })
+/** A message as a plain terminal writes it, saying [content]. */
+const plainLine = (id: string, content: unknown = 'hello') => JSON.stringify({ type: 'user', cwd: scratch, sessionId: id, timestamp: new Date().toISOString(), message: { role: 'user', content } })
+const fakeDir = () => process.env.FAKE_AGENTS_DIR!
+const removedLines = () => JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'deleted-sessions.json'), 'utf8'))
+/** The next `--bg` of the stand-in is job [job] of session [id]. */
+const nextBg = (job: string, id: string) => {
+  rmSync(join(fakeDir(), 'bg-args'), { force: true })
+  writeFileSync(join(fakeDir(), 'bg-as'), `${job} ${id}\n`)
+}
+const bgArgs = () => (existsSync(join(fakeDir(), 'bg-args')) ? readFileSync(join(fakeDir(), 'bg-args'), 'utf8').trim() : null)
+/** Taken off Home as a job goes (its `claude rm` having run), in History with its line in the file. */
+async function removedSession(id: string, ...lines: string[]): Promise<void> {
+  transcriptOf(id, ...lines)
+  hub.discover()
+  hub.upsertSession(id, { state: 'idle', title: 'A conversation' })
+  assert.equal((await del(`/v1/sessions/${id}`)).status, 200)
+  assert.equal(hub.getSession(id)?.state, 'ended')
+  assert.ok(Object.hasOwn(removedLines(), id))
+}
+async function endHolderOf(id: string): Promise<void> {
+  scanTerms()
+  const tid = termOf(id)
+  if (tid) await endTermAndWait(tid)
+}
+
+test('ranAsJob: Claude Code’s stamp on a message, anywhere in the file; never the same words inside one, a line that won’t parse, or no file', async () => {
+  assert.equal(await ranAsJob(transcriptOf('stamp-only', jobLine('stamp-only'))), true)
+  // A plain terminal's lines around a job's: it was one, whatever came after.
+  const big = 'x'.repeat(2 * 1024 * 1024)
+  assert.equal(await ranAsJob(transcriptOf('stamp-middle', plainLine('stamp-middle', big), jobLine('stamp-middle'), plainLine('stamp-middle'))), true)
+  assert.equal(await ranAsJob(transcriptOf('stamp-none', plainLine('stamp-none'))), false)
+  // In words the owner wrote, and as a tool's input: JSON all the same, and not the session's own.
+  assert.equal(await ranAsJob(transcriptOf('stamp-words', plainLine('stamp-words', 'what is "sessionKind":"bg" for?'))), false)
+  assert.equal(await ranAsJob(transcriptOf('stamp-input', plainLine('stamp-input', [{ type: 'tool_use', name: 'x', input: { sessionKind: 'bg' } }]))), false)
+  assert.equal(await ranAsJob(transcriptOf('stamp-other', JSON.stringify({ type: 'user', sessionKind: 'daemon' }))), false)
+  assert.equal(await ranAsJob(transcriptOf('stamp-cut', '{"type":"user","sessionKind":"bg"')), false)
+  assert.equal(await ranAsJob(join(scratch, 'no-such-file.jsonl')), false)
+})
+
+test('Writing in an ended session that was a job: a job again under its own id, as …/resume starts one, the words through claude attach, its line gone from the file', async () => {
+  settings.claudeAgents = true
+  hooks.installIntegration()
+  const sid = randomUUID()
+  await removedSession(sid, jobLine(sid))
+  assert.equal(hub.agentJobOf(sid), null, '`claude rm` took its job id')
+  nextBg('effa0001', sid)
+  const r = await post(`/v1/sessions/${sid}/prompt`, { text: 'carry on' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.id, sid)
+  assert.equal(r.json.forked, undefined, 'the same conversation')
+  assert.equal(r.json.session.agentJob, 'effa0001')
+  assert.equal(r.json.session.title, 'A conversation', 'it keeps its name')
+  const args = bgArgs()!
+  assert.match(args, new RegExp(`^--bg --resume ${sid} --name A conversation`))
+  assert.ok(!args.split(' ').includes('--') && !args.includes('carry on'), 'the words aren’t on its command line')
+  assert.equal(readFileSync(join(fakeDir(), 'typed-effa0001'), 'utf8').trim(), 'carry on', 'typed into claude attach')
+  assert.ok(!Object.hasOwn(removedLines(), sid))
+  scanTerms()
+  const holder = await restartHolderArgs(sid)
+  assert.deepEqual(holder.args, ['attach', 'effa0001'], 'no shared terminal running a claude of its own')
+  // Written to again: the job it is now, no second one.
+  rmSync(join(fakeDir(), 'bg-args'))
+  assert.equal((await post(`/v1/sessions/${sid}/prompt`, { text: 'and more' })).status, 200)
+  assert.equal(bgArgs(), null)
+  assert.match(readFileSync(join(fakeDir(), 'typed-effa0001'), 'utf8'), /and more/)
+  await endHolderOf(sid)
+  hooks.uninstallIntegration()
+})
+
+test('Writing in an ended session that was a job: its own mode and effort again, and a copy when Claude Code says it runs somewhere already', async () => {
+  settings.claudeAgents = true
+  hooks.installIntegration()
+  const sid = randomUUID()
+  await removedSession(sid, jobLine(sid))
+  hub.upsertSession(sid, { permissionMode: 'plan', effort: 'high' })
+  const copy = randomUUID()
+  nextBg('effa0002', copy)
+  const r = await post(`/v1/sessions/${sid}/prompt`, { text: 'carry on' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.id, copy)
+  assert.equal(r.json.forked, true)
+  const args = bgArgs()!
+  assert.match(args, /--permission-mode plan/)
+  assert.match(args, /--effort high/)
+  assert.equal(readFileSync(join(fakeDir(), 'typed-effa0002'), 'utf8').trim(), 'carry on')
+  assert.equal(hub.getSession(sid)?.state, 'ended')
+  await endHolderOf(copy)
+  hooks.uninstallIntegration()
+})
+
+test('Writing in an ended session that was no job: a shared terminal as ever, though the words mention the stamp; a job with the setting off too', async () => {
+  settings.claudeAgents = true
+  hooks.installIntegration()
+  const plain = randomUUID()
+  await removedSession(plain, plainLine(plain, 'what is "sessionKind":"bg" for?'))
+  nextBg('effa0003', plain)
+  const r = await post(`/v1/sessions/${plain}/prompt`, { text: 'carry on' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.id, plain)
+  assert.equal(r.json.session.agentJob, undefined)
+  assert.equal(bgArgs(), null, 'no job')
+  assert.ok((await restartHolderArgs(plain)).args.includes('--resume'))
+  assert.ok(!Object.hasOwn(removedLines(), plain))
+  await endHolderOf(plain)
+  // With the setting off, jobs aren't this computer's way: what was one goes in a terminal.
+  const off = randomUUID()
+  await removedSession(off, jobLine(off))
+  settings.claudeAgents = false
+  nextBg('effa0004', off)
+  const o = await post(`/v1/sessions/${off}/prompt`, { text: 'carry on' })
+  assert.equal(o.status, 200, JSON.stringify(o.json))
+  assert.equal(bgArgs(), null, 'no job')
+  assert.ok((await restartHolderArgs(off)).args.includes('--resume'))
+  assert.ok(!Object.hasOwn(removedLines(), off))
+  settings.claudeAgents = true
+  await endHolderOf(off)
+  hooks.uninstallIntegration()
+})
+
+test('Writing in an ended job: not as a job on another provider or with a switch’s context; a held prompt never resumes', async () => {
+  settings.claudeAgents = true
+  hooks.installIntegration()
+  const { saveManaged } = await import('../src/store.ts')
+  const other = randomUUID()
+  await removedSession(other, jobLine(other))
+  saveManaged({ id: other, cwd: scratch, providerId: 'some-provider', model: null, permissionMode: 'default', createdAt: Date.now(), engine: 'term' })
+  nextBg('effa0005', other)
+  await promptSession(other, 'carry on').catch(() => {})
+  assert.equal(bgArgs(), null, 'no job on another provider')
+  await endHolderOf(other)
+  const held = randomUUID()
+  await removedSession(held, jobLine(held))
+  nextBg('effa0006', held)
+  await assert.rejects(promptSession(held, 'carry on', { typeOnly: true }), (e: any) => e.code === 'no_terminal')
+  assert.equal(bgArgs(), null, 'no job for a held prompt')
+  assert.equal(hub.getSession(held)?.state, 'ended')
+  hooks.uninstallIntegration()
+})
+
+test('Writing in an ended job whose folder has gone: folder_gone, no job started, still removed; a job that won’t start or open says so, and a second try doesn’t start another', async () => {
+  settings.claudeAgents = true
+  hooks.installIntegration()
+  const gone = randomUUID()
+  await removedSession(gone, jobLine(gone))
+  hub.upsertSession(gone, { cwd: join(scratch, 'worktree-gone-3') })
+  nextBg('effa0007', gone)
+  const refused = await post(`/v1/sessions/${gone}/prompt`, { text: 'carry on' })
+  assert.equal(refused.status, 409)
+  assert.equal(refused.json.error.code, 'folder_gone')
+  assert.match(refused.json.error.message, /worktree-gone-3/)
+  assert.equal(bgArgs(), null)
+  assert.equal(hub.getSession(gone)?.state, 'ended')
+  assert.ok(Object.hasOwn(removedLines(), gone))
+  // `claude --bg` refuses: a refusal the phone shows, the words back in its box, and it's still in History.
+  const refuses = randomUUID()
+  await removedSession(refuses, jobLine(refuses))
+  writeFileSync(join(fakeDir(), 'bg-refuses'), '')
+  const no = await post(`/v1/sessions/${refuses}/prompt`, { text: 'carry on' })
+  rmSync(join(fakeDir(), 'bg-refuses'))
+  assert.equal(no.status, 409)
+  assert.match(no.json.error.message, /didn’t start the session/)
+  assert.equal(hub.getSession(refuses)?.state, 'ended')
+  // It started, and `claude attach` won't open: a refusal too, and it's a job now, so no second one.
+  const shut = randomUUID()
+  await removedSession(shut, jobLine(shut))
+  nextBg('dead0000', shut)
+  const closed = await post(`/v1/sessions/${shut}/prompt`, { text: 'carry on' })
+  assert.equal(closed.status, 409)
+  assert.equal(closed.json.error.code, 'terminal_busy')
+  assert.equal(hub.agentJobOf(shut), 'dead0000')
+  rmSync(join(fakeDir(), 'bg-args'))
+  assert.equal((await post(`/v1/sessions/${shut}/prompt`, { text: 'carry on' })).json.error.code, 'terminal_busy')
+  assert.equal(bgArgs(), null)
+  rmSync(join(fakeDir(), 'bg-as'))
+  hooks.uninstallIntegration()
 })
 
 test('History reaches what /resume would offer: older than the start’s look, from any project, removed ones whatever /resume makes of them; never a rewind’s, nor -p runs; search finds them', async () => {

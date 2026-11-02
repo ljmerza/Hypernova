@@ -17,7 +17,7 @@ import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { addClient, agentJobOf, answerApproval, removeFromHome, broadcast, clearRestarting, resolveSession, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort, setMode } from './runner.ts'
 import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
-import { agentJobCommand, setClaudeAgents } from './claude-agents.ts'
+import { agentJobCommand, ranAsJob, setClaudeAgents } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
 import { codexModels, codexSessionUsage, codexState, refreshCodexAccount } from './codex/account.ts'
 import { isCodex, isCodexMode } from './codex/threads.ts'
@@ -1439,7 +1439,8 @@ export async function dedupSend<T extends { id: string; queued: boolean; forked?
 /**
  * Send [text] to session [id] the way `POST /v1/sessions/{id}/prompt` does (also its `continue`, and
  * an automation's continue, automations.ts): typed into its shared terminal, queued in the SDK
- * runner, or, with neither, a fork of a session open elsewhere or a resume of one that ended.
+ * runner, or, with neither, a fork of a session open elsewhere or a resume of one that ended (a
+ * `claude agents` job again if it was one, typed into through `claude attach`).
  * Returns where it went (a fork's id), whether it waits in the queue, and (fork or resume) whether
  * it forked. Throws the route's errors: 404 `no_session`, 409 `needs_answer`, `waiting`, `typing`
  * (with `pending`), `starting`, `not_seen`, `not_sent`, `terminal_busy`; with [noFork], 409
@@ -1464,7 +1465,15 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
   // A `claude agents` session: typed in through `claude attach` (the same conversation), never
   // forked; a stopped or finished job too (attach wakes it, as answering it in `claude agents` does).
   // A holder that drifted to another job (attachDrifted) is replaced by attachAgentsTerm.
-  const job = settings.claudeAgents === true && (!tid || attachDrifted(tid, id)) ? agentJobOf(id) : null
+  let job = settings.claudeAgents === true && (!tid || attachDrifted(tid, id)) ? agentJobOf(id) : null
+  // One that ended and was a job (`claude rm` took it off `claude agents`) comes back as a job: started
+  // as `…/resume` starts one, its words typed in through `claude attach` below. A held prompt never resumes.
+  if (!tid && !job && !o.typeOnly && rec.state === 'ended' && !isSdk(id) && mayRunAsJob(id, rec) && (await shared()) && (await ranAsJob(rec.transcriptPath))) {
+    const at = await resumeAsJob(id, rec)
+    // Claude Code says it runs somewhere already: its copy, as a fork of a session open elsewhere.
+    if (at !== id) return { ...(await promptSession(at, text, o)), forked: true }
+    job = agentJobOf(id)
+  }
   if (job) {
     if (pendingApprovals().some((a) => a.sessionId === id)) throw new HttpError(409, 'needs_answer', 'Claude is waiting for your answer above. Answer it first.')
     tid = await attachAgentsTerm(id, rec.cwd, job)
@@ -1520,6 +1529,22 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
 /** An ended session can't resume: the folder it ran in has gone (`claude rm` takes a job's worktree with it). */
 const folderGone = (cwd: string) => new HttpError(409, 'folder_gone', `The folder it ran in is gone from the ${MACHINE}: ${cwd}`)
 
+/** Sessions can be `claude agents` jobs here, and this one can be: not on another provider, whose environment is the holder's to give, nor one that carries a switch's context; and `--resume` needs its transcript. */
+function mayRunAsJob(id: string, rec: NonNullable<ReturnType<typeof getSession>>): boolean {
+  const provider = getManaged(id)?.providerId ?? rec.providerId
+  return settings.claudeAgents === true && (provider == null || provider === 'anthropic') && !getManaged(id)?.context && existsSync(rec.transcriptPath)
+}
+
+/** An ended conversation goes on as a `claude agents` job, with no prompt, as /resume in the agent view: `claude --bg --resume <id> --name <its title>`. Returns the session it runs as (a copy's id when Claude Code says it runs somewhere already). */
+async function resumeAsJob(id: string, rec: NonNullable<ReturnType<typeof getSession>>): Promise<string> {
+  const model = resumeModels.get(id) ?? getManaged(id)?.model ?? undefined
+  const mode = RESTART_MODES.has(rec.permissionMode) ? rec.permissionMode : undefined
+  const effort = isClaudeEffort(rec.effort) ? rec.effort : undefined
+  const at = await createAgentsSession({ cwd: rec.cwd, resume: id, ...(rec.title && rec.title !== 'New session' ? { name: rec.title } : {}), ...(model ? { model } : {}), ...(mode ? { permissionMode: mode } : {}), ...(effort ? { effort } : {}) })
+  resumeModels.delete(id)
+  return at
+}
+
 /**
  * `POST /v1/sessions/{id}/resume`, for a client that resumes with no prompt (the Android app resumes by a prompt, promptSession): the ended conversation runs again under its own id,
  * with no prompt, so no turn and nothing spent, and shows on Home; as /resume in the agent view, a
@@ -1559,11 +1584,8 @@ async function resumeWithoutPrompt(id: string): Promise<{ session: ReturnType<ty
   }
   const model = resumeModels.get(id) ?? getManaged(id)?.model ?? undefined
   const mode = RESTART_MODES.has(rec.permissionMode) ? rec.permissionMode : undefined
-  const provider = getManaged(id)?.providerId ?? rec.providerId
-  const asJob = settings.claudeAgents === true && (provider == null || provider === 'anthropic') && !getManaged(id)?.context && existsSync(rec.transcriptPath)
-  const effort = isClaudeEffort(rec.effort) ? rec.effort : undefined
-  const at = asJob
-    ? await createAgentsSession({ cwd: rec.cwd, resume: id, ...(rec.title && rec.title !== 'New session' ? { name: rec.title } : {}), ...(model ? { model } : {}), ...(mode ? { permissionMode: mode } : {}), ...(effort ? { effort } : {}) })
+  const at = mayRunAsJob(id, rec)
+    ? await resumeAsJob(id, rec)
     : createSharedSession({ cwd: rec.cwd, resume: id, ...(model ? { model } : {}), ...(mode ? { permissionMode: mode } : {}) })
   resumeModels.delete(id)
   return answer(at, at !== id)

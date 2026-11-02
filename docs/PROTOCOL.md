@@ -2101,7 +2101,7 @@ daemon doesn't know.
   - A `claude agents` job is typed into through `claude attach`, a stopped or finished job too
     (attach wakes it), never forked.
   - A session with no shared terminal: open somewhere else, it continues in a fork (`forked: true`,
-    a new shared session); ended, it resumes in place.
+    a new shared session); ended, it resumes in place, as a job if it was one (see History).
   - `hold: true` (without `replace`): held rather than refused while Claude waits on the owner:
     `held: true`, `heldId`, `queued: true`. See Held prompts.
   - `via: "voice"`: the client dictated it (see Statistics).
@@ -7256,6 +7256,20 @@ stop). The name stays for the wire value `endedBy: "mac_restart"`; it applies on
 - **Opening one starts nothing** (`…/events` reads its transcript). **Writing in it resumes it**
   (`…/prompt`): the same id, in a new shared terminal, back on Home; 409 `folder_gone` when the folder it
   ran in has gone, and it stays in History. In the Android app the box's hint says so on an ended session.
+- **What was a job comes back as a job.** Writing in an ended session that was a `claude agents` job,
+  with settings.claudeAgents and on the subscription, starts it as `…/resume` does (`claude --bg --resume
+  <id> --name <its title>`, the same id and transcript, and `claude agents` lists it) and types the words
+  in through `claude attach`, so they're never on a command line. How it's known: Claude Code stamps
+  `sessionKind: "bg"` on each message a job writes (as seen on 2.1.316, not documented), and the daemon
+  reads the transcript for that as it's written in (`ranAsJob`). `agentJob` won't do, as it goes with
+  `claude rm`. The stamp stays through a `claude rm` and on the lines of a job later resumed in a plain
+  terminal; a `--fork-session` copy has none, and nor does a session whose only time as a job took no
+  prompt. No stamp, or a Claude Code that stops stamping: a shared terminal, as for anything else.
+  `forked: true`, a copy's id, when Claude Code says it runs somewhere already. A `claude --bg` that
+  fails is a 409 that says so; one that started but whose `claude attach` didn't open is 409
+  `terminal_busy`, a job by now, so writing again attaches rather than starting another. Not for a held
+  prompt, which only goes into a terminal. A session on another provider or carrying a switch's context
+  goes in a shared terminal.
 - **`POST /v1/sessions/{id}/resume`** resumes with no prompt, so no turn, for a client that wants that.
   With settings.claudeAgents and on the subscription it's a job again (`claude --bg --resume <id>
   --name <its title>`, and `claude agents` lists it), as /resume in the agent view; else a new shared

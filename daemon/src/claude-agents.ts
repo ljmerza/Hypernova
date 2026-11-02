@@ -1,5 +1,6 @@
 import { dbg, dbgProc, exitOf } from './debug-log.ts'
 import { execFile } from 'node:child_process'
+import { open, type FileHandle } from 'node:fs/promises'
 import { findClaude, log, trimText } from './util.ts'
 import { saveSettings, settings } from './store.ts'
 import { applyAgentList, type AgentJob } from './hub.ts'
@@ -59,6 +60,33 @@ export function parseAgentList(out: string): AgentJob[] | null {
   }
   if (!Array.isArray(a)) return null
   return a.filter((o) => o && o.kind === 'background' && typeof o.id === 'string' && typeof o.sessionId === 'string' && typeof o.cwd === 'string')
+}
+
+/**
+ * Whether session's transcript [path] has ever run as a `claude agents` job. `agentJob` only lasts
+ * while `claude agents` lists it, and this outlives `claude rm` and a restart: Claude Code stamps
+ * `sessionKind: "bg"` on each message a job writes. As seen on 2.1.316, undocumented: a plain terminal
+ * stamps nothing, a job resumed in one keeps its old lines' stamps, a `--fork-session` copy has none.
+ * Read as JSON, so the same words in a message or a tool's input don't count. Each line until one
+ * says so, from what can be megabytes of pasted pictures, so only when it's written in. A file that
+ * can't be read, or a Claude Code that no longer stamps, reads as no job: a shared terminal, as ever.
+ */
+export async function ranAsJob(path: string): Promise<boolean> {
+  let file: FileHandle | null = null
+  try {
+    file = await open(path)
+    for await (const line of file.readLines()) {
+      if (!line.includes('"sessionKind"')) continue
+      try {
+        if (JSON.parse(line)?.sessionKind === 'bg') return true
+      } catch {}
+    }
+  } catch {
+    // Unreadable: no job.
+  } finally {
+    await file?.close().catch(() => {})
+  }
+  return false
 }
 
 /**
