@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
-<!-- The chart's plate behind the logo (fx/Atlas.kt): its near-black, and a few of its grid's lines round a pole above. -->
+<!-- The Nebula icon's ground: violet in the middle, falling away to the near-black of the page. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FF060A17" android:pathData="M0,0h108v108h-108z"/>
-    <path android:strokeColor="#26F1E9D6" android:strokeWidth="0.7" android:fillColor="#00000000"
-        android:pathData="M-18,-30a72,72 0,1 1,144 0a72,72 0,1 1,-144 0M-42,-30a96,96 0,1 1,192 0a96,96 0,1 1,-192 0M-66,-30a120,120 0,1 1,240 0a120,120 0,1 1,-240 0M-90,-30a144,144 0,1 1,288 0a144,144 0,1 1,-288 0M54,-30L14,108M54,-30L54,108M54,-30L94,108"/>
+    <path android:pathData="M0,0H108V108H0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="54" android:centerY="54" android:gradientRadius="72">
+                <item android:offset="0" android:color="#FF3A2C86"/>
+                <item android:offset="0.5" android:color="#FF141650"/>
+                <item android:offset="1" android:color="#FF050718"/>
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

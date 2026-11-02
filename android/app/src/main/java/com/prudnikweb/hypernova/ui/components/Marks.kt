@@ -2,12 +2,21 @@ package com.prudnikweb.hypernova.ui.components
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -98,26 +107,53 @@ internal fun DrawScope.turningStar(center: Offset, r: Float, color: Color, spin:
 }
 
 /**
- * The logo's stars, in the 108-unit box the launcher's vectors use, in drawing order: x, y and how far
- * to each point. Bottom left, top left, bottom right, top right, a little out of true, as a plotted
- * figure is. The res/drawable icons repeat these numbers.
+ * The logo's two arms, in the launcher's units round its middle: the front layer of
+ * res/drawable/ic_launcher_foreground.xml, thick at the core and tapering to a point. Built once:
+ * unlike the marks above it's a path, but it never animates, so it's only drawn when its screen is.
  */
-private val logoStars = floatArrayOf(
-    36f, 81f, 6f,
-    39f, 27f, 9.5f,
-    69f, 80f, 7f,
-    73f, 29f, 6f,
-)
-private const val LOGO_LINE = 4f
-private const val LOGO_SPAN = 72f
-private const val LOGO_X = 54.25f
-private const val LOGO_Y = 52.25f
+private val logoArms: Path by lazy {
+    Path().apply {
+        addLogoArm(LOGO_ROT)
+        addLogoArm(LOGO_ROT + 180f)
+    }
+}
+private const val LOGO_ROT = 200f
+private const val LOGO_SWEEP = 235f
+private const val LOGO_R0 = 4f
+private const val LOGO_REACH = 33f
+private const val LOGO_ARM = 10f
+private const val LOGO_POWER = 0.85f
+private const val LOGO_STEPS = 44
+private const val LOGO_CORE = 7.5f
+/** How far out, of [LOGO_REACH], the arms keep the core's colour before they turn towards their tips'. */
+private const val LOGO_SOLID = 0.42f
 
-/** The logo, [extent] across, in the middle of this [DrawScope]. */
-internal fun DrawScope.logo(extent: Float, color: Color) {
-    val k = extent / LOGO_SPAN
-    fun at(i: Int) = Offset(center.x + (logoStars[i * 3] - LOGO_X) * k, center.y + (logoStars[i * 3 + 1] - LOGO_Y) * k)
-    val width = LOGO_LINE * k
-    for (i in 0 until 3) drawLine(color, at(i), at(i + 1), width, StrokeCap.Round)
-    for (i in 0 until 4) diamond(at(i), logoStars[i * 3 + 2] * k, color)
+private fun Path.addLogoArm(rot: Float) {
+    fun halfWidth(t: Float) = LOGO_ARM * (1f - t).pow(0.75f) * min(1f, t / 0.1f + 0.25f)
+    fun radius(t: Float) = LOGO_R0 + (LOGO_REACH - LOGO_R0) * t.pow(LOGO_POWER)
+    fun angle(t: Float) = (rot + LOGO_SWEEP * t) * PI.toFloat() / 180f
+    for (i in 0..LOGO_STEPS) {
+        val t = i / LOGO_STEPS.toFloat()
+        val r = radius(t) + halfWidth(t)
+        val x = r * cos(angle(t))
+        val y = r * sin(angle(t))
+        if (i == 0) moveTo(x, y) else lineTo(x, y)
+    }
+    for (i in LOGO_STEPS downTo 0) {
+        val t = i / LOGO_STEPS.toFloat()
+        val r = max(0f, radius(t) - halfWidth(t))
+        lineTo(r * cos(angle(t)), r * sin(angle(t)))
+    }
+    close()
+}
+
+/** The Nebula, its arms' tips [extent] across, in the middle of this [DrawScope]: [color] at the core, its arms turning to [tip]. */
+internal fun DrawScope.logo(extent: Float, color: Color, tip: Color) {
+    val k = extent / (2f * LOGO_REACH)
+    translate(center.x, center.y) {
+        scale(k, k, Offset.Zero) {
+            drawPath(logoArms, Brush.radialGradient(0f to color, LOGO_SOLID to color, 1f to tip, center = Offset.Zero, radius = LOGO_REACH))
+            drawCircle(color, LOGO_CORE, Offset.Zero)
+        }
+    }
 }
