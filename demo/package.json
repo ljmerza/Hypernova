@@ -1,0 +1,6 @@
+{
+  "name": "hypernova-demo",
+  "private": true,
+  "description": "The demo server for screenshots (README.md). Its packages are the daemon's.",
+  "type": "module"
+}

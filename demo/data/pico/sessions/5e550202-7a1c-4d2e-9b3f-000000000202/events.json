@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "id": "u-1",
+      "kind": "user",
+      "ts": "@now-14m",
+      "text": "Photo uploads restart from zero whenever the signal drops. Make them resume."
+    },
+    {
+      "id": "t-1",
+      "kind": "assistant",
+      "ts": "@now-1m",
+      "streaming": false,
+      "text": "Uploads resume from the last confirmed chunk now. I'm running the upload tests with the simulated bad network."
+    }
+  ],
+  "cursor": "demo-cursor",
+  "full": true
+}

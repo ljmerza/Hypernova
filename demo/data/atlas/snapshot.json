@@ -1,0 +1,1214 @@
+{
+  "mac": {
+    "id": "demo-atlas",
+    "name": "atlas",
+    "daemonVersion": "0.9.2",
+    "claudeVersion": "2.1.318",
+    "projectsRoot": "/home/dev/projects",
+    "app": null,
+    "battery": null,
+    "awake": {
+      "mode": "off",
+      "holding": false,
+      "lidClosedOk": false,
+      "backpackReady": false,
+      "until": null,
+      "extendable": false,
+      "reason": null,
+      "sleepAt": null,
+      "lidClosed": null,
+      "laptop": false,
+      "minBattery": 15,
+      "sleepDisabledBy": null,
+      "otherApp": null
+    },
+    "tz": "America/New_York",
+    "files": {
+      "browseOutsideProjects": false
+    },
+    "update": {
+      "auto": true,
+      "available": false,
+      "reason": null,
+      "state": "idle",
+      "target": null,
+      "last": null,
+      "failure": null
+    },
+    "platform": "linux",
+    "unavailable": {
+      "battery": "Hypernova shows the battery of a Mac only.",
+      "awake": "Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings.",
+      "macVoice": "The phone reads aloud with its own voice.",
+      "openWindow": "This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH."
+    }
+  },
+  "usage": {
+    "fiveHour": {
+      "pct": 24,
+      "resetsAt": "@now+3h12m"
+    },
+    "sevenDay": {
+      "pct": 38,
+      "resetsAt": "@now+4d6h"
+    },
+    "models": [
+      {
+        "label": "Sonnet",
+        "pct": 11,
+        "resetsAt": "@now+4d6h"
+      }
+    ],
+    "modelsObservedAt": "@now-2m",
+    "modelsStale": false,
+    "probe": {
+      "ok": true,
+      "since": null
+    },
+    "source": "official",
+    "observedAt": "@now-1m",
+    "rate": {
+      "fiveHour": 0.06,
+      "sevenDay": 0.01,
+      "working": true
+    }
+  },
+  "sessions": [
+    {
+      "id": "5e550001-7a1c-4d2e-9b3f-000000000001",
+      "title": "Stream invoice exports instead of buffering",
+      "cwd": "/home/dev/projects/ledgerline",
+      "projectName": "ledgerline",
+      "origin": "terminal",
+      "state": "working",
+      "providerId": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "permissionMode": "acceptEdits",
+      "bypassAvailable": false,
+      "createdAt": "@now-2h40m",
+      "lastActivityAt": "@now-20s",
+      "lastText": "The branch is up and the soak test is running on CI.",
+      "activity": "Bash: gh run watch --exit-status",
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 44,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550001",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 3,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-48m",
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550009-7a1c-4d2e-9b3f-000000000009",
+      "title": "Add idempotency keys to the payments webhook",
+      "cwd": "/home/dev/projects/ledgerline",
+      "projectName": "ledgerline",
+      "origin": "terminal",
+      "state": "needs_you",
+      "providerId": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "permissionMode": "acceptEdits",
+      "bypassAvailable": false,
+      "createdAt": "@now-1h50m",
+      "lastActivityAt": "@now-7m",
+      "lastText": "The migration adds a unique index on provider and event id. It has to run on staging before the webhook tests can pass.",
+      "activity": "Bash: npm run db:migrate -- --env staging",
+      "pendingApprovalIds": [
+        "b7a10000-0000-4000-8000-000000000003"
+      ],
+      "stoppedForAway": false,
+      "contextPct": 36,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550009",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-19m",
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550002-7a1c-4d2e-9b3f-000000000002",
+      "title": "Conflict rules for offline deletes",
+      "cwd": "/home/dev/projects/orchard-sync",
+      "projectName": "orchard-sync",
+      "origin": "terminal",
+      "state": "needs_you",
+      "providerId": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "permissionMode": "default",
+      "bypassAvailable": false,
+      "createdAt": "@now-1h15m",
+      "lastActivityAt": "@now-2m",
+      "lastText": "Both options pass the fuzz suite. The choice decides what a user sees after editing a row someone else deleted.",
+      "activity": "Asking you a question",
+      "pendingApprovalIds": [
+        "b7a10000-0000-4000-8000-000000000002"
+      ],
+      "stoppedForAway": false,
+      "contextPct": 27,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550002",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-22m",
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550003-7a1c-4d2e-9b3f-000000000003",
+      "title": "Wrong cursor position when pasting into a list",
+      "cwd": "/home/dev/projects/quillpad",
+      "projectName": "quillpad",
+      "origin": "terminal",
+      "state": "working",
+      "providerId": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "permissionMode": "auto",
+      "bypassAvailable": false,
+      "createdAt": "@now-52m",
+      "lastActivityAt": "@now-20s",
+      "lastText": "Found it: the paste handler re-renders before the selection is restored.",
+      "activity": "Bash: npm test -- editor/lists",
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 38,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550003",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-14m",
+      "todo": {
+        "active": "Running the editor tests",
+        "done": 3,
+        "total": 5
+      },
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550004-7a1c-4d2e-9b3f-000000000004",
+      "title": "Uneven rounding on multi-currency refunds",
+      "cwd": "/home/dev/projects/ledgerline",
+      "projectName": "ledgerline",
+      "origin": "terminal",
+      "state": "working",
+      "providerId": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "permissionMode": "acceptEdits",
+      "bypassAvailable": false,
+      "createdAt": "@now-35m",
+      "lastActivityAt": "@now-40s",
+      "lastText": "Yen and dinar refunds drift by one minor unit when split across tax lines.",
+      "activity": "Edit: src/ledger/rounding.ts",
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 19,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550004",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-9m",
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550005-7a1c-4d2e-9b3f-000000000005",
+      "title": "Tune the delta encoder for large docs",
+      "cwd": "/home/dev/projects/orchard-sync",
+      "projectName": "orchard-sync",
+      "origin": "terminal",
+      "state": "working",
+      "providerId": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "permissionMode": "auto",
+      "bypassAvailable": false,
+      "createdAt": "@now-1h5m",
+      "lastActivityAt": "@now-1m",
+      "lastText": "Three agents are running the corpus at 1k, 100k and 5M rows.",
+      "activity": "Waiting for its agents",
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 23,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550005",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 3,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-31m",
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550006-7a1c-4d2e-9b3f-000000000006",
+      "title": "Table of contents in exported PDFs",
+      "cwd": "/home/dev/projects/quillpad",
+      "projectName": "quillpad",
+      "origin": "terminal",
+      "state": "idle",
+      "providerId": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "permissionMode": "default",
+      "bypassAvailable": false,
+      "createdAt": "@now-5h",
+      "lastActivityAt": "@now-2h",
+      "lastText": "Done. Headings up to level 3 now link to their pages, and the export test covers nested lists.",
+      "activity": null,
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 41,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550006",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": null,
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550007-7a1c-4d2e-9b3f-000000000007",
+      "title": "Move CI to Postgres 17",
+      "cwd": "/home/dev/projects/ledgerline",
+      "projectName": "ledgerline",
+      "origin": "terminal",
+      "state": "idle",
+      "providerId": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "permissionMode": "default",
+      "bypassAvailable": false,
+      "createdAt": "@now-7h",
+      "lastActivityAt": "@now-4h",
+      "lastText": "CI is green on 17. One test relied on the old collation order, so I gave it an explicit ORDER BY.",
+      "activity": null,
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 16,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550007",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": null,
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550008-7a1c-4d2e-9b3f-000000000008",
+      "title": "Morning dependency check",
+      "cwd": "/home/dev/projects/tinroof",
+      "projectName": "tinroof",
+      "origin": "terminal",
+      "state": "idle",
+      "providerId": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "permissionMode": "default",
+      "bypassAvailable": false,
+      "createdAt": "@last 07:30 1-5",
+      "lastActivityAt": "@last 07:41 1-5",
+      "lastText": "Three patch updates, all dev tools, none with advisories. A PR is open for them.",
+      "activity": null,
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 8,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550008",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": {
+        "id": "au_0a1c7e9b01",
+        "name": "Morning dependency check",
+        "runId": "ru_71c0a9e301"
+      },
+      "turnStartedAt": null,
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    }
+  ],
+  "replaced": {},
+  "approvals": [
+    {
+      "id": "b7a10000-0000-4000-8000-000000000003",
+      "sessionId": "5e550009-7a1c-4d2e-9b3f-000000000009",
+      "createdAt": "@now-7m",
+      "expiresAt": "@now+3m",
+      "autoDeny": false,
+      "kind": "tool",
+      "toolName": "Bash",
+      "summary": "Bash: npm run db:migrate -- --env staging",
+      "input": {
+        "command": "npm run db:migrate -- --env staging",
+        "description": "Add the unique index on staging"
+      },
+      "reason": null,
+      "canAlways": true,
+      "alwaysRules": [
+        "Bash(npm run db:migrate *)"
+      ],
+      "alwaysScope": "project",
+      "why": {
+        "kind": "ask_rule",
+        "text": "Your ask rule Bash(npm run db:migrate *) in this project matches.",
+        "rule": "Bash(npm run db:migrate *)",
+        "source": "hypernova"
+      },
+      "canSession": false,
+      "questions": null,
+      "plan": null,
+      "agentId": null,
+      "agentLabel": null
+    },
+    {
+      "id": "b7a10000-0000-4000-8000-000000000002",
+      "sessionId": "5e550002-7a1c-4d2e-9b3f-000000000002",
+      "createdAt": "@now-2m",
+      "expiresAt": "@now+8m",
+      "autoDeny": false,
+      "kind": "question",
+      "toolName": "AskUserQuestion",
+      "summary": "Which rule should a delete follow?",
+      "input": {},
+      "reason": null,
+      "canAlways": false,
+      "alwaysRules": [],
+      "alwaysScope": null,
+      "why": null,
+      "canSession": false,
+      "questions": [
+        {
+          "question": "What should win when one device deletes a row another device edited offline?",
+          "header": "Delete rule",
+          "multiSelect": false,
+          "options": [
+            {
+              "label": "Keep the edit",
+              "description": "The row comes back with the edit. Nothing typed is ever lost, but deletes can seem to undo themselves."
+            },
+            {
+              "label": "Keep the delete",
+              "description": "The row stays gone. Simple to explain, and the edit goes to the recovery log."
+            }
+          ]
+        }
+      ],
+      "plan": null,
+      "agentId": null,
+      "agentLabel": null
+    }
+  ],
+  "projects": [
+    {
+      "path": "/home/dev/projects/ledgerline",
+      "name": "ledgerline",
+      "lastActivityAt": "@now-1m",
+      "sessionCount": 42
+    },
+    {
+      "path": "/home/dev/projects/orchard-sync",
+      "name": "orchard-sync",
+      "lastActivityAt": "@now-1m",
+      "sessionCount": 31
+    },
+    {
+      "path": "/home/dev/projects/quillpad",
+      "name": "quillpad",
+      "lastActivityAt": "@now-20s",
+      "sessionCount": 27
+    },
+    {
+      "path": "/home/dev/projects/tinroof",
+      "name": "tinroof",
+      "lastActivityAt": "@last 07:41 1-5",
+      "sessionCount": 12
+    }
+  ],
+  "providers": [
+    {
+      "id": "anthropic",
+      "name": "Claude (your subscription)",
+      "kind": "anthropic",
+      "baseUrl": null,
+      "models": {},
+      "builtIn": true,
+      "hasKey": false,
+      "paid": false,
+      "status": null,
+      "balance": null
+    }
+  ],
+  "account": {
+    "state": "ok",
+    "providerId": "anthropic",
+    "plan": null,
+    "limit": null,
+    "reason": null,
+    "text": null,
+    "since": null,
+    "sessionId": null,
+    "checkedAt": null,
+    "login": null
+  },
+  "speech": {
+    "engine": "phone",
+    "using": "phone",
+    "macVoice": null,
+    "rate": 1
+  },
+  "automations": {
+    "features": [
+      "steps",
+      "ask",
+      "shell",
+      "budget",
+      "step.output",
+      "trigger.webhook",
+      "trigger.cron",
+      "trigger.file",
+      "trigger.github",
+      "trigger.hook",
+      "trigger.after",
+      "output.webhook",
+      "output.file"
+    ],
+    "paused": false,
+    "list": [
+      {
+        "id": "au_0a1c7e9b01",
+        "name": "Morning dependency check",
+        "enabled": true,
+        "onlyOnce": false,
+        "trigger": {
+          "kind": "time",
+          "at": "07:30",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        "action": {
+          "kind": "start",
+          "projectPath": "/home/dev/projects/tinroof",
+          "prompt": "Check every project for outdated dependencies and security advisories. Open one PR per project with the safe updates. Say \"Nothing new.\" if there are none.",
+          "providerId": "anthropic",
+          "model": "claude-sonnet-5-5",
+          "permissionMode": "acceptEdits",
+          "allowedTools": [
+            "Bash(npm outdated:*)",
+            "Bash(gh pr create:*)"
+          ],
+          "then": "notify"
+        },
+        "steps": [
+          {
+            "id": "st_0",
+            "if": null,
+            "kind": "start",
+            "projectPath": "/home/dev/projects/tinroof",
+            "prompt": "Check every project for outdated dependencies and security advisories. Open one PR per project with the safe updates. Say \"Nothing new.\" if there are none.",
+            "providerId": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "permissionMode": "acceptEdits",
+            "allowedTools": [
+              "Bash(npm outdated:*)",
+              "Bash(gh pr create:*)"
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "id": "out_0",
+            "kind": "notify"
+          }
+        ],
+        "budget": null,
+        "template": null,
+        "createdAt": "@now-60d",
+        "updatedAt": "@now-12d",
+        "nextAt": "@next 07:30 1-5",
+        "runCount": 41,
+        "paid": false,
+        "problem": null,
+        "lastRun": {
+          "id": "ru_71c0a9e301",
+          "automationId": "au_0a1c7e9b01",
+          "name": "Morning dependency check",
+          "fired": {
+            "by": "schedule",
+            "at": "@last 07:30 1-5",
+            "sessionId": null,
+            "detail": null
+          },
+          "state": "done",
+          "reason": null,
+          "until": null,
+          "sessionIds": [
+            "5e550008-7a1c-4d2e-9b3f-000000000008"
+          ],
+          "startedAt": "@last 07:30 1-5",
+          "endedAt": "@last 07:41 1-5",
+          "late": 0,
+          "missed": 0,
+          "lateWhy": null,
+          "result": "Three patch updates, all dev tools, none with advisories. A PR is open for them.",
+          "quiet": false,
+          "skippedTools": [],
+          "permissionMode": "acceptEdits",
+          "depth": 0,
+          "retryOf": null,
+          "steps": [
+            {
+              "id": "st_0",
+              "kind": "start",
+              "state": "done",
+              "reason": null,
+              "startedAt": "@last 07:30 1-5",
+              "endedAt": "@last 07:41 1-5",
+              "result": "Three patch updates, all dev tools, none with advisories. A PR is open for them.",
+              "quiet": false,
+              "sessionIds": [
+                "5e550008-7a1c-4d2e-9b3f-000000000008"
+              ],
+              "exit": null,
+              "answer": null,
+              "reused": false
+            }
+          ],
+          "step": 0,
+          "ask": null,
+          "outputs": [],
+          "retryFrom": null,
+          "budgetUsed": null
+        }
+      },
+      {
+        "id": "au_0a1c7e9b02",
+        "name": "Nightly test sweep",
+        "enabled": true,
+        "onlyOnce": false,
+        "trigger": {
+          "kind": "time",
+          "at": "02:00",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        "action": {
+          "kind": "start",
+          "projectPath": "/home/dev/projects/ledgerline",
+          "prompt": "Run the full test suites of ledgerline and orchard-sync on their main branches. Report only the failures, with the commit that likely caused each.",
+          "providerId": "anthropic",
+          "model": "claude-opus-5-5",
+          "permissionMode": "dontAsk",
+          "allowedTools": [
+            "Bash(npm test:*)",
+            "Bash(cargo test:*)",
+            "Bash(git log:*)"
+          ],
+          "then": "notify"
+        },
+        "steps": [
+          {
+            "id": "st_0",
+            "if": null,
+            "kind": "start",
+            "projectPath": "/home/dev/projects/ledgerline",
+            "prompt": "Run the full test suites of ledgerline and orchard-sync on their main branches. Report only the failures, with the commit that likely caused each.",
+            "providerId": "anthropic",
+            "model": "claude-opus-5-5",
+            "permissionMode": "dontAsk",
+            "allowedTools": [
+              "Bash(npm test:*)",
+              "Bash(cargo test:*)",
+              "Bash(git log:*)"
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "id": "out_0",
+            "kind": "notify"
+          }
+        ],
+        "budget": null,
+        "template": null,
+        "createdAt": "@now-60d",
+        "updatedAt": "@now-12d",
+        "nextAt": "@next 02:00",
+        "runCount": 63,
+        "paid": false,
+        "problem": null,
+        "lastRun": {
+          "id": "ru_71c0a9e302",
+          "automationId": "au_0a1c7e9b02",
+          "name": "Nightly test sweep",
+          "fired": {
+            "by": "schedule",
+            "at": "@last 02:00",
+            "sessionId": null,
+            "detail": null
+          },
+          "state": "done",
+          "reason": null,
+          "until": null,
+          "sessionIds": [],
+          "startedAt": "@last 02:00",
+          "endedAt": "@last 02:38",
+          "late": 0,
+          "missed": 0,
+          "lateWhy": null,
+          "result": "All 2,914 tests pass on both branches. The slowest suite is 8% faster since Tuesday.",
+          "quiet": false,
+          "skippedTools": [],
+          "permissionMode": "dontAsk",
+          "depth": 0,
+          "retryOf": null,
+          "steps": [
+            {
+              "id": "st_0",
+              "kind": "start",
+              "state": "done",
+              "reason": null,
+              "startedAt": "@last 02:00",
+              "endedAt": "@last 02:38",
+              "result": "All 2,914 tests pass on both branches. The slowest suite is 8% faster since Tuesday.",
+              "quiet": false,
+              "sessionIds": [],
+              "exit": null,
+              "answer": null,
+              "reused": false
+            }
+          ],
+          "step": 0,
+          "ask": null,
+          "outputs": [],
+          "retryFrom": null,
+          "budgetUsed": null
+        }
+      },
+      {
+        "id": "au_0a1c7e9b03",
+        "name": "Review new pull requests",
+        "enabled": true,
+        "onlyOnce": false,
+        "trigger": {
+          "kind": "github",
+          "repoPath": "/home/dev/projects/ledgerline",
+          "events": [
+            "pr_opened"
+          ],
+          "every": 10
+        },
+        "action": {
+          "kind": "start",
+          "projectPath": "/home/dev/projects/ledgerline",
+          "prompt": "Review the pull request that was just opened. Look for bugs and missing tests, and post your findings as a review comment.",
+          "providerId": "anthropic",
+          "model": "claude-opus-5-5",
+          "permissionMode": "dontAsk",
+          "allowedTools": [
+            "Bash(gh pr view:*)",
+            "Bash(gh pr review:*)"
+          ],
+          "then": "notify"
+        },
+        "steps": [
+          {
+            "id": "st_0",
+            "if": null,
+            "kind": "start",
+            "projectPath": "/home/dev/projects/ledgerline",
+            "prompt": "Review the pull request that was just opened. Look for bugs and missing tests, and post your findings as a review comment.",
+            "providerId": "anthropic",
+            "model": "claude-opus-5-5",
+            "permissionMode": "dontAsk",
+            "allowedTools": [
+              "Bash(gh pr view:*)",
+              "Bash(gh pr review:*)"
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "id": "out_0",
+            "kind": "notify"
+          }
+        ],
+        "budget": null,
+        "template": null,
+        "createdAt": "@now-60d",
+        "updatedAt": "@now-12d",
+        "nextAt": null,
+        "runCount": 27,
+        "paid": false,
+        "problem": null,
+        "lastRun": {
+          "id": "ru_71c0a9e303",
+          "automationId": "au_0a1c7e9b03",
+          "name": "Review new pull requests",
+          "fired": {
+            "by": "github",
+            "at": "@now-4m",
+            "sessionId": null,
+            "detail": "PR #482 opened"
+          },
+          "state": "running",
+          "reason": null,
+          "until": null,
+          "sessionIds": [],
+          "startedAt": "@now-4m",
+          "endedAt": null,
+          "late": 0,
+          "missed": 0,
+          "lateWhy": null,
+          "result": null,
+          "quiet": false,
+          "skippedTools": [],
+          "permissionMode": "dontAsk",
+          "depth": 0,
+          "retryOf": null,
+          "steps": [
+            {
+              "id": "st_0",
+              "kind": "start",
+              "state": "running",
+              "reason": null,
+              "startedAt": "@now-4m",
+              "endedAt": null,
+              "result": null,
+              "quiet": false,
+              "sessionIds": [],
+              "exit": null,
+              "answer": null,
+              "reused": false
+            }
+          ],
+          "step": 0,
+          "ask": null,
+          "outputs": [],
+          "retryFrom": null,
+          "budgetUsed": null
+        }
+      },
+      {
+        "id": "au_0a1c7e9b04",
+        "name": "Carry on after the limit",
+        "enabled": true,
+        "onlyOnce": false,
+        "trigger": {
+          "kind": "reset",
+          "window": "five_hour",
+          "afterLimit": true,
+          "from": null,
+          "to": null
+        },
+        "action": {
+          "kind": "continue",
+          "target": "limited",
+          "prompt": "",
+          "providerId": null,
+          "then": "notify"
+        },
+        "steps": [
+          {
+            "id": "st_0",
+            "if": null,
+            "kind": "continue",
+            "target": "limited",
+            "prompt": "",
+            "providerId": null
+          }
+        ],
+        "outputs": [
+          {
+            "id": "out_0",
+            "kind": "notify"
+          }
+        ],
+        "budget": null,
+        "template": "carry-on",
+        "createdAt": "@now-60d",
+        "updatedAt": "@now-12d",
+        "nextAt": null,
+        "runCount": 6,
+        "paid": false,
+        "problem": null,
+        "lastRun": {
+          "id": "ru_71c0a9e304",
+          "automationId": "au_0a1c7e9b04",
+          "name": "Carry on after the limit",
+          "fired": {
+            "by": "reset",
+            "at": "@now-2d3h",
+            "sessionId": null,
+            "detail": null
+          },
+          "state": "done",
+          "reason": null,
+          "until": null,
+          "sessionIds": [],
+          "startedAt": "@now-2d3h",
+          "endedAt": "@now-2d3h",
+          "late": 0,
+          "missed": 0,
+          "lateWhy": null,
+          "result": "Picked up 2 sessions the limit had stopped.",
+          "quiet": false,
+          "skippedTools": [],
+          "permissionMode": null,
+          "depth": 0,
+          "retryOf": null,
+          "steps": [
+            {
+              "id": "st_0",
+              "kind": "continue",
+              "state": "done",
+              "reason": null,
+              "startedAt": "@now-2d3h",
+              "endedAt": "@now-2d3h",
+              "result": "Picked up 2 sessions the limit had stopped.",
+              "quiet": false,
+              "sessionIds": [],
+              "exit": null,
+              "answer": null,
+              "reused": false
+            }
+          ],
+          "step": 0,
+          "ask": null,
+          "outputs": [],
+          "retryFrom": null,
+          "budgetUsed": null
+        }
+      },
+      {
+        "id": "au_0a1c7e9b05",
+        "name": "Tidy changelog on release tag",
+        "enabled": true,
+        "onlyOnce": false,
+        "trigger": {
+          "kind": "webhook",
+          "last4": "c41d",
+          "createdAt": "@now-20d",
+          "url": "http://127.0.0.1:47341/v1/automations/au_0a1c7e9b05/fire",
+          "command": ""
+        },
+        "action": {
+          "kind": "start",
+          "projectPath": "/home/dev/projects/quillpad",
+          "prompt": "Group the commits since the last tag by feature, write the changelog entry and open a PR.",
+          "providerId": "anthropic",
+          "model": "claude-sonnet-5-5",
+          "permissionMode": "acceptEdits",
+          "allowedTools": [],
+          "then": "notify"
+        },
+        "steps": [
+          {
+            "id": "st_0",
+            "if": null,
+            "kind": "start",
+            "projectPath": "/home/dev/projects/quillpad",
+            "prompt": "Group the commits since the last tag by feature, write the changelog entry and open a PR.",
+            "providerId": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "permissionMode": "acceptEdits",
+            "allowedTools": []
+          }
+        ],
+        "outputs": [
+          {
+            "id": "out_0",
+            "kind": "notify"
+          }
+        ],
+        "budget": null,
+        "template": null,
+        "createdAt": "@now-60d",
+        "updatedAt": "@now-12d",
+        "nextAt": null,
+        "runCount": 9,
+        "paid": false,
+        "problem": null,
+        "lastRun": {
+          "id": "ru_71c0a9e305",
+          "automationId": "au_0a1c7e9b05",
+          "name": "Tidy changelog on release tag",
+          "fired": {
+            "by": "webhook",
+            "at": "@now-3d",
+            "sessionId": null,
+            "detail": null
+          },
+          "state": "done",
+          "reason": null,
+          "until": null,
+          "sessionIds": [],
+          "startedAt": "@now-3d",
+          "endedAt": "@now-3d",
+          "late": 0,
+          "missed": 0,
+          "lateWhy": null,
+          "result": "Changelog for v2.4.0 is in PR #131, grouped under Editor, Export and Sync.",
+          "quiet": false,
+          "skippedTools": [],
+          "permissionMode": "acceptEdits",
+          "depth": 0,
+          "retryOf": null,
+          "steps": [
+            {
+              "id": "st_0",
+              "kind": "start",
+              "state": "done",
+              "reason": null,
+              "startedAt": "@now-3d",
+              "endedAt": "@now-3d",
+              "result": "Changelog for v2.4.0 is in PR #131, grouped under Editor, Export and Sync.",
+              "quiet": false,
+              "sessionIds": [],
+              "exit": null,
+              "answer": null,
+              "reused": false
+            }
+          ],
+          "step": 0,
+          "ask": null,
+          "outputs": [],
+          "retryFrom": null,
+          "budgetUsed": null
+        }
+      },
+      {
+        "id": "au_0a1c7e9b06",
+        "name": "Friday release notes",
+        "enabled": false,
+        "onlyOnce": false,
+        "trigger": {
+          "kind": "time",
+          "at": "16:00",
+          "days": [
+            5
+          ]
+        },
+        "action": {
+          "kind": "start",
+          "projectPath": "/home/dev/projects/quillpad",
+          "prompt": "Write the week's release notes from the merged pull requests.",
+          "providerId": "anthropic",
+          "model": "claude-sonnet-5-5",
+          "permissionMode": "default",
+          "allowedTools": [],
+          "then": "notify"
+        },
+        "steps": [
+          {
+            "id": "st_0",
+            "if": null,
+            "kind": "start",
+            "projectPath": "/home/dev/projects/quillpad",
+            "prompt": "Write the week's release notes from the merged pull requests.",
+            "providerId": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "permissionMode": "default",
+            "allowedTools": []
+          }
+        ],
+        "outputs": [
+          {
+            "id": "out_0",
+            "kind": "notify"
+          }
+        ],
+        "budget": null,
+        "template": null,
+        "createdAt": "@now-60d",
+        "updatedAt": "@now-12d",
+        "nextAt": null,
+        "runCount": 12,
+        "paid": false,
+        "problem": null,
+        "lastRun": {
+          "id": "ru_71c0a9e306",
+          "automationId": "au_0a1c7e9b06",
+          "name": "Friday release notes",
+          "fired": {
+            "by": "schedule",
+            "at": "@now-9d",
+            "sessionId": null,
+            "detail": null
+          },
+          "state": "done",
+          "reason": null,
+          "until": null,
+          "sessionIds": [],
+          "startedAt": "@now-9d",
+          "endedAt": "@now-9d",
+          "late": 0,
+          "missed": 0,
+          "lateWhy": null,
+          "result": "Notes for the week are in docs/releases.",
+          "quiet": false,
+          "skippedTools": [],
+          "permissionMode": "default",
+          "depth": 0,
+          "retryOf": null,
+          "steps": [
+            {
+              "id": "st_0",
+              "kind": "start",
+              "state": "done",
+              "reason": null,
+              "startedAt": "@now-9d",
+              "endedAt": "@now-9d",
+              "result": "Notes for the week are in docs/releases.",
+              "quiet": false,
+              "sessionIds": [],
+              "exit": null,
+              "answer": null,
+              "reused": false
+            }
+          ],
+          "step": 0,
+          "ask": null,
+          "outputs": [],
+          "retryFrom": null,
+          "budgetUsed": null
+        }
+      }
+    ],
+    "running": 0,
+    "queued": 0,
+    "notes": [],
+    "hasBattery": false
+  },
+  "lan": null,
+  "claude": {
+    "available": true,
+    "version": "2.1.318",
+    "sdk": true,
+    "agents": true
+  },
+  "codex": {
+    "available": true,
+    "enabled": false,
+    "connected": false,
+    "version": "0.163.0",
+    "min": "0.163.0",
+    "path": "/usr/local/bin/codex",
+    "problem": null,
+    "account": null,
+    "usage": null
+  }
+}

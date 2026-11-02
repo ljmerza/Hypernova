@@ -1,0 +1,6 @@
+{
+  "path": "src/routes/exports.ts",
+  "diff": "diff --git a/src/routes/exports.ts b/src/routes/exports.ts\nindex a1a708c..3ddf480 100644\n--- a/src/routes/exports.ts\n+++ b/src/routes/exports.ts\n@@ -2,8 +2,10 @@ export const exportsRoute = Router()\n \n exportsRoute.get('/invoices.csv', requireAccount, async (req, res) => {\n   const filter = parseFilter(req.query)\n-  const csv = await buildCsv(filter)\n   res.setHeader('Content-Type', 'text/csv; charset=utf-8')\n   res.setHeader('Content-Disposition', `attachment; filename=\"${exportName(filter)}\"`)\n-  res.send(csv)\n+  // A client that hangs up closes the cursor too.\n+  await pipeline(csvStream(filter), res).catch((e) => {\n+    if (e.code !== 'ERR_STREAM_PREMATURE_CLOSE') throw e\n+  })\n })\n",
+  "truncated": false,
+  "binary": false
+}

@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "id": "u-1",
+      "kind": "user",
+      "ts": "@now-19m",
+      "text": "The payment provider retries webhooks and we sometimes post the payment twice. Make the handler idempotent."
+    },
+    {
+      "id": "t-1",
+      "kind": "assistant",
+      "ts": "@now-1m",
+      "streaming": false,
+      "text": "The migration adds a unique index on provider and event id, so a retried webhook can't post twice. It has to run on staging before the webhook tests can pass."
+    }
+  ],
+  "cursor": "demo-cursor",
+  "full": true
+}
