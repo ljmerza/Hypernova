@@ -5,8 +5,8 @@
 // from putting it back on Home as if it ran. No imports from the hub, which asks this file about every
 // session it sees.
 //
-// Resuming it takes its line out: History's tap, a prompt typed into it, or `claude --resume <id>`,
-// its claude a running session again.
+// Resuming it takes its line out: a prompt typed into it, `…/resume`, or `claude --resume <id>`, its
+// claude a running session again. Opening it to read in History starts nothing and changes nothing.
 import { join } from 'node:path'
 import { SUPPORT, readJson, writeJson } from './util.ts'
 

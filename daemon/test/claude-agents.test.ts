@@ -1480,6 +1480,46 @@ test('Resume from History: refused while its folder is gone, and it stays in His
   assert.equal(live.json.session.state, 'idle')
 })
 
+test('Opening one from History starts nothing; writing in it is what resumes it, and says so when its folder has gone', async () => {
+  settings.claudeAgents = false
+  hooks.installIntegration()
+  const sid = randomUUID()
+  transcript(sid)
+  hub.discover()
+  assert.equal((await del(`/v1/sessions/${sid}`)).status, 200)
+  const events = await get(`/v1/sessions/${sid}/events?limit=50`)
+  assert.equal(events.status, 200)
+  assert.equal(hub.getSession(sid)?.state, 'ended', 'still in History')
+  scanTerms()
+  assert.equal(termOf(sid), null, 'no terminal')
+  assert.ok(Object.hasOwn(JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'deleted-sessions.json'), 'utf8')), sid), 'still removed')
+  // Its folder gone: refused as it's written, in the words the route has, and still removed.
+  const gone = randomUUID()
+  transcript(gone)
+  hub.discover()
+  hub.upsertSession(gone, { cwd: join(scratch, 'worktree-gone-2'), state: 'ended' })
+  assert.equal((await del(`/v1/sessions/${gone}`)).status, 200)
+  const refused = await post(`/v1/sessions/${gone}/prompt`, { text: 'carry on' })
+  assert.equal(refused.status, 409)
+  assert.equal(refused.json.error.code, 'folder_gone')
+  assert.match(refused.json.error.message, /worktree-gone-2/)
+  assert.equal(hub.getSession(gone)?.state, 'ended')
+  assert.ok(Object.hasOwn(JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'deleted-sessions.json'), 'utf8')), gone))
+  // Written to: it runs again under its own id, off the removed list.
+  const r = await post(`/v1/sessions/${sid}/prompt`, { text: 'carry on' })
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.session.id, sid)
+  assert.equal(r.json.session.state, 'starting')
+  assert.ok(!Object.hasOwn(JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'deleted-sessions.json'), 'utf8')), sid))
+  const { args } = await restartHolderArgs(sid)
+  assert.ok(args.includes('--resume') && args.includes(sid), args.join(' '))
+  settings.claudeAgents = true
+  hooks.uninstallIntegration()
+  scanTerms()
+  const tid = termOf(sid)
+  if (tid) await endTermAndWait(tid)
+})
+
 test('Resume from History: not a job on another provider, nor with the setting off: a shared terminal on the same id, off the removed list too', async () => {
   settings.claudeAgents = false
   hooks.installIntegration()
