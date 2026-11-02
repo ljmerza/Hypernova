@@ -79,7 +79,7 @@ class TopBarTest {
 
     @Test fun movingAndTurningOffKeepTheOwnersOrder() {
         val c = TopBarChoice.DEFAULT.move(SEVEN_DAY, -1).move(SEVEN_DAY, -1).set(MODE, false).set(MODEL, true)
-        assertEquals(listOf(CONTEXT, SEVEN_DAY, FIVE_HOUR, MODEL), c.items)
+        assertEquals(listOf(CONTEXT, SEVEN_DAY, EFFORT, FIVE_HOUR, MODEL), c.items)
         // At an end it stays.
         assertEquals(c, c.move(CONTEXT, -1))
         assertEquals(c, c.move(TURN, 1))
@@ -87,7 +87,7 @@ class TopBarTest {
     }
 
     @Test fun itIsKeptAsOneLineAndReadBack() {
-        val c = TopBarChoice.DEFAULT.move(TURN, -7).set(TURN, true).set(FIVE_HOUR, false)
+        val c = TopBarChoice.DEFAULT.move(TURN, -9).set(TURN, true).set(FIVE_HOUR, false)
         val line = c.encode()
         assertEquals("turn,context,mode,effort,!fiveHour,sevenDay,!model,!tokens,!cost,!agents", line)
         assertEquals(c, TopBarChoice.decode(line))
