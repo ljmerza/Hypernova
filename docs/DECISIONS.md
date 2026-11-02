@@ -3364,3 +3364,17 @@ The owner: "for the workflow green bar at the bottom I like to see tiny little d
 ## No session id on the cards (2026-11-01)
 
 The owner asked what the two characters on a card were, the start of the session's id, with `1d` reading like an age next to `21d`, and chose to remove them. Home's cards and History's rows show only how long ago; TalkBack says "Active 4 minutes ago." or "Finished …". The session's own header keeps its short id.
+
+## A shared Android and desktop module, keeping OkHttp (owner, 2026-11-01)
+
+The first step towards a desktop app that can connect, list sessions and approve: `android/shared` holds the data layer, for
+Android and the desktop JVM (docs/PLATFORMS.md, "The shared module").
+
+1. **Android and JVM only.** No iOS or web target, so **OkHttp, org.json, `java.*` and the mutual TLS code stay as they are**: no
+   Ktor, no kotlinx.serialization. This replaces the "OkHttp becomes Ktor" line in PLATFORMS' iOS plan for now; iOS would have to
+   take that up again.
+2. **The package stays `com.prudnikweb.hypernova.data`,** so the app's imports hardly changed.
+3. **No feature changed, and nothing new on the session chat screen.** The tests moved with their code, their names and assertions
+   as they were. The hub's tests run twice: off Android, and on Robolectric with Android's side of the seams.
+4. **`android/shared`, not a top-level `shared/`:** Gradle's root is `android/`, and the release and CI already follow `android/**`.
+5. **No desktop app and no desktop implementations yet.** That is step 2.
