@@ -3364,3 +3364,11 @@ The owner: "for the workflow green bar at the bottom I like to see tiny little d
 ## No session id on the cards (2026-11-01)
 
 The owner asked what the two characters on a card were, the start of the session's id, with `1d` reading like an age next to `21d`, and chose to remove them. Home's cards and History's rows show only how long ago; TalkBack says "Active 4 minutes ago." or "Finished …". The session's own header keeps its short id.
+
+## The usage card says its agent and plan (2026-11-01)
+
+The owner: "remove the word official in the usage card", and add the agent and the plan (Pro, Max,
+Ultra). The trail of each usage card now says both, `Claude Code Max` or `Codex Pro`, or just the
+agent while the plan isn't known. Plans come from what the server already sends, so a plan the app
+has no spelling for is still shown, capitalised. "not measured" and "no numbers yet" stay on Claude's
+card, and LIMITED on Codex's, since they matter more than the name while they hold.

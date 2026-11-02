@@ -1398,6 +1398,11 @@ private fun ScrambledName(name: String, scramble: Boolean) {
     HText(rememberScrambled(name, scramble), style = Type.heading, color = HN.ink, maxLines = 1)
 }
 
+/** A usage card's trail (owner, 2026-11-01): whose it is and on what plan, "Claude Code Max" or "Codex Pro"; just the agent while the plan isn't known. */
+@Composable
+private fun agentAndPlan(agent: Int, withPlan: Int, plan: String?): String =
+    com.prudnikweb.hypernova.ui.settings.planWord(plan)?.let { stringResource(withPlan, it) } ?: stringResource(agent)
+
 @Composable
 private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier, from: String? = null) {
     val u = hub.usage
@@ -1412,7 +1417,7 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
                 after = from,
                 trail = when {
                     u.stale -> stringResource(R.string.usage_stale_trail)
-                    u.known -> stringResource(R.string.usage_official)
+                    u.known -> agentAndPlan(R.string.usage_agent_claude, R.string.usage_agent_claude_plan, hub.account.plan)
                     else -> stringResource(R.string.usage_waiting)
                 },
             )
@@ -1464,6 +1469,7 @@ private fun CodexUsageCard(c: CodexState, cards: UsageCards, modifier: Modifier 
             Seam(
                 stringResource(cards.codexTitle),
                 after = from,
+                trail = agentAndPlan(R.string.usage_agent_codex, R.string.usage_agent_codex_plan, c.account?.planType),
                 trailContent = if (u?.limited == true) ({ SeamWords(stringResource(R.string.cx_usage_limited), color = HN.amber) }) else null,
                 color = if (u?.limited == true) HN.amber else HN.inkMuted,
             )

@@ -247,7 +247,10 @@
     <!-- Home (live) -->
     <string name="empty_title">No sessions yet.</string>
     <string name="empty_body">Start one here, or run claude in a terminal on your Mac. It shows up here on its own.</string>
-    <string name="usage_official">official</string>
+    <string name="usage_agent_claude">Claude Code</string>
+    <string name="usage_agent_claude_plan">Claude Code %1$s</string>
+    <string name="usage_agent_codex">Codex</string>
+    <string name="usage_agent_codex_plan">Codex %1$s</string>
     <string name="usage_waiting">no numbers yet</string>
     <string name="usage_unknown_note">Usage appears after Claude Code\'s next reply on your Mac.</string>
     <string name="browse_files">Browse files</string>

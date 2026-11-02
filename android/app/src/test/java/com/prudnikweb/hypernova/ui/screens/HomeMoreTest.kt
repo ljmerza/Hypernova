@@ -415,6 +415,37 @@ class HomeMoreTest {
         rule.snap("home_codex_usage")
     }
 
+    @Test fun theUsageCardSaysItsAgentAndPlan() {
+        val base = FakeHub(sessions = only(Samples.MID), usage = Samples.usage())
+        home(object : Hub by base { override val account get() = com.prudnikweb.hypernova.data.Account(plan = "max") })
+        rule.onNodeWithText("Claude Code Max").assertExists()
+        rule.onNodeWithText("official").assertDoesNotExist()
+    }
+
+    @Test fun aPlanItDoesntKnowIsStillSaid() {
+        val base = FakeHub(sessions = only(Samples.MID), usage = Samples.usage())
+        home(object : Hub by base { override val account get() = com.prudnikweb.hypernova.data.Account(plan = "ultra") })
+        rule.onNodeWithText("Claude Code Ultra").assertExists()
+    }
+
+    @Test fun theUsageCardSaysJustTheAgentWithoutAPlan() {
+        home(FakeHub(sessions = only(Samples.MID), usage = Samples.usage()))
+        rule.onNodeWithText("Claude Code").assertExists()
+    }
+
+    @Test fun codexsUsageCardSaysItsPlan() {
+        val base = FakeHub(sessions = only(Samples.MID))
+        home(object : Hub by base {
+            override val codex = CodexState(
+                available = true, enabled = true, connected = true,
+                account = com.prudnikweb.hypernova.data.CodexAccount(signedIn = true, type = "chatgpt", planType = "pro"),
+                usage = CodexUsage(null, Window(65.0, Samples.NOW + 5 * 3_600_000L + 30_000), limited = false, observedAt = null),
+            )
+            override val claude = ClaudeState(available = false, version = null)
+        })
+        rule.onNodeWithText("Codex Pro").assertExists()
+    }
+
     @Test fun eachModelsOwnWeekHasItsMeter() {
         rule.setContent {
             Harness(spy) {
