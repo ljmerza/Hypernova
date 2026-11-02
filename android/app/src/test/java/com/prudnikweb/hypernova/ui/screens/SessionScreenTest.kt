@@ -11,6 +11,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToNode
@@ -267,6 +268,34 @@ class SessionScreenTest {
         rule.onNode(hasSetTextAction()).performKeyInput { pressKey(Key.Enter) }
         rule.waitForIdle()
         assertTrue(hub.calls.none { it.startsWith("send(") })
+    }
+
+    // ─── An ended session, opened from History: read, and written in to resume ───
+
+    private fun endedHub() = FakeHub(sessions = Samples.sessions().map { if (it.id == Samples.MID) it.copy(phase = com.prudnikweb.hypernova.data.Phase.Ended, agentJob = null, agentRunning = null) else it })
+
+    @Test fun anEndedSessionSaysItIsntRunningAndWritingInItResumesIt() {
+        val hub = endedHub()
+        chat(hub, Samples.MID)
+        rule.onNodeWithText(str(R.string.state_ended), substring = true, ignoreCase = true, useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.prompt_hint_ended), useUnmergedTree = true).assertExists()
+        rule.snap("chat_ended_reading")
+        assertTrue("opening it starts nothing", hub.calls.none { it.startsWith("send(") })
+        rule.onNode(hasSetTextAction()).performTextInput("carry on")
+        rule.onNode(hasSetTextAction()).performKeyInput { pressKey(Key.Enter) }
+        rule.waitForIdle()
+        assertEquals(listOf("send(${Samples.MID}, carry on)"), hub.calls.filter { it.startsWith("send(") })
+    }
+
+    @Test fun aResumeRefusedBecauseItsFolderHasGoneSaysSoAndTheWordsGoBack() {
+        val hub = endedHub()
+        hub.sendAnswer = Result.failure(com.prudnikweb.hypernova.data.HubException("The folder it ran in is gone from the server."))
+        chat(hub, Samples.MID)
+        rule.onNode(hasSetTextAction()).performTextInput("carry on")
+        rule.onNode(hasSetTextAction()).performKeyInput { pressKey(Key.Enter) }
+        rule.waitForIdle()
+        assertEquals(listOf("The folder it ran in is gone from the server."), spy.toasts)
+        rule.onNode(hasSetTextAction()).assert(hasText("carry on"))
     }
 
     // ─── The top bar, as Settings → Session top bar has it ───

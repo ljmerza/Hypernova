@@ -3827,7 +3827,7 @@ and in "Rename, Stop and Delete for Codex sessions" its item 2.
    get `{t:"session"}` ended, not `session.removed`. A `claude rm` in a terminal goes to History too.
 3. **Codex too:** nothing here deletes a thread any more (`thread/delete` was for good). A turn running
    stops, its terminal closes, and the thread stays in Codex and in History. A `codex delete` elsewhere
-   still makes Hypernova forget it: that one is gone. Smart's swipe still passes a Codex card over.
+   still makes Hypernova forget it: that one is gone.
 4. **History is /resume for all.** Every transcript /resume would offer, from every project, however
    old: past the start's 30 days and 300, the rest come in just after the daemon starts, read a few at
    a time, then one fresh snapshot goes to the phones (`discoverOlder`). Past that reach only what
@@ -3835,8 +3835,8 @@ and in "Rename, Stop and Delete for Codex sessions" its item 2.
    `/loop` sessions and files with no message don't flood it; those inside the old reach stay, as they
    were visible before. An automation's runs are as they were: one folded row per automation. Search
    covers them all. A rewind's replaced transcript stays hidden.
-5. **A tap resumes,** as /resume: `POST /v1/sessions/{id}/resume`, no prompt, no turn, its chat opening
-   meanwhile, and it's on Home. A `claude agents` job under the same id with the setting on (as /resume
+5. **(A tap no longer resumes: see "History's tap opens to read", the same day.)** `POST /v1/sessions/{id}/resume`:
+   no prompt, no turn, and it's on Home. A `claude agents` job under the same id with the setting on (as /resume
    in the agent view: `claude --bg --resume <id>`), else a shared terminal. Resuming takes its line out
    of the file, as a prompt typed into it and `claude --resume <id>` from a terminal do. Its folder gone
    (`claude rm` takes a worktree): it says so and stays in History.
@@ -3859,3 +3859,27 @@ The owner, running it on Linux on a 4K LG monitor: "the text is too small, every
 6. **The window:** 960 by 720 dp at the scale, centred, cut down to what's free of the screen. The smallest it goes, 520 by 420 dp, follows the scale and is cut down the same way. Moving to another monitor changes the scale of what's in it and not the window's size in pixels, as resizing under a drag fights the window manager: from 4K to a 1080p monitor it hangs over the edge until it's resized. Zooming doesn't resize it either, unless the smallest size pushes it.
 7. **The pair screen and the list keep their widths (560 and 720 dp).** The small card in a huge window was the scale: on a maximized 4K window at 2 it's 1120 pixels of 3840, the proportion a maximized 1080p window has, and the first window is mostly card.
 8. **The `.deb` installs where there are no menus.** It was thought to be missing `xdg-utils`, but jpackage already depends on it. The failure was `xdg-desktop-menu` exiting 3, "No writable system menu directory found", on a system with no `/etc/xdg/menus`, under `set -e` in the package's scripts, so it could be neither installed nor removed. That's a container or a bare server, not a normal desktop. `desktop/packaging/deb-menu-optional.sh` makes that call's failure a printed line, on the finished package, as Compose empties jpackage's resource folder just before running it.
+8. **All servers:** History lists each computer's the same way.
+
+## History's tap opens to read; Smart swipes Codex too (2026-11-02)
+
+The owner took the coordinator's suggestions on what "Delete takes a session off Home" left for him.
+
+1. **A tap in History opens the conversation to read, with nothing started.** A look shouldn't start a
+   claude, and every tap would have put the session back on Home. Replaces that section's item 5. All
+   servers and offline rows the same: a row opens on its own computer.
+2. **Resuming is writing in it,** the way an ended session's chat already had: a prompt from the box
+   (`POST …/prompt`), the same id, in a new shared terminal, back on Home. Its line in
+   `deleted-sessions.json` goes then. No button: nothing new on the chat screen.
+3. **It's plain that it isn't running:** the header already says Ended, and the only change on the chat
+   screen is the words of the box's existing hint on an ended session, "It isn't running. Write to resume
+   it…", a deliberate small exception to that standing rule, as this is what says how.
+4. **`folder_gone` says so as it's written:** `POST …/prompt` on an ended session whose folder has gone
+   is 409 `folder_gone`, shown as the toast a refused send has, the words back in the box, and it stays
+   in History and removed. Before this a holder was started in a folder that isn't there.
+5. **`POST /v1/sessions/{id}/resume` stays** for a client that resumes with no prompt; this app no longer
+   calls it.
+6. **Smart's swipe no longer skips a Completed Codex card:** it removes it, asked first, since removing
+   is no longer for good. Replaces "Smart still keeps a Completed Codex card from swiping" (2026-10-31).
+7. **Left as they are:** no delete for good from the phone, older Codex threads not in History
+   (docs/LATER.md); recent `claude -p` and SDK runs stay in History; `claudeAgents` off still hides jobs.

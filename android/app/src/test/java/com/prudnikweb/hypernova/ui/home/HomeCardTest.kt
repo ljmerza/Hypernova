@@ -107,8 +107,8 @@ class HomeCardTest {
         assertEquals(MenuOffer(rename = true, stop = false, delete = false), MenuOffer.of(codex(SessionState.Idle, Phase.Ended)))
         // Never Restart: that's claude agents' own.
         assertFalse(MenuOffer.of(codex(SessionState.Working, Phase.Working)).restart)
-        // A Completed Codex card still doesn't swipe to it, as decided when it was for good.
-        assertNull(CardSwipe.of(HomeGroup.Completed, codex(SessionState.Idle, Phase.Idle)))
+        // A Completed Codex card swipes to it: removing is no longer for good.
+        assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, codex(SessionState.Idle, Phase.Idle)))
         assertEquals(CardSwipe.Delete, CardSwipe.of(HomeGroup.Completed, session(SessionState.Idle, Phase.Idle, "j1", running = false)))
     }
 

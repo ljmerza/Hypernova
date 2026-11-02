@@ -889,10 +889,10 @@ async function api(c: Ctx): Promise<void> {
     }
     return json(res, 200, { results })
   }
-  // History's tap (docs/PROTOCOL.md, "History"): as /resume does, the conversation runs again, with no
-  // prompt and no turn, and it's back on Home.
+  // Resuming with no prompt (docs/PROTOCOL.md, "History"): as /resume does, the conversation runs again,
+  // no turn, and it's back on Home.
   const rs = /^\/v1\/sessions\/([\w-]+)\/resume$/.exec(path)
-  if (rs && m === 'POST') return json(res, 200, await resumeFromHistory(rs[1]!))
+  if (rs && m === 'POST') return json(res, 200, await resumeWithoutPrompt(rs[1]!))
   // The Home card's long-press menu (docs/PROTOCOL.md, "Session menu"): rename it (Claude Code's
   // /rename, typed in, so it shows in `claude agents` and the transcript keeps it), and for a
   // `claude agents` job, stop it or take it out of there, or restart it on the installed Claude Code
@@ -1433,7 +1433,9 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
   // A conversation that switched agents goes on in its new session (switch.ts).
   const moved = linkOf(id).to
   if (moved) throw new HttpError(409, 'switched', 'This conversation went on in another session. Write there.', { to: moved })
-  // Written to from History, say, after the owner took it off Home: it's back (deleted.ts).
+  // Writing is what resumes one from History: said now if it can't, and it stays there.
+  if (!isCodex(id) && rec.state === 'ended' && !existsSync(rec.cwd)) throw folderGone(rec.cwd)
+  // Written to after the owner took it off Home: it's back (deleted.ts).
   undelete(id)
   // Codex takes prompts over its app-server, whether or not a terminal shows the session.
   if (isCodex(id)) {
@@ -1497,8 +1499,11 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
   return { id: newId, queued: false, forked: live }
 }
 
+/** An ended session can't resume: the folder it ran in has gone (`claude rm` takes a job's worktree with it). */
+const folderGone = (cwd: string) => new HttpError(409, 'folder_gone', `The folder it ran in is gone from the ${MACHINE}: ${cwd}`)
+
 /**
- * `POST /v1/sessions/{id}/resume`, History's tap: the ended conversation runs again under its own id,
+ * `POST /v1/sessions/{id}/resume`, for a client that resumes with no prompt (the Android app resumes by a prompt, promptSession): the ended conversation runs again under its own id,
  * with no prompt, so no turn and nothing spent, and shows on Home; as /resume in the agent view, a
  * `claude agents` job with settings.claudeAgents (not on another provider, whose environment is the
  * holder's to give, nor one that carries a switch's context), else in a new shared terminal, or with no
@@ -1506,7 +1511,7 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
  * that went on in another one (the chat says where): those just answer. 409 `folder_gone` when the
  * folder it ran in has gone (`claude rm` takes a job's worktree with it), and it stays in History.
  */
-async function resumeFromHistory(id: string): Promise<{ session: ReturnType<typeof listSessions>[number] | undefined; forked: boolean }> {
+async function resumeWithoutPrompt(id: string): Promise<{ session: ReturnType<typeof listSessions>[number] | undefined; forked: boolean }> {
   const rec = getSession(id)
   if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
   const answer = (at = id, forked = false) => ({ session: listSessions().find((x) => x.id === at), forked })
@@ -1524,7 +1529,7 @@ async function resumeFromHistory(id: string): Promise<{ session: ReturnType<type
     upsertSession(id, { state: 'idle', activity: null, lastActivityAt: Date.now() })
     return answer()
   }
-  if (!existsSync(rec.cwd)) throw new HttpError(409, 'folder_gone', `The folder it ran in is gone from the ${MACHINE}: ${rec.cwd}`)
+  if (!existsSync(rec.cwd)) throw folderGone(rec.cwd)
   undelete(id)
   const useShared = await shared()
   if (!useShared) {

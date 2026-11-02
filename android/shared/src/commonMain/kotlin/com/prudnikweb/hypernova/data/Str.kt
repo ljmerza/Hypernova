@@ -145,7 +145,6 @@ enum class Str {
     err_continue,
     err_delete_older,
     err_delete_session,
-    err_resume_history,
     err_download,
     err_effort,
     err_file,

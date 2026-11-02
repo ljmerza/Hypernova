@@ -212,13 +212,6 @@ interface Hub {
     suspend fun stopSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
     /** `claude rm` for a `claude agents` job: gone from claude agents and from Home. */
     suspend fun deleteSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
-
-    /**
-     * History's tap, as /resume: the conversation runs again and it's back on Home. Where it goes on:
-     * its own id, or a copy's when it's running somewhere else already. A server too old for it answers
-     * with the id, and the session opens as it always did.
-     */
-    suspend fun resumeFromHistory(sessionId: String): Result<String> = Result.success(sessionId)
     /** `claude respawn` for a job on an older Claude Code ([Session.agentOutdated]): restarted on the installed one. */
     suspend fun respawnSession(sessionId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
     /** Restart session for a shared terminal: it closes and the conversation resumes in a new one, same id. */

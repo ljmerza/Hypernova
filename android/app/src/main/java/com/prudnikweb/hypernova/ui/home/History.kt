@@ -54,8 +54,6 @@ import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.TextHit
 import com.prudnikweb.hypernova.data.TextHits
-import com.prudnikweb.hypernova.ui.LocalAppScope
-import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.LocalHaze
 import com.prudnikweb.hypernova.ui.components.Seam
@@ -69,13 +67,12 @@ import com.prudnikweb.hypernova.ui.theme.Type
 import dev.chrisbanes.haze.hazeSource
 import java.time.ZoneId
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Ended sessions, most recent first, but for the ones a restart of the Mac ended lately (Home keeps
  * those), under the days they ended on (Today, Yesterday, Mon 13 Oct): every conversation /resume would
- * offer, the ones taken off Home too. A tap resumes one, as /resume does, and it's back on Home
- * (Hub.resumeFromHistory), its chat opening meanwhile. A search finds one by its
+ * offer, the ones taken off Home too. A tap opens one to read, with nothing started; writing in it
+ * resumes it, and it's back on Home. A search finds one by its
  * title, project or last line, and from 3 characters by the words inside it, which the current
  * Mac looks for ([Hub.searchHistory]; a hit shows its snippet, [HitCard]); with several projects,
  * chips narrow it to one (audit P9). An
@@ -85,7 +82,7 @@ import kotlinx.coroutines.launch
 internal fun HistoryTab(hub: Hub, top: Dp, bottom: Dp, now: Long, onOpen: (String) -> Unit, onRuns: (String) -> Unit) {
     HistoryList(
         listOf(HistoryServer(null, null, hub.link.state, hub)), top, bottom, now,
-        onOpen = { _, id -> onOpen(id) }, onRuns = { _, automation -> onRuns(automation) },
+        onOpen = { onOpen(it.session.id) }, onRuns = { _, automation -> onRuns(automation) },
     )
 }
 
@@ -98,7 +95,7 @@ internal fun HistoryTab(hub: Hub, top: Dp, bottom: Dp, now: Long, onOpen: (Strin
 internal fun AllHistoryTab(everywhere: Everywhere, top: Dp, bottom: Dp, now: Long) {
     HistoryList(
         everywhere.servers.map { (st, h) -> HistoryServer(st.id, st.name, st.state, h) }, top, bottom, now,
-        onOpen = { row, id -> row.server?.let { everywhere.onOpen(it, id) } },
+        onOpen = { row -> row.server?.let { everywhere.onOpen(it, row.session.id) } },
         onRuns = { row, automation -> row.server?.let { everywhere.onRuns(it, automation) } },
     )
 }
@@ -109,22 +106,9 @@ private class HistoryServer(val id: String?, val name: String?, val state: LinkS
 @Composable
 private fun HistoryList(
     servers: List<HistoryServer>, top: Dp, bottom: Dp, now: Long,
-    onOpen: (HistoryItem<Hub>, sessionId: String) -> Unit, onRuns: (HistoryItem<Hub>, automation: String) -> Unit,
+    onOpen: (HistoryItem<Hub>) -> Unit, onRuns: (HistoryItem<Hub>, automation: String) -> Unit,
 ) {
     val haze = LocalHaze.current
-    val appScope = LocalAppScope.current
-    val toast = LocalToast.current
-    val couldnt = stringResource(R.string.err_resume_history)
-    // Its chat opens at once and the conversation starts behind it. A computer out of reach only shows it as last seen.
-    val resume: (HistoryItem<Hub>) -> Unit = { row ->
-        val id = row.session.id
-        onOpen(row, id)
-        if (!row.offline && row.hub.link.state == LinkState.Connected) appScope.launch {
-            row.hub.resumeFromHistory(id)
-                .onSuccess { at -> if (at != id) onOpen(row, at) }
-                .onFailure { toast(it.message ?: couldnt) }
-        }
-    }
     val tagged = servers.any { it.id != null }
     var query by rememberSaveable { mutableStateOf("") }
     var project by rememberSaveable { mutableStateOf<String?>(null) }
@@ -231,9 +215,9 @@ private fun HistoryList(
                 if (automation != null) {
                     com.prudnikweb.hypernova.ui.automations.AutomationHistoryRow(hub, row.entry, now, onClick = { onRuns(row, automation.id) }, modifier = Modifier.padding(horizontal = 16.dp).animateItem().then(dim), server = tag)
                 } else if (hit != null) {
-                    HitCard(s, hit, now, onClick = { resume(row) }, modifier = Modifier.padding(horizontal = 16.dp).animateItem().then(dim), server = tag)
+                    HitCard(s, hit, now, onClick = { onOpen(row) }, modifier = Modifier.padding(horizontal = 16.dp).animateItem().then(dim), server = tag)
                 } else {
-                    SessionCard(s, now = now, scramble = false, clickLabel = stringResource(R.string.history_resume_session), onClick = { resume(row) }, modifier = Modifier.padding(horizontal = 16.dp).animateItem().then(dim), codex = s.codex && com.prudnikweb.hypernova.data.AgentLead.both(hub.claude, hub.codex), server = row.name, offline = row.offline)
+                    SessionCard(s, now = now, scramble = false, onClick = { onOpen(row) }, modifier = Modifier.padding(horizontal = 16.dp).animateItem().then(dim), codex = s.codex && com.prudnikweb.hypernova.data.AgentLead.both(hub.claude, hub.codex), server = row.name, offline = row.offline)
                 }
             }
         }
@@ -292,7 +276,7 @@ internal fun HitSnippet(hit: TextHit, maxLines: Int = 3) {
 @Composable
 private fun HitCard(s: Session, hit: TextHit, now: Long, onClick: () -> Unit, modifier: Modifier = Modifier, server: String? = null) {
     val res = LocalContext.current.resources
-    GlassCard(modifier.fillMaxWidth(), onClick = onClick, onClickLabel = stringResource(R.string.history_resume_session)) {
+    GlassCard(modifier.fillMaxWidth(), onClick = onClick, onClickLabel = stringResource(R.string.open_session)) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Seam(
                 label = s.project,
