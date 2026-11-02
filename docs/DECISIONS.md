@@ -1233,7 +1233,7 @@ Not built yet; the plan after the weekly reset (Oct 21).
     computer. A Lens's grant belongs to the pairing it was made under (Forget or pairing again ends
     it), and Allow on a locked phone needs unlocking. The voice and speed of the glasses' speech
     are the Mac's (Settings → Voice → Read aloud, for phone and glasses at once), so Lens's own stay
-    at their defaults on purpose. PROTOCOL.md, "The phone bridge", has the details.
+    at their defaults on purpose. PROTOCOL.md had the details until the glasses were removed.
   - **After its second review (2026-10-17)**: any app can take the port while Hypernova doesn't
     hold it (after a reboot, say), so nothing Lens sends there is worth having. Lens and the app
     agree the token at Allow (an X25519 exchange with a six-digit code both work out, compared by

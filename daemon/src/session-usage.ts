@@ -1,4 +1,5 @@
-// One session's usage, for the strip at the top of the chat (docs/PROTOCOL.md, "Session usage"):
+// Modified by Leonardo Merza, 2026. See NOTICE.
+// One session's usage, for the strip at the top of the chat (docs/PROTOCOL.md, "Session usage, the to-do list and Rewind"):
 // its model, how full its context window is, the tokens it has used and what they cost, and the
 // plan's 5-hour window.
 //

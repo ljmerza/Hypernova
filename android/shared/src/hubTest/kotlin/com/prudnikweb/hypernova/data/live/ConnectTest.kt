@@ -19,7 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Connecting (docs/PROTOCOL.md, "WebSocket"): the snapshot fills the hub, then the socket opens and answers pings. */
+/** Connecting (docs/PROTOCOL.md, "Live feed"): the snapshot fills the hub, then the socket opens and answers pings. */
 @RunWith(RigRunner::class)
 class ConnectTest {
     private val daemon = FakeDaemon()

@@ -20,7 +20,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * A session's usage as the chat's strip shows it (docs/PROTOCOL.md, "Session usage"). [contextExact]
+ * A session's usage as the chat's strip shows it (docs/PROTOCOL.md, "Session usage, the to-do list and Rewind"). [contextExact]
  * and [costExact]: Claude Code's own numbers; otherwise worked out on the Mac, so the strip says
  * "about". [costUsd] is null where no price applies (another provider).
  */

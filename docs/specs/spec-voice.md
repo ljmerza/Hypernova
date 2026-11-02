@@ -1,3 +1,4 @@
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 # Spec: voice on the phone, and voice in Mac setup
 
 Status: decided, ready to build. Builds on the Soniox work in
@@ -36,7 +37,7 @@ before you've finished looking down.
 ## 2. Protocol
 
 No new routes. The contract below is what already exists after the merge, plus two daemon changes
-(2.4). PROTOCOL.md, "Speech to text", is updated to say Android uses it too.
+(2.4). PROTOCOL.md's speech to text section, since removed with `/v1/stt*`, is updated to say Android uses it too.
 
 ### 2.1 Voice available? (snapshot)
 
@@ -627,8 +628,8 @@ its **first commit** (within minutes); Track C builds against them from then on.
 - `daemon/src/qa-checklist.ts`: the Voice section.
 - `lens/src/phone/guide.ts` (+ its caller in `lens/src/phone/app.ts` if the step list is passed in):
   skip voice when ready (4.3).
-- `docs/PROTOCOL.md`: "Speech to text" names Android as a client, the route rule (2.1), stop while
-  connecting, the log line; "The Lens guide" notes the skip.
+- `docs/PROTOCOL.md` (both sections since removed): speech to text names Android as a client, the route rule (2.1), stop while
+  connecting, the log line; the Lens guide notes the skip.
 - `docs/DECISIONS.md`: a "Voice on the phone (2026-10-15)" section from table 1.
 
 **B · Android data and audio**

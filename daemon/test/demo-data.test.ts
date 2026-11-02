@@ -158,7 +158,7 @@ function kindOf(rel: string): { shape: () => Shape; allow: Allow } | null {
   if (name === 'events.json') return one('rest-session-events.json', allow.events!)
   if (name === 'agents.json') return one('rest-agents.json', allow.agents!)
   if (name === 'usage.json') {
-    // The fixture's context is null, so its shape is spelled out here from docs/PROTOCOL.md, "Session usage".
+    // The fixture's context is null, so its shape is spelled out here from docs/PROTOCOL.md, "Session usage, the to-do list and Rewind".
     const example = fixture('rest-session-usage.json') as { usage: object }
     return { shape: () => learn(blank(), { usage: { ...example.usage, context: { used: 1, window: 1, pct: 1, exact: true } } }), allow: allow.usage! }
   }
