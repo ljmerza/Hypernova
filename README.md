@@ -12,16 +12,18 @@ through a cloud service of ours, the phone talks straight to your server.
 
 <table>
   <tr>
-    <td><img src="docs/images/shot-home.jpg" width="180" alt="Home: sessions grouped by what needs you, what's working and what's done"></td>
-    <td><img src="docs/images/shot-chat.jpg" width="180" alt="A session's chat with its workflow status"></td>
-    <td><img src="docs/images/shot-new-session.jpg" width="180" alt="Starting a new session: folder, model, effort and mode"></td>
-    <td><img src="docs/images/shot-statistics.jpg" width="180" alt="Statistics: hours, tokens and the last 30 days"></td>
-    <td><img src="docs/images/shot-automations.jpg" width="180" alt="Automations: work on a schedule or when something happens"></td>
+    <td><img src="docs/images/shot-home.jpg" width="150" alt="Home: sessions grouped by what needs input and what's working, with Allow and Deny on a card that waits for an answer"></td>
+    <td><img src="docs/images/shot-chat.jpg" width="150" alt="A session's chat: a denied push, Claude's report, and the workflow's status line with a divider for each step"></td>
+    <td><img src="docs/images/shot-changes.jpg" width="150" alt="What changed: a file's diff under review, with its syntax coloured"></td>
+    <td><img src="docs/images/shot-all-servers.jpg" width="150" alt="All servers: sessions from several machines in one list, each card naming its machine"></td>
+    <td><img src="docs/images/shot-statistics.jpg" width="150" alt="Statistics: hours, tokens and the last 30 days"></td>
+    <td><img src="docs/images/shot-automations.jpg" width="150" alt="Automations: work on a schedule or when something happens"></td>
   </tr>
   <tr>
     <td>Home</td>
     <td>A session</td>
-    <td>New session</td>
+    <td>Code review</td>
+    <td>All servers</td>
     <td>Statistics</td>
     <td>Automations</td>
   </tr>
