@@ -172,7 +172,7 @@ object Servers {
 
     /**
      * The "All" chip's link: the worst of the computers' (unpaired, offline, reconnecting, connecting,
-     * connected), so one in trouble shows in the moon's colour. Connecting for none.
+     * connected), so one in trouble shows in the mark's colour. Connecting for none.
      */
     fun worst(states: List<LinkState>): LinkState {
         val order = listOf(LinkState.Unpaired, LinkState.Offline, LinkState.Reconnecting, LinkState.Connecting, LinkState.Connected)

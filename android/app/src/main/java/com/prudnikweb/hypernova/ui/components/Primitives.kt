@@ -718,25 +718,25 @@ private const val MOON_REST = 0.55f
 private val MOON_TURN = 2f * PI.toFloat() / 1.8f
 private val TWO_PI = 2f * PI.toFloat()
 
-// The near side of the orbit, in front of the planet and clear of its tips: where the moon may rest.
+// The near side of the turn, clear of the diamond's tips: where the arcs may rest.
 private const val NEAR_FROM = 0.2f
 private const val NEAR_TO = 2.95f
 
-// However fast or slow it was going, an even brake brings the moon to rest in this many seconds. A
+// However fast or slow it was going, an even brake brings the arcs to rest in this many seconds. A
 // firmer stop at the near side's end can take as little as 0.3 s, and a swing round to the front
 // takes at least the longer one.
 private const val GLIDE_MIN = 0.5f
 private const val GLIDE_MAX = 1.2f
 
 // The app reconnects each time it comes back after a quiet spell, and that's usually over in a blink.
-// The moon starts circling only once a search has lasted this long, so those blinks leave it still
-// (each one used to nudge it a little further on, until one sent it all the way round).
+// The arcs start turning only once a search has lasted this long, so those blinks leave them still
+// (each one used to nudge them a little further on, until one sent them all the way round).
 private const val SEEK_AFTER_MS = 400L
 
 /**
- * Where the phone's moon is on its orbit and how fast it goes; it lives across frames. Once the Mac
- * is found, [glide] brings it to rest on the near side within 1.2 s (a swing round to the front, up
- * to 1.7 s), whatever its speed: braking evenly from v over a span T covers only v·T/2, so a moon
+ * Where the arcs are on their turn and how fast they go; it lives across frames. Once the Mac
+ * is found, [glide] brings them to rest on the near side within 1.2 s (a swing round to the front, up
+ * to 1.7 s), whatever their speed: braking evenly from v over a span T covers only v·T/2, so arcs
  * barely moving after a short search would otherwise crawl for seconds to reach the front.
  */
 private class MoonOrbit {
@@ -778,7 +778,7 @@ private class MoonOrbit {
         }
     }
 
-    /** Where the moon sits when nothing moves it (and always, under Reduce Motion). */
+    /** Where the arcs sit when nothing moves them (and always, under Reduce Motion). */
     fun rest() {
         angle = MOON_REST
         speed = 0f
@@ -814,8 +814,8 @@ private class MoonOrbit {
             }
             // Already past it: swing round to the front, never faster than it circles. The curve
             // peaks at 1.5·d/span midway, so a long swing takes longer (up to 1.7 s) rather than
-            // racing behind the planet while the chip already names the Mac. The span stays under
-            // 3d/v, so the moon never overshoots and comes back.
+            // racing round the diamond while the chip already names the Mac. The span stays under
+            // 3d/v, so the arcs never overshoot and come back.
             else -> {
                 d = ((NEAR_FROM - a) % TWO_PI + TWO_PI) % TWO_PI + 0.15f
                 span = maxOf(GLIDE_MAX, 1.5f * d / MOON_TURN)
@@ -831,7 +831,7 @@ private class MoonOrbit {
 /**
  * The connection's glyph, 20dp (see [ConnectionChip]), in [tone], which eases with the chip's glass:
  * Atlas's marks (components/Marks.kt) in the link's terms. Linked, a solid diamond. Looking for the
- * Mac, the working mark's two arcs turn round it, the moon's old motion. Offline, a hollow diamond
+ * Mac, the working mark's two arcs turn round it. Offline, a hollow diamond
  * struck through; unpaired, a hollow one.
  */
 @Composable
