@@ -32,8 +32,11 @@ import org.robolectric.annotation.Config
 internal class ExtHub(private val base: FakeHub = FakeHub()) : Hub by base {
     val answers = linkedMapOf<String, Result<JSONObject>>()
     val calls = mutableListOf<Triple<String, String, JSONObject?>>()
+    /** Answers before [answers] when it has one: a reply that depends on what was sent. */
+    var handler: ((String, String, JSONObject?) -> Result<JSONObject>?)? = null
     override suspend fun agentExt(method: String, path: String, body: JSONObject?, slow: Boolean): Result<JSONObject> {
         calls += Triple(method, path, body)
+        handler?.invoke(method, path, body)?.let { return it }
         return answers.entries.firstOrNull { (k, _) -> "$method $path".startsWith(k) }?.value ?: Result.failure(AgentSettingRefused("no_answer", "no answer for $method $path"))
     }
     fun on(prefix: String, json: String) { answers[prefix] = Result.success(JSONObject(json)) }

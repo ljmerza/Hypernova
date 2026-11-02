@@ -39,6 +39,10 @@ sealed interface Route {
     data class PluginBrowse(val agent: String, val folder: String?) : Route { override val key = "plugin-browse:$agent:$folder" }
     /** An agent's skills on this server. */
     data class Skills(val agent: String) : Route { override val key = "skills:$agent" }
+    /** An agent's environment variables on this server, as a list to tick and add to. */
+    data class AgentEnv(val agent: String) : Route { override val key = "agent-env:$agent" }
+    /** One of Claude Code's settings files as raw JSON, folding as it goes. */
+    data class AgentRaw(val agent: String) : Route { override val key = "agent-raw:$agent" }
     /** Settings › Mac › Connection log (data/ConnLog.kt). */
     data object ConnectionLog : Route { override val key = "connection-log" }
     data class ProviderEdit(val id: String?, val kind: String) : Route { override val key = "provider:${id ?: "new-$kind"}" }

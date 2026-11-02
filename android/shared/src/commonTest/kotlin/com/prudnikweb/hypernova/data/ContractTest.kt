@@ -800,6 +800,80 @@ class ContractTest {
         },
         "rest-skill-set" to { o -> assertTrue(o.bool("ok")); assertEquals(SkillsReply.NAME_ONLY, o.str("state")) },
         "rest-skill-refused" to { o -> assertEquals("bad_state", Api.errorOf(400, o.toString()).code) },
+        "rest-env" to { o ->
+            val r = EnvReply.wire(o)
+            assertEquals(Mcp.HOME, r.folder)
+            val file = r.files.single { it.scope == Mcp.USER }
+            assertEquals("~/.claude/settings.json", file.where)
+            assertEquals(EnvFile.OK, file.state)
+            assertNotNull(file.hash)
+            val secret = r.vars.single { it.name == "SECRET" }
+            assertTrue(secret.masked)
+            assertNull(secret.value)
+            assertNull(secret.flag)
+            assertEquals(true, r.vars.single { it.name == "DISABLE_TELEMETRY" }.flag)
+            assertEquals("30000", r.vars.single { it.name == "BASH_MAX_OUTPUT_LENGTH" }.value)
+            assertTrue(r.vars.single { it.name == "PATH" }.guarded)
+            assertTrue(r.vars.all { it.effective })
+            assertNull(r.undo)
+        },
+        "rest-env-codex" to { o ->
+            val r = EnvReply.wire(o)
+            assertEquals("~/.codex/config.toml", r.files.single().where)
+            assertEquals("sha256:abc", r.files.single().hash)
+            assertEquals(true, r.vars.single { it.name == "HN_FLAG" }.flag)
+            assertTrue(r.vars.single { it.name == "API_KEY" }.masked)
+        },
+        "rest-env-set" to { o -> assertEquals("DISABLE_TELEMETRY", o.str("name")); assertEquals("0", o.str("value")); assertFalse(o.bool("flag")) },
+        "rest-env-stale" to { o -> assertEquals(AgentSettingRefused.FILE_CHANGED, Api.errorOf(409, o.toString()).code) },
+        "rest-env-confirm" to { o ->
+            val e = Api.errorOf(403, o.toString())
+            assertEquals(EnvReply.CONFIRM_RUN, e.code)
+            assertTrue(e.serverMessage!!.contains("LD_PRELOAD: (not set) → /tmp/x.so"))
+        },
+        "rest-env-refused" to { o -> assertEquals("env_refused", Api.errorOf(403, o.toString()).code) },
+        "rest-env-undo-offer" to { o ->
+            val u = EnvReply.undo(o)!!
+            assertEquals("DISABLE_TELEMETRY", u.name)
+            assertFalse(u.needsCheck)
+            assertEquals("DISABLE_TELEMETRY: 0 → 1", u.change)
+        },
+        "rest-env-undone" to { o -> assertTrue(o.bool("ok")) },
+        "rest-raw" to { o ->
+            val r = RawFile.wire(o)
+            assertEquals(Mcp.USER, r.scope)
+            assertEquals(RawFile.OK, r.state)
+            assertEquals("<hidden on the server>", r.placeholder)
+            assertTrue(r.text!!.contains("<hidden on the server>"))
+            assertNotNull(r.hash)
+            assertTrue(r.hidden >= 1)
+            assertEquals(Mcp.HOME, r.folder)
+            assertEquals(Mcp.HOME, r.folders.first().id)
+            assertNull(r.undo)
+            assertTrue(JsonFold.parse(r.text!!) is JsonFold.Parsed.Ok)
+        },
+        "rest-raw-saved" to { o ->
+            val s = RawSaved.wire(o)
+            assertTrue(s.changed)
+            assertEquals("file-hash", s.hash)
+        },
+        "rest-raw-bad-json" to { o ->
+            val e = Api.errorOf(400, o.toString())
+            assertEquals("bad_json", e.code)
+            assertTrue(e.serverMessage!!.startsWith("Line 2, column"))
+        },
+        "rest-raw-refused" to { o ->
+            val e = Api.errorOf(403, o.toString())
+            assertEquals("raw_refused", e.code)
+            assertTrue(e.serverMessage!!.contains("permissions.defaultMode"))
+        },
+        "rest-raw-confirm" to { o ->
+            val e = Api.errorOf(403, o.toString())
+            assertEquals(EnvReply.CONFIRM_RUN, e.code)
+            assertTrue(e.serverMessage!!.contains("statusLine"))
+        },
+        "rest-raw-stale" to { o -> assertEquals(AgentSettingRefused.FILE_CHANGED, Api.errorOf(409, o.toString()).code) },
+        "rest-raw-undone" to { o -> assertTrue(o.bool("ok")) },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)

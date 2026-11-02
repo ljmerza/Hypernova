@@ -1,0 +1,7 @@
+{
+  "name": "DISABLE_TELEMETRY",
+  "scope": "user",
+  "folder": null,
+  "needsCheck": false,
+  "change": "DISABLE_TELEMETRY: 0 → 1"
+}

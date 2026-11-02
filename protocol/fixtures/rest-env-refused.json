@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "env_refused",
+    "message": "IS_SANDBOX would turn off a permission or trust check, so it can’t be set from a phone. Set it on the server."
+  }
+}

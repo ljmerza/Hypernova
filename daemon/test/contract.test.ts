@@ -1211,6 +1211,50 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       contract('rest-skills-codex', stable(codexSkills))
       useCodex(null)
       useExtrasCli(null)
+      // Environment variables: a planted secret, a flag, a guarded one, what's refused.
+      {
+        const sent = (j: unknown) => assert.ok(!JSON.stringify(j).includes('never-sent'))
+        const before = readFileSync(claudeFile, 'utf8')
+        writeFileSync(claudeFile, JSON.stringify({ ...JSON.parse(before), env: { SECRET: 'never-sent', DISABLE_TELEMETRY: '1', BASH_MAX_OUTPUT_LENGTH: '30000', PATH: '/opt/bin:/usr/bin' } }))
+        const list = await ok(get('/v1/agents/env?agent=claude'))
+        sent(list)
+        contract('rest-env', stable(list))
+        const hash = list.files.find((x: any) => x.scope === 'user').hash
+        const set = (o: object) => post('/v1/agents/env', { agent: 'claude', scope: 'user', ...o })
+        const flipped = await ok(set({ name: 'DISABLE_TELEMETRY', flip: true, expected: hash }))
+        contract('rest-env-set', stable({ ...flipped, hash: 'file-hash' }))
+        contract('rest-env-stale', await refused(set({ name: 'X', value: '1', expected: hash }), 409))
+        contract('rest-env-confirm', await refused(set({ name: 'LD_PRELOAD', value: '/tmp/x.so', expected: flipped.hash }), 403))
+        contract('rest-env-refused', await refused(set({ name: 'IS_SANDBOX', value: '1', expected: flipped.hash, confirmRun: true }), 403))
+        const offered = (await ok(get('/v1/agents/env?agent=claude'))).undo
+        contract('rest-env-undo-offer', offered)
+        contract('rest-env-undone', stable({ ...(await ok(post('/v1/agents/env/undo', { agent: 'claude' }))), hash: 'file-hash' }))
+        writeFileSync(claudeFile, before)
+        const { useCodex: stand } = await import('../src/mcp-codex.ts')
+        stand({ rpc: async (work) => work(async () => ({ config: { shell_environment_policy: { set: { HN_FLAG: 'true', API_KEY: 'never-sent' } } }, layers: [{ name: { type: 'user' }, version: 'sha256:abc', config: { shell_environment_policy: { set: { HN_FLAG: 'true', API_KEY: 'never-sent' } } } }] })) })
+        const codexList = await ok(get('/v1/agents/env?agent=codex'))
+        sent(codexList)
+        contract('rest-env-codex', codexList)
+        stand(null)
+      }
+      // JSON mode: a secret kept back, a save, each refusal.
+      {
+        const before = readFileSync(claudeFile, 'utf8')
+        writeFileSync(claudeFile, '{\n  "theme": "dark",\n  "env": { "SECRET": "never-sent" }\n}\n')
+        const raw = await ok(get('/v1/agents/raw?agent=claude&scope=user'))
+        assert.ok(!JSON.stringify(raw).includes('never-sent'))
+        contract('rest-raw', stable({ ...raw, hash: 'file-hash' }))
+        const save = (o: object) => post('/v1/agents/raw', { agent: 'claude', scope: 'user', ...o })
+        contract('rest-raw-bad-json', await refused(save({ text: '{\n  oops\n}', expected: raw.hash }), 400))
+        contract('rest-raw-refused', await refused(save({ text: '{"permissions":{"defaultMode":"bypassPermissions"}}', expected: raw.hash, confirmRun: true }), 403))
+        contract('rest-raw-confirm', await refused(save({ text: raw.text.replace('"dark"', '"dark", "statusLine": { "type": "command", "command": "echo hi" }'), expected: raw.hash }), 403))
+        contract('rest-raw-stale', await refused(save({ text: '{}', expected: 'old' }), 409))
+        const saved = await ok(save({ text: raw.text.replace('"dark"', '"light"'), expected: raw.hash }))
+        contract('rest-raw-saved', { ...saved, hash: 'file-hash' })
+        assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).env.SECRET, 'never-sent')
+        contract('rest-raw-undone', { ...(await ok(post('/v1/agents/raw/undo', { agent: 'claude' }))), hash: 'file-hash' })
+        writeFileSync(claudeFile, before)
+      }
       contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
     }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))

@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "raw_refused",
+    "message": "permissions.defaultMode can’t be set from a phone. Change it on the server."
+  }
+}

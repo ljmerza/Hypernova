@@ -201,7 +201,7 @@ class AgentSettingsScreenTest {
         rule.snap("agent_settings_claude")
     }
 
-    @Config(qualifiers = "+h1100dp")
+    @Config(qualifiers = "+h2200dp")
     @Test fun codexValuesAndSummaries() {
         hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MISSING), codex))
         open(AgentSettingsReply.CODEX)
@@ -679,5 +679,21 @@ class AgentSettingsScreenTest {
     @Test fun theEffortKeyHasWordsForItsLevelsAndWhenItApplies() {
         assertEquals(R.string.as_v_xhigh, valueWord(effortKey, "xhigh"))
         assertEquals(R.string.as_when_effort, whenWords(effortKey))
+    }
+
+    // ─── The switch to JSON (docs/DECISIONS.md, "JSON mode") ───
+
+    @Test fun claudeCodeHasTheSwitchToJsonAndCodexDoesnt() {
+        hub.answer = Result.success(AgentSettingsReply(claude, file(AgentSettingsFile.MISSING)))
+        var json = 0
+        var showing by androidx.compose.runtime.mutableStateOf(AgentSettingsReply.CLAUDE)
+        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, showing, onBack = {}, onJson = { json++ }) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.raw_mode_json)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(1, json)
+        showing = AgentSettingsReply.CODEX
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.raw_mode_json)).assertDoesNotExist()
     }
 }

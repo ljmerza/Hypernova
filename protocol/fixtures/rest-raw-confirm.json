@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "confirm_run",
+    "message": "These change what runs, what’s allowed or where data goes:\n\nstatusLine: {\"type\":\"command\",\"command\":\"echo hi\"}"
+  }
+}
