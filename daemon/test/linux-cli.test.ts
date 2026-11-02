@@ -159,7 +159,7 @@ test('arguments: the command, flags with and without values, and the words left 
 
 test('the unit: runs the installed daemon with its Node, restarts on failure, leaves holders running, starts at boot', () => {
   const c = ctx(fakeSys(() => ({})), {}, { HYPERNOVA_API_PORT: '49311', HYPERNOVA_LOCAL_PORT: '49312', UNRELATED: 'x' })
-  const node = join(c.support, 'node/v24.9.0/bin/node')
+  const node = join(c.support, 'node/v24.99.0/bin/node')
   const u = unitText(c, node)
   assert.match(u, new RegExp(`^ExecStart="${node.replace(/[.]/g, '\\.')}" --disable-warning=ExperimentalWarning "${join(c.daemonDir, 'src/main.ts').replace(/[.]/g, '\\.')}"$`, 'm'))
   assert.match(u, /^Restart=on-failure$/m)
@@ -172,7 +172,7 @@ test('the unit: runs the installed daemon with its Node, restarts on failure, le
   assert.match(u, /^Environment="HYPERNOVA_API_PORT=49311"$/m)
   assert.match(u, /^Environment="HYPERNOVA_LOCAL_PORT=49312"$/m)
   assert.doesNotMatch(u, /UNRELATED/)
-  assert.match(u, /^Environment="PATH=[^"]*\/node\/v24\.9\.0\/bin:[^"]*\.local\/bin:/m)
+  assert.match(u, /^Environment="PATH=[^"]*\/node\/v24\.99\.0\/bin:[^"]*\.local\/bin:/m)
   assert.match(u, /^Environment="LANG=C\.UTF-8"$/m)
   // systemd's specifiers and quotes stay literal.
   const odd = unitText({ ...c, daemonDir: '/opt/100%/da"emon' }, '/n')
@@ -289,30 +289,30 @@ test('installing the service writes the unit, reloads, enables and restarts it; 
 test('Node.js: the newest 24 with a build for this processor, its checksum from SHASUMS256.txt', () => {
   const index = [
     { version: 'v26.0.0', files: ['linux-x64', 'linux-arm64'] },
-    { version: 'v24.9.0', files: ['linux-x64'] },
-    { version: 'v24.10.1', files: ['linux-arm64', 'linux-x64'] },
-    { version: 'v24.2.0', files: ['linux-arm64'] },
-    { version: 'v24.9.0', files: ['linux-arm64'] },
+    { version: 'v24.99.0', files: ['linux-x64'] },
+    { version: 'v24.100.1', files: ['linux-arm64', 'linux-x64'] },
+    { version: 'v24.23.0', files: ['linux-arm64'] },
+    { version: 'v24.99.0', files: ['linux-arm64'] },
   ]
-  assert.deepEqual(pickRelease(index, 'arm64', 24, 'https://d'), { version: 'v24.10.1', file: 'node-v24.10.1-linux-arm64.tar.gz', url: 'https://d/v24.10.1/node-v24.10.1-linux-arm64.tar.gz' })
-  assert.equal(pickRelease(index, 'x64')?.version, 'v24.10.1')
+  assert.deepEqual(pickRelease(index, 'arm64', 24, 'https://d'), { version: 'v24.100.1', file: 'node-v24.100.1-linux-arm64.tar.gz', url: 'https://d/v24.100.1/node-v24.100.1-linux-arm64.tar.gz' })
+  assert.equal(pickRelease(index, 'x64')?.version, 'v24.100.1')
   assert.equal(pickRelease(index, 'ia32'), null)
   assert.equal(pickRelease([{ version: 'v23.1.0', files: ['linux-x64'] }], 'x64'), null)
   assert.equal(pickRelease('nonsense', 'x64'), null)
   assert.equal(nodeArch('x64'), 'x64')
   assert.equal(nodeArch('arm'), null)
-  assert.equal(majorOf("v24.9.0"), 24)
+  assert.equal(majorOf("v24.99.0"), 24)
   assert.equal(majorOf('garbage'), 0)
-  const sums = `${'a'.repeat(64)}  node-v24.10.1-linux-x64.tar.gz\n${'B'.repeat(64)}  node-v24.10.1-linux-arm64.tar.gz\nshort  node-v24.10.1.tar.gz\n`
-  assert.equal(shaFor(sums, 'node-v24.10.1-linux-arm64.tar.gz'), 'b'.repeat(64))
-  assert.equal(shaFor(sums, 'node-v24.10.1.tar.gz'), null)
+  const sums = `${'a'.repeat(64)}  node-v24.100.1-linux-x64.tar.gz\n${'B'.repeat(64)}  node-v24.100.1-linux-arm64.tar.gz\nshort  node-v24.100.1.tar.gz\n`
+  assert.equal(shaFor(sums, 'node-v24.100.1-linux-arm64.tar.gz'), 'b'.repeat(64))
+  assert.equal(shaFor(sums, 'node-v24.100.1.tar.gz'), null)
   assert.equal(shaFor(sums, 'missing'), null)
 })
 
 test('Node.js is downloaded into Hypernova’s own folder, and a download that fails its checksum is thrown away', async () => {
   // A stand-in nodejs.org with one release whose "node" prints its version.
   const work = join(scratch, 'dist-src')
-  const ver = 'v24.4.0'
+  const ver = 'v24.44.0'
   const name = `node-${ver}-linux-arm64`
   mkdirSync(join(work, name, 'bin'), { recursive: true })
   writeFileSync(join(work, name, 'bin', 'node'), `#!/bin/sh\necho ${ver}\n`, { mode: 0o755 })
@@ -333,7 +333,7 @@ test('Node.js is downloaded into Hypernova’s own folder, and a download that f
     const node = await downloadNode(c, (x) => said.push(x))
     assert.equal(node, join(c.nodeRoot, ver, 'bin', 'node'))
     assert.equal(execFileSync(node, { encoding: 'utf8' }).trim(), ver)
-    assert.match(said[0]!, /Downloading Node\.js v24\.4\.0 from 127\.0\.0\.1/)
+    assert.match(said[0]!, /Downloading Node\.js v24\.44\.0 from 127\.0\.0\.1/)
     // A changed download: refused, and nothing half-unpacked stays.
     sum = 'f'.repeat(64)
     const c2 = ctx(realSys(), { arch: 'arm64' }, { HYPERNOVA_NODE_DIST: dist })
@@ -459,7 +459,7 @@ test('the QR code: the smallest version, the finder and timing patterns, the for
 const claudeAnswers = (signedIn: boolean) => (cmd: string, args: string[]): Answer => {
   if (cmd === 'claude' && args[0] === '--version') return { out: '2.1.302 (Claude Code)\n' }
   if (cmd === 'claude' && args[0] === 'auth') return { code: signedIn ? 0 : 1, out: JSON.stringify({ loggedIn: signedIn, subscriptionType: signedIn ? 'max' : null, email: 'never@kept' }) }
-  if (cmd === 'node' && args[0] === '--version') return { out: 'v24.9.0\n' }
+  if (cmd === 'node' && args[0] === '--version') return { out: 'v24.99.0\n' }
   if (cmd === 'node' && args[0] === '-e') return { code: 0 } // node-pty works
   return {}
 }
@@ -573,7 +573,7 @@ test('doctor: each check with its fix; a missing login is a problem', async () =
   assert.equal(await doctor(c, {}, { listeners: () => ['127.0.0.1'] }), 1)
   const text = sys.out.join('\n')
   assert.match(text, /✓ Linux on /)
-  assert.match(text, /✓ Node\.js v24\.9\.0/)
+  assert.match(text, /✓ Node\.js v24\.99\.0/)
   assert.match(text, /✓ The daemon in ~\/\.local\/share\/hypernova\/app\/daemon/)
   assert.match(text, /✓ Shared terminals: node-pty works/)
   assert.match(text, /! No systemd user service here: This system has no systemd/)

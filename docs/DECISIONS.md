@@ -3731,3 +3731,11 @@ should just wrap because I can just click on it and hold to copy". A code block'
 screen's edge, and the block no longer scrolls sideways. A long press still copies the text as written,
 with no breaks added. Tables keep their sideways scroll when wrapping can't fit their columns.
 
+
+## Node's floor (2026-11-02)
+
+The owner: "the Node minimum". The floor moves to the October 2026 security release, confirmed against nodejs.org's release index on the day: 22.23.4, 24.22.1 and 26.12.1, all dated 2026-10-20 or 21. `engines` is `^22.23.4 || ^24.22.1 || >=26.12.1`.
+
+1. **Each line has its own floor, not one number.** "24.22.1 or newer" would have let in 25.x and 26.0 to 26.12.0, which don't have the fixes. 25 is past its end of life with no October release, so it's out.
+2. **The installers and the doctor stay on 24 and up,** as they were, and the 22 line is only for running from a checkout. A server on an older 24 downloads the newest 24 at its next install or update, and `hypernova doctor` fails until then. The old one is left where it is.
+3. **The download can't land below it.** `pickRelease` skips releases under the floor, and `install-linux.sh` and `install-macos.sh` check the Node they just unpacked. This only matters for a mirror (`HYPERNOVA_NODE_DIST`): `latest-v24.x` is already past it. A new floor is a change in three places, `node.ts`, both scripts' `node_ok` and `engines`, and `test/node-floor.test.ts` holds them together.

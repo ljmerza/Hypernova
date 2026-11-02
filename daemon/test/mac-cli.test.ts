@@ -137,7 +137,7 @@ const claudeSays = (signedIn: boolean) => (cmd: string, args: string[]): Answer 
   return null
 }
 const nodeSays = (cmd: string, args: string[]): Answer => {
-  if (args[0] === '--version') return { out: 'v24.9.0\n' }
+  if (args[0] === '--version') return { out: 'v24.99.0\n' }
   if (args[0] === '-e') return { code: 0 } // node-pty works
   return null
 }
@@ -209,7 +209,7 @@ test('the plist escapes what XML would take for markup, and carries a test daemo
 
 test('the agent’s PATH: its Node first, then ~/.local/bin, Homebrew’s, the system’s, no repeats', () => {
   assert.equal(agentPath({ home: '/Users/ada' }, '/usr/local/bin/node'), '/usr/local/bin:/Users/ada/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin')
-  assert.ok(agentPath({ home: '/Users/ada' }, '/Users/ada/Library/Application Support/Hypernova/node/v24.9.0/bin/node').startsWith('/Users/ada/Library/Application Support/Hypernova/node/v24.9.0/bin:/Users/ada/.local/bin:/opt/homebrew/bin'))
+  assert.ok(agentPath({ home: '/Users/ada' }, '/Users/ada/Library/Application Support/Hypernova/node/v24.99.0/bin/node').startsWith('/Users/ada/Library/Application Support/Hypernova/node/v24.99.0/bin:/Users/ada/.local/bin:/opt/homebrew/bin'))
 })
 
 test('a Mac’s shell block puts ~/.local/bin on PATH only when it isn’t there', () => {
@@ -496,12 +496,12 @@ test('logs on a Mac read Library’s folder', async () => {
 test('Node.js for a Mac: nodejs.org’s macOS tarball for this processor, not its .pkg', () => {
   const index = [
     { version: 'v26.1.0', files: ['linux-arm64', 'osx-arm64-tar', 'osx-x64-tar'] },
-    { version: 'v24.9.0', files: ['linux-arm64', 'linux-x64', 'osx-arm64-tar', 'osx-x64-pkg', 'osx-x64-tar'] },
-    { version: 'v24.8.0', files: ['linux-x64', 'osx-x64-pkg'] },
+    { version: 'v24.99.0', files: ['linux-arm64', 'linux-x64', 'osx-arm64-tar', 'osx-x64-pkg', 'osx-x64-tar'] },
+    { version: 'v24.88.0', files: ['linux-x64', 'osx-x64-pkg'] },
   ]
-  assert.deepEqual(pickRelease(index, 'arm64', 24, 'https://d', 'darwin'), { version: 'v24.9.0', file: 'node-v24.9.0-darwin-arm64.tar.gz', url: 'https://d/v24.9.0/node-v24.9.0-darwin-arm64.tar.gz' })
-  assert.equal(pickRelease(index, 'x64', 24, 'https://d', 'darwin')!.file, 'node-v24.9.0-darwin-x64.tar.gz')
+  assert.deepEqual(pickRelease(index, 'arm64', 24, 'https://d', 'darwin'), { version: 'v24.99.0', file: 'node-v24.99.0-darwin-arm64.tar.gz', url: 'https://d/v24.99.0/node-v24.99.0-darwin-arm64.tar.gz' })
+  assert.equal(pickRelease(index, 'x64', 24, 'https://d', 'darwin')!.file, 'node-v24.99.0-darwin-x64.tar.gz')
   assert.equal(pickRelease([index[2]], 'x64', 24, 'https://d', 'darwin'), null)
   // Linux is as it was.
-  assert.equal(pickRelease(index, 'arm64')!.file, 'node-v24.9.0-linux-arm64.tar.gz')
+  assert.equal(pickRelease(index, 'arm64')!.file, 'node-v24.99.0-linux-arm64.tar.gz')
 })

@@ -21,7 +21,7 @@ in its own star chart look, Atlas (`docs/DESIGN.md`).
 Layout: `android/` (Gradle, Kotlin, Compose: `app/` is the phone app, `shared/` the data layer for Android
 and the desktop JVM, its platform calls behind `Seams.kt`; docs/PLATFORMS.md, "The shared module"; `desktop/` is the
 thin desktop app, connect, list and approve, on Compose for Desktop; same page, "The desktop app"),
-`daemon/` (TypeScript on Node 22.18 or newer,
+`daemon/` (TypeScript on Node 22.23.4 or 24.22.1 or newer,
 run directly without a build step; `daemon/src/cli/` is the `hypernova` command), `scripts/`
 (the Linux and Mac installs, the `pack-*.sh` packagers, the Docker entrypoint, end-to-end checks).
 `docs/PROTOCOL.md` is the contract between them.

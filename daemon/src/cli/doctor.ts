@@ -11,7 +11,7 @@ import { health, local } from './api.ts'
 import { tilde, type Cli, UNIT } from './context.ts'
 import { claudeSignedIn, claudeVersionOf, findClaudeBin, isDaemonDir, missingBuildTools, ptyWorks, BUILD_TOOLS } from './install.ts'
 import { agentState, agentTarget, guiSession, restartHint, stderrLog } from './launchd.ts'
-import { NODE_MAJOR, majorOf, recordedNode, versionOf } from './node.ts'
+import { NODE_MIN, nodeMeetsFloor, recordedNode, versionOf } from './node.ts'
 import { hasUserSystemd, lingering, serviceState } from './service.ts'
 import { sdkAt } from '../sdk.ts'
 import { behindNat, wslMachineChecks, wslNetworkCheck, wslNetworkingOf } from './wsl.ts'
@@ -163,7 +163,7 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   const node = recordedNode(cli)
   const nodeVersion = node ? await versionOf(cli, node) : null
   if (!node || !nodeVersion) add({ name: 'node', mark: 'fail', text: 'No Node.js recorded for the service.', fix: 'Run hypernova setup (it downloads Node.js 24 from nodejs.org).' })
-  else if (majorOf(nodeVersion) < NODE_MAJOR) add({ name: 'node', mark: 'fail', text: `Node.js ${nodeVersion} is older than ${NODE_MAJOR}.`, fix: 'Run hypernova setup: it downloads Node.js 24 into Hypernova’s own folder.' })
+  else if (!nodeMeetsFloor(nodeVersion)) add({ name: 'node', mark: 'fail', text: `Node.js ${nodeVersion} is too old or lacks the October 2026 security fixes: Hypernova needs ${NODE_MIN} or newer.`, fix: 'Run hypernova setup: it downloads the newest Node.js 24 into Hypernova’s own folder.' })
   else add({ name: 'node', mark: 'ok', text: `Node.js ${nodeVersion} (${tilde(cli, node)})` })
 
   const installed = isDaemonDir(cli.daemonDir)

@@ -131,7 +131,8 @@ fi
 # ── 2. Node.js 24 ──────────────────────────────────────────────────────────
 NODE_MAJOR=24
 DIST="${HYPERNOVA_NODE_DIST:-https://nodejs.org/dist}"
-node_ok() { [ -x "$1" ] && "$1" -e "process.exit(Number(process.versions.node.split('.')[0]) >= $NODE_MAJOR ? 0 : 1)" 2>/dev/null; }
+# The security floor: October 2026's release on each line, as daemon/src/cli/node.ts has it. Line 25 ended before it.
+node_ok() { [ -x "$1" ] && "$1" -e "const [a,b,c]=process.versions.node.split('.').map(Number),at=(y,z)=>b>y||(b===y&&c>=z);process.exit((a===24&&at(22,1))||(a===26&&at(12,1))||a>26?0:1)" 2>/dev/null; }
 NODE=""
 if [ -f "$NODE_PATH_FILE" ] && node_ok "$(cat "$NODE_PATH_FILE")"; then
   NODE="$(cat "$NODE_PATH_FILE")"
@@ -157,6 +158,7 @@ if [ -z "$NODE" ]; then
   tar -xzf "$tmp/$file" -C "$NODE_ROOT/$version" --strip-components=1 --no-same-owner
   rm -rf "$tmp"
   NODE="$NODE_ROOT/$version/bin/node"
+  node_ok "$NODE" || die "Node.js $version doesn't run here, or is older than Hypernova's floor of 24.22.1."
   printf '%s\n' "$NODE" > "$NODE_PATH_FILE"
   chmod 600 "$NODE_PATH_FILE"
 fi

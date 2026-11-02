@@ -1,6 +1,6 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // Node.js for the daemon: the one Hypernova downloaded (<support>/node/<version>), else the
-// one running this command, when either is Node 24 or newer; otherwise the newest Node 24 from
+// one running this command, when either meets the floor (nodeMeetsFloor); otherwise the newest Node 24 from
 // nodejs.org, checked against nodejs.org's SHASUMS256.txt and unpacked into Hypernova's own folder.
 // Nothing outside that folder is touched.
 import { createHash } from 'node:crypto'
@@ -12,6 +12,11 @@ import type { Cli } from './context.ts'
 /** The oldest Node major the installers accept, and the line they download: 24, the LTS the daemon is tested on. */
 export const NODE_MAJOR = 24
 
+/** The first release of each line with October 2026's security fixes. Line 25 ended before them. docs/DECISIONS.md, "Node's floor". */
+export const NODE_FLOORS: Record<number, string> = { 24: 'v24.22.1', 26: 'v26.12.1' }
+/** The floor named to people: the line the installers download. */
+export const NODE_MIN = NODE_FLOORS[NODE_MAJOR]!.slice(1)
+
 /** nodejs.org's downloads (HYPERNOVA_NODE_DIST points the tests at a stand-in). */
 export const nodeDist = (cli: Pick<Cli, 'env'>) => (cli.env.HYPERNOVA_NODE_DIST ?? 'https://nodejs.org/dist').replace(/\/$/, '')
 
@@ -19,6 +24,14 @@ export const nodeDist = (cli: Pick<Cli, 'env'>) => (cli.env.HYPERNOVA_NODE_DIST 
 export const nodeArch = (arch: string): string | null => (arch === 'x64' ? 'x64' : arch === 'arm64' ? 'arm64' : null)
 
 export const majorOf = (version: string): number => Number(/^v?(\d+)\./.exec(version.trim())?.[1] ?? 0)
+
+/** Whether the service may run on [version]: a line the installers accept, with that line's security floor met. */
+export function nodeMeetsFloor(version: string): boolean {
+  const major = majorOf(version)
+  if (major < NODE_MAJOR || major === 25) return false
+  const floor = NODE_FLOORS[major]
+  return !floor || cmpVersion(version, floor) >= 0
+}
 
 /** The version a Node binary reports, or null when it doesn't run. */
 export async function versionOf(cli: Cli, node: string): Promise<string | null> {
@@ -45,14 +58,14 @@ export function recordNode(cli: Cli, node: string): void {
 export type Release = { version: string; file: string; url: string }
 
 /**
- * The newest Node [major] release with a build for this system and [arch], from nodejs.org's index
+ * The newest Node [major] release at or past its floor with a build for this system and [arch], from nodejs.org's index
  * (`files` lists "linux-arm64", "linux-x64", and for a Mac's tarballs "osx-arm64-tar", "osx-x64-tar").
  */
 export function pickRelease(index: unknown, arch: string, major = NODE_MAJOR, dist = 'https://nodejs.org/dist', platform: Platform = 'linux'): Release | null {
   const a = nodeArch(arch)
   if (!a || !Array.isArray(index)) return null
   const listed = platform === 'darwin' ? `osx-${a}-tar` : `linux-${a}`
-  const fits = index.filter((r: any) => typeof r?.version === 'string' && majorOf(r.version) === major && Array.isArray(r.files) && r.files.includes(listed))
+  const fits = index.filter((r: any) => typeof r?.version === 'string' && majorOf(r.version) === major && nodeMeetsFloor(r.version) && Array.isArray(r.files) && r.files.includes(listed))
   // The index is newest first, but don't count on it.
   fits.sort((x: any, y: any) => cmpVersion(y.version, x.version))
   const r = fits[0] as { version: string } | undefined
@@ -123,14 +136,14 @@ export async function downloadNode(cli: Cli, say: (s: string) => void = () => {}
 }
 
 /**
- * The Node the service will run: the recorded one, else this command's own, when it's Node 24 or
- * newer; else a fresh download. Recorded in <support>/node-path either way.
+ * The Node the service will run: the recorded one, else this command's own, when it meets the
+ * floor; else a fresh download. Recorded in <support>/node-path either way.
  */
 export async function ensureNode(cli: Cli, say: (s: string) => void = () => {}): Promise<{ node: string; version: string; downloaded: boolean }> {
   for (const node of [recordedNode(cli), process.execPath]) {
     if (!node) continue
     const version = await versionOf(cli, node)
-    if (version && majorOf(version) >= NODE_MAJOR) {
+    if (version && nodeMeetsFloor(version)) {
       recordNode(cli, node)
       return { node, version, downloaded: false }
     }
