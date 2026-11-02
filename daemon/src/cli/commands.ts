@@ -23,7 +23,7 @@ export type Flags = Record<string, string | boolean>
 export function parseArgs(argv: string[]): { cmd: string; flags: Flags; rest: string[] } {
   const flags: Flags = {}
   const rest: string[] = []
-  const valued = new Set(['from', 'n', 'lines', 'data', 'data-file', 'token'])
+  const valued = new Set(['from', 'n', 'lines', 'data', 'data-file', 'token', 'hours', 'out'])
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!
     const m = /^--?([\w-]+)(?:=(.*))?$/.exec(a)
@@ -414,11 +414,11 @@ export async function doctor(cli: Cli, flags: Flags, o: DoctorOptions = {}): Pro
 
 // ── logs ──────────────────────────────────────────────────────────────────
 
-/** The daemon's log: its last lines (-n, 100 by default), and with -f what comes after. */
+/** The daemon's log: its last lines (-n, 100 by default), and with -f what comes after. `--debug`: the debug log (cli/debug.ts). */
 export async function logs(cli: Cli, flags: Flags): Promise<number> {
-  const file = join(cli.logs, flags.terminals ? 'terminals.log' : 'daemon.log')
+  const file = join(cli.logs, flags.debug ? 'debug.log' : flags.terminals ? 'terminals.log' : 'daemon.log')
   if (!existsSync(file)) {
-    cli.sys.say(`No log yet at ${tilde(cli, file)}: the daemon hasn’t run here.`)
+    cli.sys.say(flags.debug ? `No debug log yet at ${tilde(cli, file)}: hypernova debug on starts one.` : `No log yet at ${tilde(cli, file)}: the daemon hasn’t run here.`)
     return 1
   }
   const n = Math.max(1, Number(flags.n ?? flags.lines ?? 100) || 100)
@@ -616,7 +616,11 @@ export const HELP = `hypernova: a control room for Claude Code and Codex, on thi
   hypernova pair        show the pairing QR code for the Hypernova app (--no-wait)
   hypernova status      what runs, how phones reach it, who's paired (--json)
   hypernova doctor      check everything, each problem with its fix (--json)
-  hypernova logs        the daemon's log (-n <lines>, -f to follow, --terminals: the shared terminals')
+  hypernova logs        the daemon's log (-n <lines>, -f to follow, --terminals: the shared terminals',
+                        --debug: the debug log)
+  hypernova debug on|off|status|bundle
+                        much more in a log of its own, off by itself after 24 hours (on --hours <n>);
+                        bundle: one scrubbed file to share (--out <file>)
   hypernova codex [on|off]
                         OpenAI's Codex for Hypernova: what's found here, or turn it on or off
   hypernova lan on|off  the phone's direct route on the same network

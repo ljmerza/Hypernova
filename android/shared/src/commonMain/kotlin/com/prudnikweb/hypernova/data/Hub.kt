@@ -338,6 +338,9 @@ interface Hub {
     /** Settings → the server → Update this server automatically ([Mac.update]; data/ServerUpdate.kt). */
     suspend fun setAutoUpdate(on: Boolean): Result<Unit> = Result.failure(UnsupportedOperationException())
 
+    /** Settings → the server → Server debug log ([Mac.debug]; data/ServerDebug.kt). */
+    suspend fun setServerDebug(on: Boolean): Result<Unit> = Result.failure(UnsupportedOperationException())
+
     /** Automations on the Mac (data/Automations.kt): [Automations.None] where there are none. */
     val automations: Automations get() = Automations.None
 

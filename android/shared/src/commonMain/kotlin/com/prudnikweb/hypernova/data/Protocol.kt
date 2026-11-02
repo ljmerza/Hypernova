@@ -33,6 +33,8 @@ data class MacInfo(
     val browseOutsideProjects: Boolean? = null,
     /** The server updating itself (data/ServerUpdate.kt); null from a daemon too old to. */
     val update: ServerUpdate? = null,
+    /** The server's debug log: on until when; null from a daemon too old to have one. */
+    val debug: ServerDebug? = null,
     /** The Mac features this computer lacks, each with its sentence (docs/PROTOCOL.md, "Mac-only features"). */
     val unavailable: Map<String, String> = emptyMap(),
 )
@@ -612,6 +614,7 @@ object Wire {
         platform = if (o.str("platform") == Mac.LINUX) Mac.LINUX else Mac.DARWIN,
         browseOutsideProjects = o.obj("files")?.bool("browseOutsideProjects"),
         update = ServerUpdate.parse(o.obj("update")),
+        debug = ServerDebug.parse(o.obj("debug")),
         unavailable = o.obj("unavailable")?.let { u -> u.keys().asSequence().mapNotNull { k -> u.str(k)?.let { k to it } }.toMap() }.orEmpty(),
     )
 

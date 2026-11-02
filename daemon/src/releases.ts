@@ -8,6 +8,7 @@
 // check. Settings: `releaseCheck` (unset: on). The same look hands the release to the server's own
 // update (server-update.ts, `autoUpdate`, unset: on), after the APK, so the phones are offered the
 // new app before the server restarts into the new version.
+import { dbg } from './debug-log.ts'
 import { createHash } from 'node:crypto'
 import { once } from 'node:events'
 import { chmodSync, createWriteStream, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -291,6 +292,7 @@ export function releaseChecker(o: CheckerOptions) {
     running = run()
       .catch((e: unknown): Outcome => ({ kind: 'error', message: e instanceof Error ? (e.cause instanceof Error ? `${e.message}: ${e.cause.message}` : e.message) : String(e) }))
       .then((r) => {
+        dbg('release', 'check', { outcome: r.kind, tag: (r as { tag?: string }).tag, status: (r as { status?: number }).status })
         note(r)
         toServer(r)
         return r

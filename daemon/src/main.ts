@@ -23,10 +23,18 @@ import { PLATFORM, has } from './platform.ts'
 import { startCodex } from './codex/client.ts'
 import { tickCodex } from './codex/account.ts'
 import { restoreCodex } from './codex/sessions.ts'
+import { dbg, dbgError } from './debug-log.ts'
 
 log(`hypernova daemon ${VERSION} starting on ${PLATFORM} (pid ${process.pid}, api ${API_PORT}, local ${LOCAL_PORT})`)
-process.on('uncaughtException', (e) => log('uncaught', e))
-process.on('unhandledRejection', (e) => log('unhandled rejection', e))
+process.on('uncaughtException', (e) => {
+  log('uncaught', e)
+  dbgError('error', 'uncaught', e)
+})
+process.on('unhandledRejection', (e) => {
+  log('unhandled rejection', e)
+  dbgError('error', 'unhandled-rejection', e)
+})
+dbg('debug', 'daemon-start', { version: VERSION, platform: PLATFORM, pid: process.pid })
 
 // The folder new projects go in, on first run where the owner keeps code (files.ts).
 try {
@@ -92,6 +100,7 @@ setInterval(reapAttachments, 6 * 3600_000)
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => {
     log(`stopping (${sig})`)
+    dbg('debug', 'daemon-stop', { signal: sig })
     process.exit(0)
   })
 }

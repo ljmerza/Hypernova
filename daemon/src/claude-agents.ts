@@ -1,3 +1,4 @@
+import { dbg, dbgProc, exitOf } from './debug-log.ts'
 import { execFile } from 'node:child_process'
 import { findClaude, log, trimText } from './util.ts'
 import { saveSettings, settings } from './store.ts'
@@ -32,7 +33,9 @@ export function pollClaudeAgents(): void {
   const file = findClaude()
   if (!file) return
   reading = true
+  const polled = dbgProc(file, ['agents', '--json', '--all'])
   execFile(file, ['agents', '--json', '--all'], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024 }, (e, out) => {
+    polled(exitOf(e))
     reading = false
     const list = e ? null : parseAgentList(out)
     if (!list) {
@@ -70,6 +73,7 @@ export function agentJobCommand(verb: 'stop' | 'rm' | 'respawn', job: string): P
   deaths.ownerActed(job)
   return new Promise((done) =>
     execFile(file, [verb, job], { timeout: 30_000 }, (e, out, err) => {
+      dbg('proc', 'exit', { bin: 'claude', sub: verb, job, exit: exitOf(e) })
       const said = trimText(`${out}\n${err}`.trim(), 400) ?? ''
       log(`claude ${verb}`, job, e ? 'failed:' : 'done:', said)
       done({ ok: !e, said })

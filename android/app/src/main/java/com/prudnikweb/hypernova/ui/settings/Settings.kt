@@ -381,6 +381,8 @@ private fun ServerCard(
                 if (awake != null) StayAwakeBlock(live, awake, live.mac.battery)
                 // The server updating itself (AutoUpdateRow.kt), from a daemon that can say; not from a last snapshot.
                 if (!waiting) live.mac.update?.let { AutoUpdateRow(live, it) }
+                // The server's debug log (ServerDebugRow.kt): the switch and when it ends.
+                if (!waiting) live.mac.debug?.let { ServerDebugRow(live, it) }
                 // Its notifications, kept on the phone: here while it can't be reached too.
                 ServerNotifyRow(live.serverId, live.mac.name.ifBlank { live.pairing.macName })
                 if (link.state == LinkState.Offline || link.state == LinkState.Reconnecting) {

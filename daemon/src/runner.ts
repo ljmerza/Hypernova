@@ -2,6 +2,7 @@
 // Sessions Hypernova drives itself, through the Agent SDK: one claude process per prompt,
 // resumed by session id, so they survive daemon restarts and stay normal Claude Code sessions.
 // The SDK is loaded when a prompt first runs (sdk.ts): without it a prompt isn't sent, and says why.
+import { dbgProc } from './debug-log.ts'
 import type { Query } from '@anthropic-ai/claude-agent-sdk'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -284,6 +285,9 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
   const sessionOpts = forkFrom ? { resume: forkFrom, forkSession: true, sessionId: id } : exists ? { resume: id } : { sessionId: id }
   // An automation has nobody to say yes for a project's servers, and under the SDK they'd all count as approved: checked at each turn, so an approval since counts.
   const hold = m.automation ? holdArgs(await automationHold(m.cwd)) : {}
+  // Through the SDK: the program is Claude Code, the flags the SDK's own. A turn's prompt is its size.
+  const turn = dbgProc(claude, [], { via: 'sdk', session: id, mode: m.permissionMode, prompt: text })
+  let turnFailed = false
   const q = query({
     prompt: text,
     options: {
@@ -514,8 +518,12 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
   } catch (e) {
     // The SDK throws on an error result too ("Claude Code returned an error result: API Error: 402…"):
     // stopped by a limit, the account or the provider, that's the block it said, not a failure.
-    if (!abort.signal.aborted && !run.interrupted && !stop.by) throw e
+    if (!abort.signal.aborted && !run.interrupted && !stop.by) {
+      turnFailed = true
+      throw e
+    }
   } finally {
+    turn(turnFailed ? 1 : 0)
     run.q = null
     run.abort = null
     // Close anything still marked as streaming or running.

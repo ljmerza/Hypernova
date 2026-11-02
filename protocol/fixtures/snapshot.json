@@ -38,6 +38,10 @@
       "last": null,
       "failure": null
     },
+    "debug": {
+      "on": false,
+      "until": null
+    },
     "platform": "linux",
     "unavailable": {
       "battery": "Hypernova shows the battery of a Mac only.",

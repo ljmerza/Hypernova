@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // The automations engine: the store, firing through the gates, following runs, and the routes.
 // Everything that touches the daemon goes through an AutoIO (contract.ts; the daemon's is daemon.ts).
+import { dbg, dbgProc } from '../debug-log.ts'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { basename, join, sep } from 'node:path'
 import { isSecretFile } from '../secretfiles.ts'
@@ -1860,6 +1861,7 @@ export class Automations {
 
   /** It starts: its first step (or the one a Retry begins at). */
   private async begin(r: RunRec): Promise<void> {
+    dbg('automation', 'run-begin', { run: r.id, automation: r.automationId, by: r.fired.by, steps: r.spec.steps.length })
     const now = this.io.now()
     const d = this.s.automations.find((x) => x.id === r.automationId)
     r.f.started = true
@@ -1890,6 +1892,7 @@ export class Automations {
    * a reset); else a session step goes through them now.
    */
   private async runStep(r: RunRec, gated: boolean): Promise<void> {
+    dbg('automation', 'step-start', { run: r.id, step: this.cur(r).id, kind: this.cur(r).kind })
     const now = this.io.now()
     const st = this.cur(r)
     const rs = this.rstep(r)
@@ -2202,7 +2205,9 @@ export class Automations {
     }
     this.shells.set(r.id, h)
     log('automation run', r.id, 'runs its command', st.id)
+    const shellStarted = dbgProc('sh', [], { via: 'automation', run: r.id, step: st.id })
     const ended = (x: { exit: number | null; output: string; timedOut: boolean }) => {
+      shellStarted(x.exit)
       if (this.shells.get(r.id) !== h) return
       this.shells.delete(r.id)
       r.f.shellEnd = x
@@ -2428,6 +2433,7 @@ export class Automations {
     r.f.targets = []
     this.dirtyRuns(r)
     log('automation run', r.id, 'step', st.id, state, reason ?? '')
+    dbg('automation', 'step-end', { run: r.id, step: st.id, kind: st.kind, state, reason, exit: rs.exit })
     const next = this.nextStep(r)
     if (next == null) return this.closeRun(r)
     r.step = next
@@ -2541,6 +2547,7 @@ export class Automations {
     }
     r.outputs = r.spec.outputs.map((o) => ({ id: o.id, kind: o.kind, state: 'skipped', error: null, at: null }))
     log('automation run', r.id, r.automationId, state, reason ?? '')
+    dbg('automation', 'run-end', { run: r.id, automation: r.automationId, state, reason })
     this.dirtyRuns(r)
     if (state === 'done' && !r.quiet && r.f.started) this.sendOutputs(r)
     if (state === 'failed') this.noteFailure(r)

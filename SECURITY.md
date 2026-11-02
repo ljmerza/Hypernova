@@ -87,7 +87,8 @@ created `0700`, with each secret file `0600`.
   provider keys, the text read aloud, Claude sign-in codes, and the output
   of Claude's account commands. Tests check several of these (for example "the key and the text
   never reach the log"). The log does name devices, projects and what happened, so look through it
-  before attaching it to a public issue.
+  before attaching it to a public issue. For sharing, `hypernova debug bundle` writes a scrubbed file
+  (docs/SECURITY-MODEL.md, "The server's debug log").
 
 ## Reporting a vulnerability
 

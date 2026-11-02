@@ -113,6 +113,8 @@ class LiveHub(
     private var macBrowse by mutableStateOf<Boolean?>(null)
     /** The server updating itself as last heard (the snapshot, then `{t:"update"}`); null from a daemon too old to. */
     private var macUpdate by mutableStateOf<ServerUpdate?>(null)
+    /** The server's debug log as last heard (the snapshot, then `{t:"debug"}`); null from a daemon too old to have one. */
+    private var macDebug by mutableStateOf<ServerDebug?>(null)
     /** Read aloud: the Mac's voice setting and this phone's own reads (SpeechLink.kt). */
     override val speech = PhoneSpeech(pairing, api, send = { ws?.send(it) == true }, labelOf = { id -> id?.let { i -> sessions.firstOrNull { it.id == i }?.project } }, speaker = platform.speech)
 
@@ -143,6 +145,7 @@ class LiveHub(
             platform = macInfo?.platform ?: Mac.DARWIN,
             browseOutsideProjects = macBrowse,
             update = macUpdate,
+            debug = macDebug,
             unavailable = macInfo?.unavailable.orEmpty(),
         )
 
@@ -567,6 +570,8 @@ class LiveHub(
         class FilesMsg(val browseOutsideProjects: Boolean) : Msg
         /** The server updating itself: the setting, waiting, installing (data/ServerUpdate.kt). */
         class UpdateMsg(val u: ServerUpdate) : Msg
+        /** The server's debug log: on until when, or off (data/ServerDebug.kt). */
+        class DebugMsg(val d: ServerDebug) : Msg
         data object AgentSettingsChanged : Msg
         class SleepSoonMsg(val s: SleepSoon) : Msg
         class BackpackEndingMsg(val s: BackpackEnding) : Msg
@@ -610,6 +615,7 @@ class LiveHub(
         "awake" -> Msg.AwakeMsg(MacAwake.parse(o.obj("awake")))
         "files" -> Msg.FilesMsg(o.obj("files")?.bool("browseOutsideProjects") == true)
         "update" -> ServerUpdate.parse(o.obj("update"))?.let { Msg.UpdateMsg(it) }
+        "debug" -> ServerDebug.parse(o.obj("debug"))?.let { Msg.DebugMsg(it) }
         "agent_settings" -> Msg.AgentSettingsChanged
         "mac_sleep_soon" -> SleepSoon.parse(o)?.let { Msg.SleepSoonMsg(it) }
         "mac_backpack_ending" -> BackpackEnding.parse(o)?.let { Msg.BackpackEndingMsg(it) }
@@ -679,6 +685,7 @@ class LiveHub(
             is Msg.AwakeMsg -> macAwake = m.a
             is Msg.FilesMsg -> macBrowse = m.browseOutsideProjects
             is Msg.UpdateMsg -> setServerUpdate(m.u)
+            is Msg.DebugMsg -> macDebug = m.d
             is Msg.AgentSettingsChanged -> agentSettingsVersion++
             // A newer app now on the Mac, without reconnecting: the banner (App.kt) and Settings follow
             // [appUpdate]; in the background, the notification once per version.
@@ -866,6 +873,7 @@ class LiveHub(
         macAwake = s.mac.awake
         macBrowse = s.mac.browseOutsideProjects
         setServerUpdate(s.mac.update)
+        macDebug = s.mac.debug
         raw = s.sessions.associateBy { it.id }
         // A rewind on another phone while this one was away (docs/PROTOCOL.md, "Rewind").
         for ((old, to) in s.replaced) replaced(old, to)
@@ -2071,6 +2079,12 @@ class LiveHub(
         setServerUpdate(ServerUpdate.parse(r.obj("update")) ?: macUpdate?.copy(auto = on))
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_auto_update)) }
+
+    override suspend fun setServerDebug(on: Boolean): Result<Unit> = try {
+        val r = api.post("/v1/mac/debug", JSONObject().put("on", on))
+        macDebug = ServerDebug.parse(r.obj("debug")) ?: macDebug?.copy(on = on)
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_server_debug)) }
 
     override suspend fun setAwake(mode: String): Result<Unit> = try {
         val r = api.post("/v1/mac/awake", JSONObject().put("mode", mode))

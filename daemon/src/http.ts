@@ -68,6 +68,8 @@ import { putEvent, tapBroadcast } from './hub.ts'
 import { editHeld, heldOf, hold, kickHeld, removeHeld, useHeldOps, type HeldReady } from './held.ts'
 import { checkReleaseNow } from './releases.ts'
 import { setAutoUpdate, updateView } from './server-update.ts'
+import { DEBUG_HOURS, dbg, dbgError, debugOn, debugView, onDebugChange, setDebug } from './debug-log.ts'
+import { knownSecret } from './debug-scrub.ts'
 
 /**
  * `lan`: came in on the LAN listener (lan.ts), where the admin token counts for nothing and pairing
@@ -218,6 +220,8 @@ export async function startPairing(dev = false) {
   const code = randomToken(16)
   const expiresAt = Date.now() + 10 * 60_000
   pairCodes.set(sha256(code), expiresAt)
+  knownSecret(code)
+  dbg('pair', 'code-shown', { dev })
   // Local only (docs/PROTOCOL.md, "Pairing"): everything points at this computer on its own
   // network, the LAN listener at the address a phone's browser is sent to (lan.ts), reached on the
   // same Wi-Fi or over the owner's VPN into that network. Nothing public is named.
@@ -294,6 +298,7 @@ export function downloadTarget(base: string): { url: string; local: boolean; tru
 let pairRefusedAt = 0
 function pairRefused(source: string, why: string): void {
   const now = Date.now()
+  dbg('pair', 'refused', { ip: source, reason: why.replace(/\s+/g, '_') })
   if (now - pairRefusedAt < 10_000) return
   pairRefusedAt = now
   log(`pairing from ${source} refused: ${why}`)
@@ -360,6 +365,8 @@ function snapshot(deviceId: string | null) {
       files: filesState(),
       // The server updating itself (server-update.ts): the setting, whether it can here, the last one.
       update: updateView(),
+      // The server's debug log (debug-log.ts): on until when. The lines themselves never leave.
+      debug: debugView(),
       // The server's system, and the Mac features it lacks with the reason to show (platform.ts):
       // empty on a Mac; on Linux the battery, Stay awake, the Mac's voice, opening a window.
       platform: PLATFORM, unavailable: UNAVAILABLE,
@@ -456,6 +463,7 @@ async function api(c: Ctx): Promise<void> {
     }
     addDevice({ id: deviceId, name: String(b.deviceName ?? 'Phone').slice(0, 60), model: String(b.model ?? '').slice(0, 60), createdAt: Date.now(), lastSeenAt: Date.now(), appVersion, ...(client ? { client } : {}), ...(installId ? { installId } : {}) }, token)
     log('paired', b.deviceName, b.model, client ?? '', before.length ? `(in place of ${before.length})` : '')
+    dbg('pair', 'paired', { device: deviceId, client, replaced: before.length, via: c.lan ? 'lan' : 'api' })
     broadcast({ t: 'devices' })
     return json(res, 200, { token, deviceId, mac: { id: identity.id, name: macName() } })
   }
@@ -501,6 +509,7 @@ async function api(c: Ctx): Promise<void> {
       setDeviceCert(c.deviceId, issued.certFingerprint, issued.expiresAt)
       dropOldCert(c.deviceId, issued.certFingerprint)
       log('device certificate issued', c.deviceId)
+      dbg('pair', 'cert-issued', { device: c.deviceId, fp: issued.certFingerprint })
       return json(res, 200, { cert: issued.cert.toString('base64'), ca: issued.ca.toString('base64'), fingerprint: issued.fingerprint })
     } catch (e) {
       if (e instanceof TlsError) throw new HttpError(e.code === 'no_tls' ? 503 : 400, e.code, e.message)
@@ -573,6 +582,14 @@ async function api(c: Ctx): Promise<void> {
     broadcast({ t: 'update', update })
     return json(res, 200, { update })
   }
+  // The server's debug log (debug-log.ts): Settings → the server. The switch and when it ends: no route
+  // sends its lines anywhere. Every phone hears {t:"debug"}, from onDebugChange.
+  if (path === '/v1/mac/debug' && m === 'GET') return json(res, 200, { debug: debugView() })
+  if (path === '/v1/mac/debug' && m === 'POST') {
+    const b = await readJsonBody(req)
+    if (typeof b?.on !== 'boolean') throw new HttpError(400, 'bad_value', 'Say on: true or false.')
+    return json(res, 200, { debug: setDebug(b.on, DEBUG_HOURS, c.deviceId ?? 'cli') })
+  }
   if (path === '/v1/stats' && m === 'GET') {
     // Statistics: how long Claude worked, tokens, sessions… (see stats.ts).
     const range = parseRange(url.searchParams.get('range') ?? 'week')
@@ -623,8 +640,9 @@ async function api(c: Ctx): Promise<void> {
       body: () => readJsonBody(req),
       changed: (agent: 'claude' | 'codex') => broadcast({ t: 'agent_settings', agent }),
     }
-    if (await mcpRoute(path, m, url, res, json, deps)) return
-    if (await extrasRoute(path, m, url, res, json, deps)) return
+    const area = path.startsWith('/v1/agents/mcp') ? 'mcp' : 'plugin'
+    if (await mcpRoute(path, m, url, res, json, deps)) return dbg(area, 'route', { method: m, route: path, agent: url.searchParams.get('agent'), status: res.statusCode })
+    if (await extrasRoute(path, m, url, res, json, deps)) return dbg(area, 'route', { method: m, route: path, agent: url.searchParams.get('agent'), status: res.statusCode })
   }
   // The models each provider offers, for the new-session sheet (models.ts): Claude Code's own list,
   // OpenRouter's catalogue, the providers' settings.
@@ -1959,6 +1977,10 @@ async function local(c: Ctx): Promise<void> {
   }
   if (path === '/local/settings' && m === 'POST') {
     const b = await readJsonBody(req)
+    // The server's debug log (debug-log.ts; `hypernova debug`): refused before anything else changes.
+    const debugHours = b.debugHours ?? DEBUG_HOURS
+    if (typeof debugHours !== 'number' || !(debugHours > 0) || debugHours > DEBUG_HOURS) throw new HttpError(400, 'bad_value', `Say debugHours: more than 0, up to ${DEBUG_HOURS}.`)
+    if (typeof b.debugLog === 'boolean') setDebug(b.debugLog, debugHours)
     if (b.projectsRoot && existsSync(b.projectsRoot)) settings.projectsRoot = b.projectsRoot
     // The app's GitHub releases (releases.ts): turned on, a look now.
     if (typeof b.releaseCheck === 'boolean') settings.releaseCheck = b.releaseCheck
@@ -1998,6 +2020,20 @@ function openOnLan(method: string, path: string): boolean {
   return (method === 'GET' && path === '/v1/health') || (method === 'POST' && (path === '/v1/pair' || path === '/v1/device/cert'))
 }
 
+/** A request's line when it's over: its route and how it went, never its query, its headers or its body (debug-scrub.ts). */
+function noteRequest(c: Ctx, isLocal: boolean, admin: boolean): void {
+  const { req, res, url, deviceId, lan } = c
+  const t0 = performance.now()
+  const sock = req.socket
+  const wrote = sock.bytesWritten
+  res.once('close', () => {
+    dbg('http', 'request', { via: lan ? 'lan' : isLocal ? 'local' : 'api', method: req.method, route: url.pathname, status: res.statusCode, ms: Math.round(performance.now() - t0), device: deviceId, admin: admin || undefined, in: Number(req.headers['content-length']) || 0, out: sock.bytesWritten - wrote, done: res.writableFinished ? undefined : false })
+  })
+}
+
+/** A feed's type, from the head of its JSON: it's never parsed for this, and nothing else of it is read. */
+const wsType = (s: string): string => /^\{"t":"([\w-]{1,40})"/.exec(s.slice(0, 50))?.[1] ?? 'other'
+
 function handler(isLocal: boolean, lan = false) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://x')
@@ -2008,6 +2044,7 @@ function handler(isLocal: boolean, lan = false) {
     const device = token ? deviceForToken(token) : null
     const adminLocal = direct && token !== '' && safeEqual(token, adminToken)
     const c: Ctx = { req, res, url, local: adminLocal, deviceId: device?.id ?? null, lan }
+    if (debugOn()) noteRequest(c, isLocal, !!adminLocal)
     try {
       if (lan) {
         // On the local network OPTIONS never reaches a route, whose handlers don't look at the
@@ -2023,7 +2060,10 @@ function handler(isLocal: boolean, lan = false) {
     } catch (e: any) {
       const status = e instanceof HttpError ? e.status : typeof e?.status === 'number' ? e.status : 500
       // 501 is a feature this machine doesn't have (platform.ts): an answer, not a fault to log.
-      if (status >= 500 && status !== 501) log('http error', req.method, url.pathname, e)
+      if (status >= 500 && status !== 501) {
+        log('http error', req.method, url.pathname, e)
+        dbgError('http', 'error', e, { method: req.method, route: url.pathname, status })
+      }
       // A refusal before the body was all read (an attachment past 30 MB): this connection is closed
       // after the answer, so a phone's next request never waits behind the rest of that body.
       if (!req.complete && !res.headersSent) res.setHeader('connection', 'close')
@@ -2070,6 +2110,7 @@ export function startServers(): () => Promise<void> {
     const url = new URL(req.url ?? '/', 'http://x')
     const certified = lan ? lanDevice(socket) : null
     if (lan && !certified) {
+      dbg('ws', 'refused', { route: url.pathname, reason: 'no-device-cert', via: 'lan' })
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
       socket.destroy()
       return
@@ -2080,12 +2121,19 @@ export function startServers(): () => Promise<void> {
       const t = redeemTicket(url.searchParams.get('ticket') ?? '')
       // Over the LAN, the ticket must be the certified device's own.
       if (!t || t.term !== tm[1] || (certified && t.device !== certified.id)) {
+        dbg('ws', 'refused', { route: url.pathname, reason: 'bad-ticket', via: lan ? 'lan' : 'api' })
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
         socket.destroy()
         return
       }
       wss.handleUpgrade(req, socket, head, (ws) => {
         track(t.device, ws, certified?.certFingerprint)
+        // Keys and screens go through here: how much, once, when it closes.
+        if (debugOn()) {
+          const t0 = performance.now()
+          dbg('ws', 'open', { kind: 'terminal', term: t.term, device: t.device, via: lan ? 'lan' : 'api' })
+          ws.on('close', (code, reason) => dbg('ws', 'close', { kind: 'terminal', term: t.term, device: t.device, code, reason: reason.toString('utf8').replace(/\s+/g, '_'), ms: Math.round(performance.now() - t0), in: (socket as import('node:net').Socket).bytesRead, out: (socket as import('node:net').Socket).bytesWritten }))
+        }
         relayPhone(t.term, ws, Number(url.searchParams.get('cols')) || 60, Number(url.searchParams.get('rows')) || 30)
       })
       return
@@ -2100,6 +2148,7 @@ export function startServers(): () => Promise<void> {
     const keep = (ws: import('ws').WebSocket) => track(device?.id ?? null, ws, certified?.certFingerprint)
     const ok = url.pathname === '/v1/ws' && token && (device || admin)
     if (!ok) {
+      dbg('ws', 'refused', { route: url.pathname, reason: 'not-paired', via: lan ? 'lan' : 'api' })
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
       socket.destroy()
       return
@@ -2108,20 +2157,38 @@ export function startServers(): () => Promise<void> {
       keep(ws)
       // The admin feed (`client=mac`): what's for it alone, such as who is speaking (mac-feed.ts).
       if (admin && url.searchParams.get('client') === 'mac') macFeed(ws)
-      const sendSnapshot = () => ws.readyState === ws.OPEN && ws.send(JSON.stringify({ t: 'snapshot', snapshot: snapshot(device?.id ?? null) }))
-      const remove = addClient({ send: (s) => ws.readyState === ws.OPEN && ws.send(s), phone: !!device, ...(device ? { resync: () => void sendSnapshot() } : {}) })
+      const sendSnapshot = () => {
+        if (ws.readyState !== ws.OPEN) return
+        const s = JSON.stringify({ t: 'snapshot', snapshot: snapshot(device?.id ?? null) })
+        dbg('ws', 'out', { device: device?.id, type: 'snapshot', size: s.length })
+        ws.send(s)
+      }
+      const remove = addClient({
+        send: (s) => {
+          if (ws.readyState !== ws.OPEN) return
+          if (debugOn()) dbg('ws', 'out', { device: device?.id, type: wsType(s), size: s.length })
+          ws.send(s)
+        },
+        phone: !!device,
+        ...(device ? { resync: () => void sendSnapshot() } : {}),
+      })
+      const t0 = performance.now()
+      dbg('ws', 'open', { kind: 'feed', device: device?.id, admin: admin || undefined, via: lan ? 'lan' : 'api' })
       sendSnapshot()
       // A phone on the live feed keeps the Mac awake While working (the admin feed doesn't).
       // After the snapshot, which is always a client's first message.
       const awake = device ? awakeClient() : null
       const ping = setInterval(() => ws.readyState === ws.OPEN && ws.send('{"t":"ping"}'), wsTiming.pingMs)
-      ws.on('close', () => {
+      ws.on('close', (code, reason) => {
         clearInterval(ping)
         remove()
         awake?.()
+        dbg('ws', 'close', { kind: 'feed', device: device?.id, code, reason: reason.toString('utf8').replace(/\s+/g, '_'), ms: Math.round(performance.now() - t0) })
       })
       ws.on('error', () => {})
-      ws.on('message', () => {})
+      ws.on('message', (d: Buffer) => {
+        if (debugOn()) dbg('ws', 'in', { device: device?.id, type: wsType(d.toString('utf8', 0, 50)), size: d.length })
+      })
       // A phone app says how a play goes (readaloud.ts).
       speechFeed(device?.id ?? null, ws)
     })
@@ -2140,6 +2207,8 @@ export function startServers(): () => Promise<void> {
     log('local server error', e)
     process.exit(1)
   })
+  // The debug log turned on or off, from anywhere, or run out: every client hears (debug-log.ts).
+  onDebugChange(() => broadcast({ t: 'debug', debug: debugView() }))
   // The APK handed out, as the snapshot says it now; a change later reaches every client as {t:"app"}.
   saidApp = JSON.stringify(appInfo())
   const appWatch = setInterval(announceApp, 5000)

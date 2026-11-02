@@ -19,9 +19,12 @@ import com.prudnikweb.hypernova.data.HubException
 import com.prudnikweb.hypernova.data.Mac
 import com.prudnikweb.hypernova.data.MacAwake
 import com.prudnikweb.hypernova.data.MacBattery
+import com.prudnikweb.hypernova.data.ServerDebug
 import com.prudnikweb.hypernova.data.ServerUpdate
 import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.settings.AutoUpdateRow
+import com.prudnikweb.hypernova.ui.settings.ServerDebugRow
+import com.prudnikweb.hypernova.ui.settings.serverDebugLine
 import com.prudnikweb.hypernova.ui.settings.StayAwakeBlock
 import com.prudnikweb.hypernova.ui.settings.autoUpdateLine
 import com.prudnikweb.hypernova.ui.term.TerminalScreen
@@ -44,6 +47,7 @@ class ServerHub(val base: FakeHub = FakeHub()) : Hub by base {
     override suspend fun setAwake(mode: String): Result<Unit> = answer("setAwake($mode)", Unit)
     override suspend fun extendAwake(): Result<Unit> = answer("extendAwake()", Unit)
     override suspend fun setAutoUpdate(on: Boolean): Result<Unit> = answer("setAutoUpdate($on)", Unit)
+    override suspend fun setServerDebug(on: Boolean): Result<Unit> = answer("setServerDebug($on)", Unit)
     override suspend fun openOnMac(sessionId: String): Result<Pair<String, Boolean>> = answer("openOnMac($sessionId)", "iTerm" to false)
 }
 
@@ -143,6 +147,27 @@ class MacOnlyScreensTest {
         rule.onNode(isSwitch()).performClick()
         rule.waitForIdle()
         assertEquals(listOf("setAutoUpdate(true)"), hub.calls)
+    }
+
+    // ─── Server debug log ───
+
+    @Test fun theServersDebugLogIsTurnedOnFromThePhone() {
+        val hub = ServerHub()
+        rule.setContent { Harness(spy) { Column(Modifier.padding(16.dp)) { ServerDebugRow(hub, ServerDebug(false)) } } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.sd_title)).assertExists()
+        rule.onNodeWithText(str(R.string.sd_off)).assertExists()
+        rule.onNode(isSwitch()).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("setServerDebug(true)"), hub.calls)
+    }
+
+    @Test fun theServersDebugLogSaysWhenItEnds() {
+        val until = System.currentTimeMillis() + 3_600_000
+        val line = serverDebugLine(context, ServerDebug(true, until))
+        val time = android.text.format.DateUtils.formatDateTime(context, until, android.text.format.DateUtils.FORMAT_SHOW_WEEKDAY or android.text.format.DateUtils.FORMAT_ABBREV_WEEKDAY or android.text.format.DateUtils.FORMAT_SHOW_TIME)
+        assertEquals(str(R.string.sd_on, time), line)
+        assertEquals(str(R.string.sd_off), serverDebugLine(context, ServerDebug(false)))
     }
 
     @Test fun theServersOwnUpdateSaysWhyNotAndWhatItIsDoing() {

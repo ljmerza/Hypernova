@@ -26,6 +26,10 @@
     "files": {
       "browseOutsideProjects": false
     },
+    "debug": {
+      "on": false,
+      "until": null
+    },
     "update": {
       "auto": true,
       "available": false,

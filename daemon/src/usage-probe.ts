@@ -30,6 +30,7 @@
 // Claude Code starts for it as quietly as it can: no auto-update (a download it starts would be
 // killed seconds later), no telemetry or error reports, and an English locale (the screen's times
 // are read as English; a Russian locale changes them).
+import { dbg } from './debug-log.ts'
 import { randomUUID } from 'node:crypto'
 import { existsSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
@@ -202,6 +203,7 @@ export function probeUsage(why: string): Promise<boolean> {
   if (running) return running
   lastStart = Date.now()
   running = (async () => {
+    dbg('usage', 'probe-start', { reason: why })
     const look = await readUsageApi(hiddenDir(PROBE_DIR), PROBE_ENV)
     if (look.ok) {
       offerScreenUsage(look.fiveHour, look.sevenDay, look.at, look.noFive && !look.fiveHour && !!look.sevenDay)
@@ -212,10 +214,12 @@ export function probeUsage(why: string): Promise<boolean> {
       setProbeHealth(true, null)
       const said = [look.fiveHour ? `5-hour ${look.fiveHour.pct}%` : look.sevenDay && look.noFive && 'no 5-hour window', look.sevenDay && `week ${look.sevenDay.pct}%`, ...look.models.map((m) => `${m.label} ${m.pct}%`)].filter(Boolean).join(', ')
       log(`usage probe (${why}), by the SDK: ${said}`)
+      dbg('usage', 'probe-end', { reason: why, ok: true, read: 'sdk', ms: Date.now() - lastStart })
       return true
     }
     log(`usage probe (${why}): the SDK's usage call gave nothing (${look.why}), so reading the screen`)
     const r = await runProbe()
+    dbg('usage', 'probe-end', { reason: why, ok: r.ok, read: r.why, ms: Date.now() - lastStart })
     // The 5-hour window and the week, as of the moment the screen was read: for the meters and the pace.
     const plan = r.ok && r.screen && r.at ? planWindows(r.screen.rows) : null
     // The week's row with no "Current session" row: no 5-hour window (Max, 2026-10-31), not "unchanged".

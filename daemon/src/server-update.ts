@@ -21,6 +21,7 @@
 // log, `failure` in the view (a phone's only way to hear of it) and a try again later (1 hour, 6, 24,
 // then not for that release). The new daemon, at start, sees the update it was waiting for
 // (<support>/server-update.json) and says so: the log, and `last` in the snapshot's `mac.update`.
+import { dbg } from './debug-log.ts'
 import { execFile } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -247,6 +248,7 @@ export function serverUpdater(o: UpdaterOptions = {}) {
 
   /** A failure for [tag]: the next try waits (1 h, 6 h, 24 h, then never for this release), and the phones hear it. [where]: for the log only. */
   function failed(tag: string, why: string, where = ''): void {
+    dbg('update', 'failed', { tag, why })
     const count = saved.fails?.tag === tag ? saved.fails.count + 1 : 1
     const next = count > BACKOFF.length ? null : now() + BACKOFF[count - 1]!
     saved.fails = { tag, count, next, why, at: now() }
@@ -326,6 +328,7 @@ export function serverUpdater(o: UpdaterOptions = {}) {
     const tarball = join(work, `hypernova-server-${tag}-linux.tar.gz`)
     const unpacked = join(work, 'package')
     try {
+      dbg('update', 'download', { tag, size: r.tarball.size })
       let digest: string
       try {
         digest = await downloadTo(r.tarball.url, tmp, { size: r.tarball.size, max: TARBALL_MAX, what: 'the server package', signal: AbortSignal.timeout(o.timeoutMs ?? 10 * 60_000) })
@@ -337,6 +340,7 @@ export function serverUpdater(o: UpdaterOptions = {}) {
         failed(tag, 'the package’s SHA-256 isn’t the one its note gives; thrown away')
         return { kind: 'mismatch', tag }
       }
+      dbg('update', 'checksum-ok', { tag })
       mkdirSync(unpacked, { recursive: true, mode: 0o700 })
       renameSync(tmp, tarball)
       // Unpacked into its own new folder, owned by us; the package holds one hypernova-<version>/.
@@ -354,6 +358,7 @@ export function serverUpdater(o: UpdaterOptions = {}) {
         failed(tag, `the package isn’t Hypernova’s server ${tag} (its daemon says ${String(pkg?.version ?? 'nothing')})`)
         return { kind: 'error', tag, message: 'not the package' }
       }
+      dbg('update', 'unpacked', { tag })
       // Looked at again: the download took a while, and the setting or the install may have changed.
       if (!enabled()) {
         say(`server update to ${tag}: auto-update was turned off during the download; nothing installed`, true)
@@ -374,6 +379,7 @@ export function serverUpdater(o: UpdaterOptions = {}) {
         return { kind: 'error', tag, message: 'launch' }
       }
       say(`server update: installing ${tag} (from ${version}); the service restarts when it's in (${logFile})`, true)
+      dbg('update', 'install-started', { tag, version })
       set('installing', tag)
       watch()
       return { kind: 'launched', tag }

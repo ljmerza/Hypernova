@@ -2,6 +2,7 @@
 // Shared terminals, daemon side (docs/PROTOCOL.md, "Shared terminals"): finds the holders,
 // keeps a control connection to each, links them to sessions, starts them for the phone,
 // types into them, relays them to phones and opens them in a terminal window on the Mac.
+import { dbg, dbgProc, debugOn, exitOf } from './debug-log.ts'
 import { connect, type Socket } from 'node:net'
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -108,7 +109,17 @@ const exitWaiters = new Map<string, ExitWaiter[]>()
 export function onTermExit(id: string, f: ExitWaiter): void {
   exitWaiters.set(id, [...(exitWaiters.get(id) ?? []), f])
 }
+/** The programs in holders started while the debug log is on, for their last line. */
+const termEnds = new Map<string, (exit: number | null) => void>()
+function noteTerm(id: string, file: string, args: readonly string[], session?: string | null): void {
+  if (debugOn()) termEnds.set(id, dbgProc(file, args, { term: id, session }))
+}
 function exited(id: string, code: number | null, text: string | null = null): void {
+  const ended = termEnds.get(id)
+  if (ended) {
+    termEnds.delete(id)
+    ended(code)
+  } else dbg('proc', 'exit', { term: id, exit: code })
   const fs = exitWaiters.get(id)
   exitWaiters.delete(id)
   for (const f of fs ?? []) {
@@ -607,6 +618,7 @@ export function startLoginTerm(): { termId: string; pid: number | null } {
     autoTrust: false,
   })
   log('started a sign-in terminal', id)
+  noteTerm(id, file, LOGIN_ARGS)
   return { termId: id, pid }
 }
 
@@ -653,6 +665,7 @@ export function startTermSession(o: {
     autoTrust: true,
   })
   log('started shared terminal', id, 'for', o.sessionId.slice(0, 8), 'in', o.cwd)
+  noteTerm(id, file, o.args, o.sessionId)
   return id
 }
 
@@ -682,6 +695,7 @@ export function startCodexTerm(o: { sessionId: string | null; cwd: string; args:
     codexSocket: socket,
   })
   log('started a codex terminal', id, o.sessionId ? `for ${o.sessionId.slice(0, 8)}` : '', 'in', o.cwd)
+  noteTerm(id, file, o.args, o.sessionId)
   return id
 }
 
@@ -849,7 +863,13 @@ export async function createAgentsSession(o: { cwd: string; model?: string | nul
   if (o.permissionMode) args.push('--permission-mode', o.permissionMode)
   if (o.effort) args.push('--effort', o.effort)
   if (o.prompt?.trim()) args.push('--', o.prompt)
-  const out = await new Promise<string>((ok) => execFile(file, args, { cwd: o.cwd, timeout: 30_000 }, (_e, so, se) => ok(`${so}\n${se}`)))
+  const started = dbgProc(file, args)
+  const out = await new Promise<string>((ok) =>
+    execFile(file, args, { cwd: o.cwd, timeout: 30_000 }, (e, so, se) => {
+      started(exitOf(e))
+      ok(`${so}\n${se}`)
+    }),
+  )
   const job = /backgrounded\s*·\s*([0-9a-f]{8})/.exec(out)?.[1]
   if (!job) {
     log('claude --bg started nothing:', trimText(out.trim(), 300))
