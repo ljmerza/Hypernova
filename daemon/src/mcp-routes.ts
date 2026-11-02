@@ -4,22 +4,15 @@ import type { ServerResponse } from 'node:http'
 import { claudeConfigFile, isTable, own, repoRoot } from './agent-settings.ts'
 import { TalkFailed, talkTo, type TalkTrouble } from './mcp-client.ts'
 import { factsOf, type ServerFacts } from './mcp-tools.ts'
-import { LIVE_NAME, liveServers, type LiveServer } from './mcp-probe.ts'
+import { codexAdd, codexEdit, codexList, codexLogin, codexLogout, codexReconnect, codexRemove, codexServer, codexStatus, codexToggle, codexTools, codexUndo } from './mcp-codex.ts'
+import { addServer, editServer, loginCancel, loginFinish, loginStart, logout, McpRefused, removeServer, resetChoices, scopeOf, setApproval, undoLast, undoOffer } from './mcp-edit.ts'
+import { forgetLive, LIVE_NAME, liveServers, reconnectServer, toggleServer, type LiveServer } from './mcp-probe.ts'
 import { approvalOf, claudeList, configHash, findConfig, folderId, HOME_FOLDER, knownFolders, projectServers, readClaudeConfig, setupOf, whereOf, type Scope } from './mcp-view.ts'
 import { dirname } from 'node:path'
 
-/** Something for the phone to show: its own words, never a file's or a command's. */
-export class McpRefused extends Error {
-  status: number
-  code: string
-  constructor(status: number, code: string, message: string) {
-    super(message)
-    this.status = status
-    this.code = code
-  }
-}
+export { McpRefused }
 
-export type McpDeps = { folders: () => string[] }
+export type McpDeps = { folders: () => string[]; body: () => Promise<any>; changed: (agent: 'claude' | 'codex') => void }
 
 const SCOPES: readonly string[] = ['user', 'local', 'project', 'settings']
 const LIVE_SCOPES: readonly string[] = ['plugin', 'managed', 'enterprise', 'claudeai', 'dynamic', 'agent', 'unknown']
@@ -143,13 +136,23 @@ const send = (res: ServerResponse, json: (res: ServerResponse, status: number, b
 export async function mcpRoute(path: string, m: string, url: URL, res: ServerResponse, json: (res: ServerResponse, status: number, body: unknown) => void, deps: McpDeps): Promise<boolean> {
   if (path === '/v1/agents/mcp' && m === 'GET') {
     const agent = agentOf(param(url, 'agent'))
-    if (agent === 'codex') throw new McpRefused(409, 'not_yet', 'Codex’s MCP servers aren’t available here yet.')
-    send(res, json, await claudeList(deps.folders()))
+    if (agent === 'codex') {
+      send(res, json, await codexList())
+      return true
+    }
+    const list = await claudeList(deps.folders())
+    const { root } = await readClaudeConfig(claudeConfigFile())
+    const ids = (p: string | null) => (p === null ? null : folderId(p))
+    void root
+    send(res, json, { ...list, scopes: ['user', 'project', 'local'], undo: await undoOffer(ids) })
     return true
   }
   if (path === '/v1/agents/mcp/status' && m === 'GET') {
     const agent = agentOf(param(url, 'agent'))
-    if (agent === 'codex') throw new McpRefused(409, 'not_yet', 'Codex’s MCP servers aren’t available here yet.')
+    if (agent === 'codex') {
+      send(res, json, await codexStatus(param(url, 'fresh') === '1'))
+      return true
+    }
     const id = param(url, 'folder') || HOME_FOLDER
     const folder = await folderPath(id, deps)
     const held = await heldBack(folder)
@@ -159,16 +162,100 @@ export async function mcpRoute(path: string, m: string, url: URL, res: ServerRes
   }
   if (path === '/v1/agents/mcp/server' && m === 'GET') {
     const agent = agentOf(param(url, 'agent'))
-    if (agent === 'codex') throw new McpRefused(409, 'not_yet', 'Codex’s MCP servers aren’t available here yet.')
+    if (agent === 'codex') {
+      send(res, json, await codexServer(param(url, 'name') ?? ''))
+      return true
+    }
     send(res, json, await claudeServer(param(url, 'name') ?? '', param(url, 'scope') ?? '', param(url, 'folder'), deps))
     return true
   }
   if (path === '/v1/agents/mcp/tools' && m === 'GET') {
     const agent = agentOf(param(url, 'agent'))
-    if (agent === 'codex') throw new McpRefused(409, 'not_yet', 'Codex’s MCP servers aren’t available here yet.')
+    if (agent === 'codex') {
+      send(res, json, await codexTools(param(url, 'name') ?? ''))
+      return true
+    }
     send(res, json, await claudeTools(param(url, 'name') ?? '', param(url, 'scope') ?? '', param(url, 'folder'), deps))
     return true
   }
-  return false
+  return writeRoute(path, m, res, json, deps)
 }
+
+/** The routes that change something. Each answers once it's done, and tells the other phones. */
+async function writeRoute(path: string, m: string, res: ServerResponse, json: (res: ServerResponse, status: number, body: unknown) => void, deps: McpDeps): Promise<boolean> {
+  const routes: Record<string, (b: Record<string, unknown>) => Promise<unknown>> = {
+    'POST /v1/agents/mcp/servers': async (b) => addServer(b, scopeOf(b.scope), await folderOf(b, deps)),
+    'PUT /v1/agents/mcp/servers': async (b) => editServer(b, scopeOf(b.scope), await folderOf(b, deps)),
+    'POST /v1/agents/mcp/servers/remove': async (b) => removeServer(b, scopeOf(b.scope), await folderOf(b, deps)),
+    'POST /v1/agents/mcp/undo': (b) => undoLast(b),
+    'POST /v1/agents/mcp/toggle': async (b) => {
+      const name = liveName(b)
+      if (typeof b.enabled !== 'boolean') throw new McpRefused(400, 'bad_request', 'Say on or off.')
+      const folder = await folderPath(b.folder as string | undefined, deps)
+      const held = await heldBack(folder)
+      if (held.waiting.includes(name) || held.rejected.includes(name)) throw new McpRefused(409, 'needs_approval', 'Approve this one first: it isn’t running to switch off or on.')
+      await toggleServer(folder, held.waiting, name, b.enabled)
+      return { ok: true, name, enabled: b.enabled }
+    },
+    'POST /v1/agents/mcp/reconnect': async (b) => {
+      const name = liveName(b)
+      const folder = await folderPath(b.folder as string | undefined, deps)
+      const held = await heldBack(folder)
+      if (held.waiting.includes(name) || held.rejected.includes(name)) throw new McpRefused(409, 'needs_approval', 'Approve this one first.')
+      return { ok: true, server: await reconnectServer(folder, held.waiting, name) }
+    },
+    'POST /v1/agents/mcp/approval': async (b) => setApproval(b, await folderPath(b.folder as string | undefined, deps)),
+    'POST /v1/agents/mcp/reset-choices': async (b) => resetChoices(await folderPath(b.folder as string | undefined, deps)),
+    'POST /v1/agents/mcp/login': async (b) => loginStart(liveName(b), await folderPath(b.folder as string | undefined, deps)),
+    'POST /v1/agents/mcp/login/finish': (b) => loginFinish(b),
+    'POST /v1/agents/mcp/login/cancel': async (b) => loginCancel(b),
+    'POST /v1/agents/mcp/logout': async (b) => logout(liveName(b), await folderPath(b.folder as string | undefined, deps)),
+  }
+  const route = routes[`${m} ${path}`]
+  if (!route) return false
+  const b = await deps.body()
+  if (!isTable(b)) throw new McpRefused(400, 'bad_request', 'Send what to change.')
+  const agent = agentOf(typeof b.agent === 'string' ? b.agent : null)
+  const out = agent === 'codex' ? await codexRoute(path, m, b) : await route(b)
+  forgetLive()
+  forgetTools()
+  deps.changed(agent)
+  json(res, 200, out)
+  return true
+}
+
+/** The same routes for Codex: one scope, no folders, no approvals. */
+async function codexRoute(path: string, m: string, b: Record<string, unknown>): Promise<unknown> {
+  switch (`${m} ${path}`) {
+    case 'POST /v1/agents/mcp/servers':
+      return codexAdd(b)
+    case 'PUT /v1/agents/mcp/servers':
+      return codexEdit(b)
+    case 'POST /v1/agents/mcp/servers/remove':
+      return codexRemove(b)
+    case 'POST /v1/agents/mcp/undo':
+      return codexUndo(b)
+    case 'POST /v1/agents/mcp/toggle':
+      if (typeof b.enabled !== 'boolean') throw new McpRefused(400, 'bad_request', 'Say on or off.')
+      return codexToggle(liveName(b), b.enabled)
+    case 'POST /v1/agents/mcp/reconnect':
+      return codexReconnect(liveName(b))
+    case 'POST /v1/agents/mcp/login':
+      return codexLogin(liveName(b))
+    case 'POST /v1/agents/mcp/login/finish':
+      return loginFinish(b)
+    case 'POST /v1/agents/mcp/login/cancel':
+      return loginCancel(b)
+    case 'POST /v1/agents/mcp/logout':
+      return codexLogout(liveName(b))
+    default:
+      throw new McpRefused(409, 'not_for_codex', 'Codex has no such thing: its servers have no approvals, and no folders.')
+  }
+}
+
+const liveName = (b: Record<string, unknown>) => {
+  if (typeof b.name !== 'string' || !LIVE_NAME.test(b.name)) throw new McpRefused(400, 'bad_name', 'That isn’t a server’s name.')
+  return b.name
+}
+const folderOf = async (b: Record<string, unknown>, deps: McpDeps) => (b.scope === 'user' ? null : folderPath(typeof b.folder === 'string' ? b.folder : null, deps))
 

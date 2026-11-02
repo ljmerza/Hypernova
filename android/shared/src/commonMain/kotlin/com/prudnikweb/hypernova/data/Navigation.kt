@@ -29,6 +29,8 @@ sealed interface Route {
     data class McpServers(val agent: String) : Route { override val key = "mcp:$agent" }
     /** One MCP server: where it's defined, how it's set up, its status and tools. [folder]: the folder it's looked at from. */
     data class McpServerPage(val agent: String, val name: String, val scope: String, val folder: String?) : Route { override val key = "mcp:$agent:$scope:$folder:$name" }
+    /** Add an MCP server, or, with [name], change that one. */
+    data class McpEdit(val agent: String, val name: String?, val scope: String?, val folder: String?) : Route { override val key = "mcp-edit:$agent:$scope:$folder:$name" }
     /** Settings › Mac › Connection log (data/ConnLog.kt). */
     data object ConnectionLog : Route { override val key = "connection-log" }
     data class ProviderEdit(val id: String?, val kind: String) : Route { override val key = "provider:${id ?: "new-$kind"}" }

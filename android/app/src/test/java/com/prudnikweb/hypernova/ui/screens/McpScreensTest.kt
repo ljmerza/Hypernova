@@ -5,15 +5,21 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.ui.components.OwnerCheck
+import com.prudnikweb.hypernova.ui.settings.McpEditScreen
 import com.prudnikweb.hypernova.ui.settings.McpServerScreen
 import com.prudnikweb.hypernova.ui.settings.McpServersScreen
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -164,6 +170,7 @@ class McpScreensTest {
         rule.onNodeWithText("""{"type":"object"}""").assertExists()
     }
 
+    @Config(qualifiers = "+h1800dp")
     @Test fun aServerThatCantBeAskedShowsTheNamesItHasAndSaysWhy() {
         hub.on("GET /v1/agents/mcp/server", MCP_PAGE)
         hub.on("GET /v1/agents/mcp/status", MCP_LIVE)
@@ -179,5 +186,233 @@ class McpScreensTest {
         page("broken")
         seen(str(R.string.mcp_s_failed))
         seen("spawn ENOENT")
+    }
+
+    // ─── Adding and managing ───
+
+    private fun lock(secure: Boolean = true, pass: Boolean = true) {
+        org.robolectric.Shadows.shadowOf(context.getSystemService(android.app.KeyguardManager::class.java)).setIsDeviceSecure(secure)
+        OwnerCheck.prompt = { ok, fail -> if (pass) ok() else fail(null) }
+    }
+    @org.junit.After fun tearDown() { OwnerCheck.prompt = null }
+
+    private fun form(name: String? = null, scope: String? = null, folder: String? = null, back: () -> Unit = {}) {
+        rule.setContent { Harness(spy) { McpEditScreen(hub, "claude", name, scope, folder, onBack = back) } }
+        rule.waitForIdle()
+    }
+    private fun type(label: String, text: String) = rule.onNode(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription, listOf(label))).performScrollTo().performTextInput(text)
+    private fun tap(text: String) { rule.onNodeWithText(text).performScrollTo().performClick(); rule.waitForIdle() }
+    private fun sent(method: String, path: String) = hub.calls.last { it.first == method && it.second.startsWith(path) }.third!!
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun addingAStdioServerShowsItsWholeCommandThenAsksForTheFingerprint() {
+        hub.on("GET /v1/agents/mcp?", MCP_LIST)
+        hub.on("POST /v1/agents/mcp/servers", """{"ok":true}""")
+        lock()
+        var left = false
+        form(back = { left = true })
+        type(str(R.string.mcp_f_name), "tiny")
+        type(str(R.string.mcp_command), "npx")
+        type(str(R.string.mcp_args), "-y\n@acme/mcp")
+        tap(str(R.string.mcp_pair_add))
+        type(str(R.string.mcp_pair_name), "API_TOKEN")
+        type(str(R.string.mcp_pair_value), "the-secret")
+        rule.onRoot().snap("mcp_add")
+        tap(str(R.string.mcp_f_save))
+        // Nothing yet: the confirm first, with the exact command.
+        assertTrue(hub.calls.none { it.first == "POST" })
+        val ask = spy.confirms.single()
+        assertTrue(ask.body, ask.body.contains("npx -y @acme/mcp"))
+        assertTrue(ask.danger)
+        ask.onConfirm()
+        rule.waitForIdle()
+        val body = sent("POST", "/v1/agents/mcp/servers")
+        assertEquals(true, body.getBoolean("confirmRun"))
+        assertEquals("user", body.getString("scope"))
+        assertEquals("the-secret", body.getJSONArray("env").getJSONObject(0).getString("value"))
+        assertEquals("@acme/mcp", body.getJSONArray("args").getString(1))
+        assertTrue(left)
+    }
+
+    @Test fun aCancelledFingerprintSendsNothing() {
+        hub.on("GET /v1/agents/mcp?", MCP_LIST)
+        lock(pass = false)
+        form()
+        type(str(R.string.mcp_f_name), "tiny")
+        type(str(R.string.mcp_command), "npx")
+        tap(str(R.string.mcp_f_save))
+        spy.confirms.single().onConfirm()
+        rule.waitForIdle()
+        assertTrue(hub.calls.none { it.first == "POST" })
+    }
+
+    @Test fun aPhoneWithNoLockCantAddOne() {
+        hub.on("GET /v1/agents/mcp?", MCP_LIST)
+        lock(secure = false)
+        form()
+        type(str(R.string.mcp_f_name), "tiny")
+        type(str(R.string.mcp_command), "npx")
+        tap(str(R.string.mcp_f_save))
+        spy.confirms.single().onConfirm()
+        rule.waitForIdle()
+        assertTrue(hub.calls.none { it.first == "POST" })
+        assertEquals(listOf(str(R.string.check_no_lock)), spy.toasts)
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun anHttpServerNeedsNoFingerprintAndAProjectOneNamesItsFolder() {
+        hub.on("GET /v1/agents/mcp?", MCP_LIST)
+        hub.on("POST /v1/agents/mcp/servers", """{"ok":true}""")
+        form()
+        type(str(R.string.mcp_f_name), "web")
+        tap(str(R.string.mcp_f_project))
+        tap("parser")
+        tap("HTTP")
+        type(str(R.string.mcp_url), "https://mcp.example.com/mcp")
+        tap(str(R.string.mcp_f_save))
+        assertEquals(0, spy.confirms.size)
+        val body = sent("POST", "/v1/agents/mcp/servers")
+        assertEquals("project", body.getString("scope"))
+        assertEquals("f1", body.getString("folder"))
+        assertEquals("http", body.getString("transport"))
+        assertFalse(body.has("confirmRun"))
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun editingShowsNamesAndMasksAndSendsThemBackAsTheyAreWithoutAFingerprint() {
+        hub.on("GET /v1/agents/mcp?", MCP_LIST)
+        hub.on("GET /v1/agents/mcp/server", MCP_PAGE)
+        hub.on("PUT /v1/agents/mcp/servers", """{"ok":true}""")
+        form("github", "user", "home")
+        seen("GITHUB_TOKEN")
+        seen(str(R.string.mcp_value_kept))
+        tap(str(R.string.mcp_f_save))
+        assertEquals(0, spy.confirms.size)
+        val body = sent("PUT", "/v1/agents/mcp/servers")
+        assertEquals("h1", body.getString("expected"))
+        val pair = body.getJSONArray("env").getJSONObject(0)
+        assertEquals("GITHUB_TOKEN", pair.getString("name"))
+        assertTrue(pair.getBoolean("keep"))
+        assertFalse(pair.has("value"))
+        assertEquals("•••", body.getJSONArray("args").getString(3))
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun changingWhatRunsAsksForTheFingerprintAndAFailureStaysOnTheForm() {
+        hub.on("GET /v1/agents/mcp?", MCP_LIST)
+        hub.on("GET /v1/agents/mcp/server", MCP_PAGE)
+        hub.fails("PUT /v1/agents/mcp/servers", AgentSettingRefused("file_changed", "That server changed on the server."))
+        lock()
+        var left = false
+        form("github", "user", "home", back = { left = true })
+        type(str(R.string.mcp_command), "x")
+        tap(str(R.string.mcp_f_save))
+        spy.confirms.single().onConfirm()
+        rule.waitForIdle()
+        seen("That server changed on the server.")
+        assertFalse(left)
+    }
+
+    private fun livePage(status: String, extra: String = "") {
+        hub.on("GET /v1/agents/mcp/status", """{"folder":"f1","servers":[{"name":"docs","status":"$status","source":"project","tools":[]}]}""")
+        hub.on("GET /v1/agents/mcp/tools", """{"name":"docs","whyNot":"approval","tools":[],"prompts":[],"resources":[]}""")
+        hub.on("GET /v1/agents/mcp/server", """{"agent":"claude","name":"docs","scope":"project","folder":"f1","project":"parser","where":"parser/.mcp.json","transport":"stdio","command":"uvx","args":["docs-mcp"],"envNames":[],"headerNames":[],"hidden":0,"hash":"h2","editable":true$extra}""")
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun approvingAProjectsServerShowsWhatItRunsAndAsksForTheFingerprint() {
+        livePage("waiting", ""","approval":"pending"""")
+        hub.on("POST /v1/agents/mcp/approval", """{"ok":true,"approval":"approved"}""")
+        lock()
+        page("docs", "project", "f1")
+        tap(str(R.string.mcp_approve))
+        val ask = spy.confirms.single()
+        assertTrue(ask.body, ask.body.contains("uvx docs-mcp"))
+        ask.onConfirm()
+        rule.waitForIdle()
+        val b = sent("POST", "/v1/agents/mcp/approval")
+        assertTrue(b.getBoolean("approved"))
+        assertTrue(b.getBoolean("confirmRun"))
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun turningOneDownAsksNothing() {
+        livePage("waiting", ""","approval":"pending"""")
+        hub.on("POST /v1/agents/mcp/approval", """{"ok":true}""")
+        page("docs", "project", "f1")
+        tap(str(R.string.mcp_reject))
+        assertEquals(0, spy.confirms.size)
+        assertFalse(sent("POST", "/v1/agents/mcp/approval").getBoolean("approved"))
+        assertFalse(sent("POST", "/v1/agents/mcp/approval").has("confirmRun"))
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun turningOffTurningOnAndReconnectingNeedNoFingerprint() {
+        hub.on("GET /v1/agents/mcp/server", MCP_PAGE)
+        hub.on("GET /v1/agents/mcp/status", MCP_LIVE)
+        hub.on("GET /v1/agents/mcp/tools", MCP_TOOLS)
+        hub.on("POST /v1/agents/mcp/toggle", """{"ok":true}""")
+        hub.on("POST /v1/agents/mcp/reconnect", """{"ok":true,"server":null}""")
+        page()
+        tap(str(R.string.mcp_reconnect))
+        assertEquals("github", sent("POST", "/v1/agents/mcp/reconnect").getString("name"))
+        tap(str(R.string.mcp_disable))
+        assertFalse(sent("POST", "/v1/agents/mcp/toggle").getBoolean("enabled"))
+        assertEquals("home", sent("POST", "/v1/agents/mcp/toggle").getString("folder"))
+        assertEquals(0, spy.confirms.size)
+        assertTrue(spy.toasts.contains(str(R.string.mcp_turned_off)))
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun removingConfirmsThenSendsItsVersionAndARefusalIsSaid() {
+        hub.on("GET /v1/agents/mcp/server", MCP_PAGE)
+        hub.on("GET /v1/agents/mcp/status", MCP_LIVE)
+        hub.on("GET /v1/agents/mcp/tools", MCP_TOOLS)
+        hub.fails("POST /v1/agents/mcp/servers/remove", AgentSettingRefused("file_changed", "It changed."))
+        page()
+        tap(str(R.string.mcp_remove))
+        spy.confirms.single().onConfirm()
+        rule.waitForIdle()
+        assertEquals("h1", sent("POST", "/v1/agents/mcp/servers/remove").getString("expected"))
+        seen("It changed.")
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun signingInOpensThePageAndThePastedAddressFinishesIt() {
+        hub.on("GET /v1/agents/mcp/server", """{"agent":"claude","name":"web","scope":"user","where":"~/.claude.json","transport":"http","url":"https://x.example/m","envNames":[],"headerNames":[],"hidden":0,"hash":"h3","editable":true}""")
+        hub.on("GET /v1/agents/mcp/status", """{"folder":"home","servers":[{"name":"web","status":"needs-auth","source":"user","tools":[]}]}""")
+        hub.on("GET /v1/agents/mcp/tools", """{"name":"web","whyNot":"needs_auth","tools":[],"prompts":[],"resources":[]}""")
+        hub.on("POST /v1/agents/mcp/login/finish", """{"ok":true}""")
+        hub.on("POST /v1/agents/mcp/login", """{"ok":true,"done":false,"login":"L1","url":"https://auth.example/authorize"}""")
+        page("web")
+        seen(str(R.string.mcp_why_auth))
+        tap(str(R.string.mcp_sign_in))
+        rule.onNodeWithText(str(R.string.mcp_login_open)).performClick()
+        rule.waitForIdle()
+        val opened = org.robolectric.Shadows.shadowOf(org.robolectric.RuntimeEnvironment.getApplication()).nextStartedActivity
+        assertEquals("https://auth.example/authorize", opened?.dataString)
+        type(str(R.string.mcp_login_address), "http://localhost:1234/callback?code=c")
+        rule.onNodeWithText(str(R.string.mcp_login_finish)).performClick()
+        rule.waitForIdle()
+        val b = sent("POST", "/v1/agents/mcp/login/finish")
+        assertEquals("L1", b.getString("login"))
+        assertEquals("http://localhost:1234/callback?code=c", b.getString("address"))
+        assertTrue(spy.toasts.contains(str(R.string.mcp_signed_in)))
+    }
+
+    @Test fun addIsOfferedAndUndoSaysWhatItDoesAskingForTheCheckWhenItRunsSomething() {
+        hub.on("GET /v1/agents/mcp?", MCP_LIST.replaceFirst("{", """{"undo":{"op":"remove","name":"github","scope":"user","folder":null,"needsCheck":true,"command":"npx -y @acme/mcp"},"""))
+        hub.on("GET /v1/agents/mcp/status", MCP_LIVE)
+        hub.on("POST /v1/agents/mcp/undo", """{"ok":true}""")
+        lock()
+        list()
+        seen(str(R.string.mcp_add))
+        seen(str(R.string.mcp_undo_remove, "github"))
+        rule.onNodeWithText(str(R.string.mcp_undo_remove, "github"), substring = true).performClick()
+        rule.waitForIdle()
+        assertTrue(spy.confirms.single().body.contains("npx -y @acme/mcp"))
+        spy.confirms.single().onConfirm()
+        rule.waitForIdle()
+        assertTrue(sent("POST", "/v1/agents/mcp/undo").getBoolean("confirmRun"))
     }
 }

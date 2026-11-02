@@ -1,9 +1,41 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.prudnikweb.hypernova.ui.settings
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import com.prudnikweb.hypernova.data.Confirm
+import com.prudnikweb.hypernova.data.McpForm
+import com.prudnikweb.hypernova.data.McpLogin
+import com.prudnikweb.hypernova.data.McpPair
+import com.prudnikweb.hypernova.data.mcpAdd
+import com.prudnikweb.hypernova.data.mcpApproval
+import com.prudnikweb.hypernova.data.mcpEdit
+import com.prudnikweb.hypernova.data.mcpLogin
+import com.prudnikweb.hypernova.data.mcpLoginCancel
+import com.prudnikweb.hypernova.data.mcpLoginFinish
+import com.prudnikweb.hypernova.data.mcpLogout
+import com.prudnikweb.hypernova.data.mcpReconnect
+import com.prudnikweb.hypernova.data.mcpRemove
+import com.prudnikweb.hypernova.data.mcpResetChoices
+import com.prudnikweb.hypernova.data.mcpToggle
+import com.prudnikweb.hypernova.data.mcpUndo
+import com.prudnikweb.hypernova.ui.LocalConfirm
+import com.prudnikweb.hypernova.ui.LocalToast
+import com.prudnikweb.hypernova.ui.components.Field
+import com.prudnikweb.hypernova.ui.components.FieldLabel
+import com.prudnikweb.hypernova.ui.components.NavRow
+import com.prudnikweb.hypernova.ui.components.OwnerCheck
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -108,11 +140,16 @@ internal fun mcpScopeWord(scope: String): Int = when (scope) {
 
 /** Agents & providers › an agent's settings › MCP servers: every scope, each to tap, with its status from the folder chosen. */
 @Composable
-fun McpServersScreen(hub: Hub, agent: String, onBack: () -> Unit, onOpen: (name: String, scope: String, folder: String?) -> Unit) {
+fun McpServersScreen(hub: Hub, agent: String, onBack: () -> Unit, onOpen: (name: String, scope: String, folder: String?) -> Unit, onAdd: () -> Unit = {}) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val server = hub.mac.name
+    val context = LocalContext.current
+    val toast = LocalToast.current
+    val confirm = LocalConfirm.current
+    val scope = rememberCoroutineScope()
     var attempt by remember { mutableIntStateOf(0) }
     var reply by remember { mutableStateOf<Result<McpList>?>(null) }
+    var undoing by remember { mutableStateOf(false) }
     var folder by remember { mutableStateOf(Mcp.HOME) }
     var live by remember { mutableStateOf<Result<McpLiveReply>?>(null) }
     var picking by remember { mutableStateOf(false) }
@@ -140,7 +177,33 @@ fun McpServersScreen(hub: Hub, agent: String, onBack: () -> Unit, onOpen: (name:
             when {
                 r == null -> item(key = "loading") { LoadingLine(stringResource(R.string.loading), Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) }
                 r.isFailure -> item(key = "failure") { McpFailure(r.exceptionOrNull(), R.string.mcp_err) { attempt++ } }
-                else -> mcpListItems(r.getOrThrow(), folder, live, { picking = true }, onOpen)
+                else -> {
+                    item(key = "add") { Pill(stringResource(R.string.mcp_add), onAdd, kind = PillKind.Outline, height = 44.dp, leading = Glyph.Plus, modifier = Modifier.padding(horizontal = 4.dp)) }
+                    r.getOrThrow().undo?.let { u ->
+                        item(key = "undo") {
+                            val words = stringResource(when (u.op) { "add" -> R.string.mcp_undo_add; "remove" -> R.string.mcp_undo_remove; else -> R.string.mcp_undo_edit }, u.name)
+                            GlassCard(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+                                    NavRow(stringResource(R.string.as_undo_row), if (undoing) stringResource(R.string.as_saving) else words, onClick = {
+                                        if (undoing) return@NavRow
+                                        val go = { check: Boolean ->
+                                            undoing = true
+                                            scope.launch {
+                                                hub.mcpUndo(agent, check)
+                                                    .onSuccess { toast(context.getString(R.string.as_undone, server)); attempt++ }
+                                                    .onFailure { e -> toast(e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.as_edit_err)); attempt++ }
+                                                undoing = false
+                                            }
+                                            Unit
+                                        }
+                                        if (u.needsCheck) mcpRunCheck(context, confirm, toast, server, u.name, u.command) { go(true) } else go(false)
+                                    })
+                                }
+                            }
+                        }
+                    }
+                    mcpListItems(r.getOrThrow(), folder, live, { picking = true }, onOpen)
+                }
             }
         }
     }
@@ -277,8 +340,18 @@ internal fun McpFailure(e: Throwable?, @StringRes fallback: Int, onRetry: () -> 
 
 /** One server: where it's defined, how it's set up, and how it's doing from [folder]. */
 @Composable
-fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder: String?, onBack: () -> Unit) {
+fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder: String?, onBack: () -> Unit, onEdit: () -> Unit = {}) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val context = LocalContext.current
+    val toast = LocalToast.current
+    val confirm = LocalConfirm.current
+    val coroutines = rememberCoroutineScope()
+    val serverName = hub.mac.name
+    /** A change under way: the buttons wait for it. */
+    var busy by remember { mutableStateOf(false) }
+    /** What the last change said, under the buttons. */
+    var trouble by remember { mutableStateOf<String?>(null) }
+    var login by remember { mutableStateOf<McpLogin?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
     var reply by remember { mutableStateOf<Result<McpServer>?>(null) }
     var live by remember { mutableStateOf<Result<McpLiveReply>?>(null) }
@@ -313,7 +386,50 @@ fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder
                     item(key = "where-seam") { Seam(stringResource(R.string.mcp_seam_where), modifier = seamMod()) }
                     item(key = "where") { WhereCard(s) }
                     item(key = "status-seam") { Seam(stringResource(R.string.mcp_seam_status), modifier = seamMod()) }
-                    item(key = "status") { StatusCard(live, mine) }
+                    item(key = "status") {
+                        StatusCard(live, mine)
+                    }
+                    item(key = "actions") {
+                        fun run(work: suspend () -> Result<*>, ok: String?, then: () -> Unit = {}) {
+                            busy = true
+                            trouble = null
+                            coroutines.launch {
+                                work().onSuccess { ok?.let(toast); attempt++; then() }.onFailure { e -> trouble = e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.as_edit_err); attempt++ }
+                                busy = false
+                            }
+                        }
+                        ActionsCard(
+                            s, mine, busy, trouble,
+                            onToggle = { on -> run({ hub.mcpToggle(agent, name, folder, on) }, context.getString(if (on) R.string.mcp_turned_on else R.string.mcp_turned_off)) },
+                            onReconnect = { run({ hub.mcpReconnect(agent, name, folder) }, context.getString(R.string.mcp_reconnected)) },
+                            onApprove = {
+                                mcpRunCheck(context, confirm, toast, serverName, name, s.commandLine()) { run({ hub.mcpApproval(agent, name, folder, true) }, context.getString(R.string.mcp_approved)) }
+                            },
+                            onReject = { run({ hub.mcpApproval(agent, name, folder, false) }, context.getString(R.string.mcp_rejected)) },
+                            onResetChoices = {
+                                confirm(Confirm(context.getString(R.string.mcp_reset_title), context.getString(R.string.mcp_reset_body), context.getString(R.string.mcp_reset_action), danger = false) {
+                                    run({ hub.mcpResetChoices(agent, folder) }, null)
+                                })
+                            },
+                            onSignIn = {
+                                busy = true
+                                trouble = null
+                                coroutines.launch {
+                                    hub.mcpLogin(agent, name, folder)
+                                        .onSuccess { l -> if (l.done) { l.words?.let(toast); attempt++ } else login = l }
+                                        .onFailure { e -> trouble = e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.as_edit_err) }
+                                    busy = false
+                                }
+                            },
+                            onSignOut = { run({ hub.mcpLogout(agent, name, folder) }, context.getString(R.string.mcp_signed_out)) },
+                            onEdit = onEdit,
+                            onRemove = {
+                                confirm(Confirm(context.getString(R.string.mcp_remove_title, name), context.getString(R.string.mcp_remove_body), context.getString(R.string.mcp_remove_action), danger = true) {
+                                    run({ hub.mcpRemove(s) }, context.getString(R.string.mcp_removed, serverName), onBack)
+                                })
+                            },
+                        )
+                    }
                     item(key = "setup-seam") { Seam(stringResource(R.string.mcp_seam_setup), modifier = seamMod()) }
                     item(key = "setup") { SetupCard(s.setup) }
                     item(key = "tools-seam") { Seam(stringResource(R.string.mcp_seam_tools), modifier = seamMod()) }
@@ -335,6 +451,22 @@ fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder
                 }
             }
         }
+    }
+    login?.let { l ->
+        LoginSheet(
+            l,
+            onCancel = {
+                login = null
+                l.login?.let { id -> coroutines.launch { hub.mcpLoginCancel(agent, id) } }
+            },
+            onFinish = { address, done ->
+                coroutines.launch {
+                    hub.mcpLoginFinish(agent, l.login.orEmpty(), address)
+                        .onSuccess { login = null; toast(context.getString(R.string.mcp_signed_in)); attempt++; done(null) }
+                        .onFailure { e -> done(e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.as_edit_err)) }
+                }
+            },
+        )
     }
     tool?.let { t -> ToolSheet(t) { tool = null } }
     liveTool?.let { t -> LiveToolSheet(t) { liveTool = null } }
@@ -573,5 +705,283 @@ private fun LiveToolSheet(t: McpLiveTool, onDismiss: () -> Unit) {
         AnnotationLines(t.readOnly.takeIf { it }, t.destructive.takeIf { it }, null, t.openWorld.takeIf { it })
         Spacer(Modifier.height(8.dp))
         HText(stringResource(R.string.mcp_why_names), style = Type.small, color = HN.inkDim)
+    }
+}
+
+/** The command as it would run, for a confirm: what looks secret is already masked by the server. */
+private fun McpServer.commandLine(): String? = setup.command?.let { c -> (listOf(c) + setup.args).joinToString(" ") } ?: setup.url
+
+/**
+ * Before anything that runs a program on the server: the exact command on a confirm, then the owner's
+ * fingerprint or screen lock (docs/DECISIONS.md, "Managing MCP servers from the phone").
+ */
+internal fun mcpRunCheck(context: Context, confirm: (Confirm) -> Unit, toast: (String) -> Unit, server: String, name: String, command: String?, go: () -> Unit) {
+    confirm(
+        Confirm(
+            title = context.getString(R.string.mcp_run_title, server),
+            body = context.getString(R.string.mcp_run_body, name, command ?: context.getString(R.string.mcp_run_unknown)),
+            action = context.getString(R.string.mcp_run_action),
+            danger = true,
+        ) {
+            OwnerCheck.ask(context, context.getString(R.string.mcp_run_title, server), name, context.getString(R.string.check_no_lock), onOk = go, onFail = { msg -> if (msg != null) toast(msg) })
+        },
+    )
+}
+
+@Composable
+private fun ActionsCard(
+    s: McpServer,
+    mine: McpLive?,
+    busy: Boolean,
+    trouble: String?,
+    onToggle: (Boolean) -> Unit,
+    onReconnect: () -> Unit,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+    onResetChoices: () -> Unit,
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit,
+    onEdit: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val status = mine?.status
+    val waiting = status == Mcp.WAITING || status == Mcp.REJECTED || s.approval == "pending" || s.approval == "rejected"
+    val hasAddress = s.setup.transport == Mcp.HTTP || s.setup.transport == Mcp.SSE
+    val canSignIn = hasAddress && s.setup.headerNames.none { it.equals("Authorization", ignoreCase = true) }
+    FlowRow(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (s.scope == Mcp.PROJECT && waiting) {
+            Pill(stringResource(R.string.mcp_approve), onApprove, kind = PillKind.Primary, height = 40.dp, enabled = !busy)
+            if (s.approval != "rejected") Pill(stringResource(R.string.mcp_reject), onReject, kind = PillKind.Outline, height = 40.dp, enabled = !busy)
+        }
+        if (!waiting && status != null) {
+            if (status == Mcp.DISABLED) Pill(stringResource(R.string.mcp_enable), { onToggle(true) }, kind = PillKind.Primary, height = 40.dp, enabled = !busy)
+            else Pill(stringResource(R.string.mcp_disable), { onToggle(false) }, kind = PillKind.Outline, height = 40.dp, enabled = !busy)
+            if (status != Mcp.DISABLED) Pill(stringResource(R.string.mcp_reconnect), onReconnect, kind = PillKind.Outline, height = 40.dp, enabled = !busy)
+        }
+        if (canSignIn) {
+            Pill(stringResource(if (status == Mcp.NEEDS_AUTH) R.string.mcp_sign_in else R.string.mcp_sign_in_again), onSignIn, kind = if (status == Mcp.NEEDS_AUTH) PillKind.Primary else PillKind.Outline, height = 40.dp, enabled = !busy)
+            if (status != Mcp.NEEDS_AUTH) Pill(stringResource(R.string.mcp_sign_out), onSignOut, kind = PillKind.Ghost, height = 40.dp, enabled = !busy)
+        }
+        if (s.scope == Mcp.PROJECT) Pill(stringResource(R.string.mcp_reset), onResetChoices, kind = PillKind.Ghost, height = 40.dp, enabled = !busy)
+        if (s.editable) {
+            Pill(stringResource(R.string.mcp_edit), onEdit, kind = PillKind.Outline, height = 40.dp, enabled = !busy, leading = Glyph.Pencil)
+            Pill(stringResource(R.string.mcp_remove), onRemove, kind = PillKind.Danger, height = 40.dp, enabled = !busy)
+        }
+    }
+    Column(Modifier.padding(horizontal = 4.dp)) {
+        if (busy) LoadingLine(stringResource(R.string.as_saving), Modifier.padding(top = 8.dp))
+        trouble?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 8.dp)) }
+        Spacer(Modifier.height(6.dp))
+        HText(stringResource(R.string.mcp_actions_note), style = Type.small, color = HN.inkDim)
+    }
+}
+
+/**
+ * A sign-in from the phone: the page opens in the browser, which at the end goes to an address on localhost that
+ * a phone can't open. That address, pasted here, finishes it on the server.
+ */
+@Composable
+private fun LoginSheet(l: McpLogin, onCancel: () -> Unit, onFinish: (String, (String?) -> Unit) -> Unit) {
+    val context = LocalContext.current
+    val toast = LocalToast.current
+    var address by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var trouble by remember { mutableStateOf<String?>(null) }
+    GlassSheet(stringResource(R.string.mcp_sign_in), onCancel) {
+        HText(stringResource(R.string.mcp_sign_in), style = Type.title, color = HN.ink)
+        Spacer(Modifier.height(6.dp))
+        HText(stringResource(R.string.mcp_login_body), style = Type.small, color = HN.inkMuted)
+        Spacer(Modifier.height(10.dp))
+        Pill(stringResource(R.string.mcp_login_open), {
+            // The browser itself: it holds any sign-in the owner already has there.
+            l.url?.let { u -> runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(u))) }.onFailure { toast(context.getString(R.string.about_github_no_browser)) } }
+        }, kind = PillKind.Primary, height = 44.dp)
+        Spacer(Modifier.height(12.dp))
+        Field(address, { address = it }, placeholder = "http://localhost:…", mono = true, singleLine = false, label = stringResource(R.string.mcp_login_address))
+        trouble?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 6.dp)) }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill(stringResource(R.string.mcp_login_finish), {
+                busy = true
+                trouble = null
+                onFinish(address) { err -> trouble = err; busy = false }
+            }, kind = PillKind.Outline, height = 44.dp, enabled = address.isNotBlank() && !busy)
+            Pill(stringResource(R.string.cancel), onCancel, kind = PillKind.Ghost, height = 44.dp)
+        }
+    }
+}
+
+private class PairRow(val name: String, val value: String, val kept: Boolean)
+
+/** Env vars or headers on a form: a value goes in and never comes back. One already on the server shows that it stays, until it's replaced. */
+@Composable
+private fun PairsEditor(title: String, rows: List<PairRow>, onChange: (List<PairRow>) -> Unit) {
+    FieldLabel(title, Modifier.padding(top = 10.dp))
+    rows.forEachIndexed { i, r ->
+        val set = { x: PairRow -> onChange(rows.toMutableList().also { it[i] = x }) }
+        Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            if (r.kept) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HText(r.name, style = Type.monoSmall, color = HN.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.width(8.dp))
+                    HText(stringResource(R.string.mcp_value_kept), style = Type.small, color = HN.inkDim, maxLines = 1)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    Pill(stringResource(R.string.mcp_value_replace), { set(PairRow(r.name, "", false)) }, kind = PillKind.Ghost, height = 36.dp)
+                    Pill(stringResource(R.string.mcp_value_remove), { onChange(rows.filterIndexed { x, _ -> x != i }) }, kind = PillKind.Ghost, height = 36.dp)
+                }
+            } else {
+                Field(r.name, { set(PairRow(it, r.value, false)) }, placeholder = stringResource(R.string.mcp_pair_name), mono = true, label = stringResource(R.string.mcp_pair_name))
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Field(r.value, { set(PairRow(r.name, it, false)) }, modifier = Modifier.weight(1f), placeholder = stringResource(R.string.mcp_pair_value), secret = true, label = stringResource(R.string.mcp_pair_value))
+                    Spacer(Modifier.width(8.dp))
+                    Pill(stringResource(R.string.mcp_value_remove), { onChange(rows.filterIndexed { x, _ -> x != i }) }, kind = PillKind.Ghost, height = 36.dp)
+                }
+            }
+        }
+    }
+    Pill(stringResource(R.string.mcp_pair_add), { onChange(rows + PairRow("", "", false)) }, kind = PillKind.Ghost, height = 36.dp, modifier = Modifier.padding(top = 6.dp), leading = Glyph.Plus)
+}
+
+@Composable
+private fun ChoiceRow(options: List<Pair<String, String>>, chosen: String, enabled: Boolean, onChoose: (String) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.forEach { (value, word) ->
+            Pill(word, { onChoose(value) }, kind = if (value == chosen) PillKind.Primary else PillKind.Ghost, height = 36.dp, enabled = enabled)
+        }
+    }
+}
+
+/** Add a server, or change one: the form, then the confirm and the fingerprint where it runs something. Values are checked again on the server. */
+@Composable
+fun McpEditScreen(hub: Hub, agent: String, name: String?, scope: String?, folder: String?, onBack: () -> Unit) {
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val context = LocalContext.current
+    val toast = LocalToast.current
+    val confirm = LocalConfirm.current
+    val coroutines = rememberCoroutineScope()
+    val server = hub.mac.name
+    val editing = name != null
+    val codex = agent == AgentSettingsReply.CODEX
+    var loaded by remember { mutableStateOf<Result<McpServer>?>(null) }
+    var folders by remember { mutableStateOf<List<McpFolder>>(emptyList()) }
+    var formName by remember { mutableStateOf(name.orEmpty()) }
+    var where by remember { mutableStateOf(scope ?: Mcp.USER) }
+    var inFolder by remember { mutableStateOf(folder) }
+    var transport by remember { mutableStateOf(Mcp.STDIO) }
+    var command by remember { mutableStateOf("") }
+    var argsText by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    var env by remember { mutableStateOf(emptyList<PairRow>()) }
+    var headers by remember { mutableStateOf(emptyList<PairRow>()) }
+    var clientId by remember { mutableStateOf("") }
+    var port by remember { mutableStateOf("") }
+    var clientSecret by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
+    var trouble by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        hub.mcpList(agent).onSuccess { folders = it.folders }
+        if (name != null) {
+            val r = hub.mcpServer(agent, name, scope ?: Mcp.USER, folder)
+            r.onSuccess { s ->
+                transport = s.setup.transport ?: Mcp.STDIO
+                command = s.setup.command.orEmpty()
+                argsText = s.setup.args.joinToString("\n")
+                url = s.setup.url.orEmpty()
+                env = s.setup.envNames.map { PairRow(it, "", true) }
+                headers = s.setup.headerNames.map { PairRow(it, "", true) }
+                clientId = s.setup.clientId.orEmpty()
+                port = s.setup.callbackPort?.toString().orEmpty()
+            }
+            loaded = r
+        }
+    }
+    ScreenScaffold(sourceKey = "mcp-edit:$agent:$scope:$folder:$name", title = stringResource(if (editing) R.string.mcp_edit_title else R.string.mcp_add_title), subtitle = server, onBack = onBack) { top, source ->
+        Column(
+            Modifier.fillMaxSize().then(source).verticalScroll(rememberScrollState()).padding(top = top, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),
+        ) {
+            val failure = loaded?.exceptionOrNull()
+            if (failure != null) {
+                McpFailure(failure, R.string.mcp_err) { onBack() }
+                return@Column
+            }
+            FieldLabel(stringResource(R.string.mcp_f_name))
+            if (editing) HText(formName, style = Type.mono, color = HN.ink, modifier = Modifier.padding(vertical = 6.dp))
+            else Field(formName, { formName = it }, placeholder = "my-server", mono = true, label = stringResource(R.string.mcp_f_name))
+            if (!codex && !editing) {
+                FieldLabel(stringResource(R.string.mcp_f_where), Modifier.padding(top = 10.dp))
+                ChoiceRow(listOf(Mcp.USER to stringResource(R.string.mcp_f_global), Mcp.PROJECT to stringResource(R.string.mcp_f_project), Mcp.LOCAL to stringResource(R.string.mcp_f_local)), where, true) { where = it }
+                HText(stringResource(when (where) { Mcp.USER -> R.string.mcp_f_global_body; Mcp.PROJECT -> R.string.mcp_f_project_body; else -> R.string.mcp_f_local_body }), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
+                if (where != Mcp.USER) {
+                    FieldLabel(stringResource(R.string.mcp_f_folder), Modifier.padding(top = 10.dp))
+                    val choices = folders.filter { it.id != Mcp.HOME }
+                    if (choices.isEmpty()) HText(stringResource(R.string.mcp_f_no_folders), style = Type.small, color = HN.amber)
+                    ChoiceRow(choices.map { it.id to it.name }, inFolder.orEmpty(), true) { inFolder = it }
+                }
+            }
+            FieldLabel(stringResource(R.string.mcp_f_type), Modifier.padding(top = 10.dp))
+            ChoiceRow(if (codex) listOf(Mcp.STDIO to "stdio", Mcp.HTTP to "HTTP") else listOf(Mcp.STDIO to "stdio", Mcp.HTTP to "HTTP", Mcp.SSE to "SSE"), transport, true) { transport = it }
+            if (transport == Mcp.STDIO) {
+                FieldLabel(stringResource(R.string.mcp_command), Modifier.padding(top = 10.dp))
+                Field(command, { command = it }, placeholder = "npx", mono = true, label = stringResource(R.string.mcp_command))
+                FieldLabel(stringResource(R.string.mcp_f_args), Modifier.padding(top = 10.dp))
+                Field(argsText, { argsText = it }, placeholder = "-y\n@acme/mcp", mono = true, singleLine = false, minLines = 2, label = stringResource(R.string.mcp_args))
+                PairsEditor(stringResource(R.string.mcp_env), env) { env = it }
+            } else {
+                FieldLabel(stringResource(R.string.mcp_url), Modifier.padding(top = 10.dp))
+                Field(url, { url = it }, placeholder = "https://mcp.example.com/mcp", mono = true, label = stringResource(R.string.mcp_url))
+                if (!codex) {
+                    PairsEditor(stringResource(R.string.mcp_headers), headers) { headers = it }
+                    FieldLabel(stringResource(R.string.mcp_f_oauth), Modifier.padding(top = 10.dp))
+                    Field(clientId, { clientId = it }, placeholder = stringResource(R.string.mcp_oauth_client), mono = true, label = stringResource(R.string.mcp_oauth_client))
+                    Spacer(Modifier.height(4.dp))
+                    Field(port, { port = it }, placeholder = stringResource(R.string.mcp_oauth_port), mono = true, label = stringResource(R.string.mcp_oauth_port))
+                    Spacer(Modifier.height(4.dp))
+                    Field(clientSecret, { clientSecret = it }, placeholder = stringResource(R.string.mcp_f_client_secret), secret = true, label = stringResource(R.string.mcp_f_client_secret))
+                }
+            }
+            HText(stringResource(R.string.mcp_f_secrets_note, server), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 10.dp))
+            trouble?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 8.dp)) }
+            Spacer(Modifier.height(14.dp))
+            val before = loaded?.getOrNull()
+            val args = argsText.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+            val form = { check: Boolean ->
+                McpForm(
+                    agent = agent,
+                    scope = where,
+                    folder = if (where == Mcp.USER) null else inFolder,
+                    name = formName.trim(),
+                    transport = transport,
+                    command = command.trim(),
+                    args = args,
+                    url = url.trim(),
+                    env = env.map { McpPair(it.name.trim(), if (it.kept) null else it.value) },
+                    headers = headers.map { McpPair(it.name.trim(), if (it.kept) null else it.value) },
+                    clientId = clientId.trim().ifEmpty { null },
+                    callbackPort = port.trim().toIntOrNull(),
+                    clientSecret = clientSecret.ifEmpty { null },
+                    confirmRun = check,
+                    expected = before?.hash,
+                )
+            }
+            val runs = transport == Mcp.STDIO && (before == null || before.setup.transport != Mcp.STDIO || before.setup.command != command.trim() || before.setup.args != args || env.any { !it.kept } || env.map { it.name } != before.setup.envNames)
+            val ready = formName.isNotBlank() && (if (transport == Mcp.STDIO) command.isNotBlank() else url.isNotBlank()) && (editing || where == Mcp.USER || inFolder != null) && !saving
+            Pill(stringResource(R.string.mcp_f_save), {
+                val send = { check: Boolean ->
+                    saving = true
+                    trouble = null
+                    coroutines.launch {
+                        val f = form(check)
+                        (if (editing) hub.mcpEdit(f) else hub.mcpAdd(f))
+                            .onSuccess { toast(context.getString(R.string.as_saved, server)); onBack() }
+                            .onFailure { e -> trouble = e.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.as_edit_err) }
+                        saving = false
+                    }
+                    Unit
+                }
+                if (runs) mcpRunCheck(context, confirm, toast, server, formName.trim(), (listOf(command.trim()) + args).joinToString(" ")) { send(true) } else send(false)
+            }, kind = PillKind.Primary, height = 48.dp, enabled = ready)
+        }
     }
 }

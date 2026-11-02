@@ -109,7 +109,7 @@ type Current = { bytes: Buffer; hash: string; stat: Stats } | null
  * The file's bytes, null when it isn't there. A link is refused, not followed: a write through it would
  * land wherever it points (a dotfiles repository, say), which nobody chose from the phone.
  */
-function readCurrent(file: string): Current {
+export function readCurrent(file: string): Current {
   let first: Stats
   try {
     first = lstatSync(file)
@@ -137,7 +137,7 @@ function readCurrent(file: string): Current {
 }
 
 /** The bytes as text, if that's what they are: bytes that aren't UTF-8 wouldn't come back as they were. */
-function textOf(bytes: Buffer): string | null {
+export function textOf(bytes: Buffer): string | null {
   const text = bytes.toString('utf8')
   return Buffer.from(text, 'utf8').equals(bytes) ? text : null
 }
@@ -307,7 +307,7 @@ export function jsonEdit(t: string, path: readonly string[], value: Value): stri
  * [t] with [path], any number of keys deep, set to [value], or taken out when it's null (with any table
  * that leaves empty). The same care as [jsonEdit]: only those bytes change, and what comes out is compared.
  */
-export function jsonEditPath(t: string, path: readonly string[], value: Value | null): string {
+export function jsonEditPath(t: string, path: readonly string[], value: Value | readonly string[] | null): string {
   const before = parseJson(t)
   if (!before) throw malformed()
   const eol = t.includes('\r\n') ? '\r\n' : '\n'
@@ -340,7 +340,7 @@ export function jsonEditPath(t: string, path: readonly string[], value: Value | 
     else next = splice(t, members[i - 1]!.valueTo, m.valueTo, '')
   } else if (whole) {
     const m = found.at(-1)!
-    if (t[m.valueFrom] === '{' || t[m.valueFrom] === '[') throw shape()
+    if (t[m.valueFrom] === '{' || (t[m.valueFrom] === '[' && !Array.isArray(value))) throw shape()
     next = splice(t, m.valueFrom, m.valueTo, JSON.stringify(value))
   } else {
     const { open, members, close } = levels[found.length]!
@@ -470,7 +470,7 @@ function pruneBackups(agent: Agent): void {
  * rename, so a reader sees the old file or the new one. It takes the old file's mode and owner; a new
  * file is 0600. [lastLook] runs just before the rename and may refuse.
  */
-function writeAtomic(file: string, bytes: Buffer, like: Stats | null, lastLook: () => void): void {
+export function writeAtomic(file: string, bytes: Buffer, like: Stats | null, lastLook: () => void): void {
   const tmp = join(dirname(file), `.${basename(file)}.hn-${randomBytes(6).toString('hex')}`)
   let fd: number | undefined
   try {

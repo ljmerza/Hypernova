@@ -3524,3 +3524,59 @@ what actually reaches the API: a real `claude -p` in a throwaway home, against a
    Claude Code reloads settings (its resolver reads the settings table); that wasn't measured, so the screen only promises new sessions.
 7. **Codex** is unchanged: `model_reasoning_effort` was already editable, and it's one value, not per model.
 
+## Managing MCP servers from the phone (2026-11-02)
+
+The owner: "I want to be able to click on an MCP and see where they're in the global settings or agent settings, and … how it's set
+up and its tools … add new MCPs … on a global or project basis … disable or enable or reconnect. All the features that you can do at MCPs, I want to be
+able to do." This replaces "Names only" and "Never args" of "The agents' settings, viewed" 8 and "A session's MCP servers" 3 for this screen: those routes keep their lists as they were.
+
+**The one place it cuts against "bypass stays off the phone":** adding or changing a stdio server, approving a project's servers, and an Undo that puts one back all run a program on
+the server. The owner decided that's allowed, behind a confirm showing the whole command and his fingerprint. Enable, disable and reconnect of an existing server need neither.
+
+1. **Where.** Agents & providers › an agent's Settings › MCP servers: `Route.McpServers`, then a server's page, then the form. Nothing on the session's chat screen. The session sheet's MCP view still lists names:
+   the phone has no way there to open a screen under the sheet, so the link it may have wasn't added.
+2. **What's shown.** Scope, the file, the type, the command and its arguments or the URL, the **names** of env vars and headers, OAuth client and port, timeout. Values of env and
+   headers never leave, whatever they look like. Arguments and URLs are masked where they look like a secret: by the flag before them (`--token xyz`, `--api-key=…`, `-H "X: y"`), by a secret-named
+   `NAME=value`, a `user:pass@` or a secret-named query value, a `Bearer …`, or a random-looking run (`maskSecrets`). Masks are a heuristic: an argument that holds a secret with no sign of it
+   (`mytool hunter2`) would be shown. Only `mcpServers` and a project's MCP keys are read from `~/.claude.json`, which stays closed to the file viewer.
+3. **Status comes from Claude Code, per folder.** A process with no prompt and hooks off (as the "/" list asks) answers `mcpServerStatus()`. It's asked per folder because what's on differs per folder: the screen has a
+   "Seen from" row. It costs no tokens, needs no login, and starts each server, as a session would, so an answer is kept 20 seconds.
+4. **A process under the SDK approves every project server** (2.1.316: `non_interactive`). So it's told, in its flag settings, that each one not yet approved is rejected, and it doesn't start.
+   **`daemon/src/commands.ts`'s "/" list has no such guard and does start them**: measured, a marker file written by an unapproved server. That's older than this and wasn't changed here.
+5. **A tool's detail comes from the server itself.** Claude Code's status gives a tool's name and hints, no description or schema (2.1.316's reply builder; its types offer a `description` it doesn't fill). So
+   `daemon/src/mcp-client.ts` is a small MCP client for stdio, Streamable HTTP and SSE: it starts the server as Claude Code would, with its env and `${VAR}` expanded, asks `tools/list`, `prompts/list`, `resources/list`,
+   and stops. Tools are never called. Never for a server that's off or not approved. A plugin's, an organization's or a claude.ai connector's has names and hints only: its env isn't in a file this reads.
+   A server signed in through OAuth answers 401 here too, because the tokens are Claude Code's and aren't read: it shows names and hints, saying it needs signing in only if Claude Code also says so.
+6. **Adding goes through Claude Code's commands:** `claude mcp add-json`, as the form's fields become its JSON, so its own validation and its writer (and lock) hold. A client secret goes as `MCP_CLIENT_SECRET`. **Other secrets are on that command's argv for a moment**,
+   visible to `ps` for other local users of that computer: the CLI has no other way in, and the alternative was hand-writing a file many processes rewrite. Output from these commands is never kept: `claude mcp get` prints env values, so it isn't run at all.
+   A failure's line is shown with what was sent and what looks secret taken out.
+7. **Editing is remove then add**, since Claude Code has no edit. If the add fails the old entry goes back. A name can't change, nor a scope: that's remove and add. Fields the form doesn't have (`alwaysLoad`, a helper) carry over.
+   Removing may drop a stored OAuth sign-in with the entry; not checked, so it may ask to sign in again.
+8. **A secret is write-only on the form.** A row already on the server says its value stays, with Replace and Remove. An argument still masked stands for the real one. A mask the server didn't give out is refused rather than written as three dots.
+9. **Undo** of the last add, edit or remove, one step, while the entry is what that change left. It's kept like a settings backup: the whole entry, 0600 in a 0700 folder under `<support>`.
+10. **Enable and disable are per folder**, as in `/mcp`: Claude Code's writer puts the name in that project's `disabledMcpServers`. There's no global off. A session already running keeps what it has, and the page says Restart session picks it up.
+11. **Reconnect** is `reconnectMcpServer()` in a fresh process: it says whether the server connects now. It doesn't reach a running session, which holds its own connections. Typing `/mcp reconnect <name>` in that session still does, and Restart session reloads them all. A per-session reconnect from this screen isn't built.
+12. **Approving** writes `enabledMcpjsonServers` in the folder's `.claude/settings.local.json`, where Claude Code's own dialog writes it (it has no command for this), in place and atomically, a link refused. **Claude Code ignores a folder's own approvals until the folder is trusted**, so Approve on an untrusted folder
+    says so (409 `not_trusted`): the phone doesn't accept the trust dialog, which covers much more than servers. Turning one down needs no check. `claude mcp reset-project-choices` is "Forget this folder's answers".
+13. **OAuth works from the phone**, which wasn't expected: `claude mcp login --no-browser` needs a terminal to take the pasted address, so one runs unseen on the server. The phone opens the page in its browser, which ends at a localhost address that doesn't load; pasted back, only if it's `localhost`, it goes in as typed.
+    Tokens stay with Claude Code. A connector of a claude.ai account is managed on claude.ai.
+
+### Every MCP capability, and whether it's here
+
+| Claude Code | Here |
+|---|---|
+| `claude mcp add`, `add-json` (stdio, http, sse; `-e`, `-H`, `--scope`, `--client-id`, `--client-secret`, `--callback-port`) | Yes, as the form |
+| `add-json` of a `ws` server | Shown, not added or edited: `add` doesn't offer it and the form doesn't |
+| `claude mcp list`, `get` (status) | Yes, from `mcpServerStatus()`, adding hints and tools |
+| `claude mcp remove` | Yes, with Undo |
+| `claude mcp login`, `--no-browser`; `logout` | Yes |
+| `claude mcp reset-project-choices` | Yes |
+| `claude mcp add-from-claude-desktop` | No: Mac and WSL only, and it reads another app's config |
+| `claude mcp serve` | No: it makes Claude Code a server, nothing to manage |
+| `/mcp`: view tools, enable, disable, reconnect, authenticate, re-authenticate, clear authentication, approve | Yes. Reconnect as in 11 |
+| `/mcp`: "Connect on claude.ai", a connector's sign-in | No: it's on claude.ai |
+| SDK `setMcpServers()` | No: it only changes one session's own dynamic set |
+| SDK `mcp_call` (run a tool) | No: seeing a tool isn't running one, and this is what approvals guard |
+| `enableAllProjectMcpServers`, `allowedMcpServers`, `deniedMcpServers`, `managedMcpServers` | Read where they affect approval; not set here |
+| `alwaysLoad`, `headersHelper`, per-tool policy | Shown or carried over; not on the form |
+

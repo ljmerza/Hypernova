@@ -1,0 +1,82 @@
+{
+  "agent": "claude",
+  "state": "ok",
+  "servers": [
+    {
+      "name": "github",
+      "scope": "user",
+      "transport": "stdio",
+      "summary": "node"
+    },
+    {
+      "name": "tiny",
+      "scope": "user",
+      "transport": "stdio",
+      "summary": "node"
+    },
+    {
+      "name": "home-assistant",
+      "scope": "settings",
+      "transport": "stdio",
+      "summary": "never-sent"
+    },
+    {
+      "name": "db-tools",
+      "scope": "local",
+      "folder": "folder-app-parser-fix",
+      "project": "app-parser-fix",
+      "transport": "stdio",
+      "summary": "uvx"
+    },
+    {
+      "name": "docs",
+      "scope": "project",
+      "folder": "folder-app-parser-fix",
+      "project": "app-parser-fix",
+      "transport": "http",
+      "approval": "pending",
+      "summary": "docs.example.com"
+    }
+  ],
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    },
+    {
+      "id": "folder-app-parser-fix",
+      "name": "app-parser-fix"
+    },
+    {
+      "id": "folder-notebook",
+      "name": "notebook"
+    },
+    {
+      "id": "folder-sketchpad",
+      "name": "sketchpad"
+    },
+    {
+      "id": "folder-demo",
+      "name": "demo"
+    },
+    {
+      "id": "folder-app",
+      "name": "app"
+    }
+  ],
+  "hidden": 0,
+  "foldersNotRead": 0,
+  "scopes": [
+    "user",
+    "project",
+    "local"
+  ],
+  "undo": {
+    "op": "edit",
+    "name": "tiny",
+    "scope": "user",
+    "folder": null,
+    "needsCheck": true,
+    "command": "node tiny-mcp.mjs --token •••"
+  }
+}

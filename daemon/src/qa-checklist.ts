@@ -143,6 +143,7 @@ export const CHECKLIST: { title: string; items: { id: string; title: string; how
   {
     title: 'Overall',
     items: [
+      { id: 'as-mcp', title: 'MCP servers: see, add, turn off, remove', how: 'Agents & providers → Claude Code → Settings → MCP servers. Tap one: it should say where it\'s defined, how it\'s set up with env names only, its status and its tools; tap a tool. Add a stdio one: it should show the whole command, then ask for your fingerprint. Turn it off and on, Reconnect, Remove, then Undo.' },
       { id: 'as-edit', title: 'An agent\'s settings can be changed, and put back', how: 'Agents & providers → Claude Code → Settings. Change Update channel, check ~/.claude/settings.json changed only that line, then Undo last change. Pick Auto for Starting permission mode: it should confirm, then ask for your fingerprint. Bypass should not be offered. Do the same on Codex with Web search.' },
       { id: 'all-look', title: 'It looks and feels right', how: 'Anything off in the design, motion, text or flow.' },
       { id: 'all-speed', title: 'It feels fast and doesn\'t drain the battery', how: 'Scrolling, opening sessions, and the phone\'s battery after an hour.' },

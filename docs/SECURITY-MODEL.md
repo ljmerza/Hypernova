@@ -273,6 +273,15 @@ rules, and weaknesses in the VPN or the operating system.
     the device ends it. Backups hold whole settings files, secrets in `env` included: 0600 in a 0700 folder under
     `<support>`, 20 per agent, and they go with the state folder.
 
+18. **Managing an agent's MCP servers from a paired phone** (`docs/specs/spec-mcp-manage.md`, 2026-11-02; `docs/DECISIONS.md`, "Managing MCP servers from the phone"). This one can run a program on the server by design: add a stdio server,
+    or approve a project's. The threat is a stolen pairing again. **The confirm and the fingerprint are the phone's own check; the server only sees the claim, `confirmRun`**, as with an automation's `confirmShell`, and refuses without it. A stolen token sends the claim.
+    Such a server only runs once a session or a status starts it. As with risk 11, that token could already open a terminal, so this isn't a new power; it's a new, quieter way to keep one, because it outlives the session and the device being forgotten. Check the list after a lost phone.
+
+    What holds on the server, whoever's asking: env and header values and tokens are never in a reply, on any route, tested with a planted secret in the raw bodies. Names, commands and URLs are checked. A status never starts a project's server nobody approved,
+    and neither does seeing its tools. A folder has to be one the daemon knows. Nothing new reaches the file viewer: `~/.claude.json` stays closed to it. A trust dialog isn't accepted from here. No tool can be run from here.
+
+    What doesn't hold: masking of arguments is a heuristic, and a secret with no sign of being one is shown. A value typed on the form is on `claude mcp add-json`'s command line for a moment, visible to `ps` for other users of that computer. The Undo file holds a whole entry, secrets too, as settings backups do (0600 in a 0700 folder).
+
 ## 9. Reporting
 
 Report privately through the repository's Security tab on GitHub ("Report a vulnerability"), as

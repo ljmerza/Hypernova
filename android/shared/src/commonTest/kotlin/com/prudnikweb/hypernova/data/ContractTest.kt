@@ -685,6 +685,19 @@ class ContractTest {
             assertEquals("tiny://notes", f.resources.single().uri)
             assertEquals("A tiny server.", f.instructions)
         },
+        "rest-mcp-added" to { o -> assertTrue(o.bool("ok")); assertNotNull(o.str("hash")) },
+        "rest-mcp-refused-run" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
+        "rest-mcp-file-changed" to { o -> assertEquals(AgentSettingRefused.FILE_CHANGED, Api.errorOf(409, o.toString()).code) },
+        "rest-mcp-toggled" to { o -> assertTrue(o.bool("ok")); assertFalse(o.bool("enabled")) },
+        "rest-mcp-reconnected" to { o -> assertEquals(Mcp.CONNECTED, o.obj("server")?.let(McpLiveReply::one)?.status) },
+        "rest-mcp-not-trusted" to { o -> assertEquals("not_trusted", Api.errorOf(409, o.toString()).code) },
+        "rest-mcp-list-undo" to { o ->
+            val u = McpList.wire(o).undo!!
+            assertEquals("edit", u.op)
+            assertTrue(u.needsCheck)
+            assertTrue(u.command!!.contains("•••"))
+        },
+        "rest-mcp-undone" to { o -> assertTrue(o.bool("ok")) },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)

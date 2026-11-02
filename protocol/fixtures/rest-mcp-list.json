@@ -59,5 +59,11 @@
     }
   ],
   "hidden": 0,
-  "foldersNotRead": 0
+  "foldersNotRead": 0,
+  "scopes": [
+    "user",
+    "project",
+    "local"
+  ],
+  "undo": null
 }

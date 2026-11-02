@@ -562,8 +562,9 @@ private fun Screens(
                 is Route.Agent -> com.prudnikweb.hypernova.ui.session.AgentScreen(shown, r.sessionId, r.agentId, onBack = { nav.pop() })
                 Route.Providers -> ProvidersScreen(shown, onBack = { nav.pop() }, onEdit = { id, kind -> nav.push(Route.ProviderEdit(id, kind)) }, onAgentSettings = { nav.push(Route.AgentSettings(it)) })
                 is Route.AgentSettings -> com.prudnikweb.hypernova.ui.settings.AgentSettingsScreen(shown, r.agent, onBack = { nav.pop() }, onMcp = { nav.push(Route.McpServers(r.agent)) })
-                is Route.McpServers -> com.prudnikweb.hypernova.ui.settings.McpServersScreen(shown, r.agent, onBack = { nav.pop() }, onOpen = { name, scope, folder -> nav.push(Route.McpServerPage(r.agent, name, scope, folder)) })
-                is Route.McpServerPage -> com.prudnikweb.hypernova.ui.settings.McpServerScreen(shown, r.agent, r.name, r.scope, r.folder, onBack = { nav.pop() })
+                is Route.McpServers -> com.prudnikweb.hypernova.ui.settings.McpServersScreen(shown, r.agent, onBack = { nav.pop() }, onOpen = { name, scope, folder -> nav.push(Route.McpServerPage(r.agent, name, scope, folder)) }, onAdd = { nav.push(Route.McpEdit(r.agent, null, null, null)) })
+                is Route.McpServerPage -> com.prudnikweb.hypernova.ui.settings.McpServerScreen(shown, r.agent, r.name, r.scope, r.folder, onBack = { nav.pop() }, onEdit = { nav.push(Route.McpEdit(r.agent, r.name, r.scope, r.folder)) })
+                is Route.McpEdit -> com.prudnikweb.hypernova.ui.settings.McpEditScreen(shown, r.agent, r.name, r.scope, r.folder, onBack = { nav.pop() })
                 Route.ConnectionLog -> com.prudnikweb.hypernova.ui.settings.ConnectionLogScreen(onBack = { nav.pop() })
                 is Route.ProviderEdit -> ProviderEditScreen(shown, r.id, r.kind, onBack = { nav.pop() })
                 is Route.AutomationEdit -> com.prudnikweb.hypernova.ui.automations.AutomationEditor(

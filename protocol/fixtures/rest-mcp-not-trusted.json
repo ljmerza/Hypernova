@@ -1,0 +1,7 @@
+{
+  "status": 409,
+  "error": {
+    "code": "not_trusted",
+    "message": "Claude Code hasn’t been told to trust this folder yet, so it wouldn’t read this. Start a session there and accept its question first."
+  }
+}

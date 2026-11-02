@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "confirm_run",
+    "message": "Adding this runs a program on the server. Confirm it with your fingerprint or screen lock."
+  }
+}

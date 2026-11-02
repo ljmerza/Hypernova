@@ -1117,6 +1117,31 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       writeFileSync(talker, TINY_MCP)
       writeFileSync(claudeJson, JSON.stringify({ ...JSON.parse(readFileSync(claudeJson, 'utf8')), mcpServers: { github: { command: process.execPath, args: [talker] } } }))
       contract('rest-mcp-tools', await ok(get('/v1/agents/mcp/tools?agent=claude&name=github&scope=user')))
+      // Changing them, against a stand-in for Claude Code's own commands that does what they do to the file.
+      const { useCli, forgetLast } = await import('../src/mcp-edit.ts')
+      const onDisk = () => JSON.parse(readFileSync(claudeJson, 'utf8'))
+      useCli(async (args) => {
+        const doc = onDisk()
+        if (args[1] === 'add-json') doc.mcpServers[args.at(-2)!] = JSON.parse(args.at(-1)!)
+        if (args[1] === 'remove') delete doc.mcpServers[args.at(-1)!]
+        writeFileSync(claudeJson, JSON.stringify(doc))
+        return { code: 0, stdout: '', stderr: '' }
+      })
+      const form = { agent: 'claude', scope: 'user', name: 'tiny', transport: 'stdio', command: process.execPath, args: [talker, '--token', 'never-sent'], env: [{ name: 'API_TOKEN', value: 'never-sent' }] }
+      contract('rest-mcp-refused-run', await refused(call('POST', '/v1/agents/mcp/servers', form), 403))
+      const added = await ok(post('/v1/agents/mcp/servers', { ...form, confirmRun: true }))
+      contract('rest-mcp-added', stable(added))
+      contract('rest-mcp-file-changed', await refused(call('PUT', '/v1/agents/mcp/servers', { ...form, expected: 'old', confirmRun: true }), 409))
+      await ok(call('PUT', '/v1/agents/mcp/servers', { ...form, args: [talker, '--token', '•••', 'more'], env: [{ name: 'API_TOKEN', keep: true }], expected: added.hash, confirmRun: true }))
+      const listed = await ok(get('/v1/agents/mcp?agent=claude'))
+      assert.ok(!JSON.stringify(listed.undo).includes('never-sent'))
+      contract('rest-mcp-list-undo', stable({ ...listed, undo: { ...listed.undo, command: 'node tiny-mcp.mjs --token •••' } }))
+      contract('rest-mcp-undone', await ok(post('/v1/agents/mcp/undo', { agent: 'claude', confirmRun: true })))
+      forgetLast('claude')
+      useCli(null)
+      contract('rest-mcp-toggled', await ok(post('/v1/agents/mcp/toggle', { agent: 'claude', name: 'github', folder: 'home', enabled: false })))
+      contract('rest-mcp-reconnected', await ok(post('/v1/agents/mcp/reconnect', { agent: 'claude', name: 'github', folder: 'home' })))
+      contract('rest-mcp-not-trusted', await refused(post('/v1/agents/mcp/approval', { agent: 'claude', name: 'docs', folder: folderId(cwd), approved: true, confirmRun: true }), 409))
       contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
     }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))

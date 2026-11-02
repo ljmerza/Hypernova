@@ -17,7 +17,7 @@ data class McpFolder(val id: String, val name: String)
 data class McpRow(val name: String, val scope: String, val folder: String?, val project: String?, val transport: String?, val summary: String?, val approval: String?)
 
 @Immutable
-data class McpList(val agent: String, val state: String, val servers: List<McpRow>, val folders: List<McpFolder>, val hidden: Int, val foldersNotRead: Int, val scopes: List<String>) {
+data class McpList(val agent: String, val state: String, val servers: List<McpRow>, val folders: List<McpFolder>, val hidden: Int, val foldersNotRead: Int, val scopes: List<String>, val undo: McpUndo? = null) {
     companion object {
         fun wire(o: JSONObject) = McpList(
             agent = o.str("agent") ?: AgentSettingsReply.CLAUDE,
@@ -33,9 +33,17 @@ data class McpList(val agent: String, val state: String, val servers: List<McpRo
             hidden = o.int("hidden") ?: 0,
             foldersNotRead = o.int("foldersNotRead") ?: 0,
             scopes = McpWire.strings(o.arr("scopes")),
+            undo = o.obj("undo")?.let { u ->
+                val name = u.str("name") ?: return@let null
+                McpUndo(u.str("op") ?: "add", name, u.str("scope") ?: Mcp.USER, u.str("folder"), u.bool("needsCheck"), u.str("command"))
+            },
         )
     }
 }
+
+/** What Undo would do. [needsCheck]: it would run something, so it asks for the fingerprint, showing [command]. */
+@Immutable
+data class McpUndo(val op: String, val name: String, val scope: String, val folder: String?, val needsCheck: Boolean, val command: String?)
 
 /** How a server is set up, in what may leave. */
 @Immutable
@@ -232,3 +240,65 @@ suspend fun Hub.mcpServer(agent: String, name: String, scope: String, folder: St
 
 suspend fun Hub.mcpTools(agent: String, name: String, scope: String, folder: String?): Result<McpFacts> =
     agentExt("GET", "/v1/agents/mcp/tools" + McpWire.query("agent" to agent, "name" to name, "scope" to scope, "folder" to folder), slow = true).map(McpFacts::wire)
+
+/** A sign-in started: the page to open, then the address it ends at goes to [mcpLoginFinish]. [done]: nothing to sign in to, and [words] says why. */
+@Immutable
+data class McpLogin(val done: Boolean, val login: String?, val url: String?, val words: String?)
+
+/** A row of a form's env vars or headers: a new [value], or null to keep what's on the server, which the phone doesn't know. */
+@Immutable
+data class McpPair(val name: String, val value: String?)
+
+/** What a form sends. Secrets go one way: values aren't read back, and [McpPair.value] null keeps the server's. */
+@Immutable
+data class McpForm(
+    val agent: String,
+    val scope: String,
+    val folder: String?,
+    val name: String,
+    val transport: String,
+    val command: String,
+    val args: List<String>,
+    val url: String,
+    val env: List<McpPair>,
+    val headers: List<McpPair>,
+    val clientId: String?,
+    val callbackPort: Int?,
+    val clientSecret: String?,
+    val confirmRun: Boolean,
+    val expected: String?,
+) {
+    fun wire(): JSONObject {
+        val pairs = { list: List<McpPair> ->
+            JSONArray().also { a ->
+                list.forEach { p -> a.put(JSONObject().put("name", p.name).also { if (p.value == null) it.put("keep", true) else it.put("value", p.value) }) }
+            }
+        }
+        val o = JSONObject().put("agent", agent).put("scope", scope).put("name", name).put("transport", transport)
+        folder?.let { o.put("folder", it) }
+        expected?.let { o.put("expected", it) }
+        if (confirmRun) o.put("confirmRun", true)
+        if (transport == Mcp.STDIO) {
+            o.put("command", command).put("args", JSONArray().also { a -> args.forEach { x -> a.put(x) } }).put("env", pairs(env))
+        } else {
+            o.put("url", url).put("headers", pairs(headers))
+            val oauth = JSONObject().put("clientId", clientId ?: JSONObject.NULL).put("callbackPort", callbackPort ?: JSONObject.NULL)
+            clientSecret?.takeIf { it.isNotEmpty() }?.let { oauth.put("clientSecret", it) }
+            o.put("oauth", oauth)
+        }
+        return o
+    }
+}
+
+suspend fun Hub.mcpAdd(form: McpForm): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/servers", form.wire(), slow = true)
+suspend fun Hub.mcpEdit(form: McpForm): Result<JSONObject> = agentExt("PUT", "/v1/agents/mcp/servers", form.wire(), slow = true)
+suspend fun Hub.mcpRemove(s: McpServer): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/servers/remove", JSONObject().put("agent", s.agent).put("scope", s.scope).put("name", s.name).put("expected", s.hash ?: "").also { o -> s.folder?.let { o.put("folder", it) } }, slow = true)
+suspend fun Hub.mcpToggle(agent: String, name: String, folder: String?, enabled: Boolean): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/toggle", JSONObject().put("agent", agent).put("name", name).put("folder", folder ?: Mcp.HOME).put("enabled", enabled), slow = true)
+suspend fun Hub.mcpReconnect(agent: String, name: String, folder: String?): Result<McpLive?> = agentExt("POST", "/v1/agents/mcp/reconnect", JSONObject().put("agent", agent).put("name", name).put("folder", folder ?: Mcp.HOME), slow = true).map { o -> o.obj("server")?.let(McpLiveReply::one) }
+suspend fun Hub.mcpApproval(agent: String, name: String, folder: String?, approved: Boolean): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/approval", JSONObject().put("agent", agent).put("name", name).put("folder", folder ?: Mcp.HOME).put("approved", approved).also { if (approved) it.put("confirmRun", true) }, slow = true)
+suspend fun Hub.mcpResetChoices(agent: String, folder: String?): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/reset-choices", JSONObject().put("agent", agent).put("folder", folder ?: Mcp.HOME), slow = true)
+suspend fun Hub.mcpLogin(agent: String, name: String, folder: String?): Result<McpLogin> = agentExt("POST", "/v1/agents/mcp/login", JSONObject().put("agent", agent).put("name", name).put("folder", folder ?: Mcp.HOME), slow = true).map { o -> McpLogin(o.bool("done"), o.str("login"), o.str("url"), o.str("words")) }
+suspend fun Hub.mcpLoginFinish(agent: String, login: String, address: String): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/login/finish", JSONObject().put("agent", agent).put("login", login).put("address", address), slow = true)
+suspend fun Hub.mcpLoginCancel(agent: String, login: String): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/login/cancel", JSONObject().put("agent", agent).put("login", login))
+suspend fun Hub.mcpLogout(agent: String, name: String, folder: String?): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/logout", JSONObject().put("agent", agent).put("name", name).put("folder", folder ?: Mcp.HOME), slow = true)
+suspend fun Hub.mcpUndo(agent: String, confirmRun: Boolean): Result<JSONObject> = agentExt("POST", "/v1/agents/mcp/undo", JSONObject().put("agent", agent).also { if (confirmRun) it.put("confirmRun", true) }, slow = true)
