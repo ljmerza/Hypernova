@@ -1636,7 +1636,7 @@ APK and draw each ```` ```mermaid ```` block in a small offline WebView, themed 
 colours, with a tap to open it full screen with pinch-zoom, a way to see the code, and the normal code
 block when it can't be drawn. Nothing leaves the phone.
 
-1. **Mermaid 11.17.2 is bundled** (`third_party/mermaid`, `assets/mermaid`; about 1.2 MB more APK).
+1. **Mermaid is bundled** (`third_party/mermaid`, `assets/mermaid`; 11.17.2 then, about 1.2 MB more APK; since 2026-11-02, "Mermaid 12").
    Its page loads only its own files: a content security policy allows scripts from itself alone, the
    app answers every other request with a 404, navigation is blocked, and mermaid runs with
    `securityLevel: 'strict'`. The source goes in as a JSON string, never as markup.
@@ -3883,3 +3883,45 @@ The owner took the coordinator's suggestions on what "Delete takes a session off
    is no longer for good. Replaces "Smart still keeps a Completed Codex card from swiping" (2026-10-31).
 7. **Left as they are:** no delete for good from the phone, older Codex threads not in History
    (docs/LATER.md); recent `claude -p` and SDK runs stay in History; `claudeAgents` off still hides jobs.
+
+## Node's floor (2026-11-02)
+
+The owner: "the Node minimum". The floor moves to the October 2026 security release, confirmed against nodejs.org's release index on the day: 22.23.4, 24.22.1 and 26.12.1, all dated 2026-10-20 or 21. `engines` is `^22.23.4 || ^24.22.1 || >=26.12.1`.
+
+1. **Each line has its own floor, not one number.** "24.22.1 or newer" would have let in 25.x and 26.0 to 26.12.0, which don't have the fixes. 25 is past its end of life with no October release, so it's out.
+2. **The installers and the doctor stay on 24 and up,** as they were, and the 22 line is only for running from a checkout. A server on an older 24 downloads the newest 24 at its next install or update, and `hypernova doctor` fails until then. The old one is left where it is.
+3. **The download can't land below it.** `pickRelease` skips releases under the floor, and `install-linux.sh` and `install-macos.sh` check the Node they just unpacked. This only matters for a mirror (`HYPERNOVA_NODE_DIST`): `latest-v24.x` is already past it. A new floor is a change in three places, `node.ts`, both scripts' `node_ok` and `engines`, and `test/node-floor.test.ts` holds them together.
+
+## A blank answer to a GET is a failure (owner, 2026-11-02)
+
+`Api.json` read a blank 2xx as `{}`, so a blank `GET /v1/snapshot` (a proxy, a reply cut short) emptied the session list. Now a blank answer to any GET fails with `empty_body`, so the phone keeps what it has and reconnects. Every JSON GET in the daemon goes through `json()` and has a body, so none relies on the old reading. A blank answer to a POST, PUT or DELETE still reads as `{}`: there it says only that it's done, and callers that need more already check for it (`no_session`, `no_url`).
+
+## The workflows' actions (2026-11-02)
+
+The actions move to their current majors, all on Node 24: checkout 7, setup-java 6, setup-node 7, upload-artifact 7, configure-pages 6, deploy-pages 5, upload-pages-artifact 5. Their release notes were read for what breaks our use, and none does: no job pushes with checkout's saved credentials, and no job checks out a fork on `pull_request_target`; a `package.json` without `packageManager` doesn't get setup-node's automatic cache, and these jobs name `cache: npm` themselves; the Pages site has no dotfiles for upload-pages-artifact to drop.
+
+`gradle/actions/setup-gradle` is 6 with `cache-provider: basic`. Since 6, its default cache is `gradle-actions-caching`, a proprietary component under Gradle's own terms, which using it accepts. `basic` is the MIT provider, a thin wrapper on `actions/cache`. What it costs: it has no restore keys, so a change to a build file or the version catalog starts from an empty cache and downloads everything once, and it has no cleanup or deduplication. Whether it saves only from `main` as before is only known once it has run on GitHub.
+
+## AGP 9.5 with Gradle 9.8 (2026-11-02)
+
+AGP 9.5.0 and Gradle 9.8.2 move together. The wrapper keeps its checksum, the one services.gradle.org publishes for that zip. The build scripts' own deprecations are gone: `directories` for `srcDir`, `android { }` for `androidLibrary { }`.
+
+Left for AGP 10 and Gradle 10, since none of it is ours to change in a line or two: Compose's hot-reload plugin sets a `Configuration.setVisible` (gone in Gradle 11) and uses an attribute type that fails in Gradle 10, which needs a Compose Multiplatform that fixes it; and `compose.desktop.uiTestJUnit4` wants the dependency named directly.
+
+## Mermaid 12 (owner, 2026-11-02)
+
+The owner: "also bump up Mermaid". 12.2.0 replaces 11.17.2, its file checked against npm's published checksum.
+
+1. **The look: ELK's layout and the `neo` look, with `neo`'s shadows and gradient off.** Compared on our dark theme against `layout: 'dagre', look: 'classic'`. ELK's edges run square and stay clear of nodes and labels, where dagre's curves cross labels. It is also narrower, and that decides it on a phone, since a diagram wider than the column shrinks along with its text: 380 wide against 461 for a small flowchart, 744 against 886 for 40 nodes, 1020 against 1132 for a long left-to-right one. `neo`'s default soft shadow reads as a glow and isn't Atlas, so it's off (`dropShadow`, `useGradient`, and CSS for the filter the sequence diagram sets itself). That filter was also a bug: on WebView 133, the picture cut the shadowed box off.
+2. **The cost.** `mermaid.min.js` carries ELK whether or not it's used: 3.6 MB becomes 5.5 MB, and the release APK grows by about 0.6 MB. The page got ready in 0.8 to 1.1 s against about 0.7 s on a desktop. A slow phone may show the code a little longer before the picture; past 20 seconds, the picture waits until the chat is opened again, as before. A diagram with an explicit `layout` of its own keeps it.
+3. **ELK's licence is new here:** elkjs is EPL-2.0, weak copyleft, the only such licence in the bundle. Its text is in `third_party/mermaid/LICENSES-mermaid-bundled.txt` and `THIRD-PARTY-NOTICES.md` says where its source is.
+4. **An old WebView gets the code, not a blank.** Mermaid 12 is built for ES2024, and `minSdk` is 29, whose first WebView is far older, though Play updates it. A page that can't load Mermaid or `render.js` used to say nothing, so the code showed but the app waited 20 seconds each time. `frames.js`, in syntax any WebView reads, now answers every diagram as failed once the page has loaded. Tested by breaking each file in turn in current Chromium, and with `Object.groupBy` removed, where only the use case diagram fails and shows its code. A missing call inside a drawing is already a failure.
+
+## The SDK's usage call, tried on a stand-in (owner, 2026-11-02)
+
+The owner: "try the usage API", meaning `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET()`, as a possible replacement for `usage-probe.ts`. **Not integrated yet: it hasn't been read against the real account**, and that decides it. Found so far, from SDK 0.3.316's types, the code it ships (Claude Code 2.1.316) and a run against a stand-in for `api.anthropic.com` with made-up credentials:
+
+1. **It sends no prompt.** With the prompt stream left empty, the only requests were `GET /api/oauth/profile`, `/api/claude_cli/bootstrap`, `/api/claude_code_penguin_mode` and `/api/oauth/usage`, with nothing to `/v1/messages`. `persistSession: false` left no transcript. It's a process per read, about 1.2 s, with no terminal to read.
+2. **It has the same rows.** `five_hour` and `seven_day`, `seven_day_sonnet`, and `model_scoped[]`. Each model row comes through the same function and allowlist that titles the screen's "Current week (Fable)", and resets are exact times rather than a screen's minutes.
+3. **Failure needs care.** A 429 with nothing saved gives `rate_limits_available: true` with `rate_limits: null`. A reading rebuilt from saved data has the windows but no `model_scoped`, and says nothing else about being old: absent has to mean "keep the last per-model weeks", and an empty array means none. An answer from a recent snapshot looks exactly like a fresh one and carries no time.
+4. **Still unknown:** whether the real numbers match the screen, whether the real endpoint limits repeated reads, and what this account's model rows look like. Until then the scraper stays as it is.

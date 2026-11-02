@@ -58,7 +58,7 @@ kind_of() {
   if [ -L "$path" ]; then echo binary; return; fi
   case "$name" in
     *.kt|*.kts|*.ts|*.tsx|*.js|*.mjs|*.cjs|*.java|*.swift|*.go|*.gradle) echo slash ;;
-    *.sh|*.bash|*.yml|*.yaml|*.toml|*.pro|*.properties|*.py|.gitignore|.dockerignore|.gitattributes|Dockerfile|Makefile) echo hash ;;
+    *.sh|*.bash|*.yml|*.yaml|*.toml|*.pro|*.properties|*.py|.gitignore|.dockerignore|.gitattributes|Dockerfile|Makefile|gradlew) echo hash ;;
     *.xml|*.html|*.md) echo angle ;;
     *.css) echo star ;;
     *.json|*.jsonl) echo json ;;

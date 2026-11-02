@@ -13,7 +13,7 @@ node demo/server.ts           # atlas, juniper and pico, on 47341, 47342 and 473
 node demo/server.ts atlas     # just that one
 ```
 
-It needs Node 22.18 or newer, `npm install` already run in `daemon/` (it uses that folder's `ws`), and
+It needs Node 22.23.4 or 24.22.1 or newer, `npm install` already run in `daemon/` (it uses that folder's `ws`), and
 `openssl`. Each server prints its pairing link, also in `~/.cache/hypernova-demo/<server>/pair-link`:
 
 ```bash

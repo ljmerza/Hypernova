@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 5
     steps:
       # The whole history: the list of files is worked out from the fork point.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - run: scripts/test-license-notices.sh

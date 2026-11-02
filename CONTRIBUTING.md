@@ -12,7 +12,7 @@ folder it touches.
 
 | Folder | What | Tools |
 | --- | --- | --- |
-| `daemon/` | The daemon: sessions, hooks, shared terminals, the phone API, automations, speech. TypeScript on Node 22.18 or newer, run directly with no build step | Node 24 or newer, npm |
+| `daemon/` | The daemon: sessions, hooks, shared terminals, the phone API, automations, speech. TypeScript on Node 22.23.4 or 24.22.1 or newer, run directly with no build step | Node 24.22.1 or newer, npm |
 | `android/` | The Android app, Kotlin and Jetpack Compose | JDK 21 (Android Studio's works), Gradle wrapper |
 | `scripts/` | The Linux install, the server package (`pack-linux.sh`), the Docker image's entrypoint and end-to-end checks | bash |
 | `docs/` | [`PROTOCOL.md`](docs/PROTOCOL.md) is the contract between the layers; [`DECISIONS.md`](docs/DECISIONS.md) is what is agreed; [`LATER.md`](docs/LATER.md) is what is parked; [`specs/`](docs/specs) are designs; [`INSTALL.md`](docs/INSTALL.md) is the install guide; [`RELEASING.md`](docs/RELEASING.md) is how a release is made | |
@@ -28,7 +28,7 @@ Run the ones for the folder you touched. GitHub Actions runs the same commands
 (`.github/workflows/`), so a green run locally is the goal.
 
 ```bash
-# daemon (Node 24 or newer)
+# daemon (Node 24.22.1 or newer)
 cd daemon && npm ci && npx tsc -p . && npm test
 
 # android (JDK 21; the Android SDK with platform 37)

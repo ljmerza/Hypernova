@@ -138,7 +138,7 @@ The scripts and their options:
 | The daemon | `<state>/app/daemon`. Its font is in `<state>/app/Fonts`. |
 | How it was installed | `<state>/app/daemon/install.json` ([Updating](#updating)) |
 | Node.js, when Hypernova downloaded it | `<state>/node/<version>` |
-| The Node.js the service runs | Named in `<state>/node-path`. It can be a system Node 24 or newer. |
+| The Node.js the service runs | Named in `<state>/node-path`. It can be a system Node 24.22.1 or newer (26.12.1 on the 26 line). |
 | Logs | `~/.local/state/hypernova/logs` (`$XDG_STATE_HOME/hypernova/logs`) |
 | The command | `~/.local/bin/hypernova`. It's on PATH in Ubuntu's and Debian's default `~/.profile`. |
 | The service | `~/.config/systemd/user/hypernova.service` (`$XDG_CONFIG_HOME/systemd/user`) |

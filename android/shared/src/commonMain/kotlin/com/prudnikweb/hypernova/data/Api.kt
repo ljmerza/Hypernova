@@ -231,7 +231,12 @@ class Api(val base: String, private val token: String?, private val fixed: NetRo
         val r = execute(req, max, client)
         val text = String(r.body)
         if (r.code !in 200..299) throw errorOf(r.code, text)
-        if (text.isBlank()) return JSONObject()
+        if (text.isBlank()) {
+            // Every GET here answers JSON, so nothing at all means something went wrong on the way. Read as {},
+            // a blank snapshot would empty the session list. Failing keeps what the phone has, and it reconnects.
+            if (req.method == "GET") throw ApiException(Problem.Server, r.code, "empty_body")
+            return JSONObject()
+        }
         // Parsed off the main thread: a long history is a few hundred kilobytes.
         return withContext(Dispatchers.Default) {
             runCatching { JSONObject(text) }.getOrElse { throw ApiException(Problem.Server, r.code, "bad_json") }

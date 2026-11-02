@@ -567,7 +567,7 @@ The install puts in what's missing (on a Mac: [On a Mac](#on-a-mac)):
   with python3, because the terminal module (node-pty) is built on the server. The `.deb` declares these
   as its dependencies instead, and adds `/usr/lib/hypernova-server` and `hypernova-server-setup`.
 - **Node.js 24** from nodejs.org, checked against nodejs.org's checksums, into Hypernova's own folder.
-  A Node.js 24 or newer already on the server is used instead.
+  A Node.js already on the server is used instead when it has the October 2026 security release: 24.22.1 or newer on the 24 line, 26.12.1 or newer on the 26 line. An older one is left alone and not used.
 - **The daemon** in `~/.local/share/hypernova/app`, and **the `hypernova` command** in `~/.local/bin`.
   Paired phones, settings and keys are in `~/.local/share/hypernova`, private to your user, and the log
   is `~/.local/state/hypernova/logs/daemon.log`.
