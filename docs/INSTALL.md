@@ -296,8 +296,14 @@ this install:
 | State | `~/Library/Application Support/Hypernova` |
 | Logs | `~/Library/Logs/Hypernova/daemon.log`, and `daemon.stderr.log` for what the daemon couldn't log |
 | The terminal module | node-pty comes prebuilt for both processors, so nothing is compiled and **Xcode isn't needed for it**. Apple's Command Line Tools (`xcode-select --install`) are for git, which Claude Code and the app's git views use. The install says if they're missing, and goes on. |
-| Sleeping | A Mac that sleeps is away from your phone. The app's **Stay awake** keeps it up while Claude works. |
+| Sleeping | A Mac that sleeps is away from your phone. The phone app's **Stay awake** keeps it up while Claude works, with nothing to set up. Its **Backpack** mode, awake with a MacBook's lid closed, needs a sudoers rule you add yourself (below). |
 | Your shell | The `claude` function goes in `~/.zshrc`, for zsh, a Mac's default. With another login shell `claude` stays plain, and add `~/.local/bin` to your PATH yourself. |
+
+**Backpack's rule.** Nothing installs it. Run `sudo visudo -f /etc/sudoers.d/hypernova` and add this line once, with your user name, and the app can choose Backpack with no restart. Another rule that already allows the same command counts too. Like the rest of this page, it hasn't been tried on a person's own Mac.
+
+```
+<your user> ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1
+```
 
 `hypernova status`, `doctor`, `pair`, `logs` and `uninstall` work as on Linux. To restart the service by
 hand: `launchctl kickstart -k gui/$(id -u)/com.prudnikweb.hypernova.daemon`.

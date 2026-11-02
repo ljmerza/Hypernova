@@ -10,15 +10,16 @@
 // - Off: nothing held.
 //
 // The hold is `caffeinate -i -s -w <daemon pid>`, a child of the daemon, rather than an IOKit
-// assertion taken by the Mac app: the daemon is what knows when there's work, it runs whether or not
-// the menu bar app does, and `-w` ties the assertion to the daemon's life, so a daemon that dies,
-// even by SIGKILL with no chance to clean up, never leaves the Mac unable to sleep.
+// assertion: the daemon is what knows when there's work, and `-w` ties the assertion to the
+// daemon's life, so a daemon that dies, even by SIGKILL with no chance to clean up, never leaves the
+// Mac unable to sleep.
 //
 // A MacBook on battery sleeps when its lid closes whatever assertions say. Only macOS's
 // system-wide SleepDisabled (`pmset -a disablesleep 1`, root only) keeps it awake, which is also
 // what Amphetamine's Enhancer turns on. Backpack runs exactly that through `sudo -n`, against a rule
-// the Mac app installs once with the owner's password (/etc/sudoers.d/hypernova: `pmset -a
-// disablesleep 0` and `… 1` for this user, nothing else). When Backpack ends it puts back what was
+// nothing in this repository installs, added once by hand (docs/INSTALL.md, "On a Mac";
+// /etc/sudoers.d/hypernova: `pmset -a disablesleep 0` and `… 1` for this user, nothing else). When
+// Backpack ends it puts back what was
 // there before: the owner may have SleepDisabled on already (Amphetamine), and then Backpack never
 // touches it. What it set is written down first, so a daemon that restarts finds and undoes it.
 //
@@ -525,7 +526,7 @@ export class AwakeKeeper {
     if (mode !== undefined) {
       if (mode === 'backpack') {
         if (!this.laptop) return { ok: false, code: 'no_battery', message: 'Backpack mode is for a MacBook: this Mac has no battery.' }
-        if (!this.io.ruleInstalled()) return { ok: false, code: 'needs_setup', message: 'Backpack mode needs a one-time setup on the Mac: open Hypernova in the menu bar and choose Backpack.' }
+        if (!this.io.ruleInstalled()) return { ok: false, code: 'needs_setup', message: 'Backpack mode needs a sudoers rule on the Mac, added once by hand: docs/INSTALL.md, "On a Mac".' }
         this.until = this.inputs.now() + MAX_BACKPACK_MS
         this.timeWarned = false
       } else this.until = null
@@ -720,8 +721,7 @@ export class AwakeKeeper {
   private async leaveBackpack(): Promise<boolean> {
     const bp = this.backpack
     if (!bp) return true
-    // Already back where it was (put back by the Mac app's removal while the daemon was away, or
-    // by hand): nothing to switch.
+    // Already back where it was (put back by hand while the daemon was away): nothing to switch.
     if (bp.applied && (await this.io.sleepDisabled()) === bp.prev) {
       log('awake: SleepDisabled already back at', bp.prev)
     } else if (bp.applied) {

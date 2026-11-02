@@ -806,7 +806,7 @@ test('the API: GET and POST /v1/mac/awake, the snapshot, the awake message, and 
     assert.equal(early.status, 409)
     assert.equal(early.json.error.code, 'needs_setup')
 
-    // The Mac app's one-time setup puts the rule in place.
+    // The rule added by hand.
     mkdirSync(join(scratch, 'sudoers.d'), { recursive: true })
     writeFileSync(rule, '# stand-in\n')
     const on = await call('POST', '/v1/mac/awake', { mode: 'backpack' })

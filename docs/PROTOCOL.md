@@ -2761,8 +2761,8 @@ There is no battery route: the battery comes in `Snapshot.mac.battery` and `{t:"
 
 - **Body:** `{mode?: "working" | "backpack" | "off", minBattery?: 5–50}` or `{extend: true}`
 - **Answer:** `200 {awake: Awake}`
-- **Refusals:** 400 `bad_mode`, `bad_battery`; 409 `needs_setup` (Backpack's one-time setup isn't
-  done), `no_battery` (a desktop Mac), `too_early` (`extend` before Backpack's last 10 minutes),
+- **Refusals:** 400 `bad_mode`, `bad_battery`; 409 `needs_setup` (Backpack's sudoers rule isn't
+  there), `no_battery` (a desktop Mac), `too_early` (`extend` before Backpack's last 10 minutes),
   `not_backpack` (`extend` outside Backpack); 501 `unavailable` `{feature: "awake"}` (Linux)
 - **Rules:** Backpack starts its 8 hours again each time it's chosen. `extend` is Backpack's "+2 h".
   See Stay awake.

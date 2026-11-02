@@ -49,9 +49,9 @@
     <string name="awake_let_go_battery_kept">Hypernova let go at %1$d%%, but %2$s is still keeping your Mac awake</string>
     <string name="awake_let_go_hot_kept">Hypernova let go: it\'s running hot, but %1$s is still keeping your Mac awake</string>
     <string name="awake_backpack_until">Awake with the lid closed until %1$s, or until the battery is at %2$d%%</string>
-    <string name="awake_problem_setup">Backpack mode\'s permission is gone on the Mac. Set it up again there: Hypernova in the menu bar, Settings.</string>
+    <string name="awake_problem_setup">Backpack mode\'s sudoers rule is gone from the Mac. Add it again by hand: docs/INSTALL.md, “On a Mac”.</string>
     <string name="awake_problem_failed">The Mac didn\'t take the lid-closed setting. It tries again in a moment.</string>
-    <string name="awake_needs_setup">Backpack needs a one-time setup on your Mac: open Hypernova in its menu bar and choose Backpack. It asks for the Mac\'s password once.</string>
+    <string name="awake_needs_setup">Backpack needs a sudoers rule on your Mac, added once by hand: docs/INSTALL.md, “On a Mac”.</string>
     <string name="err_awake">Couldn\'t change Stay awake.</string>
 
     <!-- TalkBack, after the connection chip's words. -->
