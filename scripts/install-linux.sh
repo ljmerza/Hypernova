@@ -38,7 +38,7 @@ say() { printf '  %s\n' "$*"; }
 die() { printf 'install-linux.sh: %s\n' "$*" >&2; exit 1; }
 
 # ── The machine ────────────────────────────────────────────────────────────
-[ "$(uname -s)" = "Linux" ] || die "this script is for Linux. On a Mac, use the Hypernova menu bar app."
+[ "$(uname -s)" = "Linux" ] || die "this script is for Linux. On a Mac, use scripts/install-macos.sh."
 case "$(uname -m)" in
   x86_64|amd64) ARCH=x64 ;;
   aarch64|arm64) ARCH=arm64 ;;
@@ -167,7 +167,7 @@ if [ -z "$FROM" ]; then
   if [ -f "$HERE/../daemon/package.json" ]; then
     FROM="$(cd "$HERE/.." && pwd)"
   else
-    die "say where the daemon is: --from <repository folder or tarball> (a release's hypernova-server-<tag>-linux.tar.gz: https://github.com/ljmerza/Hypernova/releases/latest)."
+    die "say where the daemon is: --from <repository folder or tarball> (the server package, hypernova-server-<tag>-linux.tar.gz: https://github.com/ljmerza/Hypernova/releases/latest)."
   fi
 fi
 case "$FROM" in
