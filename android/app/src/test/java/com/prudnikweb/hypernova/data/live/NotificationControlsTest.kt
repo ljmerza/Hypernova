@@ -7,13 +7,14 @@ import android.content.Intent
 import android.os.Looper
 import com.prudnikweb.hypernova.BuildConfig
 import com.prudnikweb.hypernova.ConnectionService
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Notice
 import com.prudnikweb.hypernova.data.NotificationPrefs
 import com.prudnikweb.hypernova.data.NotificationPrefsStore
-import com.prudnikweb.hypernova.data.Notifier
+import com.prudnikweb.hypernova.data.AndroidNotifier
 import com.prudnikweb.hypernova.data.NotifyActions
 import com.prudnikweb.hypernova.data.NotifyGroup
 import com.prudnikweb.hypernova.data.Pairing
@@ -72,7 +73,7 @@ class NotificationControlsTest {
 
     @Before fun pair() {
         shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        Core.init(app)
+        AndroidCore.init(app)
         ComputerWords.clear(app.storage)
         NotificationPrefsStore.set(app.storage, NotificationPrefs())
         Core.setVisible(false)
@@ -233,13 +234,13 @@ class NotificationControlsTest {
 
     @Test fun theMasterOffCancelsEverythingButTheConnectionsOwn() {
         val c = Robolectric.buildService(ConnectionService::class.java).create()
-        until("the permanent notification") { nm.getNotification(Notifier.CONNECTION_ID) != null }
+        until("the permanent notification") { nm.getNotification(AndroidNotifier.CONNECTION_ID) != null }
         showing(z2Id, Notice.Kind.Finished, "z1")
         approvalArrives(gym, "a1", "g1", gymId)
         Core.setNotifications(prefs().copy(master = false))
         assertNull(nm.getNotification(noticeId(z2Id, "z1")))
         assertNull(nm.getNotification("a1".hashCode()))
-        assertNotNull("Android requires it", nm.getNotification(Notifier.CONNECTION_ID))
+        assertNotNull("Android requires it", nm.getNotification(AndroidNotifier.CONNECTION_ID))
         // Nothing new either, from either server.
         approvalArrives(z2, "a2", "z1", z2Id)
         assertNull(nm.getNotification("a2".hashCode()))

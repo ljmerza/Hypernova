@@ -267,7 +267,7 @@ class AutomationsLiveTest {
      */
     @Test fun anAnswerFromTheNotificationGoesToTheMacAndTheNotificationGoes() {
         val app = rig.context as android.app.Application
-        com.prudnikweb.hypernova.data.Core.init(app)
+        com.prudnikweb.hypernova.data.AndroidCore.init(app)
         val mac = FakeDaemon("gym")
         try {
             mac.snapshot = snapshot("gym") { put("automations", JSONObject().put("paused", false).put("list", JSONArray().put(Fixtures.json("rest-automation").getJSONObject("automation").put("lastRun", Fixtures.json("rest-automation-run").getJSONObject("run")))).put("features", JSONArray())) }

@@ -170,7 +170,7 @@ class SheetMoreTest {
     @Test fun theSheetsModelOpensThePickerAndSwitchesTheModel() {
         val base = FakeHub()
         val hub = SheetHub(base)
-        val usage = com.prudnikweb.hypernova.ui.session.SessionUsage("claude-opus-5-5", "Opus 5.5", 84_000, 200_000, 42, true, 12_000, 3_400, 60_000, 8_000, 0, null, false)
+        val usage = com.prudnikweb.hypernova.data.SessionUsage("claude-opus-5-5", "Opus 5.5", 84_000, 200_000, 42, true, 12_000, 3_400, 60_000, 8_000, 0, null, false)
         rule.setContent { Harness(spy) { SessionScreen(hub, Samples.ZETA, onBack = {}, usageOf = { _, _ -> usage }) } }
         rule.waitForIdle()
         rule.onNode(hasContentDescription(str(R.string.usage_name_seven), substring = true)).performClick()

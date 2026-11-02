@@ -1,10 +1,5 @@
 package com.prudnikweb.hypernova.data
 
-import com.prudnikweb.hypernova.ui.changes.ChangesRepo
-import com.prudnikweb.hypernova.ui.changes.LineKind
-import com.prudnikweb.hypernova.ui.session.ChatRepo
-import com.prudnikweb.hypernova.ui.session.Todo
-import com.prudnikweb.hypernova.ui.session.TodoStatus
 import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -22,7 +17,7 @@ import org.junit.Test
  * through the daemon's own code and fails when it no longer matches), run here through the app's
  * own parsers. A change on either side the other doesn't follow fails one of the two suites.
  *
- * Gradle puts the folder on the test classpath (app/build.gradle.kts), so a changed fixture runs
+ * Gradle puts the folder on the test classpath (shared/build.gradle.kts), so a changed fixture runs
  * this again. Every fixture needs its check below, and every check its fixture.
  *
  * The live feed's messages go to the parser LiveHub's own dispatch calls for their `t`
@@ -42,7 +37,7 @@ class ContractTest {
     }
 
     private val dir: File by lazy {
-        val url = javaClass.classLoader!!.getResource("fixtures") ?: error("protocol/fixtures is not on the test classpath (app/build.gradle.kts)")
+        val url = javaClass.classLoader!!.getResource("fixtures") ?: error("protocol/fixtures is not on the test classpath (shared/build.gradle.kts)")
         File(url.toURI())
     }
 

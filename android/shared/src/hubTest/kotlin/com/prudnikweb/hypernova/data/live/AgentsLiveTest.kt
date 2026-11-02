@@ -14,7 +14,6 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /**
  * A session's agents (docs/PROTOCOL.md, "Agents and workflows"): the board `GET …/agents` fills as the
@@ -22,7 +21,7 @@ import org.robolectric.RobolectricTestRunner
  * (`agentEvents`): whole at first, then only what changed since its cursor while it runs, whole again
  * once it has ended, and nothing kept while it has only just started.
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class AgentsLiveTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }

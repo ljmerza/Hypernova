@@ -326,7 +326,7 @@ object AppUpdater {
         // The phone's own news, no server's: the default Updates switch and the master decide.
         if (!NotificationPrefsStore.get(c.storage).allows(null, Notice.Kind.Update)) return
         val open = PendingIntent.getActivity(c, 9, Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE)
-        val n = NotificationCompat.Builder(c, Notifier.SESSIONS)
+        val n = NotificationCompat.Builder(c, AndroidNotifier.SESSIONS)
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(0xFF7FFFA0.toInt())
             .setContentTitle(c.getString(R.string.update_done_title))
@@ -334,7 +334,7 @@ object AppUpdater {
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setAutoCancel(true)
             .setContentIntent(open)
-            .addExtras(Notifier.silenceable(null, Notice.Kind.Update))
+            .addExtras(AndroidNotifier.silenceable(null, Notice.Kind.Update))
             .build()
         runCatching { c.getSystemService(android.app.NotificationManager::class.java)?.notify(UPDATED_ID, n) }
     }

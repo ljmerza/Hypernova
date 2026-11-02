@@ -1,6 +1,6 @@
 package com.prudnikweb.hypernova.data.live
 
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.LinkState
@@ -21,10 +21,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /** How the hub takes the daemon's refusals and its absence: 401 unpairs, 409s say why, offline retries. */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class ErrorsTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
@@ -37,7 +36,7 @@ class ErrorsTest {
         rig.connect()
     }
 
-    private fun words(id: Int) = rig.context.getString(id)
+    private fun words(id: Str) = rig.res.getString(id)
 
     /**
      * A Linux server's hub words its own messages (toasts, errors, banners) for a server, as the
@@ -48,11 +47,11 @@ class ErrorsTest {
         daemon.snapshot = snapshot(sessions = listOf(session("s1")), platform = "linux")
         rig.connect()
         // The app's words follow the server now (ComputerWords.set from the snapshot)...
-        assertTrue(words(R.string.problem_unpaired).contains("server"))
+        assertTrue(words(Str.problem_unpaired).contains("server"))
         // ...and so should the hub's.
         daemon.on("POST", "/v1/sessions/s1/rename") { refusal(401, "unauthorized", null) }
         val r = rig.call { rig.hub.renameSession("s1", "x") }
-        assertEquals(words(R.string.problem_unpaired), r.exceptionOrNull()?.message)
+        assertEquals(words(Str.problem_unpaired), r.exceptionOrNull()?.message)
     }
 
     // ─── 401: the server forgot this phone ───
@@ -86,7 +85,7 @@ class ErrorsTest {
         val r = rig.call { rig.hub.renameSession("s1", "x") }
         assertTrue(r.isFailure)
         assertEquals(LinkState.Unpaired, rig.hub.link.state)
-        assertEquals(words(R.string.problem_unpaired), r.exceptionOrNull()?.message)
+        assertEquals(words(Str.problem_unpaired), r.exceptionOrNull()?.message)
     }
 
     @Test fun a401WhileOpeningASessionUnpairs() {
@@ -106,7 +105,7 @@ class ErrorsTest {
         daemon.on("POST", "/v1/approvals/a1") { refusal(409, "already_resolved", "Already resolved") }
         assertTrue("the widget's Allow is done", rig.call { rig.hub.answerApproval("a1", Answer.Allow) })
         assertTrue(rig.hub.pendingApprovals.isEmpty())
-        assertEquals(listOf(words(R.string.err_already_answered)), rig.toasts)
+        assertEquals(listOf(words(Str.err_already_answered)), rig.toasts)
         val card = rig.hub.transcript("s1").filterIsInstance<Item.Approval>().single()
         assertEquals("a neutral line until the server's own word", "elsewhere", card.by ?: card.resolved?.let { "elsewhere" })
     }
@@ -157,7 +156,7 @@ class ErrorsTest {
     @Test fun aRefusalWithoutWordsHasTheAppsOwn() {
         connect(session("s1"))
         daemon.on("POST", "/v1/sessions/s1/rename") { refusal(500, "boom", null) }
-        assertEquals(words(R.string.err_rename), rig.call { rig.hub.renameSession("s1", "x") }.exceptionOrNull()?.message)
+        assertEquals(words(Str.err_rename), rig.call { rig.hub.renameSession("s1", "x") }.exceptionOrNull()?.message)
     }
 
     @Test fun aWaitingPromptWhoseSessionIsGoneWaitsForANewSession() {
@@ -194,7 +193,7 @@ class ErrorsTest {
         connect(session("s1"))
         daemon.down = true
         val r = rig.call { rig.hub.renameSession("s1", "x") }
-        assertEquals(words(R.string.problem_unreachable), r.exceptionOrNull()?.message)
+        assertEquals(words(Str.problem_unreachable), r.exceptionOrNull()?.message)
         assertTrue("a request that failed doesn't unpair", rig.hub.link.state != LinkState.Unpaired)
     }
 

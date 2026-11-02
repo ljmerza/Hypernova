@@ -23,6 +23,8 @@ import android.security.keystore.KeyProperties
 import android.text.format.DateFormat
 import androidx.core.content.ContextCompat
 import com.prudnikweb.hypernova.BuildConfig
+import com.prudnikweb.hypernova.ConnectionService
+import com.prudnikweb.hypernova.widget.WidgetSync
 import java.io.File
 import java.security.KeyPairGenerator
 import java.security.KeyStore
@@ -303,22 +305,34 @@ object AndroidDeviceKeys : DeviceKeys {
     }
 }
 
-/** Everything a hub needs, on this phone. */
+/** The foreground service that keeps the sockets alive with the app closed. */
+class AndroidBackgroundLink(private val context: Context) : BackgroundLink {
+    override val running: Boolean get() = ConnectionService.running
+    override fun start() = ConnectionService.start(context)
+    override fun stop() = ConnectionService.stop(context)
+}
+
+/** Everything the data layer needs, on this phone. */
 class AndroidPlatform(context: Context) : Platform {
     private val app = context.applicationContext
     // Read each time: the app's Resources are worded for the computer paired now.
     override val strings: Strings get() = app.strings
     override val storage: Storage = AndroidStorage(app)
     override val ticks: Ticks = Ticks { SystemClock.elapsedRealtime() }
+    override val main: MainThread = AndroidMainThread
     override val log: Log = AndroidLog
     override val appInfo: AppInfo = AndroidAppInfo
     override val device: DeviceInfo = AndroidDevice(app)
     override val network: NetworkWatcher = AndroidNetwork(app)
     override val screen: ScreenWatcher = AndroidScreen(app)
     override val deviceKeys: DeviceKeys = AndroidDeviceKeys
-    override val speech: SpeechOutput = Speaker
+    override val speech: SpeechOutput get() = Speaker
+    override val background: BackgroundLink = AndroidBackgroundLink(app)
     override fun retryAlarm(): RetryAlarm = AndroidRetryAlarm(app)
     override fun automationNotes(server: String?): AutomationNotifier = AutomationNotes(app, server)
+    override fun notifier(): Notifier = AndroidNotifier(app)
+    override fun thumbOf(path: String): Any? = Thumbs.get(path)
+    override fun started() = WidgetSync.start(app as android.app.Application)
 }
 
 /** A web page (claude.ai's usage or billing, the sign-in page) in the phone's browser. */

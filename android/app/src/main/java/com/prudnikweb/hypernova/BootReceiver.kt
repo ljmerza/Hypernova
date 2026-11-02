@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 
 /**
@@ -17,7 +18,7 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         // HypernovaApp has started Core for this process already; this is only in case.
-        Core.init(context.applicationContext as Application)
+        AndroidCore.init(context.applicationContext as Application)
         if (Core.wantsService()) ConnectionService.start(context)
     }
 }

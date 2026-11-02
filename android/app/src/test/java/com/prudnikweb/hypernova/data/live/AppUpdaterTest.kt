@@ -10,6 +10,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.prudnikweb.hypernova.BuildConfig
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.AppUpdate
 import com.prudnikweb.hypernova.data.AppUpdater
 import com.prudnikweb.hypernova.data.Core
@@ -72,7 +73,7 @@ class AppUpdaterTest {
 
     @Before fun pair() {
         shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        Core.init(app)
+        AndroidCore.init(app)
         z2.snapshot = snapshot("z2")
         z2.on("GET", UpdatePolicy.APK_PATH) { MockResponse().setResponseCode(200).setBody(Buffer().write(bytes)) }
         Core.paired(Pairing(z2.base, "tok-z2", "z2", "m-z2", "dev-1"))

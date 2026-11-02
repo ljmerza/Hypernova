@@ -67,7 +67,7 @@ class AutomationNotes(private val context: Context, private val server: String? 
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setAutoCancel(true)
             .setContentIntent(open)
-            .addExtras(Notifier.silenceable(server, Notice.Kind.Automation))
+            .addExtras(AndroidNotifier.silenceable(server, Notice.Kind.Automation))
             .build()
         // One per automation: its next note takes the place of the last.
         runCatching { nm.notify(("automation:${scope()}${automationId ?: key}").hashCode(), n) }
@@ -95,7 +95,7 @@ class AutomationNotes(private val context: Context, private val server: String? 
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(open)
-            .addExtras(Notifier.silenceable(server, Notice.Kind.Automation))
+            .addExtras(AndroidNotifier.silenceable(server, Notice.Kind.Automation))
             .setTimeoutAfter((ask.until - System.currentTimeMillis()).coerceAtLeast(60_000L))
         for ((k, answer) in ask.answers.take(3).withIndex()) {
             val act = Intent(context, NotifyActions::class.java).setAction(NotifyActions.ACTION_ANSWER)

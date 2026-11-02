@@ -99,6 +99,9 @@ android {
     // The protocol's contract fixtures, shared with the daemon's tests (docs/PROTOCOL.md, "Contract
     // fixtures"): on the unit tests' classpath as fixtures/*.json, so a changed fixture runs them again.
     sourceSets.getByName("test").resources.srcDir("../../protocol")
+    // The real hub against a fake daemon (shared/src/hubTest): here on Robolectric, so Android's side of
+    // every seam is in them; in :shared off Android.
+    sourceSets.getByName("test").kotlin.srcDir("../shared/src/hubTest/kotlin")
     // Robolectric tests read the app's own resources (LiveHub's words in data/live; strings and fonts in ui/screens).
     testOptions {
         unitTests.isIncludeAndroidResources = true

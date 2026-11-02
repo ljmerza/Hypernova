@@ -14,14 +14,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /**
  * Two paired computers (data/Servers.kt, data/Core.kt): a hub each, the active one on screen and the
  * other watched in the background. An answer goes to the computer the approval waits on, as
  * [com.prudnikweb.hypernova.data.Core.hubForApproval] picks it with [Servers.approvalTarget].
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class MultiServerTest {
     private val dispatcher = StandardTestDispatcher()
     private val z2 = FakeDaemon("z2")

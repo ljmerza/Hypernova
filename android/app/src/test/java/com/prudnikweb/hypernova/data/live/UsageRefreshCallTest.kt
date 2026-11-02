@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.data.live
 
 import android.os.Looper
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
@@ -50,8 +51,8 @@ class UsageRefreshCallTest {
     }
 
     @Before fun setUp() {
-        Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(Core.app.storage)
+        AndroidCore.init(RuntimeEnvironment.getApplication())
+        ComputerWords.clear(AndroidCore.app.storage)
         UsageRefresh.reset()
     }
 

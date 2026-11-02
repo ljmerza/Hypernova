@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova
 
 import android.app.Application
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.storage
 
@@ -13,7 +14,7 @@ class HypernovaApp : Application() {
         super.onCreate()
         // The paired computer's words ("your Mac", "your server") before anything is said.
         com.prudnikweb.hypernova.data.ComputerWords.load(this.storage)
-        Core.init(this)
+        AndroidCore.init(this)
         // The launcher's long-press menu follows the sessions.
         com.prudnikweb.hypernova.ui.share.LauncherShortcuts.start(this)
     }

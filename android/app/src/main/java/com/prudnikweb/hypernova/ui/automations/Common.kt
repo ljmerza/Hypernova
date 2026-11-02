@@ -31,7 +31,7 @@ fun summaryContext(hub: Hub, now: Long): SummaryContext = SummaryContext(
     now = now,
     projectName = { path -> hub.projects.firstOrNull { it.path == path }?.name ?: path.trimEnd('/').substringAfterLast('/').ifEmpty { path } },
     sessionName = { id -> (hub.session(id) ?: hub.replacedBy(id)?.let(hub::session))?.name },
-    providerName = { id -> if (id == com.prudnikweb.hypernova.data.AgentKind.CODEX_PROVIDER) hub.codex?.let { com.prudnikweb.hypernova.data.Core.app.getString(R.string.cx_agent_codex) } else hub.providers.firstOrNull { it.id == id }?.name },
+    providerName = { id -> if (id == com.prudnikweb.hypernova.data.AgentKind.CODEX_PROVIDER) hub.codex?.let { com.prudnikweb.hypernova.data.AndroidCore.app.getString(R.string.cx_agent_codex) } else hub.providers.firstOrNull { it.id == id }?.name },
 )
 
 /** What a run that needs you asks: an ask step's question, or its session's line ("Bash: git push"). */

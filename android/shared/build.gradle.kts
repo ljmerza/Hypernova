@@ -34,6 +34,8 @@ kotlin {
         }
         // The protocol's contract fixtures, shared with the daemon's tests (docs/PROTOCOL.md, "Contract fixtures").
         commonTest.get().resources.srcDir("../../protocol")
+        // Tests of the real hub against a fake daemon, run here off Android and in the app on Robolectric.
+        commonTest.get().kotlin.srcDir("src/hubTest/kotlin")
         commonTest.dependencies {
             implementation(libs.junit)
             implementation(libs.kotlinx.coroutines.test)

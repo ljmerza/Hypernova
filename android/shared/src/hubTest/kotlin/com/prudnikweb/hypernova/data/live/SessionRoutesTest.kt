@@ -1,6 +1,6 @@
 package com.prudnikweb.hypernova.data.live
 
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Attachment
@@ -19,7 +19,6 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
-import com.prudnikweb.hypernova.data.strings
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -30,7 +29,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /**
  * The hub's session routes against the daemon's own answers: each route answered with its contract
@@ -40,7 +38,7 @@ import org.robolectric.RobolectricTestRunner
  * (S10), going on with a session (Y4), carrying on after a limit (C13), another provider (S12), the
  * live terminal (C11), Stop (Q8), a waiting prompt as a new session (Q4), a Codex approval (A9).
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class SessionRoutesTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
@@ -67,7 +65,7 @@ class SessionRoutesTest {
         rig.connect()
     }
 
-    private fun words(id: Int) = rig.context.getString(id)
+    private fun words(id: Str) = rig.res.getString(id)
     private fun last(method: String, path: String): FakeDaemon.Req = daemon.calls(method, path).last()
     private fun JSONArray.strings() = (0 until length()).map(::getString)
     private fun req(projectPath: String? = CWD, prompt: String = "Tidy the README", model: String? = null, mode: String = "default", effort: String? = null, providerId: String? = null, newProject: String? = null, files: List<Attachment> = emptyList(), agent: String = AgentKind.CLAUDE) =
@@ -135,7 +133,7 @@ class SessionRoutesTest {
         }
         // An answer without a session is the app's own words.
         daemon.ok("POST", "/v1/sessions", JSONObject())
-        assertEquals(words(R.string.err_start), rig.call { rig.hub.start(req()) }.exceptionOrNull()?.message)
+        assertEquals(words(Str.err_start), rig.call { rig.hub.start(req()) }.exceptionOrNull()?.message)
         assertEquals(listOf("s1"), rig.hub.sessions.map { it.id })
         assertEquals(LinkState.Connected, rig.hub.link.state)
     }
@@ -219,7 +217,7 @@ class SessionRoutesTest {
         daemon.on("POST", "/v1/attachments") { refusal(413, "too_large", "That file is too big to attach (30 MB at most).") }
         assertEquals("That file is too big to attach (30 MB at most).", rig.call { rig.hub.upload(Upload("big.bin", "application/octet-stream", 3) { it.write(byteArrayOf(1, 2, 3)) }) }.exceptionOrNull()?.message)
         daemon.ok("POST", "/v1/attachments", JSONObject())
-        assertEquals(words(R.string.err_upload), rig.call { rig.hub.upload(Upload("a.txt", "text/plain", 1) { it.write(1) }) }.exceptionOrNull()?.message)
+        assertEquals(words(Str.err_upload), rig.call { rig.hub.upload(Upload("a.txt", "text/plain", 1) { it.write(1) }) }.exceptionOrNull()?.message)
     }
 
     @Test fun aPromptCarriesItsFilesPathsAndAGoneFileIsSaid() {
@@ -254,7 +252,7 @@ class SessionRoutesTest {
         assertFalse(second.has("attachments"))
         assertEquals("with my notes", second.getString("text"))
         assertEquals("the same send, under its name", first.getString("clientId"), second.getString("clientId"))
-        assertTrue(rig.toasts.toString(), words(R.string.waiting_files_gone) in rig.toasts)
+        assertTrue(rig.toasts.toString(), words(Str.waiting_files_gone) in rig.toasts)
     }
 
     // ─── Load earlier (GET …/events with a bigger limit) ───
@@ -323,7 +321,7 @@ class SessionRoutesTest {
         daemon.on("GET", "/v1/sessions/$LIMITED_ID/events") { refusal(500, "boom", null) }
         rig.hub.loadEarlier(LIMITED_ID)
         rig.until("the toast") { rig.toasts.isNotEmpty() && !rig.hub.loadingEarlier(LIMITED_ID) }
-        assertEquals(words(R.string.err_history), rig.toasts.last())
+        assertEquals(words(Str.err_history), rig.toasts.last())
         assertEquals(shown, rig.hub.transcript(LIMITED_ID))
     }
 

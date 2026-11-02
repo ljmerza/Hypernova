@@ -41,7 +41,7 @@ import kotlin.random.Random
 class LiveHub(
     private val platform: Platform,
     private val scope: CoroutineScope,
-    override val pairing: Pairing,
+    val pairing: Pairing,
     private val toast: (String) -> Unit,
     /** A new approval while the app isn't on screen (from the socket or a fresh snapshot). */
     private val onApproval: (WApproval, Session?) -> Unit,
@@ -63,7 +63,7 @@ class LiveHub(
      */
     private val heldOpen: () -> Boolean = { true },
     /** Which paired computer this is (data/Servers.kt): its offline queue, certificate and notifications are its own. */
-    override val serverId: String = Servers.LEGACY_ID,
+    val serverId: String = Servers.LEGACY_ID,
     /**
      * True while the app is on screen, whichever computer it shows: how soon a failed attempt goes
      * again. [isVisible] is whether it shows this one (banners, not notifications; approvals seen).
@@ -73,7 +73,7 @@ class LiveHub(
     private val isActive: () -> Boolean = { true },
     /** The wall clock (epoch ms). Tests pass their own, so the watchdog and the usage timers can be driven. */
     private val clock: () -> Long = System::currentTimeMillis,
-) : Hub, PairedHub {
+) : Hub {
     // Read each time, worded for this hub's own computer (ComputerWords.wordedFor): kept from when the
     // hub was made, they said "Mac" for a Linux server until the app restarted.
     private val res: Strings
@@ -1443,7 +1443,7 @@ class LiveHub(
         p.value = copies
         for (c in back) {
             AttachDrafts.giveBack(sessionId, c.item.text)
-            AttachDrafts.restore(sessionId, c.item.files.map { a -> DraftFile(AttachDrafts.nextId(), a.name, a.isImage).apply { attachment = a; thumb = Thumbs.get(a.path) } })
+            AttachDrafts.restore(sessionId, c.item.files.map { a -> DraftFile(AttachDrafts.nextId(), a.name, a.isImage).apply { attachment = a; thumb = platform.thumbOf(a.path) } })
         }
         toast(res.getString(if (u.returned) Str.queued_returned else Str.queued_dropped))
     }

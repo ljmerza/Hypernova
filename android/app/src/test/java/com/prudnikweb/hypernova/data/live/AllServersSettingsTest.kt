@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.data.live
 
 import android.os.Looper
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.AboutUpdate
 import com.prudnikweb.hypernova.data.AppUpdater
 import com.prudnikweb.hypernova.data.ComputerWords
@@ -42,8 +43,8 @@ class AllServersSettingsTest {
     }
 
     @Test fun eachServersBlockActsOnItsOwnServer() {
-        Core.init(RuntimeEnvironment.getApplication())
-        val app = Core.app
+        AndroidCore.init(RuntimeEnvironment.getApplication())
+        val app = AndroidCore.app
         ComputerWords.clear(app.storage)
         val z2 = FakeDaemon("z2")
         val shed = FakeDaemon("shed")

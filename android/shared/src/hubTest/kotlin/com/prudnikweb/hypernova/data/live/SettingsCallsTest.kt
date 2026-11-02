@@ -1,6 +1,6 @@
 package com.prudnikweb.hypernova.data.live
 
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
@@ -28,8 +28,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 
 /**
  * What Settings asks of the daemon through the real hub (docs/PROTOCOL.md, "Providers", "Account",
@@ -37,7 +35,7 @@ import org.robolectric.RuntimeEnvironment
  * Forget and Statistics. The daemon answers with the contract's own fixtures (protocol/fixtures),
  * so what's asserted here is what the real daemon sends.
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class SettingsCallsTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
@@ -107,7 +105,7 @@ class SettingsCallsTest {
         daemon.on("GET", "/v1/agents/settings") { refusal(404, "not_found", "Unknown endpoint.") }
         val e = rig.call { rig.hub.agentSettings() }.exceptionOrNull()
         assertTrue(e is AgentSettingsTooOld)
-        assertEquals(RuntimeEnvironment.getApplication().getString(R.string.as_too_old), e?.message)
+        assertEquals(rig.res.getString(Str.as_too_old), e?.message)
     }
 
     @Test fun anotherFailureOfTheSettingsRouteIsNotCalledOld() {
@@ -149,7 +147,7 @@ class SettingsCallsTest {
         daemon.on("PUT", "/v1/agents/settings") { refusal(404, "not_found", "Unknown endpoint.") }
         val e = rig.call { rig.hub.changeAgentSetting("claude", "autoUpdatesChannel", "stable", "h") }.exceptionOrNull()
         assertTrue(e is AgentSettingsTooOld)
-        assertEquals(RuntimeEnvironment.getApplication().getString(R.string.as_edit_too_old), e?.message)
+        assertEquals(rig.res.getString(Str.as_edit_too_old), e?.message)
     }
 
     @Test fun undoGoesToItsRouteAndARefusalIsTheServersWords() {

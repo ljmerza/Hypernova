@@ -1,5 +1,11 @@
 package com.prudnikweb.hypernova.ui.changes
 
+import com.prudnikweb.hypernova.data.ChangesRepo
+import com.prudnikweb.hypernova.data.FileDiff
+import com.prudnikweb.hypernova.data.ChangeLine
+import com.prudnikweb.hypernova.data.LineKind
+import com.prudnikweb.hypernova.data.WorkChanges
+import com.prudnikweb.hypernova.data.ChangedFile
 import androidx.compose.animation.AnimatedContent
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import androidx.compose.animation.core.tween
@@ -377,7 +383,7 @@ private val GUTTER = 44.dp
 
 /** One line: its number, the + or -, and the code (coloured, and wrapped when it is wider than the screen). */
 @Composable
-private fun DiffRow(line: DiffLine, ext: String) {
+private fun DiffRow(line: ChangeLine, ext: String) {
     val (tint, mark, markColor) = when (line.kind) {
         LineKind.Add -> Triple(ADD.copy(alpha = 0.10f), "+", ADD)
         LineKind.Del -> Triple(DEL.copy(alpha = 0.10f), "−", DEL)

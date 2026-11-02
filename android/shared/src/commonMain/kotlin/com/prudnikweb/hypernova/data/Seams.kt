@@ -161,12 +161,46 @@ interface AutomationNotifier {
     fun cancelAsk(runId: String)
 }
 
-/** Everything a hub needs from the platform, one place to hand it over. */
+/** The background link's keeper: on Android, the foreground service that keeps the sockets alive. */
+interface BackgroundLink {
+    /** It holds the link open now. */
+    val running: Boolean
+    fun start()
+    fun stop()
+}
+
+/** The system's notifications: approvals, a session's news, the account's and a server's (data/Core.kt). */
+interface Notifier {
+    /** The system lets this app post them. */
+    fun canPost(): Boolean
+    /** An approval waits: one naming what asks, Allow and Deny where it can, on [server]. */
+    fun approval(a: WApproval, s: Session?, failed: Boolean = false, server: String? = null)
+    /** Answered from the notification and the computer has it: the notification goes. */
+    fun answered(id: String)
+    /** A session finished, waits or failed (or a newer app is on the computer): one per session, replaced by its next. */
+    fun notice(n: Notice, server: String? = null)
+    /** A reply from a session's notice reached the computer: the notice goes. */
+    fun replied(sessionId: String, server: String? = null)
+    /** What the switches now silence goes from the shade. */
+    fun cancelSilenced()
+    /** A reply that didn't get through: the notice says so, and Reply is there again. */
+    fun replyFailed(sessionId: String, title: String, why: String, server: String? = null)
+    /** The account needs nothing from the owner any more: its notification goes. */
+    fun cancelAccount(server: String? = null)
+    /** That server's update went through after all, or the setting was turned off: its notification goes. */
+    fun cancelServerUpdate(server: String? = null)
+    fun cancelApproval(id: String)
+    /** Every approval notified for [server] goes; null: every one. */
+    fun cancelAllApprovals(server: String? = null)
+}
+
+/** Everything the data layer needs from the platform, one place to hand it over. */
 interface Platform {
-    /** The app's words as the app shows them. */
+    /** The app's words as the app shows them now. */
     val strings: Strings
     val storage: Storage
     val ticks: Ticks
+    val main: MainThread
     val log: Log
     val appInfo: AppInfo
     val device: DeviceInfo
@@ -174,12 +208,13 @@ interface Platform {
     val screen: ScreenWatcher
     val deviceKeys: DeviceKeys
     val speech: SpeechOutput
+    val background: BackgroundLink
+    /** A hub's own alarm. */
     fun retryAlarm(): RetryAlarm
     fun automationNotes(server: String?): AutomationNotifier
-}
-
-/** A hub with a paired computer behind it, as the screens' tests' stand-ins haven't. */
-interface PairedHub {
-    val pairing: Pairing
-    val serverId: String
+    fun notifier(): Notifier
+    /** The preview this device already has of an attached picture, by its path on the computer ([DraftFile.thumb]). */
+    fun thumbOf(path: String): Any?
+    /** [Core] has started: what follows it on this platform (the home screen widgets on Android) can too. */
+    fun started()
 }

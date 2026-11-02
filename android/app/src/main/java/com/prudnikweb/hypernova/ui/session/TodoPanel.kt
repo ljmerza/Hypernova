@@ -1,5 +1,8 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Todo
+import com.prudnikweb.hypernova.data.TodoStatus
+import com.prudnikweb.hypernova.data.ChatRepo
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas

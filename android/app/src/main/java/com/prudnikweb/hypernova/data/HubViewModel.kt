@@ -24,7 +24,7 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
     val nav = Nav()
 
     init {
-        Core.init(app)
+        AndroidCore.init(app)
         Core.toastSink = ::showToast
     }
 
@@ -173,7 +173,7 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         pairFlow = PairFlow.Working(link)
         pairJob = viewModelScope.launch {
             try {
-                val p = Pairer.pair(AndroidPlatform(app), link)
+                val p = Pairer.pair(Core.platform, link)
                 // Added next to the computers paired already (or in the place of the same one paired
                 // before), and on screen.
                 Core.paired(p)
@@ -194,7 +194,7 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         pairFlow = null
     }
 
-    private fun hasNetwork(): Boolean = AndroidNetwork(app).hasNetwork()
+    private fun hasNetwork(): Boolean = Core.platform.network.hasNetwork()
 
 
     /**

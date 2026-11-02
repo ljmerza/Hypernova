@@ -111,7 +111,7 @@ object ReadState {
     fun server(hub: Hub): String? = serverOf(hub)
 
     /** How [server] tells: a test's hub names a server of its own here. */
-    var serverOf: (Hub) -> String? = { (it as? PairedHub)?.serverId }
+    var serverOf: (Hub) -> String? = { (it as? LiveHub)?.serverId }
 
     @Synchronized
     fun of(storage: Storage, server: String): ReadMarks = marks.getOrPut(server) {

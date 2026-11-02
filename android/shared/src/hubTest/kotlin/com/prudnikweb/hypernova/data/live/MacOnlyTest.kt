@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.AwakeWords
 import com.prudnikweb.hypernova.data.Mac
 import com.prudnikweb.hypernova.data.MacAwake
@@ -7,7 +8,6 @@ import com.prudnikweb.hypernova.data.Notice
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
-import com.prudnikweb.hypernova.data.strings
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -16,7 +16,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /**
  * The Mac-only features (docs/PROTOCOL.md, "Mac-only features", "Stay awake") as the hub has them:
@@ -25,7 +24,7 @@ import org.robolectric.RobolectricTestRunner
  * refusals with their sentences. Every message and answer is its contract fixture
  * (protocol/fixtures/), which the daemon's own code made.
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class MacOnlyTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
@@ -41,7 +40,7 @@ class MacOnlyTest {
         rig.connect()
     }
 
-    private val res get() = rig.context.resources
+    private val res get() = rig.res
 
     @Test fun aMacsBatteryAndStayAwakeComeFromTheirMessages() {
         mac()
@@ -75,14 +74,14 @@ class MacOnlyTest {
         assertEquals("battery", n.id)
         assertEquals(Notice.Kind.Power, n.kind)
         assertEquals("z2", n.title)
-        assertEquals(AwakeWords.sleepSoon(res.strings, 120, MacAwake.BATTERY, 15), n.text)
+        assertEquals(AwakeWords.sleepSoon(res, 120, MacAwake.BATTERY, 15), n.text)
         assertTrue(n.text, n.text.contains("15"))
         assertTrue(rig.notices.isEmpty())
 
         rig.visible = false
         rig.push(fx("ws-mac-sleep-soon").put("reason", "hot")) { rig.notices.isNotEmpty() }
         assertEquals("mac_sleep", rig.notices.single().id)
-        assertEquals(AwakeWords.sleepSoon(res.strings, 120, MacAwake.HOT, 15), rig.notices.single().text)
+        assertEquals(AwakeWords.sleepSoon(res, 120, MacAwake.HOT, 15), rig.notices.single().text)
     }
 
     @Test fun backpackEndingOffersTwoHoursMore() {
@@ -94,7 +93,7 @@ class MacOnlyTest {
         assertEquals(Notice.Kind.Backpack, n.kind)
         assertEquals(Notice.ACTION_EXTEND, n.action)
         // 540 s: "in 9 minutes".
-        assertEquals(res.getQuantityString(com.prudnikweb.hypernova.R.plurals.notice_backpack_ends, 9, 9), n.text)
+        assertEquals(res.getQuantityString(Plural.notice_backpack_ends, 9, 9), n.text)
 
         rig.visible = false
         rig.push(fx("ws-mac-backpack-ending")) { rig.notices.isNotEmpty() }

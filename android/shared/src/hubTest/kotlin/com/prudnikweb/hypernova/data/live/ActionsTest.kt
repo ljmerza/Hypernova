@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.AlwaysScope
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Asides
@@ -21,10 +22,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /** What the hub's actions ask of the daemon (docs/PROTOCOL.md, "REST", "Approvals", "Session menu", "Held prompts"). */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class ActionsTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
@@ -307,7 +307,7 @@ class ActionsTest {
         daemon.on("DELETE", "/v1/sessions/s1") { json(409, JSONObject().put("error", JSONObject().put("code", "not_agents").put("message", "Only a session in claude agents can be stopped or deleted here."))) }
         val r = rig.call { rig.hub.deleteSession("s1") }
         assertTrue(r.isFailure)
-        assertEquals(rig.context.getString(com.prudnikweb.hypernova.R.string.err_delete_older), r.exceptionOrNull()?.message)
+        assertEquals(rig.res.getString(Str.err_delete_older), r.exceptionOrNull()?.message)
         // The card stays: nothing was deleted.
         assertTrue(rig.hub.sessions.any { it.id == "s1" })
     }
@@ -332,7 +332,7 @@ class ActionsTest {
     @Test fun restartOnAnOlderServerSaysItNeedsUpdating() {
         connect(session("s1"))
         daemon.on("POST", "/v1/sessions/s1/restart") { json(404, JSONObject().put("error", JSONObject().put("code", "not_found").put("message", "Not found"))) }
-        assertEquals(rig.context.getString(com.prudnikweb.hypernova.R.string.err_restart_older), rig.call { rig.hub.restartSession("s1") }.exceptionOrNull()?.message)
+        assertEquals(rig.res.getString(Str.err_restart_older), rig.call { rig.hub.restartSession("s1") }.exceptionOrNull()?.message)
     }
 
     @Test fun restartOfASessionGoneSaysSoNotUpdate() {

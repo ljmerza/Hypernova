@@ -2,16 +2,21 @@ package com.prudnikweb.hypernova.data.live
 
 import android.app.AlarmManager
 import android.content.Context
+import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Looper
 import com.prudnikweb.hypernova.data.ComputerWords
+import com.prudnikweb.hypernova.data.DeviceCertStore
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.LiveHub
 import com.prudnikweb.hypernova.data.Notice
 import com.prudnikweb.hypernova.data.Pairing
+import com.prudnikweb.hypernova.data.Platform
 import com.prudnikweb.hypernova.data.Servers
 import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.data.Storage
+import com.prudnikweb.hypernova.data.Strings
 import com.prudnikweb.hypernova.data.WApproval
 import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.data.AndroidPlatform
@@ -25,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import org.junit.Assert.fail
+import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowNetworkCapabilities
@@ -54,6 +60,9 @@ class HubRig(
         // A fresh install's words (a Mac's): ComputerWords is process-wide and outlives a test.
         ComputerWords.clear(it.storage)
     }
+    val platform: Platform = AndroidPlatform(context)
+    val res: Strings get() = platform.strings
+    val storage: Storage get() = platform.storage
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
     val pairing = Pairing(baseUrl = if (baseIsListener) "https://127.0.0.1:${daemon.lanPort}" else daemon.base, token = token, macName = daemon.name, macId = "m-${daemon.name}", deviceId = deviceId).let {
         if (viaLan) it.copy(fingerprint = daemon.fingerprint, lanAddresses = listOf("127.0.0.1"), lanPort = daemon.lanPort) else it
@@ -80,7 +89,7 @@ class HubRig(
     val banners = mutableListOf<Notice>()
 
     val hub = LiveHub(
-        com.prudnikweb.hypernova.data.AndroidPlatform(context), scope, pairing,
+        platform, scope, pairing,
         toast = { toasts += it },
         onApproval = { a, s -> notified += a to s },
         onApprovalGone = { gone += it },
@@ -177,6 +186,32 @@ class HubRig(
     /** The scheduled retry's alarm, if one is set. */
     fun retryAlarm() = shadowOf(alarms).scheduledAlarms.firstOrNull { it.onAlarmListener != null }
 
+    /** The default network became another kind (a VPN came up on it). */
+    fun networkChanged() {
+        val cm = connectivity
+        val net = cm.activeNetwork!!
+        val vpn = wifi().also { shadowOf(it).addTransportType(NetworkCapabilities.TRANSPORT_VPN) }
+        for (cb in shadowOf(cm).networkCallbacks.toList()) cb.onCapabilitiesChanged(net, vpn)
+    }
+
+    /** The screen came on. */
+    fun screenOn() {
+        context.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+    }
+
+    /** Lets [ms] pass on the clock that counts while the phone sleeps, and no other: it slept. */
+    fun slept(ms: Long) {
+        ShadowSystemClock.advanceBy(Duration.ofMillis(ms))
+    }
+
+    /** That alarm goes off, as it does when the phone slept through the delay. */
+    fun fireRetryAlarm() {
+        shadowOf(alarms).fireAlarm(retryAlarm()!!)
+    }
+
+    /** This computer's device certificate, as the app keeps it. */
+    fun certs(): DeviceCertStore = DeviceCertStore(storage, platform.deviceKeys, serverId)
+
     override fun close() {
         runCatching { hub.close() }
         pump()
@@ -184,3 +219,9 @@ class HubRig(
         daemon.close()
     }
 }
+
+/** The platform this classpath's tests run on: here, Robolectric's Android. */
+fun rigPlatform(): Platform = AndroidPlatform(RuntimeEnvironment.getApplication())
+
+/** What the tests in shared/src/hubTest run under: here, Robolectric's Android. */
+class RigRunner(c: Class<*>) : RobolectricTestRunner(c)

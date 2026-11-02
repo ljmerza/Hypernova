@@ -1,6 +1,6 @@
 package com.prudnikweb.hypernova.data.live
 
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.HubException
 import com.prudnikweb.hypernova.data.SwitchPreview
@@ -17,18 +17,17 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /**
  * Codex from the phone (docs/PROTOCOL.md, "Codex (a second agent)", "Switching agents"): turning it
  * on and off, its models, a Codex session's model and effort, and a switch's preview and the switch,
  * the real hub against a [FakeDaemon] that answers with the contract fixtures.
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class CodexActionsTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
-    private val res get() = rig.context.resources
+    private val res get() = rig.res
 
     @After fun tearDown() = rig.close()
 
@@ -71,7 +70,7 @@ class CodexActionsTest {
         assertTrue(away is HubException)
         assertTrue(away.message!!.isNotBlank())
         daemon.down = false
-        assertTrue(res.getString(R.string.cx_err_turn_on).isNotBlank())
+        assertTrue(res.getString(Str.cx_err_turn_on).isNotBlank())
     }
 
     @Test fun theModelsAreAskedOnceAWhileAndAgainWhenCodexTurnsOn() {

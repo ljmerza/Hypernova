@@ -14,7 +14,6 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.usage
-import com.prudnikweb.hypernova.data.storage
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -25,10 +24,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /** What the live socket pushes (docs/PROTOCOL.md, "WebSocket `GET /v1/ws`") and what the hub makes of it. */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class SocketEventsTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
@@ -72,7 +70,7 @@ class SocketEventsTest {
 
     @Test fun aRewindsCopyReplacesTheSessionAndWhatThePhoneKeptGoesOnThere() {
         connectWith(session("s1", title = "Same title"), session("s2", title = "Same title", lastActivityAt = 7_000))
-        val marks = ReadState.of(rig.context.storage, rig.serverId)
+        val marks = ReadState.of(rig.storage, rig.serverId)
         marks.mark("s1", 1_000)
         SessionCarry.typing("s1", "half a thought")
         AttachDrafts.add("s1", DraftFile(AttachDrafts.nextId(), "a.png", true))
@@ -98,7 +96,7 @@ class SocketEventsTest {
 
     @Test fun aPhoneThatWasAwayHearsOfTheRewindInTheSnapshotWithoutHidingLaterReplies() {
         daemon.snapshot = snapshot(sessions = listOf(session("s2", lastActivityAt = 7_000))) { put("replaced", JSONObject().put("s1", "s2")) }
-        val marks = ReadState.of(rig.context.storage, rig.serverId)
+        val marks = ReadState.of(rig.storage, rig.serverId)
         marks.mark("s1", 1_000)
         rig.connect()
         assertEquals("s2", rig.hub.replacedBy("s1"))

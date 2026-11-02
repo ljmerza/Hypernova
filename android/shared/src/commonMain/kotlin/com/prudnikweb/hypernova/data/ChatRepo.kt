@@ -1,22 +1,6 @@
-package com.prudnikweb.hypernova.ui.session
+package com.prudnikweb.hypernova.data
 
 import androidx.compose.runtime.Immutable
-import com.prudnikweb.hypernova.R
-import com.prudnikweb.hypernova.data.ActiveRoutes
-import com.prudnikweb.hypernova.data.Api
-import com.prudnikweb.hypernova.data.ApiException
-import com.prudnikweb.hypernova.data.Attachment
-import com.prudnikweb.hypernova.data.Core
-import com.prudnikweb.hypernova.data.HubException
-import com.prudnikweb.hypernova.data.Net
-import com.prudnikweb.hypernova.data.NetRoute
-import com.prudnikweb.hypernova.data.Wire
-import com.prudnikweb.hypernova.data.arr
-import com.prudnikweb.hypernova.data.bool
-import com.prudnikweb.hypernova.data.dbl
-import com.prudnikweb.hypernova.data.long
-import com.prudnikweb.hypernova.data.obj
-import com.prudnikweb.hypernova.data.str
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -77,17 +61,17 @@ data class Rewound(val sessionId: String, val text: String, val files: List<Atta
  */
 object ChatRepo {
     private fun api(): Api {
-        val p = Core.pairing ?: throw HubException(Core.app.getString(R.string.chat_err_mac))
+        val p = Core.pairing ?: throw HubException(Core.platform.strings.getString(Str.chat_err_mac))
         return Api(p.baseUrl, p.token)
     }
 
-    private fun fail(e: Throwable, fallback: Int = R.string.chat_err_mac): Throwable = when {
+    private fun fail(e: Throwable, fallback: Str = Str.chat_err_mac): Throwable = when {
         e is CancellationException -> e
         e is ApiException && e.serverMessage != null -> HubException(e.serverMessage)
         // A Mac that doesn't have these yet answers 404 with no message of its own.
-        e is ApiException && e.status == 404 -> HubException(Core.app.getString(R.string.chat_err_old_mac))
+        e is ApiException && e.status == 404 -> HubException(Core.platform.strings.getString(Str.chat_err_old_mac))
         e is HubException -> e
-        else -> HubException(Core.app.getString(fallback))
+        else -> HubException(Core.platform.strings.getString(fallback))
     }
 
     suspend fun usage(sessionId: String): Result<SessionUsage> = try {
@@ -110,9 +94,9 @@ object ChatRepo {
 
     suspend fun rewind(sessionId: String, eventId: String): Result<Rewound> = try {
         val o = api().post("/v1/sessions/$sessionId/rewind", JSONObject().put("eventId", eventId))
-        val id = o.obj("session")?.str("id") ?: throw HubException(Core.app.getString(R.string.chat_err_mac))
+        val id = o.obj("session")?.str("id") ?: throw HubException(Core.platform.strings.getString(Str.chat_err_mac))
         val files = o.arr("files")?.let { a -> (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(Wire::attachment) } }.orEmpty()
-        val stays = if (o.has("originalStays")) o.str("originalStays")?.takeIf { it.isNotBlank() } else Core.app.getString(R.string.chat_rewound_older)
+        val stays = if (o.has("originalStays")) o.str("originalStays")?.takeIf { it.isNotBlank() } else Core.platform.strings.getString(Str.chat_rewound_older)
         Result.success(Rewound(id, o.str("text").orEmpty(), files, stays))
     } catch (e: CancellationException) {
         // Left the screen: not a failure to show ("StandaloneCoroutine was cancelled").
@@ -123,7 +107,7 @@ object ChatRepo {
 
     /** The Mac's voice reading [text] (docs/PROTOCOL.md, "Read aloud"): an M4A clip, whole. */
     suspend fun speech(text: String): Result<ByteArray> = try {
-        val p = Core.pairing ?: throw HubException(Core.app.getString(R.string.chat_err_mac))
+        val p = Core.pairing ?: throw HubException(Core.platform.strings.getString(Str.chat_err_mac))
         // By the active route (data/LanRoute.kt): the Mac's own address on this network, or the base URL.
         val route = ActiveRoutes.route(p.baseUrl)
         val req = Request.Builder()
@@ -135,7 +119,7 @@ object ChatRepo {
     } catch (e: CancellationException) {
         throw e
     } catch (e: Throwable) {
-        Result.failure(fail(e, R.string.chat_read_failed))
+        Result.failure(fail(e, Str.chat_read_failed))
     }
 
     /** A long reply takes the Mac a while to read into a clip: a minute before giving up. */
@@ -162,7 +146,7 @@ object ChatRepo {
         })
     }
 
-    internal fun parseUsage(o: JSONObject): SessionUsage {
+    fun parseUsage(o: JSONObject): SessionUsage {
         val c = o.obj("context")
         val t = o.obj("tokens")
         return SessionUsage(
@@ -182,7 +166,7 @@ object ChatRepo {
         )
     }
 
-    internal fun parseTodos(o: JSONObject): List<Todo> {
+    fun parseTodos(o: JSONObject): List<Todo> {
         val a = o.arr("todos") ?: return emptyList()
         return (0 until a.length()).mapNotNull { i ->
             val t = a.optJSONObject(i) ?: return@mapNotNull null

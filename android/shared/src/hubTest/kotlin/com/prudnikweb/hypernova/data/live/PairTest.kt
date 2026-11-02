@@ -1,7 +1,5 @@
 package com.prudnikweb.hypernova.data.live
 
-import android.content.Context
-import com.prudnikweb.hypernova.BuildConfig
 import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.PairLink
 import com.prudnikweb.hypernova.data.PairLinks
@@ -9,9 +7,6 @@ import com.prudnikweb.hypernova.data.Pairer
 import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
-import com.prudnikweb.hypernova.data.storage
-import com.prudnikweb.hypernova.data.AndroidPlatform
-import com.prudnikweb.hypernova.data.AndroidDevice
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -19,8 +14,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 
 /**
  * Pairing end to end (data/Pairing.kt, [Pairer.pair]; docs/PROTOCOL.md, "Pairing") against
@@ -28,9 +21,9 @@ import org.robolectric.RuntimeEnvironment
  * the link's `fp`), then the link's base URL, and what each refusal means. The daemon's answer is
  * the contract fixture itself (protocol/fixtures/rest-pair.json).
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class PairTest {
-    private val context: Context = RuntimeEnvironment.getApplication()
+    private val platform = rigPlatform()
 
     private val answer: JSONObject by lazy {
         JSONObject(javaClass.classLoader!!.getResource("fixtures/rest-pair.json")!!.readText())
@@ -44,7 +37,7 @@ class PairTest {
         return PairLinks.parse("hypernova://pair?v=1&u=$base&c=$code&n=z2$lan")!!
     }
 
-    private fun pair(l: PairLink): Pairing = runBlocking { Pairer.pair(AndroidPlatform(context), l) }
+    private fun pair(l: PairLink): Pairing = runBlocking { Pairer.pair(platform, l) }
 
     private fun refused(l: PairLink): ApiException = try {
         pair(l)
@@ -63,12 +56,12 @@ class PairTest {
             assertEquals(null, req.auth)
             val body = req.json
             assertEquals("c0de-1234", body.getString("code"))
-            assertEquals(AndroidDevice(context).name, body.getString("deviceName"))
+            assertEquals(platform.device.name, body.getString("deviceName"))
             assertTrue(body.getString("deviceName").isNotBlank())
             assertTrue(body.getString("model").isNotBlank())
-            assertEquals(BuildConfig.VERSION_NAME, body.getString("appVersion"))
+            assertEquals(platform.appInfo.versionName, body.getString("appVersion"))
             // This install's own id, the same every time (pairing again replaces its old device).
-            assertEquals(Pairer.installId(context.storage), body.getString("installId"))
+            assertEquals(Pairer.installId(platform.storage), body.getString("installId"))
             assertEquals(Pairing(d.base, "device-token", "server", "mac-id", "device-id"), p)
 
             pair(link(d, fp = null))

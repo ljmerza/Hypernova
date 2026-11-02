@@ -36,8 +36,8 @@ import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.ui.automations.rememberWords
 import com.prudnikweb.hypernova.ui.changes.ChangesDialog
-import com.prudnikweb.hypernova.ui.changes.ChangesRepo
-import com.prudnikweb.hypernova.ui.changes.WorkChanges
+import com.prudnikweb.hypernova.data.ChangesRepo
+import com.prudnikweb.hypernova.data.WorkChanges
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.InfoRow

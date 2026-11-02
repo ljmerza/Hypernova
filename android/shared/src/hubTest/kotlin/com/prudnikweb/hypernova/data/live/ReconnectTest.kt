@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.data.live
 
-import android.content.Intent
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
@@ -11,10 +10,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
-import org.robolectric.shadows.ShadowSystemClock
-import java.time.Duration
 
 /**
  * The reconnect policy (LiveHub's header, data/Retry.kt; docs/PROTOCOL.md: "Clients reconnect once at
@@ -22,7 +17,7 @@ import java.time.Duration
  * screen coming on or the app returning try at once; nothing is tried without a network, or off
  * screen without the background service.
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class ReconnectTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
@@ -91,31 +86,28 @@ class ReconnectTest {
         assertNotNull("an alarm for the next try", alarm)
         val tried = probes()
         // The coroutine's delay doesn't count while the phone sleeps; the alarm does.
-        shadowOf(rig.alarms).fireAlarm(alarm!!)
+        rig.fireRetryAlarm()
         rig.until("the alarm's try") { probes() > tried }
     }
 
     @Test fun theScreenComingOnTriesAtOnceOnlyThirtySecondsAfterTheLastTry() {
         dropAndFailTwice()
         val tried = probes()
-        rig.context.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        rig.screenOn()
         rig.pump()
         Thread.sleep(150)
         rig.pump()
         assertEquals("too soon after the last try", tried, probes())
         // The phone slept: the wall clock moved on, the coroutine's delay did not.
-        ShadowSystemClock.advanceBy(Duration.ofSeconds(31))
-        rig.context.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        rig.slept(31_000)
+        rig.screenOn()
         rig.until("the screen-on try") { probes() > tried }
     }
 
     @Test fun aNewNetworkTriesAtOnce() {
         dropAndFailTwice()
         val tried = probes()
-        val cm = rig.connectivity
-        val net = cm.activeNetwork!!
-        val vpn = rig.wifi().also { shadowOf(it).addTransportType(android.net.NetworkCapabilities.TRANSPORT_VPN) }
-        for (cb in shadowOf(cm).networkCallbacks.toList()) cb.onCapabilitiesChanged(net, vpn)
+        rig.networkChanged()
         rig.until("the network-change try") { probes() > tried }
     }
 
@@ -133,8 +125,7 @@ class ReconnectTest {
         // The network comes back (and the server with it).
         daemon.down = false
         rig.online(true)
-        val net = rig.connectivity.activeNetwork!!
-        for (cb in shadowOf(rig.connectivity).networkCallbacks.toList()) cb.onCapabilitiesChanged(net, rig.wifi().also { shadowOf(it).addTransportType(android.net.NetworkCapabilities.TRANSPORT_VPN) })
+        rig.networkChanged()
         rig.until("linked again") { rig.hub.link.state == LinkState.Connected }
     }
 

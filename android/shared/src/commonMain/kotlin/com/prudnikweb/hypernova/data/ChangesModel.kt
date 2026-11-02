@@ -1,11 +1,6 @@
-package com.prudnikweb.hypernova.ui.changes
+package com.prudnikweb.hypernova.data
 
 import androidx.compose.runtime.Immutable
-import com.prudnikweb.hypernova.R
-import com.prudnikweb.hypernova.data.Api
-import com.prudnikweb.hypernova.data.ApiException
-import com.prudnikweb.hypernova.data.Core
-import com.prudnikweb.hypernova.data.HubException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -60,15 +55,15 @@ enum class LineKind { Hunk, Add, Del, Ctx, Note }
 
 /** A line of a unified diff; [oldNo] / [newNo] are the line numbers in each version (0: none). */
 @Immutable
-data class DiffLine(val kind: LineKind, val text: String, val oldNo: Int = 0, val newNo: Int = 0)
+data class ChangeLine(val kind: LineKind, val text: String, val oldNo: Int = 0, val newNo: Int = 0)
 
 @Immutable
-data class FileDiff(val path: String, val lines: List<DiffLine>, val truncated: Boolean, val binary: Boolean)
+data class FileDiff(val path: String, val lines: List<ChangeLine>, val truncated: Boolean, val binary: Boolean)
 
 /** The calls behind the "What changed" screen. */
 object ChangesRepo {
     private fun api(): Api {
-        val p = Core.pairing ?: throw HubException(Core.app.getString(R.string.changes_err))
+        val p = Core.pairing ?: throw HubException(Core.platform.strings.getString(Str.changes_err))
         return Api(p.baseUrl, p.token)
     }
 
@@ -76,7 +71,7 @@ object ChangesRepo {
         e is CancellationException -> e
         e is ApiException && e.serverMessage != null -> HubException(e.serverMessage)
         e is HubException -> e
-        else -> HubException(Core.app.getString(R.string.changes_err))
+        else -> HubException(Core.platform.strings.getString(Str.changes_err))
     }
 
     suspend fun load(sessionId: String, all: Boolean = false): Result<WorkChanges> = try {
@@ -97,7 +92,7 @@ object ChangesRepo {
         Result.failure(fail(e))
     }
 
-    internal fun parseChanges(o: JSONObject): WorkChanges {
+    fun parseChanges(o: JSONObject): WorkChanges {
         val arr = o.optJSONArray("files")
         val files = (0 until (arr?.length() ?: 0)).map { i ->
             val f = arr!!.getJSONObject(i)
@@ -132,8 +127,8 @@ object ChangesRepo {
     private val HUNK = Regex("""^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
 
     /** A unified diff as lines with their numbers; git's own header lines (diff, index, ---, +++) are left out. */
-    internal fun parseDiff(text: String): List<DiffLine> {
-        val out = ArrayList<DiffLine>()
+    fun parseDiff(text: String): List<ChangeLine> {
+        val out = ArrayList<ChangeLine>()
         var oldNo = 0
         var newNo = 0
         var inHunk = false
@@ -145,16 +140,16 @@ object ChangesRepo {
                     inHunk = true
                     oldNo = h.groupValues[1].toInt()
                     newNo = h.groupValues[2].toInt()
-                    out += DiffLine(LineKind.Hunk, line)
+                    out += ChangeLine(LineKind.Hunk, line)
                 }
                 !inHunk -> Unit
-                line.startsWith("+") -> out += DiffLine(LineKind.Add, line.substring(1), newNo = newNo++)
-                line.startsWith("-") -> out += DiffLine(LineKind.Del, line.substring(1), oldNo = oldNo++)
-                line.startsWith("\\") -> out += DiffLine(LineKind.Note, line.removePrefix("\\ "))
-                line.startsWith(" ") -> out += DiffLine(LineKind.Ctx, line.substring(1), oldNo++, newNo++)
+                line.startsWith("+") -> out += ChangeLine(LineKind.Add, line.substring(1), newNo = newNo++)
+                line.startsWith("-") -> out += ChangeLine(LineKind.Del, line.substring(1), oldNo = oldNo++)
+                line.startsWith("\\") -> out += ChangeLine(LineKind.Note, line.removePrefix("\\ "))
+                line.startsWith(" ") -> out += ChangeLine(LineKind.Ctx, line.substring(1), oldNo++, newNo++)
                 // The empty string after the last newline.
                 line.isEmpty() -> Unit
-                else -> out += DiffLine(LineKind.Ctx, line, oldNo++, newNo++)
+                else -> out += ChangeLine(LineKind.Ctx, line, oldNo++, newNo++)
             }
         }
         return out

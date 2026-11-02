@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.data.live
 
 import android.os.Looper
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.AppUpdate
 import com.prudnikweb.hypernova.data.AppUpdater
@@ -51,8 +52,8 @@ class CoreServersTest {
      * the download over its route, and a 404 or a file Android can't read is a failure it can say.
      */
     @Test fun theAppUpdateAsksForThePermissionThenDownloadsAndSaysWhatWentWrong() {
-        Core.init(RuntimeEnvironment.getApplication())
-        val app = Core.app
+        AndroidCore.init(RuntimeEnvironment.getApplication())
+        val app = AndroidCore.app
         val z2 = FakeDaemon("z2")
         try {
             z2.snapshot = snapshot("z2", sessions = listOf(session("z-1")))
@@ -90,8 +91,8 @@ class CoreServersTest {
     }
 
     @Test fun twoComputersPairedTheSwitcherAllServersAndAnswersGoingToTheRightOne() {
-        Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(Core.app.storage)
+        AndroidCore.init(RuntimeEnvironment.getApplication())
+        ComputerWords.clear(AndroidCore.app.storage)
         val z2 = FakeDaemon("z2")
         val gym = FakeDaemon("gym")
         try {

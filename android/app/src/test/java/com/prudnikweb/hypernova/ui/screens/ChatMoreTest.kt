@@ -2,6 +2,7 @@
 
 package com.prudnikweb.hypernova.ui.screens
 
+import com.prudnikweb.hypernova.data.ChatRepo
 import android.content.ClipboardManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Core
@@ -31,10 +33,10 @@ import com.prudnikweb.hypernova.ui.session.QuickPromptChips
 import com.prudnikweb.hypernova.ui.session.QuickPrompts
 import com.prudnikweb.hypernova.ui.session.ResumeLine
 import com.prudnikweb.hypernova.ui.session.SessionScreen
-import com.prudnikweb.hypernova.ui.session.SessionUsage
-import com.prudnikweb.hypernova.ui.session.Todo
+import com.prudnikweb.hypernova.data.SessionUsage
+import com.prudnikweb.hypernova.data.Todo
 import com.prudnikweb.hypernova.ui.session.TodoChecklist
-import com.prudnikweb.hypernova.ui.session.TodoStatus
+import com.prudnikweb.hypernova.data.TodoStatus
 import com.prudnikweb.hypernova.ui.session.WaitingMenu
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -79,7 +81,7 @@ class ChatMoreTest {
     @Before fun setUp() {
         resetPrefs()
         // ChatRepo (Rewind) asks Core for the computer: none is paired here.
-        Core.init(RuntimeEnvironment.getApplication())
+        AndroidCore.init(RuntimeEnvironment.getApplication())
     }
 
     private val conversation = listOf(

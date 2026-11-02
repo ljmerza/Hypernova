@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.HubViewModel
@@ -63,8 +64,8 @@ class SettingsTabTest {
 
     @Before fun setUp() {
         resetPrefs()
-        Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(Core.app.storage)
+        AndroidCore.init(RuntimeEnvironment.getApplication())
+        ComputerWords.clear(AndroidCore.app.storage)
         AboutBuild.name = "1.2.3"
         AboutBuild.code = 4242
     }
@@ -109,7 +110,7 @@ class SettingsTabTest {
     private fun JSONObject.files(on: Boolean) = apply { getJSONObject("mac").put("files", JSONObject().put("browseOutsideProjects", on)) }
 
     private fun show(): HubViewModel {
-        val vm = HubViewModel(Core.app)
+        val vm = HubViewModel(AndroidCore.app)
         rule.setContent {
             ui = androidx.compose.ui.platform.LocalContext.current
             Harness(spy) { SettingsTab(vm, top = 0.dp) }

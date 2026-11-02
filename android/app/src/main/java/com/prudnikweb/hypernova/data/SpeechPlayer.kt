@@ -126,7 +126,7 @@ object Speaker : SpeechOutput {
         }
 
         private fun run() {
-            val ctx = Core.app
+            val ctx = AndroidCore.app
             val am = ctx.getSystemService(AudioManager::class.java)
             val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
             val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)

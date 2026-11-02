@@ -1,6 +1,6 @@
 package com.prudnikweb.hypernova.data.live
 
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Notice
 import com.prudnikweb.hypernova.data.SERVER_UPDATE_NOTICE
 import com.prudnikweb.hypernova.data.ServerUpdate
@@ -17,7 +17,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /**
  * A server's own update as the hub tells of it (docs/PROTOCOL.md, "The server's own update"): one
@@ -25,7 +24,7 @@ import org.robolectric.RobolectricTestRunner
  * up, each server's its own; nothing while an update goes well. And an approval a daemon restart
  * took away, its session still asking in its own dialog, is said again.
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class ServerUpdateNoticeTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }
@@ -58,8 +57,8 @@ class ServerUpdateNoticeTest {
         assertEquals(Notice.Kind.ServerUpdateFailed, n.kind)
         assertEquals("z2", n.title)
         assertNull("a banner opens Settings, it has no button", n.action)
-        assertTrue(n.text, n.text.startsWith(rig.context.getString(R.string.su_failed_why, "0.9.0", "the new daemon didn’t answer, so the old one is back; still 0.5.0")))
-        assertTrue(n.text, n.text.endsWith(rig.context.getString(R.string.su_failed_again)))
+        assertTrue(n.text, n.text.startsWith(rig.res.getString(Str.su_failed_why, "0.9.0", "the new daemon didn’t answer, so the old one is back; still 0.5.0")))
+        assertTrue(n.text, n.text.endsWith(rig.res.getString(Str.su_failed_again)))
         assertTrue("no notification while on screen", rig.notices.isEmpty())
         assertEquals(ServerUpdate.Failure("v0.9.0", "the new daemon didn’t answer, so the old one is back; still 0.5.0", 1_800_000_000_000L, 1_800_003_600_000L), rig.hub.mac.update?.failure)
 
@@ -70,7 +69,7 @@ class ServerUpdateNoticeTest {
 
         // It gives up on that release.
         rig.push(message(update(failure = failure("v0.9.0", next = null)))) { rig.banners.size == 2 }
-        assertTrue(rig.banners[1].text, rig.banners[1].text.endsWith(rig.context.getString(R.string.su_failed_final)))
+        assertTrue(rig.banners[1].text, rig.banners[1].text.endsWith(rig.res.getString(Str.su_failed_final)))
 
         // A newer release fails: news again.
         rig.push(message(update(failure = failure("v0.10.0")))) { rig.banners.size == 3 }

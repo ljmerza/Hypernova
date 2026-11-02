@@ -15,10 +15,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 /** Connecting (docs/PROTOCOL.md, "WebSocket"): the snapshot fills the hub, then the socket opens and answers pings. */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(RigRunner::class)
 class ConnectTest {
     private val daemon = FakeDaemon()
     private val rig by lazy { HubRig(daemon) }

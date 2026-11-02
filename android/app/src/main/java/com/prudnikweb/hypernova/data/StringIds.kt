@@ -118,6 +118,11 @@ val Str.id: Int
         Str.blocked_err_load -> R.string.blocked_err_load
         Str.blocked_err_retry -> R.string.blocked_err_retry
         Str.blocked_provider -> R.string.blocked_provider
+        Str.changes_err -> R.string.changes_err
+        Str.chat_err_mac -> R.string.chat_err_mac
+        Str.chat_err_old_mac -> R.string.chat_err_old_mac
+        Str.chat_read_failed -> R.string.chat_read_failed
+        Str.chat_rewound_older -> R.string.chat_rewound_older
         Str.cx_err_models -> R.string.cx_err_models
         Str.cx_err_preview -> R.string.cx_err_preview
         Str.cx_err_switch -> R.string.cx_err_switch
