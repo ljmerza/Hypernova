@@ -93,6 +93,9 @@ const routes: [string, string, unknown?][] = [
   ['POST', '/v1/agents/plugins/marketplaces/add', { ...codex, source: 'acme/plugins', confirmRun: true }],
   ['POST', '/v1/agents/plugins/marketplaces/remove', { ...codex, name: 'testmp' }],
   ['POST', '/v1/agents/plugins/marketplaces/update', { ...codex, name: 'testmp', confirmRun: true }],
+  ['GET', '/v1/agents/env?agent=codex'],
+  ['POST', '/v1/agents/env', { ...codex, name: 'MY_VAR', value: 'x', expected: null }],
+  ['POST', '/v1/agents/env/remove', { ...codex, name: 'MY_VAR', expected: null }],
   ['GET', '/v1/agents/skills?agent=codex'],
   ['POST', '/v1/agents/skills', { ...codex, name: 'greet', state: 'off' }],
 ]
