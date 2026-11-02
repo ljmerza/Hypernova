@@ -13,10 +13,9 @@ To see exactly what changed: `git diff -M c64bbf9`.
 ## What changed, in short
 
 The Mac app, the glasses app (Lens), the website, the name service and the built-in Tailscale node were
-removed. The server now runs on Linux and installs on a Mac, Codex is a second agent, the phone reaches
-the server only over the local network or a VPN into it, and much of the Android app's data layer moved
-to `android/shared`. Many other features were added and changed in the app and the daemon. `docs/DECISIONS.md`
-has the reasons.
+removed, so the phone reaches the server only over the local network or a VPN into it. Much of the
+Android app's data layer moved to `android/shared`, and many features were added and changed in the app
+and the daemon. `docs/DECISIONS.md` has the reasons.
 
 ## Which files say so
 
@@ -53,7 +52,8 @@ are new files.
   split up or rewritten, too little alike for git to call them the same file. They're part of this
   statement.
 - **Third-party code** in `third_party/` and its copies in `android/app/src/main/assets/` keep their own
-  licences and notices, and none of it has been modified from what the original shipped.
+  licences and notices. The third-party files the original shipped are unchanged, and those added since
+  are new files.
 - **`skills/hyper-cosmos/`** is unchanged from the original.
 - **Built packages:** comments don't survive compiling, so the APK's code and resources don't carry the
   line. `NOTICE`, which the APK and every server package hold, says the same thing for them, and the
