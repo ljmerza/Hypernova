@@ -133,6 +133,7 @@ val Str.id: Int
         Str.err_already_answered -> R.string.err_already_answered
         Str.err_answer -> R.string.err_answer
         Str.err_auto_update -> R.string.err_auto_update
+        Str.err_server_debug -> R.string.err_server_debug
         Str.err_awake -> R.string.err_awake
         Str.err_browse_setting -> R.string.err_browse_setting
         Str.err_check_account -> R.string.err_check_account

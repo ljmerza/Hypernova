@@ -137,6 +137,7 @@ enum class Str {
     err_already_answered,
     err_answer,
     err_auto_update,
+    err_server_debug,
     err_awake,
     err_browse_setting,
     err_check_account,

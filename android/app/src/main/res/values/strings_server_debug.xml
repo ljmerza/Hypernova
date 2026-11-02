@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings → the server: the server's debug log (docs/PROTOCOL.md, "The server's debug log") -->
+    <string name="sd_title">Server debug log</string>
+    <string name="sd_off">Logs much more on this server for 24 hours, then stops. No messages or secrets, and it stays on the server.</string>
+    <string name="sd_on">On until %1$s, then it stops. To read it on the server: hypernova logs --debug.</string>
+    <string name="err_server_debug">Couldn\'t change the server\'s debug log.</string>
+</resources>

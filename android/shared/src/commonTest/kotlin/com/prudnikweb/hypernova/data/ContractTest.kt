@@ -150,6 +150,12 @@ class ContractTest {
             assertNull(u.last)
             assertNull(u.failure)
         },
+        "ws-debug" to { o ->
+            val d = ServerDebug.parse(ws(o, "debug").obj("debug"))!!
+            assertTrue(d.on)
+            assertTrue(d.until!! > 0)
+        },
+        "ws-debug-off" to { o -> assertEquals(ServerDebug(false, null), ServerDebug.parse(ws(o, "debug").obj("debug"))) },
         "ws-update-failed" to { o ->
             val f = ServerUpdate.parse(ws(o, "update").obj("update"))!!.failure!!
             assertEquals("v0.9.0", f.tag)
@@ -344,6 +350,12 @@ class ContractTest {
         },
         "rest-jobs-respawn" to { o -> assertEquals(listOf(JobRestart("sess-all", true, "Done all00001")), OutdatedJobs.results(o)) },
         "rest-update" to { o -> assertEquals(true, ServerUpdate.parse(o.obj("update"))?.auto) },
+        "rest-debug" to { o ->
+            val d = ServerDebug.parse(o.obj("debug"))!!
+            assertTrue(d.on)
+            assertTrue(d.until!! > 0)
+        },
+        "rest-debug-off" to { o -> assertEquals(ServerDebug(false, null), ServerDebug.parse(o.obj("debug"))) },
         "rest-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true), ClaudeState.parse(o.obj("claude"))) },
         // ── Sessions: starting one, its chat, its terminal ──
         // LiveHub.start: the session it applies and opens.
@@ -1189,6 +1201,7 @@ class ContractTest {
         assertEquals(false, mac.browseOutsideProjects)
         assertEquals(true, mac.update!!.auto) // on by default (owner, 2026-11-01)
         assertEquals(false, mac.update!!.available)
+        assertEquals(ServerDebug(false, null), mac.debug)
         assertEquals(setOf("battery", "awake", "macVoice", "openWindow"), mac.unavailable.keys)
         usageWithoutFiveHours(s.usage)
 

@@ -312,6 +312,8 @@ data class Mac(
     val browseOutsideProjects: Boolean? = null,
     /** The server updating itself (data/ServerUpdate.kt): Settings' switch; null from a daemon too old to. */
     val update: ServerUpdate? = null,
+    /** The server's debug log (data/ServerDebug.kt): Settings' switch; null from a daemon too old to have one. */
+    val debug: ServerDebug? = null,
     /**
      * The Mac's features this computer lacks ([FEATURE_OPEN_WINDOW] and the rest), each with the
      * sentence that says why (docs/PROTOCOL.md, "Mac-only features"): empty on a Mac.
