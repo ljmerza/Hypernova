@@ -135,6 +135,7 @@ private fun itemName(item: TopBarItem): Int = when (item) {
     TopBarItem.TURN -> R.string.st_top_bar_turn
     TopBarItem.WEEK_PACE -> R.string.st_top_bar_week_pace
     TopBarItem.GIT -> R.string.st_top_bar_git
+    TopBarItem.MODEL_WEEK -> R.string.st_top_bar_model_week
 }
 
 private fun itemBody(item: TopBarItem): Int = when (item) {
@@ -150,4 +151,5 @@ private fun itemBody(item: TopBarItem): Int = when (item) {
     TopBarItem.TURN -> R.string.st_top_bar_turn_desc
     TopBarItem.WEEK_PACE -> R.string.st_top_bar_week_pace_desc
     TopBarItem.GIT -> R.string.st_top_bar_git_desc
+    TopBarItem.MODEL_WEEK -> R.string.st_top_bar_model_week_desc
 }

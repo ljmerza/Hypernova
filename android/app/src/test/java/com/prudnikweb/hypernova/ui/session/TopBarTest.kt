@@ -8,6 +8,7 @@ import com.prudnikweb.hypernova.ui.session.TopBarItem.COST
 import com.prudnikweb.hypernova.ui.session.TopBarItem.EFFORT
 import com.prudnikweb.hypernova.ui.session.TopBarItem.MODE
 import com.prudnikweb.hypernova.ui.session.TopBarItem.MODEL
+import com.prudnikweb.hypernova.ui.session.TopBarItem.MODEL_WEEK
 import com.prudnikweb.hypernova.ui.session.TopBarItem.SEVEN_DAY
 import com.prudnikweb.hypernova.ui.session.TopBarItem.TOKENS
 import com.prudnikweb.hypernova.ui.session.TopBarItem.TURN
@@ -15,6 +16,7 @@ import com.prudnikweb.hypernova.ui.session.TopBarItem.WEEK_PACE
 import com.prudnikweb.hypernova.data.CodexAccount
 import com.prudnikweb.hypernova.data.CodexState
 import com.prudnikweb.hypernova.data.CodexUsage
+import com.prudnikweb.hypernova.data.ModelWeek
 import com.prudnikweb.hypernova.data.Usage
 import com.prudnikweb.hypernova.data.Window
 import org.junit.Assert.assertEquals
@@ -37,7 +39,7 @@ class TopBarTest {
         val d = TopBarChoice.DEFAULT
         assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY), d.items)
         // The rest are there to turn on, off, after them.
-        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, MODEL, TOKENS, COST, AGENTS, TURN, WEEK_PACE, GIT), d.order)
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, MODEL, TOKENS, COST, AGENTS, TURN, WEEK_PACE, GIT, MODEL_WEEK), d.order)
         assertTrue(d.isDefault)
     }
 
@@ -96,7 +98,7 @@ class TopBarTest {
     @Test fun itIsKeptAsOneLineAndReadBack() {
         val c = TopBarChoice.DEFAULT.move(TURN, -9).set(TURN, true).set(FIVE_HOUR, false)
         val line = c.encode()
-        assertEquals("turn,context,mode,effort,!fiveHour,sevenDay,!model,!tokens,!cost,!agents,!weekPace,!git", line)
+        assertEquals("turn,context,mode,effort,!fiveHour,sevenDay,!model,!tokens,!cost,!agents,!weekPace,!git,!modelWeek", line)
         assertEquals(c, TopBarChoice.decode(line))
         // Nothing kept yet: the default.
         assertEquals(TopBarChoice.DEFAULT, TopBarChoice.decode(null))
@@ -105,7 +107,7 @@ class TopBarTest {
 
     @Test fun anOlderLineGetsNewPartsOffAtTheEndAndUnknownOnesPassedOver() {
         val c = TopBarChoice.decode("sevenDay,context,later,context,!mode")
-        assertEquals(listOf(SEVEN_DAY, CONTEXT, MODE, EFFORT, FIVE_HOUR, MODEL, TOKENS, COST, AGENTS, TURN, WEEK_PACE, GIT), c.order)
+        assertEquals(listOf(SEVEN_DAY, CONTEXT, MODE, EFFORT, FIVE_HOUR, MODEL, TOKENS, COST, AGENTS, TURN, WEEK_PACE, GIT, MODEL_WEEK), c.order)
         assertEquals(setOf(SEVEN_DAY, CONTEXT), c.shown)
     }
 
@@ -222,6 +224,41 @@ class TopBarTest {
         assertFalse(WEEK_PACE in on.visible(facts, now))
         assertTrue(WEEK_PACE in on.visible(facts.copy(weekPace = WeekPace(2, 10)), now))
         assertFalse(WEEK_PACE in TopBarChoice.DEFAULT.visible(facts.copy(weekPace = WeekPace(2, 10)), now))
+    }
+
+    // ─── This model's week ───
+
+    private val weeks = listOf(ModelWeek("Fable 5.1", 0.41f, now + 2 * day), ModelWeek("Sonnet", 0.2f, null))
+
+    @Test fun theModelsWeekGoesByItsFamily() {
+        for (model in listOf("claude-fable-5-1", "claude-fable-5-1[1m]", "Fable 5.1", "fable", "anthropic/claude-fable-5-1")) {
+            assertEquals(model, "Fable 5.1", modelWeekOf(weeks, model)?.label)
+        }
+        assertEquals("Sonnet", modelWeekOf(weeks, "claude-sonnet-4-5-20250929")?.label)
+    }
+
+    @Test fun aModelWithoutAWeekOfItsOwnHasNone() {
+        assertEquals(null, modelWeekOf(weeks, "claude-opus-5-5"))
+        assertEquals(null, modelWeekOf(weeks, "gpt-5"))
+        // Not known yet: the session's word for a model nobody has named.
+        assertEquals(null, modelWeekOf(weeks, "Default"))
+        assertEquals(null, modelWeekOf(weeks, ""))
+        assertEquals(null, modelWeekOf(emptyList(), "claude-fable-5-1"))
+    }
+
+    @Test fun theModelsWeekIsLabelledShort() {
+        assertEquals("Fable", weeks[0].shortLabel)
+        assertEquals("Sonnet", weeks[1].shortLabel)
+    }
+
+    @Test fun theModelsWeekDrawsOnlyWhenOnAboutThisSessionAndThere() {
+        assertFalse(MODEL_WEEK in TopBarChoice.DEFAULT.items)
+        val on = TopBarChoice.DEFAULT.set(MODEL_WEEK, true)
+        assertFalse(MODEL_WEEK in on.visible(facts, now))
+        assertTrue(MODEL_WEEK in on.visible(facts.copy(modelWeek = weeks[0]), now))
+        // Another provider's session, or a plan that's stale or unknown.
+        assertFalse(MODEL_WEEK in on.visible(facts.copy(modelWeek = weeks[0], plan = false), now))
+        assertFalse(MODEL_WEEK in TopBarChoice.DEFAULT.visible(facts.copy(modelWeek = weeks[0]), now))
     }
 
     @Test fun theTurnsTimeIsShort() {

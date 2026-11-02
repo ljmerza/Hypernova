@@ -5,6 +5,9 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import com.prudnikweb.hypernova.data.CodexState
+import com.prudnikweb.hypernova.data.ModelCatalog
+import com.prudnikweb.hypernova.data.ModelOption
+import com.prudnikweb.hypernova.data.ModelWeek
 import com.prudnikweb.hypernova.data.Usage
 import com.prudnikweb.hypernova.data.UsageWindow
 import kotlin.math.roundToInt
@@ -38,6 +41,8 @@ enum class TopBarItem(val key: String) {
     WEEK_PACE("weekPace"),
     /** The branch and the lines changed ("⎇ main +120 −30"), in a repository. */
     GIT("git"),
+    /** The week of the model this session runs, when it has one of its own ("FABLE 41% ↻ Tue 20:00"). */
+    MODEL_WEEK("modelWeek"),
     ;
 
     companion object {
@@ -75,7 +80,7 @@ data class TopBarChoice(val order: List<TopBarItem>, val shown: Set<TopBarItem>)
         /**
          * The owner's default (2026-10-31): the context ring, mode, effort, the 5-hour window
          * (only when reported) and the week; the model, the tokens, the API cost, the agents, the
-         * turn's time, the week's pace and git off, after them.
+         * turn's time, the week's pace, git and the model's week off, after them.
          */
         val DEFAULT = TopBarChoice(
             TopBarItem.entries.toList(),
@@ -126,6 +131,8 @@ data class TopBarFacts(
     val weekPace: WeekPace? = null,
     /** The changes route said where this session's folder stands: a repository, and it answered (rememberTopBarGit). */
     val git: Boolean = false,
+    /** The week of the model this session runs, when it has one of its own ([modelWeekOf]). */
+    val modelWeek: ModelWeek? = null,
 ) {
     /** The effort word: only for a Claude session that has one (Codex shows its mode alone). */
     val effortShown: Boolean get() = !codex && effort != null
@@ -138,7 +145,7 @@ data class TopBarFacts(
  * The items the bar draws now, in the owner's order: the chosen ones that have something to say.
  * The 5-hour window only while Claude Code reports one; the plan's windows only while they're
  * about this session; the effort for a Claude session that has one; tokens once some are spent; the cost once there's one; agents while more than none work; the turn's
- * time while in a turn; the week's pace while a week is known that's about this session; git in a repository. Nothing drops for room: the bar scrolls sideways instead.
+ * time while in a turn; the week's pace while a week is known that's about this session; git in a repository; the model's week while the plan's windows show and the model has one of its own. Nothing drops for room: the bar scrolls sideways instead.
  */
 fun TopBarChoice.visible(f: TopBarFacts, now: Long): List<TopBarItem> = items.filter {
     when (it) {
@@ -152,6 +159,7 @@ fun TopBarChoice.visible(f: TopBarFacts, now: Long): List<TopBarItem> = items.fi
         TopBarItem.TURN -> f.inTurn(now)
         TopBarItem.WEEK_PACE -> f.weekPace != null
         TopBarItem.GIT -> f.git
+        TopBarItem.MODEL_WEEK -> f.plan && f.modelWeek != null
     }
 }
 
@@ -195,6 +203,18 @@ fun weekPaceOf(codexSession: Boolean, plan: Boolean, usage: Usage, codex: CodexS
     if (!plan) return null
     return weekPace(UsageWindow.sevenDay(usage, now).used, usage.sevenDayResetAt, now)
 }
+
+/**
+ * The week of its own that [model] (an id, an alias or a name, as the bar names the session's model)
+ * spends on the plan, matched by family as the model pickers do; null when it has none or isn't
+ * known yet. [weeks] (`Usage.models`) are read off Claude Code's /usage screen every 15 minutes,
+ * so this can be up to 15 minutes old (docs/PROTOCOL.md, "Per-model weeks").
+ */
+fun modelWeekOf(weeks: List<ModelWeek>, model: String): ModelWeek? =
+    ModelCatalog.week(ModelOption(value = null, name = model, model = model), weeks)
+
+/** A week's short name for the bar: "Fable 5.1" is "Fable". */
+val ModelWeek.shortLabel: String get() = label.trim().substringBefore(' ')
 
 /**
  * Where a session stands, for when the git item asks the changes route again (rememberTopBarGit,

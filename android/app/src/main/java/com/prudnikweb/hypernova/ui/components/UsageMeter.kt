@@ -76,10 +76,11 @@ fun UsageMeter(label: String, p: UsageWindow, spoken: String, modifier: Modifier
 /**
  * The compact meter for a single row (the chat's strip): its short label ("5H"), the percentage, a
  * thin bar [barWidth] wide and the one tag. Short of room, the strip asks for less: [bar] false
- * leaves the bar out, [reset] false the reset countdown.
+ * leaves the bar out, [reset] false the reset countdown. [resetText]: the reset in other words than
+ * a countdown (a model's week: "Tue 20:00").
  */
 @Composable
-fun UsageMeterCompact(label: String, p: UsageWindow, modifier: Modifier = Modifier, barWidth: Dp = 40.dp, bar: Boolean = true, reset: Boolean = true) {
+fun UsageMeterCompact(label: String, p: UsageWindow, modifier: Modifier = Modifier, barWidth: Dp = 40.dp, bar: Boolean = true, reset: Boolean = true, resetText: String? = null) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         HText(label.uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
         Spacer(Modifier.width(5.dp))
@@ -90,7 +91,7 @@ fun UsageMeterCompact(label: String, p: UsageWindow, modifier: Modifier = Modifi
         }
         if (reset) {
             Spacer(Modifier.width(6.dp))
-            MeterTag(p, null)
+            MeterTag(p, resetText)
         }
     }
 }

@@ -59,4 +59,6 @@
     <string name="st_top_bar_week_pace_desc">The day of the week and its use in points against an even week. Not a limit or a forecast.</string>
     <string name="st_top_bar_git">Git</string>
     <string name="st_top_bar_git_desc">The branch and the lines changed since the last commit, in a repository.</string>
+    <string name="st_top_bar_model_week">This model’s week</string>
+    <string name="st_top_bar_model_week_desc">The week of the model the session runs, if it has its own. Up to 15 minutes old.</string>
 </resources>

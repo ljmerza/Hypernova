@@ -3772,3 +3772,13 @@ off by default: `⎇ main +120 −30`, from what `GET /v1/sessions/{id}/changes`
    error. A failed ask clears an earlier answer rather than leaving an old one up.
 6. **The counts are the route's:** `totalAdd` and `totalDel`, so while it can tell, only the files this session's tools
    touched, as What changed lists them. Colours as What changed's (`+` mint, `−` red). A worktree's name is for TalkBack.
+
+## This model's week in the top bar (2026-11-02)
+
+The owner: "do the week pace, git and this model's week". **This model's week** is an item in Settings → Session top
+bar, off by default: the week of the model the session runs, when it has one of its own (`FABLE 41% ↻ Tue 20:00`),
+in the compact meter the 5-hour window and the week use, with the bar, and the model's short name as its label. The reset is as the
+model's meter on Home has it: a weekday and time more than about a day off, a countdown nearer. It's matched by family
+as the model pickers do (`ModelCatalog.week`). It hides on a model with no week of its own or none known yet, and whenever
+the plan's windows aren't about this session (`planShown`), so never for Codex. `Usage.models` is read off Claude Code's
+/usage screen every 15 minutes, so it can be that old, which Settings says; the bar doesn't ask for a fresh look.

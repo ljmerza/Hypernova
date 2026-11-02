@@ -43,6 +43,7 @@ import com.prudnikweb.hypernova.data.WorkChanges
 import com.prudnikweb.hypernova.data.DraftFile
 import com.prudnikweb.hypernova.data.EnterKey
 import com.prudnikweb.hypernova.data.Item
+import com.prudnikweb.hypernova.data.ModelWeek
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.Usage
 import com.prudnikweb.hypernova.data.WAgent
@@ -395,6 +396,55 @@ class SessionScreenTest {
         val said = stripSaid()
         assertFalse(said, said.contains(str(R.string.session_sheet_branch_said, "main")))
         assertFalse(said, said.contains("no answer"))
+    }
+
+    /** The three items alone, so a picture holds them all; the session runs Fable, whose week ends in [resetIn] ms. */
+    private fun threeItems(resetIn: Long): FakeHub {
+        TopBarPref.set(
+            context,
+            TopBarChoice(TopBarChoice.DEFAULT.order, setOf(TopBarItem.WEEK_PACE, TopBarItem.GIT, TopBarItem.MODEL_WEEK)),
+        )
+        val fable = listOf(ModelWeek("Fable", 0.41f, Samples.NOW + resetIn))
+        return FakeHub(usage = Samples.usage().copy(models = fable)).also { hub ->
+            hub.sessionList = hub.sessionList.map { if (it.id == Samples.ZETA) it.copy(model = "claude-fable-5-1") else it }
+        }
+    }
+
+    private fun threeSaid() = rule.onNode(hasContentDescription("Day ", substring = true)).fetchSemanticsNode()
+        .config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString(" ")
+
+    @Config(qualifiers = "w816dp-h392dp-land-hdpi")
+    @Test fun topBarAllThreeNewItemsTogether() {
+        // A reset under a day off reads as a countdown, the same on every run; a wide screen fits all three.
+        chat(threeItems(5 * 3_600_000L + 30_000), Samples.ZETA)
+        val said = threeSaid()
+        assertTrue(said, said.contains("Day 4 of 7, 39 points under an even week."))
+        assertTrue(said, said.contains(str(R.string.session_sheet_branch_said, "main")))
+        assertTrue(said, said.contains("Fable week 41% used, resets in"))
+        rule.snap("chat_top_bar_three_items")
+    }
+
+    @Test fun topBarModelWeekSaysItsResetsDayWhenItsFarOff() {
+        chat(threeItems(3 * 24 * 3_600_000L), Samples.ZETA)
+        val said = threeSaid()
+        assertTrue(said, said.contains("Fable week 41% used, resets on "))
+    }
+
+    @Test fun topBarModelWeekHidesForAModelWithoutOne() {
+        val hub = threeItems(5 * 3_600_000L)
+        hub.sessionList = hub.sessionList.map { if (it.id == Samples.ZETA) it.copy(model = "claude-opus-5-5") else it }
+        chat(hub, Samples.ZETA)
+        val said = threeSaid()
+        assertFalse(said, said.contains("week 41%"))
+    }
+
+    @Test fun topBarGitCutsALongBranchNameShortOnScreenButSaysItWhole() {
+        val long = "feature/a-rather-long-branch-name-for-a-small-bar"
+        gitAnswer = gitAnswer.map { it.copy(branch = long) }
+        chat(threeItems(5 * 3_600_000L + 30_000), Samples.ZETA)
+        val said = threeSaid()
+        assertTrue(said, said.contains(str(R.string.session_sheet_branch_said, long)))
+        rule.snap("chat_top_bar_long_branch")
     }
 
     @Test fun topBarOpensTheSessionSheet() {

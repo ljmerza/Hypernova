@@ -3,6 +3,7 @@ package com.prudnikweb.hypernova.ui.session
 
 import com.prudnikweb.hypernova.data.SessionUsage
 import com.prudnikweb.hypernova.data.ChatRepo
+import com.prudnikweb.hypernova.data.ModelWeeks
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.WorkChanges
 import com.prudnikweb.hypernova.ui.automations.AutoGlyph
@@ -167,7 +168,7 @@ internal fun rememberTopBarGit(session: Session, edits: Int, linked: Boolean, lo
  * default the context ring and its share, the mode, the effort, the plan's
  * 5-hour window (only while Claude Code reports one) and the week, as compact meters
  * with their resets (ui/components/UsageMeter.kt); the model, the tokens, the agents at work
- * ([agents]) and this turn's time can be turned on. No cost (owner, 2026-10-30). "≈" marks what's
+ * ([agents]), this turn's time, the week's pace, git and this model's week can be turned on. No cost (owner, 2026-10-30). "≈" marks what's
  * worked out rather than Claude Code's own number. One line: nothing drops for room, the row
  * scrolls sideways under a finger, its edges fading where there's more. A tap (not a drag) opens
  * the session sheet ([onOpen], SessionSheet.kt); a tap on the agents count opens it on its Agents
@@ -184,15 +185,18 @@ internal fun UsageStrip(
     val choice by remember { TopBarPref.state(context) }
     val pct = usage.contextPct
     val u = hub.usage
-    // Moves when "resets in" would read differently, in step with Home's countdowns (ui/fx/Countdown.kt).
-    val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(u.fiveHourResetAt, u.sevenDayResetAt)
+    val model = stripModel(usage, session.model, res.getString(R.string.model_default))
     val plan = planShown(hub, session)
+    // Up to 15 minutes old, as the Mac reads these weeks off /usage (modelWeekOf). The strip doesn't ask for a fresh look: the session sheet's Usage part does.
+    val week = if (plan && TopBarItem.MODEL_WEEK in choice.items) modelWeekOf(u.models, model) else null
+    // Moves when "resets in" would read differently, in step with Home's countdowns (ui/fx/Countdown.kt).
+    val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(u.fiveHourResetAt, u.sevenDayResetAt, week?.resetsAt)
     val facts = TopBarFacts(
         codex = session.codex, effort = session.effort, tokens = usage.tokens, agents = agents, cost = usage.costUsd,
         turnStartedAt = session.turnStartedAt, ended = session.phase == com.prudnikweb.hypernova.data.Phase.Ended,
         plan = plan, fiveHour = u.fiveHourReported,
         weekPace = weekPaceOf(session.codex, plan, u, hub.codex, now),
-        git = git != null,
+        git = git != null, modelWeek = week,
     )
     // This turn's time, to the minute, while it's shown.
     val turnOn = TopBarItem.TURN in choice.items && facts.inTurn(System.currentTimeMillis())
@@ -207,9 +211,17 @@ internal fun UsageStrip(
     val seven = UsageWindow.sevenDay(u, now)
     val mode = com.prudnikweb.hypernova.ui.home.modeLabel(session.mode)
     val effort = session.effort?.takeIf { facts.effortShown }?.let { com.prudnikweb.hypernova.ui.home.claudeEffortTitle(it) }
-    val model = stripModel(usage, session.model, res.getString(R.string.model_default))
     val turnMs = (maxOf(clock, now) - session.turnStartedAt).coerceAtLeast(0L)
-    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, turnMs, facts.weekPace, git) + more
+    // The model's week as ModelWeekMeters has it: a weekday and time more than about a day off, a countdown nearer.
+    val is24 = android.text.format.DateFormat.is24HourFormat(context)
+    val weekTrail = week?.let { ModelWeeks.trail(it, now) }
+    val weekWindow = week?.let { UsageWindow.of(it.pct, if (weekTrail == ModelWeeks.Trail.None) 0L else it.resetsAt ?: 0L, now, limited = it.full) }
+    val weekOn = weekTrail as? ModelWeeks.Trail.On
+    val weekSaid = if (week != null && weekWindow != null) {
+        val at = weekOn?.let { ModelWeeks.weekdayTimeSaid(it.at, is24) }?.let { (day, time) -> res.getString(R.string.usage_reset_day_at, day, time) }
+        usageSaid(res, res.getString(R.string.usage_name_model, week.label), weekWindow, at)
+    } else null
+    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, turnMs, facts.weekPace, git, weekSaid) + more
     val agentsLabel = stringResource(R.string.top_bar_agents_open)
     val shape = RoundedCornerShape(12.dp)
     val scroll = rememberScrollState()
@@ -263,6 +275,9 @@ internal fun UsageStrip(
                     // Always this neutral colour, never red or amber: a meter shows facts (docs/DECISIONS.md).
                     TopBarItem.WEEK_PACE -> facts.weekPace?.let { HText(stringResource(R.string.top_bar_week_pace, it.day, it.figure), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1) }
                     TopBarItem.GIT -> git?.let { GitFigure(it) }
+                    TopBarItem.MODEL_WEEK -> if (week != null && weekWindow != null) {
+                        UsageMeterCompact(week.shortLabel, weekWindow, barWidth = 32.dp, resetText = weekOn?.let { ModelWeeks.weekdayTime(it.at, is24) })
+                    }
                 }
             }
         }
@@ -407,7 +422,7 @@ internal fun money(usd: Double): String = when {
 /** TalkBack's one sentence for the bar: each part it shows ([parts]), in its order. */
 private fun stripDescription(
     res: Resources, parts: List<TopBarItem>, u: SessionUsage, s: Session, model: String, mode: String, effort: String?,
-    five: UsageWindow, seven: UsageWindow, agents: Int, turnMs: Long, pace: WeekPace?, git: SheetGit?,
+    five: UsageWindow, seven: UsageWindow, agents: Int, turnMs: Long, pace: WeekPace?, git: SheetGit?, modelWeek: String?,
 ): String = parts.joinToString(" ") { part ->
     when (part) {
         TopBarItem.CONTEXT -> {
@@ -429,6 +444,7 @@ private fun stripDescription(
         TopBarItem.TURN -> res.getString(R.string.top_bar_turn_said, formatDuration(res, turnMs))
         TopBarItem.WEEK_PACE -> pace?.let { weekPaceSaid(res, it) }.orEmpty()
         TopBarItem.GIT -> git?.let { gitSaid(res, it) }.orEmpty()
+        TopBarItem.MODEL_WEEK -> modelWeek.orEmpty()
     }
 }
 
