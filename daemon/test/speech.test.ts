@@ -4,7 +4,8 @@
 // voice is the real `say`, so the tests where it reads run on a Mac only.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -124,7 +125,22 @@ test("voices from `say -v '?'`: the language is the last word before #, the name
 })
 
 const hasSay = existsSync('/usr/bin/say')
-test('read aloud: the Mac renders AAC in M4A, keeps nothing on disk, and checks the text first', { skip: !hasSay && 'no /usr/bin/say' }, async () => {
+/**
+ * Whether this machine's `say` makes AAC in M4A, which a whole clip is. GitHub's macOS 26 runner hangs
+ * on it until it's killed, though the same `say` makes a play's WAV there in a second or two (run of
+ * 2026-11-02). Why isn't known, nor whether a person's Mac does the same, so the machine is asked, not
+ * assumed. The answers below hold either way: a clip where it can be made, a plain 502 where it can't.
+ */
+const aacRenders = (() => {
+  if (!hasSay) return false
+  const file = join(scratch, 'aac-probe.m4a')
+  const r = spawnSync('/usr/bin/say', ['-o', file, '--file-format=m4af', '--data-format=aac'], { input: 'Hello.', timeout: 15_000 })
+  const made = r.status === 0 && existsSync(file) && statSync(file).size > 0
+  rmSync(file, { force: true })
+  return made
+})()
+const noAac = !hasSay ? 'no /usr/bin/say' : !aacRenders && 'this machine’s say hangs or fails on AAC in M4A'
+test('read aloud: the Mac renders AAC in M4A, keeps nothing on disk, and checks the text first', { skip: noAac }, async () => {
   const voices = json(await send('GET', '/v1/speech/voices', AUTH)).voices as { id: string; lang: string }[]
   assert.ok(voices.length > 0)
   assert.ok(voices.every((v) => v.id && /^[a-z]{2,3}(-\w+)*$/.test(v.lang)), JSON.stringify(voices.slice(0, 3)))
@@ -152,7 +168,7 @@ test('read aloud: the Mac renders AAC in M4A, keeps nothing on disk, and checks 
   assert.equal((await send('POST', '/v1/speech', {}, { text: 'hi' })).status, 401)
 })
 
-test('read aloud: a newer clip for the same device replaces the one rendering; another device is left alone', { skip: !hasSay && 'no /usr/bin/say' }, async () => {
+test('read aloud: a newer clip for the same device replaces the one rendering; another device is left alone', { skip: noAac }, async () => {
   const long = 'This sentence is long enough to keep the voice busy for a while. '.repeat(110)
   const first = send('POST', '/v1/speech', AUTH, { text: long })
   const elsewhere = send('POST', '/v1/speech', { authorization: `Bearer ${OTHER}` }, { text: long + ' Again.' })
@@ -163,6 +179,13 @@ test('read aloud: a newer clip for the same device replaces the one rendering; a
   assert.equal(replaced.status, 409)
   assert.equal(errorCode(replaced), 'replaced')
   assert.equal((await elsewhere).status, 200)
+})
+
+test('read aloud: where say can’t make a whole clip, the phone gets a plain 502 once its 40 s are up, and nothing stays on disk', { skip: !hasSay ? 'no /usr/bin/say' : aacRenders && 'this machine makes AAC' }, async () => {
+  const r = await send('POST', '/v1/speech', AUTH, { text: 'Fixed the export.' })
+  assert.equal(r.status, 502)
+  assert.equal(errorCode(r), 'speech_failed')
+  assert.deepEqual(readdirSync(join(process.env.HYPERNOVA_SUPPORT!, 'tmp')), [])
 })
 
 test('read aloud: a kept clip goes 10 minutes after it was made, on a timer that never holds the daemon up', (t) => {
