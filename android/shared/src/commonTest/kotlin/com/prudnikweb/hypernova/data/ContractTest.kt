@@ -420,7 +420,7 @@ class ContractTest {
         },
         "rest-session-interrupt" to { o -> assertTrue(o.bool("ok")) },
         // LiveHub.resume: the session that carries on (this one: not a fork).
-        // LiveHub.deleteSession and resumeFromHistory.
+        // LiveHub.deleteSession; `…/resume`, which a client can call (this app resumes by a prompt).
         "rest-session-remove" to { o -> assertEquals("ended", Wire.session(o.obj("session")!!).state) },
         "rest-session-resume" to { o ->
             assertEquals("sess-history", Wire.session(o.obj("session")!!).id)

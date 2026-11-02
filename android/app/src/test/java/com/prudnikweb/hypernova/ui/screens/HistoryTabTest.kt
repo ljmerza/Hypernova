@@ -6,7 +6,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
-import com.prudnikweb.hypernova.data.HubException
 import com.prudnikweb.hypernova.data.Link
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Phase
@@ -29,7 +28,7 @@ import org.robolectric.RobolectricTestRunner
 
 /**
  * History (FEATURES Y1): ended sessions under their day, an automation's runs folded into one row,
- * each opening what it is, a session's tap resuming it as /resume does; and the session sheet's TIME part (S11), checked by its words, never
+ * each opening what it is, a session's tap starting nothing; and the session sheet's TIME part (S11), checked by its words, never
  * pictured (its Started is a wall-clock time).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -63,47 +62,16 @@ class HistoryTabTest {
         rule.onNodeWithText("Tidy the README").performClick()
         rule.waitForIdle()
         assertEquals(listOf("h-today"), opened)
-        assertEquals("a tap resumes it, as /resume", listOf("resumeFromHistory(h-today)"), hub.calls)
+        assertTrue("a tap opens it to read, and starts nothing", hub.calls.isEmpty())
         // The automation's two runs are one row, which opens its runs.
         rule.onNode(hasText(context.resources.getQuantityString(R.plurals.au_history_runs, 2, 2), substring = true)).performClick()
         rule.waitForIdle()
         assertEquals(listOf("au_1"), runs)
         assertTrue(opened.size == 1)
-        assertEquals("an automation's runs aren't resumed", listOf("resumeFromHistory(h-today)"), hub.calls)
-    }
-
-    @Test fun aSessionRunningElsewhereGoesOnInACopyWhichOpens() {
-        val hub = FakeHub(sessions = listOf(ended("h-today", "Tidy the README", 1)))
-        hub.resumeAnswer = Result.success("h-copy")
-        val opened = mutableListOf<String>()
-        rule.setContent { Harness(spy) { HistoryTab(hub, top = 0.dp, bottom = 0.dp, now = Samples.NOW, onOpen = { opened += it }, onRuns = {}) } }
-        rule.onNodeWithText("Tidy the README").performClick()
-        rule.waitForIdle()
-        assertEquals(listOf("h-today", "h-copy"), opened)
-    }
-
-    @Test fun aResumeRefusedSaysWhyAndItsChatStillOpens() {
-        val hub = FakeHub(sessions = listOf(ended("h-today", "Tidy the README", 1)))
-        hub.resumeAnswer = Result.failure(HubException("The folder it ran in is gone."))
-        val opened = mutableListOf<String>()
-        rule.setContent { Harness(spy) { HistoryTab(hub, top = 0.dp, bottom = 0.dp, now = Samples.NOW, onOpen = { opened += it }, onRuns = {}) } }
-        rule.onNodeWithText("Tidy the README").performClick()
-        rule.waitForIdle()
-        assertEquals(listOf("h-today"), opened)
-        assertEquals(listOf("The folder it ran in is gone."), spy.toasts)
-    }
-
-    @Test fun offTheLinkItOnlyOpens() {
-        val hub = FakeHub(sessions = listOf(ended("h-today", "Tidy the README", 1)), link = Link(LinkState.Reconnecting))
-        val opened = mutableListOf<String>()
-        rule.setContent { Harness(spy) { HistoryTab(hub, top = 0.dp, bottom = 0.dp, now = Samples.NOW, onOpen = { opened += it }, onRuns = {}) } }
-        rule.onNodeWithText("Tidy the README").performClick()
-        rule.waitForIdle()
-        assertEquals(listOf("h-today"), opened)
         assertTrue(hub.calls.isEmpty())
     }
 
-    @Test fun allServersResumesOnTheRowsOwnComputerAndLeavesAnOfflineOneAlone() {
+    @Test fun allServersOpensOnTheRowsOwnComputerAndStartsNothingLinkedOrNot() {
         val z2 = FakeHub(sessions = listOf(ended("h-z2", "Removed on z2", 1)))
         val k1 = FakeHub(sessions = listOf(ended("h-k1", "Removed on k1", 2)), link = Link(LinkState.Reconnecting))
         val opened = mutableListOf<Pair<String, String>>()
@@ -116,7 +84,7 @@ class HistoryTabTest {
         rule.onNodeWithText("Removed on k1").performClick()
         rule.waitForIdle()
         assertEquals(listOf("z2" to "h-z2", "k1" to "h-k1"), opened)
-        assertEquals(listOf("resumeFromHistory(h-z2)"), z2.calls)
+        assertTrue(z2.calls.isEmpty())
         assertTrue(k1.calls.isEmpty())
     }
 

@@ -64,19 +64,17 @@
     <string name="session_remove">Remove from list</string>
     <string name="session_remove_short">Remove</string>
     <string name="session_delete_q">Remove “%1$s” from the list?</string>
-    <string name="session_delete_body">It goes from this list and from claude agents, and its worktree with it when that\'s safe. Claude Code says no while the worktree has unpushed work. The conversation stays in History: a tap there resumes it.</string>
-    <string name="session_delete_body_codex">A turn running stops, and a terminal open on it closes. It goes from this list. The conversation stays in Codex and in History: a tap there resumes it.</string>
-    <string name="session_delete_body_running">It\'s still running, so it stops, and a terminal open on it closes. It goes from this list and from claude agents, and its worktree with it when that\'s safe. Claude Code says no while the worktree has unpushed work. The conversation stays in History: a tap there resumes it.</string>
-    <string name="session_delete_body_terminal">Its live terminal closes, and Claude Code stops there. It goes from this list. The conversation stays in History: a tap there resumes it.</string>
-    <string name="session_delete_body_plain">It goes from this list. The conversation stays in History: a tap there resumes it.</string>
+    <string name="session_delete_body">It goes from this list and from claude agents, and its worktree with it when that\'s safe. Claude Code says no while the worktree has unpushed work. The conversation stays in History, to read or to write in, which resumes it.</string>
+    <string name="session_delete_body_codex">A turn running stops, and a terminal open on it closes. It goes from this list. The conversation stays in Codex and in History, to read or to write in, which resumes it.</string>
+    <string name="session_delete_body_running">It\'s still running, so it stops, and a terminal open on it closes. It goes from this list and from claude agents, and its worktree with it when that\'s safe. Claude Code says no while the worktree has unpushed work. The conversation stays in History, to read or to write in, which resumes it.</string>
+    <string name="session_delete_body_terminal">Its live terminal closes, and Claude Code stops there. It goes from this list. The conversation stays in History, to read or to write in, which resumes it.</string>
+    <string name="session_delete_body_plain">It goes from this list. The conversation stays in History, to read or to write in, which resumes it.</string>
     <string name="session_delete_cant_q">Can\'t remove “%1$s” yet</string>
     <string name="session_delete_cant_body">It\'s open in a terminal on the server that Hypernova doesn\'t hold, so it can\'t close it from here. Close it there, then remove it.</string>
     <string name="err_rename">Couldn\'t rename the session. Try again.</string>
     <string name="err_stop_session">Couldn\'t stop the session. Try again.</string>
     <string name="err_delete_session">Couldn\'t remove the session. Try again.</string>
     <string name="err_delete_older">This server runs an older Hypernova, which can only remove claude agents jobs and Codex sessions. Update it, then try again.</string>
-    <string name="err_resume_history">Couldn\'t resume the session. Try again.</string>
-    <string name="history_resume_session">Resume session</string>
     <!-- A claude agents job on an older Claude Code than the one installed (docs/PROTOCOL.md, Session.agentOutdated): `claude respawn`. -->
     <string name="session_restart">Restart</string>
     <string name="session_restart_q">Restart “%1$s”?</string>

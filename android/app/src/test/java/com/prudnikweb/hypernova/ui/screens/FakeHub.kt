@@ -97,9 +97,12 @@ class FakeHub(
         return Result.success(Unit)
     }
 
+    /** What [send] answers (null: it went). */
+    var sendAnswer: Result<String>? = null
+
     override suspend fun send(sessionId: String, text: String, files: List<Attachment>, replace: Boolean): Result<String> {
         record("send", sessionId, text)
-        return Result.success(sessionId)
+        return sendAnswer ?: Result.success(sessionId)
     }
 
     override suspend fun askAside(sessionId: String, question: String): Result<Aside> {
@@ -144,14 +147,6 @@ class FakeHub(
     override suspend fun deleteSession(sessionId: String): Result<Unit> {
         record("deleteSession", sessionId)
         return Result.success(Unit)
-    }
-
-    /** What [resumeFromHistory] answers (null: its own id). */
-    var resumeAnswer: Result<String>? = null
-
-    override suspend fun resumeFromHistory(sessionId: String): Result<String> {
-        record("resumeFromHistory", sessionId)
-        return resumeAnswer ?: Result.success(sessionId)
     }
 
     override suspend fun renameSession(sessionId: String, name: String): Result<Unit> {

@@ -936,8 +936,6 @@ fun SessionCard(
     menu: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     /** Fork: prompts the Mac holds until you answer (data/Held.kt). */
     held: Int = 0,
-    /** What TalkBack says a tap does, when it isn't opening it (History's tap resumes). */
-    clickLabel: String? = null,
     /** In Completed: its stamp says when it finished ("5m ago", "yesterday"). */
     completed: Boolean = false,
     /** Its latest reply came after it was last opened on this phone (data/Unread.kt): a mint dot before its title. */
@@ -961,7 +959,7 @@ fun SessionCard(
     if (menuOpen && menu != null) menu { menuOpen = false }
     GlassCard(
         modifier.fillMaxWidth(), accent = if (needs) HN.amber else null,
-        onClick = onClick, onClickLabel = clickLabel ?: stringResource(R.string.open_session),
+        onClick = onClick, onClickLabel = stringResource(R.string.open_session),
         onLongClick = if (menu != null) { { menuOpen = true } } else null, onLongClickLabel = stringResource(R.string.session_menu),
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {

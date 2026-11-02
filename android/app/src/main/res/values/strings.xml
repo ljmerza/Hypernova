@@ -52,6 +52,7 @@
     <string name="state_idle">Idle</string>
     <string name="jump_latest">Jump to latest</string>
     <string name="prompt_hint">Message this session…</string>
+    <string name="prompt_hint_ended">It isn\'t running. Write to resume it…</string>
     <string name="send">Send</string>
     <string name="back">Back</string>
     <string name="you">You</string>

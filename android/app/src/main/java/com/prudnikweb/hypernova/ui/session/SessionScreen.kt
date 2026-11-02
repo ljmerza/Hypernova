@@ -841,7 +841,7 @@ fun SessionScreen(
                         !linked -> stringResource(R.string.hint_mac_away_queue)
                         // Gone on with the other agent: a prompt here goes there (the send says so).
                         session.switchedTo != null -> stringResource(R.string.cx_hint_went_on, com.prudnikweb.hypernova.ui.components.agentName(hub.session(session.switchedTo)?.codex ?: !session.codex))
-                        else -> block?.let { blockedHint(hub, session, it) } ?: stringResource(R.string.prompt_hint)
+                        else -> block?.let { blockedHint(hub, session, it) } ?: stringResource(if (session.phase == Phase.Ended) R.string.prompt_hint_ended else R.string.prompt_hint)
                     },
                     onText = { draft = it },
                     attach = attach,

@@ -305,32 +305,17 @@ class ActionsTest {
         assertTrue(rig.hub.sessions.none { it.id == "s1" })
     }
 
-    @Test fun removeLeavesItEndedForHistoryAndATapHasItBackAtOnce() {
+    @Test fun writingInASessionWhoseFolderHasGoneSaysSo() {
+        connect(session("s1", state = "ended"))
+        daemon.on("POST", "/v1/sessions/s1/prompt") { json(409, JSONObject().put("error", JSONObject().put("code", "folder_gone").put("message", "The folder it ran in is gone."))) }
+        assertEquals("The folder it ran in is gone.", rig.call { rig.hub.send("s1", "carry on", emptyList(), false) }.exceptionOrNull()?.message)
+        assertEquals(com.prudnikweb.hypernova.data.Phase.Ended, rig.hub.session("s1")?.phase)
+    }
+
+    @Test fun removeLeavesItEndedForHistory() {
         connect(session("s1", state = "idle"))
         daemon.ok("DELETE", "/v1/sessions/s1", JSONObject().put("ok", true).put("session", session("s1", state = "ended")))
         assertTrue(rig.call { rig.hub.deleteSession("s1") }.isSuccess)
-        assertEquals(com.prudnikweb.hypernova.data.Phase.Ended, rig.hub.session("s1")?.phase)
-        daemon.ok("POST", "/v1/sessions/s1/resume", JSONObject().put("session", session("s1", state = "starting")).put("forked", false))
-        assertEquals("s1", rig.call { rig.hub.resumeFromHistory("s1") }.getOrThrow())
-        assertEquals(1, daemon.count("POST", "/v1/sessions/s1/resume"))
-        assertEquals(com.prudnikweb.hypernova.data.Phase.Starting, rig.hub.session("s1")?.phase)
-    }
-
-    @Test fun resumingRunningElsewhereOpensTheCopyAndRefusedSaysWhyWithItBackInHistory() {
-        connect(session("s1", state = "ended"))
-        daemon.ok("POST", "/v1/sessions/s1/resume", JSONObject().put("session", session("copy-1", state = "starting")).put("forked", true))
-        assertEquals("copy-1", rig.call { rig.hub.resumeFromHistory("s1") }.getOrThrow())
-        assertTrue(rig.hub.sessions.any { it.id == "copy-1" })
-        daemon.on("POST", "/v1/sessions/s1/resume") { json(409, JSONObject().put("error", JSONObject().put("code", "folder_gone").put("message", "The folder it ran in is gone."))) }
-        val r = rig.call { rig.hub.resumeFromHistory("s1") }
-        assertEquals("The folder it ran in is gone.", r.exceptionOrNull()?.message)
-        assertEquals(com.prudnikweb.hypernova.data.Phase.Ended, rig.hub.session("s1")?.phase)
-    }
-
-    @Test fun resumingOnAServerTooOldForItJustOpensIt() {
-        connect(session("s1", state = "ended"))
-        daemon.on("POST", "/v1/sessions/s1/resume") { json(404, JSONObject().put("error", JSONObject().put("code", "not_found").put("message", "Unknown endpoint."))) }
-        assertEquals("s1", rig.call { rig.hub.resumeFromHistory("s1") }.getOrThrow())
         assertEquals(com.prudnikweb.hypernova.data.Phase.Ended, rig.hub.session("s1")?.phase)
     }
 
