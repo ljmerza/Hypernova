@@ -4,6 +4,9 @@
   "private": true,
   "description": "Hypernova daemon: mirrors Claude Code sessions to the Hypernova apps",
   "type": "module",
+  "allowScripts": {
+    "node-pty": true
+  },
   "engines": {
     "node": ">=22.18"
   },
