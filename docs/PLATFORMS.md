@@ -258,6 +258,15 @@ are never advertised, so the phone comes in over the built-in Tailscale node; `h
 tried it on a real Windows PC (LATER L93). The native Windows host and its tray app below are still
 only this plan (LATER L92).
 
+**Status (2026-11-01):** the server installs on a Mac again, without an app: `scripts/install-macos.sh`, the
+LaunchAgent in `daemon/src/cli/launchd.ts` ([INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac-untested-on-a-real-one);
+DECISIONS, "The server's packages"). This page's Mac facts, checked against the code that day: state in
+`~/Library/Application Support/Hypernova`, logs in `~/Library/Logs/Hypernova`, `HYPERNOVA_SUPPORT` and
+`HYPERNOVA_LOGS` winning there as on Linux (`XDG_*` is Linux's only), the shell block in `~/.zshrc` (zsh only;
+it now also adds `~/.local/bin` to PATH), and macOS's folder prompts naming `node`. One edge, for test copies:
+the status line's tap (`teeBlock` in `hooks.ts`) writes to the Library folder by name, not `HYPERNOVA_SUPPORT`.
+Only CI's Mac runners have run it.
+
 **The idea.** Let the daemon run on a Linux or Windows computer, and give those computers a
 small tray app like the Mac's menu bar app. Claude Code itself already runs on both
 ([ON-DEVICE.md](ON-DEVICE.md) lists the official builds: `linux-x64`, `linux-arm64`,

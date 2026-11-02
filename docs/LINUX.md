@@ -77,7 +77,23 @@ Each [release](https://github.com/ljmerza/Hypernova/releases/latest) carries:
 | Asset | What it is |
 |---|---|
 | `hypernova-server-<tag>-linux.tar.gz` | The server package, one for x86_64 and arm64: Node.js and the terminal module are fetched and built for the server at install. |
-| `hypernova-<tag>.apk` | The Android app. |
+| `hypernova-server-<tag>-linux-amd64.deb`, `…-linux-arm64.deb` | The same server as a Debian package (below). |
+| `hypernova-client-<tag>-android.apk` | The client, the Android app. |
+
+A Mac has its own files: [INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac-untested-on-a-real-one). Every file's
+checksum is in the release's `SHA256SUMS`.
+
+The `.deb`, on the server:
+
+```sh
+sudo apt install ./hypernova-server-<tag>-linux-amd64.deb
+hypernova-server-setup     # as the user who will run the agents
+```
+
+It puts the release in `/usr/lib/hypernova-server`, declares what `install-linux.sh` would otherwise ask
+`sudo` for, and adds `/usr/bin/hypernova-server-setup`, which runs `install-linux.sh --from` that folder. So
+the install itself is the per-user one on this page: `~/.local/share/hypernova`, your own Node.js, a
+user service, updating itself. Upgrading, removing or purging the package changes none of that.
 
 A release's package by hand, on the server:
 
@@ -109,6 +125,8 @@ The scripts and their options:
 | **`get.sh`** | `curl -fsSL https://ljmerza.github.io/Hypernova/get.sh \| bash` downloads the latest release's server package and runs its install script. It refuses root. Options go after `bash -s --`. |
 | `HYPERNOVA_TAG=<tag>` | Another release, set for `bash`. |
 | **`scripts/pack-linux.sh`** | In a clone: writes `dist/linux/hypernova-<version>.tar.gz`. A release attaches it as `hypernova-server-<tag>-linux.tar.gz`. |
+| **`scripts/pack-deb.sh <amd64\|arm64>`** | In a clone: writes `dist/deb/hypernova-server_<version>_<arch>.deb`. A release attaches it as `hypernova-server-<tag>-linux-<arch>.deb`. |
+| **`hypernova-server-setup`** | The `.deb`'s command: the install, for your user, from `/usr/lib/hypernova-server`. It refuses root, takes the install script's options, and won't go back from a newer server without `--force`. |
 
 ## Where things live
 
@@ -244,7 +262,7 @@ install there.
 
 | Installed from | How it updates |
 |---|---|
-| A release's package, `get.sh`, or any folder with no `.git` | By itself (below). By hand: the `get.sh` line again, or the install script from a newer package. |
+| A release's package, `get.sh`, the `.deb`'s `hypernova-server-setup`, or any folder with no `.git` | By itself (below). By hand: the `get.sh` line again, or the install script from a newer package, or `hypernova-server-setup` after upgrading the `.deb`. |
 | A git checkout | `git pull`, then `scripts/install-linux.sh`. Never by itself. |
 | A container | [Updating the container](#updating-the-container). Never by itself. |
 
@@ -290,6 +308,7 @@ doesn't stop the server's own update.
 | "This daemon isn't run by its systemd service" | `hypernova run`, or a daemon started by hand: `systemctl --user start hypernova`. |
 | "The systemd service doesn't run this install" | `hypernova setup`. |
 | "No systemd-run here" | Install systemd's `systemd-run`, or update by hand. |
+| "A Mac doesn't update itself yet" | The `get.sh` line again. [INSTALL.md, "On a Mac"](INSTALL.md#on-a-mac-untested-on-a-real-one). |
 
 Setup leaves the answer in `install.json`: `checkout` when the folder it installed from, or the one
 above it, has a `.git`, else `package`. So a package you made yourself with `scripts/pack-linux.sh`

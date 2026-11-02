@@ -6,7 +6,7 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1569 app tests, 1065 daemon tests (1061 pass, 4 skipped: Mac-only).
+2026-11-01: 1569 app tests, 1089 daemon tests (1085 pass, 4 skipped: Mac-only).
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -293,7 +293,7 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| D1 | `hypernova setup` and `uninstall`: Node, the service, lingering, the integration | linux-cli.test.ts (all) | **covered** |
+| D1 | `hypernova setup` and `uninstall` on Linux: Node, the service, lingering, the integration | linux-cli.test.ts (all) | **covered** |
 | D2 | `pair`, `status`, `doctor`, `logs`, `lan` | linux-cli.test.ts (all) | **covered** |
 | D3 | WSL | wsl.test.ts (all); linux-cli.test.ts (the WSL tests) | **covered** |
 | D4 | Hooks and the status line tap | hooks.test.ts (all) | **covered** |
@@ -304,6 +304,9 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | D9 | Account and limits | account.test.ts, account-restart.test.ts, restart.test.ts, provider-env.test.ts (all) | **covered** |
 | D10 | Where state and logs live; log rotation | platform.test.ts, linux-fixes.test.ts, util.test.ts (all) | **covered** |
 | D11 | Security: no CORS, the hooks' secret, keys masked, credential files kept back | http.test.ts › "no web page may read the phone API…"; hooks.test.ts › "the hooks' route takes its own secret only…"; normalize.test.ts (the masking tests); secretfiles.test.ts (all); permission-rules.test.ts › "secrets in a settings file never leave…" | **covered** |
+| D12 | The server on a Mac: `setup` with a LaunchAgent, `status`, `doctor`, `logs`, `pair`, `uninstall`, Node.js for macOS, no self-update | mac-cli.test.ts (all: the plist, launchctl's lines and answers, each command against stand-ins); server-update.test.ts › "not managed…"; `scripts/test-install-macos.sh` (the scripts under bash 3.2, stand-ins for macOS); `scripts/test-macos-smoke.sh` (the real thing, on CI's Mac runners only) | **partial**: nobody has run it on a real Mac they use; what macOS asks a person at the screen isn't tested anywhere (docs/INSTALL.md, "On a Mac") |
+| D13 | The `.deb`: `hypernova-server-setup`, upgrade, remove, purge around a running server | `scripts/test-server-deb.sh` (Docker, systemd: Ubuntu 24.04, Debian 12 and 13; on CI, on amd64 and arm64) | **covered** (not by `npm test`; arm64 only on CI's runner) |
+| D14 | A release's assets and their names; a server reads the client's name, then the old one | releases.test.ts › "the client’s name is read first…"; `scripts/test-next-version.sh` (the notes' Client and Server headings, each file's name) | **covered** (the workflows themselves run only on GitHub; actionlint checks them) |
 
 ## Protocol without a contract fixture
 

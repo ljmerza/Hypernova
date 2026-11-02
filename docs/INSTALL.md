@@ -1,18 +1,21 @@
 # Install Hypernova
 
-Hypernova is a control room for Claude Code and Codex. A small service runs on a Linux server you
-own, next to your agents, and you reach it from the Android app. The phone talks straight to your
-server, over your Wi‑Fi or your own VPN into that network. There is no Hypernova server in between.
+Hypernova is a control room for Claude Code and Codex. Two parts: **the server**, a small service on a
+Linux server you own, next to your agents, and **the client**, the Android app you reach it from. The
+phone talks straight to your server, over your Wi‑Fi or your own VPN into that network. There is no
+Hypernova server in between.
 
 This page takes you from nothing to a paired phone. Then: [away from home or on a
 VPS](#away-from-home-or-on-a-vps), [update](#update), [uninstall](#uninstall),
-[Codex](#codex-optional), [Windows](#windows-experimental), [containers](#in-a-container),
-[troubleshooting](#troubleshooting). Every command and flag is in [LINUX.md](LINUX.md).
+[Codex](#codex-optional), [a Mac](#on-a-mac-untested-on-a-real-one), [Windows](#windows-experimental),
+[containers](#in-a-container), [troubleshooting](#troubleshooting). Every command and flag is in
+[LINUX.md](LINUX.md).
 
 ## What you need
 
 - A server on **Ubuntu or Debian**, x86_64 or arm64, with systemd, and a normal user with sudo.
-  Other distributions work with their packages installed by hand.
+  Other distributions work with their packages installed by hand. A Mac works too, not yet tried on a
+  real one: [On a Mac](#on-a-mac-untested-on-a-real-one).
 - A phone on **Android 10 or later**, on the server's network or your own VPN into it.
 - A Claude plan or an API key, to sign in to Claude Code. Or Codex instead:
   [Codex (optional)](#codex-optional).
@@ -48,6 +51,20 @@ When it's done, **log out and back in**, or open a new SSH session. A new login 
 What it put on your server: [What's on your server](#whats-on-your-server). Another release, no
 questions, the steps by hand, or a package of your own: [LINUX.md, "Install"](LINUX.md#install).
 
+**Or with the `.deb`**, for the same install with `apt` bringing the system packages. Download
+`hypernova-server-<tag>-linux-amd64.deb` (x86_64) or `…-linux-arm64.deb` from the
+[latest release](https://github.com/ljmerza/Hypernova/releases/latest), then:
+
+```sh
+sudo apt install ./hypernova-server-<tag>-linux-amd64.deb
+hypernova-server-setup        # as the user who will run the agents, not root
+```
+
+The package only puts the release in `/usr/lib/hypernova-server` and adds that command: it starts no
+service and touches no home folder. `hypernova-server-setup` is the install above, from that folder, and
+everything after it is the same, including the server updating itself. Upgrading or removing the package
+never touches a server that's already set up: [Uninstall](#uninstall).
+
 ### 2. Sign in to Claude Code
 
 ```sh
@@ -59,7 +76,7 @@ You only do this once. (Once you've paired, Home's account card on the phone can
 
 ### 3. Pair your phone
 
-1. **Get the app.** On the phone, download `hypernova-<tag>.apk` from the
+1. **Get the client, the app.** On the phone, download `hypernova-client-<tag>-android.apk` from the
    [latest release](https://github.com/ljmerza/Hypernova/releases/latest) and open it from your
    Downloads. When Android asks, allow installs from that source, then tap **Install**.
 2. **Show the code.** On the server:
@@ -128,18 +145,20 @@ hypernova auto-update off     # or on
 
 The app has the same switch: Settings, in the server's section, **Update this server automatically**.
 
-Only an install from a release's package does this (the `curl` line above, or the package's own
-install script). An install from a git clone or in a container doesn't, and `hypernova auto-update`
+Only an install from a release's package does this (the `curl` line above, the `.deb`'s
+`hypernova-server-setup`, or the package's own install script). An install from a git clone or in a
+container doesn't, nor does [a Mac](#on-a-mac-untested-on-a-real-one) yet, and `hypernova auto-update`
 says why. It also never asks for `sudo`, so a release that needs a new system package fails and
 leaves the server as it was: install that one by hand.
 
-**By hand**, run the `curl` line again. The new daemon is prepared beside the old one and swapped in
-once it works. From a clone: `git pull`, then `scripts/install-linux.sh`. In a container: see
+**By hand**, run the `curl` line again, or after upgrading the `.deb`, `hypernova-server-setup` (it won't
+go back from a newer server unless you add `--force`). The new daemon is prepared beside the old one and
+swapped in once it works. Upgrading the `.deb` alone changes nothing that's running. From a clone: `git pull`, then `scripts/install-linux.sh`. In a container: see
 [In a container](#in-a-container). Details: [LINUX.md, "Updating"](LINUX.md#updating).
 
 **The phone.** The same check on the server fetches the release's app and offers it to your phones,
 before the server restarts: the app shows a banner, and Settings → About shows **Update available**
-with **Update**. Your pairing stays. Or install a newer `hypernova-<tag>.apk` over the old one. Either
+with **Update**. Your pairing stays. Or install a newer `hypernova-client-<tag>-android.apk` over the old one. Either
 way, it must be signed with the same key. `"releaseCheck": false` in
 `~/.local/share/hypernova/settings.json` turns the app's part off; what GitHub sees is in
 [SECURITY-MODEL.md](SECURITY-MODEL.md).
@@ -159,7 +178,11 @@ block), the service, the command, the daemon and the Node.js it downloaded. Clau
 their logins stay, and shared sessions still open keep running until you close them. Lingering stays
 on too (other services of yours may use it); it says how to turn it off.
 
-Then uninstall Hypernova on the phone like any app.
+If you used the `.deb`, also `sudo apt remove hypernova-server` (or `purge`; they do the same). Either
+removes only the package's own files: a server set up from it keeps running, with its paired phones and
+settings, until that user runs `hypernova uninstall`.
+
+Then uninstall the client on the phone like any app.
 
 ## Codex (optional)
 
@@ -197,6 +220,88 @@ sessions keep running when Hypernova restarts. While it's on, `codex` in a new t
 shared terminal, like `claude`.
 
 <a id="4-windows-experimental-wsl2-or-docker-desktop"></a>
+
+## On a Mac (untested on a real one)
+
+The server runs on a Mac too: Apple silicon or Intel, macOS 13.5 or later. There's no menu bar app; it's
+the same `hypernova` command as on Linux, run in Terminal.
+
+**Nobody has run this on a Mac they use yet.** The only Mac it has run on is CI's runner, which installs
+it, checks it and removes it for each release (`scripts/test-macos-smoke.sh`). What that can't show, such
+as what macOS asks a person at the screen, comes from Apple's documents and the Mac app this project used
+to have, and is marked below. If you try it, an issue saying how it went helps.
+
+### Install it
+
+As the user who will run the agents, in Terminal at the Mac:
+
+```sh
+curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
+```
+
+It needs no `sudo`. It puts Node.js 24, the daemon and Claude Code in your own folders, then starts the
+service. **Then open a new terminal**: Hypernova's block in `~/.zshrc` is what puts `~/.local/bin` on your
+PATH, which a Mac doesn't do by itself. Then [sign in and pair](#2-sign-in-to-claude-code) as on Linux.
+
+Each release also has the same thing as files, named for the Mac's processor (`uname -m` says `arm64`, or
+`x86_64` for `x64`):
+
+| File | How |
+|---|---|
+| `hypernova-server-<tag>-macos-arm64.tar.gz`, `…-macos-x64.tar.gz` | Unpack it, then `bash hypernova-*/scripts/install-macos.sh`. |
+| `hypernova-server-<tag>-macos-arm64.pkg`, `…-macos-x64.pkg` | The Installer puts the release in `/usr/local/lib/hypernova-server` and adds `hypernova-server-setup`, nothing else. Then, in Terminal, as your user: `hypernova-server-setup`. |
+
+### What macOS shows you
+
+**The `curl` line shows no Gatekeeper warning**: only files a browser saved carry the mark Gatekeeper looks
+for, and `curl` doesn't add it. The same goes for a package you fetch with `curl` or `gh`.
+
+**A `.pkg` saved by a browser is blocked**, because it isn't signed. To open it:
+
+- **macOS 15 and later:** macOS says *Apple could not verify "…" is free of malware that may harm your Mac
+  or compromise your privacy*. Click **Done**. Open **System Settings → Privacy & Security**, scroll down
+  to **Security**, and click **Open Anyway** next to it. Give your password or Touch ID, then **Open
+  Anyway** once more.
+- **macOS 14:** macOS says it can't be opened because it's from an unidentified developer. Click **OK**,
+  then Control‑click the `.pkg`, choose **Open**, then **Open**.
+- **Or in Terminal, on any version:** `xattr -d com.apple.quarantine <file>.pkg`, then
+  `sudo installer -pkg <file>.pkg -target /`.
+
+Those words are what macOS showed for the old Mac app's unsigned download; a `.pkg` may word them a little
+differently.
+
+**After the install**, as far as we know from Apple's documents and the old Mac app, and not yet seen with
+this install:
+
+- A **Background Items Added** notice: that's the service. It's listed in **System Settings → General →
+  Login Items & Extensions**, under Allow in the Background. Leave it on.
+- **"node" would like to access files in your Documents folder**, or Desktop, Downloads, iCloud Drive or an
+  external disk, the first time something opens one. The service runs as `node`. Say **Allow**. If nobody
+  is at the screen to answer, the app says so, and it's in **System Settings → Privacy & Security → Files
+  and Folders** (or Full Disk Access).
+- With the **firewall** on, it may ask whether `node` may accept incoming connections. Phones come in
+  through it, so **Allow**. macOS may also ask about `node` and your local network: allow that too.
+
+### What's different from Linux
+
+| | On a Mac |
+|---|---|
+| The service | A LaunchAgent, `~/Library/LaunchAgents/com.prudnikweb.hypernova.daemon.plist`. launchd restarts it when it dies; sessions keep running through a restart. |
+| When it starts | **When you log in, not at boot.** After a restart the server waits for a login. For a Mac that should come back by itself, turn on **Automatic login** (System Settings → Users & Groups; FileVault keeps it off). Over `ssh` with nobody logged in at the screen there's no service, and setup says so. |
+| Updates | **By hand: run the `curl` line again.** A Mac doesn't update itself yet, because a broken update on a machine nobody can reach is worse than none, and it has never run on a real Mac. `hypernova auto-update` and the app's Settings say so. The phone's app still updates as usual. |
+| State | `~/Library/Application Support/Hypernova` |
+| Logs | `~/Library/Logs/Hypernova/daemon.log`, and `daemon.stderr.log` for what the daemon couldn't log |
+| The terminal module | node-pty comes prebuilt for both processors, so nothing is compiled and **Xcode isn't needed for it**. Apple's Command Line Tools (`xcode-select --install`) are for git, which Claude Code and the app's git views use. The install says if they're missing, and goes on. |
+| Sleeping | A Mac that sleeps is away from your phone. The app's **Stay awake** keeps it up while Claude works. |
+| Your shell | The `claude` function goes in `~/.zshrc`, for zsh, a Mac's default. With another login shell `claude` stays plain, and add `~/.local/bin` to your PATH yourself. |
+
+`hypernova status`, `doctor`, `pair`, `logs` and `uninstall` work as on Linux. To restart the service by
+hand: `launchctl kickstart -k gui/$(id -u)/com.prudnikweb.hypernova.daemon`.
+
+**To remove it**, `hypernova uninstall` (`--purge` for paired phones and settings too). If you used the
+`.pkg`, that leaves its files:
+`sudo rm -rf /usr/local/lib/hypernova-server /usr/local/bin/hypernova-server-setup`, then
+`sudo pkgutil --forget com.prudnikweb.hypernova.server`.
 
 ## Windows (experimental)
 
@@ -393,6 +498,16 @@ Start with `hypernova doctor`: each problem comes with the command that fixes it
 - **`Lingering is off: the service would stop when you log out`.** `sudo loginctl enable-linger $USER`.
 - **`The daemon isn't running`.** `systemctl --user start hypernova`, then `hypernova logs` to see why
   it stopped.
+- **`hypernova-server-setup: run it as the user who will run the agents`.** Without `sudo`, as that user.
+- **`Your server is already on …, newer than this package`.** It updated itself past the `.deb`, which is
+  fine: nothing to do. `hypernova-server-setup --force` goes back to the package's version.
+- **On a Mac: `Nobody is logged in at this Mac's screen`.** The service lives in the login session: log in
+  at the screen, then `hypernova setup`. Until then, `hypernova run` in a terminal you keep open.
+- **On a Mac: `launchctl bootstrap … Bootstrap failed`.** Look under **System Settings → General → Login
+  Items & Extensions → Allow in the Background**. Over `ssh` it can also fail with someone logged in: run
+  `hypernova setup` in Terminal at the screen.
+- **On a Mac: `hypernova: command not found`, or `claude`.** Open a new terminal. With a login shell other
+  than zsh: `export PATH="$HOME/.local/bin:$PATH"` in that shell's startup file.
 
 ### Pairing and reaching the server
 
@@ -435,10 +550,11 @@ problems: see [SECURITY.md](../SECURITY.md).
 
 ## What's on your server
 
-The install puts in what's missing:
+The install puts in what's missing (on a Mac: [On a Mac](#on-a-mac-untested-on-a-real-one)):
 
 - **System packages**, with `apt-get`: curl, tar, gzip, openssl, git, `ps`, `lsof`, and build tools
-  with python3, because the terminal module (node-pty) is built on the server.
+  with python3, because the terminal module (node-pty) is built on the server. The `.deb` declares these
+  as its dependencies instead, and adds `/usr/lib/hypernova-server` and `hypernova-server-setup`.
 - **Node.js 24** from nodejs.org, checked against nodejs.org's checksums, into Hypernova's own folder.
   A Node.js 24 or newer already on the server is used instead.
 - **The daemon** in `~/.local/share/hypernova/app`, and **the `hypernova` command** in `~/.local/bin`.
