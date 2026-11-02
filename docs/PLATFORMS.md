@@ -427,3 +427,7 @@ Not checked: iOS 26's own Web Push behaviour (the sources I found describe iOS 1
 the iOS 26 install change, not a new push rule), Compose Multiplatform's stability label today
 (the version page gives none), and Tauri and Compose Desktop on Windows ARM. Check these in
 the step 0 spikes.
+
+## Desktop dictation (research, 2026-11-01)
+
+`docs/specs/spec-desktop-voice.md`: which local speech models and system recognizers to use when the desktop client gets a prompt box. Nothing is built; voice would be off by default, with the model downloaded on request (LATER L111).
