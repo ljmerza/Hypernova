@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "id": "u-1",
+      "kind": "user",
+      "ts": "@now-14m",
+      "text": "TestDedupWindow fails about once a week in CI. Find out why."
+    },
+    {
+      "id": "t-1",
+      "kind": "assistant",
+      "ts": "@now-1m",
+      "streaming": false,
+      "text": "It only fails when two windows close in the same millisecond. I'm running it 50 times under the race detector to confirm the fix."
+    }
+  ],
+  "cursor": "demo-cursor",
+  "full": true
+}

@@ -1,0 +1,31 @@
+{
+  "usage": {
+    "model": "claude-opus-5-5",
+    "modelName": "Opus 5.5",
+    "context": {
+      "used": 240000,
+      "window": 1000000,
+      "pct": 24,
+      "exact": true
+    },
+    "tokens": {
+      "input": 4210,
+      "output": 21480,
+      "cacheRead": 8120000,
+      "cacheWrite": 164000
+    },
+    "agentTokens": 0,
+    "costUsd": 3.2,
+    "costExact": false,
+    "fiveHour": {
+      "pct": 24,
+      "resetsAt": "@now+3h12m"
+    },
+    "sevenDay": {
+      "pct": 38,
+      "resetsAt": "@now+4d6h"
+    },
+    "usageSource": "official",
+    "updatedAt": "@now-1m"
+  }
+}

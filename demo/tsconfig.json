@@ -1,0 +1,8 @@
+{
+  "extends": "../daemon/tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["../daemon/node_modules/@types"],
+    "paths": { "ws": ["../daemon/node_modules/@types/ws"] }
+  },
+  "include": ["*.ts"]
+}

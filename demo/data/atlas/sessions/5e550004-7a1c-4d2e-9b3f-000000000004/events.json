@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "id": "u-1",
+      "kind": "user",
+      "ts": "@now-14m",
+      "text": "A customer refund in JPY came out one yen short. Look at how refunds round across tax lines."
+    },
+    {
+      "id": "t-1",
+      "kind": "assistant",
+      "ts": "@now-1m",
+      "streaming": false,
+      "text": "Yen and dinar refunds drift by one minor unit when split across tax lines. Each line rounds on its own; I'm changing it to round the total and hand out the remainder."
+    }
+  ],
+  "cursor": "demo-cursor",
+  "full": true
+}

@@ -1,0 +1,73 @@
+{
+  "changes": {
+    "git": true,
+    "branch": "feat/streaming-exports",
+    "scope": "session",
+    "files": [
+      {
+        "path": "src/exports/invoiceCsv.ts",
+        "status": "M",
+        "untracked": false,
+        "add": 18,
+        "del": 10,
+        "binary": false,
+        "touched": true
+      },
+      {
+        "path": "src/routes/exports.ts",
+        "status": "M",
+        "untracked": false,
+        "add": 4,
+        "del": 2,
+        "binary": false,
+        "touched": true
+      },
+      {
+        "path": "src/jobs/monthEnd.ts",
+        "status": "M",
+        "untracked": false,
+        "add": 11,
+        "del": 18,
+        "binary": false,
+        "touched": true
+      },
+      {
+        "path": "test/exports/stream.test.ts",
+        "status": "A",
+        "untracked": true,
+        "add": 146,
+        "del": 0,
+        "binary": false,
+        "touched": true
+      },
+      {
+        "path": "test/exports/disconnect.test.ts",
+        "status": "A",
+        "untracked": true,
+        "add": 58,
+        "del": 0,
+        "binary": false,
+        "touched": true
+      },
+      {
+        "path": "docs/api/exports.md",
+        "status": "M",
+        "untracked": false,
+        "add": 7,
+        "del": 3,
+        "binary": false,
+        "touched": true
+      }
+    ],
+    "others": 0,
+    "hidden": 0,
+    "more": false,
+    "totalAdd": 244,
+    "totalDel": 33,
+    "upstream": "origin/feat/streaming-exports",
+    "ahead": 0,
+    "behind": 0,
+    "worktree": null,
+    "dirty": 6
+  }
+}

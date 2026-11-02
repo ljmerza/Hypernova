@@ -1,0 +1,352 @@
+{
+  "mac": {
+    "id": "demo-juniper",
+    "name": "juniper",
+    "daemonVersion": "0.9.2",
+    "claudeVersion": "2.1.318",
+    "projectsRoot": "/home/dev/projects",
+    "app": null,
+    "battery": null,
+    "awake": {
+      "mode": "off",
+      "holding": false,
+      "lidClosedOk": false,
+      "backpackReady": false,
+      "until": null,
+      "extendable": false,
+      "reason": null,
+      "sleepAt": null,
+      "lidClosed": null,
+      "laptop": false,
+      "minBattery": 15,
+      "sleepDisabledBy": null,
+      "otherApp": null
+    },
+    "tz": "America/New_York",
+    "files": {
+      "browseOutsideProjects": false
+    },
+    "update": {
+      "auto": true,
+      "available": false,
+      "reason": null,
+      "state": "idle",
+      "target": null,
+      "last": null,
+      "failure": null
+    },
+    "platform": "linux",
+    "unavailable": {
+      "battery": "Hypernova shows the battery of a Mac only.",
+      "awake": "Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings.",
+      "macVoice": "The phone reads aloud with its own voice.",
+      "openWindow": "This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH."
+    }
+  },
+  "usage": {
+    "fiveHour": {
+      "pct": 12,
+      "resetsAt": "@now+3h12m"
+    },
+    "sevenDay": {
+      "pct": 21,
+      "resetsAt": "@now+4d6h"
+    },
+    "models": [
+      {
+        "label": "Sonnet",
+        "pct": 4,
+        "resetsAt": "@now+4d6h"
+      }
+    ],
+    "modelsObservedAt": "@now-2m",
+    "modelsStale": false,
+    "probe": {
+      "ok": true,
+      "since": null
+    },
+    "source": "official",
+    "observedAt": "@now-1m",
+    "rate": {
+      "fiveHour": 0.06,
+      "sevenDay": 0.01,
+      "working": true
+    }
+  },
+  "sessions": [
+    {
+      "id": "5e550103-7a1c-4d2e-9b3f-000000000103",
+      "title": "Alert silence windows for maintenance",
+      "cwd": "/home/dev/projects/nightjar",
+      "projectName": "nightjar",
+      "origin": "terminal",
+      "state": "needs_you",
+      "providerId": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "permissionMode": "acceptEdits",
+      "bypassAvailable": false,
+      "createdAt": "@now-1h25m",
+      "lastActivityAt": "@now-3m",
+      "lastText": "Staging needs a restart to pick up the new alert routes.",
+      "activity": "Bash: kubectl rollout restart deploy/nightjar-staging",
+      "pendingApprovalIds": [
+        "b7a10000-0000-4000-8000-000000000101"
+      ],
+      "stoppedForAway": false,
+      "contextPct": 33,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550103",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-17m",
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550101-7a1c-4d2e-9b3f-000000000101",
+      "title": "Race in the alert dedup window",
+      "cwd": "/home/dev/projects/nightjar",
+      "projectName": "nightjar",
+      "origin": "terminal",
+      "state": "working",
+      "providerId": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "permissionMode": "auto",
+      "bypassAvailable": false,
+      "createdAt": "@now-40m",
+      "lastActivityAt": "@now-30s",
+      "lastText": "It only fails when two windows close in the same millisecond.",
+      "activity": "Bash: go test -race -count=50 ./dedup/...",
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 21,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550101",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-12m",
+      "todo": {
+        "active": "Running the race detector",
+        "done": 2,
+        "total": 4
+      },
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550102-7a1c-4d2e-9b3f-000000000102",
+      "title": "Add carrier rate caching",
+      "cwd": "/home/dev/projects/parcelkit",
+      "projectName": "parcelkit",
+      "origin": "terminal",
+      "state": "working",
+      "providerId": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "permissionMode": "acceptEdits",
+      "bypassAvailable": false,
+      "createdAt": "@now-1h",
+      "lastActivityAt": "@now-2m",
+      "lastText": "Rates now cache per lane for 15 minutes.",
+      "activity": "Edit: parcelkit/rates/cache.py",
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 29,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550102",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-26m",
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550104-7a1c-4d2e-9b3f-000000000104",
+      "title": "Publish the 3.0 migration guide",
+      "cwd": "/home/dev/projects/parcelkit",
+      "projectName": "parcelkit",
+      "origin": "terminal",
+      "state": "idle",
+      "providerId": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "permissionMode": "default",
+      "bypassAvailable": false,
+      "createdAt": "@now-6h",
+      "lastActivityAt": "@now-5h",
+      "lastText": "The guide is up, with a before and after for each renamed call.",
+      "activity": null,
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 12,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550104",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": null,
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    }
+  ],
+  "replaced": {},
+  "approvals": [
+    {
+      "id": "b7a10000-0000-4000-8000-000000000101",
+      "sessionId": "5e550103-7a1c-4d2e-9b3f-000000000103",
+      "createdAt": "@now-3m",
+      "expiresAt": "@now+7m",
+      "autoDeny": false,
+      "kind": "tool",
+      "toolName": "Bash",
+      "summary": "Bash: kubectl rollout restart deploy/nightjar-staging",
+      "input": {
+        "command": "kubectl rollout restart deploy/nightjar-staging",
+        "description": "Restart staging with the new alert routes"
+      },
+      "reason": null,
+      "canAlways": true,
+      "alwaysRules": [
+        "Bash(kubectl rollout restart *)"
+      ],
+      "alwaysScope": "project",
+      "why": null,
+      "canSession": false,
+      "questions": null,
+      "plan": null,
+      "agentId": null,
+      "agentLabel": null
+    }
+  ],
+  "projects": [
+    {
+      "path": "/home/dev/projects/nightjar",
+      "name": "nightjar",
+      "lastActivityAt": "@now-30s",
+      "sessionCount": 34
+    },
+    {
+      "path": "/home/dev/projects/parcelkit",
+      "name": "parcelkit",
+      "lastActivityAt": "@now-2m",
+      "sessionCount": 18
+    }
+  ],
+  "providers": [
+    {
+      "id": "anthropic",
+      "name": "Claude (your subscription)",
+      "kind": "anthropic",
+      "baseUrl": null,
+      "models": {},
+      "builtIn": true,
+      "hasKey": false,
+      "paid": false,
+      "status": null,
+      "balance": null
+    }
+  ],
+  "account": {
+    "state": "ok",
+    "providerId": "anthropic",
+    "plan": null,
+    "limit": null,
+    "reason": null,
+    "text": null,
+    "since": null,
+    "sessionId": null,
+    "checkedAt": null,
+    "login": null
+  },
+  "speech": {
+    "engine": "phone",
+    "using": "phone",
+    "macVoice": null,
+    "rate": 1
+  },
+  "automations": {
+    "features": [
+      "steps",
+      "ask",
+      "shell",
+      "budget",
+      "step.output",
+      "trigger.webhook",
+      "trigger.cron",
+      "trigger.file",
+      "trigger.github",
+      "trigger.hook",
+      "trigger.after",
+      "output.webhook",
+      "output.file"
+    ],
+    "paused": false,
+    "list": [],
+    "running": 0,
+    "queued": 0,
+    "notes": [],
+    "hasBattery": false
+  },
+  "lan": null,
+  "claude": {
+    "available": true,
+    "version": "2.1.318",
+    "sdk": true,
+    "agents": true
+  },
+  "codex": {
+    "available": true,
+    "enabled": false,
+    "connected": false,
+    "version": "0.163.0",
+    "min": "0.163.0",
+    "path": "/usr/local/bin/codex",
+    "problem": null,
+    "account": null,
+    "usage": null
+  }
+}

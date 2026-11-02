@@ -1,0 +1,405 @@
+{
+  "range": "all",
+  "from": "@now-94d",
+  "to": "@now",
+  "computedAt": "@now-1m",
+  "since": "@now-94d",
+  "countingSince": "@now-94d",
+  "claudeMs": 2187360000,
+  "wallMs": 1357747200,
+  "agentMs": 1531152000,
+  "tokens": {
+    "input": 51658960,
+    "output": 284124280,
+    "cacheRead": 24718812360,
+    "cacheWrite": 774884400
+  },
+  "sessions": 738,
+  "prompts": 4988,
+  "promptsFrom": {
+    "phone": 2045,
+    "voice": 599
+  },
+  "toolCalls": 56863,
+  "tools": [
+    {
+      "name": "Read",
+      "count": 17628
+    },
+    {
+      "name": "Bash",
+      "count": 13647
+    },
+    {
+      "name": "Edit",
+      "count": 10804
+    },
+    {
+      "name": "Grep",
+      "count": 5686
+    },
+    {
+      "name": "Agent",
+      "count": 3412
+    },
+    {
+      "name": "Write",
+      "count": 2275
+    },
+    {
+      "name": "TodoWrite",
+      "count": 1706
+    },
+    {
+      "name": "WebFetch",
+      "count": 569
+    },
+    {
+      "name": "Other",
+      "count": 1137
+    }
+  ],
+  "filesEdited": 2843,
+  "agents": 1402,
+  "approvals": {
+    "total": 3492,
+    "phone": 3093,
+    "mac": 399
+  },
+  "limitsHit": {
+    "fiveHour": 2,
+    "sevenDay": 0,
+    "model": 0
+  },
+  "busiestDay": {
+    "day": "@day-1",
+    "claudeMs": 50760000,
+    "tokens": 594330000
+  },
+  "longestSession": {
+    "id": "5e550001-7a1c-4d2e-9b3f-000000000001",
+    "title": "Stream invoice exports instead of buffering",
+    "project": "ledgerline",
+    "startedAt": "@now-2h40m",
+    "claudeMs": 26640000
+  },
+  "streak": 29,
+  "projects": [
+    {
+      "name": "ledgerline",
+      "path": "/home/dev/projects/ledgerline",
+      "claudeMs": 831196800,
+      "tokens": 9815202400,
+      "sessions": 280
+    },
+    {
+      "name": "orchard-sync",
+      "path": "/home/dev/projects/orchard-sync",
+      "claudeMs": 590587200,
+      "tokens": 6973959600,
+      "sessions": 199
+    },
+    {
+      "name": "quillpad",
+      "path": "/home/dev/projects/quillpad",
+      "claudeMs": 459345600,
+      "tokens": 5424190800,
+      "sessions": 155
+    },
+    {
+      "name": "tinroof",
+      "path": "/home/dev/projects/tinroof",
+      "claudeMs": 306230400,
+      "tokens": 3616127200,
+      "sessions": 103
+    }
+  ],
+  "days": [
+    {
+      "day": "@day-29",
+      "claudeMs": 25920000,
+      "codexMs": 1555200,
+      "wallMs": 16070400,
+      "tokens": 297360000,
+      "sessions": 9,
+      "prompts": 61
+    },
+    {
+      "day": "@day-28",
+      "claudeMs": 32760000,
+      "codexMs": 1965600,
+      "wallMs": 20311200,
+      "tokens": 387830000,
+      "sessions": 12,
+      "prompts": 77
+    },
+    {
+      "day": "@day-27",
+      "claudeMs": 2160000,
+      "codexMs": 129600,
+      "wallMs": 1339200,
+      "tokens": 48780000,
+      "sessions": 1,
+      "prompts": 5
+    },
+    {
+      "day": "@day-26",
+      "claudeMs": 3960000,
+      "codexMs": 237600,
+      "wallMs": 2455200,
+      "tokens": 45430000,
+      "sessions": 1,
+      "prompts": 9
+    },
+    {
+      "day": "@day-25",
+      "claudeMs": 30240000,
+      "codexMs": 1814400,
+      "wallMs": 18748800,
+      "tokens": 358920000,
+      "sessions": 11,
+      "prompts": 71
+    },
+    {
+      "day": "@day-24",
+      "claudeMs": 37080000,
+      "codexMs": 2224800,
+      "wallMs": 22989600,
+      "tokens": 449390000,
+      "sessions": 13,
+      "prompts": 88
+    },
+    {
+      "day": "@day-23",
+      "claudeMs": 22320000,
+      "codexMs": 1339200,
+      "wallMs": 13838400,
+      "tokens": 256060000,
+      "sessions": 8,
+      "prompts": 53
+    },
+    {
+      "day": "@day-22",
+      "claudeMs": 41040000,
+      "codexMs": 2462400,
+      "wallMs": 25444800,
+      "tokens": 482820000,
+      "sessions": 15,
+      "prompts": 97
+    },
+    {
+      "day": "@day-21",
+      "claudeMs": 35280000,
+      "codexMs": 2116800,
+      "wallMs": 21873600,
+      "tokens": 428740000,
+      "sessions": 13,
+      "prompts": 83
+    },
+    {
+      "day": "@day-20",
+      "claudeMs": 5760000,
+      "codexMs": 345600,
+      "wallMs": 3571200,
+      "tokens": 66080000,
+      "sessions": 2,
+      "prompts": 14
+    },
+    {
+      "day": "@day-19",
+      "claudeMs": 1440000,
+      "codexMs": 86400,
+      "wallMs": 892800,
+      "tokens": 28520000,
+      "sessions": 1,
+      "prompts": 3
+    },
+    {
+      "day": "@day-18",
+      "claudeMs": 27720000,
+      "codexMs": 1663200,
+      "wallMs": 17186400,
+      "tokens": 342010000,
+      "sessions": 10,
+      "prompts": 65
+    },
+    {
+      "day": "@day-17",
+      "claudeMs": 32040000,
+      "codexMs": 1922400,
+      "wallMs": 19864800,
+      "tokens": 367570000,
+      "sessions": 12,
+      "prompts": 76
+    },
+    {
+      "day": "@day-16",
+      "claudeMs": 43560000,
+      "codexMs": 2613600,
+      "wallMs": 27007200,
+      "tokens": 511730000,
+      "sessions": 16,
+      "prompts": 103
+    },
+    {
+      "day": "@day-15",
+      "claudeMs": 38160000,
+      "codexMs": 2289600,
+      "wallMs": 23659200,
+      "tokens": 461780000,
+      "sessions": 14,
+      "prompts": 90
+    },
+    {
+      "day": "@day-14",
+      "claudeMs": 24840000,
+      "codexMs": 1490400,
+      "wallMs": 15400800,
+      "tokens": 284970000,
+      "sessions": 9,
+      "prompts": 59
+    },
+    {
+      "day": "@day-13",
+      "claudeMs": 7560000,
+      "codexMs": 453600,
+      "wallMs": 4687200,
+      "tokens": 98730000,
+      "sessions": 3,
+      "prompts": 18
+    },
+    {
+      "day": "@day-12",
+      "claudeMs": 2880000,
+      "codexMs": 172800,
+      "wallMs": 1785600,
+      "tokens": 57040000,
+      "sessions": 1,
+      "prompts": 7
+    },
+    {
+      "day": "@day-11",
+      "claudeMs": 33840000,
+      "codexMs": 2030400,
+      "wallMs": 20980800,
+      "tokens": 388220000,
+      "sessions": 12,
+      "prompts": 80
+    },
+    {
+      "day": "@day-10",
+      "claudeMs": 42120000,
+      "codexMs": 2527200,
+      "wallMs": 26114400,
+      "tokens": 495210000,
+      "sessions": 15,
+      "prompts": 99
+    },
+    {
+      "day": "@day-9",
+      "claudeMs": 29880000,
+      "codexMs": 1792800,
+      "wallMs": 18525600,
+      "tokens": 366790000,
+      "sessions": 11,
+      "prompts": 71
+    },
+    {
+      "day": "@day-8",
+      "claudeMs": 47520000,
+      "codexMs": 2851200,
+      "wallMs": 29462400,
+      "tokens": 545160000,
+      "sessions": 17,
+      "prompts": 112
+    },
+    {
+      "day": "@day-7",
+      "claudeMs": 27000000,
+      "codexMs": 1620000,
+      "wallMs": 16740000,
+      "tokens": 321750000,
+      "sessions": 10,
+      "prompts": 64
+    },
+    {
+      "day": "@day-6",
+      "claudeMs": 5040000,
+      "codexMs": 302400,
+      "wallMs": 3124800,
+      "tokens": 81820000,
+      "sessions": 2,
+      "prompts": 12
+    },
+    {
+      "day": "@day-5",
+      "claudeMs": 6840000,
+      "codexMs": 410400,
+      "wallMs": 4240800,
+      "tokens": 78470000,
+      "sessions": 2,
+      "prompts": 16
+    },
+    {
+      "day": "@day-4",
+      "claudeMs": 36720000,
+      "codexMs": 2203200,
+      "wallMs": 22766400,
+      "tokens": 433260000,
+      "sessions": 13,
+      "prompts": 87
+    },
+    {
+      "day": "@day-3",
+      "claudeMs": 46080000,
+      "codexMs": 2764800,
+      "wallMs": 28569600,
+      "tokens": 552640000,
+      "sessions": 17,
+      "prompts": 109
+    },
+    {
+      "day": "@day-2",
+      "claudeMs": 34560000,
+      "codexMs": 2073600,
+      "wallMs": 21427200,
+      "tokens": 396480000,
+      "sessions": 12,
+      "prompts": 82
+    },
+    {
+      "day": "@day-1",
+      "claudeMs": 50760000,
+      "codexMs": 3045600,
+      "wallMs": 31471200,
+      "tokens": 594330000,
+      "sessions": 18,
+      "prompts": 120
+    },
+    {
+      "day": "@day",
+      "claudeMs": 15480000,
+      "codexMs": 928800,
+      "wallMs": 9597600,
+      "tokens": 201590000,
+      "sessions": 6,
+      "prompts": 37
+    }
+  ],
+  "byAgent": {
+    "claude": {
+      "ms": 2089526400,
+      "tokens": 24538006000,
+      "sessions": 694,
+      "prompts": 4689,
+      "toolCalls": 54020
+    },
+    "codex": {
+      "ms": 97833600,
+      "tokens": 1291474000,
+      "sessions": 44,
+      "prompts": 299,
+      "toolCalls": 2843
+    }
+  }
+}

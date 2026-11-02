@@ -1,0 +1,282 @@
+{
+  "mac": {
+    "id": "demo-pico",
+    "name": "pico",
+    "daemonVersion": "0.9.2",
+    "claudeVersion": "2.1.318",
+    "projectsRoot": "/home/dev/projects",
+    "app": null,
+    "battery": null,
+    "awake": {
+      "mode": "off",
+      "holding": false,
+      "lidClosedOk": false,
+      "backpackReady": false,
+      "until": null,
+      "extendable": false,
+      "reason": null,
+      "sleepAt": null,
+      "lidClosed": null,
+      "laptop": false,
+      "minBattery": 15,
+      "sleepDisabledBy": null,
+      "otherApp": null
+    },
+    "tz": "America/New_York",
+    "files": {
+      "browseOutsideProjects": false
+    },
+    "update": {
+      "auto": true,
+      "available": false,
+      "reason": null,
+      "state": "idle",
+      "target": null,
+      "last": null,
+      "failure": null
+    },
+    "platform": "linux",
+    "unavailable": {
+      "battery": "Hypernova shows the battery of a Mac only.",
+      "awake": "Stay awake is for a Mac. A Linux server stays on by itself; if this PC suspends, turn that off in its power settings.",
+      "macVoice": "The phone reads aloud with its own voice.",
+      "openWindow": "This server has no screen to open a window on. Attach from a terminal instead: hn attach, over SSH."
+    }
+  },
+  "usage": {
+    "fiveHour": {
+      "pct": 6,
+      "resetsAt": "@now+3h12m"
+    },
+    "sevenDay": {
+      "pct": 14,
+      "resetsAt": "@now+4d6h"
+    },
+    "models": [
+      {
+        "label": "Sonnet",
+        "pct": 2,
+        "resetsAt": "@now+4d6h"
+      }
+    ],
+    "modelsObservedAt": "@now-2m",
+    "modelsStale": false,
+    "probe": {
+      "ok": true,
+      "since": null
+    },
+    "source": "official",
+    "observedAt": "@now-1m",
+    "rate": {
+      "fiveHour": 0.06,
+      "sevenDay": 0.01,
+      "working": true
+    }
+  },
+  "sessions": [
+    {
+      "id": "5e550202-7a1c-4d2e-9b3f-000000000202",
+      "title": "Photo upload retries on bad signal",
+      "cwd": "/home/dev/projects/fieldnotes",
+      "projectName": "fieldnotes",
+      "origin": "terminal",
+      "state": "working",
+      "providerId": "codex",
+      "model": "gpt-5.2-codex",
+      "effort": null,
+      "permissionMode": "workspace-write",
+      "bypassAvailable": false,
+      "createdAt": "@now-30m",
+      "lastActivityAt": "@now-1m",
+      "lastText": "Uploads resume from the last confirmed chunk now.",
+      "activity": "Bash: npx jest upload",
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 18,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550202",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": "@now-11m",
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0,
+      "agent": "codex"
+    },
+    {
+      "id": "5e550201-7a1c-4d2e-9b3f-000000000201",
+      "title": "Dark theme for the docs site",
+      "cwd": "/home/dev/projects/tinroof",
+      "projectName": "tinroof",
+      "origin": "terminal",
+      "state": "idle",
+      "providerId": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "permissionMode": "default",
+      "bypassAvailable": false,
+      "createdAt": "@now-3h",
+      "lastActivityAt": "@now-2h30m",
+      "lastText": "The theme follows the system setting, and every code block passes contrast checks.",
+      "activity": null,
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 14,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550201",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": null,
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    },
+    {
+      "id": "5e550203-7a1c-4d2e-9b3f-000000000203",
+      "title": "Generate an RSS feed per tag",
+      "cwd": "/home/dev/projects/tinroof",
+      "projectName": "tinroof",
+      "origin": "terminal",
+      "state": "idle",
+      "providerId": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "permissionMode": "default",
+      "bypassAvailable": false,
+      "createdAt": "@now-1d",
+      "lastActivityAt": "@now-22h",
+      "lastText": "Each tag now has a feed at /tags/<tag>/feed.xml, and the sitemap lists them.",
+      "activity": null,
+      "pendingApprovalIds": [],
+      "stoppedForAway": false,
+      "contextPct": 9,
+      "costUsd": null,
+      "queue": [],
+      "queued": 0,
+      "term": {
+        "id": "t-5e550203",
+        "mac": 0,
+        "phone": 0
+      },
+      "menu": null,
+      "agentsRunning": 0,
+      "blocked": null,
+      "automation": null,
+      "turnStartedAt": null,
+      "todo": null,
+      "endedBy": null,
+      "browsable": true,
+      "outsideProjects": false,
+      "blockedCalls": 0
+    }
+  ],
+  "replaced": {},
+  "approvals": [],
+  "projects": [
+    {
+      "path": "/home/dev/projects/tinroof",
+      "name": "tinroof",
+      "lastActivityAt": "@now-2h30m",
+      "sessionCount": 16
+    },
+    {
+      "path": "/home/dev/projects/fieldnotes",
+      "name": "fieldnotes",
+      "lastActivityAt": "@now-1m",
+      "sessionCount": 11
+    }
+  ],
+  "providers": [
+    {
+      "id": "anthropic",
+      "name": "Claude (your subscription)",
+      "kind": "anthropic",
+      "baseUrl": null,
+      "models": {},
+      "builtIn": true,
+      "hasKey": false,
+      "paid": false,
+      "status": null,
+      "balance": null
+    }
+  ],
+  "account": {
+    "state": "ok",
+    "providerId": "anthropic",
+    "plan": null,
+    "limit": null,
+    "reason": null,
+    "text": null,
+    "since": null,
+    "sessionId": null,
+    "checkedAt": null,
+    "login": null
+  },
+  "speech": {
+    "engine": "phone",
+    "using": "phone",
+    "macVoice": null,
+    "rate": 1
+  },
+  "automations": {
+    "features": [
+      "steps",
+      "ask",
+      "shell",
+      "budget",
+      "step.output",
+      "trigger.webhook",
+      "trigger.cron",
+      "trigger.file",
+      "trigger.github",
+      "trigger.hook",
+      "trigger.after",
+      "output.webhook",
+      "output.file"
+    ],
+    "paused": false,
+    "list": [],
+    "running": 0,
+    "queued": 0,
+    "notes": [],
+    "hasBattery": false
+  },
+  "lan": null,
+  "claude": {
+    "available": true,
+    "version": "2.1.318",
+    "sdk": true,
+    "agents": true
+  },
+  "codex": {
+    "available": true,
+    "enabled": true,
+    "connected": true,
+    "version": "0.163.0",
+    "min": "0.163.0",
+    "path": "/usr/local/bin/codex",
+    "problem": null,
+    "account": null,
+    "usage": null
+  }
+}
