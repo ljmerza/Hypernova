@@ -58,7 +58,8 @@ curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
 ```
 
 That installs the system packages it needs (it asks for sudo), Node.js, the Hypernova service and
-Claude Code. Then sign in to Claude Code once and pair your phone.
+Claude Code. Log out and back in, or open a new SSH session, for your PATH and the `claude` function.
+Then sign in to Claude Code once and pair your phone.
 
 ```bash
 claude

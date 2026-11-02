@@ -67,6 +67,7 @@ else
 fi
 
 [ "$SCRIPT" = install-macos.sh ] && printf '\n  Open a new terminal first: that is what puts hypernova and claude on your PATH.\n'
+[ "$SCRIPT" = install-linux.sh ] && printf '\n  Log out and back in first, or open a new SSH session: that is what puts hypernova and claude on your PATH.\n'
 cat <<'EOF2'
 
   Next:
