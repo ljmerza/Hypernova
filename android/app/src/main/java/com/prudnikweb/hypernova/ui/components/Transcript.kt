@@ -645,10 +645,10 @@ internal fun CodeBlock(text: String, modifier: Modifier = Modifier, endPad: andr
             .semantics { customActions = listOf(CustomAccessibilityAction(copyLabel) { copy(); true }) }
             .background(HN.bg950.copy(alpha = 0.86f))
             .border(1.dp, HN.line, RoundedCornerShape(10.dp))
-            .horizontalScroll(rememberScrollState())
             .padding(start = 12.dp, end = endPad, top = 10.dp, bottom = 10.dp),
     ) {
-        HText(text, style = Type.monoSmall, color = HN.inkMuted, overflow = TextOverflow.Clip)
+        // Lines wrap rather than scroll sideways (owner, 2026-11-02); a long press still copies them as written.
+        HText(text, style = Type.monoSmall, color = HN.inkMuted)
     }
 }
 

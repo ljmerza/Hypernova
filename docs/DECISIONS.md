@@ -3699,3 +3699,10 @@ The owner: "there should be like a JSON mode where instead of a nice settings vi
 9. **A file that doesn't parse isn't shown at all,** since nothing in it could be masked. The screen says the line and column, and it's fixed on the server.
 10. **Codex is left out.** The TOML reader doesn't look inside inline tables, so `env = { KEY = "…" }` couldn't be masked, and Codex's writer changes one key at a time, so a whole file wouldn't go through it. Its `set` and its model and permission keys are on the list screens.
 
+## Code blocks wrap (2026-11-02)
+
+The owner, of an email Claude drafted in a code block: it "didn't wrap so I had to scroll", "everything
+should just wrap because I can just click on it and hold to copy". A code block's long lines wrap at the
+screen's edge, and the block no longer scrolls sideways. A long press still copies the text as written,
+with no breaks added. Tables keep their sideways scroll when wrapping can't fit their columns.
+
