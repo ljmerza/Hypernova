@@ -5481,7 +5481,9 @@ holding a mask, each means what's on the server. A mask this server didn't give 
 written as three dots. `keep` with no value there is 400 `nothing_to_keep`.
 
 For Codex an `oauth` that says anything is 400 `codex_no_oauth`, with nothing written (one that's empty or all nulls is
-ignored), and `timeout` is written as `tool_timeout_sec`, in seconds, kept on a `PUT` that doesn't speak of it.
+ignored), and `timeout` is written as `tool_timeout_sec`, in seconds, kept on a `PUT` that doesn't speak of it. What's in a
+server's table that `codex mcp list --json` doesn't show (an `oauth` table from `codex mcp add`, a tool's `approval_mode`) is
+kept through a `PUT`, a remove and Undo, and never leaves. A `PUT` to `stdio` drops `oauth`.
 
 `oauth.clientId` or `.callbackPort` null takes it out; a port is 1 to 65535. On a stdio server `oauth` is 400
 `bad_oauth`. A client secret goes as `MCP_CLIENT_SECRET`, not on the command line. Everything else in a Claude Code

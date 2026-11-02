@@ -158,6 +158,21 @@ function tableOf(raw: Raw): RawConfig {
   return out
 }
 
+/** The keys `tableOf` can see. */
+const LISTED = new Set(['command', 'args', 'env', 'env_vars', 'cwd', 'url', 'bearer_token_env_var', 'http_headers', 'env_http_headers', 'http_headers_helper', 'enabled', 'startup_timeout_sec', 'tool_timeout_sec', 'enabled_tools', 'disabled_tools'])
+
+/**
+ * What a server's table holds that `codex mcp list --json` doesn't show, from Codex's own read of the user's file: an `oauth` table
+ * `codex mcp add` wrote, a tool's `approval_mode`. A write replaces the whole table, so an edit and an Undo have to carry these. Never sent anywhere.
+ */
+async function unlisted(name: string): Promise<RawConfig> {
+  const r = await withAppServer((req) => req('config/read', { includeLayers: true }))
+  const user = (Array.isArray(r?.layers) ? r.layers : []).find((l: any) => l?.name?.type === 'user')
+  const servers = isTable(user?.config) ? own(user.config, 'mcp_servers') : undefined
+  const table = isTable(servers) ? own(servers, name) : undefined
+  return isTable(table) ? Object.fromEntries(Object.entries(table).filter(([k]) => !LISTED.has(k))) : {}
+}
+
 /** The same table in the shape the form's checks know. */
 function formShape(table: RawConfig): RawConfig {
   if (typeof table.command === 'string') return { type: 'stdio', command: table.command, args: table.args ?? [], ...(table.env ? { env: table.env } : {}) }
@@ -324,8 +339,11 @@ async function reloadShared(): Promise<void> {
 /** Whether a form's `oauth` says anything: an empty one, or all nulls, is a form that has no such fields. */
 const saysOauth = (o: unknown) => isTable(o) && Object.values(o).some((v) => v !== null && v !== undefined && v !== '')
 
-/** The table a form means, over what [before] already has that the form doesn't speak of. A `timeout` is Codex's `tool_timeout_sec`. */
-function tableFromForm(body: Record<string, unknown>, before: RawConfig | null) {
+/**
+ * The table a form means, over what [before] already has that the form doesn't speak of, and [hidden], what Codex's list doesn't show.
+ * A `timeout` is Codex's `tool_timeout_sec`. Sign-in settings only mean something for a server with an address, so they don't survive becoming a stdio one.
+ */
+function tableFromForm(body: Record<string, unknown>, before: RawConfig | null, hidden: RawConfig = {}) {
   if (body.transport === 'sse') throw new McpRefused(400, 'bad_transport', 'Codex takes stdio or streamable HTTP servers.')
   if (saysOauth(body.oauth)) throw new McpRefused(400, 'codex_no_oauth', 'Sign-in settings can’t be set on a Codex server from here. Save it without them, then sign in from its page.')
   const form = formConfig(body, before ? formShape(before) : null)
@@ -333,7 +351,8 @@ function tableFromForm(body: Record<string, unknown>, before: RawConfig | null) 
   const kept: RawConfig = {}
   if (before) for (const k of ['enabled', 'startup_timeout_sec', 'tool_timeout_sec', 'enabled_tools', 'disabled_tools']) if (before[k] !== undefined) kept[k] = before[k]
   if (sameType && before) for (const k of ['env_vars', 'cwd', 'env_http_headers', 'http_headers_helper', 'bearer_token_env_var']) if (before[k] !== undefined) kept[k] = before[k]
-  const out: RawConfig = { ...kept }
+  const { oauth, ...rest } = hidden
+  const out: RawConfig = { ...rest, ...(oauth !== undefined && body.transport !== 'stdio' ? { oauth } : {}), ...kept }
   if (typeof form.config.timeout === 'number') out.tool_timeout_sec = form.config.timeout / 1000
   else if (body.timeout === null) delete out.tool_timeout_sec
   if (body.transport === 'stdio') {
@@ -377,13 +396,14 @@ export function codexEdit(body: Record<string, unknown>) {
     if (!raw) throw new McpRefused(404, 'no_server', 'That server isn’t there any more.')
     const before = tableOf(raw)
     if (body.expected !== configHash(before)) throw new McpRefused(409, 'file_changed', 'That server changed on the server since this was read. Nothing was written.')
-    const { name, table } = tableFromForm(body, before)
+    const hidden = await unlisted(body.name as string)
+    const { name, table } = tableFromForm(body, before, hidden)
     if (!NAME.test(name)) throw new McpRefused(400, 'bad_name', 'That name can’t be changed from here.')
     check(changesWhatRuns(before, table), body, 'This changes what runs on the server. Confirm it with your fingerprint or screen lock.')
     await writeTable(name, table)
     const after = (await readAll()).find((r) => r.name === name)
     if (!after) throw new McpRefused(502, 'codex_failed', 'Codex didn’t save that server.')
-    rememberLast('codex', { op: 'edit', name, scope: 'user', folder: null, before, after: tableOf(after) })
+    rememberLast('codex', { op: 'edit', name, scope: 'user', folder: null, before: { ...before, ...hidden }, after: tableOf(after) })
     log(`mcp: changed ${name} in codex`)
     return { ok: true, name, scope: 'user', hash: configHash(tableOf(after)) }
   })
@@ -397,8 +417,9 @@ export function codexRemove(body: Record<string, unknown>) {
     if (body.expected !== configHash(before)) throw new McpRefused(409, 'file_changed', 'That server changed on the server since this was read. Nothing was written.')
     const name = body.name as string
     if (!NAME.test(name)) throw new McpRefused(400, 'bad_name', 'That one can’t be changed from here.')
+    const hidden = await unlisted(name)
     await writeTable(name, null)
-    rememberLast('codex', { op: 'remove', name, scope: 'user', folder: null, before, after: null })
+    rememberLast('codex', { op: 'remove', name, scope: 'user', folder: null, before: { ...before, ...hidden }, after: null })
     log(`mcp: removed ${name} from codex`)
     return { ok: true, name, scope: 'user', hash: null }
   })

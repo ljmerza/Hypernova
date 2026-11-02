@@ -182,6 +182,47 @@ test('Codex: a timeout is its tool_timeout_sec, kept and taken out; sign-in sett
   assert.equal((await call('POST', '/v1/agents/mcp/servers/remove', { agent: 'codex', scope: 'user', name: 'timed', expected: (await page('timed')).hash })).status, 200)
 })
 
+test('Codex: what its own list doesn’t show stays through an edit, a remove and Undo, and never leaves: an oauth table from codex mcp add, a tool’s approval mode', { skip, timeout: 180_000 }, async () => {
+  const env = { ...process.env }
+  execFileSync(realCodex!, ['mcp', 'add', 'signed', '--url', 'https://mcp.example.invalid/m', '--oauth-client-id', 'keep-this-client', '--oauth-client-secret', SECRET], { env, stdio: 'ignore' })
+  writeFileSync(join(CODEX, 'config.toml'), `${toml()}\n[mcp_servers.signed.tools.search]\napproval_mode = "approve"\n`)
+  const kept = () => {
+    assert.ok(toml().includes('[mcp_servers.signed.oauth]'), `the oauth table is gone:\n${toml().replaceAll(SECRET, '•')}`)
+    assert.ok(toml().includes('client_id = "keep-this-client"') && toml().includes(`client_secret = "${SECRET}"`))
+    assert.ok(toml().includes('approval_mode = "approve"'), 'a tool’s approval mode is gone')
+  }
+  kept()
+  const web = { agent: 'codex', scope: 'user', name: 'signed', transport: 'http' }
+
+  const edit = await call('PUT', '/v1/agents/mcp/servers', { ...web, url: 'https://mcp.example.invalid/two', expected: (await page('signed')).hash })
+  assert.equal(edit.status, 200, JSON.stringify(edit.body))
+  assert.ok(toml().includes('/two'))
+  kept()
+  const again = await call('PUT', '/v1/agents/mcp/servers', { ...web, url: 'https://mcp.example.invalid/three', timeout: 2500, expected: (await page('signed')).hash })
+  assert.equal(again.status, 200, JSON.stringify(again.body))
+  kept()
+  // Undo of an edit puts back what its list can't see too.
+  assert.equal((await call('POST', '/v1/agents/mcp/undo', { agent: 'codex' })).status, 200)
+  assert.ok(toml().includes('/two') && !toml().includes('/three'))
+  kept()
+
+  const removed = await call('POST', '/v1/agents/mcp/servers/remove', { agent: 'codex', scope: 'user', name: 'signed', expected: (await page('signed')).hash })
+  assert.equal(removed.status, 200, JSON.stringify(removed.body))
+  assert.ok(!toml().includes('mcp_servers.signed'))
+  assert.equal((await call('POST', '/v1/agents/mcp/undo', { agent: 'codex' })).status, 200)
+  kept()
+
+  // Codex itself still reads the file it left.
+  assert.equal(JSON.parse(execFileSync(realCodex!, ['mcp', 'list', '--json'], { env, encoding: 'utf8' })).find((s: any) => s.name === 'signed').transport.url, 'https://mcp.example.invalid/two')
+
+  // A stdio server has no use for a sign-in: the secret doesn't stay behind. The tool's mode does.
+  const stdio = await call('PUT', '/v1/agents/mcp/servers', { ...web, transport: 'stdio', command: process.execPath, args: [SERVER, 'x'], env: [], confirmRun: true, expected: (await page('signed')).hash })
+  assert.equal(stdio.status, 200, JSON.stringify(stdio.body))
+  assert.ok(!toml().includes('[mcp_servers.signed.oauth]') && !toml().includes('client_secret'))
+  assert.ok(toml().includes('approval_mode = "approve"'))
+  assert.equal((await call('POST', '/v1/agents/mcp/servers/remove', { agent: 'codex', scope: 'user', name: 'signed', expected: (await page('signed')).hash })).status, 200)
+})
+
 test('Codex: an HTTP server with headers and a bearer variable, and OAuth from the phone against a local authorization server', { skip, timeout: 120_000 }, async () => {
   const srv = httpServer((req, res) => {
     let b = ''
