@@ -994,8 +994,13 @@
         <item quantity="other">%1$d more names aren\'t shown.</item>
     </plurals>
     <!-- Claude Code's keys: what each does (docs/DECISIONS.md, "The agents' settings, viewed"). -->
-    <string name="as_k_effort">Default effort</string>
-    <string name="as_k_effort_body">For models with no saved level, from new sessions on. In this file, Opus 5.5 and later ignore it.</string>
+    <string name="as_k_effort">Effort for older models</string>
+    <string name="as_k_effort_body">Only Opus 5, Sonnet 5, Fable 5.1 and earlier read this one. Newer models use Effort by model, below.</string>
+    <string name="as_effort">Effort by model</string>
+    <string name="as_effort_body">What /effort saves. A new session on that model starts at it, unless it\'s started with an effort of its own. Max only lasts a session, so it isn\'t saved here.</string>
+    <string name="as_effort_default">Model\'s default</string>
+    <string name="as_effort_of">Effort for %1$s</string>
+    <string name="as_when_effort">Applies to new sessions on this model.</string>
     <string name="as_k_mode">Starting permission mode</string>
     <string name="as_k_mode_body">The mode new sessions start in.</string>
     <string name="as_k_thinking">Thinking summaries</string>

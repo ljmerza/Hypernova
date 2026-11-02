@@ -133,6 +133,16 @@ class SettingsCallsTest {
         assertTrue(second.isNull("expected"))
     }
 
+    @Test fun aModelsEffortGoesToTheSameRouteAndTakingItOutSendsNull() {
+        connect()
+        answer("PUT", "/v1/agents/settings", "rest-agent-settings-put")
+        val key = "modelSettings.claude-opus-5-5.effortLevel"
+        rig.call { rig.hub.changeAgentSetting("claude", key, "low", "h") }.getOrThrow()
+        assertEquals("low", JSONObject(last("PUT", "/v1/agents/settings").body).getString("value"))
+        rig.call { rig.hub.changeAgentSetting("claude", key, com.prudnikweb.hypernova.data.SettingChoice(null, null, false, null).wire, "h") }.getOrThrow()
+        assertTrue(JSONObject(last("PUT", "/v1/agents/settings").body).isNull("value"))
+    }
+
     @Test fun aRefusalKeepsTheServersWordsAndItsCode() {
         connect()
         answer("PUT", "/v1/agents/settings", "rest-agent-settings-file-changed", status = 409)

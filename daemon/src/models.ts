@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // The models each provider offers, for the phone's new-session sheet (docs/PROTOCOL.md, "Models").
 //
 // - Claude (the subscription): Claude Code's own list, the one its /model picker shows for this
@@ -230,6 +231,21 @@ async function claudeList(providerId: string, now = Date.now()): Promise<ModelLi
   }
   if (claude) return { providerId, source: 'claude', models: claude.models, checkedAt: claude.at, error: null }
   return { providerId, source: 'builtin', models: CLAUDE_BUILTIN, checkedAt: null, error: 'unreachable' }
+}
+
+/** Claude Code's models as known right now (the built-in list until it has answered), for its effort rows. Never waits; a fresh ask goes on behind. */
+export function claudeModelsNow(): { model: string; name: string }[] {
+  void claudeList('anthropic').catch(() => {})
+  const seen = new Set<string>()
+  const out: { model: string; name: string }[] = []
+  // A model by its own name first: "Default" is only what the same model is called in the picker's top row.
+  const list = claude?.models ?? CLAUDE_BUILTIN
+  for (const o of [...list.filter((m) => m.value !== null), ...list.filter((m) => m.value === null)]) {
+    if (!o.model || seen.has(o.model)) continue
+    seen.add(o.model)
+    out.push({ model: o.model, name: o.name })
+  }
+  return out
 }
 
 // ─── Catalogues ───

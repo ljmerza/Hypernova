@@ -41,7 +41,7 @@ process.env.HYPERNOVA_LOCAL_PORT = String(LOCAL)
 process.env.HYPERNOVA_LAN_PORT = '0'
 
 const edit = await import('../src/agent-settings-edit.ts')
-const { BACKUPS_KEPT, backupDir, changeSetting, EDITABLE, EditRefused, jsonEdit, loosens, settingsReply, tomlEdit, undoChange } = edit
+const { BACKUPS_KEPT, backupDir, changeSetting, EDITABLE, EditRefused, effortModel, jsonEdit, jsonEditPath, loosens, settingsReply, tomlEdit, undoChange } = edit
 const { CLAUDE_SHOWN, CODEX_SHOWN } = await import('../src/agent-settings.ts')
 const { startServers } = await import('../src/http.ts')
 const { addDevice, adminToken, settings } = await import('../src/store.ts')
@@ -799,4 +799,89 @@ test('the log: one line per change with the agent, key and old and new values; n
   assert.match(more[1]!, /agent settings: claude autoUpdatesChannel \(unrecognised\) -> stable$/)
   assert.ok(!readFileSync(logFile, 'utf8').includes('sk-ant'))
   assert.ok(!readFileSync(logFile, 'utf8').includes('PLANTED'))
+})
+
+// ── Effort per model (docs/DECISIONS.md, "Effort per model") ──────────────
+
+const EFFORT = 'modelSettings.claude-opus-5-5.effortLevel'
+const OPUS = [{ model: 'claude-opus-5-5', name: 'Opus 5.5' }, { model: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }]
+
+test('a model\'s effort goes under modelSettings, and every other byte stays', async () => {
+  writeFileSync(CLAUDE_FILE, RICH_JSON)
+  const r = await changeSetting({ agent: 'claude', key: EFFORT, value: 'low', expected: sha(RICH_JSON) }, noModels)
+  assert.equal(r.changed, true)
+  const after = readFileSync(CLAUDE_FILE, 'utf8')
+  const doc = JSON.parse(after)
+  assert.equal(doc.modelSettings['claude-opus-5-5'].effortLevel, 'low')
+  delete doc.modelSettings
+  assert.deepEqual(JSON.stringify(doc), JSON.stringify(JSON.parse(RICH_JSON)))
+  assert.ok(after.startsWith(RICH_JSON.slice(0, RICH_JSON.lastIndexOf('}')).trimEnd().slice(0, 200)))
+
+  const up = await changeSetting({ agent: 'claude', key: EFFORT, value: 'xhigh', expected: r.hash }, noModels)
+  onlyThisChanged(after, readFileSync(CLAUDE_FILE, 'utf8'), '"low"', '"xhigh"')
+  // Taking it out leaves what was there before it was added.
+  await changeSetting({ agent: 'claude', key: EFFORT, value: null, expected: up.hash }, noModels)
+  assert.deepEqual(JSON.parse(readFileSync(CLAUDE_FILE, 'utf8')), JSON.parse(RICH_JSON))
+})
+
+test('a neighbouring model\'s level, and the table\'s other keys, stay when one is set or taken out', () => {
+  const text = `{\n  "modelSettings": {\n    "claude-sonnet-5-5": { "effortLevel": "high", "autoCompactWindow": 200000 },\n    "claude-opus-5-5": { "effortLevel": "low" }\n  }\n}\n`
+  const set = jsonEditPath(text, ['modelSettings', 'claude-sonnet-5-5', 'effortLevel'], 'medium')
+  assert.equal(JSON.parse(set).modelSettings['claude-sonnet-5-5'].autoCompactWindow, 200000)
+  const out = jsonEditPath(text, ['modelSettings', 'claude-opus-5-5', 'effortLevel'], null)
+  assert.deepEqual(JSON.parse(out), { modelSettings: { 'claude-sonnet-5-5': { effortLevel: 'high', autoCompactWindow: 200000 } } })
+  const kept = jsonEditPath(text, ['modelSettings', 'claude-sonnet-5-5', 'effortLevel'], null)
+  assert.deepEqual(JSON.parse(kept).modelSettings['claude-sonnet-5-5'], { autoCompactWindow: 200000 })
+  assert.equal(jsonEditPath(text, ['modelSettings', 'none', 'effortLevel'], null), text)
+  assert.deepEqual(JSON.parse(jsonEditPath('{}', ['modelSettings', 'm', 'effortLevel'], 'low')), { modelSettings: { m: { effortLevel: 'low' } } })
+  assert.throws(() => jsonEditPath('{"modelSettings":3}', ['modelSettings', 'm', 'effortLevel'], 'low'), EditRefused)
+})
+
+test('effort takes only its four words, max included out, and only a model\'s shape', async () => {
+  writeFileSync(CLAUDE_FILE, '{}')
+  const expected = sha('{}')
+  for (const value of ['max', 'ultra', true, 3, '']) {
+    await assert.rejects(changeSetting({ agent: 'claude', key: EFFORT, value, expected }, noModels), (e: any) => e.code === 'value_not_allowed')
+  }
+  for (const key of ['modelSettings.__proto__.effortLevel', 'modelSettings.constructor.effortLevel', 'modelSettings..effortLevel', 'modelSettings.a b.effortLevel', 'modelSettings.m.maxEffortLevel', 'effortLevel']) {
+    await assert.rejects(changeSetting({ agent: 'claude', key, value: 'low', expected }, noModels), (e: any) => e.code === 'key_not_editable', key)
+  }
+  await assert.rejects(changeSetting({ agent: 'codex', key: EFFORT, value: 'low', expected: null }, noModels), (e: any) => e.code === 'key_not_editable')
+  await assert.rejects(changeSetting({ agent: 'claude', key: 'showThinkingSummaries', value: null, expected }, noModels), (e: any) => e.code === 'value_not_allowed')
+  assert.equal(readFileSync(CLAUDE_FILE, 'utf8'), '{}')
+  assert.equal(effortModel('modelSettings.claude-opus-5-5.effortLevel'), 'claude-opus-5-5')
+})
+
+test('Undo puts an effort back, and a file the change made goes as it came', async () => {
+  const r = await changeSetting({ agent: 'claude', key: EFFORT, value: 'high', expected: null }, noModels)
+  assert.deepEqual(r.undo, { key: EFFORT, to: null, loosens: false })
+  undoChange({ agent: 'claude', expected: r.hash })
+  assert.equal(existsSync(CLAUDE_FILE), false)
+
+  const text = JSON.stringify({ modelSettings: { 'claude-opus-5-5': { effortLevel: 'low' } } })
+  writeFileSync(CLAUDE_FILE, text)
+  const c = await changeSetting({ agent: 'claude', key: EFFORT, value: null, expected: sha(text) }, noModels)
+  assert.deepEqual(c.undo, { key: EFFORT, to: 'low', loosens: false })
+  undoChange({ agent: 'claude', expected: c.hash })
+  assert.equal(readFileSync(CLAUDE_FILE, 'utf8'), text)
+})
+
+test('the reply has a row per model, one saved for a model off the list too, beside the fixed list', async () => {
+  writeFileSync(CLAUDE_FILE, JSON.stringify({ effortLevel: 'low', modelSettings: { 'claude-opus-5-5': { effortLevel: 'medium' }, 'claude-older-1': { effortLevel: 'xhigh' }, 'claude-sonnet-5-5': { autoCompactWindow: 1 }, bad: { effortLevel: 'sk-ant-api03-PLANTEDsecretvalue0123456789' } } }))
+  const r = await settingsReply(null, {}, OPUS)
+  assert.equal((r.claude.values.find((v: any) => v.key === 'effortLevel') as any).value, 'low')
+  assert.ok(!r.claude.editable.some((e: any) => e.key.includes('ffort')))
+  const by = Object.fromEntries(r.claude.effort!.rows.map((x: any) => [x.model, x]))
+  assert.equal(by['claude-opus-5-5'].value, 'medium')
+  assert.equal(by['claude-opus-5-5'].name, 'Opus 5.5')
+  assert.equal(by['claude-sonnet-5-5'].state, 'unset')
+  assert.equal(by['claude-older-1'].value, 'xhigh')
+  assert.equal(by.bad.state, 'unrecognised')
+  assert.ok(!JSON.stringify(r).includes('PLANTED'))
+  assert.deepEqual(r.claude.effort!.choices.map((c: any) => c.value), ['low', 'medium', 'high', 'xhigh', null])
+  // A link: nothing to offer.
+  rmSync(CLAUDE_FILE)
+  symlinkSync(join(scratch, 'nowhere'), CLAUDE_FILE)
+  assert.equal((await settingsReply(null, {}, OPUS)).claude.effort, undefined)
+  rmSync(CLAUDE_FILE)
 })

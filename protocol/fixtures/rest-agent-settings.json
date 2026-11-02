@@ -90,7 +90,7 @@
       "hidden": 0,
       "foldersNotRead": 0
     },
-    "hash": "a30b34106f16c9ae5b94a288476e0e47299653e4e45158cc948c2425e7a0d777",
+    "hash": "96f1ec4b235608ec213eab2d011efa93c6b465bacca6a593500c598f1d9d2cda",
     "editable": [
       {
         "key": "permissions.defaultMode",
@@ -145,7 +145,48 @@
       }
     ],
     "undo": null,
-    "whyNot": null
+    "whyNot": null,
+    "effort": {
+      "rows": [
+        {
+          "key": "modelSettings.claude-sonnet-5-5.effortLevel",
+          "state": "unset",
+          "model": "claude-sonnet-5-5",
+          "name": "Sonnet",
+          "editable": true
+        },
+        {
+          "key": "modelSettings.claude-opus-5-5.effortLevel",
+          "state": "set",
+          "value": "low",
+          "model": "claude-opus-5-5",
+          "name": "Default",
+          "editable": true
+        }
+      ],
+      "choices": [
+        {
+          "value": "low",
+          "loosens": false
+        },
+        {
+          "value": "medium",
+          "loosens": false
+        },
+        {
+          "value": "high",
+          "loosens": false
+        },
+        {
+          "value": "xhigh",
+          "loosens": false
+        },
+        {
+          "value": null,
+          "loosens": false
+        }
+      ]
+    }
   },
   "codex": {
     "state": "ok",

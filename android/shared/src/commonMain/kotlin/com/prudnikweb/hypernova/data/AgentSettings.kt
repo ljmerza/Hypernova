@@ -33,7 +33,17 @@ data class AgentSettingsReply(val claude: AgentSettingsFile, val codex: AgentSet
                 undo = o.obj("undo")?.let(::undo),
                 whyNot = o.str("whyNot"),
                 mcp = o.obj("mcp")?.let(::mcp),
+                effort = o.obj("effort")?.let(::effort),
             )
+        }
+
+        private fun effort(o: JSONObject): EffortTable {
+            val rows = o.arr("rows").mapObjects { r ->
+                val shown = shown(r) ?: return@mapObjects null
+                val model = r.str("model") ?: return@mapObjects null
+                EffortRow(model, r.str("name") ?: model, shown, r.bool("editable"))
+            }
+            return EffortTable(rows, o.arr("choices").mapObjects(::choice))
         }
 
         private fun editable(o: JSONObject): EditableSetting? {
@@ -44,7 +54,8 @@ data class AgentSettingsReply(val claude: AgentSettingsFile, val codex: AgentSet
         private fun choice(o: JSONObject): SettingChoice? = when (val v = o.opt("value")) {
             is String -> SettingChoice(v, null, o.bool("loosens"), o.str("label"))
             is Boolean -> SettingChoice(null, v, o.bool("loosens"), null)
-            else -> null
+            // Take it out of the file: a model's effort, back to the model's own default.
+            else -> if (o.has("value") && o.isNull("value")) SettingChoice(null, null, false, null) else null
         }
 
         private fun undo(o: JSONObject): SettingUndo? {
@@ -112,6 +123,8 @@ data class AgentSettingsFile(
     val whyNot: String? = null,
     /** Claude Code's MCP servers: beside the file, which needn't be there for them. Null from an older server. */
     val mcp: ClaudeMcp? = null,
+    /** Claude Code's effort for each model (docs/DECISIONS.md, "Effort per model"). Null: a server older than this, or a file it can't change. */
+    val effort: EffortTable? = null,
 ) {
     companion object {
         const val OK = "ok"
@@ -131,16 +144,28 @@ data class EditableSetting(val key: String, val choices: List<SettingChoice>)
 /** A value to pick: its [text] or [on], whether picking it now [loosens] a permission (the server's order), and Codex's name for a model. */
 @Immutable
 data class SettingChoice(val text: String?, val on: Boolean?, val loosens: Boolean, val label: String?) {
+    /** Takes the key out of the file. */
+    val clears: Boolean get() = on == null && text == null
+
     /** The value as it goes on the wire. */
-    val wire: Any get() = on ?: text.orEmpty()
+    val wire: Any get() = on ?: text ?: JSONObject.NULL
 
     /** Whether this is what [v] holds. `manual` is `default`'s other name, and only `default` is offered. */
     fun isCurrent(v: ShownSetting?): Boolean = when {
+        clears -> v?.state == ShownSetting.UNSET
         v == null || v.state != ShownSetting.SET -> false
         on != null -> v.on == on
         else -> v.text == text || (v.key == "permissions.defaultMode" && v.text == "manual" && text == "default")
     }
 }
+
+/** One model's saved effort: its [key] is what a change names, [editable] false where the file's shape can't take one. */
+@Immutable
+data class EffortRow(val model: String, val name: String, val shown: ShownSetting, val editable: Boolean)
+
+/** A model's effort rows, and the words each can be set to. */
+@Immutable
+data class EffortTable(val rows: List<EffortRow>, val choices: List<SettingChoice>)
 
 /** What Undo would do: [key] back to [toText] or [toOn]; both null, to not being set. */
 @Immutable

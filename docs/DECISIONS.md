@@ -3494,3 +3494,33 @@ Code skill, stopped matching the app with Atlas, and it's removed. It's in git h
 personal copy on this machine to keep in step with. Older entries that name it are history, and the
 sample name `/hyper-cosmos` in tests and the protocol's examples stays: any skill's name would do.
 
+## Effort per model (2026-11-02)
+
+The owner: "I should be able to edit the effort." `docs/LATER.md`, L104. Checked against Claude Code 2.1.316 by
+what actually reaches the API: a real `claude -p` in a throwaway home, against a stand-in `ANTHROPIC_BASE_URL` that records
+`output_config.effort` on `/v1/messages`.
+
+| `settings.json` | Model | Effort sent |
+|---|---|---|
+| nothing | `claude-opus-5-5` | medium (the model's own) |
+| `effortLevel: "low"` | `claude-opus-5-5`, `claude-sonnet-5-5` | medium: **ignored** |
+| `effortLevel: "low"` | `claude-opus-5`, `claude-sonnet-5` | low |
+| `modelSettings.claude-opus-5-5.effortLevel: "low"` | `claude-opus-5-5`, its alias `opus`, and `claude-opus-5-5[1m]` | low |
+| the same | `claude-sonnet-5-5` | medium: it's per model |
+| `modelSettings.opus.effortLevel: "low"` | `claude-opus-5-5` | low: a key is put in canonical form when read |
+
+1. **What's written is what `/effort` writes:** `modelSettings.<canonical id>.effortLevel` in the user's `settings.json`
+   (the binary's writer; the id is the `model` of Claude Code's own list, `GET /v1/models`).
+2. **A row per model,** in a section of its own, Effort by model: Claude Code's list, and any other model the file already
+   has a level for. Low, medium, high, extra high, or the model's default, which takes the key out. **`max` isn't offered**: the
+   schema refuses it in a file and `/effort max` only lasts a session. A model that doesn't have a level may clamp it, as `/effort` would;
+   the phone doesn't know each model's levels beyond Claude Code's list, which offers all five on every current model.
+3. **Same route, same care.** `PUT /v1/agents/settings` with the key `modelSettings.<model>.effortLevel`: byte-identity, the hash, the backup and Undo as
+   every other key, and `null` to take it out (`docs/specs/spec-mcp-manage.md`). No fingerprint: effort lets nothing act without asking.
+   The model's shape is checked on the server; the words are its list.
+4. **The top-level `effortLevel` stays view-only,** now labelled for what it does: only older models read it.
+5. **Beside the fixed list, not in it**, so an older app sees nothing new: `claude.effort` in the reply.
+6. **When it applies:** new sessions on that model, measured. A running session that hasn't picked an effort of its own may take it when
+   Claude Code reloads settings (its resolver reads the settings table); that wasn't measured, so the screen only promises new sessions.
+7. **Codex** is unchanged: `model_reasoning_effort` was already editable, and it's one value, not per model.
+

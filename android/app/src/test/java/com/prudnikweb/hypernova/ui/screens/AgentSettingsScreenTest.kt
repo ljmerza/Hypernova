@@ -25,6 +25,8 @@ import com.prudnikweb.hypernova.data.ClaudeMcp
 import com.prudnikweb.hypernova.data.ClaudeSettingsSummary
 import com.prudnikweb.hypernova.data.CodexSettingsSummary
 import com.prudnikweb.hypernova.data.EditableSetting
+import com.prudnikweb.hypernova.data.EffortRow
+import com.prudnikweb.hypernova.data.EffortTable
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.HubException
 import com.prudnikweb.hypernova.data.McpName
@@ -612,5 +614,70 @@ class AgentSettingsScreenTest {
         // A thread from this app names its own sandbox and approvals, so the file reaches only those that do not.
         for (k in listOf("approval_policy", "sandbox_mode")) assertEquals(k, R.string.as_when_new_threads_unchosen, whenWords(k))
         for (k in listOf("effortLevel", "includeCoAuthoredBy", "autoDreamEnabled", "inputNeededNotifEnabled", "agentPushNotifEnabled", "personality")) assertNull(k, whenWords(k))
+    }
+
+    // ─── Effort per model (docs/DECISIONS.md, "Effort per model") ───
+
+    private val effortKey = "modelSettings.claude-opus-5-5.effortLevel"
+    private fun withEffort(undo: SettingUndo? = null) = claude.copy(
+        undo = undo,
+        effort = EffortTable(
+            listOf(
+                EffortRow("claude-opus-5-5", "Opus 5.5", set(effortKey, "high"), true),
+                EffortRow("claude-sonnet-5-5", "Sonnet 5.5", ShownSetting("modelSettings.claude-sonnet-5-5.effortLevel", ShownSetting.UNSET, null, null), true),
+                EffortRow("claude-odd", "claude-odd", ShownSetting("modelSettings.claude-odd.effortLevel", ShownSetting.UNRECOGNISED, null, null), false),
+            ),
+            listOf("low", "medium", "high", "xhigh").map { SettingChoice(it, null, false, null) } + SettingChoice(null, null, false, null),
+        ),
+    )
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun eachModelsEffortIsARowThatChangesItsOwnKey() {
+        hub.answer = Result.success(AgentSettingsReply(withEffort(), file(AgentSettingsFile.MISSING)))
+        open(AgentSettingsReply.CLAUDE)
+        seen(str(R.string.as_effort))
+        seen("Opus 5.5")
+        rule.onNodeWithText("Sonnet 5.5").performScrollTo().assertExists()
+        seen(str(R.string.as_effort_default))
+        rule.onNodeWithText("Opus 5.5").performScrollTo().performClick()
+        rule.waitForIdle()
+        seen(str(R.string.as_effort_of, "Opus 5.5"))
+        rule.onNodeWithText(str(R.string.as_v_low)).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("claude $effortKey low hash-claude"), hub.changes)
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun anEffortCanBeTakenOutWhichSendsNull() {
+        hub.answer = Result.success(AgentSettingsReply(withEffort(), file(AgentSettingsFile.MISSING)))
+        open(AgentSettingsReply.CLAUDE)
+        rule.onNodeWithText("Opus 5.5").performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onAllNodes(hasText(str(R.string.as_effort_default))).onLast().performClick()
+        rule.waitForIdle()
+        assertEquals(1, hub.changes.size)
+        assert(hub.changes.single().startsWith("claude $effortKey null")) { hub.changes.single() }
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun aModelOutsideTheFilesShapeIsOnlyShownAndUndoNamesTheModel() {
+        hub.answer = Result.success(AgentSettingsReply(withEffort(SettingUndo(effortKey, "low", null, false)), file(AgentSettingsFile.MISSING)))
+        open(AgentSettingsReply.CLAUDE)
+        rule.onNodeWithText("claude-odd").performScrollTo().performClick()
+        rule.waitForIdle()
+        assert(hub.changes.isEmpty())
+        seen(str(R.string.as_undo_row))
+        seen("claude-opus-5-5")
+    }
+
+    @Test fun anOlderServerWithoutEffortRowsShowsNoSection() {
+        hub.answer = Result.success(AgentSettingsReply(claude, file(AgentSettingsFile.MISSING)))
+        open(AgentSettingsReply.CLAUDE)
+        rule.onNodeWithText(str(R.string.as_effort)).assertDoesNotExist()
+    }
+
+    @Test fun theEffortKeyHasWordsForItsLevelsAndWhenItApplies() {
+        assertEquals(R.string.as_v_xhigh, valueWord(effortKey, "xhigh"))
+        assertEquals(R.string.as_when_effort, whenWords(effortKey))
     }
 }

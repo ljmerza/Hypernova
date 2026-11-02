@@ -1000,6 +1000,7 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
     claudeFile,
     JSON.stringify({
       effortLevel: 'high',
+      modelSettings: { 'claude-opus-5-5': { effortLevel: 'low' } },
       permissions: { defaultMode: 'acceptEdits', allow: ['Read', 'Bash(npm test *)'], ask: ['Bash(git push *)'], deny: [] },
       showThinkingSummaries: true,
       includeCoAuthoredBy: false,

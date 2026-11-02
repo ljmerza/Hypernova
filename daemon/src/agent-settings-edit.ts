@@ -40,6 +40,20 @@ export const EDITABLE: readonly Rule[] = [
   { agent: 'codex', key: 'web_search', of: ['disabled', 'cached', 'indexed', 'live'] },
 ]
 
+/** Claude Code's writable effort words: `max` is never saved to a settings file (its schema; `/effort max` lasts a session). */
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh'] as const
+const EFFORT_KEY = /^modelSettings\.([A-Za-z0-9][A-Za-z0-9._:-]{0,99})\.effortLevel$/
+/** The model of a per-model effort key, or null. Never a name every object already has. */
+export function effortModel(key: string): string | null {
+  const m = EFFORT_KEY.exec(key)?.[1]
+  return m && !Object.hasOwn(Object.prototype, m) ? m : null
+}
+/** [key]'s rule: the fixed list, or a model's effort, where nothing at all (null) is a value too. */
+function ruleOf(agent: Agent, key: string): Rule | undefined {
+  if (agent === 'claude' && effortModel(key)) return { agent, key, of: EFFORT_LEVELS }
+  return EDITABLE.find((r) => r.agent === agent && r.key === key)
+}
+
 /** Permission keys' values, from least to most allowed. Claude Code's modes are in its own order (2.1.316's table: plan 0; default, dontAsk 1; acceptEdits 2; auto 3; bypass 4). */
 const ORDER: Record<string, Record<string, number>> = {
   'permissions.defaultMode': { plan: 0, default: 1, manual: 1, dontAsk: 1, acceptEdits: 2, auto: 3, bypassPermissions: 4 },
@@ -151,10 +165,11 @@ function parseToml(text: string): TomlStatement[] | null {
 /** A key's value in the file, by the same rules as what the phone is shown: a word that isn't known never reaches a log or a reply. */
 function currentValue(agent: Agent, text: string, key: string): ShownValue {
   if (agent === 'claude') {
-    const rule = CLAUDE_SHOWN.find((r) => r.key === key)!
+    const model = effortModel(key)
+    const rule: Parameters<typeof shown>[0] = model ? { key, kind: 'word', of: EFFORT_LEVELS } : CLAUDE_SHOWN.find((r) => r.key === key)!
     let at: unknown = parseJson(text) ?? {}
     let found = true
-    for (const part of key.split('.')) {
+    for (const part of model ? ['modelSettings', model, 'effortLevel'] : key.split('.')) {
       found = isTable(at) && Object.hasOwn(at, part)
       at = found ? (at as Record<string, unknown>)[part] : undefined
       if (!found) break
@@ -289,6 +304,77 @@ export function jsonEdit(t: string, path: readonly string[], value: Value): stri
 }
 
 /**
+ * [t] with [path], any number of keys deep, set to [value], or taken out when it's null (with any table
+ * that leaves empty). The same care as [jsonEdit]: only those bytes change, and what comes out is compared.
+ */
+export function jsonEditPath(t: string, path: readonly string[], value: Value | null): string {
+  const before = parseJson(t)
+  if (!before) throw malformed()
+  const eol = t.includes('\r\n') ? '\r\n' : '\n'
+  const root = skipSpace(t, 0)
+  const top = membersOf(t, root).members
+  const unit = (top[0] && indentOf(leadOf(t, top[0].keyFrom))) || '  '
+  // Down through what's there. levels[i]: the object holding path[i].
+  const levels: { open: number; members: Member[]; close: number }[] = [{ open: root, ...membersOf(t, root) }]
+  const found: Member[] = []
+  for (const [i, name] of path.entries()) {
+    const m = levels[i]!.members.filter((x) => x.name === name).at(-1)
+    if (!m) break
+    found.push(m)
+    if (i === path.length - 1) break
+    if (t[m.valueFrom] !== '{') throw shape()
+    levels.push({ open: m.valueFrom, ...membersOf(t, m.valueFrom) })
+  }
+  const whole = found.length === path.length
+  let next: string
+  if (value === null) {
+    if (!whole) return t
+    // The highest level that would have nothing left goes whole.
+    let at = path.length - 1
+    while (at > 0 && levels[at]!.members.length === 1) at--
+    const { members } = levels[at]!
+    const m = found[at]!
+    const i = members.indexOf(m)
+    if (members.length === 1) next = splice(t, levels[at]!.open + 1, levels[at]!.close, '')
+    else if (i === 0) next = splice(t, m.keyFrom, members[1]!.keyFrom, '')
+    else next = splice(t, members[i - 1]!.valueTo, m.valueTo, '')
+  } else if (whole) {
+    const m = found.at(-1)!
+    if (t[m.valueFrom] === '{' || t[m.valueFrom] === '[') throw shape()
+    next = splice(t, m.valueFrom, m.valueTo, JSON.stringify(value))
+  } else {
+    const { open, members, close } = levels[found.length]!
+    const last = members.at(-1)
+    const above = found.at(-1)
+    const aboveLead = above ? leadOf(t, above.keyFrom) : eol
+    const colon = last ? t.slice(last.keyTo, last.valueFrom) : above ? t.slice(above.keyTo, above.valueFrom) : ': '
+    const lead = last ? leadOf(t, last.keyFrom) : aboveLead.includes('\n') ? aboveLead + (above ? unit : '  ') : ''
+    const inline = !lead.includes('\n')
+    const nest = (names: readonly string[], at: string): string => {
+      const body = names.length === 1 ? JSON.stringify(value) : `{${inline ? '' : at + unit}${nest(names.slice(1), at + unit)}${inline ? '' : at}}`
+      return `${JSON.stringify(names[0])}${colon}${body}`
+    }
+    const member = nest(path.slice(found.length), lead)
+    if (last) next = splice(t, last.valueTo, last.valueTo, `,${lead}${member}`)
+    else next = splice(t, open + 1, close, `${lead}${member}${aboveLead.includes('\n') ? aboveLead : ''}`)
+  }
+
+  const want = structuredClone(before)
+  const holders: Record<string, unknown>[] = [want]
+  for (const name of path.slice(0, -1)) {
+    const h = holders.at(-1)!
+    if (value !== null && !isTable(h[name])) h[name] = {}
+    holders.push(h[name] as Record<string, unknown>)
+  }
+  if (value === null) {
+    delete holders.at(-1)![path.at(-1)!]
+    for (let i = holders.length - 1; i > 0 && !Object.keys(holders[i]!).length; i--) delete holders[i - 1]![path[i - 1]!]
+  } else holders.at(-1)![path.at(-1)!] = value
+  if (!isDeepStrictEqual(parseJson(next), want)) throw shape()
+  return next
+}
+
+/**
  * [t] with the top-level [key] set to [value], by [toml-reader.ts]'s positions: that value's bytes, or
  * a new line at the end of the top-level section, before the first table. Refused (`unsupported_shape`)
  * unless it's a plain string or boolean on one line, directly at the top.
@@ -341,7 +427,10 @@ export function tomlEdit(t: string, key: string, value: string): string {
 }
 
 /** The file's next text with [key] at [value]; [text] null: a file to create, with that one key. */
-function edited(agent: Agent, text: string | null, key: string, value: Value): string {
+function edited(agent: Agent, text: string | null, key: string, value: Value | null): string {
+  const model = agent === 'claude' ? effortModel(key) : null
+  if (model) return jsonEditPath(text ?? '{}\n', ['modelSettings', model, 'effortLevel'], value)
+  if (value === null) throw shape()
   if (agent === 'claude') return jsonEdit(text ?? '{}\n', key.split('.'), value)
   return tomlEdit(text ?? '', key, String(value))
 }
@@ -419,7 +508,7 @@ function syncFolder(dir: string): void {
 const inLog = (v: ShownValue) => (v.state === 'set' ? String(v.value) : v.state === 'unset' ? '(not set)' : '(unrecognised)')
 
 /** What the last change wrote, for Undo. Its values have been checked, as the phone's are. */
-type Last = { wrote: string; backup: string | null; key: string; before: ShownValue; after: Value }
+type Last = { wrote: string; backup: string | null; key: string; before: ShownValue; after: Value | null }
 
 function readLast(agent: Agent): Last | null {
   try {
@@ -455,10 +544,10 @@ function undoOffer(agent: Agent, hash: string | null): UndoOffer | null {
   if (hash === null) return null
   const last = readLast(agent)
   if (!last || last.wrote !== hash) return null
-  const rule = EDITABLE.find((r) => r.agent === agent && r.key === last.key)
+  const rule = ruleOf(agent, last.key)
   if (!rule || !restorable(rule, last.before)) return null
   const to = last.before.state === 'set' ? last.before.value : null
-  return { key: last.key, to, loosens: loosens(last.key, { key: last.key, state: 'set', value: last.after }, to) }
+  return { key: last.key, to, loosens: loosens(last.key, last.after === null ? { key: last.key, state: 'unset' } : { key: last.key, state: 'set', value: last.after }, to) }
 }
 
 // ── The routes ───────────────────────────────────────────────────────────
@@ -466,12 +555,41 @@ function undoOffer(agent: Agent, hash: string | null): UndoOffer | null {
 /** One of Codex's models, as the daemon knows them (`GET /v1/codex/models`). Null: no list right now. */
 export type ModelList = { value: string; name: string }[] | null
 
-/** A value the phone may pick for a key, and whether picking it now loosens a permission. */
-export type Choice = { value: Value; loosens: boolean; label?: string }
+/** One of Claude Code's models, for its effort rows. */
+export type EffortModel = { model: string; name: string }
+/** Beside the fixed list, so an older app sees nothing new: each model's saved effort, what it can be set to, and null to take it out. */
+export type EffortRows = { rows: (ShownValue & { model: string; name: string; editable: boolean })[]; choices: Choice[] }
+
+/** A value the phone may pick for a key, and whether picking it now loosens a permission. Null: take it out of the file. */
+export type Choice = { value: Value | null; loosens: boolean; label?: string }
 export type Editable = { key: string; choices: Choice[] }
 /** Why a file's keys can't be edited though it reads fine. */
 export type WhyNot = 'link' | 'read_only' | 'no_folder' | 'unreadable' | null
 export type EditFields = { hash: string | null; editable: Editable[]; undo: UndoOffer | null; whyNot: WhyNot }
+
+/**
+ * Claude Code's per-model effort (docs/DECISIONS.md, "Effort per model"): a row for each model of its own
+ * list, and for any other the file already has a level for. Each can be set to a word or taken out.
+ */
+function effortRows(text: string | null, models: readonly EffortModel[]): EffortRows {
+  const saved = text === null ? {} : parseJson(text)?.modelSettings
+  const keys = isTable(saved) ? Object.keys(saved).filter((m) => effortModel(`modelSettings.${m}.effortLevel`) && isTable(saved[m]) && Object.hasOwn(saved[m] as object, 'effortLevel')) : []
+  const named = new Map(models.filter((m) => effortModel(`modelSettings.${m.model}.effortLevel`)).map((m) => [m.model, m.name]))
+  for (const m of keys) if (!named.has(m)) named.set(m, m)
+  const rows: EffortRows['rows'] = []
+  for (const [model, name] of named) {
+    const key = `modelSettings.${model}.effortLevel`
+    const before = text === null ? ({ key, state: 'unset' } as ShownValue) : currentValue('claude', text, key)
+    let editable = true
+    try {
+      edited('claude', text, key, 'high')
+    } catch {
+      editable = false
+    }
+    rows.push({ ...before, model, name, editable })
+  }
+  return { rows, choices: [...EFFORT_LEVELS.map((value) => ({ value, loosens: false })), { value: null, loosens: false }] }
+}
 
 function fieldsOf(agent: Agent, dirs: Dirs, models: ModelList): EditFields {
   const file = fileOf(agent, dirs)
@@ -510,29 +628,42 @@ function fieldsOf(agent: Agent, dirs: Dirs, models: ModelList): EditFields {
   return { hash, editable, undo: undoOffer(agent, hash), whyNot: null }
 }
 
-export type EditableReply = { scope: 'user'; claude: AgentSettingsReply['claude'] & EditFields; codex: AgentSettingsReply['codex'] & EditFields }
+export type EditableReply = { scope: 'user'; claude: AgentSettingsReply['claude'] & EditFields & { effort?: EffortRows }; codex: AgentSettingsReply['codex'] & EditFields }
 
 /**
  * GET /v1/agents/settings: what's shown, with what each file can do. The hash is read first: if the
  * file changes between the two, the phone's `expected` is older than what it saw and gets a 409,
  * never a write over something it didn't see.
  */
-export async function settingsReply(models: ModelList, dirs: Dirs = {}): Promise<EditableReply> {
+export async function settingsReply(models: ModelList, dirs: Dirs = {}, effortModels: readonly EffortModel[] = []): Promise<EditableReply> {
   const claude = fieldsOf('claude', dirs, models)
   const codex = fieldsOf('codex', dirs, models)
   const view = await agentSettings(dirs)
-  return { ...view, claude: { ...view.claude, ...claude }, codex: { ...view.codex, ...codex } }
+  const reply: EditableReply = { ...view, claude: { ...view.claude, ...claude }, codex: { ...view.codex, ...codex } }
+  // Only where the file can be read and changed.
+  if (claude.whyNot === null && (reply.claude.state === 'ok' || reply.claude.state === 'missing')) {
+    try {
+      const cur = readCurrent(fileOf('claude', dirs))
+      const text = cur ? textOf(cur.bytes) : null
+      if (!cur || text !== null) reply.claude.effort = effortRows(text, effortModels)
+    } catch {}
+  }
+  return reply
 }
 
-export type Change = { ok: true; agent: Agent; key: string; value: Value; changed: boolean; hash: string; loosened: boolean; undo: UndoOffer | null }
+export type Change = { ok: true; agent: Agent; key: string; value: Value | null; changed: boolean; hash: string; loosened: boolean; undo: UndoOffer | null }
 
 /** The checks that need no file: anything off the list stops here. */
-function checked(body: unknown): { rule: Rule; agent: Agent; key: string; value: Value; expected: string | null } {
+function checked(body: unknown): { rule: Rule; agent: Agent; key: string; value: Value | null; expected: string | null } {
   if (!isTable(body)) throw new EditRefused(400, 'bad_request', 'Send an agent, a key, a value and what you expect the file to be.')
   const { agent, key, value, expected } = body
   if (agent !== 'claude' && agent !== 'codex') throw new EditRefused(400, 'bad_agent', 'That isn’t an agent with settings here.')
-  const rule = typeof key === 'string' ? EDITABLE.find((r) => r.agent === agent && r.key === key) : undefined
+  const rule = typeof key === 'string' ? ruleOf(agent, key) : undefined
   if (!rule) throw new EditRefused(403, 'key_not_editable', 'That setting can’t be changed from a phone.')
+  if (value === null && effortModel(rule.key) !== null && rule.agent === 'claude') {
+    if (expected !== null && typeof expected !== 'string') throw new EditRefused(400, 'bad_expected', 'Say which version of the file this is for.')
+    return { rule, agent, key: rule.key, value: null, expected }
+  }
   if (typeof value !== 'string' && typeof value !== 'boolean') throw new EditRefused(403, 'value_not_allowed', 'That value can’t be chosen from a phone.')
   if (rule.of !== 'models' && !rule.of.includes(value)) throw new EditRefused(403, 'value_not_allowed', 'That value can’t be chosen from a phone.')
   if (expected !== null && typeof expected !== 'string') throw new EditRefused(400, 'bad_expected', 'Say which version of the file this is for.')
@@ -570,8 +701,8 @@ export async function changeSetting(body: unknown, models: () => Promise<ModelLi
 
   const before: ShownValue = text === null ? { key, state: 'unset' } : currentValue(agent, text, key)
   const loosened = loosens(key, before, value)
-  if (before.state === 'set' && before.value === value && cur) {
-    return { ok: true, agent, key, value, changed: false, hash: cur.hash, loosened: false, undo: undoOffer(agent, cur.hash) }
+  if ((before.state === 'set' && before.value === value && cur) || (value === null && before.state === 'unset')) {
+    return { ok: true, agent, key, value, changed: false, hash: cur?.hash ?? '', loosened: false, undo: cur ? undoOffer(agent, cur.hash) : null }
   }
   const next = Buffer.from(edited(agent, text, key, value), 'utf8')
   const wrote = sha256(next)
@@ -602,7 +733,7 @@ export async function changeSetting(body: unknown, models: () => Promise<ModelLi
   } catch (e) {
     log('agent settings: backup bookkeeping failed', agent, (e as NodeJS.ErrnoException).code ?? 'error')
   }
-  log(`agent settings: ${agent} ${key} ${inLog(before)} -> ${String(value)}${loosened ? ' (loosens)' : ''}`)
+  log(`agent settings: ${agent} ${key} ${inLog(before)} -> ${value === null ? '(not set)' : String(value)}${loosened ? ' (loosens)' : ''}`)
   return { ok: true, agent, key, value, changed: true, hash: wrote, loosened, undo: undoOffer(agent, wrote) }
 }
 
@@ -619,7 +750,7 @@ export function undoChange(body: unknown, dirs: Dirs = {}): Undone {
   const file = fileOf(agent, dirs)
   const cur = readCurrent(file)
   if (!cur || cur.hash !== expected || cur.hash !== last.wrote) throw changed()
-  const rule = EDITABLE.find((r) => r.agent === agent && r.key === last.key)
+  const rule = ruleOf(agent, last.key)
   if (!rule || !restorable(rule, last.before)) throw new EditRefused(409, 'undo_refused', 'What was there before can’t be set from a phone. Its backup is on the server.')
   try {
     accessSync(file, constants.W_OK)
@@ -628,7 +759,7 @@ export function undoChange(body: unknown, dirs: Dirs = {}): Undone {
   }
 
   const to = last.before.state === 'set' ? last.before.value : null
-  const loosened = loosens(last.key, { key: last.key, state: 'set', value: last.after }, to)
+  const loosened = loosens(last.key, last.after === null ? { key: last.key, state: 'unset' } : { key: last.key, state: 'set', value: last.after }, to)
   let hash: string | null = null
   try {
     if (last.backup === null) {
@@ -650,6 +781,6 @@ export function undoChange(body: unknown, dirs: Dirs = {}): Undone {
     throw failed()
   }
   rmSync(lastFile(agent), { force: true })
-  log(`agent settings: ${agent} ${last.key} ${String(last.after)} -> ${inLog(last.before)} (undo${loosened ? ', loosens' : ''})`)
+  log(`agent settings: ${agent} ${last.key} ${last.after === null ? '(not set)' : String(last.after)} -> ${inLog(last.before)} (undo${loosened ? ', loosens' : ''})`)
   return { ok: true, agent, key: last.key, hash, loosened }
 }

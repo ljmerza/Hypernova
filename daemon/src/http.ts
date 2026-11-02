@@ -50,7 +50,7 @@ import { AlwaysError, readAlwaysChoice, type AlwaysChoice } from './always.ts'
 import { CONTINUE_TEXT } from './blockers.ts'
 import { checkBalance, hasBalance, providerSaved } from './balance.ts'
 import { checkProvider, type ProviderCheck } from './providers-check.ts'
-import { listModels } from './models.ts'
+import { claudeModelsNow, listModels } from './models.ts'
 import { sessionUsage } from './session-usage.ts'
 import { todosOf } from './todos.ts'
 import { searchHistory } from './search.ts'
@@ -598,7 +598,7 @@ async function api(c: Ctx): Promise<void> {
   // and the shorter list a phone may change, one key at a time (agent-settings-edit.ts).
   if (path === '/v1/agents/settings' && m === 'GET') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
-    return json(res, 200, await settingsReply(await settingsModels()))
+    return json(res, 200, await settingsReply(await settingsModels(), {}, claudeModelsNow()))
   }
   if (path === '/v1/agents/settings' && m === 'PUT') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')

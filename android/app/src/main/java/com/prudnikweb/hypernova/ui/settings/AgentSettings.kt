@@ -48,6 +48,7 @@ import com.prudnikweb.hypernova.data.ClaudeSettingsSummary
 import com.prudnikweb.hypernova.data.CodexSettingsSummary
 import com.prudnikweb.hypernova.data.Confirm
 import com.prudnikweb.hypernova.data.EditableSetting
+import com.prudnikweb.hypernova.data.EffortTable
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.SettingChoice
 import com.prudnikweb.hypernova.data.SettingUndo
@@ -151,7 +152,9 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
         }
     }
     val current = reply?.getOrNull()?.of(agent)
-    val editable = if (tooOld) emptyMap() else current?.editable.orEmpty().associateBy { it.key }
+    val effort = current?.effort
+    val editable = if (tooOld) emptyMap() else current?.editable.orEmpty().associateBy { it.key } +
+        effort?.rows.orEmpty().filter { it.editable }.associate { it.shown.key to EditableSetting(it.shown.key, effort!!.choices) }
     ScreenScaffold(
         sourceKey = "agent-settings:$agent",
         title = stringResource(if (codex) R.string.as_title_codex else R.string.as_title_claude),
@@ -221,6 +224,10 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
                         item(key = "values-seam") { Seam(stringResource(R.string.as_values), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp)) }
                         item(key = "values") { ValuesCard(rows, editable, saving, trouble, enabled = saving == null) { trouble = null; picking = it } }
                     }
+                    file.effort?.takeIf { it.rows.isNotEmpty() }?.let { table ->
+                        item(key = "effort-seam") { Seam(stringResource(R.string.as_effort), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp)) }
+                        item(key = "effort") { EffortCard(table, editable, saving, trouble, enabled = saving == null) { trouble = null; picking = it } }
+                    }
                     val offer = file.undo.takeIf { !tooOld }
                     val hash = file.hash
                     if (offer != null && hash != null) {
@@ -241,7 +248,8 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit) {
     val edit = key?.let { editable[it] }
     if (key != null && edit != null) {
         val hash = current?.hash
-        PickerSheet(edit, current?.values?.firstOrNull { it.key == key }, onDismiss = { picking = null }) { choice, what, line ->
+        val row = effort?.rows?.firstOrNull { it.shown.key == key }
+        PickerSheet(edit, row?.shown ?: current?.values?.firstOrNull { it.key == key }, row?.name, onDismiss = { picking = null }) { choice, what, line ->
             // The picker closes first: its own window would hide a confirm, or the line said on a phone with no lock.
             picking = null
             gated(choice.loosens, what, line) { save(key, choice, hash) }
@@ -343,6 +351,29 @@ private fun ValuesCard(values: List<ShownSetting>, editable: Map<String, Editabl
     }
 }
 
+/** Each model's saved effort: what `/effort` saves, and what's read for that model at a new session. */
+@Composable
+private fun EffortCard(table: EffortTable, editable: Map<String, EditableSetting>, saving: String?, trouble: Pair<String, String>?, enabled: Boolean, onPick: (String) -> Unit) {
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+            table.rows.forEachIndexed { i, r ->
+                if (i > 0) Hairline(Modifier.fillMaxWidth())
+                val key = r.shown.key
+                val color = when (r.shown.state) {
+                    ShownSetting.UNRECOGNISED -> HN.amber
+                    ShownSetting.UNSET -> HN.inkDim
+                    else -> HN.ink
+                }
+                val value = if (saving == key) stringResource(R.string.as_saving) else if (r.shown.state == ShownSetting.UNSET) stringResource(R.string.as_effort_default) else shownValue(r.shown)
+                if (key in editable) EditableRow(r.name, value, color, null, null, enabled) { onPick(key) } else ReadOnlyRow(r.name, value, color, null)
+                if (trouble?.first == key) HText(trouble.second, style = Type.small, color = HN.amber, modifier = Modifier.padding(bottom = 10.dp))
+            }
+            Hairline(Modifier.fillMaxWidth())
+            HText(stringResource(R.string.as_effort_body), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 10.dp))
+        }
+    }
+}
+
 /** As [ReadOnlyRow], with a chevron and when a change applies. A tap opens its picker. */
 @Composable
 private fun EditableRow(label: String, value: String, valueColor: Color, body: String?, applies: String?, enabled: Boolean, onClick: () -> Unit) {
@@ -373,7 +404,8 @@ private fun EditableRow(label: String, value: String, valueColor: Color, body: S
 /** Undo's row: what it would put back. [onUndo] gets the words for a confirm, should it ask. */
 @Composable
 private fun UndoCard(offer: SettingUndo, busy: Boolean, onUndo: (what: String, line: String?) -> Unit) {
-    val label = settingWords(offer.key)?.let { stringResource(it.first) } ?: offer.key
+    val model = effortModelOf(offer.key)
+    val label = settingWords(offer.key)?.let { stringResource(it.first) } ?: model?.let { stringResource(R.string.as_effort_of, it) } ?: offer.key
     val shown = ShownSetting(offer.key, ShownSetting.SET, offer.toText, offer.toOn)
     val unset = offer.toText == null && offer.toOn == null
     val word = if (unset) "" else shownValue(shown)
@@ -389,8 +421,8 @@ private fun UndoCard(offer: SettingUndo, busy: Boolean, onUndo: (what: String, l
 
 /** The server's allowed values for a key: the current one ticked, a line on each where it helps. */
 @Composable
-private fun PickerSheet(edit: EditableSetting, now: ShownSetting?, onDismiss: () -> Unit, onPick: (SettingChoice, what: String, line: String?) -> Unit) {
-    val label = settingWords(edit.key)?.let { stringResource(it.first) } ?: edit.key
+private fun PickerSheet(edit: EditableSetting, now: ShownSetting?, name: String?, onDismiss: () -> Unit, onPick: (SettingChoice, what: String, line: String?) -> Unit) {
+    val label = settingWords(edit.key)?.let { stringResource(it.first) } ?: name?.let { stringResource(R.string.as_effort_of, it) } ?: edit.key
     GlassSheet(label, onDismiss) {
         HText(label, style = Type.title, color = HN.ink)
         whenWords(edit.key)?.let {
@@ -408,7 +440,7 @@ private fun PickerSheet(edit: EditableSetting, now: ShownSetting?, onDismiss: ()
         }
         Spacer(Modifier.height(8.dp))
         edit.choices.forEach { c ->
-            val word = c.label ?: shownValue(ShownSetting(edit.key, ShownSetting.SET, c.text, c.on))
+            val word = c.label ?: if (c.clears) stringResource(R.string.as_effort_default) else shownValue(ShownSetting(edit.key, ShownSetting.SET, c.text, c.on))
             val line = c.text?.let { valueLine(edit.key, it) }?.let { stringResource(it) }
             val current = c.isCurrent(now)
             Row(
@@ -594,9 +626,12 @@ internal fun settingWords(key: String): Pair<Int, Int>? = when (key) {
     else -> null
 }
 
+/** The model of a per-model effort key, else null. */
+internal fun effortModelOf(key: String): String? = key.takeIf { it.startsWith("modelSettings.") && it.endsWith(".effortLevel") }?.removePrefix("modelSettings.")?.removeSuffix(".effortLevel")
+
 /** A value in words; null: as it is in the file (a model's id, a word from a newer server). */
 @StringRes
-internal fun valueWord(key: String, value: String): Int? = when (key) {
+internal fun valueWord(key: String, value: String): Int? = when (if (effortModelOf(key) != null) "effortLevel" else key) {
     "effortLevel", "model_reasoning_effort" -> when (value) {
         "none" -> R.string.as_v_none
         "minimal" -> R.string.as_v_minimal
@@ -655,7 +690,8 @@ internal fun valueWord(key: String, value: String): Int? = when (key) {
 
 /** When a change to [key] reaches the agent: only what's been checked, else that it may take a new session (docs/DECISIONS.md, "The agents' settings, edited"). */
 @StringRes
-internal fun whenWords(key: String): Int? = when (key) {
+internal fun whenWords(key: String): Int? = when (if (effortModelOf(key) != null) "effort" else key) {
+    "effort" -> R.string.as_when_effort
     "permissions.defaultMode" -> R.string.as_when_new_sessions
     "showThinkingSummaries" -> R.string.as_when_maybe_new_session
     "autoUpdatesChannel" -> R.string.as_when_next_update

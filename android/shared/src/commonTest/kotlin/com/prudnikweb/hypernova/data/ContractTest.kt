@@ -611,6 +611,14 @@ class ContractTest {
             // Nothing view-only is offered, and approvals as a table can't be edited in place.
             assertEquals(listOf("permissions.defaultMode", "showThinkingSummaries", "autoUpdatesChannel"), r.claude.editable.map { it.key })
             assertEquals(listOf("model_reasoning_effort", "sandbox_mode", "web_search"), r.codex.editable.map { it.key })
+            // Effort per model, beside the fixed list: a row per model, and null to take one out.
+            val effort = r.claude.effort!!
+            assertEquals(ShownSetting.SET, effort.rows.single { it.model == "claude-opus-5-5" }.shown.state)
+            assertEquals("low", effort.rows.single { it.model == "claude-opus-5-5" }.shown.text)
+            assertEquals(ShownSetting.UNSET, effort.rows.single { it.model == "claude-sonnet-5-5" }.shown.state)
+            assertEquals(listOf("low", "medium", "high", "xhigh", null), effort.choices.map { it.text })
+            assertTrue(effort.choices.last().clears)
+            assertNull(r.codex.effort)
         },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)

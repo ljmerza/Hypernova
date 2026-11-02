@@ -65,7 +65,7 @@ export type AgentSettingsReply = { scope: 'user'; claude: AgentSettings<ClaudeSu
  * these words, from the agent's own schema (checked against Claude Code 2.1.316 and Codex 0.164.0).
  * 'id': free text in a model id's shape. What may be set is a list of its own: agent-settings-edit.ts.
  */
-type Shown = { key: string; kind: 'boolean' } | { key: string; kind: 'word'; of: readonly string[] } | { key: string; kind: 'id' }
+export type Shown = { key: string; kind: 'boolean' } | { key: string; kind: 'word'; of: readonly string[] } | { key: string; kind: 'id' }
 
 export const CLAUDE_SHOWN: readonly Shown[] = [
   { key: 'effortLevel', kind: 'word', of: ['low', 'medium', 'high', 'xhigh'] },
@@ -91,14 +91,16 @@ export const CODEX_SHOWN: readonly Shown[] = [
 const VALUE_MAX = 80
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/[\]@-]*$/
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/
+export const MCP_NAME = NAME
 /** Names sent per list at most. */
 const NAMES_MAX = 200
 /** A settings file past this isn't read: nobody's is, and the reply stays small. */
 const FILE_MAX = 4 * 1024 * 1024
 /** `~/.claude.json` keeps history too, so it can be far bigger than a settings file. Past this it isn't read. */
 const CONFIG_MAX = 16 * 1024 * 1024
+export const MCP_CONFIG_MAX = CONFIG_MAX
 /** A project's `.mcp.json` past this isn't read. */
-const MCP_JSON_MAX = 256 * 1024
+export const MCP_JSON_MAX = 256 * 1024
 /** Project folders whose `.mcp.json` is read per request, and how long the whole walk may take (a dead network mount doesn't hold the reply up). */
 const PROJECTS_MAX = 200
 const MCP_WALK_MS = 2000
@@ -111,6 +113,7 @@ const FOLDER = /^[\p{L}\p{N}][\p{L}\p{N} _.+-]{0,63}$/u
 
 /** Whether [s] passes: short, and with nothing in it that maskSecrets would hide. */
 const clean = (s: string) => s.length <= VALUE_MAX && maskSecrets(s) === s
+export const nameIsClean = clean
 /** Whether [s] could be shown as a model's id. */
 export const modelIdFits = (s: string) => clean(s) && MODEL_ID.test(s)
 
@@ -142,8 +145,8 @@ function read(file: string): { text: string } | { state: FileState } {
   }
 }
 
-const isTable = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
-const own = (o: Record<string, unknown>, k: string) => (Object.hasOwn(o, k) ? o[k] : undefined)
+export const isTable = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+export const own = (o: Record<string, unknown>, k: string) => (Object.hasOwn(o, k) ? o[k] : undefined)
 
 /** Claude Code's `<CLAUDE_DIR>/settings.json`. */
 export function claudeSettings(dir: string = CLAUDE_DIR): AgentSettings<ClaudeSummary> {
@@ -278,7 +281,7 @@ export function folderName(path: string, home: string = HOME): string | null {
  * A file's text, at most [max] bytes, or why not. It opens first and asks about what it opened, so a
  * pipe can't hang it and nothing can be swapped in between; without [follow], a link is refused.
  */
-async function readCapped(file: string, max: number, follow: boolean): Promise<{ text: string } | { state: FileState }> {
+export async function readCapped(file: string, max: number, follow: boolean): Promise<{ text: string } | { state: FileState }> {
   let h: Awaited<ReturnType<typeof open>> | undefined
   try {
     h = await open(file, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK | (follow ? 0 : fsConstants.O_NOFOLLOW))
@@ -296,7 +299,7 @@ async function readCapped(file: string, max: number, follow: boolean): Promise<{
 }
 
 /** [work], or null once [ms] have passed. */
-async function within<T>(work: Promise<T>, ms: number): Promise<T | null> {
+export async function within<T>(work: Promise<T>, ms: number): Promise<T | null> {
   let timer: NodeJS.Timeout | undefined
   const late = new Promise<null>((resolve) => {
     timer = setTimeout(() => resolve(null), Math.max(0, ms))
@@ -309,7 +312,7 @@ async function within<T>(work: Promise<T>, ms: number): Promise<T | null> {
 }
 
 /** A JSON file's object, or its state. An empty file is an empty object, as Claude Code takes an empty `.mcp.json`. Never a parse error: it can quote the file. */
-function parseTable(text: string): Record<string, unknown> | null {
+export function parseTable(text: string): Record<string, unknown> | null {
   if (!text.trim()) return {}
   try {
     const doc: unknown = JSON.parse(text.replace(/^\ufeff/, ''))
@@ -329,7 +332,7 @@ const serverNames = (table: unknown): string[] => {
  * Whether to read a project's `.mcp.json`: its folder is a clean absolute path, and not one of the
  * worktrees under `.claude/worktrees`, each a copy of the repository's own file.
  */
-const projectFolder = (path: string) => isAbsolute(path) && normalize(path) === path && !path.includes('/.claude/worktrees/')
+export const projectFolder = (path: string) => isAbsolute(path) && normalize(path) === path && !path.includes('/.claude/worktrees/')
 
 /**
  * `~/.claude.json`, as far as MCP goes. The whole file is read per request and nothing of it is kept;
@@ -433,7 +436,7 @@ function serverDetail(v: unknown): Pick<SessionMcpServer, 'transport' | 'command
  * The folder Claude Code files [cwd]'s local servers under (Claude Code 2.1.316's `projectPathForConfig`,
  * and its changelog): the repository's root, the main checkout's for a linked worktree, or null out of a repository.
  */
-async function repoRoot(cwd: string): Promise<string | null> {
+export async function repoRoot(cwd: string): Promise<string | null> {
   let d = cwd
   for (let i = 0; i < PARENTS_MAX; i++) {
     const dotGit = join(d, '.git')
