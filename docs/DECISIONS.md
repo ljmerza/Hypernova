@@ -3751,3 +3751,24 @@ This fits "No estimate of when usage runs out" (2026-11-01), which took away a r
    (`planShown`), so not stale or on another provider, and never once the reset has passed, until new numbers
    come. A Codex session uses Codex's own week, as Home's Codex card does, while signed in, and shows nothing
    on a plan without a week.
+
+## Git in the top bar, asked at calm moments (2026-11-02)
+
+The owner: "do the week pace, git and this model's week". **Git** is an item in Settings → Session top bar,
+off by default: `⎇ main +120 −30`, from what `GET /v1/sessions/{id}/changes` already returns. No daemon change.
+
+1. **The route isn't cheap, so it isn't polled.** Each ask spawns five to seven git processes (`daemon/src/changes.ts`:
+   `rev-parse` twice, `symbolic-ref`, `status -uall`, `diff --numstat`, and the git line's two, which alone have a
+   5-second cache), walks the folder, and reads each untracked file up to 1 MB to count its lines.
+2. **When it's asked:** the chat opening, or the item turning on; a turn ending; an edit tool finishing during a turn, at most
+   once a minute, 1.5 s after the edits settle; activity outside a turn, for a whole turn the phone slept through;
+   and the link coming back. Never with the item off, not even once, and not while the Mac isn't linked.
+3. **Not on a timer.** A composition stays alive with the phone in a pocket, so a slow interval would go on asking
+   from there. A turn that only reads asks nothing.
+4. **Why it differs from the session sheet's GIT part,** which doesn't ask during a turn at all: the sheet is opened to
+   be read, while the bar is there all along, and `+120 −30` standing still for an hour-long turn would be a stale
+   fact on screen. What Bash changes (`sed`, `git commit`) isn't seen as an edit, so it shows when the turn ends.
+5. **Nothing when there's nothing true to say:** a folder that isn't a repository, or the route failing, draws no item and no
+   error. A failed ask clears an earlier answer rather than leaving an old one up.
+6. **The counts are the route's:** `totalAdd` and `totalDel`, so while it can tell, only the files this session's tools
+   touched, as What changed lists them. Colours as What changed's (`+` mint, `−` red). A worktree's name is for TalkBack.

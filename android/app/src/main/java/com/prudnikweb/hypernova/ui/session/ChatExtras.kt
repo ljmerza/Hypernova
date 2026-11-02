@@ -59,13 +59,13 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun ChatUsage(
-    hub: Hub, session: Session, usage: SessionUsage?, agents: Int, onCompact: () -> Unit, onOpen: () -> Unit, onAgents: () -> Unit, onBlocked: () -> Unit, more: String,
+    hub: Hub, session: Session, usage: SessionUsage?, agents: Int, git: SheetGit?, onCompact: () -> Unit, onOpen: () -> Unit, onAgents: () -> Unit, onBlocked: () -> Unit, more: String,
     modifier: Modifier = Modifier,
 ) {
     val blocked = session.blockedCalls
     if (usage == null && blocked == 0) return
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (usage != null) UsageStrip(hub, session, usage, agents, onCompact, onOpen, onAgents, more, Modifier.weight(1f))
+        if (usage != null) UsageStrip(hub, session, usage, agents, git, onCompact, onOpen, onAgents, more, Modifier.weight(1f))
         if (blocked > 0) {
             if (usage != null) Spacer(Modifier.width(8.dp))
             BlockedMark(blocked, onBlocked)

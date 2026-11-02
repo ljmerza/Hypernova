@@ -73,6 +73,9 @@ internal data class SheetGit(
      * folder, and the same count. Clean, it says so ("none").
      */
     val showsDirty: Boolean get() = dirty != null && (files == 0 || scoped || dirty != files)
+
+    /** The top bar says `+n −m`: lines did change, not only a binary or a file too big to count. */
+    val linesChanged: Boolean get() = add > 0 || del > 0
 }
 
 /** The GIT part from the changes route's answer; null for a folder that isn't a repository. */

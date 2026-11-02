@@ -3,6 +3,7 @@ package com.prudnikweb.hypernova.ui.session
 import com.prudnikweb.hypernova.ui.session.TopBarItem.AGENTS
 import com.prudnikweb.hypernova.ui.session.TopBarItem.CONTEXT
 import com.prudnikweb.hypernova.ui.session.TopBarItem.FIVE_HOUR
+import com.prudnikweb.hypernova.ui.session.TopBarItem.GIT
 import com.prudnikweb.hypernova.ui.session.TopBarItem.COST
 import com.prudnikweb.hypernova.ui.session.TopBarItem.EFFORT
 import com.prudnikweb.hypernova.ui.session.TopBarItem.MODE
@@ -36,7 +37,7 @@ class TopBarTest {
         val d = TopBarChoice.DEFAULT
         assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY), d.items)
         // The rest are there to turn on, off, after them.
-        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, MODEL, TOKENS, COST, AGENTS, TURN, WEEK_PACE), d.order)
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, MODEL, TOKENS, COST, AGENTS, TURN, WEEK_PACE, GIT), d.order)
         assertTrue(d.isDefault)
     }
 
@@ -95,7 +96,7 @@ class TopBarTest {
     @Test fun itIsKeptAsOneLineAndReadBack() {
         val c = TopBarChoice.DEFAULT.move(TURN, -9).set(TURN, true).set(FIVE_HOUR, false)
         val line = c.encode()
-        assertEquals("turn,context,mode,effort,!fiveHour,sevenDay,!model,!tokens,!cost,!agents,!weekPace", line)
+        assertEquals("turn,context,mode,effort,!fiveHour,sevenDay,!model,!tokens,!cost,!agents,!weekPace,!git", line)
         assertEquals(c, TopBarChoice.decode(line))
         // Nothing kept yet: the default.
         assertEquals(TopBarChoice.DEFAULT, TopBarChoice.decode(null))
@@ -104,7 +105,7 @@ class TopBarTest {
 
     @Test fun anOlderLineGetsNewPartsOffAtTheEndAndUnknownOnesPassedOver() {
         val c = TopBarChoice.decode("sevenDay,context,later,context,!mode")
-        assertEquals(listOf(SEVEN_DAY, CONTEXT, MODE, EFFORT, FIVE_HOUR, MODEL, TOKENS, COST, AGENTS, TURN, WEEK_PACE), c.order)
+        assertEquals(listOf(SEVEN_DAY, CONTEXT, MODE, EFFORT, FIVE_HOUR, MODEL, TOKENS, COST, AGENTS, TURN, WEEK_PACE, GIT), c.order)
         assertEquals(setOf(SEVEN_DAY, CONTEXT), c.shown)
     }
 
@@ -185,6 +186,34 @@ class TopBarTest {
         assertEquals(null, weekPaceOf(codexSession = true, plan = true, planUsage, codex.copy(usage = usage.copy(sevenDay = null)), now))
         // Signed out: the last numbers, no longer measured.
         assertEquals(null, weekPaceOf(codexSession = true, plan = true, planUsage, codex.copy(account = CodexAccount(false, null, null)), now))
+    }
+
+    // ─── Git ───
+
+    @Test fun gitDrawsOnlyWhenOnAndTheRouteSaidARepository() {
+        assertFalse(GIT in TopBarChoice.DEFAULT.items)
+        val on = TopBarChoice.DEFAULT.set(GIT, true)
+        assertFalse(GIT in on.visible(facts, now))
+        assertTrue(GIT in on.visible(facts.copy(git = true), now))
+        assertFalse(GIT in TopBarChoice.DEFAULT.visible(facts.copy(git = true), now))
+    }
+
+    private val calm = GitMoment(inTurn = false, edits = 3, activity = 100L, linked = true)
+    private val turn = calm.copy(inTurn = true)
+
+    @Test fun gitAsksAgainWhenATurnEndsOrAToolEditsAFile() {
+        assertTrue("the turn ended", calm.asksAgainAfter(turn))
+        assertTrue("a tool edited a file", turn.copy(edits = 4).asksAgainAfter(turn))
+        assertTrue("a turn the phone slept through", calm.copy(activity = 200L).asksAgainAfter(calm))
+        assertTrue("back from a lost link", calm.asksAgainAfter(calm.copy(linked = false)))
+    }
+
+    @Test fun gitDoesNotAskForATurnStartingOrItsOtherActivity() {
+        assertFalse("nothing changed", calm.asksAgainAfter(calm))
+        assertFalse("a turn starting", turn.asksAgainAfter(calm))
+        assertFalse("a turn's activity moves all the time", turn.copy(activity = 200L).asksAgainAfter(turn))
+        assertFalse("no link, no asking", calm.copy(linked = false).asksAgainAfter(turn))
+        assertFalse("no link, even after an edit", turn.copy(edits = 4, linked = false).asksAgainAfter(turn))
     }
 
     @Test fun theWeeksPaceDrawsOnlyWhenOnAndKnown() {

@@ -36,6 +36,8 @@ enum class TopBarItem(val key: String) {
     TURN("turn"),
     /** The day of the plan's week and its use against an even week ("Day 2/7 +10%"): [WeekPace]. */
     WEEK_PACE("weekPace"),
+    /** The branch and the lines changed ("⎇ main +120 −30"), in a repository. */
+    GIT("git"),
     ;
 
     companion object {
@@ -73,7 +75,7 @@ data class TopBarChoice(val order: List<TopBarItem>, val shown: Set<TopBarItem>)
         /**
          * The owner's default (2026-10-31): the context ring, mode, effort, the 5-hour window
          * (only when reported) and the week; the model, the tokens, the API cost, the agents, the
-         * turn's time and the week's pace off, after them.
+         * turn's time, the week's pace and git off, after them.
          */
         val DEFAULT = TopBarChoice(
             TopBarItem.entries.toList(),
@@ -122,6 +124,8 @@ data class TopBarFacts(
     val cost: Double? = null,
     /** The week's pace ([weekPaceOf]); null when no week is known that's about this session. */
     val weekPace: WeekPace? = null,
+    /** The changes route said where this session's folder stands: a repository, and it answered (rememberTopBarGit). */
+    val git: Boolean = false,
 ) {
     /** The effort word: only for a Claude session that has one (Codex shows its mode alone). */
     val effortShown: Boolean get() = !codex && effort != null
@@ -134,7 +138,7 @@ data class TopBarFacts(
  * The items the bar draws now, in the owner's order: the chosen ones that have something to say.
  * The 5-hour window only while Claude Code reports one; the plan's windows only while they're
  * about this session; the effort for a Claude session that has one; tokens once some are spent; the cost once there's one; agents while more than none work; the turn's
- * time while in a turn; the week's pace while a week is known that's about this session. Nothing drops for room: the bar scrolls sideways instead.
+ * time while in a turn; the week's pace while a week is known that's about this session; git in a repository. Nothing drops for room: the bar scrolls sideways instead.
  */
 fun TopBarChoice.visible(f: TopBarFacts, now: Long): List<TopBarItem> = items.filter {
     when (it) {
@@ -147,6 +151,7 @@ fun TopBarChoice.visible(f: TopBarFacts, now: Long): List<TopBarItem> = items.fi
         TopBarItem.AGENTS -> f.agents > 0
         TopBarItem.TURN -> f.inTurn(now)
         TopBarItem.WEEK_PACE -> f.weekPace != null
+        TopBarItem.GIT -> f.git
     }
 }
 
@@ -189,6 +194,25 @@ fun weekPaceOf(codexSession: Boolean, plan: Boolean, usage: Usage, codex: CodexS
     }
     if (!plan) return null
     return weekPace(UsageWindow.sevenDay(usage, now).used, usage.sevenDayResetAt, now)
+}
+
+/**
+ * Where a session stands, for when the git item asks the changes route again (rememberTopBarGit,
+ * which says why): [inTurn], [edits] edit tools finished in its transcript, its last [activity], and
+ * whether the Mac is [linked].
+ */
+data class GitMoment(val inTurn: Boolean, val edits: Int, val activity: Long, val linked: Boolean) {
+    /**
+     * Worth asking again, coming from [before]: the link came back, a tool edited a file in a turn,
+     * the turn ended, or, out of a turn, there was activity (a whole turn the phone slept through).
+     * Never while unlinked, as a turn starting says nothing new, and nothing else in a turn does.
+     */
+    fun asksAgainAfter(before: GitMoment): Boolean = linked && when {
+        !before.linked -> true
+        inTurn -> edits != before.edits
+        before.inTurn -> true
+        else -> activity != before.activity
+    }
 }
 
 /** This turn's time as the bar says it: "<1m", "4m", "1h 12m". */

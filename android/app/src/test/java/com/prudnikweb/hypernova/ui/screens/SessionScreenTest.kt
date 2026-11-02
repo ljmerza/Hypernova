@@ -37,6 +37,9 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentBoard
 import com.prudnikweb.hypernova.data.Aside
 import com.prudnikweb.hypernova.data.AttachDrafts
+import com.prudnikweb.hypernova.data.ChangedFile
+import com.prudnikweb.hypernova.data.Phase
+import com.prudnikweb.hypernova.data.WorkChanges
 import com.prudnikweb.hypernova.data.DraftFile
 import com.prudnikweb.hypernova.data.EnterKey
 import com.prudnikweb.hypernova.data.Item
@@ -79,13 +82,36 @@ class SessionScreenTest {
         input = 12_000, output = 3_400, cacheRead = 60_000, cacheWrite = 8_000, agentTokens = 0, costUsd = null, costExact = false,
     )
 
-    private fun chat(hub: FakeHub, id: String, withUsage: Boolean = true) {
+    private fun chat(hub: FakeHub, id: String, withUsage: Boolean = true, gitOf: suspend (String) -> Result<WorkChanges> = { gitAsks++; gitAnswer }) {
         rule.setContent {
             Harness(spy) {
-                SessionScreen(hub, id, onBack = { backs++ }, usageOf = { _, _ -> if (withUsage) usage else null })
+                SessionScreen(hub, id, onBack = { backs++ }, usageOf = { _, _ -> if (withUsage) usage else null }, gitOf = gitOf)
             }
         }
         rule.waitForIdle()
+    }
+
+    /** What the changes route is asked, and answers, for the top bar's git item. */
+    private var gitAsks = 0
+    private var gitAnswer = Result.success(
+        WorkChanges(
+            git = true, branch = "main", scoped = true,
+            files = List(2) { ChangedFile("f$it.kt", 'M', false, 60, 15, false, true) },
+            others = 0, hidden = 0, more = false, totalAdd = 120, totalDel = 30, worktree = "topbar-items",
+        ),
+    )
+
+    private fun gitOn() = TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.GIT, true))
+
+    /** Past the settling, so an ask that's due has been made. */
+    private fun settle(ms: Long = 2_000) {
+        rule.waitForIdle()
+        rule.mainClock.advanceTimeBy(ms)
+        rule.waitForIdle()
+    }
+
+    private fun FakeHub.turn(state: SessionState) {
+        sessionList = sessionList.map { if (it.id == Samples.ZETA) it.copy(state = state, phase = Phase.of(state)) else it }
     }
 
     // ─── The rows ───
@@ -290,6 +316,85 @@ class SessionScreenTest {
         TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
         chat(FakeHub(usage = Samples.usage().copy(stale = true)), Samples.ZETA)
         rule.onNode(hasContentDescription("Day ", substring = true)).assertDoesNotExist()
+    }
+
+    @Test fun topBarGitSaysTheBranchWorktreeAndLines() {
+        gitOn()
+        chat(FakeHub(), Samples.ZETA)
+        val said = stripSaid()
+        assertTrue(said, said.contains(str(R.string.session_sheet_branch_said, "main")))
+        assertTrue(said, said.contains("In worktree topbar-items."))
+        assertTrue(said, said.contains("120 lines added and 30 removed."))
+    }
+
+    @Test fun topBarGitLeavesOutLinesThatDidNotChange() {
+        gitOn()
+        gitAnswer = gitAnswer.map { it.copy(files = emptyList(), totalAdd = 0, totalDel = 0, worktree = null) }
+        chat(FakeHub(), Samples.ZETA)
+        val said = stripSaid()
+        assertTrue(said, said.contains(str(R.string.session_sheet_branch_said, "main")))
+        assertFalse(said, said.contains("added"))
+        assertFalse(said, said.contains("worktree"))
+    }
+
+    @Test fun topBarGitNeverAsksWhileOff() {
+        val hub = FakeHub()
+        chat(hub, Samples.ZETA)
+        hub.turn(SessionState.Working)
+        settle()
+        hub.turn(SessionState.Idle)
+        settle()
+        assertEquals(0, gitAsks)
+        // Turning it on in an open chat asks once, at once.
+        gitOn()
+        rule.waitForIdle()
+        assertEquals(1, gitAsks)
+    }
+
+    @Test fun topBarGitAsksAtTheChatOpeningAndATurnsEndNotItsStart() {
+        gitOn()
+        val hub = FakeHub()
+        chat(hub, Samples.ZETA)
+        assertEquals("the chat opened", 1, gitAsks)
+        hub.turn(SessionState.Working)
+        settle()
+        assertEquals("a turn starting says nothing new", 1, gitAsks)
+        hub.turn(SessionState.Idle)
+        settle()
+        assertEquals("the turn ended", 2, gitAsks)
+    }
+
+    @Test fun topBarGitAsksAfterAnEditInATurnAtMostOnceAMinute() {
+        gitOn()
+        val hub = FakeHub()
+        chat(hub, Samples.ZETA)
+        hub.turn(SessionState.Working)
+        settle()
+        val before = hub.transcriptMap[Samples.ZETA].orEmpty()
+        hub.transcriptMap = hub.transcriptMap + (Samples.ZETA to before + Item.Diff("edit", "parser.ts", 3, 1, emptyList()))
+        settle()
+        assertEquals("the last ask was just now", 1, gitAsks)
+        settle(60_000)
+        assertEquals("a minute on", 2, gitAsks)
+    }
+
+    @Test fun topBarGitDrawsNothingOutsideARepository() {
+        gitOn()
+        gitAnswer = gitAnswer.map { it.copy(git = false) }
+        chat(FakeHub(), Samples.ZETA)
+        assertEquals(1, gitAsks)
+        val said = stripSaid()
+        assertFalse(said, said.contains(str(R.string.session_sheet_branch_said, "main")))
+    }
+
+    @Test fun topBarGitDrawsNothingWhenTheRouteFails() {
+        gitOn()
+        gitAnswer = Result.failure(IllegalStateException("no answer"))
+        chat(FakeHub(), Samples.ZETA)
+        assertEquals(1, gitAsks)
+        val said = stripSaid()
+        assertFalse(said, said.contains(str(R.string.session_sheet_branch_said, "main")))
+        assertFalse(said, said.contains("no answer"))
     }
 
     @Test fun topBarOpensTheSessionSheet() {

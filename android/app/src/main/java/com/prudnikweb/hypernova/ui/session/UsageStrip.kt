@@ -3,6 +3,13 @@ package com.prudnikweb.hypernova.ui.session
 
 import com.prudnikweb.hypernova.data.SessionUsage
 import com.prudnikweb.hypernova.data.ChatRepo
+import com.prudnikweb.hypernova.data.Phase
+import com.prudnikweb.hypernova.data.WorkChanges
+import com.prudnikweb.hypernova.ui.automations.AutoGlyph
+import com.prudnikweb.hypernova.ui.automations.AutoIcon
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.flow.filter
 import android.content.res.Resources
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import androidx.compose.animation.core.animateFloatAsState
@@ -105,6 +112,55 @@ internal fun rememberSessionUsage(sessionId: String, key: String): SessionUsage?
     return usage
 }
 
+/** A burst of changes (a turn's end, an edit) settles this long first: it costs one ask. */
+private const val GIT_SETTLE_MS = 1_500L
+
+/** In a turn, the changes route is asked at most this often, however many files it edits. */
+private const val GIT_TURN_GAP_MS = 60_000L
+
+/**
+ * The git item's answer ([sheetGit]), only while the owner has it on: with it off the route isn't
+ * called at all. Null until it answers, outside a repository and when the route fails, so the bar
+ * then draws nothing and says no error.
+ *
+ * Asked at calm moments only, never on a timer ([GitMoment.asksAgainAfter]): the chat opening (or
+ * the item turning on), an edit tool finishing in a turn, at most once a minute, a turn ending, and
+ * the link coming back. The route isn't cheap (daemon/src/changes.ts): every ask spawns five to
+ * seven git processes, `status -uall` walks the folder and each untracked file up to 1 MB is read to
+ * count its lines; only the upstream and worktree part has a 5-second cache. The session sheet's GIT
+ * part doesn't ask in a turn at all (SessionInfo.kt). This one does after edits, or a long turn's
+ * `+120 −30` would stand still for as long as it ran, and it costs nothing while a turn only reads.
+ * A timer would also go on with the phone in a pocket, as this composition stays alive there. What
+ * Bash changes (`sed`, `git commit`) shows when the turn ends.
+ */
+@Composable
+internal fun rememberTopBarGit(session: Session, edits: Int, linked: Boolean, load: suspend (String) -> Result<WorkChanges>): SheetGit? {
+    val context = LocalContext.current
+    val choice by remember { TopBarPref.state(context) }
+    val on = TopBarItem.GIT in choice.items && session.cwd != null
+    val inTurn = session.phase == Phase.Working || session.phase == Phase.Starting || session.phase == Phase.NeedsYou
+    val moment by rememberUpdatedState(GitMoment(inTurn, edits, session.updatedAt, linked))
+    val id = session.id
+    val git by produceState<SheetGit?>(null, id, on) {
+        value = null
+        if (!on) return@produceState
+        var asked = 0L
+        suspend fun ask() {
+            asked = System.currentTimeMillis()
+            value = load(id).getOrNull()?.let(::sheetGit)
+        }
+        var last = moment
+        if (last.linked) ask()
+        snapshotFlow { moment }
+            .filter { next -> next.asksAgainAfter(last).also { last = next } }
+            .collectLatest { next ->
+                delay(if (next.inTurn) maxOf(GIT_SETTLE_MS, asked + GIT_TURN_GAP_MS - System.currentTimeMillis()) else GIT_SETTLE_MS)
+                ask()
+            }
+    }
+    return git
+}
+
 /**
  * The slim glass strip at the top of the chat, the session's top bar: what the owner chose in
  * Settings → Session top bar, in his order ([TopBarChoice], TopBar.kt; owner, 2026-10-31). By
@@ -120,7 +176,7 @@ internal fun rememberSessionUsage(sessionId: String, key: String): SessionUsage?
  */
 @Composable
 internal fun UsageStrip(
-    hub: Hub, session: Session, usage: SessionUsage, agents: Int, onCompact: () -> Unit, onOpen: () -> Unit, onAgents: () -> Unit, more: String,
+    hub: Hub, session: Session, usage: SessionUsage, agents: Int, git: SheetGit?, onCompact: () -> Unit, onOpen: () -> Unit, onAgents: () -> Unit, more: String,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -136,6 +192,7 @@ internal fun UsageStrip(
         turnStartedAt = session.turnStartedAt, ended = session.phase == com.prudnikweb.hypernova.data.Phase.Ended,
         plan = plan, fiveHour = u.fiveHourReported,
         weekPace = weekPaceOf(session.codex, plan, u, hub.codex, now),
+        git = git != null,
     )
     // This turn's time, to the minute, while it's shown.
     val turnOn = TopBarItem.TURN in choice.items && facts.inTurn(System.currentTimeMillis())
@@ -152,7 +209,7 @@ internal fun UsageStrip(
     val effort = session.effort?.takeIf { facts.effortShown }?.let { com.prudnikweb.hypernova.ui.home.claudeEffortTitle(it) }
     val model = stripModel(usage, session.model, res.getString(R.string.model_default))
     val turnMs = (maxOf(clock, now) - session.turnStartedAt).coerceAtLeast(0L)
-    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, turnMs, facts.weekPace) + more
+    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, turnMs, facts.weekPace, git) + more
     val agentsLabel = stringResource(R.string.top_bar_agents_open)
     val shape = RoundedCornerShape(12.dp)
     val scroll = rememberScrollState()
@@ -205,6 +262,7 @@ internal fun UsageStrip(
                     TopBarItem.TURN -> GlyphFigure(Glyph.Timer, turnShort(turnMs))
                     // Always this neutral colour, never red or amber: a meter shows facts (docs/DECISIONS.md).
                     TopBarItem.WEEK_PACE -> facts.weekPace?.let { HText(stringResource(R.string.top_bar_week_pace, it.day, it.figure), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1) }
+                    TopBarItem.GIT -> git?.let { GitFigure(it) }
                 }
             }
         }
@@ -212,6 +270,30 @@ internal fun UsageStrip(
         if (pct != null && pct >= COMPACT_AT && !session.codex) {
             Spacer(Modifier.width(8.dp))
             CompactChip(onCompact)
+        }
+    }
+}
+
+/**
+ * "⎇ main +120 −30": the branch glyph, the name in mono cut short in its middle as the session sheet's
+ * is, then the lines changed in What changed's colours (`+` mint, `−` red; docs/DESIGN.md) once there
+ * are any. A worktree is left to TalkBack: the bar has room for one name.
+ */
+@Composable
+private fun GitFigure(g: SheetGit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        AutoIcon(AutoGlyph.Branch, size = 12.dp, color = HN.inkDim, stroke = 1.1.dp)
+        Spacer(Modifier.width(4.dp))
+        HText(
+            g.branch ?: stringResource(R.string.session_sheet_detached), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1,
+            overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.widthIn(max = 120.dp),
+        )
+        if (g.linesChanged) {
+            val (add, del) = lineCounts(g.add, g.del)
+            Spacer(Modifier.width(6.dp))
+            HText(add, style = Type.monoSmall, color = HN.accent, maxLines = 1)
+            Spacer(Modifier.width(4.dp))
+            HText(del, style = Type.monoSmall, color = HN.danger, maxLines = 1)
         }
     }
 }
@@ -325,7 +407,7 @@ internal fun money(usd: Double): String = when {
 /** TalkBack's one sentence for the bar: each part it shows ([parts]), in its order. */
 private fun stripDescription(
     res: Resources, parts: List<TopBarItem>, u: SessionUsage, s: Session, model: String, mode: String, effort: String?,
-    five: UsageWindow, seven: UsageWindow, agents: Int, turnMs: Long, pace: WeekPace?,
+    five: UsageWindow, seven: UsageWindow, agents: Int, turnMs: Long, pace: WeekPace?, git: SheetGit?,
 ): String = parts.joinToString(" ") { part ->
     when (part) {
         TopBarItem.CONTEXT -> {
@@ -346,8 +428,16 @@ private fun stripDescription(
         TopBarItem.AGENTS -> res.getQuantityString(R.plurals.session_sheet_agents_said, agents, agents)
         TopBarItem.TURN -> res.getString(R.string.top_bar_turn_said, formatDuration(res, turnMs))
         TopBarItem.WEEK_PACE -> pace?.let { weekPaceSaid(res, it) }.orEmpty()
+        TopBarItem.GIT -> git?.let { gitSaid(res, it) }.orEmpty()
     }
 }
+
+/** "Branch main. In worktree topbar-items. 120 lines added and 30 removed." */
+private fun gitSaid(res: Resources, g: SheetGit): String = listOfNotNull(
+    g.branch?.let { res.getString(R.string.session_sheet_branch_said, it) } ?: res.getString(R.string.session_sheet_detached_said),
+    g.worktree?.let { res.getString(R.string.top_bar_git_worktree_said, it) },
+    if (g.linesChanged) res.getQuantityString(R.plurals.top_bar_git_lines_said, g.add, g.add, g.del) else null,
+).joinToString(" ")
 
 /** "Day 2 of 7, 10 points over an even week.", "… 8 points under an even week.", "… level with an even week." */
 private fun weekPaceSaid(res: Resources, p: WeekPace): String {

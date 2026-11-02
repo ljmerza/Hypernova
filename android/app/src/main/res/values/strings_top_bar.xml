@@ -19,6 +19,12 @@
         <item quantity="other">Day %1$d of 7, %2$d points under an even week.</item>
     </plurals>
     <string name="top_bar_week_pace_even_said">Day %1$d of 7, level with an even week.</string>
+    <!-- Git: after session_sheet_branch_said ("Branch main."). -->
+    <string name="top_bar_git_worktree_said">In worktree %1$s.</string>
+    <plurals name="top_bar_git_lines_said">
+        <item quantity="one">%1$d line added and %2$d removed.</item>
+        <item quantity="other">%1$d lines added and %2$d removed.</item>
+    </plurals>
 
     <!-- Settings → Session top bar (ui/settings/TopBarSection.kt). -->
     <string name="st_top_bar">Session top bar</string>
@@ -51,4 +57,6 @@
     <string name="st_top_bar_turn_desc">How long the turn under way has run.</string>
     <string name="st_top_bar_week_pace">Week pace</string>
     <string name="st_top_bar_week_pace_desc">The day of the week and its use in points against an even week. Not a limit or a forecast.</string>
+    <string name="st_top_bar_git">Git</string>
+    <string name="st_top_bar_git_desc">The branch and the lines changed since the last commit, in a repository.</string>
 </resources>
