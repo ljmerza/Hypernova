@@ -329,7 +329,7 @@ object AppUpdater {
         val open = PendingIntent.getActivity(c, 9, Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(c, AndroidNotifier.SESSIONS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFF7FFFA0.toInt())
+            .setColor(0xFF6FE0C2.toInt())
             .setContentTitle(c.getString(R.string.update_done_title))
             .setContentText(c.getString(R.string.update_done_body, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
             .setCategory(NotificationCompat.CATEGORY_STATUS)

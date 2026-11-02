@@ -1,34 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The calm sky on Home (docs/DESIGN.md, "The calm sky"), its filter, and the provider card. -->
+<!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
+<!-- The filter chip over Home's list, and the provider card. -->
 <resources>
-    <!-- A planet's second line: what its project is doing. -->
-    <plurals name="sky_needs_you">
-        <item quantity="one">needs you</item>
-        <item quantity="other">%d need you</item>
-    </plurals>
-    <plurals name="sky_working">
-        <item quantity="one">working</item>
-        <item quantity="other">%d working</item>
-    </plurals>
-    <string name="sky_just_now">just now</string>
-    <!-- %1$s is a short duration: 4m, 2h, 3d. -->
-    <string name="sky_ago">%1$s ago</string>
-    <!-- The belt of projects that are quiet now: no planet of their own. -->
-    <string name="sky_quiet">+%1$d quiet</string>
 
-    <!-- The filter above the list: the project (or the quiet ones) the list shows. -->
-    <plurals name="filter_quiet">
-        <item quantity="one">%d quiet project</item>
-        <item quantity="other">%d quiet projects</item>
-    </plurals>
+    <!-- The filter above the list: the project it shows. -->
     <plurals name="filter_waiting_elsewhere">
         <item quantity="one">%d needs you elsewhere</item>
         <item quantity="other">%d need you elsewhere</item>
     </plurals>
     <string name="a11y_filter_clear">Show all sessions</string>
     <string name="a11y_filter_showing">Showing %1$s</string>
-    <string name="a11y_show_quiet">Show the quiet projects</string>
-    <string name="a11y_sky_quiet">%1$s. %2$d projects in orbit, %3$d quiet, %4$d need you.</string>
 
     <!-- A provider in trouble, as a card on Home: what's wrong and the way to fix it. -->
     <string name="provider_card_bad_key">%1$s key refused</string>

@@ -4,13 +4,13 @@
   const native = window.HN || { ready() {}, drawn() {}, failed() {} }
   // The app's colours (docs/DESIGN.md) on mermaid's "base" theme.
   const C = {
-    bg: '#14110E', bg950: '#0F0D0A', bg900: '#1B1814', bg800: '#221F1B', bg700: '#2C2823', lineStrong: '#45403A',
-    ink: '#F5F2EB', muted: '#B5B0A6', dim: '#7A7468', accentDim: '#4A8C5E', danger: '#FF7878',
+    bg: '#060A17', bg950: '#04060F', bg900: '#11141F', bg800: '#181B26', bg700: '#252A3A', lineStrong: '#43444F',
+    ink: '#F1E9D6', muted: '#B6B1A2', dim: '#8E8C80', accentDim: '#478F81', danger: '#EE4468',
   }
   // Series colours: the terminal's palette (assets/term/index.html), bright for pie slices and git
   // branches, deep under ink labels for mindmap and timeline sections.
-  const BRIGHT = ['#7FFFA0', '#E8B341', '#8AB4FF', '#D69CFF', '#7FE7FF', '#FF7878', '#B6FFC9', '#F2CC6E', '#AFCBFF', '#E5BDFF', '#A9F0FF', '#FF9C9C']
-  const DEEP = ['#2A5A38', '#5A4618', '#283C5E', '#47305C', '#1E4A52', '#5C2828']
+  const BRIGHT = ['#6FE0C2', '#FFA63C', '#8AB4FF', '#D69CFF', '#7FE7FF', '#EE4468', '#B3E8CF', '#F2CC6E', '#AFCBFF', '#E5BDFF', '#A9F0FF', '#FF9C9C']
+  const DEEP = ['#24574F', '#5A4618', '#283C5E', '#47305C', '#1E4A52', '#5C2828']
   const series = {}
   BRIGHT.forEach((c, i) => { series['pie' + (i + 1)] = c; if (i < 8) { series['git' + i] = c; series['gitBranchLabel' + i] = C.bg } })
   for (let i = 0; i < 12; i++) { series['cScale' + i] = DEEP[i % DEEP.length]; series['cScaleLabel' + i] = C.ink }
@@ -51,7 +51,7 @@
       ...series,
     },
     // Journey's section names would take their section's own colour.
-    themeCSS: 'text.journey-section { fill: #F5F2EB; }',
+    themeCSS: 'text.journey-section { fill: #F1E9D6; }',
   })
 
   // Manrope as a data: URL: an SVG drawn as a picture can't load a font by its URL.

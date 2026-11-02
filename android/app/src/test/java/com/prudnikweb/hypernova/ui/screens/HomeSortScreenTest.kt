@@ -3,7 +3,6 @@
 package com.prudnikweb.hypernova.ui.screens
 
 import android.content.Context
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -18,7 +17,6 @@ import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.PrefsKeyValue
 import com.prudnikweb.hypernova.data.ServerStatus
 import com.prudnikweb.hypernova.data.SessionState
-import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.home.Everywhere
 import com.prudnikweb.hypernova.ui.home.HomeScreen
 import com.prudnikweb.hypernova.ui.home.HomeSort
@@ -50,8 +48,8 @@ class HomeSortScreenTest {
         rule.setContent {
             Harness(spy) {
                 HomeScreen(
-                    hub, CosmosState(), mutableFloatStateOf(1f),
-                    filter = null, onFilter = {}, quiet = emptyList(),
+                    hub, 
+                    project = null, onClearProject = {},
                     onOpen = { spy.opened += "session:$it" },
                     onNewSession = {},
                     settings = {},

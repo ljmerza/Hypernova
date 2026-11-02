@@ -27,19 +27,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shadow
@@ -88,6 +85,7 @@ import com.prudnikweb.hypernova.data.codexLeads
 import com.prudnikweb.hypernova.data.problemText
 import com.prudnikweb.hypernova.data.refusedRange
 import com.prudnikweb.hypernova.data.strings
+import com.prudnikweb.hypernova.ui.components.diamond
 import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
@@ -100,7 +98,6 @@ import com.prudnikweb.hypernova.ui.components.Planet
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.Segmented
-import com.prudnikweb.hypernova.ui.components.planetSphere
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.JetBrainsMono
@@ -111,10 +108,11 @@ import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.sqrt
 import kotlin.random.Random
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /** The hero's number: big mono digits with a faint mint halo, as a bright star has. */
 private val HeroNumber = TextStyle(
@@ -729,8 +727,7 @@ private fun ProjectRow(p: StatProject, max: Long) {
     ) {
         Canvas(Modifier.size(44.dp)) {
             val r = (4.5f + 13f * share).dp.toPx()
-            drawCircle(Brush.radialGradient(listOf(color.copy(alpha = 0.18f), Color.Transparent), center, r * 2f), r * 2f, center)
-            planetSphere(center, r, color, (PI / 4).toFloat(), stroke = (r * 0.09f).coerceAtLeast(0.7.dp.toPx()))
+            diamond(center, r, color)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {

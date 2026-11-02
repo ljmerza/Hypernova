@@ -1,8 +1,10 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.fx
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
+import com.prudnikweb.hypernova.R
 import kotlinx.coroutines.delay
 
 /**
@@ -69,4 +71,19 @@ fun rememberCountdownNow(vararg at: Long?): Long {
         }
     }
     return now
+}
+
+/**
+ * "0:24", "12m", "1h 12m", "2d 4h". Seconds round up, as every countdown here does ([Countdown]):
+ * two countdowns to the same moment then always read the same.
+ */
+fun formatDuration(res: android.content.res.Resources, ms: Long): String {
+    val s = Countdown.seconds(ms, 0L)
+    return when {
+        s < 60 -> res.getString(R.string.dur_s, 0, s)
+        s < 600 -> res.getString(R.string.dur_s, s / 60, s % 60)
+        s < 3600 -> res.getString(R.string.dur_m, s / 60)
+        s < 86400 -> res.getString(R.string.dur_hm, s / 3600, (s % 3600) / 60)
+        else -> res.getString(R.string.dur_dh, s / 86400, (s % 86400) / 3600)
+    }
 }

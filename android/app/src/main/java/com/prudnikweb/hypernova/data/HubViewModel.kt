@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.prudnikweb.hypernova.ui.fx.AmbientClock
-import com.prudnikweb.hypernova.ui.fx.CosmosState
+import com.prudnikweb.hypernova.ui.fx.LimitFeel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,7 +20,8 @@ import kotlinx.coroutines.launch
  */
 class HubViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
-    val cosmos = CosmosState()
+    /** Which limits were already felt, kept here so a recreated Activity doesn't buzz again. */
+    internal val limitFeel = LimitFeel()
     val clock = AmbientClock()
     val nav = Nav()
 

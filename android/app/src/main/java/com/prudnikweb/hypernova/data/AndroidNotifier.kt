@@ -102,13 +102,13 @@ class AndroidNotifier(private val context: Context) : Notifier {
         // What the lock screen shows: who asks, never what.
         val public = NotificationCompat.Builder(context, APPROVALS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFFE8B341.toInt())
+            .setColor(0xFFFFA63C.toInt())
             .setContentTitle(title)
             .setContentText(context.getString(R.string.notif_unlock_to_see))
             .build()
         val n = NotificationCompat.Builder(context, APPROVALS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFFE8B341.toInt())
+            .setColor(0xFFFFA63C.toInt())
             .setContentTitle(title)
             .setContentText(if (failed) context.getString(R.string.notif_answer_failed) else a.summary)
             // Who asks beyond the session: another computer's name, an agent the main agent started.
@@ -185,7 +185,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
         } else openApp(n.sessionId, keyed(server, n.sessionId ?: n.id).hashCode(), server)
         val notif = NotificationCompat.Builder(context, SESSIONS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(if (n.kind == Notice.Kind.Error || n.kind == Notice.Kind.ServerUpdateFailed) 0xFFFF7878.toInt() else 0xFF7FFFA0.toInt())
+            .setColor(if (n.kind == Notice.Kind.Error || n.kind == Notice.Kind.ServerUpdateFailed) 0xFFEE4468.toInt() else 0xFF6FE0C2.toInt())
             .setContentTitle(title)
             .setContentText(n.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(n.text))
@@ -263,7 +263,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
         if (!canPost() || nm == null) return
         val notif = NotificationCompat.Builder(context, SESSIONS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFFFF7878.toInt())
+            .setColor(0xFFEE4468.toInt())
             .setContentTitle(title)
             .setContentText(why)
             .setStyle(NotificationCompat.BigTextStyle().bigText(why))
@@ -307,7 +307,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
     fun connection(title: String, text: String, disconnect: PendingIntent): android.app.Notification =
         NotificationCompat.Builder(context, CONNECTION)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFF7FFFA0.toInt())
+            .setColor(0xFF6FE0C2.toInt())
             .setContentTitle(title)
             .setContentText(text)
             .setOngoing(true)

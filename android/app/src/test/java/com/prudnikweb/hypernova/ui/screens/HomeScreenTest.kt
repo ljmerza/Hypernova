@@ -2,7 +2,6 @@
 
 package com.prudnikweb.hypernova.ui.screens
 
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
@@ -21,7 +20,6 @@ import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.ServerStatus
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
-import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.home.CardSwipePref
 import com.prudnikweb.hypernova.ui.home.CardSwipes
 import com.prudnikweb.hypernova.ui.home.Everywhere
@@ -53,8 +51,8 @@ class HomeScreenTest {
         rule.setContent {
             Harness(spy) {
                 HomeScreen(
-                    hub, CosmosState(), mutableFloatStateOf(1f),
-                    filter = null, onFilter = {}, quiet = emptyList(),
+                    hub, 
+                    project = null, onClearProject = {},
                     onOpen = { spy.opened += "session:$it" },
                     onNewSession = { newSessions += "here" },
                     settings = {},
@@ -76,8 +74,8 @@ class HomeScreenTest {
                 val holder = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
                 holder.SaveableStateProvider(server.value) {
                     HomeScreen(
-                        FakeHub(sessions = Samples.sessions()), CosmosState(), mutableFloatStateOf(1f),
-                        filter = null, onFilter = {}, quiet = emptyList(),
+                        FakeHub(sessions = Samples.sessions()), 
+                        project = null, onClearProject = {},
                         onOpen = {}, onNewSession = {},
                         settings = { androidx.compose.foundation.text.BasicText("Settings page") },
                         tabState = tab,

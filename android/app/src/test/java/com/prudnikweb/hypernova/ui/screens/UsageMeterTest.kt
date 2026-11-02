@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.ui.screens
 
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -12,7 +11,6 @@ import com.prudnikweb.hypernova.ui.components.UsageMeter
 import com.prudnikweb.hypernova.ui.components.UsageMeterCompact
 import com.prudnikweb.hypernova.ui.components.usageSaid
 import com.prudnikweb.hypernova.ui.fx.formatDuration
-import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.home.HomeScreen
 import com.prudnikweb.hypernova.ui.session.UsageDetails
 import org.junit.Assert.assertEquals
@@ -83,8 +81,8 @@ class UsageMeterTest {
             Harness(spy) {
                 HomeScreen(
                     // One session, so the usage card is on screen in the lazy list.
-                    FakeHub(sessions = Samples.sessions().filter { it.id == Samples.MID }, usage = working()), CosmosState(), mutableFloatStateOf(1f),
-                    filter = null, onFilter = {}, quiet = emptyList(),
+                    FakeHub(sessions = Samples.sessions().filter { it.id == Samples.MID }, usage = working()), 
+                    project = null, onClearProject = {},
                     onOpen = {}, onNewSession = {}, settings = {},
                 )
             }

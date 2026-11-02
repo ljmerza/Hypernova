@@ -4,10 +4,6 @@
      With Codex at work in the range (or leading), the hero, streak, footer and loading line take strings_stats_agents.xml's words. -->
 <resources>
     <string name="stats_title">Statistics</string>
-    <!-- The second line of the sun's readout, once, until Statistics is first opened. -->
-    <string name="sun_stats_hint">Tap the sun for your statistics</string>
-    <!-- TalkBack: the sky's action, and the hint's. -->
-    <string name="a11y_open_stats">Open statistics</string>
 
     <!-- The range switcher. -->
     <string name="stats_range_today">Today</string>

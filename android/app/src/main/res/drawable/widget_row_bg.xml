@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
 <!-- A row of the list: a faint ink fill (4%) with a hairline ring (ink 8%), a soft ink ripple when pressed. -->
-<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#1AF5F2EB">
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#1AF1E9D6">
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="@dimen/widget_inner_radius" />
-            <solid android:color="#0AF5F2EB" />
+            <solid android:color="#0AF1E9D6" />
             <stroke
                 android:width="1dp"
-                android:color="#14F5F2EB" />
+                android:color="#14F1E9D6" />
         </shape>
     </item>
 </ripple>

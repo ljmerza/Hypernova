@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.fx
 
 import androidx.compose.runtime.Composable
@@ -20,7 +21,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 
 /**
- * One clock for every ambient animation in the app: the cosmos, the grain, the activity meters,
+ * One clock for every ambient animation in the app: the grain, the activity meters,
  * pulsing dots and the terminal cursor all read it.
  *
  * Why one clock: on a 120Hz panel, separate infinite transitions each ask for a frame on every
@@ -30,17 +31,16 @@ import kotlin.math.cos
  * Why it runs only on demand (the owner's phone ran hot): a reader says, by reading
  * [seconds] while it draws, which [Pace] it needs. The clock ticks only for paces that something
  * drew with since their last frame, at the fastest of their rates ([FrameBudget]), and each pace's
- * readers redraw at their own rate: the far sky at 5 frames a second while a working session's
+ * readers redraw at their own rate: something slow at 5 frames a second while a working session's
  * chip breathes at 30. Whatever isn't drawn (a screen that's gone, an item scrolled out of a list,
- * a planet meter at rest that doesn't read the clock) asks for nothing, so a screen where nothing
+ * a mark at rest that doesn't read the clock) asks for nothing, so a screen where nothing
  * moves draws no frames at all. It stops while the app isn't visible, and freezes under Reduce
  * Motion.
  *
  * The film grain has a lane of its own ([grain]): a gentle 8 to 12 new patterns a second
- * ([FrameBudget.grainFps]) that only move the grain's layer: nothing is drawn again, the sky and
+ * ([FrameBudget.grainFps]) that only move the grain's layer: nothing is drawn again, the background and
  * the blurred bars included,
- * so it stays alive on a chat or Settings where nothing else moves. Where the sky draws anyway
- * (Home) it changes with the sky's frames instead, as before.
+ * so it stays alive on a chat or Settings where nothing else moves.
  *
  * Read the clock only inside draw / graphicsLayer lambdas, so ticks redraw without recomposing.
  */
@@ -63,12 +63,6 @@ class AmbientClock(initial: Float = 0f) {
     val seconds: Float get() = seconds(Pace.Live)
 
     /**
-     * The latest tick's time, asking for nothing: for a reader that only knows its pace once it
-     * has drawn (the sky), and then calls [seconds] with it. A reader that never does gets no frames.
-     */
-    val now: Float get() = time
-
-    /**
      * Seconds for a reader that moves at [pace]: it redraws on that pace's frames for as long as it
      * keeps reading. Call it only while drawing.
      */
@@ -81,13 +75,6 @@ class AmbientClock(initial: Float = 0f) {
     private fun want(lane: Int) {
         if (lanes.want(lane)) parked?.let { parked = null; it.resume(Unit) }
     }
-
-    /**
-     * The backdrop (the whole screen) is moving at a sky pace this frame, so changing the grain's
-     * pattern costs no frame of its own: it changes with these frames, 24 times a second. Without
-     * this it changes at its own lane's gentler rate.
-     */
-    fun backdropMoving() { lanes.wide = true }
 
     /**
      * The grain's pattern, read while drawing. Reading it asks for the grain's own lane: its next
@@ -141,15 +128,9 @@ class AmbientClock(initial: Float = 0f) {
             val due = lanes.tick(time)
             for (i in ticks.indices) if (due and (1 shl i) != 0) ticks[i].intValue++
             val grainDue = due and (1 shl Lanes.GRAIN) != 0
-            if (grainSteps.step(time, grainDue, lanes.wide, moves = grainFps > 0)) {
+            if (grainSteps.step(grainDue, moves = grainFps > 0)) {
                 grainTick.intValue = grainSteps.index
-            } else if (grainDue) {
-                // Its frame came on a frame of the sky's that kept the pattern (they change it 24
-                // times a second): the grain didn't redraw, so ask again for it, or it would hold
-                // still from here if the sky stopped now.
-                lanes.want(Lanes.GRAIN)
             }
-            lanes.wide = false
             // Sleep through the vsyncs we'd only skip. Measured from the frame's own timestamp
             // (System.nanoTime base), so main-thread work after the vsync doesn't push the next
             // tick a whole frame late. ~4ms margin to catch the vsync.
@@ -160,35 +141,19 @@ class AmbientClock(initial: Float = 0f) {
 }
 
 /**
- * When the film grain shows a new pattern (pure, unit-tested). On frames the sky draws anyway (the
- * whole screen is redrawn then, so a new pattern costs nothing) it changes 24 times a second, as
- * the grain was designed. Elsewhere it changes on each frame of its own lane, which runs at
- * [FrameBudget.grainFps].
+ * When the film grain shows a new pattern (pure, unit-tested): on each frame of its own lane, which
+ * runs at [FrameBudget.grainFps].
  */
 internal class GrainSteps {
     /** The current pattern; each change moves it on by one. */
     var index = 0
         private set
-    private var slot = -1
 
-    /**
-     * A tick of the clock at [time] seconds: [laneDue] the grain's own frame is due, [wide] the sky
-     * drew this frame. False when the pattern stays (so nothing needs redrawing).
-     */
-    fun step(time: Float, laneDue: Boolean, wide: Boolean, moves: Boolean): Boolean {
-        if (!moves) return false
-        if (wide) {
-            val s = (time * SKY_RATE).toInt()
-            if (s == slot) return false
-            slot = s
-        } else if (!laneDue) return false
+    /** A tick of the clock: [laneDue] the grain's own frame is due. False when the pattern stays. */
+    fun step(laneDue: Boolean, moves: Boolean): Boolean {
+        if (!moves || !laneDue) return false
         index++
         return true
-    }
-
-    private companion object {
-        /** New patterns a second while the sky moves anyway: 0stems' 24. */
-        const val SKY_RATE = 24f
     }
 }
 
@@ -209,8 +174,6 @@ internal class Lanes(n: Int = COUNT) {
     var rates = IntArray(n)
     private val wanted = BooleanArray(n)
     private val last = FloatArray(n) { -1f }
-    /** Set by [AmbientClock.backdropMoving] between ticks. */
-    var wide = false
 
     /** A reader drew with pace [i]. True when the clock was idle, so the loop should wake. */
     fun want(i: Int): Boolean {

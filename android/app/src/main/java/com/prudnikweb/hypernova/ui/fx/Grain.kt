@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.fx
 
 import android.graphics.Bitmap
@@ -49,7 +50,7 @@ private object GrainTiles {
 
 /**
  * Film grain over everything, after 0stems `GrainField.tsx`: grey noise with
- * alpha 0..90/255, overlay blend, opacity 0.32, a new pattern 12 to 24 times a second.
+ * alpha 0..90/255, overlay blend, opacity 0.32, a new pattern 8 to 12 times a second.
  *
  * - Cell size: 0stems' 960×540 canvas is stretched to the viewport, so one cell is
  *   ~1.5 CSS px on a desktop at ~60cm. A phone is held at roughly half that distance,
@@ -59,10 +60,9 @@ private object GrainTiles {
  *   into its own layer, a tile's width larger than the screen, and each new pattern only
  *   moves that layer by a random whole number of cells. Moving a layer is a property of it:
  *   nothing is drawn again on the main thread (not this layer, not the screen around it),
- *   the frame is only composited again. Where the sky draws anyway (Home) the pattern
- *   changes with its frames, 24 a second. Elsewhere (a chat, Settings) it has a gentle lane of
- *   its own in the [AmbientClock] ([AmbientClock.grain], 12 a second, 8 on a warm phone): 24
- *   there, on every screen, is what kept the phone warm, and with none the grain froze. On
+ *   the frame is only composited again. It has a gentle lane of its own in the [AmbientClock]
+ *   ([AmbientClock.grain], 12 a second, 8 on a warm phone): 24 a second, on every screen, is what kept
+ *   the phone warm, and with none the grain froze. On
  *   battery saver and a hot phone it's a still texture.
  * - The layer stays non-offscreen (alpha 1, Auto compositing), so the Overlay blend still
  *   applies to what's under it.

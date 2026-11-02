@@ -155,7 +155,7 @@ private enum class Picking { Project, Model, Mode, Effort }
  * the permission mode), each opening its picker, and Start always in reach at the foot with the
  * attachments and the mic. It starts on the project it was opened for ([initialProject]: a path or
  * a name), else the last one used, with the last model and effort, and in the mode chosen in
- * Settings → New sessions (Fork: Ask until one is; never Bypass). Frosted over the cosmos.
+ * Settings → New sessions (Fork: Ask until one is; never Bypass). Frosted over the chart.
  */
 @Composable
 fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Unit, launch: Long = 0L) {
@@ -267,7 +267,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     // custom provider (the remembered one waits for the next session on the subscription).
     val effortOffered = ClaudeEffort.offered(provider)
 
-    // The sheet blurs the cosmos and the home list beneath it.
+    // The sheet blurs the chart and the home list beneath it.
     val input = rememberEdgeInput(haze, HOME_SOURCE)
     val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
 

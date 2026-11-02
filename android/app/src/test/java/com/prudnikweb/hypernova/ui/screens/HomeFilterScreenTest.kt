@@ -4,7 +4,6 @@ package com.prudnikweb.hypernova.ui.screens
 
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
@@ -29,7 +28,6 @@ import com.prudnikweb.hypernova.data.PrefsKeyValue
 import com.prudnikweb.hypernova.data.ServerStatus
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
-import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.home.Everywhere
 import com.prudnikweb.hypernova.ui.home.HomeFilter
 import com.prudnikweb.hypernova.ui.home.HomeFilterPref
@@ -65,8 +63,8 @@ class HomeFilterScreenTest {
                 val d = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale ?: d.fontScale)) {
                     HomeScreen(
-                        hub, CosmosState(), mutableFloatStateOf(1f),
-                        filter = null, onFilter = {}, quiet = emptyList(),
+                        hub, 
+                        project = null, onClearProject = {},
                         onOpen = { spy.opened += "session:$it" },
                         onNewSession = {},
                         settings = {},

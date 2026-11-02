@@ -191,7 +191,7 @@ Then uninstall the client on the phone like any app.
 | On the server | What Hypernova does |
 | --- | --- |
 | **Claude Code only** | Everything above. |
-| **Both** | Claude Code leads (the sun in the app is its usage). Turn Codex on to use both: each has its own usage meters, and a conversation can switch from one to the other. |
+| **Both** | Claude Code leads. Turn Codex on to use both: each has its own usage meters, and a conversation can switch from one to the other. |
 | **Codex only** | New sessions go to Codex. Install without Claude Code, as below. |
 | **Neither** | The install adds Claude Code unless told not to, and `hypernova doctor` says what's missing. |
 

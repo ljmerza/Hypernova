@@ -4,7 +4,6 @@ package com.prudnikweb.hypernova.ui.screens
 
 import android.content.Context
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
@@ -40,7 +39,6 @@ import com.prudnikweb.hypernova.data.Servers
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.components.AttentionStore
-import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.home.HomeScreen
 import com.prudnikweb.hypernova.ui.home.ModelWeekMeters
 import org.junit.After
@@ -102,8 +100,8 @@ class HomeMoreTest {
         rule.setContent {
             Harness(spy) {
                 HomeScreen(
-                    hub, CosmosState(), mutableFloatStateOf(1f),
-                    filter = null, onFilter = {}, quiet = emptyList(),
+                    hub, 
+                    project = null, onClearProject = {},
                     onOpen = { spy.opened += "session:$it" }, onNewSession = {}, settings = {},
                 )
                 // As App.kt does for the chat on screen.

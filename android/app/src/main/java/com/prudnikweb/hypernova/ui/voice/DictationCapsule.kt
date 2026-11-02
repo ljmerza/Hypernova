@@ -14,7 +14,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +33,6 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -57,11 +55,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -76,7 +71,7 @@ import com.prudnikweb.hypernova.data.DictationState
 import com.prudnikweb.hypernova.data.VoiceTiming
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
-import com.prudnikweb.hypernova.ui.components.planetSphere
+import com.prudnikweb.hypernova.ui.components.turningStar
 import com.prudnikweb.hypernova.ui.fx.AmbientClock
 import com.prudnikweb.hypernova.ui.fx.LocalAmbient
 import com.prudnikweb.hypernova.ui.theme.HN
@@ -86,6 +81,11 @@ import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.Type
 import kotlinx.coroutines.delay
 import kotlin.math.PI
+import androidx.compose.foundation.background
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.semantics.contentDescription
 
 /**
  * The capsule above the box while listening (spec 3.4), with its way in and out: from the button's
@@ -354,7 +354,7 @@ private fun RingedPlanet(d: Dictation?, voice: VoiceInput, modifier: Modifier) {
             val r = (15f + 7f * p) * u * gather
             rotate(-18f, c) { drawOval(tone, Offset(c.x - r, c.y - r * 0.34f), Size(2f * r, 2f * r * 0.34f), alpha = 0.45f * (1f - p), style = ring) }
         }
-        planetSphere(c, 6.5f * u, tone, st.turn, stroke = 0.8f * u)
+        turningStar(c, 6.5f * u, tone, st.turn, 1.1f * u)
         rings(c, r1, r2, a1, a2, tone, ring, back = false)
     }
 }

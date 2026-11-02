@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
 import android.os.Build
@@ -33,7 +34,7 @@ import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
 
-/** One blur state for the whole app: the cosmos is source z=0, each screen's content z=1. */
+/** One blur state for the whole app: the chart is source z=0, each screen's content z=1. */
 val LocalHaze = staticCompositionLocalOf<HazeState> { error("No HazeState") }
 
 object Z {
@@ -45,7 +46,7 @@ object Z {
 private val CanBlur = Build.VERSION.SDK_INT >= 31
 
 /**
- * What an edge bar blurs: the cosmos plus *its own* screen's content. During a
+ * What an edge bar blurs: the chart plus *its own* screen's content. During a
  * screen transition both screens are composed at once, and without this filter
  * each screen's bars would also pick up the other screen's list.
  */

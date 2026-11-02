@@ -438,7 +438,7 @@ internal fun viewerPage(svg: String) = """<!doctype html>
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src https://$HOST; img-src data:">
 <style>
 @font-face { font-family: "Manrope"; src: url("Manrope.ttf") format("truetype"); font-weight: 200 800; }
-html, body { margin: 0; background: #14110E; }
+html, body { margin: 0; background: #060A17; }
 body { min-height: 100vh; display: flex; padding: 56px 16px 24px; box-sizing: border-box; }
 svg { display: block; margin: auto; max-width: 100%; height: auto; }
 </style></head><body>$svg</body></html>"""

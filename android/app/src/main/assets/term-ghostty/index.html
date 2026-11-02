@@ -12,10 +12,10 @@
    * The font is term/'s, not a second copy.
    */
   @font-face { font-family: "JetBrains Mono"; src: url("../term/JetBrainsMono.ttf") format("truetype"); font-weight: 100 800; }
-  html, body { margin: 0; height: 100%; background: #14110E; overflow: hidden; overscroll-behavior: none; }
+  html, body { margin: 0; height: 100%; background: #060A17; overflow: hidden; overscroll-behavior: none; }
   #t { position: absolute; inset: 0 6px 0 8px; outline: none; caret-color: transparent; }
   #t canvas { touch-action: none; }
-  #zoom { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); font: 500 12px/1 "JetBrains Mono", monospace; color: #B5B0A6; background: rgba(34,31,27,.9); border: 1px solid rgba(245,242,235,.1); border-radius: 999px; padding: 7px 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #zoom { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); font: 500 12px/1 "JetBrains Mono", monospace; color: #B6B1A2; background: rgba(34,31,27,.9); border: 1px solid rgba(245,242,235,.1); border-radius: 999px; padding: 7px 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #zoom.on { opacity: 1; }
 </style>
 </head>
@@ -450,10 +450,10 @@
       scrollback: 4 * 1024 * 1024,
       smoothScrollDuration: 0,
       theme: {
-        background: '#14110E', foreground: '#F5F2EB', cursor: '#7FFFA0', cursorAccent: '#14110E',
+        background: '#060A17', foreground: '#F1E9D6', cursor: '#6FE0C2', cursorAccent: '#060A17',
         selectionBackground: 'rgba(127,255,160,0.28)',
-        black: '#1B1814', red: '#FF7878', green: '#7FFFA0', yellow: '#E8B341', blue: '#8AB4FF', magenta: '#D69CFF', cyan: '#7FE7FF', white: '#B5B0A6',
-        brightBlack: '#7A7468', brightRed: '#FF9C9C', brightGreen: '#B6FFC9', brightYellow: '#F2CC6E', brightBlue: '#AFCBFF', brightMagenta: '#E5BDFF', brightCyan: '#A9F0FF', brightWhite: '#F5F2EB',
+        black: '#11141F', red: '#EE4468', green: '#6FE0C2', yellow: '#FFA63C', blue: '#8AB4FF', magenta: '#D69CFF', cyan: '#7FE7FF', white: '#B6B1A2',
+        brightBlack: '#8E8C80', brightRed: '#FF9C9C', brightGreen: '#B3E8CF', brightYellow: '#F2CC6E', brightBlue: '#AFCBFF', brightMagenta: '#E5BDFF', brightCyan: '#A9F0FF', brightWhite: '#F1E9D6',
       },
     })
     fit = new G.FitAddon()
@@ -480,7 +480,7 @@
   }).catch((e) => {
     // No WebAssembly (or the module failed): said once, on the page, so the trial isn't a blank screen.
     el.textContent = `Ghostty didn't start here: ${e && e.message ? e.message : e}. Settings → Terminal engine → xterm.js.`
-    el.style.cssText += ';color:#FF7878;font:13px/1.4 "JetBrains Mono",monospace;padding:16px'
+    el.style.cssText += ';color:#EE4468;font:13px/1.4 "JetBrains Mono",monospace;padding:16px'
   })
 })()
 </script>

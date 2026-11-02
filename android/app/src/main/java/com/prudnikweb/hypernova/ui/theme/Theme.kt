@@ -38,7 +38,7 @@ import com.prudnikweb.hypernova.ui.fx.HeatPolicy
 import kotlinx.coroutines.delay
 
 /**
- * How much motion we can afford. The ambient clock, the cosmos, the grain and the edge bars read this
+ * How much motion we can afford. The ambient clock, the grain and the edge bars read this
  * (frame rates and effects per level: ui/fx/Pace.kt):
  * - [reduced]: the system animator scale is 0 (accessibility "remove animations"),
  *   or the user turned Reduce Motion on. Static frames only.

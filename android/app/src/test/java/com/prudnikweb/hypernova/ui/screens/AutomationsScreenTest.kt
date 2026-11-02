@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.ui.screens
 
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -24,7 +23,6 @@ import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.ui.automations.AutomationEditor
 import com.prudnikweb.hypernova.ui.automations.AutomationsTab
 import com.prudnikweb.hypernova.ui.automations.Templates
-import com.prudnikweb.hypernova.ui.fx.CosmosState
 import com.prudnikweb.hypernova.ui.home.Everywhere
 import com.prudnikweb.hypernova.ui.home.HomeScreen
 import com.prudnikweb.hypernova.ui.home.ServerChoice
@@ -258,7 +256,7 @@ class AutomationsScreenTest {
         rule.setContent {
             Harness(spy) {
                 HomeScreen(
-                    z2, CosmosState(), mutableFloatStateOf(1f), filter = null, onFilter = {}, quiet = emptyList(),
+                    z2, project = null, onClearProject = {},
                     onOpen = {}, onNewSession = {}, settings = {},
                     servers = ServerChoice(e.servers.map { it.first }, {}, {}, all = all.value != null), everywhere = all.value,
                 )

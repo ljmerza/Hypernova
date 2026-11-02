@@ -15,7 +15,7 @@ internal enum class FilterAgent { Claude, Codex }
 /**
  * Home's filter (owner, 2026-11-01; docs/DECISIONS.md, "Home filters"): which of Home's sessions the
  * Sessions tab lists, chosen in the filter sheet (HomeFilterSheet.kt) and kept on this phone
- * ([HomeFilterPref]), not per server. Pure: HomeScreen.kt applies it after the sky's [SkyFilter]
+ * ([HomeFilterPref]), not per server. Pure: HomeScreen.kt applies it after a shortcut's project
  * and before the search, so a search looks only among what the filter shows.
  *
  * - [groups]: which of Home's groups show, by the rule Home groups them ([homeGroup]: errored,
