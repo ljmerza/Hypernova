@@ -84,7 +84,7 @@ for f in shared/data/Moved.kt shared/data/Renamed.kt shared/data/Rewritten.kt sc
   case "$out" in *"missing a notice: $f"*) ok "--check names $f" ;; *) bad "--check doesn't name $f" ;; esac
 done
 case "$out" in *'BrandNew'*|*'Untouched'*|*'lib.js'*|*'SKILL.md'*|*'pic.png'*|*'package.json'*|*'fixtures'*) bad "--check names something it should leave alone: $out" ;; *) ok "--check leaves out new, unchanged, third-party, test data, images and JSON" ;; esac
-case "$out" in *"differs from the root's NOTICE"*) ok "--check sees the APK's NOTICE out of date" ;; *) bad "--check misses the APK's NOTICE" ;; esac
+case "$out" in *"differs from NOTICE"*) ok "--check sees the APK's NOTICE out of date" ;; *) bad "--check misses the APK's NOTICE" ;; esac
 
 # ── --fix adds them, in the right place ─────────────────────────────────────
 "$SCRIPT" --fix > /dev/null
@@ -129,6 +129,36 @@ same "--fix again changes no file" "" "$(git status --porcelain)"
 { echo 'package a.b'; echo; body 3; } > shared/data/Moved.kt
 "$SCRIPT" --check > /dev/null 2>&1 && bad "--check passes with a notice removed" || ok "--check fails when a notice goes away"
 git checkout -q -- shared/data/Moved.kt
+
+# ── The APK's legal/ can't drift from the root's and third_party/'s ─────────
+ASSETS=android/app/src/main/assets
+echo 'MIT, somebody' > third_party/x/LICENSE-x
+echo '| a row |' > THIRD-PARTY-NOTICES.md
+out="$("$SCRIPT" --check 2>&1)" && rc=0 || rc=$?
+same "--check fails on a third-party licence the APK lacks" 1 "$rc"
+case "$out" in *"$ASSETS/legal/LICENSE-x"*) ok "--check names the missing licence" ;; *) bad "--check doesn't name it: $out" ;; esac
+case "$out" in *"$ASSETS/legal/THIRD-PARTY-NOTICES.md"*) ok "--check names the third-party notices" ;; *) bad "--check doesn't name them: $out" ;; esac
+"$SCRIPT" --fix > /dev/null
+same "--fix copies the licence" "MIT, somebody" "$(cat "$ASSETS/legal/LICENSE-x")"
+same "--fix copies the third-party notices" "| a row |" "$(cat "$ASSETS/legal/THIRD-PARTY-NOTICES.md")"
+same "--check passes after" "license notices: all there." "$("$SCRIPT" --check)"
+echo '| another row |' >> "$ASSETS/legal/THIRD-PARTY-NOTICES.md"
+"$SCRIPT" --check > /dev/null 2>&1 && bad "--check passes with a copy changed" || ok "--check fails when a copy differs"
+"$SCRIPT" --fix > /dev/null
+
+# ── A third-party file in the assets has to say whose it is ─────────────────
+mkdir -p "$ASSETS/new" "$ASSETS/mermaid"
+echo 'code' > "$ASSETS/new/lib.js"
+out="$("$SCRIPT" --check 2>&1)" && rc=0 || rc=$?
+same "--check fails on an asset nobody declared" 1 "$rc"
+case "$out" in *"new/lib.js"*) ok "--check names it" ;; *) bad "--check doesn't name it: $out" ;; esac
+rm -r "$ASSETS/new"
+echo 'code' > "$ASSETS/mermaid/mermaid.min.js"
+out="$("$SCRIPT" --check 2>&1)" && rc=0 || rc=$?
+same "--check fails on a known library with no licence" 1 "$rc"
+case "$out" in *"$ASSETS/legal/LICENSE-mermaid"*) ok "--check names the licence" ;; *) bad "--check doesn't name it: $out" ;; esac
+rm -r "$ASSETS/mermaid"
+git add -A; git commit -qm 'legal copies'
 
 # ── A type it doesn't know is someone's decision, not a silent skip ─────────
 echo 'text' > odd.xyz; git add -A; git commit -qm 'odd' -q

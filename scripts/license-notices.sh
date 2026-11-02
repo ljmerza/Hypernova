@@ -13,7 +13,9 @@
 # and test data stay as they are, and a file that can't hold a comment is covered by CHANGES.md. A text
 # file of a type this doesn't know fails, so that someone decides, rather than getting skipped.
 #
-# It also keeps the APK's copies of NOTICE and LICENSE (assets/legal/) the same as the root's.
+# It also keeps the APK's assets/legal/ the same as the root's NOTICE, LICENSE and
+# THIRD-PARTY-NOTICES.md and third_party/'s licences, and fails on a file in the APK's assets that
+# asset_licence doesn't know, so a new third-party file can't go in without its licence.
 # Checked by scripts/test-license-notices.sh. Needs the full history (CI: fetch-depth: 0).
 set -euo pipefail
 export LC_ALL=C
@@ -114,8 +116,25 @@ add_notice() {
   rm -f "$tmp"
 }
 
-copy_of_root() { # <file> <copy>: 0 if the same, or if this tree has no such copy
-  [ ! -e "$2" ] || cmp -s "$1" "$2"
+# What assets/legal/ has to hold a copy of.
+legal_sources() {
+  local name
+  for name in NOTICE LICENSE THIRD-PARTY-NOTICES.md; do [ ! -e "$name" ] || echo "$name"; done
+  git ls-files -co --exclude-standard -- third_party | grep -E '/(LICENSE|OFL)[^/]*$' || true
+}
+
+# What a file in the APK's assets answers to: this project's own, or its licences in assets/legal/.
+asset_licence() {
+  local name="${1##*/}"
+  case "$1" in
+    legal/*|term/index.html|term-ghostty/index.html|mermaid/index.html|mermaid/render.js|mermaid/frames.js) echo own ;;
+    term/xterm.js|term/xterm.css) echo LICENSE-xterm ;;
+    term/addon-*.js) echo "LICENSE-${name%.js}" ;;
+    term/JetBrainsMono.ttf) echo OFL-JetBrainsMono.txt ;;
+    term-ghostty/ghostty-web.js) echo LICENSE-ghostty-web LICENSE-ghostty ;;
+    mermaid/mermaid.min.js) echo LICENSE-mermaid ;;
+    *) echo unknown ;;
+  esac
 }
 
 case "$MODE" in
@@ -136,9 +155,10 @@ case "$MODE" in
       done < <(derived_files)
       [ "$added" -eq 1 ] || break
     done
-    for name in NOTICE LICENSE; do
-      if ! copy_of_root "$name" "$LEGAL/$name"; then cp "$name" "$LEGAL/$name"; echo "copied: $name to $LEGAL/"; fi
-    done ;;
+    while IFS= read -r source; do
+      copy="$LEGAL/${source##*/}"
+      if ! cmp -s "$source" "$copy"; then cp "$source" "$copy"; echo "copied: $source to $LEGAL/"; fi
+    done < <(legal_sources) ;;
 esac
 
 # Both --check and what --fix leaves behind.
@@ -152,9 +172,20 @@ while IFS= read -r path; do
       echo "can't tell how to comment this type (add it to kind_of in scripts/license-notices.sh): $path"; missing=1 ;;
   esac
 done < <(derived_files)
-for name in NOTICE LICENSE; do
-  if ! copy_of_root "$name" "$LEGAL/$name"; then echo "differs from the root's $name: $LEGAL/$name"; missing=1; fi
-done
+while IFS= read -r source; do
+  copy="$LEGAL/${source##*/}"
+  if ! cmp -s "$source" "$copy"; then echo "differs from $source, or is missing: $copy"; missing=1; fi
+done < <(legal_sources)
+while IFS= read -r asset; do
+  asset="${asset#android/app/src/main/assets/}"
+  for licence in $(asset_licence "$asset"); do
+    case "$licence" in
+      own) ;;
+      unknown) echo "whose is this asset? Say in asset_licence (scripts/license-notices.sh): $asset"; missing=1 ;;
+      *) if [ ! -e "$LEGAL/$licence" ]; then echo "no licence for $asset: $LEGAL/$licence"; missing=1; fi ;;
+    esac
+  done
+done < <(git ls-files -co --exclude-standard -- android/app/src/main/assets)
 if [ "$missing" -ne 0 ]; then
   [ "$MODE" = --fix ] || echo "Run scripts/license-notices.sh --fix." >&2
   exit 1

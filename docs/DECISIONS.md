@@ -3419,6 +3419,7 @@ some of its words leave room for doubt (the end of this section).
    It's in the server packages, since `daemon/package.json` is. `third_party/`, its copies in the APK's assets, `skills/hyper-cosmos/` and
    test data are left alone: none of them has been modified.
 5. **4(d), `NOTICE`:** the original's lines stay, with two lines of ours below them. The APK's copy is the same file, and the script's check keeps it so.
+   The same check covers the third-party notices, `third_party/`'s licences in `assets/legal/` (the Ghostty ones had been left out) and a declared licence for each third-party asset.
 6. **4(c):** the README had lost two of the original's notices that still apply, on `third_party/`'s own licences and on Codex and OpenAI. They're back. The other
    notices that are gone went with the code they were about: the Mac app, Lens, the website and the Tailscale node.
 7. **Section 6, trademarks:** the name and the package name are left for the rename the owner is choosing separately.
