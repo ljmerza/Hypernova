@@ -32,6 +32,9 @@ Each command's flags are in the rows under it.
 | `-n <lines>`, `--lines <lines>` | That many lines. |
 | `-f`, `--follow` | Keep following it. |
 | `--terminals` | The shared terminals' log instead. |
+| **`hypernova client-logs`** | The debug logs phones and desktop apps sent here on purpose, newest first, with their paths: what to give an agent when you say "check the logs" ([PROTOCOL.md](PROTOCOL.md), "Client logs"). It never shows what's in them. Works with the daemon stopped. |
+| `--latest` | Just the newest's path. Exit 1 when there are none. |
+| `--json` | As JSON. |
 | **`hypernova lan on\|off`** | Turns the local route on or off, at once, and keeps it that way ([Ports](#ports)). |
 | **`hypernova auto-update [on\|off]`** | The server installing newer releases by itself ([Updating](#updating)). Without a word: on or off, whether this install can and why not, what it's doing, a try that failed, the last update. `on` also looks for a release at once. |
 | **`hypernova codex [on\|off]`** | OpenAI's Codex for Hypernova. Without a word: its path, its version against the minimum (0.163.0), on or off, signed in. `on` connects the daemon to Codex's own app server and adds a `codex` shell function; it refuses when Codex is missing or too old. Never installs or signs in Codex ([INSTALL.md, "Codex (optional)"](https://github.com/ljmerza/Hypernova/blob/main/docs/INSTALL.md#codex-optional)). |
@@ -158,6 +161,7 @@ Inside `<state>`:
 | Copies of the files the integration changes | `backups/` |
 | Copies of an agent's settings before a phone changed them, 0600, the last 20 per agent | `settings-backups/<agent>-<timestamp>` |
 | Attachments from the phone, kept 30 days | `attachments/` |
+| Debug logs clients sent, 0700 and 0600, the newest 5 per device, kept 30 days | `client-logs/<device>/` |
 | Shared terminals | `terms/` |
 | `hn`, the status line script, a second `hypernova` for automations | `bin/` |
 | The app, downloaded from the latest release for the phones | `android/` |
