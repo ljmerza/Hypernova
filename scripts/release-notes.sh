@@ -52,10 +52,15 @@ fi
 
 echo "## Install"
 echo
-echo "- Phone: download \`hypernova-$tag.apk\` below and open it. It updates the app in place."
+echo "### Client"
+echo
+echo "- Android: download \`hypernova-client-$tag-android.apk\` below and open it. It updates the app in place."
 if [ "$server" = yes ]; then
   cat <<EOF
-- Server (Linux, Ubuntu or Debian), the latest release in one line:
+
+### Server
+
+- Linux (Ubuntu or Debian), the latest release in one line:
   \`\`\`
   curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
   hypernova pair
@@ -65,5 +70,15 @@ if [ "$server" = yes ]; then
   \`\`\`
   tmp=\$(mktemp -d) && tar -xzf hypernova-server-$tag-linux.tar.gz -C "\$tmp" && "\$tmp"/hypernova-*/scripts/install-linux.sh
   \`\`\`
+- Linux, as a package: \`hypernova-server-$tag-linux-amd64.deb\` or \`hypernova-server-$tag-linux-arm64.deb\`, then, as the user who will run the agents:
+  \`\`\`
+  sudo apt install ./hypernova-server-$tag-linux-amd64.deb
+  hypernova-server-setup
+  \`\`\`
+- Mac (tested on CI's Mac runners only so far, and it doesn't update itself yet): the same \`curl\` line, or \`hypernova-server-$tag-macos-arm64.tar.gz\`, \`hypernova-server-$tag-macos-x64.tar.gz\`, \`hypernova-server-$tag-macos-arm64.pkg\` or \`hypernova-server-$tag-macos-x64.pkg\` (unsigned: docs/INSTALL.md, "On a Mac").
+
+The \`.deb\` and the Mac's files come a few minutes after the rest. \`SHA256SUMS\` lists every file's checksum.
+
+The old-named \`hypernova-$tag.apk\` and \`hypernova-$tag.json\` are only there for older servers, which look for exactly those names (and for \`hypernova-server-$tag-linux.tar.gz\`, which keeps its name): you don't need them.
 EOF
 fi

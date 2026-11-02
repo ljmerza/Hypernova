@@ -5,9 +5,9 @@ import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.ui.automations.XmlWords
-import com.prudnikweb.hypernova.ui.changes.ChangedFile
-import com.prudnikweb.hypernova.ui.changes.ChangesRepo
-import com.prudnikweb.hypernova.ui.changes.WorkChanges
+import com.prudnikweb.hypernova.data.ChangedFile
+import com.prudnikweb.hypernova.data.ChangesRepo
+import com.prudnikweb.hypernova.data.WorkChanges
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

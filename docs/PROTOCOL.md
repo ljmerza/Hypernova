@@ -52,7 +52,7 @@ snapshot (`snapshot.json`), the live feed's messages (`ws-*.json`) and the route
   deep-equals its file. Times, random ids, the scratch folder, this machine's name and the local
   listener's port and key are normalised first (every time is `1800000000000`, a UUID the test
   didn't pick is `00000000-0000-4000-8000-00000000000N` in the order it first appears).
-- **The app** (`android/app/src/test/.../data/ContractTest.kt`) runs every file through its own
+- **The app** (`android/shared/src/commonTest/.../data/ContractTest.kt`, on Android's and the desktop's JVM) runs every file through its own
   parsers (`Wire`, `LiveHub`'s helpers, `ChangesRepo`, `PermissionRulesWire`…) and checks the
   fields it reads. Gradle puts the folder on the unit tests' classpath, so a changed fixture runs
   them again. A fixture without a check there, or a check without its fixture, fails.

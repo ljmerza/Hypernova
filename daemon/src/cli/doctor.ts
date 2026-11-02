@@ -1,14 +1,15 @@
-// `hypernova doctor`: every piece a Linux server needs, checked, each with a plain fix. A failure
+// `hypernova doctor`: every piece a server needs, checked, each with a plain fix. A failure
 // is something that stops Hypernova working (exit 1); a warning is something worth doing; info is
 // only worth knowing. The same checks feed `hypernova status`.
 import { existsSync, readFileSync } from 'node:fs'
 import { connect } from 'node:net'
 import { networkInterfaces } from 'node:os'
 import { join } from 'node:path'
-import { publicIPv4 } from '../platform.ts'
+import { LAUNCH_LABEL, machineWord, publicIPv4 } from '../platform.ts'
 import { health, local } from './api.ts'
 import { tilde, type Cli, UNIT } from './context.ts'
 import { claudeSignedIn, claudeVersionOf, findClaudeBin, isDaemonDir, missingBuildTools, ptyWorks, BUILD_TOOLS } from './install.ts'
+import { agentState, agentTarget, guiSession, restartHint, stderrLog } from './launchd.ts'
 import { NODE_MAJOR, majorOf, recordedNode, versionOf } from './node.ts'
 import { hasUserSystemd, lingering, serviceState } from './service.ts'
 import { sdkAt } from '../sdk.ts'
@@ -145,8 +146,12 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   const add = (c: Check) => checks.push(c)
 
   // The machine.
-  if (cli.platform !== 'linux') add({ name: 'system', mark: 'fail', text: 'This is a Mac: Hypernova runs from its menu bar app there.', fix: 'Open Hypernova on the Mac (Setup in its menu).' })
-  else add({ name: 'system', mark: cli.arch === 'x64' || cli.arch === 'arm64' ? 'ok' : 'warn', text: `Linux on ${cli.arch}`, ...(cli.arch === 'x64' || cli.arch === 'arm64' ? {} : { fix: 'Hypernova is built and tested on x86_64 and arm64 only.' }) })
+  const mac = cli.platform === 'darwin'
+  add({ name: 'system', mark: cli.arch === 'x64' || cli.arch === 'arm64' ? 'ok' : 'warn', text: `${mac ? 'macOS' : 'Linux'} on ${cli.arch}`, ...(cli.arch === 'x64' || cli.arch === 'arm64' ? {} : { fix: 'Hypernova is built and tested on x86_64 and arm64 only.' }) })
+  // git on a Mac is a stand-in that only offers to install Apple's Command Line Tools, until they're there.
+  if (mac && (await cli.sys.run('xcode-select', ['-p'], { timeout: 10_000 })).code !== 0 && !['/opt/homebrew/bin/git', '/usr/local/bin/git'].some((g) => existsSync(g))) {
+    add({ name: 'xcode', mark: 'warn', text: 'Apple’s Command Line Tools aren’t installed, so there’s no git: Claude Code and the app’s git views need it.', fix: 'xcode-select --install' })
+  }
   // WSL on a Windows PC (experimental, cli/wsl.ts): what WSL does and doesn't do for the service.
   if (cli.wsl) for (const c of wslMachineChecks(cli.wsl)) add(c)
   const wslNet = cli.wsl ? await wslNetworkingOf(cli) : null
@@ -161,13 +166,13 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   else add({ name: 'node', mark: 'ok', text: `Node.js ${nodeVersion} (${tilde(cli, node)})` })
 
   const installed = isDaemonDir(cli.daemonDir)
-  add(installed ? { name: 'daemon', mark: 'ok', text: `The daemon in ${tilde(cli, cli.daemonDir)}` } : { name: 'daemon', mark: 'fail', text: 'The daemon isn’t installed.', fix: 'Run scripts/install-linux.sh, or hypernova setup from the repository.' })
+  add(installed ? { name: 'daemon', mark: 'ok', text: `The daemon in ${tilde(cli, cli.daemonDir)}` } : { name: 'daemon', mark: 'fail', text: 'The daemon isn’t installed.', fix: `Run scripts/install-${mac ? 'macos' : 'linux'}.sh, or hypernova setup from the repository.` })
   if (installed && node) {
     const pty = await ptyWorks(cli, node, cli.daemonDir)
     if (pty.ok) add({ name: 'pty', mark: 'ok', text: 'Shared terminals: node-pty works' })
     else {
       const tools = missingBuildTools(cli)
-      add({ name: 'pty', mark: 'fail', text: `Shared terminals can’t start: node-pty doesn’t load (${pty.why.slice(0, 160)}).`, fix: tools.length ? `sudo apt-get install -y build-essential python3, then hypernova setup` : 'Run hypernova setup to build it again.' })
+      add({ name: 'pty', mark: 'fail', text: `Shared terminals can’t start: node-pty doesn’t load (${pty.why.slice(0, 160)}).`, fix: mac ? 'Run hypernova setup to install it again (if it has to be built: xcode-select --install first).' : tools.length ? `sudo apt-get install -y build-essential python3, then hypernova setup` : 'Run hypernova setup to build it again.' })
     }
   } else if (!installed) {
     const tools = missingBuildTools(cli)
@@ -176,9 +181,17 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   if (!cli.sys.which('openssl')) add({ name: 'openssl', mark: 'warn', text: 'No openssl: the local network route has no certificates.', fix: 'sudo apt-get install -y openssl' })
 
   // The service.
-  const sd = await hasUserSystemd(cli)
+  const sd = mac ? { ok: false, why: '' } : await hasUserSystemd(cli)
   const wslNoSystemd = !!cli.wsl && !cli.wsl.container && cli.wsl.version === 2 && !cli.wsl.systemd
-  if (!sd.ok) add({ name: 'service', mark: 'warn', text: `No systemd user service here: ${sd.why}`, fix: wslNoSystemd ? 'Turn on systemd for WSL (above), then hypernova setup. Until then: hypernova run, in a terminal you keep open.' : 'Start the daemon yourself with hypernova run (a container’s command does), or log in as this user directly (ssh) so systemd starts your user manager.' })
+  if (mac) {
+    const gui = await guiSession(cli)
+    const st = await agentState(cli)
+    if (!gui.ok) add({ name: 'service', mark: 'warn', text: `Nobody is logged in at this Mac’s screen, so the service has no session to run in: ${gui.why}`, fix: 'Log in at the screen (System Settings → Users & Groups → Automatic login, for a Mac that should come back by itself after a restart), then hypernova setup. Until then: hypernova run.' })
+    else if (!st.installed) add({ name: 'service', mark: 'fail', text: `${LAUNCH_LABEL} isn’t installed.`, fix: 'Run hypernova setup.' })
+    else if (!st.active) add({ name: 'service', mark: 'fail', text: `${LAUNCH_LABEL} isn’t running.`, fix: `${restartHint(cli)}, or hypernova setup; hypernova logs and ${tilde(cli, stderrLog(cli))} say why it stopped.` })
+    else add({ name: 'service', mark: st.enabled ? 'ok' : 'warn', text: `${LAUNCH_LABEL} running${st.pid ? ` (pid ${st.pid})` : ''}${st.enabled ? ', starts when you log in' : ', but disabled for the next login'}`, ...(st.enabled ? {} : { fix: `launchctl enable ${agentTarget(cli)}` }) })
+    add({ name: 'autostart', mark: 'info', text: 'A Mac starts its LaunchAgent at login, not at boot: after a restart the server waits for someone to log in, unless Automatic login is on (FileVault keeps that off).' })
+  } else if (!sd.ok) add({ name: 'service', mark: 'warn', text: `No systemd user service here: ${sd.why}`, fix: wslNoSystemd ? 'Turn on systemd for WSL (above), then hypernova setup. Until then: hypernova run, in a terminal you keep open.' : 'Start the daemon yourself with hypernova run (a container’s command does), or log in as this user directly (ssh) so systemd starts your user manager.' })
   else {
     const st = await serviceState(cli)
     if (!st.installed) add({ name: 'service', mark: 'fail', text: `${UNIT} isn’t installed.`, fix: 'Run hypernova setup.' })
@@ -192,7 +205,7 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
   // The daemon itself, and that nothing of it faces the network but the LAN listener.
   const api = await health(cli.apiPort)
   const loc = await health(cli.localPort)
-  if (!api || !loc) add({ name: 'health', mark: 'fail', text: `The daemon doesn’t answer on 127.0.0.1:${cli.apiPort} and :${cli.localPort}.`, fix: 'hypernova logs shows why; systemctl --user restart hypernova starts it again.' })
+  if (!api || !loc) add({ name: 'health', mark: 'fail', text: `The daemon doesn’t answer on 127.0.0.1:${cli.apiPort} and :${cli.localPort}.`, fix: `hypernova logs shows why; ${restartHint(cli)} starts it again.` })
   else add({ name: 'health', mark: 'ok', text: `Daemon answering as “${api.name}” on 127.0.0.1:${cli.apiPort} (phone API) and :${cli.localPort} (local)` })
   // The phone API and the local API listen on 127.0.0.1 only; phones come in through the LAN
   // listener, which has its own port and its own checks. Anything listening on those ports beyond
@@ -235,7 +248,7 @@ export async function doctorChecks(cli: Cli, o: DoctorOptions = {}): Promise<Che
     const v = await claudeVersionOf(cli, claude)
     add({ name: 'claude', mark: v ? 'ok' : 'fail', text: v ? `Claude Code ${v} (${tilde(cli, claude)})` : `Claude Code at ${tilde(cli, claude)} doesn’t run.`, ...(v ? {} : { fix: 'Install it again: curl -fsSL https://claude.ai/install.sh | bash' }) })
     const auth = v ? await claudeSignedIn(cli, claude) : null
-    if (auth && !auth.loggedIn) add({ name: 'login', mark: 'fail', text: 'Claude Code isn’t signed in.', fix: 'Run claude once on this server and follow its sign-in.' })
+    if (auth && !auth.loggedIn) add({ name: 'login', mark: 'fail', text: 'Claude Code isn’t signed in.', fix: `Run claude once on this ${machineWord(cli.platform)} and follow its sign-in.` })
     else if (auth) add({ name: 'login', mark: 'ok', text: `Claude Code signed in${auth.plan ? ` (${auth.plan})` : ''}` })
     // Claude Code's SDK in the daemon's packages (sdk.ts): the "/" list, Rewind and the sessions the
     // daemon runs itself go through it. `npm ci` puts it there; only a hand-made copy lacks it.

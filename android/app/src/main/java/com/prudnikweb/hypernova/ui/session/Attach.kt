@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.thumbImage
 import com.prudnikweb.hypernova.data.AttachDrafts
 import com.prudnikweb.hypernova.data.Attachment
 import com.prudnikweb.hypernova.data.DraftFile
@@ -151,7 +152,7 @@ class AttachState(
             try {
                 val a = uploads.withPermit { hub.upload(Picked.read(context, uri)).getOrThrow() }
                 thumb?.join()
-                f.thumb?.let { Thumbs.put(a.path, it) }
+                f.thumbImage?.let { Thumbs.put(a.path, it) }
                 f.attachment = a
                 if (f.temporary) withContext(Dispatchers.IO) { runCatching { context.contentResolver.delete(uri, null, null) } }
             } catch (e: CancellationException) {
@@ -341,7 +342,7 @@ fun DraftStrip(files: List<DraftFile>, onRemove: (DraftFile) -> Unit, modifier: 
                         else Modifier,
                     ),
             ) {
-                if (f.isImage) Thumb(f.thumb, Modifier.size(64.dp), dim = uploading || failed, failed = failed)
+                if (f.isImage) Thumb(f.thumbImage, Modifier.size(64.dp), dim = uploading || failed, failed = failed)
                 else FileTile(f.name, null, Modifier.height(64.dp), dim = uploading || failed, end = 36.dp, failed = failed)
                 if (uploading) Spinner(Modifier.align(Alignment.Center).size(18.dp))
                 if (failed) Icon(Glyph.Reload, Modifier.align(Alignment.Center), size = 18.dp, color = HN.danger)

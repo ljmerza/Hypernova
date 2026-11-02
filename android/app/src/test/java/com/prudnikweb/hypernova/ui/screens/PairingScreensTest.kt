@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.PairFlow
 import com.prudnikweb.hypernova.data.PairLink
@@ -121,7 +122,7 @@ class PairingScreensTest {
     }
 
     @Test fun pairedSaysSoAndOpensTheApp() {
-        Core.init(context as android.app.Application)
+        AndroidCore.init(context as android.app.Application)
         pairScreen(PairFlow.Done("z2"))
         rule.onNodeWithText(str(R.string.pair_done, "z2")).assertExists()
         rule.onNodeWithText(str(R.string.pair_open)).performClick()

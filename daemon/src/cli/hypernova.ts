@@ -1,4 +1,4 @@
-// `hypernova`: Hypernova's command on a Linux server or PC (docs/LINUX.md), where there is no menu
+// `hypernova`: Hypernova's command on a server or PC, Linux or a Mac (docs/LINUX.md), where there is no menu
 // bar app: setup, pair, status, doctor, logs, lan, codex, auto-update, uninstall, and run (the daemon in the
 // foreground). The installed launcher (~/.local/bin/hypernova) runs this file with Hypernova's
 // own Node.js; from a checkout, `node daemon/src/cli/hypernova.ts setup` installs from there.

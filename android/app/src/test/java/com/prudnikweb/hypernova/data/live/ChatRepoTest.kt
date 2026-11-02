@@ -2,6 +2,7 @@ package com.prudnikweb.hypernova.data.live
 
 import android.os.Looper
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Pairing
@@ -9,9 +10,9 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
-import com.prudnikweb.hypernova.ui.session.ChatRepo
-import com.prudnikweb.hypernova.ui.session.Rewound
-import com.prudnikweb.hypernova.ui.session.TodoStatus
+import com.prudnikweb.hypernova.data.ChatRepo
+import com.prudnikweb.hypernova.data.Rewound
+import com.prudnikweb.hypernova.data.TodoStatus
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
@@ -46,7 +47,7 @@ class ChatRepoTest {
     }
 
     @Before fun setUp() {
-        Core.init(RuntimeEnvironment.getApplication())
+        AndroidCore.init(RuntimeEnvironment.getApplication())
         daemon.snapshot = snapshot("z2", sessions = listOf(session("s1")), platform = "darwin")
         Core.paired(Pairing(daemon.base, "tok-z2", "z2", "m-z2", "dev-1"))
         until("linked") { Core.live?.link?.state == LinkState.Connected }
@@ -58,7 +59,7 @@ class ChatRepoTest {
         daemon.close()
     }
 
-    private fun words(id: Int) = Core.app.getString(id)
+    private fun words(id: Int) = AndroidCore.app.getString(id)
 
     @Test fun theUsageStripReadsTheSessionsUsage() = runBlocking {
         daemon.ok("GET", "/v1/sessions/s1/usage", fixture("rest-session-usage"))

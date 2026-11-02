@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Todo
+import com.prudnikweb.hypernova.data.TodoStatus
 import com.prudnikweb.hypernova.data.AgentBoard
 import com.prudnikweb.hypernova.data.AgentState
 import com.prudnikweb.hypernova.data.ApprovalKind

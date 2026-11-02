@@ -1,16 +1,17 @@
-// The `hypernova` commands on a Linux server (docs/LINUX.md): setup, pair, status, doctor, logs,
+// The `hypernova` commands on a server, Linux or a Mac (docs/LINUX.md): setup, pair, status, doctor, logs,
 // lan, uninstall, run. Each returns its exit code; what it prints is for a person reading a
 // terminal over SSH: one line a step, what's wrong in plain words, and the command that fixes it.
 import { closeSync, createReadStream, existsSync, openSync, readFileSync, readSync, rmSync, statSync, watchFile } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { userInfo } from 'node:os'
-import { RELEASES, shellRc } from '../platform.ts'
+import { hostname, userInfo } from 'node:os'
+import { LAUNCH_LABEL, RELEASES, machineWord, shellRc } from '../platform.ts'
 import { createInterface } from 'node:readline'
 import { ApiError, health, local, localText, waitHealthy } from './api.ts'
 import { bold, line, tilde, type Cli, UNIT } from './context.ts'
 import { CODEX_LOGIN, codexChecks, doctorChecks, type CodexState, type DoctorOptions } from './doctor.ts'
 import { claudeSignedIn, claudeVersionOf, defaultClaudeAgents, findClaudeBin, installClaude, installDaemon, setIntegration } from './install.ts'
 import { ensureNode, recordedNode } from './node.ts'
+import { agentState, guiSession, installAgent, removeAgent, serviceName, startHint, stderrLog } from './launchd.ts'
 import { encodeQr, qrLines } from './qr.ts'
 import { WSL_GUIDE, behindNat, systemdFix, wslNetworkingOf, wslPairNote } from './wsl.ts'
 import { installService, lingering, ownLauncher, removeService, serviceState, userManager, writeLauncher } from './service.ts'
@@ -33,20 +34,16 @@ export function parseArgs(argv: string[]): { cmd: string; flags: Flags; rest: st
   return { cmd: rest.shift() ?? 'help', flags, rest }
 }
 
-const notOnMac = (cli: Cli): number => {
-  cli.sys.say('On a Mac, Hypernova sets itself up from its menu bar app: open Hypernova, then Setup.')
-  return 1
-}
-
 // ── setup ─────────────────────────────────────────────────────────────────
 
 /**
  * Checks what's there and puts in what's missing: Node.js 24, the daemon (with its terminal module
- * built), the `hypernova` command, Claude Code (Anthropic's installer), the service (systemd, with
- * lingering) and the integration. Never signs in to Claude: that's the owner's, with `claude`.
+ * ready), the `hypernova` command, Claude Code (Anthropic's installer), the service (systemd with
+ * lingering, or a LaunchAgent on a Mac) and the integration. Never signs in to Claude: that's the
+ * owner's, with `claude`.
  */
 export async function setup(cli: Cli, flags: Flags): Promise<number> {
-  if (cli.platform === 'darwin') return notOnMac(cli)
+  const mac = cli.platform === 'darwin'
   cli.sys.say(bold(cli, `Hypernova setup on ${cli.user}@${hostName()}`))
   cli.sys.say()
   let failed = false
@@ -74,7 +71,7 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
   }
   writeLauncher(cli, node)
   const onPath = (cli.env.PATH ?? '').split(':').includes(join(cli.home, '.local/bin'))
-  line(cli, onPath ? 'ok' : 'warn', `The hypernova command · ${tilde(cli, cli.launcher)}`, onPath ? undefined : 'Not on your PATH yet: log in again (Ubuntu adds ~/.local/bin at login), or run it by its full path.')
+  line(cli, onPath ? 'ok' : 'warn', `The hypernova command · ${tilde(cli, cli.launcher)}`, onPath ? undefined : mac ? 'Not on your PATH yet: open a new terminal (the block setup adds to ~/.zshrc puts ~/.local/bin there; with another shell, add it yourself), or run it by its full path.' : 'Not on your PATH yet: log in again (Ubuntu adds ~/.local/bin at login), or run it by its full path.')
 
   // 3. Claude Code
   let claude = findClaudeBin(cli)
@@ -101,7 +98,27 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
   // 4. The service
   let running = false
   if (flags['no-service']) line(cli, 'info', 'The service: skipped (--no-service).')
-  else {
+  else if (mac) {
+    // A LaunchAgent lives in the login session at the screen: with nobody logged in there (a Mac
+    // reached over ssh after a restart), launchd has no place for it yet.
+    const gui = await guiSession(cli)
+    if (!gui.ok) {
+      line(cli, 'warn', `Nobody is logged in at this Mac’s screen, so there’s no service yet: ${gui.why}`, 'Log in at the screen (System Settings → Users & Groups → Automatic login, for a Mac that should come back by itself after a restart), then run hypernova setup again.\nUntil then: hypernova run, in a terminal you keep open.')
+    } else {
+      try {
+        await installAgent(cli, node)
+        running = await waitHealthy(cli, 30_000)
+        if (running) line(cli, 'ok', `The service: ${LAUNCH_LABEL}, running, starts when you log in`)
+        else {
+          line(cli, 'fail', `${LAUNCH_LABEL} started but doesn’t answer.`, `hypernova logs shows why, and ${tilde(cli, stderrLog(cli))} what the daemon couldn’t log.`)
+          failed = true
+        }
+      } catch (e: any) {
+        line(cli, 'fail', 'The service couldn’t be installed.', `${e.message}\nIf macOS turned it off: System Settings → General → Login Items & Extensions, under Allow in the Background. Over ssh, run hypernova setup in a terminal at the screen instead.`)
+        failed = true
+      }
+    }
+  } else {
     // Lingering first: it also starts the user's systemd manager when this shell has no login
     // session of its own (su, sudo -u, a script), which systemctl --user needs.
     // WSL runs systemd only when /etc/wsl.conf says so (cli/wsl.ts): no lingering to try without it.
@@ -156,7 +173,7 @@ export async function setup(cli: Cli, flags: Flags): Promise<number> {
   cli.sys.say()
   const auth = claude ? await claudeSignedIn(cli, claude) : null
   const next: string[] = []
-  if (auth && !auth.loggedIn) next.push('Sign in to Claude: run `claude` once on this server and follow its steps.')
+  if (auth && !auth.loggedIn) next.push(`Sign in to Claude: run \`claude\` once on this ${machineWord(cli.platform)} and follow its steps.`)
   if (cx?.available && !cx.enabled) next.push('Use Codex too: hypernova codex on')
   if (cli.wsl && !cli.wsl.container) next.push(`Keep WSL running for the phone: instanceIdleTimeout=-1 under [general] in %UserProfile%\\.wslconfig on Windows (${WSL_GUIDE}).`)
   next.push(cli.wsl ? 'Pair your phone: hypernova pair (WSL keeps this PC off the Wi‑Fi unless its networking is mirrored)' : 'Pair your phone: hypernova pair')
@@ -190,7 +207,8 @@ function hostName(): string {
   try {
     return readFileSync('/etc/hostname', 'utf8').trim() || 'this server'
   } catch {
-    return 'this server'
+    // A Mac has no /etc/hostname.
+    return hostname() || 'this server'
   }
 }
 
@@ -203,9 +221,8 @@ function hostName(): string {
  * (scripts pass it) but changes nothing: every code is local now.
  */
 export async function pair(cli: Cli, flags: Flags): Promise<number> {
-  if (cli.platform === 'darwin') return notOnMac(cli)
   if (!(await health(cli.localPort, 2000))) {
-    line(cli, 'fail', 'The daemon isn’t running.', 'systemctl --user start hypernova   (or hypernova run), then hypernova pair')
+    line(cli, 'fail', 'The daemon isn’t running.', `${startHint(cli)}   (or hypernova run), then hypernova pair`)
     return 1
   }
   let p: { code?: string; link: string; appLink: string; webLink?: string; download?: string; expiresAt: number; url: string }
@@ -240,7 +257,7 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
   if (p.download) {
     // `apk: null` is the daemon saying it has none; a daemon that doesn't say is taken at its link.
     const noApk = await local(cli, 'GET', '/local/status', undefined, 15_000).then((st) => !!st && 'apk' in st && st.apk == null, () => false)
-    if (noApk) cli.sys.say(`The app, if the phone doesn’t have it yet: hypernova-<tag>.apk from ${RELEASES}\n`)
+    if (noApk) cli.sys.say(`The app, if the phone doesn’t have it yet: hypernova-client-<tag>-android.apk from ${RELEASES}\n`)
     else if (!/\/\/10\.0\.2\.2[:/]/.test(p.download)) cli.sys.say(`The app, if the phone doesn’t have it yet: ${p.download}\n`)
   }
   if (!flags['no-qr']) {
@@ -332,7 +349,7 @@ export async function automation(cli: Cli, flags: Flags, rest: string[]): Promis
 // ── status ────────────────────────────────────────────────────────────────
 
 export async function status(cli: Cli, flags: Flags): Promise<number> {
-  const svc = cli.platform === 'linux' ? await serviceState(cli) : null
+  const svc = cli.platform === 'darwin' ? await agentState(cli) : await serviceState(cli)
   const up = await health(cli.localPort, 2000)
   let st: any = null
   if (up) {
@@ -348,11 +365,11 @@ export async function status(cli: Cli, flags: Flags): Promise<number> {
   }
   const row = (k: string, v: string) => cli.sys.say(`  ${k.padEnd(12)} ${v}`)
   cli.sys.say(bold(cli, `Hypernova${st?.daemonVersion ? ` ${st.daemonVersion}` : ''} on ${up?.name ?? hostName()}`))
-  const svcText = !svc ? '' : !svc.installed ? ', no service installed' : `, ${UNIT} ${svc.active ? 'active' : 'stopped'}${svc.enabled ? ', starts at boot' : ''}`
-  row('Daemon', up ? `running${svc?.pid ? ` (pid ${svc.pid})` : ''}${svcText}` : `not running${svcText}`)
+  const svcText = !svc.installed ? ', no service installed' : `, ${serviceName(cli)} ${svc.active ? 'active' : 'stopped'}${svc.enabled ? (cli.platform === 'darwin' ? ', starts when you log in' : ', starts at boot') : ''}`
+  row('Daemon', up ? `running${svc.pid ? ` (pid ${svc.pid})` : ''}${svcText}` : `not running${svcText}`)
   if (!up) {
     cli.sys.say()
-    cli.sys.say(`  Start it: systemctl --user start hypernova (or hypernova run). Why it stopped: hypernova logs`)
+    cli.sys.say(`  Start it: ${startHint(cli)} (or hypernova run). Why it stopped: hypernova logs`)
     return 1
   }
   // Loopback only: phones come in through the local route below.
@@ -521,7 +538,7 @@ export async function codex(cli: Cli, rest: string[]): Promise<number> {
     if (want === 'on' && st.shell?.installed) line(cli, 'info', `\`codex\` in a new terminal runs in a shared terminal your phone can see (${rcName(cli)}).`)
     return 0
   } catch (e: any) {
-    line(cli, 'fail', e instanceof ApiError && e.status === 0 ? 'The daemon isn’t running.' : e.message, e instanceof ApiError && e.status === 0 ? 'systemctl --user start hypernova   (or: hypernova run)' : undefined)
+    line(cli, 'fail', e instanceof ApiError && e.status === 0 ? 'The daemon isn’t running.' : e.message, e instanceof ApiError && e.status === 0 ? `${startHint(cli)}   (or: hypernova run)` : undefined)
     return 1
   }
 }
@@ -534,10 +551,6 @@ export async function codex(cli: Cli, rest: string[]): Promise<number> {
  * (paired phones, settings) stays unless --purge. Claude Code and its login stay: they're yours.
  */
 export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
-  if (cli.platform === 'darwin') {
-    cli.sys.say('On a Mac, uninstall from Hypernova’s menu bar app (its menu, Uninstall…).')
-    return 1
-  }
   const taken = flags.purge ? 'Hypernova, its paired phones and settings' : 'Hypernova (its paired phones and settings stay)'
   if (!flags.yes) {
     // Without a terminal nobody can answer: refuse rather than remove everything unasked.
@@ -545,7 +558,7 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
       cli.sys.say('Uninstall asks first, and there is no terminal to ask in. Run it with --yes to remove Hypernova without asking (add --purge for the paired phones and settings too).')
       return 1
     }
-    const ok = await ask(`Remove ${taken} from this server? [y/N] `)
+    const ok = await ask(`Remove ${taken} from this ${machineWord(cli.platform)}? [y/N] `)
     if (!/^y(es)?$/i.test(ok.trim())) {
       cli.sys.say('Nothing removed.')
       return 1
@@ -558,8 +571,8 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
   } catch (e: any) {
     notes.push(`The integration couldn’t be removed (${e.message}). Its hooks point at Hypernova’s local port, so they do nothing once it’s gone.`)
   }
-  notes.push(...(await removeService(cli)))
-  line(cli, 'ok', `${UNIT} stopped and removed`)
+  notes.push(...(cli.platform === 'darwin' ? await removeAgent(cli) : await removeService(cli)))
+  line(cli, 'ok', `${serviceName(cli)} stopped and removed`)
   if (ownLauncher(cli.launcher)) rmSync(cli.launcher, { force: true })
   // Only the Node Hypernova downloaded: one it was given (the system's) isn't its to remove.
   const node = recordedNode(cli)
@@ -578,7 +591,7 @@ export async function uninstall(cli: Cli, flags: Flags): Promise<number> {
   line(cli, 'info', 'Claude Code and its sign-in stay, and so do Codex and its own. Shared sessions still open keep running until you close them.')
   // Setup turned lingering on for the service, but other services of this user may count on it
   // too, so it isn't turned off behind the owner's back: he's told how.
-  if (await lingering(cli)) line(cli, 'info', `Lingering stays on for ${cli.user} (other services of yours may use it). To turn it off: sudo loginctl disable-linger ${cli.user}`)
+  if (cli.platform !== 'darwin' && (await lingering(cli))) line(cli, 'info', `Lingering stays on for ${cli.user} (other services of yours may use it). To turn it off: sudo loginctl disable-linger ${cli.user}`)
   for (const n of notes) line(cli, 'warn', n)
   return 0
 }

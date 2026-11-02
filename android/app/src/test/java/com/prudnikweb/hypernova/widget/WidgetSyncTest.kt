@@ -11,6 +11,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import com.prudnikweb.hypernova.MainActivity
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
@@ -21,6 +22,7 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -50,12 +52,12 @@ import java.util.concurrent.CopyOnWriteArrayList
 class WidgetSyncTest {
     private val z2 = FakeDaemon("z2")
     private val draws = CopyOnWriteArrayList<WidgetModel>()
-    private val app get() = Core.app
+    private val app get() = AndroidCore.app
     private val widget = 77
 
     @Before fun setUp() {
-        Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(app)
+        AndroidCore.init(RuntimeEnvironment.getApplication())
+        ComputerWords.clear(app.storage)
         // The widget's wall clock moves with the main thread's delays: the gap passes only as a test lets it.
         val base = System.currentTimeMillis() - SystemClock.uptimeMillis()
         WidgetSync.clock = { base + SystemClock.uptimeMillis() }

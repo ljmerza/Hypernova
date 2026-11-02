@@ -6,7 +6,8 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1569 app tests, 1065 daemon tests (1061 pass, 4 skipped: Mac-only).
+2026-11-01: 1185 app tests and 592 in `android/shared` (each on both of its targets), 1089 daemon tests
+(1085 pass, 4 skipped: Mac-only). The 1569 tests from before the move are all among them.
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
@@ -18,7 +19,11 @@ tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens 
 
 Test names, shortened:
 
-- `Class.test` is an app test under `android/app/src/test/java/com/prudnikweb/hypernova/`.
+- `Class.test` is an app test, under `android/app/src/test/java/com/prudnikweb/hypernova/`, or a data
+  test that moved with its code to `android/shared/src/` (docs/PLATFORMS.md, "The shared module"):
+  plain ones and `ContractTest` in `commonTest/`, which run on Android's and the desktop's JVM; the
+  rig tests that need nothing of Android in `hubTest/`, which run off Android in `:shared` and on
+  Robolectric in `:app`.
   - Layer 2, the real `LiveHub`/`Core` against `FakeDaemon`: `data/live/` (ActionsTest,
     AllServersSettingsTest, AppUpdaterTest, AutomationNotesTest, ConnectTest, ConnectionServiceTest,
     CoreServersTest, DeviceCertStoreTest, ErrorsTest, MacOnlyTest, MultiServerTest, MutualTlsTest,
@@ -79,7 +84,7 @@ Test names, shortened:
 | H8 | A job that died: "Stopped with an error" on its card, a banner or notification | JobDiedTest (all); SocketEventsTest.aDeadJobIsSaidOnce; fixture ws-job-died.json; job-deaths.test.ts (all); claude-agents.test.ts › "a job that crashes mid-turn…" | **covered** |
 | H9 | "Restart all" for jobs on an older Claude Code | OutdatedJobsTest (all); RestartOfferTest (all); HomeMoreTest.theOutdatedJobsNoticeRestartsThemAllAfterAskingAndSaysWhichRefused; ActionsTest.respawnOutdatedJobsUsesTheSlowRoute; fixture rest-jobs-respawn.json; claude-agents.test.ts › "the respawn-all route…" | **covered** |
 | H10 | Cards above the sessions (account, providers, prompts for gone sessions, automation questions), dismiss and undo | AttentionTest (all); HomeGroupsTest.theAccountCardFollowsWhatsOverIt; ProvidersTest (all); HomeMoreTest.aPromptWhoseSessionEndedStartsANewSessionOrGoes, aProvidersTroubleIsACardThatGoesWithASwipeAndComesBackWithUndo; SessionRoutesTest.aWaitingPromptWhoseSessionIsGoneStartsANewSessionInItsFolder | **partial**: the account card (signed out, a limit, no plan) and an automation's question card (the Automations area's) aren't drawn in a screen test |
-| H11 | Usage cards (Claude, Codex, one per computer) | UsageCardsTest (all); AllUsageTest (all); UsageWindowTest (all); UsageMeterTest (all); FiveHourReportedTest (all); ModelWeeksTest (all); HomeMoreTest.whereOnlyCodexIsInUseHomesUsageCardIsCodexs, eachModelsOwnWeekHasItsMeter; the `home_groups` baseline | **covered** |
+| H11 | Usage cards (Claude, Codex, one per computer) | UsageCardsTest (all); AllUsageTest (all); UsageWindowTest (all); UsageMeterTest (all); FiveHourReportedTest (all); ModelWeeksTest (all); HomeMoreTest.whereOnlyCodexIsInUseHomesUsageCardIsCodexs, eachModelsOwnWeekHasItsMeter, theUsageCardSaysItsAgentAndPlan, aPlanItDoesntKnowIsStillSaid, theUsageCardSaysJustTheAgentWithoutAPlan, codexsUsageCardSaysItsPlan; the `home_groups` baseline | **covered** |
 | H12 | The sky: the sun as usage, planets as projects, Codex's star, companions | SkyPlanTest, SkyLayoutTest, SkyPhysicsTest, SkySplitTest, AgentLeadTest, PaceTest, CountdownTest (all); SkyTest.theSunThePlanetsAndTheFarSky (the far sky, the sun's readout, the planets and the belt drawn, baseline `sky`, with the sky's seed and the wall clock pinned) | **covered** (Home hides the system since 2026-10-30; the drawing is guarded on its own. Codex's star and the companion aren't in the baseline: their placement is SkySplitTest's) |
 | H13 | Home filters: the button and sheet (Active, states, agent, project, server), the chip with its hidden needs-you count, Clear, the empty result, kept on the phone, search within it, the top bar at a large font | HomeFilterTest (all); HomeFilterScreenTest (all) | **partial**: the Agent row (both agents in use) isn't drawn in a screen test; the sky's project filter with Home's together is only reasoned, not tested |
 | H14 | Home sort: the button and sheet (Name by default, Recent, Project, Server in All servers), within the groups, across every computer's cards, in search results, kept on the phone, the lit button; the top bar at both fonts | HomeSortTest (all); HomeGroupsTest.completedByNameByDefault, completedNewestFirstByRecent; AllHomeTest.byServerGroupsEachComputersCardsTogetherThenByName; HomeSortScreenTest (all); HomeFilterScreenTest.theTopBarFitsAtTheUsualFont, theTopBarFitsAtTheUsualFontWithAllServers, theTopBarFitsAtALargeFontWithAllServers, aWiderPhoneKeepsTheWordsWithAllServers, aWiderPhoneSaysNewWithOneServer | **covered** |
@@ -293,7 +298,7 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
-| D1 | `hypernova setup` and `uninstall`: Node, the service, lingering, the integration | linux-cli.test.ts (all) | **covered** |
+| D1 | `hypernova setup` and `uninstall` on Linux: Node, the service, lingering, the integration | linux-cli.test.ts (all) | **covered** |
 | D2 | `pair`, `status`, `doctor`, `logs`, `lan` | linux-cli.test.ts (all) | **covered** |
 | D3 | WSL | wsl.test.ts (all); linux-cli.test.ts (the WSL tests) | **covered** |
 | D4 | Hooks and the status line tap | hooks.test.ts (all) | **covered** |
@@ -304,6 +309,9 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | D9 | Account and limits | account.test.ts, account-restart.test.ts, restart.test.ts, provider-env.test.ts (all) | **covered** |
 | D10 | Where state and logs live; log rotation | platform.test.ts, linux-fixes.test.ts, util.test.ts (all) | **covered** |
 | D11 | Security: no CORS, the hooks' secret, keys masked, credential files kept back | http.test.ts › "no web page may read the phone API…"; hooks.test.ts › "the hooks' route takes its own secret only…"; normalize.test.ts (the masking tests); secretfiles.test.ts (all); permission-rules.test.ts › "secrets in a settings file never leave…" | **covered** |
+| D12 | The server on a Mac: `setup` with a LaunchAgent, `status`, `doctor`, `logs`, `pair`, `uninstall`, Node.js for macOS, no self-update | mac-cli.test.ts (all: the plist, launchctl's lines and answers, each command against stand-ins); server-update.test.ts › "not managed…"; `scripts/test-install-macos.sh` (the scripts under bash 3.2, stand-ins for macOS); `scripts/test-macos-smoke.sh` (the real thing, on CI's Mac runners only) | **partial**: nobody has run it on a real Mac they use; what macOS asks a person at the screen isn't tested anywhere (docs/INSTALL.md, "On a Mac") |
+| D13 | The `.deb`: `hypernova-server-setup`, upgrade, remove, purge around a running server | `scripts/test-server-deb.sh` (Docker, systemd: Ubuntu 24.04, Debian 12 and 13; on CI, on amd64 and arm64) | **covered** (not by `npm test`; arm64 only on CI's runner) |
+| D14 | A release's assets and their names; a server reads the client's name, then the old one | releases.test.ts › "the client’s name is read first…"; `scripts/test-next-version.sh` (the notes' Client and Server headings, each file's name) | **covered** (the workflows themselves run only on GitHub; actionlint checks them) |
 
 ## Protocol without a contract fixture
 

@@ -9,15 +9,17 @@ import androidx.core.app.NotificationCompat
 import com.prudnikweb.hypernova.BootReceiver
 import com.prudnikweb.hypernova.ConnectionService
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
-import com.prudnikweb.hypernova.data.Notifier
+import com.prudnikweb.hypernova.data.AndroidNotifier
 import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.Phrases
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,8 +56,8 @@ class ConnectionServiceTest {
         }
     }
 
-    private fun text() = nm.getNotification(Notifier.CONNECTION_ID)?.extras?.getCharSequence(NotificationCompat.EXTRA_TEXT)?.toString()
-    private fun title() = nm.getNotification(Notifier.CONNECTION_ID)?.extras?.getCharSequence(NotificationCompat.EXTRA_TITLE)?.toString()
+    private fun text() = nm.getNotification(AndroidNotifier.CONNECTION_ID)?.extras?.getCharSequence(NotificationCompat.EXTRA_TEXT)?.toString()
+    private fun title() = nm.getNotification(AndroidNotifier.CONNECTION_ID)?.extras?.getCharSequence(NotificationCompat.EXTRA_TITLE)?.toString()
 
     @Before fun pair() {
         shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
@@ -68,8 +70,8 @@ class ConnectionServiceTest {
                 shadowOf(it).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             })
         }
-        Core.init(app)
-        ComputerWords.clear(app)
+        AndroidCore.init(app)
+        ComputerWords.clear(app.storage)
         Core.stayConnected(true)
         z2.snapshot = snapshot(
             "z2",
@@ -101,10 +103,10 @@ class ConnectionServiceTest {
         val c = Robolectric.buildService(ConnectionService::class.java).create()
         val service = c.get()
         assertTrue(ConnectionService.running)
-        assertEquals(Notifier.CONNECTION_ID, shadowOf(service).lastForegroundNotificationId)
+        assertEquals(AndroidNotifier.CONNECTION_ID, shadowOf(service).lastForegroundNotificationId)
         until("the counts") { text() == counts(2, 1) }
         assertEquals("z2", title())
-        val n = nm.getNotification(Notifier.CONNECTION_ID)!!
+        val n = nm.getNotification(AndroidNotifier.CONNECTION_ID)!!
         assertTrue("ongoing", n.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0)
         assertEquals(app.getString(R.string.notif_disconnect), n.actions.single().title.toString())
 
@@ -122,7 +124,7 @@ class ConnectionServiceTest {
     @Test fun disconnectClosesTheLinkUntilTheAppOpensAndStopsTheService() {
         val c = Robolectric.buildService(ConnectionService::class.java).create()
         until("the counts") { text() == counts(2, 1) }
-        val disconnect = shadowOf(nm.getNotification(Notifier.CONNECTION_ID)!!.actions.single().actionIntent).savedIntent
+        val disconnect = shadowOf(nm.getNotification(AndroidNotifier.CONNECTION_ID)!!.actions.single().actionIntent).savedIntent
         assertEquals(ConnectionService.ACTION_DISCONNECT, disconnect.action)
 
         c.withIntent(disconnect).startCommand(0, 2)

@@ -61,6 +61,7 @@ import com.prudnikweb.hypernova.data.PairLink
 import com.prudnikweb.hypernova.data.PairLinks
 import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.problemText
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.Planet
 import com.prudnikweb.hypernova.ui.components.BlurredTop
@@ -302,9 +303,9 @@ fun PairScreen(flow: PairFlow, onRetry: (PairLink) -> Unit, onClose: () -> Unit,
                     // The Mac's local listener (docs/PROTOCOL.md, "Local network"): no code on its screen, or a pause after wrong ones.
                     flow.code == "pairing_closed" -> stringResource(R.string.pair_closed_body)
                     flow.code == "too_many_tries" -> ((flow.retryAfterSeconds.takeIf { it > 0 } ?: 600) + 59).div(60).let { pluralStringResource(R.plurals.pair_too_many_body, it, it) }
-                    flow.problem == Problem.CodeExpired -> problemText(res, Problem.CodeExpired)
+                    flow.problem == Problem.CodeExpired -> problemText(res.strings, Problem.CodeExpired)
                     flow.problem == Problem.Server && !flow.message.isNullOrBlank() -> flow.message
-                    else -> problemText(res, flow.problem)
+                    else -> problemText(res.strings, flow.problem)
                 }
                 StateScreen(
                     mark = { StateMark(HN.danger, Glyph.Cross) },

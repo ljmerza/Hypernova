@@ -20,7 +20,7 @@ fun agentName(res: Resources, codex: Boolean): String = res.getString(if (codex)
  * where Claude Code is alone (the words from before Codex, unchanged), [codex] where Codex leads
  * (Claude Code isn't installed), [both] while both are in use.
  */
-fun byAgents(claudeState: com.prudnikweb.hypernova.data.ClaudeState?, codexState: com.prudnikweb.hypernova.data.CodexState?, claude: Int, codex: Int, both: Int): Int = when {
+fun <T> byAgents(claudeState: com.prudnikweb.hypernova.data.ClaudeState?, codexState: com.prudnikweb.hypernova.data.CodexState?, claude: T, codex: T, both: T): T = when {
     com.prudnikweb.hypernova.data.AgentLead.both(claudeState, codexState) -> both
     com.prudnikweb.hypernova.data.AgentLead.codexLeads(claudeState, codexState) -> codex
     else -> claude

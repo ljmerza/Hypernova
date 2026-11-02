@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.HubViewModel
@@ -22,6 +23,7 @@ import com.prudnikweb.hypernova.data.Route
 import com.prudnikweb.hypernova.data.live.FakeDaemon
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.settings.AboutBuild
 import com.prudnikweb.hypernova.ui.settings.SettingsTab
 import com.prudnikweb.hypernova.ui.theme.TextSize
@@ -62,8 +64,8 @@ class SettingsTabTest {
 
     @Before fun setUp() {
         resetPrefs()
-        Core.init(RuntimeEnvironment.getApplication())
-        ComputerWords.clear(Core.app)
+        AndroidCore.init(RuntimeEnvironment.getApplication())
+        ComputerWords.clear(AndroidCore.app.storage)
         AboutBuild.name = "1.2.3"
         AboutBuild.code = 4242
     }
@@ -74,7 +76,7 @@ class SettingsTabTest {
         shadowOf(Looper.getMainLooper()).idle()
         daemons.forEach { it.close() }
         TextSize.set(context, TextSize.SMALL)
-        NewSessionMemory.setStartMode(context, "default")
+        NewSessionMemory.setStartMode(context.storage, "default")
         AboutBuild.name = build.first
         AboutBuild.code = build.second
     }
@@ -108,7 +110,7 @@ class SettingsTabTest {
     private fun JSONObject.files(on: Boolean) = apply { getJSONObject("mac").put("files", JSONObject().put("browseOutsideProjects", on)) }
 
     private fun show(): HubViewModel {
-        val vm = HubViewModel(Core.app)
+        val vm = HubViewModel(AndroidCore.app)
         rule.setContent {
             ui = androidx.compose.ui.platform.LocalContext.current
             Harness(spy) { SettingsTab(vm, top = 0.dp) }
@@ -209,7 +211,7 @@ class SettingsTabTest {
         assertEquals(TextSize.LARGE, TextSize.state(context).value)
         // New sessions start in Plan.
         clickText(str(R.string.mode_plan))
-        assertEquals("plan", NewSessionMemory.startMode(context))
+        assertEquals("plan", NewSessionMemory.startMode(context.storage))
         // Stay connected in the background: off, and back on.
         assertTrue(vm.background)
         rule.onNode(isSwitch(str(R.string.bg_title))).performScrollTo().performClick()

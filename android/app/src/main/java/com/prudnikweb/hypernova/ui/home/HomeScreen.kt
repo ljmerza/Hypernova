@@ -160,6 +160,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import com.prudnikweb.hypernova.data.HomeSearch
 import com.prudnikweb.hypernova.data.TextHit
+import com.prudnikweb.hypernova.data.strings
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.components.Icon
 import kotlinx.coroutines.launch
 import com.prudnikweb.hypernova.ui.fx.rememberScrambled
@@ -630,7 +632,7 @@ fun HomeScreen(
                     items(members, key = { it.key }) { c ->
                         val s = c.session
                         val hub = c.hub
-                        val readMarks = ReadState.server(hub)?.let { ReadState.of(context, it) }
+                        val readMarks = ReadState.server(hub)?.let { ReadState.of(context.storage, it) }
                         val hits = if (!typed) null else if (c.server == null) full.hits else fullBy[c.server]?.hits
                         val server = c.server
                         // Opening it: on its own computer (which is visited for the session's screens) with "All servers".
@@ -656,7 +658,7 @@ fun HomeScreen(
                                 CardSwipe.Delete -> page = MenuPage.Delete
                                 CardSwipe.Rename -> page = MenuPage.Rename
                                 CardSwipe.Restart -> page = MenuPage.Restart
-                                CardSwipe.MarkRead -> ReadState.server(hub)?.let { ReadState.mark(context, it, s.id, s.updatedAt) }
+                                CardSwipe.MarkRead -> ReadState.server(hub)?.let { ReadState.mark(context.storage, it, s.id, s.updatedAt) }
                             }
                         }
                         SessionCard(
@@ -1168,10 +1170,10 @@ fun SessionCard(
             Seam(
                 label = s.project,
                 after = server?.let { if (offline) stringResource(R.string.servers_tag_offline, it) else it },
-                // Its short id and age as quiet marks, not "c7 · 1m". Completed: when it finished.
+                // Its age as a quiet mark (no short id: owner, 2026-11-01, "1d" read like an age). Completed: when it finished.
                 trailContent = {
-                    if (completed) SessionStamp(s.hex, finishedAgo(s.updatedAt, now), finishedSaid(res, s.hex, s.updatedAt, now))
-                    else SessionStamp(s.hex, ago(s.updatedAt, now), sessionSaid(res, s.hex, s.updatedAt, now))
+                    if (completed) SessionStamp(finishedAgo(s.updatedAt, now), finishedSaid(res, s.updatedAt, now))
+                    else SessionStamp(ago(s.updatedAt, now), sessionSaid(res, s.updatedAt, now))
                 },
                 activity = when {
                     needs -> Activity.Alert
@@ -1398,6 +1400,11 @@ private fun ScrambledName(name: String, scramble: Boolean) {
     HText(rememberScrambled(name, scramble), style = Type.heading, color = HN.ink, maxLines = 1)
 }
 
+/** A usage card's trail (owner, 2026-11-01): whose it is and on what plan, "Claude Code Max" or "Codex Pro"; just the agent while the plan isn't known. */
+@Composable
+private fun agentAndPlan(agent: Int, withPlan: Int, plan: String?): String =
+    com.prudnikweb.hypernova.ui.settings.planWord(plan)?.let { stringResource(withPlan, it) } ?: stringResource(agent)
+
 @Composable
 private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier, from: String? = null) {
     val u = hub.usage
@@ -1412,7 +1419,7 @@ private fun UsageCard(hub: Hub, cards: UsageCards, modifier: Modifier = Modifier
                 after = from,
                 trail = when {
                     u.stale -> stringResource(R.string.usage_stale_trail)
-                    u.known -> stringResource(R.string.usage_official)
+                    u.known -> agentAndPlan(R.string.usage_agent_claude, R.string.usage_agent_claude_plan, hub.account.plan)
                     else -> stringResource(R.string.usage_waiting)
                 },
             )
@@ -1464,6 +1471,7 @@ private fun CodexUsageCard(c: CodexState, cards: UsageCards, modifier: Modifier 
             Seam(
                 stringResource(cards.codexTitle),
                 after = from,
+                trail = agentAndPlan(R.string.usage_agent_codex, R.string.usage_agent_codex_plan, c.account?.planType),
                 trailContent = if (u?.limited == true) ({ SeamWords(stringResource(R.string.cx_usage_limited), color = HN.amber) }) else null,
                 color = if (u?.limited == true) HN.amber else HN.inkMuted,
             )
@@ -1613,7 +1621,7 @@ private fun OfflineCard(hub: Hub, modifier: Modifier = Modifier) {
     AttentionCard(
         id = "offline", state = offlineAttention(link), tone = HN.danger, glyph = Glyph.Unlink,
         title = stringResource(R.string.cant_reach, hub.mac.name),
-        line = com.prudnikweb.hypernova.data.linkProblemText(res, link),
+        line = com.prudnikweb.hypernova.data.linkProblemText(res.strings, link),
         stamp = retry,
         action = AttentionAction(stringResource(R.string.retry_now), hub::retry),
         links = listOfNotNull(
@@ -1732,12 +1740,12 @@ private fun AccountCard(hub: Hub, onOpen: (String) -> Unit, onNewSession: () -> 
         }
     }
     val left = limit?.resetsAt?.let { formatDuration(res, (it - now).coerceAtLeast(0)) }
-    fun at(t: Long) = AccountWords.atClock(context, t, now)
-    fun clock(t: Long) = AccountWords.clock(context, t, now)
+    fun at(t: Long) = AccountWords.atClock(context.strings, t, now)
+    fun clock(t: Long) = AccountWords.clock(context.strings, t, now)
     val text = when (a.state) {
         Account.LIMITED -> {
             val l = limit ?: return
-            val label = AccountWords.label(context, l)
+            val label = AccountWords.label(context.strings, l)
             val until = l.resetsAt
             when {
                 l.usingCredits -> AccountText(label, left?.let { stringResource(R.string.resets_in, it) }, stringResource(R.string.account_on_credits_title), until?.let { stringResource(R.string.account_on_credits_body, clock(it)) })
@@ -2103,7 +2111,7 @@ private fun ProviderCard(t: Troubled, modifier: Modifier = Modifier) {
         com.prudnikweb.hypernova.data.ProviderStatus.BAD_KEY -> stringResource(R.string.provider_card_bad_key_body)
         com.prudnikweb.hypernova.data.ProviderStatus.NO_CREDIT -> stringResource(R.string.provider_card_no_credit_body)
         com.prudnikweb.hypernova.data.ProviderStatus.LIMITED -> st.resetsAt?.takeIf { it > now }
-            ?.let { stringResource(R.string.provider_card_limited_body, com.prudnikweb.hypernova.data.AccountWords.atClock(context, it, now)) }
+            ?.let { stringResource(R.string.provider_card_limited_body, com.prudnikweb.hypernova.data.AccountWords.atClock(context.strings, it, now)) }
             ?: stringResource(R.string.provider_no_reset)
         com.prudnikweb.hypernova.data.ProviderStatus.DOWN -> stringResource(R.string.provider_down_line)
         else -> st.text.takeIf { it.isNotBlank() }
@@ -2194,7 +2202,7 @@ private fun finishedAgo(t: Long, now: Long): String = when (val f = Finished.of(
 }
 
 /** "Session c7, finished 5 minutes ago." */
-private fun finishedSaid(res: android.content.res.Resources, hex: String, t: Long, now: Long): String {
+private fun finishedSaid(res: android.content.res.Resources, t: Long, now: Long): String {
     val ago = when (val f = Finished.of(t, now)) {
         Finished.Now -> res.getString(R.string.meta_ago_now)
         is Finished.Minutes -> res.getQuantityString(R.plurals.meta_ago_minutes, f.n, f.n)
@@ -2202,5 +2210,5 @@ private fun finishedSaid(res: android.content.res.Resources, hex: String, t: Lon
         Finished.Yesterday -> res.getString(R.string.done_ago_yesterday)
         is Finished.Days -> res.getQuantityString(R.plurals.meta_ago_days, f.n, f.n)
     }
-    return res.getString(R.string.meta_finished_said, hex, ago)
+    return res.getString(R.string.meta_finished_said, ago)
 }

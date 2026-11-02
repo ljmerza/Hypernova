@@ -1,17 +1,24 @@
 name: android-release
-# The fork's releases: the signed APK for the phone, built with the fork's own release key (repo
-# secrets), and the Linux server package (scripts/pack-linux.sh). Every push to main that touches the
-# app, the daemon or the server's install scripts (and a manual run) builds both and publishes the
+# The fork's releases: the signed APK for the phone, the client, built with the fork's own release key
+# (repo secrets), and the Linux server package (scripts/pack-linux.sh). Every push to main that touches
+# the app, the daemon or the server's install scripts (and a manual run) builds both and publishes the
 # next semantic version, vX.Y.Z from the conventional commits since the last one
-# (scripts/next-version.sh; docs/RELEASING.md, "Versions"), with hypernova-vX.Y.Z.apk and
-# hypernova-server-vX.Y.Z-linux.tar.gz attached, so a download says which build it is, and
-# hypernova-vX.Y.Z.json (the APK's versionCode, versionName and SHA-256, and the server package's
-# SHA-256: servers read it to offer the phones the release's APK, daemon/src/releases.ts, and to
-# update themselves, daemon/src/server-update.ts). The APK's
+# (scripts/next-version.sh; docs/RELEASING.md, "Versions"), with hypernova-client-vX.Y.Z-android.apk and
+# hypernova-server-vX.Y.Z-linux.tar.gz attached, so a download says which build it is and which side
+# it's for, and hypernova-vX.Y.Z.json (the APK's versionCode, versionName and SHA-256, and the server
+# package's SHA-256: servers read it to offer the phones the release's APK, daemon/src/releases.ts, and
+# to update themselves, daemon/src/server-update.ts). The same APK goes on as hypernova-vX.Y.Z.apk too:
+# servers already running look for that name, and for the note's and the server package's as they are,
+# so those three names never change. The APK's
 # versionName is that version; its versionCode the build minute. One job, so one push makes one release, and every
 # release has both files (a daemon-only fix rebuilds the same app). A release published by hand gets
 # both attached too. The key must never change: Android only installs an update signed with the key
 # the installed app has.
+#
+# After that job has published, the server-packages job (server-packages.yml) builds and tests the
+# .deb and the Mac's packages and adds them, with SHA256SUMS. It `needs` the apk job, so a failure or a
+# stuck runner there can never stop a release: the APK and the Linux server package are out already.
+# A failure costs only that file, turns this run red, and leaves a line in the release's notes.
 #
 # Secrets: HYPERNOVA_KEYSTORE_B64 (base64 of the .jks), HYPERNOVA_KEYSTORE_PASSWORD,
 # HYPERNOVA_KEY_ALIAS, HYPERNOVA_KEY_PASSWORD.
@@ -23,20 +30,28 @@ on:
       - 'daemon/**'
       - 'scripts/pack-linux.sh'
       - 'scripts/install-linux.sh'
+      - 'scripts/install-macos.sh'
+      - 'scripts/pack-deb.sh'
+      - 'scripts/pack-macos.sh'
+      - 'scripts/server-setup.sh'
       - '.github/workflows/android-release.yml'
+      - '.github/workflows/server-packages.yml'
   release:
     types: [published]
   workflow_dispatch:
-# One at a time, never cancelled: each run publishes the next version, counted from the tags.
-concurrency:
-  group: android-release
-  cancel-in-progress: false
 permissions:
   contents: write
 jobs:
   apk:
+    # One at a time, never cancelled: each run publishes the next version, counted from the tags.
+    # On this job and not the run, so a Mac runner that's slow to come never holds up the next release.
+    concurrency:
+      group: android-release
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     defaults:
       run:
         working-directory: android
@@ -79,6 +94,7 @@ jobs:
       # the last vX.Y.Z tag (scripts/next-version.sh; never under 0.3.0), and that tag as PREV for
       # the notes. Never a tag that already exists.
       - name: Version
+        id: version
         env:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_TAG: ${{ github.event.release.tag_name }}
@@ -93,6 +109,7 @@ jobs:
           fi
           echo "Release $tag (after ${prev:-none})"
           { echo "TAG=$tag"; echo "PREV=$prev"; echo "VERSION=${tag#v}"; } >> "$GITHUB_ENV"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       # distRelease refuses without the release key and verifies the signed APK; output in ../dist.
       # The versionName is the release's version (build.gradle.kts's appVersion is the local default).
       - run: ./gradlew :app:distRelease --stacktrace -PappVersion="$VERSION"
@@ -122,6 +139,7 @@ jobs:
         run: |
           tag=$TAG
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
+          cp ../dist/hypernova.apk "../dist/hypernova-client-$tag-android.apk"
           cp "$SERVER_TGZ" "../dist/hypernova-server-$tag-linux.tar.gz"
           # The version note servers read before fetching the APK (daemon/src/releases.ts): the
           # build's versionCode and versionName, the APK's SHA-256 and the server package's. Uploaded last.
@@ -130,9 +148,10 @@ jobs:
           ssum=$(sha256sum "../dist/hypernova-server-$tag-linux.tar.gz" | cut -d' ' -f1)
           jq -c --arg sha256 "$sum" --arg serverSha256 "$ssum" '{versionCode, versionName, sha256: $sha256, serverSha256: $serverSha256}' ../dist/hypernova.json > "../dist/hypernova-$tag.json"
           jq -e '(.versionCode | type == "number") and (.versionName | type == "string") and (.sha256 | test("^[0-9a-f]{64}$")) and (.serverSha256 | test("^[0-9a-f]{64}$"))' "../dist/hypernova-$tag.json" > /dev/null
-          gh release upload "$tag" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" --clobber
+          gh release upload "$tag" "../dist/hypernova-client-$tag-android.apk" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" --clobber
           gh release upload "$tag" "../dist/hypernova-$tag.json" --clobber
-      # A push or a manual run: the release vX.Y.Z (the Version step), with the APK on it once, as
+      # A push or a manual run: the release vX.Y.Z (the Version step), with the APK on it as
+      # hypernova-client-vX.Y.Z-android.apk and, for servers that look for that name,
       # hypernova-vX.Y.Z.apk, and the server as hypernova-server-vX.Y.Z-linux.tar.gz (a download says
       # which build it is). A release made with the workflow token starts no other workflows.
       - name: Publish the next release
@@ -143,6 +162,7 @@ jobs:
         run: |
           tag=$TAG
           cp ../dist/hypernova.apk "../dist/hypernova-$tag.apk"
+          cp ../dist/hypernova.apk "../dist/hypernova-client-$tag-android.apk"
           cp "$SERVER_TGZ" "../dist/hypernova-server-$tag-linux.tar.gz"
           # The version note servers read before fetching the APK (daemon/src/releases.ts): the
           # build's versionCode and versionName, the APK's SHA-256 and the server package's.
@@ -154,5 +174,14 @@ jobs:
           # The notes: what changed since the release before, by type, and how to install
           # (scripts/release-notes.sh).
           ../scripts/release-notes.sh "$tag" "$PREV" "$GITHUB_SHA" > ../dist/notes.md
-          gh release create "$tag" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" "../dist/hypernova-$tag.json" \
+          gh release create "$tag" "../dist/hypernova-client-$tag-android.apk" "../dist/hypernova-$tag.apk" "../dist/hypernova-server-$tag-linux.tar.gz" "../dist/hypernova-$tag.json" \
             --target "$GITHUB_SHA" --title "$tag" --notes-file ../dist/notes.md
+
+  # The .deb and the Mac's packages, added to the release just published. Only after it, and only if
+  # it succeeded: nothing here can hold up or undo what the job above has done.
+  server-packages:
+    needs: apk
+    uses: ./.github/workflows/server-packages.yml
+    with:
+      tag: ${{ needs.apk.outputs.tag }}
+      attach: true

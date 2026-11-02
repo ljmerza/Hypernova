@@ -32,4 +32,5 @@ jobs:
           "$SDKM" "platforms;android-37.0" "build-tools;37.0.0" || "$SDKM" "platforms;android-37"
       # Caches Gradle's downloads and the wrapper; it only saves them from the main branch.
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --stacktrace
+      # The app, and the shared data layer on both of its targets (docs/PLATFORMS.md, "The shared module").
+      - run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :shared:compileKotlinDesktop :shared:desktopTest :shared:testAndroidHostTest --stacktrace

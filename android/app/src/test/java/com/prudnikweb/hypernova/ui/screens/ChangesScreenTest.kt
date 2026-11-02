@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.screens
 
+import com.prudnikweb.hypernova.data.ChangesRepo
 import android.os.Looper
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isDialog
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Pairing
@@ -41,7 +43,7 @@ class ChangesScreenTest {
 
     @Before fun setUp() {
         resetPrefs()
-        Core.init(context as android.app.Application)
+        AndroidCore.init(context as android.app.Application)
         mac.ok("GET", "/v1/sessions/${Samples.ZETA}/changes", ScreenFixtures.json("rest-changes"))
         mac.ok("GET", "/v1/sessions/${Samples.ZETA}/changes/diff", ScreenFixtures.json("rest-changes-diff"))
         Core.paired(Pairing(mac.base, "tok-z2", "z2", "m-z2", "dev-1"))

@@ -99,6 +99,9 @@ android {
     // The protocol's contract fixtures, shared with the daemon's tests (docs/PROTOCOL.md, "Contract
     // fixtures"): on the unit tests' classpath as fixtures/*.json, so a changed fixture runs them again.
     sourceSets.getByName("test").resources.srcDir("../../protocol")
+    // The real hub against a fake daemon (shared/src/hubTest): here on Robolectric, so Android's side of
+    // every seam is in them; in :shared off Android.
+    sourceSets.getByName("test").kotlin.srcDir("../shared/src/hubTest/kotlin")
     // Robolectric tests read the app's own resources (LiveHub's words in data/live; strings and fonts in ui/screens).
     testOptions {
         unitTests.isIncludeAndroidResources = true
@@ -106,6 +109,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":shared"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -226,4 +230,12 @@ tasks.register("distRelease") {
         mapping.get().asFile.copyTo(File(out, "hypernova-mapping.txt"), overwrite = true)
         logger.lifecycle("distRelease: ${File(out, "hypernova.apk")} (${file.length() / 1024} KB), ${note.trim()}, certificate SHA-256 $actual")
     }
+}
+
+// :shared is this app's own code in another module, built with it: its classes count as the app's for
+// the compiler, so a nullable property checked on one line is still known non-null on the next
+// (Kotlin refuses that smart cast across modules unless they're friends).
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    val shared = project(":shared").layout.buildDirectory.get().asFile
+    friendPaths.from(libraries.filter { it.startsWith(shared) })
 }

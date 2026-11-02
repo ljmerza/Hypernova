@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /** The app's words for the paired computer: "your Mac", or "your server" for a Linux one (data/ComputerWords.kt). */
-    override fun getResources(): android.content.res.Resources = com.prudnikweb.hypernova.data.ComputerWords.wrap(super.getResources())
+    override fun getResources(): android.content.res.Resources = com.prudnikweb.hypernova.data.ComputerResources.wrap(super.getResources())
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

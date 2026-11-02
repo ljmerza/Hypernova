@@ -3360,3 +3360,41 @@ drawn. What it no longer draws is a guess.
 ## The status line's steps (2026-11-01)
 
 The owner: "for the workflow green bar at the bottom I like to see tiny little dividers for each step." The chat's status line draws a short gap between steps, for a workflow's agents and for to-dos alike: done ones full, the current one breathing, the rest the track. With too many steps to read (each under about three gaps long) it goes back to one line.
+
+## No session id on the cards (2026-11-01)
+
+The owner asked what the two characters on a card were, the start of the session's id, with `1d` reading like an age next to `21d`, and chose to remove them. Home's cards and History's rows show only how long ago; TalkBack says "Active 4 minutes ago." or "Finished …". The session's own header keeps its short id.
+
+## The usage card says its agent and plan (2026-11-01)
+
+The owner: "remove the word official in the usage card", and add the agent and the plan (Pro, Max,
+Ultra). The trail of each usage card now says both, `Claude Code Max` or `Codex Pro`, or just the
+agent while the plan isn't known. Plans come from what the server already sends, so a plan the app
+has no spelling for is still shown, capitalised. "not measured" and "no numbers yet" stay on Claude's
+card, and LIMITED on Codex's, since they matter more than the name while they hold.
+
+## The server's packages (2026-11-01)
+
+The owner: "make the CI build a deb and img or whatever is needed for Linux and Mac", and he chose the server first; the desktop client's packages come after the shared module (LATER L105). Then: "make the names of everything clear about a server vs client version."
+
+1. **Every download says server or client** (docs/RELEASING.md, "Names"): `hypernova-server-vX.Y.Z-linux-amd64.deb`, `hypernova-server-vX.Y.Z-macos-arm64.pkg`, `hypernova-client-vX.Y.Z-android.apk`, with the desktop client's names reserved. **The old names stay published**, `hypernova-<tag>.apk`, `hypernova-<tag>.json` and `hypernova-server-<tag>-linux.tar.gz`, because servers already running look for exactly those. A current server reads the client's name first and the old one as a fallback, and fetches one. The Debian package is `hypernova-server`, its command `hypernova-server-setup`. **The `hypernova` command keeps its name**: it's used everywhere, and renaming it would break installs.
+2. **The `.deb` doesn't install a server; it lets a user install one.** The install stays per-user (its own Node.js, its own node-pty build, a systemd user service, self-update replacing that user's copy), and a package installs as root. So the `.deb` puts the release in `/usr/lib/hypernova-server`, declares in `Depends` what `install-linux.sh` would otherwise ask `sudo` for, and adds `/usr/bin/hypernova-server-setup`, which a user runs for the normal install from that folder. Its scripts only say what's next. Upgrading it leaves a running server alone; removing or purging it never touches a home folder. `hypernova-server-setup` won't go back from a server that updated itself past the package without `--force`. `scripts/test-server-deb.sh` holds all this, around a running session.
+3. **The server installs on a Mac, from the same one-line command**: a LaunchAgent (`daemon/src/cli/launchd.ts`) instead of the unit, `scripts/install-macos.sh`, and `status`, `doctor`, `logs`, `pair` and `uninstall` working there. No menu bar app. `AbandonProcessGroup` is KillMode=process's counterpart: launchd.plist(5) says launchd kills what's left in a dead job's process group unless that's set, and holders have a process group of their own anyway. It starts at login, not at boot, which is what a LaunchAgent can do.
+4. **A Mac doesn't update itself yet.** `installKind` says "not available here" with the one-line command, until it has run on a real Mac. A broken self-update on a machine nobody can reach is worse than none (LATER L106).
+5. **Tarball and an unsigned `.pkg`, no `.dmg`.** A `.dmg` is for dragging an app to Applications, and this is a background service set up per user. The `.pkg` does what the `.deb` does. It's unsigned while there's no Apple account (LATER L107): docs/INSTALL.md says what a person sees, and the `curl` line avoids it.
+6. **The Mac is tested on CI's runners only, and the docs say so.** There's no Mac here. `scripts/test-macos-smoke.sh` is the one real test: install, the LaunchAgent, `status`, `doctor`, the API, restarts, a session surviving them, `uninstall`. What it can't show, what macOS asks a person at the screen, is marked as such.
+7. **A package that fails never stops a release.** `android-release.yml` publishes the APK and the Linux tarball first, as before; `server-packages.yml` runs after, with `needs: apk`, and adds what passes its tests, plus `SHA256SUMS`. The release's queue moved to the `apk` job, so a Mac runner that's slow to come can't hold up the next one. The price is some minutes in which a release has only its first files.
+
+## A shared Android and desktop module, keeping OkHttp (owner, 2026-11-01)
+
+The first step towards a desktop app that can connect, list sessions and approve: `android/shared` holds the data layer, for
+Android and the desktop JVM (docs/PLATFORMS.md, "The shared module").
+
+1. **Android and JVM only.** No iOS or web target, so **OkHttp, org.json, `java.*` and the mutual TLS code stay as they are**: no
+   Ktor, no kotlinx.serialization. This replaces the "OkHttp becomes Ktor" line in PLATFORMS' iOS plan for now; iOS would have to
+   take that up again.
+2. **The package stays `com.prudnikweb.hypernova.data`,** so the app's imports hardly changed.
+3. **No feature changed, and nothing new on the session chat screen.** The tests moved with their code, their names and assertions
+   as they were. The hub's tests run twice: off Android, and on Robolectric with Android's side of the seams.
+4. **`android/shared`, not a top-level `shared/`:** Gradle's root is `android/`, and the release and CI already follow `android/**`.
+5. **No desktop app and no desktop implementations yet.** That is step 2.

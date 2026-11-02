@@ -1,5 +1,5 @@
-// The machine the daemon runs on: a Mac (with the menu bar app) or a Linux server or PC (WSL on a
-// Windows PC too, experimental), run from the command line only (docs/DECISIONS.md, "Direction: open source, self-hosted";
+// The machine the daemon runs on: a Mac or a Linux server or PC (WSL on a Windows PC too,
+// experimental), run from the command line only (docs/DECISIONS.md, "Direction: open source, self-hosted";
 // docs/LINUX.md). Where state and logs live, which of the Mac's features exist here and
 // why not, and where the programs the daemon runs are found.
 //
@@ -41,7 +41,7 @@ export type Places = {
 }
 
 /**
- * Where the daemon keeps its state and logs. The Mac's are the ones the menu bar app knows. On
+ * Where the daemon keeps its state and logs. A Mac's are its own Library folders. On
  * Linux they follow the XDG base directories: state in ~/.local/share/hypernova, logs in
  * ~/.local/state/hypernova/logs. HYPERNOVA_SUPPORT and HYPERNOVA_LOGS win on both (test daemons).
  */
@@ -62,8 +62,17 @@ export function places(platform: Platform, env: NodeJS.ProcessEnv, home: string)
 export const systemdUserDir = (env: NodeJS.ProcessEnv, home: string): string => join(xdg(env, 'XDG_CONFIG_HOME', home, '.config'), 'systemd', 'user')
 
 /**
- * Linux: where the `hypernova` command goes. ~/.local/bin is on PATH in Ubuntu's and Debian's
- * default ~/.profile, and Claude Code's official installer puts `claude` there too.
+ * macOS: the LaunchAgent's label (cli/launchd.ts). The Mac app used it too, so an agent it left
+ * behind is replaced rather than left fighting a second daemon for the ports.
+ */
+export const LAUNCH_LABEL = 'com.prudnikweb.hypernova.daemon'
+/** macOS: the folder launchd reads a user's own agents from. */
+export const launchAgentsDir = (home: string): string => join(home, 'Library', 'LaunchAgents')
+
+/**
+ * Where the `hypernova` command goes. ~/.local/bin is on PATH in Ubuntu's and Debian's default
+ * ~/.profile, and Claude Code's official installer puts `claude` there too. A Mac doesn't have it on
+ * PATH, so the shell integration's block adds it there (hooks.ts).
  */
 export const userBinDir = (home: string): string => join(home, '.local', 'bin')
 
@@ -156,6 +165,12 @@ export const loginShell = (platform: Platform, exists: (p: string) => boolean = 
 // ── The shell ─────────────────────────────────────────────────────────────
 
 export type ShellRc = { kind: 'zsh' | 'bash'; path: string; name: string }
+
+/**
+ * A Mac's first line in the shell block (hooks.ts): ~/.local/bin isn't on PATH there, as it is on
+ * Ubuntu and Debian, and both `hypernova` and Claude Code's official install are in it.
+ */
+export const MAC_PATH_LINE = '[[ ":$PATH:" == *":$HOME/.local/bin:"* ]] || export PATH="$HOME/.local/bin:$PATH"'
 
 /**
  * The startup file the `claude` function goes in, for the owner's login shell: ~/.zshrc for zsh

@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { type Platform, LINUX_BIN_DIRS, inContainer, platformOf, places, systemdUserDir, userBinDir, wslOf } from '../platform.ts'
+import { type Platform, LAUNCH_LABEL, LINUX_BIN_DIRS, inContainer, launchAgentsDir, platformOf, places, systemdUserDir, userBinDir, wslOf } from '../platform.ts'
 
 export type Ran = { code: number | null; out: string; err: string; missing: boolean }
 
@@ -49,6 +49,7 @@ export type Cli = {
   nodePathFile: string
   /** ~/.local/bin/hypernova */
   launcher: string
+  /** The service's file: the systemd unit on Linux, the LaunchAgent's plist on a Mac. */
   unitDir: string
   unitFile: string
   /** The daemon this command runs from (a checkout, an unpacked tarball, or the installed one). */
@@ -88,7 +89,7 @@ export function cliContext(o: Partial<Cli> = {}): Cli {
   // same volume (Dockerfile). Unset, everything lives under the support folder.
   const abs = (v: string | undefined) => (v && v.startsWith('/') ? v : undefined)
   const appDir = abs(env.HYPERNOVA_APP) ?? join(support, 'app')
-  const unitDir = systemdUserDir(env, home)
+  const unitDir = platform === 'darwin' ? launchAgentsDir(home) : systemdUserDir(env, home)
   let user = env.USER ?? ''
   try {
     user ||= userInfo().username
@@ -110,7 +111,7 @@ export function cliContext(o: Partial<Cli> = {}): Cli {
     nodePathFile: abs(env.HYPERNOVA_NODE_PATH) ?? join(support, 'node-path'),
     launcher: abs(env.HYPERNOVA_LAUNCHER) ?? join(userBinDir(home), 'hypernova'),
     unitDir,
-    unitFile: join(unitDir, UNIT),
+    unitFile: join(unitDir, platform === 'darwin' ? `${LAUNCH_LABEL}.plist` : UNIT),
     selfDaemon: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..'),
     tty: !!process.stdout.isTTY,
     wsl: platform === 'linux' ? wslHere(env) : null,

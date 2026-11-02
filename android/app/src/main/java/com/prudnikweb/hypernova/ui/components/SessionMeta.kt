@@ -134,14 +134,12 @@ fun GlyphFigure(glyph: Glyph, text: String, modifier: Modifier = Modifier, color
 }
 
 /**
- * A session's short id and how long since it was last active, as quiet marks: the id in mono,
- * then a small clock and the age ("c7  ◷ 1m"). TalkBack hears [said] ([sessionSaid]).
+ * How long since a session was last active, as a quiet mark: a small clock and the age ("◷ 1m").
+ * TalkBack hears [said] ([sessionSaid]).
  */
 @Composable
-fun SessionStamp(hex: String, age: String, said: String, modifier: Modifier = Modifier) {
+fun SessionStamp(age: String, said: String, modifier: Modifier = Modifier) {
     Row(modifier.clearAndSetSemantics { contentDescription = said }, verticalAlignment = Alignment.CenterVertically) {
-        HText(hex, style = StampText, color = HN.inkDim, maxLines = 1)
-        Spacer(Modifier.width(8.dp))
         Icon(Glyph.Clock, size = 10.dp, color = HN.inkDim, stroke = 1.1.dp)
         Spacer(Modifier.width(3.dp))
         HText(age, style = StampText, color = HN.inkDim, maxLines = 1)
@@ -151,7 +149,7 @@ fun SessionStamp(hex: String, age: String, said: String, modifier: Modifier = Mo
 /** The mode's words beside its glyph: small, in Manrope (they're words, not a value). */
 private val MetaText = Type.small.copy(fontSize = 12.sp, lineHeight = 16.sp)
 
-/** The id and age: mono, a little under the strip's figures. */
+/** The age: mono, a little under the strip's figures. */
 private val StampText = Type.monoSmall.copy(fontSize = 10.sp, lineHeight = 14.sp)
 
 /** A seam's trail in words: the label's face, half its tracking, as [Seam] draws a trail. */
@@ -161,8 +159,8 @@ private val TrailText = Type.label.copy(letterSpacing = Type.label.letterSpacing
 fun modelModeSaid(res: Resources, model: String, mode: String): String =
     res.getString(R.string.meta_model_said, model) + " " + res.getString(R.string.meta_mode_said, mode)
 
-/** "Session c7, active 4 minutes ago." */
-fun sessionSaid(res: Resources, hex: String, updatedAt: Long, now: Long): String {
+/** "Active 4 minutes ago." */
+fun sessionSaid(res: Resources, updatedAt: Long, now: Long): String {
     val s = ((now - updatedAt) / 1000).coerceAtLeast(0)
     val ago = when {
         s < 45 -> res.getString(R.string.meta_ago_now)
@@ -170,5 +168,5 @@ fun sessionSaid(res: Resources, hex: String, updatedAt: Long, now: Long): String
         s < 86400 -> (s / 3600).toInt().let { res.getQuantityString(R.plurals.meta_ago_hours, it, it) }
         else -> (s / 86400).toInt().let { res.getQuantityString(R.plurals.meta_ago_days, it, it) }
     }
-    return res.getString(R.string.meta_session_said, hex, ago)
+    return res.getString(R.string.meta_session_said, ago)
 }

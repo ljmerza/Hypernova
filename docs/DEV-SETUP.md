@@ -26,6 +26,7 @@ that affects other people:** the project only switches to a mirror when a machin
 ## Toolchain
 - JDK: Android Studio's bundled JBR 21 (`/Applications/Android Studio.app/Contents/jbr/Contents/Home`).
 - Kotlin 2.4.21: AGP 9's built-in Kotlin picks it up from the root `plugins {}` block, and Haze 2 needs it.
+- JetBrains' Compose runtime 1.12.1 for `:shared`: the one Haze already brings in, which is `androidx.compose.runtime` 1.12.1 on Android. Move it with the app's Compose, or the app's classpath changes.
 
 ## Screen tests (Robolectric and Roborazzi)
 `android/app/src/test/java/com/prudnikweb/hypernova/ui/screens/` draws Home, the chat, the session
@@ -40,6 +41,17 @@ fake hub was asked, and takes a picture of the screen (Roborazzi). The pictures 
   `--tests '*.ui.screens.HomeScreenTest'` for one class) writes them again; look at the new pictures
   before committing them.
 - The first run downloads Robolectric's Android jar (SDK 35) from Maven Central.
+
+## The shared module
+`android/shared` (docs/PLATFORMS.md, "The shared module") builds for Android and the desktop JVM.
+- `./gradlew :shared:desktopTest` and `:shared:testAndroidHostTest` run its tests on each target. `:app:testDebugUnitTest` no
+  longer runs the plain data tests that moved; run all three (CI does, `.github/workflows/android.yml`).
+- `shared/src/hubTest/` is compiled by both modules: the real hub against `FakeDaemon`, on `TestDevice` (the seams in memory,
+  in `commonTest/.../live/`) in `:shared`, and on Robolectric in `:app`. Each side has its own `HubRig` and `RigRunner`, with the
+  same calls: a test that needs Android in its body stays in `app/src/test`.
+- Those tests compare the words the app shows: `XmlStrings` reads `app/src/main/res/values` as aapt compiles it, and
+  `StringsTableTest` checks it against Android's own Resources for every key.
+- `:shared:compileKotlinDesktop` alone is the quick check that nothing of Android got in.
 
 ## The terminal page (headless Chromium)
 `node scripts/term-page-check.mjs` loads `assets/term/index.html` in a headless Chromium at the phone's

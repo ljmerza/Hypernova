@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.DictationEngine
 import com.prudnikweb.hypernova.data.VoicePrefs
+import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.Segmented
@@ -29,7 +30,7 @@ import com.prudnikweb.hypernova.ui.theme.Type
 @Composable
 fun VoiceRecognitionSection() {
     val context = LocalContext.current
-    val prefs = remember { VoicePrefs.of(context) }
+    val prefs = remember { VoicePrefs.of(context.storage) }
     Spacer(Modifier.height(10.dp))
     Seam(stringResource(R.string.voice_settings), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
     GlassCard(Modifier.fillMaxWidth()) {

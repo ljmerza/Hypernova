@@ -77,6 +77,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.withLink
+import com.prudnikweb.hypernova.data.MarkdownTable
+import com.prudnikweb.hypernova.data.isRule
+import com.prudnikweb.hypernova.data.tableAt
 import com.prudnikweb.hypernova.data.Links
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R

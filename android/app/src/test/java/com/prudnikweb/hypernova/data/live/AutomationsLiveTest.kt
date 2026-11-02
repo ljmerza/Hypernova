@@ -12,6 +12,7 @@ import com.prudnikweb.hypernova.data.Run
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.data.strings
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -256,7 +257,7 @@ class AutomationsLiveTest {
         rig.until("the folded banner") { rig.banners.any { it.id == "note:away" } }
         val b = rig.banners.single { it.id == "note:away" }
         assertEquals(res.getQuantityString(R.plurals.au_away_title, 2, 2), b.title)
-        assertEquals(AutomationNotes.names(res, listOf("Deploy check", "Morning brief")), b.text)
+        assertEquals(com.prudnikweb.hypernova.data.automationNames(res.strings, listOf("Deploy check", "Morning brief")), b.text)
         assertEquals("", b.automationId)
     }
 
@@ -266,7 +267,7 @@ class AutomationsLiveTest {
      */
     @Test fun anAnswerFromTheNotificationGoesToTheMacAndTheNotificationGoes() {
         val app = rig.context as android.app.Application
-        com.prudnikweb.hypernova.data.Core.init(app)
+        com.prudnikweb.hypernova.data.AndroidCore.init(app)
         val mac = FakeDaemon("gym")
         try {
             mac.snapshot = snapshot("gym") { put("automations", JSONObject().put("paused", false).put("list", JSONArray().put(Fixtures.json("rest-automation").getJSONObject("automation").put("lastRun", Fixtures.json("rest-automation-run").getJSONObject("run")))).put("features", JSONArray())) }

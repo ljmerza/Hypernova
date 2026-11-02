@@ -14,6 +14,7 @@ import com.prudnikweb.hypernova.data.StepAnswer
 import com.prudnikweb.hypernova.data.Then
 import com.prudnikweb.hypernova.data.Trigger
 import com.prudnikweb.hypernova.data.WorkflowShape
+import com.prudnikweb.hypernova.data.strings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
