@@ -1,0 +1,213 @@
+package com.prudnikweb.hypernova.desktop
+
+import com.prudnikweb.hypernova.data.ComputerWords
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Strings
+import org.w3c.dom.Element
+import java.io.InputStream
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Locale
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
+
+/**
+ * The app's strings, read from the phone's own res/values files, which the build puts in this app's
+ * resources (desktop/build.gradle.kts), with this app's own words beside them. So there's one set of
+ * words, and a key with no text fails a test (DesktopStringsTest) rather than a user.
+ */
+object DesktopStrings : Strings {
+    private val strings = HashMap<String, String>()
+    private val plurals = HashMap<String, Map<String, String>>()
+    private val PHONE = Regex("""\b(this|This|the|The|your|Your) phone\b""")
+    private val SCAN = Regex("""\bscan the (new )?code\b""")
+
+    init {
+        val loader = DesktopStrings::class.java.classLoader
+        fun open(name: String): InputStream = checkNotNull(loader.getResourceAsStream(name)) { "no resource $name" }
+        val index = open("res/values/index.txt").bufferedReader().use { it.readLines() }.filter { it.isNotBlank() }
+        for (name in index) read(open("res/values/$name"), ::forDesktop)
+        // Last, so one of this app's own is never the phone's.
+        read(open("desktop/strings_desktop.xml")) { it }
+    }
+
+    private fun read(from: InputStream, words: (String) -> String) {
+        val builder = DocumentBuilderFactory.newInstance().apply {
+            // Our own files, but an XML parser needn't fetch anything for them either.
+            setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+        }.newDocumentBuilder()
+        val root = from.use { builder.parse(it) }.documentElement
+        val items = root.childNodes
+        for (i in 0 until items.length) {
+            val e = items.item(i) as? Element ?: continue
+            when (e.tagName) {
+                "string" -> strings[e.getAttribute("name")] = words(decode(e.textContent))
+                "plurals" -> {
+                    val q = e.getElementsByTagName("item")
+                    plurals[e.getAttribute("name")] = (0 until q.length).map { q.item(it) as Element }
+                        .associate { it.getAttribute("quantity") to words(decode(it.textContent)) }
+                }
+            }
+        }
+    }
+
+    /** A resource string's text as aapt compiles it: its escapes done, spaces collapsed outside double quotes (as the tests' XmlStrings). */
+    fun decode(raw: String): String {
+        val out = StringBuilder()
+        var quoted = false
+        var space = false
+        var i = 0
+        while (i < raw.length) {
+            val c = raw[i]
+            when {
+                c == '\\' && i + 1 < raw.length -> {
+                    if (space) { if (out.isNotEmpty()) out.append(' '); space = false }
+                    i++
+                    when (val n = raw[i]) {
+                        'n' -> out.append('\n')
+                        't' -> out.append('\t')
+                        'u' -> { out.append(raw.substring(i + 1, i + 5).toInt(16).toChar()); i += 4 }
+                        else -> out.append(n)
+                    }
+                }
+                c == '"' -> quoted = !quoted
+                !quoted && c.isWhitespace() -> space = true
+                else -> {
+                    if (space) { if (out.isNotEmpty()) out.append(' '); space = false }
+                    out.append(c)
+                }
+            }
+            i++
+        }
+        return out.toString()
+    }
+
+
+    /** The phone's words where they say what this isn't: "this phone" is this computer, and nothing here scans a code. */
+    fun forDesktop(text: String): String {
+        val noPhone = PHONE.replace(text) { m -> if (m.groupValues[1].first().isUpperCase()) "This computer" else "this computer" }
+        return SCAN.replace(noPhone) { m -> "paste the ${m.groupValues[1]}link" }
+    }
+
+    /** A string by its resource name, for this app's screens ([Ui]) as for [Str]. */
+    fun named(name: String): String = checkNotNull(strings[name]) { "no string $name" }
+
+    fun has(name: String): Boolean = name in strings
+
+    fun quantityNamed(name: String, quantity: Int): String {
+        val q = checkNotNull(plurals[name]) { "no plurals $name" }
+        return checkNotNull(q[if (quantity == 1) "one" else "other"] ?: q["other"]) { "no quantity for $name" }
+    }
+
+    fun hasPlural(name: String): Boolean = name in plurals
+
+    override fun text(key: Str): String = named(key.name)
+
+    override fun quantityText(key: Plural, quantity: Int): String = quantityNamed(key.name, quantity)
+
+    override val locale: Locale get() = Locale.getDefault()
+
+    /** This computer's own clock style, from its locale: there's no 12 or 24 hour setting a JVM can read. */
+    override fun timePattern(withDay: Boolean): String {
+        val time = (DateFormat.getTimeInstance(DateFormat.SHORT, locale) as? SimpleDateFormat)?.toPattern() ?: "HH:mm"
+        return if (withDay) "EEE $time" else time
+    }
+}
+
+/**
+ * The words the screens use, by resource name. The names that are the phone's (res/values) and the ones
+ * that are this app's alone (resources/desktop/strings_desktop.xml) are all here, so a test can check each
+ * has its text, and a rename of the phone's fails there.
+ */
+@Suppress("EnumEntryName")
+enum class Ui {
+    allow,
+    deny,
+    group_needs,
+    group_working,
+    group_done,
+    state_working,
+    state_needs_you,
+    state_idle,
+    state_starting,
+    state_error,
+    state_ended,
+    state_mac_restarted,
+    state_paused,
+    state_signed_out,
+    state_no_plan,
+    state_on_hold,
+    state_no_credit,
+    widget_allowing,
+    widget_denying,
+    card_job_died,
+    cant_reach,
+    retry_now,
+    retrying_in,
+    retrying_now,
+    connlog_route_local,
+    connlog_route_base,
+    connlog_result_refused,
+    connlog_result_timeout,
+    connlog_result_unreachable,
+    connlog_result_no_name,
+    connlog_result_pin_wrong,
+    connlog_result_pin_expired,
+    connlog_result_tls,
+    connlog_result_http,
+    connlog_result_closed,
+    connlog_result_failed,
+    connlog_result_ok,
+    connlog_result_skipped,
+    dur_s,
+    dur_m,
+    dur_hm,
+    dur_dh,
+    onb_title,
+    onb_title_add,
+    onb_paste_hint,
+    onb_pair,
+    pair_working,
+    pair_failed,
+    pair_expired,
+    pair_closed,
+    pair_too_many,
+    pair_bad_link,
+    pair_back,
+    pair_label,
+    desk_pair_help,
+    desk_pair_field,
+    desk_pair_too_long,
+    desk_bad_link_body,
+    desk_expired_body,
+    desk_closed_body,
+    desk_too_many_body,
+    desk_pair_another,
+    desk_link_linked,
+    desk_link_connecting,
+    desk_link_reconnecting,
+    desk_link_offline,
+    desk_link_unpaired,
+    desk_stale,
+    desk_unpaired_title,
+    desk_unpaired_body,
+    desk_pair_again,
+    desk_no_sessions,
+    desk_no_sessions_body,
+    desk_answer_on_phone_question,
+    desk_answer_on_phone_plan,
+    desk_not_whole,
+    desk_answer_failed,
+    desk_from_agent,
+    ;
+
+    /** This word, as the computer on screen words things ([ComputerWords]). */
+    fun text(): String = words(DesktopStrings.named(name))
+
+    fun format(vararg args: Any?): String = String.format(DesktopStrings.locale, text(), *args)
+
+    private fun words(text: String): String =
+        if (ComputerWords.platform == com.prudnikweb.hypernova.data.Mac.LINUX) ComputerWords.reword(text) else text
+}
