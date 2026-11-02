@@ -1112,7 +1112,14 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
             { name: 'github', status: 'connected', source: 'user', serverInfo: { name: 'github-mcp', version: '2.1.0' }, config: { type: 'stdio', command: 'never-used' }, tools: [{ name: 'create_issue', annotations: { destructive: true } }, { name: 'list_issues', annotations: { readOnly: true, openWorld: true } }] },
             { name: 'plugin:context7:context7', status: 'needs-auth', source: 'plugin', config: { type: 'http', url: 'https://mcp.example.com/mcp?key=never-sent' }, tools: [] },
           ],
-          toggleMcpServer: async () => {},
+          // As Claude Code's writer does, on the home folder's entry.
+          toggleMcpServer: async (name: string, enabled: boolean) => {
+            const doc = JSON.parse(readFileSync(claudeJson, 'utf8'))
+            const home = realpathSync(process.env.HOME!)
+            const entry = (doc.projects[home] ??= {})
+            entry.disabledMcpServers = enabled ? (entry.disabledMcpServers ?? []).filter((n: string) => n !== name) : [...(entry.disabledMcpServers ?? []), name]
+            writeFileSync(claudeJson, JSON.stringify(doc))
+          },
           reconnectMcpServer: async () => {},
         } as never),
       )
@@ -1162,6 +1169,14 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       contract('rest-mcp-toggled', await ok(post('/v1/agents/mcp/toggle', { agent: 'claude', name: 'github', folder: 'home', enabled: false })))
       contract('rest-mcp-reconnected', await ok(post('/v1/agents/mcp/reconnect', { agent: 'claude', name: 'github', folder: 'home' })))
       contract('rest-mcp-not-trusted', await refused(post('/v1/agents/mcp/approval', { agent: 'claude', name: 'docs', folder: folderId(cwd), approved: true, confirmRun: true }), 409))
+      // Claude Code says yes and the file never shows it: said, not a success.
+      {
+        const { useProbe, useSaveWait } = await import('../src/mcp-probe.ts')
+        useSaveWait(50)
+        useProbe(async (_cwd, _waiting, work) => work({ mcpServerStatus: async () => [], toggleMcpServer: async () => {}, reconnectMcpServer: async () => {} } as never))
+        contract('rest-mcp-not-saved', await refused(post('/v1/agents/mcp/toggle', { agent: 'claude', name: 'github', folder: 'home', enabled: true }), 502))
+        useSaveWait(8000)
+      }
       // Codex's, from a stand-in for its CLI and its app-server.
       const { useCodex } = await import('../src/mcp-codex.ts')
       useCodex({
@@ -1196,6 +1211,7 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       const { useExtrasCli } = await import('../src/agent-extras.ts')
       useExtrasCli(async (agent, args) => {
         const out = (o: unknown) => ({ code: 0, stderr: '', stdout: JSON.stringify(o) })
+        if (args[0] === 'edit-skill-overrides') return out({ ok: true, written: { name: 'mine', state: 'name-only' }, changed: true })
         if (args[1] === 'marketplace' && args[2] === 'list') return agent === 'claude' ? out([{ name: 'testmp', source: 'github', repo: 'acme/plugins', installLocation: '/never-sent' }]) : out({ marketplaces: [{ name: 'testmp', root: '/srv/mp', marketplaceSource: { sourceType: 'local', source: '/srv/mp' } }] })
         if (args.includes('--available')) return out({ installed: [], available: [{ pluginId: 'hello@testmp', name: 'hello', description: 'A test plugin', marketplaceName: 'testmp', version: '1.0.0', source: './plugins/hello' }] })
         if (args[1] === 'list') return agent === 'claude' ? out([{ id: 'hello@testmp', version: '1.0.0', scope: 'user', enabled: true, installPath: '/never-sent', mcpServers: { hellomcp: { command: 'never-sent', env: { T: 'never-sent' } } }, hasUserConfig: true }]) : out({ installed: [{ pluginId: 'hello@testmp', name: 'hello', marketplaceName: 'testmp', version: '1.0.0', enabled: true, source: { source: 'local', path: '/srv/mp/hello' } }], available: [] })

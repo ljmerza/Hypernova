@@ -1,0 +1,7 @@
+{
+  "status": 502,
+  "error": {
+    "code": "not_saved",
+    "message": "Claude Code didn’t save that, so github is still off here. Try again."
+  }
+}

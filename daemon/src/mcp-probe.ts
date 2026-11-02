@@ -16,7 +16,10 @@ import { claudeSdk } from './sdk.ts'
 import { getProvider, providerEnv } from './store.ts'
 import { findClaude, log } from './util.ts'
 import { MACHINE } from './platform.ts'
-import { heldBack, maskText, ownApiKeyHelper, setupOf, type ServerSetup } from './mcp-view.ts'
+import { realpath } from 'node:fs/promises'
+import { isTable, own, repoRoot } from './agent-settings.ts'
+import { McpRefused } from './mcp-edit.ts'
+import { heldBack, maskText, ownApiKeyHelper, readClaudeConfig, setupOf, type ServerSetup } from './mcp-view.ts'
 
 export type LiveStatus = 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled' | 'waiting' | 'rejected'
 export type LiveTool = { name: string; readOnly?: boolean; destructive?: boolean; openWorld?: boolean }
@@ -173,24 +176,71 @@ export const askProcess = <T>(folder: string, waiting: readonly string[], work: 
 /** Whether to read them again next time: something changed that a process would see. */
 export const forgetLive = (folder?: string) => (folder ? cache.delete(folder) : cache.clear())
 
-/** Switch [name] on or off for [folder], through Claude Code's own writer (`disabledMcpServers` of that project's entry). */
+/** How long a process stays up for its write to reach the file, and how many processes get to try. */
+let SAVE_WAIT_MS = 8000
+/** Tests needn't wait out the bound. */
+export const useSaveWait = (ms: number) => {
+  SAVE_WAIT_MS = ms
+}
+const SAVE_POLL_MS = 50
+const SAVE_TRIES = 2
+
+/** The lists Claude Code keeps for a folder, under the key it files that folder by (2.1.316's `projectPathForConfig`: the repository's root, else the folder itself). */
+async function toggleLists(folder: string): Promise<{ disabled: unknown[]; enabled: unknown[] }> {
+  const real = await realpath(folder).catch(() => folder)
+  const key = (await repoRoot(real).catch(() => null)) ?? real
+  const { root } = await readClaudeConfig()
+  const projects = root ? own(root, 'projects') : undefined
+  const entry = isTable(projects) ? own(projects, key) : undefined
+  const list = (k: string) => {
+    const l = isTable(entry) ? own(entry, k) : undefined
+    return Array.isArray(l) ? l : []
+  }
+  return { disabled: list('disabledMcpServers'), enabled: list('enabledMcpServers') }
+}
+
+/**
+ * Switch [name] on or off for [folder], through Claude Code's own writer: `disabledMcpServers` of that project's entry, or
+ * `enabledMcpServers` for its few built-in servers that start off. Answers only once the file says so.
+ *
+ * `toggleMcpServer()` resolves before that write happens (2.1.316 starts it and doesn't wait: measured, 12 of 30 under load
+ * weren't in the file yet when it resolved, each there within 400 ms). So the process stays up until the file agrees, and if
+ * it never does, a new process tries once. A process's in-memory copy already has the change, so asking the same one again writes nothing.
+ */
 export async function toggleServer(folder: string, waiting: readonly string[], name: string, enabled: boolean, waitMs = 8000): Promise<void> {
-  await runner(folder, waiting, async (q) => {
-    await settled(q, 3000)
-    // A busy machine can answer this before the new process has taken the server in, so a server
-    // it doesn't know yet gets a few more tries; one that's really gone still fails after them.
-    const until = Date.now() + waitMs
-    for (;;) {
-      try {
-        await q.toggleMcpServer(name, enabled)
-        return
-      } catch (e) {
-        if (!/server not found/i.test(String((e as Error)?.message ?? e)) || Date.now() >= until) throw e
-        await new Promise((r) => setTimeout(r, 250))
+  const holds = async (hadEnabled: boolean) => {
+    const now = await toggleLists(folder)
+    if (enabled) return now.enabled.includes(name) || !now.disabled.includes(name)
+    return now.disabled.includes(name) || (hadEnabled && !now.enabled.includes(name))
+  }
+  for (let attempt = 1; attempt <= SAVE_TRIES; attempt++) {
+    const hadEnabled = (await toggleLists(folder)).enabled.includes(name)
+    const saved = await runner(folder, waiting, async (q) => {
+      await settled(q, 3000)
+      // A busy machine can answer this before the new process has taken the server in, so a server
+      // it doesn't know yet gets a few more tries; one that's really gone still fails after them.
+      const until = Date.now() + waitMs
+      for (;;) {
+        try {
+          await q.toggleMcpServer(name, enabled)
+          break
+        } catch (e) {
+          if (!/server not found/i.test(String((e as Error)?.message ?? e)) || Date.now() >= until) throw e
+          await new Promise((r) => setTimeout(r, 250))
+        }
       }
-    }
-  })
-  cache.delete(folder)
+      const end = Date.now() + SAVE_WAIT_MS
+      for (;;) {
+        if (await holds(hadEnabled)) return true
+        if (Date.now() >= end) return false
+        await new Promise((r) => setTimeout(r, SAVE_POLL_MS))
+      }
+    })
+    cache.delete(folder)
+    if (saved) return
+    log(`mcp toggle: ${name} wasn't in the file after try ${attempt}`)
+  }
+  throw new McpRefused(502, 'not_saved', `Claude Code didn’t save that, so ${name} is still ${enabled ? 'off' : 'on'} here. Try again.`)
 }
 
 /** A fresh connection to [name] from a new process: whether it works now, and its state. Running sessions keep their own. */
