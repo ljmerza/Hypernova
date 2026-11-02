@@ -44,10 +44,10 @@ internal object Atlas {
         return (light * THIN_STEPS).roundToInt() / THIN_STEPS.toFloat()
     }
 
-    /** Whether a star of threshold [th] (0..1) shows at [thin]. The faintest of the sky's gaps stays: nothing goes dark. */
+    /** Whether a star of threshold [th] (0..1) shows at [thin]. Some always do: nothing goes dark. */
     fun shows(th: Float, thin: Float): Boolean = th <= thin + 0.1f
 
-    /** How far the grid's pole sits from its centre for [notch] (0..1 of [TURN_SPAN]), to a whole pixel so its lines don't shimmer. */
+    /** How far the grid's pole sits from its centre at [notch], to a whole pixel so its lines don't shimmer. */
     fun poleShift(notch: Int, dp: Float): Float = (TURN_SPAN * dp * sin(notch * 2f * PI.toFloat() / NOTCHES)).roundToInt().toFloat()
 
     /** The notch for the wall clock [now]: a new one every [NOTCH_MS], looked at when the app comes to the front. */

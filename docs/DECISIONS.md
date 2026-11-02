@@ -3467,6 +3467,7 @@ The owner, choosing the art: "Atlas but remove the animation from the home scree
 
 The owner chose Atlas's quiet version from `docs/concepts/art/` (branch `art-concepts`; that folder isn't merged). It swaps only what showed on Home: the background, the status marks, the logo and icons, and the colours. Cards, layout, type, navigation and spacing didn't change. How it looks is in `docs/DESIGN.md`, "Colour", "The chart", "Marks".
 
+0. **The far sky went too:** `Cosmos.kt`, `Stars.kt`, `DeepSky.kt` and `SkyArt.kt`, the stars, nebulae and deep-sky pictures, for `fx/Atlas.kt`.
 1. **For a later name.** The logo's constellation reads as an N, not the concept's h, because the app is being renamed. No name, app id or command changed here: the app still says Hypernova.
 2. **What the concept said and this didn't do:**
    - **No visible slow turn.** The concept allowed "no frames at rest, or 5 for the turn"; this is the first. The grid jumps to one of nine places when the app comes to the front. A turn would redraw the chart and blur the bars 5 times a second, and hairlines moved by under a pixel shimmer. Burn-in with this isn't tested.
