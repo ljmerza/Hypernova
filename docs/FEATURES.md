@@ -6,8 +6,8 @@ before a move to Kotlin Multiplatform and Compose Multiplatform (docs/PLATFORMS.
 are the contract fixtures (docs/PROTOCOL.md, "Contract fixtures"), the data-layer rig and the screen
 tests. Built from the code, docs/PROTOCOL.md, docs/DECISIONS.md and the screens under
 `android/app/src/main/java/com/prudnikweb/hypernova/ui/`, on 2026-10-31. Both suites last passed on
-2026-11-01: 1185 app tests and 592 in `android/shared` (each on both of its targets), 1089 daemon tests
-(1085 pass, 4 skipped: Mac-only). The 1569 tests from before the move are all among them.
+2026-11-02: 1159 app tests and 593 in `android/shared` (each on both of its targets), 1125 daemon tests
+(1120 pass, 5 skipped: Mac-only). The 1569 tests from before the move are all among them.
 
 **Update this file whenever a feature or its tests change:** add the row, move its mark, name the test.
 
