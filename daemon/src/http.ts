@@ -615,7 +615,7 @@ async function api(c: Ctx): Promise<void> {
     return json(res, 200, r)
   }
   // An agent's MCP servers, to see and manage (mcp-routes.ts), for a paired phone.
-  if (path === '/v1/agents/mcp' || path.startsWith('/v1/agents/mcp/') || path === '/v1/agents/plugins' || path.startsWith('/v1/agents/plugins/') || path === '/v1/agents/skills') {
+  if (path === '/v1/agents/mcp' || path.startsWith('/v1/agents/mcp/') || path === '/v1/agents/plugins' || path.startsWith('/v1/agents/plugins/') || path === '/v1/agents/skills' || path === '/v1/agents/env' || path.startsWith('/v1/agents/env/')) {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
     const deps = {
       folders: () => [...listProjects().map((p) => p.path), ...listSessions().flatMap((s) => (s.cwd ? [s.cwd] : []))],

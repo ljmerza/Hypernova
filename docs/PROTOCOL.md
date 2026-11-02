@@ -48,7 +48,7 @@ the Android app's own.
    - Agents and models: [Codex](#codex-a-second-agent), [Switching agents](#switching-agents),
      [Providers](#providers), [Models](#models), [Agent settings](#agent-settings), [A session's MCP
      servers](#a-sessions-mcp-servers), [An agent's MCP servers](#an-agents-mcp-servers), [An agent's
-     plugins](#an-agents-plugins), [An agent's skills](#an-agents-skills), [Session menu](#session-menu), [A session's
+     plugins](#an-agents-plugins), [An agent's skills](#an-agents-skills), [An agent's environment variables](#an-agents-environment-variables), [Session menu](#session-menu), [A session's
      model](#a-sessions-model), [A session's effort](#a-sessions-effort)
    - Account and limits: [Account](#account), [Auto-continue](#auto-continue), [Session usage and
      Rewind](#session-usage-the-to-do-list-and-rewind), [Per-model
@@ -1863,6 +1863,36 @@ PluginDetail = {
 }
 ```
 
+### EnvList
+
+The answer to `GET /v1/agents/env`. Rules: see An agent's environment variables.
+
+```ts
+EnvList = {
+  agent,
+  folder,                   // an id; Codex: "home"
+  folders: McpFolder[],     // Codex: the home folder alone
+  files: {
+    scope,                  // user, project, local
+    where,                  // in words, a folder by its base name: "~/.claude/settings.json"
+    state: "ok" | "missing" | "malformed" | "link" | "unreadable",
+    hash: string | null,    // what a change sends back as `expected`
+  }[],
+  vars: {
+    name, scope,
+    masked: boolean,
+    value?,                 // none when it's masked, unless only part is
+    flag?: boolean,         // reads as on or off
+    effective: boolean,
+    overriddenBy?,          // the scope that wins this name; Codex: "system"
+    guarded: boolean,       // needs `confirmRun`
+    refused: boolean,       // can only be removed
+  }[],
+  hidden: number,           // not sent: a name that looks secret, or a value that's not a string, number or boolean
+  undo: { name, scope, folder, needsCheck: boolean, change } | null,  // `change`: "A: 0 → 1", secrets masked
+}
+```
+
 ### SkillList
 
 The answer to `GET /v1/agents/skills`. Rules: see An agent's skills.
@@ -3002,6 +3032,26 @@ plugins. A POST to a route Claude Code has and Codex doesn't is 409 `not_for_cod
 - **Body:** `{agent, name?, folder?}`. No `name`: all of them.
 - **Answer:** `200 {ok: true}`
 - **Refusals:** 400 `bad_marketplace`
+
+### Routes: agents' environment variables
+
+A paired phone only. Rules: see An agent's environment variables. An older daemon answers 404.
+
+#### GET /v1/agents/env
+
+Query: `agent`, `folder` (Claude Code; else the home folder). Answers `EnvList`. 404 `no_folder`.
+
+#### POST /v1/agents/env
+
+`{agent, scope, folder?, name, value | flip: true, expected, confirmRun?}`. `expected`: the file's `hash`, null for a file not there yet. Answers `{ok, name, scope, hash, masked, value?, flag?}`. 400 `bad_name`, `bad_value` (control characters, over 8 KB), `masked_value`, `bad_scope`. 403 `confirm_run`, `env_refused`. 409 `file_changed`, `file_is_link`, `file_malformed`, `file_unreadable`, `unsupported_shape`, `not_a_flag`. Sends `agent_settings`.
+
+#### POST /v1/agents/env/remove
+
+`{agent, scope, folder?, name, expected, confirmRun?}`. A table left empty goes too. 404 `no_variable`. Otherwise as above.
+
+#### POST /v1/agents/env/undo
+
+`{agent, confirmRun?}`. The last change, one step, while the file is what it left. 403 `confirm_run`. 409 `nothing_to_undo`, `file_changed`, `undo_refused`.
 
 ### Routes: agents' skills
 
@@ -5497,6 +5547,24 @@ change it; a state it doesn't name reads `on`). A change goes through `claude ed
 A skill's own file isn't shown or changed here.
 
 The Android app: `ui/settings/SkillScreens.kt`, `Route.Skills`: Agents & providers › an agent's Settings › Skills.
+
+### An agent's environment variables
+
+(`daemon/src/agent-env.ts`; docs/DECISIONS.md, "Environment variables from the phone"; the risk: docs/SECURITY-MODEL.md, 20.) Routes: see Routes: agents' environment variables. Type: `EnvList`.
+
+**Claude Code: the `env` table of `settings.json`, in each scope:** user, project (`.claude/settings.json` in the folder), local (`.claude/settings.local.json`). Local beats project beats user, and any of them beats the shell (measured on 2.1.316). A row says where it's from, and `overriddenBy` when another scope wins that name, compared in capitals as Claude Code does. The home folder's project file is the user's own, so it isn't listed twice. Managed settings aren't read, so an organization's value wouldn't show.
+
+**Codex: `shell_environment_policy.set` in `config.toml`.** It reaches the commands Codex runs, not Codex itself or its MCP servers. One scope. Read and written by its app-server: `hash` is its layer's `version`, sent back as `expectedVersion`.
+
+**When it applies, measured.** Claude Code: a new session reads them; one already running (a real one with a stand-in API, its Bash tool) saw a new or changed value at its next command, and **kept a deleted one** until it restarted. Codex: a new process reads them; a running app-server's `command/exec` didn't see the change.
+
+**What leaves.** A value under a secret-named name, or that looks like one, doesn't: `masked` is true and there's no `value`, or, for a URL, `value` with only the secret part masked. A flag's value (`1`, `0`, `true`, `false`, `yes`, `no`, `on`, `off`, in any of their cases) is shown under any name, and a count under a `*_TOKENS` name. A name that itself looks like a secret, or isn't a variable's name, isn't sent (`hidden`).
+
+**A flag** has `flag`, and `POST` with `flip: true` swaps it, keeping the form the file has (`1`/`0`, `True`/`False`, a JSON `true`). 409 `not_a_flag` otherwise. The app sends `1` for a name added with no value.
+
+**Guarded names** (`guardOf`): setting or removing one needs `confirmRun`, else 403 `confirm_run`, whose message is the exact change (`PATH: /a → /b`) with secrets masked. **Refused names** can't be set at all, 403 `env_refused`, confirmed or not; they can be removed, and Undo won't put one back. The lists: docs/SECURITY-MODEL.md, 20.
+
+The Android app: `ui/settings/EnvScreens.kt`, `Route.AgentEnv`: Agents & providers › an agent's Settings › Environment variables.
 
 ### Session menu
 

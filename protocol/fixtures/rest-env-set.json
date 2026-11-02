@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "name": "DISABLE_TELEMETRY",
+  "scope": "user",
+  "hash": "file-hash",
+  "masked": false,
+  "value": "0",
+  "flag": false
+}

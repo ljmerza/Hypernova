@@ -1,0 +1,7 @@
+{
+  "status": 409,
+  "error": {
+    "code": "file_changed",
+    "message": "That file changed on the server since this was read. Nothing was written."
+  }
+}

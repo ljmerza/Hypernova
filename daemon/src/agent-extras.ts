@@ -8,6 +8,7 @@
 
 import type { ServerResponse } from 'node:http'
 import { isTable } from './agent-settings.ts'
+import { claudeEnv, claudeRemove, claudeSet, claudeUndo, claudeUndoOffer, codexEnv, codexRemove, codexSet, codexUndo } from './agent-env.ts'
 import { cliWords, McpRefused, runCli, serial } from './mcp-edit.ts'
 import { codexBinary } from './codex/client.ts'
 import { withAppServer } from './mcp-codex.ts'
@@ -443,8 +444,35 @@ async function setSkill(agent: 'claude' | 'codex', b: Record<string, unknown>, d
 
 const param = (url: URL, k: string) => url.searchParams.get(k)
 
+/** GET /v1/agents/env: the rows, the files they come from, and what Undo would do. */
+async function envList(agent: 'claude' | 'codex', id: string | null, deps: McpDeps) {
+  if (agent === 'codex') return { ...(await codexEnv()), folder: HOME_FOLDER, folders: [{ id: HOME_FOLDER, name: '~' }] }
+  const folder = await folderPath(id, deps)
+  const folders = await foldersOf(deps)
+  const label = folders.find((f) => f.id === folderId(folder))?.name ?? '~'
+  return { ...(await claudeEnv(folder, label)), folder: folderId(folder), folders, undo: claudeUndoOffer((p) => (p === null ? null : folderId(p))) }
+}
+
 export async function extrasRoute(path: string, m: string, url: URL, res: ServerResponse, json: (res: ServerResponse, status: number, body: unknown) => void, deps: McpDeps): Promise<boolean> {
   const folderParam = async () => folderPath(param(url, 'folder'), deps)
+  if (path === '/v1/agents/env' && m === 'GET') {
+    json(res, 200, await envList(agentOf(param(url, 'agent')), param(url, 'folder'), deps))
+    return true
+  }
+  if (path === '/v1/agents/env' || path === '/v1/agents/env/remove' || path === '/v1/agents/env/undo') {
+    if (m !== 'POST') return false
+    const b = await deps.body()
+    if (!isTable(b)) throw new McpRefused(400, 'bad_request', 'Send what to change.')
+    const agent = agentOf(typeof b.agent === 'string' ? b.agent : null)
+    const folder = agent === 'claude' && path !== '/v1/agents/env/undo' ? await folderPath(typeof b.folder === 'string' ? b.folder : null, deps) : HOME
+    let out: unknown
+    if (path === '/v1/agents/env') out = agent === 'codex' ? await codexSet(b) : await claudeSet(b, folder)
+    else if (path === '/v1/agents/env/remove') out = agent === 'codex' ? await codexRemove(b) : await claudeRemove(b, folder)
+    else out = agent === 'codex' ? await codexUndo(b) : await claudeUndo(b)
+    deps.changed(agent)
+    json(res, 200, out)
+    return true
+  }
   if (m === 'GET') {
     const agent = agentOf(param(url, 'agent'))
     let body: unknown

@@ -1,0 +1,40 @@
+{
+  "agent": "codex",
+  "files": [
+    {
+      "scope": "user",
+      "where": "~/.codex/config.toml",
+      "state": "ok",
+      "hash": "sha256:abc"
+    }
+  ],
+  "vars": [
+    {
+      "name": "HN_FLAG",
+      "scope": "user",
+      "masked": false,
+      "value": "true",
+      "flag": true,
+      "effective": true,
+      "guarded": false,
+      "refused": false
+    },
+    {
+      "name": "API_KEY",
+      "scope": "user",
+      "masked": true,
+      "effective": true,
+      "guarded": false,
+      "refused": false
+    }
+  ],
+  "hidden": 0,
+  "undo": null,
+  "folder": "home",
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    }
+  ]
+}

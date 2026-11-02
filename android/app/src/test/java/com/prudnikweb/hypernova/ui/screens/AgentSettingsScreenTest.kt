@@ -201,7 +201,7 @@ class AgentSettingsScreenTest {
         rule.snap("agent_settings_claude")
     }
 
-    @Config(qualifiers = "+h1100dp")
+    @Config(qualifiers = "+h2200dp")
     @Test fun codexValuesAndSummaries() {
         hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MISSING), codex))
         open(AgentSettingsReply.CODEX)

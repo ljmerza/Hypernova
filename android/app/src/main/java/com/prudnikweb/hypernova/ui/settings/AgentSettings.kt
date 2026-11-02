@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
  * answers for itself, so this is the hub whose card was tapped, and nothing here changes several at once.
  */
 @Composable
-fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}) {
+fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val codex = agent == AgentSettingsReply.CODEX
     val server = hub.mac.name
@@ -178,6 +178,8 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                         NavRow(stringResource(R.string.as_plugins), stringResource(R.string.as_plugins_manage), onClick = onPlugins)
                         Hairline(Modifier.fillMaxWidth())
                         NavRow(stringResource(R.string.as_skills), stringResource(R.string.as_skills_manage), onClick = onSkills)
+                        Hairline(Modifier.fillMaxWidth())
+                        NavRow(stringResource(R.string.env_title), stringResource(R.string.env_row), onClick = onEnv)
                     }
                 }
             }

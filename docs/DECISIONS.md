@@ -3660,3 +3660,14 @@ The owner: "Also skills, I think you can disable and enable, and something else 
 4. **Codex: on or off**, through `skills/list` and `skills/config/write`, into `config.toml`, for every folder. Source: user, project, built-in, plugin, managed.
 5. **Found and not built:** `disableBundledSkills` (one setting, all of Claude Code's own skills off), and a skill's own frontmatter (`disable-model-invocation`, `user-invocable`), which is editing its file. Adding or deleting a skill is a file too, and **"no new way to reach files" holds**: a skill's SKILL.md isn't shown or changed. `claude plugin init` scaffolds one at a terminal. Codex's `skills/extraRoots/set` isn't used.
 
+## Environment variables from the phone (2026-11-02)
+
+The owner: "add ability to add and toggle environmental variables … like a list where you can edit or delete, and a lot of them are boolean, and be able to add, similar to a to-do list."
+
+1. **A list to tick.** Agents & providers › an agent's Settings › Environment variables. Name and value on each row, a switch for a flag, a tap to edit, a cross to delete, and an add line at the end. Adding a name with no value writes `1`, because a flag is what's usually being added, and the hint says so.
+2. **A flag keeps its form.** The server does the flip, so `True` goes to `False`, `on` to `off`, a JSON `true` to `false`. The phone sends `flip` and never has to say a value.
+3. **The server keeps the guarded list, and the phone asks it.** The app tries a change; a 403 `confirm_run` carries the exact change in words, which goes on the confirm, then the fingerprint, then the same request says so. No copy of the list to fall behind in the app. The lists, and how each was found: `docs/SECURITY-MODEL.md`, 20.
+4. **Claude Code's precedence and what a running session sees are measured**, a real `claude` with a stand-in API asking it to run `echo`: local over project over user over the shell; a running session has a new or changed value at its next command, **and keeps a deleted one**. That was a process under the SDK. An interactive one goes through the same code in the binary (`settings.env` changing re-applies env), but wasn't run. The screen says this.
+5. **Codex's real equivalent is narrower.** `shell_environment_policy.set` only reaches the commands Codex runs: not Codex, not its MCP servers. So `OPENAI_BASE_URL` set here wouldn't move Codex itself. `inherit`, `exclude` and `include_only` beside it aren't touched. Codex's writer turns an inline `set = { … }` into a table when it writes, and keeps comments. Measured with `codex sandbox` and `command/exec`. There's one scope.
+6. **Codex's file isn't edited byte by byte.** Claude Code's `settings.json` is, by `jsonEditPath`, with a backup per change. Codex's goes through its own writer with `expectedVersion`, so a change elsewhere is refused by Codex itself; Undo writes the value back rather than the file.
+

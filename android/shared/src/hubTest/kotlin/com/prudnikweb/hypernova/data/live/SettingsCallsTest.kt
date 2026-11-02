@@ -1,6 +1,11 @@
 package com.prudnikweb.hypernova.data.live
 
 import com.prudnikweb.hypernova.data.Mcp
+import com.prudnikweb.hypernova.data.agentEnv
+import com.prudnikweb.hypernova.data.envFlip
+import com.prudnikweb.hypernova.data.envRemove
+import com.prudnikweb.hypernova.data.envSet
+import com.prudnikweb.hypernova.data.envUndo
 import com.prudnikweb.hypernova.data.mcpList
 import com.prudnikweb.hypernova.data.plugins
 import com.prudnikweb.hypernova.data.pluginInstall
@@ -114,6 +119,34 @@ class SettingsCallsTest {
         answer("POST", "/v1/agents/plugins/uninstall", "rest-plugin-installed")
         rig.call { rig.hub.pluginUninstall("claude", "hello@testmp", "user", null) }.getOrThrow()
         assertFalse(JSONObject(last("POST", "/v1/agents/plugins/uninstall").body).has("confirmRun"))
+    }
+
+    @Test fun anAgentsEnvironmentGoesToItsRoutesAndAskingForTheCheckIsARefusalWithItsWords() {
+        connect()
+        answer("GET", "/v1/agents/env", "rest-env")
+        val r = rig.call { rig.hub.agentEnv("claude", "f1") }.getOrThrow()
+        assertTrue(r.vars.single { it.name == "SECRET" }.masked)
+        assertTrue(last("GET", "/v1/agents/env").query.contains("folder=f1"))
+        answer("POST", "/v1/agents/env", "rest-env-confirm", status = 403)
+        val e = rig.call { rig.hub.envSet("claude", "user", null, "LD_PRELOAD", "/tmp/x.so", "h") }.exceptionOrNull()
+        assertTrue(e is AgentSettingRefused)
+        assertEquals("confirm_run", (e as AgentSettingRefused).code)
+        assertTrue(e.message!!.contains("LD_PRELOAD"))
+        val sent = JSONObject(last("POST", "/v1/agents/env").body)
+        assertFalse(sent.has("confirmRun"))
+        assertEquals("/tmp/x.so", sent.getString("value"))
+        answer("POST", "/v1/agents/env", "rest-env-set")
+        rig.call { rig.hub.envFlip("claude", "user", null, "A", null, confirmRun = true) }.getOrThrow()
+        val flip = JSONObject(last("POST", "/v1/agents/env").body)
+        assertTrue(flip.getBoolean("flip"))
+        assertTrue(flip.getBoolean("confirmRun"))
+        assertTrue(flip.isNull("expected"))
+        answer("POST", "/v1/agents/env/remove", "rest-env-undone")
+        rig.call { rig.hub.envRemove("claude", "local", "f1", "A", "h") }.getOrThrow()
+        assertEquals("f1", JSONObject(last("POST", "/v1/agents/env/remove").body).getString("folder"))
+        answer("POST", "/v1/agents/env/undo", "rest-env-undone")
+        rig.call { rig.hub.envUndo("claude") }.getOrThrow()
+        assertEquals(1, daemon.count("POST", "/v1/agents/env/undo"))
     }
 
     // ─── A session's MCP servers (docs/PROTOCOL.md, "A session's MCP servers") ───

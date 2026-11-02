@@ -1,0 +1,90 @@
+{
+  "agent": "claude",
+  "files": [
+    {
+      "scope": "user",
+      "where": "~/.claude/settings.json",
+      "state": "ok",
+      "hash": "6b48b24fe6257b9d4f757355050e0f896b7ec7aa6d123050d4fbd98a0dd391db"
+    },
+    {
+      "scope": "project",
+      "where": "~/.claude/settings.json",
+      "state": "missing",
+      "hash": null
+    },
+    {
+      "scope": "local",
+      "where": "~/.claude/settings.local.json",
+      "state": "missing",
+      "hash": null
+    }
+  ],
+  "vars": [
+    {
+      "name": "SECRET",
+      "scope": "user",
+      "masked": true,
+      "effective": true,
+      "guarded": false,
+      "refused": false
+    },
+    {
+      "name": "DISABLE_TELEMETRY",
+      "scope": "user",
+      "masked": false,
+      "value": "1",
+      "flag": true,
+      "effective": true,
+      "guarded": false,
+      "refused": false
+    },
+    {
+      "name": "BASH_MAX_OUTPUT_LENGTH",
+      "scope": "user",
+      "masked": false,
+      "value": "30000",
+      "effective": true,
+      "guarded": false,
+      "refused": false
+    },
+    {
+      "name": "PATH",
+      "scope": "user",
+      "masked": false,
+      "value": "/opt/bin:/usr/bin",
+      "effective": true,
+      "guarded": true,
+      "refused": false
+    }
+  ],
+  "hidden": 0,
+  "folder": "home",
+  "folders": [
+    {
+      "id": "home",
+      "name": "~"
+    },
+    {
+      "id": "folder-app-parser-fix",
+      "name": "app-parser-fix"
+    },
+    {
+      "id": "folder-notebook",
+      "name": "notebook"
+    },
+    {
+      "id": "folder-sketchpad",
+      "name": "sketchpad"
+    },
+    {
+      "id": "folder-demo",
+      "name": "demo"
+    },
+    {
+      "id": "folder-app",
+      "name": "app"
+    }
+  ],
+  "undo": null
+}

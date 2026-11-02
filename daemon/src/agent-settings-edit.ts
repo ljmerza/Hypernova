@@ -101,7 +101,7 @@ const FILES: Record<Agent, string> = { claude: 'settings.json', codex: 'config.t
 const fileOf = (agent: Agent, dirs: Dirs) => join(agent === 'claude' ? (dirs.claude ?? CLAUDE_DIR) : (dirs.codex ?? codexHome()), FILES[agent])
 export type Dirs = { claude?: string; codex?: string; claudeConfig?: string }
 
-const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex')
+export const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex')
 
 type Current = { bytes: Buffer; hash: string; stat: Stats } | null
 
@@ -307,7 +307,7 @@ export function jsonEdit(t: string, path: readonly string[], value: Value): stri
  * [t] with [path], any number of keys deep, set to [value], or taken out when it's null (with any table
  * that leaves empty). The same care as [jsonEdit]: only those bytes change, and what comes out is compared.
  */
-export function jsonEditPath(t: string, path: readonly string[], value: Value | readonly string[] | null): string {
+export function jsonEditPath(t: string, path: readonly string[], value: Value | number | readonly string[] | null): string {
   const before = parseJson(t)
   if (!before) throw malformed()
   const eol = t.includes('\r\n') ? '\r\n' : '\n'
@@ -443,7 +443,7 @@ export const backupDir = () => join(SUPPORT, 'settings-backups')
 const lastFile = (agent: Agent) => join(backupDir(), `last-${agent}.json`)
 
 /** A backup of [bytes], mode 0600, in a folder of mode 0700. Its name: `<agent>-<timestamp>`, the next free one. */
-function writeBackup(agent: Agent, bytes: Buffer): string {
+export function writeBackup(agent: Agent, bytes: Buffer): string {
   mkdirSync(backupDir(), { recursive: true, mode: 0o700 })
   for (let at = Date.now(); ; at++) {
     const name = `${agent}-${at}`
@@ -456,7 +456,7 @@ function writeBackup(agent: Agent, bytes: Buffer): string {
   }
 }
 
-function pruneBackups(agent: Agent): void {
+export function pruneBackups(agent: Agent): void {
   const mine = new RegExp(`^${agent}-(\\d+)$`)
   const all = readdirSync(backupDir())
     .map((n) => ({ n, at: Number(mine.exec(n)?.[1] ?? NaN) }))
