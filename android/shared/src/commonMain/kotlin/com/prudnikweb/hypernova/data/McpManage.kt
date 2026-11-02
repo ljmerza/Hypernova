@@ -137,6 +137,66 @@ data class McpLiveReply(val folder: String, val servers: List<McpLive>) {
     }
 }
 
+/** One parameter of a tool, in words. */
+@Immutable
+data class McpParam(val name: String, val type: String, val required: Boolean, val description: String?, val default: String?, val choices: List<String>)
+
+/** A tool in full, from the server itself. Its words are the server's own. */
+@Immutable
+data class McpTool(
+    val name: String,
+    val title: String?,
+    val description: String?,
+    val readOnly: Boolean?,
+    val destructive: Boolean?,
+    val idempotent: Boolean?,
+    val openWorld: Boolean?,
+    val params: List<McpParam>,
+    val schema: String?,
+)
+
+/** A prompt or a resource a server offers. */
+@Immutable
+data class McpThing(val name: String, val description: String?, val uri: String?, val args: List<String>)
+
+/** [whyNot] says why there's nothing: [Mcp]'s WHY_ words. */
+@Immutable
+data class McpFacts(val tools: List<McpTool>, val prompts: List<McpThing>, val resources: List<McpThing>, val instructions: String?, val moreTools: Int, val whyNot: String?) {
+    companion object {
+        private fun flag(o: JSONObject?, k: String): Boolean? = if (o != null && o.has(k)) o.bool(k) else null
+        private fun thing(o: JSONObject): McpThing? {
+            val name = o.str("name") ?: return null
+            return McpThing(name, o.str("description"), o.str("uri"), McpWire.strings(o.arr("args")))
+        }
+
+        fun wire(o: JSONObject) = McpFacts(
+            tools = o.arr("tools").mapObjects { t ->
+                val name = t.str("name") ?: return@mapObjects null
+                val a = t.obj("annotations")
+                McpTool(
+                    name = name,
+                    title = a?.str("title"),
+                    description = t.str("description"),
+                    readOnly = flag(a, "readOnly"),
+                    destructive = flag(a, "destructive"),
+                    idempotent = flag(a, "idempotent"),
+                    openWorld = flag(a, "openWorld"),
+                    params = t.arr("params").mapObjects { p ->
+                        val n = p.str("name") ?: return@mapObjects null
+                        McpParam(n, p.str("type") ?: "any", p.bool("required"), p.str("description"), p.str("default"), McpWire.strings(p.arr("choices")))
+                    },
+                    schema = t.str("schema"),
+                )
+            },
+            prompts = o.arr("prompts").mapObjects(::thing),
+            resources = o.arr("resources").mapObjects(::thing),
+            instructions = o.str("instructions"),
+            moreTools = o.int("moreTools") ?: 0,
+            whyNot = o.str("whyNot"),
+        )
+    }
+}
+
 object Mcp {
     const val HOME = "home"
     const val USER = "user"
@@ -169,3 +229,6 @@ suspend fun Hub.mcpLive(agent: String, folder: String?, fresh: Boolean = false):
 
 suspend fun Hub.mcpServer(agent: String, name: String, scope: String, folder: String?): Result<McpServer> =
     agentExt("GET", "/v1/agents/mcp/server" + McpWire.query("agent" to agent, "name" to name, "scope" to scope, "folder" to folder), slow = true).map(McpServer::wire)
+
+suspend fun Hub.mcpTools(agent: String, name: String, scope: String, folder: String?): Result<McpFacts> =
+    agentExt("GET", "/v1/agents/mcp/tools" + McpWire.query("agent" to agent, "name" to name, "scope" to scope, "folder" to folder), slow = true).map(McpFacts::wire)

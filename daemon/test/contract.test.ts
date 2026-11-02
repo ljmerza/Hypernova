@@ -310,6 +310,24 @@ const checked = new Set<string>()
  * The fixture [name] (protocol/fixtures/<name>.json) is [value], normalised. With UPDATE_FIXTURES=1
  * it's written instead.
  */
+/** A tiny stdio MCP server: two tools, a prompt and a resource. */
+const TINY_MCP = `
+import { createInterface } from 'node:readline'
+const send = (o) => process.stdout.write(JSON.stringify(o) + '\\n')
+const tools = [
+  { name: 'echo', description: 'Says back what it is sent. Docs: https://x.example/d?key=never-sent', annotations: { title: 'Echo', readOnlyHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: { text: { type: 'string', description: 'What to say back' }, times: { type: 'integer', default: 1 }, mode: { enum: ['plain', 'loud'] } }, required: ['text'] } },
+  { name: 'wipe', description: 'Pretends to wipe something.', annotations: { destructiveHint: true, idempotentHint: true }, inputSchema: { type: 'object', properties: {} } },
+]
+createInterface({ input: process.stdin }).on('line', (l) => {
+  const m = JSON.parse(l)
+  if (m.method === 'initialize') send({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: m.params.protocolVersion, capabilities: { tools: {}, prompts: {}, resources: {} }, serverInfo: { name: 'tiny', version: '1.2.3' }, instructions: 'A tiny server.' } })
+  else if (m.method === 'tools/list') send({ jsonrpc: '2.0', id: m.id, result: { tools } })
+  else if (m.method === 'prompts/list') send({ jsonrpc: '2.0', id: m.id, result: { prompts: [{ name: 'hello', description: 'Greets.', arguments: [{ name: 'who' }] }] } })
+  else if (m.method === 'resources/list') send({ jsonrpc: '2.0', id: m.id, result: { resources: [{ name: 'notes', uri: 'tiny://notes', description: 'Some notes.' }] } })
+  else if (m.id !== undefined) send({ jsonrpc: '2.0', id: m.id, result: {} })
+})
+`
+
 function contract(name: string, value: unknown): void {
   checked.add(name)
   const got = normalise(value)
@@ -1094,6 +1112,11 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       const page = await ok(get(`/v1/agents/mcp/server?agent=claude&name=docs&scope=project&folder=${folderId(cwd)}`))
       assert.ok(!JSON.stringify(page).includes('never-sent'))
       contract('rest-mcp-server', stable(page))
+      // A tool's detail comes from the server itself: a tiny one, with a stray secret in a description.
+      const talker = join(scratch, 'tiny-mcp.mjs')
+      writeFileSync(talker, TINY_MCP)
+      writeFileSync(claudeJson, JSON.stringify({ ...JSON.parse(readFileSync(claudeJson, 'utf8')), mcpServers: { github: { command: process.execPath, args: [talker] } } }))
+      contract('rest-mcp-tools', await ok(get('/v1/agents/mcp/tools?agent=claude&name=github&scope=user')))
       contract('rest-mcp-no-server', await refused(get('/v1/agents/mcp/server?agent=claude&name=nope&scope=user'), 404))
     }
     contract('rest-agent-settings-undo-nothing', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: r.claude.hash }), 409))

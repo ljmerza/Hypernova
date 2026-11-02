@@ -665,6 +665,26 @@ class ContractTest {
             assertTrue(s.editable)
             assertTrue(s.where!!.endsWith(".mcp.json"))
         },
+        "rest-mcp-tools" to { o ->
+            val f = McpFacts.wire(o)
+            assertNull(f.whyNot)
+            val echo = f.tools.single { it.name == "echo" }
+            assertEquals("Echo", echo.title)
+            assertEquals(true, echo.readOnly)
+            assertEquals(false, echo.openWorld)
+            assertNull(echo.destructive)
+            assertTrue(echo.description!!.contains("key=•••"))
+            assertEquals(listOf("text", "times", "mode"), echo.params.map { it.name })
+            assertEquals(listOf(true, false, false), echo.params.map { it.required })
+            assertEquals("1", echo.params[1].default)
+            assertEquals(listOf("plain", "loud"), echo.params[2].choices)
+            assertNotNull(echo.schema)
+            assertEquals(true, f.tools.single { it.name == "wipe" }.idempotent)
+            assertEquals("hello", f.prompts.single().name)
+            assertEquals(listOf("who"), f.prompts.single().args)
+            assertEquals("tiny://notes", f.resources.single().uri)
+            assertEquals("A tiny server.", f.instructions)
+        },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)

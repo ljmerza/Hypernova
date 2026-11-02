@@ -39,6 +39,9 @@ process.env.HYPERNOVA_LAN_PORT = '0'
 
 const { approvalOf, claudeList, configHash, folderId, HOME_FOLDER, maskArgs, maskUrl, MASK, restoreArgs, setupOf } = await import('../src/mcp-view.ts')
 const { useProbe, forgetLive } = await import('../src/mcp-probe.ts')
+const { expandVars, talkTo, TalkFailed } = await import('../src/mcp-client.ts')
+const { factsOf } = await import('../src/mcp-tools.ts')
+const { forgetTools } = await import('../src/mcp-routes.ts')
 const { startServers } = await import('../src/http.ts')
 const { addDevice, settings } = await import('../src/store.ts')
 settings.lanAccess = false
@@ -65,6 +68,7 @@ beforeEach(() => {
   rmSync(CONFIG, { force: true })
   rmSync(join(CLAUDE, 'settings.json'), { force: true })
   forgetLive()
+  forgetTools()
 })
 
 const get = (path: string, token: string | null = TOKEN) => fetch(`http://127.0.0.1:${API}${path}`, { headers: token ? { authorization: `Bearer ${token}` } : {} })
@@ -265,4 +269,138 @@ test('status: a project server nobody approved is named as rejected to the proce
   const page = (await (await get(`/v1/agents/mcp/server${q({ agent: 'claude', name: 'plugin:ctx:ctx', scope: 'plugin', folder: folderId(app) })}`)).json()) as any
   assert.equal(page.editable, false)
   assert.equal(page.command, 'npx')
+})
+
+// ── A tool's detail, from the server itself (mcp-client.ts, mcp-tools.ts) ──
+
+/** A tiny stdio MCP server, written fresh per test: it notes each start beside itself. */
+function tinyServer(extraTools = ''): { file: string; marks: string } {
+  const dir = project('tiny')
+  const file = join(dir, 'server.mjs')
+  const marks = join(dir, 'started.log')
+  writeFileSync(file, `
+import { appendFileSync } from 'node:fs'
+import { createInterface } from 'node:readline'
+appendFileSync(${JSON.stringify(marks)}, JSON.stringify({ token: process.env.API_TOKEN ?? null, args: process.argv.slice(2) }) + '\\n')
+const send = (o) => process.stdout.write(JSON.stringify(o) + '\\n')
+const tools = [
+  { name: 'echo', description: 'Says back. See https://u:p@x.example/d?key=${PLANT}', annotations: { title: 'Echo', readOnlyHint: true }, inputSchema: { type: 'object', properties: { text: { type: 'string', description: 'What' }, times: { type: 'integer', default: 1 }, how: { enum: ['a', 'b'] }, list: { type: 'array', items: { type: 'string' } }, either: { anyOf: [{ type: 'string' }, { type: 'number' }] } }, required: ['text'] } },
+  { name: 'wipe', annotations: { destructiveHint: true }, inputSchema: { type: 'object' } },${extraTools}
+]
+createInterface({ input: process.stdin }).on('line', (l) => {
+  const m = JSON.parse(l)
+  if (m.method === 'initialize') send({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: m.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'tiny', version: '1.2.3' } } })
+  else if (m.method === 'tools/list') send({ jsonrpc: '2.0', id: m.id, result: { tools } })
+  else if (m.id !== undefined) send({ jsonrpc: '2.0', id: m.id, result: {} })
+})
+`)
+  return { file, marks }
+}
+const { readFileSync, existsSync } = await import('node:fs')
+
+test('a tool in full: description, annotations, parameters in words, schema; a secret in someone\'s description is masked; its env reached it', async () => {
+  const { file, marks } = tinyServer()
+  writeFileSync(CONFIG, JSON.stringify({ mcpServers: { tiny: { type: 'stdio', command: process.execPath, args: [file, '--flag', '${TINY_ARG:-fallback}'], env: { API_TOKEN: PLANT } } } }))
+  const r = await get(`/v1/agents/mcp/tools${q({ agent: 'claude', name: 'tiny', scope: 'user' })}`)
+  assert.equal(r.status, 200)
+  const text = await r.text()
+  assert.ok(!text.includes(PLANT), text)
+  const b = JSON.parse(text)
+  assert.equal(b.serverName, 'tiny')
+  assert.equal(b.version, '1.2.3')
+  const echo = b.tools.find((t: any) => t.name === 'echo')
+  assert.ok(echo.description.startsWith('Says back.'))
+  assert.deepEqual(echo.annotations, { title: 'Echo', readOnly: true })
+  assert.deepEqual(echo.params.map((p: any) => [p.name, p.type, p.required]), [['text', 'string', true], ['times', 'integer', false], ['how', 'one of', false], ['list', 'array of string', false], ['either', 'string or number', false]])
+  assert.equal(echo.params[0].description, 'What')
+  assert.equal(echo.params[1].default, '1')
+  assert.deepEqual(echo.params[2].choices, ['a', 'b'])
+  assert.ok(echo.schema.includes('"required"'))
+  assert.deepEqual(b.tools.find((t: any) => t.name === 'wipe').annotations, { destructive: true })
+  const start = JSON.parse(readFileSync(marks, 'utf8').trim())
+  assert.equal(start.token, PLANT)
+  assert.deepEqual(start.args, ['--flag', 'fallback'])
+  // A moment later, the same answer without starting it again.
+  await get(`/v1/agents/mcp/tools${q({ agent: 'claude', name: 'tiny', scope: 'user' })}`)
+  assert.equal(readFileSync(marks, 'utf8').trim().split('\n').length, 1)
+})
+
+test('a server that\'s off, or that nobody approved, isn\'t started to see its tools', async () => {
+  const app = project('held')
+  const { file, marks } = tinyServer()
+  writeFileSync(join(app, '.mcp.json'), JSON.stringify({ mcpServers: { held: { command: process.execPath, args: [file] } } }))
+  writeFileSync(CONFIG, JSON.stringify({ mcpServers: { off: { command: process.execPath, args: [file] } }, projects: { [app]: { disabledMcpServers: ['off'] } } }))
+  const ask = async (o: Record<string, string>) => (await (await get(`/v1/agents/mcp/tools${q({ agent: 'claude', ...o })}`)).json()) as any
+  assert.equal((await ask({ name: 'held', scope: 'project', folder: folderId(app) })).whyNot, 'approval')
+  assert.equal((await ask({ name: 'off', scope: 'user', folder: folderId(app) })).whyNot, 'disabled')
+  assert.equal((await ask({ name: 'plugin:ctx:ctx', scope: 'plugin' })).whyNot, 'no_direct')
+  assert.equal(existsSync(marks), false)
+})
+
+test('the talk: a server that fails or hangs, and HTTP: JSON and a stream, a sign-in wanted, a redirect not followed', async () => {
+  await assert.rejects(talkTo({ type: 'stdio', command: join(scratch, 'not-there') }, HOME, 2000), (e: any) => e instanceof TalkFailed && e.why === 'failed')
+  await assert.rejects(talkTo({ type: 'stdio', command: process.execPath, args: ['-e', 'setInterval(()=>{},1000)'] }, HOME, 300), (e: any) => e instanceof TalkFailed && e.why === 'too_slow')
+  await assert.rejects(talkTo({ type: 'ws', url: 'ws://x' }), (e: any) => e.why === 'no_direct')
+  await assert.rejects(talkTo({ type: 'http', url: 'http://127.0.0.1:1', headersHelper: 'x' }), (e: any) => e.why === 'no_direct')
+
+  const { createServer: http } = await import('node:http')
+  const seen: Record<string, unknown>[] = []
+  const srv = http((req, res) => {
+    let b = ''
+    req.on('data', (d) => (b += d))
+    req.on('end', () => {
+      if (req.url === '/redirect') {
+        res.writeHead(302, { location: 'https://elsewhere.example/' })
+        return res.end()
+      }
+      if (req.url === '/secure') {
+        res.writeHead(401)
+        return res.end()
+      }
+      const m = b ? JSON.parse(b) : {}
+      seen.push({ url: req.url, auth: req.headers.authorization, session: req.headers['mcp-session-id'] })
+      if (m.id === undefined) {
+        res.writeHead(202)
+        return res.end()
+      }
+      const result = m.method === 'initialize' ? { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'web', version: '9' } } : { tools: [{ name: 'fetch', inputSchema: {} }] }
+      const session = { 'mcp-session-id': 'sess-1' }
+      if (req.url === '/stream') {
+        res.writeHead(200, { 'content-type': 'text/event-stream', ...session })
+        res.write(`data: ${JSON.stringify({ jsonrpc: '2.0', method: 'noise' })}\n\n`)
+        res.end(`data: ${JSON.stringify({ jsonrpc: '2.0', id: m.id, result })}\n\n`)
+      } else {
+        res.writeHead(200, { 'content-type': 'application/json', ...session })
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: m.id, result }))
+      }
+    })
+  })
+  await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r))
+  const base = `http://127.0.0.1:${(srv.address() as { port: number }).port}`
+  try {
+    process.env.TINY_HEADER = 'from-env'
+    for (const path of ['/json', '/stream']) {
+      const facts = factsOf(await talkTo({ type: 'http', url: base + path, headers: { Authorization: 'Bearer ${TINY_HEADER}' } }))
+      assert.equal(facts.serverName, 'web')
+      assert.deepEqual(facts.tools.map((t) => t.name), ['fetch'])
+    }
+    assert.equal(seen[0]!.auth, 'Bearer from-env')
+    assert.equal(seen.at(-1)!.session, 'sess-1')
+    await assert.rejects(talkTo({ type: 'http', url: `${base}/secure` }), (e: any) => e.why === 'needs_auth')
+    await assert.rejects(talkTo({ type: 'http', url: `${base}/redirect` }), (e: any) => e.why === 'failed')
+  } finally {
+    srv.closeAllConnections()
+    srv.close()
+  }
+  assert.equal(expandVars('${A}/${B:-b}/${C}', { A: 'a' }), 'a/b/${C}')
+})
+
+test('the capped text: many tools, a long description, control characters', () => {
+  const f = factsOf({ tools: [...Array(510).keys()].map((i) => ({ name: `t${i}`, description: 'x'.repeat(10000) + '\u0007' })), prompts: [{ name: 'p', arguments: [{ name: 'a' }] }], resources: [{ name: 'r', uri: 'r://1' }, {}], instructions: 7 })
+  assert.equal(f.tools.length, 500)
+  assert.equal(f.moreTools, 10)
+  assert.ok(f.tools[0]!.description!.length <= 4000)
+  assert.equal(f.instructions, undefined)
+  assert.deepEqual(f.prompts, [{ name: 'p', args: ['a'] }])
+  assert.deepEqual(f.resources, [{ name: 'r', uri: 'r://1' }])
 })

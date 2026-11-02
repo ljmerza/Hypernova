@@ -1,7 +1,9 @@
 // The phone's MCP routes (docs/specs/spec-mcp-manage.md). A paired phone only, each of them.
 
 import type { ServerResponse } from 'node:http'
-import { claudeConfigFile } from './agent-settings.ts'
+import { claudeConfigFile, isTable, own, repoRoot } from './agent-settings.ts'
+import { TalkFailed, talkTo, type TalkTrouble } from './mcp-client.ts'
+import { factsOf, type ServerFacts } from './mcp-tools.ts'
 import { LIVE_NAME, liveServers, type LiveServer } from './mcp-probe.ts'
 import { approvalOf, claudeList, configHash, findConfig, folderId, HOME_FOLDER, knownFolders, projectServers, readClaudeConfig, setupOf, whereOf, type Scope } from './mcp-view.ts'
 import { dirname } from 'node:path'
@@ -87,6 +89,52 @@ export async function claudeServer(name: string, scope: string, folderIdValue: s
   }
 }
 
+/** Whether Claude Code has [name] switched off in [folder]: its project entry's `disabledMcpServers`. */
+export async function isDisabled(root: Record<string, unknown> | null, folder: string, name: string): Promise<boolean> {
+  const projects = root ? own(root, 'projects') : undefined
+  if (!isTable(projects)) return false
+  for (const key of [folder, await repoRoot(folder).catch(() => null)]) {
+    const entry = key ? own(projects, key) : undefined
+    const list = isTable(entry) ? own(entry, 'disabledMcpServers') : undefined
+    if (Array.isArray(list) && list.includes(name)) return true
+  }
+  return false
+}
+type ToolsWhyNot = 'approval' | 'disabled' | 'no_direct' | TalkTrouble
+const TOOLS_FRESH_MS = 60_000
+const toolsCache = new Map<string, { at: number; facts: ServerFacts }>()
+/** Tests start from nothing. */
+export const forgetTools = () => toolsCache.clear()
+
+/**
+ * GET /v1/agents/mcp/tools for Claude Code: a server's tools in full, from the server (mcp-client.ts). Never for one
+ * that's off or that nobody approved: seeing its tools isn't a way round that. A plugin's or an organization's isn't
+ * reachable from here (its env isn't in any file this reads), so the status's names are all there is.
+ */
+export async function claudeTools(name: string, scope: string, id: string | null, deps: McpDeps): Promise<{ agent: 'claude'; name: string; whyNot?: ToolsWhyNot } & Partial<ServerFacts>> {
+  const none = (whyNot: ToolsWhyNot) => ({ agent: 'claude' as const, name, whyNot, tools: [], prompts: [], resources: [], moreTools: 0 })
+  if (!LIVE_NAME.test(name)) throw new McpRefused(400, 'bad_name', 'That isn’t a server’s name.')
+  if (LIVE_SCOPES.includes(scope)) return none('no_direct')
+  if (!SCOPES.includes(scope)) throw new McpRefused(400, 'bad_scope', 'That isn’t a place a server is kept.')
+  const folder = await folderPath(id, deps)
+  const found = await findConfig(name, scope as Scope, scope === 'local' || scope === 'project' ? folder : null)
+  if (!found) throw new McpRefused(404, 'no_server', 'That server isn’t there any more.')
+  const { root } = await readClaudeConfig(claudeConfigFile())
+  if (scope === 'project' && approvalOf(name, folder, root) !== 'approved') return none('approval')
+  if (await isDisabled(root, folder, name)) return none('disabled')
+  if (!isTable(found.config)) return none('no_direct')
+  const key = `${name}\0${folder}\0${configHash(found.config)}`
+  const hit = toolsCache.get(key)
+  if (hit && Date.now() - hit.at < TOOLS_FRESH_MS) return { agent: 'claude', name, ...hit.facts }
+  try {
+    const facts = factsOf(await talkTo(found.config, folder))
+    toolsCache.set(key, { at: Date.now(), facts })
+    return { agent: 'claude', name, ...facts }
+  } catch (e) {
+    return none(e instanceof TalkFailed ? e.why : 'failed')
+  }
+}
+
 const param = (url: URL, k: string) => url.searchParams.get(k)
 
 const send = (res: ServerResponse, json: (res: ServerResponse, status: number, body: unknown) => void, body: unknown) => json(res, 200, body)
@@ -113,6 +161,12 @@ export async function mcpRoute(path: string, m: string, url: URL, res: ServerRes
     const agent = agentOf(param(url, 'agent'))
     if (agent === 'codex') throw new McpRefused(409, 'not_yet', 'Codex’s MCP servers aren’t available here yet.')
     send(res, json, await claudeServer(param(url, 'name') ?? '', param(url, 'scope') ?? '', param(url, 'folder'), deps))
+    return true
+  }
+  if (path === '/v1/agents/mcp/tools' && m === 'GET') {
+    const agent = agentOf(param(url, 'agent'))
+    if (agent === 'codex') throw new McpRefused(409, 'not_yet', 'Codex’s MCP servers aren’t available here yet.')
+    send(res, json, await claudeTools(param(url, 'name') ?? '', param(url, 'scope') ?? '', param(url, 'folder'), deps))
     return true
   }
   return false

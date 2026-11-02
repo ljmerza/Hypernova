@@ -42,16 +42,21 @@ import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Mcp
+import com.prudnikweb.hypernova.data.McpFacts
 import com.prudnikweb.hypernova.data.McpFolder
 import com.prudnikweb.hypernova.data.McpList
 import com.prudnikweb.hypernova.data.McpLive
 import com.prudnikweb.hypernova.data.McpLiveReply
+import com.prudnikweb.hypernova.data.McpLiveTool
 import com.prudnikweb.hypernova.data.McpRow
 import com.prudnikweb.hypernova.data.McpServer
 import com.prudnikweb.hypernova.data.McpSetup
+import com.prudnikweb.hypernova.data.McpThing
+import com.prudnikweb.hypernova.data.McpTool
 import com.prudnikweb.hypernova.data.mcpList
 import com.prudnikweb.hypernova.data.mcpLive
 import com.prudnikweb.hypernova.data.mcpServer
+import com.prudnikweb.hypernova.data.mcpTools
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.GlassSheet
 import com.prudnikweb.hypernova.ui.components.Glyph
@@ -285,6 +290,13 @@ fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder
         live = null
         live = hub.mcpLive(agent, folder)
     }
+    var facts by remember { mutableStateOf<Result<McpFacts>?>(null) }
+    var tool by remember { mutableStateOf<McpTool?>(null) }
+    var liveTool by remember { mutableStateOf<McpLiveTool?>(null) }
+    LaunchedEffect(attempt, hub.agentSettingsVersion) {
+        facts = null
+        facts = hub.mcpTools(agent, name, scope, folder)
+    }
     ScreenScaffold(sourceKey = "mcp:$agent:$scope:$folder:$name", title = name, subtitle = hub.mac.name, onBack = onBack) { top, source ->
         LazyColumn(
             Modifier.fillMaxSize().then(source),
@@ -305,11 +317,27 @@ fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder
                     item(key = "setup-seam") { Seam(stringResource(R.string.mcp_seam_setup), modifier = seamMod()) }
                     item(key = "setup") { SetupCard(s.setup) }
                     item(key = "tools-seam") { Seam(stringResource(R.string.mcp_seam_tools), modifier = seamMod()) }
-                    item(key = "tools") { LiveToolsCard(mine) }
+                    item(key = "tools") { ToolsCard(facts, mine, { tool = it }, { liveTool = it }) }
+                    facts?.getOrNull()?.let { f ->
+                        f.instructions?.let { words ->
+                            item(key = "instructions-seam") { Seam(stringResource(R.string.mcp_seam_instructions), modifier = seamMod()) }
+                            item(key = "instructions") { TextCard(words) }
+                        }
+                        if (f.prompts.isNotEmpty()) {
+                            item(key = "prompts-seam") { Seam(stringResource(R.string.mcp_seam_prompts), modifier = seamMod()) }
+                            item(key = "prompts") { ThingsCard(f.prompts) }
+                        }
+                        if (f.resources.isNotEmpty()) {
+                            item(key = "resources-seam") { Seam(stringResource(R.string.mcp_seam_resources), modifier = seamMod()) }
+                            item(key = "resources") { ThingsCard(f.resources) }
+                        }
+                    }
                 }
             }
         }
     }
+    tool?.let { t -> ToolSheet(t) { tool = null } }
+    liveTool?.let { t -> LiveToolSheet(t) { liveTool = null } }
 }
 
 @Composable
@@ -391,15 +419,159 @@ internal fun SetupCard(setup: McpSetup) {
     }
 }
 
+@StringRes
+private fun whyNoTools(why: String?): Int = when (why) {
+    "approval" -> R.string.mcp_why_approval
+    "disabled" -> R.string.mcp_why_disabled
+    "needs_auth" -> R.string.mcp_why_auth
+    "too_slow" -> R.string.mcp_why_slow
+    "failed" -> R.string.mcp_why_failed
+    else -> R.string.mcp_why_names
+}
+
+/** The tools in full if the server told us; else the names the agent's process knows, with why that's all. */
 @Composable
-private fun LiveToolsCard(mine: McpLive?) {
+private fun ToolsCard(facts: Result<McpFacts>?, mine: McpLive?, onTool: (McpTool) -> Unit, onLive: (McpLiveTool) -> Unit) {
+    val f = facts?.getOrNull()
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-            if (mine == null || mine.tools.isEmpty()) HText(stringResource(R.string.mcp_no_tools), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp))
-            mine?.tools.orEmpty().forEachIndexed { i, t ->
-                if (i > 0) Hairline(Modifier.fillMaxWidth())
-                HText(t.name, style = Type.monoSmall, color = HN.ink, modifier = Modifier.padding(vertical = 10.dp))
+            when {
+                facts == null -> LoadingLine(stringResource(R.string.mcp_tools_asking), Modifier.padding(vertical = 8.dp))
+                f != null && f.tools.isNotEmpty() -> {
+                    f.tools.forEachIndexed { i, t ->
+                        if (i > 0) Hairline(Modifier.fillMaxWidth())
+                        ToolRow(t.name, t.description, toolMarks(t.readOnly, t.destructive)) { onTool(t) }
+                    }
+                    if (f.moreTools > 0) HText(pluralStringResource(R.plurals.mcp_more_tools, f.moreTools, f.moreTools), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp))
+                }
+                else -> {
+                    val names = mine?.tools.orEmpty()
+                    names.forEachIndexed { i, t ->
+                        if (i > 0) Hairline(Modifier.fillMaxWidth())
+                        ToolRow(t.name, null, toolMarks(t.readOnly.takeIf { it }, t.destructive.takeIf { it })) { onLive(t) }
+                    }
+                    if (f?.whyNot != null || facts.isFailure) HText(stringResource(whyNoTools(f?.whyNot)), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp))
+                    else if (names.isEmpty()) HText(stringResource(R.string.mcp_no_tools), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp))
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun toolMarks(readOnly: Boolean?, destructive: Boolean?): String? = when {
+    destructive == true -> stringResource(R.string.mcp_a_destructive)
+    readOnly == true -> stringResource(R.string.mcp_a_read_only)
+    else -> null
+}
+
+@Composable
+private fun ToolRow(name: String, description: String?, mark: String?, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            HText(name, style = Type.monoSmall, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            description?.let {
+                Spacer(Modifier.height(2.dp))
+                HText(it, style = Type.small, color = HN.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        mark?.let {
+            Spacer(Modifier.width(10.dp))
+            HText(it, style = Type.small, color = HN.inkDim, maxLines = 1)
+        }
+        Spacer(Modifier.width(8.dp))
+        Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)
+    }
+}
+
+@Composable
+private fun TextCard(words: String) {
+    GlassCard(Modifier.fillMaxWidth()) {
+        HText(words, style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(16.dp))
+    }
+}
+
+@Composable
+private fun ThingsCard(things: List<McpThing>) {
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+            things.forEachIndexed { i, t ->
+                if (i > 0) Hairline(Modifier.fillMaxWidth())
+                Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.padding(vertical = 8.dp)) {
+                    HText(listOf(t.name, t.args.joinToString(", ").takeIf { it.isNotEmpty() }?.let { "($it)" }.orEmpty()).joinToString(" ").trim(), style = Type.monoSmall, color = HN.ink)
+                    t.description?.let { HText(it, style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(top = 2.dp)) }
+                    t.uri?.let { HText(it, style = Type.monoSmall, color = HN.inkDim, modifier = Modifier.padding(top = 2.dp)) }
+                }
+            }
+        }
+    }
+}
+
+/** What each hint says, for a flag the server gave. Its own claim: nothing checks it. */
+@Composable
+private fun AnnotationLines(readOnly: Boolean?, destructive: Boolean?, idempotent: Boolean?, openWorld: Boolean?) {
+    val lines = listOfNotNull(
+        readOnly?.let { stringResource(if (it) R.string.mcp_h_read_only else R.string.mcp_h_writes) },
+        destructive?.let { stringResource(if (it) R.string.mcp_h_destructive else R.string.mcp_h_not_destructive) },
+        idempotent?.let { stringResource(if (it) R.string.mcp_h_idempotent else R.string.mcp_h_not_idempotent) },
+        openWorld?.let { stringResource(if (it) R.string.mcp_h_open else R.string.mcp_h_closed) },
+    )
+    if (lines.isEmpty()) return
+    Spacer(Modifier.height(12.dp))
+    HText(stringResource(R.string.mcp_tool_says).uppercase(), style = Type.label, color = HN.inkDim)
+    Spacer(Modifier.height(4.dp))
+    lines.forEach { HText(it, style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(vertical = 1.dp)) }
+}
+
+/** A tool: what it's for, what it says of itself, its parameters. A tool can't be run from here. */
+@Composable
+private fun ToolSheet(t: McpTool, onDismiss: () -> Unit) {
+    var schema by remember { mutableStateOf(false) }
+    GlassSheet(t.name, onDismiss) {
+        HText(t.name, style = Type.title, color = HN.ink)
+        t.title?.takeIf { it != t.name }?.let { HText(it, style = Type.small, color = HN.inkMuted) }
+        t.description?.let {
+            Spacer(Modifier.height(8.dp))
+            HText(it, style = Type.body, color = HN.inkMuted)
+        }
+        AnnotationLines(t.readOnly, t.destructive, t.idempotent, t.openWorld)
+        Spacer(Modifier.height(12.dp))
+        HText(stringResource(R.string.mcp_params).uppercase(), style = Type.label, color = HN.inkDim)
+        if (t.params.isEmpty()) HText(stringResource(R.string.mcp_params_none), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
+        t.params.forEachIndexed { i, p ->
+            if (i > 0) Hairline(Modifier.fillMaxWidth())
+            Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.padding(vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HText(p.name, style = Type.monoSmall, color = HN.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.width(10.dp))
+                    HText(listOf(p.type, if (p.required) stringResource(R.string.mcp_param_required) else stringResource(R.string.mcp_param_optional)).joinToString(" · "), style = Type.small, color = if (p.required) HN.ink else HN.inkDim, maxLines = 1)
+                }
+                p.description?.let { HText(it, style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(top = 2.dp)) }
+                p.default?.let { HText(stringResource(R.string.mcp_param_default, it), style = Type.monoSmall, color = HN.inkDim, modifier = Modifier.padding(top = 2.dp)) }
+                if (p.choices.isNotEmpty()) HText(p.choices.joinToString(" · "), style = Type.monoSmall, color = HN.inkDim, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+        t.schema?.let { text ->
+            Spacer(Modifier.height(8.dp))
+            Pill(stringResource(if (schema) R.string.mcp_schema_hide else R.string.mcp_schema_show), { schema = !schema }, kind = PillKind.Ghost, height = 40.dp)
+            if (schema) HText(text, style = Type.monoSmall, color = HN.inkMuted, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+}
+
+/** All that's known of a tool the server itself couldn't be asked about. */
+@Composable
+private fun LiveToolSheet(t: McpLiveTool, onDismiss: () -> Unit) {
+    GlassSheet(t.name, onDismiss) {
+        HText(t.name, style = Type.title, color = HN.ink)
+        AnnotationLines(t.readOnly.takeIf { it }, t.destructive.takeIf { it }, null, t.openWorld.takeIf { it })
+        Spacer(Modifier.height(8.dp))
+        HText(stringResource(R.string.mcp_why_names), style = Type.small, color = HN.inkDim)
     }
 }
