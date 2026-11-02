@@ -120,15 +120,16 @@ suspend fun Hub.pluginUninstall(agent: String, id: String, scope: String, folder
 suspend fun Hub.pluginToggle(agent: String, id: String, scope: String, folder: String?, on: Boolean): Result<PluginChange> =
     agentExt("POST", "/v1/agents/plugins/toggle", JSONObject().put("agent", agent).put("plugin", id).put("enabled", on).at(scope, folder), slow = true).map(PluginChange::wire)
 suspend fun Hub.pluginUpdate(agent: String, id: String, scope: String, folder: String?, accept: String? = null): Result<PluginChange> =
-    agentExt("POST", "/v1/agents/plugins/update", JSONObject().put("agent", agent).put("plugin", id).at(scope, folder).also { o -> accept?.let { o.put("acceptCommand", it).put("confirmRun", true) } }, slow = true).map(PluginChange::wire)
+    agentExt("POST", "/v1/agents/plugins/update", JSONObject().put("agent", agent).put("plugin", id).put("confirmRun", true).at(scope, folder).also { o -> accept?.let { o.put("acceptCommand", it) } }, slow = true).map(PluginChange::wire)
 suspend fun Hub.pluginConfigure(agent: String, id: String, folder: String?, values: Map<String, String>): Result<PluginChange> =
     agentExt("POST", "/v1/agents/plugins/configure", JSONObject().put("agent", agent).put("plugin", id).put("values", JSONObject().also { v -> values.forEach { (k, x) -> v.put(k, x) } }).at(null, folder), slow = true).map(PluginChange::wire)
 suspend fun Hub.marketplaceAdd(agent: String, source: String, scope: String, folder: String?): Result<PluginChange> =
     agentExt("POST", "/v1/agents/plugins/marketplaces/add", JSONObject().put("agent", agent).put("source", source).put("confirmRun", true).at(scope, folder), slow = true).map(PluginChange::wire)
 suspend fun Hub.marketplaceRemove(agent: String, name: String, folder: String?): Result<PluginChange> =
     agentExt("POST", "/v1/agents/plugins/marketplaces/remove", JSONObject().put("agent", agent).put("name", name).at(null, folder), slow = true).map(PluginChange::wire)
+/** Codex's also updates its plugins, so there the caller has asked for the fingerprint first. */
 suspend fun Hub.marketplaceUpdate(agent: String, name: String?, folder: String?): Result<PluginChange> =
-    agentExt("POST", "/v1/agents/plugins/marketplaces/update", JSONObject().put("agent", agent).also { o -> name?.let { o.put("name", it) } }.at(null, folder), slow = true).map(PluginChange::wire)
+    agentExt("POST", "/v1/agents/plugins/marketplaces/update", JSONObject().put("agent", agent).also { o -> name?.let { o.put("name", it) }; if (agent == AgentSettingsReply.CODEX) o.put("confirmRun", true) }.at(null, folder), slow = true).map(PluginChange::wire)
 
 /** One skill. [source]: the agent's word for where it's from. [lockedBy]: why it can't be changed here; null: it can. */
 @Immutable

@@ -3,7 +3,9 @@ package com.prudnikweb.hypernova.data.live
 import com.prudnikweb.hypernova.data.Mcp
 import com.prudnikweb.hypernova.data.mcpList
 import com.prudnikweb.hypernova.data.plugins
+import com.prudnikweb.hypernova.data.marketplaceUpdate
 import com.prudnikweb.hypernova.data.pluginInstall
+import com.prudnikweb.hypernova.data.pluginUpdate
 import com.prudnikweb.hypernova.data.pluginUninstall
 import com.prudnikweb.hypernova.data.mcpLive
 import com.prudnikweb.hypernova.data.mcpServer
@@ -114,6 +116,14 @@ class SettingsCallsTest {
         answer("POST", "/v1/agents/plugins/uninstall", "rest-plugin-installed")
         rig.call { rig.hub.pluginUninstall("claude", "hello@testmp", "user", null) }.getOrThrow()
         assertFalse(JSONObject(last("POST", "/v1/agents/plugins/uninstall").body).has("confirmRun"))
+        answer("POST", "/v1/agents/plugins/update", "rest-plugin-installed")
+        rig.call { rig.hub.pluginUpdate("claude", "hello@testmp", "user", null) }.getOrThrow()
+        assertEquals(true, JSONObject(last("POST", "/v1/agents/plugins/update").body).getBoolean("confirmRun"))
+        answer("POST", "/v1/agents/plugins/marketplaces/update", "rest-plugin-installed")
+        rig.call { rig.hub.marketplaceUpdate("claude", "testmp", null) }.getOrThrow()
+        assertFalse(JSONObject(last("POST", "/v1/agents/plugins/marketplaces/update").body).has("confirmRun"))
+        rig.call { rig.hub.marketplaceUpdate("codex", "testmp", null) }.getOrThrow()
+        assertEquals(true, JSONObject(last("POST", "/v1/agents/plugins/marketplaces/update").body).getBoolean("confirmRun"))
     }
 
     @Test fun anOldCodexComesBackAsARefusalInItsOwnWords() {

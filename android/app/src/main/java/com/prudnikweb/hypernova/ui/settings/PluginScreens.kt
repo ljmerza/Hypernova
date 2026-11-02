@@ -82,7 +82,7 @@ import kotlinx.coroutines.launch
 
 private val seam = Modifier.padding(horizontal = 4.dp).padding(top = 8.dp, bottom = 2.dp)
 
-/** Installing a plugin, or adding a marketplace, is someone else's code on the server: the whole source on a confirm, then the fingerprint. */
+/** Installing or updating a plugin, or adding a marketplace, is someone else's code on the server: what it is on a confirm, then the fingerprint. */
 internal fun codeCheck(context: Context, confirm: (Confirm) -> Unit, toast: (String) -> Unit, server: String, what: String, body: String, go: () -> Unit) {
     confirm(
         Confirm(
@@ -126,6 +126,15 @@ fun PluginsScreen(hub: Hub, agent: String, onBack: () -> Unit, onOpen: (id: Stri
             busy = false
         }
     }
+    // Codex's update of a marketplace moves its installed plugins to their new versions too (measured on 0.164.0), so it's a plugin's update. Claude Code's leaves them.
+    fun updateMarket(name: String?) {
+        if (!codex) {
+            act { hub.marketplaceUpdate(agent, name, folder) }
+            return
+        }
+        val what = name ?: context.getString(R.string.pl_market_every)
+        codeCheck(context, confirm, toast, server, what, context.getString(R.string.pl_run_market_update, what)) { act { hub.marketplaceUpdate(agent, name, null) } }
+    }
     ScreenScaffold(sourceKey = "plugins:$agent", title = stringResource(if (codex) R.string.pl_title_codex else R.string.pl_title_claude), subtitle = server, onBack = onBack) { top, sourceMod ->
         LazyColumn(
             Modifier.fillMaxSize().then(sourceMod),
@@ -168,7 +177,7 @@ fun PluginsScreen(hub: Hub, agent: String, onBack: () -> Unit, onOpen: (id: Stri
                                     if (i > 0) Hairline(Modifier.fillMaxWidth())
                                     MarketRow(
                                         m,
-                                        onUpdate = { act { hub.marketplaceUpdate(agent, m.name, if (codex) null else folder) } },
+                                        onUpdate = { updateMarket(m.name) },
                                         onRemove = {
                                             confirm(Confirm(context.getString(R.string.pl_market_remove_title, m.name), context.getString(R.string.pl_market_remove_body), context.getString(R.string.pl_market_remove), danger = true) {
                                                 act { hub.marketplaceRemove(agent, m.name, if (codex) null else folder) }
@@ -176,7 +185,7 @@ fun PluginsScreen(hub: Hub, agent: String, onBack: () -> Unit, onOpen: (id: Stri
                                         },
                                     )
                                 }
-                                if (data.marketplaces.size > 1) Pill(stringResource(R.string.pl_market_update_all), { act { hub.marketplaceUpdate(agent, null, if (codex) null else folder) } }, kind = PillKind.Ghost, height = 36.dp, modifier = Modifier.padding(vertical = 8.dp))
+                                if (data.marketplaces.size > 1) Pill(stringResource(R.string.pl_market_update_all), { updateMarket(null) }, kind = PillKind.Ghost, height = 36.dp, modifier = Modifier.padding(vertical = 8.dp))
                             }
                         }
                     }
@@ -325,7 +334,9 @@ fun PluginScreen(hub: Hub, agent: String, id: String, scopeWord: String, folder:
                 FlowRow(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (on) Pill(stringResource(R.string.pl_disable), { act({ on = false }) { hub.pluginToggle(agent, id, scopeWord, folder, false) } }, kind = PillKind.Outline, height = 40.dp, enabled = !busy)
                     else Pill(stringResource(R.string.pl_enable), { act({ on = true }) { hub.pluginToggle(agent, id, scopeWord, folder, true) } }, kind = PillKind.Primary, height = 40.dp, enabled = !busy)
-                    if (!codex) Pill(stringResource(R.string.pl_update), { act { hub.pluginUpdate(agent, id, scopeWord, folder) } }, kind = PillKind.Outline, height = 40.dp, enabled = !busy)
+                    if (!codex) Pill(stringResource(R.string.pl_update), {
+                        codeCheck(context, confirm, toast, server, id, context.getString(R.string.pl_run_update, id)) { act { hub.pluginUpdate(agent, id, scopeWord, folder) } }
+                    }, kind = PillKind.Outline, height = 40.dp, enabled = !busy)
                     Pill(stringResource(R.string.pl_uninstall), {
                         confirm(Confirm(context.getString(R.string.pl_uninstall_title, id.substringBefore('@')), context.getString(R.string.pl_uninstall_body), context.getString(R.string.pl_uninstall), danger = true) {
                             act(onBack) { hub.pluginUninstall(agent, id, scopeWord, folder) }

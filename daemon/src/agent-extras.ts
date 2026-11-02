@@ -2,9 +2,10 @@
 // the phone" and "Skills from the phone"). Thin on purpose: each action is the agent's own command or its app-server's call,
 // and what comes back is filtered to named fields, because `claude plugin list --json` carries a plugin's whole MCP setup.
 //
-// Installing a plugin or adding a marketplace is someone else's code on the server, so the phone shows the source
-// and asks for the fingerprint; the server sees that claim (`confirmRun`) and refuses without it. Enabling, disabling and
-// uninstalling run nothing at that moment (mcp-extras-e2e.test.ts watches a plugin's hook for it).
+// Installing or updating a plugin, or adding a marketplace, is someone else's code on the server, so the phone shows what's
+// coming and asks for the fingerprint; the server sees that claim (`confirmRun`) and refuses without it. So does Codex's update of
+// a marketplace, which also updates its plugins; Claude Code's leaves what's installed alone (extras-e2e.test.ts has both).
+// Enabling, disabling and uninstalling run nothing at that moment (the same test watches a plugin's hook for it).
 
 import type { ServerResponse } from 'node:http'
 import { isTable } from './agent-settings.ts'
@@ -289,7 +290,7 @@ const claudeRoutes: Record<string, Route> = {
   '/update': async (b, deps) => {
     const id = pluginArg(b.plugin)
     const scope = typeof b.scope === 'string' ? scopeArg(b.scope) : 'user'
-    if (b.acceptCommand !== undefined) confirmed(b, 'That command')
+    confirmed(b, 'Updating a plugin')
     const o = outcome(await run('claude', ['plugin', 'update', '--json', '--scope', scope, ...acceptArgs(b), id], await whereFor({ ...b, scope }, deps), undefined, INSTALL_MS), 'Claude Code didn’t update that plugin.')
     log(`plugins: updated ${id}`)
     return needsAccept(o.raw) ?? { ok: true, id, ...(o.message ? { message: o.message } : {}), ...opt('newVersion', o.raw?.newVersion, 80) }
@@ -376,6 +377,8 @@ const codexRoutes: Record<string, Route> = {
   },
   '/marketplaces/update': async (b) => {
     const name = b.name === undefined || b.name === null ? null : marketArg(b.name)
+    // Unlike Claude Code's, this moves what's installed from it to the new version: Codex has no other update of a plugin.
+    confirmed(b, 'Updating a Codex marketplace updates its plugins too, which')
     const r = await run('codex', ['plugin', 'marketplace', 'upgrade', ...(name ? [name] : [])], HOME, undefined, INSTALL_MS)
     if (r.code !== 0) throw new McpRefused(502, 'cli_failed', cliWords(r) ?? 'Codex didn’t refresh that marketplace.')
     availableCache.clear()

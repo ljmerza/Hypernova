@@ -2957,8 +2957,8 @@ plugins. A POST to a route Claude Code has and Codex doesn't is 409 `not_for_cod
 
 #### POST /v1/agents/plugins/update
 
-- **Body:** `{agent, plugin, scope?, folder?, acceptCommand?, confirmRun?}`. `scope` is `user` if it's
-  not there. `confirmRun` is only needed with `acceptCommand`.
+- **Body:** `{agent, plugin, scope?, folder?, confirmRun, acceptCommand?}`. `scope` is `user` if it's
+  not there. A new version can bring new hooks.
 - **Answer:** `200 {ok: true, id, message?, newVersion?}`, or `needsAccept` as for install
 - **Refusals:** 400 `bad_plugin`, `bad_scope`, `bad_accept`; 403 `confirm_run`; 409 `not_for_codex`
 
@@ -3004,9 +3004,10 @@ plugins. A POST to a route Claude Code has and Codex doesn't is 409 `not_for_cod
 
 #### POST /v1/agents/plugins/marketplaces/update
 
-- **Body:** `{agent, name?, folder?}`. No `name`: all of them.
+- **Body:** `{agent, name?, folder?, confirmRun?}`. No `name`: all of them. `confirmRun` is Codex's only: there this also
+  updates the plugins installed from it.
 - **Answer:** `200 {ok: true}`
-- **Refusals:** 400 `bad_marketplace`
+- **Refusals:** 400 `bad_marketplace`; 403 `confirm_run` (Codex)
 
 ### Routes: agents' skills
 
@@ -5460,13 +5461,14 @@ Routes: agents' plugins. Types: `PluginList`, `PluginCatalogue`, `PluginDetail`.
 
 #### What needs the claim
 
-Installing a plugin and adding a marketplace are someone else's code on the server: 403 `confirm_run` without
-`confirmRun`, as for an MCP server. Not enable, disable, uninstall or removing a marketplace, which run nothing at that
-moment, and not update or marketplace update. A plugin's code runs from the next session on.
+Installing or updating a plugin and adding a marketplace are someone else's code on the server: 403 `confirm_run` without
+`confirmRun`, as for an MCP server. So is updating a marketplace **for Codex**, where that also moves its installed plugins to
+their new versions. Not for Claude Code, where it only fetches: what's installed stays until the plugin is updated. Not enable,
+disable, uninstall or removing a marketplace, which run nothing at that moment. A plugin's code runs from the next session on.
 
 A plugin that installs by running a command (Claude Code's): the answer is `{ok: false, needsAccept: {command, sha256}}`,
 with nothing done. The client shows the command, confirms, and sends the hash back as `acceptCommand`, 64 hex digits, else
-400 `bad_accept`. On update, `acceptCommand` also needs `confirmRun`. Only tested with a stand-in. A `needsAccept` answer
+400 `bad_accept`. Only tested with a stand-in. A `needsAccept` answer
 goes out as `{t:"agent_settings"}` like any other.
 
 #### Where it runs

@@ -1192,6 +1192,7 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       contract('rest-plugin-detail', await ok(get('/v1/agents/plugins/detail?agent=claude&plugin=hello@testmp')))
       contract('rest-plugin-install-refused', await refused(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user' }), 403))
       contract('rest-plugin-installed', await ok(post('/v1/agents/plugins/install', { agent: 'claude', plugin: 'hello@testmp', scope: 'user', confirmRun: true })))
+      contract('rest-plugin-update-refused', await refused(post('/v1/agents/plugins/update', { agent: 'claude', plugin: 'hello@testmp', scope: 'user' }), 403))
       // Skills: the same stand-ins, and the process's own menu.
       useProbe(async (_cwd, _waiting, work) =>
         work({
