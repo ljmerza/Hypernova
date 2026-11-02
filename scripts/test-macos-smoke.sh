@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hypernova's server on a real Mac, end to end. This is the one test that runs on macOS: CI's Mac
+# Hypernova's server on macOS itself, end to end, with its real launchd. CI's Mac
 # runners run it (.github/workflows/server-packages.yml). Nobody should run it on a Mac they use: it
 # installs the real service under its real label, and removes it again.
 #
@@ -65,6 +65,8 @@ dump() {
   [ -f "$LOGS/daemon.log" ] && { echo "--- daemon.log"; tail -40 "$LOGS/daemon.log"; }
 }
 
+# A Mac's default shell, which GitHub's runner doesn't have: the shell block goes in ~/.zshrc only for zsh.
+sudo -n dscl . -create "/Users/$(id -un)" UserShell /bin/zsh 2>/dev/null
 echo "macOS $(sw_vers -productVersion) on $(uname -m), bash $BASH_VERSION, $(id -un), login shell $(dscl . -read "/Users/$(id -un)" UserShell 2>/dev/null | awk '{print $2}')"
 echo "launchd manager: $(launchctl managername 2>&1)"
 if launchctl print "gui/$UIDN" >/dev/null 2>&1; then GUI=1; ok "this runner has a login session at the screen (gui/$UIDN)"; else GUI=0; echo "::warning::No gui/$UIDN domain on this runner: the LaunchAgent can't be tested here."; launchctl print "gui/$UIDN" 2>&1 | head -3; fi

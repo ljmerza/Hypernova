@@ -48,7 +48,7 @@ That job's release is then added to by `.github/workflows/server-packages.yml`, 
 |---|---|---|
 | `deb` (matrix) | `ubuntu-24.04`, `ubuntu-24.04-arm` | `hypernova-server-vX.Y.Z-linux-<arch>.deb`, after `scripts/test-server-deb.sh` on Ubuntu 24.04 and Debian 12 |
 | `macos` (matrix) | `macos-latest` (arm64), `macos-26-intel` (x64) | `hypernova-server-vX.Y.Z-macos-<arch>.tar.gz`, then `.pkg`, each after `scripts/test-macos-smoke.sh` |
-| `macos-unit` | `macos-latest` | nothing: the daemon's whole suite on a Mac, to read (`continue-on-error`) |
+| `macos-unit` | `macos-latest` | nothing: the daemon's whole suite on a Mac. `continue-on-error` until a run has shown it green; nothing depends on it either way |
 | `checksums` | `ubuntu-latest` | `SHA256SUMS`, from what the release really has, and a line in the notes for anything it lacks. Runs even when a job above failed |
 
 **A failure there can't stop a release.** The APK and the Linux tarball are published before any of it
@@ -82,10 +82,21 @@ The `curl` line isn't affected. Signing the `.pkg` would need:
 Nothing inside needs signing of its own: the `.pkg` holds text, and Node.js and node-pty come at install time,
 each signed or not by its own publisher. Without those secrets the workflow goes on unsigned.
 
-**What's proven, and how.** Nobody here has a Mac: `scripts/test-macos-smoke.sh` on the runners is the only
-Mac test there is. It can't show what macOS asks a person at the screen (Gatekeeper, Background Items, folder
-permissions), and a runner isn't a Mac after a real reboot. Until someone runs it on a real Mac,
-[INSTALL.md](INSTALL.md) says so, and a Mac doesn't update itself (`installKind`, `daemon/src/server-update.ts`).
+**What's proven, and how.** Nobody here has a Mac, so GitHub's runners are the only Macs it has run on. Their
+first run (2026-11-02, macOS 26 on arm64 and on Intel, from a pull request) passed `scripts/test-macos-smoke.sh`
+from both the tarball and the `.pkg`:
+
+| Proven there | Not proven anywhere |
+|---|---|
+| A login session at the screen (`gui/<uid>`), `launchctl` bootstrap, bootout and kickstart, the words `launchd.ts` reads | **A person's own Mac** |
+| `KeepAlive` after a `kill -9`; a session's holder surviving that, a kickstart and a reinstall | A real reboot, and Automatic login |
+| Node.js fetched for the processor; node-pty prebuilt, nothing compiled; `doctor` with no problems; LibreSSL's certificates | What macOS asks a person: Gatekeeper, Background Items, folder and network prompts |
+| `pkgbuild`, `productbuild` and `sudo installer` on the `.pkg` | macOS older than 26 |
+| | `get.sh` against a real release on a Mac (only with stand-ins so far), and attaching the files to a release |
+
+A Mac doesn't update itself until it's been run on a person's own Mac (`installKind`,
+`daemon/src/server-update.ts`). A whole clip of read aloud, `POST /v1/speech`, hung on that runner's `say`:
+docs/LATER.md, L108.
 
 ### Versions
 

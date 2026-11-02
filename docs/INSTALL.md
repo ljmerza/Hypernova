@@ -7,15 +7,16 @@ Hypernova server in between.
 
 This page takes you from nothing to a paired phone. Then: [away from home or on a
 VPS](#away-from-home-or-on-a-vps), [update](#update), [uninstall](#uninstall),
-[Codex](#codex-optional), [a Mac](#on-a-mac-untested-on-a-real-one), [Windows](#windows-experimental),
+[Codex](#codex-optional), [a Mac](#on-a-mac), [Windows](#windows-experimental),
 [containers](#in-a-container), [troubleshooting](#troubleshooting). Every command and flag is in
 [LINUX.md](LINUX.md).
 
 ## What you need
 
 - A server on **Ubuntu or Debian**, x86_64 or arm64, with systemd, and a normal user with sudo.
-  Other distributions work with their packages installed by hand. A Mac works too, not yet tried on a
-  real one: [On a Mac](#on-a-mac-untested-on-a-real-one).
+  Other distributions work with their packages installed by hand. A Mac works too: it has run on GitHub's
+  Mac runners, but not yet on a person's own Mac:
+  [On a Mac](#on-a-mac).
 - A phone on **Android 10 or later**, on the server's network or your own VPN into it.
 - A Claude plan or an API key, to sign in to Claude Code. Or Codex instead:
   [Codex (optional)](#codex-optional).
@@ -147,7 +148,7 @@ The app has the same switch: Settings, in the server's section, **Update this se
 
 Only an install from a release's package does this (the `curl` line above, the `.deb`'s
 `hypernova-server-setup`, or the package's own install script). An install from a git clone or in a
-container doesn't, nor does [a Mac](#on-a-mac-untested-on-a-real-one) yet, and `hypernova auto-update`
+container doesn't, nor does [a Mac](#on-a-mac) yet, and `hypernova auto-update`
 says why. It also never asks for `sudo`, so a release that needs a new system package fails and
 leaves the server as it was: install that one by hand.
 
@@ -221,15 +222,17 @@ shared terminal, like `claude`.
 
 <a id="4-windows-experimental-wsl2-or-docker-desktop"></a>
 
-## On a Mac (untested on a real one)
+## On a Mac
 
 The server runs on a Mac too: Apple silicon or Intel, macOS 13.5 or later. There's no menu bar app; it's
 the same `hypernova` command as on Linux, run in Terminal.
 
-**Nobody has run this on a Mac they use yet.** The only Mac it has run on is CI's runner, which installs
-it, checks it and removes it for each release (`scripts/test-macos-smoke.sh`). What that can't show, such
-as what macOS asks a person at the screen, comes from Apple's documents and the Mac app this project used
-to have, and is marked below. If you try it, an issue saying how it went helps.
+**Where this stands.** It has run on GitHub's Mac runners, on both processors, on macOS 26: each release's
+packages are installed there, checked and removed (`scripts/test-macos-smoke.sh`), covering the service,
+`status`, `doctor`, the API, and a session surviving restarts. **A person's own Mac is still untried**: a real
+reboot, Gatekeeper, the privacy prompts, and macOS older than 26. What those do comes from Apple's documents
+and the Mac app this project used to have, and is marked below. If you try it, an issue saying how it went
+helps.
 
 ### Install it
 
@@ -288,7 +291,7 @@ this install:
 |---|---|
 | The service | A LaunchAgent, `~/Library/LaunchAgents/com.prudnikweb.hypernova.daemon.plist`. launchd restarts it when it dies; sessions keep running through a restart. |
 | When it starts | **When you log in, not at boot.** After a restart the server waits for a login. For a Mac that should come back by itself, turn on **Automatic login** (System Settings → Users & Groups; FileVault keeps it off). Over `ssh` with nobody logged in at the screen there's no service, and setup says so. |
-| Updates | **By hand: run the `curl` line again.** A Mac doesn't update itself yet, because a broken update on a machine nobody can reach is worse than none, and it has never run on a real Mac. `hypernova auto-update` and the app's Settings say so. The phone's app still updates as usual. |
+| Updates | **By hand: run the `curl` line again.** A Mac doesn't update itself yet, because a broken update on a machine nobody can reach is worse than none, and that part has never been tried on any Mac. `hypernova auto-update` and the app's Settings say so. The phone's app still updates as usual. |
 | State | `~/Library/Application Support/Hypernova` |
 | Logs | `~/Library/Logs/Hypernova/daemon.log`, and `daemon.stderr.log` for what the daemon couldn't log |
 | The terminal module | node-pty comes prebuilt for both processors, so nothing is compiled and **Xcode isn't needed for it**. Apple's Command Line Tools (`xcode-select --install`) are for git, which Claude Code and the app's git views use. The install says if they're missing, and goes on. |
@@ -550,7 +553,7 @@ problems: see [SECURITY.md](../SECURITY.md).
 
 ## What's on your server
 
-The install puts in what's missing (on a Mac: [On a Mac](#on-a-mac-untested-on-a-real-one)):
+The install puts in what's missing (on a Mac: [On a Mac](#on-a-mac)):
 
 - **System packages**, with `apt-get`: curl, tar, gzip, openssl, git, `ps`, `lsof`, and build tools
   with python3, because the terminal module (node-pty) is built on the server. The `.deb` declares these
