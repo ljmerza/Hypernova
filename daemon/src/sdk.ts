@@ -1,8 +1,8 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // Claude Code's Agent SDK (@anthropic-ai/claude-agent-sdk), loaded the first time something needs
-// it. It is Anthropic's ("All rights reserved"), so the Mac app doesn't carry it: Setup fetches the
-// version the lockfile pins from npm into the installed daemon, once (docs/DECISIONS.md, "Going
-// public"); the Linux install gets it with the rest of `npm ci`. The daemon starts and serves
+// it. It is Anthropic's ("All rights reserved"), so a release doesn't carry it: `hypernova setup` gets the
+// version the lockfile pins from npm with the rest of `npm ci` (docs/DECISIONS.md, "Going
+// public"). The daemon starts and serves
 // without it: Codex, shared terminals and everything else work, and only what drives Claude Code
 // through it (sessions the daemon runs itself, the "/" list, Rewind) answers 409 `sdk_missing`
 // with the way to get it (docs/PROTOCOL.md, "Claude Code's SDK").
@@ -30,7 +30,7 @@ export const DAEMON_DIR = dirname(dirname(fileURLToPath(import.meta.url)))
 export type SdkState = { installed: boolean; version: string | null; wanted: string | null }
 
 /** What a client shows when the SDK isn't there, with the way to get it on this system. */
-export const SDK_MISSING_MAC = 'Claude Code’s SDK isn’t installed on this Mac yet. On the Mac, open Hypernova’s Setup, go to Background service and click Fetch again.'
+export const SDK_MISSING_MAC = 'Claude Code’s SDK isn’t installed on this Mac yet. Run hypernova setup again: it installs the daemon’s packages with npm.'
 export const SDK_MISSING_LINUX = 'Claude Code’s SDK isn’t installed on this server. Run hypernova setup again: it installs the daemon’s packages with npm.'
 
 /** The SDK isn't there (or doesn't load): 409 `sdk_missing` wherever it's asked for. */
@@ -76,7 +76,7 @@ export type SdkLoader = { load(): Promise<ClaudeSdk>; state(now?: number): SdkSt
 /**
  * The SDK of the daemon in [root]. `load` imports it once and keeps it; while it's missing (or
  * doesn't load) every call rejects with SdkMissingError and looks again the next time, so one
- * fetched meanwhile (Setup's Fetch again) is used without a restart. `state` is cheap (two small
+ * fetched meanwhile (hypernova setup) is used without a restart. `state` is cheap (two small
  * reads, at most every 5 s) for the snapshot. [pkg]: tests point it at a stand-in.
  */
 export function sdkLoader(root = DAEMON_DIR, pkg = SDK_PACKAGE): SdkLoader {

@@ -89,7 +89,7 @@ test('messages call this computer the Mac on a Mac and the server on Linux', () 
 
 test('the daemon\'s error messages don\'t say "Mac" on a server, except about a Mac-only feature', () => {
   const src = fileURLToPath(new URL('../src/', import.meta.url))
-  // Read aloud with the Mac's voice, macOS' own privacy question, a window opened on the Mac, the Mac's Setup.
+  // Read aloud with the Mac's voice, macOS' own privacy question, a window opened on the Mac, the SDK's message on a Mac.
   const macOnly = /'(mac_privacy|bad_engine|bad_voice|bad_target|speech_failed)'|open a terminal window|SDK_MISSING_MAC/
   const thrown = /\b(Http|File|Change|Provider|Tls|Resume)Error\(|new Error\(|\b(bad|skip|fail)\(/
   const found: string[] = []

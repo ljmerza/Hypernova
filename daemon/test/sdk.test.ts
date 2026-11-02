@@ -43,8 +43,8 @@ test('missing: a coded 409 with the way to get it, and the state says so', async
     return true
   })
   assert.deepEqual(sdk.state(), { installed: false, version: null, wanted: null })
-  // The words name the fix on each system: Setup's button on a Mac, hypernova setup on Linux.
-  assert.match(SDK_MISSING_MAC, /Setup.*Fetch again/)
+  // The words name the fix, the same on each system.
+  assert.match(SDK_MISSING_MAC, /hypernova setup/)
   assert.match(SDK_MISSING_LINUX, /hypernova setup/)
 })
 

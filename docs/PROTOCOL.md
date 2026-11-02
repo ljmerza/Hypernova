@@ -6422,7 +6422,7 @@ and everything else work.
   daemon runs is used without a restart.
 - **Asked for without it:** 409 `sdk_missing`, with the way to get it as the message ("Claude Code’s
   SDK isn’t installed on this server. Run hypernova setup again: it installs the daemon’s packages
-  with npm."; a Mac's message still points at the Mac app's Setup). `GET /v1/commands`,
+  with npm."; a Mac's message says "this Mac"). `GET /v1/commands`,
   `POST /v1/sessions/{id}/rewind`, and
   `POST /v1/sessions` or `…/prompt` for a session the daemon would run itself answer it before
   anything is made or queued. A prompt that reaches such a session another way (auto-continue, an
