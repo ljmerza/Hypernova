@@ -889,13 +889,14 @@ fun clipboardText(context: Context): String? = runCatching {
 // ─── Brand ─────────────────────────────────────────────────────────────────
 
 /**
- * The logo, Atlas's constellation in the shape of an N (components/Marks.kt, [logoStars]): four
- * stars joined by three lines, in [color], as large as fits [size]. The launcher, notification
- * and shortcut icons (res/drawable) are this same figure.
+ * The logo, the Nebula (components/Marks.kt, [logo]): two arms round a core, as large as fits
+ * [size]. In ink, its arms' tips turn to the accent, as the launcher icon's cream core turns to its
+ * teal arms (res/drawable has that icon, its notification glyph and its monochrome). In any other
+ * [color], a state's, it's that one colour.
  */
 @Composable
 fun NovaMark(modifier: Modifier = Modifier, size: Dp = 22.dp, color: Color = HN.ink) {
-    Canvas(modifier.size(size)) { logo(this.size.minDimension, color) }
+    Canvas(modifier.size(size)) { logo(this.size.minDimension, color, if (color == HN.ink) HN.accent else color) }
 }
 
 /** Lowercase light wordmark with the accent slash, like `0stems/` and `prudnikov/`. */
