@@ -54,6 +54,28 @@ fake hub was asked, and takes a picture of the screen (Roborazzi). The pictures 
   `StringsTableTest` checks it against Android's own Resources for every key.
 - `:shared:compileKotlinDesktop` alone is the quick check that nothing of Android got in.
 
+## The desktop app
+
+`android/desktop` (docs/PLATFORMS.md, "The desktop app"), from `android/`:
+
+```bash
+./gradlew :desktop:run       # the window. Needs a display: with none it says so and stops
+./gradlew :desktop:test      # no display needed: Compose's own test scene
+```
+
+- **Where it keeps things:** `~/.local/share/hypernova-client` on Linux (`$XDG_DATA_HOME` if set), `~/Library/Application Support/Hypernova Client` on a Mac, `%LOCALAPPDATA%\Hypernova Client` on Windows. `HYPERNOVA_CLIENT_HOME` overrides it: use that for a test copy, as one pairing and key is all a folder holds. `HYPERNOVA_CLIENT_DEBUG=1` logs to standard error (warnings always go there).
+- **To try it with nothing real behind it,** pair with the demo server (`demo/README.md`) on loopback. It tells a client to dial what `HYPERNOVA_DEMO_ADDRESS` says, and the default is the emulator's name for this machine:
+
+  ```bash
+  HYPERNOVA_DEMO_ADDRESS=127.0.0.1 HYPERNOVA_DEMO_PORT=47391 HYPERNOVA_DEMO_HOME=/tmp/demo-home node demo/server.ts atlas
+  # Paste the link it prints, also in /tmp/demo-home/atlas/pair-link
+  ```
+
+  `DemoServerTest` does the same without a window, and is skipped unless it's given a running one (how: at its top).
+- **The pictures:** `:desktop:test` leaves its screens in `android/desktop/build/renders/*.png`. Tests can't see what's wrong with a screen: look at them after a change.
+- **Linux libraries:** Compose's native library (`libskiko`) links against `libGL.so.1`, `libX11.so.6` and `libfontconfig.so.1` and won't load without them, display or no display. CI installs them.
+- **What's reused from the phone:** the build copies `app/src/main/res/values/strings*.xml` and `res/font` into the resources and compiles `ui/components/Marks.kt` in (`desktop/build.gradle.kts`). `:desktop:test` also compiles `FakeDaemon` and `XmlStrings` from `shared/src/hubTest`.
+
 ## The terminal page (headless Chromium)
 `node scripts/term-page-check.mjs` loads `assets/term/index.html` in a headless Chromium at the phone's
 size, with a stand-in for the app's bridge, and checks widths (a snapshot from the daemon's own headless
