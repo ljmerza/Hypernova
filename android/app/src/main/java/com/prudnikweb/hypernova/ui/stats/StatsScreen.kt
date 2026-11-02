@@ -126,9 +126,9 @@ private val RowNumber = Type.mono.copy(fontSize = 15.sp, lineHeight = 20.sp)
 private const val STATS_SOURCE = "stats"
 
 /**
- * Statistics, opened by tapping the sun: how much the agents worked on the Mac, in the range picked
+ * Statistics, opened from the mark in Home's top bar: how much the agents worked on the Mac, in the range picked
  * (Today, Week, Month, YTD, All). The hours and the work behind them, the last 30 days as a bar a day,
- * the projects as planets, and a few records. The Mac adds it up from Claude Code's
+ * the projects, and a few records. The Mac adds it up from Claude Code's
  * transcripts and the Codex turns it followed; this asks for it when the screen opens or the range
  * changes (showing the last answer at once), then every minute while open. Back (the arrow or the
  * gesture) is [onBack]. Every total covers both agents; with Codex at work in the range the hero
@@ -686,12 +686,12 @@ private fun DayBarsChart(
     }
 }
 
-// ─── Projects as planets ───────────────────────────────────────────────────
+// ─── Projects ───────────────────────────────────────────────────
 
-/** A project's planet shade, seeded from its name exactly as the home sky seeds it, so it's the same planet. */
+/** A project's shade, seeded from its name as the sky did, so it stays the same one. */
 private fun planetColor(name: String): Color {
     val rnd = Random(name.hashCode())
-    rnd.nextFloat() // the sky's first draw is its orbit's inclination
+    rnd.nextFloat() // the sky's first draw, its orbit's inclination: kept so each shade stays as it was
     return lerp(HN.accentDim, HN.accentBright, 0.35f + 0.5f * rnd.nextFloat())
 }
 

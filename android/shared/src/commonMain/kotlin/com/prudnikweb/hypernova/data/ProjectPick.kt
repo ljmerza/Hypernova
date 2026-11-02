@@ -109,7 +109,7 @@ object ProjectPick {
 
     /**
      * Which project the sheet starts on: the one it was opened for ([asked]: a path, or a name from
-     * the sky's filter), else the last one a session started in ([last], a path) while it's still
+     * the one-project filter), else the last one a session started in ([last], a path) while it's still
      * there, else the most recently active; null when there are none.
      */
     fun initial(projects: List<Project>, asked: String?, last: String?): String? {

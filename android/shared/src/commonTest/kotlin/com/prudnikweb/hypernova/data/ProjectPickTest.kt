@@ -103,7 +103,7 @@ class ProjectPickTest {
         val hyper = "/Users/me/Programming/hypernova"
         val stems = "/Users/me/Programming/0stems"
         assertEquals(stems, ProjectPick.initial(all, stems, hyper))
-        // The sky's filter names the project.
+        // The one-project filter names the project.
         assertEquals("/Users/me/Documents/programming/even_realities/g2-local-stt", ProjectPick.initial(all, "Hyperscribe", hyper))
         assertEquals("/Users/me/Programming/budget-tracker", ProjectPick.initial(all, null, "/Users/me/Programming/budget-tracker"))
         // The last one is gone: the most recently active.

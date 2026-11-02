@@ -494,7 +494,7 @@ fun SessionScreen(
         }
     }
     // The tail's glide steps at the live pace's rate (30 a second on a cool phone, fewer as it
-    // warms: ui/fx/Pace.kt), the rate the sky's live motion already uses.
+    // warms: ui/fx/Pace.kt).
     val motion = LocalMotion.current
     val glideFps by rememberUpdatedState(FrameBudget.fps(Pace.Live, motion.heat, motion.powerSave))
     LaunchedEffect(tailKey, barPx, items.size, working) {

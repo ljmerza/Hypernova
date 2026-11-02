@@ -75,7 +75,7 @@ with no display attached (emulator 37.2.13):
 
 | `-gpu` | What happened |
 |---|---|
-| `swangle_indirect` (the script's) | Draws the sky, glows and glass blur. Software, so slow but steady. |
+| `swangle_indirect` (the script's) | Draws the chart, glows and glass blur. Software, so slow but steady. |
 | `swiftshader_indirect` | The emulator crashes with a segfault as the app opens. |
 | `host` | Needs an X display (`Failed to get EGL display`). With `ANDROID_EGL_ON_EGL=1` it falls back to its software translator and crashes too. |
 
@@ -85,7 +85,7 @@ but adb stays `offline` for good. Three settings, all made by the script:
 - **Wi-Fi off, mobile data on.** An emulator with both keeps swapping networks and the app reconnects
   at each swap; its Wi-Fi also drops out on its own.
 - **Animations off while walking** (`animator_duration_scale 0`, the app's Reduce Motion). In software a
-  frame of the moving sky takes about 3 s, so taps and swipes arrive long after they're sent and
+  moving screen draws slowly (Home, 45 frames in 30 s: docs/DECISIONS.md, "Atlas"), so taps and swipes arrive long after they're sent and
   uiautomator never sees a quiet screen. They're back on for a few seconds before each capture, so the
   shot is the app as it normally draws.
 - **No heads-up notifications**, as the demo's approvals would drop down over the shots.

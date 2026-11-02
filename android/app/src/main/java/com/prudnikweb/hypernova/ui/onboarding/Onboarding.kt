@@ -217,7 +217,7 @@ private fun StateMark(color: Color, glyph: Glyph?) {
     }
 }
 
-/** A full-screen state over the dimmed sky: mark, title, body, actions. */
+/** A full-screen state over the dimmed chart: mark, title, body, actions. */
 @Composable
 private fun StateScreen(
     mark: @Composable () -> Unit,
@@ -232,7 +232,7 @@ private fun StateScreen(
     Box(
         Modifier
             .fillMaxSize()
-            // Only the sky is underneath (the screen itself steps aside), dimmed for calm.
+            // Only the chart is underneath (the screen itself steps aside), dimmed for calm.
             .background(HN.bg.copy(alpha = 0.6f))
             // Swallow touches meant for the screen underneath.
             .then(Modifier.padding(0.dp)),

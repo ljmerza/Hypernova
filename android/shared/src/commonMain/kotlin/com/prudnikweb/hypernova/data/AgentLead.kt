@@ -27,11 +27,11 @@ data class ClaudeState(
  * leads"): one rule in every client, here in one place. Pure, unit-tested.
  *
  * - **Claude Code leads** wherever it's installed (and on an older Mac, which doesn't say: it always
- *   had it). **Codex leads** only where Claude Code isn't installed and Codex is. The sun, the
- *   widget's star and a new session without a choice follow the leading agent.
+ *   had it). **Codex leads** only where Claude Code isn't installed and Codex is. The usage shown and
+ *   a new session without a choice follow the leading agent.
  * - **Codex in use**: turned on for Hypernova ([CodexState.enabled]).
  * - **Both in use**: Claude Code here and Codex on. Only then does anything say which agent it is
- *   (a second star, "Claude usage" and "Codex usage", the widget's second readout): a Mac with
+ *   ("Claude usage" and "Codex usage", the widget's second readout): a Mac with
  *   Claude Code alone looks exactly as it did before Codex.
  */
 object AgentLead {
@@ -51,7 +51,7 @@ object AgentLead {
     fun leading(claude: ClaudeState?, codex: CodexState?): String = if (codexLeads(claude, codex)) AgentKind.CODEX else AgentKind.CLAUDE
 
     /**
-     * The window Codex's star (or, where Codex leads, the sun) is lit by: the 5-hour window, else the
+     * The window that stands for Codex's usage: the 5-hour window, else the
      * week where a plan has only that. Null while Codex has sent no numbers.
      */
     fun codexWindow(u: CodexUsage?): Window? = u?.fiveHour ?: u?.sevenDay
@@ -78,8 +78,8 @@ object AgentLead {
     }
 
     /**
-     * Codex's limits as the sun's [Usage], for a Mac where Codex leads: its 5-hour window as the
-     * disk (the week where a plan has only that), its week as the far sky's; no rate (the Mac sends
+     * Codex's limits as a [Usage], for a Mac where Codex leads: its 5-hour window as the 5-hour
+     * slot (the week where a plan has only that), its week as the 7-day one; no rate (the Mac sends
      * none for Codex); a used-up window full and limited, the week's as the low state. Signed out,
      * the numbers are the last ones known ([Usage.stale]). Without numbers: not known yet.
      */
@@ -90,7 +90,7 @@ object AgentLead {
         val disk = five ?: week
         if (u == null || disk == null) return Usage(0f, 0f, now + 5 * 3_600_000L, now + 7 * 86_400_000L, known = false, stale = c?.account?.signedIn == false)
         val limited = codexLimitedWindow(u)
-        // When the limit began: when the Mac read these numbers (stable, so the sky doesn't see a new limit each time).
+        // When the limit began: when the Mac read these numbers (stable, so it doesn't read as a new limit each time).
         val at = u.observedAt ?: 1L
         val weekFull = week != null && limited === week
         val fiveFull = five != null && (limited === five || (limited != null && !weekFull))
@@ -112,7 +112,7 @@ object AgentLead {
 /** Claude Code is on the paired computer (an older Mac doesn't say: it always was). */
 val Hub.claudeAvailable: Boolean get() = AgentLead.claudeAvailable(claude)
 
-/** Codex leads here: Claude Code isn't installed, Codex is (the sun and new sessions are Codex's). */
+/** Codex leads here: Claude Code isn't installed, Codex is (the usage shown and new sessions are Codex's). */
 val Hub.codexLeads: Boolean get() = AgentLead.codexLeads(claude, codex)
 
 /** Codex is turned on for Hypernova. */

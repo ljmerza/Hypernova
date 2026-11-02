@@ -6,8 +6,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Asks the Mac for a fresh look at Claude Code's /usage screen (`POST /v1/usage/refresh`,
- * docs/PROTOCOL.md "Per-model weeks") when the owner opens his usage: the sun jumps to the usage
- * card, or the chat's usage breakdown opens. Otherwise the per-model weeks (Fable's) are only read
+ * docs/PROTOCOL.md "Per-model weeks") when the owner opens the chat's usage breakdown.
+ * Otherwise the per-model weeks (Fable's) are only read
  * every 15 minutes, so the meter he came to look at could be that old.
  *
  * Fire and forget: whatever the look finds reaches every app as a `usage` message, so the answer

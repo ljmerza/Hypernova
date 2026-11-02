@@ -74,7 +74,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Home's Automations tab (spec §5): the Mac's automations as cards, soonest and busiest first, a
- * Pause all, and templates to start from (the limit ones first). The sky hides here, as on History.
+ * Pause all, and templates to start from (the limit ones first).
  * [sourceKey] is Home's blur source, so its bars blur these cards too.
  */
 @Composable

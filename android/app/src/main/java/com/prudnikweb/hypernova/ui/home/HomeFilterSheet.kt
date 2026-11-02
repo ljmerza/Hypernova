@@ -61,7 +61,7 @@ internal fun filterAgentWord(a: FilterAgent): String = stringResource(
  * Working" in one tap, then STATE (each of Home's three groups on or off; never all off), AGENT
  * ([agents]: only while both agents are in use, or one is chosen), PROJECT ([projects]: only with two
  * or more, or one chosen) and SERVER ([servers], id and name: only with "All servers"), each All or
- * one. Every tap applies at once; Clear shows everything again ([onClear]: the sky's filter too).
+ * one. Every tap applies at once; Clear shows everything again ([onClear]: the one-project filter too).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

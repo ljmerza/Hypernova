@@ -85,7 +85,7 @@ fun AutoIcon(glyph: AutoGlyph, modifier: Modifier = Modifier, size: Dp = 18.dp, 
                 path(.33f, .52f, .45f, .64f, .68f, .38f)
             }
             AutoGlyph.NeedsMe -> {
-                // The sky's focus bracket around a moon that waits.
+                // A focus bracket around a dot that waits.
                 val k = .16f
                 path(.14f, .14f + k, .14f, .14f, .14f + k, .14f)
                 path(.86f - k, .14f, .86f, .14f, .86f, .14f + k)

@@ -2,8 +2,8 @@
 // How fast the 5-hour and weekly windows are being spent, in % per minute, from the official
 // readings: the status lines', and the usage probe's look at /usage (every 2 minutes while something
 // works, usage-probe.ts), which keeps them coming while no status line refreshes (agents at work in
-// the background). Pure: hub.ts feeds it readings and asks for the pace. The sun's disk on the phone
-// draws it (its gas flows with it); no client gets a time to the limit from here any more (owner,
+// the background). Pure: hub.ts feeds it readings and asks for the pace. The phones get it and nothing
+// draws it since the sky went; no client gets a time to the limit from here any more (owner,
 // 2026-11-01: that estimate wasn't accurate; docs/DECISIONS.md).
 //
 // The meters are whole percents, so one reading says little; the pace is a least-squares line over

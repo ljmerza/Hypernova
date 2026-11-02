@@ -42,8 +42,7 @@ class HistoryEntry(val key: String, val session: Session, val automation: Sessio
 
 /**
  * History's rows: an automation's ended sessions fold into one, placed by its newest run, so a
- * daily brief doesn't bury the owner's own sessions. Their own grouping; the sky shows them as
- * ordinary moons of their project.
+ * daily brief doesn't bury the owner's own sessions. Their own grouping.
  */
 fun foldRuns(ended: List<Session>): List<HistoryEntry> {
     val counts = ended.mapNotNull { it.automation?.id }.groupingBy { it }.eachCount()

@@ -35,7 +35,7 @@ class PaceTest {
                 last = fps
             }
         }
-        // Live stays live (never frozen); the far sky holds still from HOT on.
+        // Live stays live (never frozen); the Slow pace holds still from HOT on.
         assertTrue(FrameBudget.fps(Pace.Live, Heat.CRITICAL, false) > 0)
         assertEquals(0, FrameBudget.fps(Pace.Slow, Heat.HOT, false))
         assertTrue(FrameBudget.grainMoves(Heat.WARM, false))
@@ -93,7 +93,7 @@ class PaceTest {
     @Test fun theFirstReaderWakesAnIdleClockAndLaterOnesDont() {
         val l = lanes()
         assertTrue(l.want(Pace.Slow.ordinal))
-        // Already ticking for the far sky: a chip that starts breathing doesn't need to wake it.
+        // Already ticking for the Slow pace: a chip that starts breathing doesn't need to wake it.
         assertFalse(l.want(Pace.Live.ordinal))
         assertFalse(l.want(Pace.Live.ordinal))
         assertEquals(30, l.topFps())
@@ -133,7 +133,7 @@ class PaceTest {
         assertEquals(bit(Pace.Slow), l.tick(0f))
         l.want(Pace.Slow.ordinal)
         l.want(Pace.Live.ordinal)
-        // 33 ms later the far sky's next frame isn't due yet, but it still waits for one.
+        // 33 ms later the Slow pace's next frame isn't due yet, but it still waits for one.
         assertEquals(bit(Pace.Live), l.tick(0.033f))
         assertEquals(5, l.topFps())
         // A fifth of a second on, it gets it.
@@ -141,7 +141,7 @@ class PaceTest {
     }
 
     @Test fun aHeldPaceNeverKeepsTheClockGoing() {
-        val l = lanes(Heat.HOT) // the far sky holds still
+        val l = lanes(Heat.HOT) // the Slow pace holds still
         assertFalse(l.want(Pace.Slow.ordinal))
         assertEquals(0, l.topFps())
         assertEquals(0, l.tick(1f))
@@ -159,7 +159,7 @@ class PaceTest {
         assertEquals(0, FrameBudget.grainFps(Heat.HOT, powerSave = false))
         assertEquals(0, FrameBudget.grainFps(Heat.CRITICAL, powerSave = false))
         assertEquals(0, FrameBudget.grainFps(Heat.COOL, powerSave = true))
-        // Always gentler than the sky's frames, so it never sets the pace of a moving screen.
+        // Always gentler than the Calm pace's frames, so it never sets the pace of a moving screen.
         for (heat in Heat.COOL..Heat.CRITICAL) {
             assertTrue(FrameBudget.grainFps(heat, false) <= FrameBudget.fps(Pace.Calm, heat, false))
         }
@@ -176,7 +176,7 @@ class PaceTest {
         repeat(24) {
             t += 1f / 12f
             val due = l.tick(t)
-            // Its frames are its own: no pace (sky, chips) is due.
+            // Its frames are its own: no pace is due.
             assertEquals(1 shl Lanes.GRAIN, due)
             if (g.step(laneDue = true, moves = true)) patterns++
             // It drew the new pattern, so it asks for the next.

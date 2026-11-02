@@ -23,7 +23,7 @@ import com.prudnikweb.hypernova.ui.components.usageSaid
  * 5-hour and weekly meters and in their style (ui/components/UsageMeter.kt): on Home's usage
  * card and in the chat's usage breakdown. The Mac reads them off /usage every 15 minutes. What's
  * used, and the reset as the one tag, a weekday and
- * time more than about a day off, a countdown nearer. The sun stays on the 5-hour window. Nothing
+ * time more than about a day off, a countdown nearer. Nothing
  * when the Mac hasn't read any.
  */
 @Composable

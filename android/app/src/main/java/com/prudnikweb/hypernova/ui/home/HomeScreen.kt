@@ -995,7 +995,7 @@ fun SessionCard(
                 if (!plainLine || needs) Spacer(Modifier.height(4.dp))
             }
             if (block != null) {
-                // Stopped by a limit, the account or its provider: the eclipsed sun the chat's line
+                // Stopped by a limit, the account or its provider: the struck-through diamond the chat's line
                 // has, then what it is and when it lifts, in words ("session limit until 2:00").
                 val tone = if (block.kind == Blocked.LIMIT || block.kind == Blocked.MODEL) HN.inkMuted else HN.amber
                 Row(verticalAlignment = Alignment.CenterVertically) {

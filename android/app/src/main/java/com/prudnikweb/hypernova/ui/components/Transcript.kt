@@ -770,7 +770,7 @@ fun NoticeRow(item: Item.Notice, modifier: Modifier = Modifier) {
 
 /**
  * Claude Code's API error that stopped the session (a limit, signed out): its own line verbatim,
- * never a Claude bubble. A slim row with a small eclipsed sun; what follows the first " · " (the
+ * never a Claude bubble. A slim row with a small struck-through diamond; what follows the first " · " (the
  * reset, "resets 2am (Europe/Moscow)") in mono. Amber when it needs the owner, quiet for a limit.
  */
 @Composable
@@ -792,7 +792,7 @@ private fun BlockerRow(item: Item.Notice, modifier: Modifier) {
         modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // A sun with a dark disc over it: the light is blocked, nothing burned out.
+        // Struck through: it's blocked, nothing burned out.
         EclipseMark(color)
         Spacer(Modifier.width(10.dp))
         HText(text, style = Type.small, color = color)

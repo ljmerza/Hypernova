@@ -3,7 +3,7 @@ package com.prudnikweb.hypernova.data
 /**
  * A usage window as its meter shows it: how much is used and when it resets, both facts. No guess
  * at when it runs out (owner, 2026-11-01: that estimate wasn't accurate; docs/DECISIONS.md). Pure,
- * unit-tested; drawn by ui/components/UsageMeter.kt and the sun's ring (ui/fx/Solar.kt).
+ * unit-tested; drawn by ui/components/UsageMeter.kt.
  *
  * - [used]: 0..1 of the window spent.
  * - [resetIn]: ms to the reset (0 when the reset is due, -1 when its end isn't known: a per-model
@@ -31,7 +31,7 @@ data class UsageWindow(val used: Float, val resetIn: Long = -1L) {
 
         /**
          * [u] without a 5-hour window ([Usage.fiveHourReported] false): the week in the 5-hour slot
-         * too, so the sun's disk (and the widget's star) follow the week, as where Codex leads on a
+         * too, so what reads that slot follows the week, as where Codex leads on a
          * week-only plan (AgentLead.codexSunUsage). Never a 5-hour limit: the week's is the low state.
          */
         fun weekAsDisk(u: Usage): Usage = u.copy(

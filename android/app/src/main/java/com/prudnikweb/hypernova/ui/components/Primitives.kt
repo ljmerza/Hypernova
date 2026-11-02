@@ -284,9 +284,9 @@ enum class PillKind { Primary, Outline, Ghost, Danger, Glass }
 
 /**
  * Pill button (Hyperscribe shape, 0stems colours). Light haptic tick on press. [PillKind.Glass] is
- * the floating action over the sky (New session, New automation): frosted glass like the state
+ * the floating action over the chart (New session, New automation): frosted glass like the state
  * chips, its glyph a mint point of light, the label in ink; a solid mint pill there looked like a
- * stock Material button, not part of the sky (owner, 2026-10-16).
+ * stock Material button, not part of the sky behind it then (owner, 2026-10-16).
  *
  * [enabled] false: drawn faded, a tap does nothing, and TalkBack says it's disabled (so a second
  * try is never silently lost); say why next to it where the reason isn't plain.
@@ -424,8 +424,8 @@ private fun StateLight(color: Color, live: Boolean, filled: Boolean, lit: Boolea
  * Frosted glass for a small capsule: a body a little lighter than what's under it, a light along
  * its top edge that fades out by the middle (no outline), and [glow], when given, as a soft light
  * inside the glass around [glowX], where the chip's glyph sits (from the start edge, so it follows
- * the glyph in a right-to-left layout). [dense] is for glass over the sky rather than on a card, so
- * the text keeps its contrast whatever drifts behind it. Shared with the transcript's chips.
+ * the glyph in a right-to-left layout). [dense] is for glass over the chart rather than on a card, so
+ * the text keeps its contrast whatever is behind it. Shared with the transcript's chips.
  */
 internal fun Modifier.frostedGlass(glow: Color?, glowX: Dp, dense: Boolean = false, tint: Color? = null, radius: Dp? = null): Modifier = frostedGlass({ glow }, glowX, dense, tint, radius)
 

@@ -7,7 +7,7 @@ because we will lose potential audience" (DECISIONS, "More platforms, planned be
 This began as a plan only: nothing here was built or migrated when it was written, except where a
 section says so ("The shared module", the Linux host). Read it, pick
 what you want, and then we start. Facts about outside things (Apple, Kotlin, Tauri) carry a
-source link. Facts about our own code come from reading this repo on 2026-10-16.
+source link. Facts about our own code come from reading this repo on 2026-10-16; the Mac app and Lens it names have since left the repository.
 
 ## The short answer
 
@@ -74,10 +74,9 @@ parser came down from `ui/components`, and `ChatRepo` and `ChangesRepo` from `ui
 This is the part that makes the plan cheap in some places and costly in others.
 
 ```
- Android app (Kotlin, Compose) ──┐
- Lens (TypeScript, in a WebView) ─┼── http + WebSocket + device token ──▶ daemon (Node 24+)
- Mac menu bar app (SwiftUI) ──────┘      (docs/PROTOCOL.md)                 │
-                                                                           └─▶ holder ─PTY─▶ claude
+ Android app (Kotlin, Compose) ── http + WebSocket + device token ──▶ daemon (Node 24+)
+                                  (docs/PROTOCOL.md)                    │
+                                                                        └─▶ holder ─PTY─▶ claude
 ```
 
 - **One contract.** Every app talks to the daemon the same way (`docs/PROTOCOL.md`): REST,

@@ -3,7 +3,7 @@ package com.prudnikweb.hypernova.data
 
 import androidx.compose.runtime.Immutable
 
-/** What the sky draws: three states. The full lifecycle is in [Phase]. */
+/** A session's three states. The full lifecycle is in [Phase]. */
 enum class SessionState { Working, NeedsYou, Idle }
 
 /** The daemon's session states, plus a catch-all for values this build doesn't know. */
@@ -113,7 +113,7 @@ data class Session(
     /**
      * Working, by the one rule every surface uses (docs/PROTOCOL.md, Session.state; owner,
      * 2026-10-18): a live session is working while Claude works on it (or is starting) or any agent
-     * it started still runs; needing you outranks it. The sky, Home's counts, chips and order, the
+     * it started still runs; needing you outranks it. Home's counts, chips and order, the
      * background notification, the widgets and the chat's status bar all ask this.
      */
     val busy: Boolean get() = phase != Phase.Ended && state != SessionState.NeedsYou && (state == SessionState.Working || agentsRunning > 0)
@@ -211,7 +211,7 @@ data class Account(
     val ok: Boolean get() = state == OK
     /** Sessions on the subscription can't reply until the owner acts: amber, and a notification. */
     val needsYou: Boolean get() = state in NEEDS_YOU
-    /** The app can't follow usage: the sun is eclipsed. */
+    /** The app can't follow usage: signed out, no plan, or on hold. */
     val eclipsed: Boolean get() = state == LOGGED_OUT || state == NO_SUBSCRIPTION || state == ON_HOLD
 
     /** The limit Claude rests at right now, if any (one whose reset has passed is over). */
@@ -241,8 +241,8 @@ data class Account(
 }
 
 /**
- * How fast the windows are being spent right now, in % per minute. Only the sun's disk reads it (its
- * gas flows with it, [com.prudnikweb.hypernova.ui.fx.DiskModel.flow]); nothing estimates from it.
+ * How fast the windows are being spent right now, in % per minute. Sent and parsed; nothing on
+ * screen reads it since the sky went, and nothing estimates from it.
  */
 @Immutable
 data class UsageRate(val fiveHour: Float?, val sevenDay: Float?)
@@ -258,7 +258,7 @@ data class Usage(
     val fiveHourResetAt: Long,
     val sevenDayResetAt: Long,
     val limitedAt: Long? = null,
-    /** Set while the 7-day limit is hit: the sun's disk is in its low state until [sevenDayResetAt]. */
+    /** Set while the 7-day limit is hit, until [sevenDayResetAt]. */
     val weekLimitedAt: Long? = null,
     /** False until the Mac has seen official numbers (or after a reset, until it sees new ones). */
     val known: Boolean = true,
@@ -266,12 +266,12 @@ data class Usage(
     val stale: Boolean = false,
     /** The weeks some models have of their own (Fable, Sonnet), from /usage on the Mac; none until it has looked. */
     val models: List<ModelWeek> = emptyList(),
-    /** How fast the windows are being spent, for the sun's disk; null while nothing works (and from an older Mac). */
+    /** How fast the windows are being spent (nothing on screen reads it now); null while nothing works (and from an older Mac). */
     val rate: UsageRate? = null,
     /**
      * Claude Code reports a 5-hour window ([fiveHourReported]). False when the Mac has the week and
      * no 5-hour window (Max dropped it, 2026-10-31): [fiveHour], [fiveHourResetAt] and the 5-hour
-     * rate then carry the week, for the sun's disk (as where Codex leads on a week-only plan), and
+     * rate then carry the week (as where Codex leads on a week-only plan), and
      * nothing labelled 5H shows.
      */
     val fiveHourReported: Boolean = true,

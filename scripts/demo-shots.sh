@@ -113,7 +113,7 @@ start_emulator() {
   animations off
 }
 
-# In software a frame of the moving sky takes about 3 s: taps arrive late and uiautomator never sees a
+# In software a moving screen draws slowly: taps arrive late and uiautomator never sees a
 # quiet screen. Off (the app's Reduce Motion) to walk around, on for the capture (`shoot`).
 animations() { ad shell settings put global animator_duration_scale "$([ "$1" = on ] && echo 1 || echo 0)"; }
 

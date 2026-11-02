@@ -5,9 +5,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Every countdown (the sky's "REFILLS IN", the account card's and the meters' "resets in") rounds
+ * Every countdown (the account card's and the meters' "resets in") rounds
  * the same way and looks again exactly when its text changes (ui/fx/Countdown.kt). The owner saw
- * the sky read 5:59 over a card reading 6:06.
+ * the old sky read 5:59 over a card reading 6:06.
  */
 class CountdownTest {
     private val at = 1_000_000_000L
@@ -22,7 +22,7 @@ class CountdownTest {
     }
 
     @Test fun twoClocksAFewSecondsApartNoLongerDisagreeOnceBothLookOnTime() {
-        // The card looked at 6:06 left and slept 20 s; the sky drew at 5:59. Now the card wakes
+        // The card looked at 6:06 left and slept 20 s; the other clock drew at 5:59. Now the card wakes
         // when its text changes, so at any moment it has looked within the current second.
         var now = at - 366_000L
         while (now < at) {

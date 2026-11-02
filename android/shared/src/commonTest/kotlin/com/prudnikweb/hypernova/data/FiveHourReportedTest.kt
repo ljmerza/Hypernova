@@ -42,7 +42,7 @@ class FiveHourReportedTest {
         // The week's own numbers stay as they were.
         assertEquals(0.62f, u.sevenDay, 1e-6f)
         assertEquals(week.resetsAt, u.sevenDayResetAt)
-        // The sun's meter reads the week then.
+        // The 5-hour meter reads the week then.
         assertEquals(UsageWindow.sevenDay(u, now).used, UsageWindow.fiveHour(u, now).used, 1e-6f)
     }
 

@@ -8,8 +8,8 @@ import com.prudnikweb.hypernova.R
 import kotlinx.coroutines.delay
 
 /**
- * Every countdown in the app counts the same way: the sky's "REFILLS IN 5:59", the account card's
- * "resets in 5:59", the meters' "resets in 2h 11m". The owner saw the sky say 5:59 while the card
+ * Every countdown in the app counts the same way: the account card's
+ * "resets in 5:59", the meters' "resets in 2h 11m". The owner saw the old sky say 5:59 while the card
  * under it said 6:06: the card only looked at the clock every 20 seconds. Now each one rounds the
  * same way ([seconds]) and looks again exactly when its text would change ([nextChange]), so two
  * countdowns to the same moment always read the same. Pure, unit-tested.
@@ -34,7 +34,7 @@ object Countdown {
     /**
      * Milliseconds from [now] until a countdown to [at] next reads differently, or null once it
      * reads 0:00 for good. Waking then (and not every 20 or 30 seconds) is what keeps a card in step
-     * with the sky, and costs a minute-long countdown one wake a minute.
+     * with the others, and costs a minute-long countdown one wake a minute.
      */
     fun nextChange(at: Long, now: Long): Long? {
         val s = seconds(at, now)

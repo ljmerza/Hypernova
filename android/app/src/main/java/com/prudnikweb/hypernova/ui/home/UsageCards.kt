@@ -33,7 +33,7 @@ internal data class UsageCards(val claude: Boolean, val codex: Boolean) {
         fun of(claude: ClaudeState?, codex: CodexState?): UsageCards {
             val claudeHere = AgentLead.claudeAvailable(claude)
             // Codex's card while it's in use; where Claude Code isn't installed, whenever Codex is
-            // (its usage is the sun's, and its first session turns it on).
+            // (it leads, and its first session turns it on).
             val codexCard = AgentLead.codexInUse(codex) || (!claudeHere && codex != null)
             // Claude's wherever it's installed, and on a computer with neither agent (as before Codex).
             return UsageCards(claude = claudeHere || !codexCard, codex = codexCard)
