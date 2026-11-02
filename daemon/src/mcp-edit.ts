@@ -281,6 +281,7 @@ async function addJson(name: string, scope: Scope, folder: string | null, config
 async function removeOne(name: string, scope: Scope, folder: string | null): Promise<void> {
   const r = await claude(['mcp', 'remove', '--scope', scope, name], cwdFor(scope, folder))
   if (r.code !== 0) throw failed(r, [], 'Claude Code didn’t remove that server.')
+  if (await findConfig(name, scope, folder)) throw new McpRefused(502, 'not_saved', 'Claude Code said it removed that server, but it’s still in its file. Try again.')
 }
 
 /** `.mcp.json` is the folder's own, and a link would write elsewhere. */
@@ -368,7 +369,10 @@ export function undoLast(body: Record<string, unknown>): Promise<{ ok: true; nam
     if (!isDeepStrictEqual(now?.config ?? null, last.after)) throw new McpRefused(409, 'file_changed', 'That server changed on the server since. Nothing was written.')
     if (last.before !== null && changesWhatRuns(last.after, last.before) && body.confirmRun !== true) refuse('confirm_run', 'Putting this back runs a program on the server. Confirm it with your fingerprint or screen lock.', 403)
     if (last.after !== null) await removeOne(last.name, last.scope, last.folder)
-    if (last.before !== null) await addJson(last.name, last.scope, last.folder, last.before, null, [])
+    if (last.before !== null) {
+      await addJson(last.name, last.scope, last.folder, last.before, null, [])
+      if (!(await findConfig(last.name, last.scope, last.folder))) throw new McpRefused(502, 'not_saved', 'Claude Code didn’t save that server. Try again.')
+    }
     dropLast('claude')
     log(`mcp: undid the ${last.op} of ${last.name} (${last.scope})`)
     return { ok: true, name: last.name, scope: last.scope, op: last.op }

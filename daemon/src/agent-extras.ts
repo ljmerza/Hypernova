@@ -434,13 +434,15 @@ async function setSkill(agent: 'claude' | 'codex', b: Record<string, unknown>, d
   if (typeof name !== 'string' || !SKILL_NAME.test(name)) throw new McpRefused(400, 'bad_skill', 'That isn’t a skill’s name.')
   if (agent === 'codex') {
     if (b.state !== 'on' && b.state !== 'off') throw new McpRefused(400, 'bad_state', 'For Codex a skill is on or off.')
-    await withAppServer((req) => req('skills/config/write', { name, enabled: b.state === 'on' }))
+    const r = await withAppServer((req) => req('skills/config/write', { name, enabled: b.state === 'on' }))
+    if (r?.effectiveEnabled !== (b.state === 'on')) throw new McpRefused(409, 'not_saved', 'Codex says that skill is still as it was. Something over its config decides it.')
     return { ok: true, name, state: b.state }
   }
   if (!SKILL_STATES.includes(b.state as never)) throw new McpRefused(400, 'bad_state', 'That isn’t a state for a skill.')
   const folder = await folderPath(typeof b.folder === 'string' ? b.folder : null, deps)
   const r = await run('claude', ['edit-skill-overrides', '--json'], folder, JSON.stringify({ name, state: b.state }))
   if (r.code !== 0) throw new McpRefused(502, 'cli_failed', cliWords(r) ?? 'Claude Code didn’t change that skill.')
+  if (jsonOf(r.stdout)?.ok !== true) throw new McpRefused(502, 'not_saved', 'Claude Code didn’t say that was saved. Try again.')
   return { ok: true, name, state: b.state }
 }
 

@@ -2936,9 +2936,10 @@ A change answers once it's done, and goes out as `{t:"agent_settings", agent}`. 
 - **Body:** `{agent, name, folder?, enabled}`
 - **Answer:** `200 {ok: true, name, enabled}`
 - **Refusals:** 400 `bad_name`, `bad_request` (`enabled` isn't a boolean); 404 `no_server` (Codex); 409
-  `needs_approval` (Claude Code: a project's, not approved)
-- **Rules:** Claude Code: for that folder, through its own writer. Codex: the server's `enabled`, for
-  everywhere. A session already running keeps what it has.
+  `needs_approval` (Claude Code: a project's, not approved); 502 `not_saved` (Claude Code: it said yes, and its
+  file never showed it, also from a second process: the server is as it was, and the message says which way)
+- **Rules:** Claude Code: for that folder, through its own writer, and a 200 means its file says so: the answer waits for
+  that, up to 8 seconds per process. Codex: the server's `enabled`, for everywhere. A session already running keeps what it has.
 
 #### POST /v1/agents/mcp/reconnect
 

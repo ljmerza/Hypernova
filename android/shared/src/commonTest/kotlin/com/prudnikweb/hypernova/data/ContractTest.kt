@@ -913,6 +913,11 @@ class ContractTest {
         },
         "rest-raw-stale" to { o -> assertEquals(AgentSettingRefused.FILE_CHANGED, Api.errorOf(409, o.toString()).code) },
         "rest-raw-undone" to { o -> assertTrue(o.bool("ok")) },
+        "rest-mcp-not-saved" to { o ->
+            val e = Api.errorOf(502, o.toString())
+            assertEquals("not_saved", e.code)
+            assertTrue(e.serverMessage!!.contains("still off"))
+        },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)
