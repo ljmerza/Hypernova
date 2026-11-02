@@ -36,7 +36,7 @@
     <string name="ag_codex_reaching">Reaching Codex on %1$s…</string>
     <string name="ag_codex_off">Not in use with Hypernova.</string>
     <string name="ag_codex_use">Use Codex with Hypernova</string>
-    <string name="ag_codex_use_body">Start Codex sessions from this phone, next to Claude Code’s. Codex gets its own star in the sky and a usage card on Home.</string>
+    <string name="ag_codex_use_body">Start Codex sessions from this phone, next to Claude Code’s. Codex gets a usage card on Home.</string>
     <string name="ag_codex_use_body_alone">Start Codex sessions from this phone. Its usage shows on Home.</string>
 
     <!-- Settings' row when Codex is on the Mac too (otherwise providers_desc). -->

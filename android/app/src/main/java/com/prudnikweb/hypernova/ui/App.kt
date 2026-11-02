@@ -45,7 +45,7 @@ import com.prudnikweb.hypernova.ui.components.ToastHost
 import com.prudnikweb.hypernova.ui.components.Z
 import com.prudnikweb.hypernova.ui.files.FileViewer
 import com.prudnikweb.hypernova.ui.files.FilesScreen
-import com.prudnikweb.hypernova.ui.fx.Cosmos
+import com.prudnikweb.hypernova.ui.fx.AtlasBackground
 import com.prudnikweb.hypernova.ui.fx.Grain
 import com.prudnikweb.hypernova.ui.fx.ProvideAmbientClock
 import com.prudnikweb.hypernova.ui.home.HomeScreen
@@ -113,7 +113,7 @@ val LocalConfirm = staticCompositionLocalOf<(com.prudnikweb.hypernova.data.Confi
 
 /**
  * Layers, back to front:
- *  1. the cosmos (one instance for the whole app, retained across rotation, so it never restarts),
+ *  1. the chart (one instance for the whole app, so it never restarts),
  *  2. the current screen (onboarding when nothing is paired),
  *  3. the sheet (dim and panel animate separately),
  *  4. pairing / unpaired overlays, toasts,
@@ -302,7 +302,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
             LocalAskNotifications provides askNotifications,
         ) {
             Box(Modifier.fillMaxSize()) {
-                Cosmos(
+                AtlasBackground(
                     week = (leadUsage?.sevenDay ?: 0f),
                     modifier = Modifier.fillMaxSize(),
                     // The bars blur only this (and their screen): it hardly ever changes.
@@ -310,7 +310,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 )
 
                 // A full-screen state (pairing, unpaired) replaces the screen instead of covering
-                // it, so nothing underneath can read through; the cosmos stays.
+                // it, so nothing underneath can read through; the chart stays.
                 // "Add a server" (the switcher) shows the onboarding's steps in the screen's place.
                 val adding = vm.addingServer && vm.pairFlow == null
                 val covered = vm.pairFlow != null || unpaired || adding

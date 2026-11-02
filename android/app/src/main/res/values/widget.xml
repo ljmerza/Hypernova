@@ -2,15 +2,15 @@
 <resources>
     <!-- Home screen widgets. The launcher draws them, not Compose, so the app's tokens
          (ui/theme/Tokens.kt) are repeated here as resources. -->
-    <color name="widget_ink">#FFF5F2EB</color>
-    <color name="widget_ink_muted">#FFB5B0A6</color>
-    <color name="widget_ink_dim">#FF7A7468</color>
-    <color name="widget_ink_ghost">#FF45403A</color>
-    <color name="widget_line">#FF2C2823</color>
-    <color name="widget_bg">#FF14110E</color>
-    <color name="widget_accent">#FF7FFFA0</color>
-    <color name="widget_amber">#FFE8B341</color>
-    <color name="widget_danger">#FFFF7878</color>
+    <color name="widget_ink">#FFF1E9D6</color>
+    <color name="widget_ink_muted">#FFB6B1A2</color>
+    <color name="widget_ink_dim">#FF8E8C80</color>
+    <color name="widget_ink_ghost">#FF43444F</color>
+    <color name="widget_line">#FF252A3A</color>
+    <color name="widget_bg">#FF060A17</color>
+    <color name="widget_accent">#FF6FE0C2</color>
+    <color name="widget_amber">#FFFFA63C</color>
+    <color name="widget_danger">#FFEE4468</color>
 
     <!-- Android 12+ takes the launcher's own widget radii (values-v31). -->
     <dimen name="widget_radius">16dp</dimen>

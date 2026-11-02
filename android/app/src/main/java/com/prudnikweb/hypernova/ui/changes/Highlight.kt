@@ -15,7 +15,7 @@ import com.prudnikweb.hypernova.ui.theme.HN
  */
 object Highlight {
     private val KEYWORD = HN.accentBright
-    private val STRING = Color(0xFFE8B341).copy(alpha = 0.95f)
+    private val STRING = Color(0xFFFFA63C).copy(alpha = 0.95f)
     private val NUMBER = Color(0xFFF2C6A0)
     private val COMMENT = HN.inkDim
 

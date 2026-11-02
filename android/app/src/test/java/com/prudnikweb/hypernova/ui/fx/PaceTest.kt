@@ -15,7 +15,6 @@ class PaceTest {
         assertEquals(30, FrameBudget.fps(Pace.Calm, Heat.COOL, powerSave = false))
         assertEquals(5, FrameBudget.fps(Pace.Slow, Heat.COOL, powerSave = false))
         assertTrue(FrameBudget.grainMoves(Heat.COOL, powerSave = false))
-        assertTrue(FrameBudget.parallax(Heat.COOL))
         assertTrue(FrameBudget.liveBlur(Heat.COOL))
     }
 
@@ -40,7 +39,6 @@ class PaceTest {
         assertEquals(0, FrameBudget.fps(Pace.Slow, Heat.HOT, false))
         assertTrue(FrameBudget.grainMoves(Heat.WARM, false))
         assertFalse(FrameBudget.grainMoves(Heat.HOT, false))
-        assertFalse(FrameBudget.parallax(Heat.HOT))
         assertTrue(FrameBudget.liveBlur(Heat.HOT))
         assertFalse(FrameBudget.liveBlur(Heat.CRITICAL))
     }

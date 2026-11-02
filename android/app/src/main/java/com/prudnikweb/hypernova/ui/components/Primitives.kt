@@ -2,10 +2,7 @@
 package com.prudnikweb.hypernova.ui.components
 
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import kotlin.math.sin
-import kotlin.math.cos
 import kotlin.math.PI
 import android.content.ClipboardManager
 import android.content.Context
@@ -26,7 +23,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,7 +30,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,9 +63,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.State
@@ -88,15 +81,17 @@ import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.LocalMotion
 import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.Type
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.getValue
 
 // ─── Seam ──────────────────────────────────────────────────────────────────
 
 enum class Activity { Rest, Live, Alert }
 
 /**
- * Hyperscribe's seam: the activity meter (a small spinning planet), a tracked
+ * Hyperscribe's seam: the activity meter (Atlas's small mark), a tracked
  * uppercase label, a hairline that fills the row, and an optional trail. The
- * planet is still at rest, spins while a session works, and holds amber when
+ * mark is still at rest, turns while a session works, and holds amber when
  * it needs you. [after] follows the label in mono (a timer). [trailContent], when given, is drawn
  * in the trail's place (a session card's id and age, as quiet marks).
  */
@@ -114,7 +109,7 @@ fun Seam(
     thinking: Boolean = false,
     trailContent: (@Composable () -> Unit)? = null,
 ) {
-    // The label's colour eases with the planet's when the state changes.
+    // The label's colour eases with the mark's when the state changes.
     val labelColor by animateColorAsState(color, tween(900), label = "seam")
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (bars) {
@@ -128,7 +123,7 @@ fun Seam(
             HText(after, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
         }
         // No words (the session's status line while its bar shows): no gap for them either, so the
-        // planet sits as far from what follows as from the screen's edge (owner, 2026-10-30).
+        // mark sits as far from what follows as from the screen's edge (owner, 2026-10-30).
         if (label.isNotEmpty() || after != null) Spacer(Modifier.width(10.dp))
         if (line) Box(Modifier.weight(1f).height(1.dp).background(HN.line)) else Spacer(Modifier.weight(1f))
         if (trailContent != null) {
@@ -142,20 +137,21 @@ fun Seam(
 }
 
 /**
- * The activity meter: a small planet spinning on its axis, lit from the upper left. Live:
- * faint meridians slide across its face (one turn in 3 s) and fade toward the shadowed side.
- * Rest: still and dim. Alert: amber and still, pulsing gently. Read only while drawing, on the
- * shared ambient clock, so a spinning meter redraws 12dp and nothing else.
+ * The activity meter, Atlas's mark at 12dp (components/Marks.kt): a shape for each state as well as a
+ * colour. Live: the diamond in two arcs, turning once in 3 s. Rest: a hollow diamond, still. Alert:
+ * the larger diamond in its brackets, pulsing gently. Under Reduce Motion the shapes stay and hold
+ * still. Read only while drawing, on the shared ambient clock, so a turning meter redraws 12dp and
+ * nothing else.
  */
 @Composable
 fun Planet(activity: Activity, modifier: Modifier = Modifier) {
     val reduced = LocalMotion.current.reduced
     val clock = LocalAmbient.current
-    // Between states it eases: finishing, it slows to a stop and greys out over a second or so;
-    // starting, it brightens and spins up.
+    // Between states it eases: finishing, the arcs slow to a stop and go as it greys out over a
+    // second or so; starting, they come in and spin up.
     val color by animateColorAsState(
         when (activity) {
-            Activity.Rest -> HN.inkDim
+            Activity.Rest -> HN.idle
             Activity.Live -> HN.accent
             Activity.Alert -> HN.amber
         },
@@ -164,58 +160,33 @@ fun Planet(activity: Activity, modifier: Modifier = Modifier) {
     val live = activity == Activity.Live && !reduced
     val speed = animateFloatAsState(if (live) 1f else 0f, tween(if (live) 700 else 1400, easing = Motion.Expo), label = "spin")
     val alert = animateFloatAsState(if (activity == Activity.Alert && !reduced) 1f else 0f, tween(700), label = "alert")
+    val working = animateFloatAsState(if (activity == Activity.Live) 1f else 0f, tween(700), label = "working")
+    val asking = animateFloatAsState(if (activity == Activity.Alert) 1f else 0f, tween(700), label = "asking")
     // The turn so far and when it was last drawn: the angle advances by the current speed.
-    val turn = remember { floatArrayOf(0.6f, Float.NaN) }
+    val turn = remember { floatArrayOf(REST_TURN, Float.NaN) }
     Canvas(modifier.graphicsLayer().size(12.dp)) {
-        val c = Offset(size.width / 2f, size.height / 2f)
-        val r = size.minDimension / 2f - 0.6.dp.toPx()
         val v = speed.value
         val a = alert.value
-        // Reads the clock only while it moves, so a still planet doesn't redraw. On the calm pace:
-        // a 12dp planet turning once in 3 s looks the same at 15 frames a second, and a chat with
-        // agents at work shows several of these for hours.
+        // Reads the clock only while it moves, so a still mark doesn't redraw. On the calm pace:
+        // a chat with agents at work shows several of these for hours.
         if (v > 0f || a > 0f) {
             val now = clock.seconds(Pace.Calm)
-            if (!turn[1].isNaN()) turn[0] += (now - turn[1]).coerceIn(0f, 0.2f) * v * 2f * PI.toFloat() / 3f
+            if (!turn[1].isNaN()) turn[0] += (now - turn[1]).coerceIn(0f, 0.2f) * v * 120f
             turn[1] = now
         } else turn[1] = Float.NaN
         val pulse = if (a > 0f) 1f - a * 0.45f * (1f - clock.pulse(1.4f, pace = Pace.Calm)) else 1f
-        planetSphere(c, r, color, turn[0], alpha = pulse, stroke = 0.7.dp.toPx())
+        val u = size.minDimension / 14f
+        val w = working.value
+        val k = asking.value
+        val rest = (1f - w - k).coerceIn(0f, 1f)
+        if (rest > 0f) idleMark(center, u, color, alpha = rest)
+        if (w > 0f) workingMark(center, u, color, turn[0], alpha = w)
+        if (k > 0f) needsYouMark(center, u, color, alpha = k * pulse)
     }
 }
 
-/** Up and to the left: where the light comes from on a planet with no sun in the picture. */
-val PlanetLight = Offset(-0.7071f, -0.7071f)
-
-/**
- * A small planet (the activity meter, the logo, a project in the home sky): a sphere lit from
- * [light] (a unit direction toward the light), a rim, and meridians that slide across its face
- * as [spin] (radians) turns. Longitude λ projects to a half ellipse r·sin λ wide, seen while
- * cos λ > 0, fainter at the limb and on the shadowed side.
- */
-fun DrawScope.planetSphere(center: Offset, r: Float, color: Color, spin: Float, light: Offset = PlanetLight, alpha: Float = 1f, stroke: Float = r * 0.13f, meridians: Boolean = true) {
-    val lit = Offset(center.x + light.x * r * 0.64f, center.y + light.y * r * 0.64f)
-    drawCircle(
-        Brush.radialGradient(listOf(color.copy(alpha = 0.75f * alpha), color.copy(alpha = 0.22f * alpha), color.copy(alpha = 0.04f * alpha)), center = lit, radius = r * 1.7f),
-        r, center,
-    )
-    if (meridians) {
-        val st = Stroke(stroke)
-        for (k in 0 until 4) {
-            val lon = spin + k * PI.toFloat() / 2f
-            val depth = cos(lon)
-            if (depth <= 0.05f) continue
-            val half = r * sin(lon)
-            val w = kotlin.math.abs(half)
-            val a = depth * (0.55f + 0.495f * (half / r) * light.x).coerceIn(0.1f, 0.9f) * alpha
-            drawArc(
-                color.copy(alpha = a), if (half >= 0f) -90f else 90f, 180f, false,
-                topLeft = Offset(center.x - w, center.y - r), size = Size((2 * w).coerceAtLeast(0.5f), 2 * r), style = st,
-            )
-        }
-    }
-    drawCircle(color.copy(alpha = 0.45f * alpha), r, center, style = Stroke(stroke))
-}
+/** Where a working mark's arcs rest: to the left and right of its diamond, ( ). */
+private const val REST_TURN = -60f
 
 // ─── Surfaces ──────────────────────────────────────────────────────────────
 
@@ -229,7 +200,7 @@ private val BottomHighlight = Brush.horizontalGradient(listOf(Color.Transparent,
 /**
  * 0stems Card: rounded 16, a dark translucent gradient, a 1dp inset ring at
  * ink 8%, and 1dp highlight lines along the top (ink 25%) and bottom (ink 12%).
- * No per-card blur: the cosmos behind is sparse, and a dozen live blurs would
+ * No per-card blur: the chart behind is sparse, and a dozen live blurs would
  * cost more than they show.
  *
  * [accent] (or [edge]) marks a card that needs a look (owner, 2026-10-18: colour only as a thin
@@ -383,14 +354,11 @@ fun Pill(
 
 /**
  * A state chip (WORKING, NEEDS YOU, 2 AGENTS…): a capsule of frosted glass with no outline, its
- * top edge catching the light, and the state's colour carried by a point of light and the label
- * instead of a ring. The point is the session's moon as the sky draws it: live, it breathes and
- * sends out a slow ring; still, it holds, with a soft light around it inside the glass (none for
- * the greys: idle and ended have no light of their own). [filled] is the one solid element (needs
- * you): amber glass lit from above, a soft glow around it, and a dark target for its point.
- * [hollow] draws the point as a ring, for a state that's over (ended), so it reads apart from idle
- * in the same grey. Only a live point reads the shared clock, in its own small layer, so a still
- * chip never redraws. [glyph], when given, stands in the point's place (a Mac restart's resume
+ * top edge catching the light, and the state's colour carried by its mark ([StateLight]) and the
+ * label instead of a ring. [filled] is the one solid element (needs you): amber glass lit from above,
+ * a soft glow around it, and a dark mark. [hollow] is for a state that's over (ended), so it reads apart
+ * from idle in the same grey. Only a working mark reads the shared clock, in its own small layer, so
+ * a still chip never redraws. [glyph], when given, stands in the mark's place (a Mac restart's resume
  * arrow), in the chip's colour.
  */
 @Composable
@@ -412,54 +380,46 @@ fun StatusChip(text: String, color: Color, modifier: Modifier = Modifier, live: 
 }
 
 /**
- * The chip's point of light, 10dp. Live: a core that breathes and a ring that grows from it and
- * fades every 2.4 s, as a working session's moon does in the sky; it eases in and out (600ms), so
- * a session that finishes doesn't snap its ring away. Filled: a dark dot in a dark ring. Hollow: a
- * ring the dot's size, with nothing inside.
+ * The chip's mark, 10dp (components/Marks.kt). Working: the diamond and its arcs, turning once in 3 s
+ * (held still under Reduce Motion, the shape staying), which ease in and out (600ms) so a session that
+ * finishes doesn't snap them away. Filled (needs you): the bracketed diamond in the dark, on the amber
+ * glass. Hollow (over): a short rule, so it reads apart from idle in the same grey. Other lit states:
+ * a solid diamond. The greys (idle): a hollow diamond.
  */
 @Composable
 private fun StateLight(color: Color, live: Boolean, filled: Boolean, lit: Boolean, hollow: Boolean = false) {
     val clock = LocalAmbient.current
-    val on = animateFloatAsState(if (live && !LocalMotion.current.reduced) 1f else 0f, tween(600), label = "light")
+    val reduced = LocalMotion.current.reduced
+    val on = animateFloatAsState(if (live) 1f else 0f, tween(600), label = "light")
     Spacer(
         Modifier
             .graphicsLayer()
             .size(10.dp)
             .drawWithCache {
-                val u = 1.dp.toPx()
+                val u = size.minDimension / 14f
                 val mid = Offset(size.width / 2f, size.height / 2f)
-                val halo = Brush.radialGradient(listOf(color.copy(alpha = 0.45f), color.copy(alpha = 0f)), mid, 5f * u)
-                val ring = Stroke(0.8f * u)
-                val target = Stroke(0.9f * u)
+                val halo = Brush.radialGradient(listOf(color.copy(alpha = 0.3f), color.copy(alpha = 0f)), mid, size.minDimension / 2f)
                 onDrawBehind {
                     if (filled) {
-                        drawCircle(HN.bg, 1.9f * u, center)
-                        drawCircle(HN.bg.copy(alpha = 0.85f), 3.6f * u, center, style = target)
+                        needsYouMark(center, u, HN.bg)
                         return@onDrawBehind
                     }
                     if (hollow) {
-                        // As wide as the dot (2.1dp), its stroke inside that edge.
-                        drawCircle(color, 1.65f * u, center, style = target)
+                        drawLine(color, Offset(center.x - 3.4f * u, center.y), Offset(center.x + 3.4f * u, center.y), 1.3f * u, StrokeCap.Round)
                         return@onDrawBehind
                     }
+                    if (lit) drawCircle(halo, size.minDimension / 2f, center)
                     val k = on.value
-                    // Read only while live, so a still point never redraws; on the calm pace, as
-                    // its ring grows a dp a second.
+                    // Read only while it turns, so a still mark never redraws; on the calm pace.
                     if (k > 0f) {
-                        val t = clock.seconds(Pace.Calm)
-                        val p = (t / 2.4f) % 1f
-                        drawCircle(color, (2.4f + 2.8f * p) * u, center, alpha = 0.55f * (1f - p) * k, style = ring)
-                        val breathe = 0.5f + 0.5f * cos(2f * PI.toFloat() * t / 2.4f)
-                        drawCircle(halo, 5f * u, center, alpha = (if (lit) 0.65f else 0f) * (1f - k) + (0.35f + 0.55f * breathe) * k)
-                    } else if (lit) {
-                        drawCircle(halo, 5f * u, center, alpha = 0.65f)
+                        val turn = if (reduced) REST_TURN else REST_TURN + clock.seconds(Pace.Calm) * 120f
+                        workingArcs(center, 5.5f * u, color, 1.15f * u, turn, alpha = k)
                     }
-                    drawCircle(color, 2.1f * u, center)
+                    if (lit) diamond(center, 2.6f * u, color) else idleMark(center, u, color)
                 }
             },
     )
 }
-
 /**
  * Frosted glass for a small capsule: a body a little lighter than what's under it, a light along
  * its top edge that fades out by the middle (no outline), and [glow], when given, as a soft light
@@ -535,16 +495,14 @@ private fun Modifier.filledGlass(color: Color): Modifier = drawWithCache {
 }
 
 /**
- * The link to the Mac, as a quiet glass capsule: the Mac is a small planet and this phone its moon.
- * - Connected: the moon rests on its orbit, the planet lit mint, and the capsule names the Mac
+ * The link to the Mac, as a quiet glass capsule, with Atlas's mark for it ([MacMoon]).
+ * - Connected: a solid diamond in the tone of the glass, and the capsule names the Mac
  *   ([name]; "Connected" when there's none, as in Settings, where the name is the heading).
- * - Connecting, reconnecting: once the search has lasted 0.4 s, the moon circles, looking for the Mac
- *   (one turn in 1.8 s, spinning up over 0.6 s), so the blink of a reconnect when the app comes back
- *   leaves it still. Once the Mac is found, the moon comes to rest on the near side, never behind the
- *   planet: within 1.2 s, or, if it has to swing round to the front, in up to 1.7 s, never faster
- *   than it circles.
- * - Offline: a dark disc slides over the planet, leaving a thin red edge (eclipsed), and the moon goes.
- * - Unpaired: an empty outline.
+ * - Connecting, reconnecting: once the search has lasted 0.4 s, two arcs turn round it, looking for
+ *   the Mac (one turn in 1.8 s, spinning up over 0.6 s), so the blink of a reconnect when the app
+ *   comes back leaves it still. Once the Mac is found, they slow to a rest as they fade.
+ * - Offline: a hollow diamond struck through, in red.
+ * - Unpaired: a hollow diamond.
  * - [battery]: a MacBook's charge after its name while linked, quietly, drawn: a small battery
  *   filled to its level and the percentage ("MacBook Air ▭ 62%", a small mint bolt while it
  *   charges); amber under 20% on battery, red under 10%. Never cut: a long name gives way first. A
@@ -553,8 +511,8 @@ private fun Modifier.filledGlass(color: Color): Modifier = drawWithCache {
  *   internet (the paired base URL as it is). No "· Local".
  * - [awake]: a small crescent at the end while the Mac is kept awake with its lid closed (Stay awake,
  *   in a bag most likely), amber while it's about to be let sleep.
- * The planet's colour and the light in the glass ease together. The glyph reads the clock only while
- * the moon moves, so a steady link costs nothing; under Reduce Motion the moon stays at rest.
+ * The mark's colour and the light in the glass ease together. The glyph reads the clock only while
+ * the arcs move, so a steady link costs nothing; under Reduce Motion they stay at rest.
  * TalkBack hears one line: "Connected to Studio", "Reconnecting", "Connected to MacBook Air,
  * battery 62%, charging".
  */
@@ -566,7 +524,7 @@ fun ConnectionChip(
     battery: MacBattery? = null,
     awake: MacAwake? = null,
     via: String? = null,
-    /** Several computers are paired: the name shows in every state (the moon and its colour say the state). */
+    /** Several computers are paired: the name shows in every state (the mark and its colour say the state). */
     named: Boolean = false,
     /** Sessions on the other paired computers that need the owner: a small amber count at the end. */
     elsewhere: Int = 0,
@@ -871,23 +829,26 @@ private class MoonOrbit {
 }
 
 /**
- * The connection's glyph, 20dp: the Mac's planet, its orbit and this phone's moon (see
- * [ConnectionChip]), in [tone], which eases with the chip's glass.
+ * The connection's glyph, 20dp (see [ConnectionChip]), in [tone], which eases with the chip's glass:
+ * Atlas's marks (components/Marks.kt) in the link's terms. Linked, a solid diamond. Looking for the
+ * Mac, the working mark's two arcs turn round it, the moon's old motion. Offline, a hollow diamond
+ * struck through; unpaired, a hollow one.
  */
 @Composable
 private fun MacMoon(state: LinkState, tone: State<Color>) {
     val clock = LocalAmbient.current
     val reduced = LocalMotion.current.reduced
-    val looking = (state == LinkState.Connecting || state == LinkState.Reconnecting) && !reduced
-    // Starts circling only once the search has lasted a moment, and stops as soon as it ends. The
-    // wait is a timer, not the clock, so waiting costs no frames of its own.
-    val seek = produceState(false, looking) {
-        if (looking) delay(SEEK_AFTER_MS)
-        value = looking
+    val searching = state == LinkState.Connecting || state == LinkState.Reconnecting
+    val looking = searching && !reduced
+    // Starts only once the search has lasted a moment, and stops as soon as it ends. The wait is a
+    // timer, not the clock, so waiting costs no frames of its own.
+    val seek = produceState(false, searching) {
+        if (searching) delay(SEEK_AFTER_MS)
+        value = searching
     }
-    val ring = animateFloatAsState(if (state == LinkState.Offline || state == LinkState.Unpaired) 0f else 1f, tween(700), label = "orbit")
-    val eclipse = animateFloatAsState(if (state == LinkState.Offline) 1f else 0f, tween(if (reduced) 0 else 900, easing = Motion.Expo), label = "eclipse")
-    val hollow = animateFloatAsState(if (state == LinkState.Unpaired) 1f else 0f, tween(700), label = "hollow")
+    val arcs = animateFloatAsState(if (seek.value) 1f else 0f, tween(700), label = "arcs")
+    val struck = animateFloatAsState(if (state == LinkState.Offline) 1f else 0f, tween(if (reduced) 0 else 900, easing = Motion.Expo), label = "struck")
+    val hollow = animateFloatAsState(if (state == LinkState.Unpaired || state == LinkState.Offline) 1f else 0f, tween(700), label = "hollow")
     val orbit = remember { MoonOrbit() }
     Spacer(
         Modifier
@@ -895,22 +856,11 @@ private fun MacMoon(state: LinkState, tone: State<Color>) {
             .size(20.dp)
             .drawWithCache {
                 val u = 1.dp.toPx()
-                val mid = Offset(size.width / 2f, size.height / 2f)
-                val pr = 4.6f * u
-                val rx = 8.2f * u
-                val ry = 3.0f * u
-                val orbitAt = Offset(mid.x - rx, mid.y - ry)
-                val orbitSize = Size(2 * rx, 2 * ry)
-                val orbitStroke = Stroke(0.75f * u)
-                val outline = Stroke(1f * u)
-                // The eclipse only ever darkens the planet, never the glass around it.
-                val face = Path().apply { addOval(Rect(mid, pr + 0.5f * u)) }
                 onDrawBehind {
                     val o = orbit
-                    // Reduce Motion freezes the clock, so a moon caught mid-turn (even behind the
-                    // planet) would stay there: put it back where it rests.
+                    // Reduce Motion freezes the clock, so the arcs stay where they rest.
                     if (reduced) o.rest()
-                    // The moon moves while it looks for the Mac, and after, until it has come to rest.
+                    // They move while it looks for the Mac, and after, until they've come to rest.
                     val seeking = looking && seek.value
                     if (seeking || o.speed > 0f) {
                         val now = clock.seconds(Pace.Calm)
@@ -920,33 +870,11 @@ private fun MacMoon(state: LinkState, tone: State<Color>) {
                         if (!seeking && o.speed == 0f) o.last = Float.NaN
                     }
                     val c = tone.value
-                    val a = ring.value
-                    val th = o.angle
-                    val front = sin(th) >= 0f
-                    val moon = Offset(center.x + rx * cos(th), center.y + ry * sin(th))
-                    val moonColor = if (state == LinkState.Connected) HN.accentBright else c
-                    rotate(-16f, center) {
-                        if (a > 0f) {
-                            drawArc(c, 180f, 180f, false, orbitAt, orbitSize, alpha = 0.32f * a, style = orbitStroke)
-                            if (!front) drawCircle(moonColor, 1.55f * u, moon, alpha = a)
-                        }
-                    }
-                    // A dark disc behind the planet, so the orbit's far side doesn't show through it.
-                    drawCircle(HN.bg900, pr, center, alpha = 0.9f * (1f - hollow.value))
-                    planetSphere(center, pr, c, PI.toFloat() / 4f, alpha = 1f - hollow.value, stroke = 0.75f * u, meridians = eclipse.value < 0.5f)
-                    if (hollow.value > 0f) drawCircle(c, pr, center, alpha = hollow.value, style = outline)
-                    val e = eclipse.value
-                    if (e > 0f) {
-                        // The eclipse slides in from the upper left and stops just short of covering it.
-                        val shift = 1.5f * u + (1f - e) * 2.2f * pr
-                        clipPath(face) { drawCircle(HN.bg950, pr * 0.98f, Offset(center.x - shift * 0.7071f, center.y - shift * 0.7071f)) }
-                    }
-                    rotate(-16f, center) {
-                        if (a > 0f) {
-                            drawArc(c, 0f, 180f, false, orbitAt, orbitSize, alpha = 0.32f * a, style = orbitStroke)
-                            if (front) drawCircle(moonColor, 1.55f * u, moon, alpha = a)
-                        }
-                    }
+                    val h = hollow.value
+                    if (h < 1f) diamond(center, 3.8f * u, c, alpha = 1f - h)
+                    if (h > 0f) hollowDiamond(center, 3.8f * u, c, 1f * u, alpha = h)
+                    if (struck.value > 0f) strike(center, 3.8f * u, c, 1f * u, alpha = struck.value)
+                    if (arcs.value > 0f) workingArcs(center, 7.2f * u, c, 1.15f * u, o.angle * 180f / PI.toFloat(), alpha = arcs.value)
                 }
             },
     )
@@ -961,15 +889,13 @@ fun clipboardText(context: Context): String? = runCatching {
 // ─── Brand ─────────────────────────────────────────────────────────────────
 
 /**
- * The Nova mark: the small planet of the activity meter, still, lit from the upper left. The
- * app icon is the same planet.
+ * The logo, Atlas's constellation in the shape of an N (components/Marks.kt, [logoStars]): four
+ * stars joined by three lines, in [color], as large as fits [size]. The launcher, notification
+ * and shortcut icons (res/drawable) are this same figure.
  */
 @Composable
-fun NovaMark(modifier: Modifier = Modifier, size: Dp = 22.dp, color: Color = HN.accent) {
-    Canvas(modifier.size(size)) {
-        val r = this.size.minDimension / 2f - 0.6.dp.toPx()
-        planetSphere(center, r, color, PI.toFloat() / 4f, stroke = (r * 0.11f).coerceAtLeast(0.7.dp.toPx()))
-    }
+fun NovaMark(modifier: Modifier = Modifier, size: Dp = 22.dp, color: Color = HN.ink) {
+    Canvas(modifier.size(size)) { logo(this.size.minDimension, color) }
 }
 
 /** Lowercase light wordmark with the accent slash, like `0stems/` and `prudnikov/`. */

@@ -78,7 +78,7 @@ class SpeakingNotice private constructor(private val context: Context, private v
             )
             val n = Notification.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_speaking)
-                .setColor(0xFF7FFFA0.toInt())
+                .setColor(0xFF6FE0C2.toInt())
                 .setContentTitle(title)
                 .setContentText(label ?: context.getString(R.string.app_name))
                 .setContentIntent(open)

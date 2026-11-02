@@ -9,16 +9,26 @@ widgets repeat them as Android resources. (The Mac app's SwiftUI port, "Mac menu
 and Lens, "The Lens guide" and "Lens (G2)", are no longer in this repository; those sections stay
 as history.)
 
-## Colour (0stems tokens)
+## Colour (Atlas, owner, 2026-11-01)
+
+A few named tokens (`theme/Tokens.kt`, `Palette`, `AtlasColors`), and everything else derived from them in `HN`, so a theme selector (LATER L109) swaps one value. The widget, the terminal and the Mermaid pages can't read Kotlin and repeat the values as text.
+
 | Token | Value | Use |
 |---|---|---|
-| bg | `#14110E` | Base, warm near-black (not OLED black) |
-| bg-950 / 900 / 800 / 700 / 600 | `#0F0D0A` `#1B1814` `#221F1B` `#2C2823` `#36322C` | Terminals, cards, inputs, hover |
-| line / soft / strong | `#2C2823` `#221F1B` `#45403A` | Hairlines |
-| ink / muted / dim / ghost | `#F5F2EB` `#B5B0A6` `#7A7468` `#45403A` | Text hierarchy |
-| accent / bright / dim / deep | `#7FFFA0` `#B6FFC9` `#4A8C5E` `#2A5A38` | Mint: live, primary, success |
-| amber | `#E8B341` | **Needs you** (approvals, waiting) |
-| danger | `#FF7878` | Errors, deny, failed exits |
+| space | `#060A17` | The page: near-black navy |
+| ink | `#F1E9D6` | Text, the chart's lines, the logo |
+| dim | `#8E8C80` | Quiet text |
+| line | `#252A3A` | Hairlines |
+| live | `#6FE0C2` | Verdigris: **working**, primary, success |
+| ask | `#FFA63C` | Amber: **needs you** (approvals, waiting) |
+| stop | `#EE4468` | Limits, errors, deny, failed exits |
+| idle | `#7E7D74` | An idle mark |
+| light | `#E7DAB8` | The chart's stipple |
+| glow | `#F8F0DC` | The brightest highlight (only in `accentBright`) |
+
+Derived, in plain sRGB, as the concept's: bg-950 `space` 35% to black; bg-900, 800, 700 `space` with `ink` at 4.5%, 7.5%, 12%; line-strong and ink-ghost at 26%; ink-muted `dim` 42% to `ink`; accent-bright `live` halfway to `glow`; accent-dim `live` 38% to `space`.
+
+Colour-blind safety: the concept measured working against needs you in OKLab under simulated colour blindness (`docs/concepts/art/README.md` on the `art-concepts` branch; its matrices were typed from memory): 0.22 normal, 0.15 deutan, 0.17 protan, 0.27 tritan, against mint and amber's 0.12 deutan. Marks don't rely on it: each state has its own shape.
 
 ## Type
 - **Manrope** (variable, weight 500 almost everywhere, `ss01` and `tnum`). The wordmark uses weight 200.
@@ -27,28 +37,23 @@ as history.)
 - Sizes: display 34, title 22, heading 16, body 15, small 13, mono 12/11.
 
 ## Atmosphere
-- **One clock** (`fx/Ambient.kt`): the cosmos, grain, the planet meter, pulsing dots and the terminal cursor all read a single `AmbientClock`. It runs at 30fps (20 on battery saver), sleeps between frames instead of waking on every vsync, stops when the app isn't visible, and freezes under Reduce Motion. Animations read it only in draw/layer lambdas, so ticks never recompose. There are no infinite transitions anywhere.
-- **Cosmos** (`fx/Cosmos.kt`): a port of `DigitalCosmos.tsx`.
-  - Kept from the original: 6 clusters, 4 nebulae (and their breathing), wind 0.04 rad/s. Not its 2-character hex labels beside the stars: in an app whose sessions have hex ids, the owner read them as "faint stray ids" over the sky (2026-10-18). The random draws that chose them are still made, so the stars stay where they were. The stars are new (owner's note, 2026-10-16: they "look like dots", unlike the sun).
-  - **Stars like real stars** (`fx/Stars.kt`, pixels in `fx/SkyArt.kt`): 200 of them, in the sun's own family: a core white-hot at its centre and coloured outward, a soft halo, and for the brighter ones a wide faint bloom and thin diffraction spikes (a long horizontal pair, the vertical one 0.62 as long, as the sun's).
-    - Colours follow temperature in a real sky's proportions: a few blue-white, more white and yellow-white, most of them orange and red; the fainter the star, the redder it's likely to be.
-    - Brightness follows a real sky too, about three times as many stars in each fainter tier: 3.5% bright (spikes 17dp), 11% medium (spikes 8dp), 28.5% faint (a soft point with a small glow), 57% very faint.
-    - No twinkle and no breathing: there's no air in space. The sun doesn't twinkle either.
-    - The 24 sprites (4 tiers × 6 colours) are baked once per density into one atlas, on a background thread. A frame draws one bitmap per star, and the GPU batches them. The field comes from the sky's seed, so it's the same sky at every launch; at launch the stars fade in over 0.7s while the atlas is made.
-  - **Deep-sky objects** (`fx/DeepSky.kt`, pixels in `fx/SkyArt.kt`), as Hubble photographs them, few and faint, never competing with the sessions:
-    - A face-on spiral: blue arms of knots and feathery spurs, dust lanes on their inner edges, pink star-forming nebulae, a yellow-white core, sometimes a bar.
-    - An edge-on galaxy cut by its dark dust lane, and a soft elliptical with a few globular clusters round it.
-    - Star-forming pillars like the Pillars of Creation, in Hubble's teal and gold: rust dust lit gold and white on the edges facing the young stars above, heads boiling off into haze.
-    - A ring nebula like M57: blue-green inside, a ring from yellow-green to red with dark knots and spokes, faint red loops beyond.
-    - A globular cluster: 1,500 old stars crowding into a glowing core.
-    - A corner of deep field against one screen edge: tiny spirals, red ellipticals, blue clumpy galaxies and a foreground star with spikes.
-    - Placement: two of the three big ones (spiral, edge-on, pillars) share the open sky below the solar system, one on each side, scaled to fit it. The rest lie lower, behind the list, showing between its cards. The deep field sits a little beyond its edge, so the tilt never shows its cut. Where each one goes, and its shape and turn, come from the sky's seed: different for every install, the same at every launch.
-    - Each picture is light added up per pixel and rolled off softly at the top (no clipped cores), fading to nothing before its edge. They're rendered off the main thread into bitmaps (about 1.7MB at 3× density), each fading in over 2.5s as it arrives.
-    - They sit in the farthest layer and don't drift. Behind text they step back to 30%. They thin with the week like the galaxy; the week's limit leaves them as they are.
-  - Nebula radius is minSide × 0.30–0.55 × 1.5. 0stems applies dpr twice, so on a phone its clouds come out at this size.
-  - **The sky is gone** (owner, 2026-11-01; DECISIONS, "The sky is gone"). The sun, disk, planets, moons, Codex's star and the companion were hidden from Home on 2026-10-30 and deleted two days later, with their tests. What they said is on the usage and account cards. What's left of them: the phone's thud for a 5-hour limit (`fx/LimitFeel.kt`) and the far sky's thinning with the week.
-  - Performance: it holds still behind the screens, so it asks for no frames at rest; the loop stops when the app isn't visible.
-- **Grain** (`fx/Grain.kt`): grey noise with α ≤ 90/255, overlay blend, opacity 0.32, alive on every screen. Where the sky draws anyway (Home) it changes with the sky's frames, 24 patterns a second; elsewhere (a chat, Settings) it has a gentle lane of its own on the shared clock, 12 patterns a second (8 on a warm phone), whose frames redraw nothing, the sky and the blurred bars included (owner, 2026-10-17: it froze everywhere but Home after the heat work). A new pattern is the noise moved by a random whole number of cells, done by moving its layer, so only the frame is composited again.
+- **One clock** (`fx/Ambient.kt`): the grain, the marks, pulsing dots and the terminal cursor all read a single `AmbientClock`; the chart reads none. It runs at 30fps (20 on battery saver), sleeps between frames instead of waking on every vsync, stops when the app isn't visible, and freezes under Reduce Motion. Animations read it only in draw/layer lambdas, so ticks never recompose. There are no infinite transitions anywhere.
+- **The chart** (`fx/Atlas.kt`; owner, 2026-11-01, Atlas's quiet version): an engraved star chart behind every screen, where the old starfield showed. Line art on near-black.
+  - **Grid:** a conic graticule round a pole 420dp above the screen: parallels every 44dp from r 360dp, meridians every 7.5° out to ±60°, ink at 15%, a 0.4dp line that never goes under a pixel.
+  - **Milky Way:** one dot per 26 dp² of screen in a meandering band from lower left to upper right, in `light` at 22 to 34% (brighter in its middle), 0.6, 0.85 or 1.15dp square, with a dotted edge at ink 11%. Nothing in it means anything in this version: it isn't the budget.
+  - **Field stars:** 120 on a 360 × 780dp phone, ink at 27 to 68%. **They thin with the week** (light = 1 − 0.65 × week^1.5, in 1/32 steps), from all of them to about a third; the leading agent's week, Claude Code's or Codex's. The only meaning it carries.
+  - **It draws no frames at rest.** It reads no clock. It's `Canvas` calls (`drawPoints`, `drawLine`, `drawCircle`), no shaders, gradients or bitmaps of its own, drawn into one offscreen layer that's kept, once when it first shows and once for each step of the week (about 21 in a week). Only it feeds the edge bars' blur, as the far sky did. Reduce Motion changes nothing: nothing moves.
+  - **The turn is in jumps.** The concept's slow turn would have meant 5 frames a second and hairlines shimmering by less than a pixel. Instead the pole sits in one of nine places, ±14dp, to a whole pixel, picked when the app comes to the front (a new one every 20 minutes), so the lines don't sit on the same OLED pixels for days. Not tested for burn-in.
+  - **Week and frame numbers are reasoned**, except what's in AtlasTest and the emulator pass in DECISIONS, "Atlas".
+  - **The sky is gone** (owner, 2026-11-01; DECISIONS, "The sky is gone"). The sun, disk, planets, moons, Codex's star and the companion were hidden from Home on 2026-10-30 and deleted two days later, with their tests. What they said is on the usage and account cards. What's left of them: the phone's thud for a 5-hour limit (`fx/LimitFeel.kt`).
+- **Marks** (`components/Marks.kt`, on the shared clock only while they move): a shape for each state as well as a colour, at their real sizes. **`Planet` in the code and "planet" in this file's older lines mean this mark now.**
+  - **Working:** a solid diamond (r 2.6u) in two 120° arcs (r 5.5u, round caps) that turn once in 3 s on the calm pace. `u` is the mark's width over 14: 12dp `Planet`, 10dp in a chip.
+  - **Needs you:** a larger diamond (r 3.3u) in four corner brackets, pulsing gently. On the filled amber chip, in the page's dark.
+  - **Idle:** a hollow diamond (r 3.2u, line 1u), still, reading no clock.
+  - **Reduce Motion:** the shapes stay and hold still. Other lit chips (signed out, an error): a solid diamond. Ended: a short rule. Blocked (`EclipseMark`): a hollow diamond struck through.
+  - **The connection chip** (`MacMoon`, 20dp): a solid diamond while linked; two arcs turn round it after 0.4 s of looking; a hollow diamond struck through offline, a plain hollow one unpaired.
+  - Statistics' projects are solid diamonds in a shade from their name, sized by hours. The voice capsule and the mic's settling state use the working mark's parts inside their rings (`turningStar`).
+- **Grain** (`fx/Grain.kt`): grey noise with α ≤ 90/255, overlay blend, opacity 0.32, alive on every screen. It has a gentle lane of its own on the shared clock, 12 patterns a second (8 on a warm phone), whose frames redraw nothing, the sky and the blurred bars included (owner, 2026-10-17: it froze everywhere but Home after the heat work). A new pattern is the noise moved by a random whole number of cells, done by moving its layer, so only the frame is composited again.
   - Cells are 1.1dp: 0stems' ~1.5 CSS px at desktop distance, scaled for a phone held at half the distance.
   - Tiles are drawn with bilinear upscaling, like the browser does.
   - One 192² tile is generated once per process on a background thread, and drawn a tile larger than the screen so it can move.
@@ -56,7 +61,7 @@ as history.)
 - **Edges:** fully edge to edge, including the camera cutout, and locked to portrait.
   - Content scrolling under the status bar and the bottom bar is blurred with Haze: radius 22dp, bg tint 42%, full resolution.
   - The blur is at **full strength under the chrome itself** and fades to sharp only over the bar's last 35%. No black strips.
-  - Each screen's content is a keyed source (`home`, `session:<id>`), and its bars blur only the cosmos plus their own screen. Without this, both screens would bleed into each other's bars during the cross-fade.
+  - Each screen's content is a keyed source (`home`, `session:<id>`), and its bars blur only the chart plus their own screen. Without this, both screens would bleed into each other's bars during the cross-fade.
   - Android 10/11 have no RenderEffect, so a designed scrim with the same shape is drawn instead.
 
 ## Components
@@ -91,7 +96,7 @@ as history.)
   - **Stamp:** a 10dp glyph and its figure in mono 10sp, dim, for a seam's trail (`⏱ 2m 14s`, `⬡ 8.4k`); the session stamp is one. **Figure** (above) is the same at 12dp beside small type.
   - **Count mark:** a still 8dp point of light in a state's colour with its count in the trail's words (`● 2 need you`): several side by side read as a legend.
   - **Tag chip:** the model chip's capsule for any name that isn't a state (the model chip is one); `compact`, 18dp tall, inside a line of small type.
-  - **Eclipse mark:** a small sun with a dark disc over it: Claude can't reply for a while. The chat's blocked line and a stopped session's card lead with it.
+  - **Eclipse mark:** a hollow diamond struck through: Claude can't reply for a while. The chat's blocked line and a stopped session's card lead with it.
   - **Battery mark:** a hairline battery filled to its level (the connection chip, the Mac card).
 - **Agents at work** (Home session card): no chip says them on the card any more (owner, 2026-10-29: the `2 AGENTS` chip was no use there). While agents its main agent started still run, the card's seam planet turns even when the main agent is idle, and the card sorts with the working sessions, so a session waiting on its agents never reads as done. On the session screen its status line says `AGENTS · 3 running` (accent-dim, turning) instead of idle.
 - **MiniTerminal:** a Bash call.
@@ -160,7 +165,7 @@ as history.)
 - **Voice** (`ui/voice/`): the mic in the composer and its dictation capsule.
   - **The button** is Send's 44dp circle in its 48dp target. Empty box, voice on the Mac: frosted glass with a mint light inside and a hairline mic glyph (dim and dark while the Mac can't be reached). Text or files: Send as before. Listening: mint-filled, 12% bigger, a bg-coloured mic, and a halo that swells with the voice; hands-free: a check (a tap is Done); armed to cancel: red. Let go with nothing heard yet: glass with a small turning planet (3 s at most). Send and the mic cross-fade (150 ms).
   - **The capsule** sits above the box in the same bottom-anchored column, so the box and the button under the finger never move: the composer's insets and 24dp radius, the glass card's fill (80 to 86%, nothing reads through) and top highlight, and a soft mint light around the planet (red while armed). A seam (LISTENING, HANDS-FREE or LET GO TO CANCEL, a hairline, `0:07` in mono 11; from 1:45 `0:15 LEFT` in amber), then the words (body 15: settled in ink, still changing in muted, a 2dp mint caret blinking on the shared clock), then SLIDE AWAY TO CANCEL in ghost, or Cancel and Done pills in hands-free. Up to five lines; beyond that the oldest fades under a 24dp mask. Its surface takes taps. Enter: from the button's corner, scale 0.6 → 1 and a fade, 220 ms expo. Released: it sinks into the box (180 ms) as the words land. Cancelled: it shrinks back into the button (160 ms).
-  - **The ringed planet** (48dp canvas): a mint sphere, r 6.5dp, meridians turning once in 3 s (0.4× while the link opens, still while armed), inside two rings tilted −18° (aspect 0.34): base radii 11 and 15dp, growing ×(1 + 0.18L) and ×(1 + 0.32L) with the voice level L, alpha 0.35 + 0.45L and 0.18 + 0.40L; each ring's far half is drawn behind the planet and its near half in front. A syllable's onset sends an echo ring from the outer ring, 15 → 22dp, alpha 0.45 → 0 over 700 ms (three slots). A glow behind, 18dp. L is read only in draw, on the shared clock. Reduce Motion: no spin, no echoes, fixed rings whose light steps with L four times a second, fades instead of scale.
+  - **The ringed planet** (48dp canvas): the working mark, r 6.5dp, its arcs turning once in 3 s (0.4× while the link opens, still while armed), inside two rings tilted −18° (aspect 0.34): base radii 11 and 15dp, growing ×(1 + 0.18L) and ×(1 + 0.32L) with the voice level L, alpha 0.35 + 0.45L and 0.18 + 0.40L; each ring's far half is drawn behind the planet and its near half in front. A syllable's onset sends an echo ring from the outer ring, 15 → 22dp, alpha 0.45 → 0 over 700 ms (three slots). A glow behind, 18dp. L is read only in draw, on the shared clock. Reduce Motion: no spin, no echoes, fixed rings whose light steps with L four times a second, fades instead of scale.
   - **Notes** above the box: one line of dense glass (bg 92 to 94%) with a point of light: amber for a problem (4 s), dim for "Didn't catch that." (2.5 s), mint for one-time tips (6 s); the microphone's note has an Allow or Settings pill. A tap dismisses.
   - **New session:** the mic at the sheet's foot, beside Start. Held, the capsule takes exactly the field's place (no hint line); hands-free, it takes the room it needs above the chips, solid, with Cancel and Done, growing the sheet upward so the mic under the finger never moves. The field stays underneath, hidden, so an open keyboard stays open.
   - (Settings → Voice, Soniox's key card with Language and Headset microphone, went with Soniox on 2026-10-30: dictation is the phone's own.)
@@ -173,7 +178,7 @@ as history.)
 - **The update** (`ui/update/UpdateUi.kt`): while an update is under way, a banner in the notice banner's place and look (bg900 97%, radius 18, a 1dp ring in its colour at 35%, an 8dp point): `UPDATE` and the version in dim mono, what's happening (Downloading the update, Checking the update, Allow Hypernova to install its update, Ready to install, Confirm the update in Android's dialog), on the right the percent in mono mint or the step's Pill (Allow, Install, Try again; 36dp), and under it a 2dp hairline bar (ink 9% track, the part done in mint, round ends). A failure turns it amber (`UPDATE STOPPED` and why). It gives way to a notice while one shows, and swiped up it stays away until the next step. Settings' UPDATE card says the same in its body: the bar with `18.4 MB of 45.2 MB` and `42%` in mono, or the step's text and Pill, with a Ghost Open in browser only where a browser could open the Mac's page.
 - **Settings, drawn:** the Mac card's line under its name says how Stay awake holds it as a phrase ("Awake with the lid closed") and then its battery mark and percentage; the Battery row puts how it's powered after its glyph (a bolt `charging`, a plug `on power`, a stopwatch `3h 5m left`, or `on battery`) before the battery mark and the percentage (amber low, red critical), never "62% · charging". A provider's card shows its models as model chips in a flowing row (TalkBack hears their full ids) and what's left on its key after a banknote (`▭ $4.20 left`). A saved key's toast: "Key works. $4.20 left."
 - **Words where nothing can draw** (notifications, toasts): short phrases, not fields. An approval: "0stems needs you", "A question from 0stems", "A plan to review in 0stems", from an agent "From implement:fix"; a session: "cosmos renderer finished", "… is waiting for you", "… stopped on an error"; a limit: "Session limit reached. Claude carries on by itself at 2:00."; the background connection: "Session limit until 2:00" over "2 working and 1 needs you", "Connected and all quiet", "Offline and trying again".
-- **Nova mark:** the activity meter's planet, still, lit from the upper left, its two meridians at ±45° (a globe). It is the launcher, notification, Mac app and menu bar icon, and the logo in the brand row and on assistant messages. (It replaced an anchor star in a focus bracket.)
+- **The logo** (`NovaMark`, `components/Marks.kt`, `logo`; owner, 2026-11-01): Atlas's constellation in the shape of an **N**, for the app's coming name: four diamonds, top left the largest, joined by three lines, a little out of true as a plotted figure is. In ink. It's the launcher, monochrome, notification and shortcut icons, and the logo in the top bar, onboarding and on assistant messages. All drawn here; no star shapes or asterisks.
 - **Wordmark:** `hypernova/` in light lowercase with a mint slash, matching `0stems/` and `prudnikov/`.
 
 ## Motion
@@ -258,7 +263,7 @@ One home screen widget (`.../hypernova/widget/`, beside `ui/`), **Needs you** (o
   - **No pictures.** Text, the card, the command well and the pills, in the app's colours: no sun, planets, meters or grain (the owner: remove the images, a plain clean look).
   - **No countdowns.** Nothing redraws a widget every minute, so times are clock times (`Last updated 14:32`), which stay true until they pass.
   - **One layout, a list that scrolls.** A ListView whose rows come from `WidgetListService` (made from the picture last drawn, so the header and the list agree), at any size; nothing is measured to decide what fits. A list's rows share one PendingIntent (a template each row fills in), and a row both opens and answers, so every tap goes through `WidgetTap`, an activity that never shows (`Theme.NoDisplay`): it opens the app on the row's computer at its session, or hands Deny and Allow to `WidgetActions`, whose broadcast keeps the process for the round trip.
-- **Card:** the warm near-black at 92% (a wallpaper is busier than the sky) with a 1dp ink-8% ring, the launcher's own corner radii on Android 12+. Rows are a faint ink fill (4%) with a hairline ring (ink 8%), the launcher's inner radius, 6dp apart, a soft ink ripple when pressed.
+- **Card:** the near-black at 92% (a wallpaper is busier than the chart) with a 1dp ink-8% ring, the launcher's own corner radii on Android 12+. Rows are a faint ink fill (4%) with a hairline ring (ink 8%), the launcher's inner radius, 6dp apart, a soft ink ripple when pressed.
 - **Header:** `NEEDS YOU` in tracked caps (ink muted, 10sp), the count in amber mono, a hairline, and `Last updated 14:32` (dim mono) while nothing keeps the widget current. A tap opens the app.
 - **Computers:** each computer with something waiting has a line: its name in tracked caps (dim), its count in amber, and `Offline` after it while it can't be reached. In the switcher's order (the one on screen first, then as paired). A computer with nothing waiting is left out. A tap opens the app on that computer.
 - **Rows** (`WidgetModel.of`, unit-tested): one per session that needs you. Its name (`+2 more` when other approvals wait behind its oldest), what it waits on in small amber caps with the project after it in dim caps (the tool, `BASH`; Claude Code's dialog in the terminal by its title, `BASH COMMAND`; `QUESTION`; `PLAN TO REVIEW`; `WAITING FOR YOU` for anything else), then the detail: a command in the mono well with an amber `$` (`›` for other tools), or the question, the plan's first line or what it waits on as prose (up to 3 lines). Oldest wait first: an approval by when it was asked, a dialog in the terminal or another wait by when its session started, so the list holds still. A tap opens the session, switching to its computer.

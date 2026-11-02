@@ -94,15 +94,14 @@ fun CountMark(text: String, color: Color, modifier: Modifier = Modifier) {
 }
 
 /**
- * A small sun with a dark disc over it, [size] wide: Claude can't reply for a while (a limit, the
- * account), the light blocked, nothing burned out. The chat's blocked line and a card's leads with it.
+ * A hollow diamond struck through, [size] wide: Claude can't reply for a while (a limit, the
+ * account). The chat's blocked line and a card's leads with it.
  */
 @Composable
 fun EclipseMark(color: Color, modifier: Modifier = Modifier, size: Dp = 12.dp) {
     androidx.compose.foundation.Canvas(modifier.size(size)) {
         val r = this.size.minDimension / 2f
-        drawCircle(color.copy(alpha = 0.9f), radius = r * 0.78f)
-        drawCircle(HN.bg, radius = r * 0.7f, center = center + androidx.compose.ui.geometry.Offset(r * 0.22f, -r * 0.1f))
+        struckDiamond(center, r * 0.78f, color.copy(alpha = 0.9f), 1.dp.toPx())
     }
 }
 

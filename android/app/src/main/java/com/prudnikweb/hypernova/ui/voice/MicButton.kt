@@ -5,20 +5,16 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -40,7 +36,7 @@ import com.prudnikweb.hypernova.data.VoiceTiming
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.frostedGlass
-import com.prudnikweb.hypernova.ui.components.planetSphere
+import com.prudnikweb.hypernova.ui.components.turningStar
 import com.prudnikweb.hypernova.ui.fx.LocalAmbient
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.LocalMotion
@@ -50,6 +46,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.clip
 
 /** What the button shows (spec 3.1). */
 private enum class Face { Send, SendOff, Uploading, Mic, MicDim, Listening, HandsFree, Settling }
@@ -208,12 +208,12 @@ private fun Face(f: Face, voice: VoiceInput) {
             }
         }
         Face.Settling -> Box(Modifier.size(44.dp).frostedGlass(HN.accent, glowX = 22.dp, dense = true), contentAlignment = Alignment.Center) {
-            // A small planet turning while the words are on their way (3 s at most).
+            // The small mark turning while the words are on their way (3 s at most).
             val turn = remember { floatArrayOf(0f) }
             Canvas(Modifier.size(16.dp)) {
                 val t = if (reduced) 0f else clock.seconds
                 turn[0] = t * 2f * PI.toFloat() / 1.2f
-                planetSphere(Offset(size.width / 2f, size.height / 2f), 6.5.dp.toPx(), HN.accent, turn[0], stroke = 0.8.dp.toPx())
+                turningStar(Offset(size.width / 2f, size.height / 2f), 6.5.dp.toPx(), HN.accent, turn[0], 1.1.dp.toPx())
             }
         }
     }

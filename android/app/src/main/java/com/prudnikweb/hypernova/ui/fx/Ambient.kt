@@ -20,7 +20,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 
 /**
- * One clock for every ambient animation in the app: the cosmos, the grain, the activity meters,
+ * One clock for every ambient animation in the app: the grain, the activity meters,
  * pulsing dots and the terminal cursor all read it.
  *
  * Why one clock: on a 120Hz panel, separate infinite transitions each ask for a frame on every
@@ -32,7 +32,7 @@ import kotlin.math.cos
  * drew with since their last frame, at the fastest of their rates ([FrameBudget]), and each pace's
  * readers redraw at their own rate: something slow at 5 frames a second while a working session's
  * chip breathes at 30. Whatever isn't drawn (a screen that's gone, an item scrolled out of a list,
- * a planet meter at rest that doesn't read the clock) asks for nothing, so a screen where nothing
+ * a mark at rest that doesn't read the clock) asks for nothing, so a screen where nothing
  * moves draws no frames at all. It stops while the app isn't visible, and freezes under Reduce
  * Motion.
  *
@@ -60,12 +60,6 @@ class AmbientClock(initial: Float = 0f) {
 
     /** Seconds for a reader that moves at [Pace.Live]. */
     val seconds: Float get() = seconds(Pace.Live)
-
-    /**
-     * The latest tick's time, asking for nothing: for a reader that only knows its pace once it
-     * has drawn (the sky), and then calls [seconds] with it. A reader that never does gets no frames.
-     */
-    val now: Float get() = time
 
     /**
      * Seconds for a reader that moves at [pace]: it redraws on that pace's frames for as long as it

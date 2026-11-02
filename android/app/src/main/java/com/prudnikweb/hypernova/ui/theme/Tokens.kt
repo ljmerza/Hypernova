@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.ui.theme
 
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -11,35 +12,90 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.prudnikweb.hypernova.R
 
-/** Colour tokens, ported 1:1 from 0stems (tailwind.config.ts / globals.css). */
+/**
+ * The colours a theme chooses, as few as they can be: everything else derives from them ([HN]). Only
+ * Atlas's own set exists today; a theme selector (docs/LATER.md, L109) would swap this one value.
+ */
+@Immutable
+class Palette(
+    /** The page, behind everything. */
+    val space: Color,
+    /** Text, and the chart's lines. */
+    val ink: Color,
+    /** Quiet text. */
+    val dim: Color,
+    /** Hairlines. */
+    val line: Color,
+    /** Working: at work, primary, success. */
+    val live: Color,
+    /** Needs you: approvals, waiting. */
+    val ask: Color,
+    /** Limits, errors, deny. */
+    val stop: Color,
+    /** At rest: an idle mark. */
+    val idle: Color,
+    /** The chart's stipple. */
+    val light: Color,
+    /** The brightest highlight. */
+    val glow: Color,
+)
+
+/**
+ * Atlas (owner, 2026-11-01): near-black navy and warm parchment, verdigris for working and amber for
+ * needs you. docs/concepts/art on the `art-concepts` branch measured the two apart under colour
+ * blindness (OKLab 0.22 in normal vision, 0.15 deutan, 0.17 protan, 0.27 tritan, against today's mint
+ * and amber's 0.12 deutan), and each state's mark has a shape of its own besides.
+ */
+val AtlasColors = Palette(
+    space = Color(0xFF060A17),
+    ink = Color(0xFFF1E9D6),
+    dim = Color(0xFF8E8C80),
+    line = Color(0xFF252A3A),
+    live = Color(0xFF6FE0C2),
+    ask = Color(0xFFFFA63C),
+    stop = Color(0xFFEE4468),
+    idle = Color(0xFF7E7D74),
+    light = Color(0xFFE7DAB8),
+    glow = Color(0xFFF8F0DC),
+)
+
+/** [a] and [b] mixed by [k] in plain sRGB, as the concept's surfaces are. */
+private fun mix(a: Color, b: Color, k: Float) = Color(a.red + (b.red - a.red) * k, a.green + (b.green - a.green) * k, a.blue + (b.blue - a.blue) * k)
+
+/** The app's colours, all from one [Palette] (the widget's and the terminal's repeat them as text: ui/theme is the source). */
 object HN {
-    // Surfaces: warm near-black, not pure black.
-    val bg = Color(0xFF14110E)
-    val bg950 = Color(0xFF0F0D0A)
-    val bg900 = Color(0xFF1B1814)
-    val bg800 = Color(0xFF221F1B)
-    val bg700 = Color(0xFF2C2823)
+    private val p = AtlasColors
 
-    val line = Color(0xFF2C2823)
-    val lineSoft = Color(0xFF221F1B)
-    val lineStrong = Color(0xFF45403A)
+    // Surfaces: the page, then ink laid over it. Not pure black.
+    val bg = p.space
+    val bg950 = mix(p.space, Color.Black, 0.35f)
+    val bg900 = mix(p.space, p.ink, 0.045f)
+    val bg800 = mix(p.space, p.ink, 0.075f)
+    val bg700 = mix(p.space, p.ink, 0.12f)
 
-    val ink = Color(0xFFF5F2EB)
-    val inkMuted = Color(0xFFB5B0A6)
-    val inkDim = Color(0xFF7A7468)
-    val inkGhost = Color(0xFF45403A)
+    val line = p.line
+    val lineSoft = bg800
+    val lineStrong = mix(p.space, p.ink, 0.26f)
 
-    // Mint accent.
-    val accent = Color(0xFF7FFFA0)
-    val accentBright = Color(0xFFB6FFC9)
-    val accentDim = Color(0xFF4A8C5E)
+    val ink = p.ink
+    val inkMuted = mix(p.dim, p.ink, 0.42f)
+    val inkDim = p.dim
+    val inkGhost = lineStrong
+
+    /** An idle mark. */
+    val idle = p.idle
+
+    // The accent: working, primary, success.
+    val accent = p.live
+    val accentBright = mix(p.live, p.glow, 0.5f)
+    val accentDim = mix(p.live, p.space, 0.38f)
 
     // "Needs you" and failures.
-    val amber = Color(0xFFE8B341)
-    val danger = Color(0xFFFF7878)
+    val amber = p.ask
+    val danger = p.stop
 
-    /** Star tint used by the cosmos (rgb 127,255,160). */
-    val star = Color(0xFF7FFFA0)
+    /** The chart's stipple (fx/Atlas.kt). */
+    val chartLight = p.light
 }
 
 /** Motion tokens. */
