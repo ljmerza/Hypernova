@@ -233,6 +233,8 @@ async function serve(name: string, port: number): Promise<void> {
       return
     }
     sockets.handleUpgrade(req, socket, head, (ws) => {
+      // scripts/test-client-package.sh waits for this line: a certified device got as far as the feed.
+      console.log(`${name}: ${device.name} connected over mutual TLS`)
       ws.send(JSON.stringify({ t: 'snapshot', snapshot: snapshotFor(device.id) }))
       const ping = setInterval(() => ws.readyState === ws.OPEN && ws.send('{"t":"ping"}'), 25_000)
       ws.on('close', () => clearInterval(ping))
