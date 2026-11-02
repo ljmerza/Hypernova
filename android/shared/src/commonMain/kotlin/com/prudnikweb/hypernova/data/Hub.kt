@@ -301,7 +301,7 @@ interface Hub {
     /** The agent's last change put back, if the file is still what it wrote ([expected]). Fails as [changeAgentSetting] does. */
     suspend fun undoAgentSetting(agent: String, expected: String): Result<Unit> = Result.failure(UnsupportedOperationException())
     /**
-     * One call of the agents' extension routes: MCP servers, plugins, skills (docs/specs/spec-mcp-manage.md). The typed
+     * One call of the agents' extension routes: MCP servers, plugins, skills (docs/PROTOCOL.md, "Routes: agents' MCP servers" and after). The typed
      * calls are McpManage.kt's and AgentExtras.kt's. Fails with [AgentSettingRefused] in the server's words, or
      * [AgentSettingsTooOld]. [slow]: it may start the agent or its servers, so it's given longer.
      */

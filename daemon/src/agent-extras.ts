@@ -1,4 +1,4 @@
-// An agent's plugins and skills from a paired phone (docs/specs/spec-mcp-manage.md; docs/DECISIONS.md, "Plugins from
+// An agent's plugins and skills from a paired phone (docs/PROTOCOL.md, "An agent's plugins" and "An agent's skills"; docs/DECISIONS.md, "Plugins from
 // the phone" and "Skills from the phone"). Thin on purpose: each action is the agent's own command or its app-server's call,
 // and what comes back is filtered to named fields, because `claude plugin list --json` carries a plugin's whole MCP setup.
 //

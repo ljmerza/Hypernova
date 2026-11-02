@@ -1,4 +1,4 @@
-// Codex's MCP servers (docs/specs/spec-mcp-manage.md; what differs from Claude Code: docs/DECISIONS.md, "Codex's MCP
+// Codex's MCP servers (docs/PROTOCOL.md, "An agent's MCP servers", "For Codex"; what differs from Claude Code: docs/DECISIONS.md, "Codex's MCP
 // servers"). Codex's own CLI reads them (`codex mcp list --json`) and its own app-server does the rest, in a short-lived
 // copy on stdio started for the moment: `mcpServerStatus/list` connects them and gives tools with their schemas,
 // `config/value/write` writes `config.toml` with Codex's writer, keeping the rest of the file and its comments.

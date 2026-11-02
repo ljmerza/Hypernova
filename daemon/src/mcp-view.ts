@@ -1,4 +1,4 @@
-// What the phone may see of an MCP server (docs/specs/spec-mcp-manage.md): where it's defined, how it's set
+// What the phone may see of an MCP server (docs/PROTOCOL.md, "An agent's MCP servers", "What may leave"): where it's defined, how it's set
 // up, never a secret. `env` and `headers` leave as names only. Values inside arguments and URLs that look
 // like a token or a key are masked, and a form that sends a masked value back keeps the one on the server.
 //

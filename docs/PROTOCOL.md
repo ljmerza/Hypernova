@@ -33,7 +33,8 @@ the Android app's own.
    provider moves](#routes-account-and-provider-moves), [usage and
    rewind](#routes-usage-and-rewind), [Codex and switching](#routes-codex-and-switching), [projects,
    providers and models](#routes-projects-providers-and-models), [agents'
-   settings](#routes-agents-settings), [files, attachments and
+   settings](#routes-agents-settings), [agents' MCP servers](#routes-agents-mcp-servers), [agents'
+   plugins](#routes-agents-plugins), [agents' skills](#routes-agents-skills), [files, attachments and
    previews](#routes-files-attachments-and-previews), [read aloud](#routes-read-aloud), [statistics
    and history search](#routes-statistics-and-history-search), [the server's own
    update](#routes-the-servers-own-update), [Mac-only](#routes-mac-only), [Local API](#local-api)
@@ -46,7 +47,8 @@ the Android app's own.
    - Doing work: [Agents and workflows](#agents-and-workflows), [Automations](#automations)
    - Agents and models: [Codex](#codex-a-second-agent), [Switching agents](#switching-agents),
      [Providers](#providers), [Models](#models), [Agent settings](#agent-settings), [A session's MCP
-     servers](#a-sessions-mcp-servers), [Session menu](#session-menu), [A session's
+     servers](#a-sessions-mcp-servers), [An agent's MCP servers](#an-agents-mcp-servers), [An agent's
+     plugins](#an-agents-plugins), [An agent's skills](#an-agents-skills), [Session menu](#session-menu), [A session's
      model](#a-sessions-model), [A session's effort](#a-sessions-effort)
    - Account and limits: [Account](#account), [Auto-continue](#auto-continue), [Session usage and
      Rewind](#session-usage-the-to-do-list-and-rewind), [Per-model
@@ -1595,8 +1597,17 @@ The answer to `GET /v1/agents/settings`. Rules: see Agent settings.
 ```ts
 AgentSettingsReply = {
   scope: "user",            // these are the user-level files; a project's own settings can override them
-  claude: AgentSettings<ClaudeSummary> & { mcp: ClaudeMcp },   // <CLAUDE_DIR>/settings.json; mcp is beside it
+  claude: AgentSettings<ClaudeSummary> & { mcp: ClaudeMcp, effort?: EffortRows },   // <CLAUDE_DIR>/settings.json; mcp and effort are beside it
   codex: AgentSettings<CodexSummary>,    // $CODEX_HOME/config.toml, else ~/.codex/config.toml
+}
+
+EffortRows = {              // see Agent settings, "Effort per model"; absent from an older daemon
+  rows: (ShownValue & {     // key: modelSettings.<model>.effortLevel
+    model: string,
+    name: string,           // Claude Code's label; the id itself for a model only the file has
+    editable: boolean,      // false: the file's shape can't be edited in place
+  })[],
+  choices: {value: "low" | "medium" | "high" | "xhigh" | null, loosens: false}[],   // null: take it out
 }
 
 AgentSettings = {
@@ -1640,9 +1651,10 @@ The answer to `PUT /v1/agents/settings`.
 
 ```ts
 SettingChange = {
-  ok: true, agent, key, value,
+  ok: true, agent, key,
+  value,                    // null: a model's effort taken out
   changed: boolean,         // false: it already had that value, and nothing was written or backed up
-  hash: string,             // the file's sha256 now
+  hash: string,             // the file's sha256 now; "" when taking out what isn't set, with no file
   loosened: boolean,        // this allows more than before (see Agent settings)
   undo: {key, to: string | boolean | null, loosens: boolean} | null,
 }
@@ -1666,6 +1678,208 @@ SessionMcpReply = {
   forAllProjects: number,   // user-level servers: a count, never their names
   hidden: number,           // names not sent
   foldersNotRead: number,   // the walk's time limit ran out
+}
+```
+
+### McpList
+
+The answer to `GET /v1/agents/mcp`. Rules: see An agent's MCP servers.
+
+```ts
+McpList = {
+  agent: "claude" | "codex",
+  state: "ok" | "missing" | "malformed" | "unreadable",   // Claude Code's config file's; Codex: always "ok"
+  servers: {
+    name,
+    scope: "user" | "settings" | "local" | "project",     // Codex: "user"
+    folder?,                // a folder's id, for local and project
+    project?,               // that folder's base name
+    transport: "stdio" | "http" | "sse" | "ws" | null,    // null: any other kind
+    summary?,               // a command's base name or a host
+    approval?: "approved" | "pending" | "rejected",       // a project's
+    enabled?: boolean,      // Codex
+  }[],
+  folders: McpFolder[],     // where a server can be added or looked at from; Codex: the home folder alone
+  hidden: number,           // names not sent
+  foldersNotRead: number,   // the walk's time limit ran out
+  scopes: string[],         // where a new one can go: ["user", "project", "local"]; Codex: ["user"]
+  undo: {
+    op: "add" | "edit" | "remove", name, scope,
+    folder: string | null,  // a folder's id
+    needsCheck: boolean,    // putting it back needs confirmRun
+    command: string | null, // what it puts back, in full, what looks secret masked
+  } | null,
+}
+
+McpFolder = {id, name}      // id: "home" for the home folder, else opaque; name: a base name, ~ for home
+```
+
+### McpStatus
+
+The answer to `GET /v1/agents/mcp/status`. `LiveServer` is also `POST /v1/agents/mcp/reconnect`'s.
+
+```ts
+McpStatus = {agent, folder, servers: LiveServer[]}   // folder: an id; Codex: "home"
+
+LiveServer = {
+  name,
+  status: "connected" | "failed" | "needs-auth" | "pending" | "disabled"
+    | "waiting"             // a project's, not approved, not started
+    | "rejected",           // a project's, turned down, not started
+  source: string,           // Claude Code's word (user, project, local, plugin, managed, claudeai…); Codex: user, plugin
+  serverName?, version?,    // what the server says it is
+  error?,                   // masked, 300 characters at most
+  tools: {name, readOnly?: true, destructive?: true, openWorld?: true}[],
+  setup?: ServerSetup,      // Claude Code's, only for what no file here describes (a plugin's, an organization's)
+}
+
+ServerSetup = {
+  transport: "stdio" | "http" | "sse" | "ws" | null,
+  command?, args?: string[], url?,    // masked; a value past 2,048 characters is cut and ends in …
+  envNames: string[], headerNames: string[],   // names only, 200 of each at most
+  headersHelper?,           // a command that makes its headers, masked
+  oauth?: {clientId?, callbackPort?},
+  timeout?: number,         // milliseconds
+  alwaysLoad?: true,
+  hidden: number,           // env and header names not sent
+}
+```
+
+### McpServerPage
+
+The answer to `GET /v1/agents/mcp/server`.
+
+```ts
+McpServerPage = ServerSetup & {
+  agent, name,
+  scope,                    // as in McpList, or what the status says of one no file here holds: plugin, managed, enterprise, claudeai, dynamic, agent, unknown
+  folder?, project?,        // local, project; folder also for a scope no file holds
+  where?,                   // words for the place ("~/.claude.json", "<project>/.mcp.json"); only for a server in a file
+  source?,                  // the status's word; only for a scope no file holds
+  approval?,                // scope "project"
+  hash?,                    // sent back as `expected`; only for a server in a file. Keyed per run of the daemon, so a restart makes it stale
+  editable: boolean,        // false: settings.json's, a ws or unknown kind, or a scope no file holds
+  // Codex only
+  bearerEnv?, cwd?, toolsOn?: string[], toolsOff?: string[],
+  startupTimeout?: number, toolTimeout?: number,   // seconds; `timeout` is toolTimeout in milliseconds
+  enabled?: boolean, disabledReason?,
+  authStatus?,              // Codex's word: unsupported, not_logged_in, bearer_token, o_auth, unknown
+}
+```
+
+### McpTools
+
+The answer to `GET /v1/agents/mcp/tools`. All of its text is the server's own, masked and capped: show it as text.
+
+```ts
+McpTools = {
+  agent, name, serverName?, version?, instructions?,
+  tools: {
+    name, description?,
+    annotations: {title?, readOnly?: boolean, destructive?: boolean, idempotent?: boolean, openWorld?: boolean},
+    params: {name, type, required: boolean, description?, default?, choices?: string[]}[],
+    schema?,                // the input schema as pretty JSON, 16 KiB at most
+  }[],                      // 500 at most
+  prompts: {name, description?, args?: string[]}[],   // Codex: none
+  resources: {name, description?, uri?}[],
+  moreTools: number,        // tools past the cap
+  whyNot?: "approval" | "disabled" | "no_direct" | "needs_auth" | "too_slow" | "failed",   // why the lists are empty
+}
+```
+
+### McpForm
+
+The body of `POST` and `PUT /v1/agents/mcp/servers`. Rules: see An agent's MCP servers, "The form".
+
+```ts
+McpForm = {
+  agent,
+  scope: "user" | "local" | "project",   // Codex doesn't look at it
+  folder?,                  // an id, for local and project; none: the home folder
+  name,                     // letters, digits, _ and -, starting with a letter or digit, 64 at most
+  transport: "stdio" | "http" | "sse",   // Codex: no "sse"
+  command?, args?: string[], env?: McpPair[],   // stdio
+  url?, headers?: McpPair[],             // http, sse
+  oauth?: {clientId?, callbackPort?, clientSecret?} | null,   // Claude Code's, http and sse only
+  timeout?: number | null,  // milliseconds, 1,000 to 86,400,000; null takes it out; Claude Code's
+  bearerEnv?: string | null,   // Codex's, http only: a variable's name; null or "" takes it out
+  confirmRun?: boolean,     // the phone's claim of a check
+  expected?,                // PUT: the page's hash
+}
+
+McpPair = {name, value} | {name, keep: true}   // keep: the value already on the server
+```
+
+### PluginList
+
+The answer to `GET /v1/agents/plugins`. Rules: see An agent's plugins.
+
+```ts
+PluginList = {
+  agent,
+  plugins: {
+    id,                     // name@marketplace
+    name, marketplace?, version?, scope,
+    enabled: boolean,
+    hasConfig: boolean,     // has options to set; Codex: false
+    mcpServers: string[],   // names only; Codex: []
+    source?,                // Codex's: words for where it's from
+    problem?,               // Claude Code's: what's wrong with it, masked
+  }[],
+  marketplaces: {name, type?, where?}[],
+  scopes: string[],         // ["user", "project", "local"]; Codex: ["user"]
+  folders: McpFolder[],     // Codex: the home folder alone
+}
+```
+
+### PluginCatalogue
+
+The answer to `GET /v1/agents/plugins/available`.
+
+```ts
+PluginCatalogue = {
+  agent,
+  total: number,            // what matched, before the cap
+  plugins: {id, description?, marketplace?, version?, source?, marketplaceSource?}[],   // 100 at most
+}
+```
+
+### PluginDetail
+
+The answer to `GET /v1/agents/plugins/detail`.
+
+```ts
+PluginDetail = {
+  agent, id, description?,
+  skills: string[], agents: string[], hooks: string[], mcpServers: string[], lspServers: string[], commands: string[],
+  apps?: string[],          // Codex
+  alwaysOnTokens?: number,  // Claude Code's estimate
+  options: {
+    key, title?, description?,
+    sensitive: boolean,
+    set: boolean,
+    value?,                 // never for a sensitive one
+  }[],                      // Codex: []
+}
+```
+
+### SkillList
+
+The answer to `GET /v1/agents/skills`. Rules: see An agent's skills.
+
+```ts
+SkillList = {
+  agent,
+  folder,                   // an id; Codex: "home"
+  states: string[],         // Claude Code: ["on", "name-only", "user-invocable-only", "off"]; Codex: ["on", "off"]
+  folders: McpFolder[],     // Codex: the home folder alone
+  skills: {
+    name, displayName?, description?,
+    source?,                // the agent's word for where it's from
+    state,
+    tokens?: number,        // Claude Code's estimate
+    lockedBy?,              // why it can't be changed: author, plugin, policy, flag, reserved-name
+  }[],
 }
 ```
 
@@ -2519,17 +2733,18 @@ An older daemon answers 404 to each. The first three: see Agent settings.
 
 - **Body:** none
 - **Answer:** `200 AgentSettingsReply`: a fixed list of Claude Code's and Codex's user-level settings,
-  and what can be changed. Always a 200, whatever state the files are in.
+  and what can be changed, with Claude Code's effort per model beside the list. Always a 200, whatever
+  state the files are in.
 - **Rules:** waits up to 3 s for Codex's models; without them, Codex's `model` isn't offered.
 
 #### PUT /v1/agents/settings
 
 - **Body:** `{agent, key, value, expected}`. `expected` is the reply's `hash`, or null for a file
-  that isn't there yet.
+  that isn't there yet. `value` may be null only for a model's effort, to take it out.
 - **Answer:** `200 SettingChange`. A change goes out as `{t:"agent_settings"}`.
 - **Refusals:** see Agent settings, "Changing one".
-- **Rules:** one key of the shorter list. The server flags `loosened`; asking for the owner's
-  fingerprint is the client's part.
+- **Rules:** one key of the shorter list, or a model's effort. The server flags `loosened`; asking for
+  the owner's fingerprint is the client's part.
 
 #### POST /v1/agents/settings/undo
 
@@ -2548,6 +2763,264 @@ An older daemon answers 404 to each. The first three: see Agent settings.
   allow-list, read-only.
 - **Refusals:** 404 `no_session`; 409 `not_claude` (a Codex session)
 - **Rules:** see A session's MCP servers.
+
+### Routes: agents' MCP servers
+
+All of these take a paired device's token only: the admin token and the local API get 401
+`unauthorized`. An older daemon answers 404 `not_found` to each. Rules: see An agent's MCP servers.
+
+Every entry below can also refuse with what's common to them, not repeated:
+
+| Status | Code | When |
+|---|---|---|
+| 400 | `bad_agent` | `agent` isn't `claude` or `codex`. It has no default, in the query or the body |
+| 400 | `bad_json`, `bad_request` | A body that isn't JSON, or isn't an object |
+| 404 | `no_folder` | A `folder` the daemon doesn't know (An agent's MCP servers, "Folders"). Not for Codex, which doesn't look at it |
+| 409 | `no_claude`, `no_codex` | That agent isn't installed, for a route that runs it |
+| 502 | `cli_failed` | The agent's command failed: its own line, cleaned |
+| 502, 504 | `codex_failed`, `codex_refused`; `too_slow` | Codex's short-lived app-server stopped or refused, or took over 30 s |
+
+A change answers once it's done, and goes out as `{t:"agent_settings", agent}`. A refusal doesn't.
+
+#### GET /v1/agents/mcp
+
+- **Query:** `agent`
+- **Body:** none
+- **Answer:** `200 McpList`
+- **Rules:** starts nothing. Claude Code's come from the files; trouble with its config file is
+  `state`, not a refusal.
+
+#### GET /v1/agents/mcp/status
+
+- **Query:** `agent`; `folder` (an id; none: `home`); `fresh=1` (not what's kept)
+- **Body:** none
+- **Answer:** `200 McpStatus`
+- **Rules:** starts the servers, as a session there would. Kept 20 seconds per folder unless `fresh=1`,
+  and forgotten when a route here changes something (for Codex, not a sign-in finishing). See An agent's
+  MCP servers, "Status and tools".
+
+#### GET /v1/agents/mcp/server
+
+- **Query:** `agent`, `name`; for Claude Code `scope`, and `folder` for `local`, `project` or a scope no
+  file holds
+- **Body:** none
+- **Answer:** `200 McpServerPage`
+- **Refusals:** 400 `bad_name`, `bad_scope` (Claude Code; no `scope` is one); 404 `no_server`
+- **Rules:** never a value of an env var or a header. A scope no file holds asks a process, as the status
+  does.
+
+#### GET /v1/agents/mcp/tools
+
+- **Query:** as `GET /v1/agents/mcp/server`, with `folder` looked at for every scope
+- **Body:** none
+- **Answer:** `200 McpTools`. What can't be had is `whyNot` with empty lists, not a refusal.
+- **Refusals:** 400 `bad_name`, `bad_scope` (Claude Code); 404 `no_server` (Claude Code)
+- **Rules:** starts that one server, unless it's off or nobody approved it. Tools are never called. See
+  An agent's MCP servers, "Status and tools".
+
+#### POST /v1/agents/mcp/servers
+
+- **Body:** `McpForm`
+- **Answer:** `200 {ok: true, name, scope, hash}`
+- **Refusals:** 400 `bad_scope` (Claude Code), `bad_name`, `bad_transport`, `bad_command`, `bad_args`,
+  `bad_url`, `bad_pairs`, `bad_pair_name`, `bad_pair_value`, `nothing_to_keep`, `masked_unknown`,
+  `bad_oauth`, `bad_timeout`, `too_big`, `bad_bearer` (Codex); 403 `confirm_run`; 409 `exists`,
+  `file_is_link`
+- **Rules:** see An agent's MCP servers, "The form" and "What a change runs".
+
+#### PUT /v1/agents/mcp/servers
+
+- **Body:** `McpForm` with `expected`
+- **Answer:** `200 {ok: true, name, scope, hash}`
+- **Refusals:** as `POST`, without `exists`; 404 `no_server`; 409 `file_changed`
+- **Rules:** a name and a scope can't change. For Claude Code it's a remove and an add, and if the add
+  fails the old entry goes back; a form that changes nothing and has no client secret writes nothing.
+
+#### POST /v1/agents/mcp/servers/remove
+
+- **Body:** `{agent, scope, folder?, name, expected}`
+- **Answer:** `200 {ok: true, name, scope, hash: null}`
+- **Refusals:** 400 `bad_scope` (Claude Code), `bad_name` (Codex); 404 `no_server`; 409 `file_changed`,
+  `file_is_link`
+- **Rules:** no `confirmRun`: it stops something running, and Undo can put it back.
+
+#### POST /v1/agents/mcp/undo
+
+- **Body:** `{agent, confirmRun?}`
+- **Answer:** `200 {ok: true, name, scope, op}`
+- **Refusals:** 403 `confirm_run` (what it puts back runs something: the list's `undo.needsCheck`); 409
+  `nothing_to_undo`, `file_changed`
+- **Rules:** the last add, edit or remove, one step, while the entry is what that change left.
+
+#### POST /v1/agents/mcp/toggle
+
+- **Body:** `{agent, name, folder?, enabled}`
+- **Answer:** `200 {ok: true, name, enabled}`
+- **Refusals:** 400 `bad_name`, `bad_request` (`enabled` isn't a boolean); 404 `no_server` (Codex); 409
+  `needs_approval` (Claude Code: a project's, not approved)
+- **Rules:** Claude Code: for that folder, through its own writer. Codex: the server's `enabled`, for
+  everywhere. A session already running keeps what it has.
+
+#### POST /v1/agents/mcp/reconnect
+
+- **Body:** `{agent, name, folder?}`
+- **Answer:** `200 {ok: true, server: LiveServer | null}`, its state from a fresh look; null: it isn't
+  in the answer
+- **Refusals:** 400 `bad_name`; 409 `needs_approval` (Claude Code)
+- **Rules:** Claude Code: a new process's reconnect, which doesn't reach a running session. Codex: its
+  reload on the daemon's connection, if it has one, then a fresh look.
+
+#### POST /v1/agents/mcp/approval
+
+- **Body:** `{agent, name, folder?, approved, confirmRun?}`
+- **Answer:** `200 {ok: true, name, approval: "approved" | "rejected"}`
+- **Refusals:** 400 `bad_name`, `bad_request` (`approved` isn't a boolean); 403 `confirm_run` (yes
+  without it); 404 `no_server` (not in that folder's `.mcp.json`); 409 `not_trusted` (yes, in a folder
+  not yet trusted), `file_is_link`, `file_malformed`, `file_changed`, `not_for_codex`; 500 `write_failed`
+- **Rules:** see An agent's MCP servers, "Approving".
+
+#### POST /v1/agents/mcp/reset-choices
+
+- **Body:** `{agent, folder?}`
+- **Answer:** `200 {ok: true}`
+- **Refusals:** 409 `not_for_codex`
+- **Rules:** `claude mcp reset-project-choices` in that folder: every yes and no there goes, and each
+  server asks again.
+
+#### POST /v1/agents/mcp/login
+
+- **Body:** `{agent, name, folder?}`
+- **Answer:** `200 {ok: true, done: false, login, url}`, the page to open; or
+  `200 {ok: true, done: true, words?}` when there's no sign-in to do
+- **Refusals:** 400 `bad_name`; 409 `no_terminal`; 504 `too_slow` (no page within 30 s)
+- **Rules:** see An agent's MCP servers, "Signing in".
+
+#### POST /v1/agents/mcp/login/finish
+
+- **Body:** `{agent, login, address}`
+- **Answer:** `200 {ok: true}`
+- **Refusals:** 400 `bad_address` (not http or https on `localhost`, `127.0.0.1` or `[::1]`); 404
+  `no_login`; 409 `still_waiting` (not finished after 30 s; the sign-in stays open)
+- **Rules:** see An agent's MCP servers, "Signing in".
+
+#### POST /v1/agents/mcp/login/cancel
+
+- **Body:** `{agent, login}`
+- **Answer:** `200 {ok: true}`, also for a sign-in that's already gone
+
+#### POST /v1/agents/mcp/logout
+
+- **Body:** `{agent, name, folder?}`
+- **Answer:** `200 {ok: true}`
+- **Refusals:** 400 `bad_name`
+- **Rules:** the agent's own logout: its stored sign-in goes.
+
+### Routes: agents' plugins
+
+The same token rule and the same common refusals as Routes: agents' MCP servers. Rules: see An agent's
+plugins. A POST to a route Claude Code has and Codex doesn't is 409 `not_for_codex`; to no route at all,
+404 `not_found`. A change goes out as `{t:"agent_settings", agent}`.
+
+#### GET /v1/agents/plugins
+
+- **Query:** `agent`; `folder` (Claude Code's; a project's or local install shows from its folder)
+- **Body:** none
+- **Answer:** `200 PluginList`
+
+#### GET /v1/agents/plugins/available
+
+- **Query:** `agent`; `folder` (Claude Code's); `q` (in the id and description); `marketplace`
+- **Body:** none
+- **Answer:** `200 PluginCatalogue`
+- **Rules:** searched on the server, the whole list kept 5 minutes.
+
+#### GET /v1/agents/plugins/detail
+
+- **Query:** `agent`, `plugin`; `folder` (Claude Code's)
+- **Body:** none
+- **Answer:** `200 PluginDetail`
+- **Refusals:** 400 `bad_plugin`; 404 `no_plugin` (Codex)
+
+#### POST /v1/agents/plugins/install
+
+- **Body:** `{agent, plugin, scope, folder?, confirmRun, acceptCommand?}`
+- **Answer:** `200 {ok: true, id, message?}`; or `200 {ok: false, needsAccept: {command, sha256}}`: send
+  it again with `acceptCommand`, that hash (Claude Code)
+- **Refusals:** 400 `bad_plugin` (Codex also without `@marketplace`), `bad_scope` (Claude Code),
+  `bad_accept` (Claude Code); 403 `confirm_run`
+- **Rules:** see An agent's plugins, "What needs the claim".
+
+#### POST /v1/agents/plugins/update
+
+- **Body:** `{agent, plugin, scope?, folder?, acceptCommand?, confirmRun?}`. `scope` is `user` if it's
+  not there. `confirmRun` is only needed with `acceptCommand`.
+- **Answer:** `200 {ok: true, id, message?, newVersion?}`, or `needsAccept` as for install
+- **Refusals:** 400 `bad_plugin`, `bad_scope`, `bad_accept`; 403 `confirm_run`; 409 `not_for_codex`
+
+#### POST /v1/agents/plugins/uninstall
+
+- **Body:** `{agent, plugin, scope, folder?, keepData?}`. Codex looks at `plugin` alone.
+- **Answer:** `200 {ok: true, id, message?}`
+- **Refusals:** 400 `bad_plugin`, `bad_scope` (Claude Code)
+
+#### POST /v1/agents/plugins/toggle
+
+- **Body:** `{agent, plugin, scope, folder?, enabled}`. Codex looks at `plugin` and `enabled`.
+- **Answer:** `200 {ok: true, id, enabled, message?}`
+- **Refusals:** 400 `bad_plugin`, `bad_scope` (Claude Code), `bad_request` (`enabled` isn't a boolean);
+  409 `not_for_codex` (Codex: a name with a dot in it, which its key can't hold)
+
+#### POST /v1/agents/plugins/configure
+
+- **Body:** `{agent, plugin, folder?, values: {key: value}}`
+- **Answer:** `200 {ok: true, id}`
+- **Refusals:** 400 `bad_plugin`, `bad_values` (none, a key that isn't one, or a value that isn't one
+  line of 8,192 characters at most); 409 `not_for_codex`
+- **Rules:** values go over stdin, never on a command line.
+
+#### POST /v1/agents/plugins/prune
+
+- **Body:** `{agent, scope, folder?}`
+- **Answer:** `200 {ok: true, message?}`
+- **Refusals:** 400 `bad_scope`; 409 `not_for_codex`
+
+#### POST /v1/agents/plugins/marketplaces/add
+
+- **Body:** `{agent, source, scope?, folder?, confirmRun}`. `source`: `owner/repo`, a URL or a path, never
+  reading as an option. `scope` is `user` if it's not there. Codex looks at `source` and `confirmRun`.
+- **Answer:** `200 {ok: true, name?, message?}`; Codex: `200 {ok: true}`
+- **Refusals:** 400 `bad_source`, `bad_scope` (Claude Code); 403 `confirm_run`
+
+#### POST /v1/agents/plugins/marketplaces/remove
+
+- **Body:** `{agent, name, folder?}`
+- **Answer:** `200 {ok: true, name, message?}`
+- **Refusals:** 400 `bad_marketplace`
+
+#### POST /v1/agents/plugins/marketplaces/update
+
+- **Body:** `{agent, name?, folder?}`. No `name`: all of them.
+- **Answer:** `200 {ok: true}`
+- **Refusals:** 400 `bad_marketplace`
+
+### Routes: agents' skills
+
+The same token rule and the same common refusals as Routes: agents' MCP servers. Rules: see An agent's
+skills.
+
+#### GET /v1/agents/skills
+
+- **Query:** `agent`; `folder` (Claude Code's; none: `home`)
+- **Body:** none
+- **Answer:** `200 SkillList`
+- **Rules:** Claude Code's asks a process in that folder, under the same care as the status. No answer
+  from it is an empty list.
+
+#### POST /v1/agents/skills
+
+- **Body:** `{agent, folder?, name, state}`
+- **Answer:** `200 {ok: true, name, state}`. Goes out as `{t:"agent_settings", agent}`.
+- **Refusals:** 400 `bad_skill`, `bad_state` (not one of that agent's `states`)
 
 ### Routes: files, attachments and previews
 
@@ -2993,7 +3466,9 @@ objects with a `t` field. On the WebSocket's auth, see Transport and auth.
 - **Direction:** daemon → client
 - **Shape:** `{t:"agent_settings", agent}`, with `agent` `"claude"` or `"codex"`. The values don't
   travel here.
-- **When:** a phone changed or undid one of that agent's settings (see Agent settings).
+- **When:** a phone changed or undid one of that agent's settings (see Agent settings), or called a
+  route that changes its MCP servers, plugins or skills (see An agent's MCP servers, An agent's plugins,
+  An agent's skills).
 - **Client:** reads them again. An older app ignores it.
 
 ### Messages: sessions and events
@@ -4795,6 +5270,21 @@ advance). The server flags it and logs it; asking for the owner's fingerprint is
 
 Words a client shows, and never a quote of the file or of what it sent.
 
+#### Effort per model
+
+`claude.effort`, beside the fixed list so an older app sees nothing new (docs/DECISIONS.md, "Effort per
+model"). A row for each model of Claude Code's own list and for any other the file already has a level
+for, each with the key `modelSettings.<model>.effortLevel`. `state` is as in `values`: anything but the four
+words is `unrecognised`, its value kept on the server. The whole of it is left out when the file is a link,
+read-only, malformed, not UTF-8 or unreadable, or its folder isn't there.
+
+`PUT /v1/agents/settings` takes such a key for Claude Code with `value` one of the four words, or null to
+take it out (a table left empty goes too; the file's top level stays). `expected`, the reply, the backup,
+`{t:"agent_settings"}` and Undo are as for every other key; `undo.to` of null means not set. Off that shape,
+or a model id with characters outside letters, digits, `.`, `_`, `:` and `-`, or a name every object already
+has: 403 `key_not_editable`. Another word: 403 `value_not_allowed`, and null on any other key is the same.
+Nothing here loosens anything, so no fingerprint.
+
 #### The write
 
 Only that value's bytes change: JSON and TOML alike are edited in place by position, then parsed again and
@@ -4849,6 +5339,164 @@ The Android app (`ui/home/SessionMcp.kt`): a sheet from the Home card's menu, fo
 and not from the chat's session sheet. Empty: "No MCP servers for this folder". On a 404 other than `no_session`
 it says the server needs updating. A Codex session has no such item: its binary names a trusted repository's own
 `.codex/config.toml` for a project's MCP servers, not `~/.codex/config.toml`, and this doesn't read that file.
+
+### An agent's MCP servers
+
+What a paired phone may see and change of an agent's MCP servers (`daemon/src/mcp-routes.ts`, `mcp-view.ts`,
+`mcp-edit.ts`, `mcp-probe.ts`, `mcp-client.ts`, `mcp-codex.ts`; docs/DECISIONS.md, "Managing MCP servers from
+the phone" and "Codex's MCP servers"; the risks: docs/SECURITY-MODEL.md). Routes: see Routes: agents' MCP
+servers. Types: `McpList`, `McpStatus`, `McpServerPage`, `McpTools`, `McpForm`.
+
+#### Folders
+
+A folder on the wire is an id and a base name, never its path: `home` is the home folder. It must be one the
+daemon knows: the home folder, Claude Code's projects, the daemon's projects, a session's, or a parent of one.
+Else 404 `no_folder`. Where a body or query has no folder, it's the home folder.
+
+#### What may leave
+
+Values of env vars and headers never do: their names only, and a name that looks like a secret isn't sent
+(Claude Code's are counted in `hidden`). The form says `{name, keep: true}` to leave a value as it is. Arguments, commands and URLs come through a
+mask (`•••`), by the flag before them, a secret-named `NAME=value`, a `user:pass@`, a secret-named query value, a
+`Bearer …`, or a random-looking run. It's a heuristic: a secret with no sign of being one shows. Of Claude Code's
+config file only `mcpServers` and a project's MCP keys are read, per request, and nothing is kept.
+
+#### Status and tools
+
+**The status comes from a process in that folder,** with no prompt and hooks off, which costs no tokens and
+starts each server as a session would. A process under the SDK would treat every project server as approved, so
+each one not approved is named to it as rejected and doesn't start; the reply lists those as `waiting` or
+`rejected`. It waits up to 12 s for a server still `pending`. Nothing here reaches a running session, which holds
+its own connections.
+
+**A tool's detail comes from the server itself** (`mcp-client.ts`, for stdio, Streamable HTTP and SSE): it's
+started as Claude Code would, asked for its lists, and stopped, kept a minute per version of its entry, forgotten
+at any change. Never for one that's off (`whyNot: "disabled"`) or not approved (`approval`). A scope no file holds
+is `no_direct`: its env isn't in a file this reads, so the status's names are all there is. `needs_auth`,
+`too_slow` and `failed` are how the talk went.
+
+#### The form
+
+Checked here, not only in the app. A name is at most 64 characters; a command 1,024; at most 64 arguments and 64
+pairs; a value 8,192, with no line breaks or control characters; an env var's name letters, digits and `_`, a
+header's a valid token, 128 each at most; a URL http or https, or anything holding a `${VAR}`, which is Claude
+Code's to expand; the whole entry 64 KiB. What the form doesn't speak of carries over on `PUT` of the same type: `alwaysLoad`, a helper, a timeout.
+
+**What's still masked stands for the real value.** An argument the same as one the page gave out, a command or URL
+holding a mask, each means what's on the server. A mask this server didn't give out is 400 `masked_unknown`, never
+written as three dots. `keep` with no value there is 400 `nothing_to_keep`.
+
+`oauth.clientId` or `.callbackPort` null takes it out; a port is 1 to 65535. On a stdio server `oauth` is 400
+`bad_oauth`. A client secret goes as `MCP_CLIENT_SECRET`, not on the command line. Everything else in a Claude Code
+form is on `claude mcp add-json`'s command line for a moment.
+
+`.mcp.json` as a link or unreadable, in project scope, is 409 `file_is_link`.
+
+#### What a change runs
+
+Adding or changing a stdio server, approving a project's, and an Undo that puts one back all run a program on the
+server, sooner or later. **The server can't see a fingerprint: `confirmRun` is the phone's claim of one**, as
+`confirmShell` is for an automation, and it refuses with 403 `confirm_run` without it. It asks when `command`, `args` or `env`
+would change, or when a server becomes stdio; not for an http or sse server, a remove, a toggle or a reconnect.
+
+Writes go one at a time. Claude Code's go through its own commands (`claude mcp add-json`, `remove`, `login`, `logout`,
+`reset-project-choices`) and `toggleMcpServer()`; `claude mcp get` isn't run, since it prints env values. What a failed
+command said comes back in one line, with what was sent and what looks secret taken out.
+
+**Undo** is kept as a settings backup is: the whole entry, secrets too, 0600 in a 0700 folder under `<support>`.
+It's offered in the list only while the entry is what that change left. It's per agent, one step.
+
+#### Approving
+
+Yes or no to a project's server, written to `enabledMcpjsonServers` or `disabledMcpjsonServers` in the folder's
+`.claude/settings.local.json`, where Claude Code's own dialog writes it: in place, atomically, a link refused, against
+what was read. A no anywhere wins; the user's own settings count at once; a folder's own only once the folder is trusted.
+So yes on an untrusted folder is 409 `not_trusted`: the phone doesn't accept the trust dialog, which covers much more than
+servers. It's a session there that asks. No needs neither `confirmRun` nor trust.
+
+#### Signing in
+
+`mcp login <name> --no-browser` needs a terminal to take the pasted address, so one runs on the server that nobody
+sees. `login` answers the page to open, and an id. The browser ends at a localhost address that doesn't load on a
+phone; the client sends that address to `login/finish`, and it's typed in. Only a local address goes in. A sign-in left
+open is ended at the next `login` after 10 minutes. Tokens stay with the agent. Where `node-pty` can't load: 409
+`no_terminal`.
+
+#### For Codex
+
+The same routes with `agent=codex`, from `codex mcp list --json`, filtered here since it holds values, and a short-lived
+`codex app-server` of its own: `mcpServerStatus/list` for status and tools, `config/value/write` for changes, so no secret
+goes on a command line and the file's comments stay. One scope, the user's `config.toml`: `scope` is `user`, `folder` is
+`home`, and a trusted repository's own `.codex/config.toml` isn't read or written. A plugin's server shows in the
+status, and on its page as `scope: "plugin"`, not editable.
+
+`POST .../approval` and `.../reset-choices` are 409 `not_for_codex`. `transport: "sse"` is 400 `bad_transport`. A form's
+`bearerEnv` is a variable's name, else 400 `bad_bearer`. `oauth` and `timeout` are checked and then not used, as Codex's
+table has no place for them here. Fields the form doesn't have carry over on an edit: `enabled`, the timeouts, the tool
+lists, and for the same type `env_vars`, `cwd`, `env_http_headers`, `bearer_token_env_var` and the helper. Its answer has
+no prompts. `authStatus` is passed on as Codex says it.
+
+#### The Android app
+
+`ui/settings/McpScreens.kt`, `Route.McpServers`: Agents & providers › an agent's Settings › MCP servers, then a server's
+page, then the form. A 404 `not_found` is an older server, which it says needs updating; any other 404 is about the thing
+asked for. Calls go through `Hub.agentExt`, so a refusal's words are the server's.
+
+### An agent's plugins
+
+(`daemon/src/agent-extras.ts`; docs/DECISIONS.md, "Plugins from the phone"; the risks: docs/SECURITY-MODEL.md.) Routes: see
+Routes: agents' plugins. Types: `PluginList`, `PluginCatalogue`, `PluginDetail`. Each action is the agent's own command
+(`claude plugin …`, `codex plugin …`) or Codex's app-server, one write at a time, and what leaves is named fields:
+`claude plugin list --json` carries a plugin's whole MCP setup, env included, so only its server names are kept.
+
+#### What needs the claim
+
+Installing a plugin and adding a marketplace are someone else's code on the server: 403 `confirm_run` without
+`confirmRun`, as for an MCP server. Not enable, disable, uninstall or removing a marketplace, which run nothing at that
+moment, and not update or marketplace update. A plugin's code runs from the next session on.
+
+A plugin that installs by running a command (Claude Code's): the answer is `{ok: false, needsAccept: {command, sha256}}`,
+with nothing done. The client shows the command, confirms, and sends the hash back as `acceptCommand`, 64 hex digits, else
+400 `bad_accept`. On update, `acceptCommand` also needs `confirmRun`. Only tested with a stand-in. A `needsAccept` answer
+goes out as `{t:"agent_settings"}` like any other.
+
+#### Where it runs
+
+A `user` scope runs in the home folder, anything else in `folder` (none: home), so a project's or local install shows from
+its folder. `scope` is `user`, `project` or `local`.
+
+#### Options
+
+Claude Code's: `claude plugin configure --json` to read and `--values-stdin` to write. A sensitive option is write-only: it says
+it's `set`, and `value` is never there. Text from `claude plugin details` is parsed: if its wording changes the lists come back
+empty, rather than wrong.
+
+#### For Codex
+
+One scope; it needs `plugin@marketplace` to install, else 400 `bad_plugin`; no `update`, `configure` or `prune` (409
+`not_for_codex`). On and off is the `plugins.<id>.enabled` key through its writer, so a change there can fail as the app-server
+does, not `cli_failed`. What a plugin brings comes from its own `plugin/read`, with apps too; 404 `no_plugin` when its
+marketplace isn't listed.
+
+#### The Android app
+
+`ui/settings/PluginScreens.kt`, `Route.Plugins`: Agents & providers › an agent's Settings › Plugins.
+
+### An agent's skills
+
+(`daemon/src/agent-extras.ts`; docs/DECISIONS.md, "Skills from the phone".) Routes: see Routes: agents' skills. Type: `SkillList`.
+
+**Claude Code: four states, per folder.** `on`; `name-only`, listed without its description, so it costs almost no context;
+`user-invocable-only`, hidden from Claude while `/name` still works; `off`, hidden from both. The list is Claude Code's own
+`/skills` menu, from a process in that folder (`get_skills_dialog`, marked internal in its protocol, so a later version may
+change it; a state it doesn't name reads `on`). A change goes through `claude edit-skill-overrides`, into the folder's
+`.claude/settings.local.json`. `lockedBy` is passed on as Claude Code says it; the server doesn't refuse a change because of it.
+
+**Codex: on or off, everywhere,** through `skills/list` and `skills/config/write`, into `config.toml`. `folder` isn't looked at.
+
+A skill's own file isn't shown or changed here.
+
+The Android app: `ui/settings/SkillScreens.kt`, `Route.Skills`: Agents & providers › an agent's Settings › Skills.
 
 ### Session menu
 

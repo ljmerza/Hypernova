@@ -1,4 +1,4 @@
-// Changing an agent's MCP servers from a paired phone (docs/specs/spec-mcp-manage.md; the threat and the limits:
+// Changing an agent's MCP servers from a paired phone (docs/PROTOCOL.md, "An agent's MCP servers"; the threat and the limits:
 // docs/SECURITY-MODEL.md). Everything goes through Claude Code's own commands and its own writer where it
 // has one: `claude mcp add-json`, `remove`, `login`, `logout`, `reset-project-choices`, and `toggleMcpServer()`
 // from a process (mcp-probe.ts). The one file written here is a folder's `.claude/settings.local.json`, for

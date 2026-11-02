@@ -74,7 +74,7 @@ class SettingsCallsTest {
         assertEquals(listOf("home-assistant", "github", "db-tools", "docs"), r.of(AgentSettingsReply.CLAUDE).mcp?.servers?.map { it.name })
     }
 
-    // ─── An agent's MCP servers (docs/specs/spec-mcp-manage.md) ───
+    // ─── An agent's MCP servers (docs/PROTOCOL.md, "An agent's MCP servers") ───
 
     @Test fun anAgentsMcpServersAreReadWithTheirNamesEncoded() {
         connect()

@@ -1,4 +1,4 @@
-// The phone's MCP routes (docs/specs/spec-mcp-manage.md). A paired phone only, each of them.
+// The phone's MCP routes (docs/PROTOCOL.md, "Routes: agents' MCP servers"). A paired phone only, each of them.
 
 import type { ServerResponse } from 'node:http'
 import { claudeConfigFile, isTable, own, repoRoot } from './agent-settings.ts'

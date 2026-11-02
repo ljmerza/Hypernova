@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * An agent's MCP servers on a server, to see and to manage (docs/specs/spec-mcp-manage.md). The server decides
+ * An agent's MCP servers on a server, to see and to manage (docs/PROTOCOL.md, "An agent's MCP servers"). The server decides
  * what may leave: env and header values never do, and arguments and URLs come masked. Calls go through
  * [Hub.agentExt], so the words of a refusal are the server's.
  */

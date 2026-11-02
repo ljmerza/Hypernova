@@ -3543,7 +3543,7 @@ what actually reaches the API: a real `claude -p` in a throwaway home, against a
    schema refuses it in a file and `/effort max` only lasts a session. A model that doesn't have a level may clamp it, as `/effort` would;
    the phone doesn't know each model's levels beyond Claude Code's list, which offers all five on every current model.
 3. **Same route, same care.** `PUT /v1/agents/settings` with the key `modelSettings.<model>.effortLevel`: byte-identity, the hash, the backup and Undo as
-   every other key, and `null` to take it out (`docs/specs/spec-mcp-manage.md`). No fingerprint: effort lets nothing act without asking.
+   every other key, and `null` to take it out (`docs/PROTOCOL.md`, "Effort per model"). No fingerprint: effort lets nothing act without asking.
    The model's shape is checked on the server; the words are its list.
 4. **The top-level `effortLevel` stays view-only,** now labelled for what it does: only older models read it.
 5. **Beside the fixed list, not in it**, so an older app sees nothing new: `claude.effort` in the reply.
