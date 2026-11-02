@@ -8,7 +8,7 @@ Hypernova server in between.
 
 This page takes you from nothing to a paired phone. Then: [away from home or on a
 VPS](#away-from-home-or-on-a-vps), [update](#update), [uninstall](#uninstall),
-[Codex](#codex-optional), [a Mac](#on-a-mac), [Windows](#windows-experimental),
+[Codex](#codex-optional), [the desktop client](#the-desktop-client), [a Mac](#on-a-mac), [Windows](#windows-experimental),
 [containers](#in-a-container), [troubleshooting](#troubleshooting). Every command and flag is in
 [LINUX.md](LINUX.md).
 
@@ -223,6 +223,89 @@ sessions keep running when Hypernova restarts. While it's on, `codex` in a new t
 shared terminal, like `claude`.
 
 <a id="4-windows-experimental-wsl2-or-docker-desktop"></a>
+
+## The desktop client
+
+A second client, for a computer instead of a phone, on Linux, a Mac or Windows. It's a small one so far: it pairs with a
+server, lists its sessions, and answers Allow or Deny. It carries its own Java, so there's nothing else to install, and it
+isn't the server: that's still [the install above](#install), on the machine next to your agents.
+
+Download from the [latest release](https://github.com/ljmerza/Hypernova/releases/latest), a few minutes after it's
+published, as these come after the rest:
+
+| You have | File |
+|---|---|
+| Ubuntu 24.04 or newer, Debian 13 or newer, x86_64 | `hypernova-client-<tag>-linux-amd64.deb` |
+| The same on arm64 | `hypernova-client-<tag>-linux-arm64.deb` |
+| Another Linux, x86_64 | `hypernova-client-<tag>-linux-x64.tar.gz` |
+| A Mac with Apple silicon (`uname -m` says `arm64`) | `hypernova-client-<tag>-macos-arm64.dmg` |
+| A Mac with an Intel processor (`x86_64`) | `hypernova-client-<tag>-macos-x64.dmg` |
+| Windows, x86_64 | `hypernova-client-<tag>-windows-x64.msi` |
+
+**Then pair it:** run `hypernova pair` on the server, copy the link it prints under the code, paste it into the app, and choose
+**Pair**. The computer has to be on the server's network or your VPN, as a phone does.
+
+**Where this stands.** Each release's files are installed, opened and paired with a demo server on GitHub's machines, and only
+then attached. On a Mac and on Windows that's all they've ever done: **no person has opened these on their own Mac or Windows PC**,
+so what those two show you, below, comes from Apple's and Microsoft's documents and from the old Mac app, not from seeing it.
+If you try one, an issue saying how it went helps.
+
+### The client on Linux
+
+```sh
+sudo apt install ./hypernova-client-<tag>-linux-amd64.deb
+```
+
+It's in your desktop's menu as `hypernova-client`, and it's `/opt/hypernova-client/bin/hypernova-client` from a terminal. `sudo apt remove hypernova-client` removes it.
+
+The `.deb`'s dependencies are named as Ubuntu 24.04 names them, so `apt` refuses it on Ubuntu 22.04 or Debian 12. There, or on another distribution, unpack the
+tarball and run what's in it:
+
+```sh
+tar -xzf hypernova-client-<tag>-linux-x64.tar.gz
+hypernova-client/bin/hypernova-client
+```
+
+If that stops with an error about a library, it needs your system's `libGL`, `libX11`, `fontconfig` and the small X libraries (`libXext`, `libXrender`, `libXtst`, `libXi`).
+
+With no display, it says so and stops.
+
+### The client on a Mac
+
+Open the `.dmg` and drag **Hypernova Client** to Applications. Then open it from Applications.
+
+**macOS blocks it the first time, because it isn't signed.** That's what a browser's download mark does; a file fetched with `curl` or `gh` hasn't got one.
+
+- **macOS 15 and later:** macOS says *Apple could not verify "Hypernova Client" is free of malware that may harm your Mac
+  or compromise your privacy*. Click **Done**. Open **System Settings → Privacy & Security**, scroll down
+  to **Security**, and click **Open Anyway** next to it. Give your password or Touch ID, then **Open Anyway** once more.
+- **macOS 14:** macOS says it can't be opened because it's from an unidentified developer. Click **OK**,
+  then Control‑click the app, choose **Open**, then **Open**.
+- **If it says the app is "damaged"**, or in Terminal on any version:
+  `xattr -dr com.apple.quarantine "/Applications/Hypernova Client.app"`, then open it again.
+
+Those words are from Apple's documents and what macOS showed for the old Mac app's unsigned download, not from this app. As far as we know, you may also be asked whether **Hypernova Client may find devices on your local network** the first time it reaches your server. Say **Allow**, or it can't pair. It's in **System Settings → Privacy & Security → Local Network** afterwards.
+
+To remove it, drag it from Applications to the Trash. Your pairing stays in `~/Library/Application Support/Hypernova Client`: delete that too if you're done with it.
+
+### The client on Windows
+
+Open the `.msi`. It installs in `C:\Program Files\Hypernova Client`, with an entry in the Start menu and a shortcut on the desktop.
+
+**Windows warns you, because it isn't signed.** From Microsoft's documents, not from seeing this file:
+
+1. Your browser may say the file **isn't commonly downloaded**. In Edge: **…** beside the download, then **Keep**, then **Show more**, **Keep anyway**.
+2. **Windows protected your PC** (Microsoft Defender SmartScreen), when you open it. Click **More info**, then **Run anyway**.
+3. The installer's own window, with the licence. Then **User Account Control** asks whether to allow an app from an **unknown publisher** to make changes: **Yes**. It needs that because it installs for everyone on the PC.
+
+**Smart App Control**, on Windows 11 when it's on, blocks unsigned files with no exception for one file. The only way past is to turn it off in **Windows Security → App & browser control**, and whether it can then be turned back on depends on your build of Windows: [Microsoft's questions and answers](https://support.microsoft.com/en-us/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions). If that isn't worth it, stay with the phone.
+
+
+To remove it, **Settings → Apps → Installed apps → Hypernova Client → Uninstall**. Your pairing stays in `%LOCALAPPDATA%\Hypernova Client`: delete that too if you're done with it.
+
+### Updating the client
+
+It doesn't update itself, and a server's offer of the phone's app isn't for it. Install the new file over the old one: `apt` and Windows replace it, and on a Mac drag it to Applications again and choose **Replace**. Your pairing stays. A Mac's About box shows a first number one higher than the release's, 1.23.0 for v0.23.0, because macOS takes no first number of 0.
 
 ## On a Mac
 

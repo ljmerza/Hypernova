@@ -331,6 +331,16 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | D14 | A release's assets and their names; a server reads the client's name, then the old one | releases.test.ts › "the client’s name is read first…"; `scripts/test-next-version.sh` (the notes' Client and Server headings, each file's name) | **covered** (the workflows themselves run only on GitHub; actionlint checks them) |
 | D15 | `hypernova client-logs` and `POST /v1/client-logs`: paired devices only, plain text, 6 MB, the rate limit, the server's own path, one way, the newest 5 and 30 days | client-logs.test.ts (all); fixtures rest-client-log.json, rest-client-log-too-many.json | **covered** |
 
+## 22. The desktop client's packages
+
+| # | Capability | Tests | Status |
+|---|---|---|---|
+| DP1 | The `.deb` and the tarball: install or unpack, its version and licences, a window opens, no display says so, pairing and mutual TLS in the bundled Java, the real app reaching the server, removal | `scripts/test-client-package.sh --deb`, `--tarball` (run on Ubuntu 24.04 and Debian 13 containers, amd64, 2026-11-02; on CI on amd64 and, for the `.deb`, arm64) | **partial**: the screenshots need a look; arm64 and CI's own steps not yet run; a real desktop's menu entry never |
+| DP2 | The `.dmg`: copied to Applications, bundle version, opens, pairs in its Java, reaches the server, removed; both processors | `scripts/test-client-package.sh --dmg`, on CI | **gap until the first CI run**: written, never run. Gatekeeper never, on any run |
+| DP3 | The `.msi`: installs, the fixed UpgradeCode, the Start menu's entry opens it, pairs in its Java, reaches the server, a newer one replaces it, uninstalled | `scripts/test-client-package.sh --msi`, on CI | **gap until the first CI run**: written, never run. SmartScreen never, on any run |
+| DP4 | The notes' Client heading and the "Not built" lines; `SHA256SUMS` after both package workflows | `scripts/test-next-version.sh` (notes, "not built"); the `checksums` job | **partial**: the script is tested; the job, by its first release |
+| DP5 | A desktop file on a release isn't taken for the phone's APK or the server's package | releases.test.ts › "the desktop client’s files on a release…"; `get.sh` looks for `hypernova-server-` | **covered** |
+
 ## Protocol without a contract fixture
 
 The daemon already tests most of these in its own suites. What is missing is the shared golden file
