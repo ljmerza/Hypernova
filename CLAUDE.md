@@ -19,7 +19,7 @@ in the Hyper* family's "digital cosmos" look.
 
 Layout: `android/` (Gradle, Kotlin, Compose), `daemon/` (TypeScript on Node 22.18 or newer,
 run directly without a build step; `daemon/src/cli/` is the `hypernova` command), `scripts/`
-(the Linux install, `pack-linux.sh`, the Docker entrypoint, end-to-end checks),
+(the Linux and Mac installs, the `pack-*.sh` packagers, the Docker entrypoint, end-to-end checks),
 `skills/hyper-cosmos/` (the design language as a Claude Code skill, for reuse in other apps).
 `docs/PROTOCOL.md` is the contract between them.
 
@@ -59,9 +59,12 @@ the branch `archive/chatgpt-codex-2026-10-19`: reference only, never merge it.
 
 Releases: `.github/workflows/android-release.yml` builds the signed APK and the Linux server package
 (`scripts/pack-linux.sh`) on each push to `main` that touches the app, the daemon or the install
-scripts (docs/RELEASING.md). There is no Mac app, website or name service in this repository; the
-daemon keeps the `/v1/mac/*` route names and its Mac-only features (battery, Stay awake), which
-answer as unavailable on Linux (docs/PROTOCOL.md, "Mac-only features").
+scripts, then `server-packages.yml` adds the `.deb`s and the Mac's packages (docs/RELEASING.md). Names
+say server or client (docs/RELEASING.md, "Names"). There is no Mac app, website or name service in this
+repository, but the server installs on a Mac (`scripts/install-macos.sh`, `daemon/src/cli/launchd.ts`;
+docs/INSTALL.md, "On a Mac"), though only CI's Mac runners have run it. The daemon keeps the `/v1/mac/*`
+route names and its Mac-only features (battery, Stay awake), which answer as unavailable on Linux
+(docs/PROTOCOL.md, "Mac-only features").
 
 Commits: conventional commits, because the release's version and notes are counted from them
 (`scripts/next-version.sh`, docs/RELEASING.md, "Versions"). `type(scope): subject`, the scope

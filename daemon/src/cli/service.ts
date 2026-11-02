@@ -1,4 +1,4 @@
-// The daemon as a systemd user service on Linux, the counterpart of the Mac's LaunchAgent: started
+// The daemon as a systemd user service on Linux, the counterpart of the Mac's LaunchAgent (launchd.ts): started
 // at boot without anyone logged in (lingering), restarted when it fails, and stopped on its own when
 // asked, leaving the shared terminals' holders (the owner's Claude sessions) running, as launchd
 // does. Plus the `hypernova` launcher in ~/.local/bin. The texts are pure functions; the commands
@@ -55,7 +55,7 @@ export function launcherText(cli: Pick<Cli, 'daemonDir' | 'env'>, node: string):
 ${env ? env + '\n' : ''}N=${q(node)}
 C=${q(join(cli.daemonDir, 'src', 'cli', 'hypernova.ts'))}
 if [ ! -x "$N" ] || [ ! -f "$C" ]; then
-  echo "hypernova: its files are gone. Install it again with scripts/install-linux.sh." >&2
+  echo "hypernova: its files are gone. Install it again: curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash" >&2
   exit 1
 fi
 exec "$N" --disable-warning=ExperimentalWarning "$C" "$@"

@@ -401,7 +401,7 @@ test('not managed: a checkout\'s install (hnctl update), one from before the mar
   assert.match(why(install({ marker: { source: 'package' }, env: { HYPERNOVA_CONTAINER: '0' } })), /systemd service/)
   assert.match(why(install({ marker: { source: 'package' }, unit: 'ExecStart=/other/main.ts' })), /hypernova setup/)
   assert.match(why(install({ marker: { source: 'package' }, systemdRun: false })), /systemd-run/)
-  assert.match(why(install({ marker: { source: 'package' }, platform: 'darwin' })), /Linux only/)
+  assert.match(why(install({ marker: { source: 'package' }, platform: 'darwin' })), /A Mac doesn’t update itself yet.*get\.sh \| bash/)
 })
 
 test('setup marks where an install comes from: a git checkout or a package', () => {

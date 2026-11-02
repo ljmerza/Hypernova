@@ -6,7 +6,7 @@ import { userInfo } from 'node:os'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { CLAUDE_DIR, HOME, LOCAL_PORT, SUPPORT, claudeCached, log, readJson, safeEqual, writeJson, writeText, trimText } from './util.ts'
 import { HN_BIN, watchHandedBack } from './terms.ts'
-import { ON_MAC, PLATFORM, shellRc } from './platform.ts'
+import { MAC_PATH_LINE, ON_MAC, PLATFORM, shellRc } from './platform.ts'
 
 /** Read settings.json, refusing to continue if it exists but isn't valid JSON (we'd wipe it). */
 function readSettings(): any {
@@ -406,7 +406,7 @@ function shellBlock(sep: number, created: boolean): string {
 `
     : ''
   return `${SH_BEGIN} (lets your phone see and type into claude sessions; safe to delete) hn:sep=${sep}${created ? ',new' : ''}
-function claude {
+${ON_MAC ? `${MAC_PATH_LINE}\n` : ''}function claude {
   if [[ -t 0 && -t 1 && -z "$HYPERNOVA_TERM" && -z "$HYPERNOVA_OFF" && -x ${zq(HN_BIN)} ]]; then
     HYPERNOVA_CLAUDE="${which}" ${zq(HN_BIN)} run "$@"
     local rc=$?

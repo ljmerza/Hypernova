@@ -29,7 +29,7 @@ through a cloud service of ours, the phone talks straight to your server.
 
 ## Install
 
-On the server (Ubuntu or Debian, x86_64 or arm64), as the user who'll run the agents, not root.
+**The server**, on Ubuntu or Debian (x86_64 or arm64), as the user who'll run the agents, not root.
 
 ```bash
 curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
@@ -43,12 +43,18 @@ claude
 hypernova pair
 ```
 
-Install the app from the [latest release](https://github.com/ljmerza/Hypernova/releases/latest)
-(`hypernova-<tag>.apk`, Android 10 or later) and scan the QR code `hypernova pair` shows.
+**The client**: install the Android app from the
+[latest release](https://github.com/ljmerza/Hypernova/releases/latest)
+(`hypernova-client-<tag>-android.apk`, Android 10 or later) and scan the QR code `hypernova pair` shows.
 `hypernova doctor` checks every piece if something doesn't work.
 
 The server updates itself to new releases (`hypernova auto-update off` turns that off), and the same
-`curl` line updates it by hand. Docker and the manual steps are in [`docs/LINUX.md`](docs/LINUX.md).
+`curl` line updates it by hand. Each release also has the server as a `.deb`
+(`hypernova-server-<tag>-linux-amd64.deb`, then `hypernova-server-setup`). Docker and the manual steps
+are in [`docs/LINUX.md`](docs/LINUX.md).
+
+The same `curl` line installs the server on a Mac, which hasn't been tried on a real one yet and doesn't
+update itself: [`docs/INSTALL.md`, "On a Mac"](docs/INSTALL.md#on-a-mac-untested-on-a-real-one).
 
 ## What you can do from the phone
 

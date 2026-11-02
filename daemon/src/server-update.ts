@@ -3,7 +3,7 @@
 // (releases.ts) hands each release it reads here, after the APK's part, so the phones already have
 // the new app on offer. When the release is newer than this daemon's VERSION:
 //
-//   1. only on an install the installer manages ([installKind]: a Linux install in <support>/app,
+//   1. only on an install the installer manages ([installKind]: a Linux install, never a Mac's yet, in <support>/app,
 //      put there from a release's package, run by its systemd user service), never a checkout, a
 //      test copy or a container;
 //   2. the release's server package (`hypernova-server-<tag>-linux.tar.gz`) is downloaded and its
@@ -41,6 +41,9 @@ const BACKOFF = [3600_000, 6 * 3600_000, 24 * 3600_000]
 const PENDING_FOR = 3600_000
 /** The transient unit's name: one at a time (systemd refuses a second while one runs). */
 export const UPDATE_UNIT = 'hypernova-update'
+
+/** The one-line install, which is also how to update by hand. */
+const GET_SH = 'curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash'
 
 export type Managed = { ok: true } | { ok: false; reason: string }
 /** What the install needs: the unpacked package and where to write how it went. */
@@ -132,7 +135,9 @@ export function installKind(f: InstallFacts): Managed {
   const read = f.read ?? ((p: string) => readFileSync(p, 'utf8'))
   const real = f.real ?? ((p: string) => { try { return realpathSync(p) } catch { return resolve(p) } })
   const which = f.which ?? ((n: string) => ['/usr/bin', '/bin', '/usr/local/bin'].some((d) => existsSync(join(d, n))))
-  if (f.platform !== 'linux') return { ok: false, reason: 'Servers update themselves on Linux only.' }
+  // A Mac doesn't, on purpose (owner, 2026-11-01): the update has never run on one, and a broken
+  // update on a machine nobody can reach is worse than none. docs/DECISIONS.md, "The server on a Mac".
+  if (f.platform !== 'linux') return { ok: false, reason: `A Mac doesn’t update itself yet: nobody has tried that on a real Mac. Update it by hand: ${GET_SH}` }
   if (inContainer(f.env, exists)) return { ok: false, reason: 'This server runs in a container: build its image again to update it (docs/LINUX.md, "Updating the container").' }
   const installed = join(f.appDir, 'daemon')
   if (real(f.self) !== real(installed)) return { ok: false, reason: 'This daemon doesn’t run from its installed copy (a checkout or a test copy): update it the way it was started.' }

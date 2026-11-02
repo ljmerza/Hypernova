@@ -1,0 +1,206 @@
+name: server-packages
+# The server's installable packages: the .deb for each Linux processor and the Mac's tarball and .pkg
+# for each of its processors, each tested on a runner of its own before it's attached. Two ways in:
+#
+#   - android-release.yml calls this after it has published a release (attach: true), so a package
+#     that fails here can't stop that release, and costs only its own file. It's also why the release
+#     doesn't wait for the Mac runners.
+#   - a pull request that touches these files, or a manual run: everything is built and tested and
+#     kept as the run's artifacts. Nothing is published. This is how to try a change on a real Mac.
+#
+# There's no Mac here to run this on: scripts/test-macos-smoke.sh, on these runners, is the only real
+# Mac test there is (docs/RELEASING.md, "The Mac packages"). No secrets: the .pkg is unsigned.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release to attach to (vX.Y.Z)
+        type: string
+        required: true
+      attach:
+        description: Attach the packages to that release
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - 'scripts/get.sh'
+      - 'scripts/install-linux.sh'
+      - 'scripts/install-macos.sh'
+      - 'scripts/pack-linux.sh'
+      - 'scripts/pack-deb.sh'
+      - 'scripts/pack-macos.sh'
+      - 'scripts/server-setup.sh'
+      - 'scripts/test-install-macos.sh'
+      - 'scripts/test-macos-smoke.sh'
+      - 'scripts/test-server-deb.sh'
+      - 'daemon/src/cli/**'
+      - '.github/workflows/server-packages.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  # A .deb holds no native code, but each one is built and tested on its own processor: each user's
+  # install builds node-pty there, and that is what can differ.
+  deb:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Version
+        env:
+          TAG_IN: ${{ inputs.tag }}
+        run: |
+          # Without a release to attach to, the version in the repository.
+          tag="${TAG_IN:-v$(node -p "require('./daemon/package.json').version")}"
+          (cd daemon && npm pkg set version="${tag#v}")
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+      - name: Build
+        run: |
+          deb=$(scripts/pack-deb.sh "${{ matrix.arch }}" | tail -n 1)
+          test -s "$deb"
+          echo "DEB=$deb" >> "$GITHUB_ENV"
+      # Boots systemd in a container for each system: install, a user's setup, upgrade, remove, purge.
+      - name: Test on Ubuntu and Debian
+        run: scripts/test-server-deb.sh --deb "$DEB" ubuntu:24.04 debian:12
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hypernova-server-linux-${{ matrix.arch }}-deb
+          path: dist/deb/hypernova-server_*.deb
+      - name: Attach to the release
+        if: ${{ inputs.attach }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          named="dist/hypernova-server-$TAG-linux-${{ matrix.arch }}.deb"
+          cp "$DEB" "$named"
+          gh release upload "$TAG" "$named" --clobber
+
+  # The two processors' tarballs differ in name only; each is named for the runner that tested it.
+  # The tarball is attached before the .pkg is built: a .pkg that fails costs only itself.
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+          - arch: x64
+            runner: macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Version
+        env:
+          TAG_IN: ${{ inputs.tag }}
+        run: |
+          tag="${TAG_IN:-v$(node -p "require('./daemon/package.json').version")}"
+          (cd daemon && npm pkg set version="${tag#v}")
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+      - name: The scripts, under this Mac's own bash, with stand-ins
+        run: /bin/bash scripts/test-install-macos.sh
+      - name: Build the tarball
+        run: |
+          tgz=$(scripts/pack-macos.sh "${{ matrix.arch }}" | tail -n 1)
+          test -s "$tgz"
+          echo "TGZ=$tgz" >> "$GITHUB_ENV"
+      # The real thing: the LaunchAgent, status, doctor, the API, restarts, uninstall.
+      - name: Smoke test, from the tarball
+        run: /bin/bash scripts/test-macos-smoke.sh --tarball "$TGZ"
+      - name: Attach the tarball to the release
+        if: ${{ inputs.attach }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          named="dist/hypernova-server-$TAG-macos-${{ matrix.arch }}.tar.gz"
+          cp "$TGZ" "$named"
+          gh release upload "$TAG" "$named" --clobber
+      - name: Build the .pkg
+        run: |
+          pkg=$(scripts/pack-macos.sh "${{ matrix.arch }}" --pkg | tail -n 1)
+          test -s "$pkg"
+          echo "PKG=$pkg" >> "$GITHUB_ENV"
+      - name: Smoke test, from the .pkg
+        run: /bin/bash scripts/test-macos-smoke.sh --pkg "$PKG"
+      - name: Attach the .pkg to the release
+        if: ${{ inputs.attach }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          named="dist/hypernova-server-$TAG-macos-${{ matrix.arch }}.pkg"
+          cp "$PKG" "$named"
+          gh release upload "$TAG" "$named" --clobber
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: hypernova-server-macos-${{ matrix.arch }}
+          if-no-files-found: ignore
+          path: |
+            dist/macos/hypernova-server-*
+
+  # The daemon's whole suite on a Mac, to read: its tests are written on Linux and some may assume
+  # it, so a failure here says something to look at and holds nothing back.
+  macos-unit:
+    runs-on: macos-latest
+    timeout-minutes: 25
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: daemon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: daemon/package-lock.json
+      - run: npm ci
+      - run: npx tsc -p .
+      - run: npm test
+
+  # SHA256SUMS of what the release really carries, whatever got built, and a line in its notes for
+  # anything that didn't. Runs when a package job failed too: that's when the line matters.
+  checksums:
+    needs: [deb, macos]
+    if: ${{ always() && inputs.attach }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: SHA256SUMS
+        run: |
+          mkdir sums
+          gh release download "$TAG" --dir sums --pattern '*'
+          rm -f sums/SHA256SUMS
+          (cd sums && sha256sum -- * > SHA256SUMS)
+          cat sums/SHA256SUMS
+          gh release upload "$TAG" sums/SHA256SUMS --clobber
+      - name: Say what's missing
+        run: |
+          missing=""
+          for f in "hypernova-server-$TAG-linux-amd64.deb" "hypernova-server-$TAG-linux-arm64.deb" \
+                   "hypernova-server-$TAG-macos-arm64.tar.gz" "hypernova-server-$TAG-macos-arm64.pkg" \
+                   "hypernova-server-$TAG-macos-x64.tar.gz" "hypernova-server-$TAG-macos-x64.pkg"; do
+            [ -e "sums/$f" ] || missing="$missing \`$f\`"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::This release lacks:$missing"
+            { gh release view "$TAG" --json body --jq .body; printf '\n\n**Not built for this release:**%s\n' "$missing"; } | gh release edit "$TAG" --notes-file -
+          fi

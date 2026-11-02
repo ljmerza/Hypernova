@@ -111,10 +111,18 @@ want='## Features
 - Faster, breaking'
 count() { grep -c -F -- "$1" || true; }
 check "notes: grouped and stripped" "$want" sed -n '/^## Install/q;p' <<<"$notes"
-check "notes: the APK's name" 1 count 'hypernova-v3.4.0.apk' <<<"$notes"
-check "notes: the server's name" 2 count 'hypernova-server-v3.4.0-linux.tar.gz' <<<"$notes"
+check "notes: the client's name" 1 count 'hypernova-client-v3.4.0-android.apk' <<<"$notes"
+check "notes: the old names, once each, for older servers" 2 count 'only there for older servers' <<<"$(sed -n 's/`hypernova-v3.4.0.apk`.*`hypernova-v3.4.0.json`.*only there for older servers.*/only there for older servers\nonly there for older servers/p' <<<"$notes")"
+check "notes: a Client heading" 1 count '### Client' <<<"$notes"
+check "notes: a Server heading" 1 count '### Server' <<<"$notes"
+for f in linux-amd64.deb linux-arm64.deb macos-arm64.tar.gz macos-x64.tar.gz macos-arm64.pkg macos-x64.pkg; do
+  check "notes: the server's $f" 1 count "\`hypernova-server-v3.4.0-$f\`" <<<"$notes"
+done
+check "notes: the checksums" 1 count 'SHA256SUMS' <<<"$notes"
+check "notes: the server's name" 3 count 'hypernova-server-v3.4.0-linux.tar.gz' <<<"$notes"
 check "notes: the short install line" 2 count 'curl -fsSL https://ljmerza.github.io/Hypernova/get.sh |' <<<"$notes"
 check "notes: no server" 0 count 'hypernova-server' <<<"$("$NOTES" v3.4.0 v3.3.0 HEAD --no-server)"
+check "notes: no server, the client still" 1 count 'hypernova-client-v3.4.0-android.apk' <<<"$("$NOTES" v3.4.0 v3.3.0 HEAD --no-server)"
 notes=$("$NOTES" v3.4.1 HEAD HEAD)
 check "notes: nothing new" "- No app or server changes; rebuilt from $(git rev-parse --short=7 HEAD)." sed -n 3p <<<"$notes"
 

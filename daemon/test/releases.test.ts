@@ -46,11 +46,11 @@ addDevice({ id: 'device', name: 'Pixel', model: 'Pixel 9', createdAt: Date.now()
 const DIR = join(process.env.HYPERNOVA_SUPPORT, 'android')
 
 // ── The fake GitHub ──────────────────────────────────────────────────────
-type Release = { tag: string; note: unknown; apk: Buffer; noAssets?: boolean }
+type Release = { tag: string; note: unknown; apk: Buffer; noAssets?: boolean; names?: 'old' | 'client' | 'both' }
 let release: Release | null = null
 /** An answer to the latest-release call instead of the release (a rate limit, an outage). */
 let latestAnswer: { status: number; headers?: Record<string, string> } | null = null
-let hits = { latest: 0, conditional: 0, note: 0, apk: 0 }
+let hits = { latest: 0, conditional: 0, note: 0, apk: 0, apkClient: 0 }
 let gh: import('node:http').Server
 let GH = ''
 const etagOf = (r: Release) => `"${r.tag}-${createHash('sha256').update(JSON.stringify(r.note)).digest('hex').slice(0, 8)}"`
@@ -74,7 +74,8 @@ function fake(req: IncomingMessage, res: ServerResponse): void {
     }
     const t = release.tag
     const assets = release.noAssets ? [] : [
-      { name: `hypernova-${t}.apk`, size: release.apk.length, browser_download_url: `${GH}/dl/apk` },
+      ...(release.names === 'client' || release.names === 'both' ? [{ name: `hypernova-client-${t}-android.apk`, size: release.apk.length, browser_download_url: `${GH}/dl/apk-client` }] : []),
+      ...(release.names !== 'client' ? [{ name: `hypernova-${t}.apk`, size: release.apk.length, browser_download_url: `${GH}/dl/apk` }] : []),
       { name: `hypernova-server-${t}-linux.tar.gz`, size: 3, browser_download_url: `${GH}/dl/tgz` },
       { name: `hypernova-${t}.json`, size: 120, browser_download_url: `${GH}/dl/note` },
     ]
@@ -90,6 +91,11 @@ function fake(req: IncomingMessage, res: ServerResponse): void {
     hits.note++
     res.writeHead(200, { 'content-type': 'application/octet-stream' })
     return void res.end(typeof release.note === 'string' ? release.note : JSON.stringify(release.note))
+  }
+  if (path === '/dl/apk-client' && release) {
+    hits.apkClient++
+    res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': String(release.apk.length) })
+    return void res.end(release.apk)
   }
   if (path === '/dl/apk' && release) {
     hits.apk++
@@ -134,7 +140,7 @@ beforeEach(() => {
   rmSync(DIR, { recursive: true, force: true })
   release = null
   latestAnswer = null
-  hits = { latest: 0, conditional: 0, note: 0, apk: 0 }
+  hits = { latest: 0, conditional: 0, note: 0, apk: 0, apkClient: 0 }
   published = 0
 })
 
@@ -151,6 +157,29 @@ test('a newer release: its APK is fetched, checked and offered, the note last', 
   assert.equal(note.tag, 'v0.6.0')
   assert.equal(published, 1)
   assert.deepEqual(leftovers(), [])
+})
+
+test('the client’s name is read first, the old name only when there’s no other, and one file is fetched', async () => {
+  const apk = Buffer.from('the v0.7.0 apk')
+  // Both names, as a release from 2026-11-01 on has them: the client's, once.
+  publishRelease('v0.7.0', 300, apk)
+  release!.names = 'both'
+  assert.equal((await checker().check()).kind, 'published')
+  assert.deepEqual(offeredApk(), apk)
+  assert.deepEqual([hits.apkClient, hits.apk], [1, 0])
+  // Only the client's name.
+  rmSync(DIR, { recursive: true, force: true })
+  hits = { ...hits, apkClient: 0, apk: 0 }
+  publishRelease('v0.7.1', 301, apk)
+  release!.names = 'client'
+  assert.equal((await checker().check()).kind, 'published')
+  assert.deepEqual([hits.apkClient, hits.apk], [1, 0])
+  // Only the old name: a release from before the rename still reaches a server.
+  rmSync(DIR, { recursive: true, force: true })
+  hits = { ...hits, apkClient: 0, apk: 0 }
+  publishRelease('v0.7.2', 302, apk)
+  assert.equal((await checker().check()).kind, 'published')
+  assert.deepEqual([hits.apkClient, hits.apk], [0, 1])
 })
 
 test('with no APK on the server yet, the release is the one offered', async () => {

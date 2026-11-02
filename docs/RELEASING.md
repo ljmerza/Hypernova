@@ -1,25 +1,91 @@
 # Releasing
 
-How a release of Hypernova is made: the Android APK, the Linux server package, and the GitHub
-release that carries them. Each section says what to build, how to check it, and what must never
-leak.
+How a release of Hypernova is made: the client (the Android APK), the server's packages, and the
+GitHub release that carries them. Each section says what to build, how to check it, and what must
+never leak.
+
+## Names
+
+Every download says whether it's the server or the client (owner, 2026-11-01):
+
+| | File | Status |
+|---|---|---|
+| Client | `hypernova-client-vX.Y.Z-android.apk` | built |
+| Client | `hypernova-client-vX.Y.Z-linux-amd64.deb`, `…-macos-arm64.dmg`, `…-windows-x64.msi` | **reserved** for the desktop client, not built yet |
+| Server | `hypernova-server-vX.Y.Z-linux.tar.gz` | built; the name servers update themselves from, and `get.sh`'s |
+| Server | `hypernova-server-vX.Y.Z-linux-amd64.deb`, `…-linux-arm64.deb` | built; the Debian package is called `hypernova-server` |
+| Server | `hypernova-server-vX.Y.Z-macos-arm64.tar.gz`, `…-macos-x64.tar.gz`, `…-macos-arm64.pkg`, `…-macos-x64.pkg` | built |
+| Both | `SHA256SUMS` | every file above that this release has |
+| Old names | `hypernova-vX.Y.Z.apk`, `hypernova-vX.Y.Z.json` | **never rename or drop.** Servers already running look for exactly these, and for `hypernova-server-vX.Y.Z-linux.tar.gz` |
+
+The `hypernova` command on a server keeps its name: it's used
+everywhere, and renaming it would break every install. The note keeps its name too: it describes the client and
+the server's package together.
 
 ## Releases
 
 `.github/workflows/android-release.yml` cuts every release: each push to `main` that touches
-`android/`, `daemon/`, `scripts/pack-linux.sh` or `scripts/install-linux.sh` (or a manual run)
-publishes the next version, `vX.Y.Z` (below), with three files:
+`android/`, `daemon/`, or the scripts that pack and install the server (or a manual run)
+publishes the next version, `vX.Y.Z` (below), with four files:
 
 | File | What |
 |---|---|
-| `hypernova-vX.Y.Z.apk` | the Android app, signed with the release key (repo secrets), `:app:distRelease` |
+| `hypernova-client-vX.Y.Z-android.apk` | the client, the Android app, signed with the release key (repo secrets), `:app:distRelease` |
+| `hypernova-vX.Y.Z.apk` | the same file, for servers that only know this name. A server reads the client's name first, this one if a release has no other, and fetches one (`daemon/src/releases.ts`) |
 | `hypernova-vX.Y.Z.json` | the version note, `{"versionCode": N, "versionName": "X.Y.Z", "sha256": "<the APK's SHA-256, hex>", "serverSha256": "<the server package's SHA-256, hex>"}`: `dist/hypernova.json` with the checksums added (`jq`, checked before it's attached; `serverSha256` from 2026-10-31, for servers that update themselves, docs/PROTOCOL.md, "The server's own update", which install nothing from a note without it). Servers read it to know the release's versionCode without downloading the APK, fetch the APK only when it's newer than the one they hand out, and offer it only when its SHA-256 matches (docs/PROTOCOL.md, "Where the offered APK comes from"). A release without it (from before 2026-10-31) is never offered by a server |
 | `hypernova-server-vX.Y.Z-linux.tar.gz` | the Linux server package, `scripts/pack-linux.sh` renamed: the daemon's sources and lockfile, the font, the install script, `LINUX.md` as its README. No `node_modules` and no Node, so one package serves x86_64 and arm64 (the install fetches Node.js for the server and builds node-pty there) |
 
 One job builds both, so one push makes one release and every release has both, even when only the
-daemon changed. A release published by hand keeps the tag it was given, and gets all three
-attached under that tag's name (the note last, after the APK). Installing the server package: [INSTALL.md](INSTALL.md), "On a Linux
-server"; in one line, `curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash`.
+daemon changed. A release published by hand keeps the tag it was given, and gets them all
+attached under that tag's name (the note last, after the APK). Installing the server package: [INSTALL.md](INSTALL.md), "Install";
+in one line, `curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash`.
+
+### The server's other packages
+
+That job's release is then added to by `.github/workflows/server-packages.yml`, called with `needs: apk`:
+
+| Job | Runner | Attaches, once its tests pass |
+|---|---|---|
+| `deb` (matrix) | `ubuntu-24.04`, `ubuntu-24.04-arm` | `hypernova-server-vX.Y.Z-linux-<arch>.deb`, after `scripts/test-server-deb.sh` on Ubuntu 24.04 and Debian 12 |
+| `macos` (matrix) | `macos-latest` (arm64), `macos-26-intel` (x64) | `hypernova-server-vX.Y.Z-macos-<arch>.tar.gz`, then `.pkg`, each after `scripts/test-macos-smoke.sh` |
+| `macos-unit` | `macos-latest` | nothing: the daemon's whole suite on a Mac, to read (`continue-on-error`) |
+| `checksums` | `ubuntu-latest` | `SHA256SUMS`, from what the release really has, and a line in the notes for anything it lacks. Runs even when a job above failed |
+
+**A failure there can't stop a release.** The APK and the Linux tarball are published before any of it
+starts, and it only runs if they were. The queue for the release moved from the whole run to the `apk` job,
+so a Mac runner that's slow to come doesn't hold up the next release either. A job that fails costs its own
+files, turns the run red, and is said in the release's notes. The price: for some minutes after a release
+is published, the `.deb`s and Mac files aren't there yet, and `get.sh` on a Mac says to try again soon.
+
+**To try these without publishing:** a pull request that touches them runs `server-packages.yml` with
+nothing attached, and keeps the files as the run's artifacts.
+
+The note `hypernova-vX.Y.Z.json` keeps exactly its fields: a server reads `versionCode`, `versionName`,
+`sha256` and `serverSha256`. The new files' checksums are in `SHA256SUMS`, not the note.
+
+### The Mac packages
+
+**Tarball and `.pkg`, no `.dmg`.** A `.dmg` is for dragging an app to Applications; this is a background
+service set up per user, with nothing to drag. The `.pkg` does what the `.deb` does: `pkgbuild` and
+`productbuild` put the release in `/usr/local/lib/hypernova-server` and add `hypernova-server-setup`, and
+its scripts do nothing else. Its last page says what to run next. The tarball is what `get.sh` uses.
+
+**Unsigned.** What that shows a person: [INSTALL.md, "What macOS shows you"](INSTALL.md#what-macos-shows-you).
+The `curl` line isn't affected. Signing the `.pkg` would need:
+
+- a paid Apple Developer Program membership and a **Developer ID Installer** certificate;
+- secrets for the certificate as base64 `.p12` and its password, and for notarizing an App Store Connect API
+  key, or an Apple ID with an app-specific password and the team's ID;
+- in `pack-macos.sh`, `productbuild --sign "Developer ID Installer: …"`, then
+  `xcrun notarytool submit --wait` and `xcrun stapler staple` on the runner.
+
+Nothing inside needs signing of its own: the `.pkg` holds text, and Node.js and node-pty come at install time,
+each signed or not by its own publisher. Without those secrets the workflow goes on unsigned.
+
+**What's proven, and how.** Nobody here has a Mac: `scripts/test-macos-smoke.sh` on the runners is the only
+Mac test there is. It can't show what macOS asks a person at the screen (Gatekeeper, Background Items, folder
+permissions), and a runner isn't a Mac after a real reboot. Until someone runs it on a real Mac,
+[INSTALL.md](INSTALL.md) says so, and a Mac doesn't update itself (`installKind`, `daemon/src/server-update.ts`).
 
 ### Versions
 
@@ -59,8 +125,9 @@ optional, the subject in the repo's plain style (what changed, in words, no peri
 
 `scripts/release-notes.sh <tag> <previous tag> <commit>` writes them: the commits since the release
 before, grouped into **Features** (`feat`), **Fixes** (`fix`) and **Other** (the rest, and messages
-without a type), each with its `type(scope):` taken off, then how to install, with the one-line
-`get.sh` install and the files' own names.
+without a type), each with its `type(scope):` taken off, then how to install, under **Client** and
+**Server** headings, with the one-line `get.sh` install and the files' own names, and a line saying the
+old-named files are only there for older servers.
 
 ### Renaming the old releases
 
@@ -179,13 +246,21 @@ the update's integrity (`data/UpdatePolicy.kt`). Uninstall
 Hypernova once, install `hypernova.apk`, and pair again (the server keeps one device per install,
 so remove the old one: `DELETE /local/devices/{id}`).
 
-## The Linux package
+## The server's packages
 
 ```bash
-scripts/pack-linux.sh      # dist/linux/hypernova-<version>.tar.gz; its path is the last line printed
+scripts/pack-linux.sh              # dist/linux/hypernova-<version>.tar.gz; its path is the last line printed
+scripts/pack-deb.sh amd64          # dist/deb/hypernova-server_<version>_amd64.deb (or arm64)
+scripts/pack-macos.sh arm64        # dist/macos/hypernova-server-<version>-macos-arm64.tar.gz (or x64)
+scripts/pack-macos.sh arm64 --pkg  # …macos-arm64.pkg: on a Mac only
+
+scripts/test-server-deb.sh         # the .deb in Docker on Ubuntu 24.04, Debian 12 and 13: install, a user's
+                                   # setup, upgrade, remove, purge, around a running server (privileged containers)
+scripts/test-install-macos.sh --docker   # the Mac's scripts under bash 3.2, with stand-ins for macOS
+scripts/test-macos-smoke.sh --tarball …  # on a Mac runner only: the real LaunchAgent. Not on a Mac you use
 ```
 
-The licence, `NOTICE` and `THIRD-PARTY-NOTICES.md` travel inside every file: the Linux package's
+The licence, `NOTICE` and `THIRD-PARTY-NOTICES.md` travel inside every file: each server package's
 top folder and the APK's `assets/legal/` (a copy there of the root files and of `third_party/`'s
 licences: update them together when a dependency changes).
 
