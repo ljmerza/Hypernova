@@ -18,6 +18,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.getValue
@@ -44,6 +45,7 @@ import com.prudnikweb.hypernova.data.LinkState
 import kotlinx.coroutines.flow.first
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Route
+import com.prudnikweb.hypernova.data.isSettingsPage
 import com.prudnikweb.hypernova.ui.components.ConfirmDialog
 import com.prudnikweb.hypernova.ui.components.LocalHaze
 import com.prudnikweb.hypernova.ui.components.LocalTabsAsk
@@ -555,10 +557,12 @@ private fun Screens(
         val shown = if (r == Route.Home) hub else remember { hub }
         // Whether this screen has the tabs under it stays as it was while it fades out.
         val hasTabs = remember { onPages }
+        // Settings' pages end where the keyboard starts, as the window doesn't resize: a focused field
+        // scrolls clear of it. The tabs, drawn outside this, stay where they are behind it.
         CompositionLocalProvider(
             LocalTabsRoom provides if (hasTabs) tabsRoom else 0.dp,
             LocalTabsAsk provides tabsAsk,
-        ) { screens.SaveableStateProvider(key) {
+        ) { screens.SaveableStateProvider(key) { Box(if (r.isSettingsPage) Modifier.fillMaxSize().imePadding() else Modifier.fillMaxSize()) {
             when (r) {
                 Route.Home -> HomeScreen(
                     hub,
@@ -616,7 +620,7 @@ private fun Screens(
                     onOpenSession = opener.session,
                 )
             }
-        } }
+        } } }
     }
     com.prudnikweb.hypernova.ui.home.SettingsPageBar(
         visible = onPages,
