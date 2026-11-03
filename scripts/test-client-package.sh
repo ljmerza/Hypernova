@@ -225,7 +225,9 @@ $ErrorActionPreference = 'Stop'
 switch ($what) {
   'msi' {
     # /qn: no window, so what a person clicks through isn't what's tried. msiexec returns at once unless it's waited for.
+    # GetFullPath for its backslashes: given forward slashes, msiexec can't open the package (1619).
     $flag = if ($a -eq 'install') { '/i' } else { '/x' }
+    $b = [IO.Path]::GetFullPath($b)
     $p = Start-Process msiexec.exe -ArgumentList @($flag, "`"$b`"", '/qn', '/norestart') -Wait -PassThru
     exit $p.ExitCode
   }
@@ -234,6 +236,7 @@ switch ($what) {
       Where-Object { $_.DisplayName -eq $a } | ForEach-Object { $_.DisplayVersion }
   }
   'upgrade-code' {
+    $a = [IO.Path]::GetFullPath($a)
     $i = New-Object -ComObject WindowsInstaller.Installer
     $db = $i.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $i, @($a, 0))
     $view = $db.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $db, @("SELECT Value FROM Property WHERE Property='UpgradeCode'"))
