@@ -18,6 +18,7 @@ class HypernovaApp : Application() {
         com.prudnikweb.hypernova.ui.theme.AndroidUi.install(
             manrope = R.font.manrope, mono = R.font.jetbrains_mono,
             stringId = { it.id }, pluralId = { it.id }, words = { it.strings },
+            diagram = { com.prudnikweb.hypernova.ui.components.MermaidBlock(it) },
         )
         super.onCreate()
         Core.applicationStarted()

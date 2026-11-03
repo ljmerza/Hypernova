@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.ui.theme
 
 import android.content.res.Resources
+import androidx.compose.runtime.Composable
 import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Strings
@@ -21,12 +22,15 @@ object AndroidUi {
         private set
     internal var words: (Resources) -> Strings = { error("AndroidUi.install hasn't run") }
         private set
+    internal var diagram: @Composable (String) -> Unit = {}
+        private set
 
-    fun install(manrope: Int, mono: Int, stringId: (Str) -> Int, pluralId: (Plural) -> Int, words: (Resources) -> Strings) {
+    fun install(manrope: Int, mono: Int, stringId: (Str) -> Int, pluralId: (Plural) -> Int, words: (Resources) -> Strings, diagram: @Composable (String) -> Unit) {
         this.manrope = manrope
         this.mono = mono
         this.stringId = stringId
         this.pluralId = pluralId
         this.words = words
+        this.diagram = diagram
     }
 }

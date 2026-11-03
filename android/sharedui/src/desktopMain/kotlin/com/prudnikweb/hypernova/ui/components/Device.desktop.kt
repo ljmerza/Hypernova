@@ -4,6 +4,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -16,6 +19,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.HText
+import com.prudnikweb.hypernova.ui.theme.Type
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import org.jetbrains.skia.FilterBlurMode
@@ -60,4 +65,16 @@ actual fun pillFocusRing(interaction: MutableInteractionSource, shape: Shape): M
 
 internal actual fun Paint.blurredOutside(radius: Float) {
     skiaPaint.maskFilter = MaskFilter.makeBlur(FilterBlurMode.OUTER, radius / 2f)
+}
+
+actual fun Modifier.longPressCopies(key: Any, copy: () -> Unit): Modifier = this
+
+/** No web view here to draw it with (Mermaid.kt): this says it's a diagram and shows what it's made from, which can be read and copied. */
+@Composable
+internal actual fun DiagramBlock(source: String) {
+    Column {
+        HText(DeskUi.diagramNote(), style = Type.small, color = HN.inkDim)
+        Spacer(Modifier.height(6.dp))
+        CodeBlock(source)
+    }
 }

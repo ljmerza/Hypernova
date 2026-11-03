@@ -15,12 +15,13 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.theme.pluralStringResource
+import com.prudnikweb.hypernova.ui.theme.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.Glyph
@@ -45,7 +46,7 @@ internal fun ToolRunRow(run: ChatRow.Run, open: Boolean, live: Boolean, onToggle
                 .heightIn(min = 32.dp)
                 .clickable(
                     remember { MutableInteractionSource() }, indication = null, role = Role.Button,
-                    onClickLabel = stringResource(if (open) R.string.collapse else R.string.show_all), onClick = onToggle,
+                    onClickLabel = stringResource(if (open) Str.collapse else Str.show_all), onClick = onToggle,
                 )
                 .padding(vertical = 2.dp),
             verticalArrangement = Arrangement.Center,
@@ -55,7 +56,7 @@ internal fun ToolRunRow(run: ChatRow.Run, open: Boolean, live: Boolean, onToggle
                 else Icon(Glyph.Chevron, Modifier.rotate(if (open) 90f else 0f), size = 10.dp, color = HN.accentDim)
                 Spacer(Modifier.width(8.dp))
                 HText(
-                    pluralStringResource(if (live) R.plurals.run_calls_now else R.plurals.run_calls_done, run.calls, run.calls).uppercase(),
+                    pluralStringResource(if (live) Plural.run_calls_now else Plural.run_calls_done, run.calls, run.calls).uppercase(),
                     style = Type.label, color = HN.inkDim, maxLines = 1,
                 )
                 Spacer(Modifier.width(10.dp))

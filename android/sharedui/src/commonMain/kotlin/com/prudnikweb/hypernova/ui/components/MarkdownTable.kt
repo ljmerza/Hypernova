@@ -1,8 +1,6 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
@@ -38,8 +36,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.theme.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -55,7 +52,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Align
 import com.prudnikweb.hypernova.data.MarkdownTable
 import com.prudnikweb.hypernova.data.cellMarkdown
@@ -65,6 +63,7 @@ import com.prudnikweb.hypernova.data.isDivider
 import com.prudnikweb.hypernova.data.isQuantity
 import com.prudnikweb.hypernova.data.plain
 import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.wordsNow
 import com.prudnikweb.hypernova.ui.theme.LocalMotion
 import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -187,7 +186,8 @@ internal fun MdRule() {
 private fun Grid(table: MarkdownTable, color: Color, modifier: Modifier) {
     val t = rememberSteady(table)
     val cols = t.columns
-    val context = LocalContext.current
+    val res = wordsNow()
+    val copier = rememberCopier()
     val glide = remember { Glide() }
     val scope = rememberCoroutineScope()
     val smooth = !LocalMotion.current.reduced
@@ -223,8 +223,8 @@ private fun Grid(table: MarkdownTable, color: Color, modifier: Modifier) {
         }
     }
     val body = (1 until count).any { !divider[it] }
-    val said = remember(t, context) {
-        spokenRows(t) { name, value -> context.getString(R.string.table_cell, name, value) }
+    val said = remember(t, res) {
+        spokenRows(t) { name, value -> res.getString(Str.table_cell, name, value) }
     }
     // A row with nothing in it (every cell empty, or a divider) isn't a stop for TalkBack; the
     // rest are counted without it. -1: hidden.
@@ -233,11 +233,11 @@ private fun Grid(table: MarkdownTable, color: Color, modifier: Modifier) {
         IntArray(said.size) { if (said[it].isEmpty()) -1 else n++ }
     }
     val stops = stop.count { it >= 0 }
-    val copyLabel = stringResource(R.string.copy_table)
-    val copy = remember(t.source, copyLabel, context) {
+    val copyLabel = stringResource(Str.copy_table)
+    val copy = remember(t.source, copyLabel, copier) {
         listOf(
             CustomAccessibilityAction(copyLabel) {
-                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(copyLabel, t.source))
+                copier.copy(copyLabel, t.source)
                 true
             },
         )

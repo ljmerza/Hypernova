@@ -48,3 +48,10 @@ expect fun pillFocusRing(interaction: MutableInteractionSource, shape: Shape): M
 
 /** The glow round a filled capsule: its own shape, blurred, outside it. */
 internal expect fun Paint.blurredOutside(radius: Float)
+
+/** A code block's long press that copies it whole. A desktop's mouse is for selecting: there a held press is the start of a selection. */
+expect fun Modifier.longPressCopies(key: Any, copy: () -> Unit): Modifier
+
+/** A closed ```mermaid block: the phone draws the diagram. */
+@Composable
+internal expect fun DiagramBlock(source: String)

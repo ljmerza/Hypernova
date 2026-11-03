@@ -1,7 +1,5 @@
 package com.prudnikweb.hypernova.ui.session
 
-import android.content.res.Resources
-import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -33,20 +31,20 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.ChatTimes
 import com.prudnikweb.hypernova.data.Finished
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.wordsNow
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.LocalMotion
 import com.prudnikweb.hypernova.ui.theme.Motion
@@ -100,7 +98,7 @@ internal class ChatClock(private val locale: Locale, is24: Boolean, private val 
 
     /** The phone's own pattern, a plain space before AM; [noComma]: none after the weekday ("Mon Nov 2"). */
     private fun format(skeleton: String, noComma: Boolean = false) = SimpleDateFormat(
-        DateFormat.getBestDateTimePattern(locale, skeleton).let { if (noComma) it.replaceFirst(",", "") else it }.replace(NARROW_SPACE, ' '),
+        bestDatePattern(locale, skeleton).let { if (noComma) it.replaceFirst(",", "") else it }.replace(NARROW_SPACE, ' '),
         locale,
     ).apply { timeZone = TimeZone.getTimeZone(zone) }
 
@@ -108,45 +106,45 @@ internal class ChatClock(private val locale: Locale, is24: Boolean, private val 
     private fun sameYear(at: Long, now: Long) = date(at).year == date(now).year
 
     /** The floating label: "Today · 9:14 PM", "Yesterday · 9:14 PM", "Mon Nov 2 · 9:14 PM", "Mon Nov 2, 2025 · 9:14 PM". */
-    fun scrolled(res: Resources, at: Long, now: Long): String {
+    fun scrolled(res: com.prudnikweb.hypernova.data.Strings, at: Long, now: Long): String {
         val days = ChronoUnit.DAYS.between(date(at), date(now))
         val on = when {
-            days == 0L -> res.getString(R.string.chat_time_today)
-            days == 1L -> res.getString(R.string.chat_time_yesterday)
+            days == 0L -> res.getString(Str.chat_time_today)
+            days == 1L -> res.getString(Str.chat_time_yesterday)
             sameYear(at, now) -> day.format(Date(at))
             else -> dayYear.format(Date(at))
         }
-        return res.getString(R.string.chat_time_at, on, time.format(Date(at)))
+        return res.getString(Str.chat_time_at, on, time.format(Date(at)))
     }
 
     /** The message menu's line: always the date itself, to the second. */
-    fun exact(res: Resources, at: Long, now: Long): String =
-        res.getString(R.string.chat_time_at, (if (sameYear(at, now)) day else dayYear).format(Date(at)), exactTime.format(Date(at)))
+    fun exact(res: com.prudnikweb.hypernova.data.Strings, at: Long, now: Long): String =
+        res.getString(Str.chat_time_at, (if (sameYear(at, now)) day else dayYear).format(Date(at)), exactTime.format(Date(at)))
 
     /** The same for TalkBack: "Monday, November 2 at 9:14:07 PM" (with a year when it's older). */
-    fun exactSaid(res: Resources, at: Long, now: Long): String =
-        res.getString(R.string.chat_time_said, (if (sameYear(at, now)) saidDay else saidDayYear).format(Date(at)), exactTime.format(Date(at)))
+    fun exactSaid(res: com.prudnikweb.hypernova.data.Strings, at: Long, now: Long): String =
+        res.getString(Str.chat_time_said, (if (sameYear(at, now)) saidDay else saidDayYear).format(Date(at)), exactTime.format(Date(at)))
 
     /** "Last message 2 days ago" for a session quiet since [at]; null when it hasn't been quiet long enough. */
-    fun quiet(res: Resources, at: Long, now: Long): String? {
+    fun quiet(res: com.prudnikweb.hypernova.data.Strings, at: Long, now: Long): String? {
         if (now - at < QUIET_AFTER_MS) return null
         return when (val f = Finished.of(at, now, zone)) {
             Finished.Now, is Finished.Minutes -> null
-            is Finished.Hours -> res.getQuantityString(R.plurals.chat_quiet_hours, f.n, f.n)
-            Finished.Yesterday -> res.getString(R.string.chat_quiet_yesterday)
+            is Finished.Hours -> res.getQuantityString(Plural.chat_quiet_hours, f.n, f.n)
+            Finished.Yesterday -> res.getString(Str.chat_quiet_yesterday)
             is Finished.Days ->
-                if (f.n <= QUIET_DAYS_MAX) res.getQuantityString(R.plurals.chat_quiet_days, f.n, f.n)
-                else res.getString(R.string.chat_quiet_on, (if (sameYear(at, now)) plainDay else plainDayYear).format(Date(at)))
+                if (f.n <= QUIET_DAYS_MAX) res.getQuantityString(Plural.chat_quiet_days, f.n, f.n)
+                else res.getString(Str.chat_quiet_on, (if (sameYear(at, now)) plainDay else plainDayYear).format(Date(at)))
         }
     }
 }
 
+/** The chat's clock on this device's own setting. */
 @Composable
-private fun rememberChatClock(): ChatClock {
-    val configuration = LocalConfiguration.current
-    val is24 = DateFormat.is24HourFormat(LocalContext.current)
-    return remember(configuration, is24) { ChatClock(configuration.locales[0], is24) }
-}
+internal expect fun rememberChatClock(): ChatClock
+
+/** This locale's own order for [skeleton]'s fields, as a [SimpleDateFormat] pattern. */
+internal expect fun bestDatePattern(locale: Locale, skeleton: String): String
 
 /**
  * The time of what's at the top of what's on screen: the first row not wholly under the top bar (a
@@ -179,7 +177,7 @@ internal fun topTime(info: LazyListLayoutInfo, times: ChatTimes): Long? {
  */
 @Composable
 internal fun ChatTimeLabel(hub: Hub, sessionId: String, opening: Int, list: LazyListState, following: () -> Boolean, top: () -> Int, modifier: Modifier = Modifier) {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val clock = rememberChatClock()
     val reduced = LocalMotion.current.reduced
     val followingNow by rememberUpdatedState(following)
@@ -248,7 +246,7 @@ internal fun ChatTimeLabel(hub: Hub, sessionId: String, opening: Int, list: Lazy
 /** The message menu's first line: when it was said, to the second. */
 @Composable
 internal fun MessageTimeLine(at: Long) {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val clock = rememberChatClock()
     val now = remember { System.currentTimeMillis() }
     val said = clock.exactSaid(res, at, now)

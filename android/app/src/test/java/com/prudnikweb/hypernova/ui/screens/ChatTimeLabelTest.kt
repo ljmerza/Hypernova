@@ -40,6 +40,10 @@ import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.WEvent
 import com.prudnikweb.hypernova.ui.session.ChatClock
+import com.prudnikweb.hypernova.ui.session.exact
+import com.prudnikweb.hypernova.ui.session.exactSaid
+import com.prudnikweb.hypernova.ui.session.quiet
+import com.prudnikweb.hypernova.ui.session.scrolled
 import com.prudnikweb.hypernova.ui.session.ChatTimeLabel
 import com.prudnikweb.hypernova.ui.session.QUIET_AFTER_MS
 import com.prudnikweb.hypernova.ui.session.QUIET_SHOW_MS

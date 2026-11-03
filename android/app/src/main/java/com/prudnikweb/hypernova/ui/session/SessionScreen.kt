@@ -397,21 +397,10 @@ fun SessionScreen(
             if (follow && d > 0) list.scrollBy(d.toFloat())
         }
     }
-    fun tailOf(it: Item) = when (it) {
-        is Item.Terminal -> "${it.key}:${it.lines.size}:${it.running}"
-        is Item.Assistant -> "${it.key}:${it.text.length}"
-        is Item.Approval -> "${it.key}:${it.resolved}:${it.partial}"
-        // A command's output arrives under it, after it.
-        is Item.User -> "${it.key}:${it.output.size}:${it.status}"
-        // A running agent's card grows when it ends (its report) or starts one of its own.
-        is Item.AgentCard -> "${it.key}:${it.agent.state}:${it.nested.size}"
-        is Item.WorkflowCard -> "${it.key}:${it.workflow.state}:${it.workflow.phases.sumOf { p -> p.agents.size }}"
-        else -> it.key
-    }
     // Prompts waiting in the queue sit under Claude's live output, so what grows is the last
     // item above them.
     val liveAt = items.indexOfLast { !(it is Item.User && (it.queued || it.waiting || it.held)) }
-    val tailKey = listOfNotNull(items.getOrNull(liveAt)?.let(::tailOf), items.lastOrNull()?.takeIf { items.lastIndex != liveAt }?.let(::tailOf)).joinToString("|")
+    val tailKey = listOfNotNull(items.getOrNull(liveAt)?.let(::chatTail), items.lastOrNull()?.takeIf { items.lastIndex != liveAt }?.let(::chatTail)).joinToString("|")
     // Fork: the list's rows (ToolRuns.kt): runs of three or more tool calls (MCP calls from one)
     // fold into one line, and only the first reply after each message carries Claude's name. A run
     // opens on a tap and stays as the owner left it; the run Claude is working in folds too, its
@@ -1497,15 +1486,6 @@ private fun WaitingCard(codex: Boolean, onOpen: () -> Unit) {
     }
 }
 
-/** The top of a long session's transcript: "Show earlier", or a loading line while it comes. */
-@Composable
-private fun ShowEarlier(loading: Boolean, onClick: () -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
-        if (loading) LoadingLine(stringResource(R.string.earlier_loading))
-        else Pill(stringResource(R.string.earlier_show), onClick, kind = PillKind.Ghost, height = 40.dp)
-    }
-}
-
 /** "FILES CHANGED" then file-name chips, scrolling sideways. Tap one to open it. */
 @Composable
 private fun FilesChanged(paths: List<String>, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -1543,69 +1523,6 @@ private class TranscriptPadding(private val top: () -> Dp, private val side: Dp,
     override fun calculateRightPadding(layoutDirection: LayoutDirection) = side
     override fun calculateTopPadding() = top()
     override fun calculateBottomPadding() = bottom()
-}
-
-/**
- * Scroll so the end of the last item sits at the bottom of the visible area, gliding at [fps]
- * steps a second. Why not animateScrollBy: while output streams, every new line glided the list
- * for a third of a second on every vsync (120 frames a second on the owner's phone), and each of
- * those frames blurred both edge bars again; a chat with a working session was the hottest screen
- * in the app. Between steps the list doesn't move, so no frame is drawn.
- */
-private suspend fun followTail(list: LazyListState, fps: Int, reduced: Boolean) {
-    withFrameNanos { } // let the new item be laid out first
-    val info = list.layoutInfo
-    if (info.totalItemsCount == 0) return
-    val last = info.visibleItemsInfo.lastOrNull()
-    if (last != null && last.index == info.totalItemsCount - 1) {
-        val dist = (last.offset + last.size) - (info.viewportEndOffset - info.afterContentPadding)
-        if (dist > 0) list.glideBy(dist.toFloat(), fps, reduced)
-    } else {
-        list.scrollToItem(info.totalItemsCount - 1, Int.MAX_VALUE)
-    }
-}
-
-/** A transcript item's arrival: a short fade, and nothing that moves (see the list above). */
-private val ItemFadeIn = androidx.compose.animation.core.tween<Float>(Motion.DIALOG)
-
-/** How long the tail's glide takes (ms), as the dialog tween it used to be. */
-private const val GLIDE_MS = Motion.DIALOG * 2f
-
-/**
- * Scrolls by [dist] over [GLIDE_MS] with [Motion.Expo], moving the list only every 1/[fps] s. It
- * honours the coroutine's [MotionDurationScale] as animateScrollBy did (system animations off:
- * one jump) and the app's Reduce Motion ([reduced]: the same).
- */
-private suspend fun LazyListState.glideBy(dist: Float, fps: Int, reduced: Boolean) {
-    val scale = if (reduced) 0f else coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f
-    scroll { glide(dist, fps, scale, { scrollBy(it) }, { withFrameNanos { it } }) }
-}
-
-/**
- * The glide itself, apart from the list so it can be tested: [scrollBy] moves it and answers how
- * far it did, [frame] waits for the next vsync and answers its time. A [scale] of 0 jumps at once,
- * otherwise [GLIDE_MS] is stretched by it. Between steps it sleeps rather than waking on every vsync.
- */
-internal suspend fun glide(dist: Float, fps: Int, scale: Float, scrollBy: (Float) -> Float, frame: suspend () -> Long) {
-    if (scale <= 0f) { scrollBy(dist); return }
-    val stepNs = 1_000_000_000L / fps.coerceAtLeast(1)
-    val totalMs = GLIDE_MS * scale
-    val start = frame()
-    var moved = 0f
-    var lastStep = start
-    while (true) {
-        val now = frame()
-        val k = ((now - start) / 1e6f / totalMs).coerceIn(0f, 1f)
-        // A step is due; a vsync that comes early passes without moving anything (2 ms of slack,
-        // so a step never slips a whole vsync late).
-        if (k < 1f && now - lastStep < stepNs - 2_000_000L) continue
-        lastStep = now
-        moved += scrollBy(dist * Motion.Expo.transform(k) - moved)
-        if (k >= 1f) break
-        // Sleep to just before the next step instead of asking for every frame in between.
-        val leftMs = (totalMs - (now - start) / 1e6f).toLong()
-        delay(minOf(stepNs / 1_000_000L - 3L, leftMs).coerceAtLeast(0L))
-    }
 }
 
 /**

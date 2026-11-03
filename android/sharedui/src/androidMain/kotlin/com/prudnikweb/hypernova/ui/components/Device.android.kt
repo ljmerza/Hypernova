@@ -8,12 +8,14 @@ import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.Toast
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -60,3 +62,8 @@ internal actual fun Paint.blurredOutside(radius: Float) {
     // Drawn by the GPU since Android 9; the app needs 10.
     asFrameworkPaint().maskFilter = BlurMaskFilter(radius, BlurMaskFilter.Blur.OUTER)
 }
+
+actual fun Modifier.longPressCopies(key: Any, copy: () -> Unit): Modifier = pointerInput(key) { detectTapGestures(onLongPress = { copy() }) }
+
+@Composable
+internal actual fun DiagramBlock(source: String) = com.prudnikweb.hypernova.ui.theme.AndroidUi.diagram(source)

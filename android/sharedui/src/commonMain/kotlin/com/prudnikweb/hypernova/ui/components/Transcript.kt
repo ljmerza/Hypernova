@@ -1,8 +1,6 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
-import android.os.Build
-import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -51,12 +49,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
+import com.prudnikweb.hypernova.ui.theme.pluralStringResource
+import com.prudnikweb.hypernova.ui.theme.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.Role
@@ -83,7 +77,8 @@ import com.prudnikweb.hypernova.data.isRule
 import com.prudnikweb.hypernova.data.tableAt
 import com.prudnikweb.hypernova.data.Links
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.AgentState
 import com.prudnikweb.hypernova.data.AgentView
 import com.prudnikweb.hypernova.data.Answer
@@ -102,6 +97,7 @@ import com.prudnikweb.hypernova.data.Tone
 import com.prudnikweb.hypernova.ui.fx.LocalAmbient
 import com.prudnikweb.hypernova.ui.fx.formatDuration
 import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.wordsNow
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.JetBrainsMono
 import com.prudnikweb.hypernova.ui.theme.LocalMotion
@@ -151,22 +147,22 @@ fun UserMessage(
 ) {
     val cmd = remember(item.command, known) { item.command?.refined(known) }
     val status = when (item.status) {
-        SendStatus.Sending -> stringResource(R.string.sending)
-        SendStatus.QueuedStep, SendStatus.QueuedReply -> stringResource(R.string.queued_label)
-        SendStatus.WaitingMac -> stringResource(R.string.waiting_mac_label)
-        SendStatus.SessionGone -> stringResource(R.string.waiting_gone_label)
-        SendStatus.Held -> stringResource(R.string.held_label)
+        SendStatus.Sending -> stringResource(Str.sending)
+        SendStatus.QueuedStep, SendStatus.QueuedReply -> stringResource(Str.queued_label)
+        SendStatus.WaitingMac -> stringResource(Str.waiting_mac_label)
+        SendStatus.SessionGone -> stringResource(Str.waiting_gone_label)
+        SendStatus.Held -> stringResource(Str.held_label)
         null -> null
     }
     // Claude Code hands a queued prompt to Claude when the step it's on finishes; an SDK session
     // runs one prompt at a time, so there it waits for the whole reply, and so does a Codex
     // session's (its terminal too: the Mac queues it behind the turn).
     val hint = when (item.status) {
-        SendStatus.QueuedStep -> stringResource(if (codex) R.string.queued_hint_reply else R.string.queued_hint_step)
-        SendStatus.QueuedReply -> stringResource(R.string.queued_hint_reply)
-        SendStatus.WaitingMac -> stringResource(R.string.waiting_mac_hint)
-        SendStatus.SessionGone -> stringResource(R.string.waiting_gone_hint)
-        SendStatus.Held -> stringResource(R.string.held_hint)
+        SendStatus.QueuedStep -> stringResource(if (codex) Str.queued_hint_reply else Str.queued_hint_step)
+        SendStatus.QueuedReply -> stringResource(Str.queued_hint_reply)
+        SendStatus.WaitingMac -> stringResource(Str.waiting_mac_hint)
+        SendStatus.SessionGone -> stringResource(Str.waiting_gone_hint)
+        SendStatus.Held -> stringResource(Str.held_hint)
         else -> null
     }
     val attached = files?.takeIf { item.files.isNotEmpty() }
@@ -181,7 +177,7 @@ fun UserMessage(
 @Composable
 private fun TextMessage(item: Item.User, status: String?, hint: String?, files: (@Composable () -> Unit)?, modifier: Modifier, onStartNew: (() -> Unit)? = null) {
     Column(modifier) {
-        Eyebrow(stringResource(R.string.you), status, glyph = if (item.waiting) Glyph.Laptop else Glyph.Clock)
+        Eyebrow(stringResource(Str.you), status, glyph = if (item.waiting) Glyph.Laptop else Glyph.Clock)
         Spacer(Modifier.height(6.dp))
         if (files != null) {
             files()
@@ -194,7 +190,7 @@ private fun TextMessage(item: Item.User, status: String?, hint: String?, files: 
         QueuedHint(hint)
         if (item.status == SendStatus.SessionGone && onStartNew != null) {
             Spacer(Modifier.height(10.dp))
-            Pill(stringResource(R.string.waiting_start_new), onStartNew, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Plus)
+            Pill(stringResource(Str.waiting_start_new), onStartNew, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Plus)
         }
         Outputs(item.output, tail = false)
     }
@@ -207,11 +203,11 @@ private fun TextMessage(item: Item.User, status: String?, hint: String?, files: 
 @Composable
 private fun LocalCommand(cmd: CommandRun, item: Item.User, status: String?, hint: String?, files: (@Composable () -> Unit)?, modifier: Modifier) {
     val line = remember(cmd, item.pending) { commandLine(cmd, item.pending) }
-    val said = spoken(stringResource(R.string.command_desc, line.text), status)
+    val said = spoken(stringResource(Str.command_desc, line.text), status)
     Column(modifier) {
         // One stop for TalkBack; the output below stays its own (it unfolds).
         Column(Modifier.clearAndSetSemantics { contentDescription = said }) {
-            Eyebrow(stringResource(R.string.command_label), status)
+            Eyebrow(stringResource(Str.command_label), status)
             Spacer(Modifier.height(4.dp))
             Selectable { HText(line, style = Type.mono) }
         }
@@ -224,10 +220,10 @@ private fun LocalCommand(cmd: CommandRun, item: Item.User, status: String?, hint
 /** A "!" line run in bash mode: SHELL, "$ command", and the last lines of its output, as a terminal shows them. */
 @Composable
 private fun ShellCommand(cmd: CommandRun, item: Item.User, status: String?, hint: String?, files: (@Composable () -> Unit)?, modifier: Modifier) {
-    val said = spoken(stringResource(R.string.shell_desc, cmd.args), status)
+    val said = spoken(stringResource(Str.shell_desc, cmd.args), status)
     Column(modifier) {
         Column(Modifier.clearAndSetSemantics { contentDescription = said }) {
-            Eyebrow(stringResource(R.string.shell_label), status)
+            Eyebrow(stringResource(Str.shell_label), status)
             Spacer(Modifier.height(4.dp))
             // The prompt sign apart from the command: a long one wraps under itself, and a copy
             // is just the command.
@@ -253,21 +249,21 @@ private fun ShellCommand(cmd: CommandRun, item: Item.User, status: String?, hint
 @Composable
 private fun PromptCommand(cmd: CommandRun, item: Item.User, status: String?, hint: String?, files: (@Composable () -> Unit)?, modifier: Modifier) {
     val skill = cmd.type == CommandKind.Skill
-    val label = stringResource(R.string.you)
+    val label = stringResource(Str.you)
     // What it is rides in its chip, before its name; typed here and not on the Mac yet, a skill or
     // a command, nobody knows which, so it says neither.
     val kind = when {
-        skill -> stringResource(R.string.skill_label)
+        skill -> stringResource(Str.skill_label)
         cmd.guessed -> null
-        else -> stringResource(R.string.command_label)
+        else -> stringResource(Str.command_label)
     }
     val args = cmd.args.trim()
     val said = spoken(
         when {
-            skill && args.isEmpty() -> stringResource(R.string.skill_desc, cmd.bare)
-            skill -> stringResource(R.string.skill_desc_args, cmd.bare, args)
-            args.isEmpty() -> stringResource(R.string.command_desc, cmd.bare)
-            else -> stringResource(R.string.command_desc_args, cmd.bare, args)
+            skill && args.isEmpty() -> stringResource(Str.skill_desc, cmd.bare)
+            skill -> stringResource(Str.skill_desc_args, cmd.bare, args)
+            args.isEmpty() -> stringResource(Str.command_desc, cmd.bare)
+            else -> stringResource(Str.command_desc_args, cmd.bare, args)
         },
         status,
     )
@@ -394,7 +390,7 @@ fun CommandOutputRow(key: String, text: String, tone: Tone, modifier: Modifier =
     val styled = remember(text, color, tail) { if (tail) AnnotatedString(text) else outputText(text, color, tone) }
     val folded = tail && lines.size > OUTPUT_LINES
     val expandable = expanded || clipped || folded
-    val action = stringResource(if (expanded) R.string.collapse else R.string.show_all)
+    val action = stringResource(if (expanded) Str.collapse else Str.show_all)
     val style = Type.monoSmall.copy(color = color)
     Row(
         modifier
@@ -454,7 +450,7 @@ fun AssistantMessage(item: Item.Assistant, modifier: Modifier = Modifier, onPrev
             Row(verticalAlignment = Alignment.CenterVertically) {
                 NovaMark(size = 12.dp)
                 Spacer(Modifier.width(6.dp))
-                HText(stringResource(if (codex) R.string.cx_agent_codex else R.string.claude).uppercase(), style = Type.label, color = HN.accentDim)
+                HText(stringResource(if (codex) Str.cx_agent_codex else Str.claude).uppercase(), style = Type.label, color = HN.accentDim)
                 if (item.streaming) {
                     Spacer(Modifier.width(8.dp))
                     Planet(Activity.Live)
@@ -475,7 +471,7 @@ fun PreviewPills(ports: List<Int>, onPreview: (Int) -> Unit) {
     Spacer(Modifier.height(10.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         for (p in ports) {
-            Pill(stringResource(R.string.open_preview_port, p), { onPreview(p) }, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Globe)
+            Pill(stringResource(Str.open_preview_port, p), { onPreview(p) }, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Globe)
         }
     }
 }
@@ -614,7 +610,7 @@ fun Markdown(text: String, modifier: Modifier = Modifier, color: Color = HN.inkM
                     HText(markdownLite(b.text), style = Type.body, color = color, modifier = Modifier.weight(1f))
                 }
                 is Block.Code -> CodeBlock(b.text)
-                is Block.Mermaid -> MermaidBlock(b.source)
+                is Block.Mermaid -> DiagramBlock(b.source)
                 is Block.Table -> MdTable(b.table, color)
                 Block.Rule -> MdRule()
             }
@@ -627,21 +623,20 @@ fun Markdown(text: String, modifier: Modifier = Modifier, color: Color = HN.inkM
 internal fun CodeBlock(text: String, modifier: Modifier = Modifier, endPad: androidx.compose.ui.unit.Dp = 12.dp) {
     // A long press copies the block whole (the owner, 2026-10-30), and is the block's own: the
     // message's menu doesn't open over it. TalkBack has it as an action.
-    val context = LocalContext.current
-    val view = LocalView.current
-    val copyLabel = stringResource(R.string.copy_code)
-    val copied = stringResource(R.string.chat_copied)
+    val copier = rememberCopier()
+    val haptics = rememberHaptics()
+    val copyLabel = stringResource(Str.copy_code)
+    val copied = stringResource(Str.chat_copied)
     val copy = {
-        context.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText(copyLabel, text))
-        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-        // Android 13 and newer show their own "copied" preview.
-        if (android.os.Build.VERSION.SDK_INT < 33) android.widget.Toast.makeText(context, copied, android.widget.Toast.LENGTH_SHORT).show()
+        copier.copy(copyLabel, text)
+        haptics.longPress()
+        copier.sayCopied(copied)
     }
     Box(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .pointerInput(text) { detectTapGestures(onLongPress = { copy() }) }
+            .longPressCopies(text, copy)
             .semantics { customActions = listOf(CustomAccessibilityAction(copyLabel) { copy(); true }) }
             .background(HN.bg950.copy(alpha = 0.86f))
             .border(1.dp, HN.line, RoundedCornerShape(10.dp))
@@ -695,10 +690,10 @@ fun ThinkingRow(item: Item.Thinking, modifier: Modifier = Modifier) {
         // Shimmers while Claude is at it; once it's over, one constant colour and what it took.
         ThinkingText(
             when {
-                item.ongoing -> stringResource(R.string.thinking)
-                item.tookMs != null -> stringResource(R.string.thought_for, item.tookMs.let { ms -> val s = ms / 1000; if (s < 60) "${s}s" else "${s / 60}m ${s % 60}s" })
-                item.chars > 0 -> stringResource(R.string.thought_chars, String.format(Locale.ROOT, "%,d", item.chars))
-                else -> stringResource(R.string.thinking)
+                item.ongoing -> stringResource(Str.thinking)
+                item.tookMs != null -> stringResource(Str.thought_for, item.tookMs.let { ms -> val s = ms / 1000; if (s < 60) "${s}s" else "${s / 60}m ${s % 60}s" })
+                item.chars > 0 -> stringResource(Str.thought_chars, String.format(Locale.ROOT, "%,d", item.chars))
+                else -> stringResource(Str.thinking)
             },
             live = item.ongoing, style = Type.small,
         )
@@ -712,14 +707,14 @@ fun ThinkingRow(item: Item.Thinking, modifier: Modifier = Modifier) {
  */
 @Composable
 fun ResultRow(item: Item.Result, modifier: Modifier = Modifier) {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val color = if (item.ok) HN.accentDim else HN.danger
-    val head = stringResource(if (item.ok) R.string.result_done else R.string.result_failed)
-    val turns = item.turns?.let { pluralStringResource(R.plurals.turns, it, it) }
+    val head = stringResource(if (item.ok) Str.result_done else Str.result_failed)
+    val turns = item.turns?.let { pluralStringResource(Plural.turns, it, it) }
     val took = item.durationMs?.let { elapsed(it) }
-    val cost = item.costUsd?.takeIf { it >= 0.005 }?.let { String.format(Locale.ROOT, res.getString(R.string.cost), it) }
-    val said = listOfNotNull(turns, took?.let { res.getString(R.string.result_took, it) }, cost?.let { res.getString(R.string.result_cost, it) })
-        .takeIf { it.isNotEmpty() }?.let { res.getString(R.string.result_said, head, it.joinToString(", ")) } ?: head
+    val cost = item.costUsd?.takeIf { it >= 0.005 }?.let { String.format(Locale.ROOT, res.getString(Str.cost), it) }
+    val said = listOfNotNull(turns, took?.let { res.getString(Str.result_took, it) }, cost?.let { res.getString(Str.result_cost, it) })
+        .takeIf { it.isNotEmpty() }?.let { res.getString(Str.result_said, head, it.joinToString(", ")) } ?: head
     Column(modifier.padding(vertical = 2.dp)) {
         Row(Modifier.clearAndSetSemantics { contentDescription = said }, verticalAlignment = Alignment.CenterVertically) {
             Icon(if (item.ok) Glyph.Check else Glyph.Cross, size = 12.dp, color = color)
@@ -858,14 +853,14 @@ fun MiniTerminal(item: Item.Terminal, modifier: Modifier = Modifier, onPreview: 
             // How long it ran, after a stopwatch: the turning planet says it still runs, and the
             // exit code has its own line at the bottom, drawn ("✓ exit 0").
             val stopped = !running && (item.stopped || item.exitCode == null)
-            val res = LocalContext.current.resources
+            val res = wordsNow()
             Seam(
-                label = stringResource(R.string.bash),
+                label = stringResource(Str.bash),
                 activity = if (running) Activity.Live else Activity.Rest,
                 color = if (running) HN.accent else HN.inkMuted,
                 trailContent = {
-                    if (stopped) SeamWords(stringResource(R.string.tool_stopped))
-                    else Stamp(Glyph.Timer, elapsed, Modifier.clearAndSetSemantics { contentDescription = res.getString(if (running) R.string.running_for else R.string.ran_for, elapsed) })
+                    if (stopped) SeamWords(stringResource(Str.tool_stopped))
+                    else Stamp(Glyph.Timer, elapsed, Modifier.clearAndSetSemantics { contentDescription = res.getString(if (running) Str.running_for else Str.ran_for, elapsed) })
                 },
             )
             Spacer(Modifier.height(10.dp))
@@ -890,11 +885,11 @@ fun MiniTerminal(item: Item.Terminal, modifier: Modifier = Modifier, onPreview: 
                     val c = if (failed) HN.danger else HN.accent
                     Icon(if (failed) Glyph.Cross else Glyph.Check, size = 12.dp, color = c)
                     Spacer(Modifier.width(6.dp))
-                    HText(stringResource(R.string.exit_code, item.exitCode), style = Type.monoSmall, color = c)
+                    HText(stringResource(Str.exit_code, item.exitCode), style = Type.monoSmall, color = c)
                     if (expandable) {
                         Spacer(Modifier.weight(1f))
                         HText(
-                            if (expanded) stringResource(R.string.collapse) else pluralStringResource(R.plurals.lines, item.lines.size, item.lines.size),
+                            if (expanded) stringResource(Str.collapse) else pluralStringResource(Plural.lines, item.lines.size, item.lines.size),
                             style = Type.monoSmall, color = HN.inkDim,
                         )
                     }
@@ -944,11 +939,11 @@ private fun Modifier.fadeTop() = this
 /** Elapsed time from resources, always with a dot decimal ("1.5s", never "1,5s"). */
 @Composable
 private fun elapsed(ms: Long): String {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     return if (ms < 60_000) {
-        String.format(Locale.ROOT, res.getString(R.string.elapsed_secs), ms / 1000f)
+        String.format(Locale.ROOT, res.getString(Str.elapsed_secs), ms / 1000f)
     } else {
-        String.format(Locale.ROOT, res.getString(R.string.elapsed_min_secs), ms / 60_000, (ms / 1000) % 60)
+        String.format(Locale.ROOT, res.getString(Str.elapsed_min_secs), ms / 60_000, (ms / 1000) % 60)
     }
 }
 
@@ -976,7 +971,7 @@ fun AgentCard(item: Item.AgentCard, onOpen: (String) -> Unit, modifier: Modifier
         tween(Motion.SECTION), label = "ring",
     )
     val shape = RoundedCornerShape(14.dp)
-    val kind = stringResource(R.string.agent_kind, kindLabel(a.type))
+    val kind = stringResource(Str.agent_kind, kindLabel(a.type))
     val ms = agentElapsed(a)
     val said = agentSaid(a, kind, ms)
     Column(
@@ -986,7 +981,7 @@ fun AgentCard(item: Item.AgentCard, onOpen: (String) -> Unit, modifier: Modifier
             .background(HN.bg950.copy(alpha = 0.86f))
             .then(if (running) Modifier.background(RunningWash) else Modifier)
             .border(1.dp, ring, shape)
-            .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.agent_open), role = Role.Button) { onOpen(a.id) }
+            .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(Str.agent_open), role = Role.Button) { onOpen(a.id) }
             .animateContentSize(tween(Motion.REVEAL, easing = Motion.Expo))
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
@@ -1014,7 +1009,7 @@ private fun AgentBody(a: AgentView) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HText("▸ ", style = Type.monoSmall, color = if (a.asking) HN.amber else HN.accentDim)
                 HText(
-                    a.activity ?: stringResource(if (a.asking) R.string.agent_asking else R.string.agent_starting),
+                    a.activity ?: stringResource(if (a.asking) Str.agent_asking else Str.agent_starting),
                     style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -1030,7 +1025,7 @@ private fun AgentBody(a: AgentView) {
         a.state == AgentState.Failed || a.state == AgentState.Stopped -> {
             Spacer(Modifier.height(6.dp))
             HText(
-                stringResource(if (a.state == AgentState.Failed) R.string.agent_failed else R.string.agent_stopped),
+                stringResource(if (a.state == AgentState.Failed) Str.agent_failed else Str.agent_stopped),
                 style = Type.small, color = if (a.state == AgentState.Failed) HN.danger.copy(alpha = 0.85f) else HN.inkDim,
             )
         }
@@ -1059,18 +1054,18 @@ fun WorkflowCard(item: Item.WorkflowCard, onOpen: (String) -> Unit, modifier: Mo
     )
     val shape = RoundedCornerShape(14.dp)
     val ms = elapsedSince(w.startedAt, w.endedAt, running)
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     // While it runs, how many of its agents work ("2 of 5 running"); once done, how many there were
     // and what they spent after a token; how long, after a stopwatch. Short of room the tokens go,
     // then the words; the time stays.
-    val agents = if (running && w.running > 0) stringResource(R.string.workflow_running_of, w.running, w.agentCount)
-    else pluralStringResource(R.plurals.agents_count, w.agentCount, w.agentCount)
+    val agents = if (running && w.running > 0) stringResource(Str.workflow_running_of, w.running, w.agentCount)
+    else pluralStringResource(Plural.agents_count, w.agentCount, w.agentCount)
     val tokens = if (running) null else w.tokens?.let { tokensFigure(it) }
     val took = clock(res, ms)
     val trailSaid = listOfNotNull(
         agents,
-        tokens?.let { res.getString(R.string.stats_day_tokens, it) },
-        res.getString(R.string.ran_for, took),
+        tokens?.let { res.getString(Str.stats_day_tokens, it) },
+        res.getString(Str.ran_for, took),
     ).joinToString(", ")
     val trail: @Composable () -> Unit = {
         FitRow(
@@ -1103,7 +1098,7 @@ fun WorkflowCard(item: Item.WorkflowCard, onOpen: (String) -> Unit, modifier: Mo
                     else Planet(if (asking) Activity.Alert else if (running) Activity.Live else Activity.Rest)
                 }
             },
-            stringResource(R.string.workflow_label), trail,
+            stringResource(Str.workflow_label), trail,
             when {
                 asking -> HN.amber
                 running -> HN.accent
@@ -1134,7 +1129,7 @@ fun WorkflowCard(item: Item.WorkflowCard, onOpen: (String) -> Unit, modifier: Mo
                         .fillMaxWidth()
                         .heightIn(min = 28.dp)
                         .then(
-                            if (p.state == PhaseState.Done) Modifier.clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(if (folded) R.string.show_all else R.string.collapse)) {
+                            if (p.state == PhaseState.Done) Modifier.clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(if (folded) Str.show_all else Str.collapse)) {
                                 open = if (p.title in open) open - p.title else open + p.title
                             } else Modifier,
                         ),
@@ -1143,7 +1138,7 @@ fun WorkflowCard(item: Item.WorkflowCard, onOpen: (String) -> Unit, modifier: Mo
                     HText(p.title.uppercase(), style = Type.label, color = phaseColor(p.state), maxLines = 1)
                     if (folded) {
                         Spacer(Modifier.width(8.dp))
-                        DoneChip(pluralStringResource(R.plurals.phase_done, p.done, p.done))
+                        DoneChip(pluralStringResource(Plural.phase_done, p.done, p.done))
                     }
                 }
             }
@@ -1206,21 +1201,21 @@ private fun DoneChip(text: String) {
  */
 @Composable
 fun AgentRow(a: AgentView, onOpen: (String) -> Unit, modifier: Modifier = Modifier, phase: String? = null, indent: Int = 0) {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val ms = agentElapsed(a)
     val label = remember(a.label, phase) { shortLabel(a.label, phase) }
     val trail = when {
         a.running -> a.activity ?: clock(res, ms)
-        a.state == AgentState.Failed -> stringResource(R.string.agent_failed_short)
-        a.state == AgentState.Stopped -> stringResource(R.string.tool_stopped)
+        a.state == AgentState.Failed -> stringResource(Str.agent_failed_short)
+        a.state == AgentState.Stopped -> stringResource(Str.tool_stopped)
         else -> clock(res, ms)
     }
-    val said = agentSaid(a, stringResource(R.string.agent_kind, kindLabel(a.type)))
+    val said = agentSaid(a, stringResource(Str.agent_kind, kindLabel(a.type)))
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = 36.dp)
-            .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(R.string.agent_open), role = Role.Button) { onOpen(a.id) }
+            .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = stringResource(Str.agent_open), role = Role.Button) { onOpen(a.id) }
             .clearAndSetSemantics { contentDescription = said }
             .padding(start = indent.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1310,12 +1305,12 @@ private fun elapsedSince(start: Long, end: Long?, running: Boolean): Long {
 }
 
 /** "14s", "2m 14s", "1h 3m": whole seconds, calm for a clock that ticks once a second. */
-fun clock(res: android.content.res.Resources, ms: Long): String {
+fun clock(res: com.prudnikweb.hypernova.data.Strings, ms: Long): String {
     val s = ms / 1000
     return when {
-        s < 60 -> res.getString(R.string.clock_secs, s)
-        s < 3600 -> res.getString(R.string.elapsed_min_secs, s / 60, s % 60)
-        else -> res.getString(R.string.clock_hours, s / 3600, (s / 60) % 60)
+        s < 60 -> res.getString(Str.clock_secs, s)
+        s < 3600 -> res.getString(Str.elapsed_min_secs, s / 60, s % 60)
+        else -> res.getString(Str.clock_hours, s / 3600, (s / 60) % 60)
     }
 }
 
@@ -1333,14 +1328,14 @@ fun tokensFigure(n: Long): String = when {
  */
 @Composable
 private fun AgentTrail(a: AgentView, ms: Long) {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val stopped = a.state == AgentState.Stopped
     val took = clock(res, ms)
     val tokens = a.tokens?.let { tokensFigure(it) }
     val tools = a.toolUses?.takeIf { it > 0 }?.toString()
     FitRow(
         parts = listOf(
-            if (stopped) fitPart({ SeamWords(stringResource(R.string.tool_stopped)) }) else NoPart,
+            if (stopped) fitPart({ SeamWords(stringResource(Str.tool_stopped)) }) else NoPart,
             fitPart({ Stamp(Glyph.Timer, took) }),
             if (tokens != null) fitPart({ Stamp(Glyph.Token, tokens) }) else NoPart,
             if (tools != null) fitPart({ Stamp(Glyph.Tool, tools) }) else NoPart,
@@ -1353,19 +1348,19 @@ private fun AgentTrail(a: AgentView, ms: Long) {
 /** What TalkBack says for an agent: its kind, what it's for, where it is, and what it took ("Ran for 2m 14s, 8.4k tokens, 12 tool calls."). */
 @Composable
 private fun agentSaid(a: AgentView, kind: String, ms: Long? = null): String {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val where = when {
-        a.running && a.asking -> stringResource(R.string.agent_asking)
-        a.running -> a.activity?.let { stringResource(R.string.agent_running_doing, it) } ?: stringResource(R.string.state_working)
-        a.state == AgentState.Failed -> stringResource(R.string.agent_failed)
-        a.state == AgentState.Stopped -> stringResource(R.string.agent_stopped)
-        else -> stringResource(R.string.agent_done)
+        a.running && a.asking -> stringResource(Str.agent_asking)
+        a.running -> a.activity?.let { stringResource(Str.agent_running_doing, it) } ?: stringResource(Str.state_working)
+        a.state == AgentState.Failed -> stringResource(Str.agent_failed)
+        a.state == AgentState.Stopped -> stringResource(Str.agent_stopped)
+        else -> stringResource(Str.agent_done)
     }
     val took = ms?.let {
         listOfNotNull(
-            res.getString(R.string.ran_for, clock(res, it)),
-            a.tokens?.let { t -> res.getString(R.string.stats_day_tokens, tokensFigure(t)) },
-            a.toolUses?.takeIf { n -> n > 0 }?.let { n -> res.getQuantityString(R.plurals.agent_tool_calls, n, n) },
+            res.getString(Str.ran_for, clock(res, it)),
+            a.tokens?.let { t -> res.getString(Str.stats_day_tokens, tokensFigure(t)) },
+            a.toolUses?.takeIf { n -> n > 0 }?.let { n -> res.getQuantityString(Plural.agent_tool_calls, n, n) },
         ).joinToString(", ") + "."
     }
     return listOfNotNull("$kind. ${a.label}. $where", took).joinToString(" ")
@@ -1391,7 +1386,7 @@ fun DiffCard(item: Item.Diff, modifier: Modifier = Modifier, onOpen: ((String) -
                 .padding(vertical = 12.dp),
         ) {
             Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                HText((item.verb ?: stringResource(R.string.edit)).uppercase(), style = Type.label, color = HN.inkDim)
+                HText((item.verb ?: stringResource(Str.edit)).uppercase(), style = Type.label, color = HN.inkDim)
                 Spacer(Modifier.width(10.dp))
                 HText(item.file, style = Type.monoSmall, color = HN.ink, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(10.dp))
@@ -1407,7 +1402,7 @@ fun DiffCard(item: Item.Diff, modifier: Modifier = Modifier, onOpen: ((String) -
             if (long) {
                 val more = item.lines.size - DIFF_COLLAPSED_LINES
                 HText(
-                    if (expanded) stringResource(R.string.collapse) else pluralStringResource(R.plurals.more_lines, more, more),
+                    if (expanded) stringResource(Str.collapse) else pluralStringResource(Plural.more_lines, more, more),
                     style = Type.monoSmall, color = HN.accentDim, maxLines = 1,
                     modifier = Modifier
                         .padding(top = 6.dp)
@@ -1418,7 +1413,7 @@ fun DiffCard(item: Item.Diff, modifier: Modifier = Modifier, onOpen: ((String) -
         }
         if (path != null && onPreviewFile != null && isWebPage(path)) {
             Spacer(Modifier.height(10.dp))
-            Pill(stringResource(R.string.open_preview), { onPreviewFile(path) }, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Globe)
+            Pill(stringResource(Str.open_preview), { onPreviewFile(path) }, kind = PillKind.Outline, height = 40.dp, leading = Glyph.Globe)
         }
     }
 }
@@ -1433,7 +1428,7 @@ internal fun DiffLines(lines: List<com.prudnikweb.hypernova.data.DiffLine>, side
         when (l.kind) {
             '~' -> HText("⋯", style = Type.monoSmall, color = HN.inkGhost, modifier = Modifier.padding(horizontal = side, vertical = 2.dp))
             '…' -> HText(
-                pluralStringResource(R.plurals.more_lines, l.text.toIntOrNull() ?: 0, l.text.toIntOrNull() ?: 0),
+                pluralStringResource(Plural.more_lines, l.text.toIntOrNull() ?: 0, l.text.toIntOrNull() ?: 0),
                 style = Type.monoSmall, color = HN.inkDim, modifier = Modifier.padding(horizontal = side, vertical = 4.dp),
             )
             else -> {
@@ -1496,7 +1491,7 @@ fun ApprovalBlock(item: Item.Approval, onAnswer: (Answer) -> Unit, modifier: Mod
 
 @Composable
 private fun Band(item: Item.Approval) {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     // A countdown only where the Mac will say no (Codex, an automation's run): the owner's Claude
     // Code asks never get one (docs/DECISIONS.md, "Never auto-deny").
     val counts = item.autoDeny && item.expiresAt != null
@@ -1508,17 +1503,17 @@ private fun Band(item: Item.Approval) {
         Modifier.fillMaxWidth().background(HN.amber).padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HText(stringResource(R.string.state_needs_you).uppercase(), style = Type.label.copy(fontWeight = FontWeight(700)), color = HN.bg, maxLines = 1)
+        HText(stringResource(Str.state_needs_you).uppercase(), style = Type.label.copy(fontWeight = FontWeight(700)), color = HN.bg, maxLines = 1)
         if (left != null) {
             Spacer(Modifier.width(10.dp))
-            HText(stringResource(R.string.auto_deny_in, formatDuration(res, left)), style = Type.monoSmall, color = HN.bg.copy(alpha = 0.7f), maxLines = 1)
+            HText(stringResource(Str.auto_deny_in, formatDuration(res, left)), style = Type.monoSmall, color = HN.bg.copy(alpha = 0.7f), maxLines = 1)
         }
         Spacer(Modifier.width(10.dp))
         val tag = when (item.kind) {
             // "mcp__github__create_issue" → "create issue".
             ApprovalKind.Tool -> item.tool.substringAfterLast("__").replace('_', ' ').ifBlank { item.tool }
-            ApprovalKind.Question -> stringResource(R.string.question)
-            ApprovalKind.Plan -> stringResource(R.string.plan)
+            ApprovalKind.Question -> stringResource(Str.question)
+            ApprovalKind.Plan -> stringResource(Str.plan)
         }
         // Takes what's left of the band and gives way first, with an ellipsis, never clipped.
         HText(
@@ -1532,7 +1527,7 @@ private fun Band(item: Item.Approval) {
         if (agent != null) {
             Spacer(Modifier.width(8.dp))
             HText(
-                agent.ifBlank { stringResource(R.string.agent_label) }, style = Type.monoSmall, color = HN.bg.copy(alpha = 0.8f),
+                agent.ifBlank { stringResource(Str.agent_label) }, style = Type.monoSmall, color = HN.bg.copy(alpha = 0.8f),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .widthIn(max = 120.dp)
@@ -1546,12 +1541,12 @@ private fun Band(item: Item.Approval) {
 
 @Composable
 private fun ToolAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
-    val view = LocalView.current
+    val haptics = rememberHaptics()
     if (item.reason.isNotBlank()) {
         HText(item.reason, style = Type.small, color = HN.inkMuted)
         Spacer(Modifier.height(10.dp))
     } else if (item.partial) {
-        HText(stringResource(R.string.approval_loading), style = Type.small, color = HN.inkDim)
+        HText(stringResource(Str.approval_loading), style = Type.small, color = HN.inkDim)
         Spacer(Modifier.height(10.dp))
     }
     // Never cut silently (the end of a script may be its rm -rf): what doesn't fit says how much
@@ -1565,14 +1560,14 @@ private fun ToolAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
     }
     Spacer(Modifier.height(14.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.deny), { onAnswer(Answer.Deny) }, Modifier.weight(1f), kind = PillKind.Danger)
+        Pill(stringResource(Str.deny), { onAnswer(Answer.Deny) }, Modifier.weight(1f), kind = PillKind.Danger)
         if (item.canAlways) {
-            Pill(stringResource(R.string.always), { onAnswer(Answer.Always) }, Modifier.weight(1f), kind = PillKind.Outline)
+            Pill(stringResource(Str.always), { onAnswer(Answer.Always) }, Modifier.weight(1f), kind = PillKind.Outline)
         }
         Pill(
-            stringResource(R.string.allow),
+            stringResource(Str.allow),
             {
-                view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
+                haptics.confirm()
                 onAnswer(Answer.Allow)
             },
             Modifier.weight(1.2f), kind = PillKind.Primary,
@@ -1581,12 +1576,12 @@ private fun ToolAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
     // Research fetches dozens of sites, each asked about once: one answer for all of them.
     if (item.canSession) {
         Spacer(Modifier.height(8.dp))
-        Pill(stringResource(R.string.allow_session, sessionToolLabel(item.tool)), { onAnswer(Answer.Session) }, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 40.dp)
+        Pill(stringResource(Str.allow_session, sessionToolLabel(item.tool)), { onAnswer(Answer.Session) }, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 40.dp)
     }
     // What Always covers: Claude Code's own rule for it, as its terminal offers it.
     if (item.canAlways) {
         Spacer(Modifier.height(8.dp))
-        HText(stringResource(R.string.always_means), style = Type.small, color = HN.inkDim)
+        HText(stringResource(Str.always_means), style = Type.small, color = HN.inkDim)
     }
 }
 
@@ -1599,7 +1594,7 @@ private const val ASK_TALL = 0.6f
 /** The box an approval's command or change is drawn in; [tall]: whole, scrolling past [ASK_TALL] of the screen. */
 @Composable
 private fun AskBox(tall: Boolean, content: @Composable () -> Unit) {
-    val max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * ASK_TALL).dp
+    val max = (windowHeightDp() * ASK_TALL).dp
     Box(
         Modifier
             .fillMaxWidth()
@@ -1615,7 +1610,7 @@ private fun AskBox(tall: Boolean, content: @Composable () -> Unit) {
 /** "Show all (40 lines)" under a cut command or change, "Show less" once it's whole. */
 @Composable
 private fun ShowAll(all: Boolean, lines: Int, onClick: () -> Unit) {
-    val text = if (all) stringResource(R.string.ask_show_less) else pluralStringResource(R.plurals.ask_show_all, lines, lines)
+    val text = if (all) stringResource(Str.ask_show_less) else pluralStringResource(Plural.ask_show_all, lines, lines)
     Box(
         Modifier
             .heightIn(min = 40.dp)
@@ -1673,9 +1668,9 @@ private const val ASK_LONG_LINE = 120
 @Composable
 private fun sessionToolLabel(tool: String): String = stringResource(
     when (tool) {
-        "WebFetch" -> R.string.session_tool_fetch
-        "WebSearch" -> R.string.session_tool_search
-        else -> R.string.session_tool_read
+        "WebFetch" -> Str.session_tool_fetch
+        "WebSearch" -> Str.session_tool_search
+        else -> Str.session_tool_read
     },
 )
 
@@ -1691,11 +1686,11 @@ private const val ASK_STEP_TALL = 0.45f
  */
 @Composable
 private fun QuestionAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
-    val view = LocalView.current
+    val haptics = rememberHaptics()
     val qs = item.questions
     var s by remember(item.key, qs) { mutableStateOf(QuestionSteps(qs)) }
     if (qs.isEmpty()) {
-        HText(item.detail.ifBlank { stringResource(R.string.approval_loading) }, style = Type.body, color = HN.ink)
+        HText(item.detail.ifBlank { stringResource(Str.approval_loading) }, style = Type.body, color = HN.ink)
     }
     // Typing under "Other…": once the keyboard is up, the buttons come up above it (and the composer).
     val bring = remember { BringIntoViewRequester() }
@@ -1715,10 +1710,10 @@ private fun QuestionAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
     val q = s.current
     if (q != null) {
         val i = s.at
-        val head = q.header.ifBlank { stringResource(R.string.question) }
-        val pick = if (q.multiSelect) stringResource(R.string.pick_many) else stringResource(R.string.pick_one)
+        val head = q.header.ifBlank { stringResource(Str.question) }
+        val pick = if (q.multiSelect) stringResource(Str.pick_many) else stringResource(Str.pick_one)
         Seam(
-            if (s.stepped) stringResource(R.string.ask_step, i + 1, s.count, head) else head,
+            if (s.stepped) stringResource(Str.ask_step, i + 1, s.count, head) else head,
             trail = pick,
             trailContent = if (s.stepped) {
                 {
@@ -1731,7 +1726,7 @@ private fun QuestionAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
             } else null,
         )
         Spacer(Modifier.height(8.dp))
-        val max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * ASK_STEP_TALL).dp
+        val max = (windowHeightDp() * ASK_STEP_TALL).dp
         // Each step scrolls on its own, from its top.
         androidx.compose.runtime.key(i) {
             Column(Modifier.fillMaxWidth().heightIn(max = max).verticalScroll(rememberScrollState())) {
@@ -1740,13 +1735,13 @@ private fun QuestionAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
                 val sel = s.chosen[i].orEmpty()
                 for (o in q.options) OptionRow(o, o.label in sel, q.multiSelect) { s = s.pick(o.label) }
                 val isOther = i in s.otherOn
-                OptionRow(Question.Option(stringResource(R.string.other), null), isOther, q.multiSelect) { s = s.toggleOther() }
+                OptionRow(Question.Option(stringResource(Str.other), null), isOther, q.multiSelect) { s = s.toggleOther() }
                 if (isOther) {
                     Spacer(Modifier.height(6.dp))
                     Field(
                         s.other[i].orEmpty(), { s = s.type(it) },
                         modifier = Modifier.onFocusChanged { typing = it.isFocused },
-                        placeholder = stringResource(R.string.other_hint), singleLine = false, maxLines = 4,
+                        placeholder = stringResource(Str.other_hint), singleLine = false, maxLines = 4,
                     )
                 }
             }
@@ -1759,18 +1754,18 @@ private fun QuestionAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
             .onSizeChanged { rowHeight = it.height },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Pill(stringResource(R.string.skip), { onAnswer(Answer.Deny) }, Modifier.weight(if (s.stepped) 0.8f else 1f), kind = PillKind.Ghost)
+        Pill(stringResource(Str.skip), { onAnswer(Answer.Deny) }, Modifier.weight(if (s.stepped) 0.8f else 1f), kind = PillKind.Ghost)
         if (s.stepped) {
-            Pill(stringResource(R.string.back), { s = s.back() }, Modifier.weight(1f), kind = PillKind.Outline, enabled = !s.isFirst)
+            Pill(stringResource(Str.back), { s = s.back() }, Modifier.weight(1f), kind = PillKind.Outline, enabled = !s.isFirst)
         }
         if (s.stepped && !s.isLast) {
-            Pill(stringResource(R.string.ask_next), { s = s.next() }, Modifier.weight(1.3f), kind = PillKind.Primary)
+            Pill(stringResource(Str.ask_next), { s = s.next() }, Modifier.weight(1.3f), kind = PillKind.Primary)
         } else {
             Pill(
-                if (s.stepped) stringResource(R.string.send_answers) else stringResource(R.string.send_answer),
+                if (s.stepped) stringResource(Str.send_answers) else stringResource(Str.send_answer),
                 {
                     if (s.complete) {
-                        view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
+                        haptics.confirm()
                         onAnswer(Answer.Answers(s.answers()))
                     }
                 },
@@ -1783,14 +1778,14 @@ private fun QuestionAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
     // On the last step with one left open: which, and a tap goes to it.
     val open = s.firstUnanswered
     if (s.stepped && s.isLast && open != null) {
-        val name = s.questions[open].header.ifBlank { stringResource(R.string.ask_step_n, open + 1) }
+        val name = s.questions[open].header.ifBlank { stringResource(Str.ask_step_n, open + 1) }
         Box(
             Modifier
                 .heightIn(min = 40.dp)
                 .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { s = s.jump(open) },
             contentAlignment = Alignment.CenterStart,
         ) {
-            HText(stringResource(R.string.ask_still_open, name), style = Type.small, color = HN.amber, maxLines = 1)
+            HText(stringResource(Str.ask_still_open, name), style = Type.small, color = HN.amber, maxLines = 1)
         }
     }
 }
@@ -1798,14 +1793,14 @@ private fun QuestionAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
 /** A dot for each question: filled once answered, ringed where you are; a tap goes to that question. */
 @Composable
 private fun StepDots(s: QuestionSteps, onJump: (Int) -> Unit) {
-    val yes = stringResource(R.string.ask_answered)
-    val no = stringResource(R.string.ask_unanswered)
+    val yes = stringResource(Str.ask_answered)
+    val no = stringResource(Str.ask_unanswered)
     Row(verticalAlignment = Alignment.CenterVertically) {
         for (i in 0 until s.count) {
             val done = s.answered(i)
             val here = i == s.at
-            val name = s.questions[i].header.ifBlank { stringResource(R.string.ask_step_n, i + 1) }
-            val said = stringResource(R.string.ask_step_said, i + 1, s.count, name, if (done) yes else no)
+            val name = s.questions[i].header.ifBlank { stringResource(Str.ask_step_n, i + 1) }
+            val said = stringResource(Str.ask_step_said, i + 1, s.count, name, if (done) yes else no)
             Box(
                 Modifier
                     .size(32.dp)
@@ -1855,20 +1850,20 @@ private fun OptionRow(o: Question.Option, selected: Boolean, multi: Boolean, onC
 /** ExitPlanMode: the plan, then Keep planning / Approve. */
 @Composable
 private fun PlanAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
-    val view = LocalView.current
+    val haptics = rememberHaptics()
     val plan = item.plan
     if (plan.isNullOrBlank()) {
-        HText(item.detail.ifBlank { stringResource(R.string.approval_loading) }, style = Type.body, color = HN.inkMuted)
+        HText(item.detail.ifBlank { stringResource(Str.approval_loading) }, style = Type.body, color = HN.inkMuted)
     } else {
         Markdown(plan, color = HN.inkMuted)
     }
     Spacer(Modifier.height(16.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.keep_planning), { onAnswer(Answer.KeepPlanning) }, Modifier.weight(1f), kind = PillKind.Outline)
+        Pill(stringResource(Str.keep_planning), { onAnswer(Answer.KeepPlanning) }, Modifier.weight(1f), kind = PillKind.Outline)
         Pill(
-            stringResource(R.string.approve_plan),
+            stringResource(Str.approve_plan),
             {
-                view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
+                haptics.confirm()
                 onAnswer(Answer.ApprovePlan)
             },
             Modifier.weight(1.2f), kind = PillKind.Primary,
@@ -1886,22 +1881,22 @@ private fun Folded(item: Item.Approval, resolved: Resolution) {
         else -> HN.accent
     }
     val text = when (resolved) {
-        Resolution.Allowed -> stringResource(R.string.allowed)
-        Resolution.AllowedSession -> stringResource(R.string.session_allowed, sessionToolLabel(item.tool))
-        Resolution.AllowedAlways -> if (item.approvalId == null) stringResource(R.string.always_allowed, "${item.tool}(${item.detail.substringBefore(' ')} …)") else stringResource(R.string.always_allowed_short)
-        Resolution.Denied -> stringResource(R.string.denied)
-        Resolution.TimedOut -> stringResource(R.string.denied_timeout)
-        Resolution.Answered -> stringResource(R.string.answered)
-        Resolution.PlanApproved -> stringResource(R.string.plan_approved)
-        Resolution.KeptPlanning -> stringResource(R.string.kept_planning)
-        Resolution.AnsweredOnMac -> stringResource(R.string.answered_on_mac)
-        Resolution.AnsweredElsewhere -> stringResource(R.string.answered_elsewhere)
-        Resolution.Closed -> stringResource(R.string.approval_closed)
+        Resolution.Allowed -> stringResource(Str.allowed)
+        Resolution.AllowedSession -> stringResource(Str.session_allowed, sessionToolLabel(item.tool))
+        Resolution.AllowedAlways -> if (item.approvalId == null) stringResource(Str.always_allowed, "${item.tool}(${item.detail.substringBefore(' ')} …)") else stringResource(Str.always_allowed_short)
+        Resolution.Denied -> stringResource(Str.denied)
+        Resolution.TimedOut -> stringResource(Str.denied_timeout)
+        Resolution.Answered -> stringResource(Str.answered)
+        Resolution.PlanApproved -> stringResource(Str.plan_approved)
+        Resolution.KeptPlanning -> stringResource(Str.kept_planning)
+        Resolution.AnsweredOnMac -> stringResource(Str.answered_on_mac)
+        Resolution.AnsweredElsewhere -> stringResource(Str.answered_elsewhere)
+        Resolution.Closed -> stringResource(Str.approval_closed)
     }
     val by = when {
         neutral -> null
-        item.by == "mac" -> stringResource(R.string.by_mac)
-        item.by == "terminal" -> stringResource(R.string.by_terminal)
+        item.by == "mac" -> stringResource(Str.by_mac)
+        item.by == "terminal" -> stringResource(Str.by_terminal)
         else -> null
     }
     Row(Modifier.heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {

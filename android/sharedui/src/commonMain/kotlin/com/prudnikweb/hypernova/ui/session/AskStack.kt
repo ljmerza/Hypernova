@@ -19,13 +19,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.theme.pluralStringResource
+import com.prudnikweb.hypernova.ui.theme.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.ui.theme.HN
@@ -90,12 +91,12 @@ internal fun AskStack(asks: List<Item.Approval>, modifier: Modifier = Modifier, 
     }
     val behind = asks.filter { it.key != front.key }.take(SHOWN_BEHIND)
     val shape = RoundedCornerShape(16.dp)
-    val bring = stringResource(R.string.asks_bring_forward)
+    val bring = stringResource(Str.asks_bring_forward)
     // TalkBack hears which one is in front and how many wait ("1 of 3 waiting for you").
-    val said = stringResource(R.string.asks_front_said, asks.indexOf(front) + 1, asks.size)
+    val said = stringResource(Str.asks_front_said, asks.indexOf(front) + 1, asks.size)
     Column(modifier) {
         HText(
-            pluralStringResource(R.plurals.asks_waiting, asks.size, asks.size).uppercase(), style = Type.label, color = HN.amber, maxLines = 1,
+            pluralStringResource(Plural.asks_waiting, asks.size, asks.size).uppercase(), style = Type.label, color = HN.amber, maxLines = 1,
             modifier = Modifier.padding(start = 4.dp, bottom = 6.dp).semantics { contentDescription = said },
         )
         Box {
@@ -104,10 +105,10 @@ internal fun AskStack(asks: List<Item.Approval>, modifier: Modifier = Modifier, 
                 val a = behind[depth - 1]
                 val what = when (a.kind) {
                     ApprovalKind.Tool -> a.tool.substringAfterLast("__")
-                    ApprovalKind.Question -> stringResource(R.string.question)
-                    ApprovalKind.Plan -> stringResource(R.string.plan)
+                    ApprovalKind.Question -> stringResource(Str.question)
+                    ApprovalKind.Plan -> stringResource(Str.plan)
                 }
-                val behindSaid = stringResource(R.string.asks_behind_said, what, a.detail.lineSequence().firstOrNull().orEmpty().take(80), asks.indexOf(a) + 1, asks.size)
+                val behindSaid = stringResource(Str.asks_behind_said, what, a.detail.lineSequence().firstOrNull().orEmpty().take(80), asks.indexOf(a) + 1, asks.size)
                 Box(
                     Modifier
                         .padding(top = PEEK * (behind.size - depth), start = INSET * depth, end = INSET * depth)
