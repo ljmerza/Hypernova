@@ -114,17 +114,32 @@ object Servers {
     }
 
     /**
-     * The list with [p] in it: in the place of the same computer (its id kept), or added at the end
-     * under [newId]. Returns the list and the id [p] is kept under.
+     * Whether pairing [new] may take [old]'s place. The id and the name are only what the answer
+     * says, and a link can point anywhere, so they alone never put a server's token aside
+     * (docs/DECISIONS.md, "Scan in the app"): it must also have answered with [old]'s certificate,
+     * pinned, or at [old]'s very address, which is where [old]'s requests go anyway.
+     */
+    fun takesPlaceOf(old: Pairing, new: Pairing): Boolean {
+        if (!sameComputer(old, new)) return false
+        return if (new.pinnedAt != null) old.fingerprint == new.fingerprint else sameBase(old, new.baseUrl)
+    }
+
+    private fun sameBase(p: Pairing, base: String) = p.baseUrl.trimEnd('/') == base.trimEnd('/')
+
+    /**
+     * The list with [p] in it: in the place of the same computer ([takesPlaceOf]; its id kept), or
+     * added at the end under [newId], on a base URL no other server has when it can (the routes go
+     * by it: [ActiveRoutes]). Returns the list and the id [p] is kept under.
      */
     fun withPairing(list: List<Server>, p: Pairing, newId: () -> String = ::newId): Pair<List<Server>, String> {
-        val i = list.indexOfFirst { sameComputer(it.pairing, p) }
+        val i = list.indexOfFirst { takesPlaceOf(it.pairing, p) }
         if (i >= 0) {
             val id = list[i].id
-            return list.toMutableList().also { it[i] = Server(id, p) } to id
+            return list.toMutableList().also { it[i] = Server(id, p.copy(pinnedAt = null)) } to id
         }
         val id = generateSequence { newId() }.first { n -> list.none { it.id == n } }
-        return list + Server(id, p) to id
+        val base = p.pinnedAt?.takeIf { list.any { s -> sameBase(s.pairing, p.baseUrl) } } ?: p.baseUrl
+        return list + Server(id, p.copy(baseUrl = base, pinnedAt = null)) to id
     }
 
     /** The active server after [removed] goes: the same one, or the first left (null: none left). */

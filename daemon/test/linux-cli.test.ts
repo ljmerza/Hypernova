@@ -454,6 +454,19 @@ test('the QR code: the smallest version, the finder and timing patterns, the for
   assert.ok(qrLines(qr, { ansi: true })[0]!.startsWith('\x1b[38;5;16;48;5;231m'))
 })
 
+// The app's test decodes these same lines with its scanner (QrFramesTest): this holds them to what the
+// encoder makes, so the phone's side is always reading what `hypernova pair` really draws.
+test('the QR codes in protocol/pair-qr.json are this encoder\'s, as a terminal draws them', () => {
+  const file = join(import.meta.dirname, '..', '..', 'protocol', 'pair-qr.json')
+  const codes = JSON.parse(readFileSync(file, 'utf8')).codes as { link: string; version: number; lines: string[] }[]
+  assert.ok(codes.length >= 2)
+  for (const c of codes) {
+    const qr = encodeQr(c.link, 'M')
+    assert.equal(qr.version, c.version, c.link)
+    assert.deepEqual(qrLines(qr, { quiet: 2 }), c.lines, c.link)
+  }
+})
+
 // ── The commands, against the stand-in daemon ─────────────────────────────
 
 const claudeAnswers = (signedIn: boolean) => (cmd: string, args: string[]): Answer => {
@@ -475,7 +488,10 @@ test('pair: the QR code and its link, and what to do when the local route is off
   assert.ok(sys.out.some((l) => /^  [ ▀▄█]{20,}$/.test(l)), 'a QR code')
   // With no listener the daemon's link is the app's own: pasted in the app, never a site.
   assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`))
-  assert.match(text, /Paste the link in Hypernova \(Paste pairing link\):/)
+  // No page to open with the route off: Scan reads the app's own link, and the phone's camera wouldn't.
+  assert.match(text, /On the phone, open Hypernova and tap Scan/)
+  assert.doesNotMatch(text, /phone’s own camera/)
+  assert.match(text, /To paste instead, in Hypernova \(Paste pairing link\) or on a computer:/)
   assert.doesNotMatch(text, /hypernova\.observer/)
   assert.match(text, /It works once, for 10 minutes \(until \d\d:\d\d\)\./)
   // --no-qr leaves the code out.
@@ -511,7 +527,12 @@ test('pair with the local route on: the link, no warning, and where to get the a
   assert.equal(await pair(ctx(sys, { apiPort: daemon.api, localPort: daemon.local }), { 'no-wait': true }), 0)
   const text = sys.out.join('\n')
   assert.ok(sys.out.includes(`  ${daemon.pairLink.link}`), text)
-  assert.match(text, /Scan it with the phone’s camera, on this network or over your VPN into it\. The browser warns once about this server’s own certificate/)
+  // Scan first, then the phone's own camera, then the link for pasting, and no code on its own line.
+  const scan = text.indexOf('On the phone, open Hypernova and tap Scan, on this network or over your VPN into it.')
+  const camera = text.indexOf('Or use the phone’s own camera: the browser warns once about this server’s certificate')
+  const paste = text.indexOf('To paste instead')
+  assert.ok(scan >= 0 && scan < camera && camera < paste && paste < text.indexOf(daemon.pairLink.link), text)
+  assert.doesNotMatch(text, /^Code:/m)
   assert.doesNotMatch(text, /no way in|Tailscale|hypernova\.observer/)
   // Where to get the app is said whenever the daemon knows (the page the code opens without the
   // app points here): the listener at this server's address.

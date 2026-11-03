@@ -1,7 +1,13 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.onboarding
 
+import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalDensity
 import com.prudnikweb.hypernova.ui.components.clipboardText
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import android.content.ClipboardManager
@@ -52,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -89,23 +96,43 @@ private const val SERVER_RELEASES = "https://github.com/ljmerza/Hypernova/releas
 
 /**
  * Not paired yet: three short steps (install Hypernova on the server, run hypernova pair there, scan
- * the code or use its link) and a paste fallback for the link.
+ * the code) with Scan, and a paste fallback for the link. A phone with no camera has only the paste.
  * With [onClose] ("Add a server" from the switcher, others paired already): the same steps over the
- * app, titled for adding one, with Cancel at the bottom, and Back closes them. The bottom button
- * stays put above the navigation bar (and the keyboard) while the steps scroll.
+ * app, titled for adding one, with Cancel at the bottom, and Back closes them. The bottom buttons
+ * stay put above the navigation bar (and the keyboard) while the steps scroll. What Scan reads goes
+ * to [onPaste] like a pasted link: the owner started both, so neither asks again.
  */
 @Composable
-fun Onboarding(onPaste: (String) -> Unit, onClose: (() -> Unit)? = null) {
+fun Onboarding(onPaste: (String) -> Unit, onClose: (() -> Unit)? = null, camera: ScanCamera = PhoneCamera) {
     if (onClose != null) BackHandler(onBack = onClose)
     val context = LocalContext.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var pasting by rememberSaveable { mutableStateOf(false) }
     var link by rememberSaveable { mutableStateOf("") }
     val adding = onClose != null
+    val hasCamera = remember { camera.present(context) }
+    var scanning by rememberSaveable { mutableStateOf(false) }
+    // Refused: said once here, and asked again only by another tap on Scan.
+    var refused by rememberSaveable { mutableStateOf(false) }
+    val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+        refused = !allowed
+        scanning = allowed
+    }
+    val scan = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            refused = false
+            scanning = true
+        } else askCamera.launch(Manifest.permission.CAMERA)
+    }
+    val paste = {
+        val clip = clipboardText(context)
+        if (PairLinks.parse(clip) != null) onPaste(clip!!) else pasting = true
+    }
 
     val haze = LocalHaze.current
     Box(Modifier.fillMaxSize().background(HN.bg.copy(alpha = 0.5f))) {
-    Column(Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = ONBOARDING)) {
+    // TalkBack doesn't wander into the steps behind the scanner.
+    Column(Modifier.fillMaxSize().hazeSource(haze, zIndex = Z.CONTENT, key = ONBOARDING).then(if (scanning) Modifier.clearAndSetSemantics {} else Modifier)) {
     Column(
         Modifier
             .weight(1f)
@@ -131,19 +158,21 @@ fun Onboarding(onPaste: (String) -> Unit, onClose: (() -> Unit)? = null) {
         Spacer(Modifier.height(10.dp))
         Step(2, stringResource(R.string.onb_step2_title), stringResource(R.string.onb_step2_body))
         Spacer(Modifier.height(10.dp))
-        Step(3, stringResource(R.string.onb_step3_title), stringResource(R.string.onb_step3_body))
-
-        Spacer(Modifier.height(26.dp))
-        Seam(stringResource(R.string.onb_or))
-        Spacer(Modifier.height(14.dp))
-        Pill(
-            stringResource(R.string.onb_paste),
-            {
-                val clip = clipboardText(context)
-                if (PairLinks.parse(clip) != null) onPaste(clip!!) else pasting = true
-            },
-            Modifier.fillMaxWidth(), kind = PillKind.Outline, height = 48.dp,
+        Step(
+            3,
+            stringResource(if (hasCamera) R.string.onb_step3_title else R.string.onb_step3_title_paste),
+            stringResource(if (hasCamera) R.string.onb_step3_body else R.string.onb_step3_body_paste),
         )
+
+        // Refused the camera: Paste comes down to where Scan is, as the way on.
+        if (!refused) {
+            Spacer(Modifier.height(26.dp))
+            if (hasCamera) {
+                Seam(stringResource(R.string.onb_or))
+                Spacer(Modifier.height(14.dp))
+            }
+            Pill(stringResource(R.string.onb_paste), paste, Modifier.fillMaxWidth(), kind = PillKind.Outline, height = 48.dp)
+        }
         AnimatedVisibility(pasting, enter = fadeIn(tween(Motion.DIALOG)) + expandVertically(tween(Motion.REVEAL, easing = Motion.Expo)), exit = fadeOut()) {
             Column(Modifier.padding(top = 14.dp)) {
                 HText(stringResource(R.string.onb_paste_help), style = Type.small, color = HN.inkMuted)
@@ -163,19 +192,42 @@ fun Onboarding(onPaste: (String) -> Unit, onClose: (() -> Unit)? = null) {
             }
         }
     }
-    // Cancel never scrolls under the navigation bar: it sits above it, and above the keyboard while
-    // the link is typed in (with no Cancel, the steps still end above them).
-    Box(
+    // Scan and Cancel never scroll under the navigation bar: they sit above it, and Cancel above the
+    // keyboard while the link is typed in, Scan out of its way (with neither, the steps still end above them).
+    val keyboard = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    Column(
         Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
             .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (hasCamera && !keyboard) {
+            if (refused) {
+                HText(stringResource(R.string.onb_scan_refused), style = Type.small, color = HN.inkMuted)
+                Pill(stringResource(R.string.onb_paste), paste, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 48.dp)
+            }
+            Pill(stringResource(R.string.onb_scan), scan, Modifier.fillMaxWidth(), kind = if (refused) PillKind.Outline else PillKind.Primary, height = 50.dp)
+        }
         if (onClose != null) Pill(stringResource(R.string.cancel), onClose, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
     }
     }
     // Whatever scrolls under the status bar is blurred, like every other screen.
     BlurredTop(haze, ONBOARDING, Modifier.fillMaxWidth(), fade = 14.dp) { Spacer(Modifier.height(top + 18.dp)) }
+    if (scanning) {
+        ScanScreen(
+            camera,
+            onCode = {
+                scanning = false
+                onPaste(it)
+            },
+            onPaste = {
+                scanning = false
+                paste()
+            },
+            onClose = { scanning = false },
+        )
+    }
     }
 }
 
@@ -325,6 +377,52 @@ fun PairScreen(flow: PairFlow, onRetry: (PairLink) -> Unit, onClose: () -> Unit,
     }
 }
 
+private const val OFFER_ARMS_MS = 600L
+private const val OFFER_PLACES = 4
+
+/**
+ * "Add this server?" for a link from outside the app (HubViewModel.offerLink), over whatever is on
+ * screen, which stays as it is: the link's name and every address the code would go to, as the link's
+ * own claims, since nothing has answered yet. Add waits a moment after a link arrives, so a tap meant
+ * for what was on screen can't land on it.
+ */
+@Composable
+fun OfferScreen(link: PairLink, onAdd: () -> Unit, onCancel: () -> Unit) {
+    BackHandler(onBack = onCancel)
+    var armed by remember(link) { mutableStateOf(false) }
+    LaunchedEffect(link) {
+        delay(OFFER_ARMS_MS)
+        armed = true
+    }
+    Box(Modifier.fillMaxSize().background(HN.bg).pointerBlock()) {
+        StateScreen(
+            mark = { StateMark(HN.accent, null) },
+            label = stringResource(R.string.pair_label), live = false,
+            title = stringResource(R.string.pair_offer_title),
+            body = stringResource(R.string.pair_offer_body),
+        ) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    HText(stringResource(R.string.pair_offer_name), style = Type.small, color = HN.inkMuted)
+                    Spacer(Modifier.height(2.dp))
+                    HText(link.macName, style = Type.heading, color = HN.ink)
+                    Spacer(Modifier.height(12.dp))
+                    HText(stringResource(R.string.pair_offer_address), style = Type.small, color = HN.inkMuted)
+                    Spacer(Modifier.height(2.dp))
+                    val places = link.places
+                    for (place in places.take(OFFER_PLACES)) HText(place, style = Type.mono, color = HN.ink)
+                    if (places.size > OFFER_PLACES) HText(stringResource(R.string.pair_offer_more, places.size - OFFER_PLACES), style = Type.small, color = HN.inkMuted)
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Pill(stringResource(R.string.pair_offer_add), onAdd, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 50.dp, enabled = armed)
+                Pill(stringResource(R.string.cancel), onCancel, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
+            }
+        }
+    }
+}
+
 /** The Mac answered 401: this phone's token is gone. */
 @Composable
 fun UnpairedScreen(macName: String, onPairAgain: () -> Unit) {
@@ -343,6 +441,6 @@ fun UnpairedScreen(macName: String, onPairAgain: () -> Unit) {
 }
 
 /** Eats taps so the screen underneath doesn't get them. */
-private fun Modifier.pointerBlock(): Modifier = this.then(
+internal fun Modifier.pointerBlock(): Modifier = this.then(
     Modifier.pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } } },
 )

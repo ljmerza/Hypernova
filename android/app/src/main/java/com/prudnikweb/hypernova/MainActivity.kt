@@ -97,14 +97,15 @@ class MainActivity : ComponentActivity() {
         // With Home on "All servers" a session opens on its computer and All stays (vm.pendingServer).
         if (intent.action == ACTION_OPEN_SESSION) vm.pendingServer = null
         // With All servers each has its own section of Settings: a failed update's stays on All too.
-        intent.getStringExtra(EXTRA_SERVER)?.let {
+        // A pairing link chooses nothing but the question it asks: an intent:// link can carry any extra a page likes.
+        if (link == null) intent.getStringExtra(EXTRA_SERVER)?.let {
             if (vm.allServers && intent.action == ACTION_OPEN_SESSION) vm.pendingServer = it
             else if (!(vm.allServers && intent.action == ACTION_SERVER_UPDATE)) vm.switchServer(it)
         }
         when {
             // The app link hypernova://pair?…, as the server's pairing page (its QR code) hands it
-            // over, or adb: data/Pairing.kt, PairLinks.
-            link == com.prudnikweb.hypernova.data.PairLinks.Kind.Pair -> vm.handleLink(intent.dataString)
+            // over, or from anything else on the phone: data/Pairing.kt, PairLinks. It asks first.
+            link == com.prudnikweb.hypernova.data.PairLinks.Kind.Pair -> vm.offerLink(intent.dataString)
             intent.action == ACTION_OPEN_SESSION -> vm.pendingOpen = intent.getStringExtra(EXTRA_SESSION)
             // An automation's note with no session to open: the automation, or the tab for several.
             intent.action == com.prudnikweb.hypernova.data.AutomationNotes.ACTION_OPEN ->

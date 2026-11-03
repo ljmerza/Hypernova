@@ -10,7 +10,8 @@ libraries bundled inside Mermaid's and the unicode-graphemes add-on's single fil
 
 | Component | Licence |
 | --- | --- |
-| AndroidX (Core, Activity, Lifecycle) and Jetpack Compose (UI, Foundation, Animation, Graphics) | Apache-2.0 |
+| AndroidX (Core, Activity, Lifecycle, CameraX, with the Dagger runtime CameraX uses) and Jetpack Compose (UI, Foundation, Animation, Graphics) | Apache-2.0 |
+| ZXing core 3.5.4 (`com.google.zxing:core`; reads the QR code in Scan). The ZXing project's NOTICE: "Barcode4J, Copyright 2002-2010 Jeremias Märki, Copyright 2005-2006 Dietmar Bürkle. Portions of this software were contributed under section 5 of the Apache License. Contributors are listed under: http://barcode4j.sourceforge.net/contributors.html"; "JCommander, Copyright 2010 Cedric Beust cedric@beust.com" | Apache-2.0 |
 | Haze (`dev.chrisbanes.haze`) | Apache-2.0 |
 | OkHttp and Okio (Square) | Apache-2.0 |
 | Kotlin standard library and kotlinx.coroutines (JetBrains) | Apache-2.0 |

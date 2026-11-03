@@ -88,21 +88,26 @@ You only do this once. (Once you've paired, Home's account card on the phone can
    hypernova pair
    ```
 
-   It shows the pairing code as a QR code, and the link under it. It also says where to get the app:
+   It shows a QR code for the phone, and under it the same thing as a link, for pasting. It also says where to get the app:
    the releases page, or the server's own download page once the server has fetched the release's app,
    soon after it starts.
-3. **Scan it** with the phone's camera, with the phone on the server's network (on a VPS or cloud VM,
-   see [Away from home, or on a VPS](#away-from-home-or-on-a-vps) first). This opens the server's own
-   pairing page, `https://<the server's address>:47323/pair?…`. Your browser warns once
-   about the server's own certificate: go on (**Advanced**, then **Proceed**), and the page opens
-   Hypernova, which pairs. The server says `Paired with …`.
+3. **Open Hypernova and tap Scan**, with the phone on the server's network (on a VPS or cloud VM,
+   see [Away from home, or on a VPS](#away-from-home-or-on-a-vps) first). Android asks once to let it
+   use the camera. Point it at the code: it pairs with no other tap, and names the server it added.
+   The server says `Paired with …`.
 
-   No camera, or a window too narrow for the code? Copy the link under it and use **Paste pairing
-   link** in the app. A code works once and lasts 10 minutes; `hypernova pair` again makes a new one.
+   Would rather use the phone's own camera? It opens the server's own pairing page,
+   `https://<the server's address>:47323/pair?…`. Your browser warns once about the server's own
+   certificate: go on (**Advanced**, then **Proceed**). The page opens Hypernova, which shows **Add this
+   server?** with the name and address the link gives: tap **Add server**.
+
+   No camera, the camera refused, or a window too narrow for the code? Copy the link under it and use
+   **Paste pairing link** in the app. A code works once and lasts 10 minutes; `hypernova pair` again
+   makes a new one.
 4. **Allow notifications** when the app asks, so approvals reach you with the app closed.
 
-To add another server, run `hypernova pair` on it. The ones you paired stay, and Home's chip switches
-between them.
+To add another server, run `hypernova pair` on it, then **Add a server** on Home's chip and **Scan**. The
+ones you paired stay, and Home's chip switches between them.
 
 ### 4. Check it
 

@@ -21,7 +21,7 @@ Each command's flags are in the rows under it.
 | `--no-claude` | Don't install Claude Code (Codex alone). |
 | `--no-service` | Skip the service. |
 | `--no-integration` | Skip the hooks and the shell function (a container image). |
-| **`hypernova pair`** | The pairing QR code and link (the server's own page on the local route), and where to get the app. Waits for the phone and names it. A code works once, for 10 minutes. With the local route off it says so and prints the app's own `hypernova://pair` link. Exit 1 when the daemon isn't running or the code runs out. |
+| **`hypernova pair`** | The pairing QR code, for the phone (Scan in the app, or the phone's own camera), and the same link printed for pasting on a computer (the server's own page on the local route), and where to get the app. Waits for the phone and names it. A code works once, for 10 minutes. With the local route off it says so and prints the app's own `hypernova://pair` link. Exit 1 when the daemon isn't running or the code runs out. |
 | `--no-wait`, `--no-wait-phone` | Don't wait for the phone. |
 | `--no-qr` | The link and code only. |
 | **`hypernova status`** | What runs, how phones reach it, Claude Code, Codex, the integration, paired devices, sessions. Exit 1 when the daemon isn't running. |

@@ -182,6 +182,10 @@ pair() {
   link="$before"
   log "Pairing with $name…"
   ad shell "am start -a android.intent.action.VIEW -d '$link' $PKG" >/dev/null
+  # A link from outside the app asks first ("Add this server?"), and Add waits a moment.
+  wait_for 'Add server' 20
+  settle 1
+  tap_text 'Add server'
   local i
   for i in $(seq 1 30); do
     # The server writes a new code as soon as this one is used.

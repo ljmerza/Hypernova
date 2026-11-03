@@ -200,8 +200,15 @@
     <string name="onb_step1_link">Open the releases</string>
     <string name="onb_step2_title">Run hypernova pair on it</string>
     <string name="onb_step2_body">In a terminal on the server, run hypernova pair. It shows a QR code and a link under it.</string>
-    <string name="onb_step3_title">Scan the code, or use the link</string>
-    <string name="onb_step3_body">Point this phone\'s camera at the QR code, at home or over your VPN: it opens the server\'s own page (your browser warns once about the server\'s certificate: go on), which opens Hypernova and pairs. Or paste the link below.</string>
+    <string name="onb_step3_title">Scan the QR code</string>
+    <string name="onb_step3_body">Tap Scan and point this phone at the code, at home or over your VPN. It pairs by itself. Or paste the link below.</string>
+    <string name="onb_step3_title_paste">Paste the link</string>
+    <string name="onb_step3_body_paste">Copy the link under the QR code and paste it below, at home or over your VPN.</string>
+    <string name="onb_scan">Scan</string>
+    <string name="onb_scan_refused">Hypernova can\'t scan without the camera. Paste the link instead, or allow the camera in Android\'s settings and tap Scan.</string>
+    <string name="scan_title">Point at the QR code</string>
+    <string name="scan_hint">The one hypernova pair shows on your server. It pairs as soon as it reads it.</string>
+    <string name="scan_failed">The camera wouldn\'t start. Paste the link instead.</string>
     <string name="onb_step">Step %1$d</string>
     <string name="onb_paste">Paste pairing link</string>
     <string name="onb_paste_hint">https://192.168.1.20:47323/pair?c=…</string>
@@ -229,6 +236,12 @@
     <string name="pair_bad_link_body">It isn\'t a Hypernova pairing link. Run hypernova pair on your server again and scan the new code.</string>
     <string name="pair_back">Back</string>
     <string name="pair_label">Pairing</string>
+    <string name="pair_offer_title">Add this server?</string>
+    <string name="pair_offer_body">A link wants to add it to this phone. Hypernova can\'t check what the link says, so add it only if you just ran hypernova pair there.</string>
+    <string name="pair_offer_name">The link\'s name for it</string>
+    <string name="pair_offer_address">The link\'s address for it</string>
+    <string name="pair_offer_more">and %1$d more</string>
+    <string name="pair_offer_add">Add server</string>
 
     <!-- Unpaired -->
     <string name="unpaired_title">This phone was unpaired.</string>

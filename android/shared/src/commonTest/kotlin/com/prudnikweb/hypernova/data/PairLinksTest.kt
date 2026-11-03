@@ -149,4 +149,40 @@ class PairLinksTest {
         assertEquals(plain, hinted)
         assertTrue(hinted.hasLan)
     }
+
+    // ─── What "Add this server?" shows: the link's claims, as what they'd really do ───
+
+    private val fpHex = "ab".repeat(32)
+
+    @Test fun theNameIsOneShortLineWithNothingThatTurnsTheWordsRound() {
+        val l = PairLinks.parse("hypernova://pair?v=1&u=https%3A%2F%2F192.168.1.2%3A47323&c=abc&n=z2%0AYour%20bank%E2%80%AE%E2%80%8B")!!
+        assertEquals("z2 Your bank", l.macName)
+        val long = PairLinks.parse("https://192.168.1.2:47323/pair?c=abc&n=" + "x".repeat(500))!!
+        assertEquals(60, long.macName.length)
+        // Nothing left of it: as with no name at all.
+        assertEquals("192", PairLinks.parse("https://192.168.1.2:47323/pair?c=abc&n=%E2%80%AE%0A")!!.macName)
+    }
+
+    @Test fun thePlacesAreEveryAddressTheCodeWouldGoToInOrder() {
+        val page = PairLinks.parse("https://192.168.1.48:47323/pair?c=abc&n=z2&fp=$fpHex&lan=192.168.1.48,192.168.1.76&lp=47323")!!
+        assertEquals("u is the first listener: named once", listOf("192.168.1.48:47323", "192.168.1.76:47323"), page.places)
+        // A listener nobody answers on, and the code goes to `u` next: the screen can't name only the friendly one.
+        val other = PairLinks.parse("hypernova://pair?v=1&u=https%3A%2F%2F203.0.113.9%3A443&c=abc&n=z2&fp=$fpHex&lan=192.168.1.48&lp=47323")!!
+        assertEquals(listOf("192.168.1.48:47323", "203.0.113.9:443"), other.places)
+        // No fingerprint: the listeners aren't tried at all, so they aren't named.
+        val noPin = PairLinks.parse("hypernova://pair?v=1&u=https%3A%2F%2F203.0.113.9%3A443&c=abc&lan=192.168.1.48&lp=47323")!!
+        assertEquals(listOf("203.0.113.9:443"), noPin.places)
+        val v6 = PairLinks.parse("hypernova://pair?v=1&u=https%3A%2F%2F%5Bfd00%3A%3A1%5D%3A47323&c=abc&fp=$fpHex&lan=fd00::1&lp=47323")!!
+        assertEquals(listOf("[fd00::1]:47323"), v6.places)
+    }
+
+    @Test fun whatsBeforeAnAtSignIsNotTheAddress() {
+        val l = PairLinks.parse("hypernova://pair?v=1&u=https%3A%2F%2Fz2.local%40evil.example%3A47323&c=abc&n=z2")!!
+        assertEquals(listOf("evil.example:47323"), l.places)
+    }
+
+    @Test fun aLinkPrintedAnywhereKeepsItsCode() {
+        val l = PairLinks.parse("https://192.168.1.48:47323/pair?c=sekret-code&n=z2&fp=$fpHex&lan=192.168.1.48&lp=47323")!!
+        for (shown in listOf(l.toString(), l.places.joinToString())) assertFalse(shown, shown.contains("sekret-code"))
+    }
 }

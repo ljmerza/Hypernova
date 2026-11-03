@@ -157,7 +157,33 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
 
     // ─── Pairing ───────────────────────────────────────────────────────────
 
-    /** A link from the camera, a paste, or an intent. */
+    /** "Add this server?": a link from outside the app, waiting for its one tap. */
+    var offeredLink by mutableStateOf<PairLink?>(null)
+        private set
+
+    /**
+     * A link from outside the app (the server's page handing over, a browser, another app): anything
+     * can send one, so nothing happens until the owner says, and it asks first. It leaves a pairing
+     * under way and every server alone. A link that can't be read says so only if nothing else is on.
+     */
+    fun offerLink(text: String?) {
+        val link = PairLinks.parse(text)
+        if (link != null) offeredLink = link
+        else if (pairFlow == null && offeredLink == null) pairFlow = PairFlow.Failed(null, null, null)
+    }
+
+    /** The tap on "Add this server?". */
+    fun acceptOffer() {
+        val link = offeredLink ?: return
+        offeredLink = null
+        addingServer = false
+        pair(link)
+    }
+
+    /** Cancel on "Add this server?": nothing was sent, so nothing is spent. */
+    fun declineOffer() { offeredLink = null }
+
+    /** A link the owner gave the app themselves, by Scan or a paste: nothing more to ask. */
     fun handleLink(text: String?) {
         val link = PairLinks.parse(text)
         if (link == null) {
