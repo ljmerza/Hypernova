@@ -1,5 +1,12 @@
 package com.prudnikweb.hypernova.desktop.ui
 
+import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.Pill
+import com.prudnikweb.hypernova.ui.components.PillKind
+import com.prudnikweb.hypernova.ui.components.Seam
+import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.HText
+import com.prudnikweb.hypernova.ui.theme.Type
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -92,7 +99,7 @@ fun SettingsScreen(shell: Shell) {
 @Composable
 private fun Typing() {
     val enter = EnterKeyPref.state().value
-    Seam(Ui.st_enter_key.text(), MarkKind.Idle)
+    Seam(Ui.st_enter_key.text())
     Spacer(Modifier.height(10.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -114,7 +121,7 @@ private fun Typing() {
 /** Whether alerts can reach the owner here, and that they stop with the app. */
 @Composable
 private fun Alerts() {
-    Seam(Ui.desk_alerts_title.text(), MarkKind.Idle)
+    Seam(Ui.desk_alerts_title.text())
     Spacer(Modifier.height(10.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -131,7 +138,7 @@ private fun KeyPlaceSection() {
     val platform = Core.platform as? DesktopPlatform ?: return
     val place = platform.keys.place
     val tokens = platform.tokens
-    Seam(Ui.desk_key_title.text(), MarkKind.Idle)
+    Seam(Ui.desk_key_title.text())
     Spacer(Modifier.height(10.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
@@ -202,7 +209,7 @@ private fun DebugLogging(shell: Shell) {
     val flow = remember(l) { DebugSendFlow(scope, { l }) }
     LaunchedEffect(l) { withContext(Dispatchers.IO) { l.refresh() } }
     val confirming = remember { androidx.compose.runtime.mutableStateOf(false) }
-    Seam(Ui.debuglog_title.text(), MarkKind.Idle)
+    Seam(Ui.debuglog_title.text())
     Spacer(Modifier.height(10.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {

@@ -839,7 +839,7 @@ private class MoonOrbit {
  * struck through; unpaired, a hollow one.
  */
 @Composable
-private fun MacMoon(state: LinkState, tone: State<Color>) {
+internal fun MacMoon(state: LinkState, tone: State<Color>) {
     val clock = LocalAmbient.current
     val reduced = LocalMotion.current.reduced
     val searching = state == LinkState.Connecting || state == LinkState.Reconnecting

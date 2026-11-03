@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.desktop.ui
 
+import com.prudnikweb.hypernova.ui.theme.HN
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable

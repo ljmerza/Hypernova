@@ -1,5 +1,12 @@
 package com.prudnikweb.hypernova.desktop.ui
 
+import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.Pill
+import com.prudnikweb.hypernova.ui.components.PillKind
+import com.prudnikweb.hypernova.ui.components.Seam
+import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.HText
+import com.prudnikweb.hypernova.ui.theme.Type
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,7 +70,7 @@ fun Root(shell: Shell, tokens: DesktopTokens, reduced: Boolean = false) {
 private fun WaitCard(tokens: DesktopTokens, modifier: Modifier = Modifier) {
     GlassCard(Modifier.widthIn(max = 560.dp).fillMaxWidth().then(modifier), edge = HN.amber) {
         Column(Modifier.padding(20.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
-            Seam(Ui.desk_wait_title.text(), MarkKind.Idle, color = HN.amber)
+            Seam(Ui.desk_wait_title.text(), color = HN.amber)
             Spacer(Modifier.height(12.dp))
             for (w in tokens.waiting) {
                 HText(waitWords(w), style = Type.small)

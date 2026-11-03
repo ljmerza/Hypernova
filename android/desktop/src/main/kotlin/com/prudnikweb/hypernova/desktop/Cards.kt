@@ -11,6 +11,7 @@ import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.TerminalAsk
 import com.prudnikweb.hypernova.data.WApproval
+import com.prudnikweb.hypernova.ui.fx.formatDuration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -153,17 +154,8 @@ fun clockWords(at: Long, now: Long, zone: ZoneId): String {
     return DateTimeFormatter.ofPattern(pattern, DesktopStrings.locale).format(whenThen)
 }
 
-/** How long, as the phone's Countdown words it. */
-fun durationWords(ms: Long): String {
-    val s = (ms + 999) / 1000
-    return when {
-        s < 60 -> Ui.dur_s.format(0, s)
-        s < 600 -> Ui.dur_s.format(s / 60, s % 60)
-        s < 3600 -> Ui.dur_m.format(s / 60)
-        s < 86400 -> Ui.dur_hm.format(s / 3600, (s % 3600) / 60)
-        else -> Ui.dur_dh.format(s / 86400, (s % 86400) / 3600)
-    }
-}
+/** How long, in the phone's own words for it. */
+fun durationWords(ms: Long): String = formatDuration(DesktopStrings, ms)
 
 /** How long ago, as a phone's Completed card says it. */
 fun agoWords(ms: Long): String {

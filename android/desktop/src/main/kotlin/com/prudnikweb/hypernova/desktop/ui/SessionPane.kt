@@ -1,5 +1,13 @@
 package com.prudnikweb.hypernova.desktop.ui
 
+import com.prudnikweb.hypernova.ui.components.Activity
+import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.Pill
+import com.prudnikweb.hypernova.ui.components.PillKind
+import com.prudnikweb.hypernova.ui.components.Seam
+import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.HText
+import com.prudnikweb.hypernova.ui.theme.Type
 import androidx.compose.foundation.LocalScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
@@ -138,9 +146,10 @@ private fun AskCard(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Mo
     GlassCard(modifier, edge = if (needs) HN.amber else null) {
         Column(Modifier.padding(16.dp)) {
             Seam(
-                s.project, if (needs) MarkKind.NeedsYou else if (s.busy) MarkKind.Working else MarkKind.Idle,
+                s.project, activity = if (needs) Activity.Alert else if (s.busy) Activity.Live else Activity.Rest,
                 color = if (needs) HN.amber else HN.inkMuted,
-            ) { HText(s.hex, style = Type.monoSmall, color = HN.inkDim, maxLines = 1) }
+                trailContent = { HText(s.hex, style = Type.monoSmall, color = HN.inkDim, maxLines = 1) },
+            )
             Spacer(Modifier.height(8.dp))
             HText(s.name, Modifier.semantics { heading() }, style = Type.heading)
             Spacer(Modifier.height(4.dp))

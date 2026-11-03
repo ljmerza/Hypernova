@@ -1,5 +1,11 @@
 package com.prudnikweb.hypernova.desktop.ui
 
+import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.Pill
+import com.prudnikweb.hypernova.ui.components.PillKind
+import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.HText
+import com.prudnikweb.hypernova.ui.theme.Type
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn

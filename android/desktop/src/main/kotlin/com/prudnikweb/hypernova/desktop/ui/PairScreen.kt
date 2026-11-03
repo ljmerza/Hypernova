@@ -1,5 +1,14 @@
 package com.prudnikweb.hypernova.desktop.ui
 
+import com.prudnikweb.hypernova.ui.components.Activity
+import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.Pill
+import com.prudnikweb.hypernova.ui.components.PillKind
+import com.prudnikweb.hypernova.ui.components.Planet
+import com.prudnikweb.hypernova.ui.components.Seam
+import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.HText
+import com.prudnikweb.hypernova.ui.theme.Type
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -46,7 +55,7 @@ fun PairScreen(shell: Shell, canCancel: Boolean) {
         Pill(Ui.desk_settings.text(), { shell.settings = true }, Modifier.align(Alignment.BottomCenter), kind = PillKind.Ghost, height = 32.dp)
         GlassCard(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
             Column(Modifier.padding(24.dp)) {
-                Seam(Ui.pair_label.text(), MarkKind.Idle)
+                Seam(Ui.pair_label.text())
                 Spacer(Modifier.height(18.dp))
                 when (val state = shell.pair) {
                     PairState.Idle -> Asking(shell, canCancel)
@@ -110,7 +119,7 @@ private fun Asking(shell: Shell, canCancel: Boolean) {
 @Composable
 private fun Working(state: PairState.Working) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Mark(MarkKind.Working)
+        Planet(Activity.Live)
         Spacer(Modifier.padding(start = 10.dp))
         HText(Ui.pair_working.format(state.name), style = Type.title)
     }

@@ -1,5 +1,19 @@
 package com.prudnikweb.hypernova.desktop.ui
 
+import com.prudnikweb.hypernova.ui.components.Activity
+import com.prudnikweb.hypernova.ui.components.CountMark
+import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.MacMoon
+import com.prudnikweb.hypernova.ui.components.NovaMark
+import com.prudnikweb.hypernova.ui.components.Pill
+import com.prudnikweb.hypernova.ui.components.PillKind
+import com.prudnikweb.hypernova.ui.components.Seam
+import com.prudnikweb.hypernova.ui.components.StatusChip
+import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.HText
+import com.prudnikweb.hypernova.ui.theme.Type
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -277,15 +291,15 @@ private fun Switcher(statuses: List<ServerStatus>) {
     }
 }
 
-/** The word, the mark and the colour for a link. */
-private data class LinkWords(val word: String, val mark: LinkMark, val color: Color)
+/** The word and the colour for a link. */
+private data class LinkWords(val word: String, val color: Color)
 
 private fun linkWords(link: Link): LinkWords = when (link.state) {
-    LinkState.Connected -> LinkWords(Ui.desk_link_linked.text(), LinkMark.Linked, HN.accent)
-    LinkState.Connecting -> LinkWords(Ui.desk_link_connecting.text(), LinkMark.Looking, HN.inkMuted)
-    LinkState.Reconnecting -> LinkWords(Ui.desk_link_reconnecting.text(), LinkMark.Looking, HN.amber)
-    LinkState.Offline -> LinkWords(Ui.desk_link_offline.text(), LinkMark.Offline, HN.danger)
-    LinkState.Unpaired -> LinkWords(Ui.desk_link_unpaired.text(), LinkMark.Unpaired, HN.danger)
+    LinkState.Connected -> LinkWords(Ui.desk_link_linked.text(), HN.accent)
+    LinkState.Connecting -> LinkWords(Ui.desk_link_connecting.text(), HN.inkMuted)
+    LinkState.Reconnecting -> LinkWords(Ui.desk_link_reconnecting.text(), HN.amber)
+    LinkState.Offline -> LinkWords(Ui.desk_link_offline.text(), HN.danger)
+    LinkState.Unpaired -> LinkWords(Ui.desk_link_unpaired.text(), HN.danger)
 }
 
 /** The server's name and its link: `◆ z2  LINKED  LOCAL`. */
@@ -294,7 +308,7 @@ private fun ConnectionChip(hub: Hub) {
     val link = hub.link
     val words = linkWords(link)
     Row(verticalAlignment = Alignment.CenterVertically) {
-        LinkGlyph(words.mark, words.color)
+        MacMoon(link.state, animateColorAsState(words.color, tween(800), label = "link"))
         Spacer(Modifier.width(6.dp))
         HText(hub.mac.name, style = Type.small, color = HN.inkMuted, maxLines = 1)
         Spacer(Modifier.width(8.dp))
@@ -401,13 +415,14 @@ private fun NoSessions(modifier: Modifier = Modifier) {
 @Composable
 private fun GroupSeam(group: Group, count: Int, modifier: Modifier = Modifier) {
     val (label, color, mark) = when (group) {
-        Group.NeedsInput -> Triple(Ui.group_needs.text(), HN.amber, MarkKind.NeedsYou)
-        Group.Working -> Triple(Ui.group_working.text(), HN.accent, MarkKind.Working)
-        Group.Completed -> Triple(Ui.group_done.text(), HN.inkDim, MarkKind.Idle)
+        Group.NeedsInput -> Triple(Ui.group_needs.text(), HN.amber, Activity.Alert)
+        Group.Working -> Triple(Ui.group_working.text(), HN.accent, Activity.Live)
+        Group.Completed -> Triple(Ui.group_done.text(), HN.inkDim, Activity.Rest)
     }
-    Seam(label, mark, modifier.semantics { heading() }, color = if (group == Group.Completed) HN.inkMuted else color) {
-        CountMark(count.toString(), color)
-    }
+    Seam(
+        label, modifier.semantics { heading() }, activity = mark, color = if (group == Group.Completed) HN.inkMuted else color,
+        trailContent = { CountMark(count.toString(), color) },
+    )
 }
 
 /**
@@ -443,9 +458,10 @@ private fun SessionRow(hub: Hub, s: Session, chosen: Boolean, marked: Boolean, o
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Seam(
-                s.project, if (needs) MarkKind.NeedsYou else if (s.busy) MarkKind.Working else MarkKind.Idle,
+                s.project, activity = if (needs) Activity.Alert else if (s.busy) Activity.Live else Activity.Rest,
                 color = if (needs) HN.amber else HN.inkMuted,
-            ) { HText(s.hex, style = Type.monoSmall, color = HN.inkDim, maxLines = 1) }
+                trailContent = { HText(s.hex, style = Type.monoSmall, color = HN.inkDim, maxLines = 1) },
+            )
             Spacer(Modifier.height(6.dp))
             HText(s.name, style = Type.heading, maxLines = 2)
             if (line.text.isNotBlank()) {
