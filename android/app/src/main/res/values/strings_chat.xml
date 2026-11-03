@@ -19,6 +19,25 @@
     <string name="chat_todo_done">Done</string>
     <string name="chat_todo_now">Now</string>
 
+    <!-- The time over the chat, and on a message's menu (session/ChatTimeLabel.kt). -->
+    <string name="chat_time_today">Today</string>
+    <string name="chat_time_yesterday">Yesterday</string>
+    <!-- A day and a time: "Mon Nov 2 · 9:14 PM". -->
+    <string name="chat_time_at">%1$s · %2$s</string>
+    <!-- The same for TalkBack: "Monday, November 2 at 9:14:07 PM". -->
+    <string name="chat_time_said">%1$s at %2$s</string>
+    <plurals name="chat_quiet_hours">
+        <item quantity="one">Last message %1$d hour ago</item>
+        <item quantity="other">Last message %1$d hours ago</item>
+    </plurals>
+    <string name="chat_quiet_yesterday">Last message yesterday</string>
+    <plurals name="chat_quiet_days">
+        <item quantity="one">Last message %1$d day ago</item>
+        <item quantity="other">Last message %1$d days ago</item>
+    </plurals>
+    <!-- Over a month back, the day itself: "Last message Sep 14". -->
+    <string name="chat_quiet_on">Last message %1$s</string>
+
     <!-- A message's long-press menu -->
     <string name="chat_message_actions">Message actions</string>
     <string name="chat_menu_title">Message</string>

@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Aside
 import com.prudnikweb.hypernova.data.Attachment
+import com.prudnikweb.hypernova.data.ChatTimes
 import com.prudnikweb.hypernova.data.FileBytes
 import com.prudnikweb.hypernova.data.Folders
 import com.prudnikweb.hypernova.data.Hub
@@ -51,6 +52,8 @@ class FakeHub(
     var sessionList by mutableStateOf(sessions)
     var approvalMap by mutableStateOf(approvals)
     var transcriptMap by mutableStateOf(transcripts)
+    /** What [chatTimes] answers, by session: none by default, as the time over the chat has nothing to say. */
+    var timesMap by mutableStateOf(emptyMap<String, ChatTimes>())
     /** What [permissionRules] answers (null: it fails, as an older Mac's). */
     var rules: PermissionRules? = Samples.rules()
     var slashCommands: List<SlashCommand> = Samples.commands()
@@ -73,6 +76,7 @@ class FakeHub(
 
     override fun session(id: String): Session? = sessionList.firstOrNull { it.id == id }
     override fun transcript(id: String): List<Item> = transcriptMap[id].orEmpty()
+    override fun chatTimes(id: String): ChatTimes = timesMap[id] ?: ChatTimes.Empty
     override fun consumeReveal(s: Session): Boolean = false
 
     override fun approval(sessionId: String): WApproval? = approvalMap[sessionId]?.firstOrNull()

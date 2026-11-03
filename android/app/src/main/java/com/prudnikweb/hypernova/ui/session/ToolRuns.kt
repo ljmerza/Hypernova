@@ -23,7 +23,7 @@ internal sealed interface ChatRow {
 
     /** Keyed by its first item, so a run that grows at the tail keeps its place and its open state. */
     data class Run(val items: List<Item>) : ChatRow {
-        override val key: String = "run:" + items.first().key
+        override val key: String = PREFIX + items.first().key
         override fun has(itemKey: String) = items.any { it.key == itemKey }
         val calls: Int get() = items.count(ToolRuns::isCall)
         val running: Boolean get() = items.any(ToolRuns::running)
@@ -41,6 +41,10 @@ internal sealed interface ChatRow {
 
         /** The latest call in words, for the fold line while it runs: "ha_get_state · light.kitchen". */
         val hint: String? get() = items.lastOrNull(ToolRuns::isCall)?.let(ToolRuns::hint)
+
+        companion object {
+            const val PREFIX = "run:"
+        }
     }
 
     /** Fork: the asks still waiting for an answer, stacked in one row at the end (AskStack.kt). */

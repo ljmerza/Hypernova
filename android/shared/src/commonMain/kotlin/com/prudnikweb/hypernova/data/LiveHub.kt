@@ -1155,6 +1155,17 @@ class LiveHub(
         return items
     }
 
+    /** The open chat's times, built only when something asks (none does while the chat just streams). */
+    private class TimesOf(val id: String, val events: List<WEvent>, val asides: List<Asides.Entry>, val times: ChatTimes)
+    private var timesOf: TimesOf? = null
+
+    override fun chatTimes(id: String): ChatTimes {
+        val ev = slot(id).value
+        val asides = Asides.of(id)
+        timesOf?.let { if (it.id == id && it.events === ev && it.asides === asides) return it.times }
+        return ChatTimes.of(if (asides.isEmpty()) ev else Asides.into(ev, asides)).also { timesOf = TimesOf(id, ev, asides, it) }
+    }
+
     override fun agents(sessionId: String): AgentBoard = boardSlot(sessionId).value
 
     /** An agent's transcript as this phone has it, and the Mac's cursor for what came after. */
