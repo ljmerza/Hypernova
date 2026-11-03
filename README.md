@@ -90,8 +90,7 @@ update itself: [`docs/INSTALL.md`, "On a Mac"](docs/INSTALL.md#on-a-mac).
 
 ## Where it's going
 
-None of this is built yet, and these aren't promises. The desktop client only pairs, lists and approves so
-far; making it the same control room on your desk is next, then an Apple version and maybe a web version after
+None of this is built yet, and these aren't promises. The desktop client pairs, lists and approves, and has each session's chat, to read, reply and answer what it asks; making it the same control room on your desk is next, then an Apple version and maybe a web version after
 that. I also want the phone to control all of each agent's settings instead of today's set list. An
 iPhone version's notifications would have to go through Apple's push, so "no cloud in between" is a
 claim about today's Android app. The server on a Mac is a separate thing and has only run on GitHub's

@@ -3,8 +3,8 @@
 
 The base comes from 0stems (atmosphere, colour, type), the structure from
 Hyperscribe (the seam, pills, quiet copy), and urgent states from
-Hypernavigate (the filled block). On Android it's implemented in
-`android/app/src/main/java/com/prudnikweb/hypernova/ui/`. The home screen
+Hypernavigate (the filled block). It's implemented in `android/sharedui` (the tokens, the marks, the kit and the chat, for both apps) and
+`android/app/src/main/java/com/prudnikweb/hypernova/ui/` (the rest of the phone). The home screen
 widgets repeat them as Android resources. (The Mac app's SwiftUI port, "Mac menu bar and mini app",
 and Lens, "The Lens guide" and "Lens (G2)", are no longer in this repository; those sections stay
 as history.)

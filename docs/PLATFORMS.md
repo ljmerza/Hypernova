@@ -60,19 +60,48 @@ the module line (dozens of places).
 its Android half, the Resources that reword themselves, is `ComputerResources`. `readableLine` and the markdown table
 parser came down from `ui/components`, and `ChatRepo` and `ChangesRepo` from `ui`, so `data` imports nothing of `ui`.
 
-Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` is still Android's.
+Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawing the two apps share came later: the next section.
+
+## The shared drawing (2026-11-03)
+
+`android/sharedui`: Atlas and the chat, drawn once for the phone and the desktop (docs/DECISIONS.md, "The chat on the desktop"). It has only `commonMain`, so nothing in it can name `android.*`, `R` or `java.awt`, and it depends on `:shared` for the data.
+
+| Package | What |
+|---|---|
+| `ui.platform` | `UiPlatform.kt`, the only way out to an operating system, and the short ways to it (`Words.kt`, `Device.kt`) |
+| `ui.theme` | `Tokens.kt` (the palette, `HN`, `Motion`, the type scale), `Text.kt` (`HText`, `MotionPrefs`) |
+| `ui.fx` | `Ambient.kt` (the one clock), `Pace.kt`, `Countdown.kt` |
+| `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
+| `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
+
+**The seams** (`UiPlatform`), each implemented in `app/.../ui/AndroidUiPlatform.kt` and `desktop/.../DesktopUiPlatform.kt` and handed over once, with `SharedUi.install`, before anything draws:
+
+| Seam | What it asks | Phone | Desktop |
+|---|---|---|---|
+| `UiWords` | The app's words by `Str`, `Plural`, and as a `Strings` | Compose's `stringResource`, through `StringIds` | `DesktopStrings`, reworded for the computer on screen |
+| `UiFonts` | Manrope and JetBrains Mono at a weight; what mono asks of its font | `res/font`; nothing | The copies in its resources; ligatures off |
+| `UiDevice` | Haptics, the clipboard, how tall the window is, a blurred glow | The view's, the context's, `LocalConfiguration`, `BlurMaskFilter` | None, AWT's, the window's, Skia's |
+| `UiInput` | How tall a pill is to the touch, a hand and a ring on a pill, a long press on code, selecting output, the Enter key | 48 dp, none, copies it, a long press on the row, `EnterKeyPref` | 0, both, nothing (a mouse selects), `SelectionContainer`, its own `EnterKeyPref` |
+| `UiClock` | The locale and 12 or 24 hours; a skeleton's pattern | `DateFormat` | The locale's short time; English's order for the chat's skeletons, as `getBestDateTimePattern` is JDK 19's and this builds for 17 |
+| `UiDiagrams` | A closed mermaid block | `Mermaid.kt`, the web view | Says it's a diagram, and shows its source |
+
+**The toolchain, checked with a dependency report before anything moved:** a new Kotlin Multiplatform module with JetBrains' Compose coordinates added six modules to `:app`'s runtime classpath, each only a pointer to AndroidX's same 1.12.1 artifact: `foundation`, `foundation-android`, `foundation-layout`, `foundation-layout-android`, `animation` and `animation-android` under `org.jetbrains.compose`, a `.pom` and a `.module` with no jar or aar. `:sharedui` takes those two as `compileOnly` in `commonMain`, AndroidX's in `androidMain` at the app's BOM and JetBrains' in `desktopMain`. `:app`'s classpath is then the same list, debug and release, plus the project itself, compared line by line. JetBrains' `ui`, `runtime` and `runtime-saveable` were already there, through Haze. The release APK went from 10163069 to 10179521 bytes: the words' `Str` entries and their ids, and the seams' classes.
+
+**A new string in the shared drawing** is a line in `Str.kt` (or `Plural`) and in `StringIds.kt`, as for the data layer, and `WordsTest` holds it to the phone's text. `:app` and `:desktop` are the module's Kotlin friends, as `:app` is `:shared`'s.
+
+**What the desktop's chat doesn't have yet,** for the parity list: the terminal, the usage strip and the session sheet's tabs, a message's menu (Copy, Quote, Read aloud, Rewind, its exact time), the "/" list, `/btw` and its card, voice, attaching files and their pictures, Always and This session on an ask, a terminal's other menus (`MenuCard`), the status bar and to-do list, a blocked session's card and Continue, the switch line, an agent's own screen, opening a file, previews. What opens one of these from the chat says it's on the phone.
 
 ## The desktop app (step 2 of the desktop plan, built 2026-11-02)
 
-`android/desktop`: Compose for Desktop 1.12.1 over `:shared`, a JVM app, Linux first and written to be portable. It pairs by a pasted `hypernova pair` link, lists one server's sessions in the phone's three groups with the chosen session beside them (docs/DECISIONS.md, "The desktop client's two panes"), and answers Allow or Deny there. A server switcher is there because `Core` already had the rest. The choices and why: docs/DECISIONS.md, "The desktop app". How to run it: docs/DEV-SETUP.md, "The desktop app". Its packages (a `.deb`, a folder, a `.dmg` for each Mac processor and a Windows `.msi`, each with its own Java): docs/RELEASING.md, "The desktop client's packages".
+`android/desktop`: Compose for Desktop 1.12.1 over `:shared`, a JVM app, Linux first and written to be portable. It pairs by a pasted `hypernova pair` link, lists one server's sessions in the phone's three groups with the chosen session beside them (docs/DECISIONS.md, "The desktop client's two panes"), answers Allow or Deny there, and has the session's chat under them: it reads, replies and answers questions and plans (docs/DECISIONS.md, "The chat on the desktop"). A server switcher is there because `Core` already had the rest. The choices and why: docs/DECISIONS.md, "The desktop app". How to run it: docs/DEV-SETUP.md, "The desktop app". Its packages (a `.deb`, a folder, a `.dmg` for each Mac processor and a Windows `.msi`, each with its own Java): docs/RELEASING.md, "The desktop client's packages".
 
 **Run on a display? A virtual one.** The tests have no window: Compose's test scene, on real TLS, real files and the real `Core`, the demo server included (`DemoServerTest`). The window itself (`Main.kt`) has run under Xvfb, and the owner has opened it on a real 4K monitor, which is how its size came up (docs/DECISIONS.md, "The desktop app's size on a big screen"). The scale hasn't been seen on a real monitor, GNOME or Wayland yet. On Linux only so far; nothing has run on a Mac or Windows, and the ACL path in `OwnerOnly`, `MacKeychain` and `WindowsDpapiKeychain` are the parts of that written blind. CI's packages job is the first thing that will run them there, on its runners: installed, opened, and paired with the demo server (`scripts/test-client-package.sh`).
 
 | Where | What |
 |---|---|
-| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopTokens.kt` (each server's token, off the disk), `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
-| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `SessionPane.kt` (the chosen session); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
-| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopTokens.kt` (each server's token, off the disk), `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `DesktopUiPlatform.kt` (what the shared drawing asks: above, "The shared drawing"), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
+| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `SessionPane.kt` (the chosen session), `ChatPane.kt` (its chat's list, the box and where a link goes), `AtlasTheme.kt` (the motion and the clock); `AtlasPlate.kt` (the chart, the one part of Atlas still copied: `fx/Atlas.kt` draws on `android.graphics`) |
+| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `ChatTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 | `desktop/src/probe/` | `PackageProbe.kt`: in no package; pairs an installed one from inside its own Java, for `scripts/test-client-package.sh` |
 | `desktop/packaging/`, `desktop/icons/` | `client-names.sh` (the package's names: two lines for the rename), `legal/`, `deb-menu-optional.sh`; the icons, and what makes them |
 
