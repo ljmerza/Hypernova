@@ -989,9 +989,10 @@ test('a queue entry claims the phone send with its text; a prompt typed on the M
 
 test('an entry logged without text claims the oldest send typed before it, never one typed after', async () => {
   const { claimPaste, notePaste } = await import('../src/hub.ts')
-  const now = Date.now()
   notePaste('term-b', 'phone-30', '[Hypernova test] first')
   notePaste('term-b', 'phone-31', '[Hypernova test] second')
+  // After both: a clock that ticks between them mustn't make the second look typed after this entry.
+  const now = Date.now()
   // Read again from an old transcript: older than both sends.
   assert.equal(claimPaste('term-b', null, now - 60_000), null)
   assert.deepEqual(claimPaste('term-b', null, now), { clientId: 'phone-30', bash: false, text: '[Hypernova test] first' })
