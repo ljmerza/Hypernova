@@ -108,6 +108,20 @@ class ContractTest {
             assertTrue(a.running)
         },
         "ws-workflow" to { o -> workflow(Wire.workflow(ws(o, "workflow").obj("workflow")!!)!!) },
+        "ws-shell" to { o ->
+            val s = Wire.shell(ws(o, "shell").obj("shell")!!)!!
+            assertEquals("bwatch004", s.id)
+            assertEquals("sess-shells", s.sessionId)
+            assertEquals("tail -f app.log", s.command)
+            assertEquals("Watch the log", s.description)
+            assertTrue(s.running)
+            assertFalse(s.monitor)
+        },
+        "ws-session-shells" to { o ->
+            val s = Wire.session(ws(o, "session").obj("session")!!)
+            assertEquals("sess-shells", s.id)
+            assertEquals(1, s.shellsRunning)
+        },
         "ws-projects" to { o ->
             val p = ws(o, "projects").arr("projects").mapObjects(Wire::project)
             assertEquals(o.arr("projects")!!.length(), p.size)
@@ -214,7 +228,27 @@ class ContractTest {
             assertEquals("warn", n.tone)
             assertTrue(n.text.startsWith("You've hit your session limit"))
         },
+        "rest-agents-shells" to { o ->
+            val shells = o.arr("shells").mapObjects(Wire::shell).associateBy { it.id }
+            assertEquals(3, shells.size)
+            val running = shells.getValue("bserver01")
+            assertTrue(running.running)
+            // Masked by the Mac: a phone never has the key to show.
+            assertEquals("API_TOKEN=••• npm run dev", running.command)
+            assertEquals(null, running.endedAt)
+            val failed = shells.getValue("bbuild002")
+            assertEquals("error", failed.status)
+            assertEquals(3, failed.exitCode)
+            assertTrue(failed.endedAt != null)
+            val gone = shells.getValue("bgone0003")
+            assertTrue(gone.unknown)
+            assertFalse(gone.running)
+            assertEquals(null, gone.endedAt)
+        },
         "rest-agents" to { o ->
+            // An older Mac's has no `shells`: an empty list, nothing more.
+            assertTrue(JSONObject("{}").arr("shells").mapObjects(Wire::shell).isEmpty())
+            assertEquals(0, o.arr("shells")!!.length())
             val agents = o.arr("agents").mapObjects(Wire::agent).associateBy { it.id }
             assertEquals(o.arr("agents")!!.length(), agents.size)
             val plain = agents.getValue(PLAIN)

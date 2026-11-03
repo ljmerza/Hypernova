@@ -404,6 +404,19 @@ export type TaskEnd = {
    */
   waiting: boolean | null
 }
+/** A background command as its call's result says it: its call's own words are read by [shellStart]. */
+export type ShellStart = {
+  taskId: string
+  toolUseId: string | null
+  monitor: boolean
+  /** Its command's first line and what the call says it's for, not yet masked. */
+  command: string | null
+  description: string | null
+  /** When a Monitor runs out by itself (Infinity: a persistent one), 0 for a shell. */
+  until: number
+  /** The file Claude Code writes its output to, as its result names it. */
+  output: string | null
+}
 export type AgentLink =
   /** An Agent call started agent [agentId]; [report] when it ran in the foreground and has finished. */
   | { kind: 'agent'; ts: number; toolUseId: string; agentId: string; label: string | null; type: string | null; model: string | null; background: boolean; report: { result: string | null; tokens: number | null; toolUses: number | null; durationMs: number | null } | null }
@@ -411,8 +424,10 @@ export type AgentLink =
   | { kind: 'workflow'; ts: number; toolUseId: string; runId: string | null; taskId: string | null; name: string | null; summary: string | null; phases: WorkflowPhase[] }
   /** SendMessage woke a finished agent: it works again, in the same file. */
   | { kind: 'resume'; ts: number; agentId: string }
-  /** TaskStop stopped a task: a workflow ("w…") or a background agent ("a…"; a shell's is ignored). */
+  /** TaskStop stopped a task: a workflow ("w…"), a background agent ("a…") or a shell ("b…"). */
   | { kind: 'stop'; ts: number; taskId: string }
+  /** A command went on in the background (Bash's run_in_background, ctrl-B, its timeout) or a Monitor started. */
+  | ({ kind: 'shell'; ts: number } & ShellStart)
   /** An Agent call came back with an error or was interrupted (Esc): the agent it ran stopped with it. */
   | { kind: 'failed'; ts: number; toolUseId: string }
   | ({ kind: 'end'; ts: number } & TaskEnd)
@@ -478,11 +493,13 @@ const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null
  * is the call, its result already applied; [script] the workflow's untrimmed script when known (its
  * phases).
  */
-export function resultLinks(ev: ToolEv | undefined, toolUseId: string, r: any, ts: number, script?: unknown): AgentLink[] {
+export function resultLinks(ev: ToolEv | undefined, toolUseId: string, r: any, ts: number, script?: unknown, content?: unknown): AgentLink[] {
   // Its result is an error (often only a string): a foreground agent ends with no notification.
   if (ev && AGENT_TOOLS.has(ev.name) && ev.status === 'error') return [{ kind: 'failed', ts, toolUseId }]
   if (!r || typeof r !== 'object' || Array.isArray(r)) return stopLink(ev, ts)
   const name = ev?.name ?? ''
+  const shell = shellStart(name, ev?.input, toolUseId, r, content, ts)
+  if (shell) return [{ kind: 'shell', ts, ...shell }]
   if (typeof r.agentId === 'string' && (AGENT_TOOLS.has(name) || (!ev && (launched(r) || r.status === 'completed') && typeof r.prompt === 'string'))) {
     const done = r.status === 'completed'
     return [{
@@ -509,6 +526,28 @@ export function resultLinks(ev: ToolEv | undefined, toolUseId: string, r: any, t
   if (typeof r.resumedAgentId === 'string') return [{ kind: 'resume', ts, agentId: r.resumedAgentId }]
   if (typeof r.task_id === 'string' && (r.task_type === 'local_workflow' || r.task_type === 'local_agent' || name === 'TaskStop')) return [{ kind: 'stop', ts, taskId: r.task_id }]
   return stopLink(ev, ts)
+}
+
+/**
+ * The background command a Bash or Monitor call's result ([r], its toolUseResult) started, as Claude
+ * Code 2.1.317 logs it; null for any other result. [input]: the call's. [content]: the result's text.
+ */
+export function shellStart(name: string, input: Record<string, unknown> | undefined, toolUseId: string | null, r: any, content: unknown, ts: number): ShellStart | null {
+  if (!r || typeof r !== 'object') return null
+  const monitor = name === 'Monitor'
+  const id = monitor ? r.taskId : name === 'Bash' ? r.backgroundTaskId : null
+  if (typeof id !== 'string' || !id) return null
+  const text = blocksText(content)
+  const timeout = typeof r.timeoutMs === 'number' ? r.timeoutMs : 0
+  return {
+    taskId: id,
+    toolUseId,
+    monitor,
+    command: typeof input?.command === 'string' ? toolSummary('Bash', input) : null,
+    description: str(input?.description),
+    until: !monitor ? 0 : r.persistent === true ? Infinity : timeout > 0 ? ts + timeout : 0,
+    output: /Output is being written to: (\S+\.output)/.exec(text)?.[1] ?? null,
+  }
 }
 
 /** TaskStop's own input names the task it stopped, whatever shape its result has (often a string). */
@@ -1064,9 +1103,9 @@ function noteTaskEnd(st: ParseState, end: TaskEnd | null, ts: number): void {
   st.taskSeen.set(key, usage)
   st.taskSeen.set(any, usage)
   if (st.taskSeen.size > 2000) st.taskSeen.delete(st.taskSeen.keys().next().value!)
-  // Shell commands' ends ("b…") are the Bash cards' business.
-  if (!/^[aw]/.test(end.taskId)) return
   st.links.push({ kind: 'end', ts, ...end })
+  // A background command's call came back as it went to the background: there's no call to close.
+  if (!/^[aw]/.test(end.taskId)) return
   // Still at work: its call keeps running.
   if (end.waiting) return
   const ev = end.toolUseId ? st.byId.get(end.toolUseId) : undefined
@@ -1479,7 +1518,7 @@ export function feedLine(st: ParseState, o: any): void {
           // The structured result is the entry's one tool result's; with several, a launcher's only.
           if (results.length === 1 || (ev?.kind === 'tool' && (isLauncher(ev.name) || ev.name === 'TaskStop'))) {
             const tool = ev?.kind === 'tool' ? ev : undefined
-            for (const l of resultLinks(tool, b.tool_use_id, o.toolUseResult, ts, st.scripts.get(b.tool_use_id))) {
+            for (const l of resultLinks(tool, b.tool_use_id, o.toolUseResult, ts, st.scripts.get(b.tool_use_id), b.content)) {
               st.links.push(l)
               // A woken agent ends again with a notification just like its first one: that counts too.
               if (l.kind === 'resume') for (const k of [...st.taskSeen.keys()]) if (k.startsWith(`${l.agentId}:`)) st.taskSeen.delete(k)

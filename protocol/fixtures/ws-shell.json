@@ -1,0 +1,15 @@
+{
+  "t": "shell",
+  "shell": {
+    "id": "bwatch004",
+    "sessionId": "sess-shells",
+    "toolUseId": "toolu_shell4",
+    "kind": "shell",
+    "command": "tail -f app.log",
+    "description": "Watch the log",
+    "status": "running",
+    "startedAt": 1800000000000,
+    "endedAt": null,
+    "exitCode": null
+  }
+}

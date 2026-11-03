@@ -172,7 +172,7 @@ async function serve(name: string, port: number): Promise<void> {
         const limit = Number(url.searchParams.get('limit')) || all.events.length
         return { ...all, events: all.events.slice(-limit) }
       }
-      case 'agents': return at('agents.json', { agents: [], workflows: [] })
+      case 'agents': return at('agents.json', { agents: [], workflows: [], shells: [] })
       case 'usage': return at('usage.json')
       case 'todos': return at('todos.json', { todos: [], updatedAt: null })
       case 'changes': return at('changes.json')

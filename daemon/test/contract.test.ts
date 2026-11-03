@@ -9,7 +9,7 @@
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer as httpServer, request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -662,6 +662,30 @@ test('GET …/events: the transcript as the chat draws it', async () => {
 
 test('GET …/agents and an agent’s events, and one just started (starting)', async () => {
   contract('rest-agents', await ok(get(`/v1/sessions/${MAIN}/agents`)))
+
+  // A session with background commands (Background commands): running, finished, and one nothing
+  // says anything more about, in Claude Code 2.1.317's lines. Its own session, so nothing else moves.
+  const SHELLS = 'sess-shells'
+  const shellLines = (id: string, call: string, command: string, description: string) => [
+    { ...assistant(`as-${call}`, [toolUse(call, 'Bash', { command, description, run_in_background: true })]), sessionId: SHELLS },
+    { ...result(`ur-${call}`, call, `Command running in background with ID: ${id}. Output is being written to: /tmp/claude-1000/-app/${SHELLS}/tasks/${id}.output. You will be notified when it completes.`, { stdout: '', stderr: '', interrupted: false, isImage: false, noOutputExpected: false, backgroundTaskId: id }), sessionId: SHELLS },
+  ]
+  const shellsPath = hub.transcriptPathFor(cwd, SHELLS)
+  writeFileSync(shellsPath, [
+    ...shellLines('bserver01', 'toolu_shell1', 'API_TOKEN=sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKE npm run dev', 'Dev server'),
+    ...shellLines('bbuild002', 'toolu_shell2', './gradlew assembleDebug', 'Build the app'),
+    { type: 'queue-operation', operation: 'enqueue', timestamp: at(), sessionId: SHELLS, content: '<task-notification>\n<task-id>bbuild002</task-id>\n<tool-use-id>toolu_shell2</tool-use-id>\n<status>failed</status>\n<summary>Background command "Build the app" failed with exit code 3</summary>\n</task-notification>' },
+    ...shellLines('bgone0003', 'toolu_shell3', 'sleep 600', 'Sleep'),
+    { type: 'queue-operation', operation: 'enqueue', timestamp: at(), sessionId: SHELLS, content: '<task-notification>\n<task-id>bgone0003</task-id>\n<tool-use-id>toolu_shell3</tool-use-id>\n<status>stopped</status>\n<summary>Background shell command didn\'t finish before the previous session ended</summary>\n</task-notification>' },
+  ].map(line).join(''))
+  hub.upsertSession(SHELLS, { cwd, transcriptPath: shellsPath, origin: 'terminal', title: 'Run the dev server', state: 'idle', lastActivityAt: Date.now() })
+  contract('rest-agents-shells', await ok(get(`/v1/sessions/${SHELLS}/agents`)))
+  // Read as it comes: a message of its own.
+  appendFileSync(shellsPath, shellLines('bwatch004', 'toolu_shell4', 'tail -f app.log', 'Watch the log').map(line).join(''))
+  hub.pollTranscripts()
+  contract('ws-shell', heard('shell', (m) => m.shell.id === 'bwatch004'))
+  contract('ws-session-shells', heard('session', (m) => m.session.id === SHELLS && m.session.shellsRunning === 1))
+  hub.forgetSession(SHELLS)
   contract('rest-agent-events', await ok(get(`/v1/sessions/${MAIN}/agents/${PLAIN}/events?limit=300`)))
   // An agent launched a moment ago, its file not written yet.
   const now = new Date().toISOString()

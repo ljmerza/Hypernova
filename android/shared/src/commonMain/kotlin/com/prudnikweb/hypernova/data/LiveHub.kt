@@ -574,6 +574,7 @@ class LiveHub(
         /** [superseded]: a workflow step's earlier attempt (the step ran again as a new agent). */
         class AgentMsg(val a: WAgent, val superseded: Boolean) : Msg
         class WorkflowMsg(val w: WWorkflow) : Msg
+        class ShellMsg(val s: WShell) : Msg
         class Projects(val p: List<Project>) : Msg
         class Providers(val p: List<Provider>) : Msg
         class AccountMsg(val a: Account) : Msg
@@ -619,6 +620,7 @@ class LiveHub(
         "usage" -> Msg.UsageMsg(Wire.usage(o.obj("usage")))
         "agent" -> o.obj("agent")?.let { j -> Wire.agent(j)?.let { Msg.AgentMsg(it, j.bool("superseded")) } }
         "workflow" -> o.obj("workflow")?.let(Wire::workflow)?.let { Msg.WorkflowMsg(it) }
+        "shell" -> o.obj("shell")?.let(Wire::shell)?.let { Msg.ShellMsg(it) }
         "projects" -> Msg.Projects(o.arr("projects").mapObjects(Wire::project))
         "providers" -> Msg.Providers(o.arr("providers").mapObjects(Wire::provider))
         "account" -> o.obj("account")?.let { Msg.AccountMsg(Wire.account(it)) }
@@ -675,6 +677,7 @@ class LiveHub(
             // An earlier attempt no longer counts: off the board, as the Mac's own list leaves it out.
             is Msg.AgentMsg -> boardSlot(m.a.sessionId).let { it.value = if (m.superseded) it.value.without(m.a.id) else it.value.with(m.a) }
             is Msg.WorkflowMsg -> boardSlot(m.w.sessionId).let { it.value = it.value.with(m.w) }
+            is Msg.ShellMsg -> boardSlot(m.s.sessionId).let { it.value = it.value.with(m.s) }
             is Msg.ApprovalResolved -> {
                 approvals = approvals - m.id
                 resolved = resolved + (m.id to Resolved(m.decision, m.by))
@@ -1068,6 +1071,7 @@ class LiveHub(
             loginScreen = w.loginScreen,
             createdAt = w.createdAt,
             agentsRunning = w.agentsRunning,
+            shellsRunning = w.shellsRunning,
             blocked = w.blocked,
             endedBy = w.endedBy,
             automation = w.automation,
@@ -1258,7 +1262,8 @@ class LiveHub(
             try {
                 val o = api.get("/v1/sessions/$id/agents", max = 8L * 1024 * 1024)
                 val board = withContext(Dispatchers.Default) {
-                    AgentBoard(o.arr("agents").mapObjects(Wire::agent).associateBy { it.id }, o.arr("workflows").mapObjects(Wire::workflow).associateBy { it.id })
+                    // An older Mac lists no shells: none.
+                    AgentBoard(o.arr("agents").mapObjects(Wire::agent).associateBy { it.id }, o.arr("workflows").mapObjects(Wire::workflow).associateBy { it.id }, o.arr("shells").mapObjects(Wire::shell).associateBy { it.id })
                 }
                 // What the socket brought meanwhile may be newer than the list: an agent that moved on
                 // or ended since keeps that.
@@ -1268,6 +1273,7 @@ class LiveHub(
                 boardSlot(id).value = AgentBoard(
                     board.agents + cur.agents.filter { (k, a) -> newer(a, board.agents[k]) },
                     board.workflows + cur.workflows.filter { (k, w) -> newer(w, board.workflows[k]) },
+                    board.shells + cur.shells.filter { (k, s) -> board.shells[k].let { it == null || (it.running && !s.running) } },
                 )
             } catch (e: CancellationException) {
                 throw e

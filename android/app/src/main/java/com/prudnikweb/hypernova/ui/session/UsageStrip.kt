@@ -193,6 +193,7 @@ internal fun UsageStrip(
     val now = com.prudnikweb.hypernova.ui.fx.rememberCountdownNow(u.fiveHourResetAt, u.sevenDayResetAt, week?.resetsAt)
     val facts = TopBarFacts(
         codex = session.codex, effort = session.effort, tokens = usage.tokens, agents = agents, cost = usage.costUsd,
+        shells = if (session.phase == com.prudnikweb.hypernova.data.Phase.Ended) 0 else session.shellsRunning,
         turnStartedAt = session.turnStartedAt, ended = session.phase == com.prudnikweb.hypernova.data.Phase.Ended,
         plan = plan, fiveHour = u.fiveHourReported,
         weekPace = weekPaceOf(session.codex, plan, u, hub.codex, now),
@@ -221,7 +222,7 @@ internal fun UsageStrip(
         val at = weekOn?.let { ModelWeeks.weekdayTimeSaid(it.at, is24) }?.let { (day, time) -> res.getString(R.string.usage_reset_day_at, day, time) }
         usageSaid(res, res.getString(R.string.usage_name_model, week.label), weekWindow, at)
     } else null
-    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, turnMs, facts.weekPace, git, weekSaid) + more
+    val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, facts.shells, turnMs, facts.weekPace, git, weekSaid) + more
     val agentsLabel = stringResource(R.string.top_bar_agents_open)
     val shape = RoundedCornerShape(12.dp)
     val scroll = rememberScrollState()
@@ -269,7 +270,10 @@ internal fun UsageStrip(
                             .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onAgents),
                         contentAlignment = Alignment.Center,
                     ) {
-                        HText(pluralStringResource(R.plurals.top_bar_agents, agents, agents), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (agents > 0) HText(pluralStringResource(R.plurals.top_bar_agents, agents, agents), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
+                            if (facts.shells > 0) HText(pluralStringResource(R.plurals.top_bar_shells, facts.shells, facts.shells), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
+                        }
                     }
                     TopBarItem.TURN -> GlyphFigure(Glyph.Timer, turnShort(turnMs))
                     // Always this neutral colour, never red or amber: a meter shows facts (docs/DECISIONS.md).
@@ -422,7 +426,7 @@ internal fun money(usd: Double): String = when {
 /** TalkBack's one sentence for the bar: each part it shows ([parts]), in its order. */
 private fun stripDescription(
     res: Resources, parts: List<TopBarItem>, u: SessionUsage, s: Session, model: String, mode: String, effort: String?,
-    five: UsageWindow, seven: UsageWindow, agents: Int, turnMs: Long, pace: WeekPace?, git: SheetGit?, modelWeek: String?,
+    five: UsageWindow, seven: UsageWindow, agents: Int, shells: Int, turnMs: Long, pace: WeekPace?, git: SheetGit?, modelWeek: String?,
 ): String = parts.joinToString(" ") { part ->
     when (part) {
         TopBarItem.CONTEXT -> {
@@ -440,7 +444,10 @@ private fun stripDescription(
         TopBarItem.MODEL -> res.getString(R.string.meta_model_said, model)
         TopBarItem.TOKENS -> res.getString(R.string.chat_tokens_said, grouped(u.tokens))
         TopBarItem.COST -> res.getString(if (u.costExact) R.string.top_bar_cost_said else R.string.top_bar_cost_about_said, costWords(u).removePrefix("≈"))
-        TopBarItem.AGENTS -> res.getQuantityString(R.plurals.session_sheet_agents_said, agents, agents)
+        TopBarItem.AGENTS -> listOfNotNull(
+            res.getQuantityString(R.plurals.session_sheet_agents_said, agents, agents).takeIf { agents > 0 },
+            res.getQuantityString(R.plurals.session_sheet_shells_said, shells, shells).takeIf { shells > 0 },
+        ).joinToString(" ")
         TopBarItem.TURN -> res.getString(R.string.top_bar_turn_said, formatDuration(res, turnMs))
         TopBarItem.WEEK_PACE -> pace?.let { weekPaceSaid(res, it) }.orEmpty()
         TopBarItem.GIT -> git?.let { gitSaid(res, it) }.orEmpty()

@@ -466,7 +466,7 @@ async function runOne(id: string, text: string, forkFrom?: string, clientId?: st
               // Automations' hook triggers: a failed call, as the PostToolUseFailure hook says it.
               if (b.is_error) noteHookEvent('PostToolUseFailure', id, ev.name, `${ev.name} failed: ${ev.summary}`)
               // The agent or workflow run a launcher started.
-              applyLinks(id, resultLinks(ev, b.tool_use_id, msg.tool_use_result, Date.now(), scripts.get(b.tool_use_id)))
+              applyLinks(id, resultLinks(ev, b.tool_use_id, msg.tool_use_result, Date.now(), scripts.get(b.tool_use_id), b.content))
             }
           }
           setState(id, 'working', 'Thinking')

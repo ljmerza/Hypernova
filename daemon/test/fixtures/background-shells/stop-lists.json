@@ -1,0 +1,80 @@
+[
+ {
+  "hook_event_name": "Stop",
+  "background_tasks": [
+   {
+    "id": "bztk0kz3p",
+    "type": "shell",
+    "status": "running",
+    "description": "Long sleeper",
+    "command": "API_TOKEN=sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKE sleep 900; echo long done"
+   },
+   {
+    "id": "biezsguvg",
+    "type": "shell",
+    "status": "running",
+    "description": "Short job",
+    "command": "sleep 8; echo short done; exit 0"
+   },
+   {
+    "id": "byukdsy29",
+    "type": "shell",
+    "status": "running",
+    "description": "Failing job",
+    "command": "sleep 8; echo bad; exit 3"
+   },
+   {
+    "id": "b0smhwwpy",
+    "type": "shell",
+    "status": "running",
+    "description": "To be killed",
+    "command": "sleep 800"
+   }
+  ]
+ },
+ {
+  "hook_event_name": "Stop",
+  "background_tasks": [
+   {
+    "id": "bztk0kz3p",
+    "type": "shell",
+    "status": "running",
+    "description": "Long sleeper",
+    "command": "API_TOKEN=sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKE sleep 900; echo long done"
+   },
+   {
+    "id": "byukdsy29",
+    "type": "shell",
+    "status": "running",
+    "description": "Failing job",
+    "command": "sleep 8; echo bad; exit 3"
+   },
+   {
+    "id": "b0smhwwpy",
+    "type": "shell",
+    "status": "running",
+    "description": "To be killed",
+    "command": "sleep 800"
+   }
+  ]
+ },
+ {
+  "hook_event_name": "Stop",
+  "background_tasks": [
+   {
+    "id": "bztk0kz3p",
+    "type": "shell",
+    "status": "running",
+    "description": "Long sleeper",
+    "command": "API_TOKEN=sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKE sleep 900; echo long done"
+   },
+   {
+    "id": "b0smhwwpy",
+    "type": "shell",
+    "status": "running",
+    "description": "To be killed",
+    "command": "sleep 800"
+   }
+  ]
+ }
+]

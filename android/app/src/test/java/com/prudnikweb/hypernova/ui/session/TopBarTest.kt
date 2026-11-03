@@ -52,6 +52,12 @@ class TopBarTest {
         assertEquals(listOf(CONTEXT, MODE, EFFORT), d.visible(facts.copy(plan = false), now))
     }
 
+    @Test fun theAgentsItemAlsoShowsWhileOnlyBackgroundCommandsRun() {
+        val all = TopBarChoice.DEFAULT.set(AGENTS, true)
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, AGENTS), all.visible(facts.copy(shells = 1), now))
+        assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY), all.visible(facts, now))
+    }
+
     @Test fun agentsOnlyWhileAnyWorkAndTheTurnsTimeOnlyInATurn() {
         val all = TopBarChoice.DEFAULT.set(AGENTS, true).set(TURN, true).set(TOKENS, true)
         assertEquals(listOf(CONTEXT, MODE, EFFORT, FIVE_HOUR, SEVEN_DAY, TOKENS), all.visible(facts, now))

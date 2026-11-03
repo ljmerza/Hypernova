@@ -69,6 +69,8 @@ data class WSession(
     val queue: List<WQueued> = emptyList(),
     /** Agents its main agent started that are running now. */
     val agentsRunning: Int = 0,
+    /** Background commands it has running now, as Claude Code's status line counts them; an older Mac doesn't say. */
+    val shellsRunning: Int = 0,
     /** Stopped by an account or provider problem (a limit, signed out…), until a real reply clears it. */
     val blocked: Blocked? = null,
     /** Can switch to Bypass (an older Mac doesn't say: then yes, and the switch reports if not). */
@@ -136,6 +138,27 @@ data class WAgent(
     val result: String?,
 ) {
     val running: Boolean get() = status == "running"
+}
+
+/**
+ * A background command of a session's (docs/PROTOCOL.md, "Background commands"): a shell or a Monitor.
+ * [status]: `running`, `done`, `error`, `stopped`, or `unknown` when nothing says any more whether
+ * it runs.
+ */
+@Immutable
+data class WShell(
+    val id: String,
+    val sessionId: String,
+    val monitor: Boolean,
+    val command: String?,
+    val description: String?,
+    val status: String,
+    val startedAt: Long,
+    val endedAt: Long?,
+    val exitCode: Int?,
+) {
+    val running: Boolean get() = status == "running"
+    val unknown: Boolean get() = status == "unknown"
 }
 
 /** A workflow run: agents in phases, started by one Workflow call ([toolUseId]). Its [id] is the run id. */
@@ -669,6 +692,7 @@ object Wire {
             loginScreen = o.bool("loginScreen"),
             queue = o.arr("queue").mapObjects(::queued),
             agentsRunning = o.int("agentsRunning") ?: 0,
+            shellsRunning = o.int("shellsRunning") ?: 0,
             blocked = runCatching { blocked(o.obj("blocked")) }.getOrNull(),
             endedBy = o.str("endedBy")?.takeIf { it.isNotBlank() },
             automation = AutomationWire.sessionAutomation(o.obj("automation")),
@@ -763,6 +787,22 @@ object Wire {
             tokens = o.long("tokens"),
             toolUses = o.int("toolUses"),
             result = o.str("result")?.takeIf { it.isNotBlank() },
+        )
+    }
+
+    fun shell(o: JSONObject): WShell? {
+        val id = o.str("id")?.takeIf { it.isNotBlank() } ?: return null
+        return WShell(
+            id = id,
+            sessionId = o.str("sessionId").orEmpty(),
+            monitor = o.str("kind") == "monitor",
+            command = o.str("command")?.takeIf { it.isNotBlank() },
+            description = o.str("description")?.takeIf { it.isNotBlank() },
+            // One this build doesn't know says nothing it can't stand behind.
+            status = o.str("status") ?: "unknown",
+            startedAt = o.long("startedAt") ?: 0L,
+            endedAt = o.long("endedAt"),
+            exitCode = o.int("exitCode"),
         )
     }
 

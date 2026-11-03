@@ -180,6 +180,13 @@ internal fun SessionSheet(
                     SheetTab.Agents -> {
                         SheetSeam(stringResource(R.string.session_sheet_agents), trail = if (atWork > 0) stringResource(R.string.agents_running, atWork).uppercase() else null)
                         AgentsPart(agents, atWork, onOpen = { id -> onDismiss(); opener.agent(session.id, id) })
+                        // Its background commands (ShellsPart.kt): no seam when it has none, or the Mac doesn't say.
+                        val shells = sheetShells(hub.agents(session.id))
+                        if (shells.isNotEmpty()) {
+                            val going = shellsAtWork(session, shells)
+                            SheetSeam(stringResource(R.string.session_sheet_shells), trail = if (going > 0) stringResource(R.string.agents_running, going).uppercase() else null)
+                            ShellsPart(shells)
+                        }
                     }
                     SheetTab.Commands -> CommandsTab(hub, session, onDismiss, onModel)
                     SheetTab.Session -> {

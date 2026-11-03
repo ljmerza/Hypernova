@@ -57,6 +57,8 @@ data class Session(
     val createdAt: Long = 0L,
     /** Agents its main agent started that are running now. */
     val agentsRunning: Int = 0,
+    /** Background commands it has running now (docs/PROTOCOL.md, "Background commands"). */
+    val shellsRunning: Int = 0,
     /** Stopped by a limit, a sign-out or its provider, until a real reply clears it. */
     val blocked: Blocked? = null,
     /** It can switch to Bypass: false for a terminal session on the Mac that wasn't started with bypass allowed. */

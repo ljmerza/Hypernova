@@ -5,6 +5,10 @@
         <item quantity="one">%d agent</item>
         <item quantity="other">%d agents</item>
     </plurals>
+    <plurals name="top_bar_shells">
+        <item quantity="one">%d shell</item>
+        <item quantity="other">%d shells</item>
+    </plurals>
     <string name="top_bar_agents_open">Show the agents</string>
     <!-- TalkBack: this turn's time so far ("This turn: 4:05 so far."). -->
     <string name="top_bar_turn_said">This turn: %1$s so far.</string>
@@ -52,7 +56,7 @@
     <string name="st_top_bar_tokens">Tokens</string>
     <string name="st_top_bar_tokens_desc">The tokens the session has used.</string>
     <string name="st_top_bar_agents">Agents at work</string>
-    <string name="st_top_bar_agents_desc">How many agents work for it, while any do. A tap shows them.</string>
+    <string name="st_top_bar_agents_desc">Agents and shells at work, while any are. A tap shows them.</string>
     <string name="st_top_bar_turn">This turn’s time</string>
     <string name="st_top_bar_turn_desc">How long the turn under way has run.</string>
     <string name="st_top_bar_week_pace">Week pace</string>

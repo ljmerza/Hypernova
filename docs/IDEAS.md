@@ -56,7 +56,7 @@ on 2026-10-30 (DECISIONS, "The session sheet", 4); ideas that bring any back say
 | SS9 | Time ✓ built 2026-10-31 | Started at, running for, this turn's time, last activity. Useful for "is it stuck or slow". | S | app |
 | SS10 | Tokens and cost, folded | The tokens table and the estimate under a "Details" fold. **Reverses** "Remove the API cost amount"; listed for completeness. | S | app |
 | SS11 | Quick actions row | Compact, Stop turn (Esc), Open terminal, Branch, Export as small pills under the summary. Today the actions are only Rename, Stop and Delete for jobs. | S | app |
-| SS12 | Background tasks | Background shells and monitors the session started (Claude Code's `/tasks`, "everything running in the background") listed in the Agents part. Unsure how to read them from outside; `run_in_background` Bash calls in the transcript are a start. | M | both |
+| SS12 | Background tasks ✓ built 2026-11-03 | Background shells and monitors the session started (Claude Code's `/tasks`, "everything running in the background") listed in the Agents part. Unsure how to read them from outside; `run_in_background` Bash calls in the transcript are a start. | M | both |
 | SS13 | Goal | Show and set the session's goal (`/goal`, "a goal Claude checks before stopping"). Unsure where Claude Code keeps it. | M | both |
 | SS14 | Plan | The current plan (`/plan` "view the current session plan") readable from the sheet, not only as the approval card. | M | both |
 | SS15 | Claude Code version | The version the session runs, amber when older than the installed one, with Respawn (AG4). | S | both |

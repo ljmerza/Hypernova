@@ -45,7 +45,8 @@ the Android app's own.
    - Terminals and prompts: [Shared terminals](#shared-terminals), [Held prompts](#held-prompts)
    - Asks: [Approvals](#approvals), [Blocked calls](#blocked-calls), [Rules in
      effect](#rules-in-effect), [Side questions](#side-questions)
-   - Doing work: [Agents and workflows](#agents-and-workflows), [Automations](#automations)
+   - Doing work: [Agents and workflows](#agents-and-workflows), [Background
+     commands](#background-commands), [Automations](#automations)
    - Agents and models: [Codex](#codex-a-second-agent), [Switching agents](#switching-agents),
      [Providers](#providers), [Models](#models), [Agent settings](#agent-settings), [A session's MCP
      servers](#a-sessions-mcp-servers), [An agent's MCP servers](#an-agents-mcp-servers), [An agent's
@@ -559,6 +560,8 @@ Session = {
                               // (see Held prompts); text whole, files apart; absent when none
   term: {id, mac: number, phone: number} | null,  // its shared terminal; mac, phone: how many have it open on the
                               // server (`hn`) and on phones
+  shellsRunning?: number,     // background commands it has running now (see Background commands); absent while
+                              // none, and from an older server. Part of no working rule
   agentsRunning: number,      // agents its main agent started that run now (see Agents and workflows); with
                               // state, the working rule: working = state working/starting or agentsRunning > 0,
                               // needs_you outranks it (the Android app's Session.busy; one rule in every client)
@@ -947,6 +950,27 @@ Agent = {
   result: string | null       // its report, at most 600 characters, keys masked
 }
 ```
+
+### Shell
+
+A background command. Rules: see Background commands.
+
+```ts
+Shell = {
+  id: string,                 // Claude Code's task id ("b…")
+  sessionId: string,
+  toolUseId: string | null,   // the call that started it, when one is known
+  kind: "shell" | "monitor",
+  command: string | null,     // its first line, masked as a tool row is, 300 characters at most
+  description: string | null, // what the call says it's for, masked
+  status: "running" | "done" | "error" | "stopped" | "unknown",  // unknown: nothing says any more whether it runs
+  startedAt: number,          // first seen, when no call says
+  endedAt: number | null,     // null while running, and while unknown
+  exitCode: number | null     // when Claude Code or its file said one
+}
+```
+
+A client treats a status it doesn't know as `unknown`.
 
 ### Workflow
 
@@ -2443,8 +2467,9 @@ daemon doesn't know.
 #### GET /v1/sessions/{id}/agents
 
 - **Body:** none
-- **Answer:** `200 {agents: Agent[], workflows: Workflow[]}`: the agents its main agent started and
-  the workflows of them, newest first
+- **Answer:** `200 {agents: Agent[], workflows: Workflow[], shells: Shell[]}`: the agents its main
+  agent started, the workflows of them and its background commands (all that run or may, and the most
+  recent others up to 30), newest first. An older server has no `shells`: a client takes none.
 - **Refusals:** 404 `no_session`
 - **Rules:** the 60 most recent agents and any running; older ones only counted in their workflow. A
   workflow step's earlier attempts are left out. See Agents and workflows.
@@ -3918,6 +3943,13 @@ objects with a `t` field. On the WebSocket's auth, see Transport and auth.
 - **When:** a workflow started or changed (same `id` replaces), at the same pace as `agent`.
 - **Client:** a client that doesn't know it ignores it.
 
+#### `{t:"shell"}`
+
+- **Direction:** daemon → client
+- **Shape:** `{t:"shell", shell: Shell}`
+- **When:** a background command started or changed (same `id` replaces). See Background commands.
+- **Client:** a client that doesn't know it ignores it.
+
 ### Messages: files
 
 #### `{t:"files"}`
@@ -4551,9 +4583,9 @@ it (`agentsRunning`, Home, the widget, Stay awake).
     TaskStop's result on that id, or "not running"; or for a shell, a Stop or SubagentStop
     `background_tasks` that no longer names it (work that began in the last 2 s is believed anyway,
     as the list came first).
-  - The list's contents are read from the 2.1.316 binary, not from a recorded hook: the session's
-    tasks that are `running` or `pending` and not foreground, so a subagent's shells are named. Were
-    that wrong, Claude Code's word below still holds the agent.
+  - The list's contents were read from the 2.1.316 binary: the session's tasks that are `running` or
+    `pending` and not foreground, so a subagent's shells are named (recorded on 2.1.317 since,
+    Background commands). Were that wrong, Claude Code's word below still holds the agent.
 - **Claude Code's word on it.** The main transcript gets a `<task-notification>` with
   `<status>completed</status>` and
   `<summary>Agent "…" is waiting on its own background work</summary>` (and a `<note>`). The words
@@ -4688,6 +4720,87 @@ differently); the main agent's notify at once.
 SubagentStop is installed as an optional hook (see Hooks): an install without it still counts as
 connected, and the daemon adds it to an older install at start. SubagentStart isn't installed (the
 meta file and the first PreToolUse say the same).
+
+### Background commands
+
+A session's commands going on in the background, as Claude Code's own status line counts them ("1
+shell", "1 shell, 1 monitor"). Claude Code's sessions only. Read-only: nothing here starts or stops one.
+
+The owner, 2026-11-03: "a feature so I could see background commands running it says in code one
+shell for example I can only see what agents are running but not background commands".
+
+Everything below was measured on Claude Code 2.1.317 in a throwaway `HOME` against a scripted
+provider: interactive sessions, a `claude agents` job, a subagent, `-p`. The recorded lines are in
+`daemon/test/fixtures/background-shells/`. None of it is documented by Claude Code, so every field is
+optional here.
+
+**What Claude Code writes**
+
+- **Started.** `Bash` with `run_in_background`, or a foreground command moved there (ctrl-B, also
+  `backgroundedByUser: true`): its result's `toolUseResult.backgroundTaskId`, and "Output is being
+  written to: <path>" in the result's text. `Monitor`: `toolUseResult: {taskId, timeoutMs, persistent}`.
+  A subagent's are in its own file only. The command and its description are the call's input.
+- **Ended.** A `<task-notification>` with a `<status>` and its `<summary>` ("Background command "x"
+  completed (exit code 0)", "failed with exit code 3", "was stopped"), first as a `queue-operation`
+  `enqueue`. The terminal panel's stop and a process's exit only ever write that entry until a later
+  turn takes it. A subagent's shell has it in the main transcript too (`remove`, `delivered_to_agent`).
+- **`TaskStop`:** its result only (`{message, task_id, task_type: "local_bash", command}`), no
+  notification. `BashOutput`, `KillShell` and `TaskOutput` are no longer tools in this version.
+- **`Monitor` events** are notifications with no `<status>`, and end nothing. Its stream ending has
+  one. Running out of time doesn't: an event, "[Monitor expired after 3s …]", and `[killed]` in its file.
+- **The output file** ends with `[exited with code N]`, `[killed]` or `[process exited while detached;
+  exit code unknown]`.
+- **`/tasks` and `/bashes`** open the terminal's own panel and write nothing.
+- **Stop and SubagentStop's `background_tasks`** (recorded, both): what is going in the whole session
+  right now, each shell `{id, type: "shell", status, description, command}`, a Monitor as one too.
+
+**What happens to a command when its session goes**
+
+| What happened | The command | What Claude Code writes |
+|---|---|---|
+| `/exit`, "Exit and stop tasks" (a dialog when any run) | killed | `killed` notifications, then SessionEnd |
+| `-p` killed by SIGTERM | killed | a `killed` notification |
+| Claude Code killed (`kill -9`, a crash) | **lives on, orphaned** | nothing, ever |
+| `claude stop` on a job | **lives on, orphaned** | nothing; SessionEnd `other` |
+| `--resume` after any of these | as above | `stopped`, "didn't finish before the previous session ended", for each with no end in the transcript, also the one that's still alive, and also one its own `killed` notification ended |
+| `claude respawn` on a job | taken over: counted, ends with a notification | nothing about it until it ends ("exit code -1") |
+| "Move to background and exit" | taken over by a new session id | the new transcript is a fork that replays the start |
+| `/clear` | goes on, same process, under the new session id | SessionEnd `clear`; the new session's Stop names it; nothing in its transcript |
+
+**What the daemon does with that** (`daemon/src/agents.ts`, "Background commands")
+
+- Each is `running`, `done`, `error`, `stopped` or `unknown`. `unknown` says nothing can tell any more
+  whether it runs. It's never counted as running and has no `endedAt`.
+- A notification or `TaskStop` is Claude Code's word, and always stands. "Didn't finish before the
+  previous session ended" isn't that word (measured: the command was alive as it was written): `unknown`,
+  unless its file says how it ended.
+- Stop's list: named, it's running, whatever the daemon thought (a job's new process took it over),
+  unless Claude Code's word already ended it. Not named, and it started more than 2 s ago: it has ended,
+  how from its file, else `done` until its notification says otherwise. Named and never read of (a
+  subagent's whose file wasn't followed, a command moved to the background from a `!`): added, its
+  `startedAt` when first seen. After `/clear`, its session's earlier start is kept (the same task id on
+  another session's board).
+- Its output file's last 128 bytes, read only when its size changed, only for that last line. Nothing
+  else of the file is read, and nothing of it is sent or logged. The path comes from a transcript, so
+  it must be absolute, with no `..`, a plain file named `<id>.output`. A command's own last line that
+  looks the same reads as an end; the next Stop's list corrects it.
+- A Monitor past its `timeoutMs` (plus 5 s) is `stopped`; a persistent one has no such time.
+- The session's process gone (SessionEnd but for `clear` or `resume`, or gone from the registry and
+  no longer running) or the session ended: what's still running becomes `unknown`. A process newer than
+  the command (the registry's `startedAt`), with no list naming it since, makes it `unknown` too: so a
+  resumed transcript brings no old "running" back. A command this very process started goes back to
+  `running` if the process turns up again after one read of the registry missed it.
+- A daemon restart reads it all again from the transcripts, in order. Commands aren't logged.
+- `shellsRunning` counts neither agents nor busyness: it changes no session's state, keeps nothing
+  awake, and a turn isn't "working" because of it.
+
+**Not known, and said so:** a command the session lost touch with is `unknown` for good, unless a later
+list names it or a notification ends it. An orphan that finishes writes nothing, so the daemon can't
+tell it from one still running. Masked as a tool row is, through `maskSecrets`: its first line, 300
+characters at most. **SDK sessions** go through the same links, and `task_updated`; not measured there.
+
+**Codex:** nothing. Codex isn't installed here, so what its app-server offers for this wasn't measured;
+the items the daemon reads (`commandExecution`) belong to a turn. Its sessions list none.
 
 ### Automations
 
