@@ -103,10 +103,12 @@
     <string name="st_term_engine">Terminal engine</string>
     <string name="st_term_ghostty">Draw terminals with Ghostty</string>
     <string name="st_term_ghostty_desc">A trial: Ghostty\'s terminal core instead of xterm.js. The next terminal you open uses it.</string>
-    <!-- Fork: Settings → New sessions (the permission mode a new Claude session starts in; data/NewSessionMemory.kt). -->
+    <!-- Fork: an agent's settings → New sessions (the mode that agent's new sessions open on, per server; ui/settings/StartModeRow.kt). -->
     <string name="st_new_sessions">New sessions</string>
     <string name="st_start_mode">New sessions start in</string>
-    <string name="st_start_mode_desc">The mode the New session sheet opens on. Changing it there is for that session only; Bypass is chosen there each time.</string>
+    <string name="st_start_mode_claude">What New session opens on for Claude Code on %1$s, here and on the desktop client. Changing it there is for that session only, and Bypass is chosen there each time.</string>
+    <string name="st_start_mode_codex">What New session opens on for Codex on %1$s, here and on the desktop client. Changing it there is for that session only.</string>
+    <string name="st_start_mode_too_old">%1$s needs updating to keep this. Until then New session opens on what this phone had.</string>
     <!-- A table in a reply: what TalkBack says for a cell ("Tokens: 3.2k"), and an action on its rows. -->
     <string name="table_cell">%1$s: %2$s</string>
     <string name="copy_table">Copy table</string>
@@ -1354,7 +1356,7 @@
     <string name="as_effort_of">Effort for %1$s</string>
     <string name="as_when_effort">Applies to new sessions on this model.</string>
     <string name="as_k_mode">Starting permission mode</string>
-    <string name="as_k_mode_body">The mode new sessions start in.</string>
+    <string name="as_k_mode_body">The mode a session started in a terminal begins in. Ones started from this app use New sessions start in, above.</string>
     <string name="as_k_thinking">Thinking summaries</string>
     <string name="as_k_thinking_body">Shows summaries of Claude\'s thinking when it\'s expanded. It changes what you see, not what the model does.</string>
     <string name="as_k_dream">Background memory consolidation</string>

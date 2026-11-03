@@ -17,9 +17,9 @@ class SettingsPlanTest {
     private fun page(s: ServerFacts, all: Boolean = false, testing: Boolean = false) = SettingsPlan.serverParts(s, all, testing).map { it.key }
 
     @Test fun theTabIsTheServersThenThePhone() {
-        assertEquals(listOf("servers", "phone", "newSessions", "display", "about"), tab(listOf("z2")))
+        assertEquals(listOf("servers", "phone", "display", "about"), tab(listOf("z2")))
         // The Terminal engine trial only once the testing tools are unlocked, just before About.
-        assertEquals(listOf("servers", "phone", "newSessions", "display", "termEngine", "about"), tab(listOf("z2"), testing = true))
+        assertEquals(listOf("servers", "phone", "display", "termEngine", "about"), tab(listOf("z2"), testing = true))
     }
 
     @Test fun aRowPerServerInTheOrderGiven() {

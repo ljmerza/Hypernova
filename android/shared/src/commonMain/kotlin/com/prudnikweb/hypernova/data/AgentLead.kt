@@ -16,10 +16,12 @@ data class ClaudeState(
     val agents: Boolean? = null,
     /** Sessions the lost login stopped carry on by themselves once it's back (the Mac's settings.loginContinue); null from a Mac that can't. */
     val loginContinue: Boolean? = null,
+    /** What new Claude Code sessions open on, kept on that Mac; null from one too old to keep it ([NewSessionMemory.startsIn]). */
+    val startMode: String? = null,
 ) {
     companion object {
         fun parse(o: JSONObject?): ClaudeState? = o?.let {
-            ClaudeState(it.optBoolean("available", true), it.str("version")?.takeIf { v -> v.isNotBlank() }, if (it.has("agents")) it.optBoolean("agents") else null, if (it.has("loginContinue")) it.optBoolean("loginContinue") else null)
+            ClaudeState(it.optBoolean("available", true), it.str("version")?.takeIf { v -> v.isNotBlank() }, if (it.has("agents")) it.optBoolean("agents") else null, if (it.has("loginContinue")) it.optBoolean("loginContinue") else null, it.str("startMode"))
         }
     }
 }

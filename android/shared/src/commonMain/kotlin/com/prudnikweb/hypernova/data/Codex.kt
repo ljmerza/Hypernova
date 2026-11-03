@@ -44,6 +44,8 @@ data class CodexState(
     val min: String? = null,
     /** Where the codex binary is on the Mac. */
     val path: String? = null,
+    /** What new Codex sessions open on, kept on that Mac; null from one too old to keep it ([NewSessionMemory.startsIn]). */
+    val startMode: String? = null,
 ) {
     /** It can take a switch from a Claude session: installed and in use. */
     val canSwitchTo: Boolean get() = available && enabled
@@ -99,6 +101,7 @@ object CodexWire {
             usage = o.obj("usage")?.let { u -> CodexUsage(window(u.obj("fiveHour")), window(u.obj("sevenDay")), u.bool("limited"), u.long("observedAt")) },
             min = o.str("min")?.takeIf { it.isNotBlank() },
             path = o.str("path")?.takeIf { it.isNotBlank() },
+            startMode = o.str("startMode"),
         )
     }
 

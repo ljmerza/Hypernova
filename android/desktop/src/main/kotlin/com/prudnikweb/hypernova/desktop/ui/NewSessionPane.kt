@@ -115,8 +115,11 @@ internal fun NewSessionPane(hub: Hub, shell: Shell, server: String, onBack: (() 
     val healthy = if (stopped) providers.healthyOther(account, null, opened) else null
     val providerId = remember { healthy?.id ?: memory.provider?.takeIf { id -> providers.any { it.id == id } } ?: providers.firstOrNull()?.id }
     val provider = providers.firstOrNull { it.id == providerId } ?: providers.firstOrNull()
-    var mode by remember { mutableStateOf(memory.mode) }
-    var codexMode by remember { mutableStateOf(memory.codexMode) }
+    // That server's mode for each agent (NewSessionMemory.startsIn); changed here, it's this session's only.
+    var modePick by remember(hub) { mutableStateOf<String?>(null) }
+    val mode = modePick ?: NewSessionMemory.startsIn(AgentKind.CLAUDE, hub, memory)
+    var codexModePick by remember(hub) { mutableStateOf<String?>(null) }
+    val codexMode = codexModePick ?: NewSessionMemory.startsIn(AgentKind.CODEX, hub, memory)
     var prompt by remember { mutableStateOf(TextFieldValue(NewSessionMemory.draft, TextRange(NewSessionMemory.draft.length))) }
     val codex = hub.codex
     val claudeHere = AgentLead.claudeAvailable(hub.claude)
@@ -243,11 +246,11 @@ internal fun NewSessionPane(hub: Hub, shell: Shell, server: String, onBack: (() 
                             for (m in if (onCodex) AgentKind.CODEX_MODES else NewSessionMemory.START_MODES) {
                                 Choice(modeTitle(m), m == now) {
                                     when {
-                                        onCodex -> codexMode = m
+                                        onCodex -> codexModePick = m
                                         m == mode -> Unit
                                         // Auto stops at the think-twice card, every time; with no list to show, it goes on.
-                                        m == "auto" -> DeskIncidents.next()?.let { thinking = DeskIncidents.Asked(m, it) } ?: run { mode = m }
-                                        else -> mode = m
+                                        m == "auto" -> DeskIncidents.next()?.let { thinking = DeskIncidents.Asked(m, it) } ?: run { modePick = m }
+                                        else -> modePick = m
                                     }
                                 }
                             }
@@ -284,7 +287,7 @@ internal fun NewSessionPane(hub: Hub, shell: Shell, server: String, onBack: (() 
         }
     }
     thinking?.let { asked ->
-        ThinkTwice(asked, onKeep = { thinking = null }, onGoOn = { mode = asked.mode; thinking = null })
+        ThinkTwice(asked, onKeep = { thinking = null }, onGoOn = { modePick = asked.mode; thinking = null })
     }
 }
 

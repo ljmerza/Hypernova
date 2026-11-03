@@ -903,6 +903,7 @@ class LiveHub(
         // The agents first: whether Claude Code's account is worth a word depends on them.
         codexChanged(s.codex)
         claude = s.claude
+        moveStartMode()
         // An older daemon doesn't report the account: as far as this phone knows, it's fine.
         setAccount(s.account ?: Account.Ok, live = false, publish = false)
         publish()
@@ -2334,6 +2335,33 @@ class LiveHub(
         if (c != null) claude = c
         Result.success(c)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.ag_claude_agents_err)) }
+
+    override suspend fun setStartMode(agent: String, mode: String): Result<Unit> = try {
+        if (agent == AgentKind.CODEX) codexChanged(CodexWire.state(api.post("/v1/codex", JSONObject().put("startMode", mode)).obj("codex")))
+        else ClaudeState.parse(api.post("/v1/claude", JSONObject().put("startMode", mode)).obj("claude"))?.let { claude = it }
+        Result.success(Unit)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.as_edit_err)) }
+
+    private var movingStartMode = false
+
+    /**
+     * The one phone-wide "New sessions start in" of before goes to Claude Code on this server, once
+     * ([NewSessionMemory.startModeToMove]); never to Codex. Only where the server keeps it, so an older
+     * one updated later still gets it, and only where it holds nothing yet. A failure tries at the next snapshot.
+     */
+    private fun moveStartMode() {
+        if (movingStartMode || claude?.startMode == null) return
+        val mode = NewSessionMemory.startModeToMove(platform.storage, serverId) ?: return
+        movingStartMode = true
+        scope.launch {
+            try {
+                ClaudeState.parse(api.post("/v1/claude", JSONObject().put("moveStartMode", mode)).obj("claude"))?.let { claude = it }
+                NewSessionMemory.startModeMoved(platform.storage, serverId)
+            } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+                DebugLog.i("hub") { "moving the start mode to ${pairing.macName} failed: ${e.message}" }
+            } finally { movingStartMode = false }
+        }
+    }
 
     override suspend fun setCodexEnabled(on: Boolean): Result<CodexState?> = try {
         val c = CodexWire.state(api.post("/v1/codex", JSONObject().put("enabled", on)).obj("codex"))

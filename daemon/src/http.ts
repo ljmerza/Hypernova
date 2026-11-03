@@ -46,6 +46,7 @@ import { awakeClient, awakeState, setAwake } from './awake.ts'
 import { macFeed } from './mac-feed.ts'
 import { ChangeError, changesOf, diffOf } from './changes.ts'
 import { toolPath } from './normalize.ts'
+import { isStartMode, setStartMode, startMode } from './start-modes.ts'
 import { ResumeError, continueText, setAutoContinue, setLoginContinue, typeContinue } from './resume.ts'
 import { BlockedError, blockedList, dismissBlocked, retryBlocked } from './blocked.ts'
 import { AsideError, askAside, asideOf } from './aside.ts'
@@ -364,7 +365,7 @@ function afterAgentUpdate(agent: 'claude' | 'codex'): void {
   else sendCodex()
   broadcast({ t: 'agent_settings', agent })
 }
-const claudeState = () => ({ available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed, agents: settings.claudeAgents === true, loginContinue: settings.loginContinue !== false })
+const claudeState = () => ({ available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed, agents: settings.claudeAgents === true, loginContinue: settings.loginContinue !== false, startMode: startMode('claude') })
 
 function snapshot(deviceId: string | null) {
   return {
@@ -544,9 +545,15 @@ async function api(c: Ctx): Promise<void> {
   // Codex on or off for Hypernova from the phone (Settings → Agents & providers).
   if (path === '/v1/codex' && m === 'POST') {
     const b = await readJsonBody(req)
-    if (typeof b?.enabled !== 'boolean') throw new HttpError(400, 'bad_value', 'Say enabled: true or false.')
+    if (typeof b?.enabled !== 'boolean' && b?.startMode === undefined) throw new HttpError(400, 'bad_value', 'Say enabled: true or false.')
+    if (b.enabled !== undefined && typeof b.enabled !== 'boolean') throw new HttpError(400, 'bad_value', 'Say enabled: true or false.')
+    if (b.startMode !== undefined && !isStartMode('codex', b.startMode)) throw new HttpError(400, 'bad_mode', 'New Codex sessions can start read-only or workspace-write.')
     if (b.enabled && !codexBinary().ok) throw new HttpError(409, 'no_codex', 'Codex isn’t installed on this computer, or it’s too old for Hypernova.')
-    setCodexEnabled(b.enabled)
+    if (typeof b.enabled === 'boolean') setCodexEnabled(b.enabled)
+    if (b.startMode !== undefined) {
+      setStartMode('codex', b.startMode)
+      sendCodex()
+    }
     return json(res, 200, { codex: codexState() })
   }
   // Sessions in `claude agents` on or off from the phone (Settings → Agents & providers → Claude Code):
@@ -554,9 +561,15 @@ async function api(c: Ctx): Promise<void> {
   // So is carrying on by itself after signing in again (resume.ts; Settings → the server's page).
   if (path === '/v1/claude' && m === 'POST') {
     const b = await readJsonBody(req)
-    if (typeof b?.agents !== 'boolean' && typeof b?.loginContinue !== 'boolean') throw new HttpError(400, 'bad_value', 'Say agents or loginContinue: true or false.')
+    const wantsMode = b?.startMode !== undefined || b?.moveStartMode !== undefined
+    if (typeof b?.agents !== 'boolean' && typeof b?.loginContinue !== 'boolean' && !wantsMode) throw new HttpError(400, 'bad_value', 'Say agents or loginContinue: true or false.')
+    // Before anything's saved, so a refused mode changes nothing else in the same body.
+    for (const mode of [b.startMode, b.moveStartMode]) if (mode !== undefined && !isStartMode('claude', mode)) throw new HttpError(400, 'bad_mode', 'New Claude Code sessions can start in default, acceptEdits, plan or auto.')
     if (typeof b.agents === 'boolean') setClaudeAgents(b.agents)
     if (typeof b.loginContinue === 'boolean') setLoginContinue(b.loginContinue)
+    if (b.startMode !== undefined) setStartMode('claude', b.startMode)
+    // A phone moving its old setting here: a value this server already has stays.
+    if (b.moveStartMode !== undefined) setStartMode('claude', b.moveStartMode, true)
     const claude = claudeState()
     broadcast({ t: 'claude', claude })
     return json(res, 200, { claude })

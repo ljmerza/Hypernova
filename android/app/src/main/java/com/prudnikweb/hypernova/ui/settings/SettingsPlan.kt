@@ -33,7 +33,6 @@ object SettingsPlan {
     data class Servers(val ids: List<String>) : TabPart { override val key = "servers" }
     /** "This phone": the heading, and the rows of [pages]. */
     data class Phone(val pages: List<PhonePage>) : TabPart { override val key = "phone" }
-    data object NewSessions : TabPart { override val key = "newSessions" }
     data object Display : TabPart { override val key = "display" }
     /** Terminal engine: xterm.js or the Ghostty trial (ui/term/TermEngine.kt), this phone's; testing only. */
     data object TerminalEngine : TabPart { override val key = "termEngine" }
@@ -81,7 +80,6 @@ object SettingsPlan {
     fun parts(servers: List<String>, testing: Boolean): List<TabPart> = buildList {
         add(Servers(servers))
         add(Phone(PhonePage.entries.filter { it != PhonePage.Notifications || servers.isNotEmpty() }))
-        add(NewSessions)
         add(Display)
         if (testing) add(TerminalEngine)
         add(About)

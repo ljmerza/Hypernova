@@ -20,6 +20,50 @@ class NewSessionMemoryTest {
         assertEquals("default", NewSessionMemory.startMode(null))
     }
 
+    private val remembered = Remembered(null, null, emptyMap(), mode = "plan", codexMode = AgentKind.CAN_EDIT)
+
+    /** Fork: what the server keeps, one of that agent's own modes; a Bypass, a full access or the other agent's word is the safe one. */
+    @Test fun aFormOpensOnTheServersValueNeverWiderThanTheAgentsOwnModes() {
+        for (m in listOf("default", "acceptEdits", "plan", "auto")) assertEquals(m, NewSessionMemory.startsIn(AgentKind.CLAUDE, m, remembered))
+        for (m in listOf(AgentKind.READ_ONLY, AgentKind.CAN_EDIT)) assertEquals(m, NewSessionMemory.startsIn(AgentKind.CODEX, m, remembered))
+        // Whatever a stale or hand-edited value says, and whatever this phone had: not the phone's, the safe one.
+        for (m in listOf("bypassPermissions", "dontAsk", AgentKind.CAN_EDIT, AgentKind.READ_ONLY, "danger-full-access", "never", "")) {
+            assertEquals(m, "default", NewSessionMemory.startsIn(AgentKind.CLAUDE, m, remembered))
+        }
+        for (m in listOf("danger-full-access", "never", "bypassPermissions", "plan", "auto", "default", "")) {
+            assertEquals(m, AgentKind.READ_ONLY, NewSessionMemory.startsIn(AgentKind.CODEX, m, remembered))
+        }
+    }
+
+    /** An older server keeps nothing: what this phone had, Claude's old setting and Codex's last mode, each for its own agent. */
+    @Test fun anOlderServerOpensOnWhatThePhoneHad() {
+        assertEquals("plan", NewSessionMemory.startsIn(AgentKind.CLAUDE, null, remembered))
+        assertEquals(AgentKind.CAN_EDIT, NewSessionMemory.startsIn(AgentKind.CODEX, null, remembered))
+        // The old setting holding Bypass or a Codex word, by hand: Ask (load's own check).
+        val p = com.prudnikweb.hypernova.data.live.FakePlatform().storage
+        for (bad in listOf("bypassPermissions", AgentKind.CAN_EDIT)) {
+            p.prefs("hypernova").edit().putString("newSession.startMode", bad).apply()
+            assertEquals("default", NewSessionMemory.startsIn(AgentKind.CLAUDE, null, NewSessionMemory.load(p)))
+        }
+    }
+
+    /** The old phone-wide setting: what's left to move, for each server by itself; only a Claude mode that isn't Ask anyway. */
+    @Test fun theOldSettingIsToMoveOnceForEachServer() {
+        val p = com.prudnikweb.hypernova.data.live.FakePlatform().storage
+        assertNull("nothing was set", NewSessionMemory.startModeToMove(p, "z2"))
+        fun old(m: String) = p.prefs("hypernova").edit().putString("newSession.startMode", m).apply()
+        for (nothing in listOf("default", "bypassPermissions", AgentKind.CAN_EDIT, "danger-full-access", "")) {
+            old(nothing)
+            assertNull(nothing, NewSessionMemory.startModeToMove(p, "z2"))
+        }
+        old("auto")
+        assertEquals("auto", NewSessionMemory.startModeToMove(p, "z2"))
+        assertEquals("auto", NewSessionMemory.startModeToMove(p, "shed"))
+        NewSessionMemory.startModeMoved(p, "z2")
+        assertNull("once", NewSessionMemory.startModeToMove(p, "z2"))
+        assertEquals("each server by itself", "auto", NewSessionMemory.startModeToMove(p, "shed"))
+    }
+
     @Test fun theModelIsRememberedPerProvider() {
         val r = Remembered("/p", "or", mapOf("or" to "z-ai/glm-5.3", "anthropic" to null), "default")
         assertEquals("z-ai/glm-5.3", r.model("or"))

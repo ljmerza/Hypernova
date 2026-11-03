@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Codex's account, its usage windows and its models, as the phone and the Mac show them
 // (docs/PROTOCOL.md, "Codex"). The email never leaves the daemon.
 import { broadcast, type Window } from '../hub.ts'
@@ -5,12 +6,15 @@ import { log } from '../util.ts'
 import { CODEX_MIN } from './binary.ts'
 import { codexBinary, codexConnected, codexEnabled, codexProblem, onCodexChange, onCodexConnected, onCodexNotification, rpc } from './client.ts'
 import { tokensOf } from './events.ts'
+import { startMode } from '../start-modes.ts'
 
 /** `type`: how Codex is signed in ("chatgpt", "apiKey"), null when it isn't. */
 export type CodexAccount = { signedIn: boolean; type: string | null; planType: string | null }
 /** Codex's own limits: its 5-hour and weekly windows (either can be missing), and whether one is used up. */
 export type CodexUsage = { fiveHour: Window | null; sevenDay: Window | null; limited: boolean; observedAt: number | null }
 export type CodexState = {
+  /** What new Codex sessions open on in a client's New session form (start-modes.ts). */
+  startMode: string
   /** Installed, at least [min], so it can be used here. */
   available: boolean
   enabled: boolean
@@ -42,7 +46,7 @@ export function codexState(now = Date.now()): CodexState | null {
   if (!b.path) return null
   const problem = !b.ok ? `Hypernova needs Codex ${CODEX_MIN} or later (this one is ${b.version ?? 'unknown'}).` : codexEnabled() ? codexProblem() : null
   const u = usage && { ...usage, fiveHour: roll(usage.fiveHour, FIVE_HOURS, now), sevenDay: roll(usage.sevenDay, WEEK, now) }
-  return { available: b.ok, enabled: codexEnabled(), connected: codexConnected(), version: b.version, min: CODEX_MIN, path: b.path, problem, account: codexEnabled() ? account : null, usage: codexEnabled() ? u : null }
+  return { available: b.ok, enabled: codexEnabled(), connected: codexConnected(), version: b.version, min: CODEX_MIN, path: b.path, problem, account: codexEnabled() ? account : null, usage: codexEnabled() ? u : null, startMode: startMode('codex') }
 }
 
 /** What clients last heard, so they hear again only when it changes. */

@@ -122,6 +122,16 @@ class AgentSwitchSheetTest {
         assertEquals("switchAgent(${Samples.MID}, claude, 47, null, null, default)", hub.calls.last())
     }
 
+    /** The other agent starts as the New session sheet would: this server's value for it. */
+    @Test fun aSwitchStartsOnThisServersValueForTheOtherAgent() {
+        val hub = FeatureHub()
+        hub.codexState = hub.codexState!!.copy(startMode = AgentKind.CAN_EDIT)
+        sheet(hub)
+        switchPill().performClick()
+        rule.waitForIdle()
+        assertEquals("switchAgent(${Samples.MID}, codex, 47, null, null, workspace-write)", hub.calls.last())
+    }
+
     @Test fun aCodexSessionsModelPickerSwitchesItsModelAndEffort() {
         val hub = FeatureHub()
         hub.base.sessionList = hub.base.sessionList.map { if (it.id == Samples.MID) it.copy(agent = AgentKind.CODEX, mode = AgentKind.READ_ONLY, model = "gpt-test") else it }

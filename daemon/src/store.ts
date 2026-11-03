@@ -72,6 +72,11 @@ export type Settings = {
    * 2026-11-03: "default on"). Settings on the phone, `POST /v1/claude`, `POST /local/settings`. Unset: on.
    */
   loginContinue?: boolean
+  /**
+   * What each agent's new sessions open on in a client's New session form (start-modes.ts; owner, 2026-11-03).
+   * `POST /v1/claude`, `POST /v1/codex`. Unset, or a value that isn't one they can start in: Ask, Read only.
+   */
+  startModes?: { claude?: string; codex?: string }
 }
 /**
  * A session started from Hypernova. `engine` "term" runs in a shared terminal; "sdk" (or none, from

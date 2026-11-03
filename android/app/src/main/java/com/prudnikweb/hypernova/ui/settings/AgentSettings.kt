@@ -185,6 +185,8 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                     }
                 }
             }
+            // Not in the file: kept by this server's daemon, so it's here whatever the file's state (StartModeRow.kt).
+            if ((if (codex) hub.codex else hub.claude) != null) item(key = "start-mode") { StartModeSection(hub, agent) }
             item(key = "intro") {
                 // Not until the server's said otherwise is there anything to promise about changing them.
                 val viewOnly = tooOld || (current != null && current.editable.isEmpty())

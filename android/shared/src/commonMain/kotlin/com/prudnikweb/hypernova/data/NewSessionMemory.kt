@@ -4,10 +4,10 @@ package com.prudnikweb.hypernova.data
 
 /**
  * What the new-session sheet starts with next time: the project, provider, model and Claude Code's
- * effort the last session was started with, kept on the phone. Fork: Claude's mode isn't the last
- * one used but the one chosen in Settings → New sessions ([NewSessionMemory.startMode]; Ask until
- * one is), every time. With Codex (data/Codex.kt): which agent, and Codex's own model, reasoning
- * effort and mode, kept apart from Claude's.
+ * effort the last session was started with, kept on the phone. Fork: the mode isn't the last one
+ * used but what that server keeps for that agent ([NewSessionMemory.startsIn]); [mode] and [codexMode]
+ * are only for a server too old to keep it. With Codex (data/Codex.kt): which agent, and Codex's own
+ * model and reasoning effort, kept apart from Claude's.
  */
 data class Remembered(
     val project: String?,
@@ -40,6 +40,7 @@ object NewSessionMemory {
     private const val PROVIDER = "newSession.provider"
     private const val MODEL = "newSession.model."
     private const val START_MODE = "newSession.startMode"
+    private const val START_MODE_MOVED = "newSession.startModeMoved."
     private const val AGENT = "newSession.agent"
     private const val CODEX_MODEL = "newSession.codex.model"
     private const val CODEX_EFFORT = "newSession.codex.effort"
@@ -55,12 +56,30 @@ object NewSessionMemory {
     /** The mode new sessions start in, from what was saved: one of [START_MODES], else Ask. */
     fun startMode(saved: String?): String = saved?.takeIf { it in START_MODES } ?: "default"
 
-    /** Settings → New sessions: the mode the sheet opens on; a session's own pick doesn't change it. */
-    fun startMode(storage: Storage): String =
-        startMode(storage.prefs(PREFS).getString(START_MODE, null))
+    /**
+     * What a form opens on for [agent] (docs/DECISIONS.md, "New sessions start in, per server and agent"):
+     * what the server said ([served]), only ever one of that agent's own modes, so another agent's word,
+     * Bypass or `danger-full-access` is Ask or Read only. [served] null, a server too old to keep it: what
+     * this device had before, Claude's old setting and Codex's last mode.
+     */
+    fun startsIn(agent: String, served: String?, memory: Remembered): String = when {
+        agent == AgentKind.CODEX -> if (served != null) keptCodexMode(served) else memory.codexMode
+        served != null -> startMode(served)
+        else -> memory.mode
+    }
 
-    fun setStartMode(storage: Storage, mode: String) {
-        storage.prefs(PREFS).edit().putString(START_MODE, startMode(mode)).apply()
+    fun startsIn(agent: String, hub: Hub, memory: Remembered): String =
+        startsIn(agent, if (agent == AgentKind.CODEX) hub.codex?.startMode else hub.claude?.startMode, memory)
+
+    /** The old phone-wide setting, still to go to Claude Code on server [serverId]; null: done, or nothing that isn't Ask anyway. */
+    fun startModeToMove(storage: Storage, serverId: String): String? {
+        val p = storage.prefs(PREFS)
+        if (p.contains(START_MODE_MOVED + serverId)) return null
+        return p.getString(START_MODE, null)?.takeIf { it in START_MODES && it != "default" }
+    }
+
+    fun startModeMoved(storage: Storage, serverId: String) {
+        storage.prefs(PREFS).edit().putBoolean(START_MODE_MOVED + serverId, true).apply()
     }
 
     /**
@@ -95,7 +114,7 @@ object NewSessionMemory {
 
     /**
      * A session started on these: the sheet opens on them next time. [project] null: a new one, which
-     * isn't a path yet. Its mode isn't kept (Fork: [startMode]); its [effort] is (null: the default).
+     * isn't a path yet. Its mode isn't kept (Fork: [startsIn]); its [effort] is (null: the default).
      */
     fun save(storage: Storage, project: String?, provider: String?, model: String?, effort: String?) {
         val e = storage.prefs(PREFS).edit()
