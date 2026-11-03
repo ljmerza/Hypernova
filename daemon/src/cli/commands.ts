@@ -227,7 +227,7 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
     line(cli, 'fail', 'The daemon isn’t running.', `${startHint(cli)}   (or hypernova run), then hypernova pair`)
     return 1
   }
-  let p: { code?: string; link: string; appLink: string; webLink?: string; download?: string; expiresAt: number; url: string }
+  let p: { link: string; appLink: string; webLink?: string; download?: string; expiresAt: number; url: string }
   let before: string[] = []
   try {
     before = ((await local(cli, 'GET', '/local/devices')).devices ?? []).map((d: any) => d.id)
@@ -262,6 +262,7 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
     if (noApk) cli.sys.say(`The app, if the phone doesn’t have it yet: hypernova-client-<tag>-android.apk from ${RELEASES}\n`)
     else if (!/\/\/10\.0\.2\.2[:/]/.test(p.download)) cli.sys.say(`The app, if the phone doesn’t have it yet: ${p.download}\n`)
   }
+  let drawn = false
   if (!flags['no-qr']) {
     const qr = encodeQr(link, 'M')
     const need = qr.size + 4 + 2
@@ -270,13 +271,17 @@ export async function pair(cli: Cli, flags: Flags): Promise<number> {
     else {
       for (const l of qrLines(qr, { quiet: 2, ansi: cli.tty })) cli.sys.say('  ' + l)
       cli.sys.say()
+      drawn = true
     }
   }
-  if (link.startsWith('https://')) {
-    cli.sys.say('Scan it with the phone’s camera, on this network or over your VPN into it. The browser warns once about this server’s own certificate: go on (Advanced, then Proceed), and the page opens Hypernova. Or paste the link in Hypernova (Paste pairing link):')
-  } else cli.sys.say('Paste the link in Hypernova (Paste pairing link):')
+  // The code is for a phone, the link for pasting (a computer's client, or a phone with no camera).
+  if (drawn) {
+    cli.sys.say('On the phone, open Hypernova and tap Scan, on this network or over your VPN into it.')
+    // The page opens only over https; with the local route off the code is the app's own link, which only Scan reads.
+    if (link.startsWith('https://')) cli.sys.say('Or use the phone’s own camera: the browser warns once about this server’s certificate (Advanced, then Proceed), and the page opens Hypernova, which asks first.')
+  }
+  cli.sys.say('To paste instead, in Hypernova (Paste pairing link) or on a computer:')
   cli.sys.say(`  ${link}`)
-  if (p.code) cli.sys.say(`Code: ${p.code}`)
   const until = new Date(p.expiresAt)
   cli.sys.say(`It works once, for ${Math.max(1, Math.round((p.expiresAt - Date.now()) / 60_000))} minutes (until ${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}).`)
   if (flags['no-wait'] || flags['no-wait-phone']) return 0
