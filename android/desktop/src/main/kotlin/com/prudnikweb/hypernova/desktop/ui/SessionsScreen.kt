@@ -2,8 +2,16 @@ package com.prudnikweb.hypernova.desktop.ui
 
 import androidx.compose.foundation.LocalScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,32 +22,47 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Blocked
 import com.prudnikweb.hypernova.data.ConnResult
@@ -57,62 +80,155 @@ import com.prudnikweb.hypernova.data.linkProblemText
 import com.prudnikweb.hypernova.desktop.APP_NAME
 import com.prudnikweb.hypernova.desktop.CardOffer
 import com.prudnikweb.hypernova.desktop.Group
+import com.prudnikweb.hypernova.desktop.RowLine
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.Ui
-import com.prudnikweb.hypernova.desktop.answerCard
-import com.prudnikweb.hypernova.desktop.doingLine
+import com.prudnikweb.hypernova.desktop.durationWords
 import com.prudnikweb.hypernova.desktop.groupsOf
+import com.prudnikweb.hypernova.desktop.itemIndexOf
+import com.prudnikweb.hypernova.desktop.neighbour
+import com.prudnikweb.hypernova.desktop.orderOf
+import com.prudnikweb.hypernova.desktop.rowHasChip
+import com.prudnikweb.hypernova.desktop.rowLine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** How wide the list gets, however wide the window: past this a line of a command is too long to read. */
 private val COLUMN = 720.dp
+/** Under this, in dp, one pane at a time: the list, or the chosen session with a way back. */
+internal val TWO_PANES = 760.dp
+private val LIST_MIN = 340.dp
+private val LIST_MAX = 460.dp
 /** Off-link cards stay, as last heard, and step back. */
-private const val STALE_ALPHA = 0.55f
+internal const val STALE_ALPHA = 0.55f
+/** The tag of the list, for the tests. */
+const val LIST_TAG = "session-list"
 
-/** The sessions on one server, with its link's state at the top. */
+/**
+ * The sessions on one server, with its link's state at the top. The list on the left, the chosen session on the right,
+ * or in a narrow window one of them at a time. docs/DECISIONS.md, "The desktop client's two panes".
+ */
 @Composable
 fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
-    Column(Modifier.fillMaxSize()) {
-        TopBar(hub, statuses, shell)
-        val link = hub.link
-        val groups = groupsOf(hub.sessions)
-        // Over the list, not in it: scrolled down, a card that came in above would never be seen.
-        if (link.state == LinkState.Unpaired || link.state == LinkState.Offline) {
-            Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp), contentAlignment = Alignment.TopCenter) {
-                val m = Modifier.widthIn(max = COLUMN).fillMaxWidth()
-                if (link.state == LinkState.Unpaired) UnpairedCard(hub, shell, m) else OfflineCard(hub, hasSessions = groups.isNotEmpty(), m)
-            }
-        }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            val state = rememberLazyListState()
-            val stale = link.state != LinkState.Connected && link.state != LinkState.Connecting
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                state = state,
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (groups.isEmpty() && link.state == LinkState.Connected) {
-                    item(key = "none") { NoSessions(Modifier.widthIn(max = COLUMN).fillMaxWidth()) }
+    val server = Core.activeId.orEmpty()
+    val link = hub.link
+    val groups = groupsOf(hub.sessions)
+    val order = orderOf(groups)
+    // A rewind's copy goes on as the session it replaced.
+    val chosenId = shell.chosen(server)?.let { hub.replacedBy(it) ?: it }
+    val chosen = chosenId?.let(hub::session)
+    val list = shell.listOf(server)
+    val scope = rememberCoroutineScope()
+    val keys = remember { FocusRequester() }
+    var hasKeys by remember { mutableStateOf(false) }
+    // In one pane the arrows can't choose as they go, or the list would be gone at the first press: they move this, and Enter chooses.
+    var cursor by remember(server) { mutableStateOf<String?>(null) }
+    fun choose(id: String?) {
+        if (id != null) cursor = id
+        shell.choose(server, id)
+    }
+    /** Only for the keys: a row the mouse reached is where it is. */
+    fun showRow(id: String) {
+        val at = itemIndexOf(groups, id) ?: return
+        val seen = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == at }
+        val fits = seen != null && seen.offset >= list.layoutInfo.viewportStartOffset && seen.offset + seen.size <= list.layoutInfo.viewportEndOffset
+        if (!fits) scope.launch { list.scrollToItem(at) }
+    }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val twoPanes = maxWidth >= TWO_PANES
+        val listWidth = (maxWidth * 0.42f).coerceIn(LIST_MIN, LIST_MAX)
+        Column(
+            Modifier.fillMaxSize()
+                .focusRequester(keys)
+                .onFocusChanged { hasKeys = it.hasFocus }
+                .onKeyEvent { e ->
+                    if (e.type != KeyEventType.KeyDown || e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@onKeyEvent false
+                    val listShown = twoPanes || chosenId == null
+                    when (e.key) {
+                        Key.DirectionDown, Key.DirectionUp -> {
+                            if (!listShown) return@onKeyEvent false
+                            val next = neighbour(order, if (twoPanes) chosenId else cursor, if (e.key == Key.DirectionDown) 1 else -1) ?: return@onKeyEvent false
+                            if (twoPanes) choose(next) else cursor = next
+                            showRow(next)
+                            true
+                        }
+                        Key.Enter, Key.NumPadEnter -> {
+                            if (twoPanes || chosenId != null) return@onKeyEvent false
+                            val at = cursor?.takeIf { it in order } ?: return@onKeyEvent false
+                            choose(at)
+                            true
+                        }
+                        Key.Escape -> {
+                            if (chosenId == null) return@onKeyEvent false
+                            choose(null)
+                            true
+                        }
+                        else -> false
+                    }
                 }
-                for ((group, members) in groups) {
-                    item(key = group.name) { GroupSeam(group, members.size, Modifier.widthIn(max = COLUMN).fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)) }
-                    items(members, key = { it.id }) { s ->
-                        SessionCard(
-                            hub, s, shell,
-                            Modifier.widthIn(max = COLUMN).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f },
-                        )
+                .focusable(),
+        ) {
+            TopBar(hub, statuses, shell)
+            // Over the list, not in it: scrolled down, a card that came in above would never be seen.
+            if (link.state == LinkState.Unpaired || link.state == LinkState.Offline) {
+                Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp), contentAlignment = Alignment.TopCenter) {
+                    val m = Modifier.widthIn(max = COLUMN).fillMaxWidth()
+                    if (link.state == LinkState.Unpaired) UnpairedCard(hub, shell, m) else OfflineCard(hub, hasSessions = groups.isNotEmpty(), m)
+                }
+            }
+            val stale = link.state != LinkState.Connected && link.state != LinkState.Connecting
+            val sessionList = @Composable { m: Modifier ->
+                SessionList(hub, groups, list, stale, chosenId.takeIf { twoPanes }, cursor.takeIf { !twoPanes }, m) { id ->
+                    choose(id)
+                    runCatching { keys.requestFocus() }
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                when {
+                    !twoPanes && chosenId != null -> SessionPane(hub, chosenId, chosen, shell, stale, onBack = { choose(null); runCatching { keys.requestFocus() } }, Modifier.fillMaxSize().widthIn(max = PANE_MAX))
+                    // Nothing to choose from, nothing to say beside it.
+                    !twoPanes || (groups.isEmpty() && chosenId == null) -> sessionList(Modifier.fillMaxSize())
+                    else -> Row(Modifier.widthIn(max = LIST_MAX + PANE_MAX).fillMaxHeight()) {
+                        sessionList(Modifier.width(listWidth).fillMaxHeight())
+                        SessionPane(hub, chosenId, chosen, shell, stale, onBack = null, Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
-            VerticalScrollbar(
-                rememberScrollbarAdapter(state),
-                Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp, horizontal = 2.dp),
-                style = LocalScrollbarStyle.current.copy(unhoverColor = HN.ink.copy(alpha = 0.12f), hoverColor = HN.ink.copy(alpha = 0.3f)),
-            )
         }
+        // Keys from the first moment, with nothing to click first. And whatever had the focus can go with what's on screen, a pill that was just pressed, say: then they come back here.
+        LaunchedEffect(hasKeys) { if (!hasKeys) runCatching { keys.requestFocus() } }
+    }
+}
+
+/** The groups and their rows. It scrolls by itself: [state] is kept for this server, and nothing here moves it. */
+@Composable
+private fun SessionList(hub: Hub, groups: List<Pair<Group, List<Session>>>, state: LazyListState, stale: Boolean, chosen: String?, cursor: String?, modifier: Modifier = Modifier, onChoose: (String) -> Unit) {
+    Box(modifier.testTag(LIST_TAG)) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            state = state,
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (groups.isEmpty() && hub.link.state == LinkState.Connected) {
+                item(key = "none") { NoSessions(Modifier.widthIn(max = COLUMN).fillMaxWidth()) }
+            }
+            for ((group, members) in groups) {
+                item(key = group.name) { GroupSeam(group, members.size, Modifier.widthIn(max = COLUMN).fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)) }
+                items(members, key = { it.id }) { s ->
+                    SessionRow(
+                        hub, s, chosen = s.id == chosen, marked = s.id == cursor, onChoose = { onChoose(s.id) },
+                        Modifier.widthIn(max = COLUMN).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f },
+                    )
+                }
+            }
+        }
+        VerticalScrollbar(
+            rememberScrollbarAdapter(state),
+            Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp, horizontal = 2.dp),
+            style = LocalScrollbarStyle.current.copy(unhoverColor = HN.ink.copy(alpha = 0.12f), hoverColor = HN.ink.copy(alpha = 0.3f)),
+        )
     }
 }
 
@@ -224,7 +340,7 @@ private fun OfflineCard(hub: Hub, hasSessions: Boolean, modifier: Modifier = Mod
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val retry = when {
                     link.retrying -> Ui.retrying_now.text()
-                    link.retryAt != null && (link.retryAt ?: 0L) - now >= 1_000 -> Ui.retrying_in.format(duration((link.retryAt ?: 0L) - now))
+                    link.retryAt != null && (link.retryAt ?: 0L) - now >= 1_000 -> Ui.retrying_in.format(durationWords((link.retryAt ?: 0L) - now))
                     link.retryAt != null -> Ui.retrying_now.text()
                     else -> null
                 }
@@ -236,18 +352,6 @@ private fun OfflineCard(hub: Hub, hasSessions: Boolean, modifier: Modifier = Mod
                 HText(Ui.desk_stale.text(), style = Type.small, color = HN.inkDim)
             }
         }
-    }
-}
-
-/** How long, as the phone's Countdown words it. */
-private fun duration(ms: Long): String {
-    val s = (ms + 999) / 1000
-    return when {
-        s < 60 -> Ui.dur_s.format(0, s)
-        s < 600 -> Ui.dur_s.format(s / 60, s % 60)
-        s < 3600 -> Ui.dur_m.format(s / 60)
-        s < 86400 -> Ui.dur_hm.format(s / 3600, (s % 3600) / 60)
-        else -> Ui.dur_dh.format(s / 86400, (s % 86400) / 3600)
     }
 }
 
@@ -303,122 +407,64 @@ private fun GroupSeam(group: Group, count: Int, modifier: Modifier = Modifier) {
     }
 }
 
-/** A card: its project and short id, its name, what it's doing, its state, and what it asks. */
+/**
+ * A row of the list. The same height chosen or not, so choosing one moves nothing. Tab doesn't stop at each: the
+ * arrow keys walk them (SessionsScreen), and Tab goes on to what's in the pane.
+ */
 @Composable
-private fun SessionCard(hub: Hub, s: Session, shell: Shell, modifier: Modifier = Modifier) {
-    val offer = hub.approval(s.id).let { a -> remember(a, s) { CardOffer.of(a, s) } }
+private fun SessionRow(hub: Hub, s: Session, chosen: Boolean, marked: Boolean, onChoose: () -> Unit, modifier: Modifier = Modifier) {
+    val ask = hub.approval(s.id)
+    val offer = remember(ask, s) { CardOffer.of(ask, s) }
+    val line = rowLine(offer, s)
+    val block = s.activeBlock(hub.account, hub.providers, System.currentTimeMillis())
     val needs = s.state == SessionState.NeedsYou
-    GlassCard(modifier, edge = if (needs) HN.amber else null) {
-        Column(Modifier.padding(16.dp)) {
+    val shape = RoundedCornerShape(16.dp)
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    val ring = when {
+        marked -> HN.ink
+        chosen -> HN.accent
+        hovered -> HN.ink.copy(alpha = 0.3f)
+        else -> Color.Transparent
+    }
+    GlassCard(
+        modifier
+            .border(1.5.dp, ring, shape)
+            .then(if (chosen) Modifier.background(HN.accent.copy(alpha = 0.08f), shape) else Modifier)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .hoverable(hover)
+            .focusProperties { canFocus = false }
+            .clickable(hover, indication = null, role = Role.Button, onClick = onChoose)
+            .semantics { selected = chosen },
+        edge = if (needs) HN.amber else null,
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Seam(
                 s.project, if (needs) MarkKind.NeedsYou else if (s.busy) MarkKind.Working else MarkKind.Idle,
                 color = if (needs) HN.amber else HN.inkMuted,
             ) { HText(s.hex, style = Type.monoSmall, color = HN.inkDim, maxLines = 1) }
-            Spacer(Modifier.height(8.dp))
-            HText(s.name, style = Type.heading, maxLines = 2)
-            Spacer(Modifier.height(4.dp))
-            when (offer) {
-                is CardOffer.Whole -> WholeCommand(offer)
-                is CardOffer.NotWhole -> NotWholeCommand(offer)
-                is CardOffer.OnPhone -> HText(
-                    if (offer.plan) Ui.desk_answer_on_phone_plan.text() else Ui.desk_answer_on_phone_question.text(),
-                    style = Type.small, color = HN.amber,
-                )
-                null -> when {
-                    s.diedLine -> HText(Ui.card_job_died.text(), style = Type.monoSmall, color = HN.danger, maxLines = 1)
-                    needs -> HText(s.activity, style = Type.monoSmall, color = HN.amber, maxLines = 2)
-                    else -> HText(doingLine(s), style = Type.monoSmall, color = HN.inkMuted, maxLines = 2)
-                }
-            }
-            hub.approval(s.id)?.takeIf { it.agentId != null }?.agentLabel?.let { agent ->
-                Spacer(Modifier.height(4.dp))
-                HText(Ui.desk_from_agent.format(agent), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { StateChip(s, s.activeBlock(hub.account, hub.providers, System.currentTimeMillis())) }
-                if (offer is CardOffer.Whole || offer is CardOffer.NotWhole) {
-                    Spacer(Modifier.width(8.dp))
-                    AskPills(hub, s.id, offer, shell)
-                }
-            }
-        }
-    }
-}
-
-private fun annotatedCommand(tool: String, text: String): AnnotatedString = buildAnnotatedString {
-    withStyle(SpanStyle(color = HN.amber)) { append(if (tool.startsWith("Bash", ignoreCase = true)) "$ " else "› ") }
-    append(text)
-}
-
-/** Allow promises this exact command: the tool, then all of it as it will run, line breaks and all, never cut. */
-@Composable
-private fun WholeCommand(offer: CardOffer.Whole) {
-    HText(offer.tool.uppercase(), style = Type.label, color = HN.amber)
-    Spacer(Modifier.height(4.dp))
-    androidx.compose.foundation.text.BasicText(annotatedCommand(offer.tool, offer.text), style = Type.monoSmall.copy(color = HN.ink))
-}
-
-/** What can be said of a command that can't be read whole, masked, and why there's no Allow. */
-@Composable
-private fun NotWholeCommand(offer: CardOffer.NotWhole) {
-    HText(offer.tool.uppercase(), style = Type.label, color = HN.amber)
-    Spacer(Modifier.height(4.dp))
-    HText(offer.detail, style = Type.monoSmall, color = HN.inkMuted, maxLines = 3)
-    Spacer(Modifier.height(6.dp))
-    HText(Ui.desk_not_whole.text(), style = Type.small, color = HN.amber)
-}
-
-/**
- * Deny, and Allow only beside a whole command ([CardOffer]). While an answer goes it says "Allowing…" or
- * "Denying…" in their place; one that didn't get through brings them back, and says so on the card and in the toast.
- */
-@Composable
-private fun AskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell) {
-    var going by remember(offer.id) { mutableStateOf<Boolean?>(null) }
-    var failed by remember(offer.id) { mutableStateOf(false) }
-    fun send(allow: Boolean) {
-        if (going != null) return
-        going = allow
-        failed = false
-        Core.scope.launch {
-            val ok = runCatching { answerCard(hub, sessionId, offer, allow, shell::say) }.getOrDefault(false)
-            // Answered: the card goes with the hub's next word on it, and these stay until then.
-            if (!ok) {
-                going = null
-                failed = true
-            }
-        }
-    }
-    val now = going
-    if (now != null) {
-        Box(Modifier.heightIn(min = 40.dp), contentAlignment = Alignment.CenterEnd) {
-            HText(
-                if (now) Ui.widget_allowing.text() else Ui.widget_denying.text(),
-                style = Type.small, color = if (now) HN.accent else HN.inkMuted, maxLines = 1,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            )
-        }
-        return
-    }
-    Column(horizontalAlignment = Alignment.End) {
-        if (failed) {
-            HText(
-                Ui.desk_answer_failed.text(), style = Type.small, color = HN.danger, maxLines = 2,
-                modifier = Modifier.widthIn(max = 280.dp).semantics { liveRegion = LiveRegionMode.Assertive },
-            )
             Spacer(Modifier.height(6.dp))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Pill(Ui.deny.text(), { send(false) }, kind = PillKind.Danger)
-            if (offer is CardOffer.Whole) Pill(Ui.allow.text(), { send(true) }, kind = PillKind.Primary)
+            HText(s.name, style = Type.heading, maxLines = 2)
+            if (line.text.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                val color = when (line.tone) {
+                    RowLine.Tone.Ask -> HN.amber
+                    RowLine.Tone.Danger -> HN.danger
+                    RowLine.Tone.Quiet -> HN.inkMuted
+                }
+                HText(line.text, style = Type.monoSmall, color = color, maxLines = 1)
+            }
+            if (rowHasChip(s, block)) {
+                Spacer(Modifier.height(8.dp))
+                StateChip(s, block)
+            }
         }
     }
 }
 
 /** The state chip, by the phone's rules (HomeScreen's PhaseChip). */
 @Composable
-private fun StateChip(s: Session, block: Blocked?) {
+internal fun StateChip(s: Session, block: Blocked?) {
     if (block != null) {
         when (block.kind) {
             Blocked.LIMIT, Blocked.MODEL -> StatusChip(Ui.state_paused.text(), HN.inkMuted)

@@ -5,6 +5,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -22,6 +23,8 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.desktop.DesktopRig.choose
+import com.prudnikweb.hypernova.desktop.DesktopRig.inPane
 import com.prudnikweb.hypernova.desktop.DesktopRig.pairedWith
 import com.prudnikweb.hypernova.desktop.DesktopRig.platform
 import com.prudnikweb.hypernova.desktop.DesktopRig.shell
@@ -71,6 +74,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText("$ npm run db:migrate").assertExists()
         onNodeWithText(Ui.allow.text()).performClick()
         until("the answer") { d.count("POST", "/v1/approvals/a1") == 1 }
@@ -89,6 +93,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText(Ui.deny.text()).performClick()
         until("the answer") { d.count("POST", "/v1/approvals/a1") == 1 }
         assertEquals("deny", lastAnswer("a1").json.getString("decision"))
@@ -104,6 +109,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText(Ui.allow.text()).performClick()
         until("the word") { runCatching { onNodeWithText(Ui.widget_allowing.text()).assertExists() }.isSuccess }
         release.countDown()
@@ -116,6 +122,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText(Ui.desk_not_whole.text()).assertExists()
         onNodeWithText(Ui.allow.text()).assertDoesNotExist()
         onNodeWithText(Ui.deny.text()).performClick()
@@ -129,9 +136,11 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText(Ui.allow.text()).assertDoesNotExist()
         onNodeWithText(secret, substring = true).assertDoesNotExist()
-        onNodeWithText("•••", substring = true).assertExists()
+        // In the row and in the pane.
+        assertEquals(2, onAllNodesWithText("•••", substring = true).fetchSemanticsNodes().size)
     }
 
     @Test fun aQuestionAndAPlanSayToAnswerOnThePhoneWithNothingToPress() = runDesktopComposeUiTest(900, 700) {
@@ -148,8 +157,12 @@ class ApproveTest {
         waitForIdle()
         onNodeWithText(Ui.desk_answer_on_phone_question.text()).assertExists()
         onNodeWithText(Ui.desk_answer_on_phone_plan.text()).assertExists()
-        onNodeWithText(Ui.allow.text()).assertDoesNotExist()
-        onNodeWithText(Ui.deny.text()).assertDoesNotExist()
+        for ((name, words) in listOf("Asks" to Ui.desk_answer_on_phone_question, "Plans" to Ui.desk_answer_on_phone_plan)) {
+            choose(name)
+            inPane(words.text()).assertExists()
+            onNodeWithText(Ui.allow.text()).assertDoesNotExist()
+            onNodeWithText(Ui.deny.text()).assertDoesNotExist()
+        }
     }
 
     @Test fun aRefusalSaysSoOnScreenAndThePillsComeBack() = runDesktopComposeUiTest(900, 700) {
@@ -158,6 +171,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText(Ui.allow.text()).performClick()
         until("the refusal") { shell.toast != null }
         waitForIdle()
@@ -173,6 +187,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText(Ui.allow.text()).performClick()
         until("the word") { shell.toast != null }
         waitForIdle()
@@ -186,6 +201,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         d.down = true
         d.closeSocket()
         onNodeWithText(Ui.allow.text()).performClick()
@@ -227,6 +243,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText(Ui.allow.text()).assertExists()
         d.push(msg("approval.resolved") { put("id", "a1").put("sessionId", "s1").put("decision", "allow").put("by", "phone") })
         until("the ask gone") { Core.live?.approval("s1") == null }
@@ -240,6 +257,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         // Tab goes through what can take the focus, in order: Settings, Pair another, then Deny, then Allow.
         onRoot().performKeyInput { pressKey(Key.Tab) }
         onNodeWithText(Ui.desk_settings.text()).assertIsFocused()
@@ -261,6 +279,7 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Migrate the payments table")
         onNodeWithText(Ui.allow.text()).performClick()
         until("unpaired") { Core.live?.link?.state == LinkState.Unpaired }
         waitForIdle()
