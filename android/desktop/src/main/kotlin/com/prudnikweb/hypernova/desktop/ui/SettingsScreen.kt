@@ -46,9 +46,11 @@ import com.prudnikweb.hypernova.data.DebugSendFlow
 import com.prudnikweb.hypernova.data.DebugSendState
 import com.prudnikweb.hypernova.desktop.DesktopPlatform
 import com.prudnikweb.hypernova.desktop.DesktopStrings
+import com.prudnikweb.hypernova.desktop.DesktopTokens
 import com.prudnikweb.hypernova.desktop.FileWhy
 import com.prudnikweb.hypernova.desktop.KeyPlace
 import com.prudnikweb.hypernova.desktop.Shell
+import com.prudnikweb.hypernova.desktop.TokenPlace
 import com.prudnikweb.hypernova.desktop.Ui
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,7 +62,7 @@ import java.util.Date
 private val COLUMN = 640.dp
 
 /**
- * Settings on this computer: whether alerts can show here, where its key is, and Debug logging as on a phone (data/DebugLog.kt),
+ * Settings on this computer: whether alerts can show here, where its key and tokens are, and Debug logging as on a phone (data/DebugLog.kt),
  * except that there's no share sheet here: Open folder and Copy path instead.
  */
 @Composable
@@ -95,29 +97,71 @@ private fun Alerts() {
     }
 }
 
-/** Where this computer's key is, and in plain words what that doesn't protect from. */
+/** Where this computer's key and sign-in tokens are, and in plain words what that doesn't protect from. */
 @Composable
 private fun KeyPlaceSection() {
-    val place = (Core.platform as? DesktopPlatform)?.keys?.place ?: return
+    val platform = Core.platform as? DesktopPlatform ?: return
+    val place = platform.keys.place
+    val tokens = platform.tokens
     Seam(Ui.desk_key_title.text(), MarkKind.Idle)
     Spacer(Modifier.height(10.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
-            val words = when (place) {
-                KeyPlace.Nowhere -> Ui.desk_key_none
-                KeyPlace.InKeychain -> Ui.desk_key_keychain
-                is KeyPlace.InFile -> when (place.why) {
-                    FileWhy.Down -> Ui.desk_key_file_down
-                    FileWhy.NoHelper -> Ui.desk_key_file_no_helper
-                    FileWhy.DidNotHold -> Ui.desk_key_file_did_not_hold
-                    FileWhy.TurnedOff -> Ui.desk_key_file_off
+            // "No key yet" would be wrong with a keychain that hasn't said.
+            if (place != KeyPlace.Nowhere || tokens.waiting.isEmpty()) {
+                val words = when (place) {
+                    KeyPlace.Nowhere -> Ui.desk_key_none
+                    KeyPlace.InKeychain -> Ui.desk_key_keychain
+                    is KeyPlace.InFile -> when (place.why) {
+                        FileWhy.Down -> Ui.desk_key_file_down
+                        FileWhy.NoHelper -> Ui.desk_key_file_no_helper
+                        FileWhy.DidNotHold -> Ui.desk_key_file_did_not_hold
+                        FileWhy.TurnedOff -> Ui.desk_key_file_off
+                    }
+                }
+                HText(words.text(), style = Type.small, color = if (place is KeyPlace.InFile && place.why != FileWhy.TurnedOff) HN.amber else HN.ink)
+                if (place is KeyPlace.InFile) {
+                    Spacer(Modifier.height(8.dp))
+                    HText(Ui.desk_key_file_note.text(), style = Type.small, color = HN.inkMuted)
                 }
             }
-            HText(words.text(), style = Type.small, color = if (place is KeyPlace.InFile && place.why != FileWhy.TurnedOff) HN.amber else HN.ink)
-            if (place is KeyPlace.InFile) {
-                Spacer(Modifier.height(8.dp))
-                HText(Ui.desk_key_file_note.text(), style = Type.small, color = HN.inkMuted)
+            TokenPlaceWords(tokens)
+            if (tokens.waiting.isNotEmpty() || canMove(place, tokens.place)) {
+                Spacer(Modifier.height(12.dp))
+                TryAgain(tokens)
             }
+        }
+    }
+}
+
+/** The keychain was there to try and may have come back. */
+private fun canMove(key: KeyPlace, token: TokenPlace): Boolean =
+    (key as? KeyPlace.InFile)?.why.let { it == FileWhy.Down || it == FileWhy.DidNotHold } ||
+        (token as? TokenPlace.InFile)?.why.let { it == FileWhy.Down || it == FileWhy.DidNotHold }
+
+@Composable
+private fun TokenPlaceWords(tokens: DesktopTokens) {
+    for (w in tokens.waiting) {
+        Spacer(Modifier.height(8.dp))
+        HText(waitWords(w), style = Type.small, color = HN.amber)
+    }
+    when (val place = tokens.place) {
+        TokenPlace.None -> Unit
+        TokenPlace.InKeychain -> {
+            Spacer(Modifier.height(8.dp))
+            HText(Ui.desk_token_keychain.text(), style = Type.small)
+        }
+        is TokenPlace.InFile -> {
+            val words = when (place.why) {
+                FileWhy.Down -> Ui.desk_token_file_down
+                FileWhy.NoHelper -> Ui.desk_token_file_no_helper
+                FileWhy.DidNotHold -> Ui.desk_token_file_did_not_hold
+                FileWhy.TurnedOff -> Ui.desk_token_file_off
+            }
+            Spacer(Modifier.height(8.dp))
+            HText(words.text(), style = Type.small, color = if (place.why != FileWhy.TurnedOff) HN.amber else HN.ink)
+            Spacer(Modifier.height(8.dp))
+            HText(Ui.desk_token_file_note.text(), style = Type.small, color = HN.inkMuted)
         }
     }
 }

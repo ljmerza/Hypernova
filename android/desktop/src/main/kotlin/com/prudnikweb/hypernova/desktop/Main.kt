@@ -37,7 +37,7 @@ import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.DebugLog
 import com.prudnikweb.hypernova.data.Net
-import com.prudnikweb.hypernova.desktop.ui.App
+import com.prudnikweb.hypernova.desktop.ui.Root
 import com.prudnikweb.hypernova.desktop.ui.Scaled
 import com.prudnikweb.hypernova.ui.components.logo
 import kotlinx.coroutines.flow.onEach
@@ -59,6 +59,8 @@ fun startCore(platform: DesktopPlatform): Shell {
     Net.httpsOnly = true
     // Before any window or link: a locked keychain may want its password now.
     platform.keys.prepare()
+    platform.tokens.restore = Core::restored
+    platform.tokens.prepare()
     val shell = Shell(platform)
     val start = {
         // Worded for the computer last paired, before it has said anything (HypernovaApp does this on a phone).
@@ -163,7 +165,7 @@ fun main() {
                 }
                 onDispose { platform.alerts.opened = {} }
             }
-            Scaled(scale) { App(shell) }
+            Scaled(scale) { Root(shell, platform.tokens) }
         }
     }
     // OkHttp's threads would keep the process a minute longer.

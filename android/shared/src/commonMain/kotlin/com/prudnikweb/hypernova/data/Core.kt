@@ -206,6 +206,27 @@ object Core {
     }
 
     /**
+     * Computers that were paired all along and left out of the list loaded at the start, as a desktop's keychain hadn't given
+     * their tokens yet ("The desktop client's tokens in the keychain"). They take their places by [order]; their hubs start;
+     * [active] is on screen if it's one of them, or the first of them if nothing was. No phone calls this.
+     */
+    fun restored(back: List<Server>, order: List<String>, active: String?) {
+        val new = back.filter { s -> servers.none { it.id == s.id } }
+        if (new.isEmpty()) return
+        val places = order.withIndex().associate { (i, id) -> id to i }
+        servers = (servers + new).sortedBy { places[it.id] ?: Int.MAX_VALUE }
+        for (s in new) {
+            startHub(s)
+            hubs[s.id]?.foreground(visible)
+        }
+        val next = active?.takeIf { id -> new.any { it.id == id } } ?: picked ?: new.first().id
+        val switched = next != activeId
+        pick(next)
+        save()
+        if (switched) activated(next) else syncService()
+    }
+
+    /**
      * The switcher: [id] becomes the computer the screens show, its hub as it is (linked already, or
      * on its way). The one shown before goes on being watched in the background.
      */

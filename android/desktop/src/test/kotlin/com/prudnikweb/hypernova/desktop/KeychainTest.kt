@@ -71,8 +71,9 @@ class KeychainTest {
             return true
         }
 
-        override fun delete() {
+        override fun delete(): Boolean {
             held = null
+            return true
         }
     }
 
@@ -343,8 +344,15 @@ class KeychainTest {
         assertEquals(listOf("secret-tool", "lookup", "service", "hypernova-client", "account", "acct"), c.runs[1].first)
         neverOnACommandLine(c)
 
-        // As it really does: libsecret's tool/secret-tool.c, and a container's gnome-keyring.
-        assertEquals(KeychainRead.Missing, SecretServiceKeychain("a", Calls { _, _ -> HelperResult(1, "", false) }).read())
+        // As it really does: libsecret's tool/secret-tool.c, and a container's gnome-keyring. `lookup` says the same for no item
+        // and for a locked one, so `search --all` is what tells them apart.
+        val listing = { out: String -> Calls { argv, _ -> if (argv[1] == "search") HelperResult(0, out, false) else HelperResult(1, "", false) } }
+        assertEquals("nothing listed: there's none", KeychainRead.Missing, SecretServiceKeychain("a", listing("")).read())
+        assertEquals("listed, with no secret: it's locked", KeychainRead.Down, SecretServiceKeychain("a", listing("[/1]\nlabel = \n")).read())
+        val searched = listing("")
+        SecretServiceKeychain("a", searched).read()
+        assertEquals(listOf("secret-tool", "search", "--all", "service", "hypernova-client", "account", "a"), searched.runs[1].first)
+        assertEquals("a search that can't say isn't a no", KeychainRead.Down, SecretServiceKeychain("a", Calls { _, _ -> HelperResult(1, "", false) }).read())
         assertEquals(KeychainRead.Down, SecretServiceKeychain("a", Calls { _, _ -> HelperResult(1, "", true) }).read())
         assertEquals(KeychainRead.Down, SecretServiceKeychain("a", Calls { _, _ -> null }).read())
         assertFalse(SecretServiceKeychain("a", Calls { _, _ -> HelperResult(1, "", true) }).write(text))

@@ -27,7 +27,14 @@ import kotlin.system.exitProcess
  * With no link it starts on the pairing the folder already has, as an install does when it's updated.
  *
  * It also says where the key ended up and which key it is, by a hash of the public half, for the script to follow
- * it from the file to the keychain and back. Nothing of the private half is ever in this answer.
+ * it from the file to the keychain and back, and where the tokens are. No secret is ever in this answer.
+ *
+ * For the tokens' way (scripts/test-client-package.sh):
+ * - `HYPERNOVA_PROBE_EXPECT=waiting`: a server's token has to be out of reach at the start, and this says why. With no other
+ *   server to reach, that's all it does.
+ * - `HYPERNOVA_PROBE_GO=<file>`: then says so in `<file>.waiting`, waits for `<file>` to appear, and presses Try again.
+ * - `HYPERNOVA_PROBE_SERVERS=<n>`: every one of `n` servers has to link, not only the one on screen.
+ * - `HYPERNOVA_PROBE_FORGET=<name>`: then forgets that server, as Pair again does.
  */
 object PackageProbe {
     private const val TIMEOUT_MS = 90_000L
@@ -62,13 +69,36 @@ object PackageProbe {
         val link = System.getenv("HYPERNOVA_PROBE_LINK")?.takeIf { it.isNotBlank() }?.let { File(it).readText().trim() }
         val platform = DesktopPlatform()
         val shell = startCore(platform)
+        val until = System.currentTimeMillis() + TIMEOUT_MS
+        if (System.getenv("HYPERNOVA_PROBE_EXPECT") == "waiting") {
+            check(platform.tokens.waiting.isNotEmpty()) { "no server waiting for its token: ${tokenPlace(platform)}" }
+            lines += "token.waiting=${platform.tokens.waiting.joinToString(",") { it.why.name }}"
+            val go = System.getenv("HYPERNOVA_PROBE_GO")?.takeIf { it.isNotBlank() }?.let(::File)
+            if (go != null) {
+                File("${go.path}.waiting").writeText("waiting")
+                while (!go.exists()) {
+                    check(System.currentTimeMillis() < until) { "nobody unlocked it" }
+                    Thread.sleep(200)
+                }
+                SwingUtilities.invokeAndWait { platform.tokens.retry() }
+                while (platform.tokens.waiting.isNotEmpty() || platform.tokens.retrying) {
+                    check(System.currentTimeMillis() < until) { "Try again brought nothing back" }
+                    Thread.sleep(200)
+                }
+                lines += "token.waiting.after=${platform.tokens.waiting.size}"
+            } else if (link == null && Core.servers.isEmpty()) {
+                platform.folder.flush()
+                check(Core.live == null) { "a hub with no token" }
+                report(lines, platform)
+                return
+            }
+        }
         if (link != null) {
             SwingUtilities.invokeAndWait {
                 shell.link = link
                 shell.submit()
             }
         }
-        val until = System.currentTimeMillis() + TIMEOUT_MS
         fun waitFor(what: String, done: () -> Boolean) {
             while (!done()) {
                 (shell.pair as? PairState.Failed)?.let { error("the pairing failed: ${it.title}: ${it.body}") }
@@ -85,12 +115,32 @@ object PackageProbe {
         checkNotNull(route.fingerprint) { "no pin" }
         checkNotNull(route.identity) { "no certificate on the route" }
         lines += "paired=${Core.live?.mac?.name} sessions=${Core.live?.sessions?.size} route=${route.kind}"
+        System.getenv("HYPERNOVA_PROBE_SERVERS")?.takeIf { it.isNotBlank() }?.toInt()?.let { n ->
+            waitFor("$n servers each linked") { Core.servers.size == n && Core.allHubs.size == n && Core.allHubs.all { it.link.state == LinkState.Connected && it.mac.via == "local" } }
+        }
+        System.getenv("HYPERNOVA_PROBE_FORGET")?.takeIf { it.isNotBlank() }?.let { name ->
+            val id = checkNotNull(Core.servers.firstOrNull { it.pairing.macName == name }) { "no server named $name" }.id
+            SwingUtilities.invokeAndWait { Core.forget(id) }
+            lines += "forgot=$name"
+        }
+        lines += "servers=${Core.servers.joinToString(",") { it.pairing.macName }}"
+        platform.folder.flush()
+        report(lines, platform)
+    }
+
+    private fun tokenPlace(platform: DesktopPlatform) = when (val p = platform.tokens.place) {
+        TokenPlace.None -> "none"
+        TokenPlace.InKeychain -> "keychain"
+        is TokenPlace.InFile -> "file:${p.why}"
+    }
+
+    private fun report(lines: MutableList<String>, platform: DesktopPlatform) {
         lines += "key.place=${when (val p = platform.keys.place) {
             KeyPlace.Nowhere -> "nowhere"
             KeyPlace.InKeychain -> "keychain"
             is KeyPlace.InFile -> "file:${p.why}"
         }}"
-        lines += "key.public=${MessageDigest.getInstance("SHA-256").digest(checkNotNull(platform.keys.publicKey()).encoded).joinToString("") { "%02x".format(it) }}"
-        platform.folder.flush()
+        lines += "key.public=${platform.keys.publicKey()?.let { k -> MessageDigest.getInstance("SHA-256").digest(k.encoded).joinToString("") { "%02x".format(it) } } ?: "none"}"
+        lines += "token.place=${tokenPlace(platform)}"
     }
 }

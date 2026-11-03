@@ -14,19 +14,20 @@ import kotlin.concurrent.thread
 /*
  * The system's own place for a secret, reached through the program each system ships for it, with nothing added to
  * the package. Why that, and what each one does and doesn't protect from: docs/DECISIONS.md, "The desktop client's
- * key in the keychain". What's kept is the same text as the owner-only file, and a secret only ever goes to a
- * program on its standard input, never on its command line, where any user on the computer could read it.
+ * key in the keychain" and "The desktop client's tokens in the keychain". What's kept is the same text as the owner-only
+ * file, and a secret only ever goes to a program on its standard input, never on its command line, where any user on the
+ * computer could read it.
  */
 
-/** What a keychain said when asked for the key. */
+/** What a keychain said when asked for a secret. */
 sealed interface KeychainRead {
     /** The text it holds. Never put this in a log or a message: see [toString]. */
     class Found(val text: String) : KeychainRead {
         override fun toString() = "Found"
     }
-    /** It's working, and it holds nothing for this folder. */
+    /** It's working, and it holds nothing under this name. */
     data object Missing : KeychainRead
-    /** It didn't answer: locked, not running, a prompt nobody answered. It may well hold the key. */
+    /** It didn't answer: locked, not running, a prompt nobody answered. It may well hold the secret. */
     data object Down : KeychainRead
 }
 
@@ -34,7 +35,8 @@ interface Keychain {
     fun read(): KeychainRead
     /** False when it can't have taken it. True still has to be proved by reading it back. */
     fun write(text: String): Boolean
-    fun delete()
+    /** True: nothing of it is left, or there never was. False: it may still be there, as a locked keychain's is. */
+    fun delete(): Boolean
 }
 
 /** Why the key is in the owner-only file. Settings says each in its own words. */
@@ -50,13 +52,18 @@ enum class FileWhy {
 }
 
 /** Which keychain this computer has, or why there's none to try. */
-class KeychainChoice(val keychain: Keychain?, val without: FileWhy = FileWhy.NoHelper) {
+class KeychainChoice(
+    val keychain: Keychain?,
+    val without: FileWhy = FileWhy.NoHelper,
+    /** Another item of the same keychain, by a name of its own: a server's token ([Keychains.tokenItem]). Null: no way to reach one. */
+    val item: (String) -> Keychain? = { null },
+) {
     companion object {
         val OFF = KeychainChoice(null, FileWhy.TurnedOff)
     }
 }
 
-/** A finished helper program. No `toString`, as [out] can be the key. */
+/** A finished helper program. No `toString`, as [out] can be a secret. */
 class HelperResult(val code: Int, val out: String, val saidSomething: Boolean)
 
 /** Runs a helper. Null: it couldn't start, or hadn't finished in time, which is the same to a caller. */
@@ -105,31 +112,50 @@ object SystemHelper : Helper {
 /** How long one question to a keychain may take. An unlock prompt is why it's this long, and why [DesktopKeys.prepare] asks before there's a window. */
 const val KEYCHAIN_TIMEOUT_MS = 20_000L
 
-/** Not the visible name: a rename mustn't strand a key that's already paired (as DataFolder's names). */
+/** Not the visible name: a rename mustn't strand what's already paired (as DataFolder's names). */
 private const val SERVICE = "hypernova-client"
+
+private const val KEY_LABEL = "Hypernova Client's device key"
+private const val TOKEN_LABEL = "Hypernova Client's sign-in token"
 
 /**
  * The Secret Service (GNOME Keyring; KWallet since Frameworks 5.97), through libsecret's `secret-tool`: secrets on its
  * standard input when that isn't a terminal, and its answer on its standard output (tool/secret-tool.c).
- * `lookup` exits 1 either way: with words on standard error it failed, with none there's no such item.
+ *
+ * `lookup` and `clear` exit 1 and say nothing both for no such item and for one in a locked collection whose prompt nobody
+ * answered. `search --all` tells them apart, without asking for a password: it lists a locked item, with no secret, and
+ * lists nothing where there's none (seen against gnome-keyring 46 in a throwaway container). A token can't be made
+ * again, so it matters which: "not there" may never be said of a locked one. Anything else `search` says counts as down.
  */
-class SecretServiceKeychain(private val account: String, private val helper: Helper = SystemHelper, private val tool: String = "secret-tool") : Keychain {
+class SecretServiceKeychain(
+    private val account: String,
+    private val helper: Helper = SystemHelper,
+    private val tool: String = "secret-tool",
+    private val label: String = KEY_LABEL,
+) : Keychain {
     private val attributes = listOf("service", SERVICE, "account", account)
 
     override fun read(): KeychainRead {
         val r = helper.run(listOf(tool, "lookup") + attributes, null, KEYCHAIN_TIMEOUT_MS) ?: return KeychainRead.Down
         return when {
             r.code == 0 && r.out.isNotBlank() -> KeychainRead.Found(r.out.trim())
-            r.code != 0 && !r.saidSomething -> KeychainRead.Missing
+            r.code != 0 && !r.saidSomething && listed() == false -> KeychainRead.Missing
             else -> KeychainRead.Down
         }
     }
 
-    override fun write(text: String): Boolean =
-        helper.run(listOf(tool, "store", "--label=Hypernova Client's device key") + attributes, text, KEYCHAIN_TIMEOUT_MS)?.code == 0
+    /** Whether it has an item by this name, locked or not. Null: it couldn't say. What this prints can hold the secret, so only its being there is looked at. */
+    private fun listed(): Boolean? {
+        val r = helper.run(listOf(tool, "search", "--all") + attributes, null, KEYCHAIN_TIMEOUT_MS) ?: return null
+        return if (r.code == 0) r.out.isNotBlank() else null
+    }
 
-    override fun delete() {
-        helper.run(listOf(tool, "clear") + attributes, null, KEYCHAIN_TIMEOUT_MS)
+    override fun write(text: String): Boolean =
+        helper.run(listOf(tool, "store", "--label=$label") + attributes, text, KEYCHAIN_TIMEOUT_MS)?.code == 0
+
+    override fun delete(): Boolean {
+        val r = helper.run(listOf(tool, "clear") + attributes, null, KEYCHAIN_TIMEOUT_MS) ?: return false
+        return r.code == 0 || listed() == false
     }
 }
 
@@ -155,8 +181,9 @@ class MacKeychain(private val account: String, private val helper: Helper = Syst
         return helper.run(listOf(tool, "-i"), "add-generic-password -U -s $SERVICE -a $account -X $hex\n", KEYCHAIN_TIMEOUT_MS) != null
     }
 
-    override fun delete() {
-        helper.run(listOf(tool, "delete-generic-password", "-s", SERVICE, "-a", account), null, KEYCHAIN_TIMEOUT_MS)
+    override fun delete(): Boolean {
+        val r = helper.run(listOf(tool, "delete-generic-password", "-s", SERVICE, "-a", account), null, KEYCHAIN_TIMEOUT_MS) ?: return false
+        return r.code == 0 || r.code == ITEM_NOT_FOUND
     }
 
     private companion object {
@@ -199,18 +226,25 @@ class WindowsDpapiKeychain(
         return true
     }
 
-    override fun delete() {
-        Files.deleteIfExists(file)
-    }
+    override fun delete(): Boolean = runCatching { Files.deleteIfExists(file) }.isSuccess
 }
 
 object Keychains {
-    /** `off` keeps the key in the file: a test copy's, or an owner's who'd rather. */
+    /** `off` keeps the key and the tokens in the file: a test copy's, or an owner's who'd rather. */
     const val ENV = "HYPERNOVA_CLIENT_KEYCHAIN"
 
-    /** A folder's own item, so a test copy's folder ([DataFolder.ENV]) never sees the real client's key, or replaces it. */
-    fun accountOf(home: Path): String = MessageDigest.getInstance("SHA-256")
-        .digest(home.toAbsolutePath().normalize().toString().toByteArray(Charsets.UTF_8))
+    /**
+     * A folder's own item, so a test copy's folder ([DataFolder.ENV]) never sees the real client's key or tokens, or
+     * replaces them. A hash, so a name from the settings file can't be more than letters and digits on the way to a program.
+     */
+    fun accountOf(home: Path, item: String? = null): String =
+        hash(home.toAbsolutePath().normalize().toString() + (item?.let { "\u0000$it" }.orEmpty()))
+
+    /** The keychain item that holds this server's token ([com.prudnikweb.hypernova.data.Server.id]). */
+    fun tokenItem(server: String): String = "token.$server"
+
+    private fun hash(text: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(text.toByteArray(Charsets.UTF_8))
         .take(16).joinToString("") { "%02x".format(it) }
 
     fun forThisSystem(
@@ -221,9 +255,14 @@ object Keychains {
         if (env(ENV)?.trim()?.lowercase() == "off") return KeychainChoice.OFF
         val name = os.lowercase()
         return when {
-            name.startsWith("windows") -> KeychainChoice(WindowsDpapiKeychain(home.resolve("device-key.dpapi"), systemRoot = env("SystemRoot")))
-            name.startsWith("mac") -> KeychainChoice(MacKeychain(accountOf(home)))
-            onPath("secret-tool", env("PATH")) -> KeychainChoice(SecretServiceKeychain(accountOf(home)))
+            // Sealed files in the folder itself, so by the item's name alone: they move with it.
+            name.startsWith("windows") -> KeychainChoice(WindowsDpapiKeychain(home.resolve("device-key.dpapi"), systemRoot = env("SystemRoot"))) { item ->
+                WindowsDpapiKeychain(home.resolve("secret-${hash(item)}.dpapi"), systemRoot = env("SystemRoot"))
+            }
+            name.startsWith("mac") -> KeychainChoice(MacKeychain(accountOf(home))) { item -> MacKeychain(accountOf(home, item)) }
+            onPath("secret-tool", env("PATH")) -> KeychainChoice(SecretServiceKeychain(accountOf(home))) { item ->
+                SecretServiceKeychain(accountOf(home, item), label = TOKEN_LABEL)
+            }
             else -> KeychainChoice(null, FileWhy.NoHelper)
         }
     }

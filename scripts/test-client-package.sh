@@ -15,8 +15,9 @@
 #      and java.home has to be inside the install.
 #   5. The installed app, started again on that pairing, reaches the server with its certificate: the server says so.
 #   6. A newer .msi replaces the old one rather than piling up (with --msi-next), and uninstalling leaves nothing.
-#   7. With --keychain, the device key's whole way (key_journey, below) on this system's real keychain: a throwaway one,
-#      never the one of whoever runs this. So it wants CI set too. On Linux that needs dbus, gnome-keyring and secret-tool.
+#   7. With --keychain, the device key's and the tokens' whole way (key_journey, below) on this system's real keychain: a
+#      throwaway one, never the one of whoever runs this. So it wants CI set too. On Linux that needs dbus, gnome-keyring
+#      and secret-tool.
 #
 # Everything but --tarball installs on this machine for real, so it wants CI set: a runner or a throwaway
 # container (docs/RELEASING.md, "The desktop client's packages"). Needs node and daemon/node_modules for the demo
@@ -113,9 +114,12 @@ linux_up() {
     DISPLAY=":$xvfb" HYPERNOVA_CLIENT_HOME="$tmp/first-home" "$LAUNCHER" >"$tmp/first-window.log" 2>&1 &
     app_pid=$!
   }
+  # The tokens are in the keychain by now, with --keychain: the app itself, not what starts the keychain for it, is what's stopped.
   open_on_pairing() {
-    DISPLAY=":$xvfb" HYPERNOVA_CLIENT_HOME="$1" "$LAUNCHER" >"$tmp/paired-window.log" 2>&1 &
-    app_pid=$!
+    rm -f "$tmp/app.pid"
+    under_keychain sh -c 'echo $$ >"$0"; exec env DISPLAY="$1" HYPERNOVA_CLIENT_HOME="$2" "$3"' "$tmp/app.pid" ":$xvfb" "$1" "$LAUNCHER" >"$tmp/paired-window.log" 2>&1 &
+    until_true 20 test -s "$tmp/app.pid" || die "the app didn't start"
+    app_pid="$(cat "$tmp/app.pid")"
   }
   stop_app() {
     [ -n "$app_pid" ] || return 0
@@ -132,14 +136,44 @@ keychain_linux() {
   mkdir -p "$keyring_home" "$tmp/no-bus-home"
   with_keychain() {
     env -u DISPLAY -u XDG_RUNTIME_DIR HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/.local/share" dbus-run-session -- \
-      sh -c 'printf %s throwaway | gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1; exec "$@"' sh "$@"
+      sh -c 'printf %s throwaway | gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1
+        # It returns before it has the name on the bus, and a question before that would start a second, locked one.
+        i=0
+        until dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.NameHasOwner string:org.freedesktop.secrets 2>/dev/null | grep -q true; do
+          i=$((i + 1))
+          [ "$i" -ge 40 ] && break
+          sleep 0.25
+        done
+        exec "$@"' sh "$@"
   }
   # Started by the bus with nobody to give it its password, as after a login that didn't unlock it.
   keychain_gone() {
     env -u DISPLAY -u XDG_RUNTIME_DIR HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/.local/share" dbus-run-session -- "$@"
   }
   keychain_gone_says=file:Down
+  keychain_gone_waits=Locked
   no_bus() { env -u DISPLAY -u XDG_RUNTIME_DIR -u DBUS_SESSION_BUS_ADDRESS HOME="$tmp/no-bus-home" "$@"; }
+  under_keychain() { with_keychain "$@"; }
+  # Locked, as above, until the probe says it's waiting: then the password is given, with the app still running.
+  # --replace, as a second daemon wouldn't unlock the first (seen in a container).
+  keychain_unlocks() {
+    env -u DISPLAY -u XDG_RUNTIME_DIR HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/.local/share" dbus-run-session -- sh -c '
+      go="$0"
+      (
+        while [ ! -e "$go.waiting" ]; do sleep 1; done
+        printf %s throwaway | gnome-keyring-daemon --replace --unlock --components=secrets >/dev/null 2>&1
+        sleep 1
+        : >"$go"
+      ) &
+      exec "$@"' "$HYPERNOVA_PROBE_GO" "$@"
+  }
+  # How many items there are, none of them printed. Only a Secret Service can list them.
+  items_in_keychain() { with_keychain sh -c "secret-tool search --all service hypernova-client 2>/dev/null | grep -c '^\['"; }
+  # A token's far shorter than this. secret-tool cuts what it's given at 8,192 bytes and still exits 0 (seen in a container),
+  # which is why nothing leaves a file before it has come back whole.
+  long="$(head -c 4096 /dev/zero | tr '\0' A)"
+  [ "$(with_keychain sh -c 'printf %s "$1" | secret-tool store --label=long service hypernova-client-long account a && secret-tool lookup service hypernova-client-long account a; secret-tool clear service hypernova-client-long account a' sh "$long")" = "$long" ] || die "4 KB didn't come back from the keyring whole"
+  ok "4 KB goes in the keyring and comes back whole"
 }
 no_display() {
   set +e
@@ -242,6 +276,7 @@ keychain_dmg() {
   with_keychain() { "$@"; }
   keychain_gone() { env HYPERNOVA_CLIENT_KEYCHAIN=off "$@"; }
   keychain_gone_says=file:TurnedOff
+  keychain_gone_waits=TurnedOff
   no_bus() { env HYPERNOVA_CLIENT_KEYCHAIN=off "$@"; }
 }
 remove_dmg() {
@@ -335,8 +370,11 @@ PS1
 # DPAPI has nothing to set up, as the runner's user has a login.
 keychain_msi() {
   with_keychain() { "$@"; }
+  # Each secret is a sealed file in the folder.
+  items_in_keychain() { ls "$paired"/*.dpapi | wc -l | tr -d ' '; }
   keychain_gone() { env HYPERNOVA_CLIENT_KEYCHAIN=off "$@"; }
   keychain_gone_says=file:TurnedOff
+  keychain_gone_waits=TurnedOff
   no_bus() { env HYPERNOVA_CLIENT_KEYCHAIN=off "$@"; }
 }
 remove_msi() {
@@ -355,6 +393,7 @@ remove_msi() {
 
 # ── The same on each ──
 stop_app() { :; }
+under_keychain() { "$@"; }
 "install_$kind"
 
 for f in LICENSE NOTICE THIRD-PARTY-NOTICES.md OFL-Manrope.txt OFL-JetBrainsMono.txt LICENSES-skia-bundled.txt; do
@@ -375,19 +414,23 @@ sleep 5
 stop_app
 
 mkdir "$tmp/demo"
+# A second server, for the tokens' way: each keeps its own.
 HYPERNOVA_DEMO_ADDRESS=127.0.0.1 HYPERNOVA_DEMO_PORT="$DEMO_PORT" HYPERNOVA_DEMO_HOME="$(native "$tmp/demo")" \
-  node "$REPO/demo/server.ts" atlas >"$tmp/demo.log" 2>&1 &
+  node "$REPO/demo/server.ts" atlas ${keychain:+juniper} >"$tmp/demo.log" 2>&1 &
 demo_pid=$!
 until_true 60 test -s "$tmp/demo/atlas/pair-link" || die "the demo server didn't start"
+[ -z "$keychain" ] || until_true 60 test -s "$tmp/demo/juniper/pair-link" || die "the second demo server didn't start"
 connected() { grep -c 'connected over mutual TLS' "$tmp/demo.log" || true; }
 
 paired="$tmp/paired-home"
 mkdir "$paired"
 # probe_run <name> <link's file, or nothing to start on the folder's pairing> [what to run it under...]
+# On $probe_home, $paired unless a step says otherwise. HYPERNOVA_PROBE_* given in front of it go through to the probe.
+probe_home="$paired"
 probe_run() {
   local name="$1" link="$2" answer="$tmp/probe-$1.txt" pid
   shift 2
-  "$@" env HYPERNOVA_CLIENT_HOME="$(native "$paired")" HYPERNOVA_PROBE_LINK="$link" HYPERNOVA_PROBE_OUT="$(native "$answer")" \
+  "$@" env HYPERNOVA_CLIENT_HOME="$(native "$probe_home")" HYPERNOVA_PROBE_LINK="$link" HYPERNOVA_PROBE_OUT="$(native "$answer")" \
     JAVA_TOOL_OPTIONS="-javaagent:$probe" "$LAUNCHER" >"$tmp/probe-$name.log" 2>&1 &
   pid=$!
   until_true 150 test -s "$answer" || die "the probe ($name) gave no answer"
@@ -410,55 +453,135 @@ said="$(sed -n 's/^app.version=//p' "$answer")"
 ok "the app says it's $said"
 ok "paired with the demo server: an EC key, a certificate on it, mutual TLS"
 
-# The device key's whole way, each step reconnecting with mutual TLS on what's in the folder (PackageProbe, ok=true):
-#   an install from before: moved to the keychain with its pairing, its file gone, and the same key found by a restart;
-#   then the keychain locked or missing: a new key in the file, a new certificate, still connected; no second key;
-#   then the keychain back: the file's key moves over the old one.
+# The device key's and the tokens' whole way, each step reconnecting with mutual TLS on what's in the folder (PackageProbe,
+# ok=true), or saying why it can't:
+#   an install from before: key and token moved to the keychain with its pairing, the files without them, and found by a restart;
+#   a copy of the folder: holds no token, and can't connect;
+#   then the keychain locked at the start, or missing: the token's server waits, nothing lost, nothing written over; Try again
+#   brings it back once the password's given, in the same run;
+#   then a second server paired with it locked: a new key and its token in the file, a new certificate, connected, the first still waiting;
+#   then the keychain back: both servers, the file's key over the old one, the file's token moved;
+#   then Forget: that server's item goes, and the other's stays.
+token_is() { # <probe> <where>
+  [ "$(said_by "$1" token.place)" = "$2" ] || die "$1: the token is at $(said_by "$1" token.place), not $2"
+}
+token_in_file() { sed -n 's/.*\\"token\\":\\"\([^\\"]*\)\\".*/\1/p' "$1/prefs/hypernova.json"; }
+no_token_in() { # <token> <where...>
+  local token="$1"
+  shift
+  if grep -rlF -- "$token" "$@" >"$tmp/holds-token.txt" 2>/dev/null; then
+    die "a token is readable in: $(cat "$tmp/holds-token.txt")"
+  fi
+}
 key_journey() {
-  local key_file="$paired/device-key.json" secret old new
+  local key_file="$paired/device-key.json" settings="$paired/prefs/hypernova.json" secret old new first_token second_token
   key_is first file:TurnedOff
+  token_is first file:TurnedOff
   [ -s "$key_file" ] || die "no key file after the first pairing"
   ok "paired with the key in its owner-only file"
   # Only to look for, below.
   secret="$(sed 's/.*"private":"\([^"]*\)".*/\1/' "$key_file")"
   [ -n "$secret" ] || die "no private key in the key's file"
   old="$(said_by first key.public)"
+  first_token="$(token_in_file "$paired")"
+  [ -n "$first_token" ] || die "no token in the settings after the first pairing"
+  ok "and its token in the owner-only settings"
 
   "keychain_$kind"
   probe_run moved '' with_keychain
   key_is moved keychain
+  token_is moved keychain
   [ ! -e "$key_file" ] || die "the key's file is still there after the move"
   [ "$(said_by moved key.public)" = "$old" ] || die "the key changed in the move"
-  ok "an existing pairing moved its key to the keychain, removed the file, and connected"
+  no_token_in "$first_token" "$paired"
+  ok "an existing pairing moved its key and token to the keychain, took them from the files, and connected"
 
   probe_run restarted '' with_keychain
   key_is restarted keychain
+  token_is restarted keychain
   [ "$(said_by restarted key.public)" = "$old" ] || die "a restart found another key"
   [ ! -e "$key_file" ] || die "the key's file came back"
-  ok "a restart reads the same key from the keychain"
+  no_token_in "$first_token" "$paired"
+  ok "a restart reads the same key and token from the keychain"
 
-  probe_run gone '' keychain_gone
-  key_is gone "$keychain_gone_says"
+  # With DPAPI the same login can undo what's copied along: that's all it is on Windows (DECISIONS).
+  if [ "$kind" != msi ]; then
+    cp -R "$paired" "$tmp/copied"
+    probe_home="$tmp/copied" HYPERNOVA_PROBE_EXPECT=waiting probe_run copied '' with_keychain
+    [ "$(said_by copied token.waiting)" = Gone ] || die "a copy of the folder: $(said_by copied token.waiting), not Gone"
+    no_token_in "$first_token" "$tmp/copied"
+    rm -rf "$tmp/copied"
+    ok "a copy of the folder holds no token and can't connect, even beside the same keychain"
+  fi
+
+  HYPERNOVA_PROBE_EXPECT=waiting probe_run locked '' keychain_gone
+  [ "$(said_by locked token.waiting)" = "$keychain_gone_waits" ] || die "locked: $(said_by locked token.waiting), not $keychain_gone_waits"
+  key_is locked nowhere
+  grep -q 'tokenInKeychain' "$settings" || die "the server's entry didn't survive a locked start"
+  no_token_in "$first_token" "$paired"
+  ok "locked at the start with the token inside: it says so, connects to nothing, and loses nothing ($keychain_gone_waits)"
+
+  HYPERNOVA_PROBE_EXPECT=waiting probe_run locked-no-bus '' no_bus
+  [ "$(said_by locked-no-bus token.waiting)" = "$keychain_gone_waits" ] || die "no keychain: $(said_by locked-no-bus token.waiting), not $keychain_gone_waits"
+  grep -q 'tokenInKeychain' "$settings" || die "the server's entry didn't survive no keychain at all"
+  ok "no keychain running at all: the same, and nothing lost"
+
+  if [ "$kind" = deb ] || [ "$kind" = tarball ]; then
+    HYPERNOVA_PROBE_GO="$tmp/unlocked" HYPERNOVA_PROBE_EXPECT=waiting probe_run unlocked '' keychain_unlocks
+    [ "$(said_by unlocked token.waiting)" = Locked ] || die "before the password: $(said_by unlocked token.waiting), not Locked"
+    key_is unlocked keychain
+    token_is unlocked keychain
+    [ "$(said_by unlocked key.public)" = "$old" ] || die "Try again found another key"
+    ok "a real locked keyring, unlocked with the app running: Try again connected, on the same key and token, with no new pairing"
+  fi
+
+  HYPERNOVA_PROBE_EXPECT=waiting probe_run second "$(native "$tmp/demo/juniper/pair-link")" keychain_gone
+  key_is second "$keychain_gone_says"
+  token_is second "$keychain_gone_says"
   [ -s "$key_file" ] || die "no key file with the keychain gone"
-  new="$(said_by gone key.public)"
+  new="$(said_by second key.public)"
   [ "$new" != "$old" ] || die "it had the old key with the keychain gone"
-  ok "the keychain locked: a new key in the file, a new certificate, connected ($keychain_gone_says)"
+  second_token="$(token_in_file "$paired")"
+  [ -n "$second_token" ] || die "the new pairing's token isn't in the file with the keychain gone"
+  [ "$second_token" != "$first_token" ] || die "the two servers have the same token"
+  grep -q 'tokenInKeychain' "$settings" || die "the first server's entry didn't survive a second pairing"
+  no_token_in "$first_token" "$paired"
+  ok "a second server paired with the keychain gone: a new key and its token in the file, connected, the first still waiting ($keychain_gone_says)"
 
-  probe_run no-bus '' no_bus
-  key_is no-bus "$keychain_gone_says"
-  [ "$(said_by no-bus key.public)" = "$new" ] || die "with no keychain at all it didn't keep the file's key"
-  ok "no keychain running at all: the file's key, connected"
+  HYPERNOVA_PROBE_EXPECT=waiting probe_run second-no-bus '' no_bus
+  key_is second-no-bus "$keychain_gone_says"
+  [ "$(said_by second-no-bus key.public)" = "$new" ] || die "with no keychain at all it didn't keep the file's key"
+  ok "no keychain running at all: the file's key and token, connected"
 
-  probe_run back '' with_keychain
+  HYPERNOVA_PROBE_SERVERS=2 probe_run back '' with_keychain
   key_is back keychain
+  token_is back keychain
   [ "$(said_by back key.public)" = "$new" ] || die "the file's key didn't win"
+  [ "$(said_by back servers)" = "atlas,juniper" ] || die "back: the servers are $(said_by back servers), not in their places"
   [ ! -e "$key_file" ] || die "the key's file is still there with the keychain back"
-  ok "the keychain back: the file's key moved over the old one, the file gone"
+  no_token_in "$first_token" "$paired"
+  no_token_in "$second_token" "$paired"
+  if type items_in_keychain >/dev/null 2>&1; then
+    [ "$(items_in_keychain)" = 3 ] || die "the keyring has $(items_in_keychain) items, not the key and two tokens"
+  fi
+  ok "the keychain back: both servers linked, each on its own token, the file's key over the old one, no token in a file"
+
+  HYPERNOVA_PROBE_SERVERS=2 HYPERNOVA_PROBE_FORGET=juniper probe_run forgot '' with_keychain
+  [ "$(said_by forgot servers)" = atlas ] || die "after Forget: $(said_by forgot servers)"
+  if type items_in_keychain >/dev/null 2>&1; then
+    [ "$(items_in_keychain)" = 2 ] || die "the keyring has $(items_in_keychain) items after Forget, not the key and one token"
+  fi
+  probe_run after-forget '' with_keychain
+  [ "$(said_by after-forget servers)" = atlas ] || die "after a restart: $(said_by after-forget servers)"
+  ok "Forget took that server and its item, and the other connects on its own"
 
   if grep -rlF -- "$secret" "$paired" "$tmp"/probe-*.log "$tmp"/probe-*.txt ${keyring_home:+"$keyring_home"} >"$tmp/holds-key.txt" 2>/dev/null; then
     die "the first key is readable in: $(cat "$tmp/holds-key.txt")"
   fi
   ok "the private key is in no log, no answer and no file of the folder${keyring_home:+, and the keyring holds it encrypted}"
+  no_token_in "$first_token" "$paired" "$tmp"/probe-*.log "$tmp"/probe-*.txt ${keyring_home:+"$keyring_home"}
+  no_token_in "$second_token" "$paired" "$tmp"/probe-*.log "$tmp"/probe-*.txt ${keyring_home:+"$keyring_home"}
+  ok "neither token is in a log, an answer or a file of the folder${keyring_home:+, and the keyring holds them encrypted}"
 }
 [ -z "$keychain" ] || key_journey
 

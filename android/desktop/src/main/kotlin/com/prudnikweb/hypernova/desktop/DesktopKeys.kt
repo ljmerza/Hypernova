@@ -63,6 +63,24 @@ class DesktopKeys(private val file: Path, private val log: Log, choice: Keychain
         runCatching { load() }
     }
 
+    /** The keychain didn't answer in this run (its [prepare] waited out a prompt, say). The tokens needn't wait out the same one. */
+    val keychainDown: Boolean
+        @Synchronized get() = down && why == FileWhy.Down
+
+    /**
+     * Someone unlocked it, and said so ([DesktopTokens.retry]): asked again, not on the event thread. A key in the file moves
+     * across, and one that couldn't be read comes from the keychain, so no new one is made for nothing.
+     */
+    @Synchronized
+    fun retry() {
+        if (keychain == null) return
+        down = false
+        runCatching {
+            val pair = loaded
+            if (pair == null) load() else if (place is KeyPlace.InFile) moveToKeychain(pair)
+        }
+    }
+
     /** The key, made if it isn't there. */
     @Synchronized
     override fun ensure(): Pair<PublicKey, PrivateKey> {

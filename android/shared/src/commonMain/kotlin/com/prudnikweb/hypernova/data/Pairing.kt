@@ -20,7 +20,10 @@ data class Pairing(
     val fingerprint: String? = null,
     val lanAddresses: List<String> = emptyList(),
     val lanPort: Int = LanInfo.DEFAULT_PORT,
-)
+) {
+    /** Never the token, whoever prints one of these. */
+    override fun toString() = "Pairing($macName)"
+}
 
 /**
  * What a pairing link carries (docs/PROTOCOL.md, "Pairing"): the computer's own pairing page,
@@ -39,6 +42,9 @@ data class PairLink(
 ) {
     /** The link names a local listener this phone could pair through. */
     val hasLan: Boolean get() = fingerprint != null && lan.isNotEmpty()
+
+    /** Never the code, whoever prints one of these. */
+    override fun toString() = "PairLink($macName)"
 }
 
 object PairLinks {

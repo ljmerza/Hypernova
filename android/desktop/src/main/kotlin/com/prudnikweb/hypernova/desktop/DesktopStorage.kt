@@ -138,12 +138,23 @@ object OwnerOnly {
     }
 }
 
+/** What a settings file keeps off the disk ([DesktopTokens]). */
+interface PrefsSealer {
+    /** [values] as they may go on the disk. Run where the file is written, never on the window's thread. */
+    fun seal(values: Map<String, Any>): Map<String, Any>
+}
+
 /**
  * One file of small settings, in the folder; read once, kept in memory and written behind, like
- * SharedPreferences. A file of JSON (`{"token": "…", "lanPort": 47323}`): the type of a value is whatever it
+ * SharedPreferences. A file of JSON (`{"lanPort": 47323}`): the type of a value is whatever it
  * was put as, a whole number going by what's asked for.
  */
-class FilePrefs(private val file: Path, private val log: Log, private val schedule: (() -> Unit) -> Unit) : Prefs {
+class FilePrefs(
+    private val file: Path,
+    private val log: Log,
+    private val sealer: PrefsSealer? = null,
+    private val schedule: (() -> Unit) -> Unit,
+) : Prefs {
     private val values = ConcurrentHashMap<String, Any>()
     private val dirty = AtomicBoolean(false)
     private val lock = Any()
@@ -196,14 +207,33 @@ class FilePrefs(private val file: Path, private val log: Log, private val schedu
         }
     }
 
-    private fun writeNow() {
+    /** On the writer's thread. */
+    internal fun writeNow() {
         dirty.set(false)
-        val text = synchronized(lock) { JSONObject(values.toMap()).toString() }
+        val now = synchronized(lock) { values.toMap() }
         // A full disk or a removed folder: the values stay in memory, and the next change tries again.
+        // Nor does anything go out unsealed: the old file stays if sealing itself ever breaks.
         try {
-            OwnerOnly.write(file, text.toByteArray(Charsets.UTF_8))
+            val out = sealer?.seal(now) ?: now
+            OwnerOnly.write(file, JSONObject(out).toString().toByteArray(Charsets.UTF_8))
         } catch (e: IOException) {
             log.w(TAG, "couldn't save ${file.fileName}: ${e.javaClass.simpleName}")
+        } catch (e: RuntimeException) {
+            log.w(TAG, "couldn't save ${file.fileName}: ${e.javaClass.simpleName}")
+        }
+    }
+
+    /** [value] as this run sees it, with nothing written ([PrefsSealer]'s other half: what the disk doesn't hold). */
+    internal fun opened(key: String, value: String) {
+        synchronized(lock) { values[key] = value }
+    }
+
+    /** What a write killed halfway left beside the file. They can hold what was in it, so they go once it's been sealed. */
+    internal fun sweepLeftovers() {
+        val dir = file.parent ?: return
+        val mine = file.fileName.toString()
+        Files.list(dir).use { all ->
+            all.filter { it.fileName.toString().let { n -> n.startsWith(mine) && n.endsWith(".tmp") } }.forEach { Files.deleteIfExists(it) }
         }
     }
 
@@ -213,7 +243,7 @@ class FilePrefs(private val file: Path, private val log: Log, private val schedu
 }
 
 /** This app's folder ([home]), owner-only, and its settings files (`prefs/<name>.json`). */
-class DesktopStorage(val home: Path, private val log: Log) : Storage, AutoCloseable {
+class DesktopStorage(val home: Path, private val log: Log, private val sealers: Map<String, PrefsSealer> = emptyMap()) : Storage, AutoCloseable {
     private val prefsDir: Path
     private val files = ConcurrentHashMap<String, FilePrefs>()
     private val writer = Executors.newSingleThreadExecutor { r -> Thread(r, "prefs-writer").apply { isDaemon = true } }
@@ -225,19 +255,35 @@ class DesktopStorage(val home: Path, private val log: Log) : Storage, AutoClosea
 
     override val filesDir: File = OwnerOnly.dir(home.resolve("files")).toFile()
 
-    override fun prefs(name: String): Prefs = files.computeIfAbsent(name) {
+    override fun prefs(name: String): Prefs = file(name)
+
+    internal fun file(name: String): FilePrefs = files.computeIfAbsent(name) {
         // URL-encoded: never a path, whatever a name holds. "." and ".." are all that encoding leaves as they are.
         require(it.isNotBlank() && it != "." && it != "..") { "not a settings name: $it" }
-        FilePrefs(prefsDir.resolve(URLEncoder.encode(it, Charsets.UTF_8) + ".json"), log) { write -> writer.execute(write) }
+        FilePrefs(prefsDir.resolve(URLEncoder.encode(it, Charsets.UTF_8) + ".json"), log, sealers[it]) { write -> writer.execute(write) }
     }
 
-    /** Everything changed so far is on disk when this returns. */
+    /** [block] where the settings are written: it can wait on a keychain there, and every write waits for it. */
+    internal fun onWriter(block: () -> Unit) {
+        writer.execute(block)
+    }
+
+    /** As [onWriter], returning when it's done. Never from that thread. */
+    internal fun onWriterAndWait(block: () -> Unit) {
+        writer.submit(block).get()
+    }
+
+    /** Everything changed so far is on disk when this returns. Longer than a keychain's prompt: a write may be waiting on one. */
     fun flush() {
-        writer.submit { }.get(10, TimeUnit.SECONDS)
+        writer.submit { }.get(WAIT_S, TimeUnit.SECONDS)
     }
 
     override fun close() {
         writer.shutdown()
-        writer.awaitTermination(10, TimeUnit.SECONDS)
+        writer.awaitTermination(WAIT_S, TimeUnit.SECONDS)
+    }
+
+    private companion object {
+        const val WAIT_S = 45L
     }
 }
