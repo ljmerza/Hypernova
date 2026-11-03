@@ -286,7 +286,7 @@ class WidgetSyncTest {
         shadowOf(app.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(true)
         tap(Taps.answer(row(), allow = true))
         val opened = shadowOf(app).nextStartedActivity
-        assertEquals(MainActivity::class.java.name, opened.component?.className)
+        assertTrue("through the app's own way in", MainActivity.isCommand(opened, app.packageName))
         assertEquals(MainActivity.ACTION_OPEN_SESSION, opened.action)
         assertEquals("s1", opened.getStringExtra(MainActivity.EXTRA_SESSION))
         assertEquals(Core.activeId, opened.getStringExtra(MainActivity.EXTRA_SERVER))

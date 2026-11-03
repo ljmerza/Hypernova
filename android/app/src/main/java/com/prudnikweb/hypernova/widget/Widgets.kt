@@ -108,7 +108,7 @@ class WidgetTap : Activity() {
                     .putExtras(intent),
             )
         } else {
-            val open = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val open = MainActivity.command(this).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             if (server != null) open.putExtra(MainActivity.EXTRA_SERVER, server)
             if (session != null) open.setAction(MainActivity.ACTION_OPEN_SESSION).putExtra(MainActivity.EXTRA_SESSION, session)
             runCatching { startActivity(open) }

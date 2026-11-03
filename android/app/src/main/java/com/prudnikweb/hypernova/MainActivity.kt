@@ -86,19 +86,25 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    /** A pairing link (camera or another app), or a tap on a notification. */
+    /**
+     * A pairing link (camera or another app), or a command: a tap on a notification, the widget, a
+     * shortcut. This activity is exported for the launcher and the link, so any app can send it any
+     * intent: only one that came through [COMMANDS], which no other app can name, is obeyed. From
+     * anywhere else, an older build's notifications too, the app just opens.
+     */
     private fun handle(intent: Intent?) {
         if (intent == null) return
         // Reopened from Recents: the old pairing link or notification was handled already.
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         val link = if (intent.action == Intent.ACTION_VIEW) com.prudnikweb.hypernova.data.PairLinks.kind(intent.dataString) else null
+        val command = isCommand(intent, packageName)
         // A notification from a computer the app doesn't show now: that one comes on screen first
         // (data/Servers.kt), then what the notification opens, there.
         // With Home on "All servers" a session opens on its computer and All stays (vm.pendingServer).
-        if (intent.action == ACTION_OPEN_SESSION) vm.pendingServer = null
+        if (command && intent.action == ACTION_OPEN_SESSION) vm.pendingServer = null
         // With All servers each has its own section of Settings: a failed update's stays on All too.
         // A pairing link chooses nothing but the question it asks: an intent:// link can carry any extra a page likes.
-        if (link == null) intent.getStringExtra(EXTRA_SERVER)?.let {
+        if (command) intent.getStringExtra(EXTRA_SERVER)?.let {
             if (vm.allServers && intent.action == ACTION_OPEN_SESSION) vm.pendingServer = it
             else if (!(vm.allServers && intent.action == ACTION_SERVER_UPDATE)) vm.switchServer(it)
         }
@@ -106,6 +112,7 @@ class MainActivity : ComponentActivity() {
             // The app link hypernova://pair?…, as the server's pairing page (its QR code) hands it
             // over, or from anything else on the phone: data/Pairing.kt, PairLinks. It asks first.
             link == com.prudnikweb.hypernova.data.PairLinks.Kind.Pair -> vm.offerLink(intent.dataString)
+            !command -> return
             intent.action == ACTION_OPEN_SESSION -> vm.pendingOpen = intent.getStringExtra(EXTRA_SESSION)
             // An automation's note with no session to open: the automation, or the tab for several.
             intent.action == com.prudnikweb.hypernova.data.AutomationNotes.ACTION_OPEN ->
@@ -159,5 +166,15 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_SESSION = "session"
         /** The paired computer a notification came from (data/Servers.kt): a tap switches to it. */
         const val EXTRA_SERVER = "server"
+
+        /** The manifest's non-exported alias of this activity: the way in for commands. */
+        private const val COMMANDS = "com.prudnikweb.hypernova.AppCommands"
+
+        /** An intent that gives this activity a command. Android refuses any other app that names this target. */
+        fun command(context: android.content.Context): Intent = Intent().setClassName(context, COMMANDS)
+
+        /** Android keeps the alias on the intent it delivers; nothing else can put it there. */
+        internal fun isCommand(intent: Intent, packageName: String): Boolean =
+            intent.component?.let { it.packageName == packageName && it.className == COMMANDS } == true
     }
 }

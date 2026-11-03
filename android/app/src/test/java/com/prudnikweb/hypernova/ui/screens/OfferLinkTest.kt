@@ -194,7 +194,7 @@ class OfferLinkTest {
             made.destroy()
         }
         // A notification's own tap still chooses its server.
-        val note = Intent(AndroidCore.app, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_SESSION)
+        val note = MainActivity.command(AndroidCore.app).setAction(MainActivity.ACTION_OPEN_SESSION)
             .putExtra(MainActivity.EXTRA_SERVER, aId).putExtra(MainActivity.EXTRA_SESSION, "s")
         Robolectric.buildActivity(MainActivity::class.java, note).create().destroy()
         assertEquals(aId, Core.activeId)

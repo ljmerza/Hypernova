@@ -51,7 +51,7 @@ class AutomationNotes(private val context: Context, private val server: String? 
     /** [automationId] "" opens the Automations tab (several folded into one). */
     override fun post(key: String, title: String, text: String, sessionId: String?, automationId: String?) {
         if (!canPost() || nm == null || !allowed()) return
-        val i = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val i = MainActivity.command(context).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
         when {
             sessionId != null -> i.setAction(MainActivity.ACTION_OPEN_SESSION).putExtra(MainActivity.EXTRA_SESSION, sessionId)
             automationId != null -> i.setAction(ACTION_OPEN).putExtra(EXTRA_ID, automationId)
@@ -80,7 +80,7 @@ class AutomationNotes(private val context: Context, private val server: String? 
      */
     override fun postAsk(runId: String, automationId: String?, name: String, ask: RunAsk) {
         if (!canPost() || nm == null || !allowed()) return
-        val i = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val i = MainActivity.command(context).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             .setAction(ACTION_OPEN).putExtra(EXTRA_ID, automationId.orEmpty())
         if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
         val open = PendingIntent.getActivity(context, ("ask:$runId").hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
