@@ -472,6 +472,24 @@ class SettingsCallsTest {
         assertEquals(Account.LOGGED_OUT, rig.hub.account.state)
     }
 
+    @Test fun signingInSaysWhichAccountAndWhetherItsAgain() {
+        connect()
+        answer("POST", "/v1/account/login", "rest-account-login")
+        assertTrue(rig.call { rig.hub.signIn(onMac = false) }.isSuccess)
+        last("POST", "/v1/account/login").json.let {
+            assertEquals("subscription", it.getString("method"))
+            assertFalse(it.has("again"))
+        }
+        assertEquals(false, rig.hub.account.login?.console)
+        daemon.ok("POST", "/v1/account/login", JSONObject().put("account", fixture("rest-account-login").getJSONObject("account").apply { getJSONObject("login").put("method", "console") }))
+        assertTrue(rig.call { rig.hub.signIn(onMac = false, console = true, again = true) }.isSuccess)
+        last("POST", "/v1/account/login").json.let {
+            assertEquals("console", it.getString("method"))
+            assertTrue(it.getBoolean("again"))
+        }
+        assertEquals(true, rig.hub.account.login?.console)
+    }
+
     @Test fun signingInOnTheServerSaysMac() {
         connect()
         daemon.ok("POST", "/v1/account/login", JSONObject().put("account", fixture("rest-account-login").getJSONObject("account").apply { getJSONObject("login").put("where", "mac") }))

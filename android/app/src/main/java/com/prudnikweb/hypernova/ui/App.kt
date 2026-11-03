@@ -109,6 +109,8 @@ class Opener(
     val connectionLog: () -> Unit = {},
     /** The Settings tab, scrolled to one part ([com.prudnikweb.hypernova.ui.settings.SettingsJump]): "Turn on in Settings". */
     val settings: (key: String) -> Unit = {},
+    /** Signing Claude Code in, over whatever is open (ui/home/SignInSheet.kt): a /login, or Sign in here. */
+    val signIn: () -> Unit = {},
 )
 
 val LocalOpener = staticCompositionLocalOf<Opener> { error("No Opener") }
@@ -262,8 +264,10 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
 
     val scope = rememberCoroutineScope()
     var previewBusy by remember { mutableStateOf(false) }
+    var signingIn by remember { mutableStateOf(false) }
     val opener = remember(hub, nav) {
         Opener(
+            signIn = { signingIn = true },
             session = { nav.openSession(it) },
             switchSession = { nav.openSession(it) },
             files = { root, title -> nav.push(Route.Files(root, title)) },
@@ -375,6 +379,9 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                         }
                     }
                 }
+
+                // A /login from a session, or Sign in here on its card: this computer's sign-in.
+                hub?.takeIf { signingIn }?.let { h -> com.prudnikweb.hypernova.ui.home.SignInSheet(h, onDismiss = { signingIn = false }) }
 
                 // The Mac forgot this phone (401): say so, and offer the way back.
                 val live = vm.live

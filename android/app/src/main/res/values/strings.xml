@@ -694,6 +694,18 @@
     <string name="account_view_details">View details</string>
     <string name="account_check">Check again</string>
     <!-- Signing Claude Code in from the phone: the page opens here, its code goes back to the Mac. -->
+    <string name="signin_choice_title">Which account does Claude Code use?</string>
+    <string name="signin_subscription">Claude subscription</string>
+    <string name="signin_subscription_detail">Individual, Team or Enterprise</string>
+    <string name="signin_console">Anthropic Console</string>
+    <string name="signin_console_detail">The API, billed by what you use</string>
+    <string name="signin_sheet_title">Sign in to Claude Code</string>
+    <string name="signin_replaces">Claude Code is signed in on %1$s. Signing in again changes the account it uses.</string>
+    <string name="signin_done">Claude Code is signed in.</string>
+    <!-- Claude Code's own sign-in, in a session's terminal: its address and code prompt aren't a menu. -->
+    <string name="signin_terminal_title">Claude Code is asking you to sign in</string>
+    <string name="signin_terminal_body">In this session\'s terminal. Sign in here instead, or open the terminal to do it there.</string>
+    <string name="signin_here">Sign in here</string>
     <string name="signin_starting">Starting the sign-in on %1$s…</string>
     <string name="signin_steps">Sign in on the page, then paste the code it shows.</string>
     <string name="signin_open_page">Open sign-in page</string>

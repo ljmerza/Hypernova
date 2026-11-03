@@ -51,6 +51,8 @@ data class Session(
     val term: TermLink? = null,
     /** A menu its terminal shows, answered here with buttons. */
     val menu: TermMenu? = null,
+    /** Its terminal shows Claude Code's own sign-in, which cards can't finish: the phone offers its own. */
+    val loginScreen: Boolean = false,
     /** When it started (0 if unknown): with [updatedAt], how long it has run. */
     val createdAt: Long = 0L,
     /** Agents its main agent started that are running now. */
@@ -206,7 +208,8 @@ data class Account(
     @Immutable data class Limit(val window: String, val label: String?, val resetsAt: Long?, val autoResumeAt: Long?, val usingCredits: Boolean)
 
     /** A sign-in: [state] "starting", "waiting_code", "finishing" or "failed"; [url] the page to open; on the Mac's terminal or this phone. */
-    @Immutable data class Login(val state: String, val url: String?, val onMac: Boolean, val error: String?)
+    /** [console]: with the Console's API billing, not the subscription. */
+    @Immutable data class Login(val state: String, val url: String?, val onMac: Boolean, val error: String?, val console: Boolean = false)
 
     val ok: Boolean get() = state == OK
     /** Sessions on the subscription can't reply until the owner acts: amber, and a notification. */
