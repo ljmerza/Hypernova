@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings: sessions the lost login stopped carry on by themselves once it's back (ui/settings/LoginContinueRow.kt). -->
+<resources>
+    <string name="lc_title">Continue after signing in</string>
+    <!-- %1$s: the server's name. -->
+    <string name="lc_body">If Claude Code loses its login on %1$s, the sessions that stopped because of it carry on by themselves once it’s back. Each session restarts its own sub agents.</string>
+    <string name="lc_too_old">%1$s needs updating before it can do this.</string>
+    <string name="lc_all_title">Continue after signing in, all servers</string>
+    <string name="lc_all_on">On for every connected server.</string>
+    <string name="lc_all_off">Off for every connected server.</string>
+    <!-- %1$d of %2$d connected servers that can do this. -->
+    <string name="lc_all_some">On for %1$d of %2$d connected servers. This sets them all the same.</string>
+    <string name="lc_all_old">Any that needs updating isn’t changed.</string>
+    <string name="lc_all_none">No connected server can do this yet.</string>
+</resources>

@@ -2328,6 +2328,12 @@ class LiveHub(
         Result.success(c)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.ag_claude_agents_err)) }
 
+    override suspend fun setLoginContinue(on: Boolean): Result<ClaudeState?> = try {
+        val c = ClaudeState.parse(api.post("/v1/claude", JSONObject().put("loginContinue", on)).obj("claude"))
+        if (c != null) claude = c
+        Result.success(c)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.ag_claude_agents_err)) }
+
     override suspend fun setCodexEnabled(on: Boolean): Result<CodexState?> = try {
         val c = CodexWire.state(api.post("/v1/codex", JSONObject().put("enabled", on)).obj("codex"))
         codexChanged(c)

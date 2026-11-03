@@ -717,6 +717,7 @@
     <string name="activity_limit_paused">paused at the %1$s</string>
     <!-- A model this plan can't use, or one that needs usage credits: nothing to wait for. -->
     <string name="activity_model_unavailable">this model isn\'t available</string>
+    <string name="activity_signed_in">signed in again, ready to continue</string>
     <string name="activity_signed_out">signed out on the Mac</string>
     <string name="activity_no_plan">can\'t reply without a Claude plan</string>
     <string name="activity_on_hold">account on hold</string>

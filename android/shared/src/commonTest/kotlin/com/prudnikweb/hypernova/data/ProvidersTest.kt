@@ -50,6 +50,10 @@ class ProvidersTest {
         val ready = Blocked(Blocked.PROVIDER, "API Error: 402", null, null, Resume(Resume.READY, past, false, false, false, "back"))
         val or = Provider("or", "OpenRouter", "openrouter", null, true, ProviderModels(), builtIn = false)
         assertNotNull(session(ready, "or").activeBlock(account, listOf(or), now))
+        // The login that stopped it is back and it didn't carry on by itself: Continue, and nothing for the owner to fix.
+        val signedIn = Blocked(Blocked.SIGNED_IN, "Please run /login", null, null, Resume(Resume.READY, past, false, false, false, null))
+        assertNotNull(session(signedIn).activeBlock(account, emptyList(), now))
+        assertFalse(signedIn.needsYou)
         // Another provider's block without a resume lasts as its trouble does.
         val credits = Blocked(Blocked.PROVIDER, "API Error: 402")
         assertNull(session(credits, "or").activeBlock(account, listOf(or), now))
