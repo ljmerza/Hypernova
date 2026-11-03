@@ -31,4 +31,9 @@
     <string name="desk_open_folder">Open folder</string>
     <string name="desk_folder_failed">The folder couldn\'t be opened here. Copy its path instead.</string>
     <string name="desk_folder_copied">Folder path copied</string>
+    <string name="desk_alert_body">Open the window to see what it wants.</string>
+    <string name="desk_alerts_title">Alerts</string>
+    <string name="desk_alerts_tray">When something needs you and this window isn\'t in front, an alert comes from the tray. Click it to come back here.</string>
+    <string name="desk_alerts_no_tray">This desktop has no tray that this app can use, so no alert can appear. The window\'s title counts what needs you instead.</string>
+    <string name="desk_alerts_only_open">Alerts only come while this app is running. Closing the window ends it, so minimize the window instead.</string>
 </resources>

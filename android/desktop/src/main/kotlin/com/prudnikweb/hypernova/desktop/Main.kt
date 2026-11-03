@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -24,7 +25,9 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
@@ -37,6 +40,7 @@ import com.prudnikweb.hypernova.data.Net
 import com.prudnikweb.hypernova.desktop.ui.App
 import com.prudnikweb.hypernova.desktop.ui.Scaled
 import com.prudnikweb.hypernova.ui.components.logo
+import kotlinx.coroutines.flow.onEach
 import java.awt.GraphicsEnvironment
 import java.awt.Window
 import java.awt.event.ComponentAdapter
@@ -100,6 +104,8 @@ fun main() {
             runCatching { platform.folder.flush() }
         },
     )
+    platform.trayImage = { WindowIcon.toAwtImage(Density(1f), LayoutDirection.Ltr, Size(64f, 64f)) }
+    platform.tray?.start()
     val shell = startCore(platform)
     application {
         val first = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration }
@@ -117,7 +123,7 @@ fun main() {
         Window(
             onCloseRequest = ::exitApplication,
             state = state,
-            title = APP_NAME,
+            title = windowTitle(Core.statuses.sumOf { it.needsYou }),
             icon = remember { WindowIcon },
             onPreviewKeyEvent = { e ->
                 val key = zoomKey(e.key, e.isCtrlPressed, e.isAltPressed, e.isMetaPressed)
@@ -134,10 +140,26 @@ fun main() {
             val info = LocalWindowInfo.current
             LaunchedEffect(info) {
                 // The focus coming back is this computer's "the screen came on".
-                snapshotFlow { info.isWindowFocused }.collect {
-                    DebugLog.i("app") { if (it) "the window got the focus" else "the window lost the focus" }
-                    if (it) platform.screenWatch.ownerLooked()
+                followFocus(
+                    snapshotFlow { info.isWindowFocused }.onEach {
+                        DebugLog.i("app") { if (it) "the window got the focus" else "the window lost the focus" }
+                        if (it) platform.screenWatch.ownerLooked()
+                    },
+                    // Not looking is what lets LiveHub turn a request into a tray alert. The link stays either way (ProcessLink).
+                    looking = Core::setVisible,
+                )
+            }
+            DisposableEffect(window) {
+                platform.alerts.opened = { server ->
+                    server?.let(Core::switchTo)
+                    shell.settings = false
+                    shell.adding = false
+                    state.isMinimized = false
+                    window.isVisible = true
+                    window.toFront()
+                    window.requestFocus()
                 }
+                onDispose { platform.alerts.opened = {} }
             }
             Scaled(scale) { App(shell) }
         }

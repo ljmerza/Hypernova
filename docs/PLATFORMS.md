@@ -70,9 +70,9 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 
 | Where | What |
 |---|---|
-| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
+| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
 | `desktop/src/main/.../desktop/ui/` | `App.kt`, `PairScreen.kt`, `SessionsScreen.kt`; `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
-| `desktop/src/test/` | `PlatformTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `ApproveTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/test/` | `PlatformTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `ApproveTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 | `desktop/src/probe/` | `PackageProbe.kt`: in no package; pairs an installed one from inside its own Java, for `scripts/test-client-package.sh` |
 | `desktop/packaging/`, `desktop/icons/` | `client-names.sh` (the package's names: two lines for the rename), `legal/`, `deb-menu-optional.sh`; the icons, and what makes them |
 
@@ -92,7 +92,8 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | `NetworkWatcher` | Real, by polling | The JDK's interfaces, without virtual bridges, every 5 s. `kind` is `Wifi` with any and `None` with none: it can't see more. It says nothing about the internet. No hotspots |
 | `ScreenWatcher` | Nearest thing | The window getting the focus. The JVM isn't told about the screen |
 | `BackgroundLink` | Honest no-op | `running` is true: the process is the link, closing the window ends both |
-| `Notifier`, `AutomationNotifier` | No-op that logs | `canPost` is false. Automations' notes are still marked seen. LATER L113 |
+| `Notifier` | Real where there's a tray | `TrayNotifier` over AWT's tray: what needs input, while the window isn't in front. No tray: quiet, and the window's title counts it. `canPost` says which. DECISIONS, "Tray alerts on the desktop client" |
+| `AutomationNotifier` | No-op that logs | This window has no automations to open. Notes are still marked seen. LATER L123 |
 | `SpeechOutput` | Null | Never speaking; a read-aloud that comes in is ignored |
 | `thumbOf` | Null | Nothing attaches pictures here |
 | `started` | Nothing | No widgets follow it |

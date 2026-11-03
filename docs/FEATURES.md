@@ -341,6 +341,14 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | DP4 | The notes' Client heading and the "Not built" lines; `SHA256SUMS` after both package workflows | `scripts/test-next-version.sh` (notes, "not built"); the `checksums` job | **partial**: the script is tested; the job, by its first release |
 | DP5 | A desktop file on a release isn't taken for the phone's APK or the server's package | releases.test.ts › "the desktop client’s files on a release…"; `get.sh` looks for `hypernova-server-` | **covered** |
 
+## 23. The desktop client's alerts
+
+| # | Capability | Tests | Status |
+|---|---|---|---|
+| DA1 | A tray alert when something needs input and the window isn't in front: who asks, never the command, no Allow on it, once per request, by the owner's switches; a click brings the window forward, on that server | TrayAlertsTest (all, through the real hub on real mutual TLS, the tray stood in for) | **covered**, its tray stood in for |
+| DA2 | AWT's real tray: the alert and a click on it and on the icon; no tray is quiet | Run by hand under Xvfb in a throwaway `ubuntu:24.04`, with `stalonetray` and with no tray, 2026-11-02 | **partial**: no automated run, GNOME itself not seen. **Gap on a Mac and on Windows**: nothing has shown or clicked one |
+| DA3 | The window's title counts what needs input; Settings says whether alerts can show and that they stop with the app | TrayAlertsTest; `scripts/test-client-package.sh` finds the window with its count | **covered** |
+
 ## Protocol without a contract fixture
 
 The daemon already tests most of these in its own suites. What is missing is the shared golden file

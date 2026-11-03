@@ -98,7 +98,8 @@ linux_up() {
   Xvfb ":$xvfb" -screen 0 1600x1000x24 -nolisten tcp >"$tmp/xvfb.txt" 2>&1 &
   xvfb_pid=$!
   until_true 20 test -e "/tmp/.X11-unix/X$xvfb" || die "Xvfb didn't start"
-  window_up() { DISPLAY=":$xvfb" xdotool search --onlyvisible --name "^$WINDOW\$"; }
+  # With its count in front when a session needs you, as on a paired demo server (windowTitle in TrayAlerts.kt).
+  window_up() { DISPLAY=":$xvfb" xdotool search --onlyvisible --name "^(\([0-9]+\) )?$WINDOW\$"; }
   shot() { command -v import >/dev/null || return 0; DISPLAY=":$xvfb" import -window root "$1" || true; }
   # A person's path here is the menu's entry, which runs this.
   open_as_a_person() {
@@ -248,7 +249,7 @@ switch ($what) {
     Start-Process $link.FullName
   }
   'window' {
-    $w = Get-Process -Name $a -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -eq $b }
+    $w = Get-Process -Name $a -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -match ('^(\([0-9]+\) )?' + [regex]::Escape($b) + '$') }
     if (-not $w) { exit 1 }
   }
   'shot' {
