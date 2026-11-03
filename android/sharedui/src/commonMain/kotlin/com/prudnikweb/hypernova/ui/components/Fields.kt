@@ -1,5 +1,8 @@
 package com.prudnikweb.hypernova.ui.components
 
+import com.prudnikweb.hypernova.ui.platform.enterSetting
+import com.prudnikweb.hypernova.ui.platform.enterKey
+import com.prudnikweb.hypernova.ui.platform.imeAction
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange

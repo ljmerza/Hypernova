@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.DebugLog
 import com.prudnikweb.hypernova.data.EnterKey
-import com.prudnikweb.hypernova.ui.components.EnterKeyPref
+import com.prudnikweb.hypernova.desktop.EnterKeyPref
 import com.prudnikweb.hypernova.data.DebugLogger
 import com.prudnikweb.hypernova.data.DebugSendFlow
 import com.prudnikweb.hypernova.data.DebugSendState

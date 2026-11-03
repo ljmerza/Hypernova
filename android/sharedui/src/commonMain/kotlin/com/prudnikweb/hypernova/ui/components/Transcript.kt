@@ -1,6 +1,12 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
+import com.prudnikweb.hypernova.ui.platform.rememberHaptics
+import com.prudnikweb.hypernova.ui.platform.rememberCopier
+import com.prudnikweb.hypernova.ui.platform.windowHeightDp
+import com.prudnikweb.hypernova.ui.platform.longPressCopies
+import com.prudnikweb.hypernova.ui.platform.SelectableOutput
+import com.prudnikweb.hypernova.ui.platform.DiagramBlock
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -49,8 +55,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import com.prudnikweb.hypernova.ui.theme.pluralStringResource
-import com.prudnikweb.hypernova.ui.theme.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.Role
@@ -97,7 +103,7 @@ import com.prudnikweb.hypernova.data.Tone
 import com.prudnikweb.hypernova.ui.fx.LocalAmbient
 import com.prudnikweb.hypernova.ui.fx.formatDuration
 import com.prudnikweb.hypernova.ui.theme.HN
-import com.prudnikweb.hypernova.ui.theme.wordsNow
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.JetBrainsMono
 import com.prudnikweb.hypernova.ui.theme.LocalMotion

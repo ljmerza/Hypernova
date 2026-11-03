@@ -44,7 +44,8 @@ import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.ui.theme.HN
-import com.prudnikweb.hypernova.ui.theme.wordsNow
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.LocalMotion
 import com.prudnikweb.hypernova.ui.theme.Motion
@@ -98,7 +99,7 @@ internal class ChatClock(private val locale: Locale, is24: Boolean, private val 
 
     /** The phone's own pattern, a plain space before AM; [noComma]: none after the weekday ("Mon Nov 2"). */
     private fun format(skeleton: String, noComma: Boolean = false) = SimpleDateFormat(
-        bestDatePattern(locale, skeleton).let { if (noComma) it.replaceFirst(",", "") else it }.replace(NARROW_SPACE, ' '),
+        SharedUi.platform.clock.bestDatePattern(locale, skeleton).let { if (noComma) it.replaceFirst(",", "") else it }.replace(NARROW_SPACE, ' '),
         locale,
     ).apply { timeZone = TimeZone.getTimeZone(zone) }
 
@@ -141,10 +142,10 @@ internal class ChatClock(private val locale: Locale, is24: Boolean, private val 
 
 /** The chat's clock on this device's own setting. */
 @Composable
-internal expect fun rememberChatClock(): ChatClock
-
-/** This locale's own order for [skeleton]'s fields, as a [SimpleDateFormat] pattern. */
-internal expect fun bestDatePattern(locale: Locale, skeleton: String): String
+internal fun rememberChatClock(): ChatClock {
+    val style = SharedUi.platform.clock.style()
+    return remember(style) { ChatClock(style.locale, style.is24Hour) }
+}
 
 /**
  * The time of what's at the top of what's on screen: the first row not wholly under the top bar (a

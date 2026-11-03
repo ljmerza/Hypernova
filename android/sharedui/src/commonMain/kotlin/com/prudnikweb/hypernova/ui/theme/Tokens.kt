@@ -9,6 +9,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+import com.prudnikweb.hypernova.ui.platform.UiFonts
 
 /**
  * The colours a theme chooses, as few as they can be: everything else derives from them ([HN]). Only
@@ -106,8 +108,10 @@ object Motion {
     const val SECTION = 600
 }
 
-val Manrope = FontFamily(sansFont(200), sansFont(400), sansFont(500), sansFont(600), sansFont(700))
-val JetBrainsMono = FontFamily(monoFont(400), monoFont(500), monoFont(700))
+/** The app's fonts ([UiFonts]). With no app behind it (a plain JVM test that names a style) there's nothing to load them from, and nothing that draws. */
+val Manrope: FontFamily = SharedUi.installed?.fonts?.let { f -> FontFamily(f.sans(200), f.sans(400), f.sans(500), f.sans(600), f.sans(700)) } ?: FontFamily.Default
+val JetBrainsMono: FontFamily = SharedUi.installed?.fonts?.let { f -> FontFamily(f.mono(400), f.mono(500), f.mono(700)) } ?: FontFamily.Default
+private val MONO_FEATURES: String? = SharedUi.installed?.fonts?.monoFeatures
 
 /** Type scale. Weight 500 almost everywhere, as in 0stems. ss01 + tabular figures. */
 object Type {

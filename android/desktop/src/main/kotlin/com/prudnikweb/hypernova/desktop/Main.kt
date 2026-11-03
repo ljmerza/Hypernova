@@ -55,7 +55,7 @@ import kotlin.system.exitProcess
 
 /** Everything that's the same with a window and in a test: the platform up, plain http refused, [Core] started on the main thread. */
 fun startCore(platform: DesktopPlatform): Shell {
-    com.prudnikweb.hypernova.ui.components.DeskUi.diagramNote = { Ui.desk_diagram_note.text() }
+    com.prudnikweb.hypernova.ui.platform.SharedUi.install(DesktopUiPlatform)
     // Android's network security config does this on a phone; there's nothing else here to do it.
     Net.httpsOnly = true
     // Before any window or link: a locked keychain may want its password now.

@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
+import com.prudnikweb.hypernova.ui.platform.rememberCopier
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
@@ -36,7 +37,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
-import com.prudnikweb.hypernova.ui.theme.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -63,7 +64,7 @@ import com.prudnikweb.hypernova.data.isDivider
 import com.prudnikweb.hypernova.data.isQuantity
 import com.prudnikweb.hypernova.data.plain
 import com.prudnikweb.hypernova.ui.theme.HN
-import com.prudnikweb.hypernova.ui.theme.wordsNow
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import com.prudnikweb.hypernova.ui.theme.LocalMotion
 import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.Type

@@ -15,8 +15,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import com.prudnikweb.hypernova.ui.theme.pluralStringResource
-import com.prudnikweb.hypernova.ui.theme.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp

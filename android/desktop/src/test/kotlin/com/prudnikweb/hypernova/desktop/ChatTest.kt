@@ -47,7 +47,7 @@ import com.prudnikweb.hypernova.desktop.ui.ChatDrafts
 import com.prudnikweb.hypernova.desktop.ui.CHAT_TAG
 import com.prudnikweb.hypernova.desktop.ui.PANE_TAG
 import com.prudnikweb.hypernova.desktop.ui.Scaled
-import com.prudnikweb.hypernova.ui.components.EnterKeyPref
+import com.prudnikweb.hypernova.desktop.EnterKeyPref
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After

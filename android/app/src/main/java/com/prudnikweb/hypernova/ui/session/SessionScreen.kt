@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.platform.enterKey
 import com.prudnikweb.hypernova.data.Todo
 import com.prudnikweb.hypernova.data.SessionUsage
 import com.prudnikweb.hypernova.data.ChatRepo
@@ -62,7 +63,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.input.OutputTransformation
-import com.prudnikweb.hypernova.ui.components.enterKey
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState

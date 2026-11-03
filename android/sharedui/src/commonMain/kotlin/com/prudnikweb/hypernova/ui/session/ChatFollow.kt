@@ -17,7 +17,7 @@ import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.theme.Motion
-import com.prudnikweb.hypernova.ui.theme.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import kotlinx.coroutines.delay
 import kotlin.coroutines.coroutineContext
 

@@ -1,6 +1,12 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
+import com.prudnikweb.hypernova.ui.platform.rememberHaptics
+import com.prudnikweb.hypernova.ui.platform.blurredOutside
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+import com.prudnikweb.hypernova.ui.platform.pillHovered
+import com.prudnikweb.hypernova.ui.platform.pillPointer
+import com.prudnikweb.hypernova.ui.platform.pillFocusRing
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import kotlin.math.PI
@@ -39,8 +45,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import com.prudnikweb.hypernova.ui.theme.pluralStringResource
-import com.prudnikweb.hypernova.ui.theme.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.Str
 import androidx.compose.ui.semantics.Role
@@ -315,7 +321,8 @@ fun Pill(
     val glass = kind != PillKind.Ghost
     val dy by animateDpAsState(if (pressed) 1.dp else 0.dp, tween(Motion.FAST), label = "dy")
     // The touch target is at least 48dp tall even when the pill is drawn smaller.
-    val touchPad = ((48.dp - height) / 2).coerceAtLeast(0.dp)
+    val touchPad = ((SharedUi.platform.input.minTouchTarget - height) / 2).coerceAtLeast(0.dp)
+    val hovered = pillHovered(interaction)
     Box(
         modifier
             .pillPointer(interaction, enabled)
@@ -332,7 +339,7 @@ fun Pill(
             .height(height)
             .clip(CircleShape)
             // The glyph's centre: the padding plus half its 14dp.
-            .frostedGlass(if (leading != null || kind == PillKind.Glass) glow else null, glowX = 27.dp, dense = glass, tint = tint)
+            .frostedGlass(if (hovered) fg else if (leading != null || kind == PillKind.Glass) glow else null, glowX = 27.dp, dense = glass, tint = tint)
             .then(pillFocusRing(interaction, CircleShape))
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,

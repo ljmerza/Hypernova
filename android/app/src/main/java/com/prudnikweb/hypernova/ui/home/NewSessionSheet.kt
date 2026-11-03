@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.home
 
+import com.prudnikweb.hypernova.ui.platform.enterKey
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -92,7 +93,6 @@ import com.prudnikweb.hypernova.data.storage
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.components.EnterKeyPref
-import com.prudnikweb.hypernova.ui.components.enterKey
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphButton
 import com.prudnikweb.hypernova.ui.components.Icon
