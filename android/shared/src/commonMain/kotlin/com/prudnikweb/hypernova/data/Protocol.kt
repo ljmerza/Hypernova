@@ -360,6 +360,11 @@ fun noteCommands(cwd: String?, list: List<SlashCommand>) {
 sealed interface WEvent {
     val id: String
     val ts: Long
+    /**
+     * The Mac sent no [ts]: it's this phone's clock at reading (good for ordering), not when this
+     * happened, so nothing shows it as a time ([ChatTimes]).
+     */
+    val tsGuessed: Boolean
 
     /**
      * [files]: attached on a phone (on the Mac now), shown apart from the text. [command]: it was a
@@ -370,9 +375,10 @@ sealed interface WEvent {
         val files: List<Attachment> = emptyList(),
         val command: CommandRun? = null,
         val clientId: String? = null,
+        override val tsGuessed: Boolean = false,
     ) : WEvent
-    @Immutable data class Assistant(override val id: String, override val ts: Long, val text: String, val streaming: Boolean) : WEvent
-    @Immutable data class Thinking(override val id: String, override val ts: Long, val chars: Int) : WEvent
+    @Immutable data class Assistant(override val id: String, override val ts: Long, val text: String, val streaming: Boolean, override val tsGuessed: Boolean = false) : WEvent
+    @Immutable data class Thinking(override val id: String, override val ts: Long, val chars: Int, override val tsGuessed: Boolean = false) : WEvent
     @Immutable data class Tool(
         override val id: String, override val ts: Long,
         val toolUseId: String?, val name: String, val summary: String?,
@@ -380,11 +386,13 @@ sealed interface WEvent {
         val input: Map<String, String>,
         val status: String, val output: String?, val exitCode: Int?, val durationMs: Long?,
         val diff: WDiff?, val path: String?,
+        override val tsGuessed: Boolean = false,
     ) : WEvent
-    @Immutable data class Approval(override val id: String, override val ts: Long, val approvalId: String, val summary: String?, val resolution: String?) : WEvent
+    @Immutable data class Approval(override val id: String, override val ts: Long, val approvalId: String, val summary: String?, val resolution: String?, override val tsGuessed: Boolean = false) : WEvent
     @Immutable data class Result(
         override val id: String, override val ts: Long,
         val ok: Boolean, val durationMs: Long?, val costUsd: Double?, val turns: Int?, val error: String?,
+        override val tsGuessed: Boolean = false,
     ) : WEvent
     /**
      * [command]: what a command printed, with the id of the command's own user event. [unsent]:
@@ -394,9 +402,9 @@ sealed interface WEvent {
      * [blocker]: Claude Code's own API-error line (a limit, signed out…), with the kind of block it
      * put on the session ([Blocked.kind]); drawn as a slim row, never as Claude's reply.
      */
-    @Immutable data class Notice(override val id: String, override val ts: Long, val text: String, val tone: String, val command: String? = null, val unsent: Unsent? = null, val blocker: String? = null) : WEvent
+    @Immutable data class Notice(override val id: String, override val ts: Long, val text: String, val tone: String, val command: String? = null, val unsent: Unsent? = null, val blocker: String? = null, override val tsGuessed: Boolean = false) : WEvent
     /** A kind this build doesn't know: shown generically as a notice. */
-    @Immutable data class Unknown(override val id: String, override val ts: Long, val kind: String, val text: String?) : WEvent
+    @Immutable data class Unknown(override val id: String, override val ts: Long, val kind: String, val text: String?, override val tsGuessed: Boolean = false) : WEvent
 }
 
 @Immutable
@@ -840,15 +848,18 @@ object Wire {
 
     fun event(o: JSONObject): WEvent {
         val id = o.getString("id")
-        val ts = o.long("ts") ?: System.currentTimeMillis()
+        val sent = o.long("ts")
+        val ts = sent ?: System.currentTimeMillis()
+        val guessed = sent == null
         return when (val kind = o.str("kind")) {
             "user" -> WEvent.User(
                 id, ts, o.str("text").orEmpty(), o.arr("files").mapObjects(::attachment),
                 command = runCatching { commandRun(o.obj("command")) }.getOrNull(),
                 clientId = o.str("clientId")?.takeIf { it.isNotBlank() },
+                tsGuessed = guessed,
             )
-            "assistant" -> WEvent.Assistant(id, ts, o.str("text").orEmpty(), o.bool("streaming"))
-            "thinking" -> WEvent.Thinking(id, ts, o.int("chars") ?: 0)
+            "assistant" -> WEvent.Assistant(id, ts, o.str("text").orEmpty(), o.bool("streaming"), tsGuessed = guessed)
+            "thinking" -> WEvent.Thinking(id, ts, o.int("chars") ?: 0, tsGuessed = guessed)
             "tool" -> WEvent.Tool(
                 id, ts,
                 toolUseId = o.str("toolUseId"),
@@ -861,8 +872,9 @@ object Wire {
                 durationMs = o.long("durationMs"),
                 diff = diff(o.obj("diff")),
                 path = o.str("path"),
+                tsGuessed = guessed,
             )
-            "approval" -> WEvent.Approval(id, ts, o.str("approvalId").orEmpty(), o.str("summary"), o.str("resolution"))
+            "approval" -> WEvent.Approval(id, ts, o.str("approvalId").orEmpty(), o.str("summary"), o.str("resolution"), tsGuessed = guessed)
             "result" -> WEvent.Result(
                 id, ts,
                 ok = o.optBoolean("ok", true),
@@ -870,14 +882,16 @@ object Wire {
                 costUsd = o.dbl("costUsd"),
                 turns = o.int("turns"),
                 error = o.str("error"),
+                tsGuessed = guessed,
             )
             "notice" -> WEvent.Notice(
                 id, ts, o.str("text").orEmpty(), o.str("tone") ?: "info",
                 command = (o.opt("command") as? String)?.takeIf { it.isNotBlank() },
                 unsent = runCatching { unsent(o.obj("unsent")) }.getOrNull(),
                 blocker = o.str("blocker")?.takeIf { it.isNotBlank() },
+                tsGuessed = guessed,
             )
-            else -> WEvent.Unknown(id, ts, kind ?: "?", o.str("text") ?: o.str("summary"))
+            else -> WEvent.Unknown(id, ts, kind ?: "?", o.str("text") ?: o.str("summary"), tsGuessed = guessed)
         }
     }
 

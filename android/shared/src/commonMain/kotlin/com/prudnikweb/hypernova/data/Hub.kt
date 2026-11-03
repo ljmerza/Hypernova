@@ -78,6 +78,8 @@ interface Hub {
     /** What session [id] is now, if a rewind replaced it (docs/PROTOCOL.md, "Rewind"): screens and links on the old id go there. */
     fun replacedBy(id: String): String? = null
     fun transcript(id: String): List<Item>
+    /** When the things in session [id]'s chat really happened, by [Item.key] (only what has a real time). */
+    fun chatTimes(id: String): ChatTimes = ChatTimes.Empty
     /** True while a session's history is loading for the first time. */
     fun loadingTranscript(id: String): Boolean = false
     /** Why the history couldn't load (null if it did, or hasn't tried). */

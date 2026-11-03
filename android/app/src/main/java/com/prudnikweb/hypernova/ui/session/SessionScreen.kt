@@ -587,6 +587,15 @@ fun SessionScreen(
             }
         }
 
+        // The time over the chat (ChatTimeLabel.kt). Here, under both bars, so it can't cover them
+        // or what grows out of the bottom one; beside the list, so nothing in the chat moves for it.
+        ChatTimeLabel(
+            hub, sessionId, opening, list,
+            following = { follow },
+            top = { topPx + with(density) { TIME_LABEL_GAP.roundToPx() } },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+
         // Fork: a shorter header (less padding and fade under it) leaves more of the chat in view.
         BlurredTop(haze, sourceKey, Modifier.fillMaxWidth().onSizeChanged { topPx = it.height }, fade = 16.dp) {
             Column(Modifier.fillMaxWidth().padding(top = top + 4.dp, start = 8.dp, end = 12.dp, bottom = 14.dp)) {

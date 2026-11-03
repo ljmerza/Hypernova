@@ -95,6 +95,8 @@ internal fun MessageMenu(
     var page by remember(item.key) { mutableStateOf(Page.Actions) }
     when (page) {
         Page.Actions -> ChatSheet(stringResource(R.string.chat_menu_title), onDismiss) {
+            // When it was said, first; nothing for one with no real time (ChatTimeLabel.kt).
+            sessionId?.let { hub.chatTimes(it).at(item.key) }?.let { MessageTimeLine(it) }
             val codex = sessionId?.let { hub.session(it)?.codex } == true
             HText(stringResource(if (mine) R.string.you else if (codex) R.string.cx_agent_codex else R.string.claude).uppercase(), style = Type.label, color = if (mine) HN.inkDim else HN.accentDim)
             Spacer(Modifier.height(6.dp))
