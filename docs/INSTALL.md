@@ -303,6 +303,24 @@ Open the `.msi`. It installs in `C:\Program Files\Hypernova Client`, with an ent
 
 To remove it, **Settings → Apps → Installed apps → Hypernova Client → Uninstall**. Your pairing stays in `%LOCALAPPDATA%\Hypernova Client`: delete that too if you're done with it.
 
+### Where the client keeps its key
+
+The client's key, which proves to your server that this is the computer you paired, goes in your system's keychain. **Settings** in the client says where it is now. An install from before this moves it by itself the first time it starts, and stays paired.
+
+- **Linux:** GNOME Keyring or KWallet, through `secret-tool`. The `.deb` brings that along. With the tarball, install it yourself (`libsecret-tools` on Debian and Ubuntu, `libsecret` on most others). You may be asked for your keyring's password when the client starts.
+- **A Mac:** your login keychain. **Windows:** encrypted under your Windows login. Nobody has seen these two run on a person's computer yet.
+- **With no keychain, or a locked one,** it keeps working: the key is in a private file in the client's folder, Settings says so, and the client moves it to the keychain the next time it starts with one unlocked. The client may ask your server for a new certificate when this happens, which it does by itself.
+
+This keeps the key out of a copy of your home folder. It doesn't keep it from other programs running as you, and the client's sign-in token is still a private file (see docs/SECURITY-MODEL.md).
+
+### Alerts from the client
+
+When something needs you and the client's window isn't in front, an alert comes from the system's tray, saying which session is asking but not what it wants to run. Click it to bring the window back: the answer is given there, with the whole command in front of you. **Settings** in the client says whether your desktop can show them.
+
+- **They only come while the client is running.** Closing the window ends it, so minimize the window instead.
+- **Plain GNOME has no tray this can use,** so nothing pops up there. The window's title counts what needs you, for example `(2) Hypernova`. A desktop with a tray works: KDE, Xfce and the like, or GNOME with a tray extension. That list is from how those desktops are described: only a bare X11 tray has been tried.
+- **On a Mac and on Windows** nobody has seen one yet. On a Mac the alert goes through a system API Apple has deprecated, so it may not show for an app that isn't signed.
+
 ### Updating the client
 
 It doesn't update itself, and a server's offer of the phone's app isn't for it. Install the new file over the old one: `apt` and Windows replace it, and on a Mac drag it to Applications again and choose **Replace**. Your pairing stays. A Mac's About box shows a first number one higher than the release's, 1.23.0 for v0.23.0, because macOS takes no first number of 0.

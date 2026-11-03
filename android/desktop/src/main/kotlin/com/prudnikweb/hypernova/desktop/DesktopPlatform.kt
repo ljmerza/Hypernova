@@ -12,19 +12,16 @@ import com.prudnikweb.hypernova.data.Log
 import com.prudnikweb.hypernova.data.MainThread
 import com.prudnikweb.hypernova.data.NetKind
 import com.prudnikweb.hypernova.data.NetworkWatcher
-import com.prudnikweb.hypernova.data.Notice
 import com.prudnikweb.hypernova.data.Notifier
 import com.prudnikweb.hypernova.data.Platform
 import com.prudnikweb.hypernova.data.PlayInfo
 import com.prudnikweb.hypernova.data.RetryAlarm
 import com.prudnikweb.hypernova.data.RunAsk
 import com.prudnikweb.hypernova.data.ScreenWatcher
-import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SpeechOutput
 import com.prudnikweb.hypernova.data.Storage
 import com.prudnikweb.hypernova.data.Strings
 import com.prudnikweb.hypernova.data.Ticks
-import com.prudnikweb.hypernova.data.WApproval
 import com.prudnikweb.hypernova.data.Watch
 import okhttp3.Call
 import java.net.InetAddress
@@ -296,8 +293,9 @@ object ProcessLink : BackgroundLink {
 }
 
 /**
- * Nothing is shown: tray alerts are a later job. The rule that a note is told once still holds (what's marked
- * shown stays marked), so a later job's alerts won't repeat what this one has already passed over.
+ * Nothing is shown: this window has no automations to open, so an alert would lead nowhere (docs/DECISIONS.md, "Tray
+ * alerts on the desktop client"). The rule that a note is told once still holds (what's marked shown stays marked), so
+ * a later job's alerts won't repeat what this one has already passed over.
  */
 class QuietAutomationNotes(private val log: Log, storage: Storage, server: String?) : AutomationNotifier {
     private val prefs = storage.prefs("hypernova")
@@ -316,38 +314,29 @@ class QuietAutomationNotes(private val log: Log, storage: Storage, server: Strin
     }
 
     override fun post(key: String, title: String, text: String, sessionId: String?, automationId: String?) {
-        log.d("Notify", "an automation's note, not shown: there are no notifications here yet")
+        log.d("Notify", "an automation's note, not shown: this window has no automations")
     }
     override fun postAsk(runId: String, automationId: String?, name: String, ask: RunAsk) {
-        log.d("Notify", "an automation's question, not shown: there are no notifications here yet")
+        log.d("Notify", "an automation's question, not shown: this window has no automations")
     }
     override fun cancelAsk(runId: String) = Unit
 }
 
-/** No system notifications yet (a tray alert is a later job): what would have shown is only logged, in the debug log. It says it can't post. */
-class LogNotifier(private val log: Log) : Notifier {
-    override fun canPost(): Boolean = false
-    override fun approval(a: WApproval, s: Session?, failed: Boolean, server: String?) {
-        log.d("Notify", "an approval, on the window's list only (kind ${a.kind})")
-    }
-    override fun answered(id: String) = Unit
-    override fun notice(n: Notice, server: String?) {
-        log.d("Notify", "a notice, not shown: ${n.kind}")
-    }
-    override fun replied(sessionId: String, server: String?) = Unit
-    override fun cancelSilenced() = Unit
-    override fun replyFailed(sessionId: String, title: String, why: String, server: String?) = Unit
-    override fun cancelAccount(server: String?) = Unit
-    override fun cancelServerUpdate(server: String?) = Unit
-    override fun cancelApproval(id: String) = Unit
-    override fun cancelAllApprovals(server: String?) = Unit
-}
-
 /** Everything the data layer needs, on this computer, its files under [home]. */
-class DesktopPlatform(home: Path = DataFolder.of().toPath(), override val log: Log = DesktopLog()) : Platform, AutoCloseable {
+class DesktopPlatform(
+    home: Path = DataFolder.of().toPath(),
+    override val log: Log = DesktopLog(),
+    /** Null: AWT's tray, once Main.kt has given it its icon. */
+    surface: AlertSurface? = null,
+    keychain: KeychainChoice = Keychains.forThisSystem(home),
+) : Platform, AutoCloseable {
     val folder: DesktopStorage = DesktopStorage(home, log)
     val keyFile: Path = home.resolve("device-key.json")
     val screenWatch = DesktopScreen()
+    /** The picture a tray icon shows: the window's, set by Main.kt, as a test has neither. */
+    var trayImage: () -> java.awt.Image = { java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB) }
+    val tray: AwtTray? = if (surface == null) AwtTray(log) { trayImage() } else null
+    val alerts = TrayNotifier(log, folder, surface ?: checkNotNull(tray))
 
     // Read each time, as a phone's Resources follow the computer paired now.
     override val strings: Strings get() = ComputerWords.wordedFor(DesktopStrings, ComputerWords.platform)
@@ -358,12 +347,13 @@ class DesktopPlatform(home: Path = DataFolder.of().toPath(), override val log: L
     override val device: DeviceInfo = DesktopDevice()
     override val network: NetworkWatcher = DesktopNetwork()
     override val screen: ScreenWatcher get() = screenWatch
-    override val deviceKeys: DeviceKeys = DesktopKeys(keyFile, log)
+    val keys = DesktopKeys(keyFile, log, keychain)
+    override val deviceKeys: DeviceKeys get() = keys
     override val speech: SpeechOutput = SilentSpeech(log)
     override val background: BackgroundLink = ProcessLink
     override fun retryAlarm(): RetryAlarm = DesktopRetryAlarm(ticks, main)
     override fun automationNotes(server: String?): AutomationNotifier = QuietAutomationNotes(log, folder, server)
-    override fun notifier(): Notifier = LogNotifier(log)
+    override fun notifier(): Notifier = alerts
     override fun thumbOf(path: String): Any? = null
     override fun started() = Unit
 

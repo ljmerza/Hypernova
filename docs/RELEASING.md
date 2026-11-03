@@ -136,8 +136,10 @@ reaches the feed over mutual TLS. The real app is then started on that pairing, 
 certified device connected. On Windows a second `.msi` a patch newer goes over the first, and only one entry may be left.
 Then it's removed, and nothing may be left. The screenshots are in the run's artifacts: **look at them**, as a test can't.
 
+**The keychain** (`--keychain`, on each job): the device key's whole way, each step a real connection from the same folder, with no new pairing. Paired on the file, as an install from before is; moved to the keychain with its file gone and the same key; a restart reads it back; locked, so a new key in the file and a new certificate; no keychain at all, the file's key; back, and the file's key moves over the old. The first key has to be in no log, no probe's answer, no file of the folder and not readable in the keyring. **It's always a throwaway keychain:** on Linux `dbus-run-session` and `gnome-keyring-daemon` in a temp home, on a Mac a new keychain made the default for the run (locked and missing are `HYPERNOVA_CLIENT_KEYCHAIN=off` there, as a runner can't lose its own), on Windows the runner's own user. It's strict: a failure on a Mac or Windows costs that package, not the release. **Those two have never run this.** Without `--keychain` and without `CI`, a tarball's run stays out of keychains altogether.
+
 To try it on Linux here: in a throwaway `ubuntu:24.04` with `sudo`, `CI=true`, node on the path, `npm ci --ignore-scripts`
-in `daemon/`, and `xvfb xdotool imagemagick openssl`. `--tarball` needs no `CI`, as it installs nothing.
+in `daemon/`, and `xvfb xdotool imagemagick openssl`, plus `dbus gnome-keyring` (and `libsecret-tools` for `--tarball`) with `--keychain`. Build with `-PdesktopVersion=` the `--version` it's given. `--tarball` needs no `CI`, as it installs nothing, unless it's given `--keychain`.
 
 **The versions.** The tag gives `-PdesktopVersion`, and each system takes it its own way (`android/desktop/build.gradle.kts`;
 `./gradlew -q :desktop:packageVersions -PdesktopVersion=…` prints them):

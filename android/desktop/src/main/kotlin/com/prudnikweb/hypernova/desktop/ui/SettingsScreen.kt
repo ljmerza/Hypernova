@@ -44,7 +44,10 @@ import com.prudnikweb.hypernova.data.DebugLog
 import com.prudnikweb.hypernova.data.DebugLogger
 import com.prudnikweb.hypernova.data.DebugSendFlow
 import com.prudnikweb.hypernova.data.DebugSendState
+import com.prudnikweb.hypernova.desktop.DesktopPlatform
 import com.prudnikweb.hypernova.desktop.DesktopStrings
+import com.prudnikweb.hypernova.desktop.FileWhy
+import com.prudnikweb.hypernova.desktop.KeyPlace
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.Ui
 import kotlinx.coroutines.Dispatchers
@@ -57,8 +60,8 @@ import java.util.Date
 private val COLUMN = 640.dp
 
 /**
- * Settings on this computer: for now just Debug logging, as on a phone (data/DebugLog.kt), except that
- * there's no share sheet here: Open folder and Copy path instead.
+ * Settings on this computer: whether alerts can show here, where its key is, and Debug logging as on a phone (data/DebugLog.kt),
+ * except that there's no share sheet here: Open folder and Copy path instead.
  */
 @Composable
 fun SettingsScreen(shell: Shell) {
@@ -69,7 +72,52 @@ fun SettingsScreen(shell: Shell) {
                 Pill(Ui.back.text(), { shell.settings = false }, kind = PillKind.Ghost, height = 32.dp)
             }
             Spacer(Modifier.height(16.dp))
+            Alerts()
+            Spacer(Modifier.height(16.dp))
+            KeyPlaceSection()
+            Spacer(Modifier.height(16.dp))
             DebugLogging(shell)
+        }
+    }
+}
+
+/** Whether alerts can reach the owner here, and that they stop with the app. */
+@Composable
+private fun Alerts() {
+    Seam(Ui.desk_alerts_title.text(), MarkKind.Idle)
+    Spacer(Modifier.height(10.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            HText(if (Core.notifier.canPost()) Ui.desk_alerts_tray.text() else Ui.desk_alerts_no_tray.text(), style = Type.small)
+            Spacer(Modifier.height(8.dp))
+            HText(Ui.desk_alerts_only_open.text(), style = Type.small, color = HN.inkMuted)
+        }
+    }
+}
+
+/** Where this computer's key is, and in plain words what that doesn't protect from. */
+@Composable
+private fun KeyPlaceSection() {
+    val place = (Core.platform as? DesktopPlatform)?.keys?.place ?: return
+    Seam(Ui.desk_key_title.text(), MarkKind.Idle)
+    Spacer(Modifier.height(10.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
+            val words = when (place) {
+                KeyPlace.Nowhere -> Ui.desk_key_none
+                KeyPlace.InKeychain -> Ui.desk_key_keychain
+                is KeyPlace.InFile -> when (place.why) {
+                    FileWhy.Down -> Ui.desk_key_file_down
+                    FileWhy.NoHelper -> Ui.desk_key_file_no_helper
+                    FileWhy.DidNotHold -> Ui.desk_key_file_did_not_hold
+                    FileWhy.TurnedOff -> Ui.desk_key_file_off
+                }
+            }
+            HText(words.text(), style = Type.small, color = if (place is KeyPlace.InFile && place.why != FileWhy.TurnedOff) HN.amber else HN.ink)
+            if (place is KeyPlace.InFile) {
+                Spacer(Modifier.height(8.dp))
+                HText(Ui.desk_key_file_note.text(), style = Type.small, color = HN.inkMuted)
+            }
         }
     }
 }

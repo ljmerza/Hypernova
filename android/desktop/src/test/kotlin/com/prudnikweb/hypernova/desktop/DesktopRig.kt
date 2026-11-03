@@ -19,9 +19,21 @@ import javax.swing.SwingUtilities
  * process; build.gradle.kts forks a process per class). Files, keys, the TLS and the socket are all real.
  * What's on the other side is a [FakeDaemon] on loopback, or the demo server in [DemoServerTest].
  */
+class StandTray(override var available: Boolean = true) : AlertSurface {
+    val shown = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String>>()
+    override var clicked: () -> Unit = {}
+    override fun show(title: String, text: String) {
+        shown += title to text
+    }
+}
+
 object DesktopRig {
     val home = Files.createTempDirectory("hypernova-desktop-test")
-    val platform: DesktopPlatform by lazy { DesktopPlatform(home) }
+    /** A test has no tray: what would have shown is kept here. */
+    val alerts = StandTray()
+    /** A file, unless a test class says otherwise before its first use of [platform]. */
+    var keychain: KeychainChoice = KeychainChoice.OFF
+    val platform: DesktopPlatform by lazy { DesktopPlatform(home, surface = alerts, keychain = keychain) }
     val shell: Shell by lazy { startCore(platform) }
 
     fun main(block: () -> Unit) {
