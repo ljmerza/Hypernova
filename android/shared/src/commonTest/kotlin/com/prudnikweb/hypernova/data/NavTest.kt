@@ -69,4 +69,26 @@ class NavTest {
         nav.openSession("b")
         assertEquals(2, nav.depth)
     }
+
+    // Settings' pages keep the tabs (owner, 2026-11-03).
+    @Test fun settingsPagesOverHomeAreInSettingsHoweverDeep() {
+        assertEquals(false, inSettings(listOf(home)))
+        assertEquals(true, inSettings(listOf(home, Route.ServerSettings("z2"))))
+        assertEquals(true, inSettings(listOf(home, Route.ServerSettings("z2"), Route.Providers, Route.AgentSettings("claude"), Route.McpServers("claude"), Route.McpEdit("claude", null, null, null))))
+        assertEquals(true, inSettings(listOf(home, Route.ConnectionLog)))
+    }
+
+    @Test fun aWebPageIsInSettingsOnlyOverOne() {
+        val page = Route.Web("http://127.0.0.1:47322/qa", "Checklist")
+        assertEquals(true, inSettings(listOf(home, Route.ServerSettings("z2"), page)))
+        assertEquals(false, inSettings(listOf(home, page)))
+    }
+
+    @Test fun aSettingsPageOverASessionOrAnAutomationIsNot() {
+        assertEquals(false, inSettings(listOf(home, s("a"))))
+        assertEquals(false, inSettings(listOf(home, s("a"), Route.Providers)))
+        assertEquals(false, inSettings(listOf(home, Route.AutomationEdit("x"), Route.Providers)))
+        assertEquals(false, inSettings(listOf(home, Route.ServerSettings("z2"), s("a"))))
+        assertEquals(false, inSettings(listOf(home, Route.Files("/p", "p"))))
+    }
 }

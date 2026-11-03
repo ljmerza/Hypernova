@@ -11,13 +11,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -85,6 +82,7 @@ import com.prudnikweb.hypernova.ui.components.ModelChip
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
+import com.prudnikweb.hypernova.ui.components.screenBottom
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.StatusChip
 import com.prudnikweb.hypernova.ui.components.ToggleRow
@@ -106,7 +104,7 @@ private fun kindLabel(kind: String): String = when (kind) {
 /** Every provider, built-in first; add OpenRouter or a custom endpoint. Keys are never shown. */
 @Composable
 fun ProvidersScreen(hub: Hub, onBack: () -> Unit, onEdit: (id: String?, kind: String) -> Unit, onAgentSettings: (agent: String) -> Unit = {}) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     // What's left on each OpenRouter key, read again as the screen opens (quietly: a failure keeps the last reading).
     LaunchedEffect(Unit) {
         for (p in hub.providers) if (p.kind == "openrouter" && p.hasKey) hub.checkProvider(p.id)
@@ -500,7 +498,7 @@ fun ProviderEditScreen(hub: Hub, id: String?, kind: String, onBack: () -> Unit) 
     val toast = LocalToast.current
     val confirm = LocalConfirm.current
     val scope = rememberCoroutineScope()
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     // Saved here once (a new one whose key was refused stays open): further saves edit it.
     var savedId by rememberSaveable { mutableStateOf(id) }
     val existing = hub.providers.firstOrNull { it.id == savedId }

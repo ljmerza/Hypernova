@@ -63,6 +63,7 @@ import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
+import com.prudnikweb.hypernova.ui.components.screenBottom
 import com.prudnikweb.hypernova.ui.components.ToggleRow
 import com.prudnikweb.hypernova.ui.components.Z
 import com.prudnikweb.hypernova.ui.home.HOME_SOURCE
@@ -269,7 +270,7 @@ internal fun SettingsSubPage(r: Route, vm: HubViewModel, onBack: () -> Unit) {
 /** A sub page of what this phone keeps: its title, Back, and its sections in a list of their own. */
 @Composable
 private fun PhonePage(title: Int, sourceKey: String, onBack: () -> Unit, content: @Composable () -> Unit) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     ScreenScaffold(sourceKey = sourceKey, title = stringResource(title), onBack = onBack) { top, source ->
         LazyColumn(
             Modifier.fillMaxSize().then(source),
@@ -292,7 +293,7 @@ private fun ServerSettingsScreen(vm: HubViewModel, server: String, onBack: () ->
     val res = context.resources
     val toast = LocalToast.current
     val confirm = LocalConfirm.current
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val allMode = vm.allServers
     val entry = vm.everyHub.firstOrNull { it.first.id == server }
     if (entry == null) {

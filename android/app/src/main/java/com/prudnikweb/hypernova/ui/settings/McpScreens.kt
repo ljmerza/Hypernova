@@ -40,13 +40,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -98,6 +95,7 @@ import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
+import com.prudnikweb.hypernova.ui.components.screenBottom
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
@@ -141,7 +139,7 @@ internal fun mcpScopeWord(scope: String): Int = when (scope) {
 /** Agents & providers › an agent's settings › MCP servers: every scope, each to tap, with its status from the folder chosen. */
 @Composable
 fun McpServersScreen(hub: Hub, agent: String, onBack: () -> Unit, onOpen: (name: String, scope: String, folder: String?) -> Unit, onAdd: () -> Unit = {}) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val server = hub.mac.name
     val context = LocalContext.current
     val toast = LocalToast.current
@@ -349,7 +347,7 @@ internal fun McpFailure(e: Throwable?, @StringRes fallback: Int, onRetry: () -> 
 /** One server: where it's defined, how it's set up, and how it's doing from [folder]. */
 @Composable
 fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder: String?, onBack: () -> Unit, onEdit: () -> Unit = {}) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val context = LocalContext.current
     val toast = LocalToast.current
     val confirm = LocalConfirm.current
@@ -872,7 +870,7 @@ private fun ChoiceRow(options: List<Pair<String, String>>, chosen: String, enabl
 /** Add a server, or change one: the form, then the confirm and the fingerprint where it runs something. Values are checked again on the server. */
 @Composable
 fun McpEditScreen(hub: Hub, agent: String, name: String?, scope: String?, folder: String?, onBack: () -> Unit) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val context = LocalContext.current
     val toast = LocalToast.current
     val confirm = LocalConfirm.current

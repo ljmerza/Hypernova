@@ -1,10 +1,19 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.Composable
@@ -12,13 +21,52 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.ui.components.BlurredBottomOverScreens
+import com.prudnikweb.hypernova.ui.components.LocalHaze
 import com.prudnikweb.hypernova.ui.theme.HN
+import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
+
+/** The tabs with their words, where they stand at the bottom of the screen: Home's and Settings' pages' the same. */
+@Composable
+internal fun BottomTabs(selected: Tab, onSelect: (Tab) -> Unit) {
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = bottom + 6.dp)) {
+        HomeTabBar(
+            Tab.entries.map { t ->
+                when (t) {
+                    Tab.Sessions -> stringResource(R.string.sessions)
+                    Tab.Automations -> stringResource(R.string.au_tab)
+                    Tab.History -> stringResource(R.string.history)
+                    Tab.Settings -> stringResource(R.string.settings)
+                }
+            },
+            selected.ordinal, { i -> onSelect(Tab.entries[i]) },
+            Modifier.padding(horizontal = 12.dp),
+        )
+    }
+}
+
+/**
+ * The tabs over Settings' pages (owner, 2026-11-03), Settings selected. It stands outside the screens'
+ * change, so it stays still between pages; arriving from Home it covers Home's own, in the same place,
+ * and going back to Home it fades over the one coming in.
+ */
+@Composable
+internal fun SettingsPageBar(visible: Boolean, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
+    AnimatedVisibility(visible, modifier, enter = EnterTransition.None, exit = fadeOut(tween(Motion.REVEAL, easing = Motion.Expo))) {
+        BlurredBottomOverScreens(LocalHaze.current, Modifier.fillMaxWidth(), fade = 14.dp) {
+            BottomTabs(Tab.Settings, onSelect)
+        }
+    }
+}
 
 /**
  * Home's text tabs (Hyperscribe's bottom nav). With four labels of very different lengths

@@ -11,12 +11,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,6 +54,7 @@ import com.prudnikweb.hypernova.data.rawSave
 import com.prudnikweb.hypernova.data.rawUndo
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.LocalToast
+import com.prudnikweb.hypernova.ui.components.AskBeforeTabs
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Icon
@@ -66,6 +64,7 @@ import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
+import com.prudnikweb.hypernova.ui.components.screenBottom
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -86,7 +85,7 @@ internal fun SettingsModeSwitch(json: Boolean, onSettings: () -> Unit, onJson: (
  */
 @Composable
 fun AgentRawScreen(hub: Hub, agent: String, onBack: () -> Unit) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val server = hub.mac.name
     val context = LocalContext.current
     val toast = LocalToast.current
@@ -191,6 +190,7 @@ fun AgentRawScreen(hub: Hub, agent: String, onBack: () -> Unit) {
         if (!dirty) return go()
         confirm(Confirm(context.getString(R.string.raw_discard_title), context.getString(R.string.raw_discard_body), context.getString(R.string.raw_discard_action), danger = true) { go() })
     }
+    AskBeforeTabs { go -> leaving(go) }
     ScreenScaffold(sourceKey = "agent-raw:$agent", title = stringResource(R.string.raw_title), subtitle = server, onBack = { leaving(onBack) }) { top, source ->
         Column(
             Modifier.fillMaxSize().then(source).verticalScroll(rememberScrollState()).padding(top = top, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),
