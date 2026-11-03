@@ -239,7 +239,8 @@ test('nothing works at all: the last good reading stands', async () => {
 })
 
 test('a status line from the last minute isn\'t overruled by an answer that may be older', async () => {
-  const now = Date.now()
+  // More than the second offerUsage gives readings to be told apart, past the last test's: the hub takes this one on its time alone.
+  const now = Date.now() + 2000
   const reset = hub.getUsage().sevenDay!.resetsAt
   hub.offerUsage(null, { pct: 50, resetsAt: reset }, now)
   standIn(answer({ seven_day: { utilization: 49, resets_at: iso(reset) } }))

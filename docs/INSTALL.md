@@ -284,7 +284,7 @@ Open the `.dmg` and drag **Hypernova Client** to Applications. Then open it from
 - **If it says the app is "damaged"**, or in Terminal on any version:
   `xattr -dr com.apple.quarantine "/Applications/Hypernova Client.app"`, then open it again.
 
-Those words are from Apple's documents and what macOS showed for the old Mac app's unsigned download, not from this app. As far as we know, you may also be asked whether **Hypernova Client may find devices on your local network** the first time it reaches your server. Say **Allow**, or it can't pair. It's in **System Settings → Privacy & Security → Local Network** afterwards.
+Those words are from Apple's documents and what macOS showed for the old Mac app's unsigned download, not from this app. The app's own first run on GitHub's Mac runners showed one more: **Allow "Hypernova Client" to find devices on local networks?** Say **Allow**, or we expect it can't reach a server on another computer (not tried yet, as that run's server was on the same machine). It's in **System Settings → Privacy & Security → Local Network** afterwards.
 
 To remove it, drag it from Applications to the Trash. Your pairing stays in `~/Library/Application Support/Hypernova Client`: delete that too if you're done with it.
 
