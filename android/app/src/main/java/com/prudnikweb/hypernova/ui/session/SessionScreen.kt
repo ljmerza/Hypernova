@@ -875,6 +875,7 @@ fun SessionScreen(
                 onDismiss = { sheetOpen = false },
                 atBlocked = sheetAtBlocked,
                 atAgents = sheetAtAgents,
+                onCompact = { quickSend("/compact") },
             )
         }
         if (modelOpen && canChangeModel(session)) {

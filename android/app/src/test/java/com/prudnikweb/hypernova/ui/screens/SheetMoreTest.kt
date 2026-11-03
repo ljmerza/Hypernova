@@ -24,6 +24,7 @@ import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.session.SessionScreen
 import com.prudnikweb.hypernova.ui.session.SessionSheet
 import org.junit.After
+import com.prudnikweb.hypernova.data.SessionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -84,6 +85,27 @@ class SheetMoreTest {
         rule.waitForIdle()
         rule.onNode(hasText(str(R.string.session_sheet_permissions)) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).performScrollTo().performClick()
         rule.waitForIdle()
+    }
+
+    /** The sheet's Compact (owner, 2026-11-03: "add a compact button to the session top bar menu"), at any fullness. */
+    private fun compactSheet(s: com.prudnikweb.hypernova.data.Session, compacted: () -> Unit, dismissed: () -> Unit = {}) {
+        rule.setContent { Harness(spy) { SessionSheet(FakeHub(sessions = listOf(s)), s, usage = null, onModel = {}, onSwitchAgent = {}, onRetried = {}, onDismiss = dismissed, onCompact = compacted) } }
+        rule.waitForIdle()
+    }
+
+    @Test fun compactIsInTheSheetAndClosesIt() {
+        var compacted = 0
+        var dismissed = 0
+        compactSheet(Samples.session("c", "c", SessionState.Idle, 1), { compacted++ }, { dismissed++ })
+        rule.onNodeWithText(str(R.string.chat_compact)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(1, compacted)
+        assertEquals(1, dismissed)
+    }
+
+    @Test fun aCodexSessionHasNoCompactInTheSheet() {
+        compactSheet(Samples.session("c", "c", SessionState.Idle, 1).copy(agent = "codex"), {})
+        rule.onNodeWithText(str(R.string.chat_compact)).assertDoesNotExist()
     }
 
     private fun mode(label: Int) {

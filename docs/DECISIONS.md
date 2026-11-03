@@ -4282,3 +4282,7 @@ The owner: "when in any setting some page I want the bottom navigation bar and t
 8. **Automations with All servers** says why not, as on Home, and the page stays. `rememberHomeTab` is unchanged: the tab it keeps is the one the tap sets.
 9. **Sheets and dialogs** are windows of their own (`GlassWindow`), so they cover the tabs with nothing changed. **A jump** (`SettingsJump`) lands as it did, and the page has the tabs.
 10. **The desktop client has no such bar,** and `inSettings` is unused there.
+
+## Compact in the session sheet (2026-11-03)
+
+The owner: "add a compact button to the session top bar menu somewhere". The bar's Compact chip only shows from 85% context, so the sheet the bar opens has a Compact row on Overview, at any fullness, for a Claude Code session that can change. It sends `/compact` as the chip does, once for a double tap, and closes the sheet. Codex sessions have none, as with the chip. The Commands tab's Compact, with its "Keep…" line, stays as it is.
