@@ -46,13 +46,12 @@ import { awakeClient, awakeState, setAwake } from './awake.ts'
 import { macFeed } from './mac-feed.ts'
 import { ChangeError, changesOf, diffOf } from './changes.ts'
 import { toolPath } from './normalize.ts'
-import { ResumeError, setAutoContinue, typeContinue } from './resume.ts'
+import { ResumeError, continueText, setAutoContinue, setLoginContinue, typeContinue } from './resume.ts'
 import { BlockedError, blockedList, dismissBlocked, retryBlocked } from './blocked.ts'
 import { AsideError, askAside, asideOf } from './aside.ts'
 import { rulesInEffect } from './permission-rules.ts'
 import { allowSeveral, sessionAllowedTools, sessionAlwaysRules } from './hub.ts'
 import { AlwaysError, readAlwaysChoice, type AlwaysChoice } from './always.ts'
-import { CONTINUE_TEXT } from './blockers.ts'
 import { checkBalance, hasBalance, providerSaved } from './balance.ts'
 import { checkProvider, type ProviderCheck } from './providers-check.ts'
 import { claudeModelsNow, listModels } from './models.ts'
@@ -365,7 +364,7 @@ function afterAgentUpdate(agent: 'claude' | 'codex'): void {
   else sendCodex()
   broadcast({ t: 'agent_settings', agent })
 }
-const claudeState = () => ({ available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed, agents: settings.claudeAgents === true })
+const claudeState = () => ({ available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed, agents: settings.claudeAgents === true, loginContinue: settings.loginContinue !== false })
 
 function snapshot(deviceId: string | null) {
   return {
@@ -552,10 +551,12 @@ async function api(c: Ctx): Promise<void> {
   }
   // Sessions in `claude agents` on or off from the phone (Settings → Agents & providers → Claude Code):
   // taken at once, said to every phone.
+  // So is carrying on by itself after signing in again (resume.ts; Settings → the server's page).
   if (path === '/v1/claude' && m === 'POST') {
     const b = await readJsonBody(req)
-    if (typeof b?.agents !== 'boolean') throw new HttpError(400, 'bad_value', 'Say agents: true or false.')
-    setClaudeAgents(b.agents)
+    if (typeof b?.agents !== 'boolean' && typeof b?.loginContinue !== 'boolean') throw new HttpError(400, 'bad_value', 'Say agents or loginContinue: true or false.')
+    if (typeof b.agents === 'boolean') setClaudeAgents(b.agents)
+    if (typeof b.loginContinue === 'boolean') setLoginContinue(b.loginContinue)
     const claude = claudeState()
     broadcast({ t: 'claude', claude })
     return json(res, 200, { claude })
@@ -1174,7 +1175,7 @@ async function api(c: Ctx): Promise<void> {
     // carry on from by itself: its ready card goes once the turn starts.
     const afterLimit = action === 'continue' && (await readJsonBody(req))?.reason === 'limit'
     if (afterLimit && codex) throw notForCodex()
-    const b = action === 'continue' ? { text: afterLimit ? CONTINUE_TEXT.manual : "I'm back. Please continue where you left off." } : await readJsonBody(req)
+    const b = action === 'continue' ? { text: afterLimit ? continueText(id!) : "I'm back. Please continue where you left off." } : await readJsonBody(req)
     const files = attachments(b)
     if (!String(b.text ?? '').trim() && !files.length) throw new HttpError(400, 'empty', 'Write something first.')
     const text = withAttachments(String(b.text ?? '').trim(), files)
@@ -2047,10 +2048,9 @@ async function local(c: Ctx): Promise<void> {
     // The LAN listener starts or stops at once (lan.ts).
     if (typeof b.lanAccess === 'boolean') setLanAccess(b.lanAccess)
     // Sessions in `claude agents` (claude-agents.ts): `hypernova setup` turns it on; every phone hears it.
-    if (typeof b.claudeAgents === 'boolean') {
-      setClaudeAgents(b.claudeAgents)
-      broadcast({ t: 'claude', claude: claudeState() })
-    }
+    if (typeof b.claudeAgents === 'boolean') setClaudeAgents(b.claudeAgents)
+    if (typeof b.loginContinue === 'boolean') setLoginContinue(b.loginContinue)
+    if (typeof b.claudeAgents === 'boolean' || typeof b.loginContinue === 'boolean') broadcast({ t: 'claude', claude: claudeState() })
     return json(res, 200, settings)
   }
   return api({ ...c, local: true })

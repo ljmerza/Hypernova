@@ -1581,6 +1581,8 @@ const agentStates = new Map<string, string>()
 const agentDied = new Map<string, string | null>()
 /** `claude agents` shows the job as blocked: it waits on the owner, whatever its process says. */
 const agentBlocked = (id: string) => agentStates.get(id) === 'blocked'
+/** `claude agents` shows job session [id] stopped or over: no process of its own to carry on in. */
+export const agentStopped = (id: string) => ['stopped', 'done', 'failed'].includes(agentStates.get(id) ?? '')
 
 /**
  * What blocked `claude agents` job [job] waits for, in its own words (`needs` in its state file:
@@ -1601,6 +1603,8 @@ function agentNeeds(job: string | undefined): string | null {
 
 /** A job resumed with no prompt (`claude --bg --resume <id>`) says this; it waits on nothing. */
 const FIRST_PROMPT = 'send a prompt to start'
+/** How a job's `needs` opens while the login stops it (Claude Code 2.1.317): "login required — run /login · API Error: 401 …". */
+const LOGIN_NEEDS = /^login required\b/i
 
 /** When a job this daemon just started was noted: a list read before it started doesn't count against it. */
 const jobNoted = new Map<string, number>()
@@ -1644,7 +1648,9 @@ export function applyAgentList(list: AgentJob[]): void {
     seen.add(j.sessionId)
     agentJobs.set(j.sessionId, j.id)
     // Resumed with no prompt yet: `claude agents` calls that blocked, and nothing is asked of the owner.
-    const waitsForNothing = j.state === 'blocked' && agentNeeds(j.id) === FIRST_PROMPT
+    // Nor once the login it says it needs is back: its state file says so until its next prompt.
+    const needs = j.state === 'blocked' ? agentNeeds(j.id) : null
+    const waitsForNothing = needs === FIRST_PROMPT || (needs != null && LOGIN_NEEDS.test(needs) && getAccount().state !== 'logged_out')
     agentStates.set(j.sessionId, waitsForNothing ? 'idle' : String(j.state ?? ''))
     let r = sessions.get(j.sessionId)
     if (!r) {

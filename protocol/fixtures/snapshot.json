@@ -644,7 +644,8 @@
     "available": true,
     "version": "2.1.314",
     "sdk": true,
-    "agents": true
+    "agents": true,
+    "loginContinue": true
   },
   "codex": {
     "available": true,

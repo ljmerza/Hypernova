@@ -597,6 +597,11 @@ test('{t:"projects"}, {t:"providers"}, {t:"account"}, {t:"codex"}', () => {
 test('{t:"claude"} and POST /v1/claude', async () => {
   contract('rest-claude', await ok(post('/v1/claude', { agents: true })))
   contract('ws-claude', heard('claude'))
+  // Carrying on after signing in again (resume.ts): on unless turned off, stored here.
+  contract('rest-claude-login-continue', await ok(post('/v1/claude', { loginContinue: false })))
+  assert.equal(heard('claude').claude.loginContinue, false)
+  assert.equal((await post('/v1/claude', {})).status, 400)
+  await ok(post('/v1/claude', { loginContinue: true }))
 })
 
 test('{t:"files"} and {t:"lan"}', async () => {

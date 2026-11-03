@@ -9,15 +9,22 @@
 // (nothing to wait for, and a continue costs money): when that's over, the session says so and
 // offers Continue.
 //
+// The same goes for a session Claude Code's lost login stopped (an entry with `login`): followed
+// while signed out, and when the account is back it carries on once by itself, a moment apart from
+// the others, with the setting on (settings.loginContinue; docs/PROTOCOL.md, "After signing in
+// again"), else it offers Continue. The sub agents the login stopped can't be carried on from here:
+// the session's own words ask it to take them up (docs/DECISIONS.md, "Carrying on after signing in
+// again").
+//
 // Kept in <support>/resume.json (0600), so a restart keeps what was armed, cancelled or ready.
 import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { CLAUDE_DIR, SUPPORT, log, readJson, writeJson } from './util.ts'
-import { broadcast, ensureParsed, getSession, pendingApprovals, resumeWith, view, type Session } from './hub.ts'
-import { isSdk, isSubscription } from './store.ts'
+import { agentJobOf, agentStopped, broadcast, ensureParsed, getSession, pendingApprovals, resumeWith, view, type Session } from './hub.ts'
+import { isSdk, isSubscription, saveSettings, settings } from './store.ts'
 import { getAccount, providerStatus } from './account.ts'
 import { CONTINUE_TEXT, parseWhen, type Blocked, type BlockedKind, type LimitNotice, type Resume, type ResumeWhy } from './blockers.ts'
-import { answerMenu, createSharedSession, pressKeys, sharedTerminalsAvailable, termChildPid, termOf, termScreen, typeInto, type Typed } from './terms.ts'
+import { answerMenu, attachAgentsTerm, attachDrifted, createSharedSession, pressKeys, sharedTerminalsAvailable, termChildPid, termOf, termScreen, typeInto, type Typed } from './terms.ts'
 import { sendPrompt } from './runner.ts'
 import { boxLines, boxText, isWorking, menuOf, registryBusy, type Menu } from './term/shared.ts'
 import { MACHINE } from './platform.ts'
@@ -35,6 +42,11 @@ const READY_MS = 12 * 3600_000
 const NOTICE_WAIT_MS = 5000
 /** After it carried on: a block within this counts as hitting the limit again (a re-arm). */
 const FIRED_MS = 15 * 60_000
+/** After a sign-in the first session carries on this long after it, and the rest this far apart: not all at once. */
+const LOGIN_WAIT_MS = 5000
+const LOGIN_GAP_MS = 4000
+/** A block from further before the sign-out began than this is about something older. */
+const LOGIN_EARLY_MS = 60_000
 
 type State = 'armed' | 'off' | 'ready' | 'fired' | 'hidden'
 /**
@@ -42,7 +54,8 @@ type State = 'armed' | 'off' | 'ready' | 'fired' | 'hidden'
  * two the clients never see: `fired` (it carried on; a block soon after is the same limit again)
  * and `hidden` (out of credit or a refused key: never carried on by itself, but followed, so the
  * session says when it's over). `resetsAt`: when the cause lifts, if known. `noticed`: Claude Code
- * has said something about it. `liftedAt`: when the cause ended.
+ * has said something about it. `liftedAt`: when the cause ended. `login`: the lost login stopped it,
+ * `hidden` while it waits for the account to be back.
  */
 type Entry = {
   sid: string
@@ -61,6 +74,7 @@ type Entry = {
   noticeAt: number
   firedAt: number | null
   liftedAt: number | null
+  login?: boolean
 }
 
 const entries = new Map<string, Entry>()
@@ -119,6 +133,22 @@ function armByUs(e: Entry, now: number): void {
   else Object.assign(e, { state: 'armed', at: jitter(Math.max(reset, now), provider), why: null })
 }
 
+/**
+ * What a block by the lost login starts as: followed until the account is back. None on another
+ * provider's session, or for a block from well before this sign-out began (read late): another
+ * episode's. [prev]: its entry before: carried on after a sign-in a moment ago and stopped again,
+ * this login flips, so it won't by itself again until 15 minutes after that (`repeated`).
+ */
+function loginEntry(s: Session, b: Blocked, since: number, prev: Entry | undefined, now: number): Entry | null {
+  const a = getAccount()
+  if (!isSubscription(s.providerId) || a.state !== 'logged_out' || (a.since != null && since < a.since - LOGIN_EARLY_MS)) return null
+  const again = prev?.login === true && prev.firedAt != null && since >= prev.firedAt - 1000 && now - prev.firedAt < FIRED_MS
+  return {
+    sid: s.id, providerId: s.providerId, since, kind: 'logged_out', text: b.text, resetsAt: null, state: 'hidden', at: null, by: 'hypernova',
+    why: again ? 'repeated' : null, rearms: 0, createdAt: now, noticed: false, noticeAt: 0, firedAt: again ? prev.firedAt : null, liftedAt: null, login: true,
+  }
+}
+
 /** What a new block starts as (docs/PROTOCOL.md, "Auto-continue", the table). */
 function initial(s: Session, b: Blocked, since: number, rearms: number, now: number): Entry | null {
   const e: Entry = {
@@ -167,6 +197,15 @@ function blocked(sid: string, b: Blocked | null, at: number): void {
   const now = clock()
   const e = entries.get(sid)
   if (b) {
+    if (b.kind === 'logged_out') {
+      if (e?.login && e.since === at && e.state !== 'fired') return
+      const next = loginEntry(s, b, at, e, now)
+      if (next) {
+        entries.set(sid, next)
+        changed(next)
+      } else if (e) drop(sid)
+      return
+    }
     if (b.kind !== 'limit' && b.kind !== 'model' && b.kind !== 'provider') {
       if (e) drop(sid)
       return
@@ -182,7 +221,7 @@ function blocked(sid: string, b: Blocked | null, at: number): void {
     }
     // Hit again soon after it carried on by itself: one more re-arm.
     const again = e?.state === 'fired' && e.firedAt != null && at >= e.firedAt - 1000 && now - e.firedAt < FIRED_MS
-    const next = initial(s, b, at, again ? e!.rearms + 1 : 0, now)
+    const next = initial(s, b, at, again && !e!.login ? e!.rearms + 1 : 0, now)
     if (!next) {
       if (e) drop(sid)
       return
@@ -193,9 +232,80 @@ function blocked(sid: string, b: Blocked | null, at: number): void {
     return
   }
   if (!e || e.state === 'fired' || e.state === 'ready') return
+  // The account changed: it's back, or another trouble took over from the sign-out.
+  if (e.login && e.state === 'hidden') return signedInAgain(now)
   // It moved on (a prompt, a reply): nothing to carry on.
   if (s.state === 'working' || s.state === 'starting') return drop(sid)
   lifted(e, now)
+}
+
+/** Whether someone wrote in session [sid] after [at]: a prompt or a command, but for the /login that signed it in. */
+function typedSince(sid: string, at: number): boolean {
+  const r = getSession(sid)
+  if (!r) return false
+  const evs = ensureParsed(r).events
+  for (let i = evs.length - 1; i >= 0; i--) {
+    const ev = evs[i]!
+    if (ev.ts <= at) return false
+    if (ev.kind === 'user' && ev.command?.name !== '/login') return true
+  }
+  return false
+}
+
+/** A session with no process left that isn't the owner's to wake: over, or a job stopped. */
+const gone = (s: Session) => s.state === 'ended' || agentStopped(s.id)
+
+/**
+ * The account may be back: each session its lost login stopped carries on by itself, a moment apart,
+ * or (the setting off, or it flipped) says to Continue. Still signed out, or anything else that
+ * stops Claude: they go on waiting. Under a limit too, whichever way it came (`far`: one too far
+ * off to carry on from, as a limit's own rule says, so it says to Continue once it's over).
+ */
+function signedInAgain(now: number): void {
+  const a = getAccount()
+  // On usage credits Claude replies past a limit: nothing to wait for.
+  const limit = a.state === 'limited' && !a.limit?.usingCredits ? a.limit : null
+  if (a.state !== 'ok' && a.state !== 'limited') return
+  const waiting = [...entries.values()].filter((e) => e.login && e.state === 'hidden').sort((x, y) => x.since - y.since)
+  let spaced = 0
+  for (const e of waiting) {
+    const r = getSession(e.sid)
+    // Not seen (yet) after a restart: at the next look.
+    if (!r) continue
+    const s = view(r)
+    if (s.state === 'working' || s.state === 'starting' || gone(s) || typedSince(e.sid, e.since)) {
+      drop(e.sid)
+      continue
+    }
+    if (limit) {
+      if (limit.resetsAt != null && limit.resetsAt - now > HORIZON_MS && !e.why) {
+        e.why = 'far'
+        save()
+      }
+      continue
+    }
+    if (settings.loginContinue === false || e.why) {
+      Object.assign(e, { state: 'ready', at: now, liftedAt: now })
+      log('resume', e.sid.slice(0, 8), 'signed in again: waits for Continue')
+    } else {
+      Object.assign(e, { state: 'armed', at: now + LOGIN_WAIT_MS + spaced++ * LOGIN_GAP_MS, liftedAt: now })
+      log('resume', e.sid.slice(0, 8), 'signed in again: carries on in', Math.round(((e.at ?? now) - now) / 1000), 's')
+    }
+    changed(e)
+  }
+}
+
+/** Settings → the server's page, or `POST /v1/claude`. Sessions already armed read it when their moment comes. */
+export function setLoginContinue(on: boolean): void {
+  if ((settings.loginContinue !== false) === on) return
+  settings.loginContinue = on
+  saveSettings()
+  log('carrying on after signing in:', on ? 'on' : 'off')
+}
+
+/** What Continue types into session [sid] after a limit, or after the login it waited on came back. */
+export function continueText(sid: string): string {
+  return entries.get(sid)?.login ? CONTINUE_TEXT.loginManual : CONTINUE_TEXT.manual
 }
 
 /** The cause of [e]'s block is over and the session didn't carry on: armed waits for its time; else it's ready. */
@@ -221,8 +331,8 @@ function replied(sid: string, at: number): void {
 function noticed(sid: string, n: LimitNotice, at: number): void {
   const now = clock()
   let e = entries.get(sid)
-  // From before the block this resume is about: old news.
-  if (e && at < e.since - 60_000) return
+  // From before the block this resume is about: old news. The login's waits on no limit.
+  if (e && (e.login || at < e.since - 60_000)) return
   if (!e) {
     // "Usage limit has reset · press enter to continue": a ready card even on a session whose
     // block cleared already, unless it's old news (a prompt came after, or long ago).
@@ -303,6 +413,8 @@ function blockedView(s: Session): Blocked | null {
   const r = resumeOf(e, s)
   if (b) return limitish(b.kind) ? { ...b, autoResumeAt: r?.state === 'armed' ? r.at : e.by === 'claude' && !e.noticed ? b.autoResumeAt : null, resume: r } : b
   if (!r || (r.state !== 'armed' && r.state !== 'ready')) return null
+  // Back from a sign-out: nothing to show for the moment it waits, and then "signed in" with Continue.
+  if (e.login) return r.state === 'ready' ? { kind: 'signed_in', text: e.text, resetsAt: null, autoResumeAt: null, resume: r } : null
   return { kind: e.kind, text: e.text, resetsAt: e.resetsAt, autoResumeAt: r.state === 'armed' ? r.at : null, resume: r }
 }
 
@@ -353,6 +465,8 @@ export async function tick(): Promise<void> {
   ticking = true
   try {
     const now = clock()
+    // A sign-in the daemon was down for, or a limit it came back under that's over now.
+    signedInAgain(now)
     for (const e of [...entries.values()]) {
       const r = getSession(e.sid)
       if (!r) {
@@ -374,6 +488,12 @@ export async function tick(): Promise<void> {
         if (now - (e.at ?? now) > READY_MS || s.state === 'working' || s.state === 'starting') drop(e.sid)
         continue
       }
+      // Waiting for the account (above), or for its moment: one that ended stays ended.
+      if (e.login && gone(s)) {
+        drop(e.sid)
+        continue
+      }
+      if (e.login && e.state === 'hidden') continue
       // A prompt of the owner's (a new turn) ends it; so does a session that ended, unless the
       // daemon is to carry it on in a new terminal.
       if ((s.state === 'working' || s.state === 'starting') && now - e.createdAt > NOTICE_WAIT_MS) {
@@ -423,6 +543,19 @@ export async function tick(): Promise<void> {
 
 /** Carry session [s] on now, if it can: idle, nothing open, and the limit really over. */
 async function fire(e: Entry, s: Session, now: number): Promise<void> {
+  if (e.login) {
+    // Signed out again, or under a limit since: back to waiting. Typed in since: left.
+    const a = getAccount()
+    if (a.state !== 'ok' && !(a.state === 'limited' && a.limit?.usingCredits)) {
+      Object.assign(e, { state: 'hidden', at: null, liftedAt: null })
+      return changed(e)
+    }
+    if (typedSince(e.sid, e.since)) return drop(e.sid)
+    if (settings.loginContinue === false) {
+      Object.assign(e, { state: 'ready', at: now, liftedAt: now })
+      return changed(e)
+    }
+  }
   if (now - (e.at ?? now) > LATE_MS) {
     Object.assign(e, { state: 'ready', why: 'slept', at: now, liftedAt: e.liftedAt ?? now })
     return changed(e)
@@ -452,7 +585,7 @@ async function fire(e: Entry, s: Session, now: number): Promise<void> {
     e.at = now + 20_000
     return changed(e)
   }
-  const text = isSubscription(e.providerId) ? CONTINUE_TEXT.claude : CONTINUE_TEXT.provider
+  const text = e.login ? CONTINUE_TEXT.login : isSubscription(e.providerId) ? CONTINUE_TEXT.claude : CONTINUE_TEXT.provider
   const r = await deliverer(s, text)
   if (r === 'retry') {
     e.at = now + 20_000
@@ -467,18 +600,24 @@ async function fire(e: Entry, s: Session, now: number): Promise<void> {
     Object.assign(e, { state: 'ready', why: e.why ?? null, at: now, liftedAt: e.liftedAt ?? now })
     return changed(e)
   }
-  log('resume', s.id.slice(0, 8), 'carried on by itself after the limit')
+  log('resume', s.id.slice(0, 8), 'carried on by itself after', e.login ? 'signing in again' : 'the limit')
   Object.assign(e, { state: 'fired', firedAt: now })
   changed(e)
 }
 
 /**
  * Type [text] as session [s]'s next prompt: into its shared terminal, its SDK run, or (it ended)
- * a new shared terminal on the same conversation. 'retry': not now; 'typing': the owner's text is
- * in the way; 'no': there's no way to (a terminal Hypernova doesn't hold).
+ * a new shared terminal on the same conversation; a `claude agents` job through `claude attach`, as
+ * the prompt route does. 'retry': not now; 'typing': the owner's text is in the way; 'no': there's
+ * no way to (a terminal Hypernova doesn't hold).
  */
 async function deliver(s: Session, text: string): Promise<'ok' | 'retry' | 'typing' | 'no'> {
-  const tid = s.term?.id ?? termOf(s.id)
+  let tid = s.term?.id ?? termOf(s.id)
+  const job = settings.claudeAgents === true && s.state !== 'ended' && (!tid || attachDrifted(tid, s.id)) ? agentJobOf(s.id) : null
+  if (job) {
+    tid = await attachAgentsTerm(s.id, s.cwd, job)
+    if (!tid) return 'retry'
+  }
   if (tid && s.state !== 'ended') {
     const r = await typeInto(tid, text)
     if (r.ok) return 'ok'
