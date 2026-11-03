@@ -104,6 +104,8 @@ import java.time.ZoneId
 private val COLUMN = 720.dp
 /** Under this, in dp, one pane at a time: the list, or the chosen session with a way back. */
 internal val TWO_PANES = 760.dp
+/** Enough for the buttons and the widest the logo, name and chip are with an ordinary server's name. */
+private val TOP_BAR_ONE_LINE = 920.dp
 private val LIST_MIN = 340.dp
 private val LIST_MAX = 460.dp
 /** Off-link cards stay, as last heard, and step back. */
@@ -145,7 +147,10 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
     // In one pane the arrows can't choose as they go, or the list would be gone at the first press: they move this, and Enter chooses.
     var cursor by remember(server, shell.page) { mutableStateOf<String?>(null) }
     fun choose(id: String?) {
-        if (id != null) cursor = id
+        if (id != null) {
+            cursor = id
+            shell.newSession = false
+        }
         if (onSessions) shell.choose(server, id) else history.chosen = id
     }
     /** Only for the keys: a row the mouse reached is where it is. */
@@ -173,15 +178,21 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
                 .onKeyEvent { e ->
                     if (e.type != KeyEventType.KeyDown || e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@onKeyEvent false
                     when (e.key) {
-                        Key.DirectionDown -> walk(1)
-                        Key.DirectionUp -> walk(-1)
+                        // In the form they're the box's, even at its first and last line.
+                        Key.DirectionDown -> !shell.newSession && walk(1)
+                        Key.DirectionUp -> !shell.newSession && walk(-1)
                         Key.Enter, Key.NumPadEnter -> {
-                            if (twoPanes || chosenId != null) return@onKeyEvent false
+                            if (twoPanes || chosenId != null || shell.newSession) return@onKeyEvent false
                             val at = cursor?.takeIf { it in order } ?: return@onKeyEvent false
                             choose(at)
                             true
                         }
                         Key.Escape -> {
+                            if (shell.newSession) {
+                                shell.newSession = false
+                                runCatching { keys.requestFocus() }
+                                return@onKeyEvent true
+                            }
                             if (chosenId == null) return@onKeyEvent false
                             choose(null)
                             true
@@ -212,12 +223,15 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
             // Nothing to choose from, nothing to say beside it.
             val nothing = (if (onSessions) groups.isEmpty() else past.endedCount == 0) && chosenId == null
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                val form = @Composable { m: Modifier, back: (() -> Unit)? -> NewSessionPane(hub, shell, server, back, m) }
                 when {
+                    !twoPanes && shell.newSession -> form(Modifier.fillMaxSize().widthIn(max = PANE_MAX)) { shell.newSession = false; runCatching { keys.requestFocus() } }
                     !twoPanes && chosenId != null -> SessionPane(hub, chosenId, chosen, shell, stale, onBack = { choose(null); runCatching { keys.requestFocus() } }, Modifier.fillMaxSize().widthIn(max = PANE_MAX))
-                    !twoPanes || nothing -> sessionList(Modifier.fillMaxSize())
+                    !twoPanes || (nothing && !shell.newSession) -> sessionList(Modifier.fillMaxSize())
                     else -> Row(Modifier.widthIn(max = LIST_MAX + PANE_MAX).fillMaxHeight()) {
                         sessionList(Modifier.width(listWidth).fillMaxHeight())
-                        SessionPane(hub, chosenId, chosen, shell, stale, onBack = null, Modifier.weight(1f).fillMaxHeight())
+                        if (shell.newSession) form(Modifier.weight(1f).fillMaxHeight(), null)
+                        else SessionPane(hub, chosenId, chosen, shell, stale, onBack = null, Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
@@ -259,21 +273,17 @@ private fun SessionList(hub: Hub, groups: List<Pair<Group, List<Session>>>, stat
     }
 }
 
-/** The logo, the name, then where the link stands in a chip that's always there. */
+/**
+ * The logo, the name, where the link stands, and the buttons. On one line or two by the window's width alone, never by
+ * what the chip says: the chip grows as the link changes, and that mustn't move the panes under the pointer.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TopBar(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-        FlowRow(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            itemVerticalAlignment = Alignment.CenterVertically,
-        ) {
-            NovaMark()
-            HText(APP_NAME, style = Type.wordmark, maxLines = 1)
-            ConnectionChip(hub)
-            Spacer(Modifier.weight(1f))
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        val oneLine = maxWidth >= TOP_BAR_ONE_LINE
+        val buttons = @Composable {
+            Pill(Ui.new_session.text(), { shell.newSession = true }, kind = PillKind.Outline, height = 32.dp)
             for (page in Page.entries) {
                 val on = shell.page == page
                 Pill(
@@ -284,10 +294,32 @@ private fun TopBar(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
             Pill(Ui.desk_settings.text(), { shell.settings = true }, kind = PillKind.Ghost, height = 32.dp)
             Pill(Ui.desk_pair_another.text(), { shell.adding = true }, kind = PillKind.Ghost, height = 32.dp)
         }
-        if (statuses.size > 1) {
-            Spacer(Modifier.height(8.dp))
-            Switcher(statuses)
+        Column(Modifier.fillMaxWidth()) {
+            if (oneLine) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Identity(hub, Modifier.weight(1f))
+                    buttons()
+                }
+            } else {
+                Identity(hub, Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { buttons() }
+            }
+            if (statuses.size > 1) {
+                Spacer(Modifier.height(8.dp))
+                Switcher(statuses)
+            }
         }
+    }
+}
+
+/** The logo, the name and the link's chip, on one line whatever they say. */
+@Composable
+private fun Identity(hub: Hub, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        NovaMark()
+        HText(APP_NAME, style = Type.wordmark, maxLines = 1)
+        ConnectionChip(hub, Modifier.weight(1f))
     }
 }
 
@@ -321,13 +353,14 @@ private fun linkWords(link: Link): LinkWords = when (link.state) {
 
 /** The server's name and its link: `◆ z2  LINKED  LOCAL`. */
 @Composable
-private fun ConnectionChip(hub: Hub) {
+private fun ConnectionChip(hub: Hub, modifier: Modifier = Modifier) {
     val link = hub.link
     val words = linkWords(link)
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         LinkGlyph(words.mark, words.color)
         Spacer(Modifier.width(6.dp))
-        HText(hub.mac.name, style = Type.small, color = HN.inkMuted, maxLines = 1)
+        // A long name gives way, not the link's word.
+        HText(hub.mac.name, Modifier.weight(1f, fill = false), style = Type.small, color = HN.inkMuted, maxLines = 1)
         Spacer(Modifier.width(8.dp))
         HText(words.word.uppercase(), style = Type.label, color = words.color, maxLines = 1)
         if (link.state == LinkState.Connected) {

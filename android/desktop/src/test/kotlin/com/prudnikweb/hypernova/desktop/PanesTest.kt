@@ -261,6 +261,23 @@ class PanesTest {
         row("Went to Codex").assertDoesNotExist()
     }
 
+    /** The chip's words grow as the link changes: what's under the pointer, Allow most of all, stays where it was. */
+    private fun panesStayPut(width: Int) = runDesktopComposeUiTest(width, 800) {
+        d.ok("POST", "/v1/approvals/a1")
+        up()
+        choose(migrate)
+        val before = inPane(Ui.allow.text()).getBoundsInRoot().top
+        d.down = true
+        d.closeSocket()
+        until("the link to say so") { Core.live?.link?.state == LinkState.Reconnecting || Core.live?.link?.state == LinkState.Offline }
+        waitForIdle()
+        if (Core.live?.link?.state == LinkState.Reconnecting) assertEquals(before, inPane(Ui.allow.text()).getBoundsInRoot().top)
+    }
+
+    @Test fun theLinksWordsDontMoveThePanesInAWindowWithRoomForOneLine() = panesStayPut(1200)
+    @Test fun theLinksWordsDontMoveThePanesJustUnderThat() = panesStayPut(900)
+    @Test fun theLinksWordsDontMoveThePanesWhereTheButtonsWrap() = panesStayPut(800)
+
     @Test fun theChosenOneChangingGroupIsFollowed() = runDesktopComposeUiTest(1200, 800) {
         up()
         choose(stream)
@@ -447,6 +464,8 @@ class PanesTest {
         up()
         key(Key.DirectionDown)
         key(Key.Tab)
+        onNodeWithText(Ui.new_session.text()).assertIsFocused()
+        key(Key.Tab)
         onNodeWithText(Ui.sessions.text()).assertIsFocused()
         key(Key.Tab)
         onNodeWithText(Ui.history.text()).assertIsFocused()
@@ -467,7 +486,7 @@ class PanesTest {
         d.ok("POST", "/v1/approvals/a1")
         up()
         choose(migrate)
-        repeat(6) { key(Key.Tab) }
+        repeat(7) { key(Key.Tab) }
         inPane(Ui.allow.text()).assertIsFocused()
         key(Key.Enter)
         until("the answer") { d.count("POST", "/v1/approvals/a1") == 1 }
@@ -482,8 +501,8 @@ class PanesTest {
         d.on("POST", "/v1/approvals/a1") { FakeDaemon.refusal(500, "boom", "No") }
         up()
         choose(migrate)
-        // Sessions, History, Settings, Pair another, Back, Deny, Allow.
-        repeat(7) { key(Key.Tab) }
+        // New session, Sessions, History, Settings, Pair another, Back, Deny, Allow.
+        repeat(8) { key(Key.Tab) }
         inPane(Ui.allow.text()).assertIsFocused()
         key(Key.Enter)
         until("the refusal") { shell.toast != null }
@@ -497,7 +516,7 @@ class PanesTest {
         d.ok("POST", "/v1/approvals/a1")
         up()
         choose(migrate)
-        repeat(5) { key(Key.Tab) }
+        repeat(6) { key(Key.Tab) }
         inPane(Ui.deny.text()).assertIsFocused()
         key(Key.DirectionDown)
         row(stream).assertIsSelected()

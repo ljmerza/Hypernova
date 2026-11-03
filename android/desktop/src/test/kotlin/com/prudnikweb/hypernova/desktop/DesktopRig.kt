@@ -54,6 +54,7 @@ object DesktopRig {
             shell.cancelAdding()
             shell.dismissToast()
             shell.page = Page.Sessions
+            shell.newSession = false
         }
     }
 

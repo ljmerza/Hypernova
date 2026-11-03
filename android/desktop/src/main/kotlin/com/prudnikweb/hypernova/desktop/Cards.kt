@@ -1,5 +1,8 @@
 package com.prudnikweb.hypernova.desktop
 
+import com.prudnikweb.hypernova.data.Account
+import com.prudnikweb.hypernova.data.AccountWords
+import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.AllowRule
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Blocked
@@ -165,6 +168,44 @@ fun removeBody(kind: DeleteKind): String = when (kind) {
     DeleteKind.Forget -> Ui.session_delete_body_plain
     DeleteKind.Job, DeleteKind.None, DeleteKind.OpenElsewhere -> Ui.session_delete_body
 }.text()
+
+/** A permission mode's name where it's chosen ("Ask first"), and Codex's. */
+fun modeTitle(mode: String): String = when (mode) {
+    "acceptEdits" -> Ui.mode_title_accept
+    "plan" -> Ui.mode_title_plan
+    "auto" -> Ui.mode_title_auto
+    "bypassPermissions" -> Ui.mode_title_bypass
+    AgentKind.READ_ONLY -> Ui.cx_mode_read_only
+    AgentKind.CAN_EDIT -> Ui.cx_mode_can_edit
+    else -> Ui.mode_title_default
+}.text()
+
+/** What a mode does, in one line. No line for Bypass: it isn't offered here. */
+fun modeLine(mode: String): String = when (mode) {
+    "acceptEdits" -> Ui.mode_accept_desc
+    "plan" -> Ui.mode_plan_desc
+    "auto" -> Ui.mode_auto_desc
+    AgentKind.READ_ONLY -> Ui.cx_mode_read_only_desc
+    AgentKind.CAN_EDIT -> Ui.cx_mode_can_edit_desc
+    else -> Ui.mode_default_desc
+}.text()
+
+/** Why the subscription can't take a session now, as the phone's sheet says it ("Your subscription rests until 2:00"). */
+fun whyWords(a: Account, server: String, now: Long): String = when (a.state) {
+    Account.LOGGED_OUT -> Ui.why_signed_out.format(server)
+    Account.NO_SUBSCRIPTION -> Ui.why_no_plan.text()
+    Account.ON_HOLD -> Ui.why_on_hold.text()
+    Account.NO_CREDIT -> Ui.why_credits.text()
+    else -> {
+        val l = a.resting(now)
+        val at = l?.resetsAt
+        when {
+            at == null -> AccountWords.label(DesktopStrings, l)
+            l.window == "seven_day" -> Ui.why_week.format(AccountWords.clock(DesktopStrings, at, now))
+            else -> Ui.why_limit.format(AccountWords.clock(DesktopStrings, at, now))
+        }
+    }
+}
 
 /** A line of the pane's facts. */
 data class Fact(val label: String, val value: String)

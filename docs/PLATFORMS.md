@@ -64,15 +64,15 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 
 ## The desktop app (step 2 of the desktop plan, built 2026-11-02)
 
-`android/desktop`: Compose for Desktop 1.12.1 over `:shared`, a JVM app, Linux first and written to be portable. It pairs by a pasted `hypernova pair` link, lists one server's sessions in the phone's three groups with the chosen session beside them (docs/DECISIONS.md, "The desktop client's two panes"), and answers Allow or Deny there. A server switcher is there because `Core` already had the rest. The choices and why: docs/DECISIONS.md, "The desktop app". How to run it: docs/DEV-SETUP.md, "The desktop app". Its packages (a `.deb`, a folder, a `.dmg` for each Mac processor and a Windows `.msi`, each with its own Java): docs/RELEASING.md, "The desktop client's packages".
+`android/desktop`: Compose for Desktop 1.12.1 over `:shared`, a JVM app, Linux first and written to be portable. It pairs by a pasted `hypernova pair` link, lists one server's sessions in the phone's three groups with the chosen session beside them (docs/DECISIONS.md, "The desktop client's two panes"), answers Allow or Deny there, and has History, Rename, Stop, Remove from list and New session. What's left of the phone's is in "The parity list" below. A server switcher is there because `Core` already had the rest. The choices and why: docs/DECISIONS.md, "The desktop app". How to run it: docs/DEV-SETUP.md, "The desktop app". Its packages (a `.deb`, a folder, a `.dmg` for each Mac processor and a Windows `.msi`, each with its own Java): docs/RELEASING.md, "The desktop client's packages".
 
 **Run on a display? A virtual one.** The tests have no window: Compose's test scene, on real TLS, real files and the real `Core`, the demo server included (`DemoServerTest`). The window itself (`Main.kt`) has run under Xvfb, and the owner has opened it on a real 4K monitor, which is how its size came up (docs/DECISIONS.md, "The desktop app's size on a big screen"). The scale hasn't been seen on a real monitor, GNOME or Wayland yet. On Linux only so far; nothing has run on a Mac or Windows, and the ACL path in `OwnerOnly`, `MacKeychain` and `WindowsDpapiKeychain` are the parts of that written blind. CI's packages job is the first thing that will run them there, on its runners: installed, opened, and paired with the demo server (`scripts/test-client-package.sh`).
 
 | Where | What |
 |---|---|
 | `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopTokens.kt` (each server's token, off the disk), `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
-| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `HistoryList.kt` (History's list), `SessionPane.kt` (the chosen session), `SessionActions.kt` (its Rename, Stop and Remove from list), `Modal.kt` (a question over the window); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
-| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `HistoryTest`, `SessionActionsTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `HistoryList.kt` (History's list), `SessionPane.kt` (the chosen session), `SessionActions.kt` (its Rename, Stop and Remove from list), `Modal.kt` (a question over the window), `NewSessionPane.kt` (New session); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
+| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `HistoryTest`, `SessionActionsTest`, `NewSessionTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 | `desktop/src/probe/` | `PackageProbe.kt`: in no package; pairs an installed one from inside its own Java, for `scripts/test-client-package.sh` |
 | `desktop/packaging/`, `desktop/icons/` | `client-names.sh` (the package's names: two lines for the rename), `legal/`, `deb-menu-optional.sh`; the icons, and what makes them |
 
@@ -98,7 +98,7 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | `thumbOf` | Null | Nothing attaches pictures here |
 | `started` | Nothing | No widgets follow it |
 
-**Changed in `:shared` for it**, each with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now), `Net.httpsOnly` (off on Android), `DeviceKeys.publicKey()` (null on Android, so `DeviceCertStore.identity()` checks nothing there), and for History `Session.inHistory`, `HistoryEntry`, `foldRuns`, `HistorySearch.rows` and `rememberFullText`, and for the session menu `DeleteKind`, `RestartKind`, `MenuOffer` and `SESSION_NAME_MAX`, each lifted whole from the phone's `ui/`, with `ui/automations/HistoryRow.kt` and `ui/home/SessionMenu.kt` keeping the names for the phone's screens and tests.
+**Changed in `:shared` for it**, each with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now), `Net.httpsOnly` (off on Android), `DeviceKeys.publicKey()` (null on Android, so `DeviceCertStore.identity()` checks nothing there), and for History `Session.inHistory`, `HistoryEntry`, `foldRuns`, `HistorySearch.rows` and `rememberFullText`, and for the session menu `DeleteKind`, `RestartKind`, `MenuOffer` and `SESSION_NAME_MAX`, and for the think-twice card `Incident` and `IncidentList`, each lifted whole from the phone's `ui/`, with `ui/automations/HistoryRow.kt`, `ui/home/SessionMenu.kt` and `ui/components/Incidents.kt` keeping the names for the phone's screens and tests.
 
 ### The parity list: what the desktop has of the phone's
 
@@ -155,8 +155,8 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 
 | Phone | Desktop | |
 |---|---|---|
-| Prompt, folder and folder browser, new project, agent, mode | Not yet | |
-| Model and effort pickers | Not yet | |
+| Prompt, folder and folder browser, new project, agent, mode | There | In the right pane. Skills after a prompt reach the server as typed. Auto asks to think twice, as on the phone, without its story's link. **No Bypass:** it waits for an owner check the desktop hasn't got |
+| Model and effort pickers | Not yet | It starts on the default, and says so |
 | The "/" list, attachments | Not yet | |
 | Dictation | Not meant to be, for now | Desktop dictation is research only (below, "Desktop dictation") |
 | Share into the app, launcher shortcuts | Not meant to be | Android's; a desktop has the clipboard |

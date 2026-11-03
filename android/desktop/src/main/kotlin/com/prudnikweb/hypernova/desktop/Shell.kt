@@ -70,6 +70,16 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
     private val lists = HashMap<String, LazyListState>()
 
     var page by mutableStateOf(Page.Sessions)
+    /** New session is up in the right pane. */
+    var newSession by mutableStateOf(false)
+
+    /** A session started from the form: its form goes, and it's what's on screen. */
+    fun started(server: String, session: String) {
+        newSession = false
+        page = Page.Sessions
+        choose(server, session)
+    }
+
     private val histories = HashMap<String, HistoryView>()
 
     fun historyOf(server: String): HistoryView = histories.getOrPut(server) { HistoryView() }
@@ -134,6 +144,7 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
                 // A first look at this server: nothing of an earlier pairing's stands.
                 Core.activeId?.let { chosen.remove(it); lists.remove(it); histories.remove(it) }
                 page = Page.Sessions
+                newSession = false
                 // The code in the field is spent, and it was a credential until now.
                 link = ""
                 adding = false

@@ -4113,6 +4113,20 @@ The rule is the owner's from "Delete takes a session off Home, History brings it
 4. **What goes stays on screen.** After Remove the pane keeps the session, now ended, and says it's in History: nothing chooses another, and the list's row is gone.
 5. **Restart session and MCP servers aren't here,** and Stop and Restart aren't offered in History, which has nothing running.
 
+## The desktop client's New session (2026-11-03)
+
+For the same parity work: a folder, a prompt, the agent and the mode, in the right pane. What it remembers, the folder's choices, the agent's rule, what's sent and the refusals are `:shared`'s (`NewSessionMemory`, `ProjectPick`, `FolderPick`, `AgentLead`, `Hub.start`).
+
+1. **Bypass isn't offered here, and the words say why.** On the phone it's never a start mode (`NewSessionMemory.START_MODES`): it's chosen each time, through the think-twice card and then the fingerprint or screen lock (`OwnerCheck`; "The owner's morning answers", 2: "Everywhere a phone can give either"). The server asks nothing more for a new session than that it isn't running as root, so that check on the client is the only one. A desktop has nothing to stand in for it: a confirm anybody at the keyboard can click would be the weaker thing the owner said no to. **This is the owner's to change,** if he wants it with some check of the desktop's own.
+2. **Codex has its two modes,** read only and can edit (`AgentKind.CODEX_MODES`). `danger-full-access` and approval `never` aren't reachable from here, as on the phone. The server's own rules stay what they are.
+3. **Auto keeps its think-twice card, every time, with one of the same real cases** (`res/raw/incidents.json`, which the build copies in). "Keep asking" has the focus. The story's link isn't there: the case's own two sentences are on the card instead.
+4. **Skills after a prompt work as on the phone:** the box's words go as typed, lines and all, and the server makes them the skill's arguments (docs/FEATURES.md, N8). The phone's "/" list is in `ui/session/`, being changed elsewhere, so it isn't here yet.
+5. **Enter starts it, Shift+Enter is a new line,** the phone's default (`EnterKeys`, there being no Typing setting here). Two Enters start one. The arrows stay in the box while the form is up.
+6. **A session started is the one thing that chooses itself,** since someone just asked for it and waited: the form goes and the pane shows it. If the form was put away while it started, nothing moves and it's only in the list. This is the one further exception to "Nothing chooses itself". The words typed stay for next time, as on the phone, through Cancel, Escape, or choosing a row.
+7. **The default model and effort, said on the form.** No pickers yet. A subscription at its limit starts on the provider that can take it and says so, as on the phone, since that one may bill.
+8. **Not here:** attachments, the "/" list, dictation (none on this app), the model and effort pickers, All servers.
+9. **The top bar's lines go by the window's width alone.** With New session and History it no longer fits beside a long link word at 900 dp, and as it wrapped when the chip grew to "Reconnecting…", the panes moved under the pointer as the link changed, Allow with them. A test caught a click landing where Allow had just been. Now it's one line from 920 dp, two under that, and a long server's name gives way. The offline card still moves them when it comes: that's a stale list, and it was already so.
+
 ## Updating Claude Code and Codex (owner, 2026-11-02)
 
 The owner: "also add ability to check and update Claude code and codex". Agents & providers › an agent's Settings › Version: what's installed, Check for updates, Update. One server at a time, nothing on the session's chat screen, nothing automatic. `daemon/src/agent-update.ts`; `docs/PROTOCOL.md`, "Updating an agent". Checked on 2026-11-02 against Claude Code 2.1.316, Codex 0.164.0, their binaries and `code.claude.com/docs/en/setup`. **No real update ran.** Measurements used copies in a throwaway home with stand-in `npm`, `curl` and `brew`, and proxies pointing nowhere.

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -67,6 +68,8 @@ internal fun Modal(onDismiss: () -> Unit, content: @Composable ColumnScope.() ->
             // Swallows a click, so one on the card isn't one outside it.
             GlassCard(
                 Modifier.padding(24.dp).widthIn(max = 480.dp).fillMaxWidth()
+                    // A card's glass is for over the chart: what's under this one would show through its words.
+                    .background(HN.bg900, RoundedCornerShape(16.dp))
                     .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
             ) {
                 Column(Modifier.padding(20.dp), content = content)
