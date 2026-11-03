@@ -11,7 +11,7 @@ import { appendFileSync, chmodSync, readFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { LOGS, rollLog, writeJson } from '../util.ts'
-import { DATA, Frames, MSG, boxLines, codexProxyPath, frame, isWorking, metaPath, modeOf, msg, registryBusy, sockPath, type HolderSpec, type Role, type TermMeta, type TermState } from './shared.ts'
+import { DATA, Frames, MSG, boxLines, codexProxyPath, frame, isWorking, metaPath, modeOf, msg, pasteParts, registryBusy, sockPath, type HolderSpec, type Role, type TermMeta, type TermState } from './shared.ts'
 
 type Client = { sock: Socket; role: Role; cols: number; rows: number; at: number; ready: boolean; pending: Buffer[] | null; detaching: boolean }
 
@@ -452,7 +452,13 @@ function findBox(): { text: string; above: string[]; below: string[] } | null {
 const squash = (s: string) => s.replace(/\s+/g, '').replace(/^!/, '')
 /** The last prompt typed for the phone (squashed): what's left of it in the box is ours to clear. */
 let lastTyped = ''
-const ours = (box: string) => !!lastTyped && (squash(box) === lastTyped || (/^\[Pasted text #\d+[^\]]*\]$/.test(box.trim()) && lastTyped.length > 200))
+const ours = (box: string) => {
+  if (!lastTyped) return false
+  if (squash(box) === lastTyped) return true
+  // Folded by Claude Code; a command's name stays in front of its fold (pasteParts).
+  const fold = /^(\/\S+\s+)?\[Pasted text #\d+[^\]]*\]$/.exec(box.trim())
+  return !!fold && (fold[1] ? lastTyped.startsWith(squash(fold[1])) : lastTyped.length > 200)
+}
 
 /**
  * Empty the input box: Ctrl+C clears it while Claude is idle (never pressed on an empty box,
@@ -496,8 +502,19 @@ async function typeText(text: string, replace = false): Promise<Typed> {
   // Ending on an @-mention opens file suggestions; a space after it keeps them closed.
   if (/(^|\s)@\S*$/.test(clean)) clean += ' '
   lastTyped = squash(clean)
-  if (term.modes.bracketedPasteMode) child.write(`\x1b[200~${clean}\x1b[201~`)
-  else child.write(clean.replace(/\n/g, ' '))
+  if (term.modes.bracketedPasteMode) {
+    const parts = pasteParts(clean)
+    for (const [i, part] of parts.entries()) {
+      child.write(`\x1b[200~${part}\x1b[201~`)
+      if (i === parts.length - 1) break
+      // The next piece only once this one shows: pasted together, they'd read as one.
+      const shown = squash(part)
+      for (let w = 0; w < 20 && !squash(inputBox() ?? '').startsWith(shown); w++) {
+        await sleep(100)
+        if (!child) return { ok: false, reason: 'not_started' }
+      }
+    }
+  } else child.write(clean.replace(/\n/g, ' '))
   const want = squash(clean).slice(0, 20)
   const shows = (box: string | null) => box !== null && (squash(box).startsWith(want) || /\[Pasted text/.test(box))
   for (let i = 0; i < 20; i++) {

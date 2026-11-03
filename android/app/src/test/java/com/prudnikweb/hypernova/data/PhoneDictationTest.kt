@@ -282,6 +282,35 @@ class PhoneDictationTest {
         assertEquals(listOf("First part. Second part"), sent)
     }
 
+    /** Not this box's Send (the new-session sheet's Start): the words first, and the box's own Send stays out of it. */
+    @Test
+    fun finishing_ends_hands_free_and_goes_once_the_words_are_in_the_box() {
+        val box = StringBuilder("/code-review ")
+        val sent = mutableListOf<String>()
+        val voice = handsFree(box, mutableListOf())
+        rec.triggerOnReadyForSpeech(Bundle())
+        rec.triggerOnPartialResults(said("look at"))
+        voice.finishing { sent += box.toString() }
+        settle()
+        assertEquals(MicState.Idle, voice.gesture)
+        assertEquals("nothing goes until the words settle", emptyList<String>(), sent)
+        rec.triggerOnResults(said("look at the auth"))
+        settle()
+        assertEquals(listOf("/code-review look at the auth"), sent)
+    }
+
+    @Test
+    fun finishing_with_nothing_listening_goes_at_once_and_a_finger_on_the_mic_is_held() {
+        val voice = VoiceInput(VoicePrefs.of(ApplicationProvider.getApplicationContext<android.app.Application>().storage), CoroutineScope(Dispatchers.Main))
+        var went = 0
+        voice.finishing { went++ }
+        assertEquals(1, went)
+        assertFalse(voice.held)
+        voice.phoneDictate = { d }
+        voice.on(MicEvent.Down(at = 0, send = false, canSend = false, voice = true, linked = true, permitted = true))
+        assertTrue(voice.held)
+    }
+
     @Test
     fun a_pause_does_not_end_hands_free() {
         val voice = handsFree(StringBuilder(), mutableListOf())

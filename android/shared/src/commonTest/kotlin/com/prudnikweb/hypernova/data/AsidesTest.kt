@@ -61,6 +61,15 @@ class AsidesTest {
         assertEquals(CommandKind.Prompt, CommandRun.typed("/hyper-cosmos make it glow")!!.type)
     }
 
+    @Test fun aSkillsChipKeepsEverySentenceAndLineAfterIt() {
+        val words = "look at the auth changes and ignore the tests. Also check the migrations.\n\nAnd the docs."
+        val c = CommandRun.typed("/code-review $words")!!
+        assertEquals("/code-review", c.name)
+        assertEquals(words, c.args)
+        assertEquals(CommandKind.Prompt, c.type)
+        assertEquals(words, CommandRun.typed("/code-review\n$words")!!.args)
+    }
+
     @Test fun linesGoWhereTheyFallInTime() {
         val events = listOf<WEvent>(
             WEvent.User("u1", 100, "fix it"),

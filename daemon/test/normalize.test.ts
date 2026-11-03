@@ -138,6 +138,13 @@ test('skill with args: shown as typed, its body hidden', () => {
   ])
 })
 
+test('a skill with lines of words: every one its args, on the chip and in the title', () => {
+  const words = 'look at the auth changes\nand ignore the tests.\n\nAlso check the migrations.'
+  const st = parse(user('r1', null, skill('/code-review', words)), user('b1', 'r1', [{ type: 'text', text: `Base directory for this skill: /tmp/skills/cr\n\nReview.\n\n\nARGUMENTS: ${words}` }], { isMeta: true }))
+  assert.deepEqual(shape(st.events), [{ id: 'r1', kind: 'user', text: `/code-review ${words}`, command: { name: '/code-review', args: words, kind: 'skill' } }])
+  assert.equal(fallbackTitle(st), `/code-review ${words}`)
+})
+
 test('a prompt command (no skill body) stays a prompt command', () => {
   const st = parse(user('r1', null, skill('/requesting-code-review')), user('b1', 'r1', [{ type: 'text', text: 'Review the code.' }], { isMeta: true }))
   assert.deepEqual(shape(st.events), [{ id: 'r1', kind: 'user', text: '/requesting-code-review', command: { name: '/requesting-code-review', args: '', kind: 'prompt' } }])

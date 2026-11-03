@@ -3987,6 +3987,13 @@ For the daemon and `hn`, not for a client.
   doesn't count). The text goes in as a bracketed paste, and Enter follows only once it shows in the
   box. A dialog or menu replaces the input box, so Enter never answers one. Prompts are typed one at
   a time.
+- **A command with a long task:** Claude Code folds a long paste (measured on 2.1.316: five lines, or
+  1,586 characters on one; two lines stay whole) into `[Pasted text #1]`, and a box that doesn't start
+  with `/name` sends a prompt, so the skill wouldn't run and Claude would get the words as a message.
+  With a line break after the first word or past 200 characters, `/name ` is pasted first and the rest
+  once it shows: the box reads `/name [Pasted text #1]`, the command runs, and every word is its
+  `<command-args>`. A prompt started as an argument (`claude --bg`, a shared terminal, an automation's
+  start) or through the SDK never had this.
 - **Reasons when it doesn't:** `no_input` (a dialog or menu is showing), `busy_input` (unsent text
   in the box; `text` is that text), `not_started`, `not_seen`, `not_sent` (the box didn't empty
   after Enter).
