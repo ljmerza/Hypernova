@@ -895,6 +895,29 @@
     <string name="as_title_codex">Codex settings</string>
     <string name="as_intro_claude">From %1$s\'s user-level settings.json. Some can be changed here, and a project\'s own settings can override them.</string>
     <string name="as_intro_codex">From %1$s\'s user-level config.toml. Some can be changed here, and a project\'s own settings can override them.</string>
+    <string name="av_section">Version</string>
+    <string name="av_installed">Installed</string>
+    <string name="av_installed_with">With %1$s</string>
+    <string name="av_unknown">Doesn\'t say</string>
+    <string name="av_newest">Newest</string>
+    <string name="av_on_stable">On the stable channel, which runs about a week behind</string>
+    <string name="av_nothing_newer">Nothing newer to install</string>
+    <string name="av_run">Run</string>
+    <string name="av_also_itself">%1$s also updates itself in the background.</string>
+    <string name="av_check">Check for updates</string>
+    <string name="av_checking">Checking…</string>
+    <string name="av_update">Update to %1$s</string>
+    <string name="av_updating">Updating. This keeps going if you leave this page.</string>
+    <string name="av_output_show">What it said</string>
+    <string name="av_output_hide">Hide what it said</string>
+    <string name="av_too_old">Update %1$s first: it can\'t check or update %2$s yet.</string>
+    <string name="av_err">Couldn\'t read the version.</string>
+    <string name="av_confirm_what">%1$s goes from %2$s to %3$s, using %4$s. Its own updater runs on the server.</string>
+    <string name="av_check_what">Update %1$s to %2$s</string>
+    <plurals name="av_confirm_running">
+        <item quantity="one">%1$d session is open on this server.</item>
+        <item quantity="other">%1$d sessions are open on this server.</item>
+    </plurals>
     <string name="as_too_old">This server needs updating before it can show these settings.</string>
     <!-- Changing them (docs/DECISIONS.md, "The agents' settings, edited"). -->
     <string name="as_intro_claude_view">From %1$s\'s user-level settings.json. They can\'t be changed from here, and a project\'s own settings can override them.</string>

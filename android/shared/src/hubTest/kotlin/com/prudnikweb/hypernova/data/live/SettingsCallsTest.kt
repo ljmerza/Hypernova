@@ -23,6 +23,9 @@ import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
+import com.prudnikweb.hypernova.data.agentVersion
+import com.prudnikweb.hypernova.data.checkAgentVersion
+import com.prudnikweb.hypernova.data.updateAgent
 import com.prudnikweb.hypernova.data.ShownSetting
 import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.Balance
@@ -100,6 +103,38 @@ class SettingsCallsTest {
         assertEquals("docs", page.name)
         val q = last("GET", "/v1/agents/mcp/server").query!!
         assertTrue(q, q.contains("name=plugin%3Aa%20b") || q.contains("name=plugin%3Aa+b"))
+    }
+
+    // ─── Updating an agent (docs/PROTOCOL.md, "Updating an agent") ───
+
+    @Test fun anAgentsVersionIsReadAndAnUpdateSendsOnlyTheAgentAndTheClaim() {
+        connect()
+        answer("GET", "/v1/agents/version", "rest-agent-version")
+        val seen = rig.call { rig.hub.agentVersion("claude") }.getOrThrow()
+        assertEquals("2.1.316", seen.version)
+        assertTrue(last("GET", "/v1/agents/version").query.contains("agent=claude"))
+        answer("POST", "/v1/agents/version/check", "rest-agent-version-checked")
+        assertTrue(rig.call { rig.hub.checkAgentVersion("claude") }.getOrThrow().canUpdate)
+        // A check needs no fingerprint, and doesn't claim one.
+        assertFalse(last("POST", "/v1/agents/version/check").json.has("confirmRun"))
+        answer("POST", "/v1/agents/version/update", "rest-agent-version-updated")
+        assertEquals("2.1.320", rig.call { rig.hub.updateAgent("claude") }.getOrThrow().job?.to)
+        val sent = last("POST", "/v1/agents/version/update").json
+        assertEquals(setOf("agent", "confirmRun"), sent.keys().asSequence().toSet())
+        assertEquals("claude", sent.getString("agent"))
+        assertEquals(true, sent.getBoolean("confirmRun"))
+    }
+
+    @Test fun anUpdateRefusedKeepsItsWordsAndAnOlderServerSaysSo() {
+        connect()
+        answer("POST", "/v1/agents/version/update", "rest-agent-version-refused", status = 403)
+        val refused = rig.call { rig.hub.updateAgent("codex") }.exceptionOrNull()
+        assertTrue(refused is AgentSettingRefused)
+        assertEquals("confirm_run", (refused as AgentSettingRefused).code)
+        assertTrue(refused.message!!, refused.message!!.contains("fingerprint"))
+        // A server from before this has no such route.
+        assertTrue(rig.call { rig.hub.agentVersion("codex") }.exceptionOrNull() is AgentSettingsTooOld)
+        assertTrue(rig.call { rig.hub.checkAgentVersion("codex") }.exceptionOrNull() is AgentSettingsTooOld)
     }
 
     @Test fun aRefusedMcpCallKeepsItsWordsAndAnOlderServerSaysSo() {

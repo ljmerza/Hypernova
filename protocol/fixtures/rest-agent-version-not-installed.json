@@ -1,0 +1,20 @@
+{
+  "agent": "codex",
+  "installed": false,
+  "version": null,
+  "running": 0,
+  "how": null,
+  "words": null,
+  "channel": null,
+  "autoUpdates": null,
+  "latest": null,
+  "checkedAt": null,
+  "problem": null,
+  "newer": false,
+  "canUpdate": false,
+  "why": null,
+  "command": null,
+  "effect": null,
+  "warning": null,
+  "job": null
+}

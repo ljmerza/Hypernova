@@ -10,7 +10,7 @@ import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { request } from 'node:http'
+import { createServer as httpServer, request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -1279,6 +1279,53 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       contract('rest-skills-codex', stable(codexSkills))
       useCodex(null)
       useExtrasCli(null)
+      // An agent's version: stand-ins for the program, its doctor and the file it reads the newest from. No real update.
+      {
+        const { forgetClaudeVersion } = await import('../src/util.ts')
+        const { forgetAgentUpdates } = await import('../src/agent-update.ts')
+        const dir = join(scratch, 'version')
+        mkdirSync(dir, { recursive: true })
+        const bin = join(dir, 'claude')
+        writeFileSync(join(dir, 'version'), '2.1.316\n')
+        writeFileSync(
+          bin,
+          `#!/bin/sh
+case "$1" in
+  --version) echo "$(cat "${dir}/version") (Claude Code)" ;;
+  doctor) printf 'Running: native (2.1.316)\\nAuto-updates: enabled\\nAuto-update channel: latest\\n' ;;
+  update) echo "Installing update..."; echo 2.1.320 > "${dir}/version"; echo "Successfully updated from 2.1.316 to version 2.1.320" ;;
+esac
+`,
+        )
+        chmodSync(bin, 0o755)
+        const list = httpServer((_q, r) => r.end('2.1.320\n'))
+        await new Promise<void>((r) => list.listen(0, '127.0.0.1', r))
+        const claudeBin = process.env.CLAUDE_BIN
+        process.env.CLAUDE_BIN = bin
+        process.env.HYPERNOVA_CLAUDE_RELEASES = `http://127.0.0.1:${(list.address() as { port: number }).port}`
+        const open = (v: any) => ({ ...v, running: 0 })
+        contract('rest-agent-version', open(await ok(get('/v1/agents/version?agent=claude'))))
+        contract('rest-agent-version-refused', await refused(post('/v1/agents/version/update', { agent: 'claude' }), 403))
+        contract('rest-agent-version-check-first', await refused(post('/v1/agents/version/update', { agent: 'claude', confirmRun: true }), 409))
+        contract('rest-agent-version-checked', open(await ok(post('/v1/agents/version/check', { agent: 'claude' }))))
+        await ok(post('/v1/agents/version/update', { agent: 'claude', confirmRun: true }))
+        for (let i = 0; i < 200; i++) {
+          const v = await ok(get('/v1/agents/version?agent=claude'))
+          if (v.job?.state !== 'running') break
+          await new Promise((r) => setTimeout(r, 25))
+        }
+        contract('rest-agent-version-updated', open(await ok(get('/v1/agents/version?agent=claude'))))
+        process.env.CLAUDE_BIN = claudeBin
+        // Codex's, as Claude Code's lookup goes on to the login shell's PATH when the one it's told of isn't there.
+        const codexBin = process.env.HYPERNOVA_CODEX
+        process.env.HYPERNOVA_CODEX = join(scratch, 'not-there')
+        contract('rest-agent-version-not-installed', open(await ok(get('/v1/agents/version?agent=codex'))))
+        process.env.HYPERNOVA_CODEX = codexBin
+        delete process.env.HYPERNOVA_CLAUDE_RELEASES
+        list.close()
+        forgetClaudeVersion()
+        forgetAgentUpdates()
+      }
       // Environment variables: a planted secret, a flag, a guarded one, what's refused.
       {
         const sent = (j: unknown) => assert.ok(!JSON.stringify(j).includes('never-sent'))

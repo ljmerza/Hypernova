@@ -166,7 +166,7 @@ way, it must be signed with the same key. `"releaseCheck": false` in
 `~/.local/share/hypernova/settings.json` turns the app's part off; what GitHub sees is in
 [SECURITY-MODEL.md](SECURITY-MODEL.md).
 
-**Claude Code and Codex** update themselves, or with `claude update` and `codex update`. Hypernova
+**Claude Code and Codex** update themselves, or with `claude update` and `codex update`. The app can check and start that too: Agents & providers › an agent's Settings › Version. Hypernova
 needs Codex 0.163.0 or later.
 
 ## Uninstall
