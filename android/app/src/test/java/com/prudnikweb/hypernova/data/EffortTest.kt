@@ -29,7 +29,7 @@ class EffortTest {
         assertNull(ClaudeEffort.known(""))
         assertNull(ClaudeEffort.known(null))
         // Before any session from here: the default.
-        assertNull(Remembered(null, null, emptyMap(), "default").effort)
+        assertNull(Remembered(null, null, emptyMap()).effort)
     }
 
     /** As the mode: an open Claude Code session the Mac can type into; never Codex's, never an ended one. */

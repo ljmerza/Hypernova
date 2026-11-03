@@ -462,7 +462,10 @@ class ActionsTest {
     }
 
     // The phone-wide "New sessions start in" of before moves to Claude Code on each server, once.
-    private fun oldSetting(mode: String) = rig.storage.prefs("hypernova").edit().putString("newSession.startMode", mode).apply()
+    private fun oldSetting(mode: String, pairedAtFirstStart: List<String> = listOf(rig.serverId)) {
+        rig.storage.prefs("hypernova").edit().putString("newSession.startMode", mode).apply()
+        NewSessionMemory.noteStartModeServers(rig.storage, pairedAtFirstStart)
+    }
     private fun serverKeeps(mode: String?) {
         daemon.snapshot = snapshot("z2") {
             put("claude", JSONObject().put("available", true).apply { if (mode != null) put("startMode", mode) })
@@ -494,6 +497,7 @@ class ActionsTest {
         assertEquals("read-only", rig.hub.codex?.startMode)
         assertTrue("Codex hears nothing", daemon.calls("POST", "/v1/codex").isEmpty())
         rig.until("it's marked") { NewSessionMemory.startModeToMove(rig.storage, rig.serverId) == null }
+        assertFalse("nothing left to move: the old value's gone", rig.storage.prefs("hypernova").contains("newSession.startMode"))
         // Another connection, a later snapshot: not again.
         nextSnapshot()
         settled()
@@ -512,6 +516,36 @@ class ActionsTest {
         nextSnapshot()
         rig.until("it moved") { rig.hub.claude?.startMode == "plan" }
         assertEquals("plan", moves().single().json.getString("moveStartMode"))
+    }
+
+    /** Paired after the phone's first start with this: nothing moves, and the server's Ask stands. */
+    @Test fun aServerPairedAfterTheFirstStartGetsNoMove() {
+        oldSetting("auto", pairedAtFirstStart = listOf("another"))
+        serverKeeps("default")
+        rig.connect()
+        settled()
+        assertTrue(moves().isEmpty())
+        assertEquals("default", rig.hub.claude?.startMode)
+        assertNull(rig.hub.startModeOwed)
+        assertEquals("the other's still owed", "auto", NewSessionMemory.startModeToMove(rig.storage, "another"))
+    }
+
+    /** Older, and paired later: it isn't owed the old value either, so nothing here opens on it. */
+    @Test fun anOlderServerPairedLaterIsntOwedIt() {
+        oldSetting("auto", pairedAtFirstStart = listOf("another"))
+        serverKeeps(null)
+        rig.connect()
+        settled()
+        assertEquals("default", NewSessionMemory.startsIn(AgentKind.CLAUDE, rig.hub, NewSessionMemory.load(rig.storage)))
+    }
+
+    /** Older, and paired at the first start: it opens on the old value until it's updated. */
+    @Test fun anOlderServerPairedAtTheFirstStartOpensOnIt() {
+        oldSetting("auto")
+        serverKeeps(null)
+        rig.connect()
+        settled()
+        assertEquals("auto", NewSessionMemory.startsIn(AgentKind.CLAUDE, rig.hub, NewSessionMemory.load(rig.storage)))
     }
 
     @Test fun anUnusableOldSettingMovesNothing() {

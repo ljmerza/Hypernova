@@ -365,6 +365,8 @@ interface Hub {
     suspend fun setLoginContinue(on: Boolean): Result<ClaudeState?> = Result.failure(UnsupportedOperationException())
     /** What [agent]'s new sessions open on, on this Mac ([NewSessionMemory.startsIn]). Fails with the Mac's words. */
     suspend fun setStartMode(agent: String, mode: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /** The phone's old "New sessions start in", while this Mac is still owed it ([NewSessionMemory.startModeToMove]); null otherwise. */
+    val startModeOwed: String? get() = null
     /**
      * Codex on or off for Hypernova, from the phone (`POST /v1/codex {enabled}`). Succeeds with Codex
      * as the Mac has it now; fails with the Mac's words (a Codex that isn't installed, or too old).

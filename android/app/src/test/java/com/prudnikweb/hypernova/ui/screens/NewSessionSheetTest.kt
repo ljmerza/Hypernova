@@ -123,7 +123,7 @@ class NewSessionSheetTest {
 
     // ─── New sessions start in: the server's, per agent ───
 
-    private class ServerHub(claude: String?, codex: String?) : Hub by FakeHub() {
+    private class ServerHub(claude: String?, codex: String?, override val startModeOwed: String? = null) : Hub by FakeHub() {
         var claudeMode by mutableStateOf(claude)
         var codexMode by mutableStateOf(codex)
         val requests = mutableListOf<NewSessionRequest>()
@@ -196,13 +196,19 @@ class NewSessionSheetTest {
         assertEquals(AgentKind.READ_ONLY, send(claudeHub).permissionMode)
     }
 
-    @Test fun anOlderServerOpensOnWhatThisPhoneHad() {
-        context.storage.prefs("hypernova").edit().putString("newSession.startMode", "plan").putString("newSession.codex.mode", AgentKind.CAN_EDIT).apply()
-        val hub = ServerHub(null, null)
+    @Test fun anOlderServerOwedTheOldSettingOpensOnItAndCodexOnItsLastMode() {
+        context.storage.prefs("hypernova").edit().putString("newSession.codex.mode", AgentKind.CAN_EDIT).apply()
+        val hub = ServerHub(null, null, startModeOwed = "plan")
         sheet(hub, project = "/home/owner/projects/hypernova")
         modeChip(R.string.mode_label_plan).assertExists()
         agent(R.string.cx_agent_codex)
         modeChip(R.string.cx_mode_label_can_edit).assertExists()
+    }
+
+    /** Paired later, and older: nothing's kept for it and it isn't owed the old setting. Ask. */
+    @Test fun anOlderServerPairedLaterOpensOnAsk() {
+        sheet(ServerHub(null, null), project = "/home/owner/projects/hypernova")
+        modeChip(R.string.mode_label_default).assertExists()
     }
 
     /** Android 35, as PhoneDictationTest: the phone has a recognizer, and the mic may be used. */

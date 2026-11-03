@@ -2764,7 +2764,7 @@ Errors). All take the bearer token except the local fire route.
   mode each session names and checks it as before, a client that names none gets what it always did, and
   neither the agents' own files nor a terminal's `claude` or `codex` follow it. A value on disk that isn't one
   of the agent's modes reads as unset, so a hand-edited file can't widen: `default`, `read-only`. A client
-  checks again as it reads, and with no `startMode` (an older daemon) opens on what it had. `moveStartMode`: the
+  checks again as it reads, and with no `startMode` (an older daemon) opens on what it has for that server. `moveStartMode`: the
   same, only where nothing usable is saved yet, for a phone moving its old phone-wide setting here once. A client
   sends neither to a daemon that doesn't report `startMode`. Decided in docs/DECISIONS.md, "New sessions start
   in, per server and agent".

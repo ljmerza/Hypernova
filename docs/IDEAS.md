@@ -110,7 +110,7 @@ Claude Code's own terminal dialog answered from the phone, held prompts, the mod
 | PA8 | Risk on the card | Already parked: L34 (risk in the daemon). A colour and a long-press for high-risk commands; never a deny. | | |
 | PA9 | Auto mode rules | Show `claude auto-mode config` (the effective allow, soft_deny and hard_deny) read-only, so blocked calls make sense, and link to `/auto-mode-setup`. `claude auto-mode critique` costs a model call. | M | both |
 | PA10 | Allow & add rule | On a blocked call, beside Allow & retry: add an auto mode allow rule so the same call isn't blocked again. Writes settings; behind the fingerprint. | M | both |
-| PA11 | Default mode per project | Settings' "New sessions start in" per project (Plan for one repo, Auto elsewhere). Extends DECISIONS "Default mode for new sessions". | S | app |
+| PA11 | Default mode per project | An agent's "New sessions start in" per project as well as per server (Plan for one repo, Auto elsewhere). Extends DECISIONS "New sessions start in, per server and agent". | S | app |
 | PA12 | Approvals inbox | One screen with every waiting ask across sessions and servers, oldest first. Home's cards hold them now, mixed with everything else. | M | app |
 | PA13 | Reminder, never a no | An ask left 5 minutes buzzes again, quietly; at 10 it goes back to the terminal as today. | S | app |
 | PA14 | Mode changes in the log | Each mode change (who, from what, to what) in the session's log, so a session that went to Auto is never a surprise. | S | both |

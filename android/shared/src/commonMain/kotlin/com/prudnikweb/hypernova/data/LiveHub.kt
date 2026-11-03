@@ -2342,16 +2342,19 @@ class LiveHub(
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.as_edit_err)) }
 
+    override val startModeOwed: String? get() = NewSessionMemory.startModeToMove(platform.storage, serverId)
+
     private var movingStartMode = false
 
     /**
-     * The one phone-wide "New sessions start in" of before goes to Claude Code on this server, once
-     * ([NewSessionMemory.startModeToMove]); never to Codex. Only where the server keeps it, so an older
-     * one updated later still gets it, and only where it holds nothing yet. A failure tries at the next snapshot.
+     * The one phone-wide "New sessions start in" of before goes to Claude Code on this server, once, if it
+     * was paired at the first start with this ([NewSessionMemory.noteStartModeServers]); never to Codex. Only
+     * where the server keeps it, so an older one updated later still gets it, and only where it holds nothing
+     * yet. A failure tries at the next snapshot.
      */
     private fun moveStartMode() {
         if (movingStartMode || claude?.startMode == null) return
-        val mode = NewSessionMemory.startModeToMove(platform.storage, serverId) ?: return
+        val mode = startModeOwed ?: return
         movingStartMode = true
         scope.launch {
             try {

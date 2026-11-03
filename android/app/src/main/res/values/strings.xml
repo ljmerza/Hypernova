@@ -108,7 +108,7 @@
     <string name="st_start_mode">New sessions start in</string>
     <string name="st_start_mode_claude">What New session opens on for Claude Code on %1$s, here and on the desktop client. Changing it there is for that session only, and Bypass is chosen there each time.</string>
     <string name="st_start_mode_codex">What New session opens on for Codex on %1$s, here and on the desktop client. Changing it there is for that session only.</string>
-    <string name="st_start_mode_too_old">%1$s needs updating to keep this. Until then New session opens on what this phone had.</string>
+    <string name="st_start_mode_too_old">%1$s needs updating to keep this. Until then New session opens on what this phone has for it.</string>
     <!-- A table in a reply: what TalkBack says for a cell ("Tokens: 3.2k"), and an action on its rows. -->
     <string name="table_cell">%1$s: %2$s</string>
     <string name="copy_table">Copy table</string>

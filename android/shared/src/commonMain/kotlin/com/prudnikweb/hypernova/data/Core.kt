@@ -113,6 +113,8 @@ object Core {
         background = store.background
         // The list of computers; the first run after the update makes it from the one pairing kept before.
         val (list, active) = store.servers.load()
+        // Before any hub asks: who's owed the old "New sessions start in", only those paired at the first start.
+        NewSessionMemory.noteStartModeServers(p.storage, list.map { it.id })
         servers = list
         activeId = active
         picked = active
