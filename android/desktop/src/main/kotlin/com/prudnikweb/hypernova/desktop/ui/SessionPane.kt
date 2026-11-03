@@ -106,6 +106,7 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
             val card = Modifier.widthIn(max = PANE_MAX).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }
             AskCard(hub, s, shell, card)
             Facts(s, card)
+            SessionActions(hub, s, shell, card)
             val note = Modifier.widthIn(max = PANE_MAX).padding(horizontal = 4.dp, vertical = 4.dp)
             // What opening it can't do yet, said plainly: there's no chat here to read it in.
             HText(if (s.inHistory) Ui.desk_pane_history_only.text() else Ui.desk_pane_phone_only.text(), note, style = Type.small, color = HN.inkDim)

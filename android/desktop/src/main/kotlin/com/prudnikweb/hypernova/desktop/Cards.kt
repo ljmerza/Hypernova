@@ -3,9 +3,11 @@ package com.prudnikweb.hypernova.desktop
 import com.prudnikweb.hypernova.data.AllowRule
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Blocked
+import com.prudnikweb.hypernova.data.DeleteKind
 import com.prudnikweb.hypernova.data.HistoryEntry
 import com.prudnikweb.hypernova.data.HistorySearch
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.MenuOffer
 import com.prudnikweb.hypernova.data.ModelNames
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Secrets
@@ -148,6 +150,21 @@ fun runsOf(hub: Hub, e: HistoryEntry): Pair<Int, Boolean> {
     val live = hub.automations.automation(id)
     return (live?.runCount?.takeIf { it > 0 } ?: e.count) to (live == null && hub.automations.state != null)
 }
+
+/**
+ * Rename, as [MenuOffer] has it, but not in History: the server types /rename into the session (daemon/src/http.ts), and
+ * writing in an ended one resumes it. A session in History starts nothing here.
+ */
+fun offersRename(s: Session, offer: MenuOffer = MenuOffer.of(s)): Boolean = offer.rename && !s.inHistory
+
+/** What Remove from list's confirm says it will do: the phone's words for each [DeleteKind]. */
+fun removeBody(kind: DeleteKind): String = when (kind) {
+    DeleteKind.Codex -> Ui.session_delete_body_codex
+    DeleteKind.RunningJob -> Ui.session_delete_body_running
+    DeleteKind.Terminal -> Ui.session_delete_body_terminal
+    DeleteKind.Forget -> Ui.session_delete_body_plain
+    DeleteKind.Job, DeleteKind.None, DeleteKind.OpenElsewhere -> Ui.session_delete_body
+}.text()
 
 /** A line of the pane's facts. */
 data class Fact(val label: String, val value: String)

@@ -71,8 +71,8 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | Where | What |
 |---|---|
 | `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopTokens.kt` (each server's token, off the disk), `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
-| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `HistoryList.kt` (History's list), `SessionPane.kt` (the chosen session); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
-| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `HistoryTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `HistoryList.kt` (History's list), `SessionPane.kt` (the chosen session), `SessionActions.kt` (its Rename, Stop and Remove from list), `Modal.kt` (a question over the window); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
+| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `HistoryTest`, `SessionActionsTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 | `desktop/src/probe/` | `PackageProbe.kt`: in no package; pairs an installed one from inside its own Java, for `scripts/test-client-package.sh` |
 | `desktop/packaging/`, `desktop/icons/` | `client-names.sh` (the package's names: two lines for the rename), `legal/`, `deb-menu-optional.sh`; the icons, and what makes them |
 
@@ -98,7 +98,7 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | `thumbOf` | Null | Nothing attaches pictures here |
 | `started` | Nothing | No widgets follow it |
 
-**Changed in `:shared` for it**, each with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now), `Net.httpsOnly` (off on Android), `DeviceKeys.publicKey()` (null on Android, so `DeviceCertStore.identity()` checks nothing there), and for History `Session.inHistory`, `HistoryEntry`, `foldRuns`, `HistorySearch.rows` and `rememberFullText`, each lifted whole from the phone's `ui/`, with `ui/automations/HistoryRow.kt` keeping its two names for the phone's screens and tests.
+**Changed in `:shared` for it**, each with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now), `Net.httpsOnly` (off on Android), `DeviceKeys.publicKey()` (null on Android, so `DeviceCertStore.identity()` checks nothing there), and for History `Session.inHistory`, `HistoryEntry`, `foldRuns`, `HistorySearch.rows` and `rememberFullText`, and for the session menu `DeleteKind`, `RestartKind`, `MenuOffer` and `SESSION_NAME_MAX`, each lifted whole from the phone's `ui/`, with `ui/automations/HistoryRow.kt` and `ui/home/SessionMenu.kt` keeping the names for the phone's screens and tests.
 
 ### The parity list: what the desktop has of the phone's
 
@@ -128,7 +128,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Unread dot | Not yet | |
 | Usage cards | Not yet | Only the chart's week behind the list |
 | Cards above the sessions (account, providers, prompts for gone sessions, automation questions, outdated jobs) | Not yet | Tray alerts say an account needs its owner |
-| The menu: Rename, Stop, Remove from list | Not yet | |
+| The menu: Rename, Stop, Remove from list | There | As buttons in the pane, with the phone's confirm and words. No Rename in History: it would resume the session |
 | The menu: Restart session, MCP servers | Not yet | |
 | Card swipes | Not meant to be | A pointer has the pane's buttons |
 | Keys: arrows, Enter, Escape, Tab, zoom | Desktop only | |

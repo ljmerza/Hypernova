@@ -4103,6 +4103,16 @@ The owner: "got the desktop app up and running and connected to the k1 server ..
 5. **An automation's row has no runs to open** with no automation screens here. It says how many runs and Auto, and choosing it shows its newest run, with a line saying the others are on the phone.
 6. **One server at a time.** The phone's All servers History waits for an All servers here.
 
+## The desktop client's Remove from list and Rename (2026-11-03)
+
+The rule is the owner's from "Delete takes a session off Home, History brings it back": Remove from list moves a session to History, and the transcript stays. `:shared` now holds what the menu offers (`DeleteKind`, `RestartKind`, `MenuOffer`), so both clients go by one rule and the phone's confirm keeps its words.
+
+1. **Buttons in the pane, not a menu.** There's no long-press, and a pane has room. Rename, Stop and Remove from list come after the facts, so Tab still reaches Deny and Allow first and rule 3 of "The desktop app" isn't touched: nothing here is near an Allow.
+2. **The phone's confirm and words,** for each kind: what closes, that it goes from `claude agents`, that the conversation stays in History. A terminal Hypernova doesn't hold says why it can't. Stop goes at once, as on the phone. The focus starts on Cancel, since Enter presses what has the focus here and a phone has no such stray key. Escape and a click outside are Cancel.
+3. **No Rename in History, which is stricter than the phone.** The server's rename types `/rename` into the session (`daemon/src/http.ts`), and writing in an ended one resumes it: `undelete`, and a claude started. On a phone that's reached only from an opened chat's session sheet, and the phone does the same there, unchanged here. In this pane, which starts nothing, a Rename that starts a session would be a surprise. The owner may want it the other way.
+4. **What goes stays on screen.** After Remove the pane keeps the session, now ended, and says it's in History: nothing chooses another, and the list's row is gone.
+5. **Restart session and MCP servers aren't here,** and Stop and Restart aren't offered in History, which has nothing running.
+
 ## Updating Claude Code and Codex (owner, 2026-11-02)
 
 The owner: "also add ability to check and update Claude code and codex". Agents & providers › an agent's Settings › Version: what's installed, Check for updates, Update. One server at a time, nothing on the session's chat screen, nothing automatic. `daemon/src/agent-update.ts`; `docs/PROTOCOL.md`, "Updating an agent". Checked on 2026-11-02 against Claude Code 2.1.316, Codex 0.164.0, their binaries and `code.claude.com/docs/en/setup`. **No real update ran.** Measurements used copies in a throwaway home with stand-in `npm`, `curl` and `brew`, and proxies pointing nowhere.
