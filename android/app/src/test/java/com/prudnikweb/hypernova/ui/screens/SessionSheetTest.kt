@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentBoard
 import com.prudnikweb.hypernova.data.WAgent
+import com.prudnikweb.hypernova.data.WShell
 import com.prudnikweb.hypernova.ui.session.SessionSheet
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -92,6 +93,45 @@ class SessionSheetTest {
         rule.onNodeWithText(line, useUnmergedTree = true).assertExists()
         rule.onNodeWithText("Integrate the branches", useUnmergedTree = true).assertExists()
         rule.onNodeWithText(str(R.string.session_sheet_no_agents)).assertDoesNotExist()
+    }
+
+    @Test fun backgroundCommandsAreListedUnderTheAgentsAsTheyStand() {
+        val shell = { id: String, command: String?, status: String, started: Long, ended: Long?, code: Int? ->
+            id to WShell(id, Samples.ZETA, monitor = false, command = command, description = "desc", status = status, startedAt = started, endedAt = ended, exitCode = code)
+        }
+        val hub = FeatureHub()
+        hub.board = AgentBoard(
+            emptyMap(), emptyMap(),
+            mapOf(
+                shell("b1", "npm run dev", "running", Samples.NOW - 720_000L, null, null),
+                shell("b2", "API_TOKEN=••• sleep 900", "unknown", Samples.NOW - 7_200_000L, null, null),
+                shell("b3", "./gradlew build", "error", Samples.NOW - 600_000L, Samples.NOW - 300_000L, 3),
+                shell("b4", "sleep 800", "stopped", Samples.NOW - 500_000L, Samples.NOW - 400_000L, null),
+                shell("b5", "make docs", "done", Samples.NOW - 500_000L, Samples.NOW - 480_000L, 0),
+            ),
+        )
+        val s = hub.base.session(Samples.ZETA)!!
+        rule.setContent {
+            Harness(spy) {
+                SessionSheet(hub, s, usage = null, onModel = {}, onSwitchAgent = {}, onRetried = {}, onDismiss = { dismissed++ })
+            }
+        }
+        rule.waitForIdle()
+        tab(R.string.session_sheet_agents)
+        rule.onNodeWithText(str(R.string.session_sheet_shells).uppercase(), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("npm run dev", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.session_sheet_shell_running), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.session_sheet_shell_finished), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.session_sheet_shell_stopped), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("Failed (exit 3)", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("not known if it's still running", substring = true, useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("Started", substring = true, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun noBackgroundCommandsNoSeam() {
+        sheet(FakeHub(), Samples.ZETA)
+        tab(R.string.session_sheet_agents)
+        rule.onNodeWithText(str(R.string.session_sheet_shells).uppercase(), useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun closeDismisses() {

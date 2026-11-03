@@ -6,10 +6,10 @@ import androidx.compose.runtime.Immutable
 /**
  * The agents a session's main agent started and the workflows of them, as the Mac reports them
  * (`GET /v1/sessions/{id}/agents`, then `agent` and `workflow` messages; docs/PROTOCOL.md, "Agents
- * and workflows"). A change makes a new board, so a transcript is rebuilt only when it changes.
+ * and workflows"), and its background commands ("Background commands", `shell` messages). A change makes a new board, so a transcript is rebuilt only when it changes.
  */
 @Immutable
-class AgentBoard(val agents: Map<String, WAgent>, val workflows: Map<String, WWorkflow>) {
+class AgentBoard(val agents: Map<String, WAgent>, val workflows: Map<String, WWorkflow>, val shells: Map<String, WShell> = emptyMap()) {
     /** Agents by the Agent call that started them (in the session's transcript, or in an agent's own). */
     val byCall: Map<String, WAgent> by lazy { agents.values.filter { it.toolUseId != null }.associateBy { it.toolUseId!! } }
     val workflowByCall: Map<String, WWorkflow> by lazy { workflows.values.filter { it.toolUseId != null }.associateBy { it.toolUseId!! } }
@@ -18,9 +18,10 @@ class AgentBoard(val agents: Map<String, WAgent>, val workflows: Map<String, WWo
     val inWorkflow: Map<String, List<WAgent>> by lazy { agents.values.filter { it.workflowId != null }.groupBy { it.workflowId!! }.mapValues { (_, v) -> v.sortedBy { it.startedAt } } }
 
     fun isEmpty() = agents.isEmpty() && workflows.isEmpty()
-    fun with(a: WAgent) = AgentBoard(agents + (a.id to a), workflows)
-    fun without(agentId: String) = if (agentId in agents) AgentBoard(agents - agentId, workflows) else this
-    fun with(w: WWorkflow) = AgentBoard(agents, workflows + (w.id to w))
+    fun with(a: WAgent) = AgentBoard(agents + (a.id to a), workflows, shells)
+    fun without(agentId: String) = if (agentId in agents) AgentBoard(agents - agentId, workflows, shells) else this
+    fun with(w: WWorkflow) = AgentBoard(agents, workflows + (w.id to w), shells)
+    fun with(s: WShell) = AgentBoard(agents, workflows, shells + (s.id to s))
 
     companion object {
         val Empty = AgentBoard(emptyMap(), emptyMap())

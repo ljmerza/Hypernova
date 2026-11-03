@@ -7,6 +7,7 @@ import com.prudnikweb.hypernova.data.ModelNames
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.WAgent
+import com.prudnikweb.hypernova.data.WShell
 
 /*
  * What the session sheet shows (SessionSheet.kt), as plain data with nothing of Compose in it
@@ -23,7 +24,7 @@ internal enum class SheetTab(@StringRes val label: Int) {
     Overview(R.string.session_sheet_tab_overview),
     /** The mode, the blocked calls and Claude Code's rules in effect (RulesPart.kt). */
     Permissions(R.string.session_sheet_permissions),
-    /** The agents at work, by workflow. */
+    /** The agents at work, by workflow, and the background commands (ShellsPart.kt). */
     Agents(R.string.session_sheet_agents),
     /** A side question (/btw), and Claude Code's commands and the owner's skills (CommandsTab.kt). */
     Commands(R.string.session_sheet_tab_commands),
@@ -118,6 +119,40 @@ internal fun sheetAgents(board: AgentBoard): SheetAgents {
  */
 internal fun agentsAtWork(s: Session, agents: SheetAgents): Int =
     if (s.phase == Phase.Ended) 0 else maxOf(s.agentsRunning, agents.running)
+
+/** How a background command stands, as the sheet words it. */
+internal enum class ShellSay { Running, MonitorRunning, Finished, Failed, FailedCode, Stopped, Unknown }
+
+/** A background command as the sheet lists it: what it runs, and how long it ran or has been going (null: not known). */
+internal data class SheetShell(val id: String, val text: String?, val say: ShellSay, val exitCode: Int?, val startedAt: Long, val endedAt: Long?)
+
+/** The most finished ones listed: the sheet is about what's going. */
+private const val SHELLS_FINISHED_SHOWN = 5
+
+/**
+ * The session's background commands: running, oldest first; then those nothing says anything more
+ * about; then the last few that ended, newest first. Those whose status this build doesn't know read
+ * as unknown ([WShell.status]). None from an older Mac, or from Codex.
+ */
+internal fun sheetShells(board: AgentBoard): List<SheetShell> {
+    val all = board.shells.values
+    val running = all.filter { it.running }.sortedBy { it.startedAt }
+    val ended = all.filter { !it.running && say(it) != ShellSay.Unknown }.sortedByDescending { it.endedAt ?: it.startedAt }.take(SHELLS_FINISHED_SHOWN)
+    val unknown = all.filter { say(it) == ShellSay.Unknown }.sortedByDescending { it.startedAt }
+    return (running + unknown + ended).map { SheetShell(it.id, it.command ?: it.description, say(it), it.exitCode, it.startedAt, it.endedAt) }
+}
+
+private fun say(s: WShell): ShellSay = when (s.status) {
+    "running" -> if (s.monitor) ShellSay.MonitorRunning else ShellSay.Running
+    "done" -> ShellSay.Finished
+    "error" -> if (s.exitCode != null) ShellSay.FailedCode else ShellSay.Failed
+    "stopped" -> ShellSay.Stopped
+    else -> ShellSay.Unknown
+}
+
+/** How many background commands run in [s]: the session's own count, or the list's when it knows more. None once it has ended. */
+internal fun shellsAtWork(s: Session, shells: List<SheetShell>): Int =
+    if (s.phase == Phase.Ended) 0 else maxOf(s.shellsRunning, shells.count { it.say == ShellSay.Running || it.say == ShellSay.MonitorRunning })
 
 /** Where a session runs, as the sheet says it. */
 internal enum class RunsIn { Terminal, Mac, Watched }

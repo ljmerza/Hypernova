@@ -7,6 +7,7 @@ import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.TermLink
 import com.prudnikweb.hypernova.data.WAgent
+import com.prudnikweb.hypernova.data.WShell
 import com.prudnikweb.hypernova.data.WPhase
 import com.prudnikweb.hypernova.data.WWorkflow
 import org.junit.Assert.assertEquals
@@ -24,6 +25,37 @@ class SessionSheetTest {
 
     private fun board(agents: List<WAgent>, workflows: List<WWorkflow> = emptyList()) =
         AgentBoard(agents.associateBy { it.id }, workflows.associateBy { it.id })
+
+    private fun shell(id: String, status: String, at: Long = 0L, ended: Long? = null, code: Int? = null, monitor: Boolean = false) =
+        id to WShell(id, "s", monitor, "cmd-$id", null, status, at, ended, code)
+
+    @Test fun shellsRunningFirstThenUnknownThenTheLastFewEnded() {
+        val ended = (1..8).map { shell("d$it", "done", at = it.toLong(), ended = 100L + it, code = 0) }
+        val b = AgentBoard(
+            emptyMap(), emptyMap(),
+            (ended + listOf(shell("r2", "running", at = 50L), shell("r1", "running", at = 10L, monitor = true), shell("u", "unknown", at = 5L), shell("n", "gone_elsewhere", at = 6L), shell("e", "error", at = 7L, ended = 200L, code = 3), shell("e2", "error", at = 7L, ended = 90L))).toMap(),
+        )
+        val list = sheetShells(b)
+        assertEquals(listOf("r1", "r2"), list.take(2).map { it.id })
+        assertEquals(ShellSay.MonitorRunning, list[0].say)
+        assertEquals(ShellSay.Running, list[1].say)
+        // A status this build doesn't know claims nothing.
+        assertEquals(setOf("u", "n"), list.drop(2).take(2).map { it.id }.toSet())
+        assertTrue(list.drop(2).take(2).all { it.say == ShellSay.Unknown })
+        // Then newest first, the last five.
+        assertEquals(listOf("e", "d8", "d7", "d6", "d5"), list.drop(4).map { it.id })
+        assertEquals(ShellSay.FailedCode, list[4].say)
+        assertEquals(3, list[4].exitCode)
+    }
+
+    @Test fun shellsAtWorkAreThoseRunningAndNoneOnceEnded() {
+        val list = sheetShells(AgentBoard(emptyMap(), emptyMap(), listOf(shell("a", "running"), shell("b", "unknown"), shell("c", "done", ended = 1L)).toMap()))
+        assertEquals(1, shellsAtWork(session(), list))
+        // The session's count, before the list is on this phone.
+        assertEquals(2, shellsAtWork(session().copy(shellsRunning = 2), emptyList()))
+        assertEquals(0, shellsAtWork(session(phase = Phase.Ended).copy(shellsRunning = 2), list))
+        assertTrue(sheetShells(AgentBoard.Empty).isEmpty())
+    }
 
     private fun session(phase: Phase = Phase.Working, agents: Int = 0, origin: String? = "hypernova", term: TermLink? = null, agentJob: String? = null) =
         Session("00", "s", "s", "p", SessionState.Working, "claude-opus-5-5", "default", "", 0L, phase = phase, origin = origin, term = term, agentsRunning = agents, agentJob = agentJob)

@@ -33,7 +33,7 @@ enum class TopBarItem(val key: String) {
     TOKENS("tokens"),
     /** What the session comes to at API prices ("$7.86", "≈$7.86" when worked out here), once there's a price. */
     COST("cost"),
-    /** "3 agents" while agents work for it. */
+    /** "3 agents" while agents work for it, and "1 shell" while background commands run. */
     AGENTS("agents"),
     /** This turn's time ("4m") while it is in a turn. */
     TURN("turn"),
@@ -121,6 +121,8 @@ data class TopBarFacts(
     val effort: String?,
     val tokens: Long,
     val agents: Int,
+    /** Background commands running now: the agents' item says them too. */
+    val shells: Int = 0,
     val turnStartedAt: Long,
     val ended: Boolean,
     val plan: Boolean,
@@ -155,7 +157,7 @@ fun TopBarChoice.visible(f: TopBarFacts, now: Long): List<TopBarItem> = items.fi
         TopBarItem.EFFORT -> f.effortShown
         TopBarItem.TOKENS -> f.tokens > 0L
         TopBarItem.COST -> f.cost != null && f.cost > 0.0
-        TopBarItem.AGENTS -> f.agents > 0
+        TopBarItem.AGENTS -> f.agents > 0 || f.shells > 0
         TopBarItem.TURN -> f.inTurn(now)
         TopBarItem.WEEK_PACE -> f.weekPace != null
         TopBarItem.GIT -> f.git

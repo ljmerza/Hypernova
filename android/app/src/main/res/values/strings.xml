@@ -900,6 +900,23 @@
     <string name="session_sheet_provider">Provider</string>
     <string name="session_sheet_job">claude agents job</string>
     <string name="session_sheet_id">Session id</string>
+    <!-- Background commands, as Claude Code's status line counts them ("1 shell"): the Agents tab's list (ui/session/ShellsPart.kt) and the top bar. -->
+    <string name="session_sheet_shells">Background commands</string>
+    <string name="session_sheet_shell_running">Running</string>
+    <string name="session_sheet_shell_monitor_running">Monitor, running</string>
+    <string name="session_sheet_shell_finished">Finished</string>
+    <string name="session_sheet_shell_failed">Failed</string>
+    <string name="session_sheet_shell_failed_code">Failed (exit %1$d)</string>
+    <string name="session_sheet_shell_stopped">Stopped</string>
+    <!-- Its session's process went, and a command can outlive that (a crash, `claude stop`): "Started 2 h 5 min ago, not known if it's still running". -->
+    <string name="session_sheet_shell_unknown">Started %1$s ago, not known if it\'s still running</string>
+    <string name="session_sheet_shell_no_command">Background command</string>
+    <!-- TalkBack, one command: "npm run dev, Running, 12 min". -->
+    <string name="session_sheet_shell_said">%1$s, %2$s, %3$s</string>
+    <plurals name="session_sheet_shells_said">
+        <item quantity="one">%d shell running.</item>
+        <item quantity="other">%d shells running.</item>
+    </plurals>
     <!-- TalkBack, after the usage strip's sentences: the agents at work, the queue and the mode. -->
     <plurals name="session_sheet_agents_said">
         <item quantity="one">%d agent at work.</item>
