@@ -68,7 +68,7 @@ hypernova pair
 
 **The client**: install the Android app from the
 [latest release](https://github.com/ljmerza/Hypernova/releases/latest)
-(`hypernova-client-<tag>-android.apk`, Android 10 or later) and scan the QR code `hypernova pair` shows.
+(`hypernova-client-<tag>-android.apk`, Android 10 or later), tap **Scan** in it and point it at the QR code `hypernova pair` shows.
 `hypernova doctor` checks every piece if something doesn't work. A small desktop client for Linux, Mac and Windows is on
 each release too; it's unsigned, so a Mac and Windows warn: [`docs/INSTALL.md`, "The desktop client"](docs/INSTALL.md#the-desktop-client).
 

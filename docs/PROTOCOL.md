@@ -197,16 +197,28 @@ on its own network, nothing public.
 
 1. **Show a code.** `hypernova pair` calls `POST /local/pair/start` and shows a QR code of its
    `link`.
-2. **Open the page.** A phone's camera opens the server's pairing page (`GET /pair`), which hands
-   over to the app with the app link. A browser warns once about the server's own certificate, and
-   may ask for a client certificate, which the listener asks every connection for: decline it.
+2. **Get the link to the app.** Three ways:
+   - **Scan in the app**, the main one: the app's own scanner reads the QR code, and it goes straight
+     to the next step. The person started it, so the app doesn't ask again.
+   - **Paste** in the app: the same.
+   - **The phone's own camera** opens the server's pairing page (`GET /pair`), which hands over to the
+     app with the app link. A browser warns once about the server's own certificate, and may ask for a
+     client certificate, which the listener asks every connection for: decline it. The app link comes
+     from outside the app, so the app shows **"Add this server?"** first, with the link's name and every
+     address the code would go to (`PairLink.places`), and sends nothing until the tap. Cancel leaves
+     nothing behind and spends nothing. Anything on the phone can open such a link, and its `n`, `u`
+     and `lan` are only its claims, so the screen says so.
 3. **Pair.** The client calls `POST /v1/pair`: first to each `lan` address on `lp`, in parallel with
    short timeouts and the certificate pinned to `fp`, keeping the address that answered as its local
    route. Only when none answers (or there is no `lan`) does it try `u` as it is, on a route of its
    own, never another computer's.
 4. **Store.** The client keeps `u` (or, for an older link whose `u` is plain http, the listener
    address that answered: each computer's pairing has its own base URL, which is how the app tells
-   their routes apart), the token and the server's name.
+   their routes apart), the token and the server's name. The reply's `mac.id` and `mac.name` are only
+   what the other end says. A pairing takes a paired server's place only if it says the same id (or,
+   without ids, the same name) **and** either answered over the listener pinned to that server's
+   stored fingerprint, or answered at that server's very base URL. Anything else is added beside it,
+   on a base URL of its own when `u` is another server's (`Servers.takesPlaceOf`, `withPairing`).
 5. **Get a device certificate.** Right after pairing, `POST /v1/device/cert`.
 6. **Forget.** `DELETE /v1/devices/me` forgets this device on the server.
 
@@ -235,8 +247,11 @@ ends it.
   link is a smaller QR code; the snapshot still says them all).
 - The Android app handles the `hypernova` scheme, host `pair`; there is no App Link (`autoVerify`)
   for any https domain. Phone cameras and Google Lens open https links, never a custom scheme from a
-  QR code. Its "Paste pairing link" field takes the page's link, the app link and the intent
-  hand-over alike (`data/Pairing.kt`, `PairLinks`).
+  QR code (as noted 2026-10-18; not tried again since). Its scanner and its "Paste pairing link" field
+  take the page's link, the app link and the intent hand-over alike (`data/Pairing.kt`, `PairLinks`).
+  A name is cut to one line of 60 characters, with control and format characters taken out.
+- `hypernova pair` draws `link` as the QR code and prints it under the code, for pasting. The code
+  also travels inside the link; it isn't printed on a line of its own, as nothing asks for it typed.
 - A link from an older daemon may carry `u=http://10.0.2.2:47321`, the hints `ts`, `ti`, `ta` and
   `tc`, or be `https://hypernova.observer/pair#<the app link's parameters>`. The Android app still
   reads them, the last from its fragment, without fetching anything, and ignores the `t*` hints.
@@ -3492,7 +3507,8 @@ There is no battery route: the battery comes in `Snapshot.mac.battery` and `{t:"
   the app link.
 - **Body:** none.
 - **Answer:** `200 {code, link, appLink, webLink, expiresAt, url, download}`: see Pairing. `url` is
-  the base URL `u`; `download` is where a phone gets the app.
+  the base URL `u`; `download` is where a phone gets the app. `code` is the one in the links; the
+  `hypernova` command no longer prints it.
 
 #### POST /local/pair/cancel
 
