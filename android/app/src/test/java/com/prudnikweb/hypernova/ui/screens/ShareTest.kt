@@ -96,8 +96,35 @@ class ShareTest {
         val b = sent("b")
         val i = Intent(Intent.ACTION_SEND_MULTIPLE)
             .putParcelableArrayListExtra(Intent.EXTRA_STREAM, arrayListOf(a, b, Uri.parse("https://example.com/x.png")))
-        i.clipData = ClipData.newRawUri("files", a).apply { addItem(ClipData.Item(Uri.parse("file:///sdcard/notes.txt"))) }
-        assertEquals(listOf(a, Uri.parse("file:///sdcard/notes.txt"), b), readShared(i).uris)
+        i.clipData = ClipData.newRawUri("files", a).apply { addItem(ClipData.Item(sent("c"))) }
+        assertEquals(listOf(a, sent("c"), b), readShared(i).uris)
+    }
+
+    /**
+     * A share is opened as this app, so a sender could name what only this app can read: the prefs
+     * file with every server's token went up as an attachment on one tap (seen on an emulator from an
+     * ordinary app, docs/DECISIONS.md, "Commands only from the app itself").
+     */
+    @Test fun aShareCantHandOverThisAppsOwnFiles() {
+        val own = listOf(
+            "file:///data/data/${context.packageName}/shared_prefs/hypernova.xml",
+            "file:///data/user/0/${context.packageName}/files/debug-logs/crash.txt",
+            "file:///sdcard/notes.txt",
+            "FILE:///data/data/${context.packageName}/shared_prefs/hypernova.xml",
+            "content://${context.packageName}.files/debuglog/log.txt",
+            // "0@" is the same provider, for user 0, to Android's own lookup.
+            "content://0@${context.packageName}.files/debuglog/log.txt",
+            "content://${context.packageName}.androidx-startup/x",
+        ).map(Uri::parse)
+        val theirs = sent("theirs")
+        val stream = Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(own + theirs))
+        assertEquals(listOf(theirs), readShared(stream).uris)
+        val clip = Intent(Intent.ACTION_SEND)
+        clip.clipData = ClipData.newRawUri("files", own.first()).apply { own.drop(1).forEach { addItem(ClipData.Item(it)) } }
+        assertTrue(readShared(clip).uris.isEmpty())
+        val one = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, own.first()).putExtra(Intent.EXTRA_TEXT, "words")
+        assertTrue(readShared(one).uris.isEmpty())
+        assertEquals("what it says still comes, for the person to read", "words", readShared(one).text)
     }
 
     // ─── The files, copied while lent ───
@@ -194,7 +221,7 @@ class ShareTest {
         val intent = first.intent
         assertEquals(ShareLaunch.ACTION_NEW_SESSION, intent.action)
         assertEquals("/p/notes", intent.getStringExtra(ShareLaunch.EXTRA_PROJECT))
-        assertEquals(MainActivity::class.java.name, intent.component?.className)
+        assertTrue("through the app's own way in", MainActivity.isCommand(intent, context.packageName))
         // A tap on it opens the sheet on that project.
         ShareLaunch.handle(intent)
         assertEquals("/p/notes", ShareLaunch.newSession?.projectPath)

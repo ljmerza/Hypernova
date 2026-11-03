@@ -3,7 +3,6 @@ package com.prudnikweb.hypernova.ui.share
 
 import android.app.Application
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -74,7 +73,7 @@ object LauncherShortcuts {
                     .setIcon(IconCompat.createWithAdaptiveBitmap(mark(context)))
                     .setRank(i)
                     .setIntent(
-                        Intent(context, MainActivity::class.java)
+                        MainActivity.command(context)
                             .setAction(ShareLaunch.ACTION_NEW_SESSION)
                             .putExtra(ShareLaunch.EXTRA_PROJECT, p.path),
                     )

@@ -71,7 +71,7 @@ class SpeakingNotice private constructor(private val context: Context, private v
             val stop = PendingIntent.getBroadcast(context, 11, Intent(stopAction).setPackage(context.packageName), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val open = PendingIntent.getActivity(
                 context, 12,
-                Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP).apply {
+                MainActivity.command(context).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP).apply {
                     play.sessionId?.let { setAction(MainActivity.ACTION_OPEN_SESSION).putExtra(MainActivity.EXTRA_SESSION, it) }
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,

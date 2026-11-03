@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.prudnikweb.hypernova.BuildConfig
 import com.prudnikweb.hypernova.MainActivity
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AttachDrafts
@@ -145,7 +146,7 @@ class ShareActivity : ComponentActivity() {
                 // The session's composer takes the text the way it takes a send that failed.
                 if (!text.isNullOrBlank()) AttachDrafts.giveBack(sessionId, text)
                 startActivity(
-                    Intent(app, MainActivity::class.java)
+                    MainActivity.command(app)
                         .setAction(MainActivity.ACTION_OPEN_SESSION)
                         .putExtra(MainActivity.EXTRA_SESSION, sessionId)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
@@ -261,9 +262,17 @@ internal fun readShared(i: Intent): Shared {
     // A page shared from a browser: its title and then its link.
     val text = listOf(subject.takeIf { it.isNotEmpty() && !body.contains(it) }, body.takeIf { it.isNotEmpty() })
         .filterNotNull().joinToString("\n").takeIf { it.isNotBlank() }
-    // Only content:// and file:// are ours to read.
-    return Shared(text, uris.filter { it.scheme == "content" || it.scheme == "file" })
+    return Shared(text, uris.filter(::lentByAnotherApp))
 }
+
+/**
+ * Whether [uri] is what a share may hand over: another app's content. It's opened as this app, so
+ * what only this app can read has to be refused here, or any app could send it up as an attachment.
+ * So no file:// (this app has no storage permission: its own private files are all one can reach),
+ * and none of this app's own providers. Android's lookup ignores a user id before an `@`, so this does too.
+ */
+private fun lentByAnotherApp(uri: Uri): Boolean =
+    uri.scheme == "content" && uri.authority?.substringAfterLast('@')?.startsWith(BuildConfig.APPLICATION_ID) == false
 
 /** Where the shared content goes: a new session (the sheet chooses), a recent session, or a project's new session. */
 @Composable

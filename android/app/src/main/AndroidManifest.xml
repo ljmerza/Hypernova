@@ -75,8 +75,18 @@
             <!-- Long-press on the icon: New session and the latest projects (ui/share/LauncherShortcuts). -->
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+        <!-- The one way to give MainActivity a command (open a session, switch server, start an
+             update, "+2 h"...): the app's own notifications, widget and shortcuts name this. Not
+             exported, so no other app can, and MainActivity acts on nothing that came any other way
+             (MainActivity.isCommand; docs/DECISIONS.md, "Commands only from the app itself"). No
+             filter here, ever: it would have to be exported to mean anything. -->
+        <activity-alias
+            android:name=".AppCommands"
+            android:exported="false"
+            android:targetActivity=".MainActivity" />
         <!-- Share to Hypernova: text, links, pictures and files from any app's share sheet. It asks
-             where they go, puts them in that composer and opens the app there (ui/share). -->
+             where they go, puts them in that composer and opens the app there (ui/share). Any app
+             can send it, so it takes only another app's content, never this app's files (readShared). -->
         <activity
             android:name=".ui.share.ShareActivity"
             android:exported="true"

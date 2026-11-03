@@ -43,7 +43,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
 
     /** Opens the app ([server] made the active computer first, when one is named), at [sessionId] if given. */
     private fun openApp(sessionId: String?, requestCode: Int, server: String? = null): PendingIntent {
-        val i = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val i = MainActivity.command(context).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
         if (sessionId != null) i.setAction(MainActivity.ACTION_OPEN_SESSION).putExtra(MainActivity.EXTRA_SESSION, sessionId)
         if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
         return PendingIntent.getActivity(context, requestCode, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -174,11 +174,11 @@ class AndroidNotifier(private val context: Context) : Notifier {
             else -> n.title
         }
         val open = if (n.kind == Notice.Kind.Update && n.text.isNotEmpty()) {
-            val i = Intent(context, MainActivity::class.java).setAction(MainActivity.ACTION_UPDATE).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val i = MainActivity.command(context).setAction(MainActivity.ACTION_UPDATE).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
             PendingIntent.getActivity(context, 7, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         } else if (n.kind == Notice.Kind.ServerUpdateFailed) {
-            val i = Intent(context, MainActivity::class.java).setAction(MainActivity.ACTION_SERVER_UPDATE).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val i = MainActivity.command(context).setAction(MainActivity.ACTION_SERVER_UPDATE).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
             // Each computer's its own: extras don't tell two PendingIntents apart.
             PendingIntent.getActivity(context, ("server-update:" + keyed(server, n.id)).hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -201,7 +201,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
                 if ((n.kind == Notice.Kind.Finished || n.kind == Notice.Kind.Waiting) && n.sessionId != null) addAction(reply(n.sessionId, server))
                 // Backpack's "+2 h" without opening the app first (it extends and stays in the background).
                 if (n.action == Notice.ACTION_EXTEND) {
-                    val i = Intent(context, MainActivity::class.java).setAction(MainActivity.ACTION_EXTEND).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    val i = MainActivity.command(context).setAction(MainActivity.ACTION_EXTEND).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     if (server != null) i.putExtra(MainActivity.EXTRA_SERVER, server)
                     val extend = PendingIntent.getActivity(context, 8, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                     addAction(0, context.getString(R.string.notice_extend), extend)
