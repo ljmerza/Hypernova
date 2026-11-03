@@ -117,6 +117,30 @@ fun sessionStack(stack: List<Route>, id: String, fresh: Boolean = false): List<R
     }
 }
 
+/**
+ * A page of Settings, at any depth: what the Settings tab's rows lead to, and the same pages opened
+ * from elsewhere (a provider card, the offline card's connection log). Exhaustive, so a new route is
+ * decided on.
+ */
+val Route.isSettingsPage: Boolean get() = when (this) {
+    Route.Providers, is Route.ProviderEdit, is Route.AgentSettings, is Route.McpServers, is Route.McpServerPage, is Route.McpEdit,
+    is Route.Plugins, is Route.PluginPage, is Route.PluginBrowse, is Route.Skills, is Route.AgentEnv, is Route.AgentRaw,
+    Route.ConnectionLog, is Route.ServerSettings, Route.NotificationSettings, Route.TopBarSettings, Route.CardSwipeSettings,
+    Route.TypingVoiceSettings, Route.LogSettings -> true
+    Route.Home, is Route.Session, is Route.Files, is Route.FileView, is Route.Web, is Route.Terminal, is Route.Agent, is Route.AutomationEdit -> false
+}
+
+/**
+ * Whether [stack] is inside Settings, so the bottom tabs stay on screen (owner, 2026-11-03): only
+ * Settings' pages over Home, and a web page opened from one (the testing checklist, a link on a page).
+ * A page opened over a session or an automation's editor isn't: a tab would throw away what it's a
+ * detour from, an editor's unsaved words among them.
+ */
+fun inSettings(stack: List<Route>): Boolean {
+    val pages = stack.drop(1)
+    return pages.firstOrNull()?.isSettingsPage == true && pages.all { it.isSettingsPage || it is Route.Web }
+}
+
 /** The pairing screen's states. */
 sealed interface PairFlow {
     @Immutable data class Working(val link: PairLink) : PairFlow

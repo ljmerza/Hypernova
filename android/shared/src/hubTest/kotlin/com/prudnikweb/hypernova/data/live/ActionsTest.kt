@@ -436,4 +436,13 @@ class ActionsTest {
         assertTrue(last("POST", "/v1/claude").json.getBoolean("agents"))
         assertEquals(true, rig.hub.claude?.agents)
     }
+
+    @Test fun loginContinueSettingIsPostedAndApplied() {
+        connect(session("s1"))
+        assertEquals(null, rig.hub.claude?.loginContinue)
+        daemon.ok("POST", "/v1/claude", JSONObject().put("claude", JSONObject().put("available", true).put("loginContinue", false)))
+        rig.call { rig.hub.setLoginContinue(false) }
+        assertFalse(last("POST", "/v1/claude").json.getBoolean("loginContinue"))
+        assertEquals(false, rig.hub.claude?.loginContinue)
+    }
 }

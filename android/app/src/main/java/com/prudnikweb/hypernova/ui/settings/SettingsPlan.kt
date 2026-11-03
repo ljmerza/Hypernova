@@ -60,6 +60,19 @@ object SettingsPlan {
     data class Checklist(override val server: String) : ServerPart { override val key = "qa" }
 
     /**
+     * The tab's one switch for every server (Continue after signing in, LoginContinueRow.kt), read
+     * from the connected ones. Each answers with its own setting, or null (too old to have it): [can]
+     * of them have it, [on] of those are on, [old] need updating. Pure, so it's tested without a phone.
+     */
+    data class AllSwitch(val on: Int, val can: Int, val old: Int) {
+        /** On only when every one that has it is. */
+        val checked: Boolean get() = can > 0 && on == can
+        val mixed: Boolean get() = on in 1 until can
+    }
+
+    fun allSwitch(connected: List<Boolean?>): AllSwitch = AllSwitch(connected.count { it == true }, connected.count { it != null }, connected.count { it == null })
+
+    /**
      * The tab's parts in order. [servers]: every paired one with All servers, in the order they were
      * paired, otherwise the one on screen (empty: none paired, so no Notifications either).
      * [testing]: the testing tools are unlocked (a debug build, or seven taps on the build): the

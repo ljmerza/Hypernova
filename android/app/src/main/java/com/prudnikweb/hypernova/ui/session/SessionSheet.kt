@@ -116,6 +116,8 @@ internal fun SessionSheet(
     atBlocked: Boolean = false,
     /** Opened from the strip's agents count: on the Agents tab. */
     atAgents: Boolean = false,
+    /** Sends /compact as the strip's chip does; there at any fullness, for a Claude Code session that can take it. */
+    onCompact: (() -> Unit)? = null,
 ) {
     val opener = LocalOpener.current
     val change = canChange(session)
@@ -159,6 +161,10 @@ internal fun SessionSheet(
                         if (planShown(hub, session)) {
                             SheetSeam(stringResource(R.string.session_sheet_usage))
                             UsageDetails(hub)
+                        }
+                        if (onCompact != null && change && !session.codex) {
+                            Spacer(Modifier.height(12.dp))
+                            SheetLink(stringResource(R.string.chat_compact), null, { onCompact(); onDismiss() })
                         }
                     }
                     SheetTab.Permissions -> {

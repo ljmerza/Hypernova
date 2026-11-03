@@ -23,6 +23,23 @@ class HistorySearchTest {
         s("Weather in Lisbon", "zazhimayu-pogoda", 50 * hour, "Added the forecast for tomorrow."),
     )
 
+    @Test fun rowsAreWhatTheSearchFoundWithAnAutomationsRunsFolded() {
+        val a = SessionAutomation("au1", "Morning brief", null)
+        val runs = listOf(s("brief 1", "brief", 1 * hour).copy(automation = a), s("brief 2", "brief", 3 * hour).copy(automation = a))
+        val rows = HistorySearch.rows(ended + runs)
+        assertEquals(listOf("auto:au1", "release landing copy", "agent cards", "Fix the widget crash", "Weather in Lisbon"), rows.map { it.key })
+        assertEquals(2, rows.first().count)
+        assertEquals("brief 1", rows.first().session.name)
+        assertEquals(listOf("agent cards", "Fix the widget crash"), HistorySearch.rows(ended + runs, project = "hypernova").map { it.key })
+    }
+
+    @Test fun whatHistoryListsIsWhatEndedButForWhatARestartCutShort() {
+        assertEquals(false, s("idle", "p", 0).copy(phase = Phase.Idle).inHistory)
+        val over = s("over", "p", 0).copy(phase = Phase.Ended)
+        assertEquals(true, over.inHistory)
+        assertEquals(false, over.copy(endedBy = MAC_RESTART).inHistory)
+    }
+
     @Test fun blankFindsEverythingMostRecentFirst() {
         assertEquals(listOf("release landing copy", "agent cards", "Fix the widget crash", "Weather in Lisbon"), HistorySearch.find(ended, "  ").map { it.name })
     }

@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
-import com.prudnikweb.hypernova.data.SessionAutomation
 import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Seam
@@ -37,25 +36,11 @@ import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 
-/** A History row: one ended session, or ([automation] set) all of one automation's, by its newest [session]. */
-class HistoryEntry(val key: String, val session: Session, val automation: SessionAutomation?, val count: Int)
+/** A History row ([com.prudnikweb.hypernova.data.HistoryEntry], in `:shared` so the desktop lists the same). */
+typealias HistoryEntry = com.prudnikweb.hypernova.data.HistoryEntry
 
-/**
- * History's rows: an automation's ended sessions fold into one, placed by its newest run, so a
- * daily brief doesn't bury the owner's own sessions. Their own grouping.
- */
-fun foldRuns(ended: List<Session>): List<HistoryEntry> {
-    val counts = ended.mapNotNull { it.automation?.id }.groupingBy { it }.eachCount()
-    val seen = HashSet<String>()
-    return ended.mapNotNull { s ->
-        val a = s.automation
-        when {
-            a == null -> HistoryEntry(s.id, s, null, 1)
-            seen.add(a.id) -> HistoryEntry("auto:${a.id}", s, a, counts[a.id] ?: 1)
-            else -> null
-        }
-    }
-}
+/** History's rows ([com.prudnikweb.hypernova.data.foldRuns]). */
+fun foldRuns(ended: List<Session>): List<HistoryEntry> = com.prudnikweb.hypernova.data.foldRuns(ended)
 
 /**
  * "◉ MORNING BRIEF ─── 2h" over "12 runs  ◷ Today 9:00" and the AUTO chip; a tap opens its runs.

@@ -51,6 +51,8 @@ data class Session(
     val term: TermLink? = null,
     /** A menu its terminal shows, answered here with buttons. */
     val menu: TermMenu? = null,
+    /** Its terminal shows Claude Code's own sign-in, which cards can't finish: the phone offers its own. */
+    val loginScreen: Boolean = false,
     /** When it started (0 if unknown): with [updatedAt], how long it has run. */
     val createdAt: Long = 0L,
     /** Agents its main agent started that are running now. */
@@ -167,7 +169,7 @@ data class OutdatedClaude(val runs: String, val installed: String)
 @Immutable
 data class Blocked(val kind: String, val text: String, val resetsAt: Long? = null, val autoResumeAt: Long? = null, val resume: Resume? = null) {
     /** The owner has to do something (sign in, renew, add funds), rather than wait. */
-    val needsYou: Boolean get() = kind != LIMIT && kind != MODEL
+    val needsYou: Boolean get() = kind != LIMIT && kind != MODEL && kind != SIGNED_IN
 
     companion object {
         const val LIMIT = "limit"
@@ -177,6 +179,8 @@ data class Blocked(val kind: String, val text: String, val resetsAt: Long? = nul
         const val NO_SUBSCRIPTION = "no_subscription"
         const val ON_HOLD = "on_hold"
         const val PROVIDER = "provider"
+        /** The login that stopped it is back and it didn't carry on by itself: it waits for Continue. */
+        const val SIGNED_IN = "signed_in"
     }
 }
 
@@ -206,7 +210,8 @@ data class Account(
     @Immutable data class Limit(val window: String, val label: String?, val resetsAt: Long?, val autoResumeAt: Long?, val usingCredits: Boolean)
 
     /** A sign-in: [state] "starting", "waiting_code", "finishing" or "failed"; [url] the page to open; on the Mac's terminal or this phone. */
-    @Immutable data class Login(val state: String, val url: String?, val onMac: Boolean, val error: String?)
+    /** [console]: with the Console's API billing, not the subscription. */
+    @Immutable data class Login(val state: String, val url: String?, val onMac: Boolean, val error: String?, val console: Boolean = false)
 
     val ok: Boolean get() = state == OK
     /** Sessions on the subscription can't reply until the owner acts: amber, and a notification. */
@@ -252,6 +257,9 @@ data class UsageRate(val fiveHour: Float?, val sevenDay: Float?)
  * lately; a conversation that switched agents as its newest session. Anything else ended is in History.
  */
 val Session.onHome: Boolean get() = (phase != Phase.Ended || cutByRestart) && switchedTo == null
+
+/** History's list (docs/DECISIONS.md, "Delete takes a session off Home, History brings it back"): what has ended, but for what a restart ended lately, which Home keeps. */
+val Session.inHistory: Boolean get() = phase == Phase.Ended && !cutByRestart
 
 /**
  * Claude plan usage, from the status line's rate_limits.

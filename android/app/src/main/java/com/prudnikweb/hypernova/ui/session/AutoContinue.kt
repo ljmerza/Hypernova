@@ -172,6 +172,7 @@ internal fun LimitCard(hub: Hub, s: Session, b: Blocked, other: Provider?, onMov
     val creditBack = ready && b.kind == Blocked.PROVIDER && Regex("\\b402\\b|credit", RegexOption.IGNORE_CASE).containsMatchIn(b.text)
     val title = when {
         ready && b.kind == Blocked.PROVIDER -> stringResource(if (creditBack) R.string.provider_credit_back_title else R.string.provider_back_title, name)
+        ready && b.kind == Blocked.SIGNED_IN && r?.why != "dropped" -> stringResource(R.string.resume_ready_login)
         ready && r?.why == "slept" -> stringResource(R.string.resume_ready_slept)
         ready && r?.why == "dropped" -> stringResource(R.string.resume_ready_dropped)
         ready -> stringResource(R.string.resume_ready_limit)

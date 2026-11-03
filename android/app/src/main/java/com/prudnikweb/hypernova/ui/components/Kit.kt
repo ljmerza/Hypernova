@@ -34,8 +34,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -106,6 +111,31 @@ fun ScreenScaffold(
                 }
             }
         }
+    }
+}
+
+/** How tall the tabs are from the screen's bottom edge, on a Settings page that has them (ui/App.kt); else nothing. */
+val LocalTabsRoom = compositionLocalOf { 0.dp }
+
+/**
+ * What a pushed screen's content leaves free at the bottom: the tabs on a Settings page, which
+ * already stand on the navigation bar, else the navigation bar.
+ */
+@Composable
+fun screenBottom(): Dp = maxOf(LocalTabsRoom.current, WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
+
+/** What the page on screen asks before a tab takes it away: given the going, it goes or doesn't. */
+val LocalTabsAsk = staticCompositionLocalOf<MutableState<((go: () -> Unit) -> Unit)?>?> { null }
+
+/** For a page that asks before it loses what's typed: a tab asks as its Back does, with [ask]. */
+@Composable
+fun AskBeforeTabs(ask: (go: () -> Unit) -> Unit) {
+    val holder = LocalTabsAsk.current ?: return
+    val now by rememberUpdatedState(ask)
+    DisposableEffect(holder) {
+        val mine: (go: () -> Unit) -> Unit = { go -> now(go) }
+        holder.value = mine
+        onDispose { if (holder.value === mine) holder.value = null }
     }
 }
 

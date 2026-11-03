@@ -56,6 +56,7 @@ import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.inHistory
 import com.prudnikweb.hypernova.desktop.CardOffer
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.Ui
@@ -107,8 +108,9 @@ private fun BackPill(onBack: () -> Unit) {
 }
 
 /**
- * What it is and what it asks, always in view, then the chat, then the box. The facts are at the start of the chat, where they don't
- * take room from it: a short conversation has them on screen, and a long one is a scroll up. docs/DECISIONS.md, "The chat on the desktop".
+ * What it is and what it asks, always in view, then the chat, then the box. The facts and what can be done to it are at the start of the chat, where
+ * they don't take room from it: a short conversation has them on screen, and a long one is a scroll up. docs/DECISIONS.md, "The chat on the desktop".
+ * What has ended is the same: opening it only reads it, and only writing in it resumes it, which the box and the note say.
  */
 @Composable
 private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: (() -> Unit)?) {
@@ -118,16 +120,21 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
     CompositionLocalProvider(LocalUriHandler provides links) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val askMax = maxHeight * ASK_SHARE
+            // The box always has its room, in the smallest window too: the card gives way, what's asked scrolling above its pills.
+            val rest = maxHeight - BOX_ROOM - if (onBack != null) BACK_ROOM else 0.dp
             Column(
                 Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (onBack != null) BackPill(onBack)
                 val card = Modifier.widthIn(max = PANE_MAX).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }
-                AskCard(hub, s, shell, askMax, card)
+                AskCard(hub, s, shell, askMax, card.heightIn(max = rest.coerceAtLeast(0.dp)))
                 ChatList(hub, s, shell, following, box, Modifier.weight(1f).widthIn(max = PANE_MAX).fillMaxWidth()) {
                     Facts(s, Modifier.fillMaxWidth())
-                    HText(Ui.desk_pane_phone_only.text(), Modifier.padding(horizontal = 4.dp, vertical = 4.dp), style = Type.small, color = HN.inkDim)
+                    SessionActions(hub, s, shell, Modifier.fillMaxWidth())
+                    val note = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                    HText(if (s.inHistory) Ui.desk_pane_in_history.text() else Ui.desk_pane_phone_only.text(), note, style = Type.small, color = HN.inkDim)
+                    s.automation?.takeIf { s.inHistory }?.let { HText(Ui.desk_pane_runs_phone.format(it.name), note, style = Type.small, color = HN.inkDim) }
                 }
                 ChatBox(hub, s, shell, following, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
             }
@@ -155,7 +162,7 @@ private fun AskCard(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Mo
             Spacer(Modifier.height(4.dp))
             // The whole of what it asks, however long, and the pills stay in view under it: past a share of the window this scrolls.
             val askScroll = rememberScrollState()
-            Box(Modifier.heightIn(max = askMax)) {
+            Box(Modifier.weight(1f, fill = false).heightIn(max = askMax)) {
                 Column(Modifier.verticalScroll(askScroll)) {
                     when (offer) {
                         is CardOffer.Whole -> WholeCommand(offer)
@@ -231,6 +238,10 @@ private val FACT_LABEL = 128.dp
 
 /** The share of the pane what's asked may take before it scrolls: the chat and the box need the rest. */
 private const val ASK_SHARE = 0.4f
+
+/** What the pane keeps for the box and the gaps round it, and for Back. */
+private val BOX_ROOM = 88.dp
+private val BACK_ROOM = 52.dp
 
 private fun annotatedCommand(tool: String, text: String): AnnotatedString = buildAnnotatedString {
     withStyle(SpanStyle(color = HN.amber)) { append(if (tool.startsWith("Bash", ignoreCase = true)) "$ " else "› ") }

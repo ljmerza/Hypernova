@@ -25,9 +25,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -68,6 +65,7 @@ import com.prudnikweb.hypernova.ui.components.GlyphButton
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
+import com.prudnikweb.hypernova.ui.components.screenBottom
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -137,8 +135,8 @@ fun WebScreen(url: String, title: String, onBack: () -> Unit, preview: Boolean =
         },
     ) { top, _ ->
         // The WebView sits below the bar (a native view can't be blurred under it).
-        // …and above the gesture bar, so a page's fixed footer stays visible.
-        val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        // …and above the gesture bar and, reached from Settings, the tabs, so a page's fixed footer stays visible.
+        val navBottom = screenBottom()
         Column(Modifier.fillMaxSize().padding(top = top, bottom = navBottom)) {
             Box(Modifier.fillMaxWidth().height(2.dp)) {
                 if (progress in 0.01f..0.99f) Box(Modifier.fillMaxHeight().fillMaxWidth(progress).background(HN.accent))

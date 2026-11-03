@@ -54,6 +54,7 @@
     <string name="resume_failed">Didn\'t go through. Open the terminal to check.</string>
     <!-- The ready card: the cause is over and it didn't carry on by itself. -->
     <string name="resume_ready_limit">The limit has reset</string>
+    <string name="resume_ready_login">You’re signed in again</string>
     <string name="resume_ready_slept">The limit reset while your Mac slept</string>
     <string name="resume_ready_dropped">It didn\'t carry on by itself</string>
     <string name="resume_ready_line">Waiting for you since %1$s</string>

@@ -39,7 +39,7 @@ class WordsTest {
 
     /** By name, as they aren't in [Plural]: a rename of the phone's fails here rather than in a pane. */
     @Test fun thePanesPluralsAreThere() {
-        for (n in listOf("meta_ago_minutes", "meta_ago_hours", "meta_ago_days")) assertTrue(n, DesktopStrings.hasPlural(n))
+        for (n in listOf("meta_ago_minutes", "meta_ago_hours", "meta_ago_days", "au_history_runs")) assertTrue(n, DesktopStrings.hasPlural(n))
     }
 
     @Test fun thisAppsOwnWordsDontSayTheNameItIsAboutToLose() {
@@ -53,6 +53,7 @@ class WordsTest {
         assertTrue(Ui.desk_agent_on_phone.text().endsWith("on your phone."))
         assertTrue(Ui.desk_not_whole.text().endsWith("on your phone."))
         assertTrue(Ui.desk_pane_phone_only.text().contains("on your phone"))
+        assertTrue(Ui.desk_pane_runs_phone.text().contains("on your phone"))
     }
 
     @Test fun thisComputerIsntAPhoneAndScansNothing() {

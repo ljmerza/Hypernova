@@ -24,6 +24,7 @@ enum class Str {
     activity_provider,
     activity_provider_auto,
     activity_provider_ready,
+    activity_signed_in,
     activity_signed_out,
     activity_starting,
     activity_waiting,

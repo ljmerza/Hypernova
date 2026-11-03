@@ -20,6 +20,13 @@ class TermMenuStepsTest {
         ),
     ).menu
 
+    @Test fun aTerminalShowingClaudeCodesOwnSignInSaysSoAndAnOlderDaemonDoesnt() {
+        fun session(extra: String) = Wire.session(JSONObject("""{"id":"s1","cwd":"/p","state":"needs_you","term":{"id":"t1","mac":0,"phone":1}$extra}"""))
+        assertEquals(true, session(""","loginScreen":true""").loginScreen)
+        assertEquals(false, session(""","loginScreen":false""").loginScreen)
+        assertEquals(false, session("").loginScreen)
+    }
+
     @Test fun readsTheTabs() {
         val m = menu(""","steps":{"labels":["Versioning","First version"],"answered":[true,false]}""")!!
         assertEquals(TermMenu.Steps(listOf("Versioning", "First version"), listOf(true, false)), m.steps)

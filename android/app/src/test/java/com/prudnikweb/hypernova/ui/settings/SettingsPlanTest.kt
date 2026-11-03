@@ -4,6 +4,7 @@ import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.ui.settings.SettingsPlan.PhonePage
 import com.prudnikweb.hypernova.ui.settings.SettingsPlan.ServerFacts
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,6 +25,20 @@ class SettingsPlanTest {
     @Test fun aRowPerServerInTheOrderGiven() {
         val rows = SettingsPlan.parts(listOf("z2", "shed", "gym"), false).filterIsInstance<SettingsPlan.Servers>().single()
         assertEquals(listOf("z2", "shed", "gym"), rows.ids)
+    }
+
+    @Test fun theSwitchForEveryServerSaysHowTheyStand() {
+        // On only when every one that can is; the ones too old (null) aren't counted against it.
+        assertEquals(SettingsPlan.AllSwitch(on = 2, can = 2, old = 1), SettingsPlan.allSwitch(listOf(true, null, true)))
+        assertTrue(SettingsPlan.allSwitch(listOf(true, null, true)).checked)
+        val mixed = SettingsPlan.allSwitch(listOf(true, false))
+        assertTrue(mixed.mixed)
+        assertFalse(mixed.checked)
+        assertFalse(SettingsPlan.allSwitch(listOf(false, false)).mixed)
+        assertFalse(SettingsPlan.allSwitch(listOf(false, false)).checked)
+        // Nothing can: not on.
+        assertFalse(SettingsPlan.allSwitch(listOf(null)).checked)
+        assertFalse(SettingsPlan.allSwitch(emptyList()).checked)
     }
 
     @Test fun oneServerIsTheSameTabWithOneRow() {

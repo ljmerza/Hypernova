@@ -67,6 +67,11 @@ export type Settings = {
    * debug on`, `POST /local/settings`, the phone. Never more than 24 hours ahead. Unset: off.
    */
   debugUntil?: number
+  /**
+   * Sessions Claude Code's lost login stopped carry on by themselves once it's back (resume.ts; owner,
+   * 2026-11-03: "default on"). Settings on the phone, `POST /v1/claude`, `POST /local/settings`. Unset: on.
+   */
+  loginContinue?: boolean
 }
 /**
  * A session started from Hypernova. `engine` "term" runs in a shared terminal; "sdk" (or none, from

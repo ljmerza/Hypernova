@@ -273,7 +273,7 @@ interface Hub {
      * Sign Claude Code in again: on this phone (the sign-in page opens here and its code is pasted
      * back, see [sendSignInCode]) or in a terminal on the Mac ([onMac]). [account] follows it.
      */
-    suspend fun signIn(onMac: Boolean): Result<Unit> = Result.failure(UnsupportedOperationException())
+    suspend fun signIn(onMac: Boolean, console: Boolean = false, again: Boolean = false): Result<Unit> = Result.failure(UnsupportedOperationException())
     /** The code the sign-in page shows, typed into the sign-in on the Mac. Never logged. */
     suspend fun sendSignInCode(code: String): Result<Unit> = Result.failure(UnsupportedOperationException())
     suspend fun cancelSignIn(): Result<Unit> = Result.success(Unit)
@@ -362,6 +362,7 @@ interface Hub {
      * providers → Claude Code). Succeeds with Claude Code as the Mac has it now.
      */
     suspend fun setClaudeAgents(on: Boolean): Result<ClaudeState?> = Result.failure(UnsupportedOperationException())
+    suspend fun setLoginContinue(on: Boolean): Result<ClaudeState?> = Result.failure(UnsupportedOperationException())
     /**
      * Codex on or off for Hypernova, from the phone (`POST /v1/codex {enabled}`). Succeeds with Codex
      * as the Mac has it now; fails with the Mac's words (a Codex that isn't installed, or too old).

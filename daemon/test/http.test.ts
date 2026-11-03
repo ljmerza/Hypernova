@@ -212,6 +212,7 @@ test('the account is in the snapshot and /local/status; a check runs on demand; 
   }
   assert.deepEqual(await err('POST', '/v1/account/login', '{"where":"phone"}'), [409, 'not_needed'])
   assert.deepEqual(await err('POST', '/v1/account/login', '{"where":"tv"}'), [400, 'bad_where'])
+  assert.deepEqual(await err('POST', '/v1/account/login', '{"method":"magic"}'), [400, 'bad_method'])
   assert.deepEqual(await err('POST', '/v1/account/login/code', '{"code":"a#b"}'), [409, 'no_login'])
   assert.deepEqual(await err('DELETE', '/v1/account/login'), [200, true])
   assert.equal((await send(API, 'POST', '/v1/account/check', {}, '{}')).status, 401)

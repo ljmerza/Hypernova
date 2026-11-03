@@ -51,7 +51,7 @@ case "$1" in
     if [ "$2" = "ask00000" ]; then printf '\\n Do you want to proceed?\\n ❯ 1. Yes\\n   2. No\\n'; exec sleep 30; fi
     # Claude Code's own permission dialog (the Arc screen); keys pressed into it land in a file.
     # permdrft: the same, under another session's title (the holder drifted to another view).
-    if [ "$2" = "perm0000" ] || [ "$2" = "permdrft" ]; then
+    if [ "$2" = "perm0000" ] || [ "$2" = "permdrft" ] || [ "$2" = "login000" ]; then
       [ "$2" = "permdrft" ] && printf '\\033]0;Some other session\\007'
       cat "$S/perm-screen.txt"; stty -echo 2>/dev/null; exec cat > "$S/keys-$2"
     fi
@@ -493,6 +493,28 @@ test('a question form of several questions: its steps on the menu, Back/Next and
   // Past Submit, or on a menu with no steps: refused, nothing pressed.
   assert.deepEqual(await answerMenu(tid!, menu.id, { step: 3 }), { ok: false, reason: 'menu_moved' })
   assert.equal(readFileSync(keys, 'utf8').length, 18)
+})
+
+test('Claude Code’s own sign-in in a terminal: the session says so while it shows, and carries no address', async () => {
+  settings.claudeAgents = true
+  writeFileSync(join(process.env.FAKE_AGENTS_DIR!, 'perm-screen.txt'), readFileSync(join(import.meta.dirname, 'fixtures', 'login-screens', 'code-prompt.txt')))
+  job('agents-login-1', 'login000', 'busy')
+  hub.pollRegistry()
+  const tid = await attachAgentsTerm('agents-login-1', scratch, 'login000', 1500)
+  assert.ok(tid)
+  scanTerms()
+  const t0 = Date.now()
+  while (!hub.getSession('agents-login-1')?.loginScreen && Date.now() - t0 < 6000) {
+    await watchMenus()
+    await new Promise((ok) => setTimeout(ok, 200))
+  }
+  const s = hub.listSessions().find((x) => x.id === 'agents-login-1')!
+  assert.equal(s.loginScreen, true)
+  assert.equal(s.menu, null)
+  assert.ok(!JSON.stringify(s).includes('oauth/authorize'))
+  assert.ok(await endTermAndWait(tid!))
+  await watchMenus()
+  assert.equal(hub.getSession('agents-login-1')?.loginScreen, false)
 })
 
 test('a claude attach holder that drifted: its dialog is not the session’s menu', async () => {

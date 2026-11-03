@@ -391,6 +391,51 @@ class ChatTest {
         inChat(Ui.desk_pane_phone_only.text()).assertIsDisplayed()
     }
 
+    // ─── What has ended ───
+
+    private fun ended(id: String, title: String) = session(id, state = "ended", title = title)
+
+    @Test fun anEndedSessionOnlyReadsUntilItsWrittenIn() = runDesktopComposeUiTest(1200, 900) {
+        d.snapshot = snapshot("z2", sessions = listOf(session("s2", state = "idle", title = "Still here"), ended("s1", name)))
+        history(user("u1", "What was said"), reply("r1", "And its answer"))
+        d.ok("POST", prompt, JSONObject().put("session", session("s1", state = "working", title = name)))
+        setContent { App(shell, reduced = true) }
+        pairedWith(d)
+        until("the sessions") { (Core.live?.sessions?.size ?: 0) >= 2 }
+        waitForIdle()
+        onNode(hasText(Ui.history.text())).performClick()
+        waitForIdle()
+        choose(name)
+        until("its history") { Core.live?.loadingTranscript("s1") == false && d.count("GET", "/v1/sessions/s1/events") > 0 }
+        waitForIdle()
+        inChat("What was said").assertIsDisplayed()
+        inChat("And its answer").assertIsDisplayed()
+        inChat(Ui.desk_pane_in_history.text()).assertIsDisplayed()
+        onNode(hasTestTag(BOX_TAG) and hasText(Ui.prompt_hint_ended.text())).assertExists()
+        // Reading started nothing.
+        assertEquals(0, d.count("POST", "/v1/sessions/s1/resume"))
+        assertEquals(0, d.count("POST", prompt))
+        inPane(Ui.session_rename.text()).assertDoesNotExist()
+        render("chat-history")
+        type("Carry on from there")
+        press(Key.Enter)
+        until("it went") { d.count("POST", prompt) == 1 }
+        assertEquals("Carry on from there", d.calls("POST", prompt).last().json.getString("text"))
+    }
+
+    @Test fun aSessionThatEndsWhileReadKeepsItsChatAndWhatsTyped() = runDesktopComposeUiTest(1200, 900) {
+        history(user("u1", "Still reading this"))
+        up()
+        type("half a thought")
+        inPane(Ui.desk_pane_phone_only.text()).assertExists()
+        d.push(msg("session") { put("session", ended("s1", name)) })
+        until("it ended") { Core.live?.session("s1")?.phase == com.prudnikweb.hypernova.data.Phase.Ended }
+        waitForIdle()
+        inChat("Still reading this").assertIsDisplayed()
+        onNode(hasTestTag(BOX_TAG) and hasText("half a thought")).assertExists()
+        inChat(Ui.desk_pane_in_history.text()).assertExists()
+    }
+
     // ─── Links ───
 
     private val browsed = java.util.concurrent.CopyOnWriteArrayList<String>()
@@ -561,7 +606,8 @@ class ChatTest {
         d.snapshot = snapshot("z2", sessions = listOf(session("s1", state = "needs_you", title = name)), approvals = listOf(bash("a1", "ls")))
         history(user("u1", "One"), reply("r1", "Two"), user("u2", "Three"), reply("r2", "Four"))
         up()
-        repeat(4) {
+        // The top bar's New session, Sessions, History, Settings and Pair another, then Deny and Allow.
+        repeat(7) {
             onRoot().performKeyInput { pressKey(Key.Tab) }
             waitForIdle()
         }

@@ -460,8 +460,10 @@ Snapshot = {
     version: string | null,
     sdk?: boolean,                // Claude Code's SDK is in the daemon's packages (see Claude Code's SDK);
                                   // absent: an older daemon, which always carried it
-    agents?: boolean              // sessions live in `claude agents` (settings.claudeAgents, see Session menu);
+    agents?: boolean,             // sessions live in `claude agents` (settings.claudeAgents, see Session menu);
                                   // absent: an older daemon
+    loginContinue?: boolean       // sessions the lost login stopped carry on by themselves once it's back
+                                  // (settings.loginContinue, see After signing in again); absent: an older daemon
   },
   codex?: Codex | null            // Codex as a second agent (see Codex); null: not installed here; absent: an older daemon
 }
@@ -558,7 +560,9 @@ Session = {
                               // state, the working rule: working = state working/starting or agentsRunning > 0,
                               // needs_you outranks it (the Android app's Session.busy; one rule in every client)
   blocked: null | {           // why Claude can't reply here now (see Account); a real reply clears it
-    kind: "limit" | "model" | "no_credit" | "logged_out" | "no_subscription" | "on_hold" | "provider",
+    kind: "limit" | "model" | "no_credit" | "logged_out" | "no_subscription" | "on_hold" | "provider" | "signed_in",
+                                  // signed_in: the login that stopped it is back and it waits for Continue
+                                  // (see After signing in again); only with resume.state "ready"
     text: string,             // Claude Code's line, request ids removed, at most 200 characters
     resetsAt: number | null,  // epoch ms
     autoResumeAt: number | null, // it carries on by itself then: resume.at while resume.state is "armed", else null
@@ -566,6 +570,8 @@ Session = {
   },
   endedBy: null | "mac_restart",  // why it ended when nobody ended it: open when the server restarted or shut down
                               // (see After a restart of the Mac); null otherwise, and whenever it isn't "ended"
+  loginScreen?: boolean,      // its terminal shows Claude Code's own sign-in (see Signing in again); true only while it does.
+                              // Says nothing else: the address and the code are never on a session
   menu: null | {              // a menu or dialog its terminal shows instead of the input box (none while an approval is open)
     id,                       // title and option labels, hashed; answers name it
     title: string | null,
@@ -1078,7 +1084,8 @@ Account = {
   sessionId: string | null,     // the session that hit it first
   checkedAt: number | null,     // the last `claude auth status`
   login: null | { state: "starting" | "waiting_code" | "finishing" | "failed",
-                  url: string | null, where: "phone" | "mac", error: string | null }
+                  url: string | null, where: "phone" | "mac", method: "subscription" | "console",
+                  error: string | null }
 }
 ```
 
@@ -2626,12 +2633,15 @@ Errors). All take the bearer token except the local fire route.
 
 #### POST /v1/account/login
 
-- **Body:** `{where?: "phone" | "mac"}` (none: `"phone"`)
+- **Body:** `{where?: "phone" | "mac", method?: "subscription" | "console", again?: boolean}` (none:
+  `"phone"`, `"subscription"`, `false`)
 - **Answer:** `200 {account: Account}`
-- **Refusals:** 400 `bad_where`; 409 `not_needed` (the account is ok), `no_claude` (Claude Code
-  isn't installed); 501 `unavailable` `{feature: "openWindow"}` (`where: "mac"` on Linux)
+- **Refusals:** 400 `bad_where`, `bad_method`; 409 `not_needed` (the account is ok, without `again`),
+  `no_claude` (Claude Code isn't installed); 501 `unavailable` `{feature: "openWindow"}` (`where:
+  "mac"` on Linux)
 - **Rules:** signs Claude Code in again in a login holder; `account.login` follows it. While one
-  runs (not `failed`), the same one. See Signing in again, under Account.
+  runs (not `failed`), the same one, whatever this one asks: cancel it to choose again. See Signing
+  in again, under Account.
 
 #### POST /v1/account/login/code
 
@@ -2734,11 +2744,13 @@ Errors). All take the bearer token except the local fire route.
 
 #### POST /v1/claude
 
-- **Body:** `{agents: boolean}`
+- **Body:** `{agents?: boolean, loginContinue?: boolean}`, at least one
 - **Answer:** `200 {claude}` (the snapshot's `claude`)
 - **Refusals:** 400 `bad_value`
-- **Rules:** sessions in `claude agents` on or off (`settings.claudeAgents`, see Session menu),
-  saved and taken at once, without a restart. Every client hears `{t:"claude"}`.
+- **Rules:** `agents`: sessions in `claude agents` on or off (`settings.claudeAgents`, see Session
+  menu). `loginContinue`: sessions the lost login stopped carry on by themselves once it's back, on
+  unless set to false (`settings.loginContinue`, see After signing in again). Saved and taken at
+  once, without a restart. Every client hears `{t:"claude"}`.
 
 #### POST /v1/sessions/{id}/switch/preview
 
@@ -2780,8 +2792,9 @@ Errors). All take the bearer token except the local fire route.
 - **Refusals:** those of `POST /v1/sessions/{id}/prompt`; 409 `unsupported_for_agent`
   (`reason: "limit"` on Codex)
 - **Rules:** no reason, or `"away"`, sends "I'm back. Please continue where you left off." `"limit"`
-  sends the continuation after a limit (see Auto-continue), drawn as a notice row, and the session's
-  ready card goes once its turn starts.
+  sends the continuation after a limit (see Auto-continue), or, on a session the login stopped, the
+  one after signing in (see After signing in again), drawn as a notice row, and the session's ready
+  card goes once its turn starts.
 
 ### Routes: projects, providers and models
 
@@ -3526,6 +3539,7 @@ There is no battery route: the battery comes in `Snapshot.mac.battery` and `{t:"
 | `browseOutsideProjects` | See Files, The setting. Every client hears of it, with the sessions it opens or closes |
 | `codex` | Turns Codex on or off for Hypernova, with the shell's `codex` function (see Codex) |
 | `claudeAgents` | Sessions in `claude agents`, as `POST /v1/claude`. Every client hears `claude` |
+| `loginContinue` | Sessions the lost login stopped carry on by themselves once it's back, as `POST /v1/claude`. Every client hears `claude` |
 | `releaseCheck` | The app's GitHub releases (see The app update, "Where the offered APK comes from"). Turned on, a look now |
 | `autoUpdate` | The server updating itself, on unless set to false (see The server's own update; `hypernova auto-update`). Turned on, a look now; every client hears `update` |
 
@@ -3769,8 +3783,8 @@ objects with a `t` field. On the WebSocket's auth, see Transport and auth.
 
 - **Direction:** daemon → client
 - **Shape:** `{t:"claude", claude}` (as the snapshot's `claude` says it)
-- **When:** sessions in `claude agents` were turned on or off (`POST /v1/claude`, or
-  `POST /local/settings {claudeAgents}`).
+- **When:** sessions in `claude agents`, or carrying on after signing in, were turned on or off
+  (`POST /v1/claude`, or `POST /local/settings {claudeAgents, loginContinue}`).
 
 #### `{t:"codex"}`
 
@@ -6099,8 +6113,16 @@ The SDK's `accountInfo()` (from the process the "/" list starts) fills `plan` to
 
 #### Signing in again
 
-`POST /v1/account/login`: `claude auth login --claudeai` in a holder of its own (not a session; 500
-columns wide so the address fits one line; `hn ls` lists it), with `login.state` `starting`.
+`POST /v1/account/login`: `claude auth login` in a holder of its own (not a session; 500 columns wide
+so the address fits one line; `hn ls` lists it), with `login.state` `starting`. `method` says how:
+`subscription` is `--claudeai`, `console` is `--console`, the command's own flags for API billing
+(its `--help`, Claude Code 2.1.317). Both end at the same plain prompt, each at its own page
+(claude.com and platform.claude.com, 2.1.317). A third-party platform (Bedrock, Vertex, Foundry) has
+no flag: it's a provider, or a terminal.
+
+`again: true` is for signing in while signed in, as a /login is, to change account. The account being
+fine then says nothing about this sign-in, so it isn't what ends it: a refused code starts it over
+as below, and a code turned away or the time running out is `failed`, as when signed out.
 
 **The address.** The sign-in page's address is read off its screen (an `https://` link on claude.ai,
 claude.com or anthropic.com, joined back if it wraps) into `login.url`, and the state becomes
@@ -6118,8 +6140,18 @@ code prompt ("Paste code here if prompted >") shows (8 s at most), checks the co
 address on that same screen, then types it there as raw keys and Enter (not the way prompts are
 typed, never logged) → `finishing`. While Claude Code checks it, another code is 409 `not_ready`.
 
-**The answer.** `claude auth login` (Claude Code 2.1.300) is a plain line prompt, not the
-interactive /login screen, and has no error page:
+**Claude Code's own /login.** The interactive one a session's terminal shows when /login is typed
+there, or on a first run. As read from Claude Code 2.1.317 (`daemon/test/fixtures/login-screens/`):
+"Select login method:" with three numbered options, for the Console a second menu ("How do you want
+to sign in?"), then the address and "Paste code here if prompted >", which has no ❯ and so is no
+menu. A first run has the same screens with no dialog round them and no footer, after a theme picker,
+and Esc does nothing on them; in /login's dialog Esc ends it from any step ("Login interrupted").
+While any of them shows, the session has `loginScreen: true`, read with the menus (`watchMenus`), with
+`menu` still set on the menu steps. The phone doesn't type a /login: it goes to `POST
+/v1/account/login` instead. `POST /v1/sessions/{id}/interrupt` is the Esc that closes this screen.
+
+**The answer.** `claude auth login` (Claude Code 2.1.300; the prompt is the same on 2.1.317) is a
+plain line prompt, not the interactive /login screen, and has no error page:
 
 - A code without both halves gets "Invalid code…" and the prompt waits for another (→ `waiting_code`
   with `error`).
@@ -6186,7 +6218,8 @@ Whether a session a limit stopped carries on by itself (`daemon/src/resume.ts`),
   working on when it was reached; do not repeat work that is already complete." Such a prompt, and
   Continue's ("You can carry on now. …"), is a notice row in the chat ("Continued by itself after
   the limit", "Continued after the limit"), never the owner's bubble.
-- **Never by itself:** out of credit, a refused key, signed out and the rest (`resume: null`). A
+- **Never by itself:** out of credit, a refused key, and the rest but a sign-out (`resume: null`;
+  a sign-out has rules of its own, see After signing in again). A
   rate limit that named no reset, or a provider `down`, is `off` with `no_reset` and can't be armed
   (the card offers Try again). An observed terminal (not shared) shows its state; both switches are
   off there.
@@ -6220,6 +6253,51 @@ Whether a session a limit stopped carries on by itself (`daemon/src/resume.ts`),
   cleared with Backspace and the continuation typed in its place. Any other text answers 409
   `typing` as for a prompt.
 - Kept in `<support>/resume.json` (0600): a restart keeps what's armed, off or ready.
+
+#### After signing in again
+
+A session the lost login stopped (`blocked.kind: "logged_out"`) carries on by itself once the account
+is back, with `settings.loginContinue` on (the default; `POST /v1/claude`, Settings → the server's
+page, or Settings' switch for all servers, which sets each connected one). The same machinery as a
+limit's (`daemon/src/resume.ts`), with an entry marked `login`; `blocked.resume` stays null until
+there's a `ready` to show.
+
+- **Back means:** the account isn't signed out any more and says `ok`: "Login successful" from a
+  sign-in (the phone's, or `/login` in a terminal), a check that finds one, or a reply to a request
+  sent after the sign-out began. A sign-in that failed changes nothing, so nothing moves.
+- **Still under a limit** (`Account`, signing in during a limit brings it back): nothing moves until
+  the account is `ok`, at its reset. One whose reset was over 24 hours off when it came back says to
+  Continue then, as a limit's own carrying on wouldn't have run. On usage credits: no wait. On hold,
+  out of credit or no plan: it waits on.
+- **What moves:** only sessions with such a block from this sign-out (no earlier than a minute before
+  it began), on the built-in provider. Not one the owner stopped, one that ended, a `claude agents`
+  job listed `stopped`, `done` or `failed`, one on another provider, one a limit stopped (its own
+  schedule stands), nor one where someone wrote since it stopped (a prompt or a command; `/login`
+  doesn't count): that one's entry goes. Codex has its own login and isn't covered.
+- **When:** the first 5 s after the sign-in, the next 4 s apart, oldest stop first. At its moment
+  it's checked again: signed out again or a limit since, it goes back to waiting; written in since,
+  it's left; an approval, menu or dialog open (`needs_you`), 20 s later.
+- **What it types:** "Your Claude Code login is back. Continue the task you were working on when the
+  login was lost. Any agents you started that failed because of it have stopped: continue them with
+  SendMessage, or run them again if you can't; do not repeat work that is already complete." It's a
+  notice row in the chat ("Continued by itself after signing in again"), never the owner's bubble,
+  and no notification, as after a limit. A `claude agents` job is typed into through `claude attach`.
+- **Once.** The entry stays `fired` for 15 minutes. Stopped by the login again in that time, the login
+  is flipping: it won't carry on by itself again, however many sign-ins come, until 15 minutes after
+  that continuation. Kept in `resume.json`, so a restart doesn't send it twice, and a sign-in the
+  daemon was down for is noticed at its first look.
+- **Says to Continue:** with the setting off, after a flip, with unsent text in its terminal, or with
+  no way to type (a terminal Hypernova doesn't hold): `blocked: {kind: "signed_in", resume: {state:
+  "ready", …}}` (`why` `dropped` for the unsent text). Continue (`POST …/continue {reason: "limit"}`)
+  types the same words after "You can carry on now: …", a notice row "Continued after signing in
+  again". It goes with a turn, or after 12 hours.
+- **While it waits its moment** nothing shows: its block is over and the session is idle.
+- **A `claude agents` job** says `state: "blocked"` and `needs: "login required — run /login · API
+  Error: …"` in its state file until its next prompt (Claude Code 2.1.317). Once the account isn't
+  signed out it's idle here, not `needs_you`.
+- **Sub agents.** A sub agent the login stopped ends as failed; nothing in Claude Code resumes it by
+  itself. Only its session can, which is why the words above ask. What Claude Code does, as measured:
+  docs/DECISIONS.md, "Carrying on after signing in again".
 
 ### Session usage, the to-do list and Rewind
 

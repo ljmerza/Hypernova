@@ -63,6 +63,8 @@ data class WSession(
     val term: TermLink? = null,
     /** A menu or dialog its terminal shows instead of the input box, to answer with buttons. */
     val menu: TermMenu? = null,
+    /** Its terminal shows Claude Code's own sign-in. */
+    val loginScreen: Boolean = false,
     /** Prompts waiting until Claude can take them, oldest first ([queued] of them). */
     val queue: List<WQueued> = emptyList(),
     /** Agents its main agent started that are running now. */
@@ -664,6 +666,7 @@ object Wire {
             queued = o.int("queued") ?: 0,
             term = o.obj("term")?.let { t -> t.str("id")?.let { TermLink(it, t.int("mac") ?: 0, t.int("phone") ?: 0) } },
             menu = o.obj("menu")?.let(::menu),
+            loginScreen = o.bool("loginScreen"),
             queue = o.arr("queue").mapObjects(::queued),
             agentsRunning = o.int("agentsRunning") ?: 0,
             blocked = runCatching { blocked(o.obj("blocked")) }.getOrNull(),
@@ -721,6 +724,7 @@ object Wire {
                 url = l.str("url")?.takeIf { it.startsWith("https://") || it.startsWith("http://") },
                 onMac = l.str("where") == "mac",
                 error = l.str("error")?.takeIf { it.isNotBlank() },
+                console = l.str("method") == "console",
             )
         }
         return Account(

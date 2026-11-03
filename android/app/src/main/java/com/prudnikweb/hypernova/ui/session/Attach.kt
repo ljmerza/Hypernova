@@ -6,6 +6,9 @@ import com.prudnikweb.hypernova.ui.components.glassChoice
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -273,13 +276,23 @@ fun rememberAttach(key: String, hub: Hub): Pair<AttachState, AttachPickers> {
         if (ok && uri != null) state.add(listOf(uri), temporary = true)
     }
     val noCamera = stringResource(R.string.attach_no_camera)
+    val cameraRefused = stringResource(R.string.attach_camera_refused)
+    val shoot = {
+        val uri = cameraFile(context)
+        shot = uri
+        // A SecurityException too: Android refuses the camera app to an app that declares the camera
+        // permission (Scan does) without holding it, and only asking first keeps that from happening.
+        try { camera.launch(uri) } catch (e: ActivityNotFoundException) { shot = null; toast(noCamera) } catch (e: SecurityException) { shot = null; toast(cameraRefused) }
+    }
+    val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) shoot() else toast(cameraRefused)
+    }
     val pickers = remember(state) {
         AttachPickers(
             photos = { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             camera = {
-                val uri = cameraFile(context)
-                shot = uri
-                try { camera.launch(uri) } catch (e: ActivityNotFoundException) { shot = null; toast(noCamera) }
+                val held = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                if (held) shoot() else askCamera.launch(Manifest.permission.CAMERA)
             },
             files = { files.launch(arrayOf("*/*")) },
         )

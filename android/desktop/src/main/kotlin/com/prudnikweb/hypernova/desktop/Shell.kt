@@ -29,6 +29,18 @@ sealed interface PairState {
     data class Failed(val title: String, val body: String, val link: PairLink?) : PairState
 }
 
+/** Which list is on screen: what's alive, or History. Settings and pairing go over either and come back to it. */
+enum class Page { Sessions, History }
+
+/** One server's History as it was left, for as long as the window is open: nothing here is saved. */
+class HistoryView {
+    var query by mutableStateOf("")
+    var project by mutableStateOf<String?>(null)
+    /** Its own choice: going to History and back finds the list's where it was. */
+    var chosen by mutableStateOf<String?>(null)
+    val list = LazyListState()
+}
+
 /**
  * The window's own state, over [Core], which has the servers and their links. The pairing is the real one, the
  * phone's ([Pairer], then [Core.paired]): the link's code over the pinned local route, then a device certificate on
@@ -56,6 +68,21 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
     private val chosen = mutableStateMapOf<String, String>()
     /** Where each server's list is scrolled, so Settings and a switch of server come back to the same place. */
     private val lists = HashMap<String, LazyListState>()
+
+    var page by mutableStateOf(Page.Sessions)
+    /** New session is up in the right pane. */
+    var newSession by mutableStateOf(false)
+
+    /** A session started from the form: its form goes, and it's what's on screen. */
+    fun started(server: String, session: String) {
+        newSession = false
+        page = Page.Sessions
+        choose(server, session)
+    }
+
+    private val histories = HashMap<String, HistoryView>()
+
+    fun historyOf(server: String): HistoryView = histories.getOrPut(server) { HistoryView() }
 
     fun chosen(server: String): String? = chosen[server]
 
@@ -115,7 +142,9 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
                 val p = Pairer.pair(platform, parsed)
                 Core.paired(p)
                 // A first look at this server: nothing of an earlier pairing's stands.
-                Core.activeId?.let { chosen.remove(it); lists.remove(it) }
+                Core.activeId?.let { chosen.remove(it); lists.remove(it); histories.remove(it) }
+                page = Page.Sessions
+                newSession = false
                 // The code in the field is spent, and it was a credential until now.
                 link = ""
                 adding = false

@@ -20,6 +20,7 @@ val Str.id: Int
         Str.activity_provider -> R.string.activity_provider
         Str.activity_provider_auto -> R.string.activity_provider_auto
         Str.activity_provider_ready -> R.string.activity_provider_ready
+        Str.activity_signed_in -> R.string.activity_signed_in
         Str.activity_signed_out -> R.string.activity_signed_out
         Str.activity_starting -> R.string.activity_starting
         Str.activity_waiting -> R.string.activity_waiting

@@ -81,10 +81,9 @@ private val EdgeMode: HazePerformanceMode? = if (Build.VERSION.SDK_INT >= 33) Ha
 
 @Composable
 private fun EdgeBar(
-    haze: HazeState, sourceKey: String, fromTop: Boolean, fade: Dp,
+    input: HazeInput, fromTop: Boolean, fade: Dp,
     modifier: Modifier, content: @Composable BoxScope.() -> Unit,
 ) {
-    val input = rememberEdgeInput(haze, sourceKey)
     val density = LocalDensity.current
     var heightPx by remember { mutableFloatStateOf(0f) }
     val fadePx = with(density) { fade.toPx() }
@@ -120,11 +119,22 @@ private fun EdgeBar(
  */
 @Composable
 fun BlurredTop(haze: HazeState, sourceKey: String, modifier: Modifier = Modifier, fade: Dp = 30.dp, content: @Composable BoxScope.() -> Unit) =
-    EdgeBar(haze, sourceKey, fromTop = true, fade = fade, modifier = modifier, content = content)
+    EdgeBar(rememberEdgeInput(haze, sourceKey), fromTop = true, fade = fade, modifier = modifier, content = content)
 
 @Composable
 fun BlurredBottom(haze: HazeState, sourceKey: String, modifier: Modifier = Modifier, fade: Dp = 36.dp, content: @Composable BoxScope.() -> Unit) =
-    EdgeBar(haze, sourceKey, fromTop = false, fade = fade, modifier = modifier, content = content)
+    EdgeBar(rememberEdgeInput(haze, sourceKey), fromTop = false, fade = fade, modifier = modifier, content = content)
+
+/**
+ * [BlurredBottom] for a bar that stays while the screens change under it (Settings' pages, TabBar.kt):
+ * it has no one screen of its own, so it blurs the chart and whichever screens are there.
+ */
+@Composable
+fun BlurredBottomOverScreens(haze: HazeState, modifier: Modifier = Modifier, fade: Dp = 36.dp, content: @Composable BoxScope.() -> Unit) =
+    EdgeBar(
+        remember(haze) { HazeInput.Sources(haze, HazeSourceSelection.All.where { it.zIndex == Z.COSMOS || it.zIndex == Z.CONTENT }) },
+        fromTop = false, fade = fade, modifier = modifier, content = content,
+    )
 
 private val SheetStyle = HazeBlurStyle {
     blurRadius(28.dp)

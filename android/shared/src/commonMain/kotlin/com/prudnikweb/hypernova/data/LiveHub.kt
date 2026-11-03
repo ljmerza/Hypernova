@@ -1064,6 +1064,7 @@ class LiveHub(
             costUsd = w.costUsd,
             term = w.term,
             menu = w.menu,
+            loginScreen = w.loginScreen,
             createdAt = w.createdAt,
             agentsRunning = w.agentsRunning,
             blocked = w.blocked,
@@ -2328,6 +2329,12 @@ class LiveHub(
         Result.success(c)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.ag_claude_agents_err)) }
 
+    override suspend fun setLoginContinue(on: Boolean): Result<ClaudeState?> = try {
+        val c = ClaudeState.parse(api.post("/v1/claude", JSONObject().put("loginContinue", on)).obj("claude"))
+        if (c != null) claude = c
+        Result.success(c)
+    } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.ag_claude_agents_err)) }
+
     override suspend fun setCodexEnabled(on: Boolean): Result<CodexState?> = try {
         val c = CodexWire.state(api.post("/v1/codex", JSONObject().put("enabled", on)).obj("codex"))
         codexChanged(c)
@@ -2388,8 +2395,10 @@ class LiveHub(
         Result.success(Unit)
     } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(handle(e, Str.err_check_account)) }
 
-    override suspend fun signIn(onMac: Boolean): Result<Unit> = try {
-        accountFrom(api.post("/v1/account/login", JSONObject().put("where", if (onMac) "mac" else "phone")))
+    override suspend fun signIn(onMac: Boolean, console: Boolean, again: Boolean): Result<Unit> = try {
+        val body = JSONObject().put("where", if (onMac) "mac" else "phone").put("method", if (console) "console" else "subscription")
+        if (again) body.put("again", true)
+        accountFrom(api.post("/v1/account/login", body))
         Result.success(Unit)
     } catch (e: CancellationException) {
         throw e
