@@ -1,7 +1,6 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
-import android.content.res.Resources
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +17,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -154,19 +152,3 @@ private val StampText = Type.monoSmall.copy(fontSize = 10.sp, lineHeight = 14.sp
 
 /** A seam's trail in words: the label's face, half its tracking, as [Seam] draws a trail. */
 private val TrailText = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.5f)
-
-/** "Model: Opus. Permission mode: ask first." */
-fun modelModeSaid(res: Resources, model: String, mode: String): String =
-    res.getString(R.string.meta_model_said, model) + " " + res.getString(R.string.meta_mode_said, mode)
-
-/** "Active 4 minutes ago." */
-fun sessionSaid(res: Resources, updatedAt: Long, now: Long): String {
-    val s = ((now - updatedAt) / 1000).coerceAtLeast(0)
-    val ago = when {
-        s < 45 -> res.getString(R.string.meta_ago_now)
-        s < 3600 -> maxOf(1L, s / 60).toInt().let { res.getQuantityString(R.plurals.meta_ago_minutes, it, it) }
-        s < 86400 -> (s / 3600).toInt().let { res.getQuantityString(R.plurals.meta_ago_hours, it, it) }
-        else -> (s / 86400).toInt().let { res.getQuantityString(R.plurals.meta_ago_days, it, it) }
-    }
-    return res.getString(R.string.meta_session_said, ago)
-}

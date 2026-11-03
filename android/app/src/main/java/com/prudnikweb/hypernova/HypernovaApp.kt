@@ -4,7 +4,9 @@ package com.prudnikweb.hypernova
 import android.app.Application
 import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.Core
+import com.prudnikweb.hypernova.data.id
 import com.prudnikweb.hypernova.data.storage
+import com.prudnikweb.hypernova.data.strings
 
 /** Starts [Core] (pairing + live connection) once per process, for the Activity and the service. */
 class HypernovaApp : Application() {
@@ -13,7 +15,10 @@ class HypernovaApp : Application() {
 
     override fun onCreate() {
         // Before anything draws: what the shared drawing asks of this app (ui/theme, AndroidUi).
-        com.prudnikweb.hypernova.ui.theme.AndroidUi.install(manrope = R.font.manrope, mono = R.font.jetbrains_mono)
+        com.prudnikweb.hypernova.ui.theme.AndroidUi.install(
+            manrope = R.font.manrope, mono = R.font.jetbrains_mono,
+            stringId = { it.id }, pluralId = { it.id }, words = { it.strings },
+        )
         super.onCreate()
         Core.applicationStarted()
         // The paired computer's words ("your Mac", "your server") before anything is said.

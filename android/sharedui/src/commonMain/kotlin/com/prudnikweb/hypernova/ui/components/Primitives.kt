@@ -4,9 +4,6 @@ package com.prudnikweb.hypernova.ui.components
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import kotlin.math.PI
-import android.content.ClipboardManager
-import android.content.Context
-import android.view.HapticFeedbackConstants
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -42,10 +39,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.ui.theme.pluralStringResource
+import com.prudnikweb.hypernova.ui.theme.stringResource
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -69,7 +66,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.delay
-import android.graphics.BlurMaskFilter
 import kotlin.math.abs
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.prudnikweb.hypernova.data.LinkState
@@ -223,7 +219,7 @@ fun GlassCard(
     onLongClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val view = LocalView.current
+    val haptics = rememberHaptics()
     val ring = edge?.copy(alpha = 0.12f) ?: HN.ink.copy(alpha = 0.08f)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -247,7 +243,7 @@ fun GlassCard(
                         interaction, indication = null, onClickLabel = onClickLabel, role = Role.Button,
                         onLongClickLabel = onLongClickLabel,
                         onLongClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            haptics.longPress()
                             onLongClick()
                         },
                         onClick = onClick,
@@ -301,7 +297,7 @@ fun Pill(
     leading: Glyph? = null,
     enabled: Boolean = true,
 ) {
-    val view = LocalView.current
+    val haptics = rememberHaptics()
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     // Every kind is frosted glass, as the state chips are; they differ in the light inside it.
@@ -322,8 +318,9 @@ fun Pill(
     val touchPad = ((48.dp - height) / 2).coerceAtLeast(0.dp)
     Box(
         modifier
+            .pillPointer(interaction, enabled)
             .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) {
-                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                haptics.tick()
                 onClick()
             }
             .padding(vertical = touchPad),
@@ -336,6 +333,7 @@ fun Pill(
             .clip(CircleShape)
             // The glyph's centre: the padding plus half its 14dp.
             .frostedGlass(if (leading != null || kind == PillKind.Glass) glow else null, glowX = 27.dp, dense = glass, tint = tint)
+            .then(pillFocusRing(interaction, CircleShape))
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -484,8 +482,7 @@ private fun Modifier.filledGlass(color: Color): Modifier = drawWithCache {
     val edge = Brush.verticalGradient(0f to Color.White.copy(alpha = 0.45f), 0.5f to Color.White.copy(alpha = 0f), 1f to Color.Black.copy(alpha = 0.12f))
     val halo = Paint().apply {
         this.color = color.copy(alpha = 0.4f)
-        // Drawn by the GPU since Android 9; the app needs 10.
-        asFrameworkPaint().maskFilter = BlurMaskFilter(5.dp.toPx(), BlurMaskFilter.Blur.OUTER)
+        blurredOutside(5.dp.toPx())
     }
     onDrawBehind {
         drawIntoCanvas { it.drawRoundRect(0f, 0f, size.width, h, h / 2f, h / 2f, halo) }
@@ -537,24 +534,24 @@ fun ConnectionChip(
     // The route, in a word, only while linked: "Local" on the Mac's own network, "Remote" otherwise.
     val route = via?.takeIf { state == LinkState.Connected }?.let { routeWord(it) }
     val word = when (state) {
-        LinkState.Connected -> stringResource(R.string.link_connected)
-        LinkState.Connecting -> stringResource(R.string.link_connecting)
-        LinkState.Reconnecting -> stringResource(R.string.link_reconnecting)
-        LinkState.Offline -> stringResource(R.string.link_offline)
-        LinkState.Unpaired -> stringResource(R.string.link_unpaired)
+        LinkState.Connected -> stringResource(Str.link_connected)
+        LinkState.Connecting -> stringResource(Str.link_connecting)
+        LinkState.Reconnecting -> stringResource(Str.link_reconnecting)
+        LinkState.Offline -> stringResource(Str.link_offline)
+        LinkState.Unpaired -> stringResource(Str.link_unpaired)
     }
     // Only what's current: a Mac that isn't linked may have been plugged in or run down since.
     val power = battery?.takeIf { state == LinkState.Connected }
     val base = when {
         mac == null -> word
-        state == LinkState.Connected -> stringResource(R.string.link_connected_to, mac)
+        state == LinkState.Connected -> stringResource(Str.link_connected_to, mac)
         // Named while not linked (several paired): "z2, Offline".
-        else -> stringResource(R.string.link_said_named, mac, word)
+        else -> stringResource(Str.link_said_named, mac, word)
     }
     val powerSaid = when {
         power == null -> base
-        power.charging -> stringResource(R.string.link_said_charging, base, power.percent)
-        else -> stringResource(R.string.link_said_battery, base, power.percent)
+        power.charging -> stringResource(Str.link_said_charging, base, power.percent)
+        else -> stringResource(Str.link_said_battery, base, power.percent)
     }
     // Only while linked, as the battery: the crescent says how the Mac is now.
     val moon = awake?.takeIf { state == LinkState.Connected }?.let {
@@ -564,14 +561,14 @@ fun ConnectionChip(
             else -> null
         }
     }
-    val routeSaid = if (route != null) stringResource(R.string.link_said_via, powerSaid, route) else powerSaid
+    val routeSaid = if (route != null) stringResource(Str.link_said_via, powerSaid, route) else powerSaid
     val awakeSaid = when {
         moon == null -> routeSaid
-        awake?.sleepAt != null -> stringResource(R.string.link_said_sleep_soon, routeSaid)
-        else -> stringResource(R.string.link_said_awake_lid, routeSaid)
+        awake?.sleepAt != null -> stringResource(Str.link_said_sleep_soon, routeSaid)
+        else -> stringResource(Str.link_said_awake_lid, routeSaid)
     }
     val linkSaid = said ?: awakeSaid
-    val allSaid = if (elsewhere > 0) "$linkSaid. " + pluralStringResource(R.plurals.servers_elsewhere, elsewhere, elsewhere) else linkSaid
+    val allSaid = if (elsewhere > 0) "$linkSaid. " + pluralStringResource(Plural.servers_elsewhere, elsewhere, elsewhere) else linkSaid
     val target = linkTone(state)
     // Read while drawing, so the 800ms ease redraws the chip without recomposing it. The greys have
     // no light of their own, so the glass's fades out to them.
@@ -606,7 +603,7 @@ fun ConnectionChip(
             Spacer(Modifier.width(7.dp))
             BatteryMark(power.percent, ink)
             Spacer(Modifier.width(4.dp))
-            HText(stringResource(R.string.link_battery, power.percent), style = Type.small, color = ink, maxLines = 1)
+            HText(stringResource(Str.link_battery, power.percent), style = Type.small, color = ink, maxLines = 1)
             if (power.charging) {
                 Spacer(Modifier.width(3.dp))
                 Bolt(HN.accent.copy(alpha = 0.85f))
@@ -649,9 +646,9 @@ private fun ElsewhereCount(n: Int) {
 /** [Mac.via] in a word: "Local" or "Remote" (anything else says nothing). */
 @Composable
 fun routeWord(via: String): String? = when (via) {
-    Mac.VIA_LOCAL -> stringResource(R.string.route_local)
+    Mac.VIA_LOCAL -> stringResource(Str.route_local)
     // A plain remote address (a public one, or over the owner's VPN).
-    Mac.VIA_REMOTE -> stringResource(R.string.route_remote)
+    Mac.VIA_REMOTE -> stringResource(Str.route_remote)
     else -> null
 }
 
@@ -880,12 +877,6 @@ private fun MacMoon(state: LinkState, tone: State<Color>) {
     )
 }
 
-/** The clipboard's text, if it holds any (reading it is what Paste asks for). */
-fun clipboardText(context: Context): String? = runCatching {
-    val cm = context.getSystemService(ClipboardManager::class.java)
-    cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
-}.getOrNull()
-
 // ─── Brand ─────────────────────────────────────────────────────────────────
 
 /**
@@ -902,7 +893,7 @@ fun NovaMark(modifier: Modifier = Modifier, size: Dp = 22.dp, color: Color = HN.
 /** Lowercase light wordmark with the accent slash, like `0stems/` and `prudnikov/`. */
 @Composable
 fun Wordmark(modifier: Modifier = Modifier) {
-    val appName = stringResource(R.string.app_name)
+    val appName = stringResource(Str.app_name)
     HText(
         buildAnnotatedString {
             withStyle(SpanStyle(color = HN.inkMuted)) { append("hypernova") }
