@@ -328,7 +328,7 @@ fun ToggleRow(title: String, body: String?, checked: Boolean, onChange: (Boolean
 
 /** A tappable settings row: title, description, and a chevron (or a trailing value). */
 @Composable
-fun NavRow(title: String, body: String?, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = HN.ink, trailing: String? = null) {
+fun NavRow(title: String, body: String?, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = HN.ink, trailing: String? = null, end: (@Composable () -> Unit)? = null) {
     Row(
         modifier
             .fillMaxWidth()
@@ -347,6 +347,10 @@ fun NavRow(title: String, body: String?, onClick: () -> Unit, modifier: Modifier
         Spacer(Modifier.width(12.dp))
         if (trailing != null) {
             HText(trailing, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+            Spacer(Modifier.width(8.dp))
+        }
+        if (end != null) {
+            end()
             Spacer(Modifier.width(8.dp))
         }
         Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)

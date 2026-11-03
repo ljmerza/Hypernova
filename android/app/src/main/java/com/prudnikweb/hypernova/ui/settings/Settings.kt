@@ -62,6 +62,7 @@ import com.prudnikweb.hypernova.ui.components.NavRow
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
+import com.prudnikweb.hypernova.ui.components.ScreenScaffold
 import com.prudnikweb.hypernova.ui.components.ToggleRow
 import com.prudnikweb.hypernova.ui.components.Z
 import com.prudnikweb.hypernova.ui.home.HOME_SOURCE
@@ -134,43 +135,34 @@ private suspend fun scrollToKey(list: androidx.compose.foundation.lazy.LazyListS
 }
 
 /**
- * The Settings tab: the Mac, providers, the testing checklist, versions. Which parts show, and for
- * which server, is SettingsPlan's: with "All servers", each server's own parts once per server under
- * its name, each bound to that server's hub, then what this phone keeps under "This phone".
+ * The Settings tab: a row per server (each opening [ServerSettingsScreen]), then what this phone
+ * keeps, the longer parts behind rows of their own (SettingsPlan). The same page with one server and
+ * with "All servers": one server just has one row.
  */
 @Composable
 fun SettingsTab(vm: HubViewModel, top: Dp) {
     val haze = LocalHaze.current
-    val res = LocalContext.current.resources
-    // All servers (owner, 2026-10-31): nothing here acts on the server picked last; each server's settings are its own block.
+    // All servers (owner, 2026-10-31): nothing here acts on the server picked last; each server's settings are its own page.
     val allMode = vm.allServers
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val live = vm.live
-    val pairing = vm.pairing
     val hub = vm.hub
     val context = LocalContext.current
-    val toast = LocalToast.current
-    val confirm = LocalConfirm.current
     var testing by remember { mutableStateOf(TestingTools.unlocked(context)) }
     val list = androidx.compose.foundation.lazy.rememberLazyListState()
 
-    // The servers shown: every paired one with All servers (in the order they were paired), else the one on screen.
-    val every = if (allMode) vm.everyHub else emptyList()
-    val hubs: Map<String, LiveHub> = if (allMode) every.associate { it.first.id to it.second } else live?.let { mapOf(it.serverId to it) }.orEmpty()
-    val facts = if (allMode) every.map { (s, h) -> serverFacts(h, s.state) } else listOfNotNull(live?.let { serverFacts(it, it.link.state) })
-    val parts = SettingsPlan.parts(allMode, facts, BuildConfig.DEBUG || testing)
+    // The servers listed: every paired one with All servers (in the order they were paired), else the one on screen.
+    val every = vm.everyHub
+    val listed = if (allMode) every else every.filter { it.first.id == live?.serverId }
+    val parts = SettingsPlan.parts(listed.map { it.first.id }, BuildConfig.DEBUG || testing)
 
-    // Another part was asked for (SettingsJump: "Turn on in Settings"): scrolled to, once. With All
-    // servers, the part of the server it was asked on.
+    // Another part was asked for (SettingsJump: "Turn on in Settings"): those live on a server's page,
+    // the one of the server it was asked on. That page scrolls to the part and says it's done.
     val jumpAsked = SettingsJump.asked
     LaunchedEffect(jumpAsked, hub != null) {
-        val key = SettingsJump.wanted() ?: return@LaunchedEffect
-        if (hub == null) return@LaunchedEffect
-        try {
-            scrollToKey(list, SettingsPlan.jumpKey(key, SettingsJump.server ?: live?.serverId.orEmpty(), allMode))
-        } finally {
-            if (SettingsJump.asked == jumpAsked) SettingsJump.shown()
-        }
+        if (SettingsJump.wanted() == null || hub == null) return@LaunchedEffect
+        val server = SettingsJump.server?.takeIf { id -> every.any { it.first.id == id } } ?: live?.serverId
+        if (server != null) vm.nav.push(Route.ServerSettings(server)) else SettingsJump.shown()
     }
 
     LazyColumn(
@@ -179,69 +171,30 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
         contentPadding = PaddingValues(top = top + 84.dp, bottom = bottom + 120.dp, start = 16.dp, end = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // Owner, 2026-10-31: the first server's name read as the page's title, "z2", with All chosen.
-        if (allMode) item(key = "allIntro") {
-            HText(stringResource(R.string.st_all_intro), style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 4.dp))
-        }
-        for ((index, part) in parts.withIndex()) item(key = part.key) {
+        for (part in parts) item(key = part.key) {
             when (part) {
-                is SettingsPlan.Server -> {
-                    // Forget asks first, naming the server; with All servers it forgets that one, not the one picked.
-                    fun askForget(name: String, server: String?) = confirm(
-                        Confirm(
-                            title = res.getString(R.string.forget_q, name),
-                            body = res.getString(R.string.forget_body),
-                            action = res.getString(R.string.forget),
-                            danger = true,
-                        ) {
-                            vm.forget(server) { reached -> if (!reached) toast(res.getString(R.string.forgot_offline)) }
-                        },
-                    )
-                    if (allMode) {
-                        // A server's block starts with its name and link.
-                        val h = hubs[part.server] ?: return@item
-                        val status = every.firstOrNull { it.first.id == part.server }?.first
-                        val name = status?.name ?: h.mac.name
-                        GroupHeading(name, status?.state ?: h.link.state, first = index == 0)
-                        ServerCard(h, h.pairing.baseUrl, all = true, waiting = part.waiting, onConnectionLog = {}, onForget = { askForget(name, part.server) })
-                    } else {
-                        Seam(stringResource(R.string.mac), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
-                        ServerCard(
-                            live?.takeIf { pairing != null }, pairing?.baseUrl, all = false, waiting = false,
-                            onConnectionLog = { vm.nav.push(Route.ConnectionLog) },
-                            onForget = { askForget(live?.mac?.name.orEmpty(), null) },
-                        )
+                is SettingsPlan.Servers -> {
+                    GroupHeading(stringResource(if (allMode) R.string.st_servers else R.string.mac), first = true)
+                    if (listed.isEmpty()) GlassCard(Modifier.fillMaxWidth()) {
+                        HText(stringResource(R.string.not_paired), style = Type.heading, color = HN.ink, modifier = Modifier.padding(16.dp))
+                    } else GlassCard(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(horizontal = 16.dp)) {
+                            listed.forEachIndexed { i, (status, _) ->
+                                if (i > 0) Hairline(Modifier.fillMaxWidth())
+                                NavRow(status.name, stringResource(R.string.st_server_row_desc), { vm.nav.push(Route.ServerSettings(status.id)) }, end = { ConnectionChip(status.state) })
+                            }
+                        }
                     }
                 }
-                is SettingsPlan.Providers -> hubs[part.server]?.let { h ->
-                    // With All servers its screens are that server's (as a session's from Home), until Home is back.
-                    ProvidersCard(h) {
-                        if (allMode) vm.visit(part.server)
-                        vm.nav.push(Route.Providers)
-                    }
-                }
-                // Voice (VoiceSection.kt): the recognizer dictation uses, kept on this phone. Then, with one
-                // server, Read aloud (ReadAloudSection.kt): only from a Mac that reads aloud this way.
-                is SettingsPlan.Voice -> {
-                    VoiceRecognitionSection()
-                    part.readAloud?.let(hubs::get)?.let { ReadAloudSection(it) }
-                }
-                // With All servers, each server's own Read aloud: its voices and speed.
-                is SettingsPlan.ReadAloud -> hubs[part.server]?.let { ReadAloudSection(it) }
-                // Files: Browse outside projects (FilesSection below), from a Mac that has it.
-                is SettingsPlan.Files -> hubs[part.server]?.let { h ->
-                    Spacer(Modifier.height(10.dp))
-                    FilesSection(h)
-                }
-                // The owner's own test list: in debug builds, or after seven taps on the app's build (P19).
-                is SettingsPlan.Checklist -> hubs[part.server]?.let { ChecklistCard(it) }
-                SettingsPlan.PhoneHeading -> GroupHeading(stringResource(R.string.st_all_phone), null, first = index == 0)
-                // The connection log is the phone's, every server's lines in it: once, with All servers.
-                SettingsPlan.ConnectionLog -> {
-                    Spacer(Modifier.height(10.dp))
-                    Seam(stringResource(R.string.connlog_title), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+                is SettingsPlan.Phone -> {
+                    GroupHeading(stringResource(R.string.st_all_phone), first = false)
                     GlassCard(Modifier.fillMaxWidth()) {
-                        NavRow(stringResource(R.string.connlog_title), stringResource(R.string.connlog_desc), { vm.nav.push(Route.ConnectionLog) }, Modifier.padding(horizontal = 16.dp))
+                        Column(Modifier.padding(horizontal = 16.dp)) {
+                            part.pages.forEachIndexed { i, page ->
+                                if (i > 0) Hairline(Modifier.fillMaxWidth())
+                                PhonePageRow(page) { vm.nav.push(it) }
+                            }
+                        }
                     }
                 }
                 // Fork: New sessions, the mode they start in (NewSessionsSection below), kept on this phone.
@@ -254,32 +207,10 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                     Spacer(Modifier.height(10.dp))
                     DisplaySection()
                 }
-                // Card swipes: what a swipe left and right on a Home card do (CardSwipeSection.kt), kept on this phone.
-                SettingsPlan.CardSwipes -> {
-                    Spacer(Modifier.height(10.dp))
-                    CardSwipeSection()
-                }
-                // Session top bar: what the chat's top bar shows, in what order (TopBarSection.kt), kept on this phone.
-                SettingsPlan.TopBar -> {
-                    Spacer(Modifier.height(10.dp))
-                    TopBarSection()
-                }
-                // Typing: what the keyboard's Enter does in the boxes that send (TypingSection below), kept on this phone.
-                SettingsPlan.Typing -> {
-                    Spacer(Modifier.height(10.dp))
-                    TypingSection()
-                }
-                // Stay connected in the background: one setting for every server's link (Core.background).
-                SettingsPlan.Notifications -> NotificationsSection(vm)
                 // The Ghostty terminal trial (TerminalEngineSection.kt), with the testing checklist.
                 SettingsPlan.TerminalEngine -> {
                     Spacer(Modifier.height(10.dp))
                     TerminalEngineSection()
-                }
-                // Debug logging (DebugLogSection.kt): this phone's, whichever server is on screen.
-                SettingsPlan.DebugLog -> {
-                    Spacer(Modifier.height(10.dp))
-                    DebugLogSection()
                 }
                 SettingsPlan.About -> {
                     // A newer app: with All servers, the newest any connected server offers (the one
@@ -289,13 +220,149 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                             every.filter { it.first.state == LinkState.Connected }.sortedBy { it.second !== live }.map { it.second.appUpdate },
                         )
                     } else live?.appUpdate
-                    AboutSection(
-                        offer,
-                        // With All servers each server's versions are in its own card.
-                        versionsOf = live.takeIf { !allMode },
-                        testing = testing,
-                        onTestingUnlocked = { testing = true },
+                    AboutSection(offer, testing = testing, onTestingUnlocked = { testing = true })
+                }
+            }
+        }
+    }
+}
+
+/** The row that opens one of the phone's sub pages: its name and, in a few words, what's inside. */
+@Composable
+private fun PhonePageRow(page: SettingsPlan.PhonePage, onOpen: (Route) -> Unit) {
+    val (title, body, route) = when (page) {
+        SettingsPlan.PhonePage.Notifications -> Triple(R.string.notifications, R.string.st_page_notifications_desc, Route.NotificationSettings)
+        SettingsPlan.PhonePage.TopBar -> Triple(R.string.st_top_bar, R.string.st_page_top_bar_desc, Route.TopBarSettings)
+        SettingsPlan.PhonePage.CardSwipes -> Triple(R.string.st_card_swipes, R.string.st_page_card_swipes_desc, Route.CardSwipeSettings)
+        SettingsPlan.PhonePage.TypingAndVoice -> Triple(R.string.st_typing_voice, R.string.st_page_typing_voice_desc, Route.TypingVoiceSettings)
+        SettingsPlan.PhonePage.Logs -> Triple(R.string.st_logs, R.string.st_page_logs_desc, Route.LogSettings)
+    }
+    NavRow(stringResource(title), stringResource(body), { onOpen(route) })
+}
+
+/** Settings' sub pages, as App.kt shows them: a server's own, and each of the phone's. */
+@Composable
+internal fun SettingsSubPage(r: Route, vm: HubViewModel, onBack: () -> Unit) {
+    when (r) {
+        is Route.ServerSettings -> ServerSettingsScreen(vm, r.server, onBack)
+        Route.NotificationSettings -> PhonePage(R.string.notifications, r.key, onBack) { NotificationsSection(vm) }
+        Route.TopBarSettings -> PhonePage(R.string.st_top_bar, r.key, onBack) { TopBarSection() }
+        Route.CardSwipeSettings -> PhonePage(R.string.st_card_swipes, r.key, onBack) { CardSwipeSection() }
+        Route.TypingVoiceSettings -> PhonePage(R.string.st_typing_voice, r.key, onBack) {
+            TypingSection()
+            VoiceRecognitionSection()
+        }
+        Route.LogSettings -> PhonePage(R.string.st_logs, r.key, onBack) {
+            // The connection log is the phone's, every server's lines in it.
+            Seam(stringResource(R.string.connlog_title), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
+            GlassCard(Modifier.fillMaxWidth()) {
+                NavRow(stringResource(R.string.connlog_title), stringResource(R.string.connlog_desc), { vm.nav.push(Route.ConnectionLog) }, Modifier.padding(horizontal = 16.dp))
+            }
+            Spacer(Modifier.height(20.dp))
+            // Debug logging (DebugLogSection.kt): this phone's, whichever server is on screen.
+            DebugLogSection()
+        }
+        else -> Unit
+    }
+}
+
+/** A sub page of what this phone keeps: its title, Back, and its sections in a list of their own. */
+@Composable
+private fun PhonePage(title: Int, sourceKey: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    ScreenScaffold(sourceKey = sourceKey, title = stringResource(title), onBack = onBack) { top, source ->
+        LazyColumn(
+            Modifier.fillMaxSize().then(source),
+            // A seam's small words are the first thing on some pages: clear of the bar's blur.
+            contentPadding = PaddingValues(top = top + 10.dp, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),
+        ) {
+            item(key = "page") { content() }
+        }
+    }
+}
+
+/**
+ * A server's own page (owner, 2026-11-02: "a subpage for each server"): everything of that one
+ * server, bound to its hub alone, the same page with one server and with All servers. Its name and
+ * link are the title. A jump (SettingsJump) lands here and scrolls to the part asked for.
+ */
+@Composable
+private fun ServerSettingsScreen(vm: HubViewModel, server: String, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val res = context.resources
+    val toast = LocalToast.current
+    val confirm = LocalConfirm.current
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val allMode = vm.allServers
+    val entry = vm.everyHub.firstOrNull { it.first.id == server }
+    if (entry == null) {
+        // Forgotten, here or by the server: there's nothing left of it to show.
+        LaunchedEffect(Unit) { if (vm.nav.top == Route.ServerSettings(server)) onBack() }
+        return
+    }
+    val (status, h) = entry
+    val testing = remember { TestingTools.unlocked(context) }
+    val parts = SettingsPlan.serverParts(serverFacts(h, status.state), allMode, BuildConfig.DEBUG || testing)
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    // The part another screen asked for: scrolled to, once. Not there (the server isn't connected): the page's top.
+    val jumpAsked = SettingsJump.asked
+    LaunchedEffect(jumpAsked) {
+        val key = SettingsJump.wanted() ?: return@LaunchedEffect
+        try {
+            if (parts.any { it.key == key }) scrollToKey(list, key)
+        } finally {
+            if (SettingsJump.asked == jumpAsked) SettingsJump.shown()
+        }
+    }
+
+    ScreenScaffold(
+        sourceKey = "server-settings",
+        title = status.name,
+        onBack = onBack,
+        actions = {
+            Spacer(Modifier.width(10.dp))
+            ConnectionChip(status.state)
+        },
+    ) { top, source ->
+        LazyColumn(
+            Modifier.fillMaxSize().then(source),
+            state = list,
+            contentPadding = PaddingValues(top = top, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            for (part in parts) item(key = part.key) {
+                when (part) {
+                    is SettingsPlan.Server -> ServerCard(
+                        h, part.waiting,
+                        // Forget asks first, naming the server; it forgets this one, not the one picked.
+                        onForget = {
+                            confirm(
+                                Confirm(
+                                    title = res.getString(R.string.forget_q, status.name),
+                                    body = res.getString(R.string.forget_body),
+                                    action = res.getString(R.string.forget),
+                                    danger = true,
+                                ) {
+                                    vm.forget(part.server) { reached -> if (!reached) toast(res.getString(R.string.forgot_offline)) }
+                                },
+                            )
+                        },
                     )
+                    is SettingsPlan.Providers -> ProvidersCard(h) {
+                        // With All servers its screens are that server's (as a session's from Home), until Home is back.
+                        if (allMode) vm.visit(part.server)
+                        vm.nav.push(Route.Providers)
+                    }
+                    // Its Read aloud (ReadAloudSection.kt): its voices and speed, from a server that reads aloud this way.
+                    is SettingsPlan.ReadAloud -> ReadAloudSection(h)
+                    // Files: Browse outside projects (FilesSection below), from a server that has it.
+                    is SettingsPlan.Files -> {
+                        Spacer(Modifier.height(10.dp))
+                        FilesSection(h)
+                    }
+                    // The owner's own test list: in debug builds, or after seven taps on the app's build (P19).
+                    is SettingsPlan.Checklist -> ChecklistCard(h)
                 }
             }
         }
@@ -309,108 +376,66 @@ private fun serverFacts(h: LiveHub, link: LinkState) = SettingsPlan.ServerFacts(
     files = h.mac.browseOutsideProjects != null,
 )
 
-/**
- * With All servers, the heading over a server's block (its name and link) or over what this phone
- * keeps ([state] null): one step above the sections' seams, so each block reads as one.
- */
+/** The headings over the tab's two groups, its servers and what this phone keeps: one step above the sections' seams. */
 @Composable
-private fun GroupHeading(text: String, state: LinkState?, first: Boolean) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(top = if (first) 0.dp else 18.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HText(text, style = Type.title, color = HN.ink, maxLines = 1, modifier = Modifier.weight(1f).semantics { heading() })
-        if (state != null) {
-            Spacer(Modifier.width(10.dp))
-            ConnectionChip(state)
-        }
-    }
+private fun GroupHeading(text: String, first: Boolean) {
+    HText(
+        text, style = Type.title, color = HN.ink, maxLines = 1,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(top = if (first) 0.dp else 18.dp, bottom = 8.dp).semantics { heading() },
+    )
 }
 
 /**
- * A server's card: its name and link, Stay awake and its battery, the route and address, Retry while
- * it can't be reached, the connection log, Forget. [all]: in its block with All servers, under its
- * name ([GroupHeading]): no name row, its versions here (About is the phone's then), no connection
- * log (one for all, under This phone); [waiting]: it isn't connected, so its other settings are left
+ * A server's card, the first thing on its page: Stay awake and its battery, the route and address,
+ * its daemon, Claude Code and Codex versions, its update and debug switches, its notifications, Retry
+ * while it can't be reached, Forget. [waiting]: it isn't connected, so its other settings are left
  * out and one line says they come back (Retry and Forget stay).
  */
 @Composable
-private fun ServerCard(
-    live: LiveHub?,
-    baseUrl: String?,
-    all: Boolean,
-    waiting: Boolean,
-    onConnectionLog: () -> Unit,
-    onForget: (() -> Unit)?,
-) {
+private fun ServerCard(live: LiveHub, waiting: Boolean, onForget: () -> Unit) {
     val res = LocalContext.current.resources
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            if (baseUrl == null || live == null) {
-                HText(stringResource(R.string.not_paired), style = Type.heading, color = HN.ink)
-            } else {
-                val link = live.link
-                // Stay awake in one line under the name ("Awake with the lid closed" and the battery drawn), while
-                // linked; a Linux server has no Stay awake (Mac.FEATURE_AWAKE).
-                val awake = live.mac.awake?.takeIf { link.state == LinkState.Connected && live.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_AWAKE) }
-                if (!all) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        HText(live.mac.name, style = Type.heading, color = HN.ink, maxLines = 1, modifier = Modifier.weight(1f))
-                        Spacer(Modifier.width(10.dp))
-                        // The Mac's name is the heading, so the chip says the state in a word.
-                        ConnectionChip(link.state)
-                    }
-                    if (awake != null) {
-                        Spacer(Modifier.height(4.dp))
-                        AwakeStatus(awake, live.mac.battery)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                } else if (awake != null) {
-                    AwakeStatus(awake, live.mac.battery)
-                    Spacer(Modifier.height(10.dp))
-                }
-                // The route in use, drawn: Local or Remote (and its address below).
-                if (link.state == LinkState.Connected && routeWord(live.mac.via) != null) {
-                    com.prudnikweb.hypernova.ui.onboarding.RouteRow(stringResource(R.string.mac_route), live.mac.via)
-                }
-                InfoRow(stringResource(R.string.mac_address), live.mac.url ?: baseUrl)
-                if (waiting) {
-                    Spacer(Modifier.height(6.dp))
-                    HText(stringResource(R.string.st_all_waiting), style = Type.small, color = HN.inkMuted)
-                }
-                if (all && link.state == LinkState.Connected) ServerVersions(live)
-                // A MacBook's charge; a desktop Mac has no battery and no row. Only while
-                // linked: one that can't be reached may have been plugged in or run down since.
-                val battery = live.mac.battery?.takeIf { link.state == LinkState.Connected }
-                if (battery != null) BatteryRow(battery)
-                if (awake != null) StayAwakeBlock(live, awake, live.mac.battery)
-                // The server updating itself (AutoUpdateRow.kt), from a daemon that can say; not from a last snapshot.
-                if (!waiting) live.mac.update?.let { AutoUpdateRow(live, it) }
-                // The server's debug log (ServerDebugRow.kt): the switch and when it ends.
-                if (!waiting) live.mac.debug?.let { ServerDebugRow(live, it) }
-                // Its notifications, kept on the phone: here while it can't be reached too.
-                ServerNotifyRow(live.serverId, live.mac.name.ifBlank { live.pairing.macName })
-                if (link.state == LinkState.Offline || link.state == LinkState.Reconnecting) {
-                    Spacer(Modifier.height(6.dp))
-                    HText(com.prudnikweb.hypernova.data.linkProblemText(res.strings, link), style = Type.small, color = HN.inkMuted)
-                    link.tried?.let {
-                        Spacer(Modifier.height(10.dp))
-                        RouteTriedRow(it, showBase = live.mac.via == com.prudnikweb.hypernova.data.Mac.VIA_REMOTE)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Pill(stringResource(R.string.retry_now), live::retry, kind = PillKind.Outline, height = 44.dp)
-                }
-                if (!all) {
-                    // What the app tried to reach the Mac, step by step (data/ConnLog.kt), in every state.
-                    Spacer(Modifier.height(8.dp))
-                    Hairline(Modifier.fillMaxWidth())
-                    NavRow(stringResource(R.string.connlog_title), stringResource(R.string.connlog_desc), onConnectionLog)
-                }
-                if (onForget != null) {
-                    Spacer(Modifier.height(14.dp))
-                    Pill(stringResource(R.string.forget_mac), onForget, kind = PillKind.Danger, height = 44.dp)
-                }
+            val link = live.link
+            // Stay awake in one line ("Awake with the lid closed" and the battery drawn), while
+            // linked; a Linux server has no Stay awake (Mac.FEATURE_AWAKE).
+            val awake = live.mac.awake?.takeIf { link.state == LinkState.Connected && live.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_AWAKE) }
+            if (awake != null) {
+                AwakeStatus(awake, live.mac.battery)
+                Spacer(Modifier.height(10.dp))
             }
+            // The route in use, drawn: Local or Remote (and its address below).
+            if (link.state == LinkState.Connected && routeWord(live.mac.via) != null) {
+                com.prudnikweb.hypernova.ui.onboarding.RouteRow(stringResource(R.string.mac_route), live.mac.via)
+            }
+            InfoRow(stringResource(R.string.mac_address), live.mac.url ?: live.pairing.baseUrl)
+            if (waiting) {
+                Spacer(Modifier.height(6.dp))
+                HText(stringResource(R.string.st_all_waiting), style = Type.small, color = HN.inkMuted)
+            } else ServerVersions(live)
+            // A MacBook's charge; a desktop Mac has no battery and no row. Only while
+            // linked: one that can't be reached may have been plugged in or run down since.
+            val battery = live.mac.battery?.takeIf { link.state == LinkState.Connected }
+            if (battery != null) BatteryRow(battery)
+            if (awake != null) StayAwakeBlock(live, awake, live.mac.battery)
+            // The server updating itself (AutoUpdateRow.kt), from a daemon that can say; not from a last snapshot.
+            if (!waiting) live.mac.update?.let { AutoUpdateRow(live, it) }
+            // The server's debug log (ServerDebugRow.kt): the switch and when it ends.
+            if (!waiting) live.mac.debug?.let { ServerDebugRow(live, it) }
+            // Its notifications, kept on the phone: here while it can't be reached too.
+            ServerNotifyRow(live.serverId, live.mac.name.ifBlank { live.pairing.macName })
+            if (link.state == LinkState.Offline || link.state == LinkState.Reconnecting) {
+                Spacer(Modifier.height(6.dp))
+                HText(com.prudnikweb.hypernova.data.linkProblemText(res.strings, link), style = Type.small, color = HN.inkMuted)
+                link.tried?.let {
+                    Spacer(Modifier.height(10.dp))
+                    RouteTriedRow(it, showBase = live.mac.via == com.prudnikweb.hypernova.data.Mac.VIA_REMOTE)
+                }
+                Spacer(Modifier.height(12.dp))
+                Pill(stringResource(R.string.retry_now), live::retry, kind = PillKind.Outline, height = 44.dp)
+            }
+            Spacer(Modifier.height(14.dp))
+            Pill(stringResource(R.string.forget_mac), onForget, kind = PillKind.Danger, height = 44.dp)
         }
     }
 }
@@ -464,8 +489,6 @@ private fun ChecklistCard(hub: com.prudnikweb.hypernova.data.Hub) {
 @Composable
 private fun NotificationsSection(vm: HubViewModel) {
     val askNotifications = com.prudnikweb.hypernova.ui.LocalAskNotifications.current
-    Spacer(Modifier.height(10.dp))
-    Seam(stringResource(R.string.notifications), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             // Which notifications, on this phone (NotificationControls.kt).
@@ -491,14 +514,13 @@ private fun NotificationsSection(vm: HubViewModel) {
 }
 
 /**
- * About: the app's build (seven taps unlock the testing checklist), a newer app when [offer] is one,
- * and the versions of [versionsOf]'s daemon, Claude Code and Codex (null with All servers: they're
- * in each server's card).
+ * About: the app's build (seven taps unlock the testing checklist), a newer app when [offer] is one.
+ * Each server's daemon, Claude Code and Codex versions are in its own card.
  */
 internal const val GITHUB_REPO = "https://github.com/ljmerza/Hypernova"
 
 @Composable
-private fun AboutSection(offer: com.prudnikweb.hypernova.data.AppUpdate?, versionsOf: com.prudnikweb.hypernova.data.Hub?, testing: Boolean, onTestingUnlocked: () -> Unit) {
+private fun AboutSection(offer: com.prudnikweb.hypernova.data.AppUpdate?, testing: Boolean, onTestingUnlocked: () -> Unit) {
     val context = LocalContext.current
     val res = context.resources
     val toast = LocalToast.current
@@ -526,7 +548,6 @@ private fun AboutSection(offer: com.prudnikweb.hypernova.data.AppUpdate?, versio
                 com.prudnikweb.hypernova.data.AppUpdater.state,
                 com.prudnikweb.hypernova.data.AppUpdater.target,
             )?.let { com.prudnikweb.hypernova.ui.update.AboutUpdateRow(it) }
-            if (versionsOf != null) ServerVersions(versionsOf)
             // The project's page (owner, 2026-11-01), straight to the browser: its own row, nothing to confirm.
             NavRow(
                 stringResource(R.string.about_github), stringResource(R.string.about_github_repo),

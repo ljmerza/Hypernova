@@ -51,7 +51,7 @@ backup and device transfer (`allowBackup=false`); an older build's Tailscale nod
 saves them.
 
 **Dictation's audio** never goes to the Mac. The phone's speech recognizer hears it, as Settings →
-Voice chooses (`data/PhoneDictation.kt`; docs/DECISIONS.md, 2026-10-31): **Phone's recognizer**
+Typing and voice chooses (`data/PhoneDictation.kt`; docs/DECISIONS.md, 2026-10-31): **Phone's recognizer**
 (the default) is the phone's default recognition service, the one the keyboard's voice typing uses,
 normally Google's, which may send the audio to Google's servers; **On-device only** is Android's
 on-device recognizer, and the audio never leaves the phone (no fallback to the other: a phone
@@ -133,7 +133,7 @@ including a save that keeps the steps as they were.
 
 ### Client debug logs
 
-**Off by default on both clients.** Settings → Debug logging turns on a detailed log, for 24 hours at most
+**Off by default on both clients.** Settings → Debug logging (on a phone, under Logs) turns on a detailed log, for 24 hours at most
 (a clock that says it's further off than that counts as over). It's for finding what went wrong, and the
 rules are the owner's (docs/DECISIONS.md, "A debug log"):
 

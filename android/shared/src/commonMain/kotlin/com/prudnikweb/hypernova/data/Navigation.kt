@@ -43,8 +43,16 @@ sealed interface Route {
     data class AgentEnv(val agent: String) : Route { override val key = "agent-env:$agent" }
     /** One of Claude Code's settings files as raw JSON, folding as it goes. */
     data class AgentRaw(val agent: String) : Route { override val key = "agent-raw:$agent" }
-    /** Settings › Mac › Connection log (data/ConnLog.kt). */
+    /** Settings › Logs › Connection log (data/ConnLog.kt). */
     data object ConnectionLog : Route { override val key = "connection-log" }
+    /** Settings › a server: everything of that one server, with one server on screen or with "All servers". */
+    data class ServerSettings(val server: String) : Route { override val key = "settings-server:$server" }
+    /** Settings' sub pages for what this phone keeps. */
+    data object NotificationSettings : Route { override val key = "settings-notifications" }
+    data object TopBarSettings : Route { override val key = "settings-top-bar" }
+    data object CardSwipeSettings : Route { override val key = "settings-card-swipes" }
+    data object TypingVoiceSettings : Route { override val key = "settings-typing-voice" }
+    data object LogSettings : Route { override val key = "settings-logs" }
     data class ProviderEdit(val id: String?, val kind: String) : Route { override val key = "provider:${id ?: "new-$kind"}" }
     /**
      * An automation's editor: [id] null for a new one, filled from [template] if given (in [project]

@@ -34,7 +34,6 @@ import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
-import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.components.Toggle
 import com.prudnikweb.hypernova.ui.session.TopBarChoice
 import com.prudnikweb.hypernova.ui.session.TopBarItem
@@ -44,9 +43,9 @@ import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 
 /**
- * Settings → Session top bar (owner, 2026-10-31): which parts the chat's top bar shows
+ * Settings → Session top bar, its own page (owner, 2026-10-31): which parts the chat's top bar shows
  * (ui/session/TopBar.kt), each with a switch, in the order of the list; up and down arrows move a
- * part (arrows rather than dragging: the list sits in Settings' own scrolling list, and arrows are
+ * part (arrows rather than dragging: the list sits in the page's own scrolling list, and arrows are
  * TalkBack's too). Kept on this phone and applied at once. **Reset to default** while it differs.
  */
 @Composable
@@ -54,7 +53,6 @@ internal fun TopBarSection() {
     val context = LocalContext.current
     val choice by remember { TopBarPref.state(context) }
     fun set(c: TopBarChoice) = TopBarPref.set(context, c)
-    Seam(stringResource(R.string.st_top_bar), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             HText(stringResource(R.string.st_top_bar_desc), style = Type.small, color = HN.inkMuted)

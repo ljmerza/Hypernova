@@ -27,8 +27,8 @@ import org.robolectric.Shadows.shadowOf
 
 /**
  * Settings with "All servers" (ui/settings/SettingsPlan.kt, Settings.kt) against two scripted
- * daemons: each server's block reads and writes its own server, never the one picked; About offers
- * the newest app any server has and downloads it from that server; Forget in a block forgets that one.
+ * daemons: each server's page reads and writes its own server, never the one picked; About offers
+ * the newest app any server has and downloads it from that server; Forget on a page forgets that one.
  */
 @RunWith(RobolectricTestRunner::class)
 class AllServersSettingsTest {
@@ -42,7 +42,7 @@ class AllServersSettingsTest {
         }
     }
 
-    @Test fun eachServersBlockActsOnItsOwnServer() {
+    @Test fun eachServersPageActsOnItsOwnServer() {
         AndroidCore.init(RuntimeEnvironment.getApplication())
         val app = AndroidCore.app
         ComputerWords.clear(app.storage)
@@ -67,10 +67,10 @@ class AllServersSettingsTest {
             assertTrue(Core.all)
             assertEquals(z2Id, Core.activeId)
 
-            // The plan from every server's facts, as SettingsTab builds it: Files only in shed's block.
+            // The plan from every server's facts, as each server's page builds it: Files only on shed's.
             val hubs = Core.everyHub.associate { it.first.id to it.second }
             val facts = Core.everyHub.map { (s, h) -> SettingsPlan.ServerFacts(h.serverId, s.state, h.speech.settings != null, h.mac.browseOutsideProjects != null) }
-            val parts = SettingsPlan.parts(true, facts, testing = false)
+            val parts = facts.flatMap { SettingsPlan.serverParts(it, all = true, testing = false) }
             val files = parts.filterIsInstance<SettingsPlan.Files>().single()
             assertEquals(shedId, files.server)
 
@@ -94,7 +94,7 @@ class AllServersSettingsTest {
             assertEquals(0, z2.count("GET", UpdatePolicy.APK_PATH))
             AppUpdater.dismiss(app)
 
-            // Forget in shed's block: shed is told and forgotten; z2 stays paired and on screen.
+            // Forget on shed's page: shed is told and forgotten; z2 stays paired and on screen.
             shed.ok("DELETE", "/v1/devices/me")
             val vm = HubViewModel(app)
             var reached: Boolean? = null

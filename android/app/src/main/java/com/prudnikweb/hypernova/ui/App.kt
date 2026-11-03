@@ -95,7 +95,7 @@ class Opener(
     val runAtReset: (project: String) -> Unit = {},
     /** An automation's editor (an automated session's status line opens the one that started it). */
     val automation: (String) -> Unit = {},
-    /** Settings › Mac › Connection log: what the app tried to reach the Mac (the offline card links to it). */
+    /** Settings › Logs › Connection log: what the app tried to reach the Mac (the offline card links to it). */
     val connectionLog: () -> Unit = {},
     /** The Settings tab, scrolled to one part ([com.prudnikweb.hypernova.ui.settings.SettingsJump]): "Turn on in Settings". */
     val settings: (key: String) -> Unit = {},
@@ -575,6 +575,8 @@ private fun Screens(
                 is Route.McpServerPage -> com.prudnikweb.hypernova.ui.settings.McpServerScreen(shown, r.agent, r.name, r.scope, r.folder, onBack = { nav.pop() }, onEdit = { nav.push(Route.McpEdit(r.agent, r.name, r.scope, r.folder)) })
                 is Route.McpEdit -> com.prudnikweb.hypernova.ui.settings.McpEditScreen(shown, r.agent, r.name, r.scope, r.folder, onBack = { nav.pop() })
                 Route.ConnectionLog -> com.prudnikweb.hypernova.ui.settings.ConnectionLogScreen(onBack = { nav.pop() })
+                is Route.ServerSettings, Route.NotificationSettings, Route.TopBarSettings, Route.CardSwipeSettings, Route.TypingVoiceSettings, Route.LogSettings ->
+                    com.prudnikweb.hypernova.ui.settings.SettingsSubPage(r, vm, onBack = { nav.pop() })
                 is Route.ProviderEdit -> ProviderEditScreen(shown, r.id, r.kind, onBack = { nav.pop() })
                 is Route.AutomationEdit -> com.prudnikweb.hypernova.ui.automations.AutomationEditor(
                     shown, r.id, r.template, r.runs, r.project,
