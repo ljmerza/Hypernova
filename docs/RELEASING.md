@@ -25,8 +25,9 @@ the server's package together.
 
 **A rename of the desktop client** (Nebrio, later) starts in two lines, `android/desktop/packaging/client-names.sh`: the
 package name, which every file's name also starts with, and the title with a space that a Mac and Windows show. The Gradle
-build, `client-packages.yml`, `release-notes.sh`, `release-not-built.sh` and `test-client-package.sh` all read them. What
-stays: the APK's and the server's names above, which servers look for; Windows' `upgradeUuid` and the Mac's `bundleID`
+build, `client-packages.yml`, `release-notes.sh`, `release-not-built.sh` and `test-client-package.sh` all read them.
+`get-client.sh` is piped from a web page with no checkout, so it has its own copy at its top, and `test-get-client.sh` fails until the two
+are the same. What stays: the APK's and the server's names above, which servers look for; Windows' `upgradeUuid` and the Mac's `bundleID`
 in `android/desktop/build.gradle.kts`, which say it's the same app; and the data folders in `DesktopStorage.kt`, so that a
 key already paired isn't stranded. The name in the window is one line of its own, `AppName.kt`.
 
@@ -68,7 +69,7 @@ the file is whole and the line goes.
 starts, and it only runs if they were. The queue for the release moved from the whole run to the `apk` job,
 so a Mac runner that's slow to come doesn't hold up the next release either. A job that fails costs its own
 files, turns the run red, and is said in the release's notes. The price: for some minutes after a release
-is published, the `.deb`s and Mac files aren't there yet, and `get.sh` on a Mac says to try again soon.
+is published, the `.deb`s and Mac files aren't there yet, and `get.sh` on a Mac says to try again soon. So does `get-client.sh`, for the desktop files and for `SHA256SUMS`, which comes last.
 
 **To try these without publishing:** a pull request that touches them runs `server-packages.yml` with
 nothing attached, and keeps the files as the run's artifacts.
@@ -141,6 +142,10 @@ Then it's removed, and nothing may be left. The screenshots are in the run's art
 To try it on Linux here: in a throwaway `ubuntu:24.04` with `sudo`, `CI=true`, node on the path, `npm ci --ignore-scripts`
 in `daemon/`, and `xvfb xdotool imagemagick openssl`, plus `dbus gnome-keyring` (and `libsecret-tools` for `--tarball`) with `--keychain`. Build with `-PdesktopVersion=` the `--version` it's given. `--tarball` needs no `CI`, as it installs nothing, unless it's given `--keychain`.
 
+**The one line** (`scripts/get-client.sh`; docs/INSTALL.md, "The desktop client"; docs/DECISIONS.md, "The client in one line"). `pages.yml` serves it at `https://ljmerza.github.io/Hypernova/get-client.sh`, and `get.sh` a second time as `get-server.sh`, so it's live when it reaches `main`, whatever the release. It reads the release's list of files and its `SHA256SUMS`, so all it needs of this workflow is the files' names.
+
+`client-packages.yml` proves it on the package just built, **after** that package is attached, so a fault in the script turns the run red and costs no file. `scripts/test-client-package.sh --get-client` has `get-client.sh` do the install, then runs the same checks as above (no `--keychain`, no pictures). It can't download a release that isn't out, so it uses `HYPERNOVA_CLIENT_DIR`, a test-only variable taking the files and a `SHA256SUMS` from a folder. A wrong checksum first, which must install nothing. On a Mac: refused while the app is open, and a file fetched with the runner's real `curl` has to have no quarantine flag. On Windows a step shows what it says on Git Bash, and that's all it does there. The job `get-client-script` runs `scripts/test-get-client.sh`, its decisions with stand-ins, under Ubuntu's bash, a Mac's own and bash 3.2 in Docker.
+
 **The versions.** The tag gives `-PdesktopVersion`, and each system takes it its own way (`android/desktop/build.gradle.kts`;
 `./gradlew -q :desktop:packageVersions -PdesktopVersion=…` prints them):
 
@@ -182,6 +187,7 @@ Compose signs a Mac's native code ad hoc, with no identity, and not for Gatekeep
 | On Ubuntu 24.04 and Debian 13 in containers, amd64, as a user with `sudo`, under Xvfb: the `.deb` and the tarball, all of the test above, with the screenshots looked at (2026-11-02). The `.deb` also with apt's recommended packages off, so what it `Depends` on is enough | **All of the `.dmg` and the `.msi`, the arm64 `.deb`, the job's own steps, and attaching:** until the first run on GitHub's runners |
 | | A person's Mac or Windows: Gatekeeper, SmartScreen, macOS's local network question |
 | | A real Linux desktop's menu entry (a container has no menus) |
+| `get-client.sh` on Ubuntu 24.04, Debian 13 and Fedora containers, amd64, against the real v0.25.0 files (2026-11-03): the `.deb` and the tarball, the update, a failed checksum; Debian 12 refused with the tarball offered; a release mid-publish with no `SHA256SUMS` yet, seen for real on v0.26.0. `test-client-package.sh --get-client` on v0.26.0's `.deb` and tarball, the release the probe was built from, in the Ubuntu and Debian containers | **`get-client.sh` on a Mac and on Git Bash, arm64, and its job's steps:** until the first run on GitHub's runners. Only stand-ins so far, which prove what it decides and nothing about `hdiutil`, `ditto`, `pgrep` or Windows |
 
 ### Versions
 

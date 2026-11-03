@@ -235,7 +235,32 @@ A second client, for a computer instead of a phone, on Linux, a Mac or Windows. 
 server, lists its sessions, and answers Allow or Deny. It carries its own Java, so there's nothing else to install, and it
 isn't the server: that's still [the install above](#install), on the machine next to your agents.
 
-Download from the [latest release](https://github.com/ljmerza/Hypernova/releases/latest), a few minutes after it's
+**On Linux or a Mac, one line**, as yourself:
+
+```sh
+curl -fsSL https://ljmerza.github.io/Hypernova/get-client.sh | bash
+```
+
+It finds the latest release's file for this computer, checks it against the release's `SHA256SUMS`, installs it, and says how to
+open it. Run it again to update. To pick a release: `curl -fsSL https://ljmerza.github.io/Hypernova/get-client.sh | HYPERNOVA_TAG=v0.25.0 bash`.
+
+| You have | What it does |
+|---|---|
+| Linux with `apt`, x86_64 or arm64 | Installs the `.deb` with `sudo apt install`. Ubuntu 24.04 or newer, Debian 13 or newer |
+| Linux without `apt`, x86_64 (or `bash -s -- --tarball` with it) | Unpacks the tarball in `~/.local/share/hypernova-client-app`, with a link at `~/.local/bin/hypernova-client`. No sudo |
+| Linux on arm64 without `apt` | Stops and says so: there's no package for it |
+| A Mac | Copies the app from the `.dmg` to `/Applications`, or to `~/Applications` if you can't write to that, and says which. Quit the app first if it's open |
+| Windows, in Git Bash | Installs nothing: it prints the `.msi`'s address, because Windows' own installer has to run it |
+| WSL | As Linux, with a note, as WSL may have no display for it |
+
+If it says a file or `SHA256SUMS` isn't there yet, try again in a few minutes: a release gets its desktop files and then its checksums
+some minutes after it's published. It never installs a file it couldn't check. The checksums come from the same place as the file, so
+they catch a bad download, not a tampered release.
+
+**Where the one line stands.** On Linux it has run in containers against a real release (Ubuntu 24.04, Debian 13, and Fedora for the tarball). On
+a Mac and on Git Bash it's written and tested only with stand-ins until its first run on GitHub's machines, and **no person has run it on their own Mac or Windows PC**.
+
+**Or download the file yourself** from the [latest release](https://github.com/ljmerza/Hypernova/releases/latest), a few minutes after it's
 published, as these come after the rest:
 
 | You have | File |
@@ -275,11 +300,15 @@ If that stops with an error about a library, it needs your system's `libGL`, `li
 
 With no display, it says so and stops.
 
+The one line's tarball is removed with `rm -rf ~/.local/share/hypernova-client-app ~/.local/bin/hypernova-client`. That leaves your pairing, in `~/.local/share/hypernova-client`, so delete that too if you're done with it.
+
 ### The client on a Mac
 
 Open the `.dmg` and drag **Hypernova Client** to Applications. Then open it from Applications.
 
 **macOS blocks it the first time, because it isn't signed.** That's what a browser's download mark does; a file fetched with `curl` or `gh` hasn't got one.
+
+**With the one line above, we don't expect that warning**, as it fetches the `.dmg` with `curl`, and Gatekeeper's warning goes by that mark. The script doesn't remove any mark or change any security setting: there's none to remove. That comes from Apple's documents and a writer who tests these things, not from seeing it on a person's Mac (docs/DECISIONS.md, "The client in one line"). macOS still scans it for known malware the first time, and the question about local networks below still comes. If macOS blocks it anyway, do what's below.
 
 - **macOS 15 and later:** macOS says *Apple could not verify "Hypernova Client" is free of malware that may harm your Mac
   or compromise your privacy*. Click **Done**. Open **System Settings → Privacy & Security**, scroll down
@@ -330,7 +359,7 @@ When something needs you and the client's window isn't in front, an alert comes 
 
 ### Updating the client
 
-It doesn't update itself, and a server's offer of the phone's app isn't for it. Install the new file over the old one: `apt` and Windows replace it, and on a Mac drag it to Applications again and choose **Replace**. Your pairing stays. A Mac's About box shows a first number one higher than the release's, 1.23.0 for v0.23.0, because macOS takes no first number of 0.
+It doesn't update itself, and a server's offer of the phone's app isn't for it. Run the one line again, or install the new file over the old one: `apt` and Windows replace it, and on a Mac drag it to Applications again and choose **Replace**. Your pairing stays. A Mac's About box shows a first number one higher than the release's, 1.23.0 for v0.23.0, because macOS takes no first number of 0.
 
 ## On a Mac
 
