@@ -4365,3 +4365,7 @@ Two things point 6 and 7 of "The tabs on Settings' pages" left as they were.
 
 1. **A field low on a page scrolls clear of the keyboard.** Settings' pages (`Route.isSettingsPage`) now end where the keyboard starts (`imePadding`, in `App`), so a focused field scrolls above it with Compose's own bring-into-view. It's one place rather than a line on every page, and pages padded for `screenBottom()` are unchanged, which leaves a little more room under the very last row while the keyboard is up. The tab bar is drawn outside it and stays put, behind the keyboard. Other screens aren't touched.
 2. **Raw JSON's system back asks as its arrow does**, with the same words. **The MCP form and environment variables' add row still lose what's typed without asking,** on Back and on a tab alike: that's the plan the owner has, not an oversight.
+
+## Taking a photo asks for the camera first (2026-11-03)
+
+The owner: "trying to take a picture crashes the app". Scan added the camera permission to the manifest, and Android refuses `ACTION_IMAGE_CAPTURE` with a SecurityException to an app that declares that permission without holding it, as far as Android's documents say. So a photo for an attachment crashed in v0.26.0 for anyone who hadn't allowed the camera. Camera now asks for the permission first, says so if it's refused, and catches the exception as a backstop.

@@ -554,6 +554,7 @@
     <string name="attach_too_big">That file is too big to attach (30 MB at most).</string>
     <string name="attach_unreadable">Couldn\'t read that file.</string>
     <string name="attach_no_camera">There\'s no camera app on this phone.</string>
+    <string name="attach_camera_refused">Hypernova can\'t take a photo without the camera. Allow the camera in the phone\'s settings, or attach a photo instead.</string>
     <string name="attach_subtitle">Attached from your phone</string>
     <string name="err_upload">Couldn\'t send the file to your Mac.</string>
 
