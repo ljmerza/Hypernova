@@ -40,8 +40,8 @@ import org.robolectric.annotation.Config
 
 /**
  * Settings' sub pages through the whole app (ui/App.kt), not a stand-in for it: Home's Settings tab
- * opens them, the system's back gesture leaves them, the stack is the ViewModel's (so a rotation
- * keeps them), and "Turn on in Settings" from another screen lands inside a server's page.
+ * opens them, the system's back gesture leaves them, the stack is the ViewModel's (so an Activity
+ * recreated keeps them), and "Turn on in Settings" from another screen lands inside a server's page.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "+h900dp")
@@ -111,18 +111,18 @@ class SettingsNavigationTest {
         rule.onNodeWithText(str(R.string.st_all_phone)).assertExists()
     }
 
-    @Test fun aSubPageIsStillThereAfterARotation() {
+    @Test fun aSubPageIsStillThereWhenTheActivityIsRecreated() {
         pair("z2")
         val vm = HubViewModel(AndroidCore.app)
-        val rotation = StateRestorationTester(rule)
-        rotation.setContent { CompositionLocalProvider(LocalMotion provides MotionPrefs(reduced = true)) { App(vm) {} } }
+        val recreated = StateRestorationTester(rule)
+        recreated.setContent { CompositionLocalProvider(LocalMotion provides MotionPrefs(reduced = true)) { App(vm) {} } }
         rule.waitForIdle()
         settingsTab()
         rule.onNodeWithText("z2").performClick()
         rule.waitForIdle()
         assertEquals(Route.ServerSettings(Core.activeId!!), vm.nav.top)
-        // A rotation: the state saved and the screen composed anew over the same ViewModel, which keeps the stack.
-        rotation.emulateSavedInstanceStateRestore()
+        // As a font size change does: the state saved and the screen composed anew over the same ViewModel, which keeps the stack.
+        recreated.emulateSavedInstanceStateRestore()
         rule.waitForIdle()
         assertEquals(Route.ServerSettings(Core.activeId!!), vm.nav.top)
         rule.onNodeWithText(str(R.string.mac_address)).assertIsDisplayed()

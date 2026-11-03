@@ -273,7 +273,8 @@ private fun PhonePage(title: Int, sourceKey: String, onBack: () -> Unit, content
     ScreenScaffold(sourceKey = sourceKey, title = stringResource(title), onBack = onBack) { top, source ->
         LazyColumn(
             Modifier.fillMaxSize().then(source),
-            contentPadding = PaddingValues(top = top, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),
+            // A seam's small words are the first thing on some pages: clear of the bar's blur.
+            contentPadding = PaddingValues(top = top + 10.dp, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),
         ) {
             item(key = "page") { content() }
         }
