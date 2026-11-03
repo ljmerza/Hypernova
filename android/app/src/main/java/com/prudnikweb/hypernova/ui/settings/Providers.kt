@@ -346,7 +346,7 @@ internal fun codexAccountLine(a: CodexAccount): String = when {
 
 /** A line to run in a terminal on the Mac: what it's for, the command in mono, and Copy. */
 @Composable
-private fun ShellLine(key: String, command: String) {
+internal fun ShellLine(key: String, command: String) {
     val context = LocalContext.current
     val toast = LocalToast.current
     Spacer(Modifier.height(10.dp))

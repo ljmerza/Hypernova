@@ -290,6 +290,7 @@ class AgentSettingsScreenTest {
 
     private fun quantity(id: Int, n: Int) = org.robolectric.RuntimeEnvironment.getApplication().resources.getQuantityString(id, n, n)
 
+    @Config(qualifiers = "+h1500dp")
     @Test fun mcpServersAreListedEvenWithNoSettingsFile() {
         val missing = AgentSettingsFile(AgentSettingsFile.MISSING, emptyList(), null, null, mcp = claude.mcp)
         hub.answer = Result.success(AgentSettingsReply(missing, codex))
@@ -302,7 +303,7 @@ class AgentSettingsScreenTest {
         seen(quantity(R.plurals.as_hidden, 2))
     }
 
-    @Config(qualifiers = "+h1500dp")
+    @Config(qualifiers = "+h1800dp")
     @Test fun anOlderServersMcpNamesStillShowAndNothingSaysServersArentListed() {
         val older = claude.copy(mcp = null)
         hub.answer = Result.success(AgentSettingsReply(older, codex))
@@ -312,6 +313,7 @@ class AgentSettingsScreenTest {
         rule.onNodeWithText("claude mcp add", substring = true).assertDoesNotExist()
     }
 
+    @Config(qualifiers = "+h1500dp")
     @Test fun longMcpListsAreCappedAndSayHowManyMore() {
         val own = List(ClaudeMcp.NAMES_SHOWN + 3) { McpName("server$it", "user", null) }
         val folders = List(ClaudeMcp.GROUPS_SHOWN + 2) { McpName("tool", "project", "p%02d".format(it)) }
@@ -330,7 +332,7 @@ class AgentSettingsScreenTest {
         rule.onNodeWithText("server${ClaudeMcp.NAMES_SHOWN}", substring = true).assertDoesNotExist()
     }
 
-    @Config(qualifiers = "+h1500dp")
+    @Config(qualifiers = "+h1800dp")
     @Test fun anUnreadableClaudeJsonSaysTheListMayBeShort() {
         val m = ClaudeMcp(AgentSettingsFile.MALFORMED, emptyList(), 0, 0)
         hub.answer = Result.success(AgentSettingsReply(claude.copy(mcp = m), codex))
@@ -529,7 +531,7 @@ class AgentSettingsScreenTest {
         seen(str(R.string.as_why_link, hub.mac.name))
     }
 
-    @Config(qualifiers = "+h1500dp")
+    @Config(qualifiers = "+h1800dp")
     @Test fun undoIsARowThatPutsTheLastChangeBack() {
         val after = claude.copy(undo = SettingUndo("permissions.defaultMode", "plan", null, false))
         hub.answer = Result.success(AgentSettingsReply(after, file(AgentSettingsFile.MISSING)))
@@ -543,7 +545,7 @@ class AgentSettingsScreenTest {
         assertEquals(2, hub.asked)
     }
 
-    @Config(qualifiers = "+h1500dp")
+    @Config(qualifiers = "+h1800dp")
     @Test fun anUndoThatLoosensAsksLikeAnyOtherAndItsFailureIsTheServersWords() {
         allow()
         val after = claude.copy(undo = SettingUndo("permissions.defaultMode", "auto", null, true))
@@ -659,7 +661,7 @@ class AgentSettingsScreenTest {
         assert(hub.changes.single().startsWith("claude $effortKey null")) { hub.changes.single() }
     }
 
-    @Config(qualifiers = "+h1800dp")
+    @Config(qualifiers = "+h2200dp")
     @Test fun aModelOutsideTheFilesShapeIsOnlyShownAndUndoNamesTheModel() {
         hub.answer = Result.success(AgentSettingsReply(withEffort(SettingUndo(effortKey, "low", null, false)), file(AgentSettingsFile.MISSING)))
         open(AgentSettingsReply.CLAUDE)

@@ -171,6 +171,8 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
             // Whatever the file says: this comes with the server's live state, and the file may be missing.
             item(key = "account-seam") { Seam(stringResource(R.string.as_account), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 2.dp)) }
             item(key = "account") { if (codex) CodexAccountCard(hub, server) else ClaudeAccountCard(hub, server) }
+            item(key = "version-seam") { Seam(stringResource(R.string.av_section), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp)) }
+            item(key = "version") { AgentVersionSection(hub, agent) }
             item(key = "extensions-seam") { Seam(stringResource(R.string.as_extensions), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 4.dp, bottom = 2.dp)) }
             item(key = "extensions") {
                 GlassCard(Modifier.fillMaxWidth()) {
@@ -533,7 +535,7 @@ private fun Hidden(n: Int) {
 
 /** A label with its value on the right and what it means below. Nothing to tap: it's only shown. */
 @Composable
-private fun ReadOnlyRow(label: String, value: String, valueColor: Color, body: String?) {
+internal fun ReadOnlyRow(label: String, value: String, valueColor: Color, body: String?) {
     Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.padding(vertical = 10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             HText(label, style = Type.body, color = HN.ink, modifier = Modifier.weight(1f))

@@ -807,6 +807,41 @@ class ContractTest {
             assertNull(secret.value)
             assertEquals("eu", d.options.single { it.key == "region" }.value)
         },
+        "rest-agent-version" to { o ->
+            val v = AgentVersion.wire(o)
+            assertTrue(v.installed)
+            assertEquals("2.1.316", v.version)
+            assertEquals(null, v.latest)
+            assertFalse(v.canUpdate)
+            assertEquals(null, v.job)
+        },
+        "rest-agent-version-checked" to { o ->
+            val v = AgentVersion.wire(o)
+            assertEquals("the native installer", v.words)
+            assertEquals("2.1.320", v.latest)
+            assertTrue(v.newer && v.canUpdate)
+            assertEquals(true, v.autoUpdates)
+            assertTrue(v.effect!!, v.effect!!.contains("keeps its jobs"))
+        },
+        "rest-agent-version-updated" to { o ->
+            val v = AgentVersion.wire(o)
+            assertEquals("2.1.320", v.version)
+            assertFalse(v.canUpdate)
+            val job = v.job!!
+            assertEquals(AgentUpdateJob.UPDATED, job.state)
+            assertEquals("2.1.316", job.from)
+            assertEquals("2.1.320", job.to)
+            assertTrue(job.message!!, job.message!!.contains("now 2.1.320"))
+            assertEquals("Installing update...", job.output.first())
+        },
+        "rest-agent-version-not-installed" to { o ->
+            val v = AgentVersion.wire(o)
+            assertFalse(v.installed)
+            assertEquals(null, v.version)
+            assertFalse(v.canUpdate)
+        },
+        "rest-agent-version-refused" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
+        "rest-agent-version-check-first" to { o -> assertEquals("check_first", Api.errorOf(409, o.toString()).code) },
         "rest-plugin-install-refused" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
         "rest-plugin-update-refused" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
         "rest-codex-too-old" to { o ->
