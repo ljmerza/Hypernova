@@ -40,7 +40,8 @@ fun App(shell: Shell, reduced: Boolean = false) {
             if (shell.settings) SettingsScreen(shell)
             else if (hub == null || shell.adding) PairScreen(shell, canCancel = hub != null)
             else SessionsScreen(hub, Core.statuses, shell)
-            shell.toast?.let { Toast(it, shell, Modifier.align(Alignment.BottomCenter)) }
+            // Above the bottom's message box, so it doesn't cover what's being typed.
+            shell.toast?.let { Toast(it, shell, Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp)) }
             shell.zoomNote?.let { ZoomNote(it, Modifier.align(Alignment.TopCenter)) }
         }
     }

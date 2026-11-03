@@ -67,3 +67,6 @@ actual fun Modifier.longPressCopies(key: Any, copy: () -> Unit): Modifier = poin
 
 @Composable
 internal actual fun DiagramBlock(source: String) = com.prudnikweb.hypernova.ui.theme.AndroidUi.diagram(source)
+
+@Composable
+internal actual fun SelectableOutput(content: @Composable () -> Unit) = content()

@@ -6,7 +6,6 @@ import com.prudnikweb.hypernova.data.Problem
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.live.XmlStrings
 import com.prudnikweb.hypernova.data.problemText
-import com.prudnikweb.hypernova.desktop.ui.Atlas
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -50,8 +49,8 @@ class WordsTest {
 
     /** Only the phone's words get reworded. This app's mean the phone when they say it: it's where a question is answered. */
     @Test fun thisAppsOwnWordsKeepThePhoneTheyMean() {
-        assertTrue(Ui.desk_answer_on_phone_question.text().endsWith("on your phone."))
-        assertTrue(Ui.desk_answer_on_phone_plan.text().endsWith("on your phone."))
+        assertTrue(Ui.desk_preview_on_phone.text().endsWith("on your phone."))
+        assertTrue(Ui.desk_agent_on_phone.text().endsWith("on your phone."))
         assertTrue(Ui.desk_not_whole.text().endsWith("on your phone."))
         assertTrue(Ui.desk_pane_phone_only.text().contains("on your phone"))
     }
@@ -76,21 +75,6 @@ class WordsTest {
         assertTrue(DesktopStrings.timePattern(false).isNotBlank())
         assertTrue(DesktopStrings.timePattern(true).startsWith("EEE "))
         assertEquals(Locale.getDefault(), DesktopStrings.locale)
-    }
-
-    /** Tokens.kt loads its fonts through R, so Theme.kt repeats its colours: a change there fails here. */
-    @Test fun theColoursAreTheAppsColours() {
-        val tokens = listOf("../sharedui/src/commonMain/kotlin/com/prudnikweb/hypernova/ui/theme/Tokens.kt").map(::File).first { it.isFile }.readText()
-        val theirs = Regex("""(\w+) = Color\(0x([0-9A-Fa-f]{8})\)""").findAll(tokens).associate { it.groupValues[1] to it.groupValues[2].uppercase() }
-        val ours = mapOf(
-            "space" to Atlas.space, "ink" to Atlas.ink, "dim" to Atlas.dim, "line" to Atlas.line, "live" to Atlas.live,
-            "ask" to Atlas.ask, "stop" to Atlas.stop, "idle" to Atlas.idle, "light" to Atlas.light, "glow" to Atlas.glow,
-        )
-        assertEquals("the app has as many tokens", theirs.keys, ours.keys)
-        for ((name, color) in ours) {
-            val argb = (color.value shr 32).toLong() and 0xFFFFFFFFL
-            assertEquals(name, theirs[name], "%08X".format(argb))
-        }
     }
 
     @Test fun theFontsAndTheMarksComeFromTheApp() {

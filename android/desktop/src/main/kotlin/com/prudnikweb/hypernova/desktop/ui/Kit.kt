@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -44,6 +43,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,7 +65,12 @@ import com.prudnikweb.hypernova.ui.components.workingMark
 
 @Composable
 fun HText(text: String, modifier: Modifier = Modifier, style: TextStyle = Type.body, color: Color = HN.ink, maxLines: Int = Int.MAX_VALUE, overflow: TextOverflow = TextOverflow.Ellipsis) {
-    BasicText(text = text, modifier = modifier, style = style.copy(color = color), maxLines = maxLines, overflow = overflow)
+    com.prudnikweb.hypernova.ui.theme.HText(text, modifier, style, color, maxLines, overflow)
+}
+
+@Composable
+fun HText(text: AnnotatedString, modifier: Modifier = Modifier, style: TextStyle = Type.body, color: Color = HN.ink, maxLines: Int = Int.MAX_VALUE, overflow: TextOverflow = TextOverflow.Ellipsis) {
+    com.prudnikweb.hypernova.ui.theme.HText(text, modifier, style, color, maxLines, overflow)
 }
 
 private val CardFill = Brush.verticalGradient(listOf(HN.bg800.copy(alpha = 0.84f), HN.bg900.copy(alpha = 0.78f), HN.bg900.copy(alpha = 0.86f)))

@@ -4,10 +4,10 @@ import androidx.compose.foundation.LocalScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -38,6 +42,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.Hub
@@ -49,7 +54,7 @@ import com.prudnikweb.hypernova.desktop.Ui
 import com.prudnikweb.hypernova.desktop.answerCard
 import com.prudnikweb.hypernova.desktop.doingLine
 import com.prudnikweb.hypernova.desktop.factsOf
-import com.prudnikweb.hypernova.desktop.onPhoneWords
+import com.prudnikweb.hypernova.desktop.inChatWords
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -93,31 +98,39 @@ private fun BackPill(onBack: () -> Unit) {
     Pill(Ui.back.text(), onBack, kind = PillKind.Ghost, height = 32.dp)
 }
 
+/**
+ * What it is and what it asks, always in view, then the chat, then the box. The facts are at the start of the chat, where they don't
+ * take room from it: a short conversation has them on screen, and a long one is a scroll up. docs/DECISIONS.md, "The chat on the desktop".
+ */
 @Composable
 private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: (() -> Unit)?) {
-    val scroll = rememberScrollState()
-    Box(Modifier.fillMaxSize()) {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(scroll).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (onBack != null) BackPill(onBack)
-            val card = Modifier.widthIn(max = PANE_MAX).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }
-            AskCard(hub, s, shell, card)
-            Facts(s, card)
-            HText(Ui.desk_pane_phone_only.text(), Modifier.widthIn(max = PANE_MAX).padding(horizontal = 4.dp, vertical = 4.dp), style = Type.small, color = HN.inkDim)
+    val following = remember { ChatFollowing() }
+    val links = remember { DeskLinks(shell) }
+    val box = remember { FocusRequester() }
+    CompositionLocalProvider(LocalUriHandler provides links) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val askMax = maxHeight * ASK_SHARE
+            Column(
+                Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (onBack != null) BackPill(onBack)
+                val card = Modifier.widthIn(max = PANE_MAX).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }
+                AskCard(hub, s, shell, askMax, card)
+                ChatList(hub, s, shell, following, box, Modifier.weight(1f).widthIn(max = PANE_MAX).fillMaxWidth()) {
+                    Facts(s, Modifier.fillMaxWidth())
+                    HText(Ui.desk_pane_phone_only.text(), Modifier.padding(horizontal = 4.dp, vertical = 4.dp), style = Type.small, color = HN.inkDim)
+                }
+                ChatBox(hub, s, shell, following, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
+            }
+            LinkAsk(links, shell)
         }
-        VerticalScrollbar(
-            rememberScrollbarAdapter(scroll),
-            Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp, horizontal = 2.dp),
-            style = LocalScrollbarStyle.current.copy(unhoverColor = HN.ink.copy(alpha = 0.12f), hoverColor = HN.ink.copy(alpha = 0.3f)),
-        )
     }
 }
 
 /** Its project and short id, its name, what it's doing, its state, and what it asks, in full, with Deny and Allow. */
 @Composable
-private fun AskCard(hub: Hub, s: Session, shell: Shell, modifier: Modifier = Modifier) {
+private fun AskCard(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Modifier = Modifier) {
     val ask = hub.approval(s.id)
     val offer = remember(ask, s) { CardOffer.of(ask, s) }
     val needs = s.state == SessionState.NeedsYou
@@ -131,20 +144,33 @@ private fun AskCard(hub: Hub, s: Session, shell: Shell, modifier: Modifier = Mod
             Spacer(Modifier.height(8.dp))
             HText(s.name, Modifier.semantics { heading() }, style = Type.heading)
             Spacer(Modifier.height(4.dp))
-            when (offer) {
-                is CardOffer.Whole -> WholeCommand(offer)
-                is CardOffer.NotWhole -> NotWholeCommand(offer)
-                is CardOffer.OnPhone -> HText(onPhoneWords(offer), style = Type.small, color = HN.amber)
-                null -> when {
-                    s.diedLine -> HText(Ui.card_job_died.text(), style = Type.monoSmall, color = HN.danger)
-                    // A job's question in words: nothing here can answer it.
-                    needs && s.question != null -> {
-                        HText(s.question.orEmpty(), style = Type.monoSmall, color = HN.amber)
-                        Spacer(Modifier.height(6.dp))
-                        HText(Ui.desk_answer_on_phone_question.text(), style = Type.small, color = HN.amber)
+            // The whole of what it asks, however long, and the pills stay in view under it: past a share of the window this scrolls.
+            val askScroll = rememberScrollState()
+            Box(Modifier.heightIn(max = askMax)) {
+                Column(Modifier.verticalScroll(askScroll)) {
+                    when (offer) {
+                        is CardOffer.Whole -> WholeCommand(offer)
+                        is CardOffer.NotWhole -> NotWholeCommand(offer)
+                        is CardOffer.InChat -> HText(inChatWords(offer), style = Type.small, color = HN.amber)
+                        null -> when {
+                            s.diedLine -> HText(Ui.card_job_died.text(), style = Type.monoSmall, color = HN.danger)
+                            // A job's question in words: the reply goes in the box.
+                            needs && s.question != null -> {
+                                HText(s.question.orEmpty(), style = Type.monoSmall, color = HN.amber)
+                                Spacer(Modifier.height(6.dp))
+                                HText(Ui.desk_reply_below.text(), style = Type.small, color = HN.amber)
+                            }
+                            needs -> HText(s.activity, style = Type.monoSmall, color = HN.amber)
+                            else -> HText(doingLine(s), style = Type.monoSmall, color = HN.inkMuted)
+                        }
                     }
-                    needs -> HText(s.activity, style = Type.monoSmall, color = HN.amber)
-                    else -> HText(doingLine(s), style = Type.monoSmall, color = HN.inkMuted)
+                }
+                if (askScroll.maxValue > 0) {
+                    VerticalScrollbar(
+                        rememberScrollbarAdapter(askScroll),
+                        Modifier.matchParentSize().wrapContentWidth(Alignment.End),
+                        style = LocalScrollbarStyle.current.copy(unhoverColor = HN.ink.copy(alpha = 0.12f), hoverColor = HN.ink.copy(alpha = 0.3f)),
+                    )
                 }
             }
             ask?.takeIf { it.agentId != null }?.agentLabel?.let { agent ->
@@ -194,6 +220,9 @@ private fun Facts(s: Session, modifier: Modifier = Modifier) {
 
 private val FACT_LABEL = 128.dp
 
+/** The share of the pane what's asked may take before it scrolls: the chat and the box need the rest. */
+private const val ASK_SHARE = 0.4f
+
 private fun annotatedCommand(tool: String, text: String): AnnotatedString = buildAnnotatedString {
     withStyle(SpanStyle(color = HN.amber)) { append(if (tool.startsWith("Bash", ignoreCase = true)) "$ " else "› ") }
     append(text)
@@ -204,7 +233,9 @@ private fun annotatedCommand(tool: String, text: String): AnnotatedString = buil
 private fun WholeCommand(offer: CardOffer.Whole) {
     HText(offer.tool.uppercase(), style = Type.label, color = HN.amber)
     Spacer(Modifier.height(4.dp))
-    androidx.compose.foundation.text.BasicText(annotatedCommand(offer.tool, offer.text), style = Type.monoSmall.copy(color = HN.ink))
+    MouseSelectable {
+        androidx.compose.foundation.text.BasicText(annotatedCommand(offer.tool, offer.text), style = Type.monoSmall.copy(color = HN.ink))
+    }
 }
 
 /** What can be said of a command that can't be read whole, masked, and why there's no Allow. */

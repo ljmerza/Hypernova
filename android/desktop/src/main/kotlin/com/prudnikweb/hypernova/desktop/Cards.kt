@@ -84,13 +84,13 @@ data class RowLine(val text: String, val tone: Tone) {
 fun rowLine(offer: CardOffer?, s: Session): RowLine = when {
     offer is CardOffer.Whole -> RowLine(AllowRule.oneLine(offer.text), RowLine.Tone.Ask)
     offer is CardOffer.NotWhole -> RowLine(offer.detail, RowLine.Tone.Ask)
-    offer is CardOffer.OnPhone -> RowLine(onPhoneWords(offer), RowLine.Tone.Ask)
+    offer is CardOffer.InChat -> RowLine(inChatWords(offer), RowLine.Tone.Ask)
     s.diedLine -> RowLine(Ui.card_job_died.text(), RowLine.Tone.Danger)
     s.state == SessionState.NeedsYou -> RowLine(s.activity, RowLine.Tone.Ask)
     else -> RowLine(doingLine(s), RowLine.Tone.Quiet)
 }
 
-fun onPhoneWords(offer: CardOffer.OnPhone): String = if (offer.plan) Ui.desk_answer_on_phone_plan.text() else Ui.desk_answer_on_phone_question.text()
+fun inChatWords(offer: CardOffer.InChat): String = if (offer.plan) Ui.desk_ask_plan.text() else Ui.desk_ask_question.text()
 
 /** A row has a chip only for what its group's seam doesn't already say: paused, starting, an error, ended. */
 fun rowHasChip(s: Session, block: Blocked?): Boolean = block != null || s.phase == Phase.Starting || s.phase == Phase.Error || s.phase == Phase.Ended
@@ -180,8 +180,8 @@ fun agoWords(ms: Long): String {
 /**
  * What a card offers for what its session waits on. **Allow only beside the whole command as it will run**
  * ([AllowRule], the rule of a phone's notification and widget). The phone's own Home card has Allow either way
- * (the owner, 2026-10-30, CardAsk.kt), since a tap on that card opens the chat for the details; there's no chat
- * here to read them in, so this keeps the stricter rule. Deny always, for a tool. The pills are in the pane beside the list.
+ * (the owner, 2026-10-30, CardAsk.kt), since a tap on that card opens the chat for the details; the pills here are in the
+ * pane, beside the command itself, and this keeps the stricter rule. Deny always, for a tool. A question or a plan is answered in the chat.
  */
 sealed interface CardOffer {
     val id: String
@@ -192,8 +192,8 @@ sealed interface CardOffer {
     /** A tool whose command can't be read whole here: masked and on one line ([detail]), Deny only. */
     data class NotWhole(override val id: String, val tool: String, val detail: String, val terminal: TerminalAsk? = null) : CardOffer
 
-    /** A question or a plan: it says it needs answering on the phone. Nothing to press. */
-    data class OnPhone(override val id: String, val plan: Boolean) : CardOffer
+    /** A question or a plan: nothing to press here, and the chat under the card has it to answer (ApprovalBlock, as on the phone). */
+    data class InChat(override val id: String, val plan: Boolean) : CardOffer
 
     companion object {
         /** [a], the approval [s] waits on, else the permission dialog in its terminal. */
@@ -205,7 +205,7 @@ sealed interface CardOffer {
         fun of(a: WApproval): CardOffer = when (a.kind) {
             "tool" -> AllowRule.answerable(a)?.let { Whole(a.id, a.toolName, it) }
                 ?: NotWhole(a.id, a.toolName, masked(AllowRule.detail(a).first))
-            else -> OnPhone(a.id, plan = a.kind == "plan")
+            else -> InChat(a.id, plan = a.kind == "plan")
         }
 
         /** Claude Code's own dialog in the terminal: the same rule, on what it shows. */
@@ -225,7 +225,7 @@ suspend fun answerCard(hub: Hub, sessionId: String, offer: CardOffer, allow: Boo
     val terminal = when (offer) {
         is CardOffer.Whole -> offer.terminal
         is CardOffer.NotWhole -> offer.terminal
-        is CardOffer.OnPhone -> return false
+        is CardOffer.InChat -> return false
     }
     // No Allow for what can't be read, whatever calls this.
     if (allow && offer !is CardOffer.Whole) return false

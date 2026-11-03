@@ -143,7 +143,7 @@ class ApproveTest {
         assertEquals(2, onAllNodesWithText("•••", substring = true).fetchSemanticsNodes().size)
     }
 
-    @Test fun aQuestionAndAPlanSayToAnswerOnThePhoneWithNothingToPress() = runDesktopComposeUiTest(900, 700) {
+    @Test fun aQuestionAndAPlanSayToAnswerInTheChatWithNoAllowOrDeny() = runDesktopComposeUiTest(900, 700) {
         d.snapshot = snapshot(
             "z2",
             sessions = listOf(session("s1", state = "needs_you", title = "Asks"), session("s2", state = "needs_you", title = "Plans")),
@@ -155,9 +155,9 @@ class ApproveTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
-        onNodeWithText(Ui.desk_answer_on_phone_question.text()).assertExists()
-        onNodeWithText(Ui.desk_answer_on_phone_plan.text()).assertExists()
-        for ((name, words) in listOf("Asks" to Ui.desk_answer_on_phone_question, "Plans" to Ui.desk_answer_on_phone_plan)) {
+        onNodeWithText(Ui.desk_ask_question.text()).assertExists()
+        onNodeWithText(Ui.desk_ask_plan.text()).assertExists()
+        for ((name, words) in listOf("Asks" to Ui.desk_ask_question, "Plans" to Ui.desk_ask_plan)) {
             choose(name)
             inPane(words.text()).assertExists()
             onNodeWithText(Ui.allow.text()).assertDoesNotExist()

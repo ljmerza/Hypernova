@@ -29,6 +29,7 @@ on:
     paths:
       - 'android/desktop/**'
       - 'android/shared/**'
+      - 'android/sharedui/**'
       - 'android/gradle/**'
       - 'android/build.gradle.kts'
       - 'android/settings.gradle.kts'

@@ -864,19 +864,23 @@ fun MiniTerminal(item: Item.Terminal, modifier: Modifier = Modifier, onPreview: 
                 },
             )
             Spacer(Modifier.height(10.dp))
-            HText(
-                buildAnnotatedString {
-                    withStyle(SpanStyle(color = HN.accent)) { append("$ ") }
-                    withStyle(SpanStyle(color = HN.ink)) { append(item.command) }
-                },
-                style = Type.mono,
-                maxLines = if (expanded) Int.MAX_VALUE else 4,
-            )
+            SelectableOutput {
+                HText(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = HN.accent)) { append("$ ") }
+                        withStyle(SpanStyle(color = HN.ink)) { append(item.command) }
+                    },
+                    style = Type.mono,
+                    maxLines = if (expanded) Int.MAX_VALUE else 4,
+                )
+            }
             if (shown.isNotEmpty() || running) {
                 Spacer(Modifier.height(6.dp))
-                Column(Modifier.fillMaxWidth().then(if (clipped) Modifier.fadeTop() else Modifier)) {
-                    shown.forEachIndexed { i, line -> TerminalLine(line, cursor = running && i == shown.lastIndex) }
-                    if (running && shown.isEmpty()) TerminalLine("", cursor = true)
+                SelectableOutput {
+                    Column(Modifier.fillMaxWidth().then(if (clipped) Modifier.fadeTop() else Modifier)) {
+                        shown.forEachIndexed { i, line -> TerminalLine(line, cursor = running && i == shown.lastIndex) }
+                        if (running && shown.isEmpty()) TerminalLine("", cursor = true)
+                    }
                 }
             }
             if (!running && item.exitCode != null) {
@@ -1855,7 +1859,7 @@ private fun PlanAsk(item: Item.Approval, onAnswer: (Answer) -> Unit) {
     if (plan.isNullOrBlank()) {
         HText(item.detail.ifBlank { stringResource(Str.approval_loading) }, style = Type.body, color = HN.inkMuted)
     } else {
-        Markdown(plan, color = HN.inkMuted)
+        SelectableOutput { Markdown(plan, color = HN.inkMuted) }
     }
     Spacer(Modifier.height(16.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

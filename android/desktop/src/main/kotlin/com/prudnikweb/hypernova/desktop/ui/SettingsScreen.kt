@@ -35,12 +35,15 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.DebugLog
+import com.prudnikweb.hypernova.data.EnterKey
+import com.prudnikweb.hypernova.ui.components.EnterKeyPref
 import com.prudnikweb.hypernova.data.DebugLogger
 import com.prudnikweb.hypernova.data.DebugSendFlow
 import com.prudnikweb.hypernova.data.DebugSendState
@@ -79,6 +82,31 @@ fun SettingsScreen(shell: Shell) {
             KeyPlaceSection()
             Spacer(Modifier.height(16.dp))
             DebugLogging(shell)
+            Spacer(Modifier.height(16.dp))
+            Typing()
+        }
+    }
+}
+
+/** Settings → Typing as on the phone: what Enter does in the chat's box. */
+@Composable
+private fun Typing() {
+    val enter = EnterKeyPref.state().value
+    Seam(Ui.st_enter_key.text(), MarkKind.Idle)
+    Spacer(Modifier.height(10.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            HText(Ui.st_enter_key_desc.text(), style = Type.small)
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((key, words) in listOf(EnterKey.Send to Ui.st_enter_send, EnterKey.NewLine to Ui.st_enter_newline)) {
+                    Pill(
+                        words.text(), { EnterKeyPref.set(key) },
+                        Modifier.semantics { selected = enter == key },
+                        kind = if (enter == key) PillKind.Primary else PillKind.Ghost, height = 36.dp,
+                    )
+                }
+            }
         }
     }
 }

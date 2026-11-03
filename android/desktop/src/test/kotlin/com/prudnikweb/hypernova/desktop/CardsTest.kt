@@ -52,8 +52,8 @@ class CardsTest {
     }
 
     @Test fun questionsAndPlansAreForThePhone() {
-        assertEquals(CardOffer.OnPhone("ap1", plan = false), CardOffer.of(ask("question", "AskUserQuestion", "{}")))
-        assertEquals(CardOffer.OnPhone("ap1", plan = true), CardOffer.of(ask("plan", "ExitPlanMode", "{}")))
+        assertEquals(CardOffer.InChat("ap1", plan = false), CardOffer.of(ask("question", "AskUserQuestion", "{}")))
+        assertEquals(CardOffer.InChat("ap1", plan = true), CardOffer.of(ask("plan", "ExitPlanMode", "{}")))
         assertNull(CardOffer.of(null, session(SessionState.Idle)))
     }
 
@@ -86,8 +86,8 @@ class CardsTest {
     @Test fun allowIsRefusedForWhatCantBeReadWhoeverAsks() = runBlocking {
         val c = Calls()
         assertFalse(answerCard(c.hub, "s1", CardOffer.NotWhole("ap1", "Bash", "…"), allow = true) { })
-        assertFalse(answerCard(c.hub, "s1", CardOffer.OnPhone("ap1", plan = false), allow = true) { })
-        assertFalse(answerCard(c.hub, "s1", CardOffer.OnPhone("ap1", plan = false), allow = false) { })
+        assertFalse(answerCard(c.hub, "s1", CardOffer.InChat("ap1", plan = false), allow = true) { })
+        assertFalse(answerCard(c.hub, "s1", CardOffer.InChat("ap1", plan = false), allow = false) { })
         assertTrue("nothing went out", c.approvals.isEmpty())
     }
 
@@ -167,7 +167,7 @@ class CardsTest {
         val masked = rowLine(CardOffer.of(ask("tool", "Bash", """{"command":"curl -H 'Authorization: Bearer $secret' https://x"}""")), session(SessionState.NeedsYou))
         assertFalse(masked.text, masked.text.contains(secret))
         val question = rowLine(CardOffer.of(ask("question", "AskUserQuestion", "{}")), session(SessionState.NeedsYou))
-        assertEquals(Ui.desk_answer_on_phone_question.text(), question.text)
+        assertEquals(Ui.desk_ask_question.text(), question.text)
         assertEquals(RowLine.Tone.Quiet, rowLine(null, session(SessionState.Working, activity = "Bash: ls")).tone)
         assertEquals("Bash: ls", rowLine(null, session(SessionState.Working, activity = "Bash: ls")).text)
     }

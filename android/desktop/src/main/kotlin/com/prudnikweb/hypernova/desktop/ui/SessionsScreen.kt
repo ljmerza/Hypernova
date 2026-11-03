@@ -165,6 +165,7 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
                             choose(null)
                             true
                         }
+                        Key.PageUp, Key.PageDown -> ChatKeys.page?.invoke(e.key == Key.PageDown) != null
                         else -> false
                     }
                 }

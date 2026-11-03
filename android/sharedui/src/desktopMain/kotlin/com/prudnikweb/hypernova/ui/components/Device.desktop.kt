@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -78,3 +79,6 @@ internal actual fun DiagramBlock(source: String) {
         CodeBlock(source)
     }
 }
+
+@Composable
+internal actual fun SelectableOutput(content: @Composable () -> Unit) = SelectionContainer(content = content)

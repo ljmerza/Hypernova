@@ -25,6 +25,15 @@ object AndroidUi {
     internal var diagram: @Composable (String) -> Unit = {}
         private set
 
+    /** These Resources' words, the one object while they're the same Resources: what a screen remembers against it stays. */
+    internal fun wordsOf(res: Resources): Strings {
+        val last = lastWords
+        if (last != null && last.first === res) return last.second
+        return words(res).also { lastWords = res to it }
+    }
+
+    private var lastWords: Pair<Resources, Strings>? = null
+
     fun install(manrope: Int, mono: Int, stringId: (Str) -> Int, pluralId: (Plural) -> Int, words: (Resources) -> Strings, diagram: @Composable (String) -> Unit) {
         this.manrope = manrope
         this.mono = mono

@@ -25,4 +25,4 @@ actual fun pluralStringResource(key: Plural, count: Int, vararg args: Any): Stri
 
 @Composable
 @ReadOnlyComposable
-actual fun wordsNow(): Strings = AndroidUi.words(LocalContext.current.resources)
+actual fun wordsNow(): Strings = AndroidUi.wordsOf(LocalContext.current.resources)

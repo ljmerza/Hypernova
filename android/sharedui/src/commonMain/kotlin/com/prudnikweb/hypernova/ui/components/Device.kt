@@ -55,3 +55,7 @@ expect fun Modifier.longPressCopies(key: Any, copy: () -> Unit): Modifier
 /** A closed ```mermaid block: the phone draws the diagram. */
 @Composable
 internal expect fun DiagramBlock(source: String)
+
+/** Output or a plan a mouse can select, on a desktop. The phone's chat leaves these to a long press on the row, so there it's only [content]. */
+@Composable
+internal expect fun SelectableOutput(content: @Composable () -> Unit)
