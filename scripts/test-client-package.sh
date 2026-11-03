@@ -7,6 +7,10 @@
 #   scripts/test-client-package.sh --dmg x.dmg         --probe …      a Mac runner
 #   scripts/test-client-package.sh --msi x.msi         --probe … [--msi-next y.msi --next-version 0.24.0]    Windows, in Git's bash
 #
+# With --get-client (--deb, --tarball or --dmg), scripts/get-client.sh does the install, from a folder holding the package and
+# a SHA256SUMS: first with a wrong checksum, which has to install nothing, then the right one. The rest is the same. On a Mac
+# it also has to refuse while the app is open. A tarball's install then goes under a stand-in HOME, not the real one.
+#
 # What it shows, on each:
 #   1. It installs, at the version it should have, with its licences in it and its own Java.
 #   2. A window opens on the path a person takes: under Xvfb on Linux, on the runner's own screen elsewhere.
@@ -28,7 +32,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WINDOW="$(sed -n 's/^const val APP_NAME = "\(.*\)"$/\1/p' "$REPO/android/desktop/src/main/kotlin/com/prudnikweb/hypernova/desktop/AppName.kt")"
 DEMO_PORT=47391
 
-kind='' pkg='' probe='' version='' shots='' next='' next_version='' keychain=''
+kind='' pkg='' probe='' version='' shots='' next='' next_version='' keychain='' via_script=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --deb|--tarball|--dmg|--msi) kind="${1#--}"; pkg="$2"; shift 2 ;;
@@ -38,6 +42,7 @@ while [ $# -gt 0 ]; do
     --msi-next) next="$2"; shift 2 ;;
     --next-version) next_version="$2"; shift 2 ;;
     --keychain) keychain=yes; shift ;;
+    --get-client) via_script=yes; shift ;;
     *) echo "test-client-package.sh: what is $1?" >&2; exit 2 ;;
   esac
 done
@@ -53,6 +58,7 @@ ok() { printf 'ok    %s\n' "$*"; }
 [ -n "${CI:-}" ] || export HYPERNOVA_CLIENT_KEYCHAIN=off
 case "$version" in *[!0-9.]*|*.*.*.*) die "--version wants three numbers, not $version" ;; *.*.*) ;; *) die "--version wants three numbers, not $version" ;; esac
 [ -d "$REPO/daemon/node_modules/ws" ] || die "the demo server needs daemon/node_modules: npm ci --ignore-scripts in daemon/"
+[ -z "$via_script" ] || [ "$kind" != msi ] || die "--get-client installs nothing on Windows: it only says where the .msi is"
 
 on_windows=no
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) on_windows=yes ;; esac
@@ -67,7 +73,7 @@ probe="$(native "$(abs "$probe")")"
 if [ -n "$shots" ]; then mkdir -p "$shots"; shots="$(abs "$shots/.")"; fi
 
 tmp="$(mktemp -d)"
-xvfb_pid='' demo_pid='' app_pid='' mount='' test_keychain=''
+xvfb_pid='' demo_pid='' app_pid='' mount='' test_keychain='' script_flags=''
 finish() {
   code=$?
   set +e
@@ -99,6 +105,30 @@ until_true() {
 
 # What each system does differently. ROOT is the install, LAUNCHER starts it, APPDIR holds its jars and resources.
 ROOT='' LAUNCHER='' APPDIR=''
+
+# scripts/get-client.sh in the install's place. HYPERNOVA_CLIENT_DIR is its way to take a package that's on no release yet.
+get_client() { # <what to run it under...>
+  local rel="$tmp/release" base tag out
+  base="$(basename "$pkg")"
+  tag="${base#"$CLIENT_PACKAGE"-}"
+  tag="${tag%%-linux-*}"
+  tag="${tag%%-macos-*}"
+  mkdir -p "$rel"
+  cp "$pkg" "$rel/"
+  printf '%064d  %s\n' 0 "$base" >"$rel/SHA256SUMS"
+  set +e
+  out="$("$@" env HYPERNOVA_TAG="$tag" HYPERNOVA_CLIENT_DIR="$rel" bash "$REPO/scripts/get-client.sh" ${script_flags:+"$script_flags"} 2>&1 </dev/null)"
+  code=$?
+  set -e
+  [ "$code" -ne 0 ] || die "get-client.sh installed a package with the wrong checksum: $out"
+  case "$out" in *"doesn't match $tag's SHA256SUMS"*) ok "get-client.sh refuses a wrong checksum" ;; *) die "get-client.sh, on a wrong checksum: $out" ;; esac
+  if command -v sha256sum >/dev/null; then sum="$(sha256sum <"$pkg")"; else sum="$(shasum -a 256 <"$pkg")"; fi
+  printf '%s  %s\n' "${sum%% *}" "$base" >"$rel/SHA256SUMS"
+  "$@" env HYPERNOVA_TAG="$tag" HYPERNOVA_CLIENT_DIR="$rel" bash "$REPO/scripts/get-client.sh" ${script_flags:+"$script_flags"} </dev/null 2>&1 | tee "$tmp/get-client.txt" \
+    || die "get-client.sh failed"
+  grep -q 'hypernova pair' "$tmp/get-client.txt" || die "get-client.sh didn't say the next step"
+  ok "get-client.sh installed it, the checksum matching"
+}
 
 # ── Linux ──
 linux_up() {
@@ -184,14 +214,20 @@ no_display() {
   case "$out" in *"needs a display"*) ok "with no display it says so and stops" ;; *) die "with no display it said: $out" ;; esac
 }
 install_deb() {
-  # As INSTALL.md says: apt brings what the package depends on.
-  $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >"$tmp/apt.log" 2>&1 || die "apt-get install failed"
+  if [ -n "$via_script" ]; then
+    get_client env DEBIAN_FRONTEND=noninteractive
+    if [ "$(dpkg-query -W -f='${db:Status-Abbrev}' "$CLIENT_PACKAGE" 2>/dev/null)" != "ii " ]; then die "get-client.sh said it installed it, and dpkg doesn't"; fi
+    if grep -qi 'unsandboxed' "$tmp/get-client.txt"; then die "apt couldn't read the file as its own user: $(grep -i unsandboxed "$tmp/get-client.txt")"; fi
+  else
+    # As INSTALL.md says: apt brings what the package depends on.
+    $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >"$tmp/apt.log" 2>&1 || die "apt-get install failed"
+  fi
   ROOT="/opt/$CLIENT_PACKAGE"
   LAUNCHER="$ROOT/bin/$CLIENT_PACKAGE"
   APPDIR="$ROOT/lib/app"
   got="$(dpkg-query -W -f='${Version}' "$CLIENT_PACKAGE")"
   [ "$got" = "$version" ] || die "the package says $got, not $version"
-  ok "apt-get install -y, version $got"
+  ok "${via_script:+installed by get-client.sh: }apt-get install -y, version $got"
   [ -e "/usr/share/applications/$CLIENT_PACKAGE-$CLIENT_PACKAGE.desktop" ] && ok "a menu entry" || say "      (no menu entry: this system has no menus)"
   case "$(dpkg-deb -f "$pkg" Recommends)" in *libsecret-tools*) ok "it recommends what reaches a keychain" ;; *) die "it doesn't recommend libsecret-tools" ;; esac
   linux_up
@@ -202,6 +238,21 @@ remove_deb() {
   ok "apt-get remove leaves nothing"
 }
 install_tarball() {
+  if [ -n "$via_script" ]; then
+    local home="$tmp/script-home"
+    mkdir "$home"
+    script_flags=--tarball
+    get_client env HOME="$home"
+    [ -x "$home/.local/bin/$CLIENT_PACKAGE" ] || die "no link in the stand-in home's .local/bin"
+    ROOT="$(cd "$home/.local/share/$CLIENT_PACKAGE-app/current" && pwd -P)"
+    # The way a person opens it: through the link.
+    LAUNCHER="$home/.local/bin/$CLIENT_PACKAGE"
+    APPDIR="$ROOT/lib/app"
+    [ ! -e "$home/.local/share/$CLIENT_PACKAGE" ] || die "the app went in the folder the client keeps its key in"
+    ok "installed by get-client.sh, in $ROOT, with a link"
+    linux_up
+    return 0
+  fi
   mkdir "$tmp/unpacked"
   tar -xzf "$pkg" -C "$tmp/unpacked"
   ROOT="$tmp/unpacked/$CLIENT_PACKAGE"
@@ -217,24 +268,38 @@ keychain_tarball() { keychain_linux; }
 
 # ── Mac ──
 install_dmg() {
-  mount="$tmp/volume"
-  mkdir "$mount"
-  # `yes`: a licence in the image would otherwise wait for an answer.
-  yes | hdiutil attach "$pkg" -nobrowse -noverify -mountpoint "$mount" >"$tmp/hdiutil.log" 2>&1 || true
-  [ -d "$mount/$CLIENT_TITLE.app" ] || die "no $CLIENT_TITLE.app on the image: $(ls "$mount")"
   ROOT="/Applications/$CLIENT_TITLE.app"
   rm -rf "$ROOT"
-  # What dragging it does: the signature and its attributes come too.
-  ditto "$mount/$CLIENT_TITLE.app" "$ROOT"
-  hdiutil detach "$mount" -quiet -force || true
-  mount=''
+  if [ -n "$via_script" ]; then
+    get_client env
+    [ -d "$ROOT" ] || die "get-client.sh didn't put it in /Applications, which this runner can write to"
+    # What a file really has after curl, on this Mac: that's what INSTALL.md tells people, and the package above isn't curl's.
+    if curl -fsSL https://raw.githubusercontent.com/ljmerza/Hypernova/main/LICENSE -o "$tmp/by-curl"; then
+      if xattr -p com.apple.quarantine "$tmp/by-curl" >/dev/null 2>&1; then die "a file fetched with curl has the quarantine flag on this Mac: docs/INSTALL.md is wrong"; fi
+      ok "a file fetched with curl has no quarantine flag on this macOS"
+    else
+      say "      (couldn't fetch a file to look at: curl's quarantine flag isn't checked in this run)"
+    fi
+    if xattr -r -l "$ROOT" 2>/dev/null | grep -q com.apple.quarantine; then die "the installed app has the quarantine flag"; fi
+    ok "get-client.sh's copy has no quarantine flag"
+  else
+    mount="$tmp/volume"
+    mkdir "$mount"
+    # `yes`: a licence in the image would otherwise wait for an answer.
+    yes | hdiutil attach "$pkg" -nobrowse -noverify -mountpoint "$mount" >"$tmp/hdiutil.log" 2>&1 || true
+    [ -d "$mount/$CLIENT_TITLE.app" ] || die "no $CLIENT_TITLE.app on the image: $(ls "$mount")"
+    # What dragging it does: the signature and its attributes come too.
+    ditto "$mount/$CLIENT_TITLE.app" "$ROOT"
+    hdiutil detach "$mount" -quiet -force || true
+    mount=''
+  fi
   LAUNCHER="$ROOT/Contents/MacOS/$CLIENT_TITLE"
   APPDIR="$ROOT/Contents/app"
   [ -x "$LAUNCHER" ] || die "no launcher at $LAUNCHER"
   got="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Contents/Info.plist")"
   want="$((${version%%.*} + 1)).${version#*.}"
   [ "$got" = "$want" ] || die "the app's bundle says $got, not $want (docs/RELEASING.md, \"The desktop client's packages\")"
-  ok "copied from the image to /Applications, bundle version $got"
+  ok "${via_script:+by get-client.sh: }copied from the image to /Applications, bundle version $got"
   codesign --verify --deep "$ROOT" 2>"$tmp/codesign.log" && ok "its ad-hoc signature holds" || say "      (codesign --verify: $(tail -n 1 "$tmp/codesign.log"))"
   cat >"$tmp/windows.swift" <<'SWIFT'
 import CoreGraphics
@@ -408,6 +473,16 @@ first_shot="${shots:+$shots/$kind-1-first-window.png}"
 open_as_a_person || die "it didn't start"
 until_true 120 window_up || die "no window named $WINDOW after 2 minutes"
 ok "it opens: a window named $WINDOW"
+if [ -n "$via_script" ] && [ "$kind" = dmg ]; then
+  # While it's open, get-client.sh leaves it alone. This is what `pgrep` sees of a real running app.
+  set +e
+  out="$(HYPERNOVA_TAG=none-needed HYPERNOVA_CLIENT_DIR="$tmp/release" bash "$REPO/scripts/get-client.sh" 2>&1 </dev/null)"
+  code=$?
+  set -e
+  [ "$code" -ne 0 ] || die "get-client.sh replaced the app while it was open: $out"
+  case "$out" in *"is running"*) ok "get-client.sh refuses while the app is open" ;; *) die "get-client.sh, with the app open: $out" ;; esac
+  [ -x "$LAUNCHER" ] || die "the app is gone after get-client.sh refused"
+fi
 # A moment to draw before the picture.
 sleep 5
 [ -z "$first_shot" ] || shot "$first_shot"

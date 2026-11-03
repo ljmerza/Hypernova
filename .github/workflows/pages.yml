@@ -1,12 +1,15 @@
 name: pages
-# The one-line install's short address: scripts/get.sh served by GitHub Pages at
-# https://ljmerza.github.io/Hypernova/get.sh (README, docs/LINUX.md). The page itself only points
-# at the repository. Runs when the script changes on main, and by hand.
+# The one-line installs' short addresses, served by GitHub Pages: scripts/get.sh for the server at
+# https://ljmerza.github.io/Hypernova/get.sh (README, docs/LINUX.md) and, the same file, get-server.sh,
+# and scripts/get-client.sh for the desktop client at .../get-client.sh. get.sh stays for good, as docs
+# and installs out there use it. The page itself only points at the repository. Runs when a script
+# changes on main, and by hand.
 on:
   push:
     branches: [main]
     paths:
       - 'scripts/get.sh'
+      - 'scripts/get-client.sh'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
@@ -28,6 +31,8 @@ jobs:
         run: |
           mkdir -p _site
           cp scripts/get.sh _site/get.sh
+          cp scripts/get.sh _site/get-server.sh
+          cp scripts/get-client.sh _site/get-client.sh
           cat > _site/index.html <<'EOF'
           <!doctype html><meta charset="utf-8"><title>Hypernova</title>
           <meta http-equiv="refresh" content="0; url=https://github.com/ljmerza/Hypernova">

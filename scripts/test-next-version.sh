@@ -127,6 +127,8 @@ check "notes: no server, only the APK" 1 count 'hypernova-client' <<<"$("$NOTES"
 for f in linux-amd64.deb linux-x64.tar.gz linux-arm64.deb macos-arm64.dmg macos-x64.dmg windows-x64.msi; do
   check "notes: the client's $f" 1 count "\`hypernova-client-v3.4.0-$f\`" <<<"$notes"
 done
+check "notes: the client's one line, and for this release" 1 count 'get-client.sh | HYPERNOVA_TAG=v3.4.0 bash' <<<"$notes"
+check "notes: the client's one line comes under Client" 0 count 'get-client.sh' <<<"$(sed -n '/^### Server/,$p' <<<"$notes")"
 check "notes: the client's files come under Client" 0 count 'hypernova-client-v3.4.0-windows-x64.msi' <<<"$(sed -n '/^### Server/,$p' <<<"$notes")"
 check "notes: where a warning is explained" 1 count 'docs/INSTALL.md, "The desktop client"' <<<"$notes"
 

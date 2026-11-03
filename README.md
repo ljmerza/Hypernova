@@ -57,6 +57,8 @@ That's only the highlights. Over 160 capabilities are already built, each listed
 curl -fsSL https://ljmerza.github.io/Hypernova/get.sh | bash
 ```
 
+(`get-server.sh` is the same file, to go with the client's `get-client.sh` below. `get.sh` isn't going anywhere.)
+
 That installs the system packages it needs (it asks for sudo), Node.js, the Hypernova service and
 Claude Code. Log out and back in, or open a new SSH session, for your PATH and the `claude` function.
 Then sign in to Claude Code once and pair your phone.
@@ -70,7 +72,13 @@ hypernova pair
 [latest release](https://github.com/ljmerza/Hypernova/releases/latest)
 (`hypernova-client-<tag>-android.apk`, Android 10 or later), tap **Scan** in it and point it at the QR code `hypernova pair` shows.
 `hypernova doctor` checks every piece if something doesn't work. A small desktop client for Linux, Mac and Windows is on
-each release too; it's unsigned, so a Mac and Windows warn: [`docs/INSTALL.md`, "The desktop client"](docs/INSTALL.md#the-desktop-client).
+each release too, and on Linux or a Mac this installs it:
+
+```bash
+curl -fsSL https://ljmerza.github.io/Hypernova/get-client.sh | bash
+```
+
+It's unsigned, so Windows warns, and a Mac does for a browser's download, and that line has only run on Linux so far: [`docs/INSTALL.md`, "The desktop client"](docs/INSTALL.md#the-desktop-client).
 
 The server updates itself to new releases (`hypernova auto-update off` turns that off), and the same
 `curl` line updates it by hand. Each release also has the server as a `.deb`

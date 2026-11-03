@@ -9,6 +9,9 @@ name: client-packages
 #   - a pull request that touches these files, or a manual run: everything is built and tested and kept as the run's
 #     artifacts, with screenshots. Nothing is published.
 #
+# Each also proves scripts/get-client.sh, the one-line install, on the package just built (--get-client). Those steps come
+# after the package is attached, so a fault in the script costs a red run and not a file on the release.
+#
 # No secrets: nothing is signed (docs/RELEASING.md, "The desktop client's packages", and what a person sees:
 # docs/INSTALL.md, "The desktop client"). The names are in android/desktop/packaging/client-names.sh.
 on:
@@ -32,11 +35,29 @@ on:
       - 'android/gradle.properties'
       - 'demo/server.ts'
       - 'scripts/test-client-package.sh'
+      - 'scripts/get-client.sh'
+      - 'scripts/test-get-client.sh'
       - '.github/workflows/client-packages.yml'
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
+  # The one-line install's decisions, with stand-ins: on Ubuntu, in bash 3.2 in Docker, and on a Mac's own bash and tools.
+  get-client-script:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: With this system's bash
+        run: /bin/bash scripts/test-get-client.sh
+      - name: Under bash 3.2
+        if: ${{ runner.os == 'Linux' }}
+        run: scripts/test-get-client.sh --docker
+
   # jpackage works out the .deb's dependencies from what this runner has installed, for what the Java and the app
   # link against, so that's named here instead of left to the image. They're Ubuntu 24.04's names (docs/INSTALL.md).
   linux:
@@ -111,6 +132,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$TGZ" --clobber
+      - name: get-client.sh installs, opens and pairs the .deb
+        run: scripts/test-client-package.sh --get-client --deb "$DEB" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS"
+      - name: get-client.sh installs, opens and pairs the folder
+        if: ${{ matrix.arch == 'amd64' }}
+        run: scripts/test-client-package.sh --get-client --tarball "$TGZ" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS"
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
@@ -171,6 +197,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$DMG" --clobber
+      - name: get-client.sh installs, opens and pairs the .dmg
+        run: /bin/bash scripts/test-client-package.sh --get-client --dmg "$DMG" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS"
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
@@ -246,6 +274,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$MSI" --clobber
+      # On Git's bash it only says where the .msi is, and that's what's shown here.
+      - name: What get-client.sh says on Windows
+        run: |
+          out="$(HYPERNOVA_TAG="$TAG" HYPERNOVA_CLIENT_DIR=dist/client bash scripts/get-client.sh)"
+          printf '%s\n' "$out"
+          grep -F "$TAG-windows-x64.msi" <<<"$out"
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:

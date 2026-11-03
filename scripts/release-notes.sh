@@ -59,6 +59,7 @@ if [ "$server" = yes ]; then
   # The desktop client's files: the names are its own (docs/RELEASING.md, "Names"). The APK's above is one servers look for.
   . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../android/desktop/packaging/client-names.sh"
   cat <<EOF
+- Linux or Mac desktop, in one line: \`curl -fsSL https://ljmerza.github.io/Hypernova/get-client.sh | bash\`. This release itself: \`curl -fsSL https://ljmerza.github.io/Hypernova/get-client.sh | HYPERNOVA_TAG=$tag bash\`.
 - Linux desktop: \`$CLIENT_PACKAGE-$tag-linux-amd64.deb\` or \`$CLIENT_PACKAGE-$tag-linux-arm64.deb\`, then \`sudo apt install ./$CLIENT_PACKAGE-$tag-linux-amd64.deb\`. Or \`$CLIENT_PACKAGE-$tag-linux-x64.tar.gz\`, a folder to unpack and run.
 - Mac: \`$CLIENT_PACKAGE-$tag-macos-arm64.dmg\` (Apple silicon) or \`$CLIENT_PACKAGE-$tag-macos-x64.dmg\` (Intel). Drag it to Applications.
 - Windows: \`$CLIENT_PACKAGE-$tag-windows-x64.msi\`.
