@@ -2641,6 +2641,7 @@ class LiveHub(
             stale = w?.source == "stale",
             models = ModelWeeks.of(w?.models.orEmpty(), account, t),
             rate = w?.rate.takeIf { official },
+            weekReported = UsageWindow.weekReported(f7, t, hit7 != null),
         )
         usage = if (reported) read else UsageWindow.weekAsDisk(read)
         // Wake up at the next reset so the meters reset on time (and the account's limit ends with it).

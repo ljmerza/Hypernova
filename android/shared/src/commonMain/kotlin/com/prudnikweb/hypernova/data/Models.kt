@@ -275,6 +275,11 @@ data class Usage(
      * nothing labelled 5H shows.
      */
     val fiveHourReported: Boolean = true,
+    /**
+     * [sevenDay] and [sevenDayResetAt] are a week the Mac reported. False: they're stand-ins (0, a
+     * week from now), when it has no week, or the one it had is over and the next isn't in.
+     */
+    val weekReported: Boolean = true,
 ) {
     val limited: Boolean get() = limitedAt != null
     val weekLimited: Boolean get() = weekLimitedAt != null

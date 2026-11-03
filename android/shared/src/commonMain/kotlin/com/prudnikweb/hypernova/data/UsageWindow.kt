@@ -26,6 +26,10 @@ data class UsageWindow(val used: Float, val resetIn: Long = -1L) {
          * the Mac has the week and no 5-hour window, and no 5-hour limit holds ([hit]); with nothing
          * known yet, as before (true).
          */
+        /** The Mac has a week still running, or a week's limit is on ([Usage.weekReported]). */
+        fun weekReported(sevenDay: Window?, now: Long, hit: Boolean = false): Boolean =
+            hit || (sevenDay != null && sevenDay.resetsAt > now)
+
         fun fiveHourReported(fiveHour: Window?, sevenDay: Window?, hit: Boolean = false): Boolean =
             hit || fiveHour != null || sevenDay == null
 

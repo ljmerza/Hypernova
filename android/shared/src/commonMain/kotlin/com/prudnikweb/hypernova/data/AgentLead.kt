@@ -105,6 +105,7 @@ object AgentLead {
             known = true,
             stale = c.account?.signedIn == false,
             fiveHourReported = five != null,
+            weekReported = week != null,
         )
     }
 }

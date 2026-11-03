@@ -200,7 +200,7 @@ fun weekPaceOf(codexSession: Boolean, plan: Boolean, usage: Usage, codex: CodexS
         val week = codex?.takeIf { it.account?.signedIn != false }?.usage?.sevenDay ?: return null
         return weekPace((week.pct / 100.0).toFloat(), week.resetsAt, now)
     }
-    if (!plan) return null
+    if (!plan || !usage.weekReported) return null
     return weekPace(UsageWindow.sevenDay(usage, now).used, usage.sevenDayResetAt, now)
 }
 

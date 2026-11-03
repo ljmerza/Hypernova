@@ -179,6 +179,11 @@ class TopBarTest {
         assertEquals(WeekPace(4, 50), weekPaceOf(codexSession = false, plan = true, planUsage.copy(weekLimitedAt = now), null, now))
     }
 
+    @Test fun noWeekReportedHasNoPaceInsteadOfDayOneAtZero() {
+        val standIn = planUsage.copy(sevenDay = 0f, sevenDayResetAt = now + week, weekReported = false)
+        assertEquals(null, weekPaceOf(codexSession = false, plan = true, standIn, null, now))
+    }
+
     @Test fun aCodexSessionsPaceIsCodexsOwnWeek() {
         val usage = CodexUsage(fiveHour = null, sevenDay = Window(40.0, now + week / 2), limited = false, observedAt = now)
         val codex = CodexState(available = true, enabled = true, connected = true, usage = usage)

@@ -28,6 +28,16 @@ class FiveHourReportedTest {
         assertTrue(UsageWindow.fiveHourReported(null, week, hit = true))
     }
 
+    @Test fun aWeekIsReportedWhileItRunsOrItsLimitIsOn() {
+        assertTrue(UsageWindow.weekReported(week, now))
+        assertFalse(UsageWindow.weekReported(null, now))
+        // Over, and the next one isn't in yet.
+        assertFalse(UsageWindow.weekReported(week, week.resetsAt))
+        // A reset that was never said.
+        assertFalse(UsageWindow.weekReported(week.copy(resetsAt = 0L), now))
+        assertTrue(UsageWindow.weekReported(null, now, hit = true))
+    }
+
     @Test fun withoutOneTheSunsDiskFollowsTheWeek() {
         val read = Usage(
             fiveHour = 0f, sevenDay = 0.62f, fiveHourResetAt = now + 5 * 3_600_000L, sevenDayResetAt = week.resetsAt,

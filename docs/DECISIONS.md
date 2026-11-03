@@ -3764,6 +3764,8 @@ This fits "No estimate of when usage runs out" (2026-11-01), which took away a r
    come. A Codex session uses Codex's own week, as Home's Codex card does, while signed in, and shows nothing
    on a plan without a week.
 
+With no week from the server, or one that's over with the next not in yet, the item doesn't draw (`Usage.weekReported`). It used to read `Day 1/7 +0%` off stand-in numbers. The owner agreed to that fix on 2026-11-02.
+
 ## Git in the top bar, asked at calm moments (2026-11-02)
 
 The owner: "do the week pace, git and this model's week". **Git** is an item in Settings → Session top bar,
