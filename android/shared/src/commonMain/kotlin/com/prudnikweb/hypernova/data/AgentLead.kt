@@ -14,10 +14,12 @@ data class ClaudeState(
     val version: String?,
     /** Sessions live in `claude agents` (the Mac's settings.claudeAgents); null from a Mac that doesn't say. */
     val agents: Boolean? = null,
+    /** Sessions the lost login stopped carry on by themselves once it's back (the Mac's settings.loginContinue); null from a Mac that can't. */
+    val loginContinue: Boolean? = null,
 ) {
     companion object {
         fun parse(o: JSONObject?): ClaudeState? = o?.let {
-            ClaudeState(it.optBoolean("available", true), it.str("version")?.takeIf { v -> v.isNotBlank() }, if (it.has("agents")) it.optBoolean("agents") else null)
+            ClaudeState(it.optBoolean("available", true), it.str("version")?.takeIf { v -> v.isNotBlank() }, if (it.has("agents")) it.optBoolean("agents") else null, if (it.has("loginContinue")) it.optBoolean("loginContinue") else null)
         }
     }
 }

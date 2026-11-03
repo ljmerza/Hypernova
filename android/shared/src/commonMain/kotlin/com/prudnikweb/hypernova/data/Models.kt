@@ -167,7 +167,7 @@ data class OutdatedClaude(val runs: String, val installed: String)
 @Immutable
 data class Blocked(val kind: String, val text: String, val resetsAt: Long? = null, val autoResumeAt: Long? = null, val resume: Resume? = null) {
     /** The owner has to do something (sign in, renew, add funds), rather than wait. */
-    val needsYou: Boolean get() = kind != LIMIT && kind != MODEL
+    val needsYou: Boolean get() = kind != LIMIT && kind != MODEL && kind != SIGNED_IN
 
     companion object {
         const val LIMIT = "limit"
@@ -177,6 +177,8 @@ data class Blocked(val kind: String, val text: String, val resetsAt: Long? = nul
         const val NO_SUBSCRIPTION = "no_subscription"
         const val ON_HOLD = "on_hold"
         const val PROVIDER = "provider"
+        /** The login that stopped it is back and it didn't carry on by itself: it waits for Continue. */
+        const val SIGNED_IN = "signed_in"
     }
 }
 

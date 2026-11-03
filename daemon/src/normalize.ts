@@ -876,6 +876,9 @@ export function typedCommand(text: string, builtin: (name: string) => boolean | 
   return { name: `/${m[1]}`, args: (m[2] ?? '').trim(), kind: builtin(m[1]!) ? 'local' : 'prompt' }
 }
 
+/** The slim row a continuation is in the chat. */
+const AUTO_ROW = { limit: 'Continued by itself after the limit', manual: 'Continued after the limit', login: 'Continued by itself after signing in again', login_manual: 'Continued after signing in again' } as const
+
 /**
  * A prompt as the phone shows it: pasted text in place of its tags, and the files attached from
  * the phone apart from the text.
@@ -883,7 +886,7 @@ export function typedCommand(text: string, builtin: (name: string) => boolean | 
 export function userEvent(id: string, ts: number, prompt: string): Ev {
   // A continuation after a limit (resume.ts) isn't the owner speaking: a slim row says it carried on.
   const auto = autoContinueOf(prompt)
-  if (auto) return { id, kind: 'notice', ts, text: auto === 'limit' ? 'Continued by itself after the limit' : 'Continued after the limit', tone: 'info' }
+  if (auto) return { id, kind: 'notice', ts, text: AUTO_ROW[auto], tone: 'info' }
   const { text, files } = splitAttachments(unwrapPastes(prompt))
   return files.length ? { id, kind: 'user', ts, text, files } : { id, kind: 'user', ts, text }
 }

@@ -204,6 +204,7 @@ object AccountWords {
                 }
             }
             Blocked.LOGGED_OUT -> r.getString(Str.activity_signed_out)
+            Blocked.SIGNED_IN -> r.getString(Str.activity_signed_in)
             Blocked.NO_SUBSCRIPTION -> r.getString(Str.activity_no_plan)
             Blocked.ON_HOLD -> r.getString(Str.activity_on_hold)
             Blocked.NO_CREDIT -> r.getString(Str.activity_no_credit)

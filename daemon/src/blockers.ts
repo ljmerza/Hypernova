@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // What stops Claude from replying, read into one shape (docs/PROTOCOL.md, "Account"). Pure
 // functions: the transcript reader (normalize.ts), the hooks, the SDK runner and the account
 // (account.ts) all classify through here. Claude Code's texts differ between the terminal and the
@@ -11,7 +12,8 @@ export type LimitWindow = 'five_hour' | 'seven_day' | 'model' | 'credits'
 export type AccountReason = 'expired' | 'revoked' | 'not_logged_in' | 'rejected' | 'ended' | 'trial_ended' | 'downgraded' | 'org_disabled' | 'out_of_credits' | 'spend_cap' | 'api_credit'
 /** `label`: Claude Code's own words ("session limit", "weekly limit", "Opus limit"). Times in epoch ms. */
 export type Limit = { window: LimitWindow; label: string; resetsAt: number | null; autoResumeAt: number | null; usingCredits: boolean }
-export type BlockedKind = 'limit' | 'model' | 'no_credit' | 'logged_out' | 'no_subscription' | 'on_hold' | 'provider'
+/** `signed_in` is only ever shown (resume.ts): the login that stopped it is back and it didn't carry on by itself, so it waits for Continue. */
+export type BlockedKind = 'limit' | 'model' | 'no_credit' | 'logged_out' | 'no_subscription' | 'on_hold' | 'provider' | 'signed_in'
 /** Why a session carries on by itself after a limit, or doesn't (docs/PROTOCOL.md, "Auto-continue"). */
 export type ResumeWhy = 'cancelled' | 'setting' | 'far' | 'repeated' | 'exited' | 'slept' | 'dropped' | 'no_reset' | 'back'
 /**
@@ -268,21 +270,31 @@ function providerError(raw: string, text: string, err: string | null, status: nu
 }
 
 // ── Continuing after a limit ─────────────────────────────────────────────
+const AFTER_LOGIN = 'Continue the task you were working on when the login was lost. Any agents you started that failed because of it have stopped: continue them with SendMessage, or run them again if you can\'t; do not repeat work that is already complete.'
 /**
  * What carries a session on once its limit has passed, typed as its next prompt. Claude Code's own
  * (it sends it hidden at its subscription's reset); the daemon's, at another provider's reset; and
- * the one Continue sends when the owner taps it on a session that waited. Each reads as a slim row
- * in the chat (`auto` on its user event), never as a message from the owner.
+ * the one Continue sends when the owner taps it on a session that waited. After a lost login the
+ * session's sub agents failed too, each by itself, and only the session can take them up again
+ * (docs/DECISIONS.md, "Carrying on after signing in again"), so its words ask for that. Each reads as
+ * a slim row in the chat (`auto` on its user event), never as a message from the owner.
  */
 export const CONTINUE_TEXT = {
   claude: 'Your claude.ai usage limit has reset. Continue the task you were working on when the limit was reached; do not repeat work that is already complete.',
   provider: 'The rate limit has passed. Continue the task you were working on when it was reached; do not repeat work that is already complete.',
   manual: 'You can carry on now. Continue the task you were working on when you were stopped; do not repeat work that is already complete.',
+  login: `Your Claude Code login is back. ${AFTER_LOGIN}`,
+  loginManual: `You can carry on now: your Claude Code login is back. ${AFTER_LOGIN}`,
 } as const
 
-/** A prompt that is one of [CONTINUE_TEXT]'s: "limit" when it carried on by itself, "manual" when the owner tapped Continue. */
-export function autoContinueOf(text: string): 'limit' | 'manual' | null {
+/**
+ * A prompt that is one of [CONTINUE_TEXT]'s: "limit" or "login" when it carried on by itself after
+ * that, "manual" or "login_manual" when the owner tapped Continue.
+ */
+export function autoContinueOf(text: string): 'limit' | 'manual' | 'login' | 'login_manual' | null {
   const t = text.trim()
+  if (t === CONTINUE_TEXT.login) return 'login'
+  if (t === CONTINUE_TEXT.loginManual) return 'login_manual'
   if (t === CONTINUE_TEXT.claude || t === CONTINUE_TEXT.provider) return 'limit'
   if (t === CONTINUE_TEXT.manual) return 'manual'
   return null

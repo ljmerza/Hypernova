@@ -468,6 +468,55 @@ class SettingsTabTest {
         assertEquals(null, SettingsJump.asked)
     }
 
+    private fun JSONObject.loginContinue(on: Boolean) = apply { put("claude", JSONObject().put("available", true).put("version", "2.1.317").put("sdk", true).put("agents", true).put("loginContinue", on)) }
+    private fun FakeDaemon.takesLoginContinue() = on("POST", "/v1/claude") { r -> json(200, JSONObject().put("claude", JSONObject().put("available", true).put("loginContinue", r.json.getBoolean("loginContinue")))) }
+
+    @Test fun continueAfterSigningInIsAServersOwnSwitch() {
+        val z2 = server("z2", 47391) { loginContinue(true) }
+        z2.takesLoginContinue()
+        pair(z2)
+        linked()
+        show()
+        clickText("z2")
+        val title = str(R.string.lc_title)
+        rule.onNode(isSwitch(title)).performScrollTo().performClick()
+        rule.waitUntil(5_000) { z2.count("POST", "/v1/claude") == 1 }
+        assertFalse(z2.calls("POST", "/v1/claude").single().json.getBoolean("loginContinue"))
+        rule.waitUntil(5_000) { Core.live?.claude?.loginContinue == false }
+    }
+
+    @Test fun anOlderServerSaysItNeedsUpdatingForContinueAfterSigningIn() {
+        pair(server("z2", 47391))
+        linked()
+        show()
+        clickText("z2")
+        rule.onNodeWithText(str(R.string.lc_too_old, "z2")).performScrollTo().assertIsDisplayed()
+        assertEquals(0, rule.onAllNodes(isSwitch(str(R.string.lc_title))).fetchSemanticsNodes().size)
+    }
+
+    @Test fun theSwitchForAllSetsEachConnectedServerThatHasIt() {
+        val z2 = server("z2", 47391) { loginContinue(true) }
+        val shed = server("shed", 47392) { loginContinue(false) }
+        val old = server("gym", 47393)
+        z2.takesLoginContinue()
+        shed.takesLoginContinue()
+        val z2Id = pair(z2)
+        pair(shed)
+        pair(old)
+        linked()
+        Core.switchTo(z2Id)
+        Core.showAll()
+        show()
+        // One on, one off, one too old: it says so, and on sets the two that have it.
+        rule.onNodeWithText(str(R.string.lc_all_some, 1, 2) + " " + str(R.string.lc_all_old)).performScrollTo().assertIsDisplayed()
+        rule.onNode(isSwitch(str(R.string.lc_all_title))).performScrollTo().performClick()
+        rule.waitUntil(5_000) { z2.count("POST", "/v1/claude") == 1 && shed.count("POST", "/v1/claude") == 1 }
+        assertTrue(z2.calls("POST", "/v1/claude").single().json.getBoolean("loginContinue"))
+        assertTrue(shed.calls("POST", "/v1/claude").single().json.getBoolean("loginContinue"))
+        assertEquals(0, old.count("POST", "/v1/claude"))
+        rule.onNodeWithText(str(R.string.lc_all_on) + " " + str(R.string.lc_all_old)).performScrollTo().assertIsDisplayed()
+    }
+
     @Test fun aServersUpdateNoticeOpensItsCard() {
         twoServers()
         val shedId = Core.servers.single { it.pairing.macName == "shed" }.id

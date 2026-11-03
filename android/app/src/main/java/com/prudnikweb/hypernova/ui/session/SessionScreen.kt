@@ -1214,6 +1214,7 @@ private fun blockedHint(hub: Hub, s: Session, b: Blocked): String {
         Blocked.LIMIT -> b.resetsAt?.let { stringResource(R.string.hint_blocked_until, AccountWords.clock(context.strings, it)) } ?: stringResource(R.string.hint_blocked_limit)
         Blocked.MODEL -> b.resetsAt?.let { stringResource(R.string.hint_blocked_model, restingModel(hub, b), AccountWords.clock(context.strings, it)) } ?: stringResource(R.string.hint_blocked_model_any)
         Blocked.LOGGED_OUT -> stringResource(R.string.hint_blocked_sign_in)
+        Blocked.SIGNED_IN -> stringResource(R.string.prompt_hint)
         Blocked.NO_SUBSCRIPTION -> stringResource(R.string.hint_blocked_plan)
         Blocked.ON_HOLD -> stringResource(R.string.hint_blocked_hold)
         Blocked.NO_CREDIT -> stringResource(R.string.hint_blocked_credits)

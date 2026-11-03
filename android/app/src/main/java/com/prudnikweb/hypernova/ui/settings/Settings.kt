@@ -184,6 +184,11 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                                 if (i > 0) Hairline(Modifier.fillMaxWidth())
                                 NavRow(status.name, stringResource(R.string.st_server_row_desc), { vm.nav.push(Route.ServerSettings(status.id)) }, end = { ConnectionChip(status.state) })
                             }
+                            // Continue after signing in on every server at once (LoginContinueRow.kt).
+                            if (listed.size > 1) {
+                                Hairline(Modifier.fillMaxWidth())
+                                LoginContinueAllRow(listed.filter { it.first.state == LinkState.Connected }.map { it.second })
+                            }
                         }
                     }
                 }
@@ -421,6 +426,8 @@ private fun ServerCard(live: LiveHub, waiting: Boolean, onForget: () -> Unit) {
             if (awake != null) StayAwakeBlock(live, awake, live.mac.battery)
             // The server updating itself (AutoUpdateRow.kt), from a daemon that can say; not from a last snapshot.
             if (!waiting) live.mac.update?.let { AutoUpdateRow(live, it) }
+            // Carrying on after signing in again (LoginContinueRow.kt), or that it needs updating for that.
+            if (!waiting && link.state == LinkState.Connected) LoginContinueRow(live)
             // The server's debug log (ServerDebugRow.kt): the switch and when it ends.
             if (!waiting) live.mac.debug?.let { ServerDebugRow(live, it) }
             // Its notifications, kept on the phone: here while it can't be reached too.

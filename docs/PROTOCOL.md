@@ -460,8 +460,10 @@ Snapshot = {
     version: string | null,
     sdk?: boolean,                // Claude Code's SDK is in the daemon's packages (see Claude Code's SDK);
                                   // absent: an older daemon, which always carried it
-    agents?: boolean              // sessions live in `claude agents` (settings.claudeAgents, see Session menu);
+    agents?: boolean,             // sessions live in `claude agents` (settings.claudeAgents, see Session menu);
                                   // absent: an older daemon
+    loginContinue?: boolean       // sessions the lost login stopped carry on by themselves once it's back
+                                  // (settings.loginContinue, see After signing in again); absent: an older daemon
   },
   codex?: Codex | null            // Codex as a second agent (see Codex); null: not installed here; absent: an older daemon
 }
@@ -558,7 +560,9 @@ Session = {
                               // state, the working rule: working = state working/starting or agentsRunning > 0,
                               // needs_you outranks it (the Android app's Session.busy; one rule in every client)
   blocked: null | {           // why Claude can't reply here now (see Account); a real reply clears it
-    kind: "limit" | "model" | "no_credit" | "logged_out" | "no_subscription" | "on_hold" | "provider",
+    kind: "limit" | "model" | "no_credit" | "logged_out" | "no_subscription" | "on_hold" | "provider" | "signed_in",
+                                  // signed_in: the login that stopped it is back and it waits for Continue
+                                  // (see After signing in again); only with resume.state "ready"
     text: string,             // Claude Code's line, request ids removed, at most 200 characters
     resetsAt: number | null,  // epoch ms
     autoResumeAt: number | null, // it carries on by itself then: resume.at while resume.state is "armed", else null
@@ -2734,11 +2738,13 @@ Errors). All take the bearer token except the local fire route.
 
 #### POST /v1/claude
 
-- **Body:** `{agents: boolean}`
+- **Body:** `{agents?: boolean, loginContinue?: boolean}`, at least one
 - **Answer:** `200 {claude}` (the snapshot's `claude`)
 - **Refusals:** 400 `bad_value`
-- **Rules:** sessions in `claude agents` on or off (`settings.claudeAgents`, see Session menu),
-  saved and taken at once, without a restart. Every client hears `{t:"claude"}`.
+- **Rules:** `agents`: sessions in `claude agents` on or off (`settings.claudeAgents`, see Session
+  menu). `loginContinue`: sessions the lost login stopped carry on by themselves once it's back, on
+  unless set to false (`settings.loginContinue`, see After signing in again). Saved and taken at
+  once, without a restart. Every client hears `{t:"claude"}`.
 
 #### POST /v1/sessions/{id}/switch/preview
 
@@ -2780,8 +2786,9 @@ Errors). All take the bearer token except the local fire route.
 - **Refusals:** those of `POST /v1/sessions/{id}/prompt`; 409 `unsupported_for_agent`
   (`reason: "limit"` on Codex)
 - **Rules:** no reason, or `"away"`, sends "I'm back. Please continue where you left off." `"limit"`
-  sends the continuation after a limit (see Auto-continue), drawn as a notice row, and the session's
-  ready card goes once its turn starts.
+  sends the continuation after a limit (see Auto-continue), or, on a session the login stopped, the
+  one after signing in (see After signing in again), drawn as a notice row, and the session's ready
+  card goes once its turn starts.
 
 ### Routes: projects, providers and models
 
@@ -3526,6 +3533,7 @@ There is no battery route: the battery comes in `Snapshot.mac.battery` and `{t:"
 | `browseOutsideProjects` | See Files, The setting. Every client hears of it, with the sessions it opens or closes |
 | `codex` | Turns Codex on or off for Hypernova, with the shell's `codex` function (see Codex) |
 | `claudeAgents` | Sessions in `claude agents`, as `POST /v1/claude`. Every client hears `claude` |
+| `loginContinue` | Sessions the lost login stopped carry on by themselves once it's back, as `POST /v1/claude`. Every client hears `claude` |
 | `releaseCheck` | The app's GitHub releases (see The app update, "Where the offered APK comes from"). Turned on, a look now |
 | `autoUpdate` | The server updating itself, on unless set to false (see The server's own update; `hypernova auto-update`). Turned on, a look now; every client hears `update` |
 
@@ -3769,8 +3777,8 @@ objects with a `t` field. On the WebSocket's auth, see Transport and auth.
 
 - **Direction:** daemon → client
 - **Shape:** `{t:"claude", claude}` (as the snapshot's `claude` says it)
-- **When:** sessions in `claude agents` were turned on or off (`POST /v1/claude`, or
-  `POST /local/settings {claudeAgents}`).
+- **When:** sessions in `claude agents`, or carrying on after signing in, were turned on or off
+  (`POST /v1/claude`, or `POST /local/settings {claudeAgents, loginContinue}`).
 
 #### `{t:"codex"}`
 
@@ -6186,7 +6194,8 @@ Whether a session a limit stopped carries on by itself (`daemon/src/resume.ts`),
   working on when it was reached; do not repeat work that is already complete." Such a prompt, and
   Continue's ("You can carry on now. …"), is a notice row in the chat ("Continued by itself after
   the limit", "Continued after the limit"), never the owner's bubble.
-- **Never by itself:** out of credit, a refused key, signed out and the rest (`resume: null`). A
+- **Never by itself:** out of credit, a refused key, and the rest but a sign-out (`resume: null`;
+  a sign-out has rules of its own, see After signing in again). A
   rate limit that named no reset, or a provider `down`, is `off` with `no_reset` and can't be armed
   (the card offers Try again). An observed terminal (not shared) shows its state; both switches are
   off there.
@@ -6220,6 +6229,51 @@ Whether a session a limit stopped carries on by itself (`daemon/src/resume.ts`),
   cleared with Backspace and the continuation typed in its place. Any other text answers 409
   `typing` as for a prompt.
 - Kept in `<support>/resume.json` (0600): a restart keeps what's armed, off or ready.
+
+#### After signing in again
+
+A session the lost login stopped (`blocked.kind: "logged_out"`) carries on by itself once the account
+is back, with `settings.loginContinue` on (the default; `POST /v1/claude`, Settings → the server's
+page, or Settings' switch for all servers, which sets each connected one). The same machinery as a
+limit's (`daemon/src/resume.ts`), with an entry marked `login`; `blocked.resume` stays null until
+there's a `ready` to show.
+
+- **Back means:** the account isn't signed out any more and says `ok`: "Login successful" from a
+  sign-in (the phone's, or `/login` in a terminal), a check that finds one, or a reply to a request
+  sent after the sign-out began. A sign-in that failed changes nothing, so nothing moves.
+- **Still under a limit** (`Account`, signing in during a limit brings it back): nothing moves until
+  the account is `ok`, at its reset. One whose reset was over 24 hours off when it came back says to
+  Continue then, as a limit's own carrying on wouldn't have run. On usage credits: no wait. On hold,
+  out of credit or no plan: it waits on.
+- **What moves:** only sessions with such a block from this sign-out (no earlier than a minute before
+  it began), on the built-in provider. Not one the owner stopped, one that ended, a `claude agents`
+  job listed `stopped`, `done` or `failed`, one on another provider, one a limit stopped (its own
+  schedule stands), nor one where someone wrote since it stopped (a prompt or a command; `/login`
+  doesn't count): that one's entry goes. Codex has its own login and isn't covered.
+- **When:** the first 5 s after the sign-in, the next 4 s apart, oldest stop first. At its moment
+  it's checked again: signed out again or a limit since, it goes back to waiting; written in since,
+  it's left; an approval, menu or dialog open (`needs_you`), 20 s later.
+- **What it types:** "Your Claude Code login is back. Continue the task you were working on when the
+  login was lost. Any agents you started that failed because of it have stopped: continue them with
+  SendMessage, or run them again if you can't; do not repeat work that is already complete." It's a
+  notice row in the chat ("Continued by itself after signing in again"), never the owner's bubble,
+  and no notification, as after a limit. A `claude agents` job is typed into through `claude attach`.
+- **Once.** The entry stays `fired` for 15 minutes. Stopped by the login again in that time, the login
+  is flipping: it won't carry on by itself again, however many sign-ins come, until 15 minutes after
+  that continuation. Kept in `resume.json`, so a restart doesn't send it twice, and a sign-in the
+  daemon was down for is noticed at its first look.
+- **Says to Continue:** with the setting off, after a flip, with unsent text in its terminal, or with
+  no way to type (a terminal Hypernova doesn't hold): `blocked: {kind: "signed_in", resume: {state:
+  "ready", …}}` (`why` `dropped` for the unsent text). Continue (`POST …/continue {reason: "limit"}`)
+  types the same words after "You can carry on now: …", a notice row "Continued after signing in
+  again". It goes with a turn, or after 12 hours.
+- **While it waits its moment** nothing shows: its block is over and the session is idle.
+- **A `claude agents` job** says `state: "blocked"` and `needs: "login required — run /login · API
+  Error: …"` in its state file until its next prompt (Claude Code 2.1.317). Once the account isn't
+  signed out it's idle here, not `needs_you`.
+- **Sub agents.** A sub agent the login stopped ends as failed; nothing in Claude Code resumes it by
+  itself. Only its session can, which is why the words above ask. What Claude Code does, as measured:
+  docs/DECISIONS.md, "Carrying on after signing in again".
 
 ### Session usage, the to-do list and Rewind
 
