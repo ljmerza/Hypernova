@@ -43,7 +43,9 @@ This file is the notice for these. All of them have changed from the original.
 - `NOTICE`
 - `android/app/src/main/assets/legal/NOTICE` (a copy of `NOTICE` that the app ships)
 
-No images or other binary files of the original have been modified: the ones added since the fork point
+Two binary files of the original have changed since the fork point: `docs/images/social-preview.png` (the
+project's picture) and `android/gradle/wrapper/gradle-wrapper.jar` (Gradle's own wrapper, from the Gradle upgrade). No
+other image or binary file of the original has been modified: the ones added since the fork point
 are new files.
 
 ## Files with no line of their own
