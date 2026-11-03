@@ -144,6 +144,23 @@ class VoiceInput internal constructor(private val prefs: VoicePrefs, private val
         }
     }
 
+    /**
+     * A button that takes the box's words but isn't its Send (the new-session sheet's Start): hands-free
+     * ends, and [then] runs once what was said is in the box. A finger on the mic decides for itself:
+     * ask [held] first.
+     */
+    fun finishing(then: () -> Unit) {
+        if (handsFree) on(MicEvent.Done)
+        if (current == null) return then()
+        scope.launch {
+            settled()
+            then()
+        }
+    }
+
+    /** A finger holds the mic: the words aren't over until it lets go. */
+    val held: Boolean get() = listening && !handsFree
+
     private fun start() {
         // A new press while the last is still settling: its text stays as it stands.
         detach()

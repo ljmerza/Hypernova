@@ -419,11 +419,12 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                     MicButton(voice, send = false, canSend = false)
                     Spacer(Modifier.width(6.dp))
                 }
-                start = start@{
-                        // busy read now too: two Enters before the sheet redraws start one session.
-                        if (!ready || busy) return@start
-                        busy = true
-                        error = null
+                val go: () -> Unit = go@{
+                        // The box emptied by hand while the words settled: nothing to start with after all.
+                        if (prompt.isBlank() && files.isEmpty()) {
+                            busy = false
+                            return@go
+                        }
                         val sending = AttachDrafts.take(DRAFT)
                         starting = prompt
                         val name = newName.trim()
@@ -476,11 +477,20 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                             }
                         }
                     }
+                start = start@{
+                    // busy read now too: two Enters before the sheet redraws start one session.
+                    if (!ready || busy || voice.held) return@start
+                    busy = true
+                    error = null
+                    // Words being dictated go with it: only the box has counted so far, so with a
+                    // "/skill" in it Start left them behind (owner, 2026-11-02).
+                    voice.finishing(go)
+                }
                 Pill(
                     if (busy) stringResource(R.string.starting) else stringResource(R.string.start),
                     start,
                     // Nothing to start with yet: a disabled pill, as TalkBack says (P14); "Starting…" stays lit.
-                    kind = PillKind.Primary, height = 44.dp, leading = Glyph.Send, enabled = (ready && !away) || busy,
+                    kind = PillKind.Primary, height = 44.dp, leading = Glyph.Send, enabled = (ready && !away && !voice.held) || busy,
                 )
             }
         }

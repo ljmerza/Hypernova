@@ -176,6 +176,18 @@ export function boxText(lines: string[], b: { top: number; bottom: number }): st
     .trim()
 }
 /**
+ * A prompt as the pastes that type it. Claude Code folds a long paste (measured on 2.1.316: five
+ * lines, or 1,586 characters on one; two lines stay whole) into "[Pasted text #1]", and a box that
+ * doesn't start with "/name" sends a prompt, so a skill given a long task never ran: Claude got
+ * "/name …" as words. The name goes in by itself, then the rest: the box reads "/name [Pasted text #1]", the skill runs and
+ * has every word as its arguments. Short ones stay one paste, as they read fine.
+ */
+export function pasteParts(text: string): string[] {
+  const m = /^(\/[A-Za-z0-9][\w.:-]*)\s+(\S[\s\S]*)$/.exec(text)
+  return m && (m[2]!.includes('\n') || text.length > 200) ? [`${m[1]} `, m[2]!] : [text]
+}
+
+/**
  * Claude shows it's working: a spinner line above the box ("✢ Flambéing… (1m 11s", "· Brewing…",
  * "⎿ Running…") or "esc to interrupt" below. Not while it streams text (then there's no
  * spinner), so this goes with [registryBusy] and recent output.

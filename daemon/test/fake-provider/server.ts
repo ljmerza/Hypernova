@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // A fake Anthropic-compatible provider for tests (docs/specs/spec-providers.md, §5; docs/DEV-SETUP.md,
 // "Fake provider"). Claude Code points ANTHROPIC_BASE_URL at it and gets canned replies, streamed
 // the way Anthropic streams them; told to, it answers with another provider's errors (out of
@@ -34,7 +35,7 @@ export const CANNED = 'Fake provider here. Nothing went to a model.'
  * Start the fake on [host]:[port] (0: any free port). [dir] keeps the control token. Refuses any
  * address but loopback: it must never answer anything but this Mac.
  */
-export async function startFake(o: { port?: number; host?: string; dir: string; token?: string }): Promise<Fake> {
+export async function startFake(o: { port?: number; host?: string; dir: string; token?: string; onMessages?: (sid: string, body: Record<string, any>) => void }): Promise<Fake> {
   const host = o.host ?? '127.0.0.1'
   if (!LOOPBACK.has(host)) throw new Error(`the fake provider only listens on loopback, not ${host}`)
   mkdirSync(o.dir, { recursive: true, mode: 0o700 })
@@ -149,6 +150,8 @@ export async function startFake(o: { port?: number; host?: string; dir: string; 
     if (p !== '/v1/messages' || req.method !== 'POST') return send(res, 404, { type: 'error', error: { type: 'not_found_error', message: 'Not found' } })
 
     const body = await readJson(req)
+    // A test in this process hears what Claude Code sent; the log still never keeps a body.
+    o.onMessages?.(sid, body)
     const now = Date.now()
     const f = faults.find((x) => matches(x, sid, now)) ?? null
     if (f) {
