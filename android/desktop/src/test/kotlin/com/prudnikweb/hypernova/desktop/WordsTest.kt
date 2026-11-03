@@ -38,6 +38,11 @@ class WordsTest {
         for (u in Ui.entries) assertTrue("${u.name} is in res/values or strings_desktop.xml", DesktopStrings.has(u.name))
     }
 
+    /** By name, as they aren't in [Plural]: a rename of the phone's fails here rather than in a pane. */
+    @Test fun thePanesPluralsAreThere() {
+        for (n in listOf("meta_ago_minutes", "meta_ago_hours", "meta_ago_days")) assertTrue(n, DesktopStrings.hasPlural(n))
+    }
+
     @Test fun thisAppsOwnWordsDontSayTheNameItIsAboutToLose() {
         val own = DesktopStrings::class.java.classLoader.getResourceAsStream("desktop/strings_desktop.xml")!!.bufferedReader().readText()
         assertFalse("the name is in AppName.kt", own.contains(APP_NAME))
@@ -48,6 +53,7 @@ class WordsTest {
         assertTrue(Ui.desk_answer_on_phone_question.text().endsWith("on your phone."))
         assertTrue(Ui.desk_answer_on_phone_plan.text().endsWith("on your phone."))
         assertTrue(Ui.desk_not_whole.text().endsWith("on your phone."))
+        assertTrue(Ui.desk_pane_phone_only.text().contains("on your phone"))
     }
 
     @Test fun thisComputerIsntAPhoneAndScansNothing() {

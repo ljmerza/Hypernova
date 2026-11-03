@@ -9,6 +9,7 @@ import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.DeviceCertStore
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.RouteKind
+import com.prudnikweb.hypernova.desktop.DesktopRig.choose
 import com.prudnikweb.hypernova.desktop.DesktopRig.main
 import com.prudnikweb.hypernova.desktop.DesktopRig.platform
 import com.prudnikweb.hypernova.desktop.DesktopRig.render
@@ -58,6 +59,8 @@ class DemoServerTest {
             println("DEMO key file ${platform.keyFile}: ${java.nio.file.Files.getPosixFilePermissions(platform.keyFile)}")
 
             // Read-only: it refuses an answer, and that's said.
+            choose(Core.live!!.sessions.first { CardOffer.of(Core.live!!.approval(it.id), it) is CardOffer.Whole }.name)
+            render("24-demo-chosen")
             onNodeWithText(Ui.allow.text()).performClick()
             until("the refusal", timeoutMs = 20_000) { shell.toast != null }
             println("DEMO a refused Allow said: ${shell.toast}")

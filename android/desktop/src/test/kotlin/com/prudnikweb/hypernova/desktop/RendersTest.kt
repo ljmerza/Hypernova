@@ -16,6 +16,7 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
+import com.prudnikweb.hypernova.desktop.DesktopRig.choose
 import com.prudnikweb.hypernova.desktop.DesktopRig.linkOf
 import com.prudnikweb.hypernova.desktop.DesktopRig.main
 import com.prudnikweb.hypernova.desktop.DesktopRig.pairedWith
@@ -164,6 +165,7 @@ class RendersTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Add idempotency keys to the payments webhook")
         onNodeWithText(Ui.allow.text()).performClick()
         until("the refusal") { shell.toast != null }
         ok(render("07-refused"))
@@ -187,10 +189,40 @@ class RendersTest {
         setContent { App(shell, reduced = true) }
         pairedWith(d)
         waitForIdle()
+        choose("Add idempotency keys to the payments webhook")
         onRoot().performKeyInput { pressKey(Key.Tab); pressKey(Key.Tab); pressKey(Key.Tab); pressKey(Key.Tab) }
         onNodeWithText(Ui.allow.text()).assertIsFocused()
         ok(render("10-focus"))
     }
+
+    // The two panes (PanesTest says what they do; these are for looking at).
+
+    private fun androidx.compose.ui.test.ComposeUiTest.panesWith(name: String?, shot: String, scale: Float = 1f) {
+        val d = daemon()
+        d.snapshot = snapshot("atlas", sessions = sessions(), approvals = approvals())
+        setContent { Scaled(scale) { App(shell, reduced = true) } }
+        pairedWith(d)
+        until("the sessions") { Core.live?.sessions?.size == 7 }
+        waitForIdle()
+        if (name != null) choose(name)
+        ok(render(shot))
+    }
+
+    @Test fun twoPanesNothingChosen() = runDesktopComposeUiTest(960, 720) { panesWith(null, "30-panes-none") }
+
+    @Test fun twoPanesAWholeCommand() = runDesktopComposeUiTest(960, 720) { panesWith("Add idempotency keys to the payments webhook", "31-panes-allow") }
+
+    @Test fun twoPanesWhatCantBeReadWhole() = runDesktopComposeUiTest(960, 720) { panesWith("Rewrite the importer's error handling", "32-panes-not-whole") }
+
+    @Test fun twoPanesAQuestion() = runDesktopComposeUiTest(960, 720) { panesWith("Conflict rules for offline deletes", "33-panes-question") }
+
+    @Test fun twoPanesWorking() = runDesktopComposeUiTest(960, 720) { panesWith("Wrong cursor position when pasting into a list", "34-panes-working") }
+
+    @Test fun onePaneInANarrowWindow() = runDesktopComposeUiTest(600, 600) { panesWith("Add idempotency keys to the payments webhook", "35-pane-narrow") }
+
+    @Test fun twoPanesOnAWhole4kScreenAt2x() = runDesktopComposeUiTest(3840, 2160) { panesWith("Add idempotency keys to the payments webhook", "36-panes-4k-2x", scale = 2f) }
+
+    @Test fun twoPanesOnAWhole1080pScreen() = runDesktopComposeUiTest(1920, 1080) { panesWith("Wrong cursor position when pasting into a list", "37-panes-1080p-1x") }
 
     @Test fun twoServers() = runDesktopComposeUiTest(960, 720) {
         val a = daemon("atlas")

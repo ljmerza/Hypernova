@@ -2,12 +2,19 @@ package com.prudnikweb.hypernova.desktop
 
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.graphics.toAwtImage
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.live.FakeDaemon
+import com.prudnikweb.hypernova.desktop.ui.LIST_TAG
+import com.prudnikweb.hypernova.desktop.ui.PANE_TAG
 import org.json.JSONObject
 import java.io.File
 import java.nio.file.Files
@@ -76,6 +83,22 @@ object DesktopRig {
 
     @OptIn(ExperimentalTestApi::class)
     fun ComposeUiTest.until(what: String, timeoutMs: Long = 20_000, cond: () -> Boolean) = waitUntil(what, timeoutMs) { cond() }
+
+    /** The list's row with this name. */
+    @OptIn(ExperimentalTestApi::class)
+    fun ComposeUiTest.row(name: String): SemanticsNodeInteraction = onNode(hasText(name) and hasAnyAncestor(hasTestTag(LIST_TAG)))
+
+    /** This text in the pane beside the list. */
+    @OptIn(ExperimentalTestApi::class)
+    fun ComposeUiTest.inPane(text: String, substring: Boolean = false): SemanticsNodeInteraction =
+        onNode(hasText(text, substring = substring) and hasAnyAncestor(hasTestTag(PANE_TAG)))
+
+    /** The mouse on a row, as a person chooses a session. */
+    @OptIn(ExperimentalTestApi::class)
+    fun ComposeUiTest.choose(name: String) {
+        row(name).performClick()
+        waitForIdle()
+    }
 
     /** The window's picture so far, in build/renders for someone to look at. */
     @OptIn(ExperimentalTestApi::class)

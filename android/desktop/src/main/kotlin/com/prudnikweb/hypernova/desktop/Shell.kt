@@ -1,6 +1,8 @@
 package com.prudnikweb.hypernova.desktop
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.prudnikweb.hypernova.data.ApiException
@@ -49,6 +51,19 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
     /** The level, on screen for a moment after it changes. */
     var zoomNote by mutableStateOf<String?>(null)
         private set
+
+    /** The session on screen beside the list, per server. Not saved: the window opens on nothing chosen. */
+    private val chosen = mutableStateMapOf<String, String>()
+    /** Where each server's list is scrolled, so Settings and a switch of server come back to the same place. */
+    private val lists = HashMap<String, LazyListState>()
+
+    fun chosen(server: String): String? = chosen[server]
+
+    fun choose(server: String, session: String?) {
+        if (session == null) chosen.remove(server) else chosen[server] = session
+    }
+
+    fun listOf(server: String): LazyListState = lists.getOrPut(server) { LazyListState() }
 
     private var pairJob: Job? = null
     private var toastJob: Job? = null
@@ -99,6 +114,8 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
             try {
                 val p = Pairer.pair(platform, parsed)
                 Core.paired(p)
+                // A first look at this server: nothing of an earlier pairing's stands.
+                Core.activeId?.let { chosen.remove(it); lists.remove(it) }
                 // The code in the field is spent, and it was a credential until now.
                 link = ""
                 adding = false
