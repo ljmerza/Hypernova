@@ -125,6 +125,11 @@ dependencies {
     implementation(libs.haze.blur)
     // REST and the live WebSocket to the Mac's daemon. JSON is parsed with the platform's org.json.
     implementation(libs.okhttp)
+    // Scan (ui/onboarding/Scan.kt): the camera, and the QR code's decoder.
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.zxing.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
     // JVM unit tests: `./gradlew :app:testDebugUnitTest` (voice's logic and gesture, app/src/test).
     testImplementation(libs.junit)

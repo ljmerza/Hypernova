@@ -22,6 +22,11 @@
     <!-- The fingerprint or screen lock before Always, Bypass, No asking and browsing outside the
          projects folder (ui/components/OwnerCheck.kt): without it BiometricPrompt throws. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Scan, for a server's QR code (ui/onboarding/Scan.kt): asked at the tap. No frame is kept or sent.
+         Not required: a phone with no camera still installs, and pastes the link. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <queries>
         <!-- Fork: the phone's own speech recognizer (data/PhoneDictation.kt), the default for dictation. -->
