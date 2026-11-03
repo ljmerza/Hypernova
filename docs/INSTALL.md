@@ -666,7 +666,7 @@ The service listens on `127.0.0.1:47321` (the phone API, on loopback), `127.0.0.
 off on a VPS, a cloud VM and in a container). More: [LINUX.md, "Where things live"](LINUX.md#where-things-live).
 
 Hypernova never reads your Claude login: the service asks `claude auth status`. New sessions run as
-Claude Code's background sessions (`claude agents`), unless you turn that off in the app: Settings →
+Claude Code's background sessions (`claude agents`), unless you turn that off in the app: Settings → your server →
 Agents & providers → Claude Code → **Sessions in claude agents**.
 
 ### The shell integration

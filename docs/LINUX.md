@@ -16,7 +16,7 @@ Each command's flags are in the rows under it.
 
 | Command or flag | What it does |
 |---|---|
-| **`hypernova setup`** | Checks what's there and installs what's missing: Node.js 24, the daemon, the `hypernova` command, Claude Code (Anthropic's installer), the service with lingering, the hooks and status line, the `claude` shell function. Turns on sessions in `claude agents` unless `settings.json` already says either way (the app: Settings → Agents & providers → Claude Code). Says what it found of Codex. Safe to run again. Never signs in: run `claude` once for that. |
+| **`hypernova setup`** | Checks what's there and installs what's missing: Node.js 24, the daemon, the `hypernova` command, Claude Code (Anthropic's installer), the service with lingering, the hooks and status line, the `claude` shell function. Turns on sessions in `claude agents` unless `settings.json` already says either way (the app: Settings → your server → Agents & providers → Claude Code). Says what it found of Codex. Safe to run again. Never signs in: run `claude` once for that. |
 | `--from <dir>` | Install from a checkout or an unpacked package. |
 | `--no-claude` | Don't install Claude Code (Codex alone). |
 | `--no-service` | Skip the service. |

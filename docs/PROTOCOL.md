@@ -395,7 +395,7 @@ How a client picks between the two ways to reach a server. This is the shared da
 - **The offline card** names what the last round tried when nothing answered ("Your Mac doesn't
   answer on this Wi‑Fi", "Another device answers at your Mac's address"), draws each route's answer
   as a tag (`LOCAL  REFUSED`), and links to the **connection log** (`data/ConnLog.kt`; Settings →
-  the server → Connection log): the network each round saw, every probe and its answer (OK, refused,
+  Logs → Connection log): the network each round saw, every probe and its answer (OK, refused,
   no answer, unreachable, no such name, another certificate…), the route chosen and why, the socket
   opening and closing (with the close code) and the waits. The last 600 entries in memory, the
   newest 250 on disk (`files/connlog.jsonl`), logcat (`HypernovaConn`) in debug builds; Copy puts it
