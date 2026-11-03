@@ -1,16 +1,26 @@
 package com.prudnikweb.hypernova.desktop
 
+import com.prudnikweb.hypernova.data.Account
+import com.prudnikweb.hypernova.data.AccountWords
+import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.AllowRule
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Blocked
+import com.prudnikweb.hypernova.data.DeleteKind
+import com.prudnikweb.hypernova.data.HistoryEntry
+import com.prudnikweb.hypernova.data.HistorySearch
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.MenuOffer
 import com.prudnikweb.hypernova.data.ModelNames
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Secrets
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.TerminalAsk
+import com.prudnikweb.hypernova.data.TextHit
+import com.prudnikweb.hypernova.data.TextHits
 import com.prudnikweb.hypernova.data.WApproval
+import com.prudnikweb.hypernova.data.inHistory
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -94,6 +104,108 @@ fun onPhoneWords(offer: CardOffer.OnPhone): String = if (offer.plan) Ui.desk_ans
 
 /** A row has a chip only for what its group's seam doesn't already say: paused, starting, an error, ended. */
 fun rowHasChip(s: Session, block: Blocked?): Boolean = block != null || s.phase == Phase.Starting || s.phase == Phase.Error || s.phase == Phase.Ended
+
+/** A line of History's list: a day's header, or a row. */
+sealed interface HistoryLine {
+    val key: String
+    data class Day(override val key: String, val label: String) : HistoryLine
+    class Row(val entry: HistoryEntry, val hit: TextHit?) : HistoryLine {
+        override val key: String get() = entry.key
+    }
+}
+
+/**
+ * History as the list draws it, by the phone's rules (ui/home/History.kt): everything /resume would offer, under the
+ * days they ended on. [endedCount] is all of them, [lines] what the search and the project leave, [narrowed] the
+ * project if it's still among [projects].
+ */
+class HistoryModel(val endedCount: Int, val projects: List<String>, val narrowed: String?, val lines: List<HistoryLine>) {
+    /** The rows' sessions in the list's order, which the arrow keys walk. An automation's row is its newest run. */
+    val order: List<String> = lines.mapNotNull { (it as? HistoryLine.Row)?.entry?.session?.id }
+
+    /** Where [id]'s row is among the list's items. */
+    fun indexOf(id: String): Int? = lines.indexOfFirst { it is HistoryLine.Row && it.entry.session.id == id }.takeIf { it >= 0 }
+}
+
+fun historyModel(sessions: List<Session>, query: String, project: String?, hits: TextHits?, now: Long, zone: ZoneId = ZoneId.systemDefault()): HistoryModel {
+    val ended = sessions.filter { it.inHistory }
+    val projects = HistorySearch.projects(ended)
+    // A project chip that has gone (its sessions aged out) no longer narrows anything.
+    val narrowed = project?.takeIf { it in projects }
+    val today = HistorySearch.day(now, zone)
+    var lastDay: java.time.LocalDate? = null
+    val lines = buildList {
+        for (e in HistorySearch.rows(ended, query, narrowed, hits)) {
+            val day = HistorySearch.day(e.session.updatedAt, zone)
+            if (day != lastDay) {
+                lastDay = day
+                add(HistoryLine.Day("day:$day", HistorySearch.label(day, today, Ui.history_today.text(), Ui.history_yesterday.text(), DesktopStrings.locale)))
+            }
+            add(HistoryLine.Row(e, hits?.of(e.session.id)))
+        }
+    }
+    return HistoryModel(ended.size, projects, narrowed, lines)
+}
+
+/** How many runs an automation's History row says, and whether that automation has gone since (the phone's AutomationHistoryRow). */
+fun runsOf(hub: Hub, e: HistoryEntry): Pair<Int, Boolean> {
+    val id = e.automation?.id ?: return e.count to false
+    val live = hub.automations.automation(id)
+    return (live?.runCount?.takeIf { it > 0 } ?: e.count) to (live == null && hub.automations.state != null)
+}
+
+/**
+ * Rename, as [MenuOffer] has it, but not in History: the server types /rename into the session (daemon/src/http.ts), and
+ * writing in an ended one resumes it. A session in History starts nothing here.
+ */
+fun offersRename(s: Session, offer: MenuOffer = MenuOffer.of(s)): Boolean = offer.rename && !s.inHistory
+
+/** What Remove from list's confirm says it will do: the phone's words for each [DeleteKind]. */
+fun removeBody(kind: DeleteKind): String = when (kind) {
+    DeleteKind.Codex -> Ui.session_delete_body_codex
+    DeleteKind.RunningJob -> Ui.session_delete_body_running
+    DeleteKind.Terminal -> Ui.session_delete_body_terminal
+    DeleteKind.Forget -> Ui.session_delete_body_plain
+    DeleteKind.Job, DeleteKind.None, DeleteKind.OpenElsewhere -> Ui.session_delete_body
+}.text()
+
+/** A permission mode's name where it's chosen ("Ask first"), and Codex's. */
+fun modeTitle(mode: String): String = when (mode) {
+    "acceptEdits" -> Ui.mode_title_accept
+    "plan" -> Ui.mode_title_plan
+    "auto" -> Ui.mode_title_auto
+    "bypassPermissions" -> Ui.mode_title_bypass
+    AgentKind.READ_ONLY -> Ui.cx_mode_read_only
+    AgentKind.CAN_EDIT -> Ui.cx_mode_can_edit
+    else -> Ui.mode_title_default
+}.text()
+
+/** What a mode does, in one line. No line for Bypass: it isn't offered here. */
+fun modeLine(mode: String): String = when (mode) {
+    "acceptEdits" -> Ui.mode_accept_desc
+    "plan" -> Ui.mode_plan_desc
+    "auto" -> Ui.mode_auto_desc
+    AgentKind.READ_ONLY -> Ui.cx_mode_read_only_desc
+    AgentKind.CAN_EDIT -> Ui.cx_mode_can_edit_desc
+    else -> Ui.mode_default_desc
+}.text()
+
+/** Why the subscription can't take a session now, as the phone's sheet says it ("Your subscription rests until 2:00"). */
+fun whyWords(a: Account, server: String, now: Long): String = when (a.state) {
+    Account.LOGGED_OUT -> Ui.why_signed_out.format(server)
+    Account.NO_SUBSCRIPTION -> Ui.why_no_plan.text()
+    Account.ON_HOLD -> Ui.why_on_hold.text()
+    Account.NO_CREDIT -> Ui.why_credits.text()
+    else -> {
+        val l = a.resting(now)
+        val at = l?.resetsAt
+        when {
+            at == null -> AccountWords.label(DesktopStrings, l)
+            l.window == "seven_day" -> Ui.why_week.format(AccountWords.clock(DesktopStrings, at, now))
+            else -> Ui.why_limit.format(AccountWords.clock(DesktopStrings, at, now))
+        }
+    }
+}
 
 /** A line of the pane's facts. */
 data class Fact(val label: String, val value: String)

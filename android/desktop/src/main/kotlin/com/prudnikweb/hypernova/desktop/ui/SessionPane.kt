@@ -43,6 +43,7 @@ import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.inHistory
 import com.prudnikweb.hypernova.desktop.CardOffer
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.Ui
@@ -105,7 +106,11 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
             val card = Modifier.widthIn(max = PANE_MAX).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }
             AskCard(hub, s, shell, card)
             Facts(s, card)
-            HText(Ui.desk_pane_phone_only.text(), Modifier.widthIn(max = PANE_MAX).padding(horizontal = 4.dp, vertical = 4.dp), style = Type.small, color = HN.inkDim)
+            SessionActions(hub, s, shell, card)
+            val note = Modifier.widthIn(max = PANE_MAX).padding(horizontal = 4.dp, vertical = 4.dp)
+            // What opening it can't do yet, said plainly: there's no chat here to read it in.
+            HText(if (s.inHistory) Ui.desk_pane_history_only.text() else Ui.desk_pane_phone_only.text(), note, style = Type.small, color = HN.inkDim)
+            s.automation?.takeIf { s.inHistory }?.let { HText(Ui.desk_pane_runs_phone.format(it.name), note, style = Type.small, color = HN.inkDim) }
         }
         VerticalScrollbar(
             rememberScrollbarAdapter(scroll),

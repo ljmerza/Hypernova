@@ -29,6 +29,10 @@
     <string name="desk_pane_gone">That session is no longer on the list.</string>
     <string name="desk_pane_gone_body">Choose another to see it here.</string>
     <string name="desk_pane_phone_only">The chat and the terminal aren\'t in this app yet. Open this session on your phone for those.</string>
+    <string name="desk_pane_history_only">This session is in History. Reading it, and writing in it to resume it, aren\'t in this app yet. Open it from History on your phone for those.</string>
+    <string name="desk_pane_runs_phone">This is the newest run of %1$s. Its other runs are on your phone, under Automations.</string>
+    <string name="desk_bypass_on_phone">Bypass waits for a fingerprint or a screen lock, which this computer can\'t check. Choose it on your phone.</string>
+    <string name="desk_new_defaults">It starts on the default model and effort. To choose others, start it on your phone.</string>
     <string name="desk_more_asks">%1$d more waiting after this one.</string>
     <string name="desk_zoom">Zoom %1$d%%</string>
     <string name="desk_zoom_auto">Zoom %1$d%% (automatic)</string>

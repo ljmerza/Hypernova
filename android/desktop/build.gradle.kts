@@ -69,7 +69,7 @@ fun msiVersion(): String {
 
 /**
  * What this app takes from the phone's, as it is, so there's one copy: the strings (read at run time,
- * DesktopStrings.kt) with a list of their files, since a jar can't list a folder, the two fonts, and this build's version.
+ * DesktopStrings.kt) with a list of their files, since a jar can't list a folder, the think-twice card's cases, the two fonts, and this build's version.
  */
 val desktopResources = tasks.register<Sync>("desktopResources") {
     val out = layout.buildDirectory.dir("generated/desktopResources")
@@ -79,6 +79,10 @@ val desktopResources = tasks.register<Sync>("desktopResources") {
     from(appMain.dir("res/values")) {
         include("strings*.xml")
         into("res/values")
+    }
+    from(appMain.dir("res/raw")) {
+        include("incidents.json")
+        into("res/raw")
     }
     from(appMain.dir("res/font")) {
         include("*.ttf")

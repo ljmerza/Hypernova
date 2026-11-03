@@ -53,6 +53,8 @@ object DesktopRig {
             for (s in Core.servers.map { it.id }) Core.forget(s)
             shell.cancelAdding()
             shell.dismissToast()
+            shell.page = Page.Sessions
+            shell.newSession = false
         }
     }
 

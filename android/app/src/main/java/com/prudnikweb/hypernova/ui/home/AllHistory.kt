@@ -1,12 +1,11 @@
 package com.prudnikweb.hypernova.ui.home
 
 import com.prudnikweb.hypernova.data.HistorySearch
-import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Servers
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.TextHit
+import com.prudnikweb.hypernova.data.inHistory
 import com.prudnikweb.hypernova.ui.automations.HistoryEntry
-import com.prudnikweb.hypernova.ui.automations.foldRuns
 
 /*
  * History with "All servers" (docs/DECISIONS.md, "All servers on Home"): every paired computer's
@@ -40,7 +39,7 @@ class HistoryItem<H>(
 
 object AllHistory {
     /** What History lists of a computer's sessions: the ended ones, but for what a restart ended lately (Home keeps those). */
-    fun ended(sessions: List<Session>): List<Session> = sessions.filter { it.phase == Phase.Ended && !it.cutByRestart }
+    fun ended(sessions: List<Session>): List<Session> = sessions.filter { it.inHistory }
 
     /** How many ended sessions all of [parts] hold (the seam's count). */
     fun <H> endedCount(parts: List<ServerPart<H>>): Int = parts.sumOf { ended(it.sessions).size }
@@ -50,18 +49,16 @@ object AllHistory {
 
     /**
      * History's rows over [parts]: each computer's ended sessions that [query] finds, in [project]
-     * only when given, with that computer's own full-text hits merged in ([HistorySearch.merge]) and
-     * its automations' runs folded ([foldRuns], each computer's on its own), then all of them most
+     * only when given, with that computer's own full-text hits merged in ([HistorySearch.rows]) and
+     * its automations' runs folded (each computer's on its own), then all of them most
      * recent first (the same moment on two computers in the order paired). [tagged] false: one
      * computer, its rows untagged, keyed and live as History always had them.
      */
     fun <H> rows(parts: List<ServerPart<H>>, query: String = "", project: String? = null, tagged: Boolean = true): List<HistoryItem<H>> =
         parts.flatMap { p ->
             val ended = ended(p.sessions)
-            val local = HistorySearch.find(ended, query, project)
-            val found = HistorySearch.merge(ended, local, p.hits, project)
             val live = !tagged || Servers.fresh(p.state)
-            foldRuns(found).map { e ->
+            HistorySearch.rows(ended, query, project, p.hits).map { e ->
                 HistoryItem(if (tagged) p.id else null, if (tagged) p.name else null, p.hub, e, live, p.hits?.of(e.session.id))
             }
         }.sortedByDescending { it.session.updatedAt }

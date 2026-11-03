@@ -4092,6 +4092,41 @@ The owner: "the desktop app in my mind has 3 columns of cards", then "I like the
 
 No delay on new Deny and Allow pills. With two asks waiting on one session, the next ask's pills come up where the last ones were, so the second click of a double-click could answer one nobody had read. A 600 ms delay was built and taken out at the owner's word (2026-11-03: "remove the 500ms delay too", "600ms I mean"), so don't add one back without asking.
 
+## The desktop client's History (2026-11-03)
+
+The owner: "got the desktop app up and running and connected to the k1 server ... it shows like all of them in history it looks like it doesn't actually filter out the ones that are closed in the [claude] agents terminal let's keep working on the desktop version to have [feature] parity with the Android app". The filter (`Session.onHome`) left ended sessions with no home on the desktop, so History came first. His rule stands: "history acts like the resume slash command for all".
+
+1. **The phone's rules, not a copy of them.** What's listed, the search, the merge with the server's full text, the fold of an automation's runs and the days all run the phone's code, which moved to `:shared` whole where it was plain: `Session.inHistory`, `HistoryEntry`, `foldRuns`, `HistorySearch.rows`, and `rememberFullText`, which draws nothing. The phone's `AllHistory` calls them.
+2. **The same two panes.** Sessions and History are two pills in the top bar, and History takes the left pane. Each list keeps its own choice and scroll for each server while the window is open, so going to look at History loses nothing. The arrows, Escape and one pane in a narrow window work as they do on Sessions. From the search box too: the arrows choose from there, and Escape empties it first.
+3. **The search and the chips stay put over the list,** where the phone scrolls them away. The chips wrap instead of going sideways: a mouse has no sideways drag.
+4. **Opening one starts nothing and fetches nothing.** The pane is its details, from what the list already has, and says plainly: "Reading it, and writing in it to resume it, aren't in this app yet." Reading a transcript needs the chat, which is being changed elsewhere and moves to a shared module afterwards, so no transcript view was built here.
+5. **An automation's row has no runs to open** with no automation screens here. It says how many runs and Auto, and choosing it shows its newest run, with a line saying the others are on the phone.
+6. **One server at a time.** The phone's All servers History waits for an All servers here.
+
+## The desktop client's Remove from list and Rename (2026-11-03)
+
+The rule is the owner's from "Delete takes a session off Home, History brings it back": Remove from list moves a session to History, and the transcript stays. `:shared` now holds what the menu offers (`DeleteKind`, `RestartKind`, `MenuOffer`), so both clients go by one rule and the phone's confirm keeps its words.
+
+1. **Buttons in the pane, not a menu.** There's no long-press, and a pane has room. Rename, Stop and Remove from list come after the facts, so Tab still reaches Deny and Allow first and rule 3 of "The desktop app" isn't touched: nothing here is near an Allow.
+2. **The phone's confirm and words,** for each kind: what closes, that it goes from `claude agents`, that the conversation stays in History. A terminal Hypernova doesn't hold says why it can't. Stop goes at once, as on the phone. The focus starts on Cancel, since Enter presses what has the focus here and a phone has no such stray key. Escape and a click outside are Cancel.
+3. **No Rename in History, which is stricter than the phone.** The server's rename types `/rename` into the session (`daemon/src/http.ts`), and writing in an ended one resumes it: `undelete`, and a claude started. On a phone that's reached only from an opened chat's session sheet, and the phone does the same there, unchanged here. In this pane, which starts nothing, a Rename that starts a session would be a surprise. The owner may want it the other way.
+4. **What goes stays on screen.** After Remove the pane keeps the session, now ended, and says it's in History: nothing chooses another, and the list's row is gone.
+5. **Restart session and MCP servers aren't here,** and Stop and Restart aren't offered in History, which has nothing running.
+
+## The desktop client's New session (2026-11-03)
+
+For the same parity work: a folder, a prompt, the agent and the mode, in the right pane. What it remembers, the folder's choices, the agent's rule, what's sent and the refusals are `:shared`'s (`NewSessionMemory`, `ProjectPick`, `FolderPick`, `AgentLead`, `Hub.start`).
+
+1. **Bypass isn't offered here, and the words say why.** On the phone it's never a start mode (`NewSessionMemory.START_MODES`): it's chosen each time, through the think-twice card and then the fingerprint or screen lock (`OwnerCheck`; "The owner's morning answers", 2: "Everywhere a phone can give either"). The server asks nothing more for a new session than that it isn't running as root, so that check on the client is the only one. A desktop has nothing to stand in for it: a confirm anybody at the keyboard can click would be the weaker thing the owner said no to. **This is the owner's to change,** if he wants it with some check of the desktop's own.
+2. **Codex has its two modes,** read only and can edit (`AgentKind.CODEX_MODES`). `danger-full-access` and approval `never` aren't reachable from here, as on the phone. The server's own rules stay what they are.
+3. **Auto keeps its think-twice card, every time, with one of the same real cases** (`res/raw/incidents.json`, which the build copies in). "Keep asking" has the focus. The story's link isn't there: the case's own two sentences are on the card instead.
+4. **Skills after a prompt work as on the phone:** the box's words go as typed, lines and all, and the server makes them the skill's arguments (docs/FEATURES.md, N8). The phone's "/" list is in `ui/session/`, being changed elsewhere, so it isn't here yet.
+5. **Enter starts it, Shift+Enter is a new line,** the phone's default (`EnterKeys`, there being no Typing setting here). Two Enters start one. The arrows stay in the box while the form is up.
+6. **A session started is the one thing that chooses itself,** since someone just asked for it and waited: the form goes and the pane shows it. If the form was put away while it started, nothing moves and it's only in the list. This is the one further exception to "Nothing chooses itself". The words typed stay for next time, as on the phone, through Cancel, Escape, or choosing a row.
+7. **The default model and effort, said on the form.** No pickers yet. A subscription at its limit starts on the provider that can take it and says so, as on the phone, since that one may bill.
+8. **Not here:** attachments, the "/" list, dictation (none on this app), the model and effort pickers, All servers.
+9. **The top bar's lines go by the window's width alone.** With New session and History it no longer fits beside a long link word at 900 dp, and as it wrapped when the chip grew to "Reconnecting…", the panes moved under the pointer as the link changed, Allow with them. A test caught a click landing where Allow had just been. Now it's one line from 920 dp, two under that, and a long server's name gives way. The offline card still moves them when it comes: that's a stale list, and it was already so.
+
 ## Updating Claude Code and Codex (owner, 2026-11-02)
 
 The owner: "also add ability to check and update Claude code and codex". Agents & providers › an agent's Settings › Version: what's installed, Check for updates, Update. One server at a time, nothing on the session's chat screen, nothing automatic. `daemon/src/agent-update.ts`; `docs/PROTOCOL.md`, "Updating an agent". Checked on 2026-11-02 against Claude Code 2.1.316, Codex 0.164.0, their binaries and `code.claude.com/docs/en/setup`. **No real update ran.** Measurements used copies in a throwaway home with stand-in `npm`, `curl` and `brew`, and proxies pointing nowhere.

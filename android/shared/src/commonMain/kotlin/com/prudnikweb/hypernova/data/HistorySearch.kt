@@ -16,6 +16,26 @@ data class TextHits(val hits: List<TextHit>, val partial: Boolean) {
     fun of(id: String): TextHit? = hits.firstOrNull { it.id == id }
 }
 
+/** A History row: one ended session, or ([automation] set) all of one automation's, by its newest [session]. */
+class HistoryEntry(val key: String, val session: Session, val automation: SessionAutomation?, val count: Int)
+
+/**
+ * History's rows: an automation's ended sessions fold into one, placed by its newest run, so a
+ * daily brief doesn't bury the owner's own sessions. Their own grouping.
+ */
+fun foldRuns(ended: List<Session>): List<HistoryEntry> {
+    val counts = ended.mapNotNull { it.automation?.id }.groupingBy { it }.eachCount()
+    val seen = HashSet<String>()
+    return ended.mapNotNull { s ->
+        val a = s.automation
+        when {
+            a == null -> HistoryEntry(s.id, s, null, 1)
+            seen.add(a.id) -> HistoryEntry("auto:${a.id}", s, a, counts[a.id] ?: 1)
+            else -> null
+        }
+    }
+}
+
 /**
  * Finding an old session in History (audit P9: up to 300 conversations over 30 days in one flat
  * list): a search over each one's title, project and last line, a project to narrow it to, and the
@@ -69,6 +89,13 @@ object HistorySearch {
         if (more.isEmpty()) return local
         return (local + more).sortedByDescending { it.updatedAt }
     }
+
+    /**
+     * One computer's History rows: what [query] finds of its [ended] sessions, in [project] only when
+     * given, with the Mac's [hits] merged in and its automations' runs folded ([foldRuns]).
+     */
+    fun rows(ended: List<Session>, query: String = "", project: String? = null, hits: TextHits? = null): List<HistoryEntry> =
+        foldRuns(merge(ended, find(ended, query, project), hits, project))
 
     /** `GET /v1/history/search`'s answer. */
     fun wire(o: JSONObject): TextHits = TextHits(
