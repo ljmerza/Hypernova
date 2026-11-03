@@ -566,6 +566,8 @@ Session = {
   },
   endedBy: null | "mac_restart",  // why it ended when nobody ended it: open when the server restarted or shut down
                               // (see After a restart of the Mac); null otherwise, and whenever it isn't "ended"
+  loginScreen?: boolean,      // its terminal shows Claude Code's own sign-in (see Signing in again); true only while it does.
+                              // Says nothing else: the address and the code are never on a session
   menu: null | {              // a menu or dialog its terminal shows instead of the input box (none while an approval is open)
     id,                       // title and option labels, hashed; answers name it
     title: string | null,
@@ -1078,7 +1080,8 @@ Account = {
   sessionId: string | null,     // the session that hit it first
   checkedAt: number | null,     // the last `claude auth status`
   login: null | { state: "starting" | "waiting_code" | "finishing" | "failed",
-                  url: string | null, where: "phone" | "mac", error: string | null }
+                  url: string | null, where: "phone" | "mac", method: "subscription" | "console",
+                  error: string | null }
 }
 ```
 
@@ -2626,12 +2629,15 @@ Errors). All take the bearer token except the local fire route.
 
 #### POST /v1/account/login
 
-- **Body:** `{where?: "phone" | "mac"}` (none: `"phone"`)
+- **Body:** `{where?: "phone" | "mac", method?: "subscription" | "console", again?: boolean}` (none:
+  `"phone"`, `"subscription"`, `false`)
 - **Answer:** `200 {account: Account}`
-- **Refusals:** 400 `bad_where`; 409 `not_needed` (the account is ok), `no_claude` (Claude Code
-  isn't installed); 501 `unavailable` `{feature: "openWindow"}` (`where: "mac"` on Linux)
+- **Refusals:** 400 `bad_where`, `bad_method`; 409 `not_needed` (the account is ok, without `again`),
+  `no_claude` (Claude Code isn't installed); 501 `unavailable` `{feature: "openWindow"}` (`where:
+  "mac"` on Linux)
 - **Rules:** signs Claude Code in again in a login holder; `account.login` follows it. While one
-  runs (not `failed`), the same one. See Signing in again, under Account.
+  runs (not `failed`), the same one, whatever this one asks: cancel it to choose again. See Signing
+  in again, under Account.
 
 #### POST /v1/account/login/code
 
@@ -6099,8 +6105,16 @@ The SDK's `accountInfo()` (from the process the "/" list starts) fills `plan` to
 
 #### Signing in again
 
-`POST /v1/account/login`: `claude auth login --claudeai` in a holder of its own (not a session; 500
-columns wide so the address fits one line; `hn ls` lists it), with `login.state` `starting`.
+`POST /v1/account/login`: `claude auth login` in a holder of its own (not a session; 500 columns wide
+so the address fits one line; `hn ls` lists it), with `login.state` `starting`. `method` says how:
+`subscription` is `--claudeai`, `console` is `--console`, the command's own flags for API billing
+(its `--help`, Claude Code 2.1.317). Both end at the same plain prompt, each at its own page
+(claude.com and platform.claude.com, 2.1.317). A third-party platform (Bedrock, Vertex, Foundry) has
+no flag: it's a provider, or a terminal.
+
+`again: true` is for signing in while signed in, as a /login is, to change account. The account being
+fine then says nothing about this sign-in, so it isn't what ends it: a refused code starts it over
+as below, and a code turned away or the time running out is `failed`, as when signed out.
 
 **The address.** The sign-in page's address is read off its screen (an `https://` link on claude.ai,
 claude.com or anthropic.com, joined back if it wraps) into `login.url`, and the state becomes
@@ -6118,8 +6132,18 @@ code prompt ("Paste code here if prompted >") shows (8 s at most), checks the co
 address on that same screen, then types it there as raw keys and Enter (not the way prompts are
 typed, never logged) → `finishing`. While Claude Code checks it, another code is 409 `not_ready`.
 
-**The answer.** `claude auth login` (Claude Code 2.1.300) is a plain line prompt, not the
-interactive /login screen, and has no error page:
+**Claude Code's own /login.** The interactive one a session's terminal shows when /login is typed
+there, or on a first run. As read from Claude Code 2.1.317 (`daemon/test/fixtures/login-screens/`):
+"Select login method:" with three numbered options, for the Console a second menu ("How do you want
+to sign in?"), then the address and "Paste code here if prompted >", which has no ❯ and so is no
+menu. A first run has the same screens with no dialog round them and no footer, after a theme picker,
+and Esc does nothing on them; in /login's dialog Esc ends it from any step ("Login interrupted").
+While any of them shows, the session has `loginScreen: true`, read with the menus (`watchMenus`), with
+`menu` still set on the menu steps. The phone doesn't type a /login: it goes to `POST
+/v1/account/login` instead. `POST /v1/sessions/{id}/interrupt` is the Esc that closes this screen.
+
+**The answer.** `claude auth login` (Claude Code 2.1.300; the prompt is the same on 2.1.317) is a
+plain line prompt, not the interactive /login screen, and has no error page:
 
 - A code without both halves gets "Invalid code…" and the prompt waits for another (→ `waiting_code`
   with `error`).
