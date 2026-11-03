@@ -12,6 +12,8 @@ class HypernovaApp : Application() {
     override fun getResources(): android.content.res.Resources = com.prudnikweb.hypernova.data.ComputerResources.wrap(super.getResources())
 
     override fun onCreate() {
+        // Before anything draws: what the shared drawing asks of this app (ui/theme, AndroidUi).
+        com.prudnikweb.hypernova.ui.theme.AndroidUi.install(manrope = R.font.manrope, mono = R.font.jetbrains_mono)
         super.onCreate()
         Core.applicationStarted()
         // The paired computer's words ("your Mac", "your server") before anything is said.

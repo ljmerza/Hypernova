@@ -80,7 +80,7 @@ class WordsTest {
 
     /** Tokens.kt loads its fonts through R, so Theme.kt repeats its colours: a change there fails here. */
     @Test fun theColoursAreTheAppsColours() {
-        val tokens = listOf("../app/src/main/java/com/prudnikweb/hypernova/ui/theme/Tokens.kt").map(::File).first { it.isFile }.readText()
+        val tokens = listOf("../sharedui/src/commonMain/kotlin/com/prudnikweb/hypernova/ui/theme/Tokens.kt").map(::File).first { it.isFile }.readText()
         val theirs = Regex("""(\w+) = Color\(0x([0-9A-Fa-f]{8})\)""").findAll(tokens).associate { it.groupValues[1] to it.groupValues[2].uppercase() }
         val ours = mapOf(
             "space" to Atlas.space, "ink" to Atlas.ink, "dim" to Atlas.dim, "line" to Atlas.line, "live" to Atlas.live,

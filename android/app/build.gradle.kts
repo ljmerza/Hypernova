@@ -111,6 +111,7 @@ android {
 
 dependencies {
     implementation(project(":shared"))
+    implementation(project(":sharedui"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -239,10 +240,10 @@ tasks.register("distRelease") {
     }
 }
 
-// :shared is this app's own code in another module, built with it: its classes count as the app's for
+// :shared and :sharedui are this app's own code in other modules, built with it: their classes count as the app's for
 // the compiler, so a nullable property checked on one line is still known non-null on the next
 // (Kotlin refuses that smart cast across modules unless they're friends).
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    val shared = project(":shared").layout.buildDirectory.get().asFile
-    friendPaths.from(libraries.filter { it.startsWith(shared) })
+    val own = listOf(project(":shared"), project(":sharedui")).map { it.layout.buildDirectory.get().asFile }
+    friendPaths.from(libraries.filter { f -> own.any { f.startsWith(it) } })
 }

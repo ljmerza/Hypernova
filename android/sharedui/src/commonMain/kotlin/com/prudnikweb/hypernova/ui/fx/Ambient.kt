@@ -1,17 +1,10 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.fx
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import com.prudnikweb.hypernova.ui.theme.LocalMotion
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -210,16 +203,3 @@ internal class Lanes(n: Int = COUNT) {
 }
 
 val LocalAmbient = staticCompositionLocalOf { AmbientClock() }
-
-@Composable
-fun ProvideAmbientClock(clock: AmbientClock, content: @Composable () -> Unit) {
-    val motion = LocalMotion.current
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(clock, motion) {
-        if (motion.reduced) return@LaunchedEffect
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            clock.run({ FrameBudget.fps(it, motion.heat, motion.powerSave) }, FrameBudget.grainFps(motion.heat, motion.powerSave))
-        }
-    }
-    CompositionLocalProvider(LocalAmbient provides clock, content = content)
-}

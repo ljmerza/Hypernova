@@ -93,12 +93,6 @@ val desktopResources = tasks.register<Sync>("desktopResources") {
     }
 }
 
-/** The app's Atlas marks, compiled here as they are: plain Compose drawing, with nothing of Android or `R` in them. */
-val appMarks = tasks.register<Sync>("appMarks") {
-    from(appMain.dir("java/com/prudnikweb/hypernova/ui/components")) { include("Marks.kt") }
-    into(layout.buildDirectory.dir("generated/appMarks/com/prudnikweb/hypernova/ui/components"))
-}
-
 /** The hub tests' scripted daemon and the XML reader they check against (shared/src/hubTest), without the tests. */
 val hubRig = tasks.register<Sync>("hubRig") {
     from(rootProject.layout.projectDirectory.dir("shared/src/hubTest/kotlin/com/prudnikweb/hypernova/data/live")) {
@@ -108,13 +102,12 @@ val hubRig = tasks.register<Sync>("hubRig") {
 }
 
 sourceSets.named("main") { resources.srcDir(desktopResources) }
-kotlin.sourceSets.named("main") { kotlin.srcDir(layout.buildDirectory.dir("generated/appMarks")) }
 kotlin.sourceSets.named("test") { kotlin.srcDir(layout.buildDirectory.dir("generated/hubRig")) }
-tasks.named("compileKotlin") { dependsOn(appMarks) }
 tasks.named("compileTestKotlin") { dependsOn(hubRig) }
 
 dependencies {
     implementation(project(":shared"))
+    implementation(project(":sharedui"))
     implementation(compose.desktop.currentOs)
     implementation(libs.kotlinx.coroutines.swing)
 
@@ -122,6 +115,12 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)
+}
+
+// :sharedui is this app's own code in another module, as for :app: what the shared drawing keeps internal is this app's too.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    val sharedUi = project(":sharedui").layout.buildDirectory.get().asFile
+    friendPaths.from(libraries.filter { it.startsWith(sharedUi) })
 }
 
 // The window's own builds: `:desktop:run` (docs/DEV-SETUP.md, "The desktop app"). The packages, each with its own Java:

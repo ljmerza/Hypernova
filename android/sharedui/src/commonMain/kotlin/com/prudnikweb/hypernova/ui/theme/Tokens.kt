@@ -5,13 +5,10 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import com.prudnikweb.hypernova.R
 
 /**
  * The colours a theme chooses, as few as they can be: everything else derives from them ([HN]). Only
@@ -109,22 +106,8 @@ object Motion {
     const val SECTION = 600
 }
 
-@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-private fun manrope(weight: Int) = Font(
-    R.font.manrope,
-    weight = FontWeight(weight),
-    variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
-)
-
-@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-private fun mono(weight: Int) = Font(
-    R.font.jetbrains_mono,
-    weight = FontWeight(weight),
-    variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
-)
-
-val Manrope = FontFamily(manrope(200), manrope(400), manrope(500), manrope(600), manrope(700))
-val JetBrainsMono = FontFamily(mono(400), mono(500), mono(700))
+val Manrope = FontFamily(sansFont(200), sansFont(400), sansFont(500), sansFont(600), sansFont(700))
+val JetBrainsMono = FontFamily(monoFont(400), monoFont(500), monoFont(700))
 
 /** Type scale. Weight 500 almost everywhere, as in 0stems. ss01 + tabular figures. */
 object Type {
@@ -161,10 +144,10 @@ object Type {
     )
     val mono = TextStyle(
         fontFamily = JetBrainsMono, fontWeight = FontWeight(400), fontSize = 12.sp,
-        lineHeight = 18.sp, letterSpacing = 0.em,
+        lineHeight = 18.sp, letterSpacing = 0.em, fontFeatureSettings = MONO_FEATURES,
     )
     val monoSmall = TextStyle(
         fontFamily = JetBrainsMono, fontWeight = FontWeight(400), fontSize = 11.sp,
-        lineHeight = 16.sp,
+        lineHeight = 16.sp, fontFeatureSettings = MONO_FEATURES,
     )
 }

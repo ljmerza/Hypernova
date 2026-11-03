@@ -11,44 +11,23 @@ import android.os.Build
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.prudnikweb.hypernova.ui.fx.Heat
 import com.prudnikweb.hypernova.ui.fx.HeatPolicy
 import kotlinx.coroutines.delay
-
-/**
- * How much motion we can afford. The ambient clock, the grain and the edge bars read this
- * (frame rates and effects per level: ui/fx/Pace.kt):
- * - [reduced]: the system animator scale is 0 (accessibility "remove animations"),
- *   or the user turned Reduce Motion on. Static frames only.
- * - [powerSave]: battery saver is on. Lower frame rates, static grain.
- * - [heat]: how warm the phone is ([Heat]): effects step down as it warms and come back as it cools.
- */
-@Immutable
-data class MotionPrefs(val reduced: Boolean = false, val powerSave: Boolean = false, val heat: Int = Heat.COOL)
-
-val LocalMotion = staticCompositionLocalOf { MotionPrefs() }
 
 @Composable
 fun HypernovaTheme(content: @Composable () -> Unit) {
@@ -126,41 +105,4 @@ private fun readMotion(context: Context): MotionPrefs {
     val scale = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
     val pm = context.getSystemService(PowerManager::class.java)
     return MotionPrefs(reduced = scale == 0f, powerSave = pm?.isPowerSaveMode == true)
-}
-
-/** The one text primitive: BasicText with our defaults. */
-@Composable
-fun HText(
-    text: String,
-    modifier: Modifier = Modifier,
-    style: TextStyle = Type.body,
-    color: Color = HN.ink,
-    maxLines: Int = Int.MAX_VALUE,
-    overflow: TextOverflow = TextOverflow.Ellipsis,
-) {
-    BasicText(
-        text = text,
-        modifier = modifier,
-        style = style.copy(color = color),
-        maxLines = maxLines,
-        overflow = overflow,
-    )
-}
-
-@Composable
-fun HText(
-    text: AnnotatedString,
-    modifier: Modifier = Modifier,
-    style: TextStyle = Type.body,
-    color: Color = HN.ink,
-    maxLines: Int = Int.MAX_VALUE,
-    overflow: TextOverflow = TextOverflow.Ellipsis,
-) {
-    BasicText(
-        text = text,
-        modifier = modifier,
-        style = style.copy(color = color),
-        maxLines = maxLines,
-        overflow = overflow,
-    )
 }
