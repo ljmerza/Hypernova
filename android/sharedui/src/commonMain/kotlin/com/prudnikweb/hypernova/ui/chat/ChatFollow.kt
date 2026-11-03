@@ -1,4 +1,4 @@
-package com.prudnikweb.hypernova.ui.session
+package com.prudnikweb.hypernova.ui.chat
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth

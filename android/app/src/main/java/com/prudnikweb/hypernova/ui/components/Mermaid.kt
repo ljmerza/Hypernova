@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.components
 
+import com.prudnikweb.hypernova.ui.chat.CodeBlock
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap

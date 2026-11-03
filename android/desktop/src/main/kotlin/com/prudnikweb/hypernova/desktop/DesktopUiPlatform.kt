@@ -45,7 +45,7 @@ import com.prudnikweb.hypernova.data.EnterKeys
 import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Strings
-import com.prudnikweb.hypernova.ui.components.CodeBlock
+import com.prudnikweb.hypernova.ui.chat.CodeBlock
 import com.prudnikweb.hypernova.ui.platform.ClockStyle
 import com.prudnikweb.hypernova.ui.platform.Copier
 import com.prudnikweb.hypernova.ui.platform.Haptics

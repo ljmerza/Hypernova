@@ -1,6 +1,27 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
-package com.prudnikweb.hypernova.ui.components
+package com.prudnikweb.hypernova.ui.chat
 
+import com.prudnikweb.hypernova.ui.components.Activity
+import com.prudnikweb.hypernova.ui.components.CheckBox
+import com.prudnikweb.hypernova.ui.components.EclipseMark
+import com.prudnikweb.hypernova.ui.components.Field
+import com.prudnikweb.hypernova.ui.components.FitRow
+import com.prudnikweb.hypernova.ui.components.Glyph
+import com.prudnikweb.hypernova.ui.components.GlyphFigure
+import com.prudnikweb.hypernova.ui.components.Hairline
+import com.prudnikweb.hypernova.ui.components.Icon
+import com.prudnikweb.hypernova.ui.components.NoPart
+import com.prudnikweb.hypernova.ui.components.NovaMark
+import com.prudnikweb.hypernova.ui.components.Pill
+import com.prudnikweb.hypernova.ui.components.PillKind
+import com.prudnikweb.hypernova.ui.components.Planet
+import com.prudnikweb.hypernova.ui.components.Radio
+import com.prudnikweb.hypernova.ui.components.Seam
+import com.prudnikweb.hypernova.ui.components.SeamWords
+import com.prudnikweb.hypernova.ui.components.Stamp
+import com.prudnikweb.hypernova.ui.components.ThinkingText
+import com.prudnikweb.hypernova.ui.components.fitPart
+import com.prudnikweb.hypernova.ui.components.frostedGlass
 import com.prudnikweb.hypernova.ui.platform.rememberHaptics
 import com.prudnikweb.hypernova.ui.platform.rememberCopier
 import com.prudnikweb.hypernova.ui.platform.windowHeightDp

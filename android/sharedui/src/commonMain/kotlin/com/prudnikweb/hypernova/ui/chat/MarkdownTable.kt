@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
-package com.prudnikweb.hypernova.ui.components
+package com.prudnikweb.hypernova.ui.chat
 
+import com.prudnikweb.hypernova.ui.components.TopHighlight
 import com.prudnikweb.hypernova.ui.platform.rememberCopier
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween

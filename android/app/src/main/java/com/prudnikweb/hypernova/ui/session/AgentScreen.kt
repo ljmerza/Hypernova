@@ -1,6 +1,8 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.chat.AskStack
+import com.prudnikweb.hypernova.ui.chat.Asks
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -56,9 +58,9 @@ import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
 import com.prudnikweb.hypernova.ui.components.Seam
-import com.prudnikweb.hypernova.ui.components.clock
-import com.prudnikweb.hypernova.ui.components.kindLabel
-import com.prudnikweb.hypernova.ui.components.tokensFigure
+import com.prudnikweb.hypernova.ui.chat.clock
+import com.prudnikweb.hypernova.ui.chat.kindLabel
+import com.prudnikweb.hypernova.ui.chat.tokensFigure
 import com.prudnikweb.hypernova.ui.components.FitRow
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.NoPart

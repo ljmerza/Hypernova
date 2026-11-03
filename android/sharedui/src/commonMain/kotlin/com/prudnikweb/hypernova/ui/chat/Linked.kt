@@ -1,4 +1,4 @@
-package com.prudnikweb.hypernova.ui.components
+package com.prudnikweb.hypernova.ui.chat
 
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation

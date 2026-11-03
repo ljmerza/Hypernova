@@ -1,4 +1,4 @@
-package com.prudnikweb.hypernova.ui.session
+package com.prudnikweb.hypernova.ui.chat
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition

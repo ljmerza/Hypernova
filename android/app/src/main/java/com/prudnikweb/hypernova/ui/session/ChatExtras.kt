@@ -38,7 +38,7 @@ import com.prudnikweb.hypernova.data.Thumbs
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.LocalToast
-import com.prudnikweb.hypernova.ui.components.LocalSelectableText
+import com.prudnikweb.hypernova.ui.chat.LocalSelectableText
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.theme.Motion

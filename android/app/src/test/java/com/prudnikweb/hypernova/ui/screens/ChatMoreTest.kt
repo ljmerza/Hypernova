@@ -107,7 +107,7 @@ class ChatMoreTest {
 
     @Test fun aCodeBlocksLongLinesWrapAndItCopiesAsWritten() {
         val line = "Hello team, a long line in a drafted email that would never fit across a phone in one go, so it has to wrap."
-        rule.setContent { Harness(spy) { com.prudnikweb.hypernova.ui.components.CodeBlock(line) } }
+        rule.setContent { Harness(spy) { com.prudnikweb.hypernova.ui.chat.CodeBlock(line) } }
         rule.waitForIdle()
         val text = rule.onNodeWithText(line).fetchSemanticsNode()
         val window = with(rule) { onNode(androidx.compose.ui.test.isRoot()).fetchSemanticsNode().size.width }

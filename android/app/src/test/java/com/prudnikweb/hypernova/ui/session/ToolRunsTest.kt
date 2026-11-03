@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.chat.ChatRow
+import com.prudnikweb.hypernova.ui.chat.ToolRuns
 import com.prudnikweb.hypernova.data.Item
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

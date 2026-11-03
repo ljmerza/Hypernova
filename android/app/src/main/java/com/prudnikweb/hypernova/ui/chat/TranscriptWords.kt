@@ -1,4 +1,4 @@
-package com.prudnikweb.hypernova.ui.components
+package com.prudnikweb.hypernova.ui.chat
 
 import com.prudnikweb.hypernova.data.strings
 

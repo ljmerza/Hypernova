@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.components
 
+import com.prudnikweb.hypernova.ui.chat.linkShown
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager

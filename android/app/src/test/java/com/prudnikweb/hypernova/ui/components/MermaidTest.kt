@@ -1,5 +1,8 @@
 package com.prudnikweb.hypernova.ui.components
 
+import com.prudnikweb.hypernova.ui.chat.Block
+import com.prudnikweb.hypernova.ui.chat.blocks
+import com.prudnikweb.hypernova.ui.chat.fenceLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals

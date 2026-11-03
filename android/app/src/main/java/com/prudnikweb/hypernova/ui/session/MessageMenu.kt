@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.chat.MessageTimeLine
 import com.prudnikweb.hypernova.data.Rewound
 import com.prudnikweb.hypernova.data.ChatRepo
 import android.content.ClipData
@@ -33,7 +34,7 @@ import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalToast
-import com.prudnikweb.hypernova.ui.components.Markdown
+import com.prudnikweb.hypernova.ui.chat.Markdown
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.theme.HN

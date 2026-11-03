@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.files
 
 import android.graphics.BitmapFactory
@@ -52,7 +53,7 @@ import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
-import com.prudnikweb.hypernova.ui.components.isWebPage
+import com.prudnikweb.hypernova.ui.chat.isWebPage
 import com.prudnikweb.hypernova.ui.home.tilde
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText

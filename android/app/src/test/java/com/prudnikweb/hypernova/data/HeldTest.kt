@@ -45,7 +45,7 @@ class HeldTest {
         // held prompts appended after the transcript sit right above them.
         val ask = Item.Approval("ap", "Bash", "ls", "", resolved = null)
         val items = listOf(Item.User("u", "go"), ask, Item.Assistant("r", "ok")) + Held.items(listOf(held("h1", "after")), emptyList(), emptyList())
-        val (chat, asks) = com.prudnikweb.hypernova.ui.session.Asks.split(items)
+        val (chat, asks) = com.prudnikweb.hypernova.ui.chat.Asks.split(items)
         assertEquals(listOf("u", "r", "held:h1"), chat.map { it.key })
         assertEquals(listOf("ap"), asks.map { it.key })
     }

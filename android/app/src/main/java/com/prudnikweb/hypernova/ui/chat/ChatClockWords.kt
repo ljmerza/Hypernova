@@ -1,4 +1,4 @@
-package com.prudnikweb.hypernova.ui.session
+package com.prudnikweb.hypernova.ui.chat
 
 import com.prudnikweb.hypernova.data.strings
 

@@ -1,4 +1,4 @@
-package com.prudnikweb.hypernova.ui.components
+package com.prudnikweb.hypernova.ui.chat
 
 import androidx.compose.runtime.Immutable
 import com.prudnikweb.hypernova.data.Question

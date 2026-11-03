@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.chat.exact
 import com.prudnikweb.hypernova.data.TodoStatus
 import com.prudnikweb.hypernova.data.ChatRepo
 import org.json.JSONObject

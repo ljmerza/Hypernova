@@ -1,5 +1,13 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.chat.ChatClock
+import com.prudnikweb.hypernova.ui.chat.ChatRow
+import com.prudnikweb.hypernova.ui.chat.QUIET_AFTER_MS
+import com.prudnikweb.hypernova.ui.chat.exact
+import com.prudnikweb.hypernova.ui.chat.exactSaid
+import com.prudnikweb.hypernova.ui.chat.quiet
+import com.prudnikweb.hypernova.ui.chat.scrolled
+import com.prudnikweb.hypernova.ui.chat.topTime
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
