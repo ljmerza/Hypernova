@@ -154,6 +154,11 @@ export function claudeCached(): string | null {
 }
 
 let claudeVersionCache: string | null = null
+/** After an update from the phone (agent-update.ts): [claudeVersion] reads once, so it's told to read again, and the path may have moved. */
+export function forgetClaudeVersion(): void {
+  claudeVersionCache = null
+  claudeLooked = null
+}
 export function claudeVersion(): string | null {
   if (claudeVersionCache) return claudeVersionCache
   const bin = claudeCached()

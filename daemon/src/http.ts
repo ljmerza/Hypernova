@@ -19,7 +19,7 @@ import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort
 import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
 import { agentJobCommand, ranAsJob, setClaudeAgents } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
-import { codexModels, codexSessionUsage, codexState, refreshCodexAccount } from './codex/account.ts'
+import { codexModels, codexSessionUsage, codexState, refreshCodexAccount, sendCodex } from './codex/account.ts'
 import { isCodex, isCodexMode } from './codex/threads.ts'
 import { createCodexSession, ensureCodexHistory, interruptCodex, promptCodex, removeCodex, renameCodex, resumeCodex, setCodexMode, setCodexModel } from './codex/sessions.ts'
 import { SwitchError, commitSwitch, previewSwitch, useShared } from './switch.ts'
@@ -36,6 +36,7 @@ import { MAX_CLIENT_LOG, isClientLogType, saveClientLog, takeClientLogSlot } fro
 import { agentEvents, backgroundRunning, endSessionAgents, listAgents, validAgentId } from './agents.ts'
 import { sessionMcp } from './agent-settings.ts'
 import { extrasRoute } from './agent-extras.ts'
+import { startAgentUpdates, versionRoute } from './agent-update.ts'
 import { mcpRoute } from './mcp-routes.ts'
 import { changeSetting, settingsReply, undoChange, type ModelList } from './agent-settings-edit.ts'
 import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
@@ -356,6 +357,14 @@ export function claudeHere(): boolean {
  * Claude Code as the snapshot, `POST /v1/claude` and `{t:"claude"}` say it: here or not, its
  * version, its SDK, and `agents`: sessions live in `claude agents` (settings.claudeAgents).
  */
+/** Sessions on this server that aren't over, for the confirm before an update. */
+const liveSessionsOf = (agent: 'claude' | 'codex') => listSessions().filter((s) => (s.agent === 'codex') === (agent === 'codex') && s.state !== 'ended').length
+/** An agent's update ended: its version on every phone's cards, and any screen on it reads again. */
+function afterAgentUpdate(agent: 'claude' | 'codex'): void {
+  if (agent === 'claude') broadcast({ t: 'claude', claude: claudeState() })
+  else sendCodex()
+  broadcast({ t: 'agent_settings', agent })
+}
 const claudeState = () => ({ available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed, agents: settings.claudeAgents === true })
 
 function snapshot(deviceId: string | null) {
@@ -632,6 +641,12 @@ async function api(c: Ctx): Promise<void> {
     const r = undoChange(await readJsonBody(req))
     afterSettingChange(r.agent, r.key)
     return json(res, 200, r)
+  }
+  // An agent's version, to see, check and update (agent-update.ts), for a paired phone.
+  if (path === '/v1/agents/version' || path.startsWith('/v1/agents/version/')) {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
+    const deps = { body: () => readJsonBody(req), running: liveSessionsOf }
+    if (await versionRoute(path, m, url, res, json, deps)) return dbg('plugin', 'route', { method: m, route: path, agent: url.searchParams.get('agent'), status: res.statusCode })
   }
   // An agent's MCP servers, to see and manage (mcp-routes.ts), for a paired phone.
   if (path === '/v1/agents/mcp' || path.startsWith('/v1/agents/mcp/') || path === '/v1/agents/plugins' || path.startsWith('/v1/agents/plugins/') || path === '/v1/agents/skills' || path === '/v1/agents/env' || path.startsWith('/v1/agents/env/') || path === '/v1/agents/raw' || path === '/v1/agents/raw/undo') {
@@ -2242,6 +2257,8 @@ export function startServers(): () => Promise<void> {
   })
   // The debug log turned on or off, from anywhere, or run out: every client hears (debug-log.ts).
   onDebugChange(() => broadcast({ t: 'debug', debug: debugView() }))
+  // An agent's update left running by the last daemon finishes here (agent-update.ts).
+  startAgentUpdates(afterAgentUpdate)
   // The APK handed out, as the snapshot says it now; a change later reaches every client as {t:"app"}.
   saidApp = JSON.stringify(appInfo())
   const appWatch = setInterval(announceApp, 5000)

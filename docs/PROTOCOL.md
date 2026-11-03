@@ -34,7 +34,8 @@ the Android app's own.
    rewind](#routes-usage-and-rewind), [Codex and switching](#routes-codex-and-switching), [projects,
    providers and models](#routes-projects-providers-and-models), [agents'
    settings](#routes-agents-settings), [agents' MCP servers](#routes-agents-mcp-servers), [agents'
-   plugins](#routes-agents-plugins), [agents' skills](#routes-agents-skills), [files, attachments and
+   plugins](#routes-agents-plugins), [agents' skills](#routes-agents-skills), [updating an
+   agent](#routes-updating-an-agent), [files, attachments and
    previews](#routes-files-attachments-and-previews), [read aloud](#routes-read-aloud), [statistics
    and history search](#routes-statistics-and-history-search), [the server's own
    update](#routes-the-servers-own-update), [Mac-only](#routes-mac-only), [Local API](#local-api)
@@ -48,7 +49,7 @@ the Android app's own.
    - Agents and models: [Codex](#codex-a-second-agent), [Switching agents](#switching-agents),
      [Providers](#providers), [Models](#models), [Agent settings](#agent-settings), [A session's MCP
      servers](#a-sessions-mcp-servers), [An agent's MCP servers](#an-agents-mcp-servers), [An agent's
-     plugins](#an-agents-plugins), [An agent's skills](#an-agents-skills), [An agent's environment variables](#an-agents-environment-variables), [JSON mode](#json-mode), [Session menu](#session-menu), [A session's
+     plugins](#an-agents-plugins), [An agent's skills](#an-agents-skills), [An agent's environment variables](#an-agents-environment-variables), [JSON mode](#json-mode), [Updating an agent](#updating-an-agent), [Session menu](#session-menu), [A session's
      model](#a-sessions-model), [A session's effort](#a-sessions-effort)
    - Account and limits: [Account](#account), [Auto-continue](#auto-continue), [Session usage and
      Rewind](#session-usage-the-to-do-list-and-rewind), [Per-model
@@ -1944,6 +1945,40 @@ SkillList = {
 }
 ```
 
+### AgentVersion
+
+The answer to all three of Routes: updating an agent. Rules: see Updating an agent. Sentences are the server's, for showing as they are.
+
+```ts
+AgentVersion = {
+  agent: "claude" | "codex",
+  installed: boolean,       // false: everything below is empty
+  version: string | null,   // what the program says now; null if it won't say
+  running: number,          // this agent's sessions on the server that aren't over, for the confirm
+  // From the last check; null before one:
+  how: string | null,       // "native", "npm", "homebrew", "standalone", "bun", "pnpm", "vp", "deb", "rpm", "apk", "pacman", "mise", "asdf", "other"
+  words: string | null,     // the same, to say: "the native installer"
+  channel: "latest" | "stable" | null,   // Claude Code's; null for Codex
+  autoUpdates: boolean | null,           // Claude Code also updates itself in the background
+  latest: string | null,    // the newest it could find
+  checkedAt: number | null, // epoch ms; null also just after an update, when it should be looked at again
+  problem: string | null,   // why it couldn't find the newest
+  newer: boolean,           // latest is newer than version
+  canUpdate: boolean,       // an update can run from here, and there's something to get
+  why: string | null,       // why it can't update from here
+  command: string | null,   // what to run at a terminal instead. For a person: the daemon never runs it
+  effect: string | null,    // what an update does to what's running; on the confirm
+  warning: string | null,   // also on the confirm: a Codex past CODEX_CHECKED, a network disk
+  job: {                    // the last update here, kept across restarts; null if there hasn't been one
+    state: "running" | "updated" | "unchanged" | "failed",
+    from: string | null, to: string | null,   // read from the program, before and after
+    startedAt: number, endedAt: number | null,
+    message: string | null, // how it ended, in words; null while running
+    output: string[],       // its last 40 lines, scrubbed, each at most 200 characters
+  } | null,
+}
+```
+
 ## REST
 
 Each route gets one entry: method and path, then its query, body, answer, refusals and rules. Auth
@@ -3138,6 +3173,28 @@ skills.
 - **Body:** `{agent, folder?, name, state}`
 - **Answer:** `200 {ok: true, name, state}`. Goes out as `{t:"agent_settings", agent}`.
 - **Refusals:** 400 `bad_skill`, `bad_state` (not one of that agent's `states`)
+
+### Routes: updating an agent
+
+A paired phone only, each of them: anything else is 401 `unauthorized`. An older server answers 404 `not_found`, and the app says to update the server first. 400 `bad_agent` on any but `claude` and `codex`. Rules: see Updating an agent.
+
+#### GET /v1/agents/version
+
+- **Query:** `agent`
+- **Answer:** `200 AgentVersion`
+- **Rules:** runs `--version` and asks nobody outside the server.
+
+#### POST /v1/agents/version/check
+
+- **Body:** `{agent}`
+- **Answer:** `200 AgentVersion`
+- **Rules:** no fingerprint: it installs nothing. Within 5 minutes of the last one it answers from that one. Not installed answers `installed: false`.
+
+#### POST /v1/agents/version/update
+
+- **Body:** `{agent, confirmRun}`. Nothing else is read: the command is the daemon's.
+- **Answer:** `200 AgentVersion`, at once, with `job.state: "running"`
+- **Refusals:** 403 `confirm_run`; 409 `no_claude` or `no_codex`, `update_running`, `check_first`, `cant_update` (with `command`)
 
 ### Routes: files, attachments and previews
 
@@ -5695,6 +5752,43 @@ Claude Code's three `settings*.json` files, named by scope (user, project, local
 **What's allowed.** The old and new documents are compared key by key. A change that would turn on bypass is refused, 403 `raw_refused`, with the key named, confirmed or not; the same key unchanged isn't a change, and moving off one is fine. A change that runs code or widens a permission needs `confirmRun`, else 403 `confirm_run`, whose message lists each path with its new value, secrets kept back. Any key not on the plain list counts, so a key this daemon has never heard of asks.
 
 The Android app: `ui/settings/RawScreens.kt`, `Route.AgentRaw`, from the List and JSON switch on Claude Code's settings screen. Folding is the app's alone (`data/JsonFold.kt`): what's saved is always the whole text.
+
+### Updating an agent
+
+Agents & providers › an agent's Settings › Version, one server at a time. Why it's this way, and what was measured: docs/DECISIONS.md, "Updating Claude Code and Codex". The code: `daemon/src/agent-update.ts`.
+
+**Looking** runs the program's `--version`. **Checking** is on a tap, kept 5 minutes, and never installs anything. It asks the program how it was installed, keeping only named fields, and what's newest:
+
+| | How it was installed | What's newest |
+|---|---|---|
+| Claude Code | `claude doctor`'s `Running:`, `Package manager:`, `Auto-updates:` and `Auto-update channel:` lines, in the home folder. If they aren't there, where its file is. | The file `claude update` itself reads, `downloads.claude.ai/claude-code-releases/<channel>`: the daemon fetches it, with no account and no token. It has no way to ask without installing. |
+| Codex | `codex doctor --json`: `checks["updates.status"].details["update action"]`. | The same report's `"latest version"`: Codex looks, at npm's registry, Homebrew's API or GitHub by how it was installed. |
+
+**What runs, by install.** Only ever `claude update` or `codex update`, with no argument, from the home folder, with the program's own bin folder first on `PATH`, so npm's update reaches the `npm` of the Node it's under. Never `sudo`.
+
+| Install | From the phone | Otherwise |
+|---|---|---|
+| Claude Code, native | `claude update` | |
+| Claude Code, npm global, in a folder this user can write | `claude update`, which runs `npm install -g @anthropic-ai/claude-code@<version>` | `cant_update`, `npm install -g @anthropic-ai/claude-code@latest` |
+| Claude Code, npm local | `claude update` | |
+| Claude Code, Homebrew | | `brew upgrade claude-code` or `claude-code@latest`, the cask it's in. `claude update` only prints this and exits 0 |
+| Claude Code, apt, dnf, apk | | Their upgrade command, as its docs give it: they need root |
+| Claude Code, pacman, mise, asdf, another manager, a development build, `DISABLE_UPDATES` | | Says why, no command |
+| Claude Code, can't tell | | `claude update`, for a person to read what it says |
+| Codex, npm | `codex update`, which runs `npm install -g @openai/codex` | Not writable: `cant_update`, `sudo npm install -g @openai/codex@latest` |
+| Codex, bun, pnpm, Vite+, Homebrew, standalone | `codex update`, which runs its own command (standalone: `curl … install.sh \| CODEX_NON_INTERACTIVE=1 sh`) | |
+| Codex, "manual or unknown", or a later word | | Says why, and points at its guide |
+| Codex older than `CODEX_MIN` | | Neither `doctor` nor `update` runs, as 0.39.0 takes both for a prompt. npm's: `npm install -g @openai/codex@latest` |
+
+**An update** needs `confirmRun`, as a plugin's does: the phone shows what changes and what happens to what's running on a confirm, then asks for the fingerprint. The server sees only the claim. It needs a check first, so the confirm has something to say. One at a time per program: 409 `update_running`, whichever phone asks.
+
+It runs apart from any connection and from the daemon: its own process group, its output to `<support>/agent-updates/<agent>.log` (0600), which is read for `job.output` and deleted at the end. So leaving, a dropped connection or the daemon restarting doesn't stop it (the service's `KillMode=process`), and a new daemon finds it by its pid in `<support>/agent-updates.json` and waits. After 15 minutes the group gets SIGTERM, then SIGKILL.
+
+**How it ended is what the version says, read back,** not the updater's words or exit code. `updated`: it moved. `unchanged`: it exited 0 and didn't. `failed`: it exited otherwise and didn't move, or the program won't say its version now, or it ran out of time. A move with a bad exit is `updated`, and says so. `message` quotes the line that tells most. After it the snapshot's version moves too, with `{t:"claude"}` or `{t:"codex"}`, then `{t:"agent_settings", agent}`. There's no message of its own: the app asks again every 2.5 s while its page is open and an update is running.
+
+Output goes through `scrubText` (`daemon/src/debug-scrub.ts`), as the debug log does: colours, keys, tokens, URLs past their host and paths go. So does the daemon's log line.
+
+**Older sides.** An older server answers 404 and the app says to update it first; an older app never asks.
 
 ### Session menu
 

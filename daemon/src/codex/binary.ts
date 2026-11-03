@@ -13,6 +13,11 @@ import { PLATFORM, isWsl, loginShell, onWindowsDrive, packageBinDirs } from '../
  * are taken too: the handshake and the account read tell whether one still speaks the protocol.
  */
 export const CODEX_MIN = '0.163.0'
+/**
+ * The newest Codex these routes have been run against (docs/DECISIONS.md, "Codex's version on these routes"). Not a ceiling:
+ * a later one is taken, and an update from the phone says it's past this before it's confirmed (agent-update.ts). Raise it when one is checked.
+ */
+export const CODEX_CHECKED = '0.164.0'
 
 const candidates = () => [
   ...(PLATFORM === 'darwin'

@@ -1,0 +1,20 @@
+{
+  "agent": "claude",
+  "installed": true,
+  "version": "2.1.316",
+  "running": 0,
+  "how": "native",
+  "words": "the native installer",
+  "channel": "latest",
+  "autoUpdates": true,
+  "latest": "2.1.320",
+  "checkedAt": 1800000000000,
+  "problem": null,
+  "newer": true,
+  "canUpdate": true,
+  "why": null,
+  "command": null,
+  "effect": "Sessions already running stay on the version they started with, and new ones start on the new one. Claude Code’s background service restarts itself and keeps its jobs; Home marks a job on an older version.",
+  "warning": null,
+  "job": null
+}
