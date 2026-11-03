@@ -1,0 +1,42 @@
+{
+  "agents": [],
+  "workflows": [],
+  "shells": [
+    {
+      "id": "bgone0003",
+      "sessionId": "sess-shells",
+      "toolUseId": "toolu_shell3",
+      "kind": "shell",
+      "command": "sleep 600",
+      "description": "Sleep",
+      "status": "unknown",
+      "startedAt": 1800000000000,
+      "endedAt": null,
+      "exitCode": null
+    },
+    {
+      "id": "bbuild002",
+      "sessionId": "sess-shells",
+      "toolUseId": "toolu_shell2",
+      "kind": "shell",
+      "command": "./gradlew assembleDebug",
+      "description": "Build the app",
+      "status": "error",
+      "startedAt": 1800000000000,
+      "endedAt": 1800000000000,
+      "exitCode": 3
+    },
+    {
+      "id": "bserver01",
+      "sessionId": "sess-shells",
+      "toolUseId": "toolu_shell1",
+      "kind": "shell",
+      "command": "API_TOKEN=••• npm run dev",
+      "description": "Dev server",
+      "status": "running",
+      "startedAt": 1800000000000,
+      "endedAt": null,
+      "exitCode": null
+    }
+  ]
+}

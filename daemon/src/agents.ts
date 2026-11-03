@@ -14,11 +14,11 @@
 // file read), and a scan of live sessions' folders every 2 s that reads a file only when its
 // folder or its size changed, and follows only running agents' own files. A whole agent
 // transcript (one can be 50 MB) is read only when the phone opens that agent.
-import { closeSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, type Dirent } from 'node:fs'
+import { closeSync, fstatSync, lstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, type Dirent } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, join } from 'node:path'
 import { broadcast, emitEvent, ensureParsed, getSession, listSessionRecs, upsertSession } from './hub.ts'
-import { closeTool, feedLine, handbackText, maskSecrets, newParseState, parseTaskNotification, structuredText, toolSummary, waitingWord, type AgentLink, type Ev, type ParseState, type TaskEnd, type WorkflowPhase } from './normalize.ts'
+import { closeTool, feedLine, handbackText, maskSecrets, newParseState, parseTaskNotification, shellStart, structuredText, toolSummary, waitingWord, type AgentLink, type Ev, type ParseState, type ShellStart, type TaskEnd, type WorkflowPhase } from './normalize.ts'
 import { log, trimText } from './util.ts'
 
 export type AgentStatus = 'running' | 'done' | 'error' | 'stopped'
@@ -66,6 +66,28 @@ export type Workflow = {
   endedAt: number | null
   tokens: number | null
   toolUses: number | null
+}
+/**
+ * A background command of a session's, as Claude Code's status line counts them ("1 shell"), a
+ * Monitor among them. 'unknown': nothing says any more whether it runs (its session's process went
+ * and it may have outlived it); never counted as running.
+ */
+export type ShellStatus = 'running' | 'done' | 'error' | 'stopped' | 'unknown'
+export type Shell = {
+  /** Claude Code's task id ("b…"). */
+  id: string
+  sessionId: string
+  /** The call that started it, when one is known: in the main transcript or an agent's. */
+  toolUseId: string | null
+  kind: 'shell' | 'monitor'
+  /** Its command's first line and what it's for, masked. */
+  command: string | null
+  description: string | null
+  status: ShellStatus
+  /** First seen, when no call says (Claude Code's list named one the daemon hadn't read of). */
+  startedAt: number
+  endedAt: number | null
+  exitCode: number | null
 }
 
 /** Its last word: a tool call waiting, work after a result, text, its report, or an API error that cut it off (a 429, a usage limit). */
@@ -118,6 +140,8 @@ type AgentRec = Agent & {
   bg: Map<string, BgWork>
   /** TaskStop calls waiting for their result: call id → the task. */
   stops: Map<string, string>
+  /** Its Bash and Monitor calls waiting for their result, for the shell one may start. */
+  shellCalls: Map<string, { name: string; input: Record<string, unknown> }>
   /** Its turn has ended (its last reply's stop_reason, or SubagentStop) and nothing has woken it since. */
   turnOver: boolean
   /** When Claude Code last said it waits on its own background work (0: not since it last wrote). */
@@ -126,6 +150,18 @@ type AgentRec = Agent & {
   unreported: boolean
   /** Its turn ended with background work going, so it's still at work, and its activity says so. */
   waiting: boolean
+}
+type ShellRec = Shell & {
+  /** The file its output goes to: read only for the line Claude Code ends it with, and never sent. */
+  output: string | null
+  /** When a Monitor runs out by itself (Infinity: a persistent one), 0 for a shell. */
+  until: number
+  /** The size of [output] when last read. */
+  size: number
+  /** When Claude Code's own list last named it as running. */
+  namedAt: number
+  /** How it ended came from Claude Code's word on it (a notification, TaskStop): nothing brings that back. */
+  sure: boolean
 }
 type WorkflowRec = Workflow & {
   journalOffset: number
@@ -161,6 +197,13 @@ type Board = {
   launched: Set<string>
   /** Agent calls that came back with an error or were interrupted: the agent each ran stopped with it. */
   failedCalls: Set<string>
+  shells: Map<string, ShellRec>
+  /** Notifications about shells not read of yet (an agent's start is in its own file, read later). */
+  shellEnds: Map<string, { end: TaskEnd; ts: number }>
+  /** How many shells run now, as last published. */
+  shellsRunning: number
+  /** When the session's current process started (Claude Code's registry), 0 until known. */
+  processAt: number
 }
 
 const boards = new Map<string, Board>()
@@ -214,7 +257,7 @@ const numOr = (v: unknown, d: number | null): number | null => (typeof v === 'nu
 function board(id: string): Board {
   let b = boards.get(id)
   if (!b) {
-    b = { id, agents: new Map(), workflows: new Map(), tasks: new Map(), seen: new Map(), metas: new Set(), snapshots: new Map(), dirty: new Set(), sentAt: 0, timer: null, running: 0, listed: false, launched: new Set(), failedCalls: new Set() }
+    b = { id, agents: new Map(), workflows: new Map(), tasks: new Map(), seen: new Map(), metas: new Set(), snapshots: new Map(), dirty: new Set(), sentAt: 0, timer: null, running: 0, listed: false, launched: new Set(), failedCalls: new Set(), shells: new Map(), shellEnds: new Map(), shellsRunning: 0, processAt: 0 }
     boards.set(id, b)
   }
   return b
@@ -228,7 +271,7 @@ function newAgent(b: Board, id: string, at: number): AgentRec {
       status: 'running', activity: null, startedAt: at, endedAt: null, lastActivityAt: at, tokens: null, toolUses: null, result: null,
       file: null, offset: 0, carry: Buffer.alloc(0), whole: false, tools: new Set(), hookTools: 0, hookAt: 0, last: null, text: null, fromFile: false, peeked: false, checkedAt: 0,
       sure: false, retried: false, inTokens: 0, outTokens: 0, msgId: null, msgOut: 0,
-      bg: new Map(), stops: new Map(), turnOver: false, saidWaitingAt: 0, unreported: false, waiting: false,
+      bg: new Map(), stops: new Map(), shellCalls: new Map(), turnOver: false, saidWaitingAt: 0, unreported: false, waiting: false,
     }
     b.agents.set(id, a)
   }
@@ -273,6 +316,9 @@ function flush(b: Board): void {
     if (key.startsWith('a:')) {
       const a = b.agents.get(id)
       if (a) broadcast({ t: 'agent', agent: agentView(a) })
+    } else if (key.startsWith('s:')) {
+      const s = b.shells.get(id)
+      if (s) broadcast({ t: 'shell', shell: shellView(s) })
     } else {
       const w = b.workflows.get(id)
       if (w) broadcast({ t: 'workflow', workflow: workflowView(b, w) })
@@ -296,6 +342,7 @@ function publishRunning(b: Board): void {
   let n = 0
   for (const a of b.agents.values()) if (a.status === 'running') n++
   if (!n) for (const w of b.workflows.values()) if (w.status === 'running') n = 1
+  publishShells(b)
   if (n === b.running) return
   b.running = n
   if (getSession(b.id)) upsertSession(b.id, { agentsRunning: n })
@@ -513,6 +560,7 @@ function taskEnd(b: Board, e: TaskEnd, ts: number): void {
     endWorkflow(b, w, status, ts)
     return
   }
+  if (e.taskId.startsWith('b')) return shellNotified(b, e, ts)
   if (!AGENT_ID.test(e.taskId)) return
   const a = newAgent(b, e.taskId, e.durationMs != null ? ts - e.durationMs : ts)
   a.toolUseId ??= e.toolUseId
@@ -603,8 +651,13 @@ export function applyLinks(sessionId: string, links: AgentLink[], quiet = false)
           // TaskStop on a background agent: no notification has to follow.
           const a = AGENT_ID.test(l.taskId) ? b.agents.get(l.taskId) : undefined
           if (a && a.status === 'running') end(b, a, 'stopped', l.ts, true)
+          const s = b.shells.get(l.taskId)
+          if (s) shellEnd(b, s, 'stopped', l.ts, null, true)
           break
         }
+        case 'shell':
+          shellStarted(b, l, l.ts)
+          break
         case 'end':
           taskEnd(b, l, l.ts)
           break
@@ -703,6 +756,7 @@ export function hookActivity(sessionId: string, agentId: string, agentType: unkn
 export function hookSubagentStop(sessionId: string, agentId: string, last: unknown, tasks?: unknown): void {
   if (!SAFE_ID.test(agentId)) return
   const b = boards.get(sessionId)
+  if (b) shellsListed(b, tasks, Date.now())
   const a = b?.agents.get(agentId)
   if (!b || !a || a.status !== 'running') return
   // What it wrote up to here first: the command it started, or the report it handed back.
@@ -757,6 +811,7 @@ export function hookStop(sessionId: string, tasks: unknown): void {
   if (!Array.isArray(tasks)) return
   const b = board(sessionId)
   const now = Date.now()
+  shellsListed(b, tasks, now)
   const named = new Set<string>()
   for (const t of tasks) if (t && typeof t === 'object' && typeof t.id === 'string') named.add(t.id)
   for (const a of b.agents.values()) {
@@ -790,6 +845,205 @@ export function hookStop(sessionId: string, tasks: unknown): void {
     }
   }
   publishRunning(b)
+}
+
+// ── Background commands ───────────────────────────────────────────────────
+// Claude Code's status line counts them ("1 shell", "1 shell, 1 monitor"), as measured on 2.1.317
+// (docs/PROTOCOL.md, "Background commands"). Claude Code's word decides: its notification, TaskStop's
+// result, and each Stop's list of what still runs. Its process going says only that nothing will
+// tell any more: a command can outlive it (a crash, `claude stop`), so it's then 'unknown', never a
+// running one and never a finished one.
+
+const SHELLS_SHOWN = 30
+/** The line Claude Code ends a command's output file with. */
+const OUTPUT_END = /(?:^|\n)\[(?:exited with code (-?\d+)|(killed)|process exited while detached; exit code unknown)\]\s*$/
+/** Claude Code, resuming, on a command with no end in the transcript: it can't tell either (its own note says so). */
+const NOT_FINISHED = /didn.t finish before the previous session ended/
+
+const shellView = (s: ShellRec): Shell => ({
+  id: s.id, sessionId: s.sessionId, toolUseId: s.toolUseId, kind: s.kind, command: s.command, description: s.description,
+  status: s.status, startedAt: s.startedAt, endedAt: s.endedAt, exitCode: s.exitCode,
+})
+
+function publishShells(b: Board): void {
+  const r = getSession(b.id)
+  let n = 0
+  // A session read from history counts none, whatever its last lines left going.
+  if (r && r.state !== 'ended') for (const s of b.shells.values()) if (s.status === 'running') n++
+  if (n === b.shellsRunning) return
+  b.shellsRunning = n
+  // Absent while none: most sessions never have one.
+  if (r) upsertSession(b.id, { shellsRunning: n || undefined })
+}
+
+/** How many background commands of a session run now. */
+export const shellsRunning = (sessionId: string) => boards.get(sessionId)?.shellsRunning ?? 0
+
+function shellStarted(b: Board, l: ShellStart, at: number): void {
+  if (!SAFE_ID.test(l.taskId)) return
+  let s = b.shells.get(l.taskId)
+  const fresh = !s
+  if (!s) {
+    s = {
+      id: l.taskId, sessionId: b.id, toolUseId: null, kind: 'shell', command: null, description: null, status: 'running', startedAt: at, endedAt: null, exitCode: null,
+      output: null, until: 0, size: -1, namedAt: 0, sure: false,
+    }
+    b.shells.set(l.taskId, s)
+  }
+  // Also when Stop's list named it first, or a transcript is read again: this says more, and revives nothing.
+  s.toolUseId ??= l.toolUseId
+  if (l.monitor) s.kind = 'monitor'
+  s.command ??= clean(l.command, 300)
+  s.description ??= clean(l.description, 120)
+  s.output ??= l.output
+  s.until ||= l.until
+  if (at < s.startedAt) s.startedAt = at
+  const said = b.shellEnds.get(l.taskId)
+  if (said) {
+    b.shellEnds.delete(l.taskId)
+    shellNotified(b, said.end, said.ts)
+  }
+  touch(b, `s:${s.id}`, fresh)
+}
+
+/** [known]: Claude Code's word (a notification, TaskStop), which always counts; a guess only ends one it hasn't. */
+function shellEnd(b: Board, s: ShellRec, status: ShellStatus, at: number, exitCode: number | null, known: boolean): void {
+  if (!known && s.sure) return
+  const was = s.status
+  s.status = status
+  s.sure = known
+  s.endedAt = status === 'unknown' ? null : was === 'running' || was === 'unknown' || s.endedAt == null ? Math.max(at, s.startedAt) : s.endedAt
+  s.exitCode = exitCode ?? s.exitCode
+  touch(b, `s:${s.id}`, was !== status)
+}
+
+/** What its output file says at its end, read only when the file changed: whether that ended it. */
+function shellFile(b: Board, s: ShellRec): boolean {
+  const file = s.output
+  // Named by a transcript: only a command's own file, and nothing of it leaves here but how it ended.
+  if (!file || !file.startsWith('/') || file.includes('..') || basename(file) !== `${s.id}.output`) return false
+  let fd: number | null = null
+  try {
+    const st = lstatSync(file)
+    if (!st.isFile() || st.size === s.size) return false
+    s.size = st.size
+    fd = openSync(file, 'r')
+    const buf = Buffer.alloc(Math.min(st.size, 128))
+    const n = readSync(fd, buf, 0, buf.length, st.size - buf.length)
+    const m = OUTPUT_END.exec(buf.subarray(0, n).toString('utf8'))
+    if (!m) return false
+    const code = m[1] != null ? Number(m[1]) : null
+    shellEnd(b, s, m[2] ? 'stopped' : code ? 'error' : 'done', st.mtimeMs, code, false)
+    return true
+  } catch {
+    return false
+  } finally {
+    if (fd != null) closeSync(fd)
+  }
+}
+
+/** A `<task-notification>` about a "b…" task: how it ended, unless it only says Claude Code can't tell. */
+function shellNotified(b: Board, e: TaskEnd, ts: number): void {
+  const s = b.shells.get(e.taskId)
+  if (!s) {
+    if (b.shellEnds.size >= 200) b.shellEnds.clear()
+    b.shellEnds.set(e.taskId, { end: e, ts })
+    return
+  }
+  if (e.status === 'stopped' && NOT_FINISHED.test(e.summary ?? '')) {
+    s.size = -1
+    if (s.status === 'running' && !shellFile(b, s)) shellEnd(b, s, 'unknown', ts, null, false)
+    return
+  }
+  const code = /\bexit code (\d+)/.exec(e.summary ?? '')
+  shellEnd(b, s, statusOf(e.status) ?? 'stopped', ts, code ? Number(code[1]) : null, true)
+}
+
+/**
+ * [tasks] is a Stop or SubagentStop hook's background_tasks: what Claude Code has going in the whole
+ * session now, shells as {id, type: "shell", status, description, command}. Named: it runs, whatever
+ * was thought (a job's new process took it over; after /clear it's named under the new session). Not
+ * named, and not only just started: it has ended, and how comes from its file, or its notification
+ * in a moment.
+ */
+function shellsListed(b: Board, tasks: unknown, now: number): void {
+  if (!Array.isArray(tasks)) return
+  const named = new Set<string>()
+  for (const t of tasks) {
+    if (t?.type !== 'shell' || typeof t.id !== 'string' || !SAFE_ID.test(t.id)) continue
+    const status = statusOf(t.status)
+    if (status === undefined || status) continue
+    named.add(t.id)
+    let s = b.shells.get(t.id)
+    const fresh = !s
+    if (!s) {
+      // /clear: the same process goes on under a new session id, and the old session knows when it started.
+      const before = [...boards.values()].find((o) => o !== b && o.shells.has(t.id))?.shells.get(t.id)
+      shellStarted(b, { taskId: t.id, toolUseId: before?.toolUseId ?? null, monitor: before?.kind === 'monitor', command: typeof t.command === 'string' ? t.command.split('\n')[0]! : null, description: typeof t.description === 'string' ? t.description : null, until: before?.until ?? 0, output: before?.output ?? null }, before?.startedAt ?? now)
+      s = b.shells.get(t.id)
+    }
+    if (!s) continue
+    s.namedAt = now
+    if (s.status !== 'running' && !s.sure) {
+      s.status = 'running'
+      s.endedAt = null
+      s.exitCode = null
+      touch(b, `s:${s.id}`, true)
+    } else if (fresh) touch(b, `s:${s.id}`, true)
+  }
+  for (const s of b.shells.values()) {
+    if (s.status !== 'running' || named.has(s.id) || now - s.startedAt < BG_FRESH) continue
+    s.size = -1
+    if (!shellFile(b, s)) shellEnd(b, s, 'done', now, null, false)
+  }
+  publishShells(b)
+}
+
+/**
+ * What a scan can tell. Running ones: their file's last line, a Monitor past its time (its expiry
+ * writes no notification with a status). A session that ended, or a process newer than the command
+ * that no list has named since (a resumed or moved transcript shows it started): nothing says any
+ * more. A command this very process started, with the process back in the registry (one read missed
+ * it): running again.
+ */
+function settleShells(b: Board, live: boolean): void {
+  const now = Date.now()
+  for (const s of b.shells.values()) {
+    if (s.status === 'unknown') {
+      if (live && !s.sure && b.processAt > 0 && s.startedAt >= b.processAt) {
+        s.status = 'running'
+        touch(b, `s:${s.id}`, true)
+      }
+      continue
+    }
+    if (s.status !== 'running' || shellFile(b, s)) continue
+    if (s.until > 0 && now > s.until + 5000) shellEnd(b, s, 'stopped', s.until, null, false)
+    else if (!live || (b.processAt > 0 && s.startedAt < b.processAt && s.namedAt < b.processAt)) shellEnd(b, s, 'unknown', now, null, false)
+  }
+  publishShells(b)
+}
+
+/** The session's process is gone: what its files and transcript say first, the rest may run on or not. */
+function shellsGone(b: Board): void {
+  for (const s of b.shells.values()) {
+    if (s.status !== 'running') continue
+    s.size = -1
+    if (!shellFile(b, s)) shellEnd(b, s, 'unknown', Date.now(), null, false)
+  }
+  publishShells(b)
+}
+
+/** Registry's word on the session's process (hub.ts): when it started. */
+export function noteProcess(sessionId: string, startedAt: unknown): void {
+  if (typeof startedAt !== 'number' || !Number.isFinite(startedAt)) return
+  const b = board(sessionId)
+  if (startedAt !== b.processAt) b.processAt = startedAt
+}
+
+/** What the phone lists: all that run or may, then the most recent ended ones, newest first. */
+function listShells(b: Board): Shell[] {
+  const all = [...b.shells.values()].sort((x, y) => y.startedAt - x.startedAt)
+  return all.filter((s, i) => i < SHELLS_SHOWN || s.status === 'running' || s.status === 'unknown').map(shellView)
 }
 
 // ── Agent SDK sessions ────────────────────────────────────────────────────
@@ -842,6 +1096,8 @@ export function sdkTask(sessionId: string, m: any): void {
       const runId = b.tasks.get(id)
       const w = runId ? b.workflows.get(runId) : undefined
       if (w) endWorkflow(b, w, status, at)
+      const s = b.shells.get(id)
+      if (s) shellEnd(b, s, status, at, null, true)
       break
     }
     case 'task_notification':
@@ -1137,6 +1393,7 @@ function lightLine(a: AgentRec, o: any): void {
         const report = handbackText(blk.name, blk.input)
         const stops = blk.name === 'TaskStop' || blk.name === 'KillShell' ? (blk.input?.task_id ?? blk.input?.shell_id) : null
         if (typeof stops === 'string') a.stops.set(blk.id, stops)
+        if (blk.name === 'Bash' || blk.name === 'Monitor') a.shellCalls.set(blk.id, { name: blk.name, input: blk.input ?? {} })
         if (report != null) {
           a.result = clean(report)
           a.fromFile = a.result != null
@@ -1156,12 +1413,24 @@ function lightLine(a: AgentRec, o: any): void {
     a.turnOver = false
     const started = bgStarted(o.toolUseResult, Number.isFinite(ts) ? ts : Date.now())
     if (started) a.bg.set(started[0], started[1])
+    const b = boards.get(a.sessionId)
     // TaskStop came back: stopped now, or "not running" (already over). No notification has to follow.
     for (const x of o.message.content) {
-      const task = x?.type === 'tool_result' ? a.stops.get(x.tool_use_id) : undefined
+      if (x?.type !== 'tool_result') continue
+      // A Bash or Monitor call of its own came back: one that went on in the background counts for the session.
+      const call = a.shellCalls.get(x.tool_use_id)
+      if (call) {
+        a.shellCalls.delete(x.tool_use_id)
+        const when = Number.isFinite(ts) ? ts : Date.now()
+        const shell = shellStart(call.name, call.input, x.tool_use_id, o.toolUseResult, x.content, when)
+        if (b && shell) shellStarted(b, shell, when)
+      }
+      const task = a.stops.get(x.tool_use_id)
       if (task == null) continue
       a.bg.delete(task)
       a.stops.delete(x.tool_use_id)
+      const s = b?.shells.get(task)
+      if (b && s) shellEnd(b, s, 'stopped', Number.isFinite(ts) ? ts : Date.now(), null, true)
     }
   } else if (o?.type === 'attachment' && o.attachment?.type === 'structured_output') {
     const r = clean(structuredText(o.attachment.data))
@@ -1232,6 +1501,7 @@ function follow(a: AgentRec): void {
     a.msgOut = 0
     a.bg.clear()
     a.stops.clear()
+    a.shellCalls.clear()
     a.turnOver = false
   }
   if (size === a.offset) return
@@ -1353,6 +1623,7 @@ function scan(b: Board, r: Rec, follows: boolean): void {
     if (a.status === 'running' && `${a.activity}|${a.tokens}|${a.tools.size}` !== before) changed(b, a, false)
   }
   for (const w of b.workflows.values()) if (w.status === 'running') settleWorkflow(b, w, join(runs, w.id), live)
+  settleShells(b, live)
   publishRunning(b)
 }
 
@@ -1377,6 +1648,7 @@ export function endSessionAgents(sessionId: string): void {
       settle(b, a, false, true)
     }
     for (const w of b.workflows.values()) if (w.status === 'running') endWorkflow(b, w, 'stopped', Date.now())
+    shellsGone(b)
   } catch (e) {
     log('agents end failed', sessionId, e)
   }
@@ -1460,7 +1732,7 @@ export function pollAgents(): void {
   for (const r of listSessionRecs()) {
     const going = r.state === 'working' || r.state === 'needs_you' || r.state === 'starting'
     // A workflow between phases has no agent running, and still has to be seen to its end.
-    if (!going && now - r.lastActivityAt > LIVE_MS && !backgroundRunning(r.id)) continue
+    if (!going && now - r.lastActivityAt > LIVE_MS && !backgroundRunning(r.id) && !shellsRunning(r.id)) continue
     try {
       scan(board(r.id), r, true)
     } catch (e) {
@@ -1477,9 +1749,9 @@ export function pollAgents(): void {
  * counted in their workflow. A session not scanned lately (history) has its folders read once now,
  * its transcript's links included; no agent transcript is read for it.
  */
-export function listAgents(sessionId: string): { agents: Agent[]; workflows: Workflow[] } {
+export function listAgents(sessionId: string): { agents: Agent[]; workflows: Workflow[]; shells: Shell[] } {
   const r = getSession(sessionId)
-  if (!r) return { agents: [], workflows: [] }
+  if (!r) return { agents: [], workflows: [], shells: [] }
   const b = board(sessionId)
   // History is read without a message per agent (the phone asks for it whole); a live session's
   // news goes to every phone, as its scan would send it.
@@ -1501,7 +1773,7 @@ export function listAgents(sessionId: string): { agents: Agent[]; workflows: Wor
   for (const a of shown) if (a.status === 'done' && !a.workflowId && !a.fromFile) peek(b, a)
   const agents = shown.map(agentView)
   const workflows = [...b.workflows.values()].sort((x, y) => y.startedAt - x.startedAt).map((w) => workflowView(b, w))
-  return { agents, workflows }
+  return { agents, workflows, shells: listShells(b) }
 }
 
 /** How many of a session's agents run now. */

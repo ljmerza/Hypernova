@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { CLAUDE_DIR, installedClaudeVersion, log, outdatedClaude, projectNameOf, projectSlug, trimText, tail } from './util.ts'
 import { fallbackTitle, feedLine, flushAbsorbed, isLauncher, newParseState, newToolEvent, queueNow, queueView, squash, type Claim, type Ev, type ParseState, type QueuedPrompt, type ToolEv } from './normalize.ts'
 import { recordReading, rateFor, type Rate } from './usage-rate.ts'
-import { applyLinks, backgroundRunning, endSessionAgents, launchedInBackground } from './agents.ts'
+import { applyLinks, backgroundRunning, endSessionAgents, launchedInBackground, noteProcess } from './agents.ts'
 import { getManaged, isSdk, isSubscription, managedSessions, listDevices, settings } from './store.ts'
 import type { TermView } from './terms.ts'
 import { registryBusy, type Menu } from './term/shared.ts'
@@ -81,6 +81,8 @@ export type Session = {
   loginScreen?: boolean
   /** How many agents its main agent started are running now (agents.ts). */
   agentsRunning: number
+  /** How many background commands it has running now, as Claude Code's status line counts them (agents.ts); absent while none. */
+  shellsRunning?: number
   /** Why Claude can't reply here now (a usage limit, signed out…): set when an API error stopped it, cleared by a real reply. */
   blocked: Blocked | null
   /**
@@ -1797,6 +1799,7 @@ export function pollRegistry(): void {
     const r = sessions.get(o.sessionId) ?? upsertSession(o.sessionId, { cwd: o.cwd, origin: 'terminal', lastActivityAt: Number(o.statusUpdatedAt ?? o.updatedAt) || Date.now() })
     // Before the first read: whether Claude Code is busy says whether a queue read from the file still holds.
     r.pid = o.pid
+    noteProcess(r.id, o.startedAt)
     ensureParsed(r)
     // Claude Code's own permission dialog on its screen (terms.ts) waits on the owner like an approval.
     const hasPending = [...pending.values()].some((p) => p.approval.sessionId === r.id) || !!r.menu?.permission

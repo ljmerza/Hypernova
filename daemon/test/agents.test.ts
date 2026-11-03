@@ -176,7 +176,7 @@ test('a task notification ends the agent once, from whichever copy comes first, 
   assert.ok(!st.events.some((ev) => ev.kind === 'user'))
 })
 
-test('a failed agent fails its call, with the summary as its output; a shell command\'s notification links nothing', () => {
+test('a failed agent fails its call, with the summary as its output; a shell command\'s notification is only that shell\'s end', () => {
   const st = parseTranscript([
     ...launchAgent('toolu_a1', PLAIN, 'Review the parser'),
     enqueue(notification(PLAIN, 'toolu_a1', 'failed', agentUsage)),
@@ -186,7 +186,7 @@ test('a failed agent fails its call, with the summary as its output; a shell com
   assert.ok(call?.kind === 'tool')
   assert.equal(call.status, 'error')
   assert.equal(call.output, `Task "${PLAIN}" failed`)
-  assert.deepEqual(st.links.map((l) => l.kind), ['agent', 'end'])
+  assert.deepEqual(st.links.map((l) => (l.kind === 'end' ? l.taskId : l.kind)), ['agent', PLAIN, 'b9z8y7x6'])
 })
 
 test('an agent woken by SendMessage ends again with its next notification', () => {
