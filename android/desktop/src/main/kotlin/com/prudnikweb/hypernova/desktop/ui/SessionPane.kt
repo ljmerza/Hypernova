@@ -217,9 +217,6 @@ private fun NotWholeCommand(offer: CardOffer.NotWhole) {
     HText(Ui.desk_not_whole.text(), style = Type.small, color = HN.amber)
 }
 
-/** How long new Deny and Allow pills ignore clicks: longer than the gap in a double-click. */
-internal const val ASK_ARM_MS = 600L
-
 /**
  * Deny, and Allow only beside a whole command ([CardOffer]). While an answer goes it says "Allowing…" or
  * "Denying…" in their place; one that didn't get through brings them back, and says so on the card and in the toast.
@@ -228,11 +225,6 @@ internal const val ASK_ARM_MS = 600L
 private fun AskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell) {
     var going by remember(offer.id) { mutableStateOf<Boolean?>(null) }
     var failed by remember(offer.id) { mutableStateOf(false) }
-    // New pills come up where the last ones were, so the second click of a double-click can't answer what nobody has read.
-    val armed by produceState(false, offer.id) {
-        delay(ASK_ARM_MS)
-        value = true
-    }
     fun send(allow: Boolean) {
         if (going != null) return
         going = allow
@@ -266,8 +258,8 @@ private fun AskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell
             Spacer(Modifier.height(6.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Pill(Ui.deny.text(), { send(false) }, kind = PillKind.Danger, enabled = armed)
-            if (offer is CardOffer.Whole) Pill(Ui.allow.text(), { send(true) }, kind = PillKind.Primary, enabled = armed)
+            Pill(Ui.deny.text(), { send(false) }, kind = PillKind.Danger)
+            if (offer is CardOffer.Whole) Pill(Ui.allow.text(), { send(true) }, kind = PillKind.Primary)
         }
     }
 }

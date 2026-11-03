@@ -97,14 +97,6 @@ object DesktopRig {
     @OptIn(ExperimentalTestApi::class)
     fun ComposeUiTest.choose(name: String) {
         row(name).performClick()
-        armPills()
-    }
-
-    /** Long enough for new Deny and Allow pills to take a click (SessionPane.kt, ASK_ARM_MS). */
-    @OptIn(ExperimentalTestApi::class)
-    fun ComposeUiTest.armPills() {
-        waitForIdle()
-        mainClock.advanceTimeBy(com.prudnikweb.hypernova.desktop.ui.ASK_ARM_MS + 100)
         waitForIdle()
     }
 

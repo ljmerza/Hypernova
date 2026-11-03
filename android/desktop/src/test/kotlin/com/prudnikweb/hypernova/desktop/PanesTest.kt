@@ -3,8 +3,6 @@ package com.prudnikweb.hypernova.desktop
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -33,7 +31,6 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
-import com.prudnikweb.hypernova.desktop.DesktopRig.armPills
 import com.prudnikweb.hypernova.desktop.DesktopRig.choose
 import com.prudnikweb.hypernova.desktop.DesktopRig.inPane
 import com.prudnikweb.hypernova.desktop.DesktopRig.pairedWith
@@ -249,27 +246,6 @@ class PanesTest {
         onNodeWithText(Ui.allow.text()).assertDoesNotExist()
     }
 
-    @Test fun newPillsIgnoreTheSecondClickOfADoubleClick() = runDesktopComposeUiTest(1200, 800) {
-        d.ok("POST", "/v1/approvals/a2")
-        up()
-        choose(stream)
-        // The clock by hand: an ask arrives under the pointer, and the click comes before it can have been read.
-        mainClock.autoAdvance = false
-        d.push(msg("session") { put("session", session("s2", state = "needs_you", title = stream)) })
-        d.push(msg("approval") { put("approval", approval("a2", "s2", summary = "Bash: ls") { put("toolName", "Bash").put("input", JSONObject().put("command", "ls")) }) })
-        until("the ask") { Core.live?.approval("s2") != null }
-        mainClock.advanceTimeByFrame()
-        mainClock.advanceTimeByFrame()
-        inPane(Ui.allow.text()).assertIsNotEnabled().performClick()
-        inPane(Ui.deny.text()).assertIsNotEnabled().performClick()
-        mainClock.advanceTimeBy(com.prudnikweb.hypernova.desktop.ui.ASK_ARM_MS + 100)
-        assertEquals(0, d.count("POST", "/v1/approvals/a2"))
-        // Long enough to have read it, and it answers.
-        inPane(Ui.allow.text()).assertIsEnabled().performClick()
-        mainClock.autoAdvance = true
-        until("the answer") { d.count("POST", "/v1/approvals/a2") == 1 }
-    }
-
     @Test fun theChosenOneChangingGroupIsFollowed() = runDesktopComposeUiTest(1200, 800) {
         up()
         choose(stream)
@@ -455,7 +431,6 @@ class PanesTest {
         d.ok("POST", "/v1/approvals/a1")
         up()
         key(Key.DirectionDown)
-        armPills()
         key(Key.Tab)
         onNodeWithText(Ui.desk_settings.text()).assertIsFocused()
         key(Key.Tab)
