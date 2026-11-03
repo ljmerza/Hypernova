@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +52,7 @@ import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.TextHit
-import com.prudnikweb.hypernova.data.TextHits
+import com.prudnikweb.hypernova.data.rememberFullText
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.LocalHaze
 import com.prudnikweb.hypernova.ui.components.Seam
@@ -66,7 +65,6 @@ import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 import dev.chrisbanes.haze.hazeSource
 import java.time.ZoneId
-import kotlinx.coroutines.delay
 
 /**
  * Ended sessions, most recent first, but for the ones a restart of the Mac ended lately (Home keeps
@@ -222,37 +220,6 @@ private fun HistoryList(
             }
         }
     }
-}
-
-/** The Mac's full-text answer for the query typed now ([hits], null while there's none) and whether it's being asked ([searching]). */
-internal class FullText(val hits: TextHits?, val searching: Boolean)
-
-/**
- * The words inside the conversations, for History's search and Home's: from 3 characters, once
- * typing pauses, the current Mac is asked (idea HI1, [Hub.searchHistory]). An older Mac (null)
- * turns it off until this leaves the screen; none reachable, or a failure, leaves the phone's own
- * filter alone. Hits only ever answer the query they were asked for.
- */
-@Composable
-internal fun rememberFullText(hub: Hub, query: String): FullText {
-    val asked = query.trim()
-    val canAsk = hub.link.state == LinkState.Connected
-    var unsupported by remember(hub) { mutableStateOf(false) }
-    var hits by remember(hub) { mutableStateOf<Pair<String, TextHits>?>(null) }
-    var searching by remember { mutableStateOf(false) }
-    LaunchedEffect(hub, asked, canAsk, unsupported) {
-        if (!HistorySearch.wantsFullText(asked) || !canAsk || unsupported) {
-            searching = false
-            return@LaunchedEffect
-        }
-        searching = true
-        delay(HistorySearch.FULL_TEXT_DEBOUNCE_MS)
-        hub.searchHistory(asked)
-            .onSuccess { if (it == null) unsupported = true else hits = asked to it }
-            .onFailure { hits = null }
-        searching = false
-    }
-    return FullText(hits?.takeIf { it.first == asked && HistorySearch.wantsFullText(asked) && canAsk }?.second, searching)
 }
 
 /** A hit's snippet in mono, the words it found in the accent (History's hit cards, Home's cards while searching). */

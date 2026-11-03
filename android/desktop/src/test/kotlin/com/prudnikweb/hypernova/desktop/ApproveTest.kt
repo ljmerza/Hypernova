@@ -258,7 +258,11 @@ class ApproveTest {
         pairedWith(d)
         waitForIdle()
         choose("Migrate the payments table")
-        // Tab goes through what can take the focus, in order: Settings, Pair another, then Deny, then Allow.
+        // Tab goes through what can take the focus, in order: Sessions, History, Settings, Pair another, then Deny, then Allow.
+        onRoot().performKeyInput { pressKey(Key.Tab) }
+        onNodeWithText(Ui.sessions.text()).assertIsFocused()
+        onRoot().performKeyInput { pressKey(Key.Tab) }
+        onNodeWithText(Ui.history.text()).assertIsFocused()
         onRoot().performKeyInput { pressKey(Key.Tab) }
         onNodeWithText(Ui.desk_settings.text()).assertIsFocused()
         onRoot().performKeyInput { pressKey(Key.Tab) }

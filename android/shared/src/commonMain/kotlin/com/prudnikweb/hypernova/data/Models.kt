@@ -253,6 +253,9 @@ data class UsageRate(val fiveHour: Float?, val sevenDay: Float?)
  */
 val Session.onHome: Boolean get() = (phase != Phase.Ended || cutByRestart) && switchedTo == null
 
+/** History's list (docs/DECISIONS.md, "Delete takes a session off Home, History brings it back"): what has ended, but for what a restart ended lately, which Home keeps. */
+val Session.inHistory: Boolean get() = phase == Phase.Ended && !cutByRestart
+
 /**
  * Claude plan usage, from the status line's rate_limits.
  * [limitedAt] is set while the 5-hour limit is hit (sessions are rate-limited until [fiveHourResetAt]).

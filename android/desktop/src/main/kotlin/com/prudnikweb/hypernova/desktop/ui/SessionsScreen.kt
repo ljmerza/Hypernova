@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Blocked
 import com.prudnikweb.hypernova.data.ConnResult
 import com.prudnikweb.hypernova.data.Core
+import com.prudnikweb.hypernova.data.HistorySearch
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Link
 import com.prudnikweb.hypernova.data.LinkState
@@ -78,14 +80,17 @@ import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.onHome
 import com.prudnikweb.hypernova.data.linkProblemText
+import com.prudnikweb.hypernova.data.rememberFullText
 import com.prudnikweb.hypernova.desktop.APP_NAME
 import com.prudnikweb.hypernova.desktop.CardOffer
 import com.prudnikweb.hypernova.desktop.Group
+import com.prudnikweb.hypernova.desktop.Page
 import com.prudnikweb.hypernova.desktop.RowLine
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.Ui
 import com.prudnikweb.hypernova.desktop.durationWords
 import com.prudnikweb.hypernova.desktop.groupsOf
+import com.prudnikweb.hypernova.desktop.historyModel
 import com.prudnikweb.hypernova.desktop.itemIndexOf
 import com.prudnikweb.hypernova.desktop.neighbour
 import com.prudnikweb.hypernova.desktop.orderOf
@@ -93,6 +98,7 @@ import com.prudnikweb.hypernova.desktop.rowHasChip
 import com.prudnikweb.hypernova.desktop.rowLine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.ZoneId
 
 /** How wide the list gets, however wide the window: past this a line of a command is too long to read. */
 private val COLUMN = 720.dp
@@ -115,23 +121,36 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
     val link = hub.link
     // As the phone's Home: what's ended is in History (Session.onHome).
     val groups = groupsOf(hub.sessions.filter { it.onHome })
-    val order = orderOf(groups)
+    val onSessions = shell.page == Page.Sessions
+    val history = shell.historyOf(server)
+    val full = rememberFullText(hub, if (onSessions) "" else history.query)
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            delay(30_000)
+            value = System.currentTimeMillis()
+        }
+    }
+    val zone = remember { ZoneId.systemDefault() }
+    val past = remember(hub.sessions, history.query, history.project, full.hits, HistorySearch.day(now, zone)) {
+        historyModel(hub.sessions, history.query, history.project, full.hits, now, zone)
+    }
+    val order = if (onSessions) orderOf(groups) else past.order
     // A rewind's copy goes on as the session it replaced.
-    val chosenId = shell.chosen(server)?.let { hub.replacedBy(it) ?: it }
+    val chosenId = (if (onSessions) shell.chosen(server) else history.chosen)?.let { hub.replacedBy(it) ?: it }
     val chosen = chosenId?.let(hub::session)
-    val list = shell.listOf(server)
+    val list = if (onSessions) shell.listOf(server) else history.list
     val scope = rememberCoroutineScope()
     val keys = remember { FocusRequester() }
     var hasKeys by remember { mutableStateOf(false) }
     // In one pane the arrows can't choose as they go, or the list would be gone at the first press: they move this, and Enter chooses.
-    var cursor by remember(server) { mutableStateOf<String?>(null) }
+    var cursor by remember(server, shell.page) { mutableStateOf<String?>(null) }
     fun choose(id: String?) {
         if (id != null) cursor = id
-        shell.choose(server, id)
+        if (onSessions) shell.choose(server, id) else history.chosen = id
     }
     /** Only for the keys: a row the mouse reached is where it is. */
     fun showRow(id: String) {
-        val at = itemIndexOf(groups, id) ?: return
+        val at = (if (onSessions) itemIndexOf(groups, id) else past.indexOf(id)) ?: return
         val seen = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == at }
         val fits = seen != null && seen.offset >= list.layoutInfo.viewportStartOffset && seen.offset + seen.size <= list.layoutInfo.viewportEndOffset
         if (!fits) scope.launch { list.scrollToItem(at) }
@@ -139,21 +158,23 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val twoPanes = maxWidth >= TWO_PANES
         val listWidth = (maxWidth * 0.42f).coerceIn(LIST_MIN, LIST_MAX)
+        /** An arrow key: the next row chosen, or marked in one pane. False if there's nowhere to go. */
+        fun walk(step: Int): Boolean {
+            if (!twoPanes && chosenId != null) return false
+            val next = neighbour(order, if (twoPanes) chosenId else cursor, step) ?: return false
+            if (twoPanes) choose(next) else cursor = next
+            showRow(next)
+            return true
+        }
         Column(
             Modifier.fillMaxSize()
                 .focusRequester(keys)
                 .onFocusChanged { hasKeys = it.hasFocus }
                 .onKeyEvent { e ->
                     if (e.type != KeyEventType.KeyDown || e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@onKeyEvent false
-                    val listShown = twoPanes || chosenId == null
                     when (e.key) {
-                        Key.DirectionDown, Key.DirectionUp -> {
-                            if (!listShown) return@onKeyEvent false
-                            val next = neighbour(order, if (twoPanes) chosenId else cursor, if (e.key == Key.DirectionDown) 1 else -1) ?: return@onKeyEvent false
-                            if (twoPanes) choose(next) else cursor = next
-                            showRow(next)
-                            true
-                        }
+                        Key.DirectionDown -> walk(1)
+                        Key.DirectionUp -> walk(-1)
                         Key.Enter, Key.NumPadEnter -> {
                             if (twoPanes || chosenId != null) return@onKeyEvent false
                             val at = cursor?.takeIf { it in order } ?: return@onKeyEvent false
@@ -175,21 +196,25 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
             if (link.state == LinkState.Unpaired || link.state == LinkState.Offline) {
                 Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp), contentAlignment = Alignment.TopCenter) {
                     val m = Modifier.widthIn(max = COLUMN).fillMaxWidth()
-                    if (link.state == LinkState.Unpaired) UnpairedCard(hub, shell, m) else OfflineCard(hub, hasSessions = groups.isNotEmpty(), m)
+                    if (link.state == LinkState.Unpaired) UnpairedCard(hub, shell, m) else OfflineCard(hub, hasSessions = order.isNotEmpty(), m)
                 }
             }
             val stale = link.state != LinkState.Connected && link.state != LinkState.Connecting
-            val sessionList = @Composable { m: Modifier ->
-                SessionList(hub, groups, list, stale, chosenId.takeIf { twoPanes }, cursor.takeIf { !twoPanes }, m) { id ->
-                    choose(id)
-                    runCatching { keys.requestFocus() }
-                }
+            val onRow = { id: String ->
+                choose(id)
+                runCatching { keys.requestFocus() }
+                Unit
             }
+            val sessionList = @Composable { m: Modifier ->
+                if (onSessions) SessionList(hub, groups, list, stale, chosenId.takeIf { twoPanes }, cursor.takeIf { !twoPanes }, m, onRow)
+                else HistoryList(hub, history, past, full, stale, chosenId.takeIf { twoPanes }, cursor.takeIf { !twoPanes }, now, m, ::walk, onRow)
+            }
+            // Nothing to choose from, nothing to say beside it.
+            val nothing = (if (onSessions) groups.isEmpty() else past.endedCount == 0) && chosenId == null
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                 when {
                     !twoPanes && chosenId != null -> SessionPane(hub, chosenId, chosen, shell, stale, onBack = { choose(null); runCatching { keys.requestFocus() } }, Modifier.fillMaxSize().widthIn(max = PANE_MAX))
-                    // Nothing to choose from, nothing to say beside it.
-                    !twoPanes || (groups.isEmpty() && chosenId == null) -> sessionList(Modifier.fillMaxSize())
+                    !twoPanes || nothing -> sessionList(Modifier.fillMaxSize())
                     else -> Row(Modifier.widthIn(max = LIST_MAX + PANE_MAX).fillMaxHeight()) {
                         sessionList(Modifier.width(listWidth).fillMaxHeight())
                         SessionPane(hub, chosenId, chosen, shell, stale, onBack = null, Modifier.weight(1f).fillMaxHeight())
@@ -249,6 +274,13 @@ private fun TopBar(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
             HText(APP_NAME, style = Type.wordmark, maxLines = 1)
             ConnectionChip(hub)
             Spacer(Modifier.weight(1f))
+            for (page in Page.entries) {
+                val on = shell.page == page
+                Pill(
+                    (if (page == Page.Sessions) Ui.sessions else Ui.history).text(), { shell.page = page },
+                    Modifier.semantics { selected = on }, kind = if (on) PillKind.Primary else PillKind.Ghost, height = 32.dp,
+                )
+            }
             Pill(Ui.desk_settings.text(), { shell.settings = true }, kind = PillKind.Ghost, height = 32.dp)
             Pill(Ui.desk_pair_another.text(), { shell.adding = true }, kind = PillKind.Ghost, height = 32.dp)
         }
@@ -420,26 +452,7 @@ private fun SessionRow(hub: Hub, s: Session, chosen: Boolean, marked: Boolean, o
     val line = rowLine(offer, s)
     val block = s.activeBlock(hub.account, hub.providers, System.currentTimeMillis())
     val needs = s.state == SessionState.NeedsYou
-    val shape = RoundedCornerShape(16.dp)
-    val hover = remember { MutableInteractionSource() }
-    val hovered by hover.collectIsHoveredAsState()
-    val ring = when {
-        marked -> HN.ink
-        chosen -> HN.accent
-        hovered -> HN.ink.copy(alpha = 0.3f)
-        else -> Color.Transparent
-    }
-    GlassCard(
-        modifier
-            .border(1.5.dp, ring, shape)
-            .then(if (chosen) Modifier.background(HN.accent.copy(alpha = 0.08f), shape) else Modifier)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .hoverable(hover)
-            .focusProperties { canFocus = false }
-            .clickable(hover, indication = null, role = Role.Button, onClick = onChoose)
-            .semantics { selected = chosen },
-        edge = if (needs) HN.amber else null,
-    ) {
+    RowCard(chosen, marked, onChoose, modifier, edge = if (needs) HN.amber else null) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Seam(
                 s.project, if (needs) MarkKind.NeedsYou else if (s.busy) MarkKind.Working else MarkKind.Idle,
@@ -462,6 +475,32 @@ private fun SessionRow(hub: Hub, s: Session, chosen: Boolean, marked: Boolean, o
             }
         }
     }
+}
+
+/** A row of a list, this one or History's: its ring and tint draw over what's there, so choosing one moves nothing. */
+@Composable
+internal fun RowCard(chosen: Boolean, marked: Boolean, onChoose: () -> Unit, modifier: Modifier = Modifier, edge: Color? = null, content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    val ring = when {
+        marked -> HN.ink
+        chosen -> HN.accent
+        hovered -> HN.ink.copy(alpha = 0.3f)
+        else -> Color.Transparent
+    }
+    GlassCard(
+        modifier
+            .border(1.5.dp, ring, shape)
+            .then(if (chosen) Modifier.background(HN.accent.copy(alpha = 0.08f), shape) else Modifier)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .hoverable(hover)
+            .focusProperties { canFocus = false }
+            .clickable(hover, indication = null, role = Role.Button, onClick = onChoose)
+            .semantics { selected = chosen },
+        edge = edge,
+        content = content,
+    )
 }
 
 /** The state chip, by the phone's rules (HomeScreen's PhaseChip). */

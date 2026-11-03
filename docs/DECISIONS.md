@@ -4092,6 +4092,17 @@ The owner: "the desktop app in my mind has 3 columns of cards", then "I like the
 
 No delay on new Deny and Allow pills. With two asks waiting on one session, the next ask's pills come up where the last ones were, so the second click of a double-click could answer one nobody had read. A 600 ms delay was built and taken out at the owner's word (2026-11-03: "remove the 500ms delay too", "600ms I mean"), so don't add one back without asking.
 
+## The desktop client's History (2026-11-03)
+
+The owner: "got the desktop app up and running and connected to the k1 server ... it shows like all of them in history it looks like it doesn't actually filter out the ones that are closed in the [claude] agents terminal let's keep working on the desktop version to have [feature] parity with the Android app". The filter (`Session.onHome`) left ended sessions with no home on the desktop, so History came first. His rule stands: "history acts like the resume slash command for all".
+
+1. **The phone's rules, not a copy of them.** What's listed, the search, the merge with the server's full text, the fold of an automation's runs and the days all run the phone's code, which moved to `:shared` whole where it was plain: `Session.inHistory`, `HistoryEntry`, `foldRuns`, `HistorySearch.rows`, and `rememberFullText`, which draws nothing. The phone's `AllHistory` calls them.
+2. **The same two panes.** Sessions and History are two pills in the top bar, and History takes the left pane. Each list keeps its own choice and scroll for each server while the window is open, so going to look at History loses nothing. The arrows, Escape and one pane in a narrow window work as they do on Sessions. From the search box too: the arrows choose from there, and Escape empties it first.
+3. **The search and the chips stay put over the list,** where the phone scrolls them away. The chips wrap instead of going sideways: a mouse has no sideways drag.
+4. **Opening one starts nothing and fetches nothing.** The pane is its details, from what the list already has, and says plainly: "Reading it, and writing in it to resume it, aren't in this app yet." Reading a transcript needs the chat, which is being changed elsewhere and moves to a shared module afterwards, so no transcript view was built here.
+5. **An automation's row has no runs to open** with no automation screens here. It says how many runs and Auto, and choosing it shows its newest run, with a line saying the others are on the phone.
+6. **One server at a time.** The phone's All servers History waits for an All servers here.
+
 ## Updating Claude Code and Codex (owner, 2026-11-02)
 
 The owner: "also add ability to check and update Claude code and codex". Agents & providers › an agent's Settings › Version: what's installed, Check for updates, Update. One server at a time, nothing on the session's chat screen, nothing automatic. `daemon/src/agent-update.ts`; `docs/PROTOCOL.md`, "Updating an agent". Checked on 2026-11-02 against Claude Code 2.1.316, Codex 0.164.0, their binaries and `code.claude.com/docs/en/setup`. **No real update ran.** Measurements used copies in a throwaway home with stand-in `npm`, `curl` and `brew`, and proxies pointing nowhere.

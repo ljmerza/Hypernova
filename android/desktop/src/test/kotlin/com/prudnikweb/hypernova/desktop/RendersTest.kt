@@ -190,7 +190,7 @@ class RendersTest {
         pairedWith(d)
         waitForIdle()
         choose("Add idempotency keys to the payments webhook")
-        onRoot().performKeyInput { pressKey(Key.Tab); pressKey(Key.Tab); pressKey(Key.Tab); pressKey(Key.Tab) }
+        onRoot().performKeyInput { repeat(6) { pressKey(Key.Tab) } }
         onNodeWithText(Ui.allow.text()).assertIsFocused()
         ok(render("10-focus"))
     }

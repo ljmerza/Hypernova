@@ -71,8 +71,8 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | Where | What |
 |---|---|
 | `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopTokens.kt` (each server's token, off the disk), `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
-| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `SessionPane.kt` (the chosen session); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
-| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `HistoryList.kt` (History's list), `SessionPane.kt` (the chosen session); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
+| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `HistoryTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 | `desktop/src/probe/` | `PackageProbe.kt`: in no package; pairs an installed one from inside its own Java, for `scripts/test-client-package.sh` |
 | `desktop/packaging/`, `desktop/icons/` | `client-names.sh` (the package's names: two lines for the rename), `legal/`, `deb-menu-optional.sh`; the icons, and what makes them |
 
@@ -98,7 +98,7 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | `thumbOf` | Null | Nothing attaches pictures here |
 | `started` | Nothing | No widgets follow it |
 
-**Changed in `:shared` for it**, each with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now), `Net.httpsOnly` (off on Android), and `DeviceKeys.publicKey()` (null on Android, so `DeviceCertStore.identity()` checks nothing there).
+**Changed in `:shared` for it**, each with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now), `Net.httpsOnly` (off on Android), `DeviceKeys.publicKey()` (null on Android, so `DeviceCertStore.identity()` checks nothing there), and for History `Session.inHistory`, `HistoryEntry`, `foldRuns`, `HistorySearch.rows` and `rememberFullText`, each lifted whole from the phone's `ui/`, with `ui/automations/HistoryRow.kt` keeping its two names for the phone's screens and tests.
 
 ### The parity list: what the desktop has of the phone's
 
@@ -147,9 +147,9 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 
 | Phone | Desktop | |
 |---|---|---|
-| The list by day, search with full text, project chips, an automation's runs folded | Not yet | |
-| A tap opens it to read, and writing in it resumes it | Not yet | Needs the chat |
-| An automation's runs from its row | Not yet | Needs the automation screens |
+| The list by day, search with full text, project chips, an automation's runs folded | There | One server's. The automation's row has its runs and Auto, not the last run's time |
+| A tap opens it to read, and writing in it resumes it | Not yet | Needs the chat. The pane shows its details and says this |
+| An automation's runs from its row | Not yet | Needs the automation screens. The pane is its newest run, and says the rest are on the phone |
 
 **New session**
 

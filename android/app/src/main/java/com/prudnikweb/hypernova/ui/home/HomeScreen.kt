@@ -78,7 +78,9 @@ import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.LoadingLine
+import com.prudnikweb.hypernova.data.FullText
 import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.rememberFullText
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Phase

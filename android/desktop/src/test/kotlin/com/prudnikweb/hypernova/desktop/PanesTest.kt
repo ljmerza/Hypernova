@@ -447,6 +447,10 @@ class PanesTest {
         up()
         key(Key.DirectionDown)
         key(Key.Tab)
+        onNodeWithText(Ui.sessions.text()).assertIsFocused()
+        key(Key.Tab)
+        onNodeWithText(Ui.history.text()).assertIsFocused()
+        key(Key.Tab)
         onNodeWithText(Ui.desk_settings.text()).assertIsFocused()
         key(Key.Tab)
         onNodeWithText(Ui.desk_pair_another.text()).assertIsFocused()
@@ -463,7 +467,7 @@ class PanesTest {
         d.ok("POST", "/v1/approvals/a1")
         up()
         choose(migrate)
-        repeat(4) { key(Key.Tab) }
+        repeat(6) { key(Key.Tab) }
         inPane(Ui.allow.text()).assertIsFocused()
         key(Key.Enter)
         until("the answer") { d.count("POST", "/v1/approvals/a1") == 1 }
@@ -478,8 +482,8 @@ class PanesTest {
         d.on("POST", "/v1/approvals/a1") { FakeDaemon.refusal(500, "boom", "No") }
         up()
         choose(migrate)
-        // Settings, Pair another, Back, Deny, Allow.
-        repeat(5) { key(Key.Tab) }
+        // Sessions, History, Settings, Pair another, Back, Deny, Allow.
+        repeat(7) { key(Key.Tab) }
         inPane(Ui.allow.text()).assertIsFocused()
         key(Key.Enter)
         until("the refusal") { shell.toast != null }
@@ -493,7 +497,7 @@ class PanesTest {
         d.ok("POST", "/v1/approvals/a1")
         up()
         choose(migrate)
-        repeat(3) { key(Key.Tab) }
+        repeat(5) { key(Key.Tab) }
         inPane(Ui.deny.text()).assertIsFocused()
         key(Key.DirectionDown)
         row(stream).assertIsSelected()
