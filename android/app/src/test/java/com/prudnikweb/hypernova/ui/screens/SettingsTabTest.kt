@@ -18,7 +18,6 @@ import com.prudnikweb.hypernova.data.ComputerWords
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.HubViewModel
 import com.prudnikweb.hypernova.data.LinkState
-import com.prudnikweb.hypernova.data.NewSessionMemory
 import com.prudnikweb.hypernova.data.Pairing
 import com.prudnikweb.hypernova.data.Route
 import com.prudnikweb.hypernova.data.live.FakeDaemon
@@ -77,7 +76,6 @@ class SettingsTabTest {
         shadowOf(Looper.getMainLooper()).idle()
         daemons.forEach { it.close() }
         TextSize.set(context, TextSize.SMALL)
-        NewSessionMemory.setStartMode(context.storage, "default")
         AboutBuild.name = build.first
         AboutBuild.code = build.second
     }
@@ -154,7 +152,7 @@ class SettingsTabTest {
         val vm = show()
         val order = listOf(
             str(R.string.mac), "z2", str(R.string.st_all_phone), str(R.string.notifications), str(R.string.st_top_bar), str(R.string.st_card_swipes),
-            str(R.string.st_typing_voice), str(R.string.st_logs), str(R.string.st_new_sessions).uppercase(), str(R.string.st_display).uppercase(), str(R.string.about).uppercase(),
+            str(R.string.st_typing_voice), str(R.string.st_logs), str(R.string.st_display).uppercase(), str(R.string.about).uppercase(),
         )
         val tops = order.map { rule.topOf(it) }
         assertEquals("Settings' parts top down", tops.sorted(), tops)
@@ -186,7 +184,9 @@ class SettingsTabTest {
         val vm = show()
         val id = Core.activeId!!
         // A read aloud setting comes with the server's own voices; it's in SettingsPlanTest, and its section on its own in ReadAloudLiveTest.
-        for ((text, section) in listOf(R.string.st_new_sessions to "New sessions", R.string.st_display to "Display", R.string.about to "About", R.string.st_term_engine to "Terminal engine")) {
+        // New sessions start in went to each agent's settings on each server: it's not the phone's.
+        rule.onNode(hasText(str(R.string.st_new_sessions).uppercase())).assertDoesNotExist()
+        for ((text, section) in listOf(R.string.st_display to "Display", R.string.about to "About", R.string.st_term_engine to "Terminal engine")) {
             rule.onNode(hasText(str(text).uppercase())).assertExists("the tab: $section")
         }
         val pages = listOf(
@@ -276,9 +276,6 @@ class SettingsTabTest {
         // Display: the text size.
         clickText(str(R.string.st_text_large))
         assertEquals(TextSize.LARGE, TextSize.state(context).value)
-        // New sessions start in Plan.
-        clickText(str(R.string.mode_plan))
-        assertEquals("plan", NewSessionMemory.startMode(context.storage))
         // Stay connected in the background: off, and back on.
         clickText(str(R.string.notifications))
         assertTrue(vm.background)

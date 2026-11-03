@@ -139,7 +139,7 @@ class ContractTest {
             assertEquals(Window(62.0, T), u.sevenDay)
         },
         "ws-codex" to { o -> codexOff(CodexWire.state(ws(o, "codex").obj("codex"))) },
-        "ws-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true, loginContinue = true), ClaudeState.parse(ws(o, "claude").obj("claude"))) },
+        "ws-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true, loginContinue = true, startMode = "default"), ClaudeState.parse(ws(o, "claude").obj("claude"))) },
         "ws-files" to { o -> assertTrue(ws(o, "files").obj("files")?.bool("browseOutsideProjects") == true) },
         "ws-update" to { o ->
             val u = ServerUpdate.parse(ws(o, "update").obj("update"))!!
@@ -356,8 +356,10 @@ class ContractTest {
             assertTrue(d.until!! > 0)
         },
         "rest-debug-off" to { o -> assertEquals(ServerDebug(false, null), ServerDebug.parse(o.obj("debug"))) },
-        "rest-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true, loginContinue = true), ClaudeState.parse(o.obj("claude"))) },
+        "rest-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true, loginContinue = true, startMode = "default"), ClaudeState.parse(o.obj("claude"))) },
         "rest-claude-login-continue" to { o -> assertEquals(false, ClaudeState.parse(o.obj("claude"))?.loginContinue) },
+        "rest-claude-start-mode" to { o -> assertEquals("plan", ClaudeState.parse(o.obj("claude"))?.startMode) },
+        "rest-codex-start-mode" to { o -> assertEquals(AgentKind.CAN_EDIT, CodexWire.state(o.obj("codex"))?.startMode) },
         // ── Sessions: starting one, its chat, its terminal ──
         // LiveHub.start: the session it applies and opens.
         "rest-sessions-start" to { o ->
@@ -1362,7 +1364,7 @@ class ContractTest {
         assertEquals("UTC", auto.tz)
         assertNull(s.lan)
         codexOff(s.codex)
-        assertEquals(ClaudeState(true, "2.1.314", agents = true, loginContinue = true), s.claude)
+        assertEquals(ClaudeState(true, "2.1.314", agents = true, loginContinue = true, startMode = "default"), s.claude)
         // LiveHub hands the snapshot's `speech` to SpeechLink.snapshot, which reads it so.
         assertNotNull(SpeechOut.parse(o.obj("speech")))
     }

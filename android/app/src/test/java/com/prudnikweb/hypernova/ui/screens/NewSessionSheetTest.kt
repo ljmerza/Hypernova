@@ -12,15 +12,25 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AgentKind
+import com.prudnikweb.hypernova.data.ClaudeState
+import com.prudnikweb.hypernova.data.CodexState
+import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.NewSessionMemory
+import com.prudnikweb.hypernova.data.NewSessionRequest
 import com.prudnikweb.hypernova.ui.home.NewSessionSheet
+import com.prudnikweb.hypernova.data.storage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -49,7 +59,7 @@ class NewSessionSheetTest {
         NewSessionMemory.draft = ""
     }
 
-    private fun sheet(hub: FakeHub, project: String? = null) {
+    private fun sheet(hub: Hub, project: String? = null) {
         rule.setContent { Harness(spy) { NewSessionSheet(hub, initialProject = project, onStarted = { started += it }) } }
         rule.waitForIdle()
     }
@@ -109,6 +119,96 @@ class NewSessionSheetTest {
         assertTrue(call, call.contains("sonnet", ignoreCase = true))
         assertTrue(call, call.endsWith(", plan, high)"))
         assertEquals(listOf("new-session"), started)
+    }
+
+    // ─── New sessions start in: the server's, per agent ───
+
+    private class ServerHub(claude: String?, codex: String?, override val startModeOwed: String? = null) : Hub by FakeHub() {
+        var claudeMode by mutableStateOf(claude)
+        var codexMode by mutableStateOf(codex)
+        val requests = mutableListOf<NewSessionRequest>()
+        override val claude get() = ClaudeState(true, "2.1.318", startMode = claudeMode)
+        override val codex get() = CodexState(available = true, enabled = true, connected = true, startMode = codexMode)
+        override suspend fun codexModels() = Result.success(emptyList<com.prudnikweb.hypernova.data.CodexModel>())
+        override suspend fun start(req: NewSessionRequest): Result<String> {
+            requests += req
+            return Result.success("new-session")
+        }
+    }
+
+    private fun modeChip(@androidx.annotation.StringRes label: Int) = chip(str(R.string.ns_mode_said, str(label)))
+    private fun agent(@androidx.annotation.StringRes label: Int) {
+        rule.onNodeWithText(str(label)).performClick()
+        rule.waitForIdle()
+    }
+    private fun send(hub: ServerHub): NewSessionRequest {
+        rule.onNode(hasSetTextAction()).performTextReplacement("Go")
+        rule.onNodeWithText(str(R.string.start)).performClick()
+        rule.waitUntil(3_000) { hub.requests.isNotEmpty() }
+        return hub.requests.last()
+    }
+
+    @Test fun itOpensOnTheServersValueForTheChosenAgentAndFollowsAChange() {
+        val hub = ServerHub("plan", AgentKind.CAN_EDIT)
+        sheet(hub, project = "/home/owner/projects/hypernova")
+        modeChip(R.string.mode_label_plan).assertExists()
+        agent(R.string.cx_agent_codex)
+        modeChip(R.string.cx_mode_label_can_edit).assertExists()
+        agent(R.string.cx_agent_claude)
+        modeChip(R.string.mode_label_plan).assertExists()
+        // The server's value changes while it's up, or its snapshot arrives late.
+        hub.claudeMode = "auto"
+        rule.waitForIdle()
+        modeChip(R.string.mode_label_auto).assertExists()
+        assertEquals("auto", send(hub).permissionMode)
+    }
+
+    /** With All servers the sheet is for the server picked (App.kt), so two servers open apart; a pick, Bypass above all, stays on its own. */
+    @Test fun twoServersDifferAndAPickStaysWithItsServerAndChangesNothingKept() {
+        val z2 = ServerHub("auto", AgentKind.READ_ONLY)
+        val shed = ServerHub("acceptEdits", AgentKind.CAN_EDIT)
+        var on by mutableStateOf(z2)
+        rule.setContent { Harness(spy) { NewSessionSheet(on, initialProject = "/home/owner/projects/hypernova", onStarted = { started += it }) } }
+        rule.waitForIdle()
+        modeChip(R.string.mode_label_auto).assertExists()
+        // Changed in the sheet: this session's only.
+        chip(str(R.string.ns_mode_said, "").trimEnd('.')).performClick()
+        rule.waitForIdle()
+        rule.onNode(saidStartsWith(str(R.string.mode_title_plan) + ".")).performClick()
+        rule.waitForIdle()
+        modeChip(R.string.mode_label_plan).assertExists()
+        assertEquals("auto", z2.claudeMode)
+        on = shed
+        rule.waitForIdle()
+        modeChip(R.string.mode_label_accept).assertExists()
+        agent(R.string.cx_agent_codex)
+        modeChip(R.string.cx_mode_label_can_edit).assertExists()
+        assertEquals(AgentKind.CAN_EDIT, send(shed).permissionMode)
+    }
+
+    /** Neither a stale value nor another agent's reaches the sheet, so neither reaches the server. */
+    @Test fun aStaleOrDangerousValueOpensOnTheSafeMode() {
+        val claudeHub = ServerHub("bypassPermissions", "danger-full-access")
+        sheet(claudeHub, project = "/home/owner/projects/hypernova")
+        modeChip(R.string.mode_label_default).assertExists()
+        agent(R.string.cx_agent_codex)
+        modeChip(R.string.cx_mode_label_read_only).assertExists()
+        assertEquals(AgentKind.READ_ONLY, send(claudeHub).permissionMode)
+    }
+
+    @Test fun anOlderServerOwedTheOldSettingOpensOnItAndCodexOnItsLastMode() {
+        context.storage.prefs("hypernova").edit().putString("newSession.codex.mode", AgentKind.CAN_EDIT).apply()
+        val hub = ServerHub(null, null, startModeOwed = "plan")
+        sheet(hub, project = "/home/owner/projects/hypernova")
+        modeChip(R.string.mode_label_plan).assertExists()
+        agent(R.string.cx_agent_codex)
+        modeChip(R.string.cx_mode_label_can_edit).assertExists()
+    }
+
+    /** Paired later, and older: nothing's kept for it and it isn't owed the old setting. Ask. */
+    @Test fun anOlderServerPairedLaterOpensOnAsk() {
+        sheet(ServerHub(null, null), project = "/home/owner/projects/hypernova")
+        modeChip(R.string.mode_label_default).assertExists()
     }
 
     /** Android 35, as PhoneDictationTest: the phone has a recognizer, and the mic may be used. */

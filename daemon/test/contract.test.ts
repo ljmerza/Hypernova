@@ -602,6 +602,18 @@ test('{t:"claude"} and POST /v1/claude', async () => {
   assert.equal(heard('claude').claude.loginContinue, false)
   assert.equal((await post('/v1/claude', {})).status, 400)
   await ok(post('/v1/claude', { loginContinue: true }))
+  // New sessions start in (start-modes.ts): what a form opens on, kept here, one of the agent's own.
+  contract('rest-claude-start-mode', await ok(post('/v1/claude', { startMode: 'plan' })))
+  assert.equal(heard('claude').claude.startMode, 'plan')
+  for (const startMode of ['bypassPermissions', 'dontAsk', 'workspace-write', 'danger-full-access', '', 3]) {
+    const r = await post('/v1/claude', { startMode, loginContinue: false })
+    assert.equal(r.status, 400, String(startMode))
+    assert.equal(r.json.error.code, 'bad_mode')
+  }
+  // A phone moving its old setting: only where nothing's saved.
+  assert.equal((await ok(post('/v1/claude', { moveStartMode: 'auto' }))).claude.startMode, 'plan')
+  assert.equal((await post('/v1/claude', { moveStartMode: 'bypassPermissions' })).status, 400)
+  assert.equal((await ok(post('/v1/claude', { startMode: 'default' }))).claude.loginContinue, true, 'the refused one changed nothing else')
 })
 
 test('{t:"files"} and {t:"lan"}', async () => {
@@ -1596,6 +1608,16 @@ test('Codex: POST /v1/codex, GET /v1/codex/models, a Codex session’s model, a 
     const on = await ok(post('/v1/codex', { enabled: true }))
     assert.equal(typeof on.codex.connected, 'boolean')
     contract('rest-codex', { ...on, codex: { ...on.codex, connected: false } })
+    // New sessions start in (start-modes.ts): Codex's own two, and its asking stays on-request whatever this is.
+    const canEdit = await ok(post('/v1/codex', { startMode: 'workspace-write' }))
+    contract('rest-codex-start-mode', { ...canEdit, codex: { ...canEdit.codex, connected: false } })
+    for (const startMode of ['danger-full-access', 'never', 'bypassPermissions', 'plan', 3]) {
+      const r = await post('/v1/codex', { startMode, enabled: false })
+      assert.equal(r.status, 400, String(startMode))
+      assert.equal(r.json.error.code, 'bad_mode')
+    }
+    assert.equal((await ok(get('/v1/codex'))).codex.enabled, true, 'the refused one changed nothing else')
+    await ok(post('/v1/codex', { startMode: 'read-only' }))
     contract('rest-codex-models', await ok(get('/v1/codex/models?fresh=1')))
     fake.reply = 'Made notes.txt'
     const cx = (await ok(post('/v1/sessions', { agent: 'codex', projectPath: cwd, prompt: '[Hypernova test] make notes.txt', clientId: 'client-cx' }))).session.id

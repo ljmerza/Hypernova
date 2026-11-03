@@ -8,6 +8,7 @@
     "path": "/tmp/hn/codex",
     "problem": null,
     "account": null,
-    "usage": null
+    "usage": null,
+    "startMode": "read-only"
   }
 }

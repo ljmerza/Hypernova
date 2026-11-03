@@ -2,6 +2,7 @@ package com.prudnikweb.hypernova.ui.screens
 
 import android.app.KeyguardManager
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
@@ -224,6 +226,70 @@ class AgentSettingsScreenTest {
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.as_account).uppercase()).assertExists()
         rule.onNodeWithText(str(R.string.ag_claude_signed_in_plan, "Max")).assertExists()
+    }
+
+    // ─── New sessions start in, this server's, per agent ───
+
+    private class StartHub(claude: String?, codex: String?) : Hub by FakeHub() {
+        var claudeMode by mutableStateOf(claude)
+        var codexMode by mutableStateOf(codex)
+        val set = mutableListOf<String>()
+        override val claude get() = com.prudnikweb.hypernova.data.ClaudeState(true, "2.1.318", startMode = claudeMode)
+        override val codex get() = com.prudnikweb.hypernova.data.CodexState(available = true, enabled = true, connected = true, startMode = codexMode)
+        override suspend fun agentSettings() = Result.failure<AgentSettingsReply>(IllegalStateException("nope"))
+        override suspend fun setStartMode(agent: String, mode: String): Result<Unit> {
+            set += "$agent $mode"
+            if (agent == AgentSettingsReply.CODEX) codexMode = mode else claudeMode = mode
+            return Result.success(Unit)
+        }
+    }
+    private fun startHere(hub: Hub, agent: String) {
+        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, agent, onBack = {}) } }
+        rule.waitForIdle()
+    }
+
+    @Config(qualifiers = "+h1500dp")
+    @Test fun claudeCodeOffersItsFourAndNeverBypass() {
+        val hub = StartHub("plan", AgentKind.READ_ONLY)
+        startHere(hub, AgentSettingsReply.CLAUDE)
+        rule.onNodeWithText(str(R.string.st_start_mode)).performScrollTo().assertExists()
+        rule.onNodeWithText(str(R.string.mode_plan)).assertIsSelected()
+        for (m in listOf(R.string.mode_default, R.string.mode_accept, R.string.mode_auto)) rule.onNodeWithText(str(m)).assertExists()
+        rule.onNodeWithText(str(R.string.mode_bypass)).assertDoesNotExist()
+        rule.snap("agent_settings_start_mode_claude")
+        rule.onNodeWithText(str(R.string.mode_accept)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("claude acceptEdits"), hub.set)
+        rule.onNodeWithText(str(R.string.mode_accept)).assertIsSelected()
+        // Auto thinks twice first, and Keep asking keeps what it was.
+        rule.onNodeWithText(str(R.string.mode_auto)).performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.think_keep)).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("claude acceptEdits"), hub.set)
+    }
+
+    @Test fun codexOffersItsTwoAndNeverFullAccess() {
+        val hub = StartHub("auto", AgentKind.READ_ONLY)
+        startHere(hub, AgentSettingsReply.CODEX)
+        rule.onNodeWithText(str(R.string.cx_mode_read_only)).performScrollTo().assertIsSelected()
+        rule.onNodeWithText(str(R.string.mode_plan)).assertDoesNotExist()
+        rule.snap("agent_settings_start_mode_codex")
+        rule.onNodeWithText(str(R.string.cx_mode_can_edit)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("codex workspace-write"), hub.set)
+        assertEquals("Claude Code's stays", "auto", hub.claudeMode)
+    }
+
+    @Test fun aStaleValueShowsTheSafeOne() {
+        startHere(StartHub("bypassPermissions", "danger-full-access"), AgentSettingsReply.CLAUDE)
+        rule.onNodeWithText(str(R.string.mode_default)).assertIsSelected()
+    }
+
+    @Test fun anOlderServerSaysItNeedsUpdatingWithNothingToChoose() {
+        startHere(StartHub(null, null), AgentSettingsReply.CLAUDE)
+        rule.onNodeWithText(str(R.string.st_start_mode_too_old, FakeHub().mac.name)).assertExists()
+        rule.onNodeWithText(str(R.string.mode_plan)).assertDoesNotExist()
     }
 
     @Test fun codexAccountSaysItsPlanAndUsage() {

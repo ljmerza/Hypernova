@@ -154,8 +154,8 @@ private enum class Picking { Project, Model, Mode, Effort }
  * into, then the choices as chips (the project, the model with its provider, Claude Code's effort,
  * the permission mode), each opening its picker, and Start always in reach at the foot with the
  * attachments and the mic. It starts on the project it was opened for ([initialProject]: a path or
- * a name), else the last one used, with the last model and effort, and in the mode chosen in
- * Settings → New sessions (Fork: Ask until one is; never Bypass). Frosted over the chart.
+ * a name), else the last one used, with the last model and effort, and in the mode that server keeps
+ * for that agent (Fork: NewSessionMemory.startsIn; never Bypass). Frosted over the chart.
  */
 @Composable
 fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Unit, launch: Long = 0L) {
@@ -183,8 +183,10 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
         mutableStateOf(healthy?.id ?: memory.provider?.takeIf { id -> providers.any { it.id == id } } ?: providers.firstOrNull()?.id)
     }
     var model by rememberSaveable { mutableStateOf(memory.model(providerId)) }
-    // Fork: Settings → New sessions' mode each time; changed here, it's this session's only.
-    var mode by rememberSaveable { mutableStateOf(memory.mode) }
+    // Fork: this server's mode for Claude Code, each time; changed here, it's this session's only, and it
+    // goes with this hub: a pick on another server, Bypass's fingerprint with it, doesn't come along.
+    var modePick by rememberSaveable(hub) { mutableStateOf<String?>(null) }
+    val mode = modePick ?: NewSessionMemory.startsIn(AgentKind.CLAUDE, hub, memory)
     // Claude Code's effort (data/Effort.kt): the last one started with; null, its own default.
     var effort by rememberSaveable { mutableStateOf(memory.effort) }
     // What was typed survives the sheet being put away (the scrim, Back) or a start that failed
@@ -234,7 +236,9 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     val onCodex = codexHere && (agent == AgentKind.CODEX || !claudeHere)
     var codexModel by rememberSaveable { mutableStateOf(memory.codexModel) }
     var codexEffort by rememberSaveable { mutableStateOf(memory.codexEffort) }
-    var codexMode by rememberSaveable { mutableStateOf(memory.codexMode) }
+    // The same for Codex, its own two modes.
+    var codexModePick by rememberSaveable(hub) { mutableStateOf<String?>(null) }
+    val codexMode = codexModePick ?: NewSessionMemory.startsIn(AgentKind.CODEX, hub, memory)
     var codexModels by remember { mutableStateOf<List<CodexModel>?>(null) }
     var codexNote by remember { mutableStateOf<String?>(null) }
     val codexOff = stringResource(R.string.cx_models_when_on)
@@ -516,7 +520,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
         )
         Picking.Mode -> if (onCodex) ModeSheet(
             codexMode,
-            onPick = { m -> codexMode = m; picking = null },
+            onPick = { m -> codexModePick = m; picking = null },
             onDismiss = { picking = null },
             modes = AgentKind.CODEX_MODES,
         ) else ModeSheet(
@@ -531,10 +535,10 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
                         context, context.getString(R.string.check_bypass_title),
                         if (project == NEW_PROJECT) newName.trim() else project.trimEnd('/').substringAfterLast('/'),
                         context.getString(R.string.check_no_lock),
-                        onOk = { mode = m }, onFail = { msg -> if (msg != null) toast(msg) },
+                        onOk = { modePick = m }, onFail = { msg -> if (msg != null) toast(msg) },
                     )
                 } else {
-                    mode = m
+                    modePick = m
                     picking = null
                 }
             },

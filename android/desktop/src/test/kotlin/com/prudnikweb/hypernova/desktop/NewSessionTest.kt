@@ -24,6 +24,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.graphics.toAwtImage
 import com.prudnikweb.hypernova.data.Core
+import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.NewSessionMemory
 import com.prudnikweb.hypernova.data.live.FakeDaemon
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
@@ -259,6 +260,55 @@ class NewSessionTest {
         press(Ui.start.text())
         until("it started") { d.count("POST", "/v1/sessions") == 1 }
         assertEquals("default", sent().getString("permissionMode"))
+    }
+
+    // ─── New sessions start in: the server's, per agent, the same value the phone's sheet opens on ───
+
+    private fun keeps(claude: String?, codex: String?) {
+        d.snapshot = world {
+            put("claude", JSONObject().put("available", true).apply { if (claude != null) put("startMode", claude) })
+            put("codex", both().put("connected", true).apply { if (codex != null) put("startMode", codex) })
+        }
+    }
+
+    @Test fun itOpensOnTheServersValueForTheChosenAgent() = runDesktopComposeUiTest(1200, 900) {
+        keeps("plan", AgentKind.CAN_EDIT)
+        up()
+        open()
+        inPane(Ui.mode_title_plan.text()).assertIsSelected()
+        press(Ui.cx_agent_codex.text())
+        inPane(Ui.cx_mode_can_edit.text()).assertIsSelected()
+        press(Ui.claude.text())
+        inPane(Ui.mode_title_plan.text()).assertIsSelected()
+        // Changed here, it's this session's only: sent as picked, and nothing goes to the server's setting.
+        press(Ui.mode_title_accept.text())
+        write("Go")
+        press(Ui.start.text())
+        until("it started") { d.count("POST", "/v1/sessions") == 1 }
+        assertEquals("acceptEdits", sent().getString("permissionMode"))
+        assertEquals(0, d.count("POST", "/v1/claude"))
+    }
+
+    @Test fun aStaleOrDangerousValueOpensOnTheSafeMode() = runDesktopComposeUiTest(1200, 900) {
+        keeps("bypassPermissions", "danger-full-access")
+        up()
+        open()
+        inPane(Ui.mode_title_default.text()).assertIsSelected()
+        press(Ui.cx_agent_codex.text())
+        inPane(Ui.cx_mode_read_only.text()).assertIsSelected()
+        write("Go")
+        press(Ui.start.text())
+        until("it started") { d.count("POST", "/v1/sessions") == 1 }
+        assertEquals(AgentKind.READ_ONLY, sent().getString("permissionMode"))
+    }
+
+    @Test fun anOlderServerOpensOnWhatWasHere() = runDesktopComposeUiTest(1200, 900) {
+        keeps(null, null)
+        up()
+        open()
+        inPane(Ui.mode_title_default.text()).assertIsSelected()
+        press(Ui.cx_agent_codex.text())
+        inPane(Ui.cx_mode_read_only.text()).assertIsSelected()
     }
 
     @Test fun autoAsksToThinkTwiceFirstAndKeepAskingKeepsIt() = runDesktopComposeUiTest(1200, 900) {
