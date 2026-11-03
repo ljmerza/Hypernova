@@ -303,15 +303,17 @@ Open the `.msi`. It installs in `C:\Program Files\Hypernova Client`, with an ent
 
 To remove it, **Settings → Apps → Installed apps → Hypernova Client → Uninstall**. Your pairing stays in `%LOCALAPPDATA%\Hypernova Client`: delete that too if you're done with it.
 
-### Where the client keeps its key
+### Where the client keeps its key and sign-in tokens
 
-The client's key, which proves to your server that this is the computer you paired, goes in your system's keychain. **Settings** in the client says where it is now. An install from before this moves it by itself the first time it starts, and stays paired.
+The client's key, which proves to your server that this is the computer you paired, and the sign-in token for each server you pair, go in your system's keychain. **Settings** in the client says where they are now. An install from before this moves them by itself the first time it starts, and stays paired.
 
 - **Linux:** GNOME Keyring or KWallet, through `secret-tool`. The `.deb` brings that along. With the tarball, install it yourself (`libsecret-tools` on Debian and Ubuntu, `libsecret` on most others). You may be asked for your keyring's password when the client starts.
 - **A Mac:** your login keychain. **Windows:** encrypted under your Windows login. Nobody has seen these two run on a person's computer yet.
-- **With no keychain, or a locked one,** it keeps working: the key is in a private file in the client's folder, Settings says so, and the client moves it to the keychain the next time it starts with one unlocked. The client may ask your server for a new certificate when this happens, which it does by itself.
+- **With no keychain, or a locked one,** it keeps working: a new key and token go in a private file in the client's folder, Settings says so, and the client moves them to the keychain when you press **Try again** with it unlocked, or the next time it starts. The client may ask your server for a new certificate when this happens, which it does by itself.
+- **If a token is already in the keychain and the keychain is locked when the client starts,** the client can't connect to that server yet, and says so: **Waiting for your keychain**. Nothing is lost and you don't need to pair again. Unlock it and press **Try again**. Other servers connect as usual. If the keychain was reset, the token is gone: **Forget** that server and pair it again.
+- **If you move the client's folder** on Linux or a Mac, or restore your home folder to another path, it won't find its tokens, as each folder has its own. Pair again.
 
-This keeps the key out of a copy of your home folder. It doesn't keep it from other programs running as you, and the client's sign-in token is still a private file (see docs/SECURITY-MODEL.md).
+This keeps the key and tokens out of a copy of the client's folder. It doesn't keep them from other programs running as you, which can ask the keychain while it's unlocked, and it doesn't reach a backup made before the move (see docs/SECURITY-MODEL.md).
 
 ### Alerts from the client
 

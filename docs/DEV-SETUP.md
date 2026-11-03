@@ -64,7 +64,7 @@ fake hub was asked, and takes a picture of the screen (Roborazzi). The pictures 
 ```
 
 - **Where it keeps things:** `~/.local/share/hypernova-client` on Linux (`$XDG_DATA_HOME` if set), `~/Library/Application Support/Hypernova Client` on a Mac, `%LOCALAPPDATA%\Hypernova Client` on Windows. `HYPERNOVA_CLIENT_HOME` overrides it: use that for a test copy, as one pairing and key is all a folder holds. `HYPERNOVA_CLIENT_DEBUG=1` logs to standard error (warnings always go there).
-- **Its key** goes in the system's keychain, under an item of that folder's own (docs/DECISIONS.md, "The desktop client's key in the keychain"), so a test copy leaves an item behind in yours. `HYPERNOVA_CLIENT_KEYCHAIN=off` keeps it in the folder's file instead; `:desktop:test` always does.
+- **Its key and tokens** go in the system's keychain, under items of that folder's own (docs/DECISIONS.md, "The desktop client's key in the keychain" and "The desktop client's tokens in the keychain"), so a test copy leaves items behind in yours. `HYPERNOVA_CLIENT_KEYCHAIN=off` keeps them in the folder's files instead; `:desktop:test` always does. Turned on again later, they move; turned off after they've moved, a server waits for its token (it isn't asked).
 - **To try it with nothing real behind it,** pair with the demo server (`demo/README.md`) on loopback. It tells a client to dial what `HYPERNOVA_DEMO_ADDRESS` says, and the default is the emulator's name for this machine:
 
   ```bash

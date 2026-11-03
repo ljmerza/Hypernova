@@ -70,9 +70,9 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 
 | Where | What |
 |---|---|
-| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
-| `desktop/src/main/.../desktop/ui/` | `App.kt`, `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `SessionPane.kt` (the chosen session); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
-| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `ApproveTest`, `PanesTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopTokens.kt` (each server's token, off the disk), `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
+| `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `SessionPane.kt` (the chosen session); `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
+| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 | `desktop/src/probe/` | `PackageProbe.kt`: in no package; pairs an installed one from inside its own Java, for `scripts/test-client-package.sh` |
 | `desktop/packaging/`, `desktop/icons/` | `client-names.sh` (the package's names: two lines for the rename), `legal/`, `deb-menu-optional.sh`; the icons, and what makes them |
 
@@ -81,7 +81,7 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | Seam | Here | |
 |---|---|---|
 | `Strings` | Real | The phone's `res/values`, read at run time, every key tested; `locale` and the clock's pattern are the JVM's |
-| `Storage`, `Prefs` | Real | JSON files in the client's own folder, 0600 in 0700, atomic, written behind as SharedPreferences does |
+| `Storage`, `Prefs` | Real | JSON files in the client's own folder, 0600 in 0700, atomic, written behind as SharedPreferences does. The servers' tokens are kept off the disk on the way (`DesktopTokens`): DECISIONS, "The desktop client's tokens in the keychain" |
 | `DeviceKeys` | Real, weaker than a phone's | The system's keychain where one answers, else an owner-only file; Settings says which. Unproven on a Mac and on Windows until CI: DECISIONS, "The desktop client's key in the keychain" |
 | `Ticks` | Real | `nanoTime` plus any sleep the wall clock shows |
 | `MainThread` | Real | Swing's event thread, which is also `Dispatchers.Main` (`kotlinx-coroutines-swing`) |

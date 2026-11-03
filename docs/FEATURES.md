@@ -351,7 +351,7 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | DA2 | AWT's real tray: the alert and a click on it and on the icon; no tray is quiet | Run by hand under Xvfb in a throwaway `ubuntu:24.04`, with `stalonetray` and with no tray, 2026-11-02 | **partial**: no automated run, GNOME itself not seen. **Gap on a Mac and on Windows**: nothing has shown or clicked one |
 | DA3 | The window's title counts what needs input; Settings says whether alerts can show and that they stop with the app | TrayAlertsTest; `scripts/test-client-package.sh` finds the window with its count | **covered** |
 
-## 24. The desktop client's key
+## 24. The desktop client's key and tokens
 
 | # | Capability | Tests | Status |
 |---|---|---|---|
@@ -361,6 +361,14 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | DK4 | A Mac's `security`, and Windows' DPAPI through PowerShell | What's sent: KeychainTest, stand-ins. What they do: `scripts/test-client-package.sh --dmg`, `--msi` with `--keychain`, on CI | **gap until the first CI run**: written, never run |
 | DK5 | Settings says where the key is, and why it's in the file | KeychainPairingTest, through the screen: no key yet, in the keychain, in the file with it locked. The other reasons by their state in KeychainTest, their words in WordsTest | **covered** |
 | DK6 | The key in no log: a helper's failure quoting it, the debug log, every file of the folder | KeychainTest (`theKeyIsNeverInWhatItSays…`, `theDebugLogsDoorCutsIt`, nothing on a command line); KeychainPairingTest; the package script | **covered** |
+| DK7 | Each server's token moves to its own keychain item, and leaves the file only after it came back whole; a new one never touches the disk; a keychain that refuses, loses or garbles it leaves the file | KeychainTokensTest (all, stood in for); KeychainPairingTest (a real pairing); `scripts/test-client-package.sh --deb --keychain`: real `gnome-keyring` in throwaway Ubuntu 24.04 and Debian 13 containers, 2026-11-03; on CI on every package run | **covered on Linux**. KWallet not tried |
+| DK8 | Locked at the start with the token inside: the window says so with Try again, not the pairing field; nothing discarded or written over, whatever's saved meanwhile; the other servers connect; Try again brings it back with no pairing; only the owner's Forget ends it | KeychainTokensTest (`lockedAtTheStart…`, `aKeychainThatSaysNothing…`, `onlyTheOwnersOwnForget…`); TokenWaitTest, TokenGateTest, TokenGoneTest (the real window, hubs and mutual TLS); the package script (a real locked keyring, the password given with the app running) | **covered on Linux** |
+| DK9 | Locked with a new pairing: its token and key in the file, connected, Settings says so, and both move across on Try again or the next start, over what was there | KeychainTokensTest (`aNewTokenWithTheKeychainLocked…`, `aNewTokenInTheFileWins…`); KeychainPairingTest; the package script | **covered on Linux** |
+| DK10 | Forget and Unpair take that server's item, and only that one; if it's locked, as soon as it answers. Two servers each keep their own | KeychainTokensTest (`twoServers…`, `forgetWhileLocked…`); TokenWaitTest; the package script counts the real keyring's items | **covered on Linux** |
+| DK11 | A copy of the folder alone holds no token and can't connect; each folder has its own items | The package script (a real copy, beside the same keyring); KeychainTokensTest (`eachFolderAndEachServer…`) | **covered on Linux**. Windows' same login can open a copy, by design: DECISIONS |
+| DK12 | A token in no log, on no command line, in no `toString`, and cut from the debug log | KeychainTokensTest (`aTokenIsInNothing…`, `whatHoldsATokenCantPrintIt`, `eachTokenIsCut…`, `aHelpersCommandLine…`); TokenGateTest (every file with the debug log on); the package script | **covered** |
+| DK13 | A Mac's and Windows' way for a token | What's sent, and that deleting says whether it went: KeychainTokensTest, stand-ins. What they do: `--dmg`, `--msi` with `--keychain`, on CI | **gap until the first CI run**: written, never run |
+| DK14 | Settings says where the tokens are, why they're in the file, and offers Try again | KeychainPairingTest, TokenGateTest, through the screen; the other reasons by their state in KeychainTokensTest, their words in WordsTest | **covered** |
 
 ## 25. The desktop client's screens
 

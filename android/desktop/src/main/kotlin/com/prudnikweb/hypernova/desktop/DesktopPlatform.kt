@@ -330,7 +330,9 @@ class DesktopPlatform(
     surface: AlertSurface? = null,
     keychain: KeychainChoice = Keychains.forThisSystem(home),
 ) : Platform, AutoCloseable {
-    val folder: DesktopStorage = DesktopStorage(home, log)
+    /** Each paired server's token. First, as the folder's settings go through it on their way to the disk. */
+    val tokens = DesktopTokens(keychain, log)
+    val folder: DesktopStorage = DesktopStorage(home, log, mapOf(TOKENS_PREFS to tokens))
     val keyFile: Path = home.resolve("device-key.json")
     val screenWatch = DesktopScreen()
     /** The picture a tray icon shows: the window's, set by Main.kt, as a test has neither. */
@@ -349,6 +351,9 @@ class DesktopPlatform(
     override val screen: ScreenWatcher get() = screenWatch
     val keys = DesktopKeys(keyFile, log, keychain)
     override val deviceKeys: DeviceKeys get() = keys
+    init {
+        tokens.attach(folder, keys, main::post)
+    }
     override val speech: SpeechOutput = SilentSpeech(log)
     override val background: BackgroundLink = ProcessLink
     override fun retryAlarm(): RetryAlarm = DesktopRetryAlarm(ticks, main)
