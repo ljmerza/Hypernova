@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // What stops Claude from replying (docs/PROTOCOL.md, "Account"): Claude Code's API-error entries
 // and limit notices classified (pinned to the owner's real lines from his transcripts, Claude Code
 // 2.1.296 to 2.1.299), read from a transcript, made into account episodes, checked with
@@ -507,7 +508,7 @@ test('a sign-in whose codes keep being refused starts over three times, then sto
     await account.sendLoginCode(`Wrong0123456789#${account.signInState(url)}`)
   }
   await until(() => account.getAccount().login?.state === 'failed')
-  assert.deepEqual({ ...account.getAccount().login, error: account.getAccount().login?.error?.includes('didn’t work') }, { state: 'failed', url: null, where: 'phone', error: true })
+  assert.deepEqual({ ...account.getAccount().login, error: account.getAccount().login?.error?.includes('didn’t work') }, { state: 'failed', url: null, where: 'phone', method: 'subscription', error: true })
   assert.equal(account.getAccount().state, 'logged_out')
   // Starting again is a fresh sign-in with its own three tries.
   account.startLogin('phone')
@@ -547,6 +548,71 @@ test("how the login command answered a code: read below its prompt, and only \"L
   account.cancelLogin()
   writeFileSync(join(fakeState, 'signed-in'), '')
   await account.requestCheck(true)
+})
+
+test('signing in with the Console: its own command and page, kept when a refused code starts it over', async () => {
+  rmSync(join(fakeState, 'signed-in'), { force: true })
+  rmSync(join(fakeState, 'login-args'), { force: true })
+  await account.requestCheck(true)
+  account.startLogin('phone', { method: 'console' })
+  assert.equal(account.getAccount().login?.method, 'console')
+  await until(() => account.getAccount().login?.state === 'waiting_code')
+  const first = account.getAccount().login!.url!
+  assert.match(first, /^https:\/\/platform\.claude\.com\/oauth\/authorize\?/)
+  await account.sendLoginCode(`Wrong0123456789#${account.signInState(first)}`)
+  await until(() => account.getAccount().login?.state === 'waiting_code' && account.getAccount().login?.url !== first)
+  assert.equal(account.getAccount().login?.method, 'console')
+  assert.deepEqual(readFileSync(join(fakeState, 'login-args'), 'utf8').trim().split('\n'), ['--console', '--console'])
+  account.cancelLogin()
+  // The default stays the subscription.
+  account.startLogin('phone')
+  assert.equal(account.getAccount().login?.method, 'subscription')
+  await until(() => account.getAccount().login?.state === 'waiting_code')
+  assert.equal(readFileSync(join(fakeState, 'login-args'), 'utf8').trim().split('\n').at(-1), '--claudeai')
+  account.cancelLogin()
+  writeFileSync(join(fakeState, 'signed-in'), '')
+  await account.requestCheck(true)
+})
+
+test('signing in again while signed in (a /login from the phone): asked for, a refused code does not end it, the right one does', async () => {
+  writeFileSync(join(fakeState, 'signed-in'), '')
+  await account.requestCheck(true)
+  assert.equal(account.getAccount().state, 'ok')
+  assert.throws(() => account.startLogin('phone'), { code: 'not_needed' })
+  account.startLogin('phone', { method: 'console', again: true })
+  await until(() => account.getAccount().login?.state === 'waiting_code')
+  const first = account.getAccount().login!.url!
+  // Refused: the account it had is still fine, but this sign-in isn't over.
+  await account.sendLoginCode(`Wrong0123456789#${account.signInState(first)}`)
+  await until(() => account.getAccount().login?.state === 'waiting_code' && account.getAccount().login?.url !== first)
+  assert.match(account.getAccount().login?.error ?? '', /didn’t work/)
+  const second = account.getAccount().login!.url!
+  // Turned away for another reason: stops with its words, not as if it had worked.
+  await account.sendLoginCode(`Held0123456789#${account.signInState(second)}`)
+  await until(() => account.getAccount().login?.state === 'failed')
+  assert.match(account.getAccount().login?.error ?? '', /^Your account is on hold/)
+  account.cancelLogin()
+  account.startLogin('phone', { again: true })
+  await until(() => account.getAccount().login?.state === 'waiting_code')
+  await account.sendLoginCode(`AuthCode0123456789#${account.signInState(account.getAccount().login!.url)}`)
+  await until(() => account.getAccount().login === null)
+  assert.equal(account.getAccount().state, 'ok')
+})
+
+test('the address and the code of a sign-in never reach a log', async () => {
+  rmSync(join(fakeState, 'signed-in'), { force: true })
+  await account.requestCheck(true)
+  account.startLogin('phone', { method: 'console' })
+  await until(() => account.getAccount().login?.state === 'waiting_code')
+  const url = account.getAccount().login!.url!
+  const state = account.signInState(url)!
+  const code = `SecretCodeNeverLogged0123#${state}`
+  await account.sendLoginCode(code)
+  await until(() => account.getAccount().login === null)
+  await new Promise((r) => setTimeout(r, 200))
+  const logs = readdirSync(process.env.HYPERNOVA_LOGS!).map((f) => readFileSync(join(process.env.HYPERNOVA_LOGS!, f), 'utf8')).join('\n')
+  assert.match(logs, /sign-in started/)
+  for (const secret of ['SecretCodeNeverLogged0123', state, url, 'oauth/authorize']) assert.ok(!logs.includes(secret), `a log has ${secret}`)
 })
 
 test('a sign-in can be cancelled: its terminal ends and nothing changes', async () => {

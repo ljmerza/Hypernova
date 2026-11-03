@@ -77,6 +77,8 @@ export type Session = {
   term: TermView | null
   /** A menu or dialog its terminal shows in place of the input box (one with no approval card). */
   menu: Menu | null
+  /** Its terminal shows Claude Code's own sign-in (term/shared.ts, loginScreen): true only while it does. */
+  loginScreen?: boolean
   /** How many agents its main agent started are running now (agents.ts). */
   agentsRunning: number
   /** Why Claude can't reply here now (a usage limit, signed out…): set when an API error stopped it, cleared by a real reply. */

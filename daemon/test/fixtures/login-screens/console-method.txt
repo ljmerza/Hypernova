@@ -1,0 +1,24 @@
+
+❯ [Hypernova test] hi
+  ⎿  UserPromptSubmit hook error
+  ⎿  connect ECONNREFUSED 127.0.0.1:9
+  ⎿  Not logged in · Please run /login
+
+✻ Sautéed for 0s · done 12:40 PM
+
+❯ /login
+  ⎿  Login interrupted
+
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ ◐ medium · /effort ▔
+   Login
+
+   Anthropic Console account
+
+   How do you want to sign in?
+
+   ❯ 1. Sign in with your Console account (recommended)
+     2. Create an API key (legacy) · adds a key to your Console workspace
+     3. Go back
+
+   Esc to cancel

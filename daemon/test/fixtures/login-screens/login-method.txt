@@ -1,0 +1,34 @@
+
+ ▐▛███▛█   Claude Code v2.1.317
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/Projects/t1
+
+▎ Auto mode is now Claude Code's default permission mode.
+▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for
+▎ risky actions and prompt injection before executing, runs the ones it assesses as lower-risk, and
+▎ blocks the rest.
+▎ https://code.claude.com/docs/en/permission-modes
+
+❯ [Hypernova test] hi
+  ⎿  UserPromptSubmit hook error
+  ⎿  connect ECONNREFUSED 127.0.0.1:9
+  ⎿  Not logged in · Please run /login
+
+✻ Sautéed for 0s · done 12:40 PM
+
+
+
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Login
+
+   Claude Code can be used with your Claude subscription or billed based on API usage through
+   your Console account.
+
+   Select login method:
+
+   ❯ 1. Claude account with subscription · Individual, Team, or Enterprise
+     2. Anthropic Console account · API usage billing
+     3. 3rd-party platform · Amazon Bedrock, Microsoft Foundry, Google Vertex AI
+
+   Esc to cancel

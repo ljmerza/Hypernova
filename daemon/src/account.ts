@@ -13,13 +13,13 @@ import { SUPPORT, findClaude, log, readJson, sleep, writeJson } from './util.ts'
 import { REMOVED_TEXT, getProvider, isSdk, isSubscription, listProviders, providerEnv, providerRemoved, providerStatusSource, type ProviderStatus } from './store.ts'
 import { broadcast, forceUsage, listSessionRecs, reviewBlocked, sendUsage, setBlocked } from './hub.ts'
 import { childEnv } from './runner.ts'
-import { endLoginTerms, ensureTerm, onTermExit, openOnMac, pressKeys, startLoginTerm, stopTerm, termAlive, termScreen } from './terms.ts'
+import { endLoginTerms, ensureTerm, onTermExit, openOnMac, pressKeys, startLoginTerm, stopTerm, termAlive, termScreen, type LoginMethod } from './terms.ts'
 import { cleanText, type AccountReason, type AccountState, type Blocked, type Blocker, type Limit, type LimitNotice, type ProviderState } from './blockers.ts'
 import { noteNoCredit } from './balance.ts'
 import { MACHINE } from './platform.ts'
 
 /** Signing in from the phone or the Mac: its holder's progress, and the sign-in page's address. */
-export type Login = { state: 'starting' | 'waiting_code' | 'finishing' | 'failed'; url: string | null; where: 'phone' | 'mac'; error: string | null }
+export type Login = { state: 'starting' | 'waiting_code' | 'finishing' | 'failed'; url: string | null; where: 'phone' | 'mac'; method: LoginMethod; error: string | null }
 export type Account = {
   state: AccountState
   providerId: 'anthropic'
@@ -115,6 +115,8 @@ type LoginRun = {
   typed: boolean
   said: string | null
   restarts: number
+  /** Started while signed in, to change account: the account being fine says nothing about this sign-in. */
+  again: boolean
 }
 let login: LoginRun | null = null
 
@@ -506,7 +508,7 @@ async function runChecks(): Promise<void> {
 }
 
 // ── Signing in from the phone ────────────────────────────────────────────
-// `claude auth login --claudeai` in a holder of its own (not a session). Its screen gives the
+// `claude auth login` (--claudeai, or --console for API billing) in a holder of its own (not a session). Its screen gives the
 // sign-in page's address, which the phone opens; the code that page shows comes back through
 // POST /v1/account/login/code and is typed at the screen's prompt as raw keys plus Enter (never
 // the input-box path prompts take, never logged). It is a plain line prompt, not the interactive
@@ -521,8 +523,8 @@ const fail = (status: number, code: string, message: string) => Object.assign(ne
 const MAX_RESTARTS = 3
 
 /** A new sign-in in a holder of its own: the first, or the next after a refused code ([after]). */
-function launchLogin(where: 'phone' | 'mac', after: LoginRun | null): LoginRun {
-  const { termId, pid } = startLoginTerm()
+function launchLogin(where: 'phone' | 'mac', after: LoginRun | null, method: LoginMethod = 'subscription', again = false): LoginRun {
+  const { termId, pid } = startLoginTerm(method)
   const now = Date.now()
   const run: LoginRun = {
     termId,
@@ -530,7 +532,7 @@ function launchLogin(where: 'phone' | 'mac', after: LoginRun | null): LoginRun {
     where,
     startedAt: now,
     deadline: now + LOGIN_MS,
-    view: { state: 'starting', url: null, where, error: after ? SIGN_IN_AGAIN : null },
+    view: { state: 'starting', url: null, where, method, error: after ? SIGN_IN_AGAIN : null },
     cancelled: false,
     timedOut: false,
     exited: false,
@@ -540,6 +542,7 @@ function launchLogin(where: 'phone' | 'mac', after: LoginRun | null): LoginRun {
     typed: false,
     said: null,
     restarts: after ? after.restarts + 1 : 0,
+    again,
   }
   login = run
   onTermExit(termId, (code, text) => void loginExited(run, code, text))
@@ -549,11 +552,15 @@ function launchLogin(where: 'phone' | 'mac', after: LoginRun | null): LoginRun {
   return run
 }
 
-/** Start signing in (`where`: the phone opens the page; "mac" also opens the holder in a terminal there). */
-export function startLogin(where: 'phone' | 'mac'): Account {
+/**
+ * Start signing in (`where`: the phone opens the page; "mac" also opens the holder in a terminal
+ * there). [o.method]: the subscription unless it says the Console. [o.again]: asked for while
+ * signed in (a /login from the phone, to change account); otherwise that's turned away.
+ */
+export function startLogin(where: 'phone' | 'mac', o: { method?: LoginMethod; again?: boolean } = {}): Account {
   if (login && login.view.state !== 'failed') return getAccount()
-  if (acc.state === 'ok') throw fail(409, 'not_needed', `Claude Code is already signed in on this ${MACHINE}.`)
-  launchLogin(where, null)
+  if (acc.state === 'ok' && !o.again) throw fail(409, 'not_needed', `Claude Code is already signed in on this ${MACHINE}.`)
+  launchLogin(where, null, o.method, acc.state === 'ok')
   return getAccount()
 }
 
@@ -788,13 +795,15 @@ async function loginExited(run: LoginRun, code: number | null, text: string | nu
   const out = acc.state === 'logged_out' || acc.state === 'no_subscription'
   // Done once the account isn't signed out; after a code Claude Code turned away, only once it
   // works again by itself meanwhile (a /login in a terminal, a reply), never on that code's say-so.
-  if (answered ? acc.state === 'ok' : !out) {
+  // Signing in again while signed in ([LoginRun.again]), the account says nothing about this
+  // sign-in: done unless a code was turned away or the time ran out.
+  if (run.again ? !answered && !run.timedOut : answered ? acc.state === 'ok' : !out) {
     login = null
     log('sign-in finished')
   } else if (refused && run.restarts < MAX_RESTARTS) {
     // A new sign-in at once, at a new address: the old page's codes are spent.
     try {
-      launchLogin(run.where, run)
+      launchLogin(run.where, run, run.view.method, run.again)
       return
     } catch (e) {
       log('starting the sign-in again failed', e)
