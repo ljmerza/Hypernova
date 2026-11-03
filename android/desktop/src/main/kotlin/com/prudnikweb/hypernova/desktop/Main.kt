@@ -88,8 +88,8 @@ internal fun oneCopy(home: Path): Boolean {
 private object WindowIcon : Painter() {
     override val intrinsicSize: Size = Size(64f, 64f)
     override fun DrawScope.onDraw() {
-        drawRect(com.prudnikweb.hypernova.desktop.ui.HN.bg)
-        logo(size.minDimension * 0.72f, com.prudnikweb.hypernova.desktop.ui.HN.ink, com.prudnikweb.hypernova.desktop.ui.HN.accent)
+        drawRect(com.prudnikweb.hypernova.ui.theme.HN.bg)
+        logo(size.minDimension * 0.72f, com.prudnikweb.hypernova.ui.theme.HN.ink, com.prudnikweb.hypernova.ui.theme.HN.accent)
     }
 }
 
