@@ -100,6 +100,93 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 
 **Changed in `:shared` for it**, each with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now), `Net.httpsOnly` (off on Android), and `DeviceKeys.publicKey()` (null on Android, so `DeviceCertStore.identity()` checks nothing there).
 
+### The parity list: what the desktop has of the phone's
+
+The owner, 2026-11-03: "let's keep working on the desktop version to have parity with the Android app". This is what that work goes by, from `android/app/.../ui/` and docs/FEATURES.md, screen by screen. **There**: it does what the phone does. **Partly**: the row says what's missing. **Not yet**: wanted, not built. **Not meant to be**: with why. The chat and the terminal wait for the phone's chat code to move to a shared module.
+
+**Pairing and the link**
+
+| Phone | Desktop | |
+|---|---|---|
+| Pair from a pasted link | There | |
+| Scan the server's QR code | Not meant to be | The owner: "the QR code will always be for a phone"; a desktop pastes the link |
+| A link from outside the app, "Add this server?" | Not yet | Nothing hands the desktop a `hypernova://` link |
+| Device certificate, mutual TLS, the route's pin | There | The key and tokens in the system's keychain; weaker than a phone's keystore, and said so (DECISIONS) |
+| Reconnect, offline card, Retry now, a 401 unpairs | There | No hotspot sweep: a `.1` on a desktop is a Docker bridge |
+| Stay connected in the background | Not meant to be | Closing the window ends the process, and Settings says so |
+| Several servers, the switcher | There | |
+| All servers (Home, History, New session, Settings) | Not yet | One server on screen at a time |
+| Forget a server | Partly | Only when its token is lost (`TokenWait`); no Unpair in Settings |
+
+**Home**
+
+| Phone | Desktop | |
+|---|---|---|
+| Three groups, what a card says, state chips | There | Two panes instead of cards (DECISIONS, "The desktop client's two panes") |
+| Allow and Deny on the card | Partly | In the pane, with Allow only beside the whole command (rule 3 of "The desktop app"), on purpose and stricter than the phone. A question or a plan is answered on the phone |
+| Search, filter, sort | Not yet | The list is A to Z in each group |
+| Unread dot | Not yet | |
+| Usage cards | Not yet | Only the chart's week behind the list |
+| Cards above the sessions (account, providers, prompts for gone sessions, automation questions, outdated jobs) | Not yet | Tray alerts say an account needs its owner |
+| The menu: Rename, Stop, Remove from list | Not yet | |
+| The menu: Restart session, MCP servers | Not yet | |
+| Card swipes | Not meant to be | A pointer has the pane's buttons |
+| Keys: arrows, Enter, Escape, Tab, zoom | Desktop only | |
+
+**A session**
+
+| Phone | Desktop | |
+|---|---|---|
+| Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Not yet | Waits for the shared chat module |
+| Live terminal | Not yet | Waits for the shared chat module |
+| Answer a question or a plan, Always, Allow these N | Not yet | Need the chat's cards; Always also needs an owner check the desktop hasn't got |
+| Session sheet: what the list already knows (folder, model, mode, where it runs, agents, queue, context, times) | There | In the pane |
+| Session sheet: switch model, effort or mode; Blocked; rules in effect; why it asked; agents tab; commands tab; git; another provider or agent | Not yet | Each needs a request of its own |
+
+**History**
+
+| Phone | Desktop | |
+|---|---|---|
+| The list by day, search with full text, project chips, an automation's runs folded | Not yet | |
+| A tap opens it to read, and writing in it resumes it | Not yet | Needs the chat |
+| An automation's runs from its row | Not yet | Needs the automation screens |
+
+**New session**
+
+| Phone | Desktop | |
+|---|---|---|
+| Prompt, folder and folder browser, new project, agent, mode | Not yet | |
+| Model and effort pickers | Not yet | |
+| The "/" list, attachments | Not yet | |
+| Dictation | Not meant to be, for now | Desktop dictation is research only (below, "Desktop dictation") |
+| Share into the app, launcher shortcuts | Not meant to be | Android's; a desktop has the clipboard |
+
+**The other screens**
+
+| Phone | Desktop | |
+|---|---|---|
+| Automations: list, editor, runs, ask steps | Not yet | An automation's question isn't sent as an alert either: there's no screen to open (LATER L123) |
+| Files: browse, view, download, previews and the web page | Not yet | |
+| What changed | Not yet | |
+| Statistics | Not yet | |
+| Agents boards, an agent's own screen | Not yet | Only a count in the pane |
+| Settings: debug logging | There | The desktop's only part of the phone's Settings |
+| Settings: where the key and tokens are, alerts | Desktop only | |
+| Settings: providers, account and sign-in, agents' settings, MCP, plugins, skills, environment, versions | Not yet | |
+| Settings: notifications per group, Read aloud, top bar, typing, display, the server's switches (auto-update, debug, Browse outside projects, Stay awake), checklist, connection log | Not yet | |
+
+**What only a phone is for**
+
+| Phone | Desktop | |
+|---|---|---|
+| Notifications | Partly | Tray alerts for what needs input, saying who and never what, with no Allow on them. No Reply, Answer or finished alerts |
+| The widget | Not meant to be | Android's home screen |
+| Haptics, the pulse of a needs-you mark, the grain, blur | Not meant to be | No motor, and left out of Atlas here (rule 8 of "The desktop app") |
+| Read aloud | Not yet | `SpeechOutput` is null here |
+| Fingerprint or screen lock (`OwnerCheck`) | Not yet | The desktop has no check of its own, so what needs one stays on the phone |
+| The app's update offer | Not meant to be | A server offers the phone's APK. The desktop updates by its packages (docs/RELEASING.md) |
+| Glasses | Not meant to be | Lens has left this repository, and the phone has no screen for them now |
+
 ## 0. What we have to build on
 
 This is the part that makes the plan cheap in some places and costly in others.
