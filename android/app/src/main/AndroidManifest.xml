@@ -59,7 +59,8 @@
                  assetlinks.json at install). Pairing is local only: the QR code opens the server's
                  own pairing page on the network, which hands over to the link below. -->
 
-            <!-- The app link, hypernova://pair?v=1&u=…&c=…&n=…: the server's pairing page's hand-over, Paste link, adb. -->
+            <!-- The app link, hypernova://pair?v=1&u=…&c=…&n=…: the server's pairing page's hand-over, adb. Anything
+                 can open it, so it only ever asks ("Add this server?": HubViewModel.offerLink). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

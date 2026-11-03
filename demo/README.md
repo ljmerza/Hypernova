@@ -20,7 +20,7 @@ It needs Node 22.23.4 or 24.22.1 or newer, `npm install` already run in `daemon/
 adb -s emulator-5582 shell "am start -a android.intent.action.VIEW -d '<the link>' com.prudnikweb.hypernova"
 ```
 
-A code works once, and a used one is replaced in that file at once.
+A link from outside the app asks first: tap **Add server** on the phone. A code works once, and a used one is replaced in that file at once.
 
 It listens on `127.0.0.1` only, and tells the phone to dial `10.0.2.2`, the emulator's name for this
 computer's loopback, so a phone on the Wi-Fi can't reach it. The only way in is the one real phones

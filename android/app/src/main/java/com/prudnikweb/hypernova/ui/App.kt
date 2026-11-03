@@ -322,7 +322,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 val adding = vm.addingServer && vm.pairFlow == null
                 val covered = vm.pairFlow != null || unpaired || adding
                 if (adding || (!covered && hub == null)) {
-                    Onboarding(
+                    // While "Add this server?" asks: not behind it, with its camera on.
+                    if (vm.offeredLink == null) Onboarding(
                         onPaste = vm::handleLink,
                         onClose = if (adding && hub != null) ({ vm.addServer(false) }) else null,
                     )
@@ -481,6 +482,9 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 )
                 // The update under way (its progress, Install, what stopped it), where a notice's banner sits, giving way to one.
                 com.prudnikweb.hypernova.ui.update.UpdateBannerHost(covered = vm.notice != null)
+
+                // "Add this server?", above everything, which stays as it is underneath.
+                vm.offeredLink?.let { com.prudnikweb.hypernova.ui.onboarding.OfferScreen(it, onAdd = vm::acceptOffer, onCancel = vm::declineOffer) }
 
                 Grain(Modifier.fillMaxSize())
             }

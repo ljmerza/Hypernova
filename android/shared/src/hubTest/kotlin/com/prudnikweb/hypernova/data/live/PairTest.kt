@@ -96,6 +96,29 @@ class PairTest {
         }
     }
 
+    /** What may take a paired server's place goes by this (Servers.takesPlaceOf): only the pinned listener says it. */
+    @Test fun onlyAnAnswerOverThePinnedListenerSaysWhereItWasPinned() {
+        FakeDaemon("z2", lan = true).use { d ->
+            d.pairs()
+            assertEquals("https://127.0.0.1:${d.lanPort}", pair(link(d)).pinnedAt)
+        }
+        FakeDaemon("z2").use { d ->
+            d.pairs()
+            val fp = "ab".repeat(32)
+            // `fp` in the link, nobody listening there: the base answered, and proves nothing about it.
+            val p = pair(PairLinks.parse("hypernova://pair?v=1&u=${d.base}&c=c0de-1234&n=z2&fp=$fp")!!)
+            assertEquals(fp, p.fingerprint)
+            assertEquals(null, p.pinnedAt)
+        }
+    }
+
+    @Test fun aNameInTheAnswerIsCleanedAsTheLinksIs() {
+        FakeDaemon("z2").use { d ->
+            d.ok("POST", "/v1/pair", JSONObject(answer.toString()).put("mac", JSONObject().put("id", "m").put("name", "z2\n\u202Eknab")))
+            assertEquals("z2 knab", pair(link(d, fp = null)).macName)
+        }
+    }
+
     @Test fun aCodeTheServerRefusesIsExpiredAndNotTriedElsewhere() {
         for (status in listOf(400, 401, 403, 404, 410)) {
             FakeDaemon("z2").use { d ->

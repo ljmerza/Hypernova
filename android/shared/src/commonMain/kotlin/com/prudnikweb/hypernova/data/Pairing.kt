@@ -20,6 +20,12 @@ data class Pairing(
     val fingerprint: String? = null,
     val lanAddresses: List<String> = emptyList(),
     val lanPort: Int = LanInfo.DEFAULT_PORT,
+    /**
+     * Where the answer to this pairing came from with the certificate pinned to [fingerprint]: the
+     * proof that this is the computer holding that certificate's key. Only just after [Pairer.pair]
+     * ([Servers.withPairing] reads it), never stored: null on anything loaded.
+     */
+    val pinnedAt: String? = null,
 ) {
     /** Never the token, whoever prints one of these. */
     override fun toString() = "Pairing($macName)"
@@ -42,6 +48,13 @@ data class PairLink(
 ) {
     /** The link names a local listener this phone could pair through. */
     val hasLan: Boolean get() = fingerprint != null && lan.isNotEmpty()
+
+    /**
+     * Everywhere [Pairer.pair] may send this link's code, in the order it tries them, as
+     * `host:port`: what "Add this server?" names. A link's name and addresses are its own claims.
+     */
+    val places: List<String>
+        get() = ((if (hasLan) lan.map { RoutePolicy.baseOf(it, lanPort) } else emptyList()) + baseUrl).map(PairLinks::place).distinct()
 
     /** Never the code, whoever prints one of these. */
     override fun toString() = "PairLink($macName)"
@@ -101,6 +114,19 @@ object PairLinks {
         return parseWeb(web)
     }
 
+    /**
+     * A name from a link or a server's answer, fit to show: one line, at most [NAME_MAX] characters,
+     * no control or format characters (a right-to-left override would turn the words round).
+     */
+    fun cleanName(raw: String): String =
+        raw.replace(Regex("\\s+"), " ").filterNot { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() }.trim().take(NAME_MAX)
+
+    private const val NAME_MAX = 60
+
+    /** [url]'s host and port, as a connection to it reads them (never what's before an `@`). */
+    fun place(url: String): String = RoutePolicy.originOf(url)?.let { o -> "${if (':' in o.host) "[${o.host}]" else o.host}:${o.port}" }
+        ?: cleanName(url.substringAfter("://"))
+
     /** The query of [raw] as a map, percent-decoded, first value per key. Plain Kotlin, so it runs in unit tests. */
     fun query(raw: String): Map<String, String> {
         val q = raw.substringAfter('?', "").substringBefore('#')
@@ -126,7 +152,7 @@ object PairLinks {
         val base = q["u"]?.trim()?.trimEnd('/') ?: return null
         val code = q["c"]?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         if (!base.startsWith("https://") && !base.startsWith("http://")) return null
-        val name = q["n"]?.trim()?.takeIf { it.isNotEmpty() } ?: ORIGIN.find(base)?.groupValues?.get(2)?.substringBefore(':') ?: "Mac"
+        val name = q["n"]?.let(::cleanName)?.takeIf { it.isNotEmpty() } ?: ORIGIN.find(base)?.groupValues?.get(2)?.substringBefore(':') ?: "Mac"
         return withLan(PairLink(base, code, name), q)
     }
 
@@ -141,7 +167,7 @@ object PairLinks {
         val code = q["c"]?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         // An explicit u= wins (same as the app link); otherwise the page's own origin is the API.
         val base = q["u"]?.trim()?.trimEnd('/')?.takeIf { it.startsWith("http") } ?: "$scheme://$hostPort"
-        val name = q["n"]?.trim()?.takeIf { it.isNotEmpty() } ?: host.substringBefore('.')
+        val name = q["n"]?.let(::cleanName)?.takeIf { it.isNotEmpty() } ?: host.substringBefore('.')
         return withLan(PairLink(base, code, name), q)
     }
 
@@ -274,12 +300,13 @@ object Pairer {
         return Pairing(
             baseUrl = PairLinks.keptBase(link, local?.second),
             token = token,
-            macName = mac?.str("name") ?: link.macName,
+            macName = mac?.str("name")?.let(PairLinks::cleanName)?.takeIf { it.isNotEmpty() } ?: link.macName,
             macId = mac?.str("id"),
             deviceId = res.str("deviceId"),
             fingerprint = link.fingerprint,
             lanAddresses = link.lan,
             lanPort = link.lanPort,
+            pinnedAt = local?.let { RoutePolicy.baseOf(it.second, link.lanPort) },
         )
     }
 

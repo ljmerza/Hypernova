@@ -236,6 +236,12 @@
     <string name="unpaired_pair">Pair again</string>
 
     <!-- Home (live) -->
+    <string name="pair_offer_title">Add this server?</string>
+    <string name="pair_offer_body">A link wants to add it to this phone. Hypernova can\'t check what the link says, so add it only if you just ran hypernova pair there.</string>
+    <string name="pair_offer_name">The link\'s name for it</string>
+    <string name="pair_offer_address">The link\'s address for it</string>
+    <string name="pair_offer_more">and %1$d more</string>
+    <string name="pair_offer_add">Add server</string>
     <string name="empty_title">No sessions yet.</string>
     <string name="empty_body">Start one here, or run claude in a terminal on your Mac. It shows up here on its own.</string>
     <string name="usage_agent_claude">Claude Code</string>

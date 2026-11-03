@@ -116,6 +116,52 @@ class ServersTest {
         assertEquals(2, list.size)
     }
 
+    /** The same id and name, but it never showed this certificate: a link can point anywhere, and an answer can say anything. */
+    private val impostor = z2.copy(baseUrl = "https://192.168.1.66:47323", token = "tok-evil", fingerprint = "f".repeat(64), pinnedAt = "https://192.168.1.66:47323")
+
+    @Test fun anAnswerClaimingToBeAPairedServerIsAddedBesideIt() {
+        val start = listOf(Server(Servers.LEGACY_ID, z2), Server("m", mini))
+        val (list, id) = Servers.withPairing(start, impostor) { "new1" }
+        assertEquals("new1", id)
+        assertEquals(start, list.take(2))
+        assertEquals("tok-evil", list[2].pairing.token)
+        // By name alone, too (an answer with no id).
+        val named = impostor.copy(macId = null, macName = "Z2")
+        assertEquals(start, Servers.withPairing(start, named) { "new1" }.first.take(2))
+        // No fingerprint at all, on a link that left it out.
+        val bare = impostor.copy(fingerprint = null, pinnedAt = null)
+        assertEquals(start, Servers.withPairing(start, bare) { "new1" }.first.take(2))
+    }
+
+    @Test fun theRealCertificatePinnedOrTheVeryAddressTakesThePlace() {
+        val start = listOf(Server(Servers.LEGACY_ID, z2))
+        // At a new address, its own certificate pinned: the DHCP lease moved.
+        val moved = z2.copy(baseUrl = "https://192.168.1.77:47323", token = "tok-new", pinnedAt = "https://192.168.1.77:47323")
+        val (list, id) = Servers.withPairing(start, moved) { error("no new id") }
+        assertEquals(Servers.LEGACY_ID, id)
+        assertEquals("https://192.168.1.77:47323", list.single().pairing.baseUrl)
+        assertEquals("never kept", null, list.single().pairing.pinnedAt)
+        // The fingerprint alone proves nothing: a link can carry z2's, and be answered elsewhere, unpinned.
+        val copied = z2.copy(baseUrl = "https://evil.example:47323", token = "tok-evil", pinnedAt = null)
+        assertEquals(2, Servers.withPairing(start, copied) { "new1" }.first.size)
+        // A server paired before it had a certificate to check: nothing to prove it by.
+        val old = listOf(Server("o", mini))
+        val claim = mini.copy(baseUrl = "https://192.168.1.66:47323", token = "tok-evil", fingerprint = "f".repeat(64), pinnedAt = "https://192.168.1.66:47323")
+        assertEquals(2, Servers.withPairing(old, claim) { "new1" }.first.size)
+    }
+
+    @Test fun anAddedServerNeverTakesAnothersBaseUrl() {
+        val start = listOf(Server("m", mini))
+        // `u` says mini's address, and another listener answered: mini's requests must not go by this one's route.
+        val p = impostor.copy(macId = "m-other", macName = "other", baseUrl = mini.baseUrl)
+        val (list, _) = Servers.withPairing(start, p) { "new1" }
+        assertEquals("https://192.168.1.66:47323", list[1].pairing.baseUrl)
+        assertEquals(mini.baseUrl, list[0].pairing.baseUrl)
+        // Its own `u`, free: kept.
+        val own = impostor.copy(macId = "m-other", macName = "other", baseUrl = "https://192.168.1.48:47323")
+        assertEquals("https://192.168.1.48:47323", Servers.withPairing(start, own) { "new1" }.first[1].pairing.baseUrl)
+    }
+
     @Test fun aNewIdNeverClashes() {
         val start = listOf(Server("x", mini))
         val ids = ArrayDeque(listOf("x", "y"))

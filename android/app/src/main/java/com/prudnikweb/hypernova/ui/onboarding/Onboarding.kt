@@ -346,3 +346,49 @@ fun UnpairedScreen(macName: String, onPairAgain: () -> Unit) {
 private fun Modifier.pointerBlock(): Modifier = this.then(
     Modifier.pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } } },
 )
+private const val OFFER_ARMS_MS = 600L
+private const val OFFER_PLACES = 4
+
+/**
+ * "Add this server?" for a link from outside the app (HubViewModel.offerLink), over whatever is on
+ * screen, which stays as it is: the link's name and every address the code would go to, as the link's
+ * own claims, since nothing has answered yet. Add waits a moment after a link arrives, so a tap meant
+ * for what was on screen can't land on it.
+ */
+@Composable
+fun OfferScreen(link: PairLink, onAdd: () -> Unit, onCancel: () -> Unit) {
+    BackHandler(onBack = onCancel)
+    var armed by remember(link) { mutableStateOf(false) }
+    LaunchedEffect(link) {
+        delay(OFFER_ARMS_MS)
+        armed = true
+    }
+    Box(Modifier.fillMaxSize().background(HN.bg).pointerBlock()) {
+        StateScreen(
+            mark = { StateMark(HN.accent, null) },
+            label = stringResource(R.string.pair_label), live = false,
+            title = stringResource(R.string.pair_offer_title),
+            body = stringResource(R.string.pair_offer_body),
+        ) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    HText(stringResource(R.string.pair_offer_name), style = Type.small, color = HN.inkMuted)
+                    Spacer(Modifier.height(2.dp))
+                    HText(link.macName, style = Type.heading, color = HN.ink)
+                    Spacer(Modifier.height(12.dp))
+                    HText(stringResource(R.string.pair_offer_address), style = Type.small, color = HN.inkMuted)
+                    Spacer(Modifier.height(2.dp))
+                    val places = link.places
+                    for (place in places.take(OFFER_PLACES)) HText(place, style = Type.mono, color = HN.ink)
+                    if (places.size > OFFER_PLACES) HText(stringResource(R.string.pair_offer_more, places.size - OFFER_PLACES), style = Type.small, color = HN.inkMuted)
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Pill(stringResource(R.string.pair_offer_add), onAdd, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 50.dp, enabled = armed)
+                Pill(stringResource(R.string.cancel), onCancel, Modifier.fillMaxWidth(), kind = PillKind.Ghost, height = 48.dp)
+            }
+        }
+    }
+}
+
