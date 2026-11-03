@@ -141,6 +141,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Live terminal | Not yet | Waits for the shared chat module |
 | Answer a question or a plan, Always, Allow these N | Not yet | Need the chat's cards; Always also needs an owner check the desktop hasn't got |
 | Session sheet: what the list already knows (folder, model, mode, where it runs, agents, queue, context, times) | There | In the pane |
+| Background commands ("1 shell"): the Agents tab's list and the count | Not yet | `:shared` has them (`AgentBoard.shells`, `Session.shellsRunning`); needs the agents tab or a row in the pane |
 | Session sheet: switch model, effort or mode; Blocked; rules in effect; why it asked; agents tab; commands tab; git; another provider or agent | Not yet | Each needs a request of its own |
 
 **History**

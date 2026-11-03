@@ -4369,3 +4369,18 @@ Two things point 6 and 7 of "The tabs on Settings' pages" left as they were.
 ## Taking a photo asks for the camera first (2026-11-03)
 
 The owner: "trying to take a picture crashes the app". Scan added the camera permission to the manifest, and Android refuses `ACTION_IMAGE_CAPTURE` with a SecurityException to an app that declares that permission without holding it, as far as Android's documents say. So a photo for an attachment crashed in v0.26.0 for anyone who hadn't allowed the camera. Camera now asks for the permission first, says so if it's refused, and catches the exception as a backstop.
+
+## Background commands in the session sheet (2026-11-03)
+
+The owner: "a feature so I could see background commands running it says in code one shell for example I can only see what agents are running but not background commands". Idea SS12. What Claude Code really says, measured on 2.1.317, is in docs/PROTOCOL.md, "Background commands".
+
+1. **Under the agents, on the session sheet's Agents tab,** as their own part: "Background commands", with how many run. No part at all when a session has none, or an older server doesn't say. Each row: the command's first line, masked as a tool row is, how it stands, and how long.
+2. **The count goes in the top bar's existing agents item:** `2 agents 1 shell`, or `1 shell` alone, and a tap opens the same tab. It reads cleanly because the bar already scrolls sideways and the item only shows while there's something to count, so nothing crowds it. It's off by default as before. Nothing new on the chat screen beyond that.
+3. **"Shell" is Claude Code's word, and a Monitor counts as one.** Its footer says "1 shell, 1 monitor", its panel "2 active shells", and its Stop list gives a Monitor as a shell. The row says "Monitor, running". One count, for a one-line bar.
+4. **Never a stale "running".** A command can outlive its session (measured: after a crash and after `claude stop`, and nothing is ever written about it), so when a session's process goes with no word on a command, the row says "Started 2h 5m ago, not known if it's still running", with no time ticking and no count. That also goes for Claude Code's own "stopped" on a resume, "didn't finish before the previous session ended", said in the measurement about a command that was still alive. A later Stop's list or notification settles it either way.
+5. **Claude Code's list is believed over the daemon's reading:** each turn's Stop names what still runs, so an end that left no line (a Monitor running out, a subagent's) can't stay "running" past the next turn.
+6. **It doesn't make a session busy.** Agents at work hold a session in "working"; a dev server left running for hours mustn't, nor keep Stay awake on, nor hold back the Finished notification. The count is only a count.
+7. **The last 5 ended ones stay listed,** newest first, under those running: "running or finished" was asked for, and a long session's whole history would be clutter.
+8. **Read-only, and no output viewer.** No stop button: from the phone it could only go through the model (`TaskStop`) or the terminal's panel, so it's left for the owner to ask for. The output file is read only for its last line, on the daemon, and isn't sent: the chat has nothing that would show it without a new route.
+9. **Codex:** nothing. Not measured (Codex isn't installed where this was built).
+10. **Not proven:** a real model's session (the measurement scripted the provider); the Agent SDK's sessions; a Mac (paths and `/private/tmp`); other Claude Code versions, which may word these differently. A shape not recognised shows nothing, or only what a Stop's list says.
