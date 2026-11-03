@@ -248,6 +248,12 @@ data class Account(
 data class UsageRate(val fiveHour: Float?, val sevenDay: Float?)
 
 /**
+ * On Home's list, on the phone and the desktop: what's alive, and what a restart of the server ended
+ * lately; a conversation that switched agents as its newest session. Anything else ended is in History.
+ */
+val Session.onHome: Boolean get() = (phase != Phase.Ended || cutByRestart) && switchedTo == null
+
+/**
  * Claude plan usage, from the status line's rate_limits.
  * [limitedAt] is set while the 5-hour limit is hit (sessions are rate-limited until [fiveHourResetAt]).
  */

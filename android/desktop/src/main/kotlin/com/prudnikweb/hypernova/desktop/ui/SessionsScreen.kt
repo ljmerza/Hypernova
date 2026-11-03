@@ -76,6 +76,7 @@ import com.prudnikweb.hypernova.data.RouteKind
 import com.prudnikweb.hypernova.data.ServerStatus
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.onHome
 import com.prudnikweb.hypernova.data.linkProblemText
 import com.prudnikweb.hypernova.desktop.APP_NAME
 import com.prudnikweb.hypernova.desktop.CardOffer
@@ -112,7 +113,8 @@ const val LIST_TAG = "session-list"
 fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
     val server = Core.activeId.orEmpty()
     val link = hub.link
-    val groups = groupsOf(hub.sessions)
+    // As the phone's Home: what's ended is in History (Session.onHome).
+    val groups = groupsOf(hub.sessions.filter { it.onHome })
     val order = orderOf(groups)
     // A rewind's copy goes on as the session it replaced.
     val chosenId = shell.chosen(server)?.let { hub.replacedBy(it) ?: it }

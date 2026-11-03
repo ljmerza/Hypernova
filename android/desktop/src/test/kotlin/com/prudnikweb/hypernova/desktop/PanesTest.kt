@@ -246,6 +246,21 @@ class PanesTest {
         onNodeWithText(Ui.allow.text()).assertDoesNotExist()
     }
 
+    @Test fun whatEndedIsLeftOffTheListAsOnThePhone() = runDesktopComposeUiTest(1200, 800) {
+        d.snapshot = snapshot(
+            "z2",
+            sessions = sessions() +
+                session("s6", state = "ended", title = "Closed long ago") +
+                session("s7", state = "ended", title = "Cut by a restart") { put("endedBy", "mac_restart") } +
+                session("s8", state = "idle", title = "Went to Codex") { put("switchedTo", "s1") },
+        )
+        up()
+        row(migrate).assertExists()
+        row("Cut by a restart").assertExists()
+        row("Closed long ago").assertDoesNotExist()
+        row("Went to Codex").assertDoesNotExist()
+    }
+
     @Test fun theChosenOneChangingGroupIsFollowed() = runDesktopComposeUiTest(1200, 800) {
         up()
         choose(stream)

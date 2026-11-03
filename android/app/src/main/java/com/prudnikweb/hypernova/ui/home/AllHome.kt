@@ -2,12 +2,12 @@ package com.prudnikweb.hypernova.ui.home
 
 import com.prudnikweb.hypernova.data.HomeSearch
 import com.prudnikweb.hypernova.data.LinkState
-import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.ServerStatus
 import com.prudnikweb.hypernova.data.Servers
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.TextHits
+import com.prudnikweb.hypernova.data.onHome
 
 /*
  * Home's "All servers" (docs/DECISIONS.md, "All servers on Home"): every paired computer's sessions
@@ -53,7 +53,7 @@ object AllHome {
      * lately; a conversation that switched agents as its newest session.
      */
     fun homeSessions(sessions: List<Session>): List<Session> =
-        sessions.filter { (it.phase != Phase.Ended || it.cutByRestart) && it.switchedTo == null }
+        sessions.filter { it.onHome }
 
     fun key(server: String?, id: String): String = if (server == null) id else "$server:$id"
 
