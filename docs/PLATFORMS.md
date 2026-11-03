@@ -66,13 +66,13 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 
 `android/desktop`: Compose for Desktop 1.12.1 over `:shared`, a JVM app, Linux first and written to be portable. It pairs by a pasted `hypernova pair` link, lists one server's sessions in the phone's three groups, and answers Allow or Deny on a card. A server switcher is there because `Core` already had the rest. The choices and why: docs/DECISIONS.md, "The desktop app". How to run it: docs/DEV-SETUP.md, "The desktop app". Its packages (a `.deb`, a folder, a `.dmg` for each Mac processor and a Windows `.msi`, each with its own Java): docs/RELEASING.md, "The desktop client's packages".
 
-**Run on a display? A virtual one.** The tests have no window: Compose's test scene, on real TLS, real files and the real `Core`, the demo server included (`DemoServerTest`). The window itself (`Main.kt`) has run under Xvfb, and the owner has opened it on a real 4K monitor, which is how its size came up (docs/DECISIONS.md, "The desktop app's size on a big screen"). The scale hasn't been seen on a real monitor, GNOME or Wayland yet. On Linux only so far; nothing has run on a Mac or Windows, and the ACL path in `OwnerOnly` is the part of that written blind. CI's packages job is the first thing that will run them there, on its runners: installed, opened, and paired with the demo server (`scripts/test-client-package.sh`).
+**Run on a display? A virtual one.** The tests have no window: Compose's test scene, on real TLS, real files and the real `Core`, the demo server included (`DemoServerTest`). The window itself (`Main.kt`) has run under Xvfb, and the owner has opened it on a real 4K monitor, which is how its size came up (docs/DECISIONS.md, "The desktop app's size on a big screen"). The scale hasn't been seen on a real monitor, GNOME or Wayland yet. On Linux only so far; nothing has run on a Mac or Windows, and the ACL path in `OwnerOnly`, `MacKeychain` and `WindowsDpapiKeychain` are the parts of that written blind. CI's packages job is the first thing that will run them there, on its runners: installed, opened, and paired with the demo server (`scripts/test-client-package.sh`).
 
 | Where | What |
 |---|---|
-| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
+| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
 | `desktop/src/main/.../desktop/ui/` | `App.kt`, `PairScreen.kt`, `SessionsScreen.kt`; `Theme.kt`, `AtlasPlate.kt`, `Kit.kt` (Atlas, copied for now: LATER L115) |
-| `desktop/src/test/` | `PlatformTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `ApproveTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `ApproveTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 | `desktop/src/probe/` | `PackageProbe.kt`: in no package; pairs an installed one from inside its own Java, for `scripts/test-client-package.sh` |
 | `desktop/packaging/`, `desktop/icons/` | `client-names.sh` (the package's names: two lines for the rename), `legal/`, `deb-menu-optional.sh`; the icons, and what makes them |
 
@@ -82,7 +82,7 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 |---|---|---|
 | `Strings` | Real | The phone's `res/values`, read at run time, every key tested; `locale` and the clock's pattern are the JVM's |
 | `Storage`, `Prefs` | Real | JSON files in the client's own folder, 0600 in 0700, atomic, written behind as SharedPreferences does |
-| `DeviceKeys` | Real, weaker than a phone's | An owner-only file: DECISIONS, "The desktop app" |
+| `DeviceKeys` | Real, weaker than a phone's | The system's keychain where one answers, else an owner-only file; Settings says which. Unproven on a Mac and on Windows until CI: DECISIONS, "The desktop client's key in the keychain" |
 | `Ticks` | Real | `nanoTime` plus any sleep the wall clock shows |
 | `MainThread` | Real | Swing's event thread, which is also `Dispatchers.Main` (`kotlinx-coroutines-swing`) |
 | `RetryAlarm` | Real | Checked every second against `Ticks`, so it's due as the computer wakes; it doesn't wake it |
@@ -98,7 +98,7 @@ Step 2 is below, "The desktop app". Nothing of `ui/` moved, and `HubViewModel` i
 | `thumbOf` | Null | Nothing attaches pictures here |
 | `started` | Nothing | No widgets follow it |
 
-**Changed in `:shared` for it**, both with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now) and `Net.httpsOnly` (off on Android).
+**Changed in `:shared` for it**, each with Android's behaviour the same: `AllowRule.kt` (the rule and `Secrets`, moved from `WidgetModel`, which calls them now), `Net.httpsOnly` (off on Android), and `DeviceKeys.publicKey()` (null on Android, so `DeviceCertStore.identity()` checks nothing there).
 
 ## 0. What we have to build on
 

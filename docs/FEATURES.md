@@ -349,6 +349,17 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | DA2 | AWT's real tray: the alert and a click on it and on the icon; no tray is quiet | Run by hand under Xvfb in a throwaway `ubuntu:24.04`, with `stalonetray` and with no tray, 2026-11-02 | **partial**: no automated run, GNOME itself not seen. **Gap on a Mac and on Windows**: nothing has shown or clicked one |
 | DA3 | The window's title counts what needs input; Settings says whether alerts can show and that they stop with the app | TrayAlertsTest; `scripts/test-client-package.sh` finds the window with its count | **covered** |
 
+## 24. The desktop client's key
+
+| # | Capability | Tests | Status |
+|---|---|---|---|
+| DK1 | A new key goes to the keychain and never touches the disk; an existing file moves, and goes only after the key came back and signed; a keychain that refuses or gives back anything else leaves the file | KeychainTest (all, the keychain stood in for); KeychainPairingTest (a real pairing) | **covered** |
+| DK2 | Locked or missing: a new key in the file, a new certificate, connected, and that key wins when the keychain's back; a certificate for another key isn't presented | KeychainTest (`lockedAfterTheMove…`, `aCertificateForAnotherKey…`); `scripts/test-client-package.sh --keychain` | **covered on Linux** |
+| DK3 | The real Secret Service, inside the installed package's Java: moved with its pairing, restart, locked, no bus at all, back | `scripts/test-client-package.sh --deb`, `--tarball` with `--keychain`: real `gnome-keyring` in throwaway Ubuntu 24.04 and Debian 13 containers, 2026-11-02; on CI on every package run | **covered**. KWallet not tried |
+| DK4 | A Mac's `security`, and Windows' DPAPI through PowerShell | What's sent: KeychainTest, stand-ins. What they do: `scripts/test-client-package.sh --dmg`, `--msi` with `--keychain`, on CI | **gap until the first CI run**: written, never run |
+| DK5 | Settings says where the key is, and why it's in the file | KeychainPairingTest, through the screen: no key yet, in the keychain, in the file with it locked. The other reasons by their state in KeychainTest, their words in WordsTest | **covered** |
+| DK6 | The key in no log: a helper's failure quoting it, the debug log, every file of the folder | KeychainTest (`theKeyIsNeverInWhatItSays…`, `theDebugLogsDoorCutsIt`, nothing on a command line); KeychainPairingTest; the package script | **covered** |
+
 ## Protocol without a contract fixture
 
 The daemon already tests most of these in its own suites. What is missing is the shared golden file

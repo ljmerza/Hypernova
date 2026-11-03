@@ -130,7 +130,11 @@ class DeviceCertStore(storage: Storage, private val keys: DeviceKeys, server: St
         val ca = prefs.getString("ca", null) ?: return null
         return runCatching {
             val key = keys.privateKey() ?: return null
-            DeviceIdentity(arrayOf(parse(cert), parse(ca)), key)
+            val mine = parse(cert)
+            // Another key than the one it was signed for (a desktop's keychain was locked, so it made a new one): no
+            // handshake could succeed with these. Nothing presented, the server asks, and [request] gets one for this key.
+            if (keys.publicKey()?.encoded?.contentEquals(mine.publicKey.encoded) == false) return null
+            DeviceIdentity(arrayOf(mine, parse(ca)), key)
         }.getOrNull()
     }
 

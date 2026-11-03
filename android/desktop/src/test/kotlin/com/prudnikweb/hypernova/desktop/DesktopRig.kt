@@ -31,7 +31,9 @@ object DesktopRig {
     val home = Files.createTempDirectory("hypernova-desktop-test")
     /** A test has no tray: what would have shown is kept here. */
     val alerts = StandTray()
-    val platform: DesktopPlatform by lazy { DesktopPlatform(home, surface = alerts) }
+    /** A file, unless a test class says otherwise before its first use of [platform]. */
+    var keychain: KeychainChoice = KeychainChoice.OFF
+    val platform: DesktopPlatform by lazy { DesktopPlatform(home, surface = alerts, keychain = keychain) }
     val shell: Shell by lazy { startCore(platform) }
 
     fun main(block: () -> Unit) {

@@ -50,6 +50,8 @@ backup and device transfer (`allowBackup=false`); an older build's Tailscale nod
 (`files/tsnet`) stay there, no longer read since 2026-10-30. Downloaded files go where the user
 saves them.
 
+**The desktop client.** Its device token and certificate are in an owner-only settings file in its own folder (`~/.local/share/hypernova-client` on Linux). Its device key is in the system's keychain where one answers: the Secret Service on Linux, the login keychain on a Mac, DPAPI on Windows, the last two **not yet run outside CI**. Otherwise it's in an owner-only file beside the settings, and Settings says so. The key's bytes are in the process's memory on every system, and any program running as the user can get them from any of these. What a keychain adds is that they aren't readable in a copy of the home folder. **That copy still has the token, which can get a certificate for another key** (docs/DECISIONS.md, "The desktop client's key in the keychain", 10; LATER L124).
+
 **Dictation's audio** never goes to the Mac. The phone's speech recognizer hears it, as Settings →
 Voice chooses (`data/PhoneDictation.kt`; docs/DECISIONS.md, 2026-10-31): **Phone's recognizer**
 (the default) is the phone's default recognition service, the one the keyboard's voice typing uses,
@@ -283,9 +285,9 @@ The rules are at the write (`daemon/src/debug-scrub.ts`), so no call site has to
    `POST /v1/device/cert` (needs a paired device's token), and a shown code's pairing page. The download
    page's certificate is self-signed at the IP address (`hypernova pair` shows the checksum).
 4. (Removed with the glasses, 2026-10-30: a relay on the Lens bridge.)
-5. **Tokens at rest.** Device tokens on the phone, and the Mac's admin token and provider keys, are
-   plain private files or preferences, not the Keychain or Keystore (LATER L30 for the keys). Anyone who
-   already runs code as the user on the Mac or the phone has them.
+5. **Tokens at rest.** Device tokens on the phone and on the desktop client, and the Mac's admin token and provider keys, are
+   plain private files or preferences, not the Keychain or Keystore (LATER L30 for the keys, L124 for the desktop client's token). Anyone who
+   already runs code as the user on the Mac, the desktop or the phone has them.
 6. (Removed with the name service, 2026-10-30: the private name in Certificate Transparency logs and DNS.)
 7. **A lost phone is a lost unlocked keyboard** until it is forgotten on the Mac. Who can join the Wi-Fi
    and the VPN into it is the user's to set.

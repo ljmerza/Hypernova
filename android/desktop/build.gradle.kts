@@ -209,6 +209,8 @@ tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageT
 }
 
 tasks.withType<Test>().configureEach {
+    // Never the keychain of whoever runs these: a test that wants one is handed its own (KeychainTest).
+    environment("HYPERNOVA_CLIENT_KEYCHAIN", "off")
     // No display on CI or here: the screens render with no window (Compose's own test scene).
     systemProperty("java.awt.headless", "true")
     // Core is one object per process, as it is on a phone: a new process per test class.

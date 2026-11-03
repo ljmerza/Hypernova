@@ -7,6 +7,7 @@ import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.RouteKind
 import java.io.File
 import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.security.spec.ECGenParameterSpec
 import javax.net.ssl.SSLContext
 import javax.swing.SwingUtilities
@@ -23,6 +24,10 @@ import kotlin.system.exitProcess
  *
  * `HYPERNOVA_PROBE_LINK` is the file with the pairing link, `HYPERNOVA_PROBE_OUT` where the answer goes (a window
  * launcher on Windows has no standard output), and `HYPERNOVA_CLIENT_HOME` the folder, which stays paired after it.
+ * With no link it starts on the pairing the folder already has, as an install does when it's updated.
+ *
+ * It also says where the key ended up and which key it is, by a hash of the public half, for the script to follow
+ * it from the file to the keychain and back. Nothing of the private half is ever in this answer.
  */
 object PackageProbe {
     private const val TIMEOUT_MS = 90_000L
@@ -54,12 +59,14 @@ object PackageProbe {
     }
 
     private fun pair(lines: MutableList<String>) {
-        val link = File(checkNotNull(System.getenv("HYPERNOVA_PROBE_LINK")) { "HYPERNOVA_PROBE_LINK isn't set" }).readText().trim()
+        val link = System.getenv("HYPERNOVA_PROBE_LINK")?.takeIf { it.isNotBlank() }?.let { File(it).readText().trim() }
         val platform = DesktopPlatform()
         val shell = startCore(platform)
-        SwingUtilities.invokeAndWait {
-            shell.link = link
-            shell.submit()
+        if (link != null) {
+            SwingUtilities.invokeAndWait {
+                shell.link = link
+                shell.submit()
+            }
         }
         val until = System.currentTimeMillis() + TIMEOUT_MS
         fun waitFor(what: String, done: () -> Boolean) {
@@ -78,6 +85,12 @@ object PackageProbe {
         checkNotNull(route.fingerprint) { "no pin" }
         checkNotNull(route.identity) { "no certificate on the route" }
         lines += "paired=${Core.live?.mac?.name} sessions=${Core.live?.sessions?.size} route=${route.kind}"
+        lines += "key.place=${when (val p = platform.keys.place) {
+            KeyPlace.Nowhere -> "nowhere"
+            KeyPlace.InKeychain -> "keychain"
+            is KeyPlace.InFile -> "file:${p.why}"
+        }}"
+        lines += "key.public=${MessageDigest.getInstance("SHA-256").digest(checkNotNull(platform.keys.publicKey()).encoded).joinToString("") { "%02x".format(it) }}"
         platform.folder.flush()
     }
 }

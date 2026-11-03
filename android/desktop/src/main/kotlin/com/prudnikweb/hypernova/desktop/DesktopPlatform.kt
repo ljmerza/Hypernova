@@ -328,6 +328,7 @@ class DesktopPlatform(
     override val log: Log = DesktopLog(),
     /** Null: AWT's tray, once Main.kt has given it its icon. */
     surface: AlertSurface? = null,
+    keychain: KeychainChoice = Keychains.forThisSystem(home),
 ) : Platform, AutoCloseable {
     val folder: DesktopStorage = DesktopStorage(home, log)
     val keyFile: Path = home.resolve("device-key.json")
@@ -346,7 +347,8 @@ class DesktopPlatform(
     override val device: DeviceInfo = DesktopDevice()
     override val network: NetworkWatcher = DesktopNetwork()
     override val screen: ScreenWatcher get() = screenWatch
-    override val deviceKeys: DeviceKeys = DesktopKeys(keyFile, log)
+    val keys = DesktopKeys(keyFile, log, keychain)
+    override val deviceKeys: DeviceKeys get() = keys
     override val speech: SpeechOutput = SilentSpeech(log)
     override val background: BackgroundLink = ProcessLink
     override fun retryAlarm(): RetryAlarm = DesktopRetryAlarm(ticks, main)

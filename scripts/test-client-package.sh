@@ -2,7 +2,7 @@
 # Installs one desktop client package the way a person does, opens it, and pairs it with the demo server
 # (demo/README.md) from inside its own Java, then removes it. For .github/workflows/client-packages.yml:
 #
-#   scripts/test-client-package.sh --deb x.deb         --probe package-probe.jar --version 0.23.0 [--shots DIR]
+#   scripts/test-client-package.sh --deb x.deb         --probe package-probe.jar --version 0.23.0 [--shots DIR] [--keychain]
 #   scripts/test-client-package.sh --tarball x.tar.gz  --probe …
 #   scripts/test-client-package.sh --dmg x.dmg         --probe …      a Mac runner
 #   scripts/test-client-package.sh --msi x.msi         --probe … [--msi-next y.msi --next-version 0.24.0]    Windows, in Git's bash
@@ -15,6 +15,8 @@
 #      and java.home has to be inside the install.
 #   5. The installed app, started again on that pairing, reaches the server with its certificate: the server says so.
 #   6. A newer .msi replaces the old one rather than piling up (with --msi-next), and uninstalling leaves nothing.
+#   7. With --keychain, the device key's whole way (key_journey, below) on this system's real keychain: a throwaway one,
+#      never the one of whoever runs this. So it wants CI set too. On Linux that needs dbus, gnome-keyring and secret-tool.
 #
 # Everything but --tarball installs on this machine for real, so it wants CI set: a runner or a throwaway
 # container (docs/RELEASING.md, "The desktop client's packages"). Needs node and daemon/node_modules for the demo
@@ -25,7 +27,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WINDOW="$(sed -n 's/^const val APP_NAME = "\(.*\)"$/\1/p' "$REPO/android/desktop/src/main/kotlin/com/prudnikweb/hypernova/desktop/AppName.kt")"
 DEMO_PORT=47391
 
-kind='' pkg='' probe='' version='' shots='' next='' next_version=''
+kind='' pkg='' probe='' version='' shots='' next='' next_version='' keychain=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --deb|--tarball|--dmg|--msi) kind="${1#--}"; pkg="$2"; shift 2 ;;
@@ -34,6 +36,7 @@ while [ $# -gt 0 ]; do
     --shots) shots="$2"; shift 2 ;;
     --msi-next) next="$2"; shift 2 ;;
     --next-version) next_version="$2"; shift 2 ;;
+    --keychain) keychain=yes; shift ;;
     *) echo "test-client-package.sh: what is $1?" >&2; exit 2 ;;
   esac
 done
@@ -44,6 +47,9 @@ ok() { printf 'ok    %s\n' "$*"; }
 [ -s "$probe" ] || die "no probe jar: --probe, from :desktop:probeJar"
 [ -n "$version" ] || die "--version: the release's numbers, 0.23.0"
 [ "$kind" = tarball ] || [ -n "${CI:-}" ] || die "this installs on this machine for real, so only with CI set: a runner or a throwaway container"
+[ -z "$keychain" ] || [ -n "${CI:-}" ] || die "--keychain changes this machine's keychains on a Mac, so only with CI set: a runner or a throwaway container"
+# A tarball tried on someone's own computer stays out of their keychain, whatever happens below.
+[ -n "${CI:-}" ] || export HYPERNOVA_CLIENT_KEYCHAIN=off
 case "$version" in *[!0-9.]*|*.*.*.*) die "--version wants three numbers, not $version" ;; *.*.*) ;; *) die "--version wants three numbers, not $version" ;; esac
 [ -d "$REPO/daemon/node_modules/ws" ] || die "the demo server needs daemon/node_modules: npm ci --ignore-scripts in daemon/"
 
@@ -60,7 +66,7 @@ probe="$(native "$(abs "$probe")")"
 if [ -n "$shots" ]; then mkdir -p "$shots"; shots="$(abs "$shots/.")"; fi
 
 tmp="$(mktemp -d)"
-xvfb_pid='' demo_pid='' app_pid='' mount=''
+xvfb_pid='' demo_pid='' app_pid='' mount='' test_keychain=''
 finish() {
   code=$?
   set +e
@@ -70,6 +76,7 @@ finish() {
   fi
   [ -z "$xvfb_pid" ] || kill "$xvfb_pid" 2>/dev/null
   [ -z "$mount" ] || hdiutil detach "$mount" -quiet -force >/dev/null 2>&1
+  [ -z "$test_keychain" ] || security delete-keychain "$test_keychain" >/dev/null 2>&1
   if [ "$code" -ne 0 ]; then
     for f in "$tmp"/*.log; do [ -e "$f" ] && { echo "--- $f"; tail -n 60 "$f"; }; done
   fi
@@ -118,6 +125,22 @@ linux_up() {
     return 0
   }
 }
+# A session bus and a keyring of their own, in a home of their own: never anyone's real ones.
+keychain_linux() {
+  for tool in dbus-run-session gnome-keyring-daemon secret-tool; do command -v "$tool" >/dev/null || die "--keychain wants $tool here"; done
+  keyring_home="$tmp/keyring-home"
+  mkdir -p "$keyring_home" "$tmp/no-bus-home"
+  with_keychain() {
+    env -u DISPLAY -u XDG_RUNTIME_DIR HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/.local/share" dbus-run-session -- \
+      sh -c 'printf %s throwaway | gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1; exec "$@"' sh "$@"
+  }
+  # Started by the bus with nobody to give it its password, as after a login that didn't unlock it.
+  keychain_gone() {
+    env -u DISPLAY -u XDG_RUNTIME_DIR HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/.local/share" dbus-run-session -- "$@"
+  }
+  keychain_gone_says=file:Down
+  no_bus() { env -u DISPLAY -u XDG_RUNTIME_DIR -u DBUS_SESSION_BUS_ADDRESS HOME="$tmp/no-bus-home" "$@"; }
+}
 no_display() {
   set +e
   out="$(env -u DISPLAY HYPERNOVA_CLIENT_HOME="$tmp/no-display" "$LAUNCHER" 2>&1)"
@@ -136,6 +159,7 @@ install_deb() {
   [ "$got" = "$version" ] || die "the package says $got, not $version"
   ok "apt-get install -y, version $got"
   [ -e "/usr/share/applications/$CLIENT_PACKAGE-$CLIENT_PACKAGE.desktop" ] && ok "a menu entry" || say "      (no menu entry: this system has no menus)"
+  case "$(dpkg-deb -f "$pkg" Recommends)" in *libsecret-tools*) ok "it recommends what reaches a keychain" ;; *) die "it doesn't recommend libsecret-tools" ;; esac
   linux_up
 }
 remove_deb() {
@@ -154,6 +178,8 @@ install_tarball() {
   linux_up
 }
 remove_tarball() { :; }
+keychain_deb() { keychain_linux; }
+keychain_tarball() { keychain_linux; }
 
 # ── Mac ──
 install_dmg() {
@@ -203,6 +229,20 @@ SWIFT
     app_pid=''
     return 0
   }
+}
+# A keychain of its own, unlocked, and the default: a runner's login keychain may not be either.
+keychain_dmg() {
+  test_keychain="$tmp/hypernova-test.keychain-db"
+  security create-keychain -p throwaway "$test_keychain"
+  security set-keychain-settings "$test_keychain"
+  security unlock-keychain -p throwaway "$test_keychain"
+  # shellcheck disable=SC2046 # one name per line, each in quotes, none with a space on a runner
+  security list-keychains -d user -s "$test_keychain" $(security list-keychains -d user | tr -d '"')
+  security default-keychain -d user -s "$test_keychain"
+  with_keychain() { "$@"; }
+  keychain_gone() { env HYPERNOVA_CLIENT_KEYCHAIN=off "$@"; }
+  keychain_gone_says=file:TurnedOff
+  no_bus() { env HYPERNOVA_CLIENT_KEYCHAIN=off "$@"; }
 }
 remove_dmg() {
   rm -rf "$ROOT"
@@ -289,6 +329,13 @@ PS1
     return 0
   }
 }
+# DPAPI has nothing to set up, as the runner's user has a login.
+keychain_msi() {
+  with_keychain() { "$@"; }
+  keychain_gone() { env HYPERNOVA_CLIENT_KEYCHAIN=off "$@"; }
+  keychain_gone_says=file:TurnedOff
+  no_bus() { env HYPERNOVA_CLIENT_KEYCHAIN=off "$@"; }
+}
 remove_msi() {
   if [ -n "$next" ]; then
     win msi install "$(native "$next")" || die "the newer .msi failed: exit $?"
@@ -333,20 +380,84 @@ connected() { grep -c 'connected over mutual TLS' "$tmp/demo.log" || true; }
 
 paired="$tmp/paired-home"
 mkdir "$paired"
-answer="$tmp/probe-answer.txt"
-HYPERNOVA_CLIENT_HOME="$(native "$paired")" HYPERNOVA_PROBE_LINK="$(native "$tmp/demo/atlas/pair-link")" HYPERNOVA_PROBE_OUT="$(native "$answer")" \
-  JAVA_TOOL_OPTIONS="-javaagent:$probe" "$LAUNCHER" >"$tmp/probe.log" 2>&1 &
-probe_pid=$!
-until_true 150 test -s "$answer" || die "the probe gave no answer"
-wait "$probe_pid" || true
+# probe_run <name> <link's file, or nothing to start on the folder's pairing> [what to run it under...]
+probe_run() {
+  local name="$1" link="$2" answer="$tmp/probe-$1.txt" pid
+  shift 2
+  "$@" env HYPERNOVA_CLIENT_HOME="$(native "$paired")" HYPERNOVA_PROBE_LINK="$link" HYPERNOVA_PROBE_OUT="$(native "$answer")" \
+    JAVA_TOOL_OPTIONS="-javaagent:$probe" "$LAUNCHER" >"$tmp/probe-$name.log" 2>&1 &
+  pid=$!
+  until_true 150 test -s "$answer" || die "the probe ($name) gave no answer"
+  wait "$pid" || true
+  grep -q '^ok=true$' "$answer" || { cat "$answer"; die "it didn't pair or connect ($name)"; }
+}
+said_by() { sed -n "s/^$2=//p" "$tmp/probe-$1.txt"; }
+key_is() { # <probe> <where>
+  [ "$(said_by "$1" key.place)" = "$2" ] || die "$1: the key is at $(said_by "$1" key.place), not $2"
+}
+
+# The first pairing is on the file, as every install before this was.
+probe_run first "$(native "$tmp/demo/atlas/pair-link")" env HYPERNOVA_CLIENT_KEYCHAIN=off
+answer="$tmp/probe-first.txt"
 cat "$answer"
-grep -q '^ok=true$' "$answer" || die "it didn't pair"
 java_home="$(sed -n 's/^java.home=//p' "$answer" | tr '\\' '/')"
 case "$java_home" in "$(native "$ROOT")"*) ok "that's the Java in the install, $java_home" ;; *) die "that was another Java: $java_home, not in $ROOT" ;; esac
 said="$(sed -n 's/^app.version=//p' "$answer")"
 [ "$said" = "$version" ] || die "the app says it's $said, not $version"
 ok "the app says it's $said"
 ok "paired with the demo server: an EC key, a certificate on it, mutual TLS"
+
+# The device key's whole way, each step reconnecting with mutual TLS on what's in the folder (PackageProbe, ok=true):
+#   an install from before: moved to the keychain with its pairing, its file gone, and the same key found by a restart;
+#   then the keychain locked or missing: a new key in the file, a new certificate, still connected; no second key;
+#   then the keychain back: the file's key moves over the old one.
+key_journey() {
+  local key_file="$paired/device-key.json" secret old new
+  key_is first file:TurnedOff
+  [ -s "$key_file" ] || die "no key file after the first pairing"
+  ok "paired with the key in its owner-only file"
+  # Only to look for, below.
+  secret="$(sed 's/.*"private":"\([^"]*\)".*/\1/' "$key_file")"
+  [ -n "$secret" ] || die "no private key in the key's file"
+  old="$(said_by first key.public)"
+
+  "keychain_$kind"
+  probe_run moved '' with_keychain
+  key_is moved keychain
+  [ ! -e "$key_file" ] || die "the key's file is still there after the move"
+  [ "$(said_by moved key.public)" = "$old" ] || die "the key changed in the move"
+  ok "an existing pairing moved its key to the keychain, removed the file, and connected"
+
+  probe_run restarted '' with_keychain
+  key_is restarted keychain
+  [ "$(said_by restarted key.public)" = "$old" ] || die "a restart found another key"
+  [ ! -e "$key_file" ] || die "the key's file came back"
+  ok "a restart reads the same key from the keychain"
+
+  probe_run gone '' keychain_gone
+  key_is gone "$keychain_gone_says"
+  [ -s "$key_file" ] || die "no key file with the keychain gone"
+  new="$(said_by gone key.public)"
+  [ "$new" != "$old" ] || die "it had the old key with the keychain gone"
+  ok "the keychain locked: a new key in the file, a new certificate, connected ($keychain_gone_says)"
+
+  probe_run no-bus '' no_bus
+  key_is no-bus "$keychain_gone_says"
+  [ "$(said_by no-bus key.public)" = "$new" ] || die "with no keychain at all it didn't keep the file's key"
+  ok "no keychain running at all: the file's key, connected"
+
+  probe_run back '' with_keychain
+  key_is back keychain
+  [ "$(said_by back key.public)" = "$new" ] || die "the file's key didn't win"
+  [ ! -e "$key_file" ] || die "the key's file is still there with the keychain back"
+  ok "the keychain back: the file's key moved over the old one, the file gone"
+
+  if grep -rlF -- "$secret" "$paired" "$tmp"/probe-*.log "$tmp"/probe-*.txt ${keyring_home:+"$keyring_home"} >"$tmp/holds-key.txt" 2>/dev/null; then
+    die "the first key is readable in: $(cat "$tmp/holds-key.txt")"
+  fi
+  ok "the private key is in no log, no answer and no file of the folder${keyring_home:+, and the keyring holds it encrypted}"
+}
+[ -z "$keychain" ] || key_journey
 
 before="$(connected)"
 open_on_pairing "$paired"

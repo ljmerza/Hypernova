@@ -152,6 +152,8 @@ interface DeviceKeys {
     /** The key, made if it isn't there. */
     fun ensure(): Pair<PublicKey, PrivateKey>
     fun privateKey(): PrivateKey?
+    /** The key's public half when that's cheap to say. Null: can't say, and it's never been known to change (a phone's keystore). */
+    fun publicKey(): PublicKey? = null
     fun delete()
 }
 

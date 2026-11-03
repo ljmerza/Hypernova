@@ -73,7 +73,7 @@ jobs:
       - name: What the build and the test need
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq binutils fakeroot libasound2t64 libfontconfig1 libgl1 libx11-6 libxext6 libxi6 libxrender1 libxtst6 xvfb xdotool imagemagick
+          sudo apt-get install -y -qq binutils fakeroot libasound2t64 libfontconfig1 libgl1 libx11-6 libxext6 libxi6 libxrender1 libxtst6 xvfb xdotool imagemagick dbus gnome-keyring libsecret-tools
       - name: Build
         working-directory: android
         run: ./gradlew :desktop:packageDeb :desktop:createDistributable :desktop:probeJar -PdesktopVersion="$VERSION" --stacktrace
@@ -90,7 +90,7 @@ jobs:
         working-directory: daemon
         run: npm ci --ignore-scripts
       - name: Install, open and pair the .deb
-        run: scripts/test-client-package.sh --deb "$DEB" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots
+        run: scripts/test-client-package.sh --deb "$DEB" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots --keychain
       - name: Attach the .deb to the release
         if: ${{ inputs.attach }}
         env:
@@ -105,7 +105,7 @@ jobs:
           echo "TGZ=$tgz" >> "$GITHUB_ENV"
       - name: Unpack, open and pair the folder
         if: ${{ matrix.arch == 'amd64' }}
-        run: scripts/test-client-package.sh --tarball "$TGZ" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots
+        run: scripts/test-client-package.sh --tarball "$TGZ" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots --keychain
       - name: Attach the folder to the release
         if: ${{ matrix.arch == 'amd64' && inputs.attach }}
         env:
@@ -165,7 +165,7 @@ jobs:
         working-directory: daemon
         run: npm ci --ignore-scripts
       - name: Install, open and pair the .dmg
-        run: /bin/bash scripts/test-client-package.sh --dmg "$DMG" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots
+        run: /bin/bash scripts/test-client-package.sh --dmg "$DMG" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots --keychain
       - name: Attach the .dmg to the release
         if: ${{ inputs.attach }}
         env:
@@ -240,7 +240,7 @@ jobs:
         working-directory: daemon
         run: npm ci --ignore-scripts
       - name: Install, open, pair, upgrade and uninstall the .msi
-        run: scripts/test-client-package.sh --msi "$MSI" --msi-next dist/client-next/next.msi --next-version "$NEXT" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots
+        run: scripts/test-client-package.sh --msi "$MSI" --msi-next dist/client-next/next.msi --next-version "$NEXT" --probe android/desktop/build/probe/package-probe.jar --version "$NUMBERS" --shots dist/client-shots --keychain
       - name: Attach the .msi to the release
         if: ${{ inputs.attach }}
         env:
