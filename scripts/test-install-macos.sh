@@ -212,6 +212,19 @@ run bash "$PREFIX/bin/hypernova-server-setup"
 has "1.10.0 is newer than 1.2.3, as numbers" "$OUT" 'already on 1.10.0'
 
 echo "get.sh"
+# A connection dropped during `curl | bash`: cut off anywhere, it runs nothing.
+cut_dir=$(mktemp -d)
+for t in uname curl tar id mktemp; do printf '#!/bin/sh\necho ran >> "%s/ran"\n' "$cut_dir" > "$cut_dir/$t"; chmod +x "$cut_dir/$t"; done
+size=$(wc -c < "$SCRIPTS/get.sh")
+n=0; ran=''
+while [ "$n" -lt "$size" ]; do
+  rm -f "$cut_dir/ran"
+  head -c "$n" "$SCRIPTS/get.sh" | PATH="$cut_dir" "$BASH" >/dev/null 2>&1 || true
+  [ -e "$cut_dir/ran" ] && ran="$ran $n"
+  n=$((n + 97))
+done
+rm -rf "$cut_dir"
+[ -z "$ran" ] && ok "get.sh cut off at any point runs nothing" || bad "get.sh cut off at bytes$ran ran something" ""
 GH="$DIST/latest"
 A=https://github.test/dl
 cat > "$GH" <<EOF

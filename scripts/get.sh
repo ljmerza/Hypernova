@@ -19,6 +19,8 @@ set -euo pipefail
 REPO=ljmerza/Hypernova
 die() { printf 'get.sh: %s\n' "$*" >&2; exit 1; }
 
+# All of it in one function, called on the last line: a connection dropped during `curl | bash` runs nothing.
+main() {
 case "$(uname -s)" in
   Linux)
     ASSET='-linux\.tar\.gz'
@@ -74,3 +76,6 @@ cat <<'EOF2'
     claude            sign in to Claude Code once
     hypernova pair    a QR code for the phone (the client: hypernova-client-<tag>-android.apk on the releases page)
 EOF2
+}
+
+main "$@"
