@@ -341,6 +341,14 @@ On a Linux server these answer as unavailable (docs/PROTOCOL.md, "Mac-only featu
 | DP4 | The notes' Client heading and the "Not built" lines; `SHA256SUMS` after both package workflows | `scripts/test-next-version.sh` (notes, "not built"); the `checksums` job | **partial**: the script is tested; the job, by its first release |
 | DP5 | A desktop file on a release isn't taken for the phone's APK or the server's package | releases.test.ts › "the desktop client’s files on a release…"; `get.sh` looks for `hypernova-server-` | **covered** |
 
+## 23. The desktop client's screens
+
+| # | Capability | Tests | Status |
+|---|---|---|---|
+| DC1 | Home as two panes: the list in the phone's groups, the chosen session beside it (its state, what it's doing or asking, why it's stopped, its folder, model, mode, times), Allow and Deny there and only beside the whole command, a question or a plan sent to the phone, what isn't here said plainly | PanesTest (choosing, nothing chosen, the list staying put, a session vanishing, a rewind's copy, offline, two servers, Settings and back); ApproveTest (all, through the pane); CardsTest (a row's line, the facts, the words); RendersTest (`30`-`37`) | **partial**: the real window has run under Xvfb on 1600x1000 and 3840x2160, at the automatic scale, with real keys and clicks, against the demo server. Not on a real monitor, a Mac or Windows, or with a real Allow from a real window (the demo refuses answers; Allow itself is over real mutual TLS in the tests) |
+| DC2 | A narrow window is one pane at a time, by dp, so it follows the scale and zoom; Back finds the list where it was | PanesTest (narrow, smallest, a scale's width) | **covered** in the test scene; a real resize looked at under Xvfb |
+| DC3 | Keys: up and down choose, Escape lets go, Enter opens in one pane, Tab reaches the pills, and they still work after what had the focus goes | PanesTest (the keys) | **covered** in the test scene; real keys looked at under Xvfb |
+
 ## Protocol without a contract fixture
 
 The daemon already tests most of these in its own suites. What is missing is the shared golden file
