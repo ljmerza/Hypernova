@@ -28,7 +28,6 @@ import com.prudnikweb.hypernova.ui.components.GlassSheet
 import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.NavRow
 import com.prudnikweb.hypernova.ui.components.Radio
-import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.home.CardSwipePref
 import com.prudnikweb.hypernova.ui.home.SwipeChoice
 import com.prudnikweb.hypernova.ui.theme.HN
@@ -36,7 +35,7 @@ import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 
 /**
- * Settings → Card swipes (owner, 2026-10-31): what a swipe left and a swipe right on a Home card do
+ * Settings → Card swipes, its own page (owner, 2026-10-31): what a swipe left and a swipe right on a Home card do
  * (ui/home/CardSwipe.kt), a row each with the pick and what it does; a tap opens the choices in a
  * sheet. Kept on this phone and applied to Home at once. By default left is Smart and right Nothing.
  */
@@ -46,7 +45,6 @@ internal fun CardSwipeSection() {
     val swipes by remember { CardSwipePref.state(context) }
     // The way whose choices are open: true left, false right.
     var picking by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    Seam(stringResource(R.string.st_card_swipes), modifier = Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp))
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             HText(stringResource(R.string.st_card_swipes_desc), style = Type.small, color = HN.inkMuted)

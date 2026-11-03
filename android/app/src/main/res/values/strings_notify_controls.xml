@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Settings → Notifications and each server's card (ui/settings/NotificationControls.kt). -->
-    <string name="nc_master_desc">From every server, on this phone. A server\'s own card can change that.</string>
+    <!-- Settings → Notifications and each server's page (ui/settings/NotificationControls.kt). -->
+    <string name="nc_master_desc">From every server, on this phone. A server\'s own page can change that.</string>
     <string name="nc_master_off_desc">Nothing from any server. Home, the banners in the app and the widget still show everything. Android keeps the connection\'s own quiet notification.</string>
     <string name="nc_which">Which ones</string>
     <string name="nc_which_all">All</string>
@@ -25,10 +25,10 @@
     <string name="nc_same">Same as all</string>
     <string name="nc_custom">Custom</string>
     <string name="nc_off">Off</string>
-    <string name="nc_server_same_desc">Follows the Notifications section further down.</string>
+    <string name="nc_server_same_desc">Follows the Notifications page in Settings.</string>
     <string name="nc_server_custom_desc">These switches, for this server only.</string>
     <string name="nc_server_off_desc">Nothing from this server. Its cards still show.</string>
-    <string name="nc_server_master_off">The Notifications switch further down is off, so nothing comes from any server.</string>
+    <string name="nc_server_master_off">The switch on the Notifications page in Settings is off, so nothing comes from any server.</string>
 
     <!-- The confirm, whichever switch would leave a prompt silent. -->
     <string name="nc_ask_master">Turn off all notifications?</string>

@@ -35,6 +35,7 @@ import com.prudnikweb.hypernova.data.NotificationPrefs
 import com.prudnikweb.hypernova.data.NotificationPrefsStore
 import com.prudnikweb.hypernova.data.NotifyGroup
 import com.prudnikweb.hypernova.data.Pairing
+import com.prudnikweb.hypernova.data.Route
 import com.prudnikweb.hypernova.data.ServerNotify
 import com.prudnikweb.hypernova.data.live.FakeDaemon
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
@@ -44,7 +45,6 @@ import com.prudnikweb.hypernova.ui.components.ConfirmDialog
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.settings.NotificationDefaults
 import com.prudnikweb.hypernova.ui.settings.ServerNotifyRow
-import com.prudnikweb.hypernova.ui.settings.SettingsTab
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,8 +60,8 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * Settings' notification controls (ui/settings/NotificationControls.kt): the defaults in the
- * Notifications card, a row in each server's card, and the confirm that says a prompt would wait
+ * Settings' notification controls (ui/settings/NotificationControls.kt): the defaults on the
+ * Notifications page, a row in each server's card, and the confirm that says a prompt would wait
  * silently. The tab itself in SettingsTabTest; here its rows, on their own so the pictures show them.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -293,31 +293,38 @@ class NotificationSettingsTest {
 
     // ─── In the tab ───
 
-    @Config(qualifiers = "+h5200dp")
-    @Test fun inAllServersEachBlocksRowIsThatServersAndThePermissionsAskStays() {
+    @Config(qualifiers = "+h2000dp")
+    @Test fun inAllServersEachServersPageHasItsRowAndThePermissionsAskStays() {
         val z2 = pair("z2")
         val shed = pair("shed")
         linked()
         Core.switchTo(z2)
         Core.showAll()
         val vm = HubViewModel(AndroidCore.app)
-        rule.setContent { Harness(spy) { SettingsTab(vm, top = 0.dp) } }
+        rule.setContent { Harness(spy) { SettingsHost(vm) } }
         rule.waitForIdle()
-        // A row per server, and one master in Notifications.
-        assertEquals(2, rule.onAllNodesWithText(str(R.string.nc_same)).fetchSemanticsNodes().size)
+        // One master, on the Notifications page; the permission's ask is there too (Robolectric's phone hasn't granted it).
+        click(str(R.string.notifications))
+        assertEquals(Route.NotificationSettings, vm.nav.top)
         rule.onNode(isSwitch(str(R.string.notifications))).assertExists()
-        // Robolectric's phone hasn't granted the permission: the existing ask is there.
         rule.onNodeWithText(str(R.string.notif_allow)).performScrollTo().assertExists()
-        rule.onAllNodesWithText(str(R.string.nc_custom))[1].performScrollTo().performClick()
+        vm.nav.reset()
         rule.waitForIdle()
+        // Custom on shed's page is shed's alone.
+        click("shed")
+        assertEquals(1, rule.onAllNodesWithText(str(R.string.nc_same)).fetchSemanticsNodes().size)
+        click(str(R.string.nc_custom))
         assertEquals(ServerNotify.Custom, prefs().modeOf(shed))
         assertEquals(ServerNotify.Same, prefs().modeOf(z2))
         rule.onNode(isSwitch(str(R.string.nc_finished))).performScrollTo().performClick()
         rule.waitForIdle()
         assertFalse(prefs().allows(shed, Notice.Kind.Finished))
         assertTrue(prefs().allows(z2, Notice.Kind.Finished))
-        // Off in z2's block names z2.
-        rule.onAllNodesWithText(str(R.string.nc_off))[0].performScrollTo().performClick()
+        vm.nav.reset()
+        rule.waitForIdle()
+        // Off on z2's page names z2.
+        click("z2")
+        rule.onNodeWithText(str(R.string.nc_off)).performScrollTo().performClick()
         rule.waitForIdle()
         assertEquals(str(R.string.nc_ask_server, "z2"), spy.confirms.single().title)
     }
@@ -335,8 +342,9 @@ class NotificationSettingsTest {
             Thread.sleep(3)
         }
         val vm = HubViewModel(AndroidCore.app)
-        rule.setContent { Harness(spy) { SettingsTab(vm, top = 0.dp) } }
+        rule.setContent { Harness(spy) { SettingsHost(vm) } }
         rule.waitForIdle()
+        click("z2")
         rule.onNodeWithText(str(R.string.nc_off)).performScrollTo().performClick()
         rule.waitForIdle()
         spy.confirms.single().onConfirm()

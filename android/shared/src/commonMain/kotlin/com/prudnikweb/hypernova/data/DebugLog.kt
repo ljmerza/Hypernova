@@ -433,6 +433,12 @@ val Route.debugWords: String
         is Route.AgentEnv -> "agent environment"
         is Route.AgentRaw -> "agent raw settings"
         Route.ConnectionLog -> "connection log"
+        is Route.ServerSettings -> "a server's settings"
+        Route.NotificationSettings -> "notification settings"
+        Route.TopBarSettings -> "session top bar settings"
+        Route.CardSwipeSettings -> "card swipe settings"
+        Route.TypingVoiceSettings -> "typing and voice settings"
+        Route.LogSettings -> "log settings"
         is Route.ProviderEdit -> "editing a provider"
         is Route.AutomationEdit -> "automation ${id ?: "new"}"
     }

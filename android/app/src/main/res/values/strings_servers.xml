@@ -58,9 +58,17 @@
     <!-- The permanent notification's title with others watched under it. -->
     <string name="notif_title_watched">%1$s · +%2$d watched</string>
 
-    <!-- Settings with "All servers" (ui/settings/SettingsPlan.kt): each server's block under its name, then this phone's. -->
+    <!-- The Settings tab (ui/settings/SettingsPlan.kt): a row per server, then this phone's. -->
+    <string name="st_servers">Servers</string>
+    <string name="st_server_row_desc">Connection, updates, agents, voices and files</string>
     <string name="st_all_phone">This phone</string>
-    <string name="st_all_intro">All servers: each server\'s settings under its name, then this phone\'s.</string>
-    <!-- In a server's block while it isn't connected: its other settings are left out until it is. -->
+    <string name="st_typing_voice">Typing and voice</string>
+    <string name="st_logs">Logs</string>
+    <string name="st_page_notifications_desc">Which ones you get, and staying connected in the background</string>
+    <string name="st_page_top_bar_desc">What the bar at the top of a chat shows</string>
+    <string name="st_page_card_swipes_desc">What a swipe left or right does on a Home card</string>
+    <string name="st_page_typing_voice_desc">What Enter does, and which voice recognition to use</string>
+    <string name="st_page_logs_desc">How the app reached your Mac, and the detailed log</string>
+    <!-- On a server's page while it isn't connected: its other settings are left out until it is. -->
     <string name="st_all_waiting">Its settings show here once it\'s connected.</string>
 </resources>

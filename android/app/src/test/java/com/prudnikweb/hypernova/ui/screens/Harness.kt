@@ -93,6 +93,15 @@ fun Harness(spy: AppSpy, content: @Composable () -> Unit) {
     }
 }
 
+/** The Settings tab and its sub pages as App.kt shows them, by [HubViewModel.nav]; other screens draw nothing, the stack says they opened. */
+@Composable
+fun SettingsHost(vm: com.prudnikweb.hypernova.data.HubViewModel) {
+    when (val r = vm.nav.top) {
+        com.prudnikweb.hypernova.data.Route.Home -> com.prudnikweb.hypernova.ui.settings.SettingsTab(vm, top = androidx.compose.ui.unit.Dp(0f))
+        else -> com.prudnikweb.hypernova.ui.settings.SettingsSubPage(r, vm, onBack = { vm.nav.pop() })
+    }
+}
+
 val context: Context get() = RuntimeEnvironment.getApplication()
 
 fun str(id: Int, vararg args: Any): String = context.getString(id, *args)

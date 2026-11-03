@@ -3,13 +3,11 @@ package com.prudnikweb.hypernova.ui.settings
 import com.prudnikweb.hypernova.data.LinkState
 
 /**
- * Which parts of the Settings tab show, in their order, with one server on screen or with "All
- * servers" (docs/DECISIONS.md, "All servers in Settings"). With one server, the parts are as they
- * always were. With All servers, nothing acts on the server picked last: each server's own parts
- * (its card, Agents & providers, Read aloud, Files, the testing checklist) show once per server, one
- * after the other under its name, each bound to that server alone; a server that isn't connected
- * shows its card only, saying its settings come back once it is. Then what this phone keeps, under
- * "This phone". Pure, so it's tested (SettingsPlanTest).
+ * What Settings shows and where (docs/DECISIONS.md, "Settings in sub pages"). The tab is the same
+ * with one server and with "All servers": a row for each server listed, opening that server's own
+ * page, then what this phone keeps, the longer parts behind rows of their own. A server's page holds
+ * everything of that server, bound to it alone, whichever way it was opened. Pure, so it's tested
+ * (SettingsPlanTest).
  */
 object SettingsPlan {
     /** What Settings needs to know about a paired server. */
@@ -23,9 +21,28 @@ object SettingsPlan {
     )
 
     sealed interface Part {
-        /** The list item's key: unique in the list, and what SettingsJump scrolls to. */
+        /** The list item's key: unique in its list, and what SettingsJump scrolls to on a server's page. */
         val key: String
     }
+
+    // ─── The tab ───
+
+    sealed interface TabPart : Part
+
+    /** A row for each of [ids], in order; none: not paired. */
+    data class Servers(val ids: List<String>) : TabPart { override val key = "servers" }
+    /** "This phone": the heading, and the rows of [pages]. */
+    data class Phone(val pages: List<PhonePage>) : TabPart { override val key = "phone" }
+    data object NewSessions : TabPart { override val key = "newSessions" }
+    data object Display : TabPart { override val key = "display" }
+    /** Terminal engine: xterm.js or the Ghostty trial (ui/term/TermEngine.kt), this phone's; testing only. */
+    data object TerminalEngine : TabPart { override val key = "termEngine" }
+    data object About : TabPart { override val key = "about" }
+
+    /** The phone's sub pages, in their order on the tab. */
+    enum class PhonePage { Notifications, TopBar, CardSwipes, TypingAndVoice, Logs }
+
+    // ─── A server's page ───
 
     /** A part that reads and writes one server's hub, [server]'s, and no other. */
     sealed interface ServerPart : Part {
@@ -33,86 +50,42 @@ object SettingsPlan {
     }
 
     /**
-     * The server's card: its name and link, address, battery and Stay awake, Retry, Forget. With All
-     * servers its name is the block's heading and [waiting] says it isn't connected: its other
-     * settings are left out until it is.
+     * The server's card: its link, address, versions, battery and Stay awake, Retry, Forget. [waiting]
+     * says it isn't connected: its other settings are left out until it is.
      */
-    data class Server(override val server: String, override val key: String, val waiting: Boolean = false) : ServerPart
-    data class Providers(override val server: String, override val key: String) : ServerPart
-    data class ReadAloud(override val server: String, override val key: String) : ServerPart
-    data class Files(override val server: String, override val key: String) : ServerPart
-    data class Checklist(override val server: String, override val key: String) : ServerPart
-
-    /** Voice recognition, this phone's; with one server, its Read aloud follows in the same item ([readAloud]). */
-    data class Voice(val readAloud: String? = null) : Part { override val key = "voice" }
-    /** "This phone": the heading over what the phone keeps, with All servers only. */
-    data object PhoneHeading : Part { override val key = "phone" }
-    /** The connection log, once (it's the phone's, every server's lines in it), with All servers only. */
-    data object ConnectionLog : Part { override val key = "connectionLog" }
-    data object NewSessions : Part { override val key = "newSessions" }
-    data object Display : Part { override val key = "display" }
-    data object CardSwipes : Part { override val key = "cardSwipes" }
-    data object TopBar : Part { override val key = "topBar" }
-    data object Typing : Part { override val key = "typing" }
-    data object Notifications : Part { override val key = "background" }
-    /** Terminal engine: xterm.js or the Ghostty trial (ui/term/TermEngine.kt), this phone's; testing only. */
-    data object TerminalEngine : Part { override val key = "termEngine" }
-    /** Debug logging (DebugLogSection.kt): this device's, off by default. */
-    data object DebugLog : Part { override val key = "debugLog" }
-    data object About : Part { override val key = "about" }
-
-    /** A server part's key: the part's own with one server, the part's and the server's with All servers. */
-    fun keyOf(part: String, server: String, all: Boolean): String = if (all) "$part:$server" else part
-
-    /** The list item [SettingsJump] asked for: as [keyOf], but the server's card has a key of its own with All servers. */
-    fun jumpKey(part: String, server: String, all: Boolean): String = keyOf(if (all && part == SettingsJump.SERVER) "server" else part, server, all)
+    data class Server(override val server: String, val waiting: Boolean = false) : ServerPart { override val key = SettingsJump.SERVER }
+    data class Providers(override val server: String) : ServerPart { override val key = "providers" }
+    data class ReadAloud(override val server: String) : ServerPart { override val key = "readAloud" }
+    data class Files(override val server: String) : ServerPart { override val key = SettingsJump.FILES }
+    data class Checklist(override val server: String) : ServerPart { override val key = "qa" }
 
     /**
-     * The parts in order. [all]: "All servers" is on, [servers] every paired one in the order they
-     * were paired; otherwise [servers] is the one on screen (empty: none paired). [testing]: the
-     * testing checklist is unlocked (a debug build, or seven taps on the build), and with it the
+     * The tab's parts in order. [servers]: every paired one with All servers, in the order they were
+     * paired, otherwise the one on screen (empty: none paired, so no Notifications either).
+     * [testing]: the testing tools are unlocked (a debug build, or seven taps on the build): the
      * Terminal engine trial, just before About.
      */
-    fun parts(all: Boolean, servers: List<ServerFacts>, testing: Boolean): List<Part> =
-        if (all) allServers(servers, testing) else oneServer(servers.firstOrNull(), testing)
-
-    private fun oneServer(s: ServerFacts?, testing: Boolean): List<Part> = buildList {
-        add(Server(s?.id.orEmpty(), "mac"))
-        if (s != null) {
-            add(Providers(s.id, "providers"))
-            add(Voice(readAloud = s.id.takeIf { s.readAloud }))
-            if (s.files) add(Files(s.id, SettingsJump.FILES))
-        }
-        addAll(phoneKept())
-        if (s != null) {
-            add(Notifications)
-            if (testing) add(Checklist(s.id, "qa"))
-        }
+    fun parts(servers: List<String>, testing: Boolean): List<TabPart> = buildList {
+        add(Servers(servers))
+        add(Phone(PhonePage.entries.filter { it != PhonePage.Notifications || servers.isNotEmpty() }))
+        add(NewSessions)
+        add(Display)
         if (testing) add(TerminalEngine)
-        add(DebugLog)
         add(About)
     }
 
-    private fun allServers(servers: List<ServerFacts>, testing: Boolean): List<Part> = buildList {
-        for (s in servers) {
-            val linked = s.link == LinkState.Connected
-            add(Server(s.id, keyOf("server", s.id, true), waiting = !linked))
-            if (!linked) continue
-            add(Providers(s.id, keyOf("providers", s.id, true)))
-            if (s.readAloud) add(ReadAloud(s.id, keyOf("readAloud", s.id, true)))
-            if (s.files) add(Files(s.id, keyOf(SettingsJump.FILES, s.id, true)))
-            if (testing) add(Checklist(s.id, keyOf("qa", s.id, true)))
-        }
-        add(PhoneHeading)
-        add(Voice())
-        addAll(phoneKept())
-        add(Notifications)
-        add(ConnectionLog)
-        if (testing) add(TerminalEngine)
-        add(DebugLog)
-        add(About)
+    /**
+     * Server [s]'s page in order. With All servers ([all]), a server that isn't connected shows its
+     * card alone, so no controls from its last snapshot; the one server on screen keeps its parts
+     * while it can't be reached, as it always has. [testing]: its testing checklist too.
+     */
+    fun serverParts(s: ServerFacts, all: Boolean, testing: Boolean): List<ServerPart> = buildList {
+        val waiting = all && s.link != LinkState.Connected
+        add(Server(s.id, waiting))
+        if (waiting) return@buildList
+        add(Providers(s.id))
+        if (s.readAloud) add(ReadAloud(s.id))
+        if (s.files) add(Files(s.id))
+        if (testing) add(Checklist(s.id))
     }
-
-    /** Kept on this phone, whatever server: the same with one server and with All servers. */
-    private fun phoneKept(): List<Part> = listOf(NewSessions, Display, CardSwipes, TopBar, Typing)
 }

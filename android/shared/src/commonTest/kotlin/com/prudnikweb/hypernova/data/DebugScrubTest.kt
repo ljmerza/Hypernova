@@ -200,6 +200,7 @@ class DebugScrubTest {
             Route.Web("https://h/?q=PLANTEDURL", "PLANTEDTITLE"),
             Route.McpServerPage("claude", "PLANTEDSERVER", "user", "/home/me/PLANTEDFOLDER"),
             Route.PluginPage("claude", "PLANTEDPLUGIN", "user", null, true),
+            Route.ServerSettings("PLANTEDSERVER"),
         )
         for (r in screens) assertFalse(r.debugWords, r.debugWords.contains("PLANTED"))
         assertEquals("session s1", Route.Session("s1").debugWords)

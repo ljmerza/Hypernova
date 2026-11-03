@@ -8,14 +8,14 @@ import androidx.compose.runtime.setValue
 
 /**
  * A part of Settings another screen sends the owner to, such as "Turn on in Settings" on a folder
- * outside the projects folder: Home switches to the Settings tab, and Settings scrolls to that part
- * (its list item's key), once. Compose state, written on the main thread.
+ * outside the projects folder: Home switches to the Settings tab, the tab opens the server's own page,
+ * and that page scrolls to the part (its list item's key), once. Compose state, written on the main thread.
  */
 object SettingsJump {
-    /** Settings → Files (Browse outside projects). */
+    /** Settings → the server → Files (Browse outside projects). */
     const val FILES = "files"
 
-    /** Settings → the server's own card (an update that failed): its key with one server on screen. */
+    /** Settings → the server's own card (an update that failed): the first thing on its page. */
     const val SERVER = "mac"
 
     /** How long an ask stands: a screen that opens later doesn't jump. */
@@ -27,7 +27,7 @@ object SettingsJump {
     private var at by mutableLongStateOf(0L)
     /**
      * The server whose part is asked for (the one on screen when it was asked, a session's own from
-     * "All servers"): with All servers each server has its own part (SettingsPlan.keyOf). Null: the one on screen.
+     * "All servers"): whose page opens. Null: the one on screen.
      */
     var server by mutableStateOf<String?>(null)
         private set
@@ -41,7 +41,7 @@ object SettingsJump {
     /** The part still asked for at [now], or null. */
     fun wanted(now: Long = System.currentTimeMillis()): String? = asked?.takeIf { now - at in 0..FRESH_MS }
 
-    /** Settings scrolled to it. */
+    /** The page scrolled to it. */
     fun shown() {
         asked = null
     }
