@@ -16,7 +16,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
@@ -29,7 +32,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.HubViewModel
 import com.prudnikweb.hypernova.data.extendBackpack
@@ -40,6 +46,8 @@ import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Route
 import com.prudnikweb.hypernova.ui.components.ConfirmDialog
 import com.prudnikweb.hypernova.ui.components.LocalHaze
+import com.prudnikweb.hypernova.ui.components.LocalTabsAsk
+import com.prudnikweb.hypernova.ui.components.LocalTabsRoom
 import com.prudnikweb.hypernova.ui.components.NoticeHost
 import com.prudnikweb.hypernova.data.Notice
 import com.prudnikweb.hypernova.ui.components.ToastHost
@@ -128,6 +136,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     val screens = rememberSaveableStateHolder()
     // Home's tab stays as the switcher changes the computer (HomeScreen.kt, rememberHomeTab).
     val homeTab = com.prudnikweb.hypernova.ui.home.rememberHomeTab(if (vm.allServers) "home:all" else "home:${vm.pairing?.token?.hashCode()}")
+    // Counts the tabs tapped on Settings' pages: each starts the main Settings page again, at its top.
+    val settingsFresh = rememberSaveable { mutableStateOf(0) }
     var sheet by rememberSaveable { mutableStateOf(false) }
     // The project the new-session sheet opens on (a path, or the filtered project's name), and the
     // launch that asked for it: its own, not the list's filter, which lets go of a project with
@@ -329,7 +339,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                     )
                 } else if (!covered && hub != null) {
                     Screens(
-                        hub, vm, route, nav.depth, screens, homeTab, focusProject, { focusProject = null },
+                        hub, vm, route, nav.depth, screens, homeTab, settingsFresh, focusProject, { focusProject = null },
                         { sheetProject = focusProject; sheetServer = null; sheet = true }, toAccount, toAutomations,
                         onNewSessionOn = { server -> sheetProject = focusProject; sheetServer = server; sheet = true },
                     )
@@ -500,6 +510,7 @@ private fun Screens(
     depth: Int,
     screens: androidx.compose.runtime.saveable.SaveableStateHolder,
     homeTab: androidx.compose.runtime.MutableState<com.prudnikweb.hypernova.ui.home.Tab>,
+    settingsFresh: androidx.compose.runtime.MutableState<Int>,
     focusProject: String?,
     onClearProject: () -> Unit,
     onNewSession: () -> Unit,
@@ -514,6 +525,16 @@ private fun Screens(
     var lastDepth by remember { mutableStateOf(depth) }
     val opening = depth >= lastDepth
     LaunchedEffect(depth) { lastDepth = depth }
+    // Settings' pages keep the tabs (owner, 2026-11-03; docs/DECISIONS.md, "The tabs on Settings' pages").
+    val onPages = com.prudnikweb.hypernova.data.inSettings(nav.stack)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val navBottom = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    var tabsPx by remember { mutableStateOf(0) }
+    // Before the bar has been measured: about what it measures, so a page doesn't start short of it.
+    val tabsRoom = if (tabsPx > 0) with(density) { tabsPx.toDp() } else navBottom + 60.dp
+    val tabsAsk = remember { mutableStateOf<((go: () -> Unit) -> Unit)?>(null) }
+    val toast = LocalToast.current
+    val noAutomations = stringResource(R.string.all_servers_no_automations)
     AnimatedContent(
         targetState = route,
         transitionSpec = {
@@ -532,13 +553,18 @@ private fun Screens(
         // A screen over Home stays on the computer it opened on (a session from "All servers" is
         // its own computer's), though Home's hub changes back under it as it closes.
         val shown = if (r == Route.Home) hub else remember { hub }
-        screens.SaveableStateProvider(key) {
+        // Whether this screen has the tabs under it stays as it was while it fades out.
+        val hasTabs = remember { onPages }
+        CompositionLocalProvider(
+            LocalTabsRoom provides if (hasTabs) tabsRoom else 0.dp,
+            LocalTabsAsk provides tabsAsk,
+        ) { screens.SaveableStateProvider(key) {
             when (r) {
                 Route.Home -> HomeScreen(
                     hub,
                     project = focusProject, onClearProject = onClearProject,
                     onOpen = opener.session, onNewSession = onNewSession,
-                    settings = { top -> SettingsTab(vm, top) },
+                    settings = { top -> androidx.compose.runtime.key(settingsFresh.value) { SettingsTab(vm, top) } },
                     tabState = homeTab,
                     toAccount = toAccount,
                     toAutomations = toAutomations,
@@ -590,6 +616,24 @@ private fun Screens(
                     onOpenSession = opener.session,
                 )
             }
-        }
+        } }
     }
+    com.prudnikweb.hypernova.ui.home.SettingsPageBar(
+        visible = onPages,
+        // A tab goes straight there, from any depth, and Settings is its main page from the top, the
+        // same rule from wherever it's tapped; Back is the way up one level. Automations with All
+        // servers says why not, as on Home; a page that asks before it loses what's typed asks first.
+        onSelect = { to ->
+            if (vm.allServers && to == com.prudnikweb.hypernova.ui.home.Tab.Automations) toast(noAutomations)
+            else {
+                val go = {
+                    nav.reset()
+                    settingsFresh.value++
+                    homeTab.value = to
+                }
+                tabsAsk.value?.invoke(go) ?: go()
+            }
+        },
+        modifier = Modifier.fillMaxSize().wrapContentHeight(androidx.compose.ui.Alignment.Bottom).onSizeChanged { if (it.height > 0) tabsPx = it.height },
+    )
 }

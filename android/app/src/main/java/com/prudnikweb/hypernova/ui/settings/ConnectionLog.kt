@@ -10,13 +10,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -52,6 +49,7 @@ import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
+import com.prudnikweb.hypernova.ui.components.screenBottom
 import com.prudnikweb.hypernova.ui.components.StatusChip
 import com.prudnikweb.hypernova.ui.components.Stamp
 import com.prudnikweb.hypernova.ui.components.frostedGlass
@@ -76,7 +74,7 @@ import java.util.Date
 fun ConnectionLogScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val toast = LocalToast.current
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val version = ConnLog.version
     val entries = remember(version) { ConnLog.entries() }
     val rounds = remember(entries) { roundsOf(entries) }

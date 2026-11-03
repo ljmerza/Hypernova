@@ -11,13 +11,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -74,6 +71,7 @@ import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
+import com.prudnikweb.hypernova.ui.components.screenBottom
 import com.prudnikweb.hypernova.ui.components.Seam
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
@@ -99,7 +97,7 @@ internal fun codeCheck(context: Context, confirm: (Confirm) -> Unit, toast: (Str
 /** Agents & providers › an agent's Settings › Plugins: what's installed and from where. */
 @Composable
 fun PluginsScreen(hub: Hub, agent: String, onBack: () -> Unit, onOpen: (id: String, scope: String, folder: String?, enabled: Boolean) -> Unit, onBrowse: (folder: String?) -> Unit) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val server = hub.mac.name
     val context = LocalContext.current
     val toast = LocalToast.current
@@ -286,7 +284,7 @@ private fun MarketRow(m: Marketplace, onUpdate: () -> Unit, onRemove: () -> Unit
 /** A plugin: what it brings, its options, and what can be done with it. */
 @Composable
 fun PluginScreen(hub: Hub, agent: String, id: String, scopeWord: String, folder: String?, enabled: Boolean, onBack: () -> Unit) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val server = hub.mac.name
     val context = LocalContext.current
     val toast = LocalToast.current
@@ -415,7 +413,7 @@ private fun BringsCard(d: PluginDetail) {
 /** What can be installed, to search, and a tap to install with its source on the confirm. */
 @Composable
 fun PluginBrowseScreen(hub: Hub, agent: String, folder: String?, onBack: () -> Unit) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottom = screenBottom()
     val server = hub.mac.name
     val context = LocalContext.current
     val toast = LocalToast.current

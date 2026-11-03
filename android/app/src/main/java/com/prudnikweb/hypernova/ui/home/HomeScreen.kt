@@ -716,24 +716,8 @@ fun HomeScreen(
         // Bottom: the text tabs (Hyperscribe's bottom nav). Fork: no pill over them (it's in the top
         // bar) and a short fade, so more of the list shows.
         BlurredBottom(haze, HOME_SOURCE, Modifier.align(Alignment.BottomCenter).fillMaxWidth(), fade = 14.dp) {
-            Column(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = bottom + 6.dp)) {
-                HomeTabBar(
-                    Tab.entries.map { t ->
-                        when (t) {
-                            Tab.Sessions -> stringResource(R.string.sessions)
-                            Tab.Automations -> stringResource(R.string.au_tab)
-                            Tab.History -> stringResource(R.string.history)
-                            Tab.Settings -> stringResource(R.string.settings)
-                        }
-                    },
-                    // All servers (owner, 2026-10-31): Automations are one server's; History lists every server's; Settings shows what the phone keeps.
-                    tab.ordinal, { i ->
-                        val to = Tab.entries[i]
-                        if (everywhere != null && to == Tab.Automations) backToast(allNoAutomations) else tab = to
-                    },
-                    Modifier.padding(horizontal = 12.dp),
-                )
-            }
+            // All servers (owner, 2026-10-31): Automations are one server's; History lists every server's; Settings shows what the phone keeps.
+            BottomTabs(tab) { to -> if (everywhere != null && to == Tab.Automations) backToast(allNoAutomations) else tab = to }
         }
     }
 
