@@ -407,6 +407,34 @@ class SettingsNavigationTest {
         assertTrue("$gap between the last row and the tabs: the room counted twice", gap < 90.dp)
     }
 
+    @Test fun theSystemBackAsksAsTheArrowDoesBeforeRawJsonLosesWhatsTyped() {
+        rawFile(pair("z2"))
+        val vm = show()
+        settingsTab()
+        push(vm, Route.AgentRaw("claude"))
+        waitForRawLines()
+        // Nothing typed: straight back.
+        systemBack()
+        assertEquals(listOf<Route>(Route.Home), vm.nav.stack.toList())
+
+        push(vm, Route.AgentRaw("claude"))
+        waitForRawLines()
+        rule.onNode(hasContentDescription("line 1")).performTextReplacement("{ \"typed\": 1,")
+        rule.waitForIdle()
+        systemBack()
+        assertEquals(Route.AgentRaw("claude"), vm.nav.top)
+        rule.onNodeWithText(str(R.string.raw_discard_title)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.cancel)).performClick()
+        rule.waitForIdle()
+        // Staying keeps what's typed.
+        assertEquals(Route.AgentRaw("claude"), vm.nav.top)
+        rule.onNodeWithText("typed", substring = true).assertExists()
+        systemBack()
+        rule.onNodeWithText(str(R.string.raw_discard_action)).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf<Route>(Route.Home), vm.nav.stack.toList())
+    }
+
     /** The keyboard, [height] tall, as the system tells the window (which doesn't resize: enableEdgeToEdge). */
     private fun keyboard(height: androidx.compose.ui.unit.Dp) {
         val px = with(rule.density) { height.roundToPx() }
