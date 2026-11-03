@@ -2,6 +2,7 @@
 package com.prudnikweb.hypernova.ui.home
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,6 +104,7 @@ import com.prudnikweb.hypernova.ui.components.BlurredBottom
 import com.prudnikweb.hypernova.ui.components.BlurredTop
 import com.prudnikweb.hypernova.ui.components.ConnectionChip
 import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.glassChoice
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.LocalHaze
 import com.prudnikweb.hypernova.ui.components.NovaMark
@@ -136,6 +138,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -1585,13 +1588,16 @@ private fun AccountCard(hub: Hub, onOpen: (String) -> Unit, onNewSession: () -> 
     var action: AttentionAction? = null
     var links = emptyList<AttentionAction>()
     val signingIn = a.login != null
+    // Sign in was tapped: subscription or API, in the card (null: it wasn't; true: for the Mac's window).
+    var signInFor by remember { mutableStateOf<Boolean?>(null) }
+    val choosing = signInFor != null
     when {
-        signingIn -> Unit
+        signingIn || choosing -> Unit
         a.state == Account.LOGGED_OUT -> {
-            action = AttentionAction(stringResource(R.string.account_sign_in), { act { hub.signIn(onMac = false) } })
+            action = AttentionAction(stringResource(R.string.account_sign_in), { signInFor = false })
             // Signing in on the computer opens a terminal window there: a Mac's, never a server's.
             links = listOfNotNull(
-                if (hub.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_OPEN_WINDOW)) AttentionAction(stringResource(R.string.account_sign_in_mac), { act { hub.signIn(onMac = true) } }, glyph = Glyph.Laptop) else null,
+                if (hub.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_OPEN_WINDOW)) AttentionAction(stringResource(R.string.account_sign_in_mac), { signInFor = true }, glyph = Glyph.Laptop) else null,
                 goOn,
             )
         }
@@ -1618,7 +1624,7 @@ private fun AccountCard(hub: Hub, onOpen: (String) -> Unit, onNewSession: () -> 
         a.state == Account.NO_SUBSCRIPTION -> {
             // Short, with a globe like Usage, so it fits beside the words.
             action = AttentionAction(stringResource(R.string.account_renew_short), { openLink(context, AccountWords.RENEW_URL) }, glyph = Glyph.Globe, description = stringResource(R.string.account_renew))
-            links = listOf(goOn, AttentionAction(stringResource(R.string.account_sign_in_again), { act { hub.signIn(onMac = false) } }))
+            links = listOf(goOn, AttentionAction(stringResource(R.string.account_sign_in_again), { signInFor = false }))
         }
         a.state == Account.ON_HOLD -> {
             action = AttentionAction(stringResource(R.string.account_view_details), { openLink(context, AccountWords.link(a.text, AccountWords.HOLD_URL)) })
@@ -1637,22 +1643,26 @@ private fun AccountCard(hub: Hub, onOpen: (String) -> Unit, onNewSession: () -> 
         title = text.heading, line = text.body, stamp = text.trail,
         action = action, links = links,
         // A sign-in under way stays until it's done or cancelled.
-        dismissible = !signingIn,
+        dismissible = !signingIn && !choosing,
         modifier = modifier,
-        content = if (signingIn) ({ SignInPanel(hub, mac) }) else null,
+        content = if (signingIn || choosing) ({ SignInPanel(hub, mac, choosing = choosing, onMac = signInFor == true, onCancel = { signInFor = null }) }) else null,
     )
 }
 
 /**
- * Signing Claude Code in again, from here: Sign in opens its sign-in page on this phone and takes
- * the code the page shows back to the Mac; or it runs in a terminal on the Mac. Each step of the
- * sign-in shows as it happens; once it works, the account card goes.
+ * Signing Claude Code in again, from here: Sign in asks subscription or API, opens its sign-in page
+ * on this phone and takes the code the page shows back to the Mac; or it runs in a terminal on the
+ * Mac, where there's one to open. Each step of the sign-in shows as it happens; once it works, the
+ * account card goes. [choosing]: it starts at that question ([onMac]: for the Mac's window).
+ * [onCancel]: its Cancel was tapped, at the question or during a sign-in.
  * [more]: pills for another way on (another provider), beside Sign in until a sign-in starts.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SignInPanel(hub: Hub, mac: String, modifier: Modifier = Modifier, more: (@Composable () -> Unit)? = null) {
+fun SignInPanel(hub: Hub, mac: String, modifier: Modifier = Modifier, choosing: Boolean = false, onMac: Boolean = false, onCancel: () -> Unit = {}, more: (@Composable () -> Unit)? = null) {
     val login = hub.account.login
+    // The question's up, and for which way (true: the Mac's window); null: it isn't.
+    var asking by remember { mutableStateOf(if (choosing) onMac else null) }
     val context = LocalContext.current
     val appScope = LocalAppScope.current
     val toast = LocalToast.current
@@ -1672,14 +1682,27 @@ fun SignInPanel(hub: Hub, mac: String, modifier: Modifier = Modifier, more: (@Co
         if (c.isEmpty()) return
         act { hub.sendSignInCode(c).onSuccess { code = "" } }
     }
+    // Signed in already (a /login, to change account): asked for, or the server turns it away.
+    fun start(window: Boolean, console: Boolean) = act { hub.signIn(onMac = window, console = console, again = hub.account.state == Account.OK) }
     val cancel: @Composable () -> Unit = {
-        Pill(stringResource(R.string.cancel), { act { hub.cancelSignIn() } }, kind = PillKind.Ghost, height = 36.dp)
+        Pill(stringResource(R.string.cancel), { onCancel(); act { hub.cancelSignIn() } }, kind = PillKind.Ghost, height = 36.dp)
     }
+    val forWindow = asking
     Column(modifier.fillMaxWidth()) {
         when {
+            login == null && forWindow != null -> {
+                HText(stringResource(R.string.signin_choice_title), style = Type.small, color = HN.inkMuted)
+                Spacer(Modifier.height(10.dp))
+                SignInOption(stringResource(R.string.signin_subscription), stringResource(R.string.signin_subscription_detail)) { start(forWindow, console = false) }
+                Spacer(Modifier.height(6.dp))
+                SignInOption(stringResource(R.string.signin_console), stringResource(R.string.signin_console_detail)) { start(forWindow, console = true) }
+                Spacer(Modifier.height(6.dp))
+                Pill(stringResource(R.string.cancel), { asking = null; onCancel() }, kind = PillKind.Ghost, height = 36.dp)
+            }
             login == null -> FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill(stringResource(R.string.account_sign_in), { act { hub.signIn(onMac = false) } }, kind = PillKind.Primary, height = 40.dp)
-                Pill(stringResource(R.string.account_sign_in_mac), { act { hub.signIn(onMac = true) } }, kind = PillKind.Ghost, height = 40.dp, leading = Glyph.Laptop)
+                Pill(stringResource(R.string.account_sign_in), { asking = false }, kind = PillKind.Primary, height = 40.dp)
+                // Signing in on the computer opens a terminal window there: a Mac's, never a server's.
+                if (hub.mac.has(com.prudnikweb.hypernova.data.Mac.FEATURE_OPEN_WINDOW)) Pill(stringResource(R.string.account_sign_in_mac), { asking = true }, kind = PillKind.Ghost, height = 40.dp, leading = Glyph.Laptop)
                 more?.invoke()
             }
             login.state == "starting" -> LoadingLine(stringResource(R.string.signin_starting, mac))
@@ -1688,7 +1711,7 @@ fun SignInPanel(hub: Hub, mac: String, modifier: Modifier = Modifier, more: (@Co
                 HText(login.error ?: stringResource(R.string.signin_failed), style = Type.small, color = HN.danger)
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Pill(stringResource(R.string.try_again), { act { hub.signIn(login.onMac) } }, kind = PillKind.Outline, height = 40.dp)
+                    Pill(stringResource(R.string.try_again), { start(login.onMac, login.console) }, kind = PillKind.Outline, height = 40.dp)
                     cancel()
                 }
             }
@@ -1729,6 +1752,25 @@ fun SignInPanel(hub: Hub, mac: String, modifier: Modifier = Modifier, more: (@Co
                 cancel()
             }
         }
+    }
+}
+
+/** One answer to subscription or API: its name and what it means, a tap starts that sign-in. */
+@Composable
+private fun SignInOption(label: String, detail: String, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .glassChoice(pressed, 12.dp)
+            .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        HText(label, style = Type.body, color = HN.ink)
+        HText(detail, style = Type.small, color = HN.inkDim)
     }
 }
 

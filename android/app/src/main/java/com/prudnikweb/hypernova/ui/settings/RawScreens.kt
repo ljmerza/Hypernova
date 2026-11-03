@@ -2,6 +2,7 @@
 
 package com.prudnikweb.hypernova.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -191,6 +192,8 @@ fun AgentRawScreen(hub: Hub, agent: String, onBack: () -> Unit) {
         confirm(Confirm(context.getString(R.string.raw_discard_title), context.getString(R.string.raw_discard_body), context.getString(R.string.raw_discard_action), danger = true) { go() })
     }
     AskBeforeTabs { go -> leaving(go) }
+    // The system's back gesture too: App's own handler would pop the page and lose what's typed.
+    BackHandler(enabled = dirty) { leaving(onBack) }
     ScreenScaffold(sourceKey = "agent-raw:$agent", title = stringResource(R.string.raw_title), subtitle = server, onBack = { leaving(onBack) }) { top, source ->
         Column(
             Modifier.fillMaxSize().then(source).verticalScroll(rememberScrollState()).padding(top = top, bottom = bottom + 32.dp, start = 16.dp, end = 16.dp),

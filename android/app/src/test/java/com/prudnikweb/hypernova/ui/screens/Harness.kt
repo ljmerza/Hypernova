@@ -61,6 +61,7 @@ class AppSpy {
         automation = { opened += "automation:$it" },
         connectionLog = { opened += "connectionLog" },
         settings = { opened += "settings:$it" },
+        signIn = { opened += "signIn" },
     )
 }
 

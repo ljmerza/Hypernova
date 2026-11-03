@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.ui.screens
 
 import android.os.Looper
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsActions
@@ -17,11 +18,15 @@ import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AndroidCore
 import com.prudnikweb.hypernova.data.ComputerWords
@@ -400,5 +405,70 @@ class SettingsNavigationTest {
         val gap = bar.top - last.bottom
         assertTrue("the last row ends over the tabs, by ${-gap}", gap >= 0.dp)
         assertTrue("$gap between the last row and the tabs: the room counted twice", gap < 90.dp)
+    }
+
+    @Test fun theSystemBackAsksAsTheArrowDoesBeforeRawJsonLosesWhatsTyped() {
+        rawFile(pair("z2"))
+        val vm = show()
+        settingsTab()
+        push(vm, Route.AgentRaw("claude"))
+        waitForRawLines()
+        // Nothing typed: straight back.
+        systemBack()
+        assertEquals(listOf<Route>(Route.Home), vm.nav.stack.toList())
+
+        push(vm, Route.AgentRaw("claude"))
+        waitForRawLines()
+        rule.onNode(hasContentDescription("line 1")).performTextReplacement("{ \"typed\": 1,")
+        rule.waitForIdle()
+        systemBack()
+        assertEquals(Route.AgentRaw("claude"), vm.nav.top)
+        rule.onNodeWithText(str(R.string.raw_discard_title)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.cancel)).performClick()
+        rule.waitForIdle()
+        // Staying keeps what's typed.
+        assertEquals(Route.AgentRaw("claude"), vm.nav.top)
+        rule.onNodeWithText("typed", substring = true).assertExists()
+        systemBack()
+        rule.onNodeWithText(str(R.string.raw_discard_action)).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf<Route>(Route.Home), vm.nav.stack.toList())
+    }
+
+    /** The keyboard, [height] tall, as the system tells the window (which doesn't resize: enableEdgeToEdge). */
+    private fun keyboard(height: androidx.compose.ui.unit.Dp) {
+        val px = with(rule.density) { height.roundToPx() }
+        val insets = WindowInsetsCompat.Builder()
+            .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, px))
+            .setVisible(WindowInsetsCompat.Type.ime(), true)
+            .build()
+        rule.runOnIdle {
+            val compose = rule.activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ViewGroup
+            ViewCompat.dispatchApplyWindowInsets(compose.getChildAt(0), insets)
+        }
+        rule.waitForIdle()
+    }
+
+    @Config(qualifiers = "+h640dp")
+    @Test fun aFieldLowOnAPageScrollsClearOfTheKeyboardAndTheTabsStayWhereTheyAre() {
+        pair("z2")
+        val vm = show()
+        settingsTab()
+        push(vm, Route.ProviderEdit(null, "custom"))
+        val up = 280.dp
+        val page = rule.onRoot().getBoundsInRoot().bottom
+        val bar = tab(R.string.settings).getBoundsInRoot()
+        // The lowest field on screen above the tabs: the keyboard will be over it.
+        val fields = rule.onAllNodes(hasSetTextAction())
+        val low = fields.fetchSemanticsNodes().withIndex()
+            .filter { with(rule.density) { it.value.boundsInRoot.bottom.toDp() } < bar.top }
+            .maxBy { it.value.boundsInRoot.bottom }.index
+        assertTrue("the field is under where the keyboard goes", fields[low].getBoundsInRoot().bottom > page - up)
+        fields[low].performClick()
+        rule.waitForIdle()
+        keyboard(up)
+        assertTrue("${fields[low].getBoundsInRoot().bottom} is under the keyboard, from ${page - up}", fields[low].getBoundsInRoot().bottom <= page - up)
+        assertTrue("and under the top bar's blur only if it has to", fields[low].getBoundsInRoot().top > 0.dp)
+        assertEquals(bar, tab(R.string.settings).getBoundsInRoot())
     }
 }

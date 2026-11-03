@@ -32,8 +32,14 @@ case "$1 $2" in
     # Each run a new sign-in: the runs are counted in $S/logins.
     n=$(( $(cat "$S/logins" 2>/dev/null || echo 0) + 1 ))
     echo "$n" > "$S/logins"
+    # How it was asked to sign in: the words after "auth login", a run a line.
+    shift 2
+    echo "$*" >> "$S/login-args"
     state="FakeState${n}x0123456789abcdefghijklmnopqrstuvw"
-    url="https://claude.ai/oauth/authorize?code=true&client_id=00000000-0000-4000-8000-000000000000&response_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=user%3Ainference+user%3Aprofile+user%3Asessions%3Aclaude_code&code_challenge=FakeChallenge${n}x0123456789abcdefghijklmnopqrs&code_challenge_method=S256&state=${state}"
+    # The Console's page is on another host, as the real command's is (Claude Code 2.1.317).
+    host=claude.ai
+    [ "$1" = "--console" ] && host=platform.claude.com
+    url="https://${host}/oauth/authorize?code=true&client_id=00000000-0000-4000-8000-000000000000&response_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=user%3Ainference+user%3Aprofile+user%3Asessions%3Aclaude_code&code_challenge=FakeChallenge${n}x0123456789abcdefghijklmnopqrs&code_challenge_method=S256&state=${state}"
     printf 'Opening browser to sign in\342\200\246\n'
     printf "If the browser didn't open, visit: %s\n" "$url"
     printf 'Paste code here if prompted > '

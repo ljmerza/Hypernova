@@ -20,7 +20,7 @@ import { promptTitle, typedCommand } from './normalize.ts'
 import { trialEnded } from './blockers.ts'
 import { noteTrialEnded } from './account.ts'
 import { fromBeforeBoot } from './reboot.ts'
-import { DATA, Frames, MSG, TERMS, boxLines, boxText, codexTuiArgs, frame, isWorking, menuOf, metaPath, modeOf, msg, newTermId, registryBusy, sessionEnv, sockPath, spawnHolder, type Permission, type TermMeta, type TermState } from './term/shared.ts'
+import { DATA, Frames, MSG, TERMS, boxLines, boxText, codexTuiArgs, frame, isWorking, loginScreen, menuOf, metaPath, modeOf, msg, newTermId, registryBusy, sessionEnv, sockPath, spawnHolder, type Permission, type TermMeta, type TermState } from './term/shared.ts'
 import { CodexError, codexBinary, codexSocketPath, rpc } from './codex/client.ts'
 import { getThread } from './codex/threads.ts'
 import { isHiddenCwd } from './term/hidden.ts'
@@ -417,7 +417,7 @@ export async function watchMenus(): Promise<void> {
         // Codex's TUI draws its own dialogs; its approvals come over the app-server instead.
         if (!r.term || r.state === 'ended' || isCodexRec(r)) {
           lastMenu.delete(r.id)
-          if (r.menu) upsertSession(r.id, { menu: null })
+          if (r.menu || r.loginScreen) upsertSession(r.id, { menu: null, loginScreen: false })
           return
         }
         // A `claude attach` holder showing another job or the agent list: no menu there is this
@@ -425,8 +425,12 @@ export async function watchMenus(): Promise<void> {
         const drifted = attachDrifted(r.term.id, r.id)
         const text = drifted ? '' : await screenOf(r.term.id)
         if (text === null) return
-        let menu = menuOf(text.split('\n'))
+        const lines = text.split('\n')
+        let menu = menuOf(lines)
         const dialog = !!menu?.permission
+        // Claude Code's own sign-in: the phone offers its own way through (docs/PROTOCOL.md, "Signing in again").
+        const signingIn = !drifted && loginScreen(lines)
+        if (signingIn !== !!r.loginScreen) upsertSession(r.id, { loginScreen: signingIn })
         // Claude Code's "Your Claude Code trial has ended." dialog: the plan is over.
         if (menu && trialEnded(menu.title) && isSubscription(r.providerId)) noteTrialEnded(Date.now(), r.id)
         const asked = view(r).pendingApprovalIds.length > 0
@@ -593,21 +597,23 @@ export async function termScreen(id: string): Promise<{ text: string; cols: numb
 }
 
 // ── Signing in ───────────────────────────────────────────────────────────
-// `claude auth login --claudeai` in a holder of its own: no session runs there. Wide, so the
+// `claude auth login` (--claudeai or --console) in a holder of its own: no session runs there. Wide, so the
 // sign-in page's address, often 400 characters, sits on one line of its screen.
-const LOGIN_ARGS = ['auth', 'login', '--claudeai']
+const loginArgs = (method: LoginMethod) => ['auth', 'login', method === 'console' ? '--console' : '--claudeai']
+export type LoginMethod = 'subscription' | 'console'
 const isLogin = (args: string[] | undefined) => !!args && args[0] === 'auth' && args[1] === 'login'
 
-/** Start signing in Claude Code in a new holder. */
-export function startLoginTerm(): { termId: string; pid: number | null } {
+/** Start signing in Claude Code in a new holder: with the subscription, or the Console's API billing. */
+export function startLoginTerm(method: LoginMethod): { termId: string; pid: number | null } {
   const file = findClaude()
   if (!file) throw Object.assign(new Error(`Claude Code isn’t installed on this ${MACHINE}.`), { status: 409, code: 'no_claude' })
   const id = newTermId()
+  const args = loginArgs(method)
   const pid = spawnHolder({
     id,
     cwd: HOME,
     file,
-    args: LOGIN_ARGS,
+    args,
     env: sessionEnv(process.env, id, providerEnv(getProvider(null))),
     cols: 500,
     rows: 40,
@@ -618,7 +624,7 @@ export function startLoginTerm(): { termId: string; pid: number | null } {
     autoTrust: false,
   })
   log('started a sign-in terminal', id)
-  noteTerm(id, file, LOGIN_ARGS)
+  noteTerm(id, file, args)
   return { termId: id, pid }
 }
 

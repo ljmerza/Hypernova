@@ -63,9 +63,10 @@ const HIDDEN = new Set(['heapdump', 'workflow-launch-exec', 'color', 'focus', 's
 // command list marks them "Opens in the terminal" (docs/DECISIONS.md, "Commands in the session
 // sheet"). Read from 2.1.314's command table (its Ink commands, by what each one draws). Commands
 // whose only screen is a numbered picker (/model, /effort with nothing after them) aren't here:
-// the phone answers those as menus. The list says nothing of how a command draws, so this is kept by hand.
+// the phone answers those as menus. Nor is /login: the phone has its own sign-in for it. The list says
+// nothing of how a command draws, so this is kept by hand.
 const TERMINAL = new Set([
-  'config', 'settings', 'permissions', 'hooks', 'mcp', 'memory', 'plugin', 'theme', 'resume', 'login', 'privacy-settings',
+  'config', 'settings', 'permissions', 'hooks', 'mcp', 'memory', 'plugin', 'theme', 'resume', 'privacy-settings',
   'status', 'usage', 'help', 'tasks', 'workflows', 'skills', 'loops', 'diff', 'export', 'rewind', 'copy', 'feedback', 'bug',
   'artifacts', 'powerup', 'scroll-speed', 'tui', 'wellbeing', 'import', 'install-github-app', 'setup-bedrock', 'setup-vertex',
   'web-setup', 'remote-env', 'cloud-plugins', 'daemon', 'design-login', 'rate-limit-options', 'usage-credits', 'upgrade',

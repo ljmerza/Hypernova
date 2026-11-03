@@ -733,7 +733,8 @@ async function api(c: Ctx): Promise<void> {
     if (!where) throw new HttpError(400, 'bad_where', `Sign in on the phone or on the ${MACHINE}.`)
     // Signing in "on the Mac" opens a terminal window there; a Linux server has no screen for one.
     if (where === 'mac' && !has('openWindow')) throw unavailable('openWindow')
-    return json(res, 200, { account: startLogin(where) })
+    if (b?.method != null && b.method !== 'subscription' && b.method !== 'console') throw new HttpError(400, 'bad_method', 'Sign in with the subscription or the Console.')
+    return json(res, 200, { account: startLogin(where, { method: b?.method ?? 'subscription', again: b?.again === true }) })
   }
   if (path === '/v1/account/login' && m === 'DELETE') {
     cancelLogin()

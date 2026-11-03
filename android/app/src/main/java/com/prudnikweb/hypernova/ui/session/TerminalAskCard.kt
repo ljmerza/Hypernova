@@ -38,12 +38,35 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.TerminalAsk
+import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
+
+/** A /login from the box or the Commands tab goes to the app's own sign-in, not into the terminal. */
+internal fun isSignInCommand(text: String): Boolean = text.trim() == "/login"
+
+/**
+ * Claude Code's own sign-in in the session's terminal (typed there, or in a job): its menus lead to an
+ * address and a code prompt, which aren't a menu, so cards can't finish it. Where to go instead.
+ */
+@Composable
+internal fun TerminalLoginCard(onSignIn: () -> Unit, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    GlassCard(modifier.fillMaxWidth(), accent = HN.amber) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            HText(stringResource(R.string.signin_terminal_title), style = Type.heading, color = HN.ink)
+            Spacer(Modifier.height(4.dp))
+            HText(stringResource(R.string.signin_terminal_body), style = Type.small, color = HN.inkMuted)
+            Spacer(Modifier.height(12.dp))
+            Pill(stringResource(R.string.signin_here), onSignIn, Modifier.fillMaxWidth(), kind = PillKind.Primary)
+            Spacer(Modifier.height(8.dp))
+            Pill(stringResource(R.string.open_terminal), onOpen, Modifier.fillMaxWidth(), kind = PillKind.Outline, height = 40.dp, leading = Glyph.Terminal)
+        }
+    }
+}
 
 /**
  * Fork: Claude Code's own permission dialog in the session's terminal ([TerminalAsk]), drawn as the

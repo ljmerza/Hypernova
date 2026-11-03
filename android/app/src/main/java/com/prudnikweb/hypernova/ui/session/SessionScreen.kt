@@ -289,6 +289,12 @@ fun SessionScreen(
     }
     /** Send the draft and the files ([replace]: clear unsent text in the terminal first). */
     val send: (Boolean) -> Unit = send@{ replace ->
+        if (!session.codex && attach.files.isEmpty() && isSignInCommand(draft)) {
+            draft = ""
+            busy = null
+            opener.signIn()
+            return@send
+        }
         Asides.sideQuestion(draft)?.takeIf { asideReach(session) }?.let { q -> askAside(draft, q); return@send }
         // Never without a file that was attached: one that failed is sent again or removed first,
         // and one still uploading is waited for.
@@ -714,8 +720,21 @@ fun SessionScreen(
                 // A menu or dialog only the terminal shows: its options as buttons here, or (one
                 // that doesn't read as a menu) a way to the terminal.
                 val noCard = items.none { it is Item.Approval && it.resolved == null }
+                // Claude Code's own sign-in: cards can't finish it, so one card that says where to go.
+                val signInThere = session.loginScreen && session.term != null && !session.codex
+                if (signInThere) {
+                    TerminalLoginCard(
+                        onSignIn = {
+                            // Esc closes /login's screens, as the Sign in here takes over.
+                            hub.interrupt(sessionId)
+                            opener.signIn()
+                        },
+                        onOpen = { opener.terminal(sessionId) },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
                 // Claude Code's own permission dialog isn't one of these: it's an ask in the chat (termAsk).
-                val menu = session.menu?.takeIf { noCard && session.term != null && !session.codex && TerminalAsk.of(it) == null }
+                val menu = session.menu?.takeIf { noCard && !signInThere && session.term != null && !session.codex && TerminalAsk.of(it) == null }
                 AnimatedVisibility(menu != null, enter = fadeIn(tween(Motion.DIALOG)) + expandVertically(tween(Motion.REVEAL, easing = Motion.Expo)), exit = fadeOut(tween(Motion.DIALOG)) + shrinkVertically(tween(Motion.DIALOG))) {
                     // Keeps the last menu on screen while it folds away.
                     val last = remember { arrayOfNulls<TermMenu>(1) }
@@ -736,7 +755,7 @@ fun SessionScreen(
                     }
                 }
                 // A question in words isn't a dialog: the reply goes in the composer, not the terminal.
-                val waitingInTerminal = session.term != null && session.state == SessionState.NeedsYou && noCard && menu == null && termAsk == null && session.question == null
+                val waitingInTerminal = session.term != null && session.state == SessionState.NeedsYou && noCard && !signInThere && menu == null && termAsk == null && session.question == null
                 if (waitingInTerminal) {
                     WaitingCard(codex = session.codex, onOpen = { opener.terminal(sessionId) })
                     Spacer(Modifier.height(12.dp))

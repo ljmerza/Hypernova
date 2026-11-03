@@ -13,6 +13,7 @@
       "state": "starting",
       "url": null,
       "where": "phone",
+      "method": "subscription",
       "error": null
     }
   }

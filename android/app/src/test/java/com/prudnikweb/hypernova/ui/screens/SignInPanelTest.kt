@@ -13,11 +13,13 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.ui.home.SignInPanel
+import com.prudnikweb.hypernova.ui.home.SignInSheet
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -34,8 +36,11 @@ private class AccountHub(private val base: FakeHub = FakeHub()) : Hub by base {
     val calls = mutableListOf<String>()
     override val account: Account get() = acct
     override suspend fun checkAccount(): Result<Unit> { calls += "checkAccount"; return Result.success(Unit) }
-    override suspend fun signIn(onMac: Boolean): Result<Unit> { calls += "signIn(onMac=$onMac)"; return Result.success(Unit) }
-    override suspend fun sendSignInCode(code: String): Result<Unit> { calls += "sendSignInCode($code)"; return Result.success(Unit) }
+    override val mac get() = base.mac.copy(unavailable = unavailable)
+    var unavailable by mutableStateOf<Map<String, String>>(emptyMap())
+    override suspend fun signIn(onMac: Boolean, console: Boolean, again: Boolean): Result<Unit> { calls += "signIn(onMac=$onMac, console=$console, again=$again)"; return Result.success(Unit) }
+    var codeAnswer: Result<Unit> = Result.success(Unit)
+    override suspend fun sendSignInCode(code: String): Result<Unit> { calls += "sendSignInCode($code)"; return codeAnswer }
     override suspend fun cancelSignIn(): Result<Unit> { calls += "cancelSignIn"; return Result.success(Unit) }
 }
 
@@ -70,11 +75,103 @@ class SignInPanelTest {
 
     private val codeField get() = rule.onNode(hasSetTextAction() and hasContentDescription(str(R.string.signin_code_hint)))
 
-    @Test fun signInHereOrOnTheServer() {
+    @Test fun signInAsksSubscriptionOrApiAndStartsTheOneChosen() {
         show()
+        // Nothing starts on Sign in: it asks.
         click(str(R.string.account_sign_in))
+        assertEquals(emptyList<String>(), hub.calls)
+        rule.onNodeWithText(str(R.string.signin_choice_title)).assertExists()
+        rule.snap("signin_choice")
+        click(str(R.string.signin_console))
+        rule.waitUntil(3_000) { hub.calls.isNotEmpty() }
+        assertEquals(listOf("signIn(onMac=false, console=true, again=false)"), hub.calls)
+    }
+
+    @Test fun onAMacItsWindowAsksTooAndCancelGoesBack() {
+        var cancelled = 0
+        rule.setContent { Harness(spy) { SignInPanel(hub, "z2", Modifier.padding(16.dp), onCancel = { cancelled++ }) } }
+        rule.waitForIdle()
         click(str(R.string.account_sign_in_mac))
-        assertEquals(listOf("signIn(onMac=false)", "signIn(onMac=true)"), hub.calls)
+        rule.onNodeWithText(str(R.string.signin_choice_title)).assertExists()
+        click(str(R.string.cancel))
+        assertEquals(1, cancelled)
+        rule.onNodeWithText(str(R.string.signin_choice_title)).assertDoesNotExist()
+        click(str(R.string.account_sign_in_mac))
+        click(str(R.string.signin_subscription))
+        rule.waitUntil(3_000) { hub.calls.isNotEmpty() }
+        assertEquals(listOf("signIn(onMac=true, console=false, again=false)"), hub.calls)
+    }
+
+    @Test fun aLinuxServerHasNoWindowToSignInIn() {
+        hub.unavailable = mapOf(com.prudnikweb.hypernova.data.Mac.FEATURE_OPEN_WINDOW to "This server has no screen.")
+        show()
+        rule.onNodeWithText(str(R.string.account_sign_in)).assertExists()
+        rule.onNodeWithText(str(R.string.account_sign_in_mac)).assertDoesNotExist()
+    }
+
+    @Test fun signedInAlreadySigningInAgainSaysSoToTheServer() {
+        hub.acct = Account(state = Account.OK)
+        rule.setContent { Harness(spy) { SignInPanel(hub, "z2", Modifier.padding(16.dp), choosing = true) } }
+        rule.waitForIdle()
+        click(str(R.string.signin_console))
+        rule.waitUntil(3_000) { hub.calls.isNotEmpty() }
+        assertEquals(listOf("signIn(onMac=false, console=true, again=true)"), hub.calls)
+    }
+
+    @Test fun theSheetAsksThenShowsTheAddressAndTheCodeBoxThenClosesAndSaysSo() {
+        var closed = 0
+        rule.setContent { Harness(spy) { SignInSheet(hub, onDismiss = { closed++ }) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.signin_replaces, hub.mac.name)).assertDoesNotExist()
+        click(str(R.string.signin_console))
+        rule.waitUntil(3_000) { hub.calls.isNotEmpty() }
+        assertEquals(listOf("signIn(onMac=false, console=true, again=false)"), hub.calls)
+        login("waiting_code", url = page)
+        rule.onNodeWithText(str(R.string.signin_open_page)).assertExists()
+        codeField.assertExists()
+        rule.onNodeWithText(str(R.string.signin_choice_title)).assertDoesNotExist()
+        assertEquals(0, closed)
+        hub.acct = hub.acct.copy(state = Account.OK, login = null)
+        rule.waitForIdle()
+        assertEquals(1, closed)
+        assertEquals(listOf(str(R.string.signin_done)), spy.toasts)
+    }
+
+    @Test fun theSheetSaysWhatSigningInAgainDoesAndCancelClosesItQuietly() {
+        hub.acct = Account(state = Account.OK)
+        var closed = 0
+        rule.setContent { Harness(spy) { SignInSheet(hub, onDismiss = { closed++ }) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.signin_replaces, hub.mac.name)).assertExists()
+        click(str(R.string.cancel))
+        assertEquals(1, closed)
+        assertTrue(spy.toasts.isEmpty())
+    }
+
+    @Test fun whatTheServerSaysOfACodeIsInTheSheetNotInAToastBehindIt() {
+        hub.codeAnswer = Result.failure(RuntimeException("That isn't the whole code. Copy it again from the sign-in page."))
+        rule.setContent { Harness(spy) { SignInSheet(hub, onDismiss = {}) } }
+        rule.waitForIdle()
+        login("waiting_code", url = page)
+        codeField.performTextReplacement("half")
+        rule.waitForIdle()
+        click(str(R.string.send))
+        rule.waitUntil(3_000) { hub.calls.isNotEmpty() }
+        rule.onNodeWithText("That isn't the whole code. Copy it again from the sign-in page.").assertExists()
+        assertTrue(spy.toasts.isEmpty())
+    }
+
+    @Test fun aSignInCancelledFromTheSheetClosesItWithoutSayingItWorked() {
+        var closed = 0
+        rule.setContent { Harness(spy) { SignInSheet(hub, onDismiss = { closed++ }) } }
+        rule.waitForIdle()
+        login("waiting_code", url = page)
+        click(str(R.string.cancel))
+        rule.waitUntil(3_000) { hub.calls.isNotEmpty() }
+        hub.acct = hub.acct.copy(login = null)
+        rule.waitForIdle()
+        assertEquals(1, closed)
+        assertTrue(spy.toasts.isEmpty())
     }
 
     @Test fun eachStepOfASignInAsTheServerSaysIt() {
@@ -129,11 +226,12 @@ class SignInPanelTest {
         login("failed", onMac = true)
         rule.onNodeWithText(str(R.string.signin_failed)).assertExists()
         click(str(R.string.try_again))
-        login("failed", error = "Signing in timed out.")
+        hub.acct = hub.acct.copy(login = Account.Login("failed", null, false, "Signing in timed out.", console = true))
+        rule.waitForIdle()
         rule.onNodeWithText("Signing in timed out.").assertExists()
         click(str(R.string.try_again))
         click(str(R.string.cancel))
-        assertEquals(listOf("signIn(onMac=true)", "signIn(onMac=false)", "cancelSignIn"), hub.calls)
+        assertEquals(listOf("signIn(onMac=true, console=false, again=false)", "signIn(onMac=false, console=true, again=false)", "cancelSignIn"), hub.calls)
         assertTrue(spy.toasts.isEmpty())
     }
 }

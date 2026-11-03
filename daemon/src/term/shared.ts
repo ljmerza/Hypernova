@@ -217,6 +217,8 @@ export const modeOf = (below: string[]) => {
 }
 
 // ── Menus ────────────────────────────────────────────────────────────────
+/** The heavy line over /login's dialog (it may end with the status line's words: "▔▔▔ ◐ medium · /effort ▔"). */
+const overline = (s: string) => /^\s*▔{8,}/.test(s)
 export type MenuOption = { label: string; detail: string | null; current: boolean }
 /** A menu or dialog Claude Code shows in place of its input box, read off the screen. */
 export type Menu = {
@@ -292,6 +294,23 @@ function paragraphs(lines: string[], width: number): string[] {
     prev = l
   }
   return out
+}
+
+/**
+ * Claude Code's own sign-in on a screen of plain lines: /login's dialog (a heavy line, then "Login",
+ * through all its steps), or a first run's ("Select login method:", then the same address and code
+ * prompt with no dialog round them). Its code prompt isn't a menu, so nothing else tells the phone.
+ * Never with the input box up, or under a permission dialog: there the words are only in the
+ * transcript. Says only that it's there: the address and the code stay off the session.
+ */
+export function loginScreen(lines: string[]): boolean {
+  if (boxLines(lines) || menuOf(lines)?.permission) return false
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!overline(lines[i]!)) continue
+    if (lines.slice(i + 1).find((l) => l.trim())?.trim() === 'Login') return true
+    break
+  }
+  return lines.some((l) => /^\s*(?:Select login method:|Paste code here if prompted\b)/.test(l))
 }
 
 /**
@@ -375,7 +394,7 @@ export function menuOf(lines: string[]): Menu | null {
   const key = keys.find((k) => /^[a-z0-9]$/i.test(k[1]!))
   // The title: from the rule that opens the dialog down to the options.
   let top = a - 1
-  while (top >= 0 && a - top <= 30 && !rule(lines[top]!)) top--
+  while (top >= 0 && a - top <= 30 && !rule(lines[top]!) && !overline(lines[top]!)) top--
   // With several asks open at once, Claude Code counts them at the right of the title row ("1 of
   // 3"; a subagent's dialog says whose after the title, "Bash command · from the Explore agent"):
   // not the title's, and a row that full would read as one that wrapped into the next.
@@ -450,4 +469,3 @@ function commandBlock(region: string[], width: number): { text: string; from: nu
   })
   return { text: text.length > 4000 ? text.slice(0, 3999) + '…' : text, from, to }
 }
-

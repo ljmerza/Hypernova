@@ -221,6 +221,12 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
     }
     fun send(c: SlashCommand, typed: String, line: String = commandLine(c, typed)) {
         if (sending || !canSendCommand(c, typed)) return
+        if (!s.codex && isSignInCommand("/${c.name}")) {
+            used(c)
+            onDismiss()
+            opener.signIn()
+            return
+        }
         if (c.terminal && !canTerminal) {
             toast(res.getString(R.string.commands_no_terminal))
             return
