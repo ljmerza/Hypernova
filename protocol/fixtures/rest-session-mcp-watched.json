@@ -1,0 +1,47 @@
+{
+  "agent": "claude",
+  "kind": "watched",
+  "folder": "folder-app-parser-fix",
+  "live": false,
+  "servers": [
+    {
+      "name": "github",
+      "status": "connected",
+      "source": "user",
+      "toolCount": 2,
+      "tools": [
+        {
+          "name": "create_issue",
+          "destructive": true
+        },
+        {
+          "name": "list_issues",
+          "readOnly": true,
+          "openWorld": true
+        }
+      ],
+      "actions": [],
+      "signIn": false
+    },
+    {
+      "name": "plugin:context7:context7",
+      "status": "needs-auth",
+      "source": "plugin",
+      "toolCount": 0,
+      "tools": [],
+      "actions": [],
+      "signIn": false
+    },
+    {
+      "name": "docs",
+      "status": "waiting",
+      "source": "project",
+      "toolCount": 0,
+      "tools": [],
+      "transport": "http",
+      "host": "docs.example.com",
+      "actions": [],
+      "signIn": false
+    }
+  ]
+}

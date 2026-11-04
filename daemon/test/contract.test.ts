@@ -1175,6 +1175,36 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
       const page = await ok(get(`/v1/agents/mcp/server?agent=claude&name=docs&scope=project&folder=${folderId(cwd)}`))
       assert.ok(!JSON.stringify(page).includes('never-sent'))
       contract('rest-mcp-server', stable(page))
+      // One session's own connections (mcp-session.ts): a terminal played from real /mcp screens, read back after an action, and what can't be reached.
+      {
+        const { playedTerm } = await import('./played-mcp-term.ts')
+        const { useTermOps } = await import('../src/mcp-session.ts')
+        const played = playedTerm({ answers: { '/mcp reconnect broken': '  ⎿  Failed to reconnect to broken', '/mcp reconnect many': '  ⎿  Successfully reconnected to many' } })
+        useTermOps(played)
+        // Each time: the daemon's scan takes a terminal it can't reach off its session.
+        const inTerminal = () => hub.upsertSession('sess-mcp-term', { cwd, origin: 'terminal', title: 'A terminal', state: 'idle', term: { id: 'term-mcp', mac: 0, phone: 0 } as never })
+        inTerminal()
+        const session = (v: unknown) => JSON.parse(JSON.stringify(stable(v)).replaceAll(folderId(cwd), 'folder-of-the-session'))
+        const reply = await ok(get('/v1/sessions/sess-mcp-term/mcp/live'))
+        assert.ok(!JSON.stringify(reply).includes('never-sent'))
+        contract('rest-session-mcp-live', session(reply))
+        inTerminal()
+        contract('rest-session-mcp-acted', session(await ok(post('/v1/sessions/sess-mcp-term/mcp/live', { action: 'reconnect', name: 'many' }))))
+        inTerminal()
+        contract('rest-session-mcp-failed', session(await ok(post('/v1/sessions/sess-mcp-term/mcp/live', { action: 'reconnect', name: 'broken' }))))
+        inTerminal()
+        contract('rest-session-mcp-tools', await ok(get('/v1/sessions/sess-mcp-term/mcp/live/tools?name=many')))
+        inTerminal()
+        played.refuse = 'busy_input'
+        contract('rest-session-mcp-unread', session(await ok(get('/v1/sessions/sess-mcp-term/mcp/live'))))
+        inTerminal()
+        played.refuse = 'no_input'
+        contract('rest-session-mcp-refused', await refused(post('/v1/sessions/sess-mcp-term/mcp/live', { action: 'reconnect', name: 'many' }), 409))
+        useTermOps(null)
+        // A session Hypernova can't reach: what a new one in the folder would get, and nothing to do.
+        contract('rest-session-mcp-watched', session(await ok(get('/v1/sessions/sess-plan/mcp/live?fresh=1'))))
+        contract('rest-session-mcp-not-here', await refused(post('/v1/sessions/sess-plan/mcp/live', { action: 'reconnect', name: 'github' }), 409))
+      }
       // A tool's detail comes from the server itself: a tiny one, with a stray secret in a description.
       const talker = join(scratch, 'tiny-mcp.mjs')
       writeFileSync(talker, TINY_MCP)

@@ -1,0 +1,34 @@
+
+ ▐▛███▛█   Claude Code v2.1.317
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   /tmp/hn-mcpm/proj2
+
+
+❯ /mcp
+  ⎿  Failed to reconnect to broken: CONNECTION_CLOSED
+
+
+
+
+
+
+
+
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Webauth MCP Server
+
+   Status:           ✔ connected
+   Auth:             ✔ authenticated
+   URL:              http://127.0.0.1:48518/mcp
+   Config location:  /tmp/hn-mcpm/claude/.claude.json [project: /tmp/hn-mcpm/proj2]
+   Capabilities: tools
+   Tools: 1 tool
+
+   ❯ 1. View tools
+     2. Re-authenticate
+     3. Clear authentication
+     4. Reconnect
+     5. Disable
+
+   ↑/↓ to navigate · Enter to select · Esc to back

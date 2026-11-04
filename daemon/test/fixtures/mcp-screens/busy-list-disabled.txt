@@ -1,0 +1,14 @@
+  ⎿  Enabled 3 MCP server(s)
+❯ [Hypernova test] slow one
+✶ Boogieing…
+  ⎿  Tip: Run claude --continue or claude --resume to resume a conversation
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ MCP server "tiny" disabled ▔
+   Manage MCP servers
+   3 servers
+     Local MCPs (/tmp/hn-mcpm/claude/.claude.json [project: /tmp/hn-mcpm/proj])
+   ❯ ✔ flaky      2 tools
+     ◯ tiny
+     User MCPs (/tmp/hn-mcpm/claude/.claude.json)
+     ✔ usertiny   1 tool
+   https://code.claude.com/docs/en/mcp for help
+   ↑/↓ to navigate · Enter to confirm · Esc to cancel

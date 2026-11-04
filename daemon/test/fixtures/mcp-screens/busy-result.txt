@@ -1,0 +1,34 @@
+ ▝▝   ▝▝   /tmp/hn-mcpm/proj2
+
+
+❯ /mcp
+  ⎿  Failed to reconnect to broken: CONNECTION_CLOSED
+
+❯ /mcp reconnect many
+  ⎿  Successfully reconnected to many
+
+❯ /mcp reconnect broken
+  ⎿  Failed to reconnect to broken
+
+❯ /mcp disable many
+  ⎿  MCP server "many" disabled
+
+❯ /mcp enable many
+  ⎿  MCP server "many" enabled
+
+❯ /mcp reconnect nosuch
+  ⎿  MCP server "nosuch" not found
+
+❯ /mcp enable many
+  ⎿  "many" is still available in this session, but another session disabled it — it keeps working
+     here and won't reconnect after the next launch. Disable and re-enable it in /mcp to persist the
+     re-enable.
+
+❯ [Hypernova test] slow
+
+· Doing…
+                                                                  Successfully reconnected to many
+────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt

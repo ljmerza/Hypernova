@@ -1,0 +1,34 @@
+ ▝▝   ▝▝   /tmp/hn-mcpm/proj3
+
+ tmux detected · scroll with PgUp/PgDn · or add 'set … ▔
+   Manage MCP servers
+   41 servers
+
+     ↑ 18 more
+     ✔ srv-18-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-19-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-20-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-21-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-22-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-23-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-24-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-25-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-26-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-27-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-28-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-29-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-30-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-31-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-32-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-33-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-34-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-35-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-36-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-37-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-38-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-39-with-a-rather-long-name-ind…   1 tool
+
+     User MCPs (/tmp/hn-mcpm/claude/.claude.json)
+   ❯ ✔ usertiny                              1 tool
+   https://code.claude.com/docs/en/mcp for help
+   ↑/↓ to navigate · Enter to confirm · Esc to cancel

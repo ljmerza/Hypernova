@@ -385,6 +385,8 @@ function permissionActivity(title: string | null, p: Permission): string {
 
 /** The menu each session's terminal showed at the last look: one counts once it holds still. */
 const lastMenu = new Map<string, string | null>()
+/** Terminals the daemon itself has /mcp open in for a moment (mcp-session.ts): that isn't a question for the phones. */
+export const menusQuiet = new Set<string>()
 let looking = false
 /**
  * Look at each shared session's screen for a menu or dialog (the /model picker, a dialog the
@@ -414,6 +416,7 @@ export async function watchMenus(): Promise<void> {
   try {
     await Promise.all(
       listSessionRecs().map(async (r) => {
+        if (r.term && menusQuiet.has(r.term.id)) return
         // Codex's TUI draws its own dialogs; its approvals come over the app-server instead.
         if (!r.term || r.state === 'ended' || isCodexRec(r)) {
           lastMenu.delete(r.id)

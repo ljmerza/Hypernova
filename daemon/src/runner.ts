@@ -135,6 +135,12 @@ export function sendPrompt(id: string, text: string, forkFrom?: string, clientId
   return true
 }
 
+/** The process of the turn session [id] is in, the one thing that holds its MCP connections (mcp-session.ts). Null between turns. */
+export const runningQuery = (id: string): Pick<Query, 'mcpServerStatus' | 'reconnectMcpServer' | 'toggleMcpServer'> | null => {
+  const run = runs.get(id)
+  return run?.running ? run.q : null
+}
+
 export async function interrupt(id: string): Promise<void> {
   const run = runs.get(id)
   if (!run?.running) return

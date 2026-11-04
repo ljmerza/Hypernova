@@ -1,0 +1,34 @@
+
+ ▐▛███▛█   Claude Code v2.1.317
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   /tmp/hn-mcpm/proj2
+
+
+❯ /mcp
+  ⎿  Failed to reconnect to broken: CONNECTION_CLOSED
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Broken MCP Server
+
+   Status:           ✘ failed
+   Command:          node /tmp/hn-mcpm/rig/tiny.mjs broken /tmp/hn-mcpm/logs
+   Config location:  /tmp/hn-mcpm/claude/.claude.json [project: /tmp/hn-mcpm/proj2]
+
+   ❯ 1. Reconnect
+     2. Disable
+
+   ↑/↓ to navigate · Enter to select · Esc to back
