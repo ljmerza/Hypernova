@@ -12,8 +12,9 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+# Two jobs side by side, and `build`, which passes when both do (docs/DECISIONS.md, "CI's Android job, split in two").
 jobs:
-  build:
+  phone:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     defaults:
@@ -31,13 +32,47 @@ jobs:
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKM" --licenses > /dev/null || true
           "$SDKM" "platforms;android-37.0" "build-tools;37.0.0" || "$SDKM" "platforms;android-37"
-      # Caches Gradle's downloads and the wrapper; it only saves them from the main branch.
+      # Caches Gradle's downloads and the wrapper; it only saves them from the main branch. Both jobs have one key, and the
+      # first to save it wins, so only this job saves: what it downloads is nearly all the other needs, not the reverse.
       # v6's default cache is a proprietary component; basic keeps it MIT (docs/DECISIONS.md, "The workflows' actions").
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
+      - run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --stacktrace
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      # :shared has an Android target too, so this job needs the same platform.
+      - name: Android SDK platform 37
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-37.0" "build-tools;37.0.0" || "$SDKM" "platforms;android-37"
+      # Reads what the phone job saved (above).
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+          cache-read-only: true
       # What Compose for Desktop's native library links against, even with no display (docs/DEV-SETUP.md, "The desktop app").
       - name: Desktop libraries
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libgl1 libx11-6 libfontconfig1
-      # The app, the shared data layer on both of its targets (docs/PLATFORMS.md, "The shared module") and the desktop app.
-      - run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :shared:compileKotlinDesktop :shared:desktopTest :shared:testAndroidHostTest :desktop:compileKotlin :desktop:test --stacktrace
+      # The shared data layer on both of its targets (docs/PLATFORMS.md, "The shared module") and the desktop app.
+      - run: ./gradlew :shared:desktopTest :shared:testAndroidHostTest :desktop:test --stacktrace
+  # The one result, under the name this workflow has always had. It fails if either job failed or was cancelled.
+  build:
+    needs: [phone, desktop]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Both jobs passed
+        run: test "${{ needs.phone.result }}" = success && test "${{ needs.desktop.result }}" = success

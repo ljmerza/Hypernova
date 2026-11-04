@@ -4660,3 +4660,18 @@ The owner: "if I scroll back somewhere and then try to send a command it'll auto
 2. **Every way of sending:** the box, voice, a quick prompt and Compact, Replace on the terminal's text card, and Allow & retry in the session sheet. None of them turns following on now.
 3. **What still goes to the end:** opening a session, Jump to latest, and scrolling down to the end by hand. Continue on a paused session and a limit card's move to another provider or model do too: those are the owner asking to carry on and see it, and they were left as they were.
 4. **The keyboard and a growing box** only move a list that's following already.
+## CI's Android job, split in two (2026-11-04)
+
+The owner: "is there a way to make to see how fast her for the Gradle takes almost 14 minutes maybe like a parallel runs split it in half". The one Gradle step took 816 s on GitHub.
+
+1. **Two jobs side by side:** `phone` (the app and its tests) and `desktop` (`:shared` on both targets, and the desktop app). Nothing is dropped. `build` stays as a job that passes only when both do, so anything that looks for that name still finds it.
+2. **Three desktop test classes at once.** GitHub's standard runner has 4 CPUs and 16 GB. Four forks were no faster here, and three leave a CPU for Gradle.
+3. **The slowest classes go first.** Gradle deals classes to forks in turn, whatever their size. In alphabetical order, the longest fork at 2 forks would hold 93% of the work and at 4 forks 50%, worked out from one class's times. Passing the slowest first is what made more forks pay: about 310 s of wall time against 720 s for one fork, both on 4 CPUs of a machine busy with other work.
+4. **The phone's tests stay in one process.** Two forks saved about 50 s of a job of several minutes, and in 8 repeats two failures came that aren't on the list of known flakes. Nothing shows the forks caused them, and it isn't worth finding out for 50 s.
+5. **`org.gradle.parallel` stays off.** With the configuration cache, Gradle already overlaps tasks: `:shared`'s two test tasks took 99 s of wall time for 162 s of tests. One run with it against two without was too little, on a loaded machine, to show a gain.
+6. **One cache, saved by `phone`.** `cache-provider: basic` has one key for all jobs, and the first to save wins. The desktop job on the phone job's cache needed 78 MB more; the phone job on the desktop's needs about 1 GB. So `desktop` only reads. `android-release.yml`'s `apk` job has the same key and may save first on `main`; that isn't new, and what it costs is only known from GitHub's logs.
+7. **`:shared:compileKotlinDesktop` and `:desktop:compileKotlin` are no longer named.** Other tasks need them anyway: a dry run lists the same tasks with or without them.
+
+### Not proven
+
+These times are from a machine shared with other work, at load averages from about 13 to 49 on 12 threads. Nothing here has run on GitHub, so whether it reaches half is only known after the first push. `verifyRoborazziDebug` isn't in this workflow, and wasn't before.

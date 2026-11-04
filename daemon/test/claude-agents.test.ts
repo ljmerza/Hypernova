@@ -17,6 +17,9 @@ const scratch = mkdtempSync(join(tmpdir(), 'hn-agents-'))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
 process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
+// A machine that's been up for a day, whatever this one's real uptime: a real pid with a start time a minute old is only
+// looked at by the code under test if the machine booted before that, and reboot.ts skips it otherwise.
+process.env.HYPERNOVA_BOOTED_AT = String(Date.now() - 24 * 3600_000)
 process.env.HOME = join(scratch, 'home')
 process.env.ZDOTDIR = join(scratch, 'zdot')
 process.env.FAKE_AGENTS_DIR = join(scratch, 'fake')

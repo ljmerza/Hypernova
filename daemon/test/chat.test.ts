@@ -15,6 +15,9 @@ const scratch = mkdtempSync(join(realpathSync(tmpdir()), 'hypernova-chat-'))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
 process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
+// A machine that's been up for a day, whatever this one's real uptime: a real pid with a start time a minute old is only
+// looked at by the code under test if the machine booted before that, and reboot.ts skips it otherwise.
+process.env.HYPERNOVA_BOOTED_AT = String(Date.now() - 24 * 3600_000)
 after(() => rmSync(scratch, { recursive: true, force: true }))
 
 const { callCost, contextWindow, modelInfo, sessionUsage } = await import('../src/session-usage.ts')
