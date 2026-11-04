@@ -205,7 +205,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 
 | Phone | Desktop | |
 |---|---|---|
-| Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Partly | The transcript, the box, the queue and the offline queue are there, the phone's own drawing (`:sharedui`). No rewind, message menu, attachments or quick prompts: "The shared drawing" lists what isn't |
+| Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Partly | The transcript, the box, the queue and the offline queue are there, the phone's own drawing (`:sharedui`). A right click on a waiting message offers Edit and Remove, the phone's long press (`WaitingEditBody`). No rewind, the rest of the message menu, attachments or quick prompts: "The shared drawing" lists what isn't |
 | Live terminal | Not yet | Not begun |
 | Answer a question or a plan, Always, Allow these N | Partly | Questions and plans are answered in the chat. Always also needs an owner check the desktop hasn't got |
 | Session sheet: what the list already knows (folder, model, mode, where it runs, agents, queue, context, times) | There | In the pane |
