@@ -29,4 +29,12 @@ class OutdatedJobsTest {
         assertEquals(listOf(JobRestart("a", true, "Respawned"), JobRestart("e", false, "Couldn't respawn je: it isn't running")), OutdatedJobs.results(o))
         assertEquals(emptyList<JobRestart>(), OutdatedJobs.results(JSONObject("{}")))
     }
+
+    @Test fun aReleasePageOnlyForWhatReadsAsAVersion() {
+        assertEquals("https://github.com/anthropics/claude-code/releases/tag/v2.1.317", OutdatedJobs.releaseUrl("2.1.317"))
+        assertEquals("https://github.com/anthropics/claude-code/releases/tag/v2.1.317-beta.1", OutdatedJobs.releaseUrl("2.1.317-beta.1"))
+        for (bad in listOf(null, "", "latest", "2.1", "2.1.317/../../evil", "2.1.317?x=1", "https://evil.example/2.1.317", "2.1.317 evil")) {
+            assertEquals("$bad", null, OutdatedJobs.releaseUrl(bad))
+        }
+    }
 }

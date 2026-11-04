@@ -13,6 +13,13 @@ data class JobRestart(val sessionId: String, val ok: Boolean, val said: String)
  * Code"): each one restarted with `claude respawn <job>`, never `--all`, which restarts current ones too.
  */
 object OutdatedJobs {
+    /**
+     * That Claude Code's release page. [version] comes from the server, so it goes in only if it's
+     * a version: nothing else can reach this address.
+     */
+    fun releaseUrl(version: String?): String? = version?.takeIf { Regex("""\d+\.\d+\.\d+[A-Za-z0-9.-]*""").matches(it) }
+        ?.let { "https://github.com/anthropics/claude-code/releases/tag/v$it" }
+
     /** The open jobs a process of an older Claude Code runs, the list's order. */
     fun of(sessions: List<Session>): List<Session> =
         sessions.filter { it.agentJob != null && it.agentOutdated != null && it.phase != Phase.Ended }

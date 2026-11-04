@@ -345,6 +345,17 @@ class HomeMoreTest {
 
     // ─── H9: Restart all for jobs on an older Claude Code ───
 
+    @Test fun theOutdatedJobsNoticeLinksToWhatThatVersionBrings() {
+        val outdated = OutdatedClaude("2.1.312", "2.1.316")
+        val base = FakeHub(sessions = only(Samples.ZETA, Samples.ALPHA, Samples.MID).map { if (it.agentJob != null) it.copy(agentOutdated = outdated) else it })
+        home(HomeHub(base))
+        rule.onNodeWithText(str(R.string.jobs_release_notes, "2.1.316")).performClick()
+        rule.waitForIdle()
+        val page = org.robolectric.Shadows.shadowOf(context as android.app.Application).nextStartedActivity
+        assertEquals("https://github.com/anthropics/claude-code/releases/tag/v2.1.316", page.dataString)
+        assertTrue(base.calls.isEmpty())
+    }
+
     @Test fun theOutdatedJobsNoticeRestartsThemAllAfterAskingAndSaysWhichRefused() {
         val outdated = OutdatedClaude("2.1.312", "2.1.316")
         val base = FakeHub(sessions = only(Samples.ZETA, Samples.ALPHA, Samples.MID).map { if (it.agentJob != null) it.copy(agentOutdated = outdated) else it })

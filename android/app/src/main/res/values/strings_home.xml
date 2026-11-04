@@ -96,6 +96,7 @@
     </plurals>
     <string name="jobs_outdated_line">%1$s is installed.</string>
     <string name="jobs_restart_all">Restart all</string>
+    <string name="jobs_release_notes">What\'s new in %1$s</string>
     <plurals name="jobs_restart_q">
         <item quantity="one">Restart %d job?</item>
         <item quantity="other">Restart %d jobs?</item>

@@ -4433,3 +4433,7 @@ The owner, on a file he opened from a session, `~/.codex/plans/handoff-….md`, 
 7. **Formatted is the chat's Markdown,** the same drawing, a block to a row of a list so a long document scrolls. No second renderer. A file over the viewer's 512 KB of text is cut, in both views, with the line it already had.
 8. **Where plans really are.** Claude Code's binary (2.1.317) defaults to `<config dir>/plans`; its `plansDirectory` setting has to stay inside the project, where a project's rules apply. Codex's (0.164.0) names no plans folder, so what writes to `~/.codex/plans` isn't Codex by itself: a skill or a prompt, as far as can be told. `CODEX_HOME` isn't followed: the exception is the key place's own `~/.codex`.
 9. **Not proven.** Nothing has run on a real phone or a Mac's disk. A Mac's mixed case rests on its native realpath, as the key places do, and on a Linux test that another spelling is another folder.
+
+## What's new, on the restart notice (2026-11-03)
+
+The owner: "add link to specific release on the update provider notification with restart button". Home's notice about jobs on an older Claude Code has a link beside Restart all, "What's new in 2.1.317", to that version's page on Claude Code's GitHub releases. The version comes from the server, so it only goes into the address if it reads as a version. It goes straight to the browser, as Settings' links do. Only Claude Code has this notice, so there's no Codex link.

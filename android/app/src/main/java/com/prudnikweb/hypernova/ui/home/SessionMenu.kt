@@ -171,10 +171,21 @@ internal fun OutdatedJobsCard(hub: Hub, jobs: List<Session>, modifier: Modifier 
     val n = jobs.size
     val ids = jobs.map { it.id }
     val restart = stringResource(if (n == 1) R.string.session_restart else R.string.jobs_restart_all)
+    val installed = jobs.firstNotNullOfOrNull { it.agentOutdated?.installed }
+    val context = LocalContext.current
     AttentionCard(
         id = OUTDATED_CARD, state = OutdatedJobs.attention(jobs), tone = HN.accentDim, glyph = Glyph.Reload,
         title = pluralStringResource(R.plurals.jobs_outdated_title, n, n),
-        line = jobs.firstNotNullOfOrNull { it.agentOutdated?.installed }?.let { stringResource(R.string.jobs_outdated_line, it) },
+        line = installed?.let { stringResource(R.string.jobs_outdated_line, it) },
+        // What the restart brings: straight to the browser, a row chosen on purpose ("Links out of Settings").
+        links = listOfNotNull(
+            com.prudnikweb.hypernova.data.OutdatedJobs.releaseUrl(installed)?.let { url ->
+                AttentionAction(stringResource(R.string.jobs_release_notes, installed.orEmpty()), {
+                    val page = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    runCatching { context.startActivity(page) }.onFailure { toast(context.getString(R.string.about_github_no_browser)) }
+                })
+            },
+        ),
         action = AttentionAction(restart, {
             if (!busy) confirm(
                 Confirm(res.getQuantityString(R.plurals.jobs_restart_q, n, n), res.getString(R.string.jobs_restart_body), restart, danger = false) {
