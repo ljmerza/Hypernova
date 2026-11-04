@@ -31,6 +31,8 @@ object SettingsPlan {
 
     /** A row for each of [ids], in order; none: not paired. */
     data class Servers(val ids: List<String>) : TabPart { override val key = "servers" }
+    /** The row that opens Statistics: of what's on screen, one server or All servers, so not on a server's own page. */
+    data object Statistics : TabPart { override val key = "statistics" }
     /** "This phone": the heading, and the rows of [pages]. */
     data class Phone(val pages: List<PhonePage>) : TabPart { override val key = "phone" }
     data object Display : TabPart { override val key = "display" }
@@ -79,6 +81,7 @@ object SettingsPlan {
      */
     fun parts(servers: List<String>, testing: Boolean): List<TabPart> = buildList {
         add(Servers(servers))
+        if (servers.isNotEmpty()) add(Statistics)
         add(Phone(PhonePage.entries.filter { it != PhonePage.Notifications || servers.isNotEmpty() }))
         add(Display)
         if (testing) add(TerminalEngine)

@@ -192,6 +192,10 @@ fun SettingsTab(vm: HubViewModel, top: Dp) {
                         }
                     }
                 }
+                SettingsPlan.Statistics -> GlassCard(Modifier.fillMaxWidth()) {
+                    val about = if (allMode) stringResource(R.string.st_stats_desc_all) else stringResource(R.string.st_stats_desc, listed.first().first.name)
+                    NavRow(stringResource(R.string.stats_title), about, { vm.nav.push(Route.Statistics) }, Modifier.padding(horizontal = 16.dp))
+                }
                 is SettingsPlan.Phone -> {
                     GroupHeading(stringResource(R.string.st_all_phone), first = false)
                     GlassCard(Modifier.fillMaxWidth()) {

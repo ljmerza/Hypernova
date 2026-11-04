@@ -15,6 +15,9 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import com.prudnikweb.hypernova.R
@@ -23,7 +26,9 @@ import com.prudnikweb.hypernova.data.ApiException
 import com.prudnikweb.hypernova.data.Link
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Problem
+import com.prudnikweb.hypernova.data.AndroidStrings
 import com.prudnikweb.hypernova.data.StatDay
+import com.prudnikweb.hypernova.data.StatWords
 import com.prudnikweb.hypernova.data.StatProject
 import com.prudnikweb.hypernova.data.StatTokens
 import com.prudnikweb.hypernova.data.StatTool
@@ -32,9 +37,6 @@ import com.prudnikweb.hypernova.data.StatsRange
 import com.prudnikweb.hypernova.data.StatsServer
 import com.prudnikweb.hypernova.data.StatsSource
 import com.prudnikweb.hypernova.ui.stats.StatsScreen
-import com.prudnikweb.hypernova.ui.stats.dayName
-import com.prudnikweb.hypernova.ui.stats.hours
-import com.prudnikweb.hypernova.ui.stats.hoursSaid
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -49,7 +51,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Statistics (ui/stats/StatsScreen.kt): the totals and the last 30 days as a bar a day. The fake hub
+ * Statistics (ui/stats/, in :sharedui, shown by ui/stats/StatsPage.kt): the totals and the last 30 days as a bar a day. The fake hub
  * has no Mac to ask, so the answers are put where the screen looks first (StatsSource.put). With
  * "All servers" (data/AllStats.kt) every server's are added up: a fake hub with no answer put fails
  * when asked, as a server that doesn't answer does.
@@ -61,6 +63,10 @@ class StatsScreenTest {
     private val spy = AppSpy()
     private var backs = 0
     private val res get() = context.resources
+    private val words get() = AndroidStrings(context, context.resources)
+    private fun hours(ms: Long) = StatWords.time(words, ms)
+    private fun hoursSaid(ms: Long) = StatWords.timeSaid(words, ms)
+    private fun dayName(d: LocalDate) = StatWords.weekday(words, d)
 
     @Before fun setUp() = resetPrefs()
 
@@ -115,11 +121,11 @@ class StatsScreenTest {
         StatsSource.put(hub, StatsRange.Week, week)
         screen(hub)
         val said = heroSaid()
-        assertTrue(said, said.startsWith(res.getString(R.string.stats_claude_worked) + " " + hours(res, week.claudeMs)))
+        assertTrue(said, said.startsWith(res.getString(R.string.stats_claude_worked) + " " + hoursSaid(week.claudeMs)))
         assertTrue(said, said.contains("${week.sessions} sessions, ${week.agents} agents"))
         // The chart: 30 bars, the busiest day named; 24 of the 30 days had work.
         val busiest = week.days.maxBy { it.claudeMs }
-        rule.onNode(hasContentDescription(str(R.string.a11y_stats_days, hoursSaid(res, busiest.claudeMs), dayName(busiest.day)), substring = true)).assertExists()
+        rule.onNode(hasContentDescription(str(R.string.a11y_stats_days, hoursSaid(busiest.claudeMs), dayName(busiest.day)), substring = true)).assertExists()
         rule.onNodeWithText(res.getQuantityString(R.plurals.stats_active_days, 24, 24), substring = true, useUnmergedTree = true).assertExists()
         rule.onNodeWithText("hypernova", useUnmergedTree = true).assertExists()
         rule.snap("stats_week")
@@ -134,7 +140,7 @@ class StatsScreenTest {
         rule.onNode(hasText(str(R.string.stats_range_month))).performClick()
         rule.waitForIdle()
         val said = heroSaid()
-        assertTrue(said, said.contains(hours(res, month.claudeMs)))
+        assertTrue(said, said.contains(hoursSaid(month.claudeMs)))
         assertTrue(said, said.contains("${month.sessions} sessions"))
         rule.snap("stats_month")
     }
@@ -167,17 +173,17 @@ class StatsScreenTest {
         // The header says All servers, before the days they cover.
         rule.onNodeWithText(str(R.string.stats_on_server, str(R.string.servers_all), "25 – 31 Oct"), useUnmergedTree = true).assertExists()
         val said = heroSaid()
-        assertTrue(said, said.startsWith(res.getString(R.string.stats_claude_worked) + " " + hours(res, a.claudeMs + b.claudeMs)))
+        assertTrue(said, said.startsWith(res.getString(R.string.stats_claude_worked) + " " + hoursSaid(a.claudeMs + b.claudeMs)))
         assertTrue(said, said.contains("${a.sessions + b.sessions} sessions, ${a.agents + b.agents} agents"))
         // The chart's days summed: the busiest is the same day (each server's work scales alike), its hours added.
         val busiest = a.days.indices.maxBy { a.days[it].claudeMs + b.days[it].claudeMs }
         val ms = a.days[busiest].claudeMs + b.days[busiest].claudeMs
-        rule.onNode(hasContentDescription(str(R.string.a11y_stats_days, hoursSaid(res, ms), dayName(a.days[busiest].day)), substring = true)).assertExists()
+        rule.onNode(hasContentDescription(str(R.string.a11y_stats_days, hoursSaid(ms), dayName(a.days[busiest].day)), substring = true)).assertExists()
         rule.onNodeWithText(res.getQuantityString(R.plurals.stats_active_days, 24, 24), substring = true, useUnmergedTree = true).assertExists()
         // Same-named projects are one, summed.
         val hn = a.projects.first().claudeMs + b.projects.first().claudeMs
         rule.onNodeWithText("hypernova", useUnmergedTree = true).assertExists()
-        rule.onNodeWithText(hours(res, hn), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(hours(hn), useUnmergedTree = true).assertExists()
         // The one that isn't answering is named.
         rule.onNodeWithText(res.getQuantityString(R.plurals.stats_all_missing, 1, "k1"), useUnmergedTree = true).assertExists()
         rule.snap("stats_all_servers")
@@ -196,7 +202,7 @@ class StatsScreenTest {
         rule.onNode(hasText(str(R.string.stats_range_month))).performClick()
         rule.waitForIdle()
         val said = heroSaid()
-        assertTrue(said, said.contains(hours(res, a.claudeMs + b.claudeMs)))
+        assertTrue(said, said.contains(hoursSaid(a.claudeMs + b.claudeMs)))
         assertTrue(said, said.contains("${a.sessions + b.sessions} sessions"))
     }
 
@@ -275,7 +281,7 @@ class StatsScreenTest {
         rule.onNode(hasText(str(R.string.stats_range_ytd))).performClick()
         rule.waitForIdle()
         val said = heroSaid()
-        assertTrue(said, said.contains(hours(res, ytd.claudeMs)))
+        assertTrue(said, said.contains(hoursSaid(ytd.claudeMs)))
         rule.onNodeWithText(str(R.string.stats_since, "1 Jan"), useUnmergedTree = true).assertExists()
         rule.snap("stats_ytd")
     }
@@ -290,7 +296,7 @@ class StatsScreenTest {
         rule.onNode(hasText(str(R.string.stats_range_ytd))).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.stats_on_server, str(R.string.servers_all), str(R.string.stats_since, "1 Jan")), useUnmergedTree = true).assertExists()
-        assertTrue(heroSaid().contains(hours(res, a.claudeMs + b.claudeMs)))
+        assertTrue(heroSaid().contains(hoursSaid(a.claudeMs + b.claudeMs)))
     }
 
     // ─── All: when it starts ───────────────────────────────────────────────
@@ -348,7 +354,7 @@ class StatsScreenTest {
         rule.onNode(hasText(str(R.string.stats_range_week))).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(res.getQuantityString(R.plurals.stats_needs_update, 1, hub.mac.name), useUnmergedTree = true).assertDoesNotExist()
-        assertTrue(heroSaid().contains(hours(res, stats(StatsRange.Week, 1).claudeMs)))
+        assertTrue(heroSaid().contains(hoursSaid(stats(StatsRange.Week, 1).claudeMs)))
     }
 
     /** z2 and gym know YTD; k1, linked, is too old for it. */
@@ -370,7 +376,7 @@ class StatsScreenTest {
         rule.waitForIdle()
         rule.onNodeWithText(res.getQuantityString(R.plurals.stats_needs_update, 1, "k1"), useUnmergedTree = true).assertExists()
         rule.onNodeWithText(res.getQuantityString(R.plurals.stats_all_missing, 1, "k1"), useUnmergedTree = true).assertDoesNotExist()
-        assertTrue(heroSaid().contains(hours(res, stats(StatsRange.Ytd, 1).claudeMs + stats(StatsRange.Ytd, 3).claudeMs)))
+        assertTrue(heroSaid().contains(hoursSaid(stats(StatsRange.Ytd, 1).claudeMs + stats(StatsRange.Ytd, 3).claudeMs)))
         rule.snap("stats_all_servers_needs_update")
     }
 
@@ -469,6 +475,122 @@ class StatsScreenTest {
         pick(servers[0].hub as FakeHub, StatsRange.All, R.string.stats_range_all, withOlderDays(StatsRange.All), servers)
         rule.onNodeWithText(str(R.string.stats_on_server, str(R.string.servers_all), str(R.string.stats_since, "8 Jan 2026")), useUnmergedTree = true).assertExists()
         rule.onNodeWithText(str(R.string.stats_later, "1 Aug 2026"), useUnmergedTree = true).assertExists()
+    }
+
+    // ─── The logo, and what the rewrite added ──────────────────────────────
+
+    @Test fun theLogoInItsBarGoesHome() {
+        var home = 0
+        val hub = FakeHub()
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        rule.setContent { Harness(spy) { StatsScreen(hub, onBack = {}, onHome = { home++ }) } }
+        rule.waitForIdle()
+        rule.onNode(hasContentDescription(str(R.string.home_mark_label))).performClick()
+        assertEquals(1, home)
+    }
+
+    @Test fun aTapPicksADayAndADragThenATapStillDo() {
+        val hub = FakeHub()
+        val week = stats(StatsRange.Week, 1)
+        StatsSource.put(hub, StatsRange.Week, week)
+        screen(hub)
+        val chart = rule.onNode(hasContentDescription(str(R.string.a11y_stats_days, hoursSaid(week.days.maxBy { it.claudeMs }.claudeMs), dayName(week.days.maxBy { it.claudeMs }.day)), substring = true))
+        val line = { d: StatDay -> dayName(d.day).uppercase() }
+        rule.onNodeWithText(line(week.days.last()), useUnmergedTree = true).assertExists()
+        chart.performTouchInput { click(androidx.compose.ui.geometry.Offset(2f, centerY)) }
+        rule.waitForIdle()
+        rule.onNodeWithText(line(week.days.first()), useUnmergedTree = true).assertExists()
+        // A drag across ends on the day under the finger, and a finger leaves nothing held: the next tap counts.
+        chart.performTouchInput { swipe(androidx.compose.ui.geometry.Offset(2f, centerY), androidx.compose.ui.geometry.Offset(width - 2f, centerY), 300) }
+        rule.waitForIdle()
+        rule.onNodeWithText(line(week.days.last()), useUnmergedTree = true).assertExists()
+        chart.performTouchInput { click(androidx.compose.ui.geometry.Offset(2f, centerY)) }
+        rule.waitForIdle()
+        rule.onNodeWithText(line(week.days.first()), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(line(week.days.last()), useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun todayLeavesOutTheBusiestDayItWouldOnlyRepeat() {
+        val hub = FakeHub()
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        StatsSource.put(hub, StatsRange.Today, stats(StatsRange.Today, 1))
+        screen(hub)
+        rule.onNodeWithText(str(R.string.stats_busiest).uppercase(), useUnmergedTree = true).assertExists()
+        rule.onNode(hasText(str(R.string.stats_range_today))).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.stats_busiest).uppercase(), useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun theTwoOtherTimesAreATableUnderTheHero() {
+        val hub = FakeHub()
+        val week = stats(StatsRange.Week, 1)
+        StatsSource.put(hub, StatsRange.Week, week)
+        screen(hub)
+        val said = heroSaid()
+        assertTrue(said, said.contains(str(R.string.stats_by_clock, hoursSaid(week.wallMs))))
+        assertTrue(said, said.contains(str(R.string.stats_agent_work, hoursSaid(week.agentMs))))
+    }
+
+    @Test fun whatsOnlyCountedLaterSaysSoAndOnlyThen() {
+        val hub = FakeHub()
+        val week = stats(StatsRange.Week, 1)
+        val start = day(2026, 10, 28)
+        StatsSource.put(hub, StatsRange.Week, week.copy(countingSince = start))
+        screen(hub)
+        rule.onNodeWithText(str(R.string.stats_counted_what, "28 Oct"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun anAnswerThatCouldntBeRefreshedSaysFromWhen() {
+        val hub = FakeHub()
+        val old = stats(StatsRange.Today, 1)
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        StatsSource.put(hub, StatsRange.Today, old)
+        StatsSource.refuse(hub, StatsRange.Today, ApiException(Problem.Unreachable))
+        // Kept from long enough ago that it's asked again, and asking fails.
+        val board = com.prudnikweb.hypernova.data.StatsBoard(hub, null)
+        board.pick(StatsRange.Today)
+        runBlocking { board.ask(again = true) }
+        val shown = board.shown as com.prudnikweb.hypernova.data.StatsShown.Numbers
+        assertEquals(old.to, shown.staleSince)
+        assertEquals(old.claudeMs, shown.stats.claudeMs)
+        // And it's on the screen, over the numbers.
+        rule.setContent { Harness(spy) { com.prudnikweb.hypernova.ui.stats.StatsBody(board) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.stats_stale, "X").substringBefore("X"), substring = true, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun anotherRangesNumbersNeverStandIn() {
+        val hub = FakeHub()
+        StatsSource.put(hub, StatsRange.Week, stats(StatsRange.Week, 1))
+        screen(hub)
+        rule.onNode(hasText(str(R.string.stats_range_month))).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.stats_error), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.try_again), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("hypernova", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun aServerThatDoesntKnowTheRouteIsToldToUpdate() {
+        val hub = FakeHub()
+        StatsSource.refuse(hub, StatsRange.Week, ApiException(Problem.Server, 404, "not_found"))
+        screen(hub)
+        rule.onNodeWithText(str(R.string.stats_old_mac), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.stats_error), useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun bothAgentsSayWhoseHoursAreWhose() {
+        val hub = FakeHub()
+        val week = stats(StatsRange.Week, 1)
+        StatsSource.put(hub, StatsRange.Week, week.copy(
+            claude = com.prudnikweb.hypernova.data.StatAgent(week.claudeMs - 3_600_000L, 1, 1, 1, 1),
+            codex = com.prudnikweb.hypernova.data.StatAgent(3_600_000L, 1, 1, 1, 1),
+        ))
+        screen(hub)
+        val said = rule.onNode(hasContentDescription(res.getString(R.string.stats_agents_worked), substring = true)).fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription].joinToString(" ")
+        assertTrue(said, said.contains(str(R.string.a11y_stats_split, hoursSaid(week.claudeMs - 3_600_000L), hoursSaid(3_600_000L))))
+        rule.onNodeWithText(str(R.string.stats_footer_agents, hub.mac.name), useUnmergedTree = true).assertExists()
+        rule.snap("stats_both_agents")
     }
 
     private fun <T> assertNotNullAnd(v: T?): T {

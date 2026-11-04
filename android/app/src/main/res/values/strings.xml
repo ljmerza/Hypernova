@@ -974,8 +974,8 @@
     <string name="mermaid_show_code">Show the code</string>
     <string name="mermaid_show_diagram">Show the diagram</string>
     <string name="mermaid_close">Close</string>
-    <!-- The mark in Home's top bar opens Statistics (it did from the sun, before the sky went). -->
-    <string name="stats_open_label">Open Statistics</string>
+    <!-- The logo in a top bar, for TalkBack: wherever it's shown it goes to the Sessions list, at its top. -->
+    <string name="home_mark_label">Go to the sessions list</string>
     <!-- An agent's settings on the server, to view (ui/settings/AgentSettings.kt). -->
     <string name="as_row">Settings</string>
     <string name="as_row_claude">Effort, permission mode and more, from the server\'s settings.json</string>

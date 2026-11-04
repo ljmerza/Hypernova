@@ -73,6 +73,7 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 | `ui.fx` | `Ambient.kt` (the one clock), `Pace.kt`, `Countdown.kt` |
 | `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
 | `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
+| `ui.stats` | Statistics: `StatsBody.kt` (the widths, the states, the range switch), `StatsHero.kt`, `StatsDays.kt`, `StatsLists.kt`. Its sums are `:shared`'s (`StatsBoard`, `DayChart`, `StatWords`), and each app gives it a place: `app/.../ui/stats/StatsPage.kt`, `desktop/.../ui/StatsPane.kt` |
 
 **The seams** (`UiPlatform`), each implemented in `app/.../ui/AndroidUiPlatform.kt` and `desktop/.../DesktopUiPlatform.kt` and handed over once, with `SharedUi.install`, before anything draws:
 
@@ -192,6 +193,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 |---|---|---|
 | Three groups, what a card says, state chips | There | Two panes instead of cards (DECISIONS, "The desktop client's two panes") |
 | Allow and Deny on the card | Partly | In the pane, with Allow only beside the whole command (rule 3 of "The desktop app"), on purpose and stricter than the phone. A question or a plan is answered on the phone |
+| The logo goes to the list at its top | There | From a session, History, New session and Settings: the same `HomeMark` |
 | Search, filter, sort | Not yet | The list is A to Z in each group |
 | Unread dot | Not yet | |
 | Usage cards | Not yet | Only the chart's week behind the list |
@@ -239,7 +241,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Automations: list, editor, runs, ask steps | Not yet | An automation's question isn't sent as an alert either: there's no screen to open (LATER L123) |
 | Files: browse, view, download, previews and the web page | Not yet | When the viewer comes it needs Markdown's Raw and Formatted switch, raw first, and to leave Share and Save off a file marked view only (docs/PROTOCOL.md, "Agents' plans"). The chat's Markdown is already in `sharedui`, with `markdownRows` for a long document |
 | What changed | Not yet | |
-| Statistics | Not yet | |
+| Statistics | There | The phone's parts (`ui.stats`), on a page of their own under the top bar, across the window instead of in the pane. All servers is a pill on that page: the desktop has it nowhere else |
 | Agents boards, an agent's own screen | Not yet | Only a count in the pane |
 | Settings: debug logging | There | The desktop's only part of the phone's Settings |
 | Settings: where the key and tokens are, alerts | Desktop only | |

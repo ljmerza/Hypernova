@@ -18,6 +18,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -914,6 +915,26 @@ fun Wordmark(modifier: Modifier = Modifier) {
 @Composable
 fun Hairline(modifier: Modifier = Modifier, color: Color = HN.line) {
     Box(modifier.height(1.dp).background(color))
+}
+
+/**
+ * The logo in a top bar, as the way home (owner, 2026-11-03): wherever it's shown, it goes to the Sessions list at its
+ * top. It starts at the bar's start, so it lines up with what's under it. [target]: how much of the bar it can answer in.
+ */
+@Composable
+fun HomeMark(onClick: () -> Unit, modifier: Modifier = Modifier, target: Dp = 48.dp) {
+    val label = stringResource(Str.home_mark_label)
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        modifier
+            .size(target)
+            .pillPointer(interaction, enabled = true)
+            // Tab goes from the list straight to the buttons; a pointer and TalkBack reach this.
+            .focusProperties { canFocus = false }
+            .clickable(interaction, indication = null, onClickLabel = label, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.CenterStart,
+    ) { NovaMark(size = 22.dp) }
 }
 
 /** Round icon button: 48dp touch target, 40dp visual, labelled for TalkBack. */
