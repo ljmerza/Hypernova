@@ -4535,3 +4535,37 @@ The owner: "paths should be in a box and press down copied like commands".
 1. **A paragraph of a reply that is only a file path, or only paths, draws as a code block**, with the code block's own long press to copy. The message's menu doesn't open over it.
 2. **It counts as a path with two folders or a `~/`,** so a lone `/compact` stays text. A path with a space in it isn't recognised.
 3. **A path inside a sentence or a bullet stays where it is.** Boxing it would break the sentence up.
+
+## No fingerprints or screen locks (owner, 2026-11-04)
+
+The owner: "but don't add fingerprinting needed", then, asked about the existing ones (Bypass in the New session sheet, plugin installs, agent updates, the JSON tab): "yeah no fingerprint stuff".
+
+1. **Every fingerprint or screen-lock prompt in the app goes.** `OwnerCheck`, the framework's `BiometricPrompt` and the `USE_BIOMETRIC` permission are gone. `scripts/arch-check.py` fails on them coming back (`no-biometric`).
+2. **What stands in their place keeps the safety that wasn't the fingerprint.** Where a think-twice card or a confirm already came first, it stays, and pressing it now goes straight through. Where the fingerprint was the only step for something that loosens permissions, runs code or can't be undone, there's a plain one-tap confirm saying what it does. Nothing new where there's no real consequence: the owner wants speed.
+
+   | Where | What it does now |
+   |---|---|
+   | The session sheet's mode, New session's mode, the switch sheet's mode: Bypass | The think-twice card, then it's chosen |
+   | The automation editor's No asking | The think-twice card when it's picked, and the confirm below on every save |
+   | The chat's Always, with Claude Code's rule | The Always sheet, with the rule and where it goes. Always allow answers |
+   | The chat's Always, with no rule | **New confirm:** what Always means and the whole command |
+   | Saving an automation with No asking or a shell step | **New confirm**, one for both, every save, with the commands whole. Then `confirmBypass`, `confirmShell` |
+   | Browse outside projects, on | **New confirm** saying what it opens. Off asks nothing |
+   | An agent's settings, loosening | The confirm saying what it allows |
+   | Environment variables and raw JSON the server wants confirmed | The confirm with the server's words, then `confirmRun` |
+   | MCP servers: adding, changing, approving, Undo | The confirm with the whole command, then `confirmRun` |
+   | Plugins and marketplaces: install, update, adding, Codex's marketplace update | The confirm with the source, then `confirmRun` |
+   | An agent's update | The confirm saying what changes, then `confirmRun` |
+
+3. **The server's flags stay, and so does every rule of the API.** `confirmRun`, `confirmBypass`, `confirmShell`, `needsCheck` and `loosened` keep their names and their meaning, and a client still sets them after its confirm. Only the refusals' words changed ("Confirm it first."), so older clients and older servers still fit: both sides read the code, never the message. An older server's words still say "fingerprint" on the Environment variables confirm, which shows its message, until it's updated. Raw JSON's refusal never named it.
+4. **The rules that stand, stand.** Bypass, `danger-full-access` and approval `never` can never be a default, and the server refuses them there. Bypass is chosen each time with its think-twice card. Allow only beside the whole command: the new Always confirm shows it uncut.
+5. **With no case to show, Bypass doesn't go.** The think-twice card goes on without one for Auto if `incidents.json` can't be read. The fingerprint stood behind that for Bypass, and nothing does now, so Bypass stops there instead, on the phone and the desktop.
+6. **The desktop.** It sent people to the phone because it had no fingerprint, and that reason is gone (owner's call, as "The desktop client's New session", 1, left it).
+   - **Bypass in its New session form,** with the same think-twice card. Chosen each time, and never kept: not in what the form remembers, not after the form is put away, not on another server. Not for Codex.
+   - **Always on an ask's card,** where the server offers it and Allow is offered. A confirm says Claude Code's rule and where it goes, or what Always means with no rule, then the whole command. It sends Claude Code's suggestion as it stands: the phone's sheet for editing a rule isn't on the desktop yet. A terminal's own dialog has no Always here.
+   - Automations, an agent's settings and Browse outside projects aren't on the desktop at all, for other reasons, so nothing else was held back.
+7. **What this doesn't touch.** The Android keystore key for the device's certificate never asked for the lock (no `setUserAuthenticationRequired`), and stays as it is.
+8. **Notifications' Allow and Deny still need the phone unlocked, for now: the owner's to decide.** `setAuthenticationRequired` isn't a prompt the app raises and isn't what the owner was asked about: it's Android refusing a button on the lock screen, and it's the difference between someone holding an unlocked phone and someone holding a locked one. Taking it away would let anyone who picks up a locked phone press Allow, so it stays until he says otherwise. The widget's locked branch and the lock screen hiding the command stay for the same reason.
+9. **The risk, stated plainly,** is in `docs/SECURITY-MODEL.md`, section 6: anyone holding an unlocked phone or at a paired device can now choose Bypass, install a plugin, loosen permissions or set a hook, with one tap, and that runs code on the server. The old check was only in the client.
+
+**This replaces:** "Android and connection" ("A biometric check guards..."); "The owner's morning answers", 2; "The owner's afternoon answers", 3, for the prompt's part; "Default mode for new sessions", 3, for why (Bypass still isn't a default); "What Always covers, and allowing several", for the fingerprint after the sheet; "The widget: Needs you", 4's last line; "The agents' settings, edited"; "Managing MCP servers from the phone"; "Plugins from the phone", 2, 3 and 7; "Environment variables from the phone", 3; "JSON mode", 4; "The desktop client's New session", 1; "Updating Claude Code and Codex", 6; "The session sheet's MCP tab", 10. In each of those a fingerprint now reads as the confirm. Those sections stay as they were written, and so do `docs/specs/spec-automations.md` and `docs/specs/workflows.md`, which are research.

@@ -11,7 +11,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentSettingRefused
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.settings.AgentEnvScreen
 import org.json.JSONObject
 import org.junit.After
@@ -40,15 +39,9 @@ class AgentEnvScreenTest {
     @get:Rule val rule = createComposeRule()
     private val spy = AppSpy()
     private val hub = ExtHub()
-    private var checks = 0
 
     @Before fun setUp() = resetPrefs()
-    @After fun tearDown() { OwnerCheck.prompt = null }
 
-    private fun lock(pass: Boolean = true) {
-        org.robolectric.Shadows.shadowOf(context.getSystemService(android.app.KeyguardManager::class.java)).setIsDeviceSecure(true)
-        OwnerCheck.prompt = { ok, fail -> checks++; if (pass) ok() else fail(null) }
-    }
     private fun open(agent: String = "claude") {
         rule.setContent { Harness(spy) { AgentEnvScreen(hub, agent, onBack = {}) } }
         rule.waitForIdle()
@@ -138,14 +131,13 @@ class AgentEnvScreenTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun whenTheServerWantsTheCheckItsWordsGoOnTheConfirmThenTheFingerprintThenItSaysSo() {
+    @Test fun whenTheServerWantsTheCheckItsWordsGoOnTheConfirmThenItSaysSo() {
         hub.on("GET /v1/agents/env", ENV)
         hub.handler = { m, path, body ->
             if (m == "POST" && path == "/v1/agents/env") {
                 if (body!!.optBoolean("confirmRun")) ok() else Result.failure(AgentSettingRefused("confirm_run", "LD_PRELOAD: (not set) → /tmp/x.so changes what runs or where data goes."))
             } else null
         }
-        lock()
         open()
         field(str(R.string.env_add_name)).performScrollTo().performTextInput("LD_PRELOAD")
         field(str(R.string.env_add_value)).performScrollTo().performTextInput("/tmp/x.so")
@@ -155,25 +147,24 @@ class AgentEnvScreenTest {
         assertTrue(ask.body, ask.body.contains("LD_PRELOAD: (not set) → /tmp/x.so"))
         assertTrue(ask.danger)
         assertEquals(1, posts("/v1/agents/env").size)
+        assertFalse(posts("/v1/agents/env").single().optBoolean("confirmRun"))
         ask.onConfirm()
         rule.waitForIdle()
-        assertEquals(1, checks)
         assertTrue(posts("/v1/agents/env").last().getBoolean("confirmRun"))
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun aCancelledFingerprintChangesNothing() {
+    @Test fun aConfirmNotPressedChangesNothing() {
         hub.on("GET /v1/agents/env", ENV)
         hub.handler = { m, path, _ -> if (m == "POST" && path == "/v1/agents/env/remove") Result.failure(AgentSettingRefused("confirm_run", "Taking PATH away changes what runs.")) else null }
-        lock(pass = false)
         open()
         rule.onNode(hasContentDescription(str(R.string.env_delete, "PATH"))).performScrollTo().performClick()
         rule.waitForIdle()
         spy.confirms[0].onConfirm()
         rule.waitForIdle()
-        spy.confirms[1].onConfirm()
-        rule.waitForIdle()
-        assertEquals(1, posts("/v1/agents/env/remove").size)
+        // The server's confirm is up, and nobody pressed it: only the first try went, without the flag.
+        assertEquals(2, spy.confirms.size)
+        assertFalse(posts("/v1/agents/env/remove").single().optBoolean("confirmRun"))
     }
 
     @Config(qualifiers = "+h1800dp")
@@ -192,7 +183,6 @@ class AgentEnvScreenTest {
     @Test fun undoSaysWhatItWouldDoAndAsksWhereItMust() {
         hub.on("GET /v1/agents/env", ENV.replace("\"undo\":null", "\"undo\":{\"name\":\"PATH\",\"scope\":\"user\",\"folder\":null,\"needsCheck\":true,\"change\":\"PATH: /opt/bin → (not set)\"}"))
         hub.handler = { m, path, body -> if (m == "POST" && path == "/v1/agents/env/undo") { if (body!!.optBoolean("confirmRun")) ok() else Result.failure(AgentSettingRefused("confirm_run", "Putting this back changes what runs.")) } else null }
-        lock()
         open()
         seen("PATH: /opt/bin → (not set)")
         rule.onNodeWithText("PATH: /opt/bin → (not set)").performClick()

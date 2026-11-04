@@ -41,7 +41,7 @@ data class McpList(val agent: String, val state: String, val servers: List<McpRo
     }
 }
 
-/** What Undo would do. [needsCheck]: it would run something, so it asks for the fingerprint, showing [command]. */
+/** What Undo would do. [needsCheck]: it would run something, so it confirms first, showing [command]. */
 @Immutable
 data class McpUndo(val op: String, val name: String, val scope: String, val folder: String?, val needsCheck: Boolean, val command: String?)
 

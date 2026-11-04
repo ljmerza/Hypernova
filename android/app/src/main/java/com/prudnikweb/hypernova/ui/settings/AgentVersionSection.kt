@@ -45,7 +45,7 @@ internal const val UPDATE_POLL_MS = 2_500L
 
 /**
  * An agent's Settings › Version (docs/DECISIONS.md, "Updating Claude Code and Codex"; owner: "also add ability to check and update
- * Claude code and codex"). What [hub]'s server has, a check when asked, and an update behind a confirm and the fingerprint. The
+ * Claude code and codex"). What [hub]'s server has, a check when asked, and an update behind a confirm. The
  * update runs on the server whether or not this page is open, so its result is here on return.
  */
 @Composable

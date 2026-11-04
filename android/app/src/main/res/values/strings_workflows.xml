@@ -113,9 +113,9 @@
     <string name="wf_timeout">Stops after</string>
     <string name="wf_seconds">%1$ds</string>
     <string name="wf_shell_note">Runs with /bin/sh in the project folder, without a terminal. Words from other sessions or a webhook reach it only through its environment.</string>
-    <string name="wf_shell_fingerprint">Saving it asks for your fingerprint, every time.</string>
-    <string name="wf_shell_title">Let an automation run commands</string>
-    <string name="wf_lock_needed">Set up a screen lock on this phone first: saving a command needs it.</string>
+    <string name="wf_shell_confirm">Saving it asks you to confirm, every time.</string>
+    <string name="wf_shell_title">Let an automation run commands?</string>
+    <string name="wf_shell_body">%1$s runs this on the server by itself, with your account\'s access, each time it runs:\n\n%2$s</string>
 
     <!-- Placeholders, one line each. -->
     <string name="wf_ph_project">{project}: the project\'s name</string>
@@ -307,7 +307,7 @@
     <string name="wf_err_answers">Give 2 or 3 different answers, 24 characters each at most.</string>
     <string name="wf_err_timeout">Pick how long it waits.</string>
     <string name="wf_err_command">Write the command to run.</string>
-    <string name="wf_err_confirm_shell">A command needs your fingerprint or screen lock first.</string>
+    <string name="wf_err_confirm_shell">Confirm the command first.</string>
     <string name="wf_err_placeholder">Words from another session or from outside can\'t go there. A command reads them from its environment.</string>
     <string name="wf_err_outputs">Tell two places at most.</string>
     <string name="wf_err_output">Your Mac can\'t send there yet.</string>

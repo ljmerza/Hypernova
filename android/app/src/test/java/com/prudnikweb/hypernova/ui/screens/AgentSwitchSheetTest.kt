@@ -122,6 +122,21 @@ class AgentSwitchSheetTest {
         assertEquals("switchAgent(${Samples.MID}, claude, 47, null, null, default)", hub.calls.last())
     }
 
+    @Test fun aSwitchToClaudeTakesBypassWithItsThinkTwiceCardAndNothingElse() {
+        val hub = FeatureHub()
+        hub.base.sessionList = hub.base.sessionList.map { if (it.id == Samples.MID) it.copy(agent = AgentKind.CODEX, mode = AgentKind.READ_ONLY, model = "gpt-test") else it }
+        sheet(hub, to = AgentKind.CLAUDE)
+        rule.onNode(androidx.compose.ui.test.hasContentDescription(str(R.string.ns_mode_said, str(R.string.mode_label_default)), substring = true)).performClick()
+        rule.waitForIdle()
+        rule.onNode(androidx.compose.ui.test.hasContentDescription(str(R.string.mode_title_bypass) + ".", substring = true)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.think_use_bypass)).performClick()
+        rule.waitForIdle()
+        switchPill().performClick()
+        rule.waitForIdle()
+        assertEquals("switchAgent(${Samples.MID}, claude, 47, null, null, bypassPermissions)", hub.calls.last())
+    }
+
     /** The other agent starts as the New session sheet would: this server's value for it. */
     @Test fun aSwitchStartsOnThisServersValueForTheOtherAgent() {
         val hub = FeatureHub()

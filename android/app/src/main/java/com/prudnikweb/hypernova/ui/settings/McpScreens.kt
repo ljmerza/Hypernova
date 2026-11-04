@@ -34,7 +34,6 @@ import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.FieldLabel
 import com.prudnikweb.hypernova.ui.components.NavRow
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -642,8 +641,8 @@ private fun ToolSheet(t: McpTool, onDismiss: () -> Unit) {
 private fun McpServer.commandLine(): String? = setup.command?.let { c -> (listOf(c) + setup.args).joinToString(" ") } ?: setup.url
 
 /**
- * Before anything that runs a program on the server: the exact command on a confirm, then the owner's
- * fingerprint or screen lock (docs/DECISIONS.md, "Managing MCP servers from the phone").
+ * Before anything that runs a program on the server: the exact command on a confirm
+ * (docs/DECISIONS.md, "Managing MCP servers from the phone").
  */
 internal fun mcpRunCheck(context: Context, confirm: (Confirm) -> Unit, toast: (String) -> Unit, server: String, name: String, command: String?, go: () -> Unit) {
     confirm(
@@ -652,9 +651,8 @@ internal fun mcpRunCheck(context: Context, confirm: (Confirm) -> Unit, toast: (S
             body = context.getString(R.string.mcp_run_body, name, command ?: context.getString(R.string.mcp_run_unknown)),
             action = context.getString(R.string.mcp_run_action),
             danger = true,
-        ) {
-            OwnerCheck.ask(context, context.getString(R.string.mcp_run_title, server), name, context.getString(R.string.check_no_lock), onOk = go, onFail = { msg -> if (msg != null) toast(msg) })
-        },
+            onConfirm = go,
+        ),
     )
 }
 
@@ -749,7 +747,7 @@ private fun ChoiceRow(options: List<Pair<String, String>>, chosen: String, enabl
     }
 }
 
-/** Add a server, or change one: the form, then the confirm and the fingerprint where it runs something. Values are checked again on the server. */
+/** Add a server, or change one: the form, then the confirm where it runs something. Values are checked again on the server. */
 @Composable
 fun McpEditScreen(hub: Hub, agent: String, name: String?, scope: String?, folder: String?, onBack: () -> Unit) {
     val bottom = screenBottom()

@@ -68,7 +68,6 @@ import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.LoadingLine
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
@@ -81,7 +80,7 @@ import kotlinx.coroutines.launch
 
 private val seam = Modifier.padding(horizontal = 4.dp).padding(top = 8.dp, bottom = 2.dp)
 
-/** Installing or updating a plugin, or adding a marketplace, is someone else's code on the server: what it is on a confirm, then the fingerprint. */
+/** Installing or updating a plugin, or adding a marketplace, is someone else's code on the server: what it is on a confirm. */
 internal fun codeCheck(context: Context, confirm: (Confirm) -> Unit, toast: (String) -> Unit, server: String, what: String, body: String, go: () -> Unit) {
     confirm(
         Confirm(
@@ -89,9 +88,8 @@ internal fun codeCheck(context: Context, confirm: (Confirm) -> Unit, toast: (Str
             body = body,
             action = context.getString(R.string.pl_run_action),
             danger = true,
-        ) {
-            OwnerCheck.ask(context, context.getString(R.string.pl_run_title, server), what, context.getString(R.string.check_no_lock), onOk = go, onFail = { msg -> if (msg != null) toast(msg) })
-        },
+            onConfirm = go,
+        ),
     )
 }
 

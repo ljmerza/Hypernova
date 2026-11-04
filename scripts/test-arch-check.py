@@ -76,6 +76,13 @@ BREACHES = [
     ("classpath: JetBrains' animation-android", "app-classpath", {"android/app/classpath-debug.txt": "org.jetbrains.compose.animation:animation-android:1.12.1\n"}),
     ("classpath: a list gone", "app-classpath", {"android/app/classpath-debug.txt": None}),
     ("previews: the ignore line gone", "previews-ignored", {".gitignore": None}),
+    ("biometric: the system's prompt", "no-biometric", {f"{APP}/B1.kt": "package x\n\nimport android.hardware.biometrics.BiometricPrompt\n"}),
+    ("biometric: OwnerCheck come back, in sharedui", "no-biometric", {f"{SHAREDUI}/chat/B2.kt": in_ui("chat", "object OwnerCheck")}),
+    ("biometric: AndroidX's, in the phone's tests", "no-biometric", {f"android/app/src/test/java/{PKG}/B3.kt": "package x\n\nimport androidx.biometric.BiometricPrompt\n"}),
+    ("biometric: a key that waits for the lock", "no-biometric", {f"{APP}/B4.kt": "package x\n\nfun b4(s: Spec) = s.setUserAuthenticationRequired(true)\n"}),
+    ("biometric: the manifest's permission", "no-biometric", {"android/app/src/main/AndroidManifest.xml": '<uses-permission android:name="android.permission.USE_BIOMETRIC" />\n'}),
+    ("biometric: the dependency", "no-biometric", {"android/app/build.gradle.kts": 'dependencies { implementation("androidx.biometric:biometric:1.1.0") }\n'}),
+    ("biometric: on the classpath", "no-biometric", {"android/app/classpath-release.txt": "androidx.biometric:biometric:1.1.0\n"}),
     ("allowlist: the breach is gone, and the entry isn't", "allowlist", {f"{DESK}/HistoryList.kt": None}),
     ("allowlist: its row in LATER is gone", "allowlist", {"docs/LATER.md": None}),
 ]
@@ -92,6 +99,9 @@ NOT_BREACHES = [
     ("a feature importing the kit", {f"{SHAREDUI}/chat/N8.kt": in_ui("chat", f"import {UI}.theme.HN\nimport {UI}.components.Pill")}),
     ("JetBrains' animation-core, there through Haze", {"android/app/classpath-debug.txt": "org.jetbrains.compose.animation:animation-core:1.12.1\n"}),
     ("state in :shared", {f"{SHARED}/N10.kt": SHARED_DATA + "import androidx.compose.runtime.mutableStateOf\nimport androidx.compose.runtime.Immutable\n"}),
+    ("the banned names in a comment and a string", {f"{APP}/N11.kt": 'package x\n\n// OwnerCheck and BiometricPrompt have gone.\nval n11 = "USE_BIOMETRIC OwnerCheck"\n'}),
+    ("a notification's button that needs unlocking", {f"{APP}/N12.kt": "package x\n\nfun n12(b: B) = b.setAuthenticationRequired(true)\n"}),
+    ("a certificate's fingerprint", {f"{SHARED}/N13.kt": SHARED_DATA + "fun fingerprint(cert: String): String = cert\n"}),
     ("the same file name in another package", {f"android/app/src/main/java/{PKG}/ui/home/Tokens.kt": f"package {UI}.home\n"}),
     ("the same file name in one module's tests and another's", {f"android/app/src/test/java/{PKG}/ui/theme/Tokens.kt": f"package {UI}.theme\n"}),
 ]

@@ -334,9 +334,9 @@
     <string name="au_rule_add">Add a rule</string>
     <string name="au_rule_remove">Remove %1$s</string>
     <string name="au_rules_note">Claude Code\'s own rules: Bash(git log:*) allows every git log.</string>
-    <!-- The fingerprint check before saving "No asking". -->
-    <string name="au_bypass_title">Let an automation run without asking</string>
-    <string name="au_bypass_needed">Set up a screen lock on this phone first: “No asking” needs it.</string>
+    <!-- The confirm before saving "No asking". -->
+    <string name="au_bypass_title">Let an automation run without asking?</string>
+    <string name="au_bypass_body">%1$s can run any command and change any file on the server with your account\'s access, without asking, each time it runs.</string>
     <!-- Name. -->
     <string name="au_name_hint">Morning brief</string>
     <!-- Runs. -->
@@ -374,7 +374,7 @@
     <string name="au_err_session">That session no longer exists.</string>
     <string name="au_err_provider">That provider isn\'t set up on the Mac.</string>
     <string name="au_err_mode">The Mac didn\'t accept this permission mode.</string>
-    <string name="au_err_confirm">“No asking” needs your fingerprint or screen lock first.</string>
+    <string name="au_err_confirm">Confirm “No asking” first.</string>
     <string name="au_err_rule">A rule looks like Bash(npm test) or Read.</string>
     <string name="au_err_rule_broad">That rule would allow everything. Name the command, like Bash(npm test).</string>
     <string name="au_err_battery">This Mac has no battery.</string>

@@ -5,7 +5,7 @@
 // - A secret never leaves. Its value is swapped for a placeholder before sending, by position, so everything else in the text is
 //   as it is in the file; a placeholder left where it was keeps the stored value, and one anywhere else is refused.
 // - Nothing that would turn on bypass. Refused with the key named, unless it was already there and hasn't changed.
-// - What runs code or widens a permission needs the fingerprint's claim. Anything not on the short list of plain keys counts,
+// - What runs code or widens a permission needs the confirm's claim. Anything not on the short list of plain keys counts,
 //   so a key a newer Claude Code adds asks by default.
 //
 // Codex isn't here: its `config.toml` has inline tables that the TOML reader can't see inside to mask, and its writer
@@ -240,7 +240,7 @@ export function restored(sent: string, stored: string): { text: string; doc: Rec
 // ── What changed, and what each change takes ─────────────────────────────
 
 /**
- * Keys that decide nothing about what runs, what's allowed or where data goes. Everything else asks for the fingerprint,
+ * Keys that decide nothing about what runs, what's allowed or where data goes. Everything else asks for a confirm,
  * so a key this list has never heard of asks too. docs/SECURITY-MODEL.md, 21, says why each is on which side.
  */
 export const PLAIN_KEYS = new Set([

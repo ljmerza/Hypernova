@@ -2,6 +2,6 @@
   "status": 403,
   "error": {
     "code": "confirm_run",
-    "message": "Installing a plugin runs someone else’s code on the server. Confirm it with your fingerprint or screen lock."
+    "message": "Installing a plugin runs someone else’s code on the server. Confirm it first."
   }
 }

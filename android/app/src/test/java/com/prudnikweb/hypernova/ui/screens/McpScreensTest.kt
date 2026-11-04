@@ -13,7 +13,6 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
 import com.prudnikweb.hypernova.data.Hub
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.settings.McpEditScreen
 import com.prudnikweb.hypernova.ui.settings.McpServerScreen
 import com.prudnikweb.hypernova.ui.settings.McpServersScreen
@@ -193,12 +192,6 @@ class McpScreensTest {
 
     // ─── Adding and managing ───
 
-    private fun lock(secure: Boolean = true, pass: Boolean = true) {
-        org.robolectric.Shadows.shadowOf(context.getSystemService(android.app.KeyguardManager::class.java)).setIsDeviceSecure(secure)
-        OwnerCheck.prompt = { ok, fail -> if (pass) ok() else fail(null) }
-    }
-    @org.junit.After fun tearDown() { OwnerCheck.prompt = null }
-
     private fun form(name: String? = null, scope: String? = null, folder: String? = null, back: () -> Unit = {}) {
         rule.setContent { Harness(spy) { McpEditScreen(hub, "claude", name, scope, folder, onBack = back) } }
         rule.waitForIdle()
@@ -208,10 +201,9 @@ class McpScreensTest {
     private fun sent(method: String, path: String) = hub.calls.last { it.first == method && it.second.startsWith(path) }.third!!
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun addingAStdioServerShowsItsWholeCommandThenAsksForTheFingerprint() {
+    @Test fun addingAStdioServerShowsItsWholeCommandOnAConfirm() {
         hub.on("GET /v1/agents/mcp?", MCP_LIST)
         hub.on("POST /v1/agents/mcp/servers", """{"ok":true}""")
-        lock()
         var left = false
         form(back = { left = true })
         type(str(R.string.mcp_f_name), "tiny")
@@ -237,33 +229,18 @@ class McpScreensTest {
         assertTrue(left)
     }
 
-    @Test fun aCancelledFingerprintSendsNothing() {
+    @Test fun aConfirmNotPressedSendsNothing() {
         hub.on("GET /v1/agents/mcp?", MCP_LIST)
-        lock(pass = false)
         form()
         type(str(R.string.mcp_f_name), "tiny")
         type(str(R.string.mcp_command), "npx")
         tap(str(R.string.mcp_f_save))
-        spy.confirms.single().onConfirm()
-        rule.waitForIdle()
+        spy.confirms.single()
         assertTrue(hub.calls.none { it.first == "POST" })
-    }
-
-    @Test fun aPhoneWithNoLockCantAddOne() {
-        hub.on("GET /v1/agents/mcp?", MCP_LIST)
-        lock(secure = false)
-        form()
-        type(str(R.string.mcp_f_name), "tiny")
-        type(str(R.string.mcp_command), "npx")
-        tap(str(R.string.mcp_f_save))
-        spy.confirms.single().onConfirm()
-        rule.waitForIdle()
-        assertTrue(hub.calls.none { it.first == "POST" })
-        assertEquals(listOf(str(R.string.check_no_lock)), spy.toasts)
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun anHttpServerNeedsNoFingerprintAndAProjectOneNamesItsFolder() {
+    @Test fun anHttpServerNeedsNoConfirmAndAProjectOneNamesItsFolder() {
         hub.on("GET /v1/agents/mcp?", MCP_LIST)
         hub.on("POST /v1/agents/mcp/servers", """{"ok":true}""")
         form()
@@ -282,7 +259,7 @@ class McpScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun editingShowsNamesAndMasksAndSendsThemBackAsTheyAreWithoutAFingerprint() {
+    @Test fun editingShowsNamesAndMasksAndSendsThemBackAsTheyAreWithoutAConfirm() {
         hub.on("GET /v1/agents/mcp?", MCP_LIST)
         hub.on("GET /v1/agents/mcp/server", MCP_PAGE)
         hub.on("PUT /v1/agents/mcp/servers", """{"ok":true}""")
@@ -301,11 +278,10 @@ class McpScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun changingWhatRunsAsksForTheFingerprintAndAFailureStaysOnTheForm() {
+    @Test fun changingWhatRunsConfirmsAndAFailureStaysOnTheForm() {
         hub.on("GET /v1/agents/mcp?", MCP_LIST)
         hub.on("GET /v1/agents/mcp/server", MCP_PAGE)
         hub.fails("PUT /v1/agents/mcp/servers", AgentSettingRefused("file_changed", "That server changed on the server."))
-        lock()
         var left = false
         form("github", "user", "home", back = { left = true })
         type(str(R.string.mcp_command), "x")
@@ -323,10 +299,9 @@ class McpScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun approvingAProjectsServerShowsWhatItRunsAndAsksForTheFingerprint() {
+    @Test fun approvingAProjectsServerShowsWhatItRunsOnAConfirm() {
         livePage("waiting", ""","approval":"pending"""")
         hub.on("POST /v1/agents/mcp/approval", """{"ok":true,"approval":"approved"}""")
-        lock()
         page("docs", "project", "f1")
         tap(str(R.string.mcp_approve))
         val ask = spy.confirms.single()
@@ -350,7 +325,7 @@ class McpScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun turningOffTurningOnAndReconnectingNeedNoFingerprint() {
+    @Test fun turningOffTurningOnAndReconnectingNeedNoConfirm() {
         hub.on("GET /v1/agents/mcp/server", MCP_PAGE)
         hub.on("GET /v1/agents/mcp/status", MCP_LIVE)
         hub.on("GET /v1/agents/mcp/tools", MCP_TOOLS)
@@ -407,7 +382,6 @@ class McpScreensTest {
         hub.on("GET /v1/agents/mcp?", MCP_LIST.replaceFirst("{", """{"undo":{"op":"remove","name":"github","scope":"user","folder":null,"needsCheck":true,"command":"npx -y @acme/mcp"},"""))
         hub.on("GET /v1/agents/mcp/status", MCP_LIVE)
         hub.on("POST /v1/agents/mcp/undo", """{"ok":true}""")
-        lock()
         list()
         seen(str(R.string.mcp_add))
         seen(str(R.string.mcp_undo_remove, "github"))

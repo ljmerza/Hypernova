@@ -499,7 +499,7 @@ export async function versionRoute(path: string, m: string, url: URL, res: unkno
     return true
   }
   // Updating runs code on the server, and this is the one thing the server can hold it to (docs/SECURITY-MODEL.md, 22).
-  if (b?.confirmRun !== true) throw new McpRefused(403, 'confirm_run', `Updating ${NAMES[agent]} runs its updater on the server. Confirm it with your fingerprint or screen lock.`)
+  if (b?.confirmRun !== true) throw new McpRefused(403, 'confirm_run', `Updating ${NAMES[agent]} runs its updater on the server. Confirm it first.`)
   const bin = binOf(agent)
   if (!bin || !existsSync(bin)) throw notInstalled(agent)
   if (state(agent).job?.state === 'running') throw new McpRefused(409, 'update_running', `${NAMES[agent]} is already updating here. Its result will be on this page.`)

@@ -33,6 +33,7 @@ import com.prudnikweb.hypernova.desktop.ui.App
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -85,6 +86,74 @@ class ApproveTest {
         assertEquals("Bearer device-token-z2", req.auth)
         // And it says what's happening, not the pills: a second click can't send a second answer.
         until("the hub to have it") { Core.live?.approval("s1") == null }
+    }
+
+    @Test fun alwaysConfirmsSayingItsRuleAndWhereAndSendsThemOnlyWhenPressed() = runDesktopComposeUiTest(900, 700) {
+        onlySession(
+            approval("a1", "s1", summary = "Bash: npm test") {
+                put("toolName", "Bash").put("input", JSONObject().put("command", "npm test"))
+                put("canAlways", true).put("alwaysRules", org.json.JSONArray(listOf("Bash(npm test *)"))).put("alwaysScope", "project")
+            },
+        )
+        d.ok("POST", "/v1/approvals/a1")
+        setContent { App(shell, reduced = true) }
+        pairedWith(d)
+        waitForIdle()
+        choose("Migrate the payments table")
+        onNodeWithText(Ui.always.text()).performClick()
+        waitForIdle()
+        onNodeWithText(Ui.always_confirm_title.text()).assertIsDisplayed()
+        // The rule, where it goes, and the whole command.
+        onNodeWithText(Ui.desk_always_project.format("Bash(npm test *)") + "\n\n" + Ui.always_scope_project_body.text() + "\n\nnpm test").assertIsDisplayed()
+        // Cancel, which has the focus: nothing goes.
+        onNodeWithText(Ui.cancel.text()).assertIsFocused().performClick()
+        waitForIdle()
+        assertEquals(0, d.count("POST", "/v1/approvals/a1"))
+        onNodeWithText(Ui.always.text()).performClick()
+        waitForIdle()
+        onNodeWithText(Ui.always_save.text()).performClick()
+        until("the answer") { d.count("POST", "/v1/approvals/a1") == 1 }
+        val sent = lastAnswer("a1").json
+        assertEquals("always", sent.getString("decision"))
+        assertEquals("project", sent.getString("scope"))
+        assertEquals("Bash(npm test *)", sent.getJSONArray("rules").getString(0))
+    }
+
+    @Test fun alwaysWithNoRuleSaysWhatItMeansAndSendsPlainAlways() = runDesktopComposeUiTest(900, 700) {
+        onlySession(approval("a1", "s1", summary = "Bash: npm test") { put("toolName", "Bash").put("input", JSONObject().put("command", "npm test")).put("canAlways", true) })
+        d.ok("POST", "/v1/approvals/a1")
+        setContent { App(shell, reduced = true) }
+        pairedWith(d)
+        waitForIdle()
+        choose("Migrate the payments table")
+        onNodeWithText(Ui.always.text()).performClick()
+        waitForIdle()
+        onNodeWithText(Ui.always_means.text(), substring = true).assertIsDisplayed()
+        onNodeWithText(Ui.always_save.text()).performClick()
+        until("the answer") { d.count("POST", "/v1/approvals/a1") == 1 }
+        val sent = lastAnswer("a1").json
+        assertEquals("always", sent.getString("decision"))
+        assertFalse(sent.has("rules"))
+    }
+
+    @Test fun noAlwaysWhereTheServerDoesntOfferIt() = runDesktopComposeUiTest(900, 700) {
+        onlySession(approval("a1", "s1", summary = "Bash: npm test") { put("toolName", "Bash").put("input", JSONObject().put("command", "npm test")).put("canAlways", false) })
+        setContent { App(shell, reduced = true) }
+        pairedWith(d)
+        waitForIdle()
+        choose("Migrate the payments table")
+        onNodeWithText(Ui.allow.text()).assertExists()
+        onNodeWithText(Ui.always.text()).assertDoesNotExist()
+    }
+
+    @Test fun noAlwaysWhereAllowIsntOffered() = runDesktopComposeUiTest(900, 700) {
+        onlySession(tool("a1", "s1", "Edit", JSONObject().put("file_path", "/p/a.kt").put("old_string", "a").put("new_string", "b"), summary = "Edit: /p/a.kt").put("canAlways", true))
+        setContent { App(shell, reduced = true) }
+        pairedWith(d)
+        waitForIdle()
+        choose("Migrate the payments table")
+        onNodeWithText(Ui.allow.text()).assertDoesNotExist()
+        onNodeWithText(Ui.always.text()).assertDoesNotExist()
     }
 
     @Test fun denySendsDeny() = runDesktopComposeUiTest(900, 700) {

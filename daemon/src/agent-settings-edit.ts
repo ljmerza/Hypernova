@@ -65,7 +65,7 @@ const UNSET_MEANS: Record<string, string> = { 'permissions.defaultMode': 'defaul
 
 /**
  * Whether going from [from] to [to] allows more without asking: the phone's cue for a confirm and the
- * owner's fingerprint, and the server's flag in its reply and its log. Pure. Anything it can't place
+ * owner's confirm, and the server's flag in its reply and its log. Pure. Anything it can't place
  * counts as loosening. Only the permission keys ever do.
  */
 export function loosens(key: string, from: ShownValue, to: Value | null): boolean {

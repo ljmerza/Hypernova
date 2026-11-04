@@ -19,9 +19,7 @@
     <string name="always_means">Always is Claude Code’s own “Yes, and don’t ask again” for this.</string>
     <string name="answered_elsewhere">Answered elsewhere</string>
     <string name="check_always_title">Allow this from now on</string>
-    <string name="check_bypass_title">Let this session run without asking</string>
-    <string name="check_no_lock">Set up a screen lock on this phone first: this step needs it.</string>
-    <string name="check_failed">The fingerprint check didn’t open. Try again.</string>
+    <string name="always_confirm_title">Allow this from now on?</string>
 
     <!-- The Always sheet, from the approval card's Always (IDEAS PA2, PA3). -->
     <string name="always_rule">Rule</string>
@@ -37,9 +35,6 @@
     <string name="always_scope_project_body">Saved in this project’s .claude/settings.local.json, which stays out of git.</string>
     <string name="always_scope_everywhere_body">Saved in your Claude Code settings (~/.claude/settings.json), for every project.</string>
     <string name="always_save">Always allow</string>
-    <string name="always_check_session">%1$s, for this session</string>
-    <string name="always_check_project">%1$s, in this project</string>
-    <string name="always_check_everywhere">%1$s, everywhere</string>
 
     <!-- Allow these N, in the session sheet's Permissions tab (IDEAS PA6). -->
     <string name="several_seam">Asks waiting</string>

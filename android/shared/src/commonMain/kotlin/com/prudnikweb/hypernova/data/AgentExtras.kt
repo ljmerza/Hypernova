@@ -127,7 +127,7 @@ suspend fun Hub.marketplaceAdd(agent: String, source: String, scope: String, fol
     agentExt("POST", "/v1/agents/plugins/marketplaces/add", JSONObject().put("agent", agent).put("source", source).put("confirmRun", true).at(scope, folder), slow = true).map(PluginChange::wire)
 suspend fun Hub.marketplaceRemove(agent: String, name: String, folder: String?): Result<PluginChange> =
     agentExt("POST", "/v1/agents/plugins/marketplaces/remove", JSONObject().put("agent", agent).put("name", name).at(null, folder), slow = true).map(PluginChange::wire)
-/** Codex's also updates its plugins, so there the caller has asked for the fingerprint first. */
+/** Codex's also updates its plugins, so there the caller has confirmed first. */
 suspend fun Hub.marketplaceUpdate(agent: String, name: String?, folder: String?): Result<PluginChange> =
     agentExt("POST", "/v1/agents/plugins/marketplaces/update", JSONObject().put("agent", agent).also { o -> name?.let { o.put("name", it) }; if (agent == AgentSettingsReply.CODEX) o.put("confirmRun", true) }.at(null, folder), slow = true).map(PluginChange::wire)
 

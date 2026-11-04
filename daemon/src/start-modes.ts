@@ -9,7 +9,7 @@ export type StartAgent = 'claude' | 'codex'
 
 /**
  * What each agent can start in, the first being what an unset or unusable value means. Never `bypassPermissions`
- * (chosen each time on the phone, behind its fingerprint), `danger-full-access` or approval `never`: nothing outside
+ * (chosen each time in a client, behind its think-twice card), `danger-full-access` or approval `never`: nothing outside
  * this list can be saved, and nothing outside it is read back, so a hand-edited file falls back rather than widens.
  */
 const MODES: Record<StartAgent, readonly string[]> = {

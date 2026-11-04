@@ -3,7 +3,7 @@
 // and what comes back is filtered to named fields, because `claude plugin list --json` carries a plugin's whole MCP setup.
 //
 // Installing or updating a plugin, or adding a marketplace, is someone else's code on the server, so the phone shows what's
-// coming and asks for the fingerprint; the server sees that claim (`confirmRun`) and refuses without it. So does Codex's update of
+// coming on a confirm; the server sees that claim (`confirmRun`) and refuses without it. So does Codex's update of
 // a marketplace, which also updates its plugins; Claude Code's leaves what's installed alone (extras-e2e.test.ts has both).
 // Enabling, disabling and uninstalling run nothing at that moment (the same test watches a plugin's hook for it).
 
@@ -92,7 +92,7 @@ const marketArg = (v: unknown) => {
   return v
 }
 const confirmed = (b: Record<string, unknown>, what: string) => {
-  if (b.confirmRun !== true) throw new McpRefused(403, 'confirm_run', `${what} runs someone else’s code on the server. Confirm it with your fingerprint or screen lock.`)
+  if (b.confirmRun !== true) throw new McpRefused(403, 'confirm_run', `${what} runs someone else’s code on the server. Confirm it first.`)
 }
 
 async function foldersOf(deps: McpDeps) {

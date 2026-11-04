@@ -983,8 +983,8 @@ internal fun ModeSheet(mode: String, onPick: (String) -> Unit, onDismiss: () -> 
             ModeRow(m, m == mode) {
                 if (m != mode && needsThinkTwice(m)) {
                     val pick = Incidents.next(context)
-                    // No list to show (the file is damaged): go on rather than block the choice.
-                    if (pick == null) onPick(m) else { incidentId = pick.id; asking = m }
+                    // No list to show (the file is damaged): go on rather than block the choice, but never into Bypass.
+                    if (pick != null) { incidentId = pick.id; asking = m } else if (m != "bypassPermissions") onPick(m)
                 } else onPick(m)
             }
         }

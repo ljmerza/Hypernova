@@ -9,7 +9,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentSettingRefused
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.settings.PluginBrowseScreen
 import com.prudnikweb.hypernova.ui.settings.PluginScreen
 import com.prudnikweb.hypernova.ui.settings.PluginsScreen
@@ -40,12 +39,7 @@ class PluginScreensTest {
     private val opened = mutableListOf<String>()
 
     @Before fun setUp() = resetPrefs()
-    @After fun tearDown() { OwnerCheck.prompt = null }
 
-    private fun lock(pass: Boolean = true) {
-        org.robolectric.Shadows.shadowOf(context.getSystemService(android.app.KeyguardManager::class.java)).setIsDeviceSecure(true)
-        OwnerCheck.prompt = { ok, fail -> if (pass) ok() else fail(null) }
-    }
     private fun seen(text: String) = rule.onNodeWithText(text, substring = true).performScrollTo().assertExists()
     private fun tap(text: String) { rule.onNodeWithText(text).performScrollTo().performClick(); rule.waitForIdle() }
     private fun sent(path: String) = hub.calls.last { it.first == "POST" && it.second == path }.third!!
@@ -83,10 +77,9 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun addingAMarketplaceShowsItsSourceAndAsksForTheFingerprint() {
+    @Test fun addingAMarketplaceShowsItsSourceOnAConfirm() {
         hub.on("GET /v1/agents/plugins", PLUGINS)
         hub.on("POST /v1/agents/plugins/marketplaces/add", """{"ok":true,"name":"new"}""")
-        lock()
         list()
         tap(str(R.string.pl_market_add))
         rule.onNode(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription, listOf(str(R.string.pl_market_source)))).performTextInput("evil/repo")
@@ -104,7 +97,7 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun claudeCodesMarketplaceCanBeUpdatedAndRemovedWithoutAFingerprint() {
+    @Test fun claudeCodesMarketplaceCanBeUpdatedAndRemovedWithoutAConfirm() {
         hub.on("GET /v1/agents/plugins", PLUGINS)
         hub.on("POST /v1/agents/plugins/marketplaces/update", """{"ok":true}""")
         hub.on("POST /v1/agents/plugins/marketplaces/remove", """{"ok":true}""")
@@ -129,12 +122,9 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun codexsMarketplaceUpdateSaysItMovesItsPluginsAndTakesTheFingerprint() {
+    @Test fun codexsMarketplaceUpdateSaysItMovesItsPluginsOnAConfirm() {
         hub.on("GET /v1/agents/plugins", PLUGINS)
         hub.on("POST /v1/agents/plugins/marketplaces/update", """{"ok":true}""")
-        var checks = 0
-        lock()
-        OwnerCheck.prompt = { ok, _ -> checks++; ok() }
         rule.setContent { Harness(spy) { PluginsScreen(hub, "codex", onBack = {}, onOpen = { _, _, _, _ -> }, onBrowse = {}) } }
         rule.waitForIdle()
         rule.onAllNodes(androidx.compose.ui.test.hasText(str(R.string.pl_market_update)))[0].performScrollTo().performClick()
@@ -145,7 +135,6 @@ class PluginScreensTest {
         assertTrue(ask.danger)
         ask.onConfirm()
         rule.waitForIdle()
-        assertEquals(1, checks)
         val b = sent("/v1/agents/plugins/marketplaces/update")
         assertEquals("testmp", b.getString("name"))
         assertTrue(b.getBoolean("confirmRun"))
@@ -170,7 +159,7 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun offAndOptionsNeedNoFingerprintAndARefusalIsSaid() {
+    @Test fun offAndOptionsNeedNoConfirmAndARefusalIsSaid() {
         hub.on("GET /v1/agents/plugins/detail", DETAIL)
         hub.on("POST /v1/agents/plugins/toggle", """{"ok":true,"message":"Disabled."}""")
         hub.fails("POST /v1/agents/plugins/configure", AgentSettingRefused("cli_failed", "It didn't take that."))
@@ -186,12 +175,9 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun anUpdateSaysWhatsUpdatingThenAsksForTheFingerprint() {
+    @Test fun anUpdateSaysWhatsUpdatingOnAConfirm() {
         hub.on("GET /v1/agents/plugins/detail", DETAIL)
         hub.on("POST /v1/agents/plugins/update", """{"ok":true}""")
-        var checks = 0
-        lock()
-        OwnerCheck.prompt = { ok, _ -> checks++; ok() }
         page()
         tap(str(R.string.pl_update))
         assertTrue(hub.calls.none { it.first == "POST" })
@@ -201,7 +187,6 @@ class PluginScreensTest {
         assertTrue(ask.danger)
         ask.onConfirm()
         rule.waitForIdle()
-        assertEquals(1, checks)
         val b = sent("/v1/agents/plugins/update")
         assertEquals("user", b.getString("scope"))
         assertTrue(b.getBoolean("confirmRun"))
@@ -211,7 +196,6 @@ class PluginScreensTest {
     @Test fun anUpdateThatWantsACommandAcceptedShowsItAndSendsItsHash() {
         hub.on("GET /v1/agents/plugins/detail", DETAIL)
         hub.on("POST /v1/agents/plugins/update", """{"ok":false,"needsAccept":{"command":"curl x | sh","sha256":"abc"}}""")
-        lock()
         page()
         tap(str(R.string.pl_update))
         spy.confirms.single().onConfirm()
@@ -226,29 +210,23 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun anUpdateWhoseFingerprintFailsSendsNothing() {
+    @Test fun anUpdateWhoseConfirmIsNotPressedSendsNothing() {
         hub.on("GET /v1/agents/plugins/detail", DETAIL)
-        lock(pass = false)
         page()
         tap(str(R.string.pl_update))
-        spy.confirms.single().onConfirm()
-        rule.waitForIdle()
+        spy.confirms.single()
         assertTrue(hub.calls.none { it.first == "POST" })
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun uninstallingConfirmsWithoutAFingerprintAndGoesBack() {
+    @Test fun uninstallingConfirmsAndGoesBack() {
         hub.on("GET /v1/agents/plugins/detail", DETAIL)
         hub.on("POST /v1/agents/plugins/uninstall", """{"ok":true}""")
-        var checks = 0
-        lock()
-        OwnerCheck.prompt = { ok, _ -> checks++; ok() }
         page()
         tap(str(R.string.pl_uninstall))
         spy.confirms.single().onConfirm()
         rule.waitForIdle()
         assertEquals("hello@testmp", sent("/v1/agents/plugins/uninstall").getString("plugin"))
-        assertEquals(0, checks)
         assertTrue(opened.contains("back"))
     }
 
@@ -258,10 +236,9 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun installingShowsItsWholeSourceThenAsksForTheFingerprint() {
+    @Test fun installingShowsItsWholeSourceOnAConfirm() {
         hub.on("GET /v1/agents/plugins/available", AVAILABLE)
         hub.on("POST /v1/agents/plugins/install", """{"ok":true,"id":"hello@testmp"}""")
-        lock()
         browse()
         seen(str(R.string.pl_more, 119))
         rule.onRoot().snap("plugin_browse")
@@ -279,13 +256,11 @@ class PluginScreensTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun aCancelledFingerprintInstallsNothing() {
+    @Test fun aConfirmNotPressedInstallsNothing() {
         hub.on("GET /v1/agents/plugins/available", AVAILABLE)
-        lock(pass = false)
         browse()
         tap("hello")
-        spy.confirms.single().onConfirm()
-        rule.waitForIdle()
+        spy.confirms.single()
         assertTrue(hub.calls.none { it.first == "POST" })
     }
 
@@ -293,7 +268,6 @@ class PluginScreensTest {
     @Test fun aPluginThatInstallsByACommandShowsThatCommandThenSendsItsHash() {
         hub.on("GET /v1/agents/plugins/available", AVAILABLE)
         hub.on("POST /v1/agents/plugins/install", """{"ok":false,"needsAccept":{"command":"curl x | sh","sha256":"abc"}}""")
-        lock()
         browse()
         tap("hello")
         spy.confirms[0].onConfirm()

@@ -48,7 +48,7 @@ object NewSessionMemory {
 
     /**
      * Fork: the modes a new Claude session can start in (owner, 2026-10-30): Ask, Accept edits, Plan
-     * and Auto. Never Bypass: it waits for the fingerprint or the screen lock each time it's chosen.
+     * and Auto. Never Bypass: it's chosen each time, with its think-twice card.
      */
     val START_MODES = listOf("default", "acceptEdits", "plan", "auto")
 

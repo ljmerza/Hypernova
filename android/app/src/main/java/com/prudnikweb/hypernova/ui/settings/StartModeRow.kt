@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
  * An agent's **New sessions start in**, on its Settings for this server (docs/DECISIONS.md, "New sessions
  * start in, per server and agent"; owner, 2026-11-03): kept on that server's daemon, so its desktop client
  * follows too. Claude Code offers Ask, Edits, Plan and Auto, Auto through the think-twice card as it's
- * chosen; Codex its two. Bypass isn't offered: it's chosen each time in the sheet, behind its fingerprint.
+ * chosen; Codex its two. Bypass isn't offered: it's chosen each time in the sheet, behind its think-twice card.
  * An older server says it needs updating. A server without the agent doesn't show this: AgentSettingsScreen leaves it out.
  */
 @Composable

@@ -210,7 +210,7 @@ class SessionScreenTest {
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.always_save)).assertExists()
         rule.onNodeWithText("Bash(npm test *)", substring = true, useUnmergedTree = true).assertExists()
-        // Nothing is answered until the rule is saved (and the owner checked).
+        // Nothing is answered until the rule is saved.
         assertTrue(hub.calls.isEmpty())
         rule.snap("chat_always_sheet")
     }

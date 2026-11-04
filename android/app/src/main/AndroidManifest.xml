@@ -19,9 +19,6 @@
     <!-- The in-app update (data/AppUpdater.kt): the APK the paired computer hands out, installed with
          PackageInstaller after Android's own "Update this app?" (and, once, "Install unknown apps"). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- The fingerprint or screen lock before Always, Bypass, No asking and browsing outside the
-         projects folder (ui/components/OwnerCheck.kt): without it BiometricPrompt throws. -->
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Scan, for a server's QR code (ui/onboarding/Scan.kt): asked at the tap. No frame is kept or sent.
          Not required: a phone with no camera still installs, and pastes the link. -->
     <uses-permission android:name="android.permission.CAMERA" />

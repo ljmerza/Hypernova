@@ -340,10 +340,10 @@ test('a wrong agent is refused on every route, and an unknown route isn’t hand
 
 // ── Updating ─────────────────────────────────────────────────────────────
 
-test('the server holds an update to the fingerprint’s claim: nothing runs without it', async () => {
+test('the server holds an update to the confirm’s claim: nothing runs without it', async () => {
   await check('claude')
   for (const body of [{}, { confirmRun: false }, { confirmRun: 'true' }, { confirmRun: 1 }]) {
-    await assert.rejects(update('claude', body), (e: Refusal) => e.status === 403 && e.code === 'confirm_run' && /fingerprint/.test(e.message))
+    await assert.rejects(update('claude', body), (e: Refusal) => e.status === 403 && e.code === 'confirm_run' && /Confirm it first/.test(e.message))
   }
   assert.deepEqual(updates(CLAUDE_DIR), [])
 })

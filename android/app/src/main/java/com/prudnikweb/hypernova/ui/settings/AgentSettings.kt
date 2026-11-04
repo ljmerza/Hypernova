@@ -59,7 +59,6 @@ import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.NavRow
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
@@ -100,7 +99,7 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
         if (reply?.isSuccess != true) reply = null
         reply = hub.agentSettings()
     }
-    /** Runs [go], after a confirm saying what it allows and the owner's fingerprint if it [loosens] a permission. */
+    /** Runs [go], after a confirm saying what it allows if it [loosens] a permission. */
     fun gated(loosens: Boolean, what: String, line: String?, go: () -> Unit) {
         if (!loosens) return go()
         confirm(
@@ -109,12 +108,8 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                 body = line?.let { context.getString(R.string.as_loosen_body, what, it) } ?: context.getString(R.string.as_loosen_generic),
                 action = context.getString(R.string.as_loosen_action),
                 danger = true,
-            ) {
-                OwnerCheck.ask(
-                    context, context.getString(R.string.as_check_title, server), what, context.getString(R.string.check_no_lock),
-                    onOk = go, onFail = { msg -> if (msg != null) toast(msg) },
-                )
-            },
+                onConfirm = go,
+            ),
         )
     }
     /** A failure stays under its row; a refusal may mean the file moved on, so it's read again. */

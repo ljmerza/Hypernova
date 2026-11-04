@@ -30,7 +30,7 @@ data class EnvReply(val agent: String, val folder: String, val folders: List<Mcp
     fun fileOf(scope: String) = files.firstOrNull { it.scope == scope }
 
     companion object {
-        /** The server's way of saying a change needs the owner's fingerprint: its message says exactly what would change. */
+        /** The server's way of saying a change needs a confirm: its message says exactly what would change. */
         const val CONFIRM_RUN = "confirm_run"
 
         fun undo(o: JSONObject): EnvUndo? {

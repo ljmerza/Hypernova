@@ -1,6 +1,5 @@
 package com.prudnikweb.hypernova.ui.screens
 
-import android.app.KeyguardManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -37,7 +36,6 @@ import com.prudnikweb.hypernova.data.SettingChange
 import com.prudnikweb.hypernova.data.SettingChoice
 import com.prudnikweb.hypernova.data.SettingUndo
 import com.prudnikweb.hypernova.data.ShownSetting
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.settings.AgentSettingsScreen
 import com.prudnikweb.hypernova.ui.settings.settingWords
 import com.prudnikweb.hypernova.ui.settings.valueWord
@@ -82,7 +80,7 @@ private class SettingsHub(private val base: FakeHub = FakeHub()) : Hub by base {
 /**
  * Agents & providers › an agent's Settings (ui/settings/AgentSettings.kt): the labelled values, the
  * summaries, the line about where they come from, what each state of the file says, and changing
- * what the server lists as editable: the picker, the confirm and the fingerprint, a refusal, an older server.
+ * what the server lists as editable: the picker, the confirm, a refusal, an older server.
  */
 @RunWith(RobolectricTestRunner::class)
 class AgentSettingsScreenTest {
@@ -415,18 +413,6 @@ class AgentSettingsScreenTest {
 
     // ─── Changing them (docs/DECISIONS.md, "The agents' settings, edited") ───
 
-    private fun allow(ok: Boolean = true, secure: Boolean = true) {
-        shadowOf(context.getSystemService(KeyguardManager::class.java)).setIsDeviceSecure(secure)
-        OwnerCheck.prompt = { pass, fail ->
-            checks++
-            if (ok) pass() else fail(null)
-        }
-    }
-    private var checks = 0
-    @After fun tearDown() {
-        OwnerCheck.prompt = null
-    }
-
     private fun claudeOpen() {
         hub.answer = Result.success(AgentSettingsReply(claude, file(AgentSettingsFile.MISSING)))
         open(AgentSettingsReply.CLAUDE)
@@ -465,7 +451,6 @@ class AgentSettingsScreenTest {
 
     @Config(qualifiers = "+h1500dp")
     @Test fun tighteningAsksNothingSavesAgainstTheHashReadAndReadsAgain() {
-        allow()
         claudeOpen()
         assertEquals(1, hub.asked)
         row(R.string.as_k_mode)
@@ -473,7 +458,6 @@ class AgentSettingsScreenTest {
         rule.waitForIdle()
         assertEquals(listOf("claude permissions.defaultMode plan hash-claude"), hub.changes)
         assertEquals(0, spy.confirms.size)
-        assertEquals(0, checks)
         assertEquals(listOf(str(R.string.as_saved, hub.mac.name)), spy.toasts)
         assertEquals(2, hub.asked)
     }
@@ -488,8 +472,7 @@ class AgentSettingsScreenTest {
     }
 
     @Config(qualifiers = "+h1500dp")
-    @Test fun looseningAsksSayingWhatItAllowsThenTheFingerprintAndOnlyThenSaves() {
-        allow()
+    @Test fun looseningAsksSayingWhatItAllowsAndOnlyThenSaves() {
         claudeOpen()
         row(R.string.as_k_mode)
         choice(R.string.mode_title_auto).performClick()
@@ -499,38 +482,20 @@ class AgentSettingsScreenTest {
         val ask = spy.confirms.single()
         assertEquals(str(R.string.as_loosen_title, hub.mac.name), ask.title)
         assertEquals(str(R.string.as_loosen_body, str(R.string.mode_title_auto), str(R.string.as_l_auto)), ask.body)
-        assertEquals(0, checks)
         ask.onConfirm()
         rule.waitForIdle()
-        assertEquals(1, checks)
         assertEquals(listOf("claude permissions.defaultMode auto hash-claude"), hub.changes)
     }
 
     @Config(qualifiers = "+h1500dp")
-    @Test fun aCancelledFingerprintSavesNothing() {
-        allow(ok = false)
+    @Test fun aConfirmNotPressedSavesNothing() {
         claudeOpen()
         row(R.string.as_k_mode)
         choice(R.string.mode_title_auto).performClick()
         rule.waitForIdle()
-        spy.confirms.single().onConfirm()
-        rule.waitForIdle()
-        assertEquals(1, checks)
+        spy.confirms.single()
         assertEquals(emptyList<String>(), hub.changes)
         assertEquals(emptyList<String>(), spy.toasts)
-    }
-
-    @Config(qualifiers = "+h1500dp")
-    @Test fun aPhoneWithNoLockCantLoosenAndIsToldWhy() {
-        allow(secure = false)
-        claudeOpen()
-        row(R.string.as_k_mode)
-        choice(R.string.mode_title_auto).performClick()
-        rule.waitForIdle()
-        spy.confirms.single().onConfirm()
-        rule.waitForIdle()
-        assertEquals(emptyList<String>(), hub.changes)
-        assertEquals(listOf(str(R.string.check_no_lock)), spy.toasts)
     }
 
     @Config(qualifiers = "+h1500dp")
@@ -613,7 +578,6 @@ class AgentSettingsScreenTest {
 
     @Config(qualifiers = "+h1800dp")
     @Test fun anUndoThatLoosensAsksLikeAnyOtherAndItsFailureIsTheServersWords() {
-        allow()
         val after = claude.copy(undo = SettingUndo("permissions.defaultMode", "auto", null, true))
         hub.answer = Result.success(AgentSettingsReply(after, file(AgentSettingsFile.MISSING)))
         hub.undoing = Result.failure(AgentSettingRefused(AgentSettingRefused.FILE_CHANGED, "That file changed."))
@@ -623,7 +587,6 @@ class AgentSettingsScreenTest {
         assertEquals(emptyList<String>(), hub.undos)
         spy.confirms.single().onConfirm()
         rule.waitForIdle()
-        assertEquals(1, checks)
         assertEquals(listOf("claude hash-claude"), hub.undos)
         seen("That file changed.")
     }

@@ -184,7 +184,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
     }
     var model by rememberSaveable { mutableStateOf(memory.model(providerId)) }
     // Fork: this server's mode for Claude Code, each time; changed here, it's this session's only, and it
-    // goes with this hub: a pick on another server, Bypass's fingerprint with it, doesn't come along.
+    // goes with this hub: a pick on another server, Bypass with it, doesn't come along.
     var modePick by rememberSaveable(hub) { mutableStateOf<String?>(null) }
     val mode = modePick ?: NewSessionMemory.startsIn(AgentKind.CLAUDE, hub, memory)
     // Claude Code's effort (data/Effort.kt): the last one started with; null, its own default.
@@ -526,21 +526,8 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
         ) else ModeSheet(
             mode,
             onPick = { m ->
-                // Starting in Bypass waits for the fingerprint or the screen lock, as switching to it does
-                // (docs/DECISIONS.md, "The owner's morning answers", 2); cancelled, the mode stays as it was.
-                // The picker closes first: its own window would hide the line said when the phone has no lock.
-                if (m == "bypassPermissions" && m != mode) {
-                    picking = null
-                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, context.getString(R.string.check_bypass_title),
-                        if (project == NEW_PROJECT) newName.trim() else project.trimEnd('/').substringAfterLast('/'),
-                        context.getString(R.string.check_no_lock),
-                        onOk = { modePick = m }, onFail = { msg -> if (msg != null) toast(msg) },
-                    )
-                } else {
-                    modePick = m
-                    picking = null
-                }
+                modePick = m
+                picking = null
             },
             onDismiss = { picking = null },
         )

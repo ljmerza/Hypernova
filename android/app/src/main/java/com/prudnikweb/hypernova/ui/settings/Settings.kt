@@ -619,7 +619,7 @@ private fun BatteryExemption() {
  * Settings → Files: **Browse outside projects** (docs/PROTOCOL.md, "Files"), off by default. On, the
  * Mac opens sessions' folders in the home folder to the phone, read only; key folders and files with
  * keys stay locked whatever it says. One calm line, "Why it matters" behind a quiet toggle. Turning it
- * on asks for the fingerprint or the screen lock first (OwnerCheck); turning it off asks nothing.
+ * on asks first, saying what it opens; turning it off asks nothing.
  */
 @Composable
 private fun DisplaySection() {
@@ -678,6 +678,7 @@ private fun FilesSection(hub: com.prudnikweb.hypernova.data.Hub) {
     val toast = LocalToast.current
     val scope = rememberCoroutineScope()
     val on = hub.mac.browseOutsideProjects == true
+    val confirm = LocalConfirm.current
     var busy by remember { mutableStateOf(false) }
     var why by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     fun set(value: Boolean) {
@@ -695,11 +696,7 @@ private fun FilesSection(hub: com.prudnikweb.hypernova.data.Hub) {
                 { want ->
                     if (busy) return@ToggleRow
                     if (want) {
-                        com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                            context, context.getString(R.string.st_browse_check_title), context.getString(R.string.st_browse_check_sub),
-                            context.getString(R.string.st_browse_no_lock),
-                            onOk = { set(true) }, onFail = { msg -> if (msg != null) toast(msg) },
-                        )
+                        confirm(Confirm(context.getString(R.string.st_browse_check_title), context.getString(R.string.st_browse_check_sub), context.getString(R.string.st_browse_check_action), danger = true) { set(true) })
                     } else set(false)
                 },
             )

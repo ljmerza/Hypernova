@@ -10,7 +10,6 @@ import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
 import com.prudnikweb.hypernova.data.Hub
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.settings.AgentSettingsScreen
 import com.prudnikweb.hypernova.ui.settings.AgentVersionSection
 import org.json.JSONObject
@@ -25,7 +24,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** An agent's Settings › Version (ui/settings/AgentVersionSection.kt): a check, the confirm and the fingerprint, what came of it, each server its own. */
+/** An agent's Settings › Version (ui/settings/AgentVersionSection.kt): a check, the confirm, what came of it, each server its own. */
 private class VersionHub(val server: String = "z2", private val base: FakeHub = FakeHub()) : Hub by base {
     val calls = mutableListOf<String>()
     var look: Result<JSONObject> = Result.success(version())
@@ -62,18 +61,6 @@ class AgentVersionSectionTest {
     @get:Rule val rule = createComposeRule()
     private val spy = AppSpy()
     private val hub = VersionHub()
-    private var checks = 0
-
-    @Before fun fingerprint() {
-        org.robolectric.Shadows.shadowOf(context.getSystemService(android.app.KeyguardManager::class.java)).setIsDeviceSecure(true)
-        OwnerCheck.prompt = { pass, _ ->
-            checks++
-            pass()
-        }
-    }
-    @After fun tearDown() {
-        OwnerCheck.prompt = null
-    }
 
     private fun open(agent: String = AgentSettingsReply.CLAUDE) {
         rule.setContent { Harness(spy) { AgentVersionSection(hub, agent) } }
@@ -94,11 +81,10 @@ class AgentVersionSectionTest {
         assertEquals(listOf("GET /v1/agents/version?agent=claude"), hub.calls.map { it.trim() })
     }
 
-    @Test fun aCheckNeedsNoFingerprintAndOffersTheUpdate() {
+    @Test fun aCheckNeedsNoConfirmAndOffersTheUpdate() {
         hub.checked = Result.success(checked())
         open()
         tap(R.string.av_check)
-        assertEquals(0, checks)
         assertEquals(0, spy.confirms.size)
         assertTrue(hub.calls.last().startsWith("POST /v1/agents/version/check"))
         assertFalse(hub.calls.last().contains("confirmRun"))
@@ -117,7 +103,7 @@ class AgentVersionSectionTest {
         gone(str(R.string.av_update, "2.1.316"))
     }
 
-    @Test fun anUpdateSaysWhatItDoesThenTheFingerprintThenSendsOnlyTheClaim() {
+    @Test fun anUpdateSaysWhatItDoesThenSendsOnlyTheClaim() {
         hub.look = Result.success(checked { put("running", 2) })
         hub.updated = Result.success(checked(v = "2.1.320") {
             put("newer", false)
@@ -128,7 +114,6 @@ class AgentVersionSectionTest {
         tap(R.string.av_update, "2.1.320")
         // Nothing yet: the confirm says what changes and what happens to what's running.
         assertFalse(hub.calls.any { it.startsWith("POST") })
-        assertEquals(0, checks)
         val ask = spy.confirms.single()
         assertEquals(str(R.string.pl_run_title, hub.mac.name), ask.title)
         assertTrue(ask.danger)
@@ -137,7 +122,6 @@ class AgentVersionSectionTest {
         assertTrue(ask.body, ask.body.contains("Sessions already running stay"))
         ask.onConfirm()
         rule.waitForIdle()
-        assertEquals(1, checks)
         val sent = hub.calls.single { it.startsWith("POST") }
         assertTrue(sent, sent.startsWith("POST /v1/agents/version/update"))
         assertEquals(setOf("agent", "confirmRun"), JSONObject(sent.substringAfter(' ').substringAfter(' ')).keys().asSequence().toSet())
@@ -153,17 +137,11 @@ class AgentVersionSectionTest {
         assertTrue(ask.body, ask.body.contains(str(R.string.cx_agent_codex)))
     }
 
-    @Test fun aCancelledFingerprintUpdatesNothing() {
-        OwnerCheck.prompt = { _, fail ->
-            checks++
-            fail(null)
-        }
+    @Test fun aConfirmNotPressedUpdatesNothing() {
         hub.look = Result.success(checked())
         open()
         tap(R.string.av_update, "2.1.320")
-        spy.confirms.single().onConfirm()
-        rule.waitForIdle()
-        assertEquals(1, checks)
+        spy.confirms.single()
         assertFalse(hub.calls.any { it.startsWith("POST") })
     }
 

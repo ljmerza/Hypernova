@@ -187,6 +187,38 @@ class NewSessionSheetTest {
     }
 
     /** Neither a stale value nor another agent's reaches the sheet, so neither reaches the server. */
+    @Test fun bypassIsChosenWithItsThinkTwiceCardAndNothingElse() {
+        sheet(FakeHub())
+        modeChip(R.string.mode_label_default).performClick()
+        rule.waitForIdle()
+        rule.onNode(saidStartsWith(str(R.string.mode_title_bypass) + ".")).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.think_keep)).performClick()
+        rule.waitForIdle()
+        rule.onNode(saidStartsWith(str(R.string.mode_title_bypass) + ".")).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.think_use_bypass)).performClick()
+        rule.waitForIdle()
+        modeChip(R.string.mode_label_bypass).assertExists()
+        assertTrue(spy.confirms.isEmpty())
+    }
+
+    @Test fun withNoCaseToShowBypassIsntChosen() {
+        val cache = com.prudnikweb.hypernova.ui.components.Incidents::class.java.getDeclaredField("cache").apply { isAccessible = true }
+        cache.set(null, emptyList<com.prudnikweb.hypernova.ui.components.Incident>())
+        try {
+            sheet(FakeHub())
+            modeChip(R.string.mode_label_default).performClick()
+            rule.waitForIdle()
+            rule.onNode(saidStartsWith(str(R.string.mode_title_bypass) + ".")).performClick()
+            rule.waitForIdle()
+            rule.onNode(saidStartsWith(str(R.string.mode_title_bypass) + ".")).assertExists()
+            modeChip(R.string.mode_label_bypass).assertDoesNotExist()
+        } finally {
+            cache.set(null, null)
+        }
+    }
+
     @Test fun aStaleOrDangerousValueOpensOnTheSafeMode() {
         val claudeHub = ServerHub("bypassPermissions", "danger-full-access")
         sheet(claudeHub, project = "/home/owner/projects/hypernova")

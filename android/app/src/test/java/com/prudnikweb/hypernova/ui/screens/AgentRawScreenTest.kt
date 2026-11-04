@@ -11,7 +11,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentSettingRefused
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.settings.AgentRawScreen
 import org.json.JSONObject
 import org.junit.After
@@ -35,19 +34,13 @@ class AgentRawScreenTest {
     @get:Rule val rule = createComposeRule()
     private val spy = AppSpy()
     private val hub = ExtHub()
-    private var checks = 0
 
     @Before fun setUp() = resetPrefs()
-    @After fun tearDown() { OwnerCheck.prompt = null }
 
     private fun open(text: String = TEXT) {
         hub.on("GET /v1/agents/raw", reply(text))
         rule.setContent { Harness(spy) { AgentRawScreen(hub, "claude", onBack = {}) } }
         rule.waitForIdle()
-    }
-    private fun lock(pass: Boolean = true) {
-        org.robolectric.Shadows.shadowOf(context.getSystemService(android.app.KeyguardManager::class.java)).setIsDeviceSecure(true)
-        OwnerCheck.prompt = { ok, fail -> checks++; if (pass) ok() else fail(null) }
     }
     private fun seen(text: String) = rule.onNodeWithText(text, substring = true).performScrollTo().assertExists()
     private fun tap(text: String) { rule.onNodeWithText(text).performScrollTo().performClick(); rule.waitForIdle() }
@@ -152,13 +145,12 @@ class AgentRawScreenTest {
     }
 
     @Config(qualifiers = "+h1400dp")
-    @Test fun whatTheServerWantsCheckedGoesOnTheConfirmThenTheFingerprintThenItSaysSo() {
+    @Test fun whatTheServerWantsCheckedGoesOnTheConfirmThenItSaysSo() {
         hub.handler = { m, path, body ->
             if (m == "POST" && path == "/v1/agents/raw") {
                 if (body!!.optBoolean("confirmRun")) ok() else Result.failure(AgentSettingRefused("confirm_run", "These change what runs:\n\nhooks: {\"Stop\":[]}"))
             } else null
         }
-        lock()
         open()
         line(1).performTextReplacement("{\n  \"theme\": \"x\",")
         rule.waitForIdle()
@@ -166,9 +158,11 @@ class AgentRawScreenTest {
         val ask = spy.confirms.single()
         assertTrue(ask.body, ask.body.contains("hooks: {\"Stop\":[]}"))
         assertTrue(ask.danger)
+        // Not pressed: the one try went without the flag.
+        assertEquals(1, saves())
+        assertFalse(saved().optBoolean("confirmRun"))
         ask.onConfirm()
         rule.waitForIdle()
-        assertEquals(1, checks)
         assertTrue(saved().getBoolean("confirmRun"))
     }
 
@@ -208,7 +202,6 @@ class AgentRawScreenTest {
     @Config(qualifiers = "+h1400dp")
     @Test fun undoIsOfferedAndAsksWhereItMust() {
         hub.handler = { m, path, body -> if (m == "POST" && path == "/v1/agents/raw/undo") { if (body!!.optBoolean("confirmRun")) ok() else Result.failure(AgentSettingRefused("confirm_run", "Putting this back: hooks")) } else null }
-        lock()
         hub.on("GET /v1/agents/raw", reply(TEXT, more = "").replace("\"undo\":null", "\"undo\":{\"scope\":\"user\",\"folder\":null,\"needsCheck\":true}"))
         rule.setContent { Harness(spy) { AgentRawScreen(hub, "claude", onBack = {}) } }
         rule.waitForIdle()
