@@ -196,6 +196,8 @@ val Str.id: Int
         Str.chat_time_said -> R.string.chat_time_said
         Str.chat_time_today -> R.string.chat_time_today
         Str.chat_time_yesterday -> R.string.chat_time_yesterday
+        Str.chat_todo_done -> R.string.chat_todo_done
+        Str.chat_todo_now -> R.string.chat_todo_now
         Str.check_always_title -> R.string.check_always_title
         Str.check_no_lock -> R.string.check_no_lock
         Str.claude -> R.string.claude
@@ -415,6 +417,13 @@ val Str.id: Int
         Str.send_answers -> R.string.send_answers
         Str.sending -> R.string.sending
         Str.session_allowed -> R.string.session_allowed
+        Str.session_sheet_agents -> R.string.session_sheet_agents
+        Str.session_sheet_open_agent -> R.string.session_sheet_open_agent
+        Str.session_sheet_permissions -> R.string.session_sheet_permissions
+        Str.session_sheet_tab_commands -> R.string.session_sheet_tab_commands
+        Str.session_sheet_tab_mcp -> R.string.session_sheet_tab_mcp
+        Str.session_sheet_tab_overview -> R.string.session_sheet_tab_overview
+        Str.session_sheet_title -> R.string.session_sheet_title
         Str.session_tool_fetch -> R.string.session_tool_fetch
         Str.session_tool_read -> R.string.session_tool_read
         Str.session_tool_search -> R.string.session_tool_search
@@ -448,6 +457,63 @@ val Str.id: Int
         Str.state_unavailable -> R.string.state_unavailable
         Str.state_working -> R.string.state_working
         Str.stats_day_tokens -> R.string.stats_day_tokens
+        Str.stats_said_hm -> R.string.stats_said_hm
+        Str.status_agent_done -> R.string.status_agent_done
+        Str.status_agent_running -> R.string.status_agent_running
+        Str.status_agent_said -> R.string.status_agent_said
+        Str.status_agent_said_doing -> R.string.status_agent_said_doing
+        Str.status_creating -> R.string.status_creating
+        Str.status_desc_plain -> R.string.status_desc_plain
+        Str.status_desc_todos -> R.string.status_desc_todos
+        Str.status_desc_workflow -> R.string.status_desc_workflow
+        Str.status_desc_workflow_only -> R.string.status_desc_workflow_only
+        Str.status_detail_at_once -> R.string.status_detail_at_once
+        Str.status_detail_step -> R.string.status_detail_step
+        Str.status_detail_tokens -> R.string.status_detail_tokens
+        Str.status_detail_turn -> R.string.status_detail_turn
+        Str.status_editing -> R.string.status_editing
+        Str.status_expand -> R.string.status_expand
+        Str.status_expand_agents -> R.string.status_expand_agents
+        Str.status_expand_details -> R.string.status_expand_details
+        Str.status_expand_main -> R.string.status_expand_main
+        Str.status_failed -> R.string.status_failed
+        Str.status_fetching -> R.string.status_fetching
+        Str.status_fold -> R.string.status_fold
+        Str.status_fold_agents -> R.string.status_fold_agents
+        Str.status_fold_details -> R.string.status_fold_details
+        Str.status_fold_main -> R.string.status_fold_main
+        Str.status_folded -> R.string.status_folded
+        Str.status_main -> R.string.status_main
+        Str.status_main_waiting -> R.string.status_main_waiting
+        Str.status_open -> R.string.status_open
+        Str.status_planning -> R.string.status_planning
+        Str.status_reading -> R.string.status_reading
+        Str.status_reading_many -> R.string.status_reading_many
+        Str.status_retrying -> R.string.status_retrying
+        Str.status_run_said -> R.string.status_run_said
+        Str.status_running -> R.string.status_running
+        Str.status_searching -> R.string.status_searching
+        Str.status_searching_web -> R.string.status_searching_web
+        Str.status_sending -> R.string.status_sending
+        Str.status_starting -> R.string.status_starting
+        Str.status_stop -> R.string.status_stop
+        Str.status_stop_desc -> R.string.status_stop_desc
+        Str.status_stopping -> R.string.status_stopping
+        Str.status_thinking -> R.string.status_thinking
+        Str.status_todo_heading_said -> R.string.status_todo_heading_said
+        Str.status_todo_label -> R.string.status_todo_label
+        Str.status_tokens_figure -> R.string.status_tokens_figure
+        Str.status_tokens_said_millions -> R.string.status_tokens_said_millions
+        Str.status_tokens_said_thousands -> R.string.status_tokens_said_thousands
+        Str.status_tokens_short -> R.string.status_tokens_short
+        Str.status_tool -> R.string.status_tool
+        Str.status_wait_answer -> R.string.status_wait_answer
+        Str.status_wait_approve -> R.string.status_wait_approve
+        Str.status_wait_plan -> R.string.status_wait_plan
+        Str.status_wait_you -> R.string.status_wait_you
+        Str.status_workflow -> R.string.status_workflow
+        Str.status_working -> R.string.status_working
+        Str.status_writing -> R.string.status_writing
         Str.su_failed -> R.string.su_failed
         Str.su_failed_again -> R.string.su_failed_again
         Str.su_failed_final -> R.string.su_failed_final
@@ -526,5 +592,13 @@ val Plural.id: Int
         Plural.run_calls_done -> R.plurals.run_calls_done
         Plural.run_calls_now -> R.plurals.run_calls_now
         Plural.servers_elsewhere -> R.plurals.servers_elsewhere
+        Plural.stats_said_hours -> R.plurals.stats_said_hours
+        Plural.stats_said_minutes -> R.plurals.stats_said_minutes
+        Plural.status_agents -> R.plurals.status_agents
+        Plural.status_detail_commands -> R.plurals.status_detail_commands
+        Plural.status_main_agents -> R.plurals.status_main_agents
+        Plural.status_main_agents_said -> R.plurals.status_main_agents_said
+        Plural.status_seconds_said -> R.plurals.status_seconds_said
+        Plural.status_tokens_said_units -> R.plurals.status_tokens_said_units
         Plural.turns -> R.plurals.turns
     }

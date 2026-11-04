@@ -1,7 +1,6 @@
 package com.prudnikweb.hypernova.ui.session
 
-import androidx.annotation.StringRes
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.AgentBoard
 import com.prudnikweb.hypernova.data.ModelNames
 import com.prudnikweb.hypernova.data.Phase
@@ -19,19 +18,19 @@ import com.prudnikweb.hypernova.data.WShell
  * The sheet's tabs, in the row's order, each with its name (owner, 2026-10-30). A new tab is an
  * entry here and its branch in the sheet's `when` (the compiler asks for it).
  */
-internal enum class SheetTab(@StringRes val label: Int) {
+internal enum class SheetTab(val label: Str) {
     /** The model and the plan's windows. */
-    Overview(R.string.session_sheet_tab_overview),
+    Overview(Str.session_sheet_tab_overview),
     /** The mode, the blocked calls and Claude Code's rules in effect (RulesPart.kt). */
-    Permissions(R.string.session_sheet_permissions),
+    Permissions(Str.session_sheet_permissions),
     /** The agents at work, by workflow, and the background commands (ShellsPart.kt). */
-    Agents(R.string.session_sheet_agents),
+    Agents(Str.session_sheet_agents),
     /** This session's MCP servers, and what can be done to them (McpTab.kt). */
-    Mcp(R.string.session_sheet_tab_mcp),
+    Mcp(Str.session_sheet_tab_mcp),
     /** A side question (/btw), and Claude Code's commands and the owner's skills (CommandsTab.kt). */
-    Commands(R.string.session_sheet_tab_commands),
+    Commands(Str.session_sheet_tab_commands),
     /** Its time and git line (SessionInfo.kt), where it runs, and the Home card's menu. */
-    Session(R.string.session_sheet_title),
+    Session(Str.session_sheet_title),
 }
 
 /** The tab the sheet opens on: Permissions from the strip's blocked mark, Agents from its agents count, else Overview. */

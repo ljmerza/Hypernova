@@ -1,7 +1,13 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Strings
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import com.prudnikweb.hypernova.data.Todo
+import com.prudnikweb.hypernova.data.spokenHours
+import com.prudnikweb.hypernova.ui.platform.SharedUi
 import com.prudnikweb.hypernova.data.TodoStatus
 import com.prudnikweb.hypernova.data.ChatRepo
 import androidx.compose.animation.AnimatedVisibility
@@ -35,7 +41,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -54,13 +59,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -72,7 +75,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentState
 import com.prudnikweb.hypernova.data.AgentView
 import com.prudnikweb.hypernova.data.Hub
@@ -148,10 +150,10 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     val isError = raw?.tone == BarTone.Error
     // Kept out here so the list stays open (or folded) across short gaps between two steps.
     val open = session.id in openBars
-    val activity = LocalActivity.current
+    val recreating = SharedUi.platform.device.recreating()
     DisposableEffect(session.id) {
         val id = session.id
-        onDispose { if (activity?.isChangingConfigurations != true) openBars.remove(id) }
+        onDispose { if (!recreating()) openBars.remove(id) }
     }
     var kept by remember(session.id) { mutableStateOf(false) }
     var expired by remember(session.id) { mutableStateOf(false) }
@@ -209,7 +211,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
         if (shown != null) {
             Column {
                 val opener = com.prudnikweb.hypernova.ui.LocalOpener.current
-                StatusCard(shown, session, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }, modifier = Modifier.weight(1f, fill = false)) {
+                StatusBarCard(shown, session, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }, modifier = Modifier.weight(1f, fill = false)) {
                     if (!stopping) {
                         stopping = true
                         hub.interrupt(session.id)
@@ -222,7 +224,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
 }
 
 @Composable
-private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, workflow: WorkflowView?, barAgents: List<BarAgent>, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onOpenAgent: (String) -> Unit, modifier: Modifier = Modifier, onStop: () -> Unit) {
+private fun StatusBarCard(model: BarModel, session: Session, todos: List<Todo>, workflow: WorkflowView?, barAgents: List<BarAgent>, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onOpenAgent: (String) -> Unit, modifier: Modifier = Modifier, onStop: () -> Unit) {
     // Ticks once a second while the card is on screen and the Mac is linked; gone with it.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(away == null) {
@@ -232,7 +234,7 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
         }
     }
     val tone by animateColorAsState(if (away != null) HN.inkDim else toneColor(model.tone), tween(300), label = "statusTone")
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val said = away ?: sayText(model.say)
     val turnMs = barClockMs(session.turnStartedAt, session.turn, barAgents, since, now)
     val details = barDetails(session.activity, session.turnStartedAt, session.turn, now)
@@ -242,10 +244,10 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
     val runMs = run?.let { (now - it.startedAt).coerceAtLeast(0) }
     val runTokens = run?.let { workflowTokens(it) }
     val time = if (runMs != null) {
-        listOfNotNull(ccDuration(runMs), runTokens?.let { stringResource(R.string.status_tokens_short, ccTokens(it)) }).joinToString(" · ")
+        listOfNotNull(ccDuration(runMs), runTokens?.let { stringResource(Str.status_tokens_short, ccTokens(it)) }).joinToString(" · ")
     } else clockText(turnMs)
     val timeSaid = if (runMs != null) {
-        listOfNotNull(stringResource(R.string.status_run_said, durationSaid(res, runMs)), runTokens?.let { tokensSaid(res, it) }).joinToString(", ")
+        listOfNotNull(stringResource(Str.status_run_said, durationSaid(res, runMs)), runTokens?.let { tokensSaid(res, it) }).joinToString(", ")
     } else clockText(turnMs)
     // The workflow's agents, phase by phase as its card has them, then any of no phase.
     val agents = remember(workflow) { workflow?.let { w -> w.phases.flatMap { it.agents } + w.loose }.orEmpty() }
@@ -258,21 +260,21 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
     val expandable = hinted || (model.tone == BarTone.Working && details.any)
     // The rows above the agents in the opened list.
     val top = if (details.any) 1 else 0
-    val saidAloud = if (away == null && model.say.kind == SayKind.MainAndAgents) pluralStringResource(R.plurals.status_main_agents_said, model.say.n, model.say.n) else said
+    val saidAloud = if (away == null && model.say.kind == SayKind.MainAndAgents) pluralStringResource(Plural.status_main_agents_said, model.say.n, model.say.n) else said
     val spoken = when {
         model.hasWorkflow && away == null && model.say.kind == SayKind.Workflow ->
-            stringResource(R.string.status_desc_workflow_only, model.workflow!!, model.done, model.total, timeSaid)
-        model.hasWorkflow -> stringResource(R.string.status_desc_workflow, said, model.workflow!!, model.done, model.total, timeSaid)
-        model.hasTodos -> stringResource(R.string.status_desc_todos, saidAloud, model.done, model.total, timeSaid)
-        else -> stringResource(R.string.status_desc_plain, saidAloud, timeSaid)
+            stringResource(Str.status_desc_workflow_only, model.workflow!!, model.done, model.total, timeSaid)
+        model.hasWorkflow -> stringResource(Str.status_desc_workflow, said, model.workflow!!, model.done, model.total, timeSaid)
+        model.hasTodos -> stringResource(Str.status_desc_todos, saidAloud, model.done, model.total, timeSaid)
+        else -> stringResource(Str.status_desc_plain, saidAloud, timeSaid)
     }
-    val stateWord = stringResource(if (open) R.string.status_open else R.string.status_folded)
+    val stateWord = stringResource(if (open) Str.status_open else Str.status_folded)
     val label = stringResource(
         when {
-            listsAgents -> if (open) R.string.status_fold_agents else R.string.status_expand_agents
-            listsMain -> if (open) R.string.status_fold_main else R.string.status_expand_main
-            !model.hasTodos && model.tone == BarTone.Working -> if (open) R.string.status_fold_details else R.string.status_expand_details
-            else -> if (open) R.string.status_fold else R.string.status_expand
+            listsAgents -> if (open) Str.status_fold_agents else Str.status_expand_agents
+            listsMain -> if (open) Str.status_fold_main else Str.status_expand_main
+            !model.hasTodos && model.tone == BarTone.Working -> if (open) Str.status_fold_details else Str.status_expand_details
+            else -> if (open) Str.status_fold else Str.status_expand
         },
     )
     GlassCard(modifier.fillMaxWidth().animateContentSize(tween(Motion.DIALOG, easing = Motion.Expo))) {
@@ -345,7 +347,7 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
 /** Stop, or "Stopping…" (dim, not a button) once pressed until the turn ends. TalkBack: "Stop Claude", or Codex ([codex]). */
 @Composable
 private fun StopButton(stopping: Boolean, codex: Boolean, onClick: () -> Unit) {
-    val desc = if (stopping) stringResource(R.string.status_stopping) else stringResource(R.string.status_stop_desc, com.prudnikweb.hypernova.ui.components.agentName(codex))
+    val desc = if (stopping) stringResource(Str.status_stopping) else stringResource(Str.status_stop_desc, com.prudnikweb.hypernova.ui.components.agentName(codex))
     Box(
         Modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
@@ -362,7 +364,7 @@ private fun StopButton(stopping: Boolean, codex: Boolean, onClick: () -> Unit) {
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HText(stringResource(if (stopping) R.string.status_stopping else R.string.status_stop), style = Type.small, color = if (stopping) HN.inkDim else HN.inkMuted, maxLines = 1)
+            HText(stringResource(if (stopping) Str.status_stopping else Str.status_stop), style = Type.small, color = if (stopping) HN.inkDim else HN.inkMuted, maxLines = 1)
         }
     }
 }
@@ -448,32 +450,32 @@ private fun toneColor(t: BarTone): Color = when (t) {
 
 @Composable
 private fun sayText(s: Say): String = when (s.kind) {
-    SayKind.Starting -> stringResource(R.string.status_starting)
-    SayKind.Sending -> stringResource(R.string.status_sending)
-    SayKind.Thinking -> stringResource(R.string.status_thinking)
-    SayKind.Writing -> stringResource(R.string.status_writing)
-    SayKind.Working -> stringResource(R.string.status_working)
-    SayKind.Retrying -> stringResource(R.string.status_retrying, s.arg)
-    SayKind.Reading -> stringResource(R.string.status_reading, s.arg)
-    SayKind.ReadingMany -> stringResource(R.string.status_reading_many, s.n)
-    SayKind.Searching -> stringResource(R.string.status_searching, s.arg)
-    SayKind.Editing -> stringResource(R.string.status_editing, s.arg)
-    SayKind.Creating -> stringResource(R.string.status_creating, s.arg)
-    SayKind.Running -> stringResource(R.string.status_running, s.arg)
-    SayKind.Fetching -> stringResource(R.string.status_fetching, s.arg)
-    SayKind.SearchingWeb -> stringResource(R.string.status_searching_web, s.arg)
-    SayKind.Agents -> pluralStringResource(R.plurals.status_agents, s.n, s.n)
-    SayKind.Planning -> stringResource(R.string.status_planning)
-    SayKind.Tool -> stringResource(R.string.status_tool, s.arg)
-    SayKind.Workflow -> stringResource(R.string.status_workflow, s.arg)
-    SayKind.MainAndAgents -> pluralStringResource(R.plurals.status_main_agents, s.n, s.n)
-    SayKind.MainWaiting -> stringResource(R.string.status_main_waiting)
+    SayKind.Starting -> stringResource(Str.status_starting)
+    SayKind.Sending -> stringResource(Str.status_sending)
+    SayKind.Thinking -> stringResource(Str.status_thinking)
+    SayKind.Writing -> stringResource(Str.status_writing)
+    SayKind.Working -> stringResource(Str.status_working)
+    SayKind.Retrying -> stringResource(Str.status_retrying, s.arg)
+    SayKind.Reading -> stringResource(Str.status_reading, s.arg)
+    SayKind.ReadingMany -> stringResource(Str.status_reading_many, s.n)
+    SayKind.Searching -> stringResource(Str.status_searching, s.arg)
+    SayKind.Editing -> stringResource(Str.status_editing, s.arg)
+    SayKind.Creating -> stringResource(Str.status_creating, s.arg)
+    SayKind.Running -> stringResource(Str.status_running, s.arg)
+    SayKind.Fetching -> stringResource(Str.status_fetching, s.arg)
+    SayKind.SearchingWeb -> stringResource(Str.status_searching_web, s.arg)
+    SayKind.Agents -> pluralStringResource(Plural.status_agents, s.n, s.n)
+    SayKind.Planning -> stringResource(Str.status_planning)
+    SayKind.Tool -> stringResource(Str.status_tool, s.arg)
+    SayKind.Workflow -> stringResource(Str.status_workflow, s.arg)
+    SayKind.MainAndAgents -> pluralStringResource(Plural.status_main_agents, s.n, s.n)
+    SayKind.MainWaiting -> stringResource(Str.status_main_waiting)
     SayKind.Raw -> s.arg
-    SayKind.WaitApprove -> stringResource(R.string.status_wait_approve, s.arg)
-    SayKind.WaitAnswer -> stringResource(R.string.status_wait_answer)
-    SayKind.WaitPlan -> stringResource(R.string.status_wait_plan)
-    SayKind.WaitYou -> stringResource(R.string.status_wait_you)
-    SayKind.Failed -> stringResource(R.string.status_failed)
+    SayKind.WaitApprove -> stringResource(Str.status_wait_approve, s.arg)
+    SayKind.WaitAnswer -> stringResource(Str.status_wait_answer)
+    SayKind.WaitPlan -> stringResource(Str.status_wait_plan)
+    SayKind.WaitYou -> stringResource(Str.status_wait_you)
+    SayKind.Failed -> stringResource(Str.status_failed)
 }
 
 /**
@@ -511,15 +513,15 @@ private fun PanelList(todos: List<Todo>, follow: Int, modifier: Modifier = Modif
 private fun LazyListScope.detailRows(d: BarDetails) {
     if (!d.any) return
     item(key = "details") {
-        val res = LocalContext.current.resources
+        val res = wordsNow()
         Column(Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             d.doing?.let { HText(it, style = if (d.isCommand) Type.monoSmall else Type.small, color = HN.ink, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) }
-            d.turnMs?.let { DetailRow(stringResource(R.string.status_detail_turn), spinnerDuration(it), durationSaid(res, it)) }
-            d.tokens?.let { DetailRow(stringResource(R.string.status_detail_tokens), stringResource(R.string.status_tokens_figure, ccTokens(it)), tokensSaid(res, it)) }
-            d.stepMs?.let { DetailRow(stringResource(R.string.status_detail_step), spinnerDuration(it), durationSaid(res, it)) }
+            d.turnMs?.let { DetailRow(stringResource(Str.status_detail_turn), spinnerDuration(it), durationSaid(res, it)) }
+            d.tokens?.let { DetailRow(stringResource(Str.status_detail_tokens), stringResource(Str.status_tokens_figure, ccTokens(it)), tokensSaid(res, it)) }
+            d.stepMs?.let { DetailRow(stringResource(Str.status_detail_step), spinnerDuration(it), durationSaid(res, it)) }
             if (d.atOnce > 0) {
-                val n = pluralStringResource(R.plurals.status_detail_commands, d.atOnce, d.atOnce)
-                DetailRow(stringResource(R.string.status_detail_at_once), n, n)
+                val n = pluralStringResource(Plural.status_detail_commands, d.atOnce, d.atOnce)
+                DetailRow(stringResource(Str.status_detail_at_once), n, n)
             }
         }
     }
@@ -582,13 +584,13 @@ private object StatusPanel {
 @Composable
 private fun WorkflowAgentRow(a: AgentView) {
     val state = when (a.state) {
-        AgentState.Running -> a.activity?.takeIf { it.isNotBlank() } ?: stringResource(R.string.status_agent_running)
-        AgentState.Done -> stringResource(R.string.status_agent_done)
-        AgentState.Failed -> stringResource(R.string.agent_failed_short)
-        AgentState.Stopped -> stringResource(R.string.tool_stopped)
+        AgentState.Running -> a.activity?.takeIf { it.isNotBlank() } ?: stringResource(Str.status_agent_running)
+        AgentState.Done -> stringResource(Str.status_agent_done)
+        AgentState.Failed -> stringResource(Str.agent_failed_short)
+        AgentState.Stopped -> stringResource(Str.tool_stopped)
     }
-    val said = if (a.running && a.activity != null) stringResource(R.string.status_agent_said_doing, a.label, a.activity)
-    else stringResource(R.string.status_agent_said, a.label, state)
+    val said = if (a.running && a.activity != null) stringResource(Str.status_agent_said_doing, a.label, a.activity)
+    else stringResource(Str.status_agent_said, a.label, state)
     Row(
         Modifier
             .fillMaxWidth()
@@ -627,7 +629,7 @@ private fun WorkflowAgentRow(a: AgentView) {
 @Composable
 private fun TodoTally(done: Int, total: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        HText(stringResource(R.string.status_todo_label).uppercase(), style = Type.label, color = HN.accentDim, maxLines = 1)
+        HText(stringResource(Str.status_todo_label).uppercase(), style = Type.label, color = HN.accentDim, maxLines = 1)
         Spacer(Modifier.width(5.dp))
         HText("$done/$total", style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
     }
@@ -637,7 +639,7 @@ private fun TodoTally(done: Int, total: Int) {
 @Composable
 private fun TodoHeading(todos: List<Todo>) {
     val done = todos.count { it.status == TodoStatus.Done }
-    val said = stringResource(R.string.status_todo_heading_said, done, todos.size)
+    val said = stringResource(Str.status_todo_heading_said, done, todos.size)
     Row(
         Modifier
             .fillMaxWidth()
@@ -657,9 +659,9 @@ private fun TodoHeading(todos: List<Todo>) {
  */
 @Composable
 private fun MainRow(model: BarModel, turnMs: Long) {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val doing = sayText(model.main)
-    val name = stringResource(R.string.status_main)
+    val name = stringResource(Str.status_main)
     val said = listOf(name, doing, durationSaid(res, turnMs)).joinToString(", ")
     val activity = when {
         model.tone == BarTone.NeedsYou -> Activity.Alert
@@ -699,13 +701,13 @@ private fun MainRow(model: BarModel, turnMs: Long) {
  */
 @Composable
 private fun BarAgentRow(a: BarAgent, now: Long, onOpen: () -> Unit) {
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     val ms = (now - a.startedAt).coerceAtLeast(0)
     val doing = when {
-        a.asking -> stringResource(R.string.status_wait_you)
+        a.asking -> stringResource(Str.status_wait_you)
         else -> a.doing?.let { sayText(it) } ?: a.kind
     }
-    val figures = listOfNotNull(ccDuration(ms), a.tokens?.let { stringResource(R.string.status_tokens_figure, ccTokens(it)) }).joinToString(" · ")
+    val figures = listOfNotNull(ccDuration(ms), a.tokens?.let { stringResource(Str.status_tokens_figure, ccTokens(it)) }).joinToString(" · ")
     val said = listOfNotNull(a.title, a.kind, a.doing?.let { sayText(it) }, if (a.asking) doing else null, durationSaid(res, ms), a.tokens?.let { tokensSaid(res, it) })
         .joinToString(", ")
     Row(
@@ -714,7 +716,7 @@ private fun BarAgentRow(a: BarAgent, now: Long, onOpen: () -> Unit) {
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(if (a.asking) HN.amber.copy(alpha = 0.07f) else HN.accent.copy(alpha = 0.05f))
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.session_sheet_open_agent), onClick = onOpen)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(Str.session_sheet_open_agent), onClick = onOpen)
             .semantics(mergeDescendants = true) { contentDescription = said }
             .padding(horizontal = 6.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -735,18 +737,18 @@ private fun BarAgentRow(a: BarAgent, now: Long, onOpen: () -> Unit) {
 }
 
 /** How long, for TalkBack: "42 seconds", "4 minutes", "1 hour 12 minutes". */
-internal fun durationSaid(res: android.content.res.Resources, ms: Long): String {
+internal fun durationSaid(res: Strings, ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0).toInt()
-    return if (s < 60) res.getQuantityString(R.plurals.status_seconds_said, s, s)
-    else com.prudnikweb.hypernova.ui.stats.hoursSaid(res, ms)
+    return if (s < 60) res.getQuantityString(Plural.status_seconds_said, s, s)
+    else spokenHours(res, ms)
 }
 
 /** Tokens, for TalkBack: "980 tokens", "81 thousand tokens", "1.2 million tokens". */
-internal fun tokensSaid(res: android.content.res.Resources, n: Long): String {
+internal fun tokensSaid(res: Strings, n: Long): String {
     val t = spokenTokens(n)
     return when (t.scale) {
-        TokenScale.Units -> res.getQuantityString(R.plurals.status_tokens_said_units, t.count, t.count)
-        TokenScale.Thousands -> res.getString(R.string.status_tokens_said_thousands, t.figure)
-        TokenScale.Millions -> res.getString(R.string.status_tokens_said_millions, t.figure)
+        TokenScale.Units -> res.getQuantityString(Plural.status_tokens_said_units, t.count, t.count)
+        TokenScale.Thousands -> res.getString(Str.status_tokens_said_thousands, t.figure)
+        TokenScale.Millions -> res.getString(Str.status_tokens_said_millions, t.figure)
     }
 }

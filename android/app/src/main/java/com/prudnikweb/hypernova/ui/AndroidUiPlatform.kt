@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui
 
+import androidx.activity.compose.LocalActivity
+
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.semantics.onLongClick
@@ -146,6 +148,12 @@ private object PhoneDevice : UiDevice {
 
     @Composable
     override fun windowHeightDp(): Int = LocalConfiguration.current.screenHeightDp
+
+    @Composable
+    override fun recreating(): () -> Boolean {
+        val activity = LocalActivity.current
+        return { activity?.isChangingConfigurations == true }
+    }
 
     override fun blurOutside(paint: Paint, radius: Float) {
         // Drawn by the GPU since Android 9; the app needs 10.

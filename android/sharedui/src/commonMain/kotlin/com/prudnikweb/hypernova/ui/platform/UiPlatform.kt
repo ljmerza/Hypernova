@@ -73,6 +73,8 @@ interface UiDevice {
     @Composable fun copier(): Copier
     /** How tall the screen or the window is: the share an approval may take of it goes by this. */
     @Composable fun windowHeightDp(): Int
+    /** Whether what's leaving the screen now only leaves for a moment, as the phone's activity is recreated on a rotation: a screen's "you've left" isn't true then. */
+    @Composable fun recreating(): () -> Boolean
     /** A glow round a filled capsule: its own shape, blurred, outside it. */
     fun blurOutside(paint: Paint, radius: Float)
 }

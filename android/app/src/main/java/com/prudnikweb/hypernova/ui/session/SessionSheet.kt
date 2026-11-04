@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.id
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Hub
@@ -302,7 +303,7 @@ private fun SheetTabs(tab: SheetTab, onTab: (SheetTab) -> Unit) {
                             .padding(vertical = 9.dp, horizontal = 14.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        HText(stringResource(t.label), style = Type.small, color = if (on) HN.accent else HN.inkMuted, maxLines = 1)
+                        HText(stringResource(t.label.id), style = Type.small, color = if (on) HN.accent else HN.inkMuted, maxLines = 1)
                     }
                 }
             },

@@ -1,18 +1,14 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Todo
 import com.prudnikweb.hypernova.data.TodoStatus
 import com.prudnikweb.hypernova.data.ChatRepo
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,7 +29,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,24 +40,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.ui.components.Activity
-import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.Planet
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
-import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.theme.Type
 import kotlinx.coroutines.delay
 
@@ -134,8 +124,8 @@ internal fun Modifier.panelViewport(list: LazyListState): Modifier = this
 /** One line: ticked when done, lit while it's the one Claude is on, a hollow ring when it waits. */
 @Composable
 private fun TodoRow(t: Todo, current: Boolean) {
-    val doneWord = stringResource(R.string.chat_todo_done)
-    val nowWord = stringResource(R.string.chat_todo_now)
+    val doneWord = stringResource(Str.chat_todo_done)
+    val nowWord = stringResource(Str.chat_todo_now)
     val said = when {
         t.status == TodoStatus.Done -> "$doneWord: ${t.text}"
         current -> "$nowWord: ${t.active ?: t.text}"

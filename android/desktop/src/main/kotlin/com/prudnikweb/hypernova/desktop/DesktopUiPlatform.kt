@@ -168,6 +168,10 @@ private object DeskDevice : UiDevice {
     @Composable
     override fun windowHeightDp(): Int = (LocalWindowInfo.current.containerSize.height / LocalDensity.current.density).toInt()
 
+    /** Nothing here is recreated in place: closing the window ends the app. */
+    @Composable
+    override fun recreating(): () -> Boolean = { false }
+
     override fun blurOutside(paint: Paint, radius: Float) {
         paint.skiaPaint.maskFilter = MaskFilter.makeBlur(FilterBlurMode.OUTER, radius / 2f)
     }

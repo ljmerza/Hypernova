@@ -69,6 +69,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.prudnikweb.hypernova.ui.LocalOpener
+import com.prudnikweb.hypernova.data.LinkState
+import com.prudnikweb.hypernova.ui.session.ChatStatusBar
+import com.prudnikweb.hypernova.ui.session.linkWord
+import com.prudnikweb.hypernova.ui.session.rememberStatusBar
 import com.prudnikweb.hypernova.ui.chat.LinkAsk
 import com.prudnikweb.hypernova.ui.chat.LinkHandler
 
@@ -123,9 +127,11 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
     val opener = LocalOpener.current
     val links = remember(opener) { LinkHandler(opener) }
     val box = remember { FocusRequester() }
+    val status = rememberStatusBar(hub, s, hub.transcript(s.id), hub.sending(s.id), away = if (hub.link.state == LinkState.Connected) null else linkWord(hub.link.state))
     CompositionLocalProvider(LocalUriHandler provides links) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val askMax = maxHeight * ASK_SHARE
+            val statusMax = maxHeight * STATUS_SHARE
             // The box always has its room, in the smallest window too: the card gives way, what's asked scrolling above its pills.
             val rest = maxHeight - BOX_ROOM - if (onBack != null) BACK_ROOM else 0.dp
             Column(
@@ -142,6 +148,8 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
                     HText(if (s.inHistory) Ui.desk_pane_in_history.text() else Ui.desk_pane_phone_only.text(), note, style = Type.small, color = HN.inkDim)
                     s.automation?.takeIf { s.inHistory }?.let { HText(Ui.desk_pane_runs_phone.format(it.name), note, style = Type.small, color = HN.inkDim) }
                 }
+                // The status bar over the box, as on the phone; opened, it keeps to a share of the pane, and the chat has the rest.
+                ChatStatusBar(hub, s, status, Modifier.widthIn(max = PANE_MAX).fillMaxWidth().heightIn(max = statusMax))
                 ChatBox(hub, s, shell, following, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
             }
             LinkAsk(
@@ -253,6 +261,9 @@ private val FACT_LABEL = 128.dp
 
 /** The share of the pane what's asked may take before it scrolls: the chat and the box need the rest. */
 private const val ASK_SHARE = 0.4f
+
+/** The share of the pane the status bar may take, opened. */
+private const val STATUS_SHARE = 0.45f
 
 /** What the pane keeps for the box and the gaps round it, and for Back. */
 private val BOX_ROOM = 88.dp

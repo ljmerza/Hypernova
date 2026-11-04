@@ -73,7 +73,7 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 | `ui.fx` | `Ambient.kt` (the one clock), `Pace.kt`, `Countdown.kt` |
 | `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`, `Rows.kt` (`FieldLabel`, `ToggleRow`, `NavRow`, `InfoRow`, `ConfirmDialog`, `Segmented`), `Popups.kt` (`GlassDialog`, `GlassSheet`), `AgentWords.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
 | `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `LinkAsk.kt` (where a link goes, and the question), `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
-| `ui.session` | A session's screen, as far as it's moved. `ChatList.kt` (what the list shows, following its tail, Show earlier), `TranscriptItem.kt` (one item), `SessionWords.kt` (what's said of a session, what can be changed), `TerminalTextCard.kt`, `AttachParts.kt`, `AlwaysSheet.kt`, `ChatSheet.kt`, `WhyAsked.kt`, `WithMessageMenu.kt`. Same package as the phone's, so its screens' imports stayed |
+| `ui.session` | A session's screen, as far as it's moved. `ChatList.kt` (what the list shows, following its tail, Show earlier), `TranscriptItem.kt` (one item), `SessionWords.kt` (what's said of a session, what can be changed), `TerminalTextCard.kt`, `StatusBar.kt`, `StatusModel.kt`, `TodoPanel.kt`, `SessionSheetModel.kt`, `AttachParts.kt`, `AlwaysSheet.kt`, `ChatSheet.kt`, `WhyAsked.kt`, `WithMessageMenu.kt`. Same package as the phone's, so its screens' imports stayed |
 | `ui` | `Locals.kt`: `LocalToast`, `LocalAppScope`, `Opener`: what a screen asks of the app round it. The desktop's `Opener` says what it has no screen for is on the phone |
 
 **The seams** (`UiPlatform`), each implemented in `app/.../ui/AndroidUiPlatform.kt` and `desktop/.../DesktopUiPlatform.kt` and handed over once, with `SharedUi.install`, before anything draws:
@@ -95,7 +95,7 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 
 **A new string in the shared drawing** is a line in `Str.kt` (or `Plural`) and in `StringIds.kt`, as for the data layer, and `WordsTest` holds it to the phone's text. `:app` and `:desktop` are the module's Kotlin friends, as `:app` is `:shared`'s.
 
-**What the desktop's chat doesn't have yet,** for the parity list: the terminal, the usage strip and the session sheet's tabs, a message's menu (Copy, Quote, Read aloud, Rewind, its exact time), the "/" list, `/btw` and its card, voice, attaching files and their pictures, Always and This session on an ask, a terminal's other menus (`MenuCard`), the status bar and to-do list, a blocked session's card and Continue, the switch line, an agent's own screen, opening a file, previews. What opens one of these from the chat says it's on the phone.
+**What the desktop's chat doesn't have yet,** for the parity list: the terminal, the usage strip and the session sheet's tabs, a message's menu (Copy, Quote, Read aloud, Rewind, its exact time), the "/" list, `/btw` and its card, voice, attaching files and their pictures, Always and This session on an ask, a terminal's other menus (`MenuCard`), a blocked session's card and Continue, the switch line, an agent's own screen, opening a file, previews. What opens one of these from the chat says it's on the phone.
 
 ## The rules' checks (2026-11-03)
 
@@ -213,6 +213,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 |---|---|---|
 | Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Partly | The transcript, the box, the queue and the offline queue are there, the phone's own drawing (`:sharedui`). No rewind, message menu, attachments or quick prompts: "The shared drawing" lists what isn't |
 | Live terminal | Not yet | Not begun |
+| The status bar and its details: what it's doing, to-dos, the agents, the whole command, the turn's time and tokens, Stop | There | The phone's own (`ui.session.StatusBar.kt`), over the box. An agent's row says its screen is on the phone. Opened, it keeps to 45% of the pane |
 | Answer a question or a plan, Always, Allow these N | Partly | Questions and plans are answered in the chat. Always also needs an owner check the desktop hasn't got |
 | Session sheet: what the list already knows (folder, model, mode, where it runs, agents, queue, context, times) | There | In the pane |
 | Background commands ("1 shell"): the Agents tab's list and the count | Not yet | `:shared` has them (`AgentBoard.shells`, `Session.shellsRunning`); needs the agents tab or a row in the pane |
