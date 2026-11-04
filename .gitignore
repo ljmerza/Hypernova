@@ -10,3 +10,5 @@ android/app/libs/tsnet-sources.jar
 *.jks
 *.keystore
 keystore.properties
+# What agents leave behind when they try a screen by eye.
+.*-preview/

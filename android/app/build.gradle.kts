@@ -247,3 +247,58 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     val own = listOf(project(":shared"), project(":sharedui")).map { it.layout.buildDirectory.get().asFile }
     friendPaths.from(libraries.filter { f -> own.any { f.startsWith(it) } })
 }
+
+/**
+ * This app's runtime classpath, debug and release, one module to a line in classpath-debug.txt and classpath-release.txt.
+ * A shared UI library's version moves the phone too (docs/PLATFORMS.md, "The rules' checks"), so a change here is a choice:
+ * `:app:checkRuntimeClasspath` fails on any other, and `:app:writeRuntimeClasspath` makes the lists for the same commit.
+ * From the dependency graph and not the artifacts, as JetBrains' pointers have no jar or aar to show up by.
+ */
+@UntrackedTask(because = "Its files are checked in, and it has to read them every time.")
+abstract class RuntimeClasspath : DefaultTask() {
+    @get:Input abstract val debug: Property<ResolvedComponentResult>
+    @get:Input abstract val release: Property<ResolvedComponentResult>
+    @get:Input abstract val write: Property<Boolean>
+    @get:Internal abstract val folder: DirectoryProperty
+
+    private fun modules(root: ResolvedComponentResult): List<String> {
+        val seen = linkedSetOf(root)
+        val queue = ArrayDeque(listOf(root))
+        while (queue.isNotEmpty()) {
+            for (edge in queue.removeFirst().dependencies) {
+                val next = (edge as? ResolvedDependencyResult)?.selected ?: continue
+                if (seen.add(next)) queue.add(next)
+            }
+        }
+        return (seen - root).map { it.id.displayName }.sorted()
+    }
+
+    @TaskAction fun run() {
+        val problems = mutableListOf<String>()
+        for ((variant, root) in listOf("debug" to debug.get(), "release" to release.get())) {
+            val file = folder.file("classpath-$variant.txt").get().asFile
+            val now = modules(root)
+            if (write.get()) {
+                file.writeText(now.joinToString("\n", postfix = "\n"))
+                logger.lifecycle("${file.name}: ${now.size} modules")
+                continue
+            }
+            val kept = if (file.isFile) file.readLines().filter { it.isNotBlank() } else emptyList()
+            val gone = (kept - now.toSet()).map { "  - $it" }
+            val new = (now - kept.toSet()).map { "  + $it" }
+            if (gone.isNotEmpty() || new.isNotEmpty()) problems += "${file.name} differs from the build:\n" + (gone + new).joinToString("\n")
+        }
+        if (problems.isNotEmpty()) throw GradleException(
+            problems.joinToString("\n") + "\n:app's runtime classpath changed. If that's a choice, run :app:writeRuntimeClasspath, commit " +
+                "the lists with the change, and say why in the commit. If it isn't, undo the dependency change.",
+        )
+    }
+}
+listOf("check" to false, "write" to true).forEach { (verb, writes) ->
+    tasks.register<RuntimeClasspath>("${verb}RuntimeClasspath") {
+        debug.set(configurations.named("debugRuntimeClasspath").flatMap { it.incoming.resolutionResult.rootComponent })
+        release.set(configurations.named("releaseRuntimeClasspath").flatMap { it.incoming.resolutionResult.rootComponent })
+        write.set(writes)
+        folder.set(layout.projectDirectory)
+    }
+}
