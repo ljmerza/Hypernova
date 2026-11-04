@@ -639,6 +639,20 @@ test('following: Claude Code not starting, a session ending on an error, Stop by
   await assert.rejects(e.stopRun('ru_nope'), (err: any) => err.code === 'no_run' && err.status === 404)
 })
 
+test('the finished rule: a running Monitor keeps it going as agents do, a plain shell doesn\'t', async () => {
+  const { w, e } = setup()
+  const a = e.create({ name: 'After', enabled: true, trigger: { kind: 'session', event: 'finished', projectPath: PROJECT, from: 'mine' }, action: { kind: 'notify', text: '{session} finished: {result}' } })
+  w.replies.set('s1', 'Watched it.')
+  w.set(e, 's1', { state: 'working' })
+  w.set(e, 's1', { state: 'idle', shellsRunning: 1, monitorsRunning: 1 })
+  await later(w, e, 6 * SEC)
+  assert.equal(e.runsPage(a.id, null, 5).length, 0, 'its Monitor still watches')
+  w.set(e, 's1', { state: 'working', shellsRunning: undefined, monitorsRunning: undefined })
+  w.set(e, 's1', { state: 'idle', shellsRunning: 1 })
+  await later(w, e, 6 * SEC)
+  assert.equal(e.runsPage(a.id, null, 5).length, 1, 'a dev server left running doesn\'t hold it back')
+})
+
 test('the finished rule: agents at work, a queue, an approval or a block keep it going; 5 s settles it', async () => {
   const { w, e } = setup()
   const a = e.create({ name: 'After', enabled: true, trigger: { kind: 'session', event: 'finished', projectPath: PROJECT, from: 'mine' }, action: { kind: 'notify', text: '{session} finished: {result}' } })

@@ -686,6 +686,13 @@ test('GET …/agents and an agent’s events, and one just started (starting)', 
   hub.pollTranscripts()
   contract('ws-shell', heard('shell', (m) => m.shell.id === 'bwatch004'))
   contract('ws-session-shells', heard('session', (m) => m.session.id === SHELLS && m.session.shellsRunning === 1))
+  // A Monitor beside it: among the shells, and said apart, so it counts as Working (Session.busy).
+  appendFileSync(shellsPath, [
+    { ...assistant('as-mon', [toolUse('toolu_mon5', 'Monitor', { description: 'Watch the build', command: 'tail -f build.log', timeout_ms: 900000, persistent: false })]), sessionId: SHELLS },
+    { ...result('ur-mon', 'toolu_mon5', 'Monitor started (task bmon00005, expires in 15m unless the source ends first).', { taskId: 'bmon00005', timeoutMs: 900000, persistent: false }), sessionId: SHELLS },
+  ].map(line).join(''))
+  hub.pollTranscripts()
+  contract('ws-session-monitors', heard('session', (m) => m.session.id === SHELLS && m.session.monitorsRunning === 1))
   hub.forgetSession(SHELLS)
   contract('rest-agent-events', await ok(get(`/v1/sessions/${MAIN}/agents/${PLAIN}/events?limit=300`)))
   // An agent launched a moment ago, its file not written yet.

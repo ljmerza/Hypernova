@@ -145,6 +145,8 @@ const GATE_REASONS: RunReason[] = ['limited', 'signed_out', 'no_plan', 'on_hold'
 /** A run's session stopped by a block with no reset: the run's reason, as the gate's skips are worded. */
 const BLOCKED_REASON: Partial<Record<string, RunReason>> = { logged_out: 'signed_out', no_subscription: 'no_plan', on_hold: 'on_hold', no_credit: 'no_credit', provider: 'provider', limit: 'limited', model: 'limited' }
 const isActive = (r: Run) => ACTIVE.includes(r.state)
+/** Its main agent rests and what it started goes on, so it hasn't finished: agents, or a Monitor it will be woken by. Not a plain shell. */
+const goesOn = (s: Session) => s.agentsRunning > 0 || (s.monitorsRunning ?? 0) > 0
 const hex = (n: number) => randomBytes(n).toString('hex')
 /** At most 300 characters, as a run's result. */
 const cut = (s: string) => (s.length > 300 ? s.slice(0, 299).trimEnd() + '…' : s)
@@ -2243,10 +2245,10 @@ export class Automations {
     const now = this.io.now()
     const starts = this.cur(r).kind === 'start'
     if (!s) return { kind: 'end', state: 'failed', reason: 'no_session' }
-    if (s.state === 'working' || s.state === 'needs_you' || s.agentsRunning > 0 || (this.workedAt.get(sid) ?? -Infinity) >= seen.since) seen.worked = true
+    if (s.state === 'working' || s.state === 'needs_you' || goesOn(s) || (this.workedAt.get(sid) ?? -Infinity) >= seen.since) seen.worked = true
     // What it was last seen doing, before it ended (an end mid-turn isn't a finish).
     const lastSeen = seen.last ?? null
-    if (s.state !== 'ended') seen.last = s.state === 'idle' && s.agentsRunning > 0 ? 'working' : s.state
+    if (s.state !== 'ended') seen.last = s.state === 'idle' && goesOn(s) ? 'working' : s.state
     if (s.stoppedForAway) return { kind: 'end', state: 'stopped', reason: 'away' }
     if (s.blocked) {
       const until = s.blocked.autoResumeAt ?? s.blocked.resetsAt
@@ -2279,7 +2281,7 @@ export class Automations {
       seen.finished = true
       return { kind: 'finished' }
     }
-    if (s.state === 'idle' && seen.worked && s.agentsRunning === 0 && !s.queued && !s.pendingApprovalIds.length) {
+    if (s.state === 'idle' && seen.worked && !goesOn(s) && !s.queued && !s.pendingApprovalIds.length) {
       seen.idleAt ??= now
       if (now - seen.idleAt >= SETTLE_MS) {
         seen.finished = true
@@ -2791,7 +2793,7 @@ export class Automations {
     const now = this.io.now()
     const prev = this.lastState.get(s.id)
     this.lastState.set(s.id, s.state)
-    if (s.state === 'working' || s.state === 'needs_you' || s.agentsRunning > 0) this.workedAt.set(s.id, now)
+    if (s.state === 'working' || s.state === 'needs_you' || goesOn(s)) this.workedAt.set(s.id, now)
     // Most session messages (activity, text) change nothing here: the timer is woken only for those that may.
     let news = false
     // Sessions a usage limit stopped, for "Carry on after the limit" once it's reset.
@@ -2825,11 +2827,11 @@ export class Automations {
       followed = true
       const seen = (r.f.seen[s.id] ??= { worked: false, idleAt: null, since: now, finished: false })
       // What it was doing before it ended, if it does: an end mid-turn isn't a finish.
-      if (s.state !== 'ended') seen.last = s.state === 'idle' && s.agentsRunning > 0 ? 'working' : s.state
+      if (s.state !== 'ended') seen.last = s.state === 'idle' && goesOn(s) ? 'working' : s.state
       // Since when it has waited on a menu with no approval behind it (sessionStatus gives it 10 minutes).
       if ((s.menu || s.state === 'needs_you') && !s.pendingApprovalIds.length && !s.blocked) seen.needsAt ??= now
       else seen.needsAt = null
-      if (s.state === 'working' || s.state === 'needs_you' || s.agentsRunning > 0) {
+      if (s.state === 'working' || s.state === 'needs_you' || goesOn(s)) {
         seen.worked = true
         seen.idleAt = null
       } else if (s.state === 'idle' && seen.idleAt == null) seen.idleAt = now
@@ -3041,7 +3043,7 @@ export class Automations {
       if (now - at < SETTLE_MS) continue
       this.finishing.delete(sid)
       const s = this.io.session(sid)
-      if (s && s.state === 'idle' && s.agentsRunning === 0 && !s.queued && !s.pendingApprovalIds.length && !s.blocked) this.events.push({ event: 'finished', sessionId: sid, ask: null, at: now, key: '' })
+      if (s && s.state === 'idle' && !goesOn(s) && !s.queued && !s.pendingApprovalIds.length && !s.blocked) this.events.push({ event: 'finished', sessionId: sid, ask: null, at: now, key: '' })
     }
     for (const [id, at] of [...this.agentAsks]) {
       if (now < at) continue

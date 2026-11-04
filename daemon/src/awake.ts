@@ -773,10 +773,10 @@ export class AwakeKeeper {
 
 // ── The daemon's keeper ───────────────────────────────────────────────────
 
-/** Sessions or their agents at work: starting, working, waiting on an answer mid-turn, or agents running. */
-function sessionsWorking(): boolean {
+/** Sessions or their agents at work: starting, working, waiting on an answer mid-turn, agents or a Monitor running. */
+export function sessionsWorking(): boolean {
   for (const r of listSessionRecs()) {
-    if (r.state === 'starting' || r.state === 'working' || r.state === 'needs_you' || r.agentsRunning > 0) return true
+    if (r.state === 'starting' || r.state === 'working' || r.state === 'needs_you' || r.agentsRunning > 0 || (r.monitorsRunning ?? 0) > 0) return true
   }
   return false
 }
