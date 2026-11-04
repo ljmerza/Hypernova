@@ -68,10 +68,10 @@ enum class RestartKind {
         }
 
         /**
-         * Whether it asks first: a turn at work, agents running or an approval waiting would stop, and
+         * Whether it asks first: a turn at work, agents or a Monitor running or an approval waiting would stop, and
          * a terminal open on it on the server would close. At rest and unwatched it just goes.
          */
-        fun asksFirst(s: Session): Boolean = s.state != SessionState.Idle || s.agentsRunning > 0 || (s.term?.mac ?: 0) > 0
+        fun asksFirst(s: Session): Boolean = s.state != SessionState.Idle || s.goesOn || (s.term?.mac ?: 0) > 0
     }
 }
 

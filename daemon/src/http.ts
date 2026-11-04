@@ -998,7 +998,7 @@ async function api(c: Ctx): Promise<void> {
     // Off Home, for a session that is no job: one at rest, whatever made it. Its shared terminal closes
     // first; a terminal Hypernova doesn't hold can't be closed from here, so the owner hears why.
     if (!job && !action) {
-      if (!['idle', 'ended', 'error'].includes(rec.state) || backgroundRunning(id!)) throw new HttpError(409, 'at_work', 'It’s still at work. Remove it once it has finished.')
+      if (!['idle', 'ended', 'error'].includes(rec.state) || backgroundRunning(id!) || (rec.monitorsRunning ?? 0) > 0) throw new HttpError(409, 'at_work', 'It’s still at work. Remove it once it has finished.')
       const pid = rec.pid
       const tid = termOf(id!)
       if (tid) {

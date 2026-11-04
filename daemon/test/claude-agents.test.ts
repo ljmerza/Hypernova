@@ -1375,6 +1375,14 @@ test('Delete: refused with the reason for a terminal Hypernova doesn’t hold an
   assert.equal(working.status, 409)
   assert.equal(working.json.error.code, 'at_work')
   assert.ok(hub.getSession('delete-open-1'))
+  // A Monitor running with its main agent at rest: at work too. A plain shell isn't.
+  writeFileSync(entry, JSON.stringify({ pid: p.pid, sessionId: 'delete-open-1', cwd: scratch, kind: 'interactive', status: 'idle', startedAt: Date.now(), updatedAt: Date.now() }))
+  hub.pollRegistry()
+  hub.upsertSession('delete-open-1', { shellsRunning: 1, monitorsRunning: 1 })
+  assert.equal((await del('/v1/sessions/delete-open-1')).json.error.code, 'at_work')
+  hub.upsertSession('delete-open-1', { monitorsRunning: undefined })
+  assert.equal((await del('/v1/sessions/delete-open-1')).json.error.code, 'terminal_open')
+  assert.ok(hub.getSession('delete-open-1'))
   rmSync(entry)
   // Stop and Restart stay a job's own.
   hub.upsertSession('delete-plain-2', { cwd: scratch, origin: 'terminal' })

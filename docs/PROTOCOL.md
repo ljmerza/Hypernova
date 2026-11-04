@@ -584,11 +584,15 @@ Session = {
                               // (see Held prompts); text whole, files apart; absent when none
   term: {id, mac: number, phone: number} | null,  // its shared terminal; mac, phone: how many have it open on the
                               // server (`hn`) and on phones
-  shellsRunning?: number,     // background commands it has running now (see Background commands); absent while
-                              // none, and from an older server. Part of no working rule
+  shellsRunning?: number,     // background commands it has running now, Monitors among them (see Background
+                              // commands); absent while none, and from an older server
+  monitorsRunning?: number,   // how many of those are Monitors holding it in Working (see Background commands);
+                              // absent while none, and from an older server. A list's mark for plain shells is
+                              // shellsRunning - monitorsRunning
   agentsRunning: number,      // agents its main agent started that run now (see Agents and workflows); with
-                              // state, the working rule: working = state working/starting or agentsRunning > 0,
-                              // needs_you outranks it (the Android app's Session.busy; one rule in every client)
+                              // state, the working rule: working = state working/starting, agentsRunning > 0 or
+                              // monitorsRunning > 0, needs_you outranks it (the Android app's Session.busy; one
+                              // rule in every client)
   blocked: null | {           // why Claude can't reply here now (see Account); a real reply clears it
     kind: "limit" | "model" | "no_credit" | "logged_out" | "no_subscription" | "on_hold" | "provider" | "signed_in",
                                   // signed_in: the login that stopped it is back and it waits for Continue
@@ -4798,10 +4802,11 @@ main-agent tool call, or a task notification starting one).
 
 The same in every client (in the Android app `Session.busy`, behind its Home seam, card and
 notification, and the widget): a session that hasn't ended is *working* when `state` is `working` or
-`starting`, or `agentsRunning > 0`; `needs_you` (an approval open, or a dialog in its terminal)
-outranks working. So a session whose main agent is idle while 2 agents run is working ("2 AGENTS"),
-not idle, and counts once among the working. A client doesn't notify "Finished" for a turn that ends
-while agents still run; the turn the last agent's report starts does.
+`starting`, or `agentsRunning > 0` or `monitorsRunning > 0`; `needs_you` (an approval open, or a dialog
+in its terminal) outranks working. So a session whose main agent is idle while 2 agents run is working
+("2 AGENTS"), not idle, and counts once among the working. A client doesn't notify "Finished" for a
+turn that ends while agents or a Monitor still run; the turn the last agent's report or the Monitor's
+last word starts does. A plain background shell is no part of this (Background commands).
 
 #### Approvals from an agent
 
@@ -4886,8 +4891,30 @@ optional here.
   resumed transcript brings no old "running" back. A command this very process started goes back to
   `running` if the process turns up again after one read of the registry missed it.
 - A daemon restart reads it all again from the transcripts, in order. Commands aren't logged.
-- `shellsRunning` counts neither agents nor busyness: it changes no session's state, keeps nothing
-  awake, and a turn isn't "working" because of it.
+- `shellsRunning` counts every one running, Monitors too, so an older client reads as it did. Plain
+  shells change no session's state, keep nothing awake, and a turn isn't "working" because of them: such
+  a session stays in Completed, and a list says "1 shell" on its row.
+
+**Monitors hold a session in Working** (`monitorsRunning`, part of `shellsRunning`; the working rule in
+Agents and workflows). The owner, 2026-11-03: "option one plus [Monitors] and working". A Monitor is
+told apart from a shell by its call's result, as Stop's list gives it as a shell. One only a list has
+named reads as a shell until that result is read.
+
+- **Measured, on Claude Code 2.1.318:** with a Monitor running and its main agent at rest, the registry
+  says `status: "shell"`, not `busy`, so `state` stays `idle`: only `monitorsRunning` says it's at work,
+  and an older client sees what it saw before. Each event, and running out of time, starts a turn; the
+  list at that turn's Stop no longer names one that has ended (`monitors-e2e.test.ts`).
+- **What ends the hold:** as any background command: its stream's notification, `TaskStop`, a Stop's list
+  no longer naming it, past its `timeoutMs` (plus 5 s), its session ending or its process going (then
+  `unknown`), a process newer than it. A restart reads the same from the transcript.
+- **A persistent one, or one stating no time,** holds for 12 hours at most from its start, the waiting
+  agents' cap. Past that it may still run: it stays in `shellsRunning` and leaves `monitorsRunning`, so
+  the session goes to Completed with "1 shell", and its row in the sheet still says Monitor, running.
+- **What it holds, as agents do:** Stay awake, the Finished notification, an automation's "finished" and
+  a run's following (`goesOn`, engine.ts), Remove from list (409 `at_work`), and a restart's or a rewind's
+  asking first. **What it doesn't:** the usage spend rate and the probe (`anythingWorking`, as a Monitor
+  spends nothing until it wakes Claude), `backgroundRunning` (the main agent's state: a Monitor doesn't
+  keep Claude Code `busy`), an automation's Esc or its stop at a budget (Esc doesn't stop a Monitor).
 
 **Not known, and said so:** a command the session lost touch with is `unknown` for good, unless a later
 list names it or a notification ends it. An orphan that finishes writes nothing, so the daemon can't
@@ -7653,7 +7680,7 @@ Clients never say the Mac will sleep while `sleepDisabledBy` is `"other"`: "Hype
 but Amphetamine is still keeping your Mac awake" (`otherApp`, or "another app").
 
 - **While working** (the default) holds a sleep assertion while a session is starting, working or
-  waiting on an answer mid-turn, its agents run, an automation asks for it (`keepAwake(key, on)` in
+  waiting on an answer mid-turn, its agents or a Monitor run, an automation asks for it (`keepAwake(key, on)` in
   awake.ts), or a phone is on `/v1/ws` (the admin-token feed doesn't count), and for 3 minutes after
   the last of those: macOS sleeps the moment an assertion goes if the Mac has been idle long enough,
   so a socket blinking during a network change would put it to sleep at once.

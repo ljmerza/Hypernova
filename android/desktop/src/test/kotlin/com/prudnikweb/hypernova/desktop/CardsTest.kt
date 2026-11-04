@@ -127,6 +127,22 @@ class CardsTest {
         assertEquals(listOf("A", "b"), g[0].second.map { it.name })
     }
 
+    @Test fun aPlainShellStaysCompletedWithAMarkAndAMonitorIsWorkingWithout() {
+        val shell = session(SessionState.Idle).copy(shellsRunning = 2)
+        assertEquals(Group.Completed, groupOf(shell))
+        assertEquals("2 shells", shellMark(shell))
+        assertEquals("1 shell", shellMark(session(SessionState.Idle).copy(shellsRunning = 1)))
+        assertEquals(null, shellMark(session(SessionState.Idle)))
+        val monitor = session(SessionState.Idle).copy(shellsRunning = 1, monitorsRunning = 1)
+        assertEquals(Group.Working, groupOf(monitor))
+        assertEquals(null, shellMark(monitor))
+        val both = session(SessionState.Idle).copy(shellsRunning = 2, monitorsRunning = 1)
+        assertEquals(Group.Working, groupOf(both))
+        assertEquals("1 shell", shellMark(both))
+        // An ended session runs nothing as far as anyone can say.
+        assertEquals(null, shellMark(session(SessionState.Idle, phase = Phase.Ended).copy(shellsRunning = 1)))
+    }
+
     @Test fun aWorkingCardSaysItsTodoElseItsActivity() {
         assertEquals("Bash: npm test", doingLine(session(SessionState.Working, activity = "Bash: npm test")))
         assertEquals("Running the tests 3/7", doingLine(session(SessionState.Working, activity = "x", todo = TodoNow("Running the tests", 3, 7))))

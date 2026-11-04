@@ -197,6 +197,27 @@ class StatusModelTest {
         assertFalse(alone.canStop)
     }
 
+    @Test fun aMonitorAloneSaysItWaitsNotThatClaudeThinks() {
+        val alone = statusBar(BarInput(Phase.Idle, SessionState.Idle, "Thinking", monitorsRunning = 2))!!
+        assertEquals(Say(SayKind.WaitingMonitors, n = 2), alone.say)
+        assertEquals(BarTone.Working, alone.tone)
+        // Nothing of the main agent to stop, and no agents to list.
+        assertFalse(alone.canStop)
+        assertFalse(alone.hasAgents)
+    }
+
+    @Test fun aMonitorGivesWayToWhatMattersMore() {
+        // Claude at work on what it heard: what it's doing.
+        assertEquals(SayKind.Thinking, statusBar(working("Thinking").copy(monitorsRunning = 1))!!.say.kind)
+        // Its agents too: as agents alone say it.
+        assertEquals(SayKind.MainAndAgents, statusBar(BarInput(Phase.Idle, SessionState.Idle, "", agentsRunning = 1, monitorsRunning = 1))!!.say.kind)
+        // Waiting on the owner and nothing else going on: no bar, as before.
+        assertEquals(null, statusBar(BarInput(Phase.NeedsYou, SessionState.NeedsYou, "", monitorsRunning = 1)))
+        assertEquals(null, statusBar(BarInput(Phase.Ended, SessionState.Idle, "", monitorsRunning = 1)))
+        // A plain shell, or an older server: no bar.
+        assertEquals(null, statusBar(BarInput(Phase.Idle, SessionState.Idle, "")))
+    }
+
     @Test fun anAgentsWaitingLineIsSaidAsItIs() {
         // No colon, so it never reads as a tool's name: an older app shows the daemon's words too.
         for (line in listOf("Waiting for its background command", "Waiting for its 2 background commands", "Waiting for the agents it started", "Waiting for its background work")) {

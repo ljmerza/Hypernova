@@ -458,5 +458,6 @@ enum class Plural {
     run_calls_done,
     run_calls_now,
     servers_elsewhere,
+    status_waiting_monitors,
     turns,
 }

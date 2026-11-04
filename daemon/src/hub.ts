@@ -89,6 +89,8 @@ export type Session = {
   agentsRunning: number
   /** How many background commands it has running now, as Claude Code's status line counts them (agents.ts); absent while none. */
   shellsRunning?: number
+  /** How many of those are Monitors holding it in Working (agents.ts, holdsWorking); absent while none. */
+  monitorsRunning?: number
   /** Why Claude can't reply here now (a usage limit, signed out…): set when an API error stopped it, cleared by a real reply. */
   blocked: Blocked | null
   /**

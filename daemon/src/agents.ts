@@ -200,8 +200,9 @@ type Board = {
   shells: Map<string, ShellRec>
   /** Notifications about shells not read of yet (an agent's start is in its own file, read later). */
   shellEnds: Map<string, { end: TaskEnd; ts: number }>
-  /** How many shells run now, as last published. */
+  /** How many shells run now, as last published, and how many of those are Monitors holding the session in Working. */
   shellsRunning: number
+  monitorsRunning: number
   /** When the session's current process started (Claude Code's registry), 0 until known. */
   processAt: number
 }
@@ -257,7 +258,7 @@ const numOr = (v: unknown, d: number | null): number | null => (typeof v === 'nu
 function board(id: string): Board {
   let b = boards.get(id)
   if (!b) {
-    b = { id, agents: new Map(), workflows: new Map(), tasks: new Map(), seen: new Map(), metas: new Set(), snapshots: new Map(), dirty: new Set(), sentAt: 0, timer: null, running: 0, listed: false, launched: new Set(), failedCalls: new Set(), shells: new Map(), shellEnds: new Map(), shellsRunning: 0, processAt: 0 }
+    b = { id, agents: new Map(), workflows: new Map(), tasks: new Map(), seen: new Map(), metas: new Set(), snapshots: new Map(), dirty: new Set(), sentAt: 0, timer: null, running: 0, listed: false, launched: new Set(), failedCalls: new Set(), shells: new Map(), shellEnds: new Map(), shellsRunning: 0, monitorsRunning: 0, processAt: 0 }
     boards.set(id, b)
   }
   return b
@@ -865,15 +866,31 @@ const shellView = (s: ShellRec): Shell => ({
   status: s.status, startedAt: s.startedAt, endedAt: s.endedAt, exitCode: s.exitCode,
 })
 
+/**
+ * A running Monitor holds its session in Working: one with a stated time until [settleShells] ends it
+ * at that time; a persistent one, or one that states none, for [WAIT_MAX] from its start, as a waiting
+ * agent's cap has it. After that it may still run, so it stays counted, as a plain shell.
+ */
+const holdsWorking = (s: ShellRec, now: number) => s.kind === 'monitor' && ((s.until > 0 && Number.isFinite(s.until)) || now < s.startedAt + WAIT_MAX)
+
 function publishShells(b: Board): void {
   const r = getSession(b.id)
+  const now = Date.now()
   let n = 0
+  let m = 0
   // A session read from history counts none, whatever its last lines left going.
-  if (r && r.state !== 'ended') for (const s of b.shells.values()) if (s.status === 'running') n++
-  if (n === b.shellsRunning) return
+  if (r && r.state !== 'ended') {
+    for (const s of b.shells.values()) {
+      if (s.status !== 'running') continue
+      n++
+      if (holdsWorking(s, now)) m++
+    }
+  }
+  if (n === b.shellsRunning && m === b.monitorsRunning) return
   b.shellsRunning = n
+  b.monitorsRunning = m
   // Absent while none: most sessions never have one.
-  if (r) upsertSession(b.id, { shellsRunning: n || undefined })
+  if (r) upsertSession(b.id, { shellsRunning: n || undefined, monitorsRunning: m || undefined })
 }
 
 /** How many background commands of a session run now. */

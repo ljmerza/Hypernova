@@ -4,6 +4,7 @@ import com.prudnikweb.hypernova.data.AttachDrafts
 import com.prudnikweb.hypernova.data.DraftFile
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Notice
+import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.ReadState
 import com.prudnikweb.hypernova.data.Resolution
 import com.prudnikweb.hypernova.data.SendStatus
@@ -291,6 +292,32 @@ class SocketEventsTest {
         assertEquals("s1", n.sessionId)
         assertEquals("Docs", n.title)
         assertEquals("All done.", n.text)
+    }
+
+    @Test fun aTurnThatLeavesAMonitorRunningHasNotFinishedAndItsCardSaysWhatItWaitsOn() {
+        connectWith(session("s1", state = "working"))
+        rig.push(msg("session") { put("session", session("s1", state = "idle", lastActivityAt = 8_000) { put("lastText", "Started the watch."); put("shellsRunning", 1); put("monitorsRunning", 1) }) }) { rig.hub.session("s1")!!.state == SessionState.Idle }
+        rig.advance(1_600)
+        assertTrue(rig.banners.none { it.kind == Notice.Kind.Finished })
+        val s = rig.hub.session("s1")!!
+        assertTrue(s.busy)
+        assertEquals(XmlStrings.quantityText(Plural.status_waiting_monitors, 1), s.activity)
+        // Its stream ended: a turn on what it said, and that turn's end is the finish.
+        rig.push(msg("session") { put("session", session("s1", state = "working", lastActivityAt = 9_000)) }) { rig.hub.session("s1")!!.state == SessionState.Working }
+        rig.push(msg("session") { put("session", session("s1", state = "idle", lastActivityAt = 10_000) { put("lastText", "It passed.") }) }) { rig.hub.session("s1")!!.state == SessionState.Idle }
+        rig.advance(1_600)
+        assertEquals("It passed.", rig.banners.single { it.kind == Notice.Kind.Finished }.text)
+        assertEquals("It passed.", rig.hub.session("s1")!!.activity)
+    }
+
+    @Test fun aPlainShellLeftRunningDoesNotHoldBackFinishedOrChangeItsLastWords() {
+        connectWith(session("s1", state = "working"))
+        rig.push(msg("session") { put("session", session("s1", state = "idle", lastActivityAt = 8_000) { put("lastText", "Dev server is up."); put("shellsRunning", 1) }) }) { rig.hub.session("s1")!!.state == SessionState.Idle }
+        rig.advance(1_600)
+        assertEquals("Dev server is up.", rig.banners.single { it.kind == Notice.Kind.Finished }.text)
+        val s = rig.hub.session("s1")!!
+        assertEquals("Dev server is up.", s.activity)
+        assertEquals(1, s.plainShells)
     }
 
     @Test fun aTurnThatCarriesOnWithinTheMomentSaysNothing() {

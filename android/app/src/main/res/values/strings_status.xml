@@ -70,6 +70,11 @@
     <!-- The main agent's own row: its name as Claude Code's footer has it, and what it does while it waits. -->
     <string name="status_main">main</string>
     <string name="status_main_waiting">Waiting for its agents</string>
+    <!-- At rest while a Monitor it started watches for it: the status bar's line, and a card's. -->
+    <plurals name="status_waiting_monitors">
+        <item quantity="one">Waiting for its Monitor</item>
+        <item quantity="other">Waiting for its %1$d Monitors</item>
+    </plurals>
     <string name="status_expand_main">Show the main agent and its agents</string>
     <string name="status_fold_main">Fold the agents</string>
     <!-- Tokens as Claude Code's footer writes them: "↓ 181.1k" folded, "↓ 81.2k tokens" on an agent's row. -->

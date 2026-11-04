@@ -143,7 +143,7 @@ private fun RestartConfirm(hub: Hub, s: Session, onDismiss: () -> Unit) {
         RestartKind.asksFirst(s) -> ConfirmDialog(
             visible = true,
             title = stringResource(R.string.session_restart_q, s.name),
-            body = stringResource(if (s.state != SessionState.Idle || s.agentsRunning > 0) R.string.session_restart_body_work else R.string.session_restart_body_watched),
+            body = stringResource(if (s.state != SessionState.Idle || s.goesOn) R.string.session_restart_body_work else R.string.session_restart_body_watched),
             confirm = stringResource(R.string.session_restart),
             onConfirm = go,
             onDismiss = onDismiss,
