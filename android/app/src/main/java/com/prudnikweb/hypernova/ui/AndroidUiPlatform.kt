@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui
 
+import kotlinx.coroutines.CoroutineScope
+
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.ui.changes.ChangesDialog
@@ -140,6 +142,8 @@ private class ContextCopier(private val context: Context) : Copier {
     }
 
     // Android 13 and newer show their own "copied" preview.
+    override val saysCopied: Boolean = Build.VERSION.SDK_INT >= 33
+
     override fun sayCopied(words: String) {
         if (Build.VERSION.SDK_INT < 33) Toast.makeText(context, words, Toast.LENGTH_SHORT).show()
     }
@@ -273,6 +277,9 @@ private object PhoneImages : UiImages {
 private object PhoneReading : UiReading {
     override val canRead: Boolean = true
     override val now: String? get() = ReadAloud.reading
+
+    override fun toggle(hub: Hub, key: String, text: String, scope: CoroutineScope, toast: (String) -> Unit, sessionId: String?) =
+        ReadAloud.toggle(hub, key, text, scope, toast, sessionId)
 
     @Composable
     override fun Mark(modifier: Modifier) = SpeakingMark(modifier)

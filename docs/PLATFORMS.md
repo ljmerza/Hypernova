@@ -211,7 +211,9 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 
 | Phone | Desktop | |
 |---|---|---|
-| Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Partly | The transcript, the box, the queue and the offline queue are there, the phone's own drawing (`:sharedui`). No rewind, message menu, attachments or quick prompts: "The shared drawing" lists what isn't |
+| Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Partly | The transcript, the box, the queue and the offline queue are there, the phone's own drawing (`:sharedui`). No quick prompts: "The shared drawing" lists what isn't |
+| A message's menu: Copy, Quote, Rewind, its exact time, a waiting prompt's Edit and Remove | There | The phone's own (`MessageMenu.kt`, `WaitingMenu.kt`), on the other mouse button. No Select page: a mouse selects the words where they are |
+| Read aloud from a message | Not yet | LATER L131: it needs a player and a voice |
 | Live terminal | Not yet | Not begun |
 | The top bar (usage strip): the context ring, mode, effort, the plan's windows and any of the items Settings chooses, Compact past 85%, the blocked mark | There | The phone's own (`ui.session.UsageStrip.kt`, `TopBar.kt`), between the card and the chat. Settings has the phone's row for what it shows (`ui.settings.TopBarSection.kt`), kept on this computer |
 | The status bar and its details: what it's doing, to-dos, the agents, the whole command, the turn's time and tokens, Stop | There | The phone's own (`ui.session.StatusBar.kt`), over the box. An agent's row says its screen is on the phone. Opened, it keeps to 45% of the pane |

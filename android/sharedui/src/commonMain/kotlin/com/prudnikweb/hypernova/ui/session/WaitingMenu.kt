@@ -1,8 +1,10 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
-import android.content.ClipData
-import android.content.ClipboardManager
+import com.prudnikweb.hypernova.ui.platform.rememberCopier
+import com.prudnikweb.hypernova.ui.platform.wordsNow
+
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,12 +17,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.SendStatus
@@ -45,26 +45,27 @@ import kotlinx.coroutines.launch
 internal fun WaitingMenu(hub: Hub, item: Item.User, onDismiss: () -> Unit, sessionId: String? = null) {
     val heldIn = sessionId?.takeIf { item.heldId != null }
     val id = item.waitingId ?: item.heldId?.takeIf { heldIn != null } ?: return onDismiss()
-    val context = LocalContext.current
+    val res = wordsNow()
+    val copier = rememberCopier()
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val opener = LocalOpener.current
     var editing by rememberSaveable(id) { mutableStateOf(false) }
     if (editing) {
         var value by rememberSaveable(id) { mutableStateOf(item.text) }
-        ChatSheet(stringResource(R.string.waiting_edit), onDismiss) {
+        ChatSheet(stringResource(Str.waiting_edit), onDismiss) {
             Field(
                 value, { value = it },
                 singleLine = false, maxLines = 6, commands = true,
                 keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                label = stringResource(R.string.waiting_edit),
+                label = stringResource(Str.waiting_edit),
             )
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
-                Pill(stringResource(R.string.cancel), onDismiss, kind = PillKind.Ghost, height = 44.dp)
+                Pill(stringResource(Str.cancel), onDismiss, kind = PillKind.Ghost, height = 44.dp)
                 Pill(
-                    stringResource(R.string.waiting_save),
+                    stringResource(Str.waiting_save),
                     {
                         if (heldIn != null) appScope.launch { hub.editHeld(heldIn, id, value.trim()).onFailure { toast(it.message.orEmpty()) } }
                         else hub.editWaiting(id, value)
@@ -77,24 +78,24 @@ internal fun WaitingMenu(hub: Hub, item: Item.User, onDismiss: () -> Unit, sessi
         }
         return
     }
-    ChatSheet(stringResource(R.string.chat_menu_title), onDismiss) {
-        HText(stringResource(R.string.you).uppercase(), style = Type.label, color = HN.inkDim)
+    ChatSheet(stringResource(Str.chat_menu_title), onDismiss) {
+        HText(stringResource(Str.you).uppercase(), style = Type.label, color = HN.inkDim)
         Spacer(Modifier.height(6.dp))
         HText(item.text, style = Type.small, color = HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(12.dp))
         if (item.status == SendStatus.SessionGone) {
-            SheetAction(ChatGlyph.NewSession, stringResource(R.string.waiting_start_new), {
+            SheetAction(ChatGlyph.NewSession, stringResource(Str.waiting_start_new), {
                 onDismiss()
                 appScope.launch { hub.startFromWaiting(id).onSuccess { opener.switchSession(it) }.onFailure { toast(it.message.orEmpty()) } }
             })
         }
-        SheetAction(ChatGlyph.Edit, stringResource(R.string.waiting_edit), { editing = true })
-        SheetAction(ChatGlyph.Copy, stringResource(R.string.chat_copy), {
-            context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.chat_copy), item.text))
-            if (android.os.Build.VERSION.SDK_INT < 33) toast(context.getString(R.string.chat_copied))
+        SheetAction(ChatGlyph.Edit, stringResource(Str.waiting_edit), { editing = true })
+        SheetAction(ChatGlyph.Copy, stringResource(Str.chat_copy), {
+            copier.copy(res.getString(Str.chat_copy), item.text)
+            if (!copier.saysCopied) toast(res.getString(Str.chat_copied))
             onDismiss()
         })
-        SheetAction(ChatGlyph.Remove, stringResource(R.string.waiting_remove), {
+        SheetAction(ChatGlyph.Remove, stringResource(Str.waiting_remove), {
             if (heldIn != null) appScope.launch { hub.removeHeld(heldIn, id).onFailure { toast(it.message.orEmpty()) } }
             else hub.removeWaiting(id)
             onDismiss()

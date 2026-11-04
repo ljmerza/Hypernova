@@ -1,11 +1,15 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+import com.prudnikweb.hypernova.ui.platform.rememberCopier
+import com.prudnikweb.hypernova.ui.platform.wordsNow
+
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.ui.chat.MessageTimeLine
 import com.prudnikweb.hypernova.data.Rewound
 import com.prudnikweb.hypernova.data.ChatRepo
-import android.content.ClipData
-import android.content.ClipboardManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,12 +22,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.ui.LocalAppScope
@@ -61,7 +63,9 @@ internal fun MessageMenu(
     /** The session it's in: what the Mac's speaking wave and this phone's status line show it on. */
     sessionId: String? = null,
 ) {
-    val context = LocalContext.current
+    val res = wordsNow()
+    val copier = rememberCopier()
+    val reading = SharedUi.platform.reading
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     if (item is Item.User && (item.waiting || item.held)) return WaitingMenu(hub, item, onDismiss, sessionId)
@@ -69,41 +73,44 @@ internal fun MessageMenu(
     val mine = item is Item.User
     var page by remember(item.key) { mutableStateOf(Page.Actions) }
     when (page) {
-        Page.Actions -> ChatSheet(stringResource(R.string.chat_menu_title), onDismiss) {
+        Page.Actions -> ChatSheet(stringResource(Str.chat_menu_title), onDismiss) {
             // When it was said, first; nothing for one with no real time (ChatTimeLabel.kt).
             sessionId?.let { hub.chatTimes(it).at(item.key) }?.let { MessageTimeLine(it) }
             val codex = sessionId?.let { hub.session(it)?.codex } == true
-            HText(stringResource(if (mine) R.string.you else if (codex) R.string.cx_agent_codex else R.string.claude).uppercase(), style = Type.label, color = if (mine) HN.inkDim else HN.accentDim)
+            HText(stringResource(if (mine) Str.you else if (codex) Str.cx_agent_codex else Str.claude).uppercase(), style = Type.label, color = if (mine) HN.inkDim else HN.accentDim)
             Spacer(Modifier.height(6.dp))
             // Claude's reply as words, not its markdown.
             HText(if (mine) text else spokenText(text).ifBlank { text }, style = Type.small, color = HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(12.dp))
-            SheetAction(ChatGlyph.Copy, stringResource(R.string.chat_copy), {
-                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.chat_copy), text))
-                // Android 13+ shows its own confirmation.
-                if (android.os.Build.VERSION.SDK_INT < 33) toast(context.getString(R.string.chat_copied))
+            SheetAction(ChatGlyph.Copy, stringResource(Str.chat_copy), {
+                copier.copy(res.getString(Str.chat_copy), text)
+                // Where the system doesn't show its own confirmation.
+                if (!copier.saysCopied) toast(res.getString(Str.chat_copied))
                 onDismiss()
             })
-            SheetAction(ChatGlyph.Quote, stringResource(R.string.chat_quote), { onQuote(quoted(text)); onDismiss() })
-            val reading = ReadAloud.reading == item.key
-            SheetAction(
-                if (reading) ChatGlyph.Stop else ChatGlyph.Speaker,
-                stringResource(if (reading) R.string.chat_read_stop else R.string.chat_read),
-                { ReadAloud.toggle(hub, item.key, text, appScope, toast, sessionId); onDismiss() },
-                hint = if (reading) null else stringResource(R.string.chat_read_hint),
-            )
-            SheetAction(ChatGlyph.Select, stringResource(R.string.chat_select), { page = Page.Select })
-            if (rewind != null) SheetAction(ChatGlyph.Rewind, stringResource(R.string.chat_rewind), { page = Page.Rewind })
+            SheetAction(ChatGlyph.Quote, stringResource(Str.chat_quote), { onQuote(quoted(text)); onDismiss() })
+            if (reading.canRead) {
+                val readingThis = reading.now == item.key
+                SheetAction(
+                    if (readingThis) ChatGlyph.Stop else ChatGlyph.Speaker,
+                    stringResource(if (readingThis) Str.chat_read_stop else Str.chat_read),
+                    { reading.toggle(hub, item.key, text, appScope, toast, sessionId); onDismiss() },
+                    hint = if (readingThis) null else stringResource(Str.chat_read_hint),
+                )
+            }
+            // Where the menu took the press that would have selected; a mouse selects the words where they are.
+            if (SharedUi.platform.input.menuTakesThePress) SheetAction(ChatGlyph.Select, stringResource(Str.chat_select), { page = Page.Select })
+            if (rewind != null) SheetAction(ChatGlyph.Rewind, stringResource(Str.chat_rewind), { page = Page.Rewind })
         }
-        Page.Select -> ChatSheet(stringResource(R.string.chat_select), onDismiss) {
-            HText(stringResource(R.string.chat_select_hint), style = Type.small, color = HN.inkDim)
+        Page.Select -> ChatSheet(stringResource(Str.chat_select), onDismiss) {
+            HText(stringResource(Str.chat_select_hint), style = Type.small, color = HN.inkDim)
             Spacer(Modifier.height(12.dp))
             SelectionContainer {
                 if (mine) HText(text, style = Type.body, color = HN.ink) else Markdown(text, color = HN.ink)
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Pill(stringResource(R.string.chat_close), onDismiss, kind = PillKind.Ghost, height = 44.dp)
+                Pill(stringResource(Str.chat_close), onDismiss, kind = PillKind.Ghost, height = 44.dp)
             }
         }
         Page.Rewind -> RewindConfirm(item, rewind ?: return onDismiss(), onRewound, onDismiss)
@@ -135,30 +142,30 @@ private fun RewindConfirm(item: Item, ask: RewindAsk, onRewound: (Rewound) -> Un
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     var busy by remember { mutableStateOf(false) }
-    ChatSheet(stringResource(R.string.chat_rewind_title), { if (!busy) onDismiss() }) {
-        HText(stringResource(R.string.chat_rewind_title), style = Type.title, color = HN.ink)
+    ChatSheet(stringResource(Str.chat_rewind_title), { if (!busy) onDismiss() }) {
+        HText(stringResource(Str.chat_rewind_title), style = Type.title, color = HN.ink)
         Spacer(Modifier.height(10.dp))
         when (ask.running) {
             RewindRunning.No -> null
-            RewindRunning.Working -> R.string.chat_rewind_working
-            RewindRunning.Waiting -> R.string.chat_rewind_waiting
+            RewindRunning.Working -> Str.chat_rewind_working
+            RewindRunning.Waiting -> Str.chat_rewind_waiting
         }?.takeUnless { ask.stays }?.let {
             HText(stringResource(it), style = Type.body, color = HN.amber)
             Spacer(Modifier.height(10.dp))
         }
-        val yours = pluralStringResource(R.plurals.chat_rewind_yours, ask.yours, ask.yours)
-        val lost = if (ask.replies > 0) stringResource(R.string.chat_rewind_both, yours, pluralStringResource(R.plurals.chat_rewind_replies, ask.replies, ask.replies)) else yours
-        HText(stringResource(R.string.chat_rewind_body, lost), style = Type.body, color = HN.inkMuted)
+        val yours = pluralStringResource(Plural.chat_rewind_yours, ask.yours, ask.yours)
+        val lost = if (ask.replies > 0) stringResource(Str.chat_rewind_both, yours, pluralStringResource(Plural.chat_rewind_replies, ask.replies, ask.replies)) else yours
+        HText(stringResource(Str.chat_rewind_body, lost), style = Type.body, color = HN.inkMuted)
         Spacer(Modifier.height(10.dp))
-        HText(stringResource(R.string.chat_rewind_files), style = Type.small, color = HN.amber)
+        HText(stringResource(Str.chat_rewind_files), style = Type.small, color = HN.amber)
         if (ask.stays || ask.terminalCloses) {
             Spacer(Modifier.height(6.dp))
-            HText(stringResource(if (ask.stays) R.string.chat_rewind_stays else R.string.chat_rewind_closes), style = Type.small, color = HN.inkDim)
+            HText(stringResource(if (ask.stays) Str.chat_rewind_stays else Str.chat_rewind_closes), style = Type.small, color = HN.inkDim)
         }
         Spacer(Modifier.height(18.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Pill(stringResource(R.string.cancel), { if (!busy) onDismiss() }, Modifier.weight(1f), kind = PillKind.Ghost, height = 48.dp)
-            Pill(stringResource(if (busy) R.string.chat_rewinding else R.string.chat_rewind_go), {
+            Pill(stringResource(Str.cancel), { if (!busy) onDismiss() }, Modifier.weight(1f), kind = PillKind.Ghost, height = 48.dp)
+            Pill(stringResource(if (busy) Str.chat_rewinding else Str.chat_rewind_go), {
                 if (busy) return@Pill
                 busy = true
                 appScope.launch {

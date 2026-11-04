@@ -66,6 +66,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import org.jetbrains.skia.FilterBlurMode
 import org.jetbrains.skia.MaskFilter
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
@@ -171,6 +172,9 @@ private object AwtCopier : Copier {
     }
 
     override fun sayCopied(words: String) {}
+
+    /** Nothing here shows it. */
+    override val saysCopied: Boolean = false
 }
 
 private object DeskDevice : UiDevice {
@@ -232,7 +236,11 @@ private object DeskInput : UiInput {
         .pointerInput(Unit) {
             awaitEachGesture {
                 val e = awaitPointerEvent(PointerEventPass.Initial)
-                if (e.type == PointerEventType.Press && e.buttons.isSecondaryPressed) open()
+                if (e.type == PointerEventType.Press && e.buttons.isSecondaryPressed) {
+                    // Before a selection's own menu of one word sees it, under this one.
+                    e.changes.forEach { it.consume() }
+                    open()
+                }
             }
         }
         .semantics { onLongClick(label) { open(); true } }
@@ -374,6 +382,8 @@ private object DeskImages : UiImages {
 private object NoReading : UiReading {
     override val canRead: Boolean = false
     override val now: String? = null
+
+    override fun toggle(hub: Hub, key: String, text: String, scope: CoroutineScope, toast: (String) -> Unit, sessionId: String?) {}
 
     @Composable
     override fun Mark(modifier: Modifier) {}

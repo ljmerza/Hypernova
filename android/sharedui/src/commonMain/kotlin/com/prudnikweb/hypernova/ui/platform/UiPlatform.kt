@@ -18,6 +18,7 @@ import com.prudnikweb.hypernova.data.Incident
 import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Strings
+import kotlinx.coroutines.CoroutineScope
 import java.util.Locale
 
 /*
@@ -114,6 +115,8 @@ interface Copier {
     fun copy(label: String, text: String)
     /** [words] where the system doesn't show its own word for it. */
     fun sayCopied(words: String)
+    /** Whether the system shows its own confirmation of a copy. Where it doesn't, the app's toast can. */
+    val saysCopied: Boolean
 }
 
 /** Fingers and a keyboard, or a pointer and a keyboard: what differs in how a thing is pressed, selected and typed in. */
@@ -193,6 +196,8 @@ interface UiReading {
     val canRead: Boolean
     /** The message being read, by its key, or null. */
     val now: String?
+    /** Reads it aloud, or stops if it's the one being read. */
+    fun toggle(hub: Hub, key: String, text: String, scope: CoroutineScope, toast: (String) -> Unit, sessionId: String?)
     /** On the message being read: its wave. */
     @Composable fun Mark(modifier: Modifier)
 }

@@ -221,14 +221,34 @@ val Str.id: Int
         Str.chat_context_said -> R.string.chat_context_said
         Str.chat_context_unknown_said -> R.string.chat_context_unknown_said
         Str.chat_copied -> R.string.chat_copied
+        Str.chat_copy -> R.string.chat_copy
         Str.chat_err_mac -> R.string.chat_err_mac
         Str.chat_err_old_mac -> R.string.chat_err_old_mac
+        Str.chat_menu_title -> R.string.chat_menu_title
         Str.chat_message_actions -> R.string.chat_message_actions
         Str.chat_plan_note -> R.string.chat_plan_note
         Str.chat_quiet_on -> R.string.chat_quiet_on
         Str.chat_quiet_yesterday -> R.string.chat_quiet_yesterday
+        Str.chat_quote -> R.string.chat_quote
+        Str.chat_read -> R.string.chat_read
         Str.chat_read_failed -> R.string.chat_read_failed
+        Str.chat_read_hint -> R.string.chat_read_hint
+        Str.chat_read_stop -> R.string.chat_read_stop
+        Str.chat_rewind -> R.string.chat_rewind
+        Str.chat_rewind_body -> R.string.chat_rewind_body
+        Str.chat_rewind_both -> R.string.chat_rewind_both
+        Str.chat_rewind_closes -> R.string.chat_rewind_closes
+        Str.chat_rewind_files -> R.string.chat_rewind_files
+        Str.chat_rewind_go -> R.string.chat_rewind_go
+        Str.chat_rewind_stays -> R.string.chat_rewind_stays
+        Str.chat_rewind_title -> R.string.chat_rewind_title
+        Str.chat_rewind_waiting -> R.string.chat_rewind_waiting
+        Str.chat_rewind_working -> R.string.chat_rewind_working
+        Str.chat_rewinding -> R.string.chat_rewinding
+        Str.chat_rewound -> R.string.chat_rewound
         Str.chat_rewound_older -> R.string.chat_rewound_older
+        Str.chat_select -> R.string.chat_select
+        Str.chat_select_hint -> R.string.chat_select_hint
         Str.chat_time_at -> R.string.chat_time_at
         Str.chat_time_said -> R.string.chat_time_said
         Str.chat_time_today -> R.string.chat_time_today
@@ -928,12 +948,15 @@ val Str.id: Int
         Str.usage_said_reset -> R.string.usage_said_reset
         Str.usage_said_reset_at -> R.string.usage_said_reset_at
         Str.usage_seven_short -> R.string.usage_seven_short
+        Str.waiting_edit -> R.string.waiting_edit
         Str.waiting_files_gone -> R.string.waiting_files_gone
         Str.waiting_gone_hint -> R.string.waiting_gone_hint
         Str.waiting_gone_label -> R.string.waiting_gone_label
         Str.waiting_mac_hint -> R.string.waiting_mac_hint
         Str.waiting_mac_label -> R.string.waiting_mac_label
         Str.waiting_no_folder -> R.string.waiting_no_folder
+        Str.waiting_remove -> R.string.waiting_remove
+        Str.waiting_save -> R.string.waiting_save
         Str.waiting_start_new -> R.string.waiting_start_new
         Str.wf_ask_notif_default -> R.string.wf_ask_notif_default
         Str.wf_err_answers -> R.string.wf_err_answers
@@ -989,6 +1012,8 @@ val Plural.id: Int
         Plural.changes_files -> R.plurals.changes_files
         Plural.chat_quiet_days -> R.plurals.chat_quiet_days
         Plural.chat_quiet_hours -> R.plurals.chat_quiet_hours
+        Plural.chat_rewind_replies -> R.plurals.chat_rewind_replies
+        Plural.chat_rewind_yours -> R.plurals.chat_rewind_yours
         Plural.lines -> R.plurals.lines
         Plural.more_lines -> R.plurals.more_lines
         Plural.notice_backpack_ends -> R.plurals.notice_backpack_ends

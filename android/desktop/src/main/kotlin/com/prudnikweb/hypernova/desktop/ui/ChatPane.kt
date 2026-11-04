@@ -67,6 +67,7 @@ import com.prudnikweb.hypernova.data.AttachDrafts
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.knownCommands
 import com.prudnikweb.hypernova.data.sendPrompt
+import com.prudnikweb.hypernova.ui.session.ChatMenuHost
 import com.prudnikweb.hypernova.ui.session.FollowChatTail
 import com.prudnikweb.hypernova.ui.session.FollowWithTheList
 import com.prudnikweb.hypernova.ui.session.KeepPlaceOverEarlier
@@ -165,6 +166,8 @@ internal fun ChatList(hub: Hub, s: Session, shell: Shell, following: ChatFollowi
     val showsAsk = { ask: Item.Approval -> ask.kind != ApprovalKind.Tool }
     val model = chatListRows(items, showsAsk = showsAsk)
     val runOpen = remember(sessionId) { mutableStateMapOf<String, Boolean>() }
+    // Which message's menu is open: the other mouse button on it (UiInput.messageMenu).
+    var menuKey by remember(sessionId) { mutableStateOf<String?>(null) }
     val working = chatWorking(hub, s, items)
     val shownAsk = remember(sessionId) { mutableStateOf<String?>(null) }
     val earlierAnchor = remember(sessionId) { mutableStateOf<String?>(null) }
@@ -195,8 +198,9 @@ internal fun ChatList(hub: Hub, s: Session, shell: Shell, following: ChatFollowi
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item(key = "head") { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { head() } }
-            chatRows(hub, sessionId, items, model, working, runOpen, earlierAnchor, known = knownCommands(s.cwd))
+            chatRows(hub, sessionId, items, model, working, runOpen, earlierAnchor, known = knownCommands(s.cwd), onMenu = { menuKey = it.key })
         }
+        ChatMenuHost(hub, s, items, menuKey, onQuote = { q -> ChatDrafts.set(sessionId, q + ChatDrafts.of(sessionId)) }, onDismiss = { menuKey = null })
         // Over the list and beside it, so nothing in the chat moves for it, and no pointer input, so a click goes through.
         val gap = with(androidx.compose.ui.platform.LocalDensity.current) { TIME_LABEL_GAP.roundToPx() }
         ChatTimeLabel(hub, sessionId, opening = 0, list, following = { following.on }, top = { gap }, modifier = Modifier.align(Alignment.TopCenter))
