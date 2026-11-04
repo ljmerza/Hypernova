@@ -109,8 +109,8 @@ export JAVA_HOME=$HOME/Android/jdk-21 ANDROID_HOME=$HOME/Android/sdk PATH=$HOME/
 
 - **Nothing public and no cloud:** no relay, no push service, no Tailscale, no public name service. A phone reaches its server directly over mutual TLS. An iPhone version may use Apple's push one day, and that's the only exception.
 - **Allow only beside the whole command.** A list row or a notification that would cut it off has no Allow.
-- **Bypass, `danger-full-access` and approval `never` stay off the phone's defaults.** Bypass is chosen each time behind the fingerprint. The server refuses them where a default is set.
-- **Running new code needs the fingerprint:** a plugin install, an agent update.
+- **Bypass, `danger-full-access` and approval `never` are never a default.** Bypass is chosen each time, with its think-twice confirm. The server refuses them where a default is set.
+- **No fingerprints or screen locks.** The owner chose this on 2026-11-04: "no fingerprint stuff". What loosens permissions or runs code gets a one-tap confirm saying what it does, required by the server. Don't add a biometric check.
 - **Secrets never reach a client or a log:** credentials, `~/.claude.json`, the key places in `secretfiles.ts`. Mask commands as tool rows do. Attachments and client logs are untrusted text.
 - **The session's chat screen stays clean.** Nothing new there unless the owner asks for it, and then a decision records the exception.
 - **Don't overstate.** Plain wording, unique names, no hype, no clutter. The README promises only what's there.
