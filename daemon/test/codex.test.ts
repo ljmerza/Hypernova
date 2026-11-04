@@ -135,6 +135,46 @@ test('a prompt while a turn runs waits in the queue, and goes once the turn ends
   }
 })
 
+test('one queued prompt can be removed, or taken out to edit: the turn’s end doesn’t send it, and saving does', async () => {
+  codex.autoTurn = false
+  try {
+    const id = (await call('POST', '/v1/sessions', { agent: 'codex', projectPath: project, prompt: 'first' })).body.session.id
+    await until(() => codex.running.has(id))
+    codex.notify('turn/started', { threadId: id, turn: { id: codex.running.get(id), status: 'inProgress', items: [] } })
+    await until(() => session(id)?.state === 'working')
+    for (const t of ['one', 'two', 'three', 'four']) await call('POST', `/v1/sessions/${id}/prompt`, { text: t, clientId: `c-${t}` })
+    assert.equal(session(id)?.queueEdit, true)
+    const qid = (t: string) => session(id)!.queue.find((q) => q.text === t)!.id
+    assert.equal((await call('DELETE', `/v1/sessions/${id}/queue/${qid('two')}`)).status, 200)
+    assert.deepEqual(session(id)!.queue.map((q) => q.text), ['one', 'three', 'four'])
+    const open = await call('POST', `/v1/sessions/${id}/queue/${qid('three')}/edit`, {})
+    assert.equal(open.status, 200, JSON.stringify(open.body))
+    assert.equal(open.body.text, 'three')
+    assert.deepEqual(session(id)!.queue.map((q) => q.text), ['one'], 'what was ahead of it stays in line')
+    assert.deepEqual(session(id)!.held!.map((h) => [h.text, !!h.editing]), [['three', true], ['four', false]], 'it and what was behind it wait')
+    const texts = () => codex.calls.filter((c) => c.method === 'turn/start' && c.params.threadId === id).map((c) => c.params.input?.[0]?.text)
+    // The turn ends: the one ahead goes, and that turn ends too. The one being edited doesn't.
+    codex.end(id, 'completed')
+    await until(() => texts().includes('one'))
+    await until(() => codex.running.has(id))
+    codex.end(id, 'completed')
+    await until(() => session(id)?.state === 'idle')
+    await sleep(400)
+    assert.ok(!texts().includes('three') && !texts().includes('four'), 'not while it’s being edited')
+    assert.equal((await call('PUT', `/v1/sessions/${id}/held/${open.body.heldId}`, { text: 'three, changed' })).status, 200)
+    await until(() => texts().includes('three, changed'), 8000)
+    codex.end(id, 'completed')
+    await until(() => texts().includes('four'), 8000)
+    codex.end(id, 'completed')
+    const gone = await call('DELETE', `/v1/sessions/${id}/queue/q:nothing-here`)
+    assert.equal(gone.status, 404)
+    assert.equal(gone.body.error.code, 'no_queued')
+    assert.ok((await events(id)).some((e) => e.kind === 'notice' && /already gone to Claude/.test(e.text)), 'the chat says so')
+  } finally {
+    codex.autoTurn = true
+  }
+})
+
 test('Stop interrupts the turn and gives back the prompts that waited, named', async () => {
   codex.autoTurn = false
   try {

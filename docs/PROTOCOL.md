@@ -579,11 +579,15 @@ Session = {
                               // "!" line a client sent with its "!"; clientId: the client send it came
                               // from, null when typed in the terminal
   queued: number,             // queue.length
-  held?: [{id, text, files?: Attachment[], at, clientId: string | null}],
+  queueEdit?: true,           // one entry of `queue` can be removed or taken out to edit (see Taking a prompt
+                              // out of the queue); absent from an older server, and for a terminal whose holder
+                              // started before it could
+  held?: [{id, text, files?: Attachment[], at, clientId: string | null, editing?: true}],
                               // prompts held until Claude Code's input box is back, oldest first
-                              // (see Held prompts); text whole, files apart; absent when none
-  term: {id, mac: number, phone: number} | null,  // its shared terminal; mac, phone: how many have it open on the
-                              // server (`hn`) and on phones
+                              // (see Held prompts); text whole, files apart; editing: the owner has it open
+                              // to change, and nothing sends it; absent when none
+  term: {id, mac: number, phone: number, unqueue?: true} | null,  // its shared terminal; mac, phone: how many have it open on
+                              // the server (`hn`) and on phones; unqueue: its holder can take the queue out
   shellsRunning?: number,     // background commands it has running now, Monitors among them (see Background
                               // commands); absent while none, and from an older server
   monitorsRunning?: number,   // how many of those are Monitors holding it in Working (see Background commands);
@@ -2299,8 +2303,13 @@ daemon doesn't know.
     (attach wakes it), never forked.
   - A session with no shared terminal: open somewhere else, it continues in a fork (`forked: true`,
     a new shared session); ended, it resumes in place, as a job if it was one (see History).
-  - `hold: true` (without `replace`): held rather than refused while Claude waits on the owner:
-    `held: true`, `heldId`, `queued: true`. See Held prompts.
+  - `hold: true` (without `replace`): held rather than refused while Claude waits on the owner, and
+    rather than queued while Claude works if it's a command or follows one: `held: true`, `heldId`,
+    `queued: true`. See Held prompts.
+  - `text` holding a command with no use for words and a message after it: both, in turn. See A
+    command and the words after it.
+  - To a session `/clear` left behind: it goes on in the emptied one, and `session` names that. See
+    After /clear.
   - `via: "voice"`: the client dictated it (see Statistics).
 
 #### POST /v1/sessions/{id}/interrupt
@@ -2540,18 +2549,37 @@ daemon doesn't know.
 
 #### PUT /v1/sessions/{id}/held/{heldId}
 
-- **Body:** `{text}`: the held prompt's new words, trimmed. Its files are kept.
+- **Body:** `{text}`: the held prompt's new words, trimmed. Its files are kept. It's no longer being
+  edited. Or `{editing: boolean}` alone: the owner opened it to change it, or stopped without changing it.
 - **Answer:** `200 {session}`
 - **Refusals:** 400 `empty`; 404 `no_session`, `no_held` (sent or removed already); 409 `sending`
-  (being typed right now).
+  (being typed right now). `no_held` and `sending` also put a notice in the chat saying so.
+- **Older server:** `{editing}` alone is 400 `empty`. A client then edits without the hold, as it did.
 - **Rules:** see Held prompts.
 
 #### DELETE /v1/sessions/{id}/held/{heldId}
 
 - **Body:** none.
 - **Answer:** `200 {session}`: the prompt is taken back, never sent.
-- **Refusals:** 404 `no_session`, `no_held`; 409 `sending`.
+- **Refusals:** 404 `no_session`, `no_held`; 409 `sending`. As for PUT, with the notice.
 - **Rules:** see Held prompts.
+
+#### DELETE /v1/sessions/{id}/queue/{queueId}
+
+- **Body:** none.
+- **Answer:** `200 {session}`: that entry of `session.queue` is gone, never sent. The others stay, in order.
+- **Refusals:** 404 `no_session`, `no_queued` (Claude has it, with a notice in the chat saying so);
+  409 `typing` (unsent words in the terminal; `pending` has them), `waiting` (a dialog there),
+  `queue_unreadable`, `no_terminal`, `terminal_busy`. Nothing has moved after a 409.
+- **Rules:** see Taking a prompt out of the queue.
+
+#### POST /v1/sessions/{id}/queue/{queueId}/edit
+
+- **Body:** `{}`
+- **Answer:** `200 {session, heldId, text}`: the entry is now the held prompt `heldId`, `editing`, and
+  `text` is its words, whole (`session.queue` cuts them at 300 characters).
+- **Refusals:** as for DELETE.
+- **Rules:** see Taking a prompt out of the queue. It's finished with `PUT …/held/{heldId}`.
 
 ### Routes: approvals
 
@@ -4187,7 +4215,7 @@ objects with a `t` field. On the WebSocket's auth, see Transport and auth.
 
 - **Direction:** holder → client
 - **Shape:**
-  `{t:"hello", v: 1, id, caps: ["replace", "mode", "queued"], unicode, cols, rows, title, childPid, tty, phone, started, sessionId?}`
+  `{t:"hello", v: 1, id, caps: ["replace", "mode", "queued", "unqueue"], unicode, cols, rows, title, childPid, tty, phone, started, sessionId?}`
 - **When:** on joining, before `snapshot`.
 - **Client:** takes the width rules of `unicode` before it draws the snapshot (see Shared terminals,
   Widths).
@@ -4256,7 +4284,8 @@ For the daemon and `hn`, not for a client.
 - **Frames:** `[type u8][length u32 BE][payload]`. Type 1 is raw terminal bytes (output to clients,
   keystrokes from them), type 2 one JSON message.
 - **To the holder:** `{t:"hello", v:1, role:"tty"|"phone"|"control", cols, rows, snapshot}`,
-  `{t:"resize", cols, rows}`, `{t:"paste", text, id, replace?}`, `{t:"mode", mode, id}`,
+  `{t:"resize", cols, rows}`, `{t:"paste", text, id, replace?}`, `{t:"unqueue", id}` (answered as `pasted`; see
+  Taking a prompt out of the queue), `{t:"mode", mode, id}`,
   `{t:"keys", data}`, `{t:"detach"}` (this window leaves on purpose), `{t:"kill"}`, `{t:"screen"}`,
   `{t:"move", to, text?}` (control only: the conversation went on in holder `to`, see Switching
   agents; the holder tells its windows and phones, then ends).
@@ -4382,11 +4411,23 @@ input box is back, so a client's message box can always send (`daemon/src/held.t
   would be 409 `needs_answer` (an approval, a question or a plan is open for the session) or
   `waiting` (a dialog or menu in the terminal instead of the input box), it's held:
   `200 {session, queued: true, held: true, heldId}`.
+- **Commands while Claude works:** a command Claude Code would queue (`waitsInQueue`: anything
+  starting "/name", a skill too, but not the ones below or `/model`, `/effort`, `/cost`, `/config`,
+  `/help`, `/fast`, which run at once: measured on 2.1.318) is held while Claude works or anything waits in
+  its queue, and goes once the session is idle. So is a message while a command waits in that queue, one
+  typed in the terminal say. Claude Code hands messages over when a step ends and leaves commands for the
+  turn's end, so in its queue "/clear" then a message runs the message first and then wipes it (measured
+  on 2.1.316 and 2.1.318). `/clear` while Claude works doesn't stop the turn: it runs when the turn ends.
 - **Order:** a prompt sent while others are held for an open session is held behind them, so they go
   in order.
 - **Never held:** one of Claude Code's own commands it runs at once, while Claude works (`/btw`,
   `/status`, `/stop`… `commands.ts`, `isImmediateCommand`, from 2.1.314's command table): typed now,
   or the route's own 409.
+- **Being edited** (`editing`): `PUT …/held/{heldId}` with `{editing: true}`, or a prompt taken out of the
+  queue. It isn't sent, nor anything behind it, however ready the session is, until `{text}` or
+  `{editing: false}`, or the session ends and its grace runs out (Dropped, below). Nothing times it out: a
+  client that vanished leaves it open, shown as being edited, for any client to finish. It's kept across
+  daemon restarts.
 - **Without `hold`** nothing changes. `clientId` works as for any send: a repeat gets the first
   answer, and the `user` event or queue entry it becomes carries it.
 - **Shown:** `session.held` (absent when none), and a `session` message whenever it changes.
@@ -4405,8 +4446,67 @@ input box is back, so a client's message box can always send (`daemon/src/held.t
   `unsent.reason: "dropped"`, naming them so a client takes their text back. A session that no
   longer exists drops them silently.
 - **Kept** in `<support>/held.json` (0600) across daemon restarts:
-  `{sessionId: [{id, prompt, at, clientId}]}`, `prompt` as Claude Code gets it (attachments as
+  `{sessionId: [{id, prompt, at, clientId, editing?}]}`, `prompt` as Claude Code gets it (attachments as
   @-mentions first).
+- **Moved:** after `/clear` the line goes on under the next session, ahead of anything held there (After
+  /clear). The held routes still answer under the old session's id.
+
+#### A command and the words after it
+
+A message after a command never becomes that command's arguments, and is never lost. Each runs as its
+own turn, in order.
+
+- **One send holding both:** `text` starting with a command that has no use for words, then words on
+  the same line or the next (`splitCommand`: `/clear`, `/reset`, `/new`, `/context`, `/usage`, `/cost`,
+  `/stats`, `/reload-skills`). It's the command, then the words as a message with the send's `clientId`, held
+  or typed by the rules above. Claude Code itself would record the words in `<command-args>` and drop them:
+  no turn, and the session's title the two together (measured on 2.1.318). A send with files isn't one, as
+  its @-mentions come first.
+- **What makes one:** the "/" list in a client's box puts `/clear ` there without sending it, and a
+  send that comes back goes in the box ahead of what's typed. A client now puts words already typed
+  first when what comes back starts with a command (`AttachDrafts.joined`).
+- **`/clear`'s `[name]`:** Claude Code's list offers `/clear [name]`, a title for the next session. It can't
+  be told from a message here, and a lost message costs more than a title: `/rename` is there for that.
+- **Other commands' words are theirs:** `/compact keep the file names`, a skill's task. Typed on the same
+  line, words are arguments.
+
+#### After /clear
+
+`/clear` goes on in the same process and terminal under a new session id (the holder's registry entry, or a
+job's). The daemon knows it by the SessionEnd hook's `reason: "clear"` and the holder or job then running
+another session (`cleared.ts`).
+
+- For 10 minutes, a prompt to the old session, now ended, goes to the new one, and the answer's `session`
+  is that one, so a client that follows its answer moves there. Without this it resumed the old
+  conversation in a new terminal. The window isn't kept across a daemon restart.
+- After that, writing to the old session resumes it from History, as writing to any ended session does.
+- The held line moves with it. A client's screen stays on the old session until something it sends is
+  answered with the new one.
+
+#### Taking a prompt out of the queue
+
+One entry of `session.queue`, removed or opened to edit, when `queueEdit` says it can be.
+
+- **A session the daemon runs, or Codex:** its line is the daemon's own, so the entry just leaves it.
+- **Claude Code's queue has no way to reach one entry.** Up in an empty box gives back all of it, one
+  line each, and logs `popAll` per entry (measured on 2.1.316 and 2.1.318). So under the holder's own
+  typing lock (`{t:"unqueue"}`): Up, then Ctrl+U until the box is empty (Ctrl+C would stop Claude). What came
+  out is read from the transcript, with no notice to anyone (`popCatch`), and what stays is typed back in, in
+  order, under the same `clientId`s. New queue ids, the same text.
+- **Remove:** all but that entry goes back.
+- **Edit:** what was ahead of it goes back. It and what was behind it go to the front of the held line,
+  it with `editing`, and what's behind waits behind it, so nothing overtakes it.
+- **Meanwhile:** a prompt sent while the queue is out is held behind it, and the held line waits.
+- **A step ended first:** an entry Claude took isn't given back. If it's the one asked for, the answer is
+  404 `no_queued` and the chat says "That message had already gone to Claude, so it wasn’t changed."
+- **Back in the box refused** (a dialog came up, say): what's left goes to the front of the held line.
+  Nothing is lost.
+- **Won't start:** unsent words in the box (Up would move the cursor, not fetch the queue), a dialog, or an
+  entry whose text wasn't logged (`queue_unreadable`: it couldn't be typed back). Nothing moves.
+- **Not covered:** pictures pasted in the terminal into a queued prompt aren't logged, so they don't come
+  back with it. A client's own attachments do, as their @-mentions are text.
+- **Order at the turn's end:** two messages queued together reach Claude in one request, as two user
+  messages (measured on 2.1.318). That's Claude Code's and is left alone.
 
 ### Approvals
 

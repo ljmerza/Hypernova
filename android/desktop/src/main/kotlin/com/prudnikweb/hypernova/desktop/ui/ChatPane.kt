@@ -179,6 +179,8 @@ internal fun ChatList(hub: Hub, s: Session, shell: Shell, following: ChatFollowi
     val sessionId = s.id
     LaunchedEffect(sessionId) { hub.opened(sessionId) }
     val items = hub.transcript(sessionId)
+    val waitingMenu = remember(sessionId) { WaitingMenuState() }
+    WaitingMenuHost(hub, sessionId, waitingMenu, shell)
     val list = rememberLazyListState(initialFirstVisibleItemIndex = (items.size - 1).coerceAtLeast(0))
     val scope = rememberCoroutineScope()
     val motion = LocalMotion.current
@@ -279,7 +281,7 @@ internal fun ChatList(hub: Hub, s: Session, shell: Shell, following: ChatFollowi
             items(rows, key = { it.key }) { row ->
                 val rowModifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = ItemFadeIn, placementSpec = null, fadeOutSpec = null)
                 when (row) {
-                    is ChatRow.One -> ChatItem(hub, s, row.item, rowModifier, shell, named = row.item.key in labelled)
+                    is ChatRow.One -> ChatItem(hub, s, row.item, rowModifier, shell, named = row.item.key in labelled, waitingMenu = waitingMenu)
                     is ChatRow.Run -> {
                         val open = runOpen[row.key] ?: false
                         val live = row.running || (working && row.key == liveRowKey)
@@ -362,12 +364,12 @@ private fun ChatEmpty(hub: Hub, sessionId: String, linked: Boolean) {
  * an agent's own screen) says so rather than doing nothing. A tool's ask never comes here while it waits (see [ChatList]).
  */
 @Composable
-private fun ChatItem(hub: Hub, s: Session, item: Item, modifier: Modifier, shell: Shell, named: Boolean = true) {
+private fun ChatItem(hub: Hub, s: Session, item: Item, modifier: Modifier, shell: Shell, named: Boolean = true, waitingMenu: WaitingMenuState? = null) {
     val previewOnPhone = { _: Int -> shell.say(Ui.desk_preview_on_phone.text()) }
     val agentOnPhone = { _: String -> shell.say(Ui.desk_agent_on_phone.text()) }
     when (item) {
         is Item.User -> UserMessage(
-            item, modifier, codex = s.codex,
+            item, if (waitingMenu != null) modifier.waitingMenu(item, waitingMenu) else modifier, codex = s.codex,
             files = { AttachedNames(item) },
             onStartNew = item.waitingId?.let { w -> { Core.scope.launch { hub.startFromWaiting(w).onFailure { shell.say(it.message.orEmpty()) } } } },
         )
@@ -408,7 +410,7 @@ internal fun ChatBox(hub: Hub, s: Session, shell: Shell, following: ChatFollowin
     val back = AttachDrafts.givenBack(sessionId)
     LaunchedEffect(back) {
         val t = AttachDrafts.takeBack(sessionId) ?: return@LaunchedEffect
-        ChatDrafts.set(sessionId, if (ChatDrafts.of(sessionId).isBlank()) t else "$t\n${ChatDrafts.of(sessionId)}")
+        ChatDrafts.set(sessionId, AttachDrafts.joined(t, ChatDrafts.of(sessionId)))
     }
     fun send(replace: Boolean) {
         val text = ChatDrafts.of(sessionId)

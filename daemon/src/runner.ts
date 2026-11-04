@@ -135,6 +135,19 @@ export function sendPrompt(id: string, text: string, forkFrom?: string, clientId
   return true
 }
 
+/**
+ * A prompt out of this session's line, by its id, and with [behind] the ones after it too, in order
+ * (queue-edit.ts). Null when it isn't there: it has started.
+ */
+export function takeQueued(id: string, queueId: string, behind: boolean): QueueEntry[] | null {
+  const run = runs.get(id)
+  const at = run?.queue.findIndex((e) => e.id === queueId) ?? -1
+  if (!run || at < 0) return null
+  const out = run.queue.splice(at, behind ? run.queue.length : 1)
+  publishQueue(id, run)
+  return out
+}
+
 /** The process of the turn session [id] is in, the one thing that holds its MCP connections (mcp-session.ts). Null between turns. */
 export const runningQuery = (id: string): Pick<Query, 'mcpServerStatus' | 'reconnectMcpServer' | 'toggleMcpServer'> | null => {
   const run = runs.get(id)

@@ -264,7 +264,7 @@ fun SessionScreen(
     val back = AttachDrafts.givenBack(sessionId)
     LaunchedEffect(back) {
         val t = AttachDrafts.takeBack(sessionId) ?: return@LaunchedEffect
-        draft = if (draft.isBlank()) t else "$t\n$draft"
+        draft = AttachDrafts.joined(t, draft)
     }
     // A send that waits for files still on their way (the voice path can send meanwhile): its
     // [replace], until they're all on the Mac.

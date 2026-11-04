@@ -456,6 +456,10 @@ sealed interface Item {
         val waitingId: String? = null,
         /** Fork: the Mac's id for it while it's held ([SendStatus.Held]): what Edit and Remove act on. */
         val heldId: String? = null,
+        /** Its entry in the session's queue while it waits there, when the Mac can take one entry out: what Edit and Remove act on. */
+        val queueId: String? = null,
+        /** The owner has it open to change: nothing sends it, here or on the Mac, until they've finished. */
+        val editing: Boolean = false,
     ) : Item {
         /** Not the Mac's own copy of it yet: drawn quieter. */
         val pending: Boolean get() = status != null
@@ -464,6 +468,8 @@ sealed interface Item {
         val waiting: Boolean get() = status == SendStatus.WaitingMac || status == SendStatus.SessionGone
         /** Fork: held on the Mac until Claude Code's input box is back. */
         val held: Boolean get() = status == SendStatus.Held
+        /** A long-press can remove or change it: it waits somewhere that can still let it go. */
+        val changeable: Boolean get() = waiting || held || queueId != null
     }
     @Immutable data class Assistant(
         override val key: String,

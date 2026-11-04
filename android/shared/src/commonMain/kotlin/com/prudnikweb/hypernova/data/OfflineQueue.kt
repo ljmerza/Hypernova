@@ -25,6 +25,8 @@ data class Waiting(
     val mode: String? = null,
     /** The Mac has no such session any more: the prompt stays, to start a new session with. */
     val ended: Boolean = false,
+    /** The owner has it open to change: it isn't sent, nor anything behind it, until they've finished. Kept, so closing the app doesn't send it. */
+    val editing: Boolean = false,
 )
 
 /** Where the queue is kept between runs of the app. */
@@ -83,12 +85,24 @@ class OfflineQueue(private val store: QueueStore, private val clock: () -> Long 
         return w
     }
 
-    /** New words for a waiting prompt. False when it isn't there, is being sent, or would be empty. */
+    /** New words for a waiting prompt, and no longer being edited. False when it isn't there, is being sent, or would be empty. */
     fun edit(id: String, text: String): Boolean {
         val w = get(id) ?: return false
         if (id in flying || (text.isBlank() && w.files.isEmpty())) return false
-        change(items.map { if (it.id == id) it.copy(text = text.trim()) else it })
+        change(items.map { if (it.id == id) it.copy(text = text.trim(), editing = false) else it })
         return true
+    }
+
+    /** The owner opened it to change it: [due] and [sending] let it go no more. False when it isn't there or is on its way already. */
+    fun startEditing(id: String): Boolean {
+        if (id in flying || get(id) == null) return false
+        change(items.map { if (it.id == id) it.copy(editing = true) else it })
+        return true
+    }
+
+    /** The owner stopped without changing it. */
+    fun stopEditing(id: String) {
+        if (get(id)?.editing == true) change(items.map { if (it.id == id) it.copy(editing = false) else it })
     }
 
     /** Drops a waiting prompt. False when it isn't there or is being sent. */
@@ -111,18 +125,20 @@ class OfflineQueue(private val store: QueueStore, private val clock: () -> Long 
 
     /**
      * What to send next, in the order typed: a session's prompts go one after the other, so none
-     * overtakes another, and a session whose earlier prompt is on its way waits for it.
+     * overtakes another, and a session whose earlier prompt is on its way waits for it. One being
+     * edited holds up its session the same way.
      */
     fun due(): List<Waiting> {
         val busy = items.filter { it.id in flying }.mapTo(HashSet()) { it.sessionId }
         return items.filter { !it.ended && it.id !in flying && it.sessionId !in busy }
             .distinctBy { it.sessionId }
+            .filter { !it.editing }
             .sortedBy { it.at }
     }
 
-    /** Marks [id] as being sent; false when it already is, or isn't there. */
+    /** Marks [id] as being sent; false when it already is, isn't there, or is being edited. */
     fun sending(id: String): Boolean {
-        if (get(id) == null || !flying.add(id)) return false
+        if (get(id)?.editing != false || !flying.add(id)) return false
         version++
         return true
     }
@@ -156,6 +172,7 @@ class OfflineQueue(private val store: QueueStore, private val clock: () -> Long 
                         w.cwd?.let { o.put("cwd", it) }
                         w.mode?.let { o.put("mode", it) }
                         if (w.ended) o.put("ended", true)
+                        if (w.editing) o.put("editing", true)
                     },
             )
         }.toString()
@@ -174,7 +191,7 @@ class OfflineQueue(private val store: QueueStore, private val clock: () -> Long 
                         Attachment(path, x.optString("name", path.substringAfterLast('/')), if (x.isNull("mime")) null else x.optString("mime"), x.optLong("size"))
                     }
                 }.orEmpty()
-                Waiting(id, session, o.optString("text"), files, o.optLong("at"), o.optString("cwd").takeIf { it.isNotEmpty() }, o.optString("mode").takeIf { it.isNotEmpty() }, o.optBoolean("ended"))
+                Waiting(id, session, o.optString("text"), files, o.optLong("at"), o.optString("cwd").takeIf { it.isNotEmpty() }, o.optString("mode").takeIf { it.isNotEmpty() }, o.optBoolean("ended"), o.optBoolean("editing"))
             }.sortedBy { it.at }
         }.getOrDefault(emptyList())
     }
@@ -188,4 +205,5 @@ fun Waiting.item(): Item.User = Item.User(
     files = files,
     sentAt = at,
     waitingId = id,
+    editing = editing,
 )

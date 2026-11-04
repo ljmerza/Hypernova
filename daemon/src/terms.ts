@@ -14,6 +14,8 @@ import { CLAUDE_DIR, HOME, SUPPORT, findClaude, log, randomToken, readJson, trim
 import { getManaged, getProvider, isClaudeEffort, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
 import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, noteAgentJob, notePaste, noteScreenTokens, noteTermDialog, sessionAllowedTools, sessionAlwaysRules, sessionOfAgentJob, upsertSession, view } from './hub.ts'
 import { undelete } from './deleted.ts'
+import { linkCleared } from './cleared.ts'
+import { moveHeld } from './held.ts'
 import { rulesInEffect } from './permission-rules.ts'
 import { whyFromRules, type Why } from './why.ts'
 import { promptTitle, typedCommand } from './normalize.ts'
@@ -26,7 +28,8 @@ import { getThread } from './codex/threads.ts'
 import { isHiddenCwd } from './term/hidden.ts'
 import { MACHINE, has, unavailable } from './platform.ts'
 
-export type TermView = { id: string; mac: number; phone: number }
+/** [unqueue]: its holder can take Claude Code's queue back out (queue-edit.ts); one started before can't. */
+export type TermView = { id: string; mac: number; phone: number; unqueue?: true }
 type T = {
   meta: TermMeta
   sock: Socket | null
@@ -204,7 +207,10 @@ export const bypassAllowed = (args: string[] | undefined): boolean => {
   return args.some((a, i) => /^--(allow-)?dangerously-skip-permissions$/.test(a) || a === '--permission-mode=bypassPermissions' || (a === '--permission-mode' && args[i + 1] === 'bypassPermissions'))
 }
 
-const viewOf = (t: T): TermView => ({ id: t.meta.id, mac: t.state?.tty ?? t.meta.tty ?? 0, phone: t.state?.phone ?? t.meta.phone ?? 0 })
+const viewOf = (t: T): TermView => ({ id: t.meta.id, mac: t.state?.tty ?? t.meta.tty ?? 0, phone: t.state?.phone ?? t.meta.phone ?? 0, ...(t.caps.includes('unqueue') ? { unqueue: true as const } : {}) })
+
+/** The session each holder was last seen running. */
+const lastSession = new Map<string, string>()
 
 /** Put each live holder on its session, and take it off sessions it no longer runs. */
 function link(): void {
@@ -214,6 +220,10 @@ function link(): void {
   for (const t of shown) {
     const sid = sessionOf(t)
     if (sid) want.set(sid, viewOf(t))
+    // /clear: the same terminal runs the next session now. What waited for the old one goes with it.
+    const before = lastSession.get(t.meta.id)
+    if (sid && before && before !== sid && linkCleared(before, sid)) moveHeld(before, sid)
+    if (sid) lastSession.set(t.meta.id, sid)
   }
   const byTerm = new Map<string, T>()
   for (const t of shown) {
@@ -347,6 +357,17 @@ export async function typeInto(id: string, text: string, replace = false, client
     else forgetPaste(id, clientId, r.queued ? QUEUED_CLAIM_MS : 0)
   }
   return r
+}
+
+/**
+ * Claude Code's queue, all of it, out and gone from its box, for queue-edit.ts to put back what stays.
+ * Only into an empty box (`busy_input` otherwise), and `no_input` with a dialog up. What left the queue
+ * is in the transcript's `popAll` lines, not in this answer. A holder started before it could do this
+ * (no `unqueue` in its hello) says `unreachable`.
+ */
+export async function unqueue(id: string): Promise<Typed> {
+  if (!(terms.get(id)?.caps ?? []).includes('unqueue')) return { ok: false, reason: 'unreachable' }
+  return ask(id, { t: 'unqueue' })
 }
 
 /** Switch a shared session's permission mode (Shift+Tab until Claude Code's mode line shows it). */

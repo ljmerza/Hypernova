@@ -1,7 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 // Two HTTP servers on loopback: the phone API (phones reach the same routes through the LAN
 // listener, lan.ts) and the local API for the `hypernova` command, Claude Code hooks and the testing checklist.
-import { isImmediateCommand, listCommands } from './commands.ts'
+import { isImmediateCommand, listCommands, splitCommand, waitsInQueue } from './commands.ts'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { existsSync, statSync, readdirSync, readFileSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
@@ -16,7 +16,7 @@ import { lanDevice, lanInfo, lanOrigin, pairAllowed, pairFailed, pairingAddresse
 import { TlsError, issueDeviceCert, serverIdentity } from './tls.ts'
 import { addClient, agentJobOf, answerApproval, removeFromHome, broadcast, clearRestarting, resolveSession, clientCount, getSession, getUsage, isLiveTerminal, isRestarting, listSessions, markRestarting, noteEffortSet, pendingApprovals, upsertSession, ensureParsed } from './hub.ts'
 import { createSession, interrupt, isRunning, prepareFork, sendPrompt, setEffort, setMode } from './runner.ts'
-import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
+import { answerMenu, attachAgentsTerm, attachDrifted, createAgentsSession, createSharedSession, endTermAndWait, openCodexTerminal, openOnMac, pressKeys, redeemTicket, relayPhone, scanTerms, sharedTerminalsAvailable, switchTermMode, termChildPid, terminalTicket, termOf, termScreen, typeInto } from './terms.ts'
 import { agentJobCommand, ranAsJob, setClaudeAgents } from './claude-agents.ts'
 import { codexBinary, setCodexEnabled } from './codex/client.ts'
 import { codexModels, codexSessionUsage, codexState, refreshCodexAccount, sendCodex } from './codex/account.ts'
@@ -69,7 +69,9 @@ import { systemZone } from './schedule.ts'
 import { MACHINE, PLATFORM, RELEASES, UNAVAILABLE, bypassBlockedByRoot, has, unavailable } from './platform.ts'
 import { randomUUID } from 'node:crypto'
 import { putEvent, tapBroadcast } from './hub.ts'
-import { editHeld, heldOf, hold, kickHeld, removeHeld, useHeldOps, type HeldReady } from './held.ts'
+import { editHeld, heldOf, hold, holdsIt, kickHeld, removeHeld, setHeldEditing, useHeldOps, type HeldReady } from './held.ts'
+import { clearedTo, noteCleared } from './cleared.ts'
+import { rebuildingQueue, takeFromQueue } from './queue-edit.ts'
 import { checkReleaseNow } from './releases.ts'
 import { setAutoUpdate, updateView } from './server-update.ts'
 import { DEBUG_HOURS, dbg, dbgError, debugOn, debugView, onDebugChange, setDebug } from './debug-log.ts'
@@ -1108,17 +1110,49 @@ async function api(c: Ctx): Promise<void> {
   // Fork: a held prompt's new words, or taken back (docs/PROTOCOL.md, "Held prompts").
   const hp = /^\/v1\/sessions\/([\w-]+)\/held\/([\w-]+)$/.exec(path)
   if (hp && (m === 'PUT' || m === 'DELETE')) {
-    const [, id, heldId] = hp
-    if (!getSession(id!)) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    const [, asked, heldId] = hp
+    if (!getSession(asked!)) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    // /clear took the line on to the next session (cleared.ts).
+    const id = holdsIt(asked!, heldId!) ? asked! : goesOnIn(asked!)
     let done: 'ok' | 'gone' | 'sending'
     if (m === 'PUT') {
-      const text = String((await readJsonBody(req))?.text ?? '').trim()
-      if (!text) throw new HttpError(400, 'empty', 'Write something first.')
-      done = editHeld(id!, heldId!, text)
-    } else done = removeHeld(id!, heldId!)
-    if (done === 'gone') throw new HttpError(404, 'no_held', 'That message isn’t held any more: it was sent or removed.')
-    if (done === 'sending') throw new HttpError(409, 'sending', 'That message is being sent right now.')
+      const b = await readJsonBody(req)
+      if (typeof b?.editing === 'boolean' && b.text === undefined) done = setHeldEditing(id, heldId!, b.editing)
+      else {
+        const text = String(b?.text ?? '').trim()
+        if (!text) throw new HttpError(400, 'empty', 'Write something first.')
+        done = editHeld(id, heldId!, text)
+      }
+    } else done = removeHeld(id, heldId!)
+    if (done === 'gone') {
+      tooLate(id)
+      throw new HttpError(404, 'no_held', 'That message isn’t held any more: it was sent or removed.')
+    }
+    if (done === 'sending') {
+      tooLate(id)
+      throw new HttpError(409, 'sending', 'That message is being sent right now.')
+    }
     return json(res, 200, { session: listSessions().find((x) => x.id === id) })
+  }
+  // One entry of the session's queue: removed, or taken out to be edited (queue-edit.ts).
+  const qp = /^\/v1\/sessions\/([\w-]+)\/queue\/([\w:%-]+)(\/edit)?$/.exec(path)
+  if (qp && ((m === 'DELETE' && !qp[3]) || (m === 'POST' && qp[3]))) {
+    const [, asked, queueId] = qp
+    if (!getSession(asked!)) throw new HttpError(404, 'no_session', 'That session no longer exists.')
+    const id = goesOnIn(asked!)
+    const r = await takeFromQueue(id, decodeURIComponent(queueId!), qp[3] ? 'edit' : 'remove')
+    if (!r.ok) {
+      if (r.code === 'gone') {
+        tooLate(id)
+        throw new HttpError(404, 'no_queued', 'That message isn’t queued any more: Claude has it.')
+      }
+      if (r.code === 'typing') throw new HttpError(409, 'typing', `There’s unsent text in this session’s terminal on the ${MACHINE}. Send or clear it there first.`, r.pending ? { pending: r.pending } : undefined)
+      if (r.code === 'waiting') throw new HttpError(409, 'waiting', 'Claude is showing something in the terminal (a question or a menu). Answer it first.')
+      if (r.code === 'unreadable') throw new HttpError(409, 'queue_unreadable', 'Claude Code’s queue holds a message whose words it didn’t log, so it can’t be taken apart here. Open the terminal to change it.')
+      if (r.code === 'no_terminal') throw new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
+      throw new HttpError(409, 'terminal_busy', 'The terminal didn’t answer. Try again in a moment.')
+    }
+    return json(res, 200, { session: listSessions().find((x) => x.id === id), ...(r.heldId ? { heldId: r.heldId, text: r.text ?? '' } : {}) })
   }
   const s = /^\/v1\/sessions\/([\w-]+)\/(events|prompt|interrupt|continue|mode|effort|terminal|open|menu|provider|model)$/.exec(path)
   if (s) {
@@ -1233,7 +1267,15 @@ async function api(c: Ctx): Promise<void> {
     // on the way (a phone sending again when the Mac came back) doesn't type the prompt twice.
     // Fork: `hold: true` (the phone app): held while Claude waits on the owner, not refused (held.ts).
     const holdIt = action === 'prompt' && b.hold === true && b.replace !== true
-    const r = await dedupSend(id!, clientId, () => (holdIt ? promptOrHold(id!, text, clientId) : promptSession(id!, text, { afterLimit, replace: b.replace === true, clientId })))
+    const r = await dedupSend(id!, clientId, () => {
+      if (action !== 'prompt') return promptSession(id!, text, { afterLimit, clientId })
+      // Still on the session /clear left behind: the conversation goes on in the emptied one (cleared.ts).
+      const at = goesOnIn(id!)
+      // A command with no use for words, and a message after it in the same send: each its own turn.
+      const parts = files.length ? null : splitCommand(text)
+      if (parts) return commandThenWords(at, parts, clientId, b.replace === true)
+      return holdIt ? promptOrHold(at, text, clientId) : promptSession(at, text, { replace: b.replace === true, clientId })
+    })
     if (action === 'prompt') notePrompt(c.deviceId, c.local, b.via)
     return json(res, 200, { session: listSessions().find((x) => x.id === r.id), ...(r.forked === undefined ? {} : { forked: r.forked }), queued: r.queued, ...('heldId' in r && r.heldId ? { held: true, heldId: r.heldId } : {}) })
   }
@@ -1577,13 +1619,13 @@ export async function promptSession(id: string, text: string, o: { afterLimit?: 
     upsertSession(id, { stoppedForAway: false })
     return { id, queued: r.queued === true }
   }
-  // Fork: a held prompt only ever goes into a terminal, never into a fork or a resume (held.ts).
-  if (o.typeOnly) throw new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
   if (isSdk(id)) {
     await needSdk()
     upsertSession(id, { stoppedForAway: false })
     return { id, queued: sendPrompt(id, text, undefined, o.clientId) }
   }
+  // Fork: a held prompt only ever goes into a terminal or the daemon's own run, never into a fork or a resume (held.ts).
+  if (o.typeOnly) throw new HttpError(409, 'no_terminal', 'This session isn’t running in a shared terminal.')
   // A session with no shared terminal: fork it while it's open somewhere else, continue it in place once it has ended.
   const live = isLiveTerminal(id)
   if (live && o.noFork) throw new HttpError(409, 'no_terminal', 'This session runs in a terminal Hypernova doesn’t hold.')
@@ -1888,7 +1930,11 @@ export async function promptOrHold(id: string, text: string, clientId?: string):
   // prompts or a dialog, as the side-question route never holds /btw. Typed now, or the route's 409.
   if (isImmediateCommand(text)) return await promptSession(id, text, { clientId })
   const held = () => ({ id, queued: true, heldId: hold(id, text, clientId ?? null).id })
-  if (heldOf(id).length && heldReady(id) !== 'ended') return held()
+  if (rebuildingQueue(id) || (heldOf(id).length && heldReady(id) !== 'ended')) return held()
+  // Claude at work: a command waits here, not in Claude Code's queue, and so does whatever follows one,
+  // or a message would overtake it there.
+  const r = getSession(id)
+  if (r && r.state !== 'ended' && claudeCodeQueues(id) && waitsHere(r, text)) return held()
   try {
     return await promptSession(id, text, { clientId })
   } catch (e) {
@@ -1901,15 +1947,76 @@ export async function promptOrHold(id: string, text: string, clientId?: string):
  * Whether session [id]'s input box could be back: nothing waits on the owner there (no approval,
  * no menu, not needs_you) and it isn't starting, and it has a terminal Hypernova holds, or is a
  * `claude agents` job `claude attach` reaches. Typing then says for sure (`no_input` otherwise).
+ * [prompt], when it's that prompt's turn: it may have to wait for the turn or a command ([waitsHere]).
+ * A session the daemon runs itself, or Codex, has a line of its own that takes it at any time.
  */
-export function heldReady(id: string): HeldReady {
+export function heldReady(id: string, prompt?: string): HeldReady {
   const r = getSession(id)
   if (!r || r.state === 'ended') return 'ended'
   if (pendingApprovals().some((a) => a.sessionId === id)) return 'wait'
   // Waiting on a question in words (a `claude agents` job, `question`): its box is open, the reply goes.
   if (r.menu || (r.state === 'needs_you' && !r.question) || r.state === 'starting') return 'wait'
+  if (!claudeCodeQueues(id)) return 'ready'
   if (!termOf(id) && !(settings.claudeAgents === true && agentJobOf(id))) return 'wait'
+  if (rebuildingQueue(id)) return 'wait'
+  if (prompt !== undefined && waitsHere(r, prompt)) return 'wait'
   return 'ready'
+}
+
+/** Prompts for [id] go through Claude Code's own queue: not the daemon's own runs, nor Codex. */
+const claudeCodeQueues = (id: string) => !isCodex(id) && !isSdk(id)
+
+/**
+ * [text] can't go into Claude Code's queue now: a command while Claude works or anything waits there
+ * (it would run after whatever is typed behind it), or anything behind a command already there.
+ */
+function waitsHere(r: { state: string; queue: { text: string }[] }, text: string): boolean {
+  if (r.queue.some((q) => waitsInQueue(q.text))) return true
+  return waitsInQueue(text) && (r.state === 'working' || r.queue.length > 0)
+}
+
+/** The owner's choice about a waiting message came too late: the chat says so, on every client. */
+function tooLate(id: string): void {
+  putEvent(id, { id: `n:${randomUUID()}`, kind: 'notice', ts: Date.now(), text: 'That message had already gone to Claude, so it wasn’t changed.', tone: 'info' })
+}
+
+/** Where a prompt to [id] goes: the emptied conversation, if the owner cleared [id] not long ago. */
+function goesOnIn(id: string): string {
+  const to = clearedTo(id)
+  if (to === id) return id
+  const next = getSession(to)
+  return getSession(id)?.state === 'ended' && next && next.state !== 'ended' ? to : id
+}
+
+const isClear = (command: string) => /^\/(clear|reset|new)$/.test(command)
+
+/**
+ * "/clear read this" as a client sent it: the command, then the words as a message of their own. Held
+ * for now, the words are held behind it. Otherwise, after /clear, the words go once its terminal has moved
+ * on, so the answer can name the session they went on in. What can't take them now holds them: the
+ * command has run, so they're not given back to be sent with it again.
+ */
+async function commandThenWords(id: string, parts: { command: string; words: string }, clientId: string | undefined, replace: boolean): Promise<{ id: string; queued: boolean; forked?: boolean; heldId?: string }> {
+  const first = replace ? await promptSession(id, parts.command, { replace: true }) : await promptOrHold(id, parts.command)
+  if ('heldId' in first && first.heldId) return { id, queued: true, heldId: hold(id, parts.words, clientId ?? null).id }
+  let at = first.id
+  if (isClear(parts.command)) {
+    noteCleared(at)
+    for (let i = 0; i < 80 && clearedTo(at) === at; i++) {
+      await new Promise((ok) => setTimeout(ok, 100))
+      scanTerms()
+    }
+    const to = clearedTo(at)
+    // Not seen moving: held, it follows when the terminal does, or comes back with a notice. Never typed where it might resume the old one.
+    if (to === at && !termOf(at)) return { id: at, queued: true, heldId: hold(at, parts.words, clientId ?? null).id }
+    at = to
+  }
+  try {
+    return { ...(await promptOrHold(at, parts.words, clientId)), ...(first.forked ? { forked: true } : {}) }
+  } catch (e) {
+    if (e instanceof HttpError && e.code !== 'switched') return { id: at, queued: true, heldId: hold(at, parts.words, clientId ?? null).id }
+    throw e
+  }
 }
 
 useHeldOps({

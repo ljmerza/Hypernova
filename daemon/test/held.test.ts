@@ -144,6 +144,61 @@ test('one being typed right now can’t be edited or removed', async () => {
   assert.equal(held.heldOf(s7).length, 0)
 })
 
+test('one being edited is never sent, nor anything behind it, until the owner has finished: save or cancel', async () => {
+  sent.length = 0
+  held.useHeldOps({
+    ready: (sid) => ready.get(sid) ?? 'wait',
+    async send(sid, prompt, clientId) {
+      sent.push({ sid, prompt, clientId })
+    },
+    changed: (sid) => void changed.push(sid),
+    unsent: (sid, u) => void unsent.push({ sid, u }),
+  })
+  ready.set('ed', 'ready')
+  ready.set('other', 'wait')
+  const [a, b] = held.holdFirst('ed', [
+    { prompt: 'in edit', at: 1, clientId: 'x1', editing: true },
+    { prompt: 'behind it', at: 2, clientId: 'x2' },
+  ])
+  assert.deepEqual(held.heldView('ed').held?.map((h) => [h.text, h.editing ?? false]), [['in edit', true], ['behind it', false]])
+  // However often the line is looked at, however ready the session is.
+  for (let i = 0; i < 5; i++) await held.drain('ed', () => later())
+  held.tick(later())
+  assert.equal(sent.length, 0, 'nothing went')
+  // Cancelled: as it was, in order.
+  assert.equal(held.setHeldEditing('ed', a!.id, false), 'ok')
+  await held.drain('ed', () => later())
+  assert.deepEqual(sent.map((s) => s.prompt), ['in edit', 'behind it'])
+  assert.equal(held.setHeldEditing('ed', b!.id, true), 'gone', 'too late: it was sent')
+
+  // Saved: the new words go, and it's no longer being edited.
+  sent.length = 0
+  const e = held.hold('ed', 'first words', null)
+  assert.equal(held.setHeldEditing('ed', e.id, true), 'ok')
+  await held.drain('ed', () => later())
+  assert.equal(sent.length, 0)
+  assert.equal(held.editHeld('ed', e.id, 'new words'), 'ok')
+  assert.equal(held.heldView('ed').held?.[0]?.editing, undefined)
+  await held.drain('ed', () => later())
+  assert.deepEqual(sent.map((s) => s.prompt), ['new words'])
+
+  // Kept across a restart's read, so a restart doesn't send it either.
+  held.hold('other', 'kept', null)
+  const k = held.heldOf('other')[0]!
+  held.setHeldEditing('other', k.id, true)
+  assert.equal(JSON.parse(readFileSync(join(process.env.HYPERNOVA_SUPPORT!, 'held.json'), 'utf8')).other[0].editing, true)
+  held.removeHeld('other', k.id)
+})
+
+test('a line moves with its conversation, ahead of anything held in the next session', () => {
+  held.hold('from', 'older', 'o1')
+  held.hold('to', 'newer', 'n1')
+  held.moveHeld('from', 'to')
+  assert.deepEqual(held.heldOf('from'), [])
+  assert.deepEqual(held.heldOf('to').map((e) => e.prompt), ['older', 'newer'])
+  for (const e of [...held.heldOf('to')]) held.removeHeld('to', e.id)
+})
+
 test('the line is kept in held.json and read back by a daemon started again', async () => {
   held.hold('s8', 'survives a restart', 'c8')
   const file = join(process.env.HYPERNOVA_SUPPORT!, 'held.json')

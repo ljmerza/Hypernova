@@ -1127,7 +1127,7 @@ class LiveHub(
 
     override fun consumeReveal(s: Session): Boolean = s.isNew && revealed.add(s.id)
 
-    private class Cached(val events: List<WEvent>, val pending: List<Sent>, val approvals: Map<String, WApproval>, val resolved: Map<String, Resolved>, val answered: Map<String, Resolution>, val settled: Boolean, val active: Boolean, val shared: Boolean, val queue: List<WQueued>, val step: Boolean, val board: AgentBoard, val waiting: Int, val items: List<Item>, val held: List<WQueued> = emptyList(), val asides: List<Asides.Entry> = emptyList())
+    private class Cached(val events: List<WEvent>, val pending: List<Sent>, val approvals: Map<String, WApproval>, val resolved: Map<String, Resolved>, val answered: Map<String, Resolution>, val settled: Boolean, val active: Boolean, val shared: Boolean, val queue: List<WQueued>, val step: Boolean, val board: AgentBoard, val waiting: Int, val items: List<Item>, val held: List<WQueued> = emptyList(), val asides: List<Asides.Entry> = emptyList(), val queueEdit: Boolean = false)
     private val cache = HashMap<String, Cached>()
 
     override fun transcript(id: String): List<Item> {
@@ -1150,17 +1150,18 @@ class LiveHub(
         val waitingNow = offline.version
         // Fork: prompts the Mac holds until Claude Code's input box is back (data/Held.kt).
         val held = raw[id]?.held.orEmpty()
+        val queueEdit = raw[id]?.queueEdit == true
         val c = cache[id]
         // The queue compared by value: the session arrives anew with every change of activity.
-        if (c != null && c.events === ev && c.pending === pend && c.approvals === ap && c.resolved === rs && c.answered === an && c.settled == st && c.active == active && c.shared == shared && c.queue == queue && c.step == step && c.board === board && c.waiting == waitingNow && c.held == held && c.asides === asides) return c.items
+        if (c != null && c.events === ev && c.pending === pend && c.approvals === ap && c.resolved === rs && c.answered === an && c.settled == st && c.active == active && c.shared == shared && c.queue == queue && c.step == step && c.board === board && c.waiting == waitingNow && c.held == held && c.asides === asides && c.queueEdit == queueEdit) return c.items
         val all = if (asides.isEmpty()) ev else Asides.into(ev, asides)
         // Only events that changed (new instances) are converted again; streaming text and
         // 64 KB Bash outputs arrive several times a second.
         val built = Items.build(all, ap, rs, an, id, raw[id]?.cwd, now, settled = st, cache = itemCaches.getOrPut(id) { Items.Cache() }, active = active, board = board)
         // What waits on this phone for the Mac comes last, under everything.
         // Fork: held prompts before those, just above the asks waiting at the end (ui/session/AskStack.kt).
-        val items = withCopies(built, all, pend, shared, queue, step) + Held.items(held, ev, queue) + offline.of(id).map(Waiting::item)
-        cache[id] = Cached(ev, pend, ap, rs, an, st, active, shared, queue, step, board, waitingNow, items, held, asides)
+        val items = withCopies(built, all, pend, shared, queue, step, queueEdit) + Held.items(held, ev, queue) + offline.of(id).map(Waiting::item)
+        cache[id] = Cached(ev, pend, ap, rs, an, st, active, shared, queue, step, board, waitingNow, items, held, asides, queueEdit)
         return items
     }
 
@@ -1294,8 +1295,8 @@ class LiveHub(
      * before it. Elsewhere one waiting for the Mac stays at the end. While its request is out,
      * [shared] (the session now) guesses which it will be.
      */
-    private fun withCopies(items: List<Item>, events: List<WEvent>, copies: List<Sent>, shared: Boolean, queue: List<WQueued>, step: Boolean): List<Item> {
-        val waiting = queuedTail(copies, queue, step, events)
+    private fun withCopies(items: List<Item>, events: List<WEvent>, copies: List<Sent>, shared: Boolean, queue: List<WQueued>, step: Boolean, queueEdit: Boolean): List<Item> {
+        val waiting = queuedTail(copies, queue, step, events, queueEdit)
         val sent = if (waiting.isEmpty()) copies else copies.filter { it.stage != Stage.Queued }
         val out = placeCopies(items, events, sent, shared)
         return if (waiting.isEmpty()) out else out + waiting
@@ -1331,7 +1332,7 @@ class LiveHub(
      * Claude Code's queue, which Claude reads when the step it's on finishes; else an SDK
      * session's, which waits for the whole reply.
      */
-    private fun queuedTail(copies: List<Sent>, queue: List<WQueued>, step: Boolean, events: List<WEvent>): List<Item> {
+    private fun queuedTail(copies: List<Sent>, queue: List<WQueued>, step: Boolean, events: List<WEvent>, queueEdit: Boolean = false): List<Item> {
         val queued = copies.filter { it.stage == Stage.Queued }
         if (queue.isEmpty() && queued.isEmpty()) return emptyList()
         val matched = queueMatches(copies, queue)
@@ -1343,8 +1344,9 @@ class LiveHub(
             // A copy still on its way shows itself, where it was sent. One of this phone's sends
             // whose copy has gone (the Mac's copy replaced it, or it came back) and a prompt whose
             // Mac copy is in already are leaving: the queue's update is a moment behind.
-            if (c != null) { if (c.stage == Stage.Queued) out += c.item }
-            else if (q.clientId !in sentIds && !delivered(q, events)) out += macQueued(q, step)
+            // [queueEdit]: a long press can take this entry out (docs/PROTOCOL.md, "Taking a prompt out of the queue").
+            if (c != null) { if (c.stage == Stage.Queued) out += if (queueEdit) (c.item as Item.User).copy(queueId = q.id) else c.item }
+            else if (q.clientId !in sentIds && !delivered(q, events)) out += macQueued(q, step).let { if (queueEdit) it.copy(queueId = q.id) else it }
         }
         for (c in queued) if (!c.seen && c.item.key !in inQueue) out += c.item
         return out
@@ -1946,6 +1948,113 @@ class LiveHub(
             heldRemoved -= heldId
             Result.failure(handle(e, Str.held_err_remove))
         }
+    }
+
+    override suspend fun openWaitingEdit(sessionId: String, item: Item.User): Result<WaitingEdit> {
+        item.waitingId?.let { id ->
+            if (offline.startEditing(id)) return Result.success(WaitingEdit(sessionId, offline.get(id)?.text ?: item.text, waitingId = id, emptyOk = item.files.isNotEmpty()))
+            return Result.failure(saidTooLate(sessionId))
+        }
+        return try {
+            when {
+                item.heldId != null -> {
+                    val r = runCatching { applySession(api.put("/v1/sessions/$sessionId/held/${item.heldId}", JSONObject().put("editing", true))) }
+                    // A server from before it could hold one back says the words are empty: Save works there as it always has.
+                    val older = (r.exceptionOrNull() as? ApiException)?.code == "empty"
+                    if (!older) r.getOrThrow()
+                    Result.success(WaitingEdit(sessionId, item.text, heldId = item.heldId))
+                }
+                item.queueId != null -> {
+                    val copy = queueCopy(sessionId, item.queueId)
+                    val o = api.post("/v1/sessions/$sessionId/queue/${item.queueId}/edit", JSONObject())
+                    applySession(o)
+                    copy?.let { dropCopy(sessionId, it) }
+                    Result.success(WaitingEdit(sessionId, o.str("text") ?: item.text, heldId = o.str("heldId")))
+                }
+                else -> Result.failure(HubException(res.getString(Str.held_err_edit)))
+            }
+        } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(tooLateOr(e, Str.held_err_edit)) }
+    }
+
+    override suspend fun saveWaitingEdit(edit: WaitingEdit, text: String): Result<Unit> {
+        edit.waitingId?.let { id ->
+            if (!offline.edit(id, text)) return Result.failure(saidTooLate(edit.sessionId))
+            if (link.state == LinkState.Connected) flushOffline()
+            return Result.success(Unit)
+        }
+        val id = edit.heldId ?: return Result.failure(HubException(res.getString(Str.held_err_edit)))
+        return try {
+            applySession(api.put("/v1/sessions/${edit.sessionId}/held/$id", JSONObject().put("text", text.trim())))
+            Result.success(Unit)
+        } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+            // What the owner wrote isn't lost with the request: it waits in the box.
+            val out = tooLateOr(e, Str.held_err_edit)
+            AttachDrafts.giveBack(edit.sessionId, text)
+            Result.failure(out)
+        }
+    }
+
+    override fun cancelWaitingEdit(edit: WaitingEdit) {
+        edit.waitingId?.let { id ->
+            offline.stopEditing(id)
+            if (link.state == LinkState.Connected) flushOffline()
+        }
+        edit.heldId?.let { id ->
+            scope.launch { runCatching { applySession(api.put("/v1/sessions/${edit.sessionId}/held/$id", JSONObject().put("editing", false))) } }
+        }
+    }
+
+    override suspend fun removeWaitingMessage(sessionId: String, item: Item.User): Result<Unit> {
+        item.waitingId?.let { id ->
+            return if (offline.remove(id)) Result.success(Unit) else Result.failure(saidTooLate(sessionId))
+        }
+        return try {
+            when {
+                item.heldId != null -> {
+                    // Before the call: the Mac's session update may come over the socket first.
+                    heldRemoved += item.heldId
+                    try {
+                        applySession(api.delete("/v1/sessions/$sessionId/held/${item.heldId}"))
+                    } catch (e: Throwable) {
+                        heldRemoved -= item.heldId
+                        throw e
+                    }
+                    Result.success(Unit)
+                }
+                item.queueId != null -> {
+                    val copy = queueCopy(sessionId, item.queueId)
+                    applySession(api.delete("/v1/sessions/$sessionId/queue/${item.queueId}"))
+                    copy?.let { dropCopy(sessionId, it) }
+                    Result.success(Unit)
+                }
+                else -> Result.failure(HubException(res.getString(Str.held_err_remove)))
+            }
+        } catch (e: CancellationException) { throw e } catch (e: Throwable) { Result.failure(tooLateOr(e, Str.held_err_remove)) }
+    }
+
+    /** This phone's copy of the queue entry [queueId], if it's one of its sends. */
+    private fun queueCopy(sessionId: String, queueId: String): String? {
+        val copies = pending[sessionId]?.value ?: return null
+        return queueMatches(copies, raw[sessionId]?.queue.orEmpty())[queueId]?.item?.key
+    }
+
+    private fun dropCopy(sessionId: String, key: String) {
+        val p = pending[sessionId] ?: return
+        p.value = p.value.filter { it.item.key != key }
+    }
+
+    /** [e] says it had left the line: the Mac put that in the chat. Otherwise its own message. */
+    private fun tooLateOr(e: Throwable, fallback: Str): HubException {
+        val code = (e as? ApiException)?.code
+        return if (code == "no_held" || code == "no_queued" || code == "sending") WaitingTooLate(e.message.orEmpty()) else handle(e, fallback)
+    }
+
+    /** It left this phone's own line before the choice came: no Mac to say so, so this phone does, in the chat. */
+    private fun saidTooLate(sessionId: String): WaitingTooLate {
+        val text = res.getString(Str.waiting_too_late)
+        val s = slot(sessionId)
+        s.value = s.value + WEvent.Notice("local-n-${seq++}", maxOf(s.value.maxOfOrNull { it.ts } ?: 0L, raw[sessionId]?.lastActivityAt ?: 0L), text, "info")
+        return WaitingTooLate(text)
     }
 
     override suspend fun startFromWaiting(waitingId: String): Result<String> {
