@@ -150,7 +150,7 @@ private fun roundsOf(newestFirst: List<ConnEntry>): List<List<ConnEntry>> {
 private fun ConnRow(e: ConnEntry, now: Long) {
     val ago = ConnText.ago(now, e.at)
     val kind = kindWord(e.kind)
-    val route = e.route?.let { routeWord(it) }
+    val route = e.route?.let { routeKindWord(it) }
     val result = resultWord(e.result)
     val said = stringResource(R.string.connlog_row_said, ago, listOfNotNull(kind, route, result, e.text, e.target, e.ms?.let { "$it ms" }).joinToString(", "))
     Row(
@@ -197,7 +197,7 @@ fun RouteTag(route: RouteKind, modifier: Modifier = Modifier, trail: String? = n
         }
         Spacer(Modifier.width(5.dp))
         val caps = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.6f)
-        HText(routeWord(route).uppercase(), style = caps, color = HN.inkMuted, maxLines = 1)
+        HText(routeKindWord(route).uppercase(), style = caps, color = HN.inkMuted, maxLines = 1)
         if (trail != null) {
             Spacer(Modifier.width(6.dp))
             HText(trail.uppercase(), style = caps, color = trailColor, maxLines = 1)
@@ -217,7 +217,7 @@ fun RouteTriedRow(report: RouteReport, showBase: Boolean, modifier: Modifier = M
         .groupBy { it.route }.mapNotNull { (_, list) -> list.lastOrNull() }
         .sortedBy { it.route.ordinal }
     if (shown.isEmpty()) return
-    val parts = shown.map { "${routeWord(it.route)} ${(resultWord(it.result) ?: "").lowercase()}".trim() }
+    val parts = shown.map { "${routeKindWord(it.route)} ${(resultWord(it.result) ?: "").lowercase()}".trim() }
     val said = stringResource(R.string.route_tried_said, parts.joinToString(", "))
     FlowRow(
         modifier.clearAndSetSemantics { contentDescription = said },
@@ -242,7 +242,7 @@ private fun kindWord(k: ConnKind): String = stringResource(
 )
 
 @Composable
-private fun routeWord(r: RouteKind): String = stringResource(
+private fun routeKindWord(r: RouteKind): String = stringResource(
     when (r) {
         RouteKind.Local -> R.string.connlog_route_local
         RouteKind.Remote -> R.string.connlog_route_base

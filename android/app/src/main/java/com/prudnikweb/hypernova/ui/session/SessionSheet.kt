@@ -453,9 +453,9 @@ private fun AgentsPart(agents: SheetAgents, atWork: Int, onOpen: (String) -> Uni
     }
     for (w in agents.workflows) {
         WorkflowRow(w)
-        for (a in w.agents) AgentRow(a, now, indent = true, onOpen = { onOpen(a.id) })
+        for (a in w.agents) SheetAgentRow(a, now, indent = true, onOpen = { onOpen(a.id) })
     }
-    for (a in agents.loose) AgentRow(a, now, indent = false, onOpen = { onOpen(a.id) })
+    for (a in agents.loose) SheetAgentRow(a, now, indent = false, onOpen = { onOpen(a.id) })
 }
 
 /** A running workflow: its name, and its agents done of those it has started so far. */
@@ -474,7 +474,7 @@ private fun WorkflowRow(w: SheetWorkflow) {
 
 /** One agent at work: a mint dot, its label, what it does now and how long it has run; a tap opens it. */
 @Composable
-private fun AgentRow(a: WAgent, now: Long, indent: Boolean, onOpen: () -> Unit) {
+private fun SheetAgentRow(a: WAgent, now: Long, indent: Boolean, onOpen: () -> Unit) {
     val res = LocalContext.current.resources
     val doing = a.activity?.takeIf { it.isNotBlank() } ?: stringResource(R.string.session_sheet_agent_working)
     val time = formatDuration(res, now - a.startedAt)

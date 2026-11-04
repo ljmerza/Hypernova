@@ -334,7 +334,7 @@ private fun Identity(hub: Hub, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         NovaMark()
         HText(APP_NAME, style = Type.wordmark, maxLines = 1)
-        ConnectionChip(hub, Modifier.weight(1f))
+        ServerLink(hub, Modifier.weight(1f))
     }
 }
 
@@ -368,7 +368,7 @@ private fun linkWords(link: Link): LinkWords = when (link.state) {
 
 /** The server's name and its link: `◆ z2  LINKED  LOCAL`. */
 @Composable
-private fun ConnectionChip(hub: Hub, modifier: Modifier = Modifier) {
+private fun ServerLink(hub: Hub, modifier: Modifier = Modifier) {
     val link = hub.link
     val words = linkWords(link)
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
