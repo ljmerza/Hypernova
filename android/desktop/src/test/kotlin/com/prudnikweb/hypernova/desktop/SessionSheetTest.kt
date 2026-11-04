@@ -113,12 +113,15 @@ class SessionSheetTest {
     }
 
     @Test fun bypassIsntOfferedAndItSaysWhy() = runDesktopComposeUiTest(1700, 1100) {
+        d.snapshot = snapshot("z2", sessions = listOf(session("s1", state = "idle", title = name) { put("projectName", "invoices").put("cwd", "/home/dev/invoices").put("bypassAvailable", false) }))
         up()
         openSheet()
         tab(Str.session_sheet_permissions)
         inSheet(word(Str.mode_auto)).assertIsDisplayed()
         inSheet(word(Str.mode_bypass)).assertDoesNotExist()
         inSheet(Ui.desk_bypass_on_phone.text()).assertIsDisplayed()
+        // Not the phone's line too, that a session from here could have it: seen in a real window, against a session that started in a terminal.
+        inSheet(word(Str.mode_bypass_unavailable)).assertDoesNotExist()
     }
 
     @Test fun aModeChangeGoesToTheServer() = runDesktopComposeUiTest(1700, 1100) {

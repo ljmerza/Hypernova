@@ -122,7 +122,8 @@ fun ModePicker(mode: String, onChange: (String) -> Unit, modifier: Modifier = Mo
             },
             enabled = { it != "bypassPermissions" || bypassAvailable },
         )
-        if (!bypassAvailable) {
+        // Why it's dimmed: where it's left out, there's nothing dimmed to explain.
+        if (bypass && !bypassAvailable) {
             Spacer(Modifier.height(8.dp))
             HText(stringResource(Str.mode_bypass_unavailable), style = Type.small, color = HN.inkDim)
         }
