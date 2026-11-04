@@ -231,10 +231,7 @@ fun SessionScreen(
         val t = AttachDrafts.takeBack(sessionId) ?: return@LaunchedEffect
         draft = if (draft.isBlank()) t else "$t\n$draft"
     }
-    // A send that waits for files still on their way (the voice path can send meanwhile): its
-    // [replace], until they're all on the Mac.
-    var sendWaiting by remember(sessionId) { mutableStateOf<Boolean?>(null) }
-    val fixFirst = stringResource(R.string.attach_fix_first)
+    val filesFirst = rememberFilesFirst(sessionId, attach)
     val noFiles = stringResource(R.string.aside_no_files)
     /**
      * "/btw <question>" goes as the Commands tab asks it (data/Asides.kt): typed in at once, never
@@ -271,10 +268,7 @@ fun SessionScreen(
             return@send
         }
         Asides.sideQuestion(draft)?.takeIf { asideReach(session) }?.let { q -> askAside(draft, q); return@send }
-        // Never without a file that was attached: one that failed is sent again or removed first,
-        // and one still uploading is waited for.
-        attach.failed?.let { f -> toast(String.format(fixFirst, f.name)); return@send }
-        if (attach.uploading) { sendWaiting = replace; return@send }
+        if (!filesFirst.mayGo(replace)) return@send
         val text = draft
         val files = AttachDrafts.take(sessionId)
         if (text.isNotBlank() || files.isNotEmpty()) {
@@ -295,12 +289,7 @@ fun SessionScreen(
             hub.aside(sessionId).onSuccess { a -> if (a != null) Asides.note(sessionId, a) }
         }
     }
-    LaunchedEffect(sendWaiting, attach.uploading, attach.failed) {
-        val replace = sendWaiting ?: return@LaunchedEffect
-        // A file failed meanwhile: its own message said so, and the text stays in the box.
-        if (attach.failed != null) sendWaiting = null
-        else if (!attach.uploading) { sendWaiting = null; send(replace) }
-    }
+    FilesFirstEffect(filesFirst, attach, send)
     // Files written or edited in this session, newest last, for the strip under the header.
     val changed = remember(items) {
         val seen = LinkedHashSet<String>()

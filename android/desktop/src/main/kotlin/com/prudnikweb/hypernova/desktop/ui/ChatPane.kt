@@ -67,7 +67,21 @@ import com.prudnikweb.hypernova.data.AttachDrafts
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.knownCommands
 import com.prudnikweb.hypernova.data.sendPrompt
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import com.prudnikweb.hypernova.desktop.DeskAttach
+import com.prudnikweb.hypernova.ui.session.AttachButton
+import com.prudnikweb.hypernova.ui.session.AttachState
 import com.prudnikweb.hypernova.ui.session.ChatMenuHost
+import com.prudnikweb.hypernova.ui.session.CommandHint
+import com.prudnikweb.hypernova.ui.session.CommandSuggestions
+import com.prudnikweb.hypernova.ui.session.DraftStrip
+import com.prudnikweb.hypernova.ui.session.FilesFirstEffect
+import com.prudnikweb.hypernova.ui.session.commandQuery
+import com.prudnikweb.hypernova.ui.session.matching
+import com.prudnikweb.hypernova.ui.session.picked
+import com.prudnikweb.hypernova.ui.session.rememberCommands
+import com.prudnikweb.hypernova.ui.session.rememberFilesFirst
 import com.prudnikweb.hypernova.ui.session.FollowChatTail
 import com.prudnikweb.hypernova.ui.session.FollowWithTheList
 import com.prudnikweb.hypernova.ui.session.KeepPlaceOverEarlier
@@ -267,25 +281,51 @@ internal fun ChatBox(hub: Hub, s: Session, shell: Shell, box: FocusRequester, mo
         val t = AttachDrafts.takeBack(sessionId) ?: return@LaunchedEffect
         ChatDrafts.set(sessionId, if (ChatDrafts.of(sessionId).isBlank()) t else "$t\n${ChatDrafts.of(sessionId)}")
     }
+    val attach = remember(sessionId) { AttachState(sessionId, hub, DeskAttach, Core.platform.strings, Core.scope, shell::say) }
+    val filesFirst = rememberFilesFirst(sessionId, attach)
     fun send(replace: Boolean) {
         val text = ChatDrafts.of(sessionId)
-        if (text.isBlank()) return
+        if (!filesFirst.mayGo(replace)) return
+        val files = AttachDrafts.take(sessionId)
+        if (text.isBlank() && files.isEmpty()) return
         ChatDrafts.set(sessionId, "")
         busy = null
         // The chat stays where it is, scrolled back or not: docs/DECISIONS.md, "Sending never moves the chat".
         // Core's scope: leaving the session doesn't cancel the send.
         Core.scope.launch {
-            sendPrompt(hub, sessionId, text, emptyList(), replace, onSwitch = { shell.choose(Core.activeId.orEmpty(), it) }, onBusy = { busy = it }, onFail = shell::say)
+            sendPrompt(hub, sessionId, text, files, replace, onSwitch = { shell.choose(Core.activeId.orEmpty(), it) }, onBusy = { busy = it }, onFail = shell::say)
         }
     }
+    FilesFirstEffect(filesFirst, attach) { send(it) }
     val focus = LocalFocusManager.current
+    // "/" opens the commands and skills Claude Code has in this project, as on the phone. (Claude Code's: a Codex session has none of them.)
+    val query = if (s.codex) null else commandQuery(draft)
+    val commands = rememberCommands(hub, s.cwd, query != null)
+    val pickFiles = {
+        val title = Ui.attach.text()
+        // The dialog holds the window until it's put away, as a system's file dialog does.
+        attach.add(shell.desk.pickFiles(title))
+    }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         busy?.let { pending -> TerminalTextCard(pending, onReplace = { send(true) }, onOpen = null, onDismiss = { busy = null }) }
+        if (query != null) CommandSuggestions(commands, query, onPick = { ChatDrafts.set(sessionId, "/${it.name} ") })
+        commands.picked(draft)?.takeIf { it.argumentHint.isNotBlank() }?.let { CommandHint(it, Modifier.padding(horizontal = 18.dp)) }
+        if (attach.files.isNotEmpty()) DraftStrip(attach.files, attach::remove, side = 0.dp, onRetry = attach::retry)
         Row(verticalAlignment = Alignment.Bottom) {
+            AttachButton(false, pickFiles)
             Field(
                 draft, { ChatDrafts.set(sessionId, it) },
                 // The arrows and Escape stop here: going through to the screen, they'd choose another session under the words being typed.
-                Modifier.weight(1f).testTag(BOX_TAG).focusRequester(box).onKeyEvent { e ->
+                Modifier.weight(1f).testTag(BOX_TAG).focusRequester(box).onPreviewKeyEvent { e ->
+                    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when {
+                        // A picture on the clipboard attaches, as on the phone; anything else is the box's own paste.
+                        e.isCtrlPressed && e.key == Key.V -> shell.desk.clipboardImage()?.let { attach.add(listOf(it), temporary = true) } != null
+                        // The best match of the "/" list goes in.
+                        e.key == Key.Tab && query != null -> commands.list?.let { matching(it, query).firstOrNull() }?.let { ChatDrafts.set(sessionId, "/${it.name} ") } != null
+                        else -> false
+                    }
+                }.onKeyEvent { e ->
                     when (e.key) {
                         Key.DirectionUp, Key.DirectionDown -> true
                         Key.Escape -> {
@@ -300,10 +340,10 @@ internal fun ChatBox(hub: Hub, s: Session, shell: Shell, box: FocusRequester, mo
                 commands = !s.codex,
                 label = Ui.prompt_hint.text(),
                 onSend = { send(false) },
-                canSend = draft.isNotBlank(),
+                canSend = (draft.isNotBlank() || attach.files.isNotEmpty()) && !attach.uploading,
             )
             Spacer(Modifier.width(8.dp))
-            Pill(Ui.send.text(), { send(false) }, kind = PillKind.Primary, height = 48.dp, enabled = draft.isNotBlank())
+            Pill(Ui.send.text(), { send(false) }, kind = PillKind.Primary, height = 48.dp, enabled = (draft.isNotBlank() || attach.files.isNotEmpty()) && !attach.uploading)
         }
     }
 }

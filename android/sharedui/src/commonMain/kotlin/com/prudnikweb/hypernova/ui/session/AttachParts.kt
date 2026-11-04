@@ -1,5 +1,8 @@
 package com.prudnikweb.hypernova.ui.session
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
+
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import androidx.compose.animation.core.LinearEasing
@@ -197,5 +200,24 @@ fun Spinner(modifier: Modifier = Modifier, color: Color = HN.accent) {
         val w = 1.8.dp.toPx()
         drawArc(color.copy(alpha = 0.18f), 0f, 360f, false, style = Stroke(w))
         drawArc(color, -90f, 100f, false, style = Stroke(w, cap = StrokeCap.Round))
+    }
+}
+
+/** The paperclip at the start of the composer; a cross while the tray is open. */
+@Composable
+fun AttachButton(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(if (open) Str.attach_close else Str.attach)
+    Box(
+        modifier
+            .size(48.dp)
+            .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = label, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(if (open) HN.bg700 else Color.Transparent), contentAlignment = Alignment.Center) {
+            Crossfade(open, label = "attach") { o ->
+                if (o) Icon(Glyph.Cross, size = 14.dp, color = HN.ink) else Icon(Glyph.Clip, size = 20.dp, color = HN.inkMuted)
+            }
+        }
     }
 }

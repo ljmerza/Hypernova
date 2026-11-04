@@ -18,6 +18,7 @@ import com.prudnikweb.hypernova.data.Incident
 import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Strings
+import com.prudnikweb.hypernova.data.Upload
 import kotlinx.coroutines.CoroutineScope
 import java.util.Locale
 
@@ -181,6 +182,21 @@ interface UiOwner {
 fun interface OwnerAsk {
     /** [onOk] only after a good check; [onFail] with a line to show, null when the owner cancelled. [noLock]: what to say on a device with nothing to check. */
     fun ask(title: String, subtitle: String, noLock: String, onOk: () -> Unit, onFail: (String?) -> Unit)
+}
+
+/** What one system's picked files are, for [com.prudnikweb.hypernova.ui.session.AttachState]: a content:// address on the phone, a file on a computer. */
+interface AttachSource {
+    /** Its name, and its size (-1 when unknown). */
+    fun nameAndSize(source: Any): Pair<String, Long>
+    fun isImage(source: Any, name: String): Boolean
+    /** Whether it can go at this size. */
+    fun fits(image: Boolean, size: Long): Boolean
+    /** A small preview for the box. */
+    suspend fun thumbnail(source: Any): ImageBitmap?
+    /** Ready to upload, by this system's rules for a photo. */
+    suspend fun read(source: Any): Upload
+    /** Our own copy has gone up: it goes. */
+    suspend fun discard(source: Any)
 }
 
 /** Pictures attached to prompts: the system's decoder, and what's kept of them by their path on the computer, so a sent one shows at once. */

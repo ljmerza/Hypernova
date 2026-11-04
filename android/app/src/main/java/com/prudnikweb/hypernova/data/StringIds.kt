@@ -103,10 +103,17 @@ val Str.id: Int
         Str.asks_bring_forward -> R.string.asks_bring_forward
         Str.asks_front_said -> R.string.asks_front_said
         Str.at_clock -> R.string.at_clock
+        Str.attach -> R.string.attach
+        Str.attach_close -> R.string.attach_close
+        Str.attach_failed_named -> R.string.attach_failed_named
+        Str.attach_fix_first -> R.string.attach_fix_first
+        Str.attach_limit -> R.string.attach_limit
+        Str.attach_mac_away -> R.string.attach_mac_away
         Str.attach_open -> R.string.attach_open
         Str.attach_remove -> R.string.attach_remove
         Str.attach_retry -> R.string.attach_retry
         Str.attach_too_big -> R.string.attach_too_big
+        Str.attach_too_big_named -> R.string.attach_too_big_named
         Str.attach_unreadable -> R.string.attach_unreadable
         Str.au_and -> R.string.au_and
         Str.au_channel -> R.string.au_channel
@@ -553,6 +560,7 @@ val Str.id: Int
         Str.open_terminal -> R.string.open_terminal
         Str.other -> R.string.other
         Str.other_hint -> R.string.other_hint
+        Str.paste_unusable -> R.string.paste_unusable
         Str.percent -> R.string.percent
         Str.pg_connect -> R.string.pg_connect
         Str.pg_dev_server -> R.string.pg_dev_server

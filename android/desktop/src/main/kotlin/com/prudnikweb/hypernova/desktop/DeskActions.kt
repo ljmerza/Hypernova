@@ -2,6 +2,12 @@ package com.prudnikweb.hypernova.desktop
 
 import com.prudnikweb.hypernova.data.Links
 import java.awt.Desktop
+import java.awt.FileDialog
+import java.awt.Frame
+import java.awt.Image
+import java.awt.datatransfer.DataFlavor
+import java.awt.image.BufferedImage
+import javax.imageio.ImageIO
 import java.awt.GraphicsEnvironment
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
@@ -15,6 +21,10 @@ interface DeskActions {
     fun copy(text: String)
     /** Opens a web page in the system's browser; false when this system can't. Off the main thread. */
     fun browse(url: String): Boolean = false
+    /** The system's file dialog, for a prompt's attachments: what was chosen, none if it was put away. */
+    fun pickFiles(title: String): List<File> = emptyList()
+    /** A picture on the clipboard, saved in a file of its own to attach, or null when there's none. */
+    fun clipboardImage(): File? = null
 }
 
 /** AWT's way, and on Linux the system's own way when AWT says it has none. */
@@ -50,4 +60,23 @@ object RealDesk : DeskActions {
     override fun copy(text: String) {
         runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null) }
     }
+
+    override fun pickFiles(title: String): List<File> {
+        if (GraphicsEnvironment.isHeadless()) return emptyList()
+        val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD)
+        dialog.isMultipleMode = true
+        dialog.isVisible = true
+        return dialog.files.toList()
+    }
+
+    override fun clipboardImage(): File? = runCatching {
+        val clip = Toolkit.getDefaultToolkit().systemClipboard
+        if (!clip.isDataFlavorAvailable(DataFlavor.imageFlavor)) return null
+        val image = clip.getData(DataFlavor.imageFlavor) as? Image ?: return null
+        val copy = BufferedImage(image.getWidth(null), image.getHeight(null), BufferedImage.TYPE_INT_ARGB)
+        copy.createGraphics().apply { drawImage(image, 0, 0, null); dispose() }
+        val file = File.createTempFile("pasted-", ".png")
+        ImageIO.write(copy, "png", file)
+        file
+    }.getOrNull()
 }

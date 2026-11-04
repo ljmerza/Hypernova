@@ -4514,6 +4514,16 @@ The owner: "let's make sure that we are modularizing this correctly so shared co
 
 The rules are in `CLAUDE.md`, "Architecture". `scripts/arch-check.py` and `:app:checkRuntimeClasspath` enforce them (`docs/PLATFORMS.md`, "The rules' checks"). Parts and state are shared; each system may lay them out its own way. Voice, the terminal, the camera, file picking and the widget stay per system.
 
+## The desktop's session screen (2026-11-04)
+
+The owner: "have agents keep going for 0.28", working through desktop parity with the phone, with maintainability across operating systems first: a feature is built once. So the phone's code moved to `:sharedui`, and both use it.
+
+1. **Moved, not copied:** the chat's list and items, the status bar, the top bar, the session sheet and its tabs, a message's menu, the "/" list and attachments. `ChatPane` no longer mirrors `SessionScreen` (LATER L130 is gone).
+2. **Parts shared, layouts each system's:** the phone's screen and the desktop's pane each lay the same parts out. The sheet's content is one; the phone opens it as its bottom sheet, the desktop beside the chat from a window 1560 dp wide, over it below that. 580 dp, so all its tabs show: a mouse can't drag a row sideways.
+3. **A mouse and a big window, modestly:** the other button opens a message's menu, a selection's own menu held back; Ctrl+I opens the sheet and Escape puts it away; Tab puts the best match of the "/" list in; Ctrl+V takes a picture from the clipboard. No new tooltips: a pill already lights under the pointer.
+4. **Bypass stays off the desktop, and Always says to use the phone:** `UiOwner` is the fingerprint on the phone and on the desktop a check that can't pass, as "The desktop client's New session" chose. The owner has since said "no fingerprint stuff" (CLAUDE.md, 2026-11-04), which another branch is carrying out: what replaces it there replaces `UiOwner`. This branch didn't decide that.
+5. **What's not here says where it is:** the desktop's `Opener` says a file, a preview, a terminal, an agent's own screen or another provider is on the phone.
+
 ## Sending never moves the chat (2026-11-04)
 
 The owner: "if I scroll back somewhere and then try to send a command it'll automatically scroll all the way to the bottom I don't want to do this allow me to be able to send messages but it'll stay where I'm at the latest I can with this what's the latest button that appears".
