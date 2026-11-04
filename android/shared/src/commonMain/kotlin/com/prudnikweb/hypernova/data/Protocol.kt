@@ -505,7 +505,8 @@ data class FileEntry(
 @Immutable
 data class Listing(val path: String, val entries: List<FileEntry>, val truncated: Boolean = false, val total: Int = entries.size)
 
-class FileBytes(val bytes: ByteArray, val mime: String?)
+/** [viewOnly]: the server shows it but won't download it (an agent's plan; docs/PROTOCOL.md, "Agents' plans"). */
+class FileBytes(val bytes: ByteArray, val mime: String?, val viewOnly: Boolean = false)
 
 @Immutable
 data class ProviderModels(val default: String? = null, val opus: String? = null, val sonnet: String? = null, val haiku: String? = null) {

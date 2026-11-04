@@ -60,6 +60,9 @@
     <string name="fl_row_locked">File, %1$s, stays on the server</string>
 
     <!-- The viewer and downloads. -->
+    <string name="fv_raw">Raw</string>
+    <string name="fv_formatted">Formatted</string>
+    <string name="fv_view_only">An agent’s plan: you can read it here, but not share or save it.</string>
     <string name="fv_share">Share</string>
     <string name="fv_save">Save</string>
     <string name="fv_open_with">Open with</string>

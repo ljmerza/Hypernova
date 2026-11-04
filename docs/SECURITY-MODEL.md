@@ -149,7 +149,7 @@ the fingerprint or screen lock first), each session's own folder in the home fol
 a folder outside the home folder, and never the home folder's key places (keys, keychains, cookies,
 mail, messages, browsers' profiles, `~/Library/Application Support`, the daemon's state and Claude
 Code's: `daemon/src/secretfiles.ts`), checked after links are followed (`Session.browsable` says which
-sessions). An "Always" answer, switching to Bypass, starting a session in it and an automation's No
+sessions). One exception, for reading alone: Markdown in an agent's plans folder (section 8, risk 24). An "Always" answer, switching to Bypass, starting a session in it and an automation's No
 asking each wait for the fingerprint or the screen lock on the phone; notifications and the widget
 offer Allow and Deny only. "Bypass" asks the user to think twice, and automations never run on credits or a paid provider without the user's yes.
 
@@ -272,7 +272,7 @@ another session's reply. All of that is **outside text**, and the daemon treats 
   or MCP commands, args and env (`daemon/test/agent-settings.test.ts` plants a secret in each). Those
   names do show what's set up on the server, to a paired phone, which can already start sessions there.
   The GET only reads, for a device token and not the admin token; `~/.claude` and `~/.codex` stay
-  closed to the phone's file browser. What writes is in section 8, risk 17.
+  closed to the phone's file browser, but for their plans (section 8, risk 24). What writes is in section 8, risk 17.
 - Claude Code's `~/.claude.json` and projects' `.mcp.json` (the account's details, OAuth data, history, MCP
   commands, args, env, URLs and headers): a paired device gets only MCP server names from the `mcpServers`
   tables, each checked as a name, with a scope and a folder's base name (`claude.mcp` of the same route;
@@ -409,6 +409,8 @@ rules, and weaknesses in the VPN or the operating system.
     What holds: no `sudo`, ever; a system package or a folder this user can't write is refused and shown as a command for a person. What the updater prints goes through `scrubText` before the phone or the log sees it, and sits unscrubbed in a 0600 file only while it runs. From the doctors, only named fields are kept. `~/.claude.json` and settings files are never read here.
     What doesn't hold: a secret that doesn't look like one, printed by npm or an installer, reaches the phone, as anywhere (risk 20). A failed update can leave a program broken: the version read back says so, and only a terminal fixes it. Claude Code restores its own binary on some npm failures; that wasn't run.
 23. **An app with Notification access can answer what a notification offers** (section 6, "Commands from outside the app"): Allow, Deny, Reply, an automation's answer, with nobody touching anything (Allow proven on an emulator). It needs a grant the person makes by hand in Android's settings. "Always" isn't offered there, and a notification's Allow keeps its own rules, but Allow alone runs the command. Not closed: closing it changes what a notification offers.
+
+24. **Agents' plans can be read on a paired phone** (`isAgentPlan` in `daemon/src/secretfiles.ts`; `docs/PROTOCOL.md`, "Agents' plans", 2026-11-03). Newly readable: a regular `*.md` whose real path is in or under `~/.codex/plans/` or `<CLAUDE_DIR>/plans/`, in a key place until now. Why: the owner opened a handoff doc from a session and it was refused, "should be able to view MD files". With a device token only, whatever Browse outside projects says, and viewing only: no download, Share, Save, listing, preview or write, and the rest of those folders stays closed, `auth.json`, credentials, sessions and `.claude.json` among them. What it doesn't stop: a plan is whatever an agent or the person wrote in it, and nothing is masked, here or in any file the viewer opens. So a secret pasted into a plan reaches a paired phone, and any program running as the user can copy a key into that folder as `x.md`, or hard-link it there, which can't be told from the file itself. Such a program can already read the key. A screenshot of it isn't stopped. `daemon/test/files.test.ts` tries each case with real links.
 
 ## 9. Reporting
 

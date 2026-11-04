@@ -7,18 +7,19 @@
 // itself too), read-only. Never a folder outside the home folder (other than the projects folder),
 // never the home folder's key places (secretfiles.ts: keys, keychains, mail, browsers' profiles, the
 // daemon's state and Claude Code's), and never a file with keys wherever it is. Links are followed
-// (realpath) before any of this is decided.
+// (realpath) before any of this is decided. One narrow exception, for viewing alone: Markdown in an
+// agent's plans folder ([agentPlan]).
 //
 // The new-session sheet's folder picker sees less and further ([listFolders]): only folders' names,
 // anywhere while that setting is on, so a session can start in any folder the owner picks.
-import { constants, existsSync, mkdirSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { constants, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { open, readdir, stat } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { CLAUDE_DIR, HOME, SUPPORT, log } from './util.ts'
 import { settings, saveSettings } from './store.ts'
 import { broadcast, listSessionRecs, view } from './hub.ts'
-import { isSecretFile, keyPlacesIn } from './secretfiles.ts'
+import { isAgentPlan, isSecretFile, keyPlacesIn } from './secretfiles.ts'
 import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile } from './attachments.ts'
 import { mimeByName, needsSniff, sniff } from './mime.ts'
 import { MACHINE, ON_MAC } from './platform.ts'
@@ -275,6 +276,22 @@ function checked(p: string): string {
   throw c.code === 'locked_folder' ? lockedFolder() : outside(c.setting)
 }
 
+/**
+ * [p]'s real path when it's a plan a client may read though it's in a key place ([isAgentPlan]),
+ * whatever "Browse outside projects" says: the setting is about sessions' own folders. Only viewing
+ * asks ([fileFor]): it stays a key place to [checkPath], so to listings, downloads, previews and all
+ * else. Not a regular file, not a plan; a name that isn't there goes on to say so, as any file gone.
+ */
+function agentPlan(p: string): string | null {
+  const real = realOr(p)
+  if (!isAgentPlan(real, [realOr(join(HOME, '.codex')), realOr(CLAUDE_DIR)])) return null
+  try {
+    return lstatSync(real).isFile() ? real : null
+  } catch {
+    return real
+  }
+}
+
 /** A file system error as the phone's code: gone, not a folder, blocked by macOS' privacy, unreadable. */
 function fsError(e: any, what: 'folder' | 'file'): FileError {
   switch (e?.code) {
@@ -469,10 +486,12 @@ export async function listFolders(p: string | null, hidden = false): Promise<Fol
  * The file the phone may read at [p] (a project's, or an attachment of its own), checked: its
  * real path, size, type and whether it's an attachment. Throws a [FileError].
  */
-export async function fileFor(p: string, max: number | null): Promise<{ full: string; size: number; mtime: number; mime: string; attachment: boolean }> {
+export async function fileFor(p: string, max: number | null): Promise<{ full: string; size: number; mtime: number; mime: string; attachment: boolean; viewOnly: boolean }> {
   const attached = p ? attachmentFile(p) : null
   if (!attached && p && resolve(p).startsWith(ATTACH_DIR + sep)) throw new FileError(404, 'attachment_gone', `This attachment is no longer on the ${MACHINE} (they’re kept for 30 days).`)
-  const full = attached ?? checked(p)
+  // [max] null is viewing; a download has its limit, so a plan isn't one (docs/PROTOCOL.md, "Agents' plans").
+  const plan = !attached && max === null ? agentPlan(p) : null
+  const full = attached ?? plan ?? checked(p)
   let s
   try {
     s = await stat(full)
@@ -482,9 +501,9 @@ export async function fileFor(p: string, max: number | null): Promise<{ full: st
   if (s.isDirectory()) throw new FileError(400, 'is_dir', 'That’s a folder, not a file.')
   if (!attached && isSecretFile(full)) throw new FileError(403, 'secret_file', `Files with keys and passwords stay on the ${MACHINE}.`)
   const limit = max ?? (attached ? MAX_ATTACHMENT : VIEW_MAX)
-  if (s.size > limit) throw new FileError(413, 'too_large', `That file is ${mb(s.size)}; the phone ${max === DOWNLOAD_MAX ? 'downloads' : 'opens'} files up to ${mb(limit)}.`, { size: s.size, max: limit })
+  if (s.size > limit) throw new FileError(413, 'too_large', `That file is ${mb(s.size)}; the phone ${max === DOWNLOAD_MAX ? 'downloads' : 'opens'} files up to ${mb(limit)}.`, { size: s.size, max: limit, ...(plan ? { viewOnly: true } : {}) })
   const mime = mimeByName(full) ?? (needsSniff(full) ? ((await sniffFile(full)) ?? 'application/octet-stream') : 'application/octet-stream')
-  return { full, size: s.size, mtime: s.mtimeMs, mime, attachment: !!attached }
+  return { full, size: s.size, mtime: s.mtimeMs, mime, attachment: !!attached, viewOnly: !!plan }
 }
 
 const mb = (n: number) => (n >= 1024 * 1024 ? `${Math.round(n / (1024 * 1024))} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
@@ -528,7 +547,7 @@ export function parseByteRange(h: string | undefined, size: number): { start: nu
  * download carrying on after a dropped connection). [download]: saved under its own name, not
  * shown. A file removed or unreadable mid-way ends the response rather than leaving it hanging.
  */
-export async function sendChecked(req: IncomingMessage, res: ServerResponse, f: { full: string; size: number; mtime: number; mime: string; attachment?: boolean }, download: boolean, name = basename(f.full)): Promise<void> {
+export async function sendChecked(req: IncomingMessage, res: ServerResponse, f: { full: string; size: number; mtime: number; mime: string; attachment?: boolean; viewOnly?: boolean }, download: boolean, name = basename(f.full)): Promise<void> {
   // Opened before the answer starts: a file that can't be read gets its code, not a cut-off body.
   // A file the phone browsed to was checked at its real path, so it isn't a link: one put there
   // since the check (pointing at a key) is refused, not followed.
@@ -546,6 +565,8 @@ export async function sendChecked(req: IncomingMessage, res: ServerResponse, f: 
     etag,
     'last-modified': new Date(f.mtime).toUTCString(),
     'content-disposition': contentDisposition(name, download ? 'attachment' : 'inline'),
+    // So a client doesn't offer Share and Save on a file that won't download.
+    ...(f.viewOnly ? { 'x-hypernova-view-only': '1' } : {}),
   }
   // A resume only from the same file: one changed since gets the whole of it again.
   const ifRange = req.headers['if-range']

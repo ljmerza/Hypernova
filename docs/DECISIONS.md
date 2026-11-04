@@ -4419,3 +4419,17 @@ The owner: "a feature so I could see background commands running it says in code
 8. **Read-only, and no output viewer.** No stop button: from the phone it could only go through the model (`TaskStop`) or the terminal's panel, so it's left for the owner to ask for. The output file is read only for its last line, on the daemon, and isn't sent: the chat has nothing that would show it without a new route.
 9. **Codex:** nothing. Not measured (Codex isn't installed where this was built).
 10. **Not proven:** a real model's session (the measurement scripted the provider); the Agent SDK's sessions; a Mac (paths and `/private/tmp`); other Claude Code versions, which may word these differently. A shape not recognised shows nothing, or only what a Stop's list says.
+
+## Agents' plans on the phone, and Markdown raw first (2026-11-03)
+
+The owner, on a file he opened from a session, `~/.codex/plans/handoff-….md`, refused as a key place: "tried to view a handoff doc and got this. should be able to view MD files", "in formatted and raw view", and then "raw by default".
+
+1. **A narrow exception, not an open folder.** A regular `*.md` whose real path is in or under `~/.codex/plans/` or `<CLAUDE_DIR>/plans/` can be read. The rest of those folders stays closed. One small function says so (`isAgentPlan`), and every other check in the daemon still counts these files as in a key place (docs/PROTOCOL.md, "Agents' plans"; docs/SECURITY-MODEL.md, section 8, risk 24).
+2. **Reading only: no download, Share, Save or Open with,** though a project's Markdown has them. A download is one more way out of a folder that holds sign-ins, and he asked to view. The server says view only, and the phone leaves those buttons off with one line on why. The owner can widen this.
+3. **No listing.** The viewer has Back and no breadcrumb, so it never needs the folder's names.
+4. **Browse outside projects has no say.** It opens sessions' own folders, and this isn't one. A tool row in a session whose folder is closed opens a path that looks like a plan too (`mayBeAgentPlan`), and the server decides.
+5. **Judged on the real path.** A link from elsewhere that leads to a plan opens that plan, the same file anyone may read at its own path. One that leads anywhere else stays closed, and so does a `plans` that is itself a link.
+6. **Raw first, everywhere the viewer opens Markdown.** Every opening starts on Raw, with the switch to Formatted, for any `.md` or `.markdown`, not only plans. The viewer keeps nowhere a last choice or a per-file one, and none was added. Before this the viewer only had the raw lines, so nothing assumed formatted first.
+7. **Formatted is the chat's Markdown,** the same drawing, a block to a row of a list so a long document scrolls. No second renderer. A file over the viewer's 512 KB of text is cut, in both views, with the line it already had.
+8. **Where plans really are.** Claude Code's binary (2.1.317) defaults to `<config dir>/plans`; its `plansDirectory` setting has to stay inside the project, where a project's rules apply. Codex's (0.164.0) names no plans folder, so what writes to `~/.codex/plans` isn't Codex by itself: a skill or a prompt, as far as can be told. `CODEX_HOME` isn't followed: the exception is the key place's own `~/.codex`.
+9. **Not proven.** Nothing has run on a real phone or a Mac's disk. A Mac's mixed case rests on its native realpath, as the key places do, and on a Linux test that another spelling is another folder.

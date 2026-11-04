@@ -4,7 +4,8 @@
 // (ranges, names, types), previews that never serve keys, and error codes the phone acts on.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, realpathSync, rmSync, symlinkSync, writeFileSync, ftruncateSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync, ftruncateSync } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -472,6 +473,229 @@ test('a session isn’t started in a folder that isn’t there, inside the proje
     assert.equal(r.status, 400, projectPath)
     assert.equal(r.json.error.code, 'bad_project', projectPath)
   }
+})
+
+// Agents' plans (docs/PROTOCOL.md, "Agents' plans"), on a real disk: with real links, and with the
+// setting off and on. Read only, and nothing round the rest of the folder.
+const PLAN_TEXT = '# Handoff\n\nWhere things stand. PLAN-MARKER\n'
+const KEY_TEXT = 'KEY-MARKER'
+function plantPlans() {
+  const CODEX = join(HOME, '.codex')
+  const CLAUDE = process.env.CLAUDE_CONFIG_DIR!
+  const PLANS = join(CODEX, 'plans')
+  mkdirSync(join(PLANS, 'older'), { recursive: true })
+  mkdirSync(join(PLANS, '.ssh'), { recursive: true })
+  mkdirSync(join(PLANS, 'folder.md'), { recursive: true })
+  mkdirSync(join(CODEX, 'sessions'), { recursive: true })
+  mkdirSync(join(CLAUDE, 'plans'), { recursive: true })
+  mkdirSync(join(CLAUDE, 'projects', 'memory'), { recursive: true })
+  mkdirSync(join(HOME, 'notes'), { recursive: true })
+  mkdirSync(join(HOME, 'through'), { recursive: true })
+  for (const f of [join(CODEX, 'auth.json'), join(CODEX, 'config.toml'), join(CODEX, 'AGENTS.md'), join(CODEX, 'history.md'), join(CODEX, 'sessions', 'rollout.md'), join(CODEX, 'state.sqlite'), join(PLANS, 'auth.json'), join(PLANS, 'config.toml'), join(PLANS, 'x.md.bak'), join(PLANS, '.env.md'), join(PLANS, '.ssh', 'hidden.md'), join(CLAUDE, 'CLAUDE.md'), join(CLAUDE, 'credentials.json'), join(CLAUDE, 'settings.json'), join(CLAUDE, 'projects', 'memory', 'MEMORY.md'), join(HOME, '.claude.json'), join(HOME, 'notes', 'elsewhere.md')])
+    writeFileSync(f, KEY_TEXT)
+  for (const f of [join(PLANS, 'handoff.md'), join(PLANS, 'SHOUTING.MD'), join(PLANS, 'older', 'deep.md'), join(CLAUDE, 'plans', 'quiet-river.md')]) writeFileSync(f, PLAN_TEXT)
+  const link = (target: string, at: string) => {
+    rmSync(at, { force: true, recursive: true })
+    symlinkSync(target, at)
+  }
+  // Links in the folder: to a key, to a note elsewhere, a folder out, one that's broken, and one staying in.
+  link(join(CODEX, 'auth.json'), join(PLANS, 'escape.md'))
+  link(join(HOME, 'notes', 'elsewhere.md'), join(PLANS, 'away.md'))
+  link(CODEX, join(PLANS, 'up'))
+  link(join(HOME, 'notes'), join(PLANS, 'out'))
+  link(join(CODEX, 'nothing-here'), join(PLANS, 'broken.md'))
+  link(join(PLANS, 'handoff.md'), join(PLANS, 'also-handoff.md'))
+  // Links from elsewhere, each judged on where it really leads.
+  link(CODEX, join(HOME, 'through', 'codex'))
+  link(join(CODEX, 'auth.json'), join(HOME, 'through', 'auth.md'))
+  link(join(CODEX, 'AGENTS.md'), join(HOME, 'through', 'agents.md'))
+  link(join(PLANS, 'handoff.md'), join(HOME, 'through', 'plan.md'))
+  link(join(CODEX, 'auth.json'), join(APP, 'looks-like-a-plan.md'))
+  return { CODEX, CLAUDE, PLANS, link }
+}
+
+for (const outside of [false, true]) {
+  test(`an agent’s plans read on the phone, Browse outside projects ${outside ? 'on' : 'off'}: Markdown there and nothing else`, async () => {
+    const { CODEX, CLAUDE, PLANS } = plantPlans()
+    files.setBrowseOutside(outside)
+    try {
+      const allowed = [join(PLANS, 'handoff.md'), join(PLANS, 'SHOUTING.MD'), join(PLANS, 'older', 'deep.md'), join(CLAUDE, 'plans', 'quiet-river.md'), join(PLANS, 'also-handoff.md'), join(PLANS, 'older', '..', 'handoff.md'), join(HOME, 'through', 'plan.md'), join(HOME, 'through', 'codex', 'plans', 'handoff.md')]
+      for (const p of allowed) {
+        const r = await get(`/v1/file?path=${q(p)}`)
+        assert.equal(r.status, 200, p)
+        assert.equal(r.body.toString(), PLAN_TEXT, p)
+        assert.match(String(r.headers['content-type']), /^text\/markdown/, p)
+        assert.equal(r.headers['x-hypernova-view-only'], '1', p)
+        assert.equal(r.headers['cache-control'], 'no-store', p)
+      }
+      const refused = [
+        join(CODEX, 'auth.json'), join(CODEX, 'config.toml'), join(CODEX, 'AGENTS.md'), join(CODEX, 'history.md'), join(CODEX, 'sessions', 'rollout.md'), join(CODEX, 'state.sqlite'),
+        join(PLANS, 'auth.json'), join(PLANS, 'config.toml'), join(PLANS, 'x.md.bak'), join(PLANS, '.env.md'), join(PLANS, '.ssh', 'hidden.md'),
+        join(CLAUDE, 'CLAUDE.md'), join(CLAUDE, 'credentials.json'), join(CLAUDE, 'settings.json'), join(CLAUDE, 'projects', 'memory', 'MEMORY.md'), join(HOME, '.claude.json'),
+        // A link named x.md, a folder link inside plans, a broken one: judged on where they lead.
+        join(PLANS, 'escape.md'), join(PLANS, 'broken.md'), join(PLANS, 'up', 'auth.json'), join(PLANS, 'up', 'AGENTS.md'),
+        // .. tricks, written straight and through a link.
+        `${PLANS}/../auth.json`, `${PLANS}/../AGENTS.md`, `${PLANS}/older/../../auth.json`, `${PLANS}/handoff.md/../../auth.json`,
+        // Through a link from elsewhere, whatever it's called.
+        join(HOME, 'through', 'codex', 'auth.json'), join(HOME, 'through', 'codex', 'AGENTS.md'), join(HOME, 'through', 'auth.md'), join(HOME, 'through', 'agents.md'), join(APP, 'looks-like-a-plan.md'),
+        // Folders.
+        PLANS, join(PLANS, 'older'), join(PLANS, 'folder.md'),
+      ]
+      for (const p of refused) {
+        const r = await get(`/v1/file?path=${q(p)}`)
+        assert.equal(r.status, 403, p)
+        assert.equal(r.json.error.code, 'locked_folder', p)
+        assert.ok(!r.body.toString().includes(KEY_TEXT), p)
+      }
+      // A link in plans to a note elsewhere is that note, by the usual rules: closed, or with the
+      // setting on open as the session's folder here is (the home folder). Never as a plan.
+      const away = await get(`/v1/file?path=${q(join(PLANS, 'away.md'))}`)
+      assert.equal(away.headers['x-hypernova-view-only'], undefined)
+      assert.equal(away.status, outside ? 200 : 403)
+      if (!outside) assert.equal(away.json.error.code, 'outside_projects')
+      // A plan gone since says so: not as a place that stays on the server.
+      const gone = await get(`/v1/file?path=${q(join(PLANS, 'gone.md'))}`)
+      assert.equal(gone.status, 404)
+      assert.equal(gone.json.error.code, 'not_found')
+    } finally {
+      files.setBrowseOutside(false)
+    }
+  })
+
+  test(`an agent’s plans stay read only, Browse outside projects ${outside ? 'on' : 'off'}: no download, listing, preview or way in`, async () => {
+    const { CODEX, CLAUDE, PLANS } = plantPlans()
+    const plan = join(PLANS, 'handoff.md')
+    files.setBrowseOutside(outside)
+    try {
+      for (const p of [plan, join(CLAUDE, 'plans', 'quiet-river.md'), join(HOME, 'through', 'plan.md')]) {
+        const d = await get(`/v1/file?path=${q(p)}&download=1`)
+        assert.equal(d.status, 403, p)
+        assert.equal(d.json.error.code, 'locked_folder', p)
+        assert.ok(!d.body.toString().includes('PLAN-MARKER'), p)
+      }
+      // No listing: the folder, the one above it and a folder inside it. Neither of the browsers' routes.
+      for (const dir of [PLANS, CODEX, join(PLANS, 'older'), join(CLAUDE, 'plans'), CLAUDE]) {
+        for (const route of ['files', 'folders']) {
+          const r = await get(`/v1/${route}?path=${q(dir)}`)
+          assert.equal(r.status, 403, `${route} ${dir}`)
+          assert.equal(r.json.error.code, 'locked_folder', `${route} ${dir}`)
+          assert.ok(!r.body.toString().includes('handoff'), `${route} ${dir}`)
+        }
+      }
+      // It stays a key place to everything that isn't the viewer.
+      assert.equal(files.allowedPath(plan), null)
+      assert.equal(files.workPath(plan), null)
+      assert.equal(files.keyPlace(realpathSync(plan)), true)
+      assert.equal(files.reach(realpathSync(PLANS)), 'none')
+      const c = files.checkPath(plan)
+      assert.equal(c.ok, false)
+      if (!c.ok) assert.equal(c.code, 'locked_folder')
+      const preview = await send('POST', '/v1/preview', { 'content-type': 'application/json' }, JSON.stringify({ path: plan }))
+      assert.equal(preview.status, 403)
+      // Nothing writes: the route takes GET and HEAD alone, and the file is as it was.
+      for (const m of ['PUT', 'POST', 'DELETE', 'PATCH']) {
+        const r = await send(m, `/v1/file?path=${q(plan)}`, { 'content-type': 'application/json' }, '{"content":"written"}')
+        assert.ok(r.status >= 400, m)
+      }
+      assert.equal(readFileSync(plan, 'utf8'), PLAN_TEXT)
+      // A HEAD reads nothing out.
+      const head = await send('HEAD', `/v1/file?path=${q(plan)}`)
+      assert.equal(head.status, 200)
+      assert.equal(head.body.length, 0)
+    } finally {
+      files.setBrowseOutside(false)
+    }
+  })
+}
+
+test('an agent’s plans: the plans folder itself a link leading elsewhere opens nothing', async () => {
+  const { CLAUDE, link } = plantPlans()
+  const real = join(CLAUDE, 'plans')
+  const secrets = join(CLAUDE, 'projects', 'memory')
+  link(secrets, real)
+  try {
+    const r = await get(`/v1/file?path=${q(join(real, 'MEMORY.md'))}`)
+    assert.equal(r.status, 403)
+    assert.equal(r.json.error.code, 'locked_folder')
+    assert.ok(!r.body.toString().includes(KEY_TEXT))
+  } finally {
+    rmSync(real)
+  }
+})
+
+test('an agent’s plans: the agent’s folder moved by a link still has its plans, and only them', async () => {
+  const { CODEX } = plantPlans()
+  const moved = join(HOME, 'dotfiles', 'codex')
+  mkdirSync(join(moved, 'plans'), { recursive: true })
+  writeFileSync(join(moved, 'plans', 'kept.md'), PLAN_TEXT)
+  writeFileSync(join(moved, 'auth.json'), KEY_TEXT)
+  writeFileSync(join(moved, 'README.md'), KEY_TEXT)
+  const held = join(HOME, 'codex-was-here')
+  execFileSync('mv', [CODEX, held])
+  symlinkSync(moved, CODEX)
+  try {
+    const ok = await get(`/v1/file?path=${q(join(CODEX, 'plans', 'kept.md'))}`)
+    assert.equal(ok.status, 200)
+    assert.equal(ok.body.toString(), PLAN_TEXT)
+    // The rest of the moved folder isn't a plan: refused, as locked or as outside the folders.
+    for (const f of ['auth.json', 'README.md']) {
+      const r = await get(`/v1/file?path=${q(join(CODEX, f))}`)
+      assert.equal(r.status, 403, f)
+      assert.ok(!r.body.toString().includes(KEY_TEXT), f)
+      assert.equal(r.headers['x-hypernova-view-only'], undefined, f)
+    }
+  } finally {
+    rmSync(CODEX)
+    execFileSync('mv', [held, CODEX])
+  }
+})
+
+test('an agent’s plans: a regular file only, the viewer’s size limit, and a link swapped in after the check is refused', async () => {
+  const { PLANS } = plantPlans()
+  // A pipe named x.md would hold the read open for ever: refused without reading it.
+  if (process.platform !== 'win32') {
+    execFileSync('mkfifo', [join(PLANS, 'pipe.md')])
+    const r = await get(`/v1/file?path=${q(join(PLANS, 'pipe.md'))}`)
+    assert.equal(r.json.error.code, 'locked_folder')
+    rmSync(join(PLANS, 'pipe.md'))
+  }
+  const huge = join(PLANS, 'huge.md')
+  closeSync(openSync(huge, 'w'))
+  const fd = openSync(huge, 'r+')
+  ftruncateSync(fd, files.VIEW_MAX + 1)
+  closeSync(fd)
+  const big = await get(`/v1/file?path=${q(huge)}`)
+  assert.equal(big.status, 413)
+  assert.equal(big.json.error.code, 'too_large')
+  assert.equal(big.json.error.max, files.VIEW_MAX)
+  assert.equal(big.json.error.viewOnly, true, 'so the phone doesn’t offer a download that can’t work')
+  rmSync(huge)
+  // The result says so, for sendChecked's header.
+  assert.equal((await files.fileFor(join(PLANS, 'handoff.md'), null)).viewOnly, true)
+  // A project's Markdown isn't marked: it downloads as ever.
+  writeFileSync(join(APP, 'PLAN.md'), PLAN_TEXT)
+  const project = await get(`/v1/file?path=${q(join(APP, 'PLAN.md'))}`)
+  assert.equal(project.status, 200)
+  assert.equal(project.headers['x-hypernova-view-only'], undefined)
+  assert.equal((await get(`/v1/file?path=${q(join(APP, 'PLAN.md'))}&download=1`)).status, 200)
+  // Checked, then replaced by a link to the key before it's opened.
+  const swapped = join(PLANS, 'swapped.md')
+  writeFileSync(swapped, PLAN_TEXT)
+  const f = await files.fileFor(swapped, null)
+  rmSync(swapped)
+  symlinkSync(join(HOME, '.codex', 'auth.json'), swapped)
+  const sent: Buffer[] = []
+  const res = { headersSent: false, writeHead() { return this }, setHeader() {}, on() {}, end() {}, write: (c: Buffer) => void sent.push(c) } as any
+  await assert.rejects(files.sendChecked({ headers: {}, method: 'GET' } as any, res, f, false), (e: any) => e.code === 'not_found')
+  assert.equal(Buffer.concat(sent).toString(), '')
+  rmSync(swapped)
+})
+
+test('an agent’s plans: what’s in them never reaches the daemon’s log', async () => {
+  const { PLANS } = plantPlans()
+  assert.equal((await get(`/v1/file?path=${q(join(PLANS, 'handoff.md'))}`)).status, 200)
+  const logs = process.env.HYPERNOVA_LOGS!
+  for (const f of existsSync(logs) ? readdirSync(logs) : []) assert.ok(!readFileSync(join(logs, f), 'utf8').includes('PLAN-MARKER'), f)
 })
 
 test('the content disposition keeps any name, and ranges read as RFC 9110 says', () => {
