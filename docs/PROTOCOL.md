@@ -2020,6 +2020,39 @@ RawFile = {
 }
 ```
 
+### AgentRules
+
+The answer to `GET /v1/agents/rules`. Rules: see Permission rules.
+
+```ts
+AgentRules =
+  | {
+      agent: "claude", supported: true,
+      where,                  // "~/.claude/settings.json"
+      state: "ok" | "missing" | "malformed" | "unreadable",   // unreadable: not a plain file, or over 256 KB
+      whyNot: "link" | "read_only" | "no_folder" | "unreadable" | null,   // shown, and nothing can be changed
+      hash: string | null,    // what a change sends back as `expected`
+      lists: { allow: RuleList, ask: RuleList, deny: RuleList } | null,   // null unless ok or missing
+      undo: { needsConfirm: boolean, change: string } | null,             // `change`: in words, secrets kept back
+    }
+  | { agent: "codex", supported: false, rulesFiles: number | null }       // *.rules in its rules folder, by count
+
+RuleList = {
+  rules: RuleRow[] | null,    // null: something other than a list, which makes Claude Code skip the whole file
+  others: number,             // entries that aren't text, which it drops
+}
+
+RuleRow = {
+  index: number,              // its place in the file's list, counting everything there
+  text: string,               // a numbered placeholder where a secret stays on the server
+  masked: boolean,
+  problem?: string,           // Claude Code would skip it
+  warning?: string,           // it reads it, though not as it looks
+  broad?: string,             // on Allow: what it lets through, plainly
+  overriddenBy?: "ask" | "deny", overrides?: string,   // that list wins whatever the call, through this rule
+}
+```
+
 ### EnvList
 
 The answer to `GET /v1/agents/env`. Rules: see An agent's environment variables.
@@ -2997,18 +3030,20 @@ An older daemon answers 404 to each. The first three: see Agent settings.
 #### PUT /v1/agents/settings
 
 - **Body:** `{agent, key, value, expected}`. `expected` is the reply's `hash`, or null for a file
-  that isn't there yet. `value` may be null only for a model's effort, to take it out.
+  that isn't there yet. `value` may be null only for a model's effort, to take it out. Or, for a
+  permission rule, `{agent, rule, expected, confirmed?, asTyped?}`: see Permission rules.
 - **Answer:** `200 SettingChange`. A change goes out as `{t:"agent_settings"}`.
-- **Refusals:** see Agent settings, "Changing one".
+- **Refusals:** see Agent settings, "Changing one", and Permission rules.
 - **Rules:** one key of the shorter list, or a model's effort. The server flags `loosened`; confirming with
   the owner is the client's part.
 
 #### POST /v1/agents/settings/undo
 
-- **Body:** `{agent, expected}`
+- **Body:** `{agent, expected, confirmed?}`. `confirmed` counts only for a change to the permission rules.
 - **Answer:** `200 {ok: true, agent, key, hash: string | null, loosened}`; `hash` is null when the
   change had made the file, and it's gone again. Goes out as `{t:"agent_settings"}`.
-- **Refusals:** 400 `bad_request`, `bad_agent`, `bad_expected`; 409 `file_changed`,
+- **Refusals:** 400 `bad_request`, `bad_agent`, `bad_expected`; 403 `confirm_needed` (the rules, when
+  going back would loosen them); 409 `file_changed`,
   `nothing_to_undo`, `undo_refused`, `file_is_link`, `file_read_only`, `file_unreadable`, `no_folder`;
   500 `write_failed`
 - **Rules:** that agent's last change put back, one step. See Agent settings, "Undo".
@@ -3298,6 +3333,14 @@ Query: `agent`, `scope`, `folder` (else the home folder). Answers `RawFile`. 400
 #### POST /v1/agents/raw/undo
 
 `{agent, confirmRun?}`. The file as it was before the last save, byte for byte, while it's what that save left. Going back is judged as a change: 403 `confirm_run`, 409 `undo_refused`, `nothing_to_undo`, `file_changed`.
+
+### Routes: permission rules
+
+A paired device only. Rules: see Permission rules. An older daemon answers 404.
+
+#### GET /v1/agents/rules
+
+Query: `agent`. Answers `AgentRules`, a 200 whatever state the file is in.
 
 ### Routes: agents' environment variables
 
@@ -6059,6 +6102,44 @@ Claude Code's three `settings*.json` files, named by scope (user, project, local
 **What's allowed.** The old and new documents are compared key by key. A change that would turn on bypass is refused, 403 `raw_refused`, with the key named, confirmed or not; the same key unchanged isn't a change, and moving off one is fine. A change that runs code or widens a permission needs `confirmRun`, else 403 `confirm_run`, whose message lists each path with its new value, secrets kept back. Any key not on the plain list counts, so a key this daemon has never heard of asks.
 
 The Android app: `ui/settings/RawScreens.kt`, `Route.AgentRaw`, from the List and JSON switch on Claude Code's settings screen. Folding is the app's alone (`data/JsonFold.kt`): what's saved is always the whole text.
+
+### Permission rules
+
+(`daemon/src/agent-rules.ts`, `daemon/src/rule-text.ts`; docs/DECISIONS.md, "Permission rules, edited"; the risk: docs/SECURITY-MODEL.md, 25.) Routes: `GET /v1/agents/rules`, and `PUT /v1/agents/settings` with `rule`. Type: `AgentRules`.
+
+Claude Code's `permissions.allow`, `ask` and `deny` in the user-level `settings.json`, and nothing else of any file. For the rules in effect in one session, project ones included, read-only: "Rules in effect". Codex has no such lists: `supported: false`, and how many `*.rules` files are in its rules folder, never what's in them.
+
+**What leaves.** Each rule through `maskedRule`, with a numbered `<hidden on the server 1>` over each secret: what a tool row masks (`Secrets.maskCommand`), plus a URL's parameters and secret-named flags. If the pieces don't line up, the whole rule is one placeholder.
+
+**A change.** `{agent: "claude", expected, confirmed?, asTyped?, rule}`, `rule` being one of:
+
+| `rule` | What it does |
+|---|---|
+| `{op: "add", list, text}` | Trimmed, then put at the end of `list`. Already there: `changed: false` |
+| `{op: "edit", list, index, text}` | A placeholder goes back as the secret it stands for. The same rule: `changed: false` |
+| `{op: "delete", list, index}` | Takes it out; a list left empty stays as `[]` |
+| `{op: "move", list, index, to}` | Takes it out of `list` and adds it to `to`, unless `to` has it |
+
+`list` and `to` are `allow`, `ask` or `deny`. `index` is `RuleRow.index`, which means what the client saw because `expected` is the file's hash. The answer is `SettingChange`, with `key: "permissions.rules"` and `value: null`. Only that element's bytes change; the rest is compared afterwards, with the backup, one-step Undo, `{t:"agent_settings"}` and log line as for any key. The log says which list and what was done, never the rule.
+
+**What loosens,** decided here: anything added to Allow; any edit; a delete from Ask or Deny; a move from Deny to Ask, or to Allow from either. Without `confirmed: true` it's 403 `confirm_needed`, whose message says what it does, naming a broad rule's reach (`broadWords`), and a client shows those words on a plain confirm. Everything else tightens, and asks nothing. Undo is judged the same way, from the two files: `undo.needsConfirm` says so in advance.
+
+| Status | Code | When (nothing is written in any of them) |
+|---|---|---|
+| 400 | `bad_request`, `bad_expected` | Not that shape |
+| 400 | `bad_rule` | Claude Code would skip it, or an edit would repeat a rule in that list. For the first, `asTyped: true` keeps it as typed, and its row then has `problem` |
+| 400 | `bad_value` | Over 8 KB, or control characters other than a tab or a new line |
+| 400 | `masked_value`, `placeholder_unknown` | It has `•••` in it, or a placeholder this rule never gave out |
+| 403 | `confirm_needed` | It loosens, without `confirmed` |
+| 409 | `not_for_codex` | Codex |
+| 409 | `file_changed` | The file isn't what `expected` says, also just before the rename; or `index` isn't a rule |
+| 409 | `unsupported_shape` | `list` or `to` isn't a list in the file |
+| 409 | `file_malformed`, `file_is_link`, `file_read_only`, `file_unreadable`, `no_folder` | As for any key |
+| 500 | `write_failed` | The write failed; the file is as it was |
+
+**What's judged** (`judgeRule`): Claude Code's own check, `Tke` in 2.1.317, held to `claude doctor` by `test/rules-e2e.test.ts`. A bad rule in the file is skipped by Claude Code on its own and the rest of the file holds, but a list that isn't a list makes it skip the whole file. Measured results: docs/DECISIONS.md, "Permission rules, edited", 5.
+
+The apps: `sharedui`'s `ui/settings/AgentRulesParts.kt`, framed by `ui/settings/AgentRulesScreen.kt` (`Route.AgentRules`) on the phone and `desktop/ui/RulesScreen.kt` on the desktop. On a 404 to the GET they say the server needs updating.
 
 ### Updating an agent
 
