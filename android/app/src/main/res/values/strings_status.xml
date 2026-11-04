@@ -36,6 +36,16 @@
     <string name="status_fold">Fold the to-do list</string>
     <string name="status_expand_agents">Show the workflow\'s agents</string>
     <string name="status_fold_agents">Fold the workflow\'s agents</string>
+    <string name="status_expand_details">Show the details</string>
+    <string name="status_fold_details">Fold the details</string>
+    <string name="status_detail_turn">This turn</string>
+    <string name="status_detail_tokens">Tokens</string>
+    <string name="status_detail_step">This step</string>
+    <string name="status_detail_at_once">At once</string>
+    <plurals name="status_detail_commands">
+        <item quantity="one">%1$d command</item>
+        <item quantity="other">%1$d commands</item>
+    </plurals>
     <string name="status_open">Open</string>
     <string name="status_folded">Folded</string>
     <!-- TalkBack: what the bar reads. %1$s is the sentence above, so no full stop of its own. -->

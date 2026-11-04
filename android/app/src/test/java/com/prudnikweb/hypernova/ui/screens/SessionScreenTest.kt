@@ -554,7 +554,7 @@ class SessionScreenTest {
 
     private fun box() = rule.onNode(hasSetTextAction())
     private fun panelToggle() = rule.onNode(hasClickLabel(str(R.string.status_fold_main)))
-    private fun panelList() = rule.onNode(hasScrollAction() and hasAnyDescendant(hasContentDescription("Explore", substring = true) or hasContentDescription("To-do", substring = true)))
+    private fun panelList() = rule.onNode(hasScrollAction() and hasAnyDescendant(hasText("npm test", substring = true) or hasContentDescription("Explore", substring = true) or hasContentDescription("To-do", substring = true)))
 
     /** The box is whole, inside the window and above the keyboard, and the bar ends above it. */
     private fun assertBoxHasRoom(keyboard: Dp = 0.dp) {

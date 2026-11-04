@@ -235,6 +235,7 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
     val res = LocalContext.current.resources
     val said = away ?: sayText(model.say)
     val turnMs = barClockMs(session.turnStartedAt, session.turn, barAgents, since, now)
+    val details = barDetails(session.activity, session.turnStartedAt, session.turn, now)
     // A running workflow's own time and tokens, as Claude Code's footer writes them (19m08s,
     // ↓ 181.1k); otherwise the turn's clock.
     val run = workflow?.takeIf { model.hasWorkflow }
@@ -251,7 +252,12 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
     val listsAgents = model.hasWorkflow && agents.isNotEmpty()
     // No workflow: the main agent and the agents it runs, a row each.
     val listsMain = model.hasAgents
-    val expandable = model.hasTodos || listsAgents || listsMain
+    // It opens whenever Claude works and there's something to say (owner, 2026-11-03). The chevron stays
+    // what it was: nothing new on the folded bar, so a plain line wears one only once it's open.
+    val hinted = model.hasTodos || listsAgents || listsMain
+    val expandable = hinted || (model.tone == BarTone.Working && details.any)
+    // The rows above the agents in the opened list.
+    val top = if (details.any) 1 else 0
     val saidAloud = if (away == null && model.say.kind == SayKind.MainAndAgents) pluralStringResource(R.plurals.status_main_agents_said, model.say.n, model.say.n) else said
     val spoken = when {
         model.hasWorkflow && away == null && model.say.kind == SayKind.Workflow ->
@@ -265,6 +271,7 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
         when {
             listsAgents -> if (open) R.string.status_fold_agents else R.string.status_expand_agents
             listsMain -> if (open) R.string.status_fold_main else R.string.status_expand_main
+            !model.hasTodos && model.tone == BarTone.Working -> if (open) R.string.status_fold_details else R.string.status_expand_details
             else -> if (open) R.string.status_fold else R.string.status_expand
         },
     )
@@ -301,7 +308,7 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
                 }
                 Spacer(Modifier.width(10.dp))
                 HText(time, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
-                if (expandable) {
+                if (hinted || (open && expandable)) {
                     Spacer(Modifier.width(8.dp))
                     Icon(Glyph.Chevron, Modifier.rotate(if (open) 90f else -90f), size = 12.dp, color = HN.inkDim)
                 }
@@ -314,16 +321,23 @@ private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, wor
         if (open && listsAgents) {
             // The running agent stays in view.
             val at = agents.indexOfFirst { it.running }
-            PanelList(todos, follow = if (at > 1) at - 1 else 0, Modifier.weight(1f, fill = false).panelBody()) {
+            PanelList(todos, follow = if (at > 1) at - 1 + top else 0, Modifier.weight(1f, fill = false).panelBody(), atTop = details.any) {
+                detailRows(details)
                 items(agents, key = { it.id }) { WorkflowAgentRow(it) }
             }
         } else if (open && listsMain) {
             // The newest agent stays in view, with the one before it.
-            PanelList(todos, follow = if (barAgents.size > 3) barAgents.size - 1 else 0, Modifier.weight(1f, fill = false).panelBody()) {
+            PanelList(todos, follow = if (barAgents.size > 3) barAgents.size - 1 + top else 0, Modifier.weight(1f, fill = false).panelBody(), atTop = details.any) {
+                detailRows(details)
                 item(key = "main") { MainRow(model, turnMs) }
                 items(barAgents, key = { it.id }) { a -> BarAgentRow(a, now, onOpen = { onOpenAgent(a.id) }) }
             }
-        } else if (open && expandable) TodoChecklist(todos, Modifier.weight(1f, fill = false).panelBody())
+        } else if (open && expandable && !details.any) TodoChecklist(todos, Modifier.weight(1f, fill = false).panelBody())
+        else if (open && expandable) {
+            // The to-do Claude is on stays in view as the list moves on, under the details and the to-dos' heading.
+            val at = todos.indexOfFirst { it.status == TodoStatus.Active }
+            PanelList(todos, follow = if (at > 1) at + 1 else 0, Modifier.weight(1f, fill = false).panelBody(), atTop = true) { detailRows(details) }
+        }
         StatusLine(model, tone, Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 10.dp), frozen = away != null)
     }
 }
@@ -467,11 +481,13 @@ private fun sayText(s: Say): String = when (s.kind) {
  * one, since a list each couldn't share a small panel (the first took all of it, leaving the to-dos
  * out of reach). It follows the agents ([follow], a row to bring into view; 0 for none), not the
  * to-dos, whose tally stays in the row above: two things to follow in one list would pull it about.
+ * [atTop]: the details are its first row: it opens on them, and follows only once something moves on.
  */
 @Composable
-private fun PanelList(todos: List<Todo>, follow: Int, modifier: Modifier = Modifier, rows: LazyListScope.() -> Unit) {
+private fun PanelList(todos: List<Todo>, follow: Int, modifier: Modifier = Modifier, atTop: Boolean = false, rows: LazyListScope.() -> Unit) {
     val list = rememberLazyListState()
-    LaunchedEffect(follow) { if (follow > 0) list.animateScrollToItem(follow) }
+    val opened = remember { follow }
+    LaunchedEffect(follow) { if (follow > 0 && !(atTop && follow == opened)) list.animateScrollToItem(follow) }
     LazyColumn(
         modifier.fillMaxWidth().panelViewport(list),
         state = list,
@@ -483,6 +499,42 @@ private fun PanelList(todos: List<Todo>, follow: Int, modifier: Modifier = Modif
             item(key = "todo-heading") { TodoHeading(todos) }
             todoRows(todos)
         }
+    }
+}
+
+/**
+ * What the terminal says above its box, as the first row of the opened bar's list (owner, 2026-11-03):
+ * what it's doing whole, wrapped, then the turn's time and tokens, the step's time and how many
+ * commands run at once. What isn't known has no row. Commands running in the background (the session
+ * sheet's Agents tab) aren't here; a row of theirs would go last.
+ */
+private fun LazyListScope.detailRows(d: BarDetails) {
+    if (!d.any) return
+    item(key = "details") {
+        val res = LocalContext.current.resources
+        Column(Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            d.doing?.let { HText(it, style = if (d.isCommand) Type.monoSmall else Type.small, color = HN.ink, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) }
+            d.turnMs?.let { DetailRow(stringResource(R.string.status_detail_turn), spinnerDuration(it), durationSaid(res, it)) }
+            d.tokens?.let { DetailRow(stringResource(R.string.status_detail_tokens), stringResource(R.string.status_tokens_figure, ccTokens(it)), tokensSaid(res, it)) }
+            d.stepMs?.let { DetailRow(stringResource(R.string.status_detail_step), spinnerDuration(it), durationSaid(res, it)) }
+            if (d.atOnce > 0) {
+                val n = pluralStringResource(R.plurals.status_detail_commands, d.atOnce, d.atOnce)
+                DetailRow(stringResource(R.string.status_detail_at_once), n, n)
+            }
+        }
+    }
+}
+
+/** A fact in the opened bar: its name, its value on the right; TalkBack hears the two as one. */
+@Composable
+private fun DetailRow(name: String, value: String, said: String) {
+    Row(
+        Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = "$name, $said" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HText(name, style = Type.small, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(10.dp))
+        HText(value, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
     }
 }
 
