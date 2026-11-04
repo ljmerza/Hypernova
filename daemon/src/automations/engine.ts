@@ -993,7 +993,7 @@ export class Automations {
         }
         const mode = v.permissionMode ?? 'dontAsk'
         if (!['dontAsk', 'default', 'acceptEdits', 'auto', 'bypassPermissions'].includes(mode)) throw bad('bad_mode', 'That isn’t a permission mode for an automation.', `${at}.permissionMode`)
-        if (mode === 'bypassPermissions' && b.confirmBypass !== true) throw bad('confirm_bypass', 'Confirm “No asking” with your fingerprint or screen lock.', `${at}.permissionMode`)
+        if (mode === 'bypassPermissions' && b.confirmBypass !== true) throw bad('confirm_bypass', 'Confirm “No asking” first.', `${at}.permissionMode`)
         const text = prompt(v.prompt)
         // Words from another session or from outside ({result}, {prev}, {payload}…; it may have read
         // a web page) never go into a session that asks nothing before it acts.
@@ -1245,11 +1245,11 @@ export class Automations {
     }
     // Commands run on the Mac: every save of one that has them is confirmed by the owner's hand.
     const sh = steps.findIndex((st) => st.kind === 'shell')
-    if (sh >= 0 && b.confirmShell !== true) throw bad('confirm_shell', `Confirm with your fingerprint or screen lock that it may run commands on the ${MACHINE}.`, `steps[${sh}].command`)
+    if (sh >= 0 && b.confirmShell !== true) throw bad('confirm_shell', `Confirm that it may run commands on the ${MACHINE}.`, `steps[${sh}].command`)
     // So is every save of one with a No asking start, also one whose steps are kept as they were
     // (an old client's {kind: "workflow"}): its trigger or name may be what changed.
     const nb = steps.findIndex((st) => st.kind === 'start' && st.permissionMode === 'bypassPermissions')
-    if (nb >= 0 && b.confirmBypass !== true) throw bad('confirm_bypass', 'Confirm “No asking” with your fingerprint or screen lock.', b.steps !== undefined ? `steps[${nb}].permissionMode` : 'action')
+    if (nb >= 0 && b.confirmBypass !== true) throw bad('confirm_bypass', 'Confirm “No asking” first.', b.steps !== undefined ? `steps[${nb}].permissionMode` : 'action')
     const template = b.template == null || b.template === '' ? null : str(b.template)
     if (template !== null && !/^[a-z][a-z0-9_]{0,31}$/.test(template)) throw bad('bad_template', 'That isn’t a template.', 'template')
     return { name, enabled, onlyOnce: trigger.kind === 'once' || b.onlyOnce === true, trigger, action: keptAction(steps, outputs), steps, outputs, budget, template, paidOk: agreed, secrets }

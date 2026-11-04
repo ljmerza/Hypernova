@@ -205,11 +205,11 @@ export type WorkflowInput = {
   budget?: Budget | null
   action?: Action | ActionMirror
   template?: string | null
-  /** Any start step in bypassPermissions: after the fingerprint (phone) or Touch ID (Mac). */
+  /** Any start step in bypassPermissions: after the client's confirm. */
   confirmBypass?: true
   /** Any start or continue step on a provider that costs money: after a confirmation. */
   confirmPaid?: true
-  /** Any shell step: after the fingerprint (phone) or Touch ID (Mac), on every save. */
+  /** Any shell step: after the client's confirm, on every save. */
   confirmShell?: true
 }
 /** A save's answer: [token] only when this save made a webhook trigger's token (shown once). */

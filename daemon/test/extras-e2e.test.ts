@@ -151,7 +151,7 @@ test('Claude Code: a marketplace and a plugin, in full, and what runs code when'
   write(join(mp, 'plugins/hello/.claude-plugin/plugin.json'), JSON.stringify({ name: 'hello', version: '2.0.0', description: 'A test plugin' }))
   const installed = async () => (await ok(call('GET', `/v1/agents/plugins${q({ agent: 'claude' })}`))).plugins[0].version
   await ok(call('POST', '/v1/agents/plugins/marketplaces/update', { ...claude, name: 'testmp' }))
-  assert.equal(await installed(), '1.0.0', 'Claude Code’s marketplace update moved an installed plugin: it needs the fingerprint now')
+  assert.equal(await installed(), '1.0.0', 'Claude Code’s marketplace update moved an installed plugin: it needs the confirm now')
   await ok(call('POST', '/v1/agents/plugins/update', { ...claude, plugin: 'hello@testmp', scope: 'user', confirmRun: true }))
   assert.equal(await installed(), '2.0.0')
   assert.equal(hookRuns(), 0, 'an update ran the plugin’s hook')
@@ -279,7 +279,7 @@ test('Codex: updating a marketplace from git moves an installed plugin to its ne
     assert.equal((await call('POST', '/v1/agents/plugins/marketplaces/update', { ...codex, name: 'gitmp' })).body.error.code, 'confirm_run')
     assert.equal(await version(), '1.0.0', 'a refused update changed something')
     await ok(call('POST', '/v1/agents/plugins/marketplaces/update', { ...codex, name: 'gitmp', confirmRun: true }))
-    assert.equal(await version(), '2.0.0', 'Codex’s marketplace update no longer moves a plugin: it may not need the fingerprint now')
+    assert.equal(await version(), '2.0.0', 'Codex’s marketplace update no longer moves a plugin: it may not need the confirm now')
     assert.ok(existsSync(join(CODEX, 'plugins/cache/gitmp/moved/2.0.0/hooks.json')), 'the new version’s hooks came with it')
     assert.equal(hookRuns(), 0, 'the update ran the plugin’s hook')
     await ok(call('POST', '/v1/agents/plugins/uninstall', { ...codex, plugin: 'moved@gitmp' }))

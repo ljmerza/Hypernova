@@ -4,8 +4,8 @@
 // from a process (mcp-probe.ts). The one file written here is a folder's `.claude/settings.local.json`, for
 // approving a project's server, as Claude Code's own dialog does: it has no command for that.
 //
-// Adding or changing a stdio server is running a program on the server. The server can't see a fingerprint,
-// so the phone's check is only a claim (`confirmRun`), as `confirmShell` is for an automation; it's refused without one.
+// Adding or changing a stdio server is running a program on the server. The server can't see a person,
+// so the client's confirm is only a claim (`confirmRun`), as `confirmShell` is for an automation; it's refused without one.
 
 import { dbgProc } from './debug-log.ts'
 import { execFile } from 'node:child_process'
@@ -161,7 +161,7 @@ export function formConfig(body: Record<string, unknown>, original: RawConfig | 
   return { name: name as string, config, secrets, clientSecret }
 }
 
-/** Whether going from [before] to [after] changes what would run on the server: the thing the fingerprint is for. */
+/** Whether going from [before] to [after] changes what would run on the server: the thing the confirm is for. */
 export function changesWhatRuns(before: unknown, after: unknown): boolean {
   if (transportOf(after) !== 'stdio') return false
   if (transportOf(before) !== 'stdio' || !isTable(before) || !isTable(after)) return true
@@ -306,7 +306,7 @@ export type Changed = { ok: true; name: string; scope: Scope; hash: string | nul
 export function addServer(body: Record<string, unknown>, scope: Scope, folder: string | null): Promise<Changed> {
   return serial(async () => {
     const form = formConfig(body)
-    if (changesWhatRuns(null, form.config) && body.confirmRun !== true) refuse('confirm_run', 'Adding this runs a program on the server. Confirm it with your fingerprint or screen lock.', 403)
+    if (changesWhatRuns(null, form.config) && body.confirmRun !== true) refuse('confirm_run', 'Adding this runs a program on the server. Confirm it first.', 403)
     projectFileOk(scope, folder)
     if (await findConfig(form.name, scope, folder)) refuse('exists', 'There’s already a server of that name there.', 409)
     await addJson(form.name, scope, folder, form.config, form.clientSecret, form.secrets)
@@ -328,7 +328,7 @@ export function editServer(body: Record<string, unknown>, scope: Scope, folder: 
     if (!found || !isTable(found.config)) throw new McpRefused(404, 'no_server', 'That server isn’t there any more.')
     if (body.expected !== configHash(found.config)) throw new McpRefused(409, 'file_changed', 'That server changed on the server since this was read. Nothing was written.')
     const form = formConfig(body, found.config)
-    if (changesWhatRuns(found.config, form.config) && body.confirmRun !== true) refuse('confirm_run', 'This changes what runs on the server. Confirm it with your fingerprint or screen lock.', 403)
+    if (changesWhatRuns(found.config, form.config) && body.confirmRun !== true) refuse('confirm_run', 'This changes what runs on the server. Confirm it first.', 403)
     projectFileOk(scope, folder)
     if (isDeepStrictEqual(found.config, form.config) && !form.clientSecret) return { ok: true, name: form.name, scope, hash: configHash(found.config) }
     await removeOne(form.name, scope, folder)
@@ -346,7 +346,7 @@ export function editServer(body: Record<string, unknown>, scope: Scope, folder: 
   })
 }
 
-/** POST /v1/agents/mcp/servers/remove. No fingerprint: it stops something running, and Undo can put it back. */
+/** POST /v1/agents/mcp/servers/remove. No confirm: it stops something running, and Undo can put it back. */
 export function removeServer(body: Record<string, unknown>, scope: Scope, folder: string | null): Promise<Changed> {
   return serial(async () => {
     const found = typeof body.name === 'string' ? await findConfig(body.name, scope, folder) : null
@@ -367,7 +367,7 @@ export function undoLast(body: Record<string, unknown>): Promise<{ ok: true; nam
     if (!last) throw new McpRefused(409, 'nothing_to_undo', 'There’s no change here to undo.')
     const now = await findConfig(last.name, last.scope, last.folder)
     if (!isDeepStrictEqual(now?.config ?? null, last.after)) throw new McpRefused(409, 'file_changed', 'That server changed on the server since. Nothing was written.')
-    if (last.before !== null && changesWhatRuns(last.after, last.before) && body.confirmRun !== true) refuse('confirm_run', 'Putting this back runs a program on the server. Confirm it with your fingerprint or screen lock.', 403)
+    if (last.before !== null && changesWhatRuns(last.after, last.before) && body.confirmRun !== true) refuse('confirm_run', 'Putting this back runs a program on the server. Confirm it first.', 403)
     if (last.after !== null) await removeOne(last.name, last.scope, last.folder)
     if (last.before !== null) {
       await addJson(last.name, last.scope, last.folder, last.before, null, [])
@@ -403,7 +403,7 @@ export function setApproval(body: Record<string, unknown>, folder: string): Prom
     const yes = body.approved === true
     if (!yes && body.approved !== false) refuse('bad_request', 'Say yes or no.')
     if (!(await findConfig(name as string, 'project', folder))) throw new McpRefused(404, 'no_server', 'That server isn’t in this folder’s .mcp.json.')
-    if (yes && body.confirmRun !== true) refuse('confirm_run', 'Approving this runs a program on the server. Confirm it with your fingerprint or screen lock.', 403)
+    if (yes && body.confirmRun !== true) refuse('confirm_run', 'Approving this runs a program on the server. Confirm it first.', 403)
     const { root } = await readClaudeConfig()
     if (yes && !folderTrusted(root, folder)) refuse('not_trusted', 'Claude Code hasn’t been told to trust this folder yet, so it wouldn’t read this. Start a session there and accept its question first.', 409)
     const dir = join(folder, '.claude')

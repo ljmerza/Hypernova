@@ -2,6 +2,6 @@
   "status": 403,
   "error": {
     "code": "confirm_run",
-    "message": "LD_PRELOAD: (not set) → /tmp/x.so changes what runs or where data goes. Confirm it with your fingerprint or screen lock."
+    "message": "LD_PRELOAD: (not set) → /tmp/x.so changes what runs or where data goes. Confirm it first."
   }
 }

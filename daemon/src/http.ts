@@ -587,7 +587,7 @@ async function api(c: Ctx): Promise<void> {
     return json(res, 200, { awake: r.awake })
   }
   // Browse outside projects (files.ts): sessions' folders in the home folder, read-only. The phone
-  // asks for the fingerprint before it turns it on.
+  // confirms before it turns it on.
   if (path === '/v1/mac/files' && m === 'GET') return json(res, 200, { files: filesState() })
   if (path === '/v1/mac/files' && m === 'POST') {
     const b = await readJsonBody(req)

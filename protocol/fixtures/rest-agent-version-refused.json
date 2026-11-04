@@ -2,6 +2,6 @@
   "status": 403,
   "error": {
     "code": "confirm_run",
-    "message": "Updating Claude Code runs its updater on the server. Confirm it with your fingerprint or screen lock."
+    "message": "Updating Claude Code runs its updater on the server. Confirm it first."
   }
 }

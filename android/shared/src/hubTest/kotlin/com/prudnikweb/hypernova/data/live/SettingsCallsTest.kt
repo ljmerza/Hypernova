@@ -152,7 +152,7 @@ class SettingsCallsTest {
         assertTrue(last("GET", "/v1/agents/version").query.contains("agent=claude"))
         answer("POST", "/v1/agents/version/check", "rest-agent-version-checked")
         assertTrue(rig.call { rig.hub.checkAgentVersion("claude") }.getOrThrow().canUpdate)
-        // A check needs no fingerprint, and doesn't claim one.
+        // A check needs no confirm, and doesn't claim one.
         assertFalse(last("POST", "/v1/agents/version/check").json.has("confirmRun"))
         answer("POST", "/v1/agents/version/update", "rest-agent-version-updated")
         assertEquals("2.1.320", rig.call { rig.hub.updateAgent("claude") }.getOrThrow().job?.to)
@@ -168,7 +168,7 @@ class SettingsCallsTest {
         val refused = rig.call { rig.hub.updateAgent("codex") }.exceptionOrNull()
         assertTrue(refused is AgentSettingRefused)
         assertEquals("confirm_run", (refused as AgentSettingRefused).code)
-        assertTrue(refused.message!!, refused.message!!.contains("fingerprint"))
+        assertTrue(refused.message!!, refused.message!!.contains("Confirm it first"))
         // A server from before this has no such route.
         assertTrue(rig.call { rig.hub.agentVersion("codex") }.exceptionOrNull() is AgentSettingsTooOld)
         assertTrue(rig.call { rig.hub.checkAgentVersion("codex") }.exceptionOrNull() is AgentSettingsTooOld)

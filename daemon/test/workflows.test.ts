@@ -896,7 +896,7 @@ test('a budget in points of the 5-hour window: the window as it was when the run
   assert.equal(w.notes().at(-1).text, 'It stopped: it reached its budget of 10 points of the 5-hour window.')
 })
 
-test('shell steps: the fingerprint on every save, safe placeholders only (shell-quoted), outside words through the environment', () => {
+test('shell steps: the confirm on every save, safe placeholders only (shell-quoted), outside words through the environment', () => {
   const { e } = setup()
   const sh = (o: Record<string, unknown> = {}) => ({ kind: 'shell', projectPath: PROJECT, command: 'npm test', ...o })
   assert.deepEqual(err(() => e.create(base({ steps: [sh()] }))), { code: 'confirm_shell', field: 'steps[0].command', status: 400 })

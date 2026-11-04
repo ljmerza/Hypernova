@@ -5,7 +5,7 @@
 // environment its config sets, which reaches the commands it runs and not Codex itself or its MCP servers.
 //
 // A value that looks secret, or sits under a name that says so, never leaves: the row says it's masked, and a new one is
-// write-only. What changes what runs or where data goes needs the owner's fingerprint, on the server too (`confirmRun`).
+// write-only. What changes what runs or where data goes needs a confirm, required by the server too (`confirmRun`).
 // What would turn on bypass, or tell Claude Code a folder is trusted, can't be set from a phone at all, only taken away.
 
 import { randomBytes } from 'node:crypto'
@@ -252,12 +252,12 @@ function wanted(body: Record<string, unknown>, removing: boolean): { name: strin
   return { name: name as string, value: value as string, flip: false }
 }
 
-/** The fingerprint's claim and the outright refusal, whoever's asking. [off]: taking the variable away, which is always allowed for a refused one. */
+/** The confirm's claim and the outright refusal, whoever's asking. [off]: taking the variable away, which is always allowed for a refused one. */
 function allowed(name: string, off: boolean, body: Record<string, unknown>, from: Stored | null, to: Stored | null): void {
   const guard = guardOf(name)
   if (guard === 'refused' && !off) refuse(403, 'env_refused', `${name} would turn off a permission or trust check, so it can’t be set from a phone. Set it on the server.`)
-  if (guard === 'guarded' && !off && body.confirmRun !== true) refuse(403, 'confirm_run', `${changeWords(name, from, to)} changes what runs or where data goes. Confirm it with your fingerprint or screen lock.`)
-  if (guard === 'guarded' && off && body.confirmRun !== true) refuse(403, 'confirm_run', `Taking ${name} away changes what runs or where data goes. Confirm it with your fingerprint or screen lock.`)
+  if (guard === 'guarded' && !off && body.confirmRun !== true) refuse(403, 'confirm_run', `${changeWords(name, from, to)} changes what runs or where data goes. Confirm it first.`)
+  if (guard === 'guarded' && off && body.confirmRun !== true) refuse(403, 'confirm_run', `Taking ${name} away changes what runs or where data goes. Confirm it first.`)
 }
 
 const stale = () => new McpRefused(409, 'file_changed', 'That file changed on the server since this was read. Nothing was written.')
@@ -365,7 +365,7 @@ export function claudeUndo(body: Record<string, unknown>) {
     const cur = readChecked(file)
     if ((cur?.hash ?? null) !== last!.wrote) throw stale()
     if (last!.before !== null && guardOf(last!.name) === 'refused') refuse(409, 'undo_refused', 'What was there before can’t be set from a phone. Its backup is on the server.')
-    if (guardOf(last!.name) === 'guarded' && body.confirmRun !== true) refuse(403, 'confirm_run', 'Putting this back changes what runs or where data goes. Confirm it with your fingerprint or screen lock.')
+    if (guardOf(last!.name) === 'guarded' && body.confirmRun !== true) refuse(403, 'confirm_run', 'Putting this back changes what runs or where data goes. Confirm it first.')
     let hash: string | null = null
     if (last!.backup === null) {
       rmSync(file, { force: true })
@@ -479,7 +479,7 @@ export function codexUndo(body: Record<string, unknown>) {
       const { version } = await codexRead(req)
       if (version !== last!.wrote) throw stale()
       if (last!.before !== null && guardOf(last!.name) === 'refused') refuse(409, 'undo_refused', 'What was there before can’t be set from a phone.')
-      if (guardOf(last!.name) === 'guarded' && body.confirmRun !== true) refuse(403, 'confirm_run', 'Putting this back changes what runs or where data goes. Confirm it with your fingerprint or screen lock.')
+      if (guardOf(last!.name) === 'guarded' && body.confirmRun !== true) refuse(403, 'confirm_run', 'Putting this back changes what runs or where data goes. Confirm it first.')
       const hash = await codexWrite(req, last!.name, last!.before, version)
       rmSync(lastFile('codex'), { force: true })
       return { ok: true, name: last!.name, scope: 'user', hash }
