@@ -13,6 +13,7 @@ import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.live.FakeDaemon
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
+import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
@@ -190,7 +191,7 @@ class RendersTest {
         pairedWith(d)
         waitForIdle()
         choose("Add idempotency keys to the payments webhook")
-        onRoot().performKeyInput { repeat(7) { pressKey(Key.Tab) } }
+        onRoot().performKeyInput { repeat(8) { pressKey(Key.Tab) } }
         onNodeWithText(Ui.allow.text()).assertIsFocused()
         ok(render("10-focus"))
     }
@@ -223,6 +224,44 @@ class RendersTest {
     @Test fun twoPanesOnAWhole4kScreenAt2x() = runDesktopComposeUiTest(3840, 2160) { panesWith("Add idempotency keys to the payments webhook", "36-panes-4k-2x", scale = 2f) }
 
     @Test fun twoPanesOnAWhole1080pScreen() = runDesktopComposeUiTest(1920, 1080) { panesWith("Wrong cursor position when pasting into a list", "37-panes-1080p-1x") }
+
+    // Statistics (StatsPaneTest says what it does).
+
+    private fun androidx.compose.ui.test.ComposeUiTest.statsAt(shot: String, scale: Float = 1f, all: Boolean = false) {
+        val d = daemon("atlas")
+        d.snapshot = snapshot("atlas", sessions = sessions())
+        d.on("GET", "/v1/stats") { req -> json(200, statsAnswer(req.query.substringAfter("range=", "week"))) }
+        setContent { Scaled(scale) { App(shell, reduced = true) } }
+        pairedWith(d)
+        if (all) {
+            val e = daemon("juniper")
+            e.snapshot = snapshot("juniper", sessions = sessions().drop(3).take(2))
+            e.on("GET", "/v1/stats") { req -> json(200, statsAnswer(req.query.substringAfter("range=", "week"), 3)) }
+            pairedWith(e)
+            until("two servers") { Core.statuses.size == 2 }
+        }
+        waitForIdle()
+        DesktopRig.main {
+            shell.page = Page.Statistics
+            shell.statsAll = all
+        }
+        until("the numbers") { onAllNodes(androidx.compose.ui.test.hasText(Core.platform.strings.text(com.prudnikweb.hypernova.data.Str.stats_work).uppercase())).fetchSemanticsNodes().isNotEmpty() }
+        waitForIdle()
+        ok(render(shot))
+        DesktopRig.main { shell.statsAll = false }
+    }
+
+    @Test fun statisticsOnAWhole1080pScreen() = runDesktopComposeUiTest(1920, 1080) { statsAt("40-stats-1080p") }
+
+    @Test fun statisticsOnAWhole4kScreenAt2x() = runDesktopComposeUiTest(3840, 2160) { statsAt("41-stats-4k-2x", 2f) }
+
+    @Test fun statisticsOnAWhole4kScreenAt1x() = runDesktopComposeUiTest(3840, 2160) { statsAt("42-stats-4k-1x") }
+
+    @Test fun statisticsInAMiddleWindow() = runDesktopComposeUiTest(1100, 1300) { statsAt("43-stats-middle") }
+
+    @Test fun statisticsInANarrowWindow() = runDesktopComposeUiTest(520, 1900) { statsAt("44-stats-narrow") }
+
+    @Test fun statisticsAddedUp() = runDesktopComposeUiTest(1600, 1000) { statsAt("45-stats-all-servers", all = true) }
 
     @Test fun twoServers() = runDesktopComposeUiTest(960, 720) {
         val a = daemon("atlas")

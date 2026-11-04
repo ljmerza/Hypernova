@@ -120,7 +120,7 @@ private val COLUMN = 720.dp
 /** Under this, in dp, one pane at a time: the list, or the chosen session with a way back. */
 internal val TWO_PANES = 760.dp
 /** Enough for the buttons and the widest the logo, name and chip are with an ordinary server's name. */
-private val TOP_BAR_ONE_LINE = 920.dp
+private val TOP_BAR_ONE_LINE = 1020.dp
 private val LIST_MIN = 340.dp
 private val LIST_MAX = 460.dp
 /** Off-link cards stay, as last heard, and step back. */
@@ -139,8 +139,9 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
     // As the phone's Home: what's ended is in History (Session.onHome).
     val groups = groupsOf(hub.sessions.filter { it.onHome })
     val onSessions = shell.page == Page.Sessions
+    val onStats = shell.page == Page.Statistics
     val history = shell.historyOf(server)
-    val full = rememberFullText(hub, if (onSessions) "" else history.query)
+    val full = rememberFullText(hub, if (shell.page == Page.History) history.query else "")
     val now by produceState(System.currentTimeMillis()) {
         while (true) {
             delay(30_000)
@@ -180,6 +181,7 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
         val listWidth = (maxWidth * 0.42f).coerceIn(LIST_MIN, LIST_MAX)
         /** An arrow key: the next row chosen, or marked in one pane. False if there's nowhere to go. */
         fun walk(step: Int): Boolean {
+            if (onStats) return false
             if (!twoPanes && chosenId != null) return false
             val next = neighbour(order, if (twoPanes) chosenId else cursor, step) ?: return false
             if (twoPanes) choose(next) else cursor = next
@@ -241,6 +243,7 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                 val form = @Composable { m: Modifier, back: (() -> Unit)? -> NewSessionPane(hub, shell, server, back, m) }
                 when {
+                    onStats -> StatsPane(hub, shell)
                     !twoPanes && shell.newSession -> form(Modifier.fillMaxSize().widthIn(max = PANE_MAX)) { shell.newSession = false; runCatching { keys.requestFocus() } }
                     !twoPanes && chosenId != null -> SessionPane(hub, chosenId, chosen, shell, stale, onBack = { choose(null); runCatching { keys.requestFocus() } }, Modifier.fillMaxSize().widthIn(max = PANE_MAX))
                     !twoPanes || (nothing && !shell.newSession) -> sessionList(Modifier.fillMaxSize())
@@ -305,11 +308,24 @@ private fun TopBar(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
     BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
         val oneLine = maxWidth >= TOP_BAR_ONE_LINE
         val buttons = @Composable {
-            Pill(Ui.new_session.text(), { shell.newSession = true }, kind = PillKind.Outline, height = 32.dp)
+            Pill(
+                Ui.new_session.text(),
+                {
+                    // Over Statistics it has no pane to go in.
+                    if (shell.page == Page.Statistics) shell.page = Page.Sessions
+                    shell.newSession = true
+                },
+                kind = PillKind.Outline, height = 32.dp,
+            )
             for (page in Page.entries) {
                 val on = shell.page == page
                 Pill(
-                    (if (page == Page.Sessions) Ui.sessions else Ui.history).text(), { shell.page = page },
+                    when (page) {
+                        Page.Sessions -> Ui.sessions
+                        Page.History -> Ui.history
+                        Page.Statistics -> Ui.stats_title
+                    }.text(),
+                    { shell.page = page },
                     Modifier.semantics { selected = on }, kind = if (on) PillKind.Primary else PillKind.Ghost, height = 32.dp,
                 )
             }
@@ -329,7 +345,7 @@ private fun TopBar(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
             }
             if (statuses.size > 1) {
                 Spacer(Modifier.height(8.dp))
-                Switcher(statuses)
+                Switcher(statuses, shell)
             }
         }
     }
@@ -348,14 +364,23 @@ private fun Identity(hub: Hub, shell: Shell, modifier: Modifier = Modifier) {
 /** One pill per paired server: a tap puts it on screen. [Core] already watches each. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Switcher(statuses: List<ServerStatus>) {
+private fun Switcher(statuses: List<ServerStatus>, shell: Shell) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Added up across every server: for Statistics only, as nothing else here shows several at once.
+        val adding = shell.page == Page.Statistics && shell.statsAll
+        if (shell.page == Page.Statistics) {
+            Pill(Ui.servers_all.text(), { shell.statsAll = true }, Modifier.semantics { selected = adding }, kind = if (adding) PillKind.Primary else PillKind.Ghost, height = 32.dp)
+        }
         // In the order they were paired, so a pill doesn't jump when it's picked.
         for (s in statuses.sortedBy { it.name.lowercase() }) {
             val word = if (s.needsYou > 0) "${s.name}  ${s.needsYou}" else s.name
             Pill(
-                word, { Core.switchTo(s.id) },
-                kind = if (s.active) PillKind.Primary else if (s.needsYou > 0) PillKind.Outline else PillKind.Ghost,
+                word,
+                {
+                    shell.statsAll = false
+                    Core.switchTo(s.id)
+                },
+                kind = if (s.active && !adding) PillKind.Primary else if (s.needsYou > 0) PillKind.Outline else PillKind.Ghost,
                 height = 32.dp,
             )
         }

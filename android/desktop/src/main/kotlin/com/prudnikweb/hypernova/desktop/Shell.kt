@@ -29,8 +29,8 @@ sealed interface PairState {
     data class Failed(val title: String, val body: String, val link: PairLink?) : PairState
 }
 
-/** Which list is on screen: what's alive, or History. Settings and pairing go over either and come back to it. */
-enum class Page { Sessions, History }
+/** What's under the top bar: what's alive, History, or Statistics. Settings and pairing go over any of them and come back to it. */
+enum class Page { Sessions, History, Statistics }
 
 /** One server's History as it was left, for as long as the window is open: nothing here is saved. */
 class HistoryView {
@@ -72,6 +72,8 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
     var page by mutableStateOf(Page.Sessions)
     /** New session is up in the right pane. */
     var newSession by mutableStateOf(false)
+    /** Statistics adds up every server, rather than the one on screen's. */
+    var statsAll by mutableStateOf(false)
 
     /** The logo was pressed: the list goes to its top once it's on screen ([goHome]). */
     var toTop by mutableStateOf(false)

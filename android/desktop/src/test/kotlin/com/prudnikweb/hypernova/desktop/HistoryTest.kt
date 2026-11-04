@@ -261,7 +261,8 @@ class HistoryTest {
         inPane(Ui.desk_pane_phone_only.text()).assertIsDisplayed()
     }
 
-    @Test fun narrowIsOnePaneAtATimeAndBackFindsTheList() = runDesktopComposeUiTest(600, 600) {
+    // 640 tall: at 600 wide the top bar's six buttons take two lines, and the pane's note is below 600.
+    @Test fun narrowIsOnePaneAtATimeAndBackFindsTheList() = runDesktopComposeUiTest(600, 640) {
         up()
         toHistory()
         onNode(hasTestTag(PANE_TAG)).assertDoesNotExist()

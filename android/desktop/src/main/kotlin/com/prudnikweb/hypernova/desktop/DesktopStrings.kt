@@ -234,6 +234,8 @@ enum class Ui {
     desk_zoom,
     desk_zoom_auto,
     desk_settings,
+    stats_title,
+    servers_all,
     desk_open_folder,
     desk_folder_failed,
     desk_folder_copied,
