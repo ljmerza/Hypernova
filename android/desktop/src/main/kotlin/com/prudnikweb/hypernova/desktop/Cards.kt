@@ -171,7 +171,7 @@ fun removeBody(kind: DeleteKind): String = when (kind) {
 }.text()
 
 /** A permission mode's name where it's chosen ("Ask first"), and Codex's. */
-fun modeTitle(mode: String): String = when (mode) {
+fun paneModeTitle(mode: String): String = when (mode) {
     "acceptEdits" -> Ui.mode_title_accept
     "plan" -> Ui.mode_title_plan
     "auto" -> Ui.mode_title_auto
@@ -182,7 +182,7 @@ fun modeTitle(mode: String): String = when (mode) {
 }.text()
 
 /** What a mode does, in one line. No line for Bypass: it isn't offered here. */
-fun modeLine(mode: String): String = when (mode) {
+fun paneModeLine(mode: String): String = when (mode) {
     "acceptEdits" -> Ui.mode_accept_desc
     "plan" -> Ui.mode_plan_desc
     "auto" -> Ui.mode_auto_desc

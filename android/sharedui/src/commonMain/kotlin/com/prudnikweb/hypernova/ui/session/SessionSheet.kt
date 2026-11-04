@@ -1,5 +1,10 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import com.prudnikweb.hypernova.data.SessionUsage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,9 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -50,8 +55,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.prudnikweb.hypernova.R
-import com.prudnikweb.hypernova.data.id
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Hub
@@ -83,7 +86,6 @@ import com.prudnikweb.hypernova.ui.home.MenuActions
 import com.prudnikweb.hypernova.ui.home.MenuOffer
 import com.prudnikweb.hypernova.ui.home.MenuPage
 import com.prudnikweb.hypernova.ui.home.SessionMenu
-import com.prudnikweb.hypernova.ui.home.modeLabel
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -120,17 +122,42 @@ internal fun SessionSheet(
     /** Sends /compact as the strip's chip does; there at any fullness, for a Claude Code session that can take it. */
     onCompact: (() -> Unit)? = null,
 ) {
-    val opener = LocalOpener.current
-    val change = canChange(session)
     // Rename or Delete from the actions, over the sheet (ui/home/SessionMenu.kt).
     var menuPage by remember { mutableStateOf<MenuPage?>(null) }
+    ChatSheet(stringResource(Str.session_sheet_title), onDismiss, scroll = false) {
+        SessionSheetBody(hub, session, usage, onModel, onSwitchAgent, onRetried, onEmptied, onDismiss, { menuPage = it }, atBlocked, atAgents, onCompact)
+    }
+    menuPage?.let { SessionMenu(hub, session, { menuPage = null }, start = it) }
+}
+
+/**
+ * The sheet's content, whatever it opens in: the phone's bottom sheet, or the desktop's panel beside the chat. [onMenu]: the actions' Rename, Delete and the rest,
+ * which open over it.
+ */
+@Composable
+internal fun ColumnScope.SessionSheetBody(
+    hub: Hub,
+    session: Session,
+    usage: SessionUsage?,
+    onModel: () -> Unit,
+    onSwitchAgent: (String) -> Unit,
+    onRetried: () -> Unit,
+    onEmptied: () -> Unit,
+    onDismiss: () -> Unit,
+    onMenu: (MenuPage) -> Unit,
+    atBlocked: Boolean = false,
+    atAgents: Boolean = false,
+    onCompact: (() -> Unit)? = null,
+) {
+    val opener = LocalOpener.current
+    val change = canChange(session)
     // The open tab, kept while the sheet is (a new one opens on Overview again).
     var tab by rememberSaveable { mutableStateOf(openingTab(atBlocked, atAgents)) }
     // The blocked calls into view once, not each time Permissions is chosen again.
     var toBlocked by remember { mutableStateOf(atBlocked) }
     val agents = sheetAgents(hub.agents(session.id))
     val atWork = agentsAtWork(session, agents)
-    ChatSheet(stringResource(R.string.session_sheet_title), onDismiss, scroll = false) {
+    run {
         HText(session.name, style = Type.title, color = HN.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(2.dp))
         // As the header has it: the project, and its short id as a quiet mark after it.
@@ -140,7 +167,7 @@ internal fun SessionSheet(
             HText(session.hex, style = Type.monoSmall.copy(fontSize = 10.sp), color = HN.inkDim.copy(alpha = 0.75f), maxLines = 1)
         }
         Spacer(Modifier.height(10.dp))
-        val unknown = stringResource(R.string.model_default)
+        val unknown = stringResource(Str.model_default)
         SummaryLine(sheetSummary(session, atWork, if (usage == null) session.model else stripModel(usage, session.model, unknown)))
         Spacer(Modifier.height(14.dp))
         SheetTabs(tab, onTab = { tab = it })
@@ -151,25 +178,25 @@ internal fun SessionSheet(
             Column(Modifier.weight(1f, fill = false).heightIn(min = TAB_MIN_HEIGHT).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 when (tab) {
                     SheetTab.Overview -> {
-                        SheetSeam(stringResource(R.string.model))
+                        SheetSeam(stringResource(Str.model))
                         ModelPart(hub, session, usage, change, canChangeModel(session), onModel, onSwitchAgent)
                         // Claude Code's effort (EffortPart.kt), on the subscription only; Codex's goes with its model.
                         if (ClaudeEffort.shown(session)) {
-                            SheetSeam(stringResource(R.string.effort))
+                            SheetSeam(stringResource(Str.effort))
                             EffortPart(hub, session)
                         }
                         // Only the plan's windows: none for another provider, nor while they're unknown.
                         if (planShown(hub, session)) {
-                            SheetSeam(stringResource(R.string.session_sheet_usage))
+                            SheetSeam(stringResource(Str.session_sheet_usage))
                             UsageDetails(hub)
                         }
                         if (onCompact != null && change && !session.codex) {
                             Spacer(Modifier.height(12.dp))
-                            SheetLink(stringResource(R.string.chat_compact), null, { onCompact(); onDismiss() })
+                            SheetLink(stringResource(Str.chat_compact), null, { onCompact(); onDismiss() })
                         }
                     }
                     SheetTab.Permissions -> {
-                        SheetSeam(stringResource(R.string.session_sheet_permissions))
+                        SheetSeam(stringResource(Str.session_sheet_permissions))
                         PermissionsPart(hub, session, canChangeMode(session), toBlocked, onRetried, onEmptied, onBrought = { toBlocked = false })
                         // Why the waiting ask asked (WhyAsked.kt); with several, each says it under "Asks waiting".
                         if (!session.codex) WhyAskedPart(hub, session)
@@ -179,13 +206,13 @@ internal fun SessionSheet(
                         if (!session.codex) RulesPart(hub, session)
                     }
                     SheetTab.Agents -> {
-                        SheetSeam(stringResource(R.string.session_sheet_agents), trail = if (atWork > 0) stringResource(R.string.agents_running, atWork).uppercase() else null)
+                        SheetSeam(stringResource(Str.session_sheet_agents), trail = if (atWork > 0) stringResource(Str.agents_running, atWork).uppercase() else null)
                         AgentsPart(agents, atWork, onOpen = { id -> onDismiss(); opener.agent(session.id, id) })
                         // Its background commands (ShellsPart.kt): no seam when it has none, or the Mac doesn't say.
                         val shells = sheetShells(hub.agents(session.id))
                         if (shells.isNotEmpty()) {
                             val going = shellsAtWork(session, shells)
-                            SheetSeam(stringResource(R.string.session_sheet_shells), trail = if (going > 0) stringResource(R.string.agents_running, going).uppercase() else null)
+                            SheetSeam(stringResource(Str.session_sheet_shells), trail = if (going > 0) stringResource(Str.agents_running, going).uppercase() else null)
                             ShellsPart(shells)
                         }
                     }
@@ -193,17 +220,17 @@ internal fun SessionSheet(
                     SheetTab.Commands -> CommandsTab(hub, session, onDismiss, onModel)
                     SheetTab.Session -> {
                         // How it's going, then what it changed (SessionInfo.kt), before where it runs.
-                        SheetSeam(stringResource(R.string.session_sheet_time))
+                        SheetSeam(stringResource(Str.session_sheet_time))
                         TimePart(session)
-                        GitPart(hub, session) { SheetSeam(stringResource(R.string.session_sheet_git)) }
-                        SheetSeam(stringResource(R.string.session_sheet_where))
+                        GitPart(hub, session) { SheetSeam(stringResource(Str.session_sheet_git)) }
+                        SheetSeam(stringResource(Str.session_sheet_where))
                         WherePart(hub, session, onDismiss)
                         // The Home card's long-press menu.
                         if (MenuOffer.of(session).any) {
-                            SheetSeam(stringResource(R.string.session_sheet_actions))
+                            SheetSeam(stringResource(Str.session_sheet_actions))
                             // Its job runs an older Claude Code: said quietly, above Restart.
                             session.agentOutdated?.let { OutdatedNotice(it) }
-                            MenuActions(hub, session, { menuPage = it }, onDismiss)
+                            MenuActions(hub, session, onMenu, onDismiss)
                         }
                     }
                 }
@@ -211,10 +238,9 @@ internal fun SessionSheet(
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp), horizontalArrangement = Arrangement.End) {
-            Pill(stringResource(R.string.chat_close), onDismiss, kind = PillKind.Ghost, height = 44.dp)
+            Pill(stringResource(Str.chat_close), onDismiss, kind = PillKind.Ghost, height = 44.dp)
         }
     }
-    menuPage?.let { SessionMenu(hub, session, { menuPage = null }, start = it) }
 }
 
 /** The least a tab's parts take, so a short tab (no agents) doesn't shrink the sheet to a strip. */
@@ -236,17 +262,17 @@ internal fun SheetSeam(label: String, trail: String? = null) {
  */
 @Composable
 private fun SummaryLine(sum: SheetSummary) {
-    val res = LocalContext.current.resources
-    val words = modeLabel(sum.mode)
+    val res = wordsNow()
+    val words = modeWords(sum.mode)
     val ran = sum.ranMs?.let { formatDuration(res, it) }
-    val agentsText = pluralStringResource(R.plurals.agents_count, sum.atWork, sum.atWork)
-    val blockedText = pluralStringResource(R.plurals.blocked_chip, sum.blocked, sum.blocked)
+    val agentsText = pluralStringResource(Plural.agents_count, sum.atWork, sum.atWork)
+    val blockedText = pluralStringResource(Plural.blocked_chip, sum.blocked, sum.blocked)
     val said = buildString {
-        append(res.getString(R.string.meta_mode_said, words))
-        sum.model?.let { append(' ').append(res.getString(R.string.meta_model_said, it)) }
-        ran?.let { append(' ').append(res.getString(R.string.ran_for, it)).append('.') }
-        if (sum.showsAgents) append(' ').append(res.getQuantityString(R.plurals.session_sheet_agents_said, sum.atWork, sum.atWork))
-        if (sum.showsBlocked) append(' ').append(res.getQuantityString(R.plurals.blocked_mark_said, sum.blocked, sum.blocked))
+        append(res.getString(Str.meta_mode_said, words))
+        sum.model?.let { append(' ').append(res.getString(Str.meta_model_said, it)) }
+        ran?.let { append(' ').append(res.getString(Str.ran_for, it)).append('.') }
+        if (sum.showsAgents) append(' ').append(res.getQuantityString(Plural.session_sheet_agents_said, sum.atWork, sum.atWork))
+        if (sum.showsBlocked) append(' ').append(res.getQuantityString(Plural.blocked_mark_said, sum.blocked, sum.blocked))
     }
     val mode = buildList<@Composable () -> Unit> {
         add { ModeTag(sum.mode, words, color = HN.inkMuted) }
@@ -303,7 +329,7 @@ private fun SheetTabs(tab: SheetTab, onTab: (SheetTab) -> Unit) {
                             .padding(vertical = 9.dp, horizontal = 14.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        HText(stringResource(t.label.id), style = Type.small, color = if (on) HN.accent else HN.inkMuted, maxLines = 1)
+                        HText(stringResource(t.label), style = Type.small, color = if (on) HN.accent else HN.inkMuted, maxLines = 1)
                     }
                 }
             },
@@ -330,12 +356,12 @@ private fun SheetTabs(tab: SheetTab, onTab: (SheetTab) -> Unit) {
  */
 @Composable
 private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolean, changeModel: Boolean, onModel: () -> Unit, onSwitchAgent: (String) -> Unit) {
-    val res = LocalContext.current.resources
-    val id = modelId(usage, s.model, res.getString(R.string.model_default))
+    val res = wordsNow()
+    val id = modelId(usage, s.model, res.getString(Str.model_default))
     if (changeModel) ModelLine(s.model, onClick = onModel)
     else {
         val name = ModelNames.chip(s.model)
-        Row(Modifier.clearAndSetSemantics { contentDescription = res.getString(R.string.meta_model_said, name) }) { ModelChip(name) }
+        Row(Modifier.clearAndSetSemantics { contentDescription = res.getString(Str.meta_model_said, name) }) { ModelChip(name) }
     }
     if (id != null) {
         Spacer(Modifier.height(6.dp))
@@ -363,11 +389,13 @@ private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolea
 private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Boolean, onRetried: () -> Unit, onEmptied: () -> Unit, onBrought: () -> Unit) {
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
-    val context = LocalContext.current
-    val codexNextTurn = stringResource(R.string.cx_mode_next_turn)
-    val bypassNextTurn = stringResource(R.string.mode_bypass_next_turn)
-    val bypassTitle = stringResource(R.string.check_bypass_title)
-    val noLock = stringResource(R.string.check_no_lock)
+    val res = wordsNow()
+    val owner = SharedUi.platform.owner
+    val askOwner = owner.asker()
+    val codexNextTurn = stringResource(Str.cx_mode_next_turn)
+    val bypassNextTurn = stringResource(Str.mode_bypass_next_turn)
+    val bypassTitle = stringResource(Str.check_bypass_title)
+    val noLock = stringResource(Str.check_no_lock)
     when {
         change && s.codex -> com.prudnikweb.hypernova.ui.components.Segmented(
             AgentKind.CODEX_MODES.map { it to com.prudnikweb.hypernova.ui.home.modeTitle(it) },
@@ -388,24 +416,30 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Bo
                 }
                 // Bypass waits for the fingerprint or the screen lock too (docs/DECISIONS.md).
                 if (m != s.mode && m == "bypassPermissions") {
-                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, bypassTitle, s.name, noLock,
+                    askOwner.ask(
+                        bypassTitle, s.name, noLock,
                         onOk = { go() }, onFail = { msg -> if (msg != null) toast(msg) },
                     )
                 } else if (m != s.mode) go()
             },
             bypassAvailable = s.bypassAvailable,
+            // Where there's no check to pass, Bypass isn't offered, and it's said why under the picker.
+            bypass = owner.canCheck,
         )
         else -> {
-            val words = modeLabel(s.mode)
-            val said = context.resources.getString(R.string.meta_mode_said, words)
+            val words = modeWords(s.mode)
+            val said = res.getString(Str.meta_mode_said, words)
             ModeTag(s.mode, words, Modifier.padding(start = 4.dp).clearAndSetSemantics { contentDescription = said }, color = HN.inkMuted)
             Spacer(Modifier.height(6.dp))
             HText(
-                stringResource(if (s.phase == Phase.Ended) R.string.session_sheet_mode_ended else R.string.session_sheet_mode_watched),
+                stringResource(if (s.phase == Phase.Ended) Str.session_sheet_mode_ended else Str.session_sheet_mode_watched),
                 style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp),
             )
         }
+    }
+    if (change && !s.codex) owner.bypassNote()?.let { note ->
+        Spacer(Modifier.height(8.dp))
+        HText(note, style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp))
     }
     var seen by remember(s.id) { mutableStateOf(s.blockedCalls > 0) }
     LaunchedEffect(s.blockedCalls) { if (s.blockedCalls > 0) seen = true }
@@ -425,7 +459,7 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Bo
         Hairline(Modifier.fillMaxWidth())
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HText(stringResource(R.string.session_sheet_blocked).uppercase(), style = Type.label, color = HN.inkDim, modifier = Modifier.weight(1f))
+            HText(stringResource(Str.session_sheet_blocked).uppercase(), style = Type.label, color = HN.inkDim, modifier = Modifier.weight(1f))
             if (s.blockedCalls > 0) HText("${s.blockedCalls}", style = Type.monoSmall, color = HN.amber, maxLines = 1)
         }
         Spacer(Modifier.height(8.dp))
@@ -441,7 +475,7 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Bo
 private fun AgentsPart(agents: SheetAgents, atWork: Int, onOpen: (String) -> Unit) {
     if (agents.isEmpty) {
         // The board isn't on this phone yet: the seam's count says it.
-        if (atWork == 0) HText(stringResource(R.string.session_sheet_no_agents), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp))
+        if (atWork == 0) HText(stringResource(Str.session_sheet_no_agents), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp))
         return
     }
     // How long each has run, a second at a time while the sheet is open.
@@ -462,7 +496,7 @@ private fun AgentsPart(agents: SheetAgents, atWork: Int, onOpen: (String) -> Uni
 /** A running workflow: its name, and its agents done of those it has started so far. */
 @Composable
 private fun WorkflowRow(w: SheetWorkflow) {
-    val said = stringResource(R.string.session_sheet_workflow_said, w.name, w.done, w.started)
+    val said = stringResource(Str.session_sheet_workflow_said, w.name, w.done, w.started)
     Row(
         Modifier.fillMaxWidth().heightIn(min = 36.dp).clearAndSetSemantics { contentDescription = said }.padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -476,16 +510,16 @@ private fun WorkflowRow(w: SheetWorkflow) {
 /** One agent at work: a mint dot, its label, what it does now and how long it has run; a tap opens it. */
 @Composable
 private fun SheetAgentRow(a: WAgent, now: Long, indent: Boolean, onOpen: () -> Unit) {
-    val res = LocalContext.current.resources
-    val doing = a.activity?.takeIf { it.isNotBlank() } ?: stringResource(R.string.session_sheet_agent_working)
+    val res = wordsNow()
+    val doing = a.activity?.takeIf { it.isNotBlank() } ?: stringResource(Str.session_sheet_agent_working)
     val time = formatDuration(res, now - a.startedAt)
-    val said = stringResource(R.string.session_sheet_agent_said, a.label, doing, time)
+    val said = stringResource(Str.session_sheet_agent_said, a.label, doing, time)
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(10.dp))
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.session_sheet_open_agent), onClick = onOpen)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(Str.session_sheet_open_agent), onClick = onOpen)
             .semantics(mergeDescendants = true) { contentDescription = said }
             .padding(start = if (indent) 14.dp else 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -510,33 +544,33 @@ private fun SheetAgentRow(a: WAgent, now: Long, indent: Boolean, onOpen: () -> U
 private fun WherePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
     val opener = LocalOpener.current
     val cwd = s.cwd
-    if (cwd != null) InfoRow(stringResource(R.string.session_sheet_folder), cwd)
+    if (cwd != null) InfoRow(stringResource(Str.session_sheet_folder), cwd)
     // As the header's Folder button: quieter where only Browse outside projects would open it.
     if (cwd != null && (s.browsable || s.outsideProjects)) {
-        SheetLink(stringResource(R.string.files), null, { onDismiss(); opener.files(cwd, s.project) }, dim = !s.browsable)
+        SheetLink(stringResource(Str.files), null, { onDismiss(); opener.files(cwd, s.project) }, dim = !s.browsable)
         Spacer(Modifier.height(4.dp))
     }
     InfoRow(
-        stringResource(R.string.session_sheet_runs_in),
+        stringResource(Str.session_sheet_runs_in),
         stringResource(
             when (runsIn(s)) {
-                RunsIn.Terminal -> R.string.session_sheet_runs_terminal
-                RunsIn.Mac -> R.string.session_sheet_runs_mac
-                RunsIn.Watched -> R.string.session_sheet_runs_watched
+                RunsIn.Terminal -> Str.session_sheet_runs_terminal
+                RunsIn.Mac -> Str.session_sheet_runs_mac
+                RunsIn.Watched -> Str.session_sheet_runs_watched
             },
         ),
     )
     // A Codex session gets a terminal when it's asked for, as from the header.
     if (s.term != null || s.codex) {
-        SheetLink(stringResource(R.string.open_terminal), null, { onDismiss(); opener.terminal(s.id) })
+        SheetLink(stringResource(Str.open_terminal), null, { onDismiss(); opener.terminal(s.id) })
         Spacer(Modifier.height(4.dp))
     }
-    InfoRow(stringResource(R.string.session_sheet_agent), agentName(s.codex))
+    InfoRow(stringResource(Str.session_sheet_agent), agentName(s.codex))
     if (!s.codex) {
-        hub.providers.firstOrNull { it.id == (s.providerId ?: "anthropic") }?.let { InfoRow(stringResource(R.string.session_sheet_provider), it.name) }
+        hub.providers.firstOrNull { it.id == (s.providerId ?: "anthropic") }?.let { InfoRow(stringResource(Str.session_sheet_provider), it.name) }
     }
-    s.agentJob?.let { InfoRow(stringResource(R.string.session_sheet_job), it) }
-    InfoRow(stringResource(R.string.session_sheet_id), s.id)
+    s.agentJob?.let { InfoRow(stringResource(Str.session_sheet_job), it) }
+    InfoRow(stringResource(Str.session_sheet_id), s.id)
 }
 
 /**
@@ -546,7 +580,7 @@ private fun WherePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
 @Composable
 private fun OutdatedNotice(v: OutdatedClaude) {
     HText(
-        stringResource(R.string.session_outdated, v.runs, v.installed),
+        stringResource(Str.session_outdated, v.runs, v.installed),
         style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
     )
 }

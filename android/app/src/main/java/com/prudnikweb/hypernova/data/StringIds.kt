@@ -5,6 +5,7 @@ import com.prudnikweb.hypernova.R
 /** The string resource behind a [Str]: named in full, so R8 keeps what's used and drops the rest. */
 val Str.id: Int
     get() = when (this) {
+        Str.about_github_no_browser -> R.string.about_github_no_browser
         Str.activity_ended -> R.string.activity_ended
         Str.activity_error -> R.string.activity_error
         Str.activity_limit -> R.string.activity_limit
@@ -36,6 +37,11 @@ val Str.id: Int
         Str.agent_running_doing -> R.string.agent_running_doing
         Str.agent_starting -> R.string.agent_starting
         Str.agent_stopped -> R.string.agent_stopped
+        Str.agents_running -> R.string.agents_running
+        Str.ago_days -> R.string.ago_days
+        Str.ago_hours -> R.string.ago_hours
+        Str.ago_minutes -> R.string.ago_minutes
+        Str.ago_now -> R.string.ago_now
         Str.allow -> R.string.allow
         Str.allow_session -> R.string.allow_session
         Str.allowed -> R.string.allowed
@@ -69,9 +75,22 @@ val Str.id: Int
         Str.as_edit_err -> R.string.as_edit_err
         Str.as_edit_too_old -> R.string.as_edit_too_old
         Str.as_err -> R.string.as_err
+        Str.as_mcp -> R.string.as_mcp
+        Str.as_mcp_trouble -> R.string.as_mcp_trouble
         Str.as_too_old -> R.string.as_too_old
+        Str.aside_ask -> R.string.aside_ask
+        Str.aside_asking -> R.string.aside_asking
+        Str.aside_clipped -> R.string.aside_clipped
         Str.aside_err_ask -> R.string.aside_err_ask
         Str.aside_err_read -> R.string.aside_err_read
+        Str.aside_failed -> R.string.aside_failed
+        Str.aside_intro -> R.string.aside_intro
+        Str.aside_placeholder -> R.string.aside_placeholder
+        Str.aside_question -> R.string.aside_question
+        Str.aside_question_said -> R.string.aside_question_said
+        Str.aside_seam -> R.string.aside_seam
+        Str.aside_unreachable -> R.string.aside_unreachable
+        Str.aside_unseen -> R.string.aside_unseen
         Str.ask_answered -> R.string.ask_answered
         Str.ask_next -> R.string.ask_next
         Str.ask_show_less -> R.string.ask_show_less
@@ -173,11 +192,20 @@ val Str.id: Int
         Str.balance_left -> R.string.balance_left
         Str.balance_today -> R.string.balance_today
         Str.bash -> R.string.bash
+        Str.blocked_dismiss -> R.string.blocked_dismiss
+        Str.blocked_empty -> R.string.blocked_empty
         Str.blocked_err_dismiss -> R.string.blocked_err_dismiss
         Str.blocked_err_load -> R.string.blocked_err_load
         Str.blocked_err_retry -> R.string.blocked_err_retry
+        Str.blocked_intro -> R.string.blocked_intro
+        Str.blocked_loading -> R.string.blocked_loading
         Str.blocked_mark_open -> R.string.blocked_mark_open
         Str.blocked_provider -> R.string.blocked_provider
+        Str.blocked_reason_auto -> R.string.blocked_reason_auto
+        Str.blocked_reason_auto_why -> R.string.blocked_reason_auto_why
+        Str.blocked_reason_away -> R.string.blocked_reason_away
+        Str.blocked_retried -> R.string.blocked_retried
+        Str.blocked_retry -> R.string.blocked_retry
         Str.busy_body -> R.string.busy_body
         Str.busy_dismiss -> R.string.busy_dismiss
         Str.busy_replace -> R.string.busy_replace
@@ -185,7 +213,9 @@ val Str.id: Int
         Str.by_mac -> R.string.by_mac
         Str.by_terminal -> R.string.by_terminal
         Str.cancel -> R.string.cancel
+        Str.changes_entry -> R.string.changes_entry
         Str.changes_err -> R.string.changes_err
+        Str.chat_close -> R.string.chat_close
         Str.chat_compact -> R.string.chat_compact
         Str.chat_context_about_said -> R.string.chat_context_about_said
         Str.chat_context_said -> R.string.chat_context_said
@@ -207,18 +237,45 @@ val Str.id: Int
         Str.chat_todo_now -> R.string.chat_todo_now
         Str.chat_tokens_said -> R.string.chat_tokens_said
         Str.check_always_title -> R.string.check_always_title
+        Str.check_bypass_title -> R.string.check_bypass_title
         Str.check_no_lock -> R.string.check_no_lock
         Str.claude -> R.string.claude
         Str.clock_hours -> R.string.clock_hours
         Str.clock_secs -> R.string.clock_secs
+        Str.close -> R.string.close
         Str.collapse -> R.string.collapse
         Str.command_desc -> R.string.command_desc
         Str.command_desc_args -> R.string.command_desc_args
         Str.command_label -> R.string.command_label
+        Str.commands_builtin -> R.string.commands_builtin
+        Str.commands_compact_intro -> R.string.commands_compact_intro
+        Str.commands_compact_keep -> R.string.commands_compact_keep
+        Str.commands_effort_set -> R.string.commands_effort_set
+        Str.commands_hint -> R.string.commands_hint
+        Str.commands_loading -> R.string.commands_loading
+        Str.commands_no_terminal -> R.string.commands_no_terminal
+        Str.commands_none -> R.string.commands_none
+        Str.commands_pin -> R.string.commands_pin
+        Str.commands_pinned -> R.string.commands_pinned
+        Str.commands_pinned_toast -> R.string.commands_pinned_toast
+        Str.commands_recent -> R.string.commands_recent
+        Str.commands_seam -> R.string.commands_seam
+        Str.commands_search -> R.string.commands_search
+        Str.commands_sent -> R.string.commands_sent
+        Str.commands_terminal -> R.string.commands_terminal
+        Str.commands_terminal_mark -> R.string.commands_terminal_mark
+        Str.commands_unpin -> R.string.commands_unpin
+        Str.commands_unpinned_toast -> R.string.commands_unpinned_toast
+        Str.commands_unreachable -> R.string.commands_unreachable
+        Str.commands_yours -> R.string.commands_yours
         Str.copy_code -> R.string.copy_code
         Str.copy_table -> R.string.copy_table
         Str.cost -> R.string.cost
+        Str.cx_agent -> R.string.cx_agent
+        Str.cx_agent_claude -> R.string.cx_agent_claude
         Str.cx_agent_codex -> R.string.cx_agent_codex
+        Str.cx_done -> R.string.cx_done
+        Str.cx_effort -> R.string.cx_effort
         Str.cx_effort_high -> R.string.cx_effort_high
         Str.cx_effort_low -> R.string.cx_effort_low
         Str.cx_effort_medium -> R.string.cx_effort_medium
@@ -231,13 +288,27 @@ val Str.id: Int
         Str.cx_err_turn_off -> R.string.cx_err_turn_off
         Str.cx_err_turn_on -> R.string.cx_err_turn_on
         Str.cx_hint_went_on -> R.string.cx_hint_went_on
+        Str.cx_loading_models -> R.string.cx_loading_models
+        Str.cx_mode_can_edit -> R.string.cx_mode_can_edit
+        Str.cx_mode_can_edit_desc -> R.string.cx_mode_can_edit_desc
         Str.cx_mode_label_can_edit -> R.string.cx_mode_label_can_edit
         Str.cx_mode_label_read_only -> R.string.cx_mode_label_read_only
+        Str.cx_mode_next_turn -> R.string.cx_mode_next_turn
+        Str.cx_mode_read_only -> R.string.cx_mode_read_only
+        Str.cx_mode_read_only_desc -> R.string.cx_mode_read_only_desc
+        Str.cx_models_line -> R.string.cx_models_line
+        Str.cx_switch_to_claude -> R.string.cx_switch_to_claude
+        Str.cx_switch_to_codex -> R.string.cx_switch_to_codex
         Str.cx_went_on -> R.string.cx_went_on
         Str.debuglog_send_failed -> R.string.debuglog_send_failed
         Str.denied -> R.string.denied
         Str.denied_timeout -> R.string.denied_timeout
         Str.deny -> R.string.deny
+        Str.done_ago_days -> R.string.done_ago_days
+        Str.done_ago_hours -> R.string.done_ago_hours
+        Str.done_ago_minutes -> R.string.done_ago_minutes
+        Str.done_ago_now -> R.string.done_ago_now
+        Str.done_ago_yesterday -> R.string.done_ago_yesterday
         Str.dur_dh -> R.string.dur_dh
         Str.dur_hm -> R.string.dur_hm
         Str.dur_m -> R.string.dur_m
@@ -252,6 +323,7 @@ val Str.id: Int
         Str.effort_low_desc -> R.string.effort_low_desc
         Str.effort_max_desc -> R.string.effort_max_desc
         Str.effort_medium_desc -> R.string.effort_medium_desc
+        Str.effort_next_turn -> R.string.effort_next_turn
         Str.effort_xhigh_desc -> R.string.effort_xhigh_desc
         Str.elapsed_min_secs -> R.string.elapsed_min_secs
         Str.elapsed_secs -> R.string.elapsed_secs
@@ -296,7 +368,9 @@ val Str.id: Int
         Str.err_terminal -> R.string.err_terminal
         Str.err_upload -> R.string.err_upload
         Str.exit_code -> R.string.exit_code
+        Str.files -> R.string.files
         Str.five_hours -> R.string.five_hours
+        Str.fl_ok -> R.string.fl_ok
         Str.headline_limit -> R.string.headline_limit
         Str.headline_limit_claude -> R.string.headline_limit_claude
         Str.headline_no_credit -> R.string.headline_no_credit
@@ -343,16 +417,74 @@ val Str.id: Int
         Str.link_said_sleep_soon -> R.string.link_said_sleep_soon
         Str.link_said_via -> R.string.link_said_via
         Str.link_unpaired -> R.string.link_unpaired
+        Str.loading -> R.string.loading
         Str.loading_conversation -> R.string.loading_conversation
+        Str.mcp_a_destructive -> R.string.mcp_a_destructive
+        Str.mcp_a_read_only -> R.string.mcp_a_read_only
+        Str.mcp_disable -> R.string.mcp_disable
+        Str.mcp_enable -> R.string.mcp_enable
+        Str.mcp_h_closed -> R.string.mcp_h_closed
+        Str.mcp_h_destructive -> R.string.mcp_h_destructive
+        Str.mcp_h_idempotent -> R.string.mcp_h_idempotent
+        Str.mcp_h_not_destructive -> R.string.mcp_h_not_destructive
+        Str.mcp_h_not_idempotent -> R.string.mcp_h_not_idempotent
+        Str.mcp_h_open -> R.string.mcp_h_open
+        Str.mcp_h_read_only -> R.string.mcp_h_read_only
+        Str.mcp_h_writes -> R.string.mcp_h_writes
+        Str.mcp_login_address -> R.string.mcp_login_address
+        Str.mcp_login_body -> R.string.mcp_login_body
+        Str.mcp_login_finish -> R.string.mcp_login_finish
+        Str.mcp_login_open -> R.string.mcp_login_open
+        Str.mcp_reconnect -> R.string.mcp_reconnect
+        Str.mcp_s_connected -> R.string.mcp_s_connected
+        Str.mcp_s_disabled -> R.string.mcp_s_disabled
+        Str.mcp_s_failed -> R.string.mcp_s_failed
+        Str.mcp_s_needs_auth -> R.string.mcp_s_needs_auth
+        Str.mcp_s_pending -> R.string.mcp_s_pending
+        Str.mcp_s_rejected -> R.string.mcp_s_rejected
+        Str.mcp_s_unknown -> R.string.mcp_s_unknown
+        Str.mcp_s_waiting -> R.string.mcp_s_waiting
+        Str.mcp_scope_claudeai -> R.string.mcp_scope_claudeai
+        Str.mcp_scope_local -> R.string.mcp_scope_local
+        Str.mcp_scope_managed -> R.string.mcp_scope_managed
+        Str.mcp_scope_plugin -> R.string.mcp_scope_plugin
+        Str.mcp_scope_project -> R.string.mcp_scope_project
+        Str.mcp_scope_settings -> R.string.mcp_scope_settings
+        Str.mcp_scope_user -> R.string.mcp_scope_user
+        Str.mcp_sign_in -> R.string.mcp_sign_in
+        Str.mcp_tool_says -> R.string.mcp_tool_says
         Str.meta_mode_said -> R.string.meta_mode_said
         Str.meta_model_said -> R.string.meta_model_said
+        Str.mode_accept -> R.string.mode_accept
+        Str.mode_accept_desc -> R.string.mode_accept_desc
+        Str.mode_auto -> R.string.mode_auto
+        Str.mode_auto_desc -> R.string.mode_auto_desc
+        Str.mode_bypass -> R.string.mode_bypass
+        Str.mode_bypass_desc -> R.string.mode_bypass_desc
+        Str.mode_bypass_next_turn -> R.string.mode_bypass_next_turn
+        Str.mode_bypass_unavailable -> R.string.mode_bypass_unavailable
+        Str.mode_default -> R.string.mode_default
+        Str.mode_default_desc -> R.string.mode_default_desc
         Str.mode_label_accept -> R.string.mode_label_accept
         Str.mode_label_auto -> R.string.mode_label_auto
         Str.mode_label_bypass -> R.string.mode_label_bypass
         Str.mode_label_default -> R.string.mode_label_default
         Str.mode_label_dont_ask -> R.string.mode_label_dont_ask
         Str.mode_label_plan -> R.string.mode_label_plan
+        Str.mode_plan -> R.string.mode_plan
+        Str.mode_plan_desc -> R.string.mode_plan_desc
+        Str.mode_title_accept -> R.string.mode_title_accept
+        Str.mode_title_auto -> R.string.mode_title_auto
+        Str.mode_title_bypass -> R.string.mode_title_bypass
+        Str.mode_title_default -> R.string.mode_title_default
+        Str.mode_title_plan -> R.string.mode_title_plan
+        Str.model -> R.string.model
+        Str.model_change -> R.string.model_change
         Str.model_default -> R.string.model_default
+        Str.model_label_default -> R.string.model_label_default
+        Str.model_next_turn -> R.string.model_next_turn
+        Str.model_paid_body -> R.string.model_paid_body
+        Str.model_paid_ok -> R.string.model_paid_ok
         Str.model_paid_q -> R.string.model_paid_q
         Str.more -> R.string.more
         Str.notice_agent_asks -> R.string.notice_agent_asks
@@ -381,7 +513,21 @@ val Str.id: Int
         Str.notice_signed_out -> R.string.notice_signed_out
         Str.notice_signed_out_both -> R.string.notice_signed_out_both
         Str.notice_waiting -> R.string.notice_waiting
+        Str.ns_all_models -> R.string.ns_all_models
+        Str.ns_change -> R.string.ns_change
+        Str.ns_context_said -> R.string.ns_context_said
+        Str.ns_earlier -> R.string.ns_earlier
         Str.ns_effort_said -> R.string.ns_effort_said
+        Str.ns_free -> R.string.ns_free
+        Str.ns_free_said -> R.string.ns_free_said
+        Str.ns_loading_models -> R.string.ns_loading_models
+        Str.ns_models_partial -> R.string.ns_models_partial
+        Str.ns_own_models -> R.string.ns_own_models
+        Str.ns_price_said -> R.string.ns_price_said
+        Str.ns_row_said -> R.string.ns_row_said
+        Str.ns_runs_said -> R.string.ns_runs_said
+        Str.ns_search_models -> R.string.ns_search_models
+        Str.ns_week_said -> R.string.ns_week_said
         Str.open_preview -> R.string.open_preview
         Str.open_preview_port -> R.string.open_preview_port
         Str.open_terminal -> R.string.open_terminal
@@ -447,27 +593,129 @@ val Str.id: Int
         Str.resume_failed -> R.string.resume_failed
         Str.route_local -> R.string.route_local
         Str.route_remote -> R.string.route_remote
+        Str.rules_clipped -> R.string.rules_clipped
+        Str.rules_close -> R.string.rules_close
+        Str.rules_default_mode -> R.string.rules_default_mode
+        Str.rules_dirs -> R.string.rules_dirs
         Str.rules_err -> R.string.rules_err
+        Str.rules_kind_allow -> R.string.rules_kind_allow
+        Str.rules_kind_ask -> R.string.rules_kind_ask
+        Str.rules_kind_deny -> R.string.rules_kind_deny
+        Str.rules_loading -> R.string.rules_loading
+        Str.rules_managed_only -> R.string.rules_managed_only
+        Str.rules_missing -> R.string.rules_missing
+        Str.rules_none -> R.string.rules_none
+        Str.rules_not_in_effect -> R.string.rules_not_in_effect
+        Str.rules_open -> R.string.rules_open
+        Str.rules_precedence -> R.string.rules_precedence
+        Str.rules_said -> R.string.rules_said
+        Str.rules_seam -> R.string.rules_seam
+        Str.rules_session_path -> R.string.rules_session_path
+        Str.rules_source_local -> R.string.rules_source_local
+        Str.rules_source_managed -> R.string.rules_source_managed
+        Str.rules_source_project -> R.string.rules_source_project
+        Str.rules_source_said -> R.string.rules_source_said
+        Str.rules_source_session -> R.string.rules_source_session
+        Str.rules_source_user -> R.string.rules_source_user
+        Str.rules_state_invalid -> R.string.rules_state_invalid
+        Str.rules_state_missing -> R.string.rules_state_missing
+        Str.rules_state_too_big -> R.string.rules_state_too_big
+        Str.rules_state_unreadable -> R.string.rules_state_unreadable
         Str.running_for -> R.string.running_for
+        Str.save -> R.string.save
+        Str.send -> R.string.send
         Str.send_answer -> R.string.send_answer
         Str.send_answers -> R.string.send_answers
         Str.sending -> R.string.sending
         Str.session_allowed -> R.string.session_allowed
+        Str.session_delete_body -> R.string.session_delete_body
+        Str.session_delete_body_codex -> R.string.session_delete_body_codex
+        Str.session_delete_body_plain -> R.string.session_delete_body_plain
+        Str.session_delete_body_running -> R.string.session_delete_body_running
+        Str.session_delete_body_terminal -> R.string.session_delete_body_terminal
+        Str.session_delete_cant_body -> R.string.session_delete_cant_body
+        Str.session_delete_cant_q -> R.string.session_delete_cant_q
+        Str.session_delete_q -> R.string.session_delete_q
+        Str.session_name -> R.string.session_name
+        Str.session_outdated -> R.string.session_outdated
+        Str.session_remove -> R.string.session_remove
+        Str.session_remove_short -> R.string.session_remove_short
+        Str.session_rename -> R.string.session_rename
+        Str.session_restart -> R.string.session_restart
+        Str.session_restart_body_watched -> R.string.session_restart_body_watched
+        Str.session_restart_body_work -> R.string.session_restart_body_work
+        Str.session_restart_cant_body -> R.string.session_restart_cant_body
+        Str.session_restart_cant_q -> R.string.session_restart_cant_q
+        Str.session_restart_full -> R.string.session_restart_full
+        Str.session_restart_line -> R.string.session_restart_line
+        Str.session_restart_q -> R.string.session_restart_q
+        Str.session_restarting -> R.string.session_restarting
+        Str.session_sheet_actions -> R.string.session_sheet_actions
+        Str.session_sheet_agent -> R.string.session_sheet_agent
+        Str.session_sheet_agent_said -> R.string.session_sheet_agent_said
+        Str.session_sheet_agent_working -> R.string.session_sheet_agent_working
         Str.session_sheet_agents -> R.string.session_sheet_agents
+        Str.session_sheet_ahead_behind_said -> R.string.session_sheet_ahead_behind_said
+        Str.session_sheet_blocked -> R.string.session_sheet_blocked
+        Str.session_sheet_branch -> R.string.session_sheet_branch
         Str.session_sheet_branch_said -> R.string.session_sheet_branch_said
+        Str.session_sheet_clean -> R.string.session_sheet_clean
         Str.session_sheet_detached -> R.string.session_sheet_detached
         Str.session_sheet_detached_said -> R.string.session_sheet_detached_said
+        Str.session_sheet_effort_unknown -> R.string.session_sheet_effort_unknown
+        Str.session_sheet_even_said -> R.string.session_sheet_even_said
+        Str.session_sheet_folder -> R.string.session_sheet_folder
+        Str.session_sheet_git -> R.string.session_sheet_git
+        Str.session_sheet_id -> R.string.session_sheet_id
+        Str.session_sheet_job -> R.string.session_sheet_job
+        Str.session_sheet_last_activity -> R.string.session_sheet_last_activity
+        Str.session_sheet_lines_said -> R.string.session_sheet_lines_said
+        Str.session_sheet_mode_ended -> R.string.session_sheet_mode_ended
+        Str.session_sheet_mode_watched -> R.string.session_sheet_mode_watched
+        Str.session_sheet_no_agents -> R.string.session_sheet_no_agents
+        Str.session_sheet_no_upstream -> R.string.session_sheet_no_upstream
+        Str.session_sheet_no_upstream_said -> R.string.session_sheet_no_upstream_said
         Str.session_sheet_open -> R.string.session_sheet_open
         Str.session_sheet_open_agent -> R.string.session_sheet_open_agent
         Str.session_sheet_permissions -> R.string.session_sheet_permissions
+        Str.session_sheet_provider -> R.string.session_sheet_provider
+        Str.session_sheet_ran_for -> R.string.session_sheet_ran_for
+        Str.session_sheet_running_for -> R.string.session_sheet_running_for
+        Str.session_sheet_runs_in -> R.string.session_sheet_runs_in
+        Str.session_sheet_runs_mac -> R.string.session_sheet_runs_mac
+        Str.session_sheet_runs_terminal -> R.string.session_sheet_runs_terminal
+        Str.session_sheet_runs_watched -> R.string.session_sheet_runs_watched
+        Str.session_sheet_shell_failed -> R.string.session_sheet_shell_failed
+        Str.session_sheet_shell_failed_code -> R.string.session_sheet_shell_failed_code
+        Str.session_sheet_shell_finished -> R.string.session_sheet_shell_finished
+        Str.session_sheet_shell_monitor_running -> R.string.session_sheet_shell_monitor_running
+        Str.session_sheet_shell_no_command -> R.string.session_sheet_shell_no_command
+        Str.session_sheet_shell_running -> R.string.session_sheet_shell_running
+        Str.session_sheet_shell_said -> R.string.session_sheet_shell_said
+        Str.session_sheet_shell_stopped -> R.string.session_sheet_shell_stopped
+        Str.session_sheet_shell_unknown -> R.string.session_sheet_shell_unknown
+        Str.session_sheet_shells -> R.string.session_sheet_shells
+        Str.session_sheet_started -> R.string.session_sheet_started
         Str.session_sheet_tab_commands -> R.string.session_sheet_tab_commands
         Str.session_sheet_tab_mcp -> R.string.session_sheet_tab_mcp
         Str.session_sheet_tab_overview -> R.string.session_sheet_tab_overview
+        Str.session_sheet_this_turn -> R.string.session_sheet_this_turn
+        Str.session_sheet_time -> R.string.session_sheet_time
         Str.session_sheet_title -> R.string.session_sheet_title
+        Str.session_sheet_uncommitted -> R.string.session_sheet_uncommitted
+        Str.session_sheet_upstream_unknown_said -> R.string.session_sheet_upstream_unknown_said
+        Str.session_sheet_usage -> R.string.session_sheet_usage
+        Str.session_sheet_where -> R.string.session_sheet_where
+        Str.session_sheet_workflow_said -> R.string.session_sheet_workflow_said
+        Str.session_sheet_worktree -> R.string.session_sheet_worktree
+        Str.session_stop -> R.string.session_stop
         Str.session_tool_fetch -> R.string.session_tool_fetch
         Str.session_tool_read -> R.string.session_tool_read
         Str.session_tool_search -> R.string.session_tool_search
         Str.seven_days -> R.string.seven_days
+        Str.several_body -> R.string.several_body
+        Str.several_more -> R.string.several_more
+        Str.several_seam -> R.string.several_seam
         Str.shell_desc -> R.string.shell_desc
         Str.shell_label -> R.string.shell_label
         Str.show_all -> R.string.show_all
@@ -479,8 +727,57 @@ val Str.id: Int
         Str.skill_desc_args -> R.string.skill_desc_args
         Str.skill_label -> R.string.skill_label
         Str.skip -> R.string.skip
+        Str.sm_empty -> R.string.sm_empty
         Str.sm_err -> R.string.sm_err
+        Str.sm_from -> R.string.sm_from
+        Str.sm_label -> R.string.sm_label
+        Str.sm_local -> R.string.sm_local
+        Str.sm_note -> R.string.sm_note
+        Str.sm_other -> R.string.sm_other
+        Str.sm_project -> R.string.sm_project
         Str.sm_too_old -> R.string.sm_too_old
+        Str.smt_act_err -> R.string.smt_act_err
+        Str.smt_check -> R.string.smt_check
+        Str.smt_cut -> R.string.smt_cut
+        Str.smt_did_disable -> R.string.smt_did_disable
+        Str.smt_did_disable_codex -> R.string.smt_did_disable_codex
+        Str.smt_did_enable -> R.string.smt_did_enable
+        Str.smt_did_enable_codex -> R.string.smt_did_enable_codex
+        Str.smt_did_reconnect -> R.string.smt_did_reconnect
+        Str.smt_did_reconnect_codex -> R.string.smt_did_reconnect_codex
+        Str.smt_empty -> R.string.smt_empty
+        Str.smt_err -> R.string.smt_err
+        Str.smt_failed_disable -> R.string.smt_failed_disable
+        Str.smt_failed_enable -> R.string.smt_failed_enable
+        Str.smt_failed_reconnect -> R.string.smt_failed_reconnect
+        Str.smt_held -> R.string.smt_held
+        Str.smt_held_rest -> R.string.smt_held_rest
+        Str.smt_keep_on -> R.string.smt_keep_on
+        Str.smt_new_sessions -> R.string.smt_new_sessions
+        Str.smt_next_turn_disable -> R.string.smt_next_turn_disable
+        Str.smt_next_turn_disable_codex -> R.string.smt_next_turn_disable_codex
+        Str.smt_next_turn_enable -> R.string.smt_next_turn_enable
+        Str.smt_next_turn_enable_codex -> R.string.smt_next_turn_enable_codex
+        Str.smt_no_tools -> R.string.smt_no_tools
+        Str.smt_note_codex -> R.string.smt_note_codex
+        Str.smt_note_codex_idle -> R.string.smt_note_codex_idle
+        Str.smt_note_ended -> R.string.smt_note_ended
+        Str.smt_note_rest -> R.string.smt_note_rest
+        Str.smt_note_terminal -> R.string.smt_note_terminal
+        Str.smt_note_turn -> R.string.smt_note_turn
+        Str.smt_note_watched -> R.string.smt_note_watched
+        Str.smt_off_for_new -> R.string.smt_off_for_new
+        Str.smt_one_tool -> R.string.smt_one_tool
+        Str.smt_seam -> R.string.smt_seam
+        Str.smt_settings -> R.string.smt_settings
+        Str.smt_settings_body -> R.string.smt_settings_body
+        Str.smt_signed_in_rest -> R.string.smt_signed_in_rest
+        Str.smt_tool_names -> R.string.smt_tool_names
+        Str.smt_tools_count -> R.string.smt_tools_count
+        Str.smt_tools_err -> R.string.smt_tools_err
+        Str.smt_tools_hide -> R.string.smt_tools_hide
+        Str.smt_unconfirmed -> R.string.smt_unconfirmed
+        Str.smt_working -> R.string.smt_working
         Str.st_top_bar_agents -> R.string.st_top_bar_agents
         Str.st_top_bar_agents_desc -> R.string.st_top_bar_agents_desc
         Str.st_top_bar_context -> R.string.st_top_bar_context
@@ -594,6 +891,14 @@ val Str.id: Int
         Str.su_failed_final -> R.string.su_failed_final
         Str.su_failed_why -> R.string.su_failed_why
         Str.table_cell -> R.string.table_cell
+        Str.think_ai_mistakes -> R.string.think_ai_mistakes
+        Str.think_keep -> R.string.think_keep
+        Str.think_kicker_auto -> R.string.think_kicker_auto
+        Str.think_kicker_bypass -> R.string.think_kicker_bypass
+        Str.think_story -> R.string.think_story
+        Str.think_story_desc -> R.string.think_story_desc
+        Str.think_use_auto -> R.string.think_use_auto
+        Str.think_use_bypass -> R.string.think_use_bypass
         Str.thinking -> R.string.thinking
         Str.thought_chars -> R.string.thought_chars
         Str.thought_for -> R.string.thought_for
@@ -659,6 +964,7 @@ val Str.id: Int
         Str.wf_err_too_often -> R.string.wf_err_too_often
         Str.wf_err_url -> R.string.wf_err_url
         Str.why_hypernova -> R.string.why_hypernova
+        Str.why_it_matters -> R.string.why_it_matters
         Str.why_label -> R.string.why_label
         Str.why_seam -> R.string.why_seam
         Str.workflow_label -> R.string.workflow_label
@@ -671,6 +977,8 @@ val Plural.id: Int
     get() = when (this) {
         Plural.agent_tool_calls -> R.plurals.agent_tool_calls
         Plural.agents_count -> R.plurals.agents_count
+        Plural.as_hidden -> R.plurals.as_hidden
+        Plural.as_mcp_not_read -> R.plurals.as_mcp_not_read
         Plural.ask_show_all -> R.plurals.ask_show_all
         Plural.asks_waiting -> R.plurals.asks_waiting
         Plural.au_away_title -> R.plurals.au_away_title
@@ -678,18 +986,25 @@ val Plural.id: Int
         Plural.awake_seconds -> R.plurals.awake_seconds
         Plural.blocked_chip -> R.plurals.blocked_chip
         Plural.blocked_mark_said -> R.plurals.blocked_mark_said
+        Plural.changes_files -> R.plurals.changes_files
         Plural.chat_quiet_days -> R.plurals.chat_quiet_days
         Plural.chat_quiet_hours -> R.plurals.chat_quiet_hours
         Plural.lines -> R.plurals.lines
         Plural.more_lines -> R.plurals.more_lines
         Plural.notice_backpack_ends -> R.plurals.notice_backpack_ends
         Plural.notice_provider_no_credit -> R.plurals.notice_provider_no_credit
+        Plural.ns_models_count -> R.plurals.ns_models_count
         Plural.phase_done -> R.plurals.phase_done
         Plural.run_calls_done -> R.plurals.run_calls_done
         Plural.run_calls_now -> R.plurals.run_calls_now
         Plural.servers_elsewhere -> R.plurals.servers_elsewhere
         Plural.session_sheet_agents_said -> R.plurals.session_sheet_agents_said
+        Plural.session_sheet_files_changed -> R.plurals.session_sheet_files_changed
+        Plural.session_sheet_files_touched -> R.plurals.session_sheet_files_touched
         Plural.session_sheet_shells_said -> R.plurals.session_sheet_shells_said
+        Plural.several_allow -> R.plurals.several_allow
+        Plural.several_q -> R.plurals.several_q
+        Plural.sm_for_all -> R.plurals.sm_for_all
         Plural.stats_said_hours -> R.plurals.stats_said_hours
         Plural.stats_said_minutes -> R.plurals.stats_said_minutes
         Plural.status_agents -> R.plurals.status_agents

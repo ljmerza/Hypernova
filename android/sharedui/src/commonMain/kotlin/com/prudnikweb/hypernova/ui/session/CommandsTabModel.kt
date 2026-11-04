@@ -1,6 +1,6 @@
 package com.prudnikweb.hypernova.ui.session
 
-import android.content.Context
+import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
@@ -155,13 +155,13 @@ internal object CommandPicksStore {
     private const val RECENT = "sheet.commands.recent"
     private const val PINNED = "sheet.commands.pinned"
 
-    fun load(c: Context): CommandPicks {
-        val p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    fun load(): CommandPicks {
+        val p = Core.platform.storage.prefs(PREFS)
         return CommandPicks(names(p.getString(RECENT, null)), names(p.getString(PINNED, null)))
     }
 
-    fun save(c: Context, picks: CommandPicks) {
-        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+    fun save(picks: CommandPicks) {
+        Core.platform.storage.prefs(PREFS).edit()
             .putString(RECENT, JSONArray(picks.recent).toString())
             .putString(PINNED, JSONArray(picks.pinned).toString())
             .apply()

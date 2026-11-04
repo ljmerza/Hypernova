@@ -1,6 +1,8 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.home
 
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,12 +17,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.CodexModel
 import com.prudnikweb.hypernova.data.ModelNames
@@ -43,7 +43,7 @@ import com.prudnikweb.hypernova.ui.theme.Type
 @Composable
 internal fun AgentChoice(agent: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
     Segmented(
-        listOf(AgentKind.CLAUDE to stringResource(R.string.cx_agent_claude), AgentKind.CODEX to stringResource(R.string.cx_agent_codex)),
+        listOf(AgentKind.CLAUDE to stringResource(Str.cx_agent_claude), AgentKind.CODEX to stringResource(Str.cx_agent_codex)),
         if (agent == AgentKind.CODEX) AgentKind.CODEX else AgentKind.CLAUDE,
         onChange,
         modifier,
@@ -71,7 +71,7 @@ internal fun CodexModelSheet(
     onDone: (model: String?, effort: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val title = stringResource(R.string.model)
+    val title = stringResource(Str.model)
     var m by rememberSaveable { mutableStateOf(model) }
     var e by rememberSaveable { mutableStateOf(effort) }
     val list = models.orEmpty()
@@ -79,13 +79,13 @@ internal fun CodexModelSheet(
     ChatSheet(title, onDismiss) {
         HText(title, style = Type.title, color = HN.ink)
         Spacer(Modifier.height(4.dp))
-        HText(stringResource(R.string.cx_models_line), style = Type.small, color = HN.inkDim)
+        HText(stringResource(Str.cx_models_line), style = Type.small, color = HN.inkDim)
         Spacer(Modifier.height(10.dp))
         when {
-            models == null -> LoadingLine(stringResource(R.string.cx_loading_models), Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
+            models == null -> LoadingLine(stringResource(Str.cx_loading_models), Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
             list.isEmpty() -> {
                 // Nothing listed (Codex is off until its first session, or the Mac couldn't ask): its default.
-                CodexModelRow(stringResource(R.string.model_label_default), note, isDefault = false, selected = true) { if (!withEffort) onDone(null, null) }
+                CodexModelRow(stringResource(Str.model_label_default), note, isDefault = false, selected = true) { if (!withEffort) onDone(null, null) }
             }
             else -> for (o in list) {
                 CodexModelRow(o.name, o.description, o.isDefault, selected = o == chosen) {
@@ -101,11 +101,11 @@ internal fun CodexModelSheet(
         if (withEffort) {
             val efforts = chosen?.efforts.orEmpty()
             if (efforts.size > 1) {
-                PartHeader(stringResource(R.string.cx_effort))
+                PartHeader(stringResource(Str.cx_effort))
                 Segmented(efforts.map { it to effortTitle(it) }, e ?: chosen?.defaultEffort ?: efforts.first(), { e = it })
             }
             Spacer(Modifier.height(16.dp))
-            Pill(stringResource(R.string.cx_done), { onDone(m, e) }, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 44.dp)
+            Pill(stringResource(Str.cx_done), { onDone(m, e) }, Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 44.dp)
         }
     }
 }
@@ -113,15 +113,15 @@ internal fun CodexModelSheet(
 /** One of Codex's models: its name (its default with a chip), and what it's for under it. */
 @Composable
 private fun CodexModelRow(name: String, sub: String?, isDefault: Boolean, selected: Boolean, onClick: () -> Unit) {
-    val res = LocalContext.current.resources
-    val said = listOfNotNull(res.getString(R.string.ns_row_said, name), sub).joinToString(" ")
+    val res = wordsNow()
+    val said = listOfNotNull(res.getString(Str.ns_row_said, name), sub).joinToString(" ")
     Row(Modifier.pickRow(selected, said, onClick), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).clearAndSetSemantics { }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HText(name, style = Type.body, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (isDefault) {
                     Spacer(Modifier.width(8.dp))
-                    TagChip(stringResource(R.string.model_label_default), compact = true)
+                    TagChip(stringResource(Str.model_label_default), compact = true)
                 }
             }
             if (sub != null) HText(sub, style = Type.small, color = HN.inkDim, maxLines = 2, overflow = TextOverflow.Ellipsis)

@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
@@ -18,13 +20,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Phase
@@ -53,28 +53,28 @@ import kotlinx.coroutines.launch
 internal fun EffortPart(hub: Hub, s: Session) {
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
-    val res = LocalContext.current.resources
-    val nextTurn = stringResource(R.string.effort_next_turn)
+    val res = wordsNow()
+    val nextTurn = stringResource(Str.effort_next_turn)
     val change = ClaudeEffort.changeable(s, canChangeMode(s))
     // What was picked, until the Mac says otherwise (its answer, or the status line later).
     var shown by remember(s.id, s.effort) { mutableStateOf(s.effort) }
     var picking by rememberSaveable { mutableStateOf(false) }
     val name = claudeEffortTitle(shown)
-    val said = res.getString(R.string.ns_effort_said, name)
+    val said = res.getString(Str.ns_effort_said, name)
     Row(
         Modifier
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(12.dp))
             .glassChoice(false, 12.dp)
             .then(
-                if (change) Modifier.clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.ns_change)) { picking = true }
+                if (change) Modifier.clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(Str.ns_change)) { picking = true }
                 else Modifier,
             )
             .semantics(mergeDescendants = true) { contentDescription = said }
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HText(stringResource(R.string.effort).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
+        HText(stringResource(Str.effort).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
         Spacer(Modifier.width(10.dp))
         TagChip(name)
         if (change) {
@@ -84,11 +84,11 @@ internal fun EffortPart(hub: Hub, s: Session) {
     }
     // Not said yet (Claude Code's default until its status line says), and why it can't change here.
     val lines = listOfNotNull(
-        R.string.session_sheet_effort_unknown.takeIf { shown == null },
+        Str.session_sheet_effort_unknown.takeIf { shown == null },
         when {
             change -> null
-            s.phase == Phase.Ended -> R.string.session_sheet_mode_ended
-            else -> R.string.session_sheet_mode_watched
+            s.phase == Phase.Ended -> Str.session_sheet_mode_ended
+            else -> Str.session_sheet_mode_watched
         },
     )
     for (line in lines) {

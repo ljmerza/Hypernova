@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,13 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.ui.fx.formatDuration
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
@@ -51,20 +51,20 @@ internal fun ShellsPart(shells: List<SheetShell>) {
 
 @Composable
 private fun ShellRow(s: SheetShell, now: Long) {
-    val res = LocalContext.current.resources
-    val text = s.text ?: stringResource(R.string.session_sheet_shell_no_command)
+    val res = wordsNow()
+    val text = s.text ?: stringResource(Str.session_sheet_shell_no_command)
     val going = s.say == ShellSay.Running || s.say == ShellSay.MonitorRunning
     val time = if (s.say == ShellSay.Unknown) null else formatDuration(res, ((s.endedAt ?: now) - s.startedAt).coerceAtLeast(0L))
     val words = when (s.say) {
-        ShellSay.Running -> stringResource(R.string.session_sheet_shell_running)
-        ShellSay.MonitorRunning -> stringResource(R.string.session_sheet_shell_monitor_running)
-        ShellSay.Finished -> stringResource(R.string.session_sheet_shell_finished)
-        ShellSay.Failed -> stringResource(R.string.session_sheet_shell_failed)
-        ShellSay.FailedCode -> stringResource(R.string.session_sheet_shell_failed_code, s.exitCode ?: 0)
-        ShellSay.Stopped -> stringResource(R.string.session_sheet_shell_stopped)
-        ShellSay.Unknown -> stringResource(R.string.session_sheet_shell_unknown, formatDuration(res, (now - s.startedAt).coerceAtLeast(0L)))
+        ShellSay.Running -> stringResource(Str.session_sheet_shell_running)
+        ShellSay.MonitorRunning -> stringResource(Str.session_sheet_shell_monitor_running)
+        ShellSay.Finished -> stringResource(Str.session_sheet_shell_finished)
+        ShellSay.Failed -> stringResource(Str.session_sheet_shell_failed)
+        ShellSay.FailedCode -> stringResource(Str.session_sheet_shell_failed_code, s.exitCode ?: 0)
+        ShellSay.Stopped -> stringResource(Str.session_sheet_shell_stopped)
+        ShellSay.Unknown -> stringResource(Str.session_sheet_shell_unknown, formatDuration(res, (now - s.startedAt).coerceAtLeast(0L)))
     }
-    val said = stringResource(R.string.session_sheet_shell_said, text, words, time.orEmpty()).trimEnd(' ', ',')
+    val said = stringResource(Str.session_sheet_shell_said, text, words, time.orEmpty()).trimEnd(' ', ',')
     Row(
         Modifier
             .fillMaxWidth()

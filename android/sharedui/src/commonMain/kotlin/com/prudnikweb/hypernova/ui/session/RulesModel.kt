@@ -1,7 +1,6 @@
 package com.prudnikweb.hypernova.ui.session
 
-import androidx.annotation.StringRes
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.PermissionRules
 import com.prudnikweb.hypernova.data.RuleSource
 
@@ -64,23 +63,21 @@ internal fun shownPath(path: String?, cwd: String?): String? {
 }
 
 /** A source's name, as the row says it. */
-@StringRes
-internal fun sourceLabel(source: String): Int = when (source) {
-    RuleSource.MANAGED -> R.string.rules_source_managed
-    RuleSource.SESSION -> R.string.rules_source_session
-    RuleSource.LOCAL -> R.string.rules_source_local
-    RuleSource.PROJECT -> R.string.rules_source_project
-    else -> R.string.rules_source_user
+internal fun sourceLabel(source: String): Str = when (source) {
+    RuleSource.MANAGED -> Str.rules_source_managed
+    RuleSource.SESSION -> Str.rules_source_session
+    RuleSource.LOCAL -> Str.rules_source_local
+    RuleSource.PROJECT -> Str.rules_source_project
+    else -> Str.rules_source_user
 }
 
 /** Why a source has no rules to show, or null when it was read. */
-@StringRes
-internal fun stateLabel(state: String): Int? = when (state) {
+internal fun stateLabel(state: String): Str? = when (state) {
     RuleSource.OK -> null
-    RuleSource.MISSING -> R.string.rules_state_missing
-    RuleSource.INVALID -> R.string.rules_state_invalid
-    RuleSource.TOO_BIG -> R.string.rules_state_too_big
-    else -> R.string.rules_state_unreadable
+    RuleSource.MISSING -> Str.rules_state_missing
+    RuleSource.INVALID -> Str.rules_state_invalid
+    RuleSource.TOO_BIG -> Str.rules_state_too_big
+    else -> Str.rules_state_unreadable
 }
 
 /**

@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -52,7 +51,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -73,27 +71,17 @@ import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.Folder
 import com.prudnikweb.hypernova.data.FolderPick
 import com.prudnikweb.hypernova.data.Folders
-import com.prudnikweb.hypernova.data.ModelCatalog
-import com.prudnikweb.hypernova.data.ModelList
-import com.prudnikweb.hypernova.data.ModelOption
-import com.prudnikweb.hypernova.data.ModelWeek
-import com.prudnikweb.hypernova.data.ModelWeeks
 import com.prudnikweb.hypernova.data.Project
 import com.prudnikweb.hypernova.data.ProjectPick
-import com.prudnikweb.hypernova.data.Provider
-import com.prudnikweb.hypernova.data.UsageWindow
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphButton
-import com.prudnikweb.hypernova.ui.components.GlyphFigure
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.Incidents
 import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
-import com.prudnikweb.hypernova.ui.components.UsageMeterCompact
 import com.prudnikweb.hypernova.ui.components.Stamp
-import com.prudnikweb.hypernova.ui.components.TagChip
 import com.prudnikweb.hypernova.ui.components.ThinkTwiceCard
 import com.prudnikweb.hypernova.ui.components.frostedGlass
 import com.prudnikweb.hypernova.ui.components.glassChoice
@@ -111,43 +99,6 @@ import kotlinx.coroutines.delay
 // each provider offers (docs/PROTOCOL.md, "Models"); the mode picker explains each mode.
 
 /** The five permission modes, in the order Claude Code's Shift+Tab cycles them. */
-internal val MODES = listOf("default", "acceptEdits", "plan", "auto", "bypassPermissions")
-
-/** A mode's name as its chip and picker say it: "Ask first", "Accept edits"…; Codex's "Read only", "Can edit". */
-@Composable
-internal fun modeTitle(mode: String): String = stringResource(
-    when (mode) {
-        "acceptEdits" -> R.string.mode_title_accept
-        "plan" -> R.string.mode_title_plan
-        "auto" -> R.string.mode_title_auto
-        "bypassPermissions" -> R.string.mode_title_bypass
-        AgentKind.READ_ONLY -> R.string.cx_mode_read_only
-        AgentKind.CAN_EDIT -> R.string.cx_mode_can_edit
-        else -> R.string.mode_title_default
-    },
-)
-
-/** What a mode does, in one line. */
-@Composable
-internal fun modeLine(mode: String): String = stringResource(
-    when (mode) {
-        "acceptEdits" -> R.string.mode_accept_desc
-        "plan" -> R.string.mode_plan_desc
-        "auto" -> R.string.mode_auto_desc
-        "bypassPermissions" -> R.string.mode_bypass_desc
-        AgentKind.READ_ONLY -> R.string.cx_mode_read_only_desc
-        AgentKind.CAN_EDIT -> R.string.cx_mode_can_edit_desc
-        else -> R.string.mode_default_desc
-    },
-)
-
-/** A mode's colour where it's chosen: Bypass red, Auto amber, the rest quiet. */
-internal fun modeTone(mode: String): Color? = when (mode) {
-    "bypassPermissions" -> HN.danger
-    "auto" -> HN.amber
-    else -> null
-}
-
 // ─── Chips ───
 
 /**
@@ -247,74 +198,6 @@ internal fun chipVariants(model: List<Int>, effort: List<Int>, mode: List<Int>, 
     }
     return Triple(mi, ei, oi)
 }
-
-// ─── Shared parts of the pickers ───
-
-/**
- * A picker's search box: the house field's well, a lens before the words, a cross to clear them.
- * [onClose]: the cross always shows and closes the search instead (Home's, [closeLabel] for TalkBack).
- */
-@Composable
-internal fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier, onClose: (() -> Unit)? = null, closeLabel: String? = null) {
-    val shape = RoundedCornerShape(14.dp)
-    val clear = closeLabel ?: stringResource(R.string.close)
-    BasicTextField(
-        value, onChange,
-        singleLine = true,
-        textStyle = Type.body.copy(color = HN.ink),
-        cursorBrush = SolidColor(HN.accent),
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Search),
-        modifier = modifier.fillMaxWidth().semantics { contentDescription = placeholder },
-        decorationBox = { inner ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 44.dp)
-                    .clip(shape)
-                    .background(HN.bg800.copy(alpha = 0.6f))
-                    .border(1.dp, HN.ink.copy(alpha = 0.10f), shape)
-                    .padding(start = 12.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Glyph.Search, size = 16.dp, color = HN.inkDim, stroke = 1.4.dp)
-                Spacer(Modifier.width(10.dp))
-                Box(Modifier.weight(1f).padding(vertical = 11.dp)) {
-                    if (value.isEmpty()) HText(placeholder, style = Type.body, color = HN.inkGhost, maxLines = 1)
-                    inner()
-                }
-                if (value.isNotEmpty() || onClose != null) {
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = clear) { if (onClose != null) onClose() else onChange("") }
-                            .semantics { contentDescription = clear },
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Glyph.Cross, size = 12.dp, color = HN.inkMuted) }
-                } else Spacer(Modifier.width(8.dp))
-            }
-        },
-    )
-}
-
-/** A part of a picker's list: its name (tracked caps, or a folder in mono), a hairline, a count. */
-@Composable
-internal fun PartHeader(label: String, mono: Boolean = false, trail: String? = null, trailColor: Color = HN.inkDim, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().padding(top = 18.dp, bottom = 6.dp).semantics { heading() }, verticalAlignment = Alignment.CenterVertically) {
-        val most = Modifier.widthIn(max = 240.dp)
-        if (mono) HText(label, style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = most)
-        else HText(label.uppercase(), style = Type.label, color = HN.inkMuted, maxLines = 1, modifier = most)
-        Spacer(Modifier.width(10.dp))
-        Box(Modifier.weight(1f).height(1.dp).background(HN.line))
-        if (trail != null) {
-            Spacer(Modifier.width(10.dp))
-            HText(trail, style = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.5f), color = trailColor, maxLines = 1)
-        }
-    }
-}
-
-/** The nav bar's height, below a picker's list. */
-@Composable
-private fun listBottom(): PaddingValues = PaddingValues(bottom = 14.dp)
 
 // ─── Projects ───
 
@@ -765,170 +648,6 @@ private fun FolderLine(name: String, sub: String?, glyph: Glyph, selected: Boole
             if (sub != null) HText(sub, style = Type.monoSmall, color = HN.inkDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
         }
         if (glyph == Glyph.Folder) Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)
-    }
-}
-
-// ─── Models ───
-
-/**
- * The model picker: every provider's models (the Mac's lists, [lists]; what's known here until
- * they come, [loading]), each provider under its name with its trouble or what's left on it, the
- * subscription's earlier versions apart, another provider's own models before its catalogue. A
- * model with a week of its own ([weeks]) shows that week's meter. Search when the lists are long.
- */
-@Composable
-internal fun ModelPicker(
-    providers: List<Provider>,
-    lists: List<ModelList>?,
-    loading: Boolean,
-    providerId: String?,
-    model: String?,
-    weeks: List<ModelWeek>,
-    now: Long,
-    providerTrail: @Composable (Provider) -> Pair<String, Boolean>?,
-    onPick: (String, String?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val title = stringResource(R.string.model)
-    var query by rememberSaveable { mutableStateOf("") }
-    val all = remember(providers, lists) { providers.map { it to ModelCatalog.of(it, lists) } }
-    val total = all.sumOf { it.second.size }
-    val searchable = total > 14
-    // The list as it's drawn, each provider under its header: so the chosen row can be found.
-    val entries = remember(all, query, lists, loading) { modelEntries(all, lists, loading, query) }
-    val chosen = entries.indexOfFirst { it is ModelEntry.Choice && it.provider.id == providerId && it.option.value == model }
-    val list = rememberLazyListState(initialFirstVisibleItemIndex = (chosen - 1).coerceAtLeast(0))
-    // A new search starts at the top of what it found; opening starts at the one chosen.
-    var searched by remember { mutableStateOf(false) }
-    LaunchedEffect(query) {
-        if (searched) list.scrollToItem(0)
-        searched = true
-    }
-    ChatSheet(title, onDismiss, height = if (total > 8) 640.dp else null, scroll = false) {
-        HText(title, style = Type.title, color = HN.ink)
-        Spacer(Modifier.height(if (searchable) 12.dp else 4.dp))
-        if (searchable) SearchField(query, { query = it }, stringResource(R.string.ns_search_models))
-        LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), state = list, contentPadding = listBottom()) {
-            items(entries, key = { it.key }) { e ->
-                when (e) {
-                    is ModelEntry.Header -> {
-                        val trail = providerTrail(e.provider)
-                        PartHeader(e.provider.name, trail = trail?.first, trailColor = if (trail?.second == true) HN.amber else HN.inkDim)
-                    }
-                    is ModelEntry.Part -> Row(Modifier.padding(start = 10.dp, top = 10.dp, bottom = 2.dp).semantics { heading() }, verticalAlignment = Alignment.CenterVertically) {
-                        val sub = when (e.part) {
-                            ModelCatalog.Part.Older -> R.string.ns_earlier
-                            ModelCatalog.Part.Own -> R.string.ns_own_models
-                            else -> R.string.ns_all_models
-                        }
-                        HText(stringResource(sub).uppercase(), style = Type.label, color = HN.inkDim)
-                        if (e.part == ModelCatalog.Part.Catalogue) {
-                            Spacer(Modifier.width(8.dp))
-                            HText(pluralStringResource(R.plurals.ns_models_count, e.count, e.count), style = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.5f), color = HN.inkGhost)
-                        }
-                    }
-                    is ModelEntry.Choice -> ModelRow(
-                        e.option, e.all, selected = e.provider.id == providerId && e.option.value == model,
-                        week = if (e.provider.builtIn) ModelCatalog.week(e.option, weeks) else null,
-                        now = now,
-                    ) { onPick(e.provider.id, e.option.value) }
-                    is ModelEntry.Loading -> LoadingLine(stringResource(R.string.ns_loading_models), Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
-                    is ModelEntry.Partial -> HText(stringResource(R.string.ns_models_partial), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp))
-                }
-            }
-        }
-    }
-}
-
-/** One line of the model picker's list. */
-private sealed interface ModelEntry {
-    val key: String
-    data class Header(val provider: Provider) : ModelEntry { override val key get() = "prov:${provider.id}" }
-    data class Part(val provider: Provider, val part: ModelCatalog.Part, val count: Int) : ModelEntry { override val key get() = "part:${provider.id}:$part" }
-    data class Choice(val provider: Provider, val option: ModelOption, val all: List<ModelOption>) : ModelEntry {
-        override val key get() = "m:${provider.id}:${option.value ?: "\u0000default"}"
-    }
-    data class Loading(val provider: Provider) : ModelEntry { override val key get() = "loading:${provider.id}" }
-    data class Partial(val provider: Provider) : ModelEntry { override val key get() = "partial:${provider.id}" }
-}
-
-/**
- * Every provider's models as the picker lists them, [query] found: the provider's header, its parts
- * (the subscription's earlier versions, another's own models before its catalogue), and whether its
- * list is still coming or came incomplete.
- */
-private fun modelEntries(all: List<Pair<Provider, List<ModelOption>>>, lists: List<ModelList>?, loading: Boolean, query: String): List<ModelEntry> {
-    val out = ArrayList<ModelEntry>()
-    for ((p, options) in all) {
-        val shown = ModelCatalog.search(options, query)
-        if (shown.isEmpty() && query.isNotBlank()) continue
-        out += ModelEntry.Header(p)
-        val parts = ModelCatalog.parts(shown, p.builtIn)
-        for ((part, items) in parts) {
-            if (part != ModelCatalog.Part.Current && (part != ModelCatalog.Part.Own || parts.size > 1)) out += ModelEntry.Part(p, part, items.size)
-            for (o in items) out += ModelEntry.Choice(p, o, options)
-        }
-        val l = lists?.firstOrNull { it.providerId == p.id }
-        if (!p.builtIn && loading && l == null && query.isBlank()) out += ModelEntry.Loading(p)
-        else if (l?.error != null && query.isBlank()) out += ModelEntry.Partial(p)
-    }
-    return out
-}
-
-/**
- * One model: its name (the default with the model it runs as a chip), one line on what it's for or
- * its id, its context window and, on another provider, its price; a model with its own week, that
- * week's meter.
- */
-@Composable
-private fun ModelRow(o: ModelOption, all: List<ModelOption>, selected: Boolean, week: ModelWeek?, now: Long, onClick: () -> Unit) {
-    val res = LocalContext.current.resources
-    val runs = if (o.value == null) ModelCatalog.shown(o, all).takeIf { it != o.name } else null
-    val sub = o.description ?: o.model?.takeIf { it != o.name }
-    val price = o.price
-    val priceText = price?.let { if (ModelCatalog.free(it)) stringResource(R.string.ns_free) else "${ModelCatalog.dollars(it.input)} / ${ModelCatalog.dollars(it.output)}" }
-    val weekP = week?.let { w ->
-        val trail = ModelWeeks.trail(w, now)
-        UsageWindow.of(w.pct, if (trail == ModelWeeks.Trail.None) 0L else w.resetsAt ?: 0L, now, limited = w.full)
-    }
-    val said = buildString {
-        append(res.getString(R.string.ns_row_said, o.name))
-        if (runs != null) append(' ').append(res.getString(R.string.ns_runs_said, runs))
-        o.description?.let { append(' ').append(it).append('.') }
-        o.context?.let { append(' ').append(res.getString(R.string.ns_context_said, ModelCatalog.contextText(it))) }
-        if (price != null) append(' ').append(if (ModelCatalog.free(price)) res.getString(R.string.ns_free_said) else res.getString(R.string.ns_price_said, ModelCatalog.dollars(price.input), ModelCatalog.dollars(price.output)))
-        if (week != null) append(' ').append(res.getString(R.string.ns_week_said, (week.pct * 100).toInt().coerceIn(0, 100)))
-    }
-    Row(Modifier.pickRow(selected, said, onClick), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).clearAndSetSemantics { }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HText(o.name, style = Type.body, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                val tag = runs ?: o.slot?.uppercase()
-                if (tag != null) {
-                    Spacer(Modifier.width(8.dp))
-                    TagChip(tag, compact = true)
-                }
-            }
-            if (sub != null) {
-                val mono = o.description == null
-                HText(sub, style = if (mono) Type.monoSmall else Type.small, color = HN.inkDim, maxLines = 1, overflow = if (mono) TextOverflow.MiddleEllipsis else TextOverflow.Ellipsis)
-            }
-            if (weekP != null) {
-                Spacer(Modifier.height(6.dp))
-                UsageMeterCompact(stringResource(R.string.seven_days), weekP, barWidth = 48.dp)
-            }
-        }
-        if (o.context != null || priceText != null) {
-            Spacer(Modifier.width(10.dp))
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.clearAndSetSemantics { }) {
-                o.context?.let { GlyphFigure(Glyph.Token, ModelCatalog.contextText(it)) }
-                if (priceText != null) {
-                    Spacer(Modifier.height(4.dp))
-                    GlyphFigure(Glyph.Note, priceText)
-                }
-            }
-        }
-        ChosenMark(selected)
     }
 }
 

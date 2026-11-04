@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
@@ -26,14 +27,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.PermissionRules
 import com.prudnikweb.hypernova.data.Session
@@ -43,7 +43,6 @@ import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
-import com.prudnikweb.hypernova.ui.home.modeLabel
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -68,8 +67,8 @@ internal fun RulesPart(hub: Hub, s: Session) {
             .onFailure { error = it.message.orEmpty() }
     }
     val view = rules?.let { rulesView(it, s.cwd) }
-    val title = stringResource(R.string.rules_seam)
-    val said = view?.let { stringResource(R.string.rules_said, title, it.counts.deny, it.counts.ask, it.counts.allow) } ?: title
+    val title = stringResource(Str.rules_seam)
+    val said = view?.let { stringResource(Str.rules_said, title, it.counts.deny, it.counts.ask, it.counts.allow) } ?: title
     Seam(
         title,
         Modifier
@@ -77,14 +76,14 @@ internal fun RulesPart(hub: Hub, s: Session) {
             .heightIn(min = 32.dp)
             .clickable(
                 remember { MutableInteractionSource() }, indication = null, role = Role.Button,
-                onClickLabel = stringResource(if (fold.open) R.string.rules_close else R.string.rules_open),
+                onClickLabel = stringResource(if (fold.open) Str.rules_close else Str.rules_open),
             ) { fold = fold.toggled() }
             .semantics(mergeDescendants = true) { contentDescription = said },
         trailContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (view != null) {
-                    if (view.none) HText(stringResource(R.string.rules_none).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
-                    else Counts(view.counts)
+                    if (view.none) HText(stringResource(Str.rules_none).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
+                    else RuleCounts(view.counts)
                     Spacer(Modifier.width(8.dp))
                 }
                 Icon(Glyph.Chevron, Modifier.rotate(if (fold.open) 90f else 0f), size = 10.dp, color = HN.inkDim)
@@ -96,19 +95,19 @@ internal fun RulesPart(hub: Hub, s: Session) {
         view == null && error != null -> Column(Modifier.padding(start = 4.dp)) {
             HText(error.orEmpty(), style = Type.small, color = HN.danger)
             Spacer(Modifier.height(10.dp))
-            Pill(stringResource(R.string.try_again), { error = null; reload++ }, kind = PillKind.Outline, height = 44.dp)
+            Pill(stringResource(Str.try_again), { error = null; reload++ }, kind = PillKind.Outline, height = 44.dp)
         }
-        view == null -> LoadingLine(stringResource(R.string.rules_loading), Modifier.padding(start = 4.dp))
+        view == null -> LoadingLine(stringResource(Str.rules_loading), Modifier.padding(start = 4.dp))
         else -> {
-            if (view.none) HText(stringResource(R.string.rules_none), style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
-            else HText(stringResource(R.string.rules_precedence), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
-            if (view.managedOnly) HText(stringResource(R.string.rules_managed_only), style = Type.small, color = HN.amber, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+            if (view.none) HText(stringResource(Str.rules_none), style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+            else HText(stringResource(Str.rules_precedence), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+            if (view.managedOnly) HText(stringResource(Str.rules_managed_only), style = Type.small, color = HN.amber, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
             for (g in view.groups) key(g.key) {
                 SourceRow(g, open = fold.shows(g.key), onToggle = { fold = fold.toggled(g.key) })
             }
             if (view.missing.isNotEmpty()) {
                 val names = view.missing.map { stringResource(sourceLabel(it.source)) }.distinct().joinToString(", ")
-                HText(stringResource(R.string.rules_missing, names), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
+                HText(stringResource(Str.rules_missing, names), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
             }
         }
     }
@@ -116,10 +115,10 @@ internal fun RulesPart(hub: Hub, s: Session) {
 
 /** Deny, ask and allow counts, each in its colour; a kind with none isn't shown. */
 @Composable
-private fun Counts(c: RuleCounts) {
+private fun RuleCounts(c: RuleCounts) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         var first = true
-        for ((n, label, color) in listOf(Triple(c.deny, R.string.rules_kind_deny, HN.danger), Triple(c.ask, R.string.rules_kind_ask, HN.amber), Triple(c.allow, R.string.rules_kind_allow, HN.accent))) {
+        for ((n, label, color) in listOf(Triple(c.deny, Str.rules_kind_deny, HN.danger), Triple(c.ask, Str.rules_kind_ask, HN.amber), Triple(c.allow, Str.rules_kind_allow, HN.accent))) {
             if (n == 0) continue
             if (!first) Spacer(Modifier.width(8.dp))
             first = false
@@ -133,8 +132,8 @@ private fun Counts(c: RuleCounts) {
 private fun SourceRow(g: RuleGroup, open: Boolean, onToggle: () -> Unit) {
     val name = stringResource(sourceLabel(g.source.source))
     val problem = stateLabel(g.source.state)?.let { stringResource(it) }
-    val path = g.path ?: stringResource(R.string.rules_session_path)
-    val said = stringResource(R.string.rules_source_said, name, problem ?: stringResource(R.string.rules_said, path, g.counts.deny, g.counts.ask, g.counts.allow))
+    val path = g.path ?: stringResource(Str.rules_session_path)
+    val said = stringResource(Str.rules_source_said, name, problem ?: stringResource(Str.rules_said, path, g.counts.deny, g.counts.ask, g.counts.allow))
     Column(Modifier.fillMaxWidth().alpha(if (g.inEffect) 1f else 0.55f)) {
         Row(
             Modifier
@@ -144,7 +143,7 @@ private fun SourceRow(g: RuleGroup, open: Boolean, onToggle: () -> Unit) {
                 .then(
                     if (g.expandable) Modifier.clickable(
                         remember { MutableInteractionSource() }, indication = null, role = Role.Button,
-                        onClickLabel = stringResource(if (open) R.string.collapse else R.string.show_all), onClick = onToggle,
+                        onClickLabel = stringResource(if (open) Str.collapse else Str.show_all), onClick = onToggle,
                     ) else Modifier,
                 )
                 .clearAndSetSemantics { contentDescription = said }
@@ -160,17 +159,17 @@ private fun SourceRow(g: RuleGroup, open: Boolean, onToggle: () -> Unit) {
             }
             Spacer(Modifier.width(10.dp))
             if (problem != null) HText(problem, style = Type.monoSmall, color = HN.amber, maxLines = 1)
-            else Counts(g.counts)
+            else RuleCounts(g.counts)
         }
         if (open) {
             Column(Modifier.padding(start = 22.dp, end = 4.dp, bottom = 8.dp)) {
-                if (!g.inEffect) Note(stringResource(R.string.rules_not_in_effect), HN.amber)
-                Rules(R.string.rules_kind_deny, g.source.deny, HN.danger)
-                Rules(R.string.rules_kind_ask, g.source.ask, HN.amber)
-                Rules(R.string.rules_kind_allow, g.source.allow, HN.accent)
-                g.source.defaultMode?.let { Note(stringResource(R.string.rules_default_mode, modeLabel(it)), HN.inkMuted) }
-                if (g.source.additionalDirectories.isNotEmpty()) Rules(R.string.rules_dirs, g.source.additionalDirectories, HN.inkMuted, caps = false)
-                if (g.source.clipped) Note(stringResource(R.string.rules_clipped), HN.inkDim)
+                if (!g.inEffect) RulesNote(stringResource(Str.rules_not_in_effect), HN.amber)
+                Rules(Str.rules_kind_deny, g.source.deny, HN.danger)
+                Rules(Str.rules_kind_ask, g.source.ask, HN.amber)
+                Rules(Str.rules_kind_allow, g.source.allow, HN.accent)
+                g.source.defaultMode?.let { RulesNote(stringResource(Str.rules_default_mode, modeWords(it)), HN.inkMuted) }
+                if (g.source.additionalDirectories.isNotEmpty()) Rules(Str.rules_dirs, g.source.additionalDirectories, HN.inkMuted, caps = false)
+                if (g.source.clipped) RulesNote(stringResource(Str.rules_clipped), HN.inkDim)
             }
         }
     }
@@ -178,7 +177,7 @@ private fun SourceRow(g: RuleGroup, open: Boolean, onToggle: () -> Unit) {
 
 /** One kind's rules under its label, each on its own line in mono, selectable. */
 @Composable
-private fun Rules(label: Int, rules: List<String>, color: Color, caps: Boolean = true) {
+private fun Rules(label: Str, rules: List<String>, color: Color, caps: Boolean = true) {
     if (rules.isEmpty()) return
     val words = stringResource(label)
     HText(if (caps) words.uppercase() else words, style = Type.label, color = color, modifier = Modifier.padding(top = 6.dp, bottom = 2.dp))
@@ -190,6 +189,6 @@ private fun Rules(label: Int, rules: List<String>, color: Color, caps: Boolean =
 }
 
 @Composable
-private fun Note(text: String, color: Color) {
+private fun RulesNote(text: String, color: Color) {
     HText(text, style = Type.small, color = color, modifier = Modifier.padding(top = 6.dp))
 }

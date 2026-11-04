@@ -2,6 +2,8 @@
 
 package com.prudnikweb.hypernova.ui.settings
 
+import com.prudnikweb.hypernova.data.id
+
 import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -259,7 +261,7 @@ private fun PluginRowView(p: PluginRow, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             HText(p.name, style = Type.body, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
-            HText(listOfNotNull(stringResource(mcpScopeWord(p.scope)), p.marketplace, p.version).joinToString(" · "), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            HText(listOfNotNull(stringResource(mcpScopeWord(p.scope).id), p.marketplace, p.version).joinToString(" · "), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             p.problem?.let { HText(it, style = Type.small, color = HN.amber) }
         }
         Spacer(Modifier.width(12.dp))
@@ -327,7 +329,7 @@ fun PluginScreen(hub: Hub, agent: String, id: String, scopeWord: String, folder:
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item(key = "where") {
-                HText(listOfNotNull(id.substringAfter('@', "").ifEmpty { null }, stringResource(mcpScopeWord(scopeWord))).joinToString(" · "), style = Type.monoSmall, color = HN.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
+                HText(listOfNotNull(id.substringAfter('@', "").ifEmpty { null }, stringResource(mcpScopeWord(scopeWord).id)).joinToString(" · "), style = Type.monoSmall, color = HN.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
             }
             item(key = "actions") {
                 FlowRow(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

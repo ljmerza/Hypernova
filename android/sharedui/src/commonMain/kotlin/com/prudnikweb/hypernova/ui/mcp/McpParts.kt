@@ -1,6 +1,9 @@
 package com.prudnikweb.hypernova.ui.mcp
 
-import androidx.annotation.StringRes
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+import com.prudnikweb.hypernova.ui.platform.wordsNow
+
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -19,12 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Mcp
 import com.prudnikweb.hypernova.data.McpLiveTool
 import com.prudnikweb.hypernova.data.McpLogin
@@ -45,16 +46,15 @@ import com.prudnikweb.hypernova.ui.theme.Type
  */
 
 /** The status's word. Null: not asked yet, or it isn't in the answer. */
-@StringRes
-internal fun mcpStatusWord(status: String?): Int = when (status) {
-    Mcp.CONNECTED -> R.string.mcp_s_connected
-    Mcp.FAILED -> R.string.mcp_s_failed
-    Mcp.NEEDS_AUTH -> R.string.mcp_s_needs_auth
-    Mcp.PENDING -> R.string.mcp_s_pending
-    Mcp.DISABLED -> R.string.mcp_s_disabled
-    Mcp.WAITING -> R.string.mcp_s_waiting
-    Mcp.REJECTED -> R.string.mcp_s_rejected
-    else -> R.string.mcp_s_unknown
+internal fun mcpStatusWord(status: String?): Str = when (status) {
+    Mcp.CONNECTED -> Str.mcp_s_connected
+    Mcp.FAILED -> Str.mcp_s_failed
+    Mcp.NEEDS_AUTH -> Str.mcp_s_needs_auth
+    Mcp.PENDING -> Str.mcp_s_pending
+    Mcp.DISABLED -> Str.mcp_s_disabled
+    Mcp.WAITING -> Str.mcp_s_waiting
+    Mcp.REJECTED -> Str.mcp_s_rejected
+    else -> Str.mcp_s_unknown
 }
 
 @Composable
@@ -64,22 +64,21 @@ internal fun mcpStatusColor(status: String?): Color = when (status) {
     else -> HN.inkDim
 }
 
-@StringRes
-internal fun mcpScopeWord(scope: String): Int = when (scope) {
-    Mcp.USER -> R.string.mcp_scope_user
-    Mcp.LOCAL -> R.string.mcp_scope_local
-    Mcp.PROJECT -> R.string.mcp_scope_project
-    Mcp.SETTINGS -> R.string.mcp_scope_settings
-    Mcp.PLUGIN -> R.string.mcp_scope_plugin
-    "managed", "enterprise" -> R.string.mcp_scope_managed
-    "claudeai" -> R.string.mcp_scope_claudeai
-    else -> R.string.mcp_scope_plugin
+internal fun mcpScopeWord(scope: String): Str = when (scope) {
+    Mcp.USER -> Str.mcp_scope_user
+    Mcp.LOCAL -> Str.mcp_scope_local
+    Mcp.PROJECT -> Str.mcp_scope_project
+    Mcp.SETTINGS -> Str.mcp_scope_settings
+    Mcp.PLUGIN -> Str.mcp_scope_plugin
+    "managed", "enterprise" -> Str.mcp_scope_managed
+    "claudeai" -> Str.mcp_scope_claudeai
+    else -> Str.mcp_scope_plugin
 }
 
 @Composable
 internal fun mcpToolMark(readOnly: Boolean?, destructive: Boolean?): String? = when {
-    destructive == true -> stringResource(R.string.mcp_a_destructive)
-    readOnly == true -> stringResource(R.string.mcp_a_read_only)
+    destructive == true -> stringResource(Str.mcp_a_destructive)
+    readOnly == true -> stringResource(Str.mcp_a_read_only)
     else -> null
 }
 
@@ -112,14 +111,14 @@ internal fun McpToolRow(name: String, description: String?, mark: String?, onCli
 @Composable
 internal fun McpAnnotationLines(readOnly: Boolean?, destructive: Boolean?, idempotent: Boolean?, openWorld: Boolean?) {
     val lines = listOfNotNull(
-        readOnly?.let { stringResource(if (it) R.string.mcp_h_read_only else R.string.mcp_h_writes) },
-        destructive?.let { stringResource(if (it) R.string.mcp_h_destructive else R.string.mcp_h_not_destructive) },
-        idempotent?.let { stringResource(if (it) R.string.mcp_h_idempotent else R.string.mcp_h_not_idempotent) },
-        openWorld?.let { stringResource(if (it) R.string.mcp_h_open else R.string.mcp_h_closed) },
+        readOnly?.let { stringResource(if (it) Str.mcp_h_read_only else Str.mcp_h_writes) },
+        destructive?.let { stringResource(if (it) Str.mcp_h_destructive else Str.mcp_h_not_destructive) },
+        idempotent?.let { stringResource(if (it) Str.mcp_h_idempotent else Str.mcp_h_not_idempotent) },
+        openWorld?.let { stringResource(if (it) Str.mcp_h_open else Str.mcp_h_closed) },
     )
     if (lines.isEmpty()) return
     Spacer(Modifier.height(12.dp))
-    HText(stringResource(R.string.mcp_tool_says).uppercase(), style = Type.label, color = HN.inkDim)
+    HText(stringResource(Str.mcp_tool_says).uppercase(), style = Type.label, color = HN.inkDim)
     Spacer(Modifier.height(4.dp))
     lines.forEach { HText(it, style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(vertical = 1.dp)) }
 }
@@ -141,31 +140,44 @@ internal fun McpLiveToolSheet(t: McpLiveTool, why: String, onDismiss: () -> Unit
  */
 @Composable
 internal fun McpLoginSheet(l: McpLogin, onCancel: () -> Unit, onFinish: (String, (String?) -> Unit) -> Unit) {
-    val context = LocalContext.current
+    val res = wordsNow()
+    val browser = SharedUi.platform.device.browser()
     val toast = LocalToast.current
     var address by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var trouble by remember { mutableStateOf<String?>(null) }
-    GlassSheet(stringResource(R.string.mcp_sign_in), onCancel) {
-        HText(stringResource(R.string.mcp_sign_in), style = Type.title, color = HN.ink)
+    GlassSheet(stringResource(Str.mcp_sign_in), onCancel) {
+        HText(stringResource(Str.mcp_sign_in), style = Type.title, color = HN.ink)
         Spacer(Modifier.height(6.dp))
-        HText(stringResource(R.string.mcp_login_body), style = Type.small, color = HN.inkMuted)
+        HText(stringResource(Str.mcp_login_body), style = Type.small, color = HN.inkMuted)
         Spacer(Modifier.height(10.dp))
-        Pill(stringResource(R.string.mcp_login_open), {
+        Pill(stringResource(Str.mcp_login_open), {
             // The browser itself: it holds any sign-in the owner already has there.
-            l.url?.let { u -> runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(u))) }.onFailure { toast(context.getString(R.string.about_github_no_browser)) } }
+            l.url?.let { u -> browser.open(u) { toast(res.getString(Str.about_github_no_browser)) } }
         }, kind = PillKind.Primary, height = 44.dp)
         Spacer(Modifier.height(12.dp))
-        Field(address, { address = it }, placeholder = "http://localhost:…", mono = true, singleLine = false, label = stringResource(R.string.mcp_login_address))
+        Field(address, { address = it }, placeholder = "http://localhost:…", mono = true, singleLine = false, label = stringResource(Str.mcp_login_address))
         trouble?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 6.dp)) }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pill(stringResource(R.string.mcp_login_finish), {
+            Pill(stringResource(Str.mcp_login_finish), {
                 busy = true
                 trouble = null
                 onFinish(address) { err -> trouble = err; busy = false }
             }, kind = PillKind.Outline, height = 44.dp, enabled = address.isNotBlank() && !busy)
-            Pill(stringResource(R.string.cancel), onCancel, kind = PillKind.Ghost, height = 44.dp)
+            Pill(stringResource(Str.cancel), onCancel, kind = PillKind.Ghost, height = 44.dp)
+        }
+    }
+}
+
+/** What an agent's settings couldn't fetch, and another try, unless the server is too old for them. */
+@Composable
+internal fun AgentSettingsFailure(e: Throwable?, fallback: String, onRetry: () -> Unit) {
+    Column(Modifier.padding(horizontal = 4.dp)) {
+        HText(e?.message?.takeIf { it.isNotBlank() } ?: fallback, style = Type.small, color = HN.amber)
+        if (e !is com.prudnikweb.hypernova.data.AgentSettingsTooOld) {
+            Spacer(Modifier.height(10.dp))
+            Pill(stringResource(Str.try_again), onRetry, kind = PillKind.Outline, height = 40.dp)
         }
     }
 }

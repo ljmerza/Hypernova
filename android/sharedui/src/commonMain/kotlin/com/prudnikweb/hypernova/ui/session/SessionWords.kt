@@ -179,3 +179,18 @@ internal fun stripMore(s: Session): String {
     val res = wordsNow()
     return if (s.queued > 0) " " + res.getString(Str.queued, s.queued) + "." else ""
 }
+
+/** A /login from the box or the Commands tab goes to the app's own sign-in, not into the terminal. */
+internal fun isSignInCommand(text: String): Boolean = text.trim() == "/login"
+
+/** How long ago, shortly: "now", "5m", "2h", "3d". */
+@Composable
+internal fun agoShort(t: Long, now: Long): String {
+    val s = ((now - t) / 1000).coerceAtLeast(0)
+    return when {
+        s < 45 -> stringResource(Str.ago_now)
+        s < 3600 -> stringResource(Str.ago_minutes, maxOf(1L, s / 60))
+        s < 86400 -> stringResource(Str.ago_hours, s / 3600)
+        else -> stringResource(Str.ago_days, s / 86400)
+    }
+}

@@ -2,6 +2,8 @@
 
 package com.prudnikweb.hypernova.ui.settings
 
+import com.prudnikweb.hypernova.data.id
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -203,7 +205,7 @@ fun AgentRawScreen(hub: Hub, agent: String, onBack: () -> Unit) {
             SettingsModeSwitch(json = true, onSettings = { leaving(onBack) }, onJson = {}, modifier = Modifier.padding(horizontal = 4.dp))
             FlowRow(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(Mcp.USER, Mcp.PROJECT, Mcp.LOCAL).forEach { s ->
-                    Pill(stringResource(mcpScopeWord(s)), { if (s != where) leaving { where = s } }, kind = if (s == where) PillKind.Primary else PillKind.Ghost, height = 36.dp)
+                    Pill(stringResource(mcpScopeWord(s).id), { if (s != where) leaving { where = s } }, kind = if (s == where) PillKind.Primary else PillKind.Ghost, height = 36.dp)
                 }
             }
             val r = file

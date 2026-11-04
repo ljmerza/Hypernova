@@ -1,5 +1,7 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
@@ -20,14 +22,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.SlashCommand
 import com.prudnikweb.hypernova.data.find
@@ -93,22 +94,22 @@ fun CommandSuggestions(state: CommandsState, query: String, onPick: (SlashComman
         Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
             val list = state.list
             when {
-                list == null && state.error != null -> Note(state.error)
+                list == null && state.error != null -> CommandNote(state.error)
                 list == null -> Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Planet(Activity.Live)
                     Spacer(Modifier.width(10.dp))
-                    HText(stringResource(R.string.commands_loading), style = Type.small, color = HN.inkDim)
+                    HText(stringResource(Str.commands_loading), style = Type.small, color = HN.inkDim)
                 }
                 else -> {
                     val shown = matching(list, query)
-                    if (shown.isEmpty()) Note(stringResource(R.string.commands_none))
+                    if (shown.isEmpty()) CommandNote(stringResource(Str.commands_none))
                     var group: Boolean? = null
                     for (c in shown) {
                         // Headings only over the whole list; filtered, it's one list, best first.
                         if (query.isEmpty() && c.builtin != group) {
                             group = c.builtin
                             HText(
-                                stringResource(if (c.builtin) R.string.commands_builtin else R.string.commands_yours).uppercase(),
+                                stringResource(if (c.builtin) Str.commands_builtin else Str.commands_yours).uppercase(),
                                 style = Type.label, color = HN.inkDim,
                                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 2.dp),
                             )
@@ -122,7 +123,7 @@ fun CommandSuggestions(state: CommandsState, query: String, onPick: (SlashComman
 }
 
 @Composable
-private fun Note(text: String) {
+private fun CommandNote(text: String) {
     HText(text, style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
 }
 

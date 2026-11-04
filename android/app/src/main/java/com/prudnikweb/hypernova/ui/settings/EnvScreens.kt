@@ -2,6 +2,8 @@
 
 package com.prudnikweb.hypernova.ui.settings
 
+import com.prudnikweb.hypernova.data.id
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -197,7 +199,7 @@ fun AgentEnvScreen(hub: Hub, agent: String, onBack: () -> Unit) {
                                         Spacer(Modifier.height(6.dp))
                                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                             data.files.filter { it.changeable }.forEach { f ->
-                                                Pill(stringResource(mcpScopeWord(f.scope)), { addScope = f.scope }, kind = if (f.scope == addScope) PillKind.Primary else PillKind.Ghost, height = 36.dp)
+                                                Pill(stringResource(mcpScopeWord(f.scope).id), { addScope = f.scope }, kind = if (f.scope == addScope) PillKind.Primary else PillKind.Ghost, height = 36.dp)
                                             }
                                         }
                                     }
@@ -254,8 +256,8 @@ private fun EnvRow(v: EnvVar, codex: Boolean, canChange: Boolean, onFlip: () -> 
             }
             Spacer(Modifier.height(2.dp))
             val where = buildList {
-                if (!codex) add(stringResource(mcpScopeWord(v.scope)))
-                v.overriddenBy?.let { add(stringResource(R.string.env_overridden, if (it == "system") stringResource(R.string.env_scope_system) else stringResource(mcpScopeWord(it)))) }
+                if (!codex) add(stringResource(mcpScopeWord(v.scope).id))
+                v.overriddenBy?.let { add(stringResource(R.string.env_overridden, if (it == "system") stringResource(R.string.env_scope_system) else stringResource(mcpScopeWord(it).id))) }
                 if (v.guarded) add(stringResource(R.string.env_guarded))
                 if (v.refused) add(stringResource(R.string.env_refused))
             }.joinToString(" · ")

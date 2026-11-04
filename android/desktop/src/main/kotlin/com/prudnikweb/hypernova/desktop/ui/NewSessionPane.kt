@@ -87,8 +87,8 @@ import com.prudnikweb.hypernova.data.healthyOther
 import com.prudnikweb.hypernova.desktop.DeskIncidents
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.Ui
-import com.prudnikweb.hypernova.desktop.modeLine
-import com.prudnikweb.hypernova.desktop.modeTitle
+import com.prudnikweb.hypernova.desktop.paneModeLine
+import com.prudnikweb.hypernova.desktop.paneModeTitle
 import com.prudnikweb.hypernova.desktop.whyWords
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -251,7 +251,7 @@ internal fun NewSessionPane(hub: Hub, shell: Shell, server: String, onBack: (() 
                         val now = if (onCodex) codexMode else mode
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             for (m in if (onCodex) AgentKind.CODEX_MODES else NewSessionMemory.START_MODES) {
-                                Choice(modeTitle(m), m == now) {
+                                Choice(paneModeTitle(m), m == now) {
                                     when {
                                         onCodex -> codexModePick = m
                                         m == mode -> Unit
@@ -263,7 +263,7 @@ internal fun NewSessionPane(hub: Hub, shell: Shell, server: String, onBack: (() 
                             }
                         }
                         Spacer(Modifier.height(6.dp))
-                        HText(modeLine(now), style = Type.small, color = if (now == "auto") HN.amber else HN.inkMuted)
+                        HText(paneModeLine(now), style = Type.small, color = if (now == "auto") HN.amber else HN.inkMuted)
                         if (!onCodex) {
                             Spacer(Modifier.height(4.dp))
                             HText(Ui.desk_bypass_on_phone.text(), style = Type.small, color = HN.inkDim)

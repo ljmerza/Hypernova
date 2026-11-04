@@ -377,7 +377,7 @@ private fun StepPermissions(a: Action.Start, sub: String?, onChange: (Action) ->
     val marked = sub == "permissionMode" || sub == "allowedTools"
     var shown by remember { mutableStateOf(marked) }
     val rules = a.allowedTools.size.takeIf { it > 0 && Rules.kept(a.permissionMode) }
-    val value = modeTitle(a.permissionMode) + (rules?.let { ", " + pluralStringResource(R.plurals.wf_rules_n, it, it) } ?: "")
+    val value = autoModeTitle(a.permissionMode) + (rules?.let { ", " + pluralStringResource(R.plurals.wf_rules_n, it, it) } ?: "")
     Spacer(Modifier.height(4.dp))
     PickRow(stringResource(R.string.au_permissions), value, { shown = !shown })
     AnimatedVisibility(shown || marked) {

@@ -1,9 +1,10 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
+import com.prudnikweb.hypernova.data.Incident
+
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.ui.platform.SharedUi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
@@ -21,13 +22,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -48,17 +47,17 @@ fun needsThinkTwice(mode: String) = mode == "auto" || mode == "bypassPermissions
 fun ThinkTwiceCard(mode: String, incident: Incident, onKeep: () -> Unit, onGoOn: () -> Unit) {
     val bypass = mode == "bypassPermissions"
     val tint = if (bypass) HN.danger else HN.amber
-    val context = LocalContext.current
+    val browser = SharedUi.platform.device.browser()
     GlassDialog(
         onDismiss = onKeep,
-        eyebrow = stringResource(if (bypass) R.string.think_kicker_bypass else R.string.think_kicker_auto),
+        eyebrow = stringResource(if (bypass) Str.think_kicker_bypass else Str.think_kicker_auto),
         title = incident.headline,
-        line = stringResource(R.string.think_ai_mistakes),
+        line = stringResource(Str.think_ai_mistakes),
         tint = tint,
         warm = bypass,
-        secondary = DialogButton(stringResource(if (bypass) R.string.think_use_bypass else R.string.think_use_auto), onGoOn, if (bypass) PillKind.Danger else PillKind.Ghost),
-        primary = DialogButton(stringResource(R.string.think_keep), onKeep, PillKind.Primary),
-        moreLabel = stringResource(R.string.why_it_matters),
+        secondary = DialogButton(stringResource(if (bypass) Str.think_use_bypass else Str.think_use_auto), onGoOn, if (bypass) PillKind.Danger else PillKind.Ghost),
+        primary = DialogButton(stringResource(Str.think_keep), onKeep, PillKind.Primary),
+        moreLabel = stringResource(Str.why_it_matters),
         more = {
             HText(incident.what, style = Type.small, color = HN.inkMuted)
             Spacer(Modifier.height(10.dp))
@@ -73,20 +72,20 @@ fun ThinkTwiceCard(mode: String, incident: Incident, onKeep: () -> Unit, onGoOn:
                 HText(incident.month(), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
             }
             val source = incident.sources.first()
-            val storyDesc = stringResource(R.string.think_story_desc, source.title)
+            val storyDesc = stringResource(Str.think_story_desc, source.title)
             Row(
                 Modifier
                     .padding(top = 4.dp)
                     .heightIn(min = 44.dp)
                     .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) {
-                        try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(source.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: ActivityNotFoundException) { }
+                        browser.open(source.url) { }
                     }
                     .semantics { contentDescription = storyDesc },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Glyph.Globe, size = 13.dp, color = HN.accent)
                 Spacer(Modifier.width(7.dp))
-                HText(stringResource(R.string.think_story), style = Type.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(600)), color = HN.accent)
+                HText(stringResource(Str.think_story), style = Type.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(600)), color = HN.accent)
             }
         },
     )
@@ -101,22 +100,22 @@ fun ThinkTwiceCard(mode: String, incident: Incident, onKeep: () -> Unit, onGoOn:
  */
 @Composable
 fun ModePicker(mode: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, bypassAvailable: Boolean = true, bypass: Boolean = true) {
-    val context = LocalContext.current
+    val incidents = SharedUi.platform.device.incidents()
     var asking by rememberSaveable { mutableStateOf<String?>(null) }
     var incidentId by rememberSaveable { mutableStateOf<String?>(null) }
     Column(modifier) {
         Segmented(
             listOfNotNull(
-                "default" to stringResource(R.string.mode_default),
-                "acceptEdits" to stringResource(R.string.mode_accept),
-                "plan" to stringResource(R.string.mode_plan),
-                "auto" to stringResource(R.string.mode_auto),
-                ("bypassPermissions" to stringResource(R.string.mode_bypass)).takeIf { bypass },
+                "default" to stringResource(Str.mode_default),
+                "acceptEdits" to stringResource(Str.mode_accept),
+                "plan" to stringResource(Str.mode_plan),
+                "auto" to stringResource(Str.mode_auto),
+                ("bypassPermissions" to stringResource(Str.mode_bypass)).takeIf { bypass },
             ),
             mode,
             { m ->
                 if (m != mode && needsThinkTwice(m)) {
-                    val pick = Incidents.next(context)
+                    val pick = incidents.next()
                     // No list to show (the file is damaged): go on rather than block the choice.
                     if (pick == null) onChange(m) else { incidentId = pick.id; asking = m }
                 } else onChange(m)
@@ -125,11 +124,11 @@ fun ModePicker(mode: String, onChange: (String) -> Unit, modifier: Modifier = Mo
         )
         if (!bypassAvailable) {
             Spacer(Modifier.height(8.dp))
-            HText(stringResource(R.string.mode_bypass_unavailable), style = Type.small, color = HN.inkDim)
+            HText(stringResource(Str.mode_bypass_unavailable), style = Type.small, color = HN.inkDim)
         }
     }
     val m = asking
-    val incident = Incidents.byId(context, incidentId)
+    val incident = incidents.byId(incidentId)
     if (m != null && incident != null) {
         ThinkTwiceCard(m, incident, onKeep = { asking = null }, onGoOn = { asking = null; onChange(m) })
     }

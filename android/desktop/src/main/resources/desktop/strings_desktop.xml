@@ -24,6 +24,8 @@
     <string name="desk_ask_plan">A plan to review.</string>
     <string name="desk_reply_below">Reply in the box below.</string>
     <string name="desk_preview_on_phone">Previews open on your phone.</string>
+    <string name="desk_changes_on_phone">What changed is on your phone.</string>
+    <string name="desk_switch_on_phone">Switching agents is on your phone.</string>
     <string name="desk_files_on_phone">Files open on your phone.</string>
     <string name="desk_terminal_on_phone">A session\'s live terminal is on your phone.</string>
     <string name="desk_settings_on_phone">That\'s in the phone\'s app, for now.</string>

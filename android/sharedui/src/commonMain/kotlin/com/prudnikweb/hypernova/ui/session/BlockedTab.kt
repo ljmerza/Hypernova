@@ -1,7 +1,8 @@
 package com.prudnikweb.hypernova.ui.session
 
-import android.os.Build
-import android.view.HapticFeedbackConstants
+import com.prudnikweb.hypernova.ui.platform.rememberHaptics
+
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -28,14 +29,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.BlockedCall
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
@@ -45,7 +44,6 @@ import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
-import com.prudnikweb.hypernova.ui.home.ago
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -78,7 +76,7 @@ internal fun BlockedCalls(hub: Hub, session: Session, onRetried: () -> Unit, onL
     var error by remember(session.id) { mutableStateOf<String?>(null) }
     var busy by remember(session.id) { mutableStateOf<String?>(null) }
     var reload by remember(session.id) { mutableLongStateOf(0L) }
-    val retried = stringResource(R.string.blocked_retried)
+    val retried = stringResource(Str.blocked_retried)
     val loadedNow by rememberUpdatedState(onLoaded)
     fun show(list: List<BlockedCall>) {
         calls.clear()
@@ -99,14 +97,14 @@ internal fun BlockedCalls(hub: Hub, session: Session, onRetried: () -> Unit, onL
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         when {
-            !loaded -> LoadingLine(stringResource(R.string.blocked_loading))
+            !loaded -> LoadingLine(stringResource(Str.blocked_loading))
             error != null && calls.isEmpty() -> Column {
                 HText(error.orEmpty(), style = Type.body, color = HN.danger)
                 Spacer(Modifier.height(12.dp))
-                Pill(stringResource(R.string.try_again), { reload++ }, kind = PillKind.Outline, height = 44.dp)
+                Pill(stringResource(Str.try_again), { reload++ }, kind = PillKind.Outline, height = 44.dp)
             }
-            calls.isEmpty() -> HText(stringResource(R.string.blocked_empty), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp))
-            else -> HText(stringResource(R.string.blocked_intro), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
+            calls.isEmpty() -> HText(stringResource(Str.blocked_empty), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp))
+            else -> HText(stringResource(Str.blocked_intro), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
         }
         for (call in calls) key(call.id) {
             BlockedRow(
@@ -144,20 +142,20 @@ internal fun BlockedCalls(hub: Hub, session: Session, onRetried: () -> Unit, onL
 /** One blocked call: its tool, why and when, what it would run in mono, then Dismiss and Allow & retry. */
 @Composable
 private fun BlockedRow(call: BlockedCall, now: Long, enabled: Boolean, onRetry: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    val view = LocalView.current
+    val haptics = rememberHaptics()
     GlassCard(modifier, accent = HN.amber) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HText(toolTag(call.tool).uppercase(), style = Type.label, color = HN.amber, maxLines = 1, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(10.dp))
-                HText(ago(call.at, now), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                HText(agoShort(call.at, now), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
             }
             Spacer(Modifier.height(4.dp))
             HText(
                 when {
-                    call.reason == BlockedCall.AWAY -> stringResource(R.string.blocked_reason_away)
-                    call.why != null -> stringResource(R.string.blocked_reason_auto_why, call.why)
-                    else -> stringResource(R.string.blocked_reason_auto)
+                    call.reason == BlockedCall.AWAY -> stringResource(Str.blocked_reason_away)
+                    call.why != null -> stringResource(Str.blocked_reason_auto_why, call.why)
+                    else -> stringResource(Str.blocked_reason_auto)
                 },
                 style = Type.small, color = HN.inkMuted,
             )
@@ -180,11 +178,11 @@ private fun BlockedRow(call: BlockedCall, now: Long, enabled: Boolean, onRetry: 
             }
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill(stringResource(R.string.blocked_dismiss), onDismiss, Modifier.weight(1f), kind = PillKind.Ghost, enabled = enabled)
+                Pill(stringResource(Str.blocked_dismiss), onDismiss, Modifier.weight(1f), kind = PillKind.Ghost, enabled = enabled)
                 Pill(
-                    stringResource(R.string.blocked_retry),
+                    stringResource(Str.blocked_retry),
                     {
-                        view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
+                        haptics.confirm()
                         onRetry()
                     },
                     Modifier.weight(1.2f), kind = PillKind.Primary, enabled = enabled,

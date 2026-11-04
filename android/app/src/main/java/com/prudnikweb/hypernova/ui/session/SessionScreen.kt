@@ -93,7 +93,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -111,7 +110,6 @@ import com.prudnikweb.hypernova.data.AttachDrafts
 import com.prudnikweb.hypernova.data.sendPrompt
 import com.prudnikweb.hypernova.data.Aside
 import com.prudnikweb.hypernova.data.Asides
-import com.prudnikweb.hypernova.data.SessionSwitched
 import com.prudnikweb.hypernova.data.Blocked
 import com.prudnikweb.hypernova.data.healthyOther
 import com.prudnikweb.hypernova.ui.home.SignInPanel
@@ -124,7 +122,6 @@ import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.SessionState
-import com.prudnikweb.hypernova.data.TerminalBusy
 import com.prudnikweb.hypernova.data.knownCommands
 import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.LocalOpener
@@ -728,11 +725,7 @@ fun SessionScreen(
                 onCompact = { quickSend("/compact") },
             )
         }
-        if (modelOpen && canChangeModel(session)) {
-            if (session.codex) CodexModelPicker(hub, session, onDismiss = { modelOpen = false })
-            else SessionModelPicker(hub, session, onDismiss = { modelOpen = false })
-        }
-        ModelSwitchHost(hub, session)
+        ModelPickerHost(hub, session, modelOpen, onDismiss = { modelOpen = false })
         // Switching to the other agent (AgentSwitchSheet.kt): on success the chat goes on in the new session.
         switching?.let { to ->
             AgentSwitchSheet(hub, session, to, onSwitched = { id -> switching = null; opener.switchSession(id) }, onDismiss = { switching = null })
@@ -761,119 +754,6 @@ internal fun WaitingForMac(hub: Hub, onBack: () -> Unit) {
         }
     }
 }
-
-/**
- * The session sheet's Model part: the model the session runs, as its chip, and a way to another
- * one (the picker below). TalkBack hears "Model: Opus 5.5" and the action.
- */
-@Composable
-internal fun ModelLine(model: String, onClick: () -> Unit) {
-    val res = LocalContext.current.resources
-    val name = com.prudnikweb.hypernova.data.ModelNames.chip(model)
-    val said = res.getString(R.string.meta_model_said, name)
-    Row(
-        Modifier
-            .heightIn(min = 44.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .glassChoice(false, 12.dp)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.model_change), onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = said }
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HText(stringResource(R.string.model).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
-        Spacer(Modifier.width(10.dp))
-        com.prudnikweb.hypernova.ui.components.ModelChip(name)
-        Spacer(Modifier.width(10.dp))
-        Icon(Glyph.Chevron, size = 11.dp, color = HN.inkDim)
-    }
-}
-
-/**
- * The Start sheet's model picker for a running session: only its own provider's models (moving
- * to another provider is the limit card's "carry on elsewhere"), the one it runs marked. A pick
- * switches it ([Hub.setModel]); on a provider that bills it, after the owner's yes ("This costs
- * money", as automations ask).
- */
-@Composable
-private fun SessionModelPicker(hub: Hub, s: Session, onDismiss: () -> Unit) {
-    val provider = hub.providers.firstOrNull { it.id == (s.providerId ?: "anthropic") } ?: hub.providers.firstOrNull { it.builtIn } ?: return
-    var lists by remember { mutableStateOf<List<com.prudnikweb.hypernova.data.ModelList>?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    LaunchedEffect(hub) {
-        hub.models().onSuccess { lists = it }
-        loading = false
-    }
-    val options = remember(provider, lists) { com.prudnikweb.hypernova.data.ModelCatalog.of(provider, lists) }
-    val current = com.prudnikweb.hypernova.data.ModelCatalog.current(options, s.model)
-    val opened = remember { System.currentTimeMillis() }
-    com.prudnikweb.hypernova.ui.home.ModelPicker(
-        listOf(provider), lists, loading, provider.id,
-        // None of the list runs it (a model it was started on elsewhere): nothing is marked.
-        model = if (current != null) current.value else NONE_MARKED,
-        weeks = hub.usage.models, now = opened,
-        providerTrail = { null },
-        onPick = { _, value ->
-            onDismiss()
-            val o = com.prudnikweb.hypernova.data.ModelCatalog.find(options, value)
-            if (o != null && o != current) {
-                ModelSwitching.ask(s.id, o.value ?: o.model, o.name, paid = com.prudnikweb.hypernova.data.ModelCatalog.paid(provider, o))
-            }
-        },
-        onDismiss = onDismiss,
-    )
-}
-
-/**
- * A model switch on its way, and the "This costs money" question it may need first. Kept outside
- * the picker (which closes on the pick) so the question and the switch outlive it.
- */
-private object ModelSwitching {
-    /** The switch waiting for the owner's yes: session, model (null: the default), its name. */
-    var asking by mutableStateOf<Triple<String, String?, String>?>(null)
-    var pending by mutableStateOf<Pair<Triple<String, String?, String>, Boolean>?>(null)
-
-    fun ask(sessionId: String, model: String?, name: String, paid: Boolean) {
-        val t = Triple(sessionId, model, name)
-        if (paid) asking = t else pending = t to false
-    }
-}
-
-/**
- * Runs the switch [ModelSwitching] holds, and asks "This costs money" when the session's provider
- * bills it (or the Mac says so): the Mac switches only with that yes.
- */
-@Composable
-private fun ModelSwitchHost(hub: Hub, s: Session) {
-    val appScope = com.prudnikweb.hypernova.ui.LocalAppScope.current
-    val toast = LocalToast.current
-    val res = LocalContext.current.resources
-    val go = ModelSwitching.pending
-    LaunchedEffect(go) {
-        val (t, paid) = go ?: return@LaunchedEffect
-        ModelSwitching.pending = null
-        appScope.launch {
-            hub.setModel(t.first, t.second, confirmPaid = paid)
-                .onSuccess { sw -> if (sw.nextTurn) toast(res.getString(R.string.model_next_turn, t.third)) }
-                .onFailure { e -> if (e is com.prudnikweb.hypernova.data.PaidModel && !paid) ModelSwitching.asking = t else toast(e.message.orEmpty()) }
-        }
-    }
-    val q = ModelSwitching.asking?.takeIf { it.first == s.id } ?: return
-    val provider = hub.providers.firstOrNull { it.id == (s.providerId ?: "anthropic") }?.name ?: s.providerId.orEmpty()
-    val dismiss = { ModelSwitching.asking = null }
-    com.prudnikweb.hypernova.ui.components.GlassDialog(
-        onDismiss = dismiss,
-        eyebrow = q.third,
-        title = stringResource(R.string.model_paid_q),
-        line = stringResource(R.string.model_paid_body, provider),
-        primary = com.prudnikweb.hypernova.ui.components.DialogButton(stringResource(R.string.model_paid_ok), { ModelSwitching.pending = q to true; dismiss() }, PillKind.Primary),
-        secondary = com.prudnikweb.hypernova.ui.components.DialogButton(stringResource(R.string.cancel), dismiss),
-        tint = HN.amber,
-    )
-}
-
-/** A value no model has: the picker marks none. */
-private const val NONE_MARKED = "\u0000none"
 
 private fun elapsedText(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)

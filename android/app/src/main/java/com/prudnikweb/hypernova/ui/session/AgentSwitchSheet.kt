@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,7 +22,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -43,9 +41,7 @@ import com.prudnikweb.hypernova.data.SessionState
 import com.prudnikweb.hypernova.data.SwitchRefused
 import com.prudnikweb.hypernova.data.pick
 import com.prudnikweb.hypernova.data.storage
-import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
-import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.agentName
 import com.prudnikweb.hypernova.ui.components.FieldLabel
@@ -55,8 +51,6 @@ import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Segmented
-import com.prudnikweb.hypernova.ui.components.TagChip
-import com.prudnikweb.hypernova.ui.components.glassChoice
 import com.prudnikweb.hypernova.ui.components.modeGlyph
 import com.prudnikweb.hypernova.ui.home.ChipText
 import com.prudnikweb.hypernova.ui.home.CodexModelSheet
@@ -88,17 +82,6 @@ private const val NONE = "none"
 /** How long "Stop and switch" waits for the session to come to rest before it gives up. */
 private const val STOP_WAIT_MS = 20_000L
 
-/**
- * The agent [s] can switch to from its panel: Claude from any Codex session; Codex from a Claude one
- * once Codex is in use on this Mac; none once the conversation went on elsewhere.
- */
-internal fun switchTarget(hub: Hub, s: Session): String? = when {
-    s.switchedTo != null -> null
-    s.codex -> AgentKind.CLAUDE
-    hub.codex?.canSwitchTo == true -> AgentKind.CODEX
-    else -> null
-}
-
 /** Claude or Codex at work in [s] (a turn, an approval, prompts waiting): a switch stops it first. */
 private fun atWork(s: Session): Boolean = s.phase != Phase.Ended && (s.state != SessionState.Idle || s.phase == Phase.Starting || s.queued > 0)
 
@@ -129,63 +112,6 @@ internal fun SwitchLine(hub: Hub, s: Session, modifier: Modifier = Modifier) {
         Spacer(Modifier.width(6.dp))
         Icon(Glyph.Chevron, size = 10.dp, color = HN.accentDim)
     }
-}
-
-/**
- * The status line's panel, after the model and the mode: the agent the session runs on, as its
- * chip, and the way to the other one. TalkBack hears "Switch to Codex".
- */
-@Composable
-internal fun AgentLine(codex: Boolean, onClick: () -> Unit) {
-    val target = stringResource(if (codex) R.string.cx_switch_to_claude else R.string.cx_switch_to_codex)
-    Row(
-        Modifier
-            .heightIn(min = 44.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .glassChoice(false, 12.dp)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = target, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = target }
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HText(stringResource(R.string.cx_agent).uppercase(), style = Type.label, color = HN.inkDim, maxLines = 1)
-        Spacer(Modifier.width(10.dp))
-        TagChip(agentName(codex))
-        Spacer(Modifier.width(10.dp))
-        HText(target, style = Type.small, color = HN.accentDim, maxLines = 1)
-        Spacer(Modifier.width(8.dp))
-        Icon(Glyph.Chevron, size = 11.dp, color = HN.inkDim)
-    }
-}
-
-/**
- * A Codex session's model and reasoning effort, from the session sheet: Codex's own list (the one it
- * runs marked), its effort under it, and Done switches it ([Hub.setCodexModel]; from its next turn
- * while one runs).
- */
-@Composable
-internal fun CodexModelPicker(hub: Hub, s: Session, onDismiss: () -> Unit) {
-    val appScope = LocalAppScope.current
-    val toast = LocalToast.current
-    val res = LocalContext.current.resources
-    var models by remember { mutableStateOf<List<CodexModel>?>(null) }
-    var note by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(hub) { hub.codexModels().onSuccess { models = it }.onFailure { models = emptyList(); note = it.message } }
-    CodexModelSheet(
-        models, note, model = s.model, effort = null, withEffort = true,
-        onDone = { m, e ->
-            onDismiss()
-            if (m != s.model || e != null) {
-                val name = codexModelName(models, m, res.getString(R.string.model_label_default))
-                appScope.launch {
-                    hub.setCodexModel(s.id, m, e)
-                        .onSuccess { sw -> if (sw.nextTurn) toast(res.getString(R.string.model_next_turn, name)) }
-                        .onFailure { toast(it.message.orEmpty()) }
-                }
-            }
-        },
-        onDismiss = onDismiss,
-    )
 }
 
 /**

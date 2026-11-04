@@ -66,6 +66,17 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import org.jetbrains.skia.FilterBlurMode
 import org.jetbrains.skia.MaskFilter
+import androidx.compose.runtime.LaunchedEffect
+import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.ui.LocalToast
+import com.prudnikweb.hypernova.ui.platform.UiScreens
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.prudnikweb.hypernova.ui.platform.Browser
+import com.prudnikweb.hypernova.ui.platform.IncidentSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.Surface
@@ -98,6 +109,7 @@ object DesktopUiPlatform : UiPlatform {
     override val owner: UiOwner = DeskOwner
     override val images: UiImages = DeskImages
     override val reading: UiReading = NoReading
+    override val screens: UiScreens = DeskScreens
 }
 
 /** The phone's words from DesktopStrings, reworded for the computer on screen as the phone's Resources are. */
@@ -143,6 +155,9 @@ private object DeskFonts : UiFonts {
     override val monoFeatures: String? = "liga 0, calt 0"
 }
 
+/** The window's [Shell], for what the platform's seams do through it. */
+internal val LocalShell = staticCompositionLocalOf<Shell?> { null }
+
 private object NoHaptics : Haptics {
     override fun longPress() {}
     override fun tick() {}
@@ -167,6 +182,21 @@ private object DeskDevice : UiDevice {
 
     @Composable
     override fun windowHeightDp(): Int = (LocalWindowInfo.current.containerSize.height / LocalDensity.current.density).toInt()
+
+    /** Through the window's own [DeskActions], so a test's stands in. */
+    @Composable
+    override fun browser(): Browser {
+        val shell = LocalShell.current
+        return Browser { url, onFail ->
+            Core.scope.launch {
+                val opened = withContext(Dispatchers.IO) { (shell?.desk ?: RealDesk).browse(url) }
+                if (!opened) onFail()
+            }
+        }
+    }
+
+    @Composable
+    override fun incidents(): IncidentSource = DeskIncidents
 
     /** Nothing here is recreated in place: closing the window ends the app. */
     @Composable
@@ -347,4 +377,16 @@ private object NoReading : UiReading {
 
     @Composable
     override fun Mark(modifier: Modifier) {}
+}
+
+/** No What changed here yet: it says so, and the row is ready to go on. */
+private object DeskScreens : UiScreens {
+    @Composable
+    override fun WhatChanged(hub: Hub, s: Session, onDismiss: () -> Unit) {
+        val toast = LocalToast.current
+        LaunchedEffect(Unit) {
+            toast(Ui.desk_changes_on_phone.text())
+            onDismiss()
+        }
+    }
 }

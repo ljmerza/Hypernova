@@ -216,9 +216,11 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | The top bar (usage strip): the context ring, mode, effort, the plan's windows and any of the items Settings chooses, Compact past 85%, the blocked mark | There | The phone's own (`ui.session.UsageStrip.kt`, `TopBar.kt`), between the card and the chat. Settings has the phone's row for what it shows (`ui.settings.TopBarSection.kt`), kept on this computer |
 | The status bar and its details: what it's doing, to-dos, the agents, the whole command, the turn's time and tokens, Stop | There | The phone's own (`ui.session.StatusBar.kt`), over the box. An agent's row says its screen is on the phone. Opened, it keeps to 45% of the pane |
 | Answer a question or a plan, Always, Allow these N | Partly | Questions and plans are answered in the chat. Always also needs an owner check the desktop hasn't got |
-| Session sheet: what the list already knows (folder, model, mode, where it runs, agents, queue, context, times) | There | In the pane |
-| Background commands ("1 shell"): the Agents tab's list and the count | Not yet | `:shared` has them (`AgentBoard.shells`, `Session.shellsRunning`); needs the agents tab or a row in the pane |
-| Session sheet: switch model, effort or mode; Blocked; rules in effect; why it asked; agents tab; commands tab; git; another provider or agent | Not yet | Each needs a request of its own |
+| Session sheet: what the list already knows (folder, model, mode, where it runs, agents, queue, context, times) | There | In the pane, and the sheet's Session tab |
+| Background commands ("1 shell"): the Agents tab's list and the count | There | The sheet's Agents tab (`ShellsPart.kt`) |
+| Session sheet: switch model, effort or mode; Blocked; rules in effect; why it asked; agents tab; MCP tab; commands tab; git; the actions | There | The phone's own content (`ui.session.SessionSheet.kt`). It's beside the chat from a window 1560 dp wide, else the phone's card over it. **No Bypass:** it isn't offered, and it says why (`UiOwner`). What needs the owner's check on the phone (Always) says to use the phone |
+| Session sheet: another agent | Not yet | The sheet's line says it's on the phone: `AgentSwitchSheet.kt` waits for the new session's pickers |
+| Session sheet: another provider, What changed, Files, a live terminal, an agent's own screen | Not yet | Each says it's on the phone (the desktop's `Opener`, `UiScreens`) |
 
 **History**
 

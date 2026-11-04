@@ -1,5 +1,10 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
@@ -20,22 +25,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Finished
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
-import com.prudnikweb.hypernova.data.strings
-import com.prudnikweb.hypernova.ui.changes.ChangesDialog
 import com.prudnikweb.hypernova.data.ChangesRepo
 import com.prudnikweb.hypernova.data.WorkChanges
 import com.prudnikweb.hypernova.ui.components.Glyph
@@ -60,8 +61,8 @@ import kotlinx.coroutines.delay
  */
 @Composable
 internal fun TimePart(s: Session) {
-    val res = LocalContext.current.resources
-    val words = LocalContext.current.resources.strings
+    val res = wordsNow()
+    val words = wordsNow()
     val h24 = com.prudnikweb.hypernova.ui.platform.SharedUi.platform.clock.style().is24Hour
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -71,21 +72,21 @@ internal fun TimePart(s: Session) {
         }
     }
     for (row in sheetTimeRows(s, now)) when (row) {
-        is TimeRow.Started -> InfoRow(stringResource(R.string.session_sheet_started), startedWords(words, h24, row.at, now))
-        is TimeRow.Running -> InfoRow(stringResource(if (row.ended) R.string.session_sheet_ran_for else R.string.session_sheet_running_for), formatDuration(res, row.ms))
-        is TimeRow.Turn -> InfoRow(stringResource(R.string.session_sheet_this_turn), formatDuration(res, row.ms), valueColor = HN.accent)
-        is TimeRow.Last -> InfoRow(stringResource(R.string.session_sheet_last_activity), agoWords(row.ago))
+        is TimeRow.Started -> InfoRow(stringResource(Str.session_sheet_started), startedWords(words, h24, row.at, now))
+        is TimeRow.Running -> InfoRow(stringResource(if (row.ended) Str.session_sheet_ran_for else Str.session_sheet_running_for), formatDuration(res, row.ms))
+        is TimeRow.Turn -> InfoRow(stringResource(Str.session_sheet_this_turn), formatDuration(res, row.ms), valueColor = HN.accent)
+        is TimeRow.Last -> InfoRow(stringResource(Str.session_sheet_last_activity), agoWords(row.ago))
     }
 }
 
 /** "just now", "2m ago", "yesterday", as Completed cards say when they finished. */
 @Composable
 private fun agoWords(f: Finished): String = when (f) {
-    Finished.Now -> stringResource(R.string.done_ago_now)
-    is Finished.Minutes -> stringResource(R.string.done_ago_minutes, f.n)
-    is Finished.Hours -> stringResource(R.string.done_ago_hours, f.n)
-    Finished.Yesterday -> stringResource(R.string.done_ago_yesterday)
-    is Finished.Days -> stringResource(R.string.done_ago_days, f.n)
+    Finished.Now -> stringResource(Str.done_ago_now)
+    is Finished.Minutes -> stringResource(Str.done_ago_minutes, f.n)
+    is Finished.Hours -> stringResource(Str.done_ago_hours, f.n)
+    Finished.Yesterday -> stringResource(Str.done_ago_yesterday)
+    is Finished.Days -> stringResource(Str.done_ago_days, f.n)
 }
 
 /**
@@ -102,16 +103,16 @@ internal fun GitPart(hub: Hub, s: Session, seam: @Composable () -> Unit) {
     LaunchedEffect(s.id, inTurn, open) {
         if (!open && (changes == null || !inTurn)) changes = ChangesRepo.load(s.id).getOrNull() ?: changes
     }
-    if (open) ChangesDialog(hub, s, onDismiss = { open = false })
+    if (open) SharedUi.platform.screens.WhatChanged(hub, s, onDismiss = { open = false })
     val g = changes?.let(::sheetGit) ?: return
     seam()
     BranchRow(g)
-    g.worktree?.let { InfoRow(stringResource(R.string.session_sheet_worktree), it) }
+    g.worktree?.let { InfoRow(stringResource(Str.session_sheet_worktree), it) }
     if (g.showsDirty) {
         val dirty = g.dirty ?: 0
         InfoRow(
-            stringResource(R.string.session_sheet_uncommitted),
-            if (dirty == 0) stringResource(R.string.session_sheet_clean) else pluralStringResource(R.plurals.changes_files, dirty, dirty),
+            stringResource(Str.session_sheet_uncommitted),
+            if (dirty == 0) stringResource(Str.session_sheet_clean) else pluralStringResource(Plural.changes_files, dirty, dirty),
         )
     }
     if (g.showsFiles) {
@@ -126,18 +127,18 @@ internal fun GitPart(hub: Hub, s: Session, seam: @Composable () -> Unit) {
  */
 @Composable
 private fun BranchRow(g: SheetGit) {
-    val res = LocalContext.current.resources
-    val name = g.branch ?: stringResource(R.string.session_sheet_detached)
+    val res = wordsNow()
+    val name = g.branch ?: stringResource(Str.session_sheet_detached)
     val said = buildString {
-        append(if (g.branch != null) res.getString(R.string.session_sheet_branch_said, g.branch) else res.getString(R.string.session_sheet_detached_said))
+        append(if (g.branch != null) res.getString(Str.session_sheet_branch_said, g.branch) else res.getString(Str.session_sheet_detached_said))
         if (g.branch != null) {
             append(' ')
             append(
                 when {
-                    g.upstream == null -> res.getString(R.string.session_sheet_no_upstream_said)
-                    g.ahead == null || g.behind == null -> res.getString(R.string.session_sheet_upstream_unknown_said, g.upstream)
-                    g.ahead == 0 && g.behind == 0 -> res.getString(R.string.session_sheet_even_said, g.upstream)
-                    else -> res.getString(R.string.session_sheet_ahead_behind_said, g.ahead, g.behind, g.upstream)
+                    g.upstream == null -> res.getString(Str.session_sheet_no_upstream_said)
+                    g.ahead == null || g.behind == null -> res.getString(Str.session_sheet_upstream_unknown_said, g.upstream)
+                    g.ahead == 0 && g.behind == 0 -> res.getString(Str.session_sheet_even_said, g.upstream)
+                    else -> res.getString(Str.session_sheet_ahead_behind_said, g.ahead, g.behind, g.upstream)
                 },
             )
         }
@@ -146,7 +147,7 @@ private fun BranchRow(g: SheetGit) {
         Modifier.fillMaxWidth().padding(vertical = 7.dp).clearAndSetSemantics { contentDescription = said },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HText(stringResource(R.string.session_sheet_branch), style = Type.small, color = HN.inkDim)
+        HText(stringResource(Str.session_sheet_branch), style = Type.small, color = HN.inkDim)
         Spacer(Modifier.width(16.dp))
         Spacer(Modifier.weight(1f))
         HText(name, style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
@@ -155,7 +156,7 @@ private fun BranchRow(g: SheetGit) {
             g.branch == null -> Unit
             g.upstream == null -> {
                 Spacer(Modifier.width(8.dp))
-                HText(stringResource(R.string.session_sheet_no_upstream), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                HText(stringResource(Str.session_sheet_no_upstream), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
             }
             marks != null -> {
                 Spacer(Modifier.width(8.dp))
@@ -172,16 +173,16 @@ private fun BranchRow(g: SheetGit) {
  */
 @Composable
 private fun FilesLine(g: SheetGit, onClick: () -> Unit) {
-    val text = pluralStringResource(if (g.scoped) R.plurals.session_sheet_files_touched else R.plurals.session_sheet_files_changed, g.files, g.files)
+    val text = pluralStringResource(if (g.scoped) Plural.session_sheet_files_touched else Plural.session_sheet_files_changed, g.files, g.files)
     val (add, del) = lineCounts(g.add, g.del)
-    val said = stringResource(R.string.session_sheet_lines_said, text, g.add, g.del)
+    val said = stringResource(Str.session_sheet_lines_said, text, g.add, g.del)
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(12.dp))
             .glassChoice(false, 12.dp)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.changes_entry), onClick = onClick)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(Str.changes_entry), onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = said }
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

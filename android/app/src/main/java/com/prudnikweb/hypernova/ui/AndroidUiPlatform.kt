@@ -1,5 +1,16 @@
 package com.prudnikweb.hypernova.ui
 
+import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.ui.changes.ChangesDialog
+import com.prudnikweb.hypernova.ui.platform.UiScreens
+
+import android.content.Intent
+import android.net.Uri
+import com.prudnikweb.hypernova.ui.components.Incidents
+import com.prudnikweb.hypernova.ui.platform.Browser
+import com.prudnikweb.hypernova.ui.platform.IncidentSource
+
 import androidx.activity.compose.LocalActivity
 
 import androidx.compose.ui.graphics.Color
@@ -81,6 +92,7 @@ object AndroidUiPlatform : UiPlatform {
     override val owner: UiOwner = PhoneOwner
     override val images: UiImages = PhoneImages
     override val reading: UiReading = PhoneReading
+    override val screens: UiScreens = PhoneScreens
 }
 
 private object PhoneWords : UiWords {
@@ -148,6 +160,27 @@ private object PhoneDevice : UiDevice {
 
     @Composable
     override fun windowHeightDp(): Int = LocalConfiguration.current.screenHeightDp
+
+    @Composable
+    override fun browser(): Browser {
+        val context = LocalContext.current
+        return remember(context) {
+            Browser { url, onFail ->
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure { onFail() }
+            }
+        }
+    }
+
+    @Composable
+    override fun incidents(): IncidentSource {
+        val context = LocalContext.current
+        return remember(context) {
+            object : IncidentSource {
+                override fun next() = Incidents.next(context)
+                override fun byId(id: String?) = Incidents.byId(context, id)
+            }
+        }
+    }
 
     @Composable
     override fun recreating(): () -> Boolean {
@@ -243,4 +276,9 @@ private object PhoneReading : UiReading {
 
     @Composable
     override fun Mark(modifier: Modifier) = SpeakingMark(modifier)
+}
+
+private object PhoneScreens : UiScreens {
+    @Composable
+    override fun WhatChanged(hub: Hub, s: Session, onDismiss: () -> Unit) = ChangesDialog(hub, s, onDismiss)
 }

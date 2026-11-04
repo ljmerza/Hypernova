@@ -1,5 +1,9 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.ui.platform.wordsNow
+
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Plural
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,12 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.WApproval
@@ -72,7 +74,7 @@ internal fun AllowSeveralPart(hub: Hub, s: Session) {
     val several = severalOf(hub.waitingAsks(s.id)) ?: return
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
-    val context = LocalContext.current
+    val res = wordsNow()
     var confirm by remember { mutableStateOf<List<String>?>(null) }
     val n = several.asks.size
     Column {
@@ -80,7 +82,7 @@ internal fun AllowSeveralPart(hub: Hub, s: Session) {
         Hairline(Modifier.fillMaxWidth())
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HText(stringResource(R.string.several_seam).uppercase(), style = Type.label, color = HN.inkDim, modifier = Modifier.weight(1f))
+            HText(stringResource(Str.several_seam).uppercase(), style = Type.label, color = HN.inkDim, modifier = Modifier.weight(1f))
             HText("$n", style = Type.monoSmall, color = HN.amber, maxLines = 1)
         }
         Spacer(Modifier.height(8.dp))
@@ -95,7 +97,7 @@ internal fun AllowSeveralPart(hub: Hub, s: Session) {
                 if (a.agent != null) {
                     Spacer(Modifier.width(8.dp))
                     HText(
-                        a.agent.ifBlank { stringResource(R.string.agent_label) }, style = Type.monoSmall, color = HN.inkDim,
+                        a.agent.ifBlank { stringResource(Str.agent_label) }, style = Type.monoSmall, color = HN.inkDim,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .widthIn(max = 110.dp)
@@ -110,24 +112,24 @@ internal fun AllowSeveralPart(hub: Hub, s: Session) {
         }
         if (several.others > 0) {
             Spacer(Modifier.height(4.dp))
-            HText(stringResource(R.string.several_more), style = Type.small, color = HN.inkDim)
+            HText(stringResource(Str.several_more), style = Type.small, color = HN.inkDim)
         }
         Spacer(Modifier.height(10.dp))
         Pill(
-            pluralStringResource(R.plurals.several_allow, n, n), { confirm = several.asks.map { it.id } },
+            pluralStringResource(Plural.several_allow, n, n), { confirm = several.asks.map { it.id } },
             Modifier.fillMaxWidth(), kind = PillKind.Primary, height = 44.dp,
         )
     }
     val ids = confirm
     ConfirmDialog(
         visible = ids != null,
-        title = pluralStringResource(R.plurals.several_q, ids?.size ?: n, ids?.size ?: n),
-        body = stringResource(R.string.several_body),
-        confirm = pluralStringResource(R.plurals.several_allow, ids?.size ?: n, ids?.size ?: n),
+        title = pluralStringResource(Plural.several_q, ids?.size ?: n, ids?.size ?: n),
+        body = stringResource(Str.several_body),
+        confirm = pluralStringResource(Plural.several_allow, ids?.size ?: n, ids?.size ?: n),
         onConfirm = {
             confirm = null
             // The asks shown when Allow was tapped, not any that came in since.
-            if (ids != null) appScope.launch { hub.allowSeveral(s.id, ids).onFailure { toast(it.message ?: context.getString(R.string.err_answer)) } }
+            if (ids != null) appScope.launch { hub.allowSeveral(s.id, ids).onFailure { toast(it.message ?: res.getString(Str.err_answer)) } }
         },
         onDismiss = { confirm = null },
     )

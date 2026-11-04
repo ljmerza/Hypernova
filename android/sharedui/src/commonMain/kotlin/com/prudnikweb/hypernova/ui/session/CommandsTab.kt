@@ -1,6 +1,9 @@
 package com.prudnikweb.hypernova.ui.session
 
-import android.view.HapticFeedbackConstants
+import com.prudnikweb.hypernova.ui.platform.rememberHaptics
+import com.prudnikweb.hypernova.ui.platform.wordsNow
+
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,9 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -45,7 +46,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Aside
 import com.prudnikweb.hypernova.data.Asides
 import com.prudnikweb.hypernova.data.ClaudeEffort
@@ -88,9 +88,9 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun CommandsTab(hub: Hub, session: Session, onDismiss: () -> Unit, onModel: (() -> Unit)? = null) {
-    SheetPartSeam(stringResource(R.string.aside_seam))
+    SheetPartSeam(stringResource(Str.aside_seam))
     AsidePart(hub, session, onDismiss)
-    SheetPartSeam(stringResource(R.string.commands_seam))
+    SheetPartSeam(stringResource(Str.commands_seam))
     CommandsPart(hub, session, onDismiss, onModel)
 }
 
@@ -109,7 +109,7 @@ private fun AsidePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
     val appScope = LocalAppScope.current
     val opener = LocalOpener.current
     if (!asideReach(s)) {
-        HText(stringResource(R.string.aside_unreachable), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
+        HText(stringResource(Str.aside_unreachable), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
         return
     }
     var question by remember(s.id) { mutableStateOf("") }
@@ -141,17 +141,17 @@ private fun AsidePart(hub: Hub, s: Session, onDismiss: () -> Unit) {
     }
     Field(
         question, { question = it },
-        placeholder = stringResource(R.string.aside_placeholder),
+        placeholder = stringResource(Str.aside_placeholder),
         singleLine = false, maxLines = 4,
         keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-        label = stringResource(R.string.aside_seam),
+        label = stringResource(Str.aside_seam),
         onSend = ::ask, canSend = question.isNotBlank() && !busy,
     )
     Spacer(Modifier.height(8.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
-        HText(stringResource(R.string.aside_intro), style = Type.small, color = HN.inkDim, modifier = Modifier.weight(1f).padding(start = 4.dp))
+        HText(stringResource(Str.aside_intro), style = Type.small, color = HN.inkDim, modifier = Modifier.weight(1f).padding(start = 4.dp))
         Spacer(Modifier.width(10.dp))
-        Pill(stringResource(R.string.aside_ask), ::ask, kind = PillKind.Primary, height = 44.dp, leading = Glyph.Send, enabled = question.isNotBlank() && !busy)
+        Pill(stringResource(Str.aside_ask), ::ask, kind = PillKind.Primary, height = 44.dp, leading = Glyph.Send, enabled = question.isNotBlank() && !busy)
     }
     val a = aside ?: return
     Spacer(Modifier.height(14.dp))
@@ -169,39 +169,38 @@ private fun AsideAnswer(a: Aside, terminal: Boolean, onTerminal: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val said = stringResource(R.string.aside_question_said, a.question)
+        val said = stringResource(Str.aside_question_said, a.question)
         HText(
-            stringResource(R.string.aside_question, a.question), style = Type.monoSmall, color = HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis,
+            stringResource(Str.aside_question, a.question), style = Type.monoSmall, color = HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.semantics { contentDescription = said },
         )
         when (a.state) {
-            Aside.ASKING -> LoadingLine(stringResource(R.string.aside_asking))
+            Aside.ASKING -> LoadingLine(stringResource(Str.aside_asking))
             Aside.ANSWERED -> {
                 SelectionContainer { HText(a.answer.orEmpty(), style = Type.body, color = HN.ink) }
-                if (a.clipped) HText(stringResource(R.string.aside_clipped), style = Type.small, color = HN.inkDim)
+                if (a.clipped) HText(stringResource(Str.aside_clipped), style = Type.small, color = HN.inkDim)
             }
-            Aside.FAILED -> HText(stringResource(R.string.aside_failed, a.error.orEmpty()), style = Type.small, color = HN.amber)
-            else -> HText(stringResource(R.string.aside_unseen), style = Type.small, color = HN.inkDim)
+            Aside.FAILED -> HText(stringResource(Str.aside_failed, a.error.orEmpty()), style = Type.small, color = HN.amber)
+            else -> HText(stringResource(Str.aside_unseen), style = Type.small, color = HN.inkDim)
         }
         val more = a.state == Aside.UNSEEN || (a.state == Aside.ANSWERED && a.clipped)
-        if (more && terminal) Pill(stringResource(R.string.open_terminal), onTerminal, kind = PillKind.Ghost, height = 40.dp, leading = Glyph.Terminal)
+        if (more && terminal) Pill(stringResource(Str.open_terminal), onTerminal, kind = PillKind.Ghost, height = 40.dp, leading = Glyph.Terminal)
     }
 }
 
 /** The project's commands and skills: Recent, Pinned, then all, with a search. */
 @Composable
 private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (() -> Unit)?) {
-    val context = LocalContext.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val opener = LocalOpener.current
-    val view = LocalView.current
+    val haptics = rememberHaptics()
     if (!commandReach(s)) {
-        HText(stringResource(R.string.commands_unreachable), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
+        HText(stringResource(Str.commands_unreachable), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
         return
     }
     val state = rememberCommands(hub, s.cwd, wanted = true)
-    var picks by remember { mutableStateOf(CommandPicksStore.load(context)) }
+    var picks by remember { mutableStateOf(CommandPicksStore.load()) }
     var query by remember(s.id) { mutableStateOf("") }
     // The command whose field is open, and what's typed in it.
     var picked by remember(s.id) { mutableStateOf<SlashCommand?>(null) }
@@ -212,12 +211,12 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
     // The Compact sheet (open with /compact's entry from the list) and the rename sheet.
     var compacting by remember(s.id) { mutableStateOf<SlashCommand?>(null) }
     var renaming by remember(s.id) { mutableStateOf(false) }
-    val res = context.resources
+    val res = wordsNow()
     val canTerminal = terminalReach(s)
     val reach = HelperReach.of(s, canChangeModel(s)).let { if (onModel == null) it.copy(model = false) else it }
 
     fun used(c: SlashCommand) {
-        picks = picks.used(c.name).also { CommandPicksStore.save(context, it) }
+        picks = picks.used(c.name).also { CommandPicksStore.save(it) }
     }
     fun send(c: SlashCommand, typed: String, line: String = commandLine(c, typed)) {
         if (sending || !canSendCommand(c, typed)) return
@@ -228,7 +227,7 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
             return
         }
         if (c.terminal && !canTerminal) {
-            toast(res.getString(R.string.commands_no_terminal))
+            toast(res.getString(Str.commands_no_terminal))
             return
         }
         sending = true
@@ -240,7 +239,7 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
                         picked = null
                         args = ""
                         compacting = null
-                        toast(res.getString(R.string.commands_sent, line))
+                        toast(res.getString(Str.commands_sent, line))
                         // Its screen is in the terminal: open it there. A session that went on as another: that one.
                         if (c.terminal && canTerminal) { onDismiss(); opener.terminal(s.id) }
                         else if (id != s.id) { onDismiss(); opener.switchSession(id) }
@@ -252,7 +251,7 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
         }
     }
     // /effort through the effort route (as the Overview's Effort part), not typed.
-    val nextTurn = stringResource(R.string.effort_next_turn)
+    val nextTurn = stringResource(Str.effort_next_turn)
     val levelNames = ClaudeEffort.LEVELS.associateWith { claudeEffortTitle(it) }
     fun setEffort(c: SlashCommand, level: String) {
         if (sending) return
@@ -263,7 +262,7 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
                     .onSuccess { later ->
                         used(c)
                         picked = null
-                        toast(if (later) nextTurn else res.getString(R.string.commands_effort_set, levelNames[level] ?: level))
+                        toast(if (later) nextTurn else res.getString(Str.commands_effort_set, levelNames[level] ?: level))
                     }
                     .onFailure { toast(it.message.orEmpty()) }
             } finally {
@@ -272,40 +271,40 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
         }
     }
     fun pin(c: SlashCommand) {
-        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        haptics.longPress()
         val on = !picks.isPinned(c.name)
-        picks = picks.pinToggled(c.name).also { CommandPicksStore.save(context, it) }
-        toast(res.getString(if (on) R.string.commands_pinned_toast else R.string.commands_unpinned_toast, "/${c.name}"))
+        picks = picks.pinToggled(c.name).also { CommandPicksStore.save(it) }
+        toast(res.getString(if (on) Str.commands_pinned_toast else Str.commands_unpinned_toast, "/${c.name}"))
     }
 
     val list = state.list
     when {
         list == null && state.error != null -> HText(state.error, style = Type.small, color = HN.danger, modifier = Modifier.padding(horizontal = 4.dp))
-        list == null -> LoadingLine(stringResource(R.string.commands_loading), Modifier.padding(start = 4.dp))
+        list == null -> LoadingLine(stringResource(Str.commands_loading), Modifier.padding(start = 4.dp))
         else -> {
-            SearchField(query, { query = it }, stringResource(R.string.commands_search))
+            SearchField(query, { query = it }, stringResource(Str.commands_search))
             Spacer(Modifier.height(6.dp))
-            HText(stringResource(R.string.commands_hint), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
+            HText(stringResource(Str.commands_hint), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
             val parts = commandSections(list, picks, query)
             if (parts.isEmpty) {
                 Spacer(Modifier.height(10.dp))
-                HText(stringResource(R.string.commands_none), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
+                HText(stringResource(Str.commands_none), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(horizontal = 4.dp))
             }
             // Each group under its heading (none over a search's matches), keyed by group: a command
             // both recent and listed below is two rows.
             val groups = buildList {
-                add(Triple("recent", stringResource(R.string.commands_recent), parts.recent))
-                add(Triple("pinned", stringResource(R.string.commands_pinned), parts.pinned))
+                add(Triple("recent", stringResource(Str.commands_recent), parts.recent))
+                add(Triple("pinned", stringResource(Str.commands_pinned), parts.pinned))
                 if (query.isNotBlank()) add(Triple("found", null, parts.all))
                 else {
-                    add(Triple("yours", stringResource(R.string.commands_yours), parts.all.filter { !it.builtin }))
-                    add(Triple("builtin", stringResource(R.string.commands_builtin), parts.all.filter { it.builtin && !it.terminal }))
-                    add(Triple("terminal", stringResource(R.string.commands_terminal), parts.all.filter { it.terminal }))
+                    add(Triple("yours", stringResource(Str.commands_yours), parts.all.filter { !it.builtin }))
+                    add(Triple("builtin", stringResource(Str.commands_builtin), parts.all.filter { it.builtin && !it.terminal }))
+                    add(Triple("terminal", stringResource(Str.commands_terminal), parts.all.filter { it.terminal }))
                 }
             }
             for ((group, heading, cs) in groups) {
                 if (cs.isEmpty()) continue
-                if (heading != null) Heading(heading)
+                if (heading != null) CommandsHeading(heading)
                 for (c in cs) key(group, c.name) {
                     val open = picked == c && openIn == group
                     val helper = argHelper(c, reach)
@@ -337,7 +336,7 @@ private fun CommandsPart(hub: Hub, s: Session, onDismiss: () -> Unit, onModel: (
 }
 
 @Composable
-private fun Heading(text: String) {
+private fun CommandsHeading(text: String) {
     HText(text.uppercase(), style = Type.label, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 14.dp, bottom = 4.dp))
 }
 
@@ -345,7 +344,7 @@ private fun Heading(text: String) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CommandLine(c: SlashCommand, pinned: Boolean, dim: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
-    val pinLabel = stringResource(if (pinned) R.string.commands_unpin else R.string.commands_pin)
+    val pinLabel = stringResource(if (pinned) Str.commands_unpin else Str.commands_pin)
     Column(
         Modifier
             .fillMaxWidth()
@@ -366,7 +365,7 @@ private fun CommandLine(c: SlashCommand, pinned: Boolean, dim: Boolean, onClick:
             )
             if (c.terminal) {
                 Spacer(Modifier.width(8.dp))
-                HText(stringResource(R.string.commands_terminal_mark), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                HText(stringResource(Str.commands_terminal_mark), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
             }
         }
         if (c.description.isNotBlank()) {
@@ -389,8 +388,8 @@ private fun ArgsLine(c: SlashCommand, value: String, onChange: (String) -> Unit,
         )
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
-            Pill(stringResource(R.string.cancel), onCancel, kind = PillKind.Ghost, height = 40.dp)
-            Pill(stringResource(R.string.send), onSend, kind = PillKind.Primary, height = 40.dp, leading = Glyph.Send, enabled = enabled)
+            Pill(stringResource(Str.cancel), onCancel, kind = PillKind.Ghost, height = 40.dp)
+            Pill(stringResource(Str.send), onSend, kind = PillKind.Primary, height = 40.dp, leading = Glyph.Send, enabled = enabled)
         }
     }
 }
@@ -420,7 +419,7 @@ private fun EffortLine(current: String?, names: Map<String, String>, enabled: Bo
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Pill(stringResource(R.string.cancel), onCancel, kind = PillKind.Ghost, height = 40.dp)
+            Pill(stringResource(Str.cancel), onCancel, kind = PillKind.Ghost, height = 40.dp)
         }
     }
 }
@@ -432,22 +431,22 @@ private fun EffortLine(current: String?, names: Map<String, String>, enabled: Bo
 @Composable
 private fun CompactSheet(sending: Boolean, onCompact: (String) -> Unit, onDismiss: () -> Unit) {
     var focus by remember { mutableStateOf("") }
-    val title = stringResource(R.string.chat_compact)
+    val title = stringResource(Str.chat_compact)
     ChatSheet(title, onDismiss) {
         HText(title, style = Type.title, color = HN.ink)
         Spacer(Modifier.height(6.dp))
-        HText(stringResource(R.string.commands_compact_intro), style = Type.small, color = HN.inkDim)
+        HText(stringResource(Str.commands_compact_intro), style = Type.small, color = HN.inkDim)
         Spacer(Modifier.height(14.dp))
         Field(
             focus, { focus = it },
-            placeholder = stringResource(R.string.commands_compact_keep),
+            placeholder = stringResource(Str.commands_compact_keep),
             keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
             label = compactLine(""),
             onDone = { if (!sending) onCompact(focus) },
         )
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
-            Pill(stringResource(R.string.cancel), onDismiss, kind = PillKind.Ghost, height = 44.dp)
+            Pill(stringResource(Str.cancel), onDismiss, kind = PillKind.Ghost, height = 44.dp)
             Pill(title, { onCompact(focus) }, kind = PillKind.Primary, height = 44.dp, leading = Glyph.Send, enabled = !sending)
         }
     }

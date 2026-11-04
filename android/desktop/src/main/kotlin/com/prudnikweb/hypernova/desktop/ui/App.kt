@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.DebugLog
+import com.prudnikweb.hypernova.desktop.LocalShell
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.Ui
 import com.prudnikweb.hypernova.ui.LocalAppScope
@@ -40,7 +41,7 @@ import androidx.compose.runtime.remember
 fun App(shell: Shell, reduced: Boolean = false) {
     val opener = remember(shell) { deskOpener(shell) }
     AtlasTheme(reduced) {
-        CompositionLocalProvider(LocalToast provides shell::say, LocalOpener provides opener, LocalAppScope provides Core.scope) {
+        CompositionLocalProvider(LocalToast provides shell::say, LocalOpener provides opener, LocalAppScope provides Core.scope, LocalShell provides shell) {
         Box(Modifier.fillMaxSize().background(HN.bg)) {
             val hub = Core.live
             val pairing = hub == null || shell.adding

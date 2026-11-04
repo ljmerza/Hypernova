@@ -12,6 +12,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.unit.Dp
 import com.prudnikweb.hypernova.data.EnterKey
+import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.data.Incident
 import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Strings
@@ -35,6 +38,7 @@ interface UiPlatform {
     val owner: UiOwner
     val images: UiImages
     val reading: UiReading
+    val screens: UiScreens
 }
 
 /** The one in this process. */
@@ -75,8 +79,24 @@ interface UiDevice {
     @Composable fun windowHeightDp(): Int
     /** Whether what's leaving the screen now only leaves for a moment, as the phone's activity is recreated on a rotation: a screen's "you've left" isn't true then. */
     @Composable fun recreating(): () -> Boolean
+    /** The system's way to a web page, for a link the app itself gives: a story's source, a sign-in page. What's in a chat asks first (LinkAsk). */
+    @Composable fun browser(): Browser
+    /** The think-twice card's cases. */
+    @Composable fun incidents(): IncidentSource
     /** A glow round a filled capsule: its own shape, blurred, outside it. */
     fun blurOutside(paint: Paint, radius: Float)
+}
+
+fun interface Browser {
+    /** [onFail] where it can't be opened. */
+    fun open(url: String, onFail: () -> Unit)
+}
+
+/** Real cases where an agent with too much freedom did damage: docs/DECISIONS.md. */
+interface IncidentSource {
+    /** A random one, never the one shown last unless it's the only one. Null with no list to show: the choice goes on rather than being blocked. */
+    fun next(): Incident?
+    fun byId(id: String?): Incident?
 }
 
 /** A small physical answer to a press. */
@@ -175,6 +195,12 @@ interface UiReading {
     val now: String?
     /** On the message being read: its wave. */
     @Composable fun Mark(modifier: Modifier)
+}
+
+/** A screen the shared drawing opens and only some systems have yet. What hasn't one says where it is. */
+interface UiScreens {
+    /** What changed in the session's folder. */
+    @Composable fun WhatChanged(hub: Hub, s: Session, onDismiss: () -> Unit)
 }
 
 /** A closed ```mermaid block: the phone draws it in a web view; what has none says what it is. */

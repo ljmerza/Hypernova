@@ -2,7 +2,9 @@
 
 package com.prudnikweb.hypernova.ui.session
 
-import androidx.annotation.StringRes
+import com.prudnikweb.hypernova.ui.platform.wordsNow
+
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -22,12 +24,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Mcp
@@ -56,7 +56,7 @@ import com.prudnikweb.hypernova.ui.mcp.mcpScopeWord
 import com.prudnikweb.hypernova.ui.mcp.mcpStatusColor
 import com.prudnikweb.hypernova.ui.mcp.mcpStatusWord
 import com.prudnikweb.hypernova.ui.mcp.mcpToolMark
-import com.prudnikweb.hypernova.ui.settings.McpFailure
+import com.prudnikweb.hypernova.ui.mcp.AgentSettingsFailure
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
@@ -72,7 +72,7 @@ import kotlinx.coroutines.launch
 internal fun McpTab(hub: Hub, s: Session, onDismiss: () -> Unit) {
     val opener = LocalOpener.current
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val res = wordsNow()
     var attempt by remember { mutableIntStateOf(0) }
     var reply by remember { mutableStateOf<Result<SessionMcpLive>?>(null) }
     /** The server an action is under way on: the others wait for it, one terminal being one screen. */
@@ -84,7 +84,7 @@ internal fun McpTab(hub: Hub, s: Session, onDismiss: () -> Unit) {
         reply = null
         reply = hub.sessionMcpLive(s.id, fresh = attempt > 0)
     }
-    val fallback = stringResource(R.string.smt_act_err)
+    val fallback = stringResource(Str.smt_act_err)
     fun act(action: String, name: String) {
         busy = name
         result = null
@@ -92,7 +92,7 @@ internal fun McpTab(hub: Hub, s: Session, onDismiss: () -> Unit) {
             hub.sessionMcpAct(s.id, action, name)
                 .onSuccess { a ->
                     reply = Result.success(a.reply)
-                    result = name to mcpResultLine(a, context.resources::getString)
+                    result = name to mcpResultLine(a) { res.getString(it) }
                 }
                 .onFailure { e -> result = name to McpResultLine(e.message?.takeIf { it.isNotBlank() } ?: fallback, trouble = true) }
             busy = null
@@ -100,14 +100,14 @@ internal fun McpTab(hub: Hub, s: Session, onDismiss: () -> Unit) {
     }
     val r = reply
     val live = r?.getOrNull()
-    SheetSeam(stringResource(R.string.smt_seam))
+    SheetSeam(stringResource(Str.smt_seam))
     when {
-        r == null -> LoadingLine(stringResource(R.string.loading), Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
-        r.isFailure -> McpFailure(r.exceptionOrNull(), R.string.smt_err) { attempt++ }
+        r == null -> LoadingLine(stringResource(Str.loading), Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
+        r.isFailure -> AgentSettingsFailure(r.exceptionOrNull(), stringResource(Str.smt_err)) { attempt++ }
         live != null -> {
             HText(stringResource(mcpNote(live)), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
             live.unreadWords?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)) }
-            if (live.servers.isEmpty() && live.unreadWords == null) HText(stringResource(R.string.smt_empty), style = Type.body, color = HN.inkMuted, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+            if (live.servers.isEmpty() && live.unreadWords == null) HText(stringResource(Str.smt_empty), style = Type.body, color = HN.inkMuted, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
             live.servers.forEachIndexed { i, row ->
                 if (i > 0) Hairline(Modifier.fillMaxWidth())
                 val line = result?.takeIf { it.first == row.name }?.second
@@ -128,14 +128,14 @@ internal fun McpTab(hub: Hub, s: Session, onDismiss: () -> Unit) {
             }
             // What the owner said belongs elsewhere, and what can't be done from here.
             Spacer(Modifier.height(10.dp))
-            Pill(stringResource(R.string.smt_check), { result = null; attempt++ }, kind = PillKind.Outline, height = 40.dp, enabled = busy == null, modifier = Modifier.padding(start = 4.dp))
+            Pill(stringResource(Str.smt_check), { result = null; attempt++ }, kind = PillKind.Outline, height = 40.dp, enabled = busy == null, modifier = Modifier.padding(start = 4.dp))
             if (live.kind == SessionMcp.TERMINAL || live.kind == SessionMcp.JOB || live.kind == SessionMcp.CODEX || s.term != null) {
                 Spacer(Modifier.height(10.dp))
-                SheetLink(stringResource(R.string.open_terminal), null, { onDismiss(); opener.terminal(s.id) })
+                SheetLink(stringResource(Str.open_terminal), null, { onDismiss(); opener.terminal(s.id) })
             }
             Spacer(Modifier.height(8.dp))
-            SheetLink(stringResource(R.string.smt_settings), null, { onDismiss(); opener.mcpServers(live.agent) })
-            HText(stringResource(R.string.smt_settings_body), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
+            SheetLink(stringResource(Str.smt_settings), null, { onDismiss(); opener.mcpServers(live.agent) })
+            HText(stringResource(Str.smt_settings_body), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
         }
     }
     login?.let { (name, l) ->
@@ -155,7 +155,7 @@ internal fun McpTab(hub: Hub, s: Session, onDismiss: () -> Unit) {
                             // Signed in, for Claude Code. This session's own connection takes it only when it reconnects (measured), so it's asked to, and what's read back is what's said.
                             if (live?.live == true) act(SessionMcp.RECONNECT, name)
                             else {
-                                result = name to McpResultLine(context.getString(R.string.smt_signed_in_rest), trouble = false)
+                                result = name to McpResultLine(res.getString(Str.smt_signed_in_rest), trouble = false)
                                 attempt++
                             }
                         }
@@ -170,26 +170,26 @@ internal fun McpTab(hub: Hub, s: Session, onDismiss: () -> Unit) {
 internal data class McpResultLine(val words: String, val trouble: Boolean)
 
 /** What the state read back says happened, in this kind's words. The agent's own words after them, where it failed. */
-internal fun mcpResultLine(a: SessionMcpActed, words: (Int) -> String): McpResultLine {
+internal fun mcpResultLine(a: SessionMcpActed, words: (Str) -> String): McpResultLine {
     val codex = a.reply.agent == AgentSettingsReply.CODEX
-    @StringRes val id: Int? = when (a.outcome) {
+    val id: Str? = when (a.outcome) {
         SessionMcp.DONE -> when (a.action) {
-            SessionMcp.RECONNECT -> if (codex) R.string.smt_did_reconnect_codex else R.string.smt_did_reconnect
-            SessionMcp.DISABLE -> if (codex) R.string.smt_did_disable_codex else R.string.smt_did_disable
-            else -> if (codex) R.string.smt_did_enable_codex else R.string.smt_did_enable
+            SessionMcp.RECONNECT -> if (codex) Str.smt_did_reconnect_codex else Str.smt_did_reconnect
+            SessionMcp.DISABLE -> if (codex) Str.smt_did_disable_codex else Str.smt_did_disable
+            else -> if (codex) Str.smt_did_enable_codex else Str.smt_did_enable
         }
         SessionMcp.NEXT_TURN -> when (a.action) {
-            SessionMcp.DISABLE -> if (codex) R.string.smt_next_turn_disable_codex else R.string.smt_next_turn_disable
-            else -> if (codex) R.string.smt_next_turn_enable_codex else R.string.smt_next_turn_enable
+            SessionMcp.DISABLE -> if (codex) Str.smt_next_turn_disable_codex else Str.smt_next_turn_disable
+            else -> if (codex) Str.smt_next_turn_enable_codex else Str.smt_next_turn_enable
         }
-        SessionMcp.NEW_SESSIONS -> R.string.smt_new_sessions
-        SessionMcp.UNCONFIRMED -> R.string.smt_unconfirmed
+        SessionMcp.NEW_SESSIONS -> Str.smt_new_sessions
+        SessionMcp.UNCONFIRMED -> Str.smt_unconfirmed
         // Its own words say it best, and they say what to do.
-        SessionMcp.NO_CHANGE -> if (a.said == null) R.string.smt_unconfirmed else null
+        SessionMcp.NO_CHANGE -> if (a.said == null) Str.smt_unconfirmed else null
         else -> when (a.action) {
-            SessionMcp.RECONNECT -> R.string.smt_failed_reconnect
-            SessionMcp.DISABLE -> R.string.smt_failed_disable
-            else -> R.string.smt_failed_enable
+            SessionMcp.RECONNECT -> Str.smt_failed_reconnect
+            SessionMcp.DISABLE -> Str.smt_failed_disable
+            else -> Str.smt_failed_enable
         }
     }
     val failed = a.outcome == SessionMcp.FAILED
@@ -202,14 +202,13 @@ internal fun mcpResultLine(a: SessionMcpActed, words: (Int) -> String): McpResul
     return McpResultLine(line, trouble = failed || a.outcome == SessionMcp.UNCONFIRMED || a.outcome == SessionMcp.NO_CHANGE)
 }
 
-@StringRes
-private fun mcpNote(live: SessionMcpLive): Int = when (live.kind) {
-    SessionMcp.TERMINAL, SessionMcp.JOB -> R.string.smt_note_terminal
-    SessionMcp.TURN -> R.string.smt_note_turn
-    SessionMcp.REST -> R.string.smt_note_rest
-    SessionMcp.CODEX -> if (live.live) R.string.smt_note_codex else R.string.smt_note_codex_idle
-    SessionMcp.ENDED -> R.string.smt_note_ended
-    else -> R.string.smt_note_watched
+private fun mcpNote(live: SessionMcpLive): Str = when (live.kind) {
+    SessionMcp.TERMINAL, SessionMcp.JOB -> Str.smt_note_terminal
+    SessionMcp.TURN -> Str.smt_note_turn
+    SessionMcp.REST -> Str.smt_note_rest
+    SessionMcp.CODEX -> if (live.live) Str.smt_note_codex else Str.smt_note_codex_idle
+    SessionMcp.ENDED -> Str.smt_note_ended
+    else -> Str.smt_note_watched
 }
 
 /** One server: its name and status, how it's set up, its tools to open, what can be done, and what came of the last thing done. */
@@ -224,27 +223,27 @@ private fun McpRowPart(hub: Hub, s: Session, live: SessionMcpLive, row: SessionM
         val how = listOfNotNull(row.source.takeIf { it != "unknown" }?.let { stringResource(mcpScopeWord(it)) }, row.transport, row.command, row.host).joinToString(" · ")
         if (how.isNotBlank()) HText(how, style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         row.error?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 4.dp)) }
-        if (row.offForNew) HText(stringResource(R.string.smt_off_for_new), style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 4.dp))
-        if (row.cut) HText(stringResource(R.string.smt_cut), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
+        if (row.offForNew) HText(stringResource(Str.smt_off_for_new), style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 4.dp))
+        if (row.cut) HText(stringResource(Str.smt_cut), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
         if (row.status == Mcp.WAITING || row.status == Mcp.REJECTED) {
-            HText(stringResource(if (live.kind == SessionMcp.REST && row.status == Mcp.WAITING) R.string.smt_held_rest else R.string.smt_held), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
+            HText(stringResource(if (live.kind == SessionMcp.REST && row.status == Mcp.WAITING) Str.smt_held_rest else Str.smt_held), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
         }
         McpToolsPart(hub, s, row)
         if (row.signIn || row.actions.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val free = busy == null
-                if (row.signIn) Pill(stringResource(R.string.mcp_sign_in), onSignIn, kind = PillKind.Primary, height = 40.dp, enabled = free)
+                if (row.signIn) Pill(stringResource(Str.mcp_sign_in), onSignIn, kind = PillKind.Primary, height = 40.dp, enabled = free)
                 row.actions.forEach { action ->
                     when (action) {
-                        SessionMcp.RECONNECT -> Pill(stringResource(R.string.mcp_reconnect), { onAct(action) }, kind = PillKind.Outline, height = 40.dp, enabled = free)
-                        SessionMcp.DISABLE -> Pill(stringResource(R.string.mcp_disable), { onAct(action) }, kind = PillKind.Outline, height = 40.dp, enabled = free)
-                        SessionMcp.ENABLE -> Pill(stringResource(if (row.offForNew) R.string.smt_keep_on else R.string.mcp_enable), { onAct(action) }, kind = PillKind.Primary, height = 40.dp, enabled = free)
+                        SessionMcp.RECONNECT -> Pill(stringResource(Str.mcp_reconnect), { onAct(action) }, kind = PillKind.Outline, height = 40.dp, enabled = free)
+                        SessionMcp.DISABLE -> Pill(stringResource(Str.mcp_disable), { onAct(action) }, kind = PillKind.Outline, height = 40.dp, enabled = free)
+                        SessionMcp.ENABLE -> Pill(stringResource(if (row.offForNew) Str.smt_keep_on else Str.mcp_enable), { onAct(action) }, kind = PillKind.Primary, height = 40.dp, enabled = free)
                     }
                 }
             }
         }
-        if (busy == row.name) LoadingLine(stringResource(R.string.smt_working), Modifier.padding(top = 8.dp))
+        if (busy == row.name) LoadingLine(stringResource(Str.smt_working), Modifier.padding(top = 8.dp))
         line?.let { HText(it.words, style = Type.small, color = if (it.trouble) HN.amber else HN.inkMuted, modifier = Modifier.padding(top = 8.dp)) }
     }
 }
@@ -262,10 +261,10 @@ private fun McpToolsPart(hub: Hub, s: Session, row: SessionMcpRow) {
     var tools by remember(row.name, row.tools) { mutableStateOf<Result<List<McpLiveTool>>?>(if (row.tools.isNotEmpty()) Result.success(row.tools) else null) }
     var tool by remember { mutableStateOf<McpLiveTool?>(null) }
     val label = when {
-        open -> stringResource(R.string.smt_tools_hide)
-        count == 0 -> stringResource(R.string.smt_no_tools)
-        count == 1 -> stringResource(R.string.smt_one_tool)
-        else -> stringResource(R.string.smt_tools_count, count)
+        open -> stringResource(Str.smt_tools_hide)
+        count == 0 -> stringResource(Str.smt_no_tools)
+        count == 1 -> stringResource(Str.smt_one_tool)
+        else -> stringResource(Str.smt_tools_count, count)
     }
     if (count == 0) {
         HText(label, style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
@@ -281,12 +280,12 @@ private fun McpToolsPart(hub: Hub, s: Session, row: SessionMcpRow) {
     if (!open) return
     val t = tools
     when {
-        t == null -> LoadingLine(stringResource(R.string.loading), Modifier.padding(vertical = 6.dp))
-        t.isFailure -> HText(t.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: stringResource(R.string.smt_tools_err), style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 4.dp))
+        t == null -> LoadingLine(stringResource(Str.loading), Modifier.padding(vertical = 6.dp))
+        t.isFailure -> HText(t.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: stringResource(Str.smt_tools_err), style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 4.dp))
         else -> t.getOrThrow().forEachIndexed { i, x ->
             if (i > 0) Hairline(Modifier.fillMaxWidth())
             McpToolRow(x.name, null, mcpToolMark(x.readOnly.takeIf { it }, x.destructive.takeIf { it })) { tool = x }
         }
     }
-    tool?.let { x -> McpLiveToolSheet(x, stringResource(R.string.smt_tool_names)) { tool = null } }
+    tool?.let { x -> McpLiveToolSheet(x, stringResource(Str.smt_tool_names)) { tool = null } }
 }

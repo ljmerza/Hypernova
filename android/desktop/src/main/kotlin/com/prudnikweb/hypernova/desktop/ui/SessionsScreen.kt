@@ -190,6 +190,7 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
                 .focusRequester(keys)
                 .onFocusChanged { hasKeys = it.hasFocus }
                 .onKeyEvent { e ->
+                    if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.I) return@onKeyEvent ChatKeys.sheet?.invoke() != null
                     if (e.type != KeyEventType.KeyDown || e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@onKeyEvent false
                     when (e.key) {
                         // In the form they're the box's, even at its first and last line.
@@ -202,6 +203,7 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
                             true
                         }
                         Key.Escape -> {
+                            if (ChatKeys.escape?.invoke() == true) return@onKeyEvent true
                             if (shell.newSession) {
                                 shell.newSession = false
                                 runCatching { keys.requestFocus() }
@@ -243,7 +245,8 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
                     !twoPanes && shell.newSession -> form(Modifier.fillMaxSize().widthIn(max = PANE_MAX)) { shell.newSession = false; runCatching { keys.requestFocus() } }
                     !twoPanes && chosenId != null -> SessionPane(hub, chosenId, chosen, shell, stale, onBack = { choose(null); runCatching { keys.requestFocus() } }, Modifier.fillMaxSize().widthIn(max = PANE_MAX))
                     !twoPanes || (nothing && !shell.newSession) -> sessionList(Modifier.fillMaxSize())
-                    else -> Row(Modifier.widthIn(max = LIST_MAX + PANE_MAX).fillMaxHeight()) {
+                    // A session sheet beside the chat takes more of a big window, and gives it back as it goes.
+                    else -> Row(Modifier.widthIn(max = LIST_MAX + PANE_MAX + if (ChatKeys.sheetAt.value != null) SHEET_WIDTH else 0.dp).fillMaxHeight()) {
                         sessionList(Modifier.width(listWidth).fillMaxHeight())
                         if (shell.newSession) form(Modifier.weight(1f).fillMaxHeight(), null)
                         else SessionPane(hub, chosenId, chosen, shell, stale, onBack = null, Modifier.weight(1f).fillMaxHeight())

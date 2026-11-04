@@ -124,6 +124,12 @@ internal object ChatDrafts {
  */
 internal object ChatKeys {
     var page: ((down: Boolean) -> Unit)? = null
+    /** Escape: true if the session on screen had something to put away. */
+    var escape: (() -> Boolean)? = null
+    /** Ctrl+I: the session sheet, open or away. */
+    var sheet: (() -> Unit)? = null
+    /** Where the session on screen's sheet is open, or null: the window's panes make room for it. */
+    val sheetAt = mutableStateOf<SheetAt?>(null)
 }
 
 /** The share of the list one Page Up or Page Down moves, so the last lines stay in view. */

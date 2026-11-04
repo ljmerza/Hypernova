@@ -69,6 +69,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.prudnikweb.hypernova.ui.LocalOpener
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.runtime.DisposableEffect
+import com.prudnikweb.hypernova.ui.components.popupGlass
+import com.prudnikweb.hypernova.ui.home.MenuPage
+import com.prudnikweb.hypernova.ui.home.SessionMenu
+import com.prudnikweb.hypernova.ui.session.ModelPickerHost
+import com.prudnikweb.hypernova.ui.session.SessionSheet
+import com.prudnikweb.hypernova.ui.session.SessionSheetBody
 import com.prudnikweb.hypernova.data.ChangesRepo
 import com.prudnikweb.hypernova.ui.session.fileEdits
 import com.prudnikweb.hypernova.ui.session.rememberQuickSend
@@ -146,7 +156,21 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
     val usage = rememberSessionUsage(s.id, "$tail|${chatWorking(hub, s, items)}|${s.model}")
     val edits = remember(items) { fileEdits(items) }
     val git = rememberTopBarGit(s, edits, linked) { ChangesRepo.load(it) }
-    var sheet by remember { mutableStateOf<SheetAt?>(null) }
+    var sheet by ChatKeys.sheetAt
+    var modelOpen by remember { mutableStateOf(false) }
+    // Escape puts the sheet away before it goes on to the window's keys, and the window's keys open it (SessionsScreen).
+    DisposableEffect(Unit) {
+        val escape = { (sheet != null).also { if (it) sheet = null } }
+        val toggle = { sheet = if (sheet == null) SheetAt.Overview else null }
+        ChatKeys.escape = escape
+        ChatKeys.sheet = toggle
+        onDispose {
+            if (ChatKeys.escape === escape) ChatKeys.escape = null
+            if (ChatKeys.sheet === toggle) ChatKeys.sheet = null
+            // Choosing another session folds it, as leaving the phone's chat does.
+            sheet = null
+        }
+    }
     val quick = rememberQuickSend(hub, s.id, onSent = { following.on = true }, onBusy = shell::say)
     CompositionLocalProvider(LocalUriHandler provides links) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -154,8 +178,12 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
             val statusMax = maxHeight * STATUS_SHARE
             // The box always has its room, in the smallest window too: the card gives way, what's asked scrolling above its pills.
             val rest = maxHeight - BOX_ROOM - if (onBack != null) BACK_ROOM else 0.dp
+            val window = LocalWindowInfo.current.containerSize.width / LocalDensity.current.density
+            val beside = window >= SHEET_BESIDE.value
+            val open = sheet
+            Row(Modifier.fillMaxSize()) {
             Column(
-                Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                Modifier.weight(1f).fillMaxHeight().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (onBack != null) BackPill(onBack)
@@ -178,6 +206,30 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
                 ChatStatusBar(hub, s, status, Modifier.widthIn(max = PANE_MAX).fillMaxWidth().heightIn(max = statusMax))
                 ChatBox(hub, s, shell, following, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
             }
+            // The session sheet beside the chat where there's room, so both can be read; else over it as the phone's card. The content is the same.
+            if (open != null && beside) key(open) {
+                var menuPage by remember { mutableStateOf<MenuPage?>(null) }
+                Column(
+                    Modifier.width(SHEET_WIDTH).fillMaxHeight().padding(top = 8.dp, end = 16.dp, bottom = 16.dp).testTag(SHEET_TAG)
+                        .popupGlass(null, radius = 20.dp).padding(start = 18.dp, end = 18.dp, top = 16.dp),
+                ) {
+                    SessionSheetBody(
+                        hub, s, usage, onModel = { modelOpen = true }, onSwitchAgent = { shell.say(Ui.desk_switch_on_phone.text()) },
+                        onRetried = { following.on = true }, onEmptied = { sheet = null }, onDismiss = { sheet = null }, onMenu = { menuPage = it },
+                        atBlocked = open == SheetAt.Blocked, atAgents = open == SheetAt.Agents, onCompact = { quick("/compact") },
+                    )
+                }
+                menuPage?.let { SessionMenu(hub, s, { menuPage = null }, start = it) }
+            }
+            }
+            if (open != null && !beside) key(open) {
+                SessionSheet(
+                    hub, s, usage, onModel = { modelOpen = true }, onSwitchAgent = { shell.say(Ui.desk_switch_on_phone.text()) },
+                    onRetried = { following.on = true }, onEmptied = { sheet = null }, onDismiss = { sheet = null },
+                    atBlocked = open == SheetAt.Blocked, atAgents = open == SheetAt.Agents, onCompact = { quick("/compact") },
+                )
+            }
+            ModelPickerHost(hub, s, modelOpen, onDismiss = { modelOpen = false })
             LinkAsk(
                 links, shell::say,
                 browse = { url, done ->
@@ -367,5 +419,14 @@ private fun PaneAskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: S
     }
 }
 
+/** The tag of the session sheet's panel, for the tests. */
+const val SHEET_TAG = "session-sheet"
+
+/** How wide the sheet is beside the chat: all its tabs in view, as a mouse can't drag a row sideways. */
+internal val SHEET_WIDTH = 580.dp
+
+/** From a window this wide the sheet goes beside the chat: the list, a readable chat and the sheet. Under it, the sheet comes up over the chat. */
+private val SHEET_BESIDE = 1560.dp
+
 /** Which part of the session sheet a click on the top bar opens. */
-private enum class SheetAt { Overview, Agents, Blocked }
+internal enum class SheetAt { Overview, Agents, Blocked }

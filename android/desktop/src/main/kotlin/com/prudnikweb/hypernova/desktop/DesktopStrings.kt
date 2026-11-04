@@ -198,6 +198,8 @@ enum class Ui {
     desk_preview_on_phone,
     desk_agent_on_phone,
     desk_files_on_phone,
+    desk_changes_on_phone,
+    desk_switch_on_phone,
     desk_terminal_on_phone,
     desk_settings_on_phone,
     desk_diagram_note,
