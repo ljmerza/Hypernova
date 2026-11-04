@@ -4,7 +4,7 @@ import { log, VERSION, API_PORT, LOCAL_PORT } from './util.ts'
 import { broadcast, discover, discoverOlder, pollRegistry, pollTranscripts, tickUsage } from './hub.ts'
 import { pollStatusLine } from './services.ts'
 import { ensureProjectsRoot } from './files.ts'
-import { announceApp, appInfo, startServers } from './http.ts'
+import { announceApp, appInfo, sendClaudeStartMode, startServers } from './http.ts'
 import { startReleaseCheck } from './releases.ts'
 import { serverUpdateHook, startServerUpdate, updateView } from './server-update.ts'
 import { refreshClaudeCommands, scanTerms, attachWaitingJobs, watchMenus, writeHnBin } from './terms.ts'
@@ -91,6 +91,7 @@ setInterval(pollClaudeAgents, 5000) // settings.claudeAgents: the whole `claude 
 setInterval(pollStatusLine, 3000)
 setInterval(tickUsage, 3000) // a window that resets with nothing running is announced then
 setInterval(tickCodex, 3000) // and Codex's
+setInterval(sendClaudeStartMode, 3000) // a terminal's /config or a hand edit: what forms open on (Codex's comes with its tick)
 setInterval(scanTerms, 1500)
 setInterval(watchMenus, 800)
 // A `claude agents` job's ask this restart handed back to its own dialog: the phone gets it as a card

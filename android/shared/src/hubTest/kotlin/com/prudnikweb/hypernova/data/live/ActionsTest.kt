@@ -448,129 +448,56 @@ class ActionsTest {
         assertEquals(false, rig.hub.claude?.loginContinue)
     }
 
-    /** Each agent's goes to its own route, and comes back as the server has it. */
-    @Test fun aStartModeIsPostedForItsAgentAndApplied() {
-        connect(session("s1"))
-        daemon.ok("POST", "/v1/claude", JSONObject().put("claude", JSONObject().put("available", true).put("startMode", "plan")))
-        daemon.ok("POST", "/v1/codex", JSONObject().put("codex", JSONObject().put("available", true).put("enabled", true).put("connected", true).put("startMode", "workspace-write")))
-        assertTrue(rig.call { rig.hub.setStartMode(AgentKind.CLAUDE, "plan") }.isSuccess)
-        assertEquals("plan", last("POST", "/v1/claude").json.getString("startMode"))
-        assertEquals("plan", rig.hub.claude?.startMode)
-        assertTrue(rig.call { rig.hub.setStartMode(AgentKind.CODEX, "workspace-write") }.isSuccess)
-        assertEquals("workspace-write", last("POST", "/v1/codex").json.getString("startMode"))
-        assertEquals("workspace-write", rig.hub.codex?.startMode)
-    }
-
-    // The phone-wide "New sessions start in" of before moves to Claude Code on each server, once.
-    private fun oldSetting(mode: String, pairedAtFirstStart: List<String> = listOf(rig.serverId)) {
-        rig.storage.prefs("hypernova").edit().putString("newSession.startMode", mode).apply()
-        NewSessionMemory.noteStartModeServers(rig.storage, pairedAtFirstStart)
-    }
-    private fun serverKeeps(mode: String?) {
+    // What a form opens on: the agent's own setting, as the server says it (docs/DECISIONS.md, "One starting mode, the agent's own").
+    private fun serverSays(claude: String?, codex: String? = null) {
         daemon.snapshot = snapshot("z2") {
-            put("claude", JSONObject().put("available", true).apply { if (mode != null) put("startMode", mode) })
-            put("codex", JSONObject().put("available", true).put("enabled", true).put("connected", true).apply { if (mode != null) put("startMode", "read-only") })
+            put("claude", JSONObject().put("available", true).apply { if (claude != null) put("startMode", claude) })
+            put("codex", JSONObject().put("available", true).put("enabled", true).put("connected", true).apply { if (codex != null) put("startMode", codex) })
         }
-        daemon.ok("POST", "/v1/claude", JSONObject().put("claude", JSONObject().put("available", true).put("startMode", "plan")))
+    }
+    private fun opensOn(agent: String) = NewSessionMemory.startsIn(agent, rig.hub, NewSessionMemory.load(rig.storage))
+
+    /** A row changed on any client, or the file by hand: the server says so, and the next form opens on it. No extra call. */
+    @Test fun aFormFollowsWhatTheServerSaysForEachAgent() {
+        serverSays("plan", "workspace-write")
+        rig.connect()
+        rig.until("linked") { rig.hub.claude != null && rig.hub.codex != null }
+        assertEquals("plan", opensOn(AgentKind.CLAUDE))
+        assertEquals("workspace-write", opensOn(AgentKind.CODEX))
+        daemon.push(msg("claude") { put("claude", JSONObject().put("available", true).put("startMode", "auto")) })
+        rig.until("it's heard") { rig.hub.claude?.startMode == "auto" }
+        assertEquals("auto", opensOn(AgentKind.CLAUDE))
+        daemon.push(msg("codex") { put("codex", JSONObject().put("available", true).put("enabled", true).put("connected", true).put("startMode", "read-only")) })
+        rig.until("it's heard") { rig.hub.codex?.startMode == "read-only" }
+        assertEquals("read-only", opensOn(AgentKind.CODEX))
+        assertEquals("nothing's asked or sent for it", 0, daemon.count("GET", "/v1/agents/settings"))
+        assertTrue(daemon.calls("POST", "/v1/claude").isEmpty())
+        assertTrue(daemon.calls("POST", "/v1/codex").isEmpty())
     }
 
-    private fun moves() = daemon.calls("POST", "/v1/claude")
-    /** The socket drops and the link comes back: the next snapshot. */
-    private fun nextSnapshot() {
+    /** v0.27.0's server still says what it kept, and one before it says nothing. */
+    @Test fun anOlderServerOpensOnWhatItKeptElseAsk() {
+        serverSays("plan")
+        rig.connect()
+        rig.until("linked") { rig.hub.claude != null }
+        assertEquals("plan", opensOn(AgentKind.CLAUDE))
+        serverSays(null)
         val n = daemon.count("GET", "/v1/snapshot")
         daemon.closeSocket()
-        rig.until("the next snapshot") { daemon.count("GET", "/v1/snapshot") > n && rig.hub.link.state == LinkState.Connected }
+        rig.until("the next snapshot") { daemon.count("GET", "/v1/snapshot") > n && rig.hub.link.state == LinkState.Connected && rig.hub.claude?.startMode == null }
+        assertEquals("default", opensOn(AgentKind.CLAUDE))
     }
-    /** Nothing more on its way: the hub's handled what it had, and a moment for a request it may have sent. */
-    private fun settled() {
+
+    /** A value left from v0.27.0 isn't sent anywhere, and doesn't open a form: not this hub's to use. */
+    @Test fun anOldSettingLeftBehindIsNeverSentOrOpenedOn() {
+        rig.storage.prefs("hypernova").edit().putString("newSession.startMode", "auto").putString("newSession.startModeOwed", rig.serverId).apply()
+        serverSays("default")
+        rig.connect()
+        rig.until("linked") { rig.hub.claude != null }
         rig.sync()
         Thread.sleep(100)
         rig.pump()
-    }
-
-    @Test fun theOldSettingGoesToClaudeOnceAndNeverToCodex() {
-        oldSetting("plan")
-        serverKeeps("default")
-        rig.connect()
-        rig.until("it moved") { rig.hub.claude?.startMode == "plan" }
-        assertEquals("plan", moves().single().json.getString("moveStartMode"))
-        assertEquals("read-only", rig.hub.codex?.startMode)
-        assertTrue("Codex hears nothing", daemon.calls("POST", "/v1/codex").isEmpty())
-        rig.until("it's marked") { NewSessionMemory.startModeToMove(rig.storage, rig.serverId) == null }
-        assertFalse("nothing left to move: the old value's gone", rig.storage.prefs("hypernova").contains("newSession.startMode"))
-        // Another connection, a later snapshot: not again.
-        nextSnapshot()
-        settled()
-        assertEquals(1, moves().size)
-    }
-
-    @Test fun anOlderServerTakesNothingUntilItsUpdated() {
-        oldSetting("plan")
-        serverKeeps(null)
-        rig.connect()
-        settled()
-        assertNull(rig.hub.claude?.startMode)
-        assertTrue(moves().isEmpty())
-        // Updated: it takes it then.
-        serverKeeps("default")
-        nextSnapshot()
-        rig.until("it moved") { rig.hub.claude?.startMode == "plan" }
-        assertEquals("plan", moves().single().json.getString("moveStartMode"))
-    }
-
-    /** Paired after the phone's first start with this: nothing moves, and the server's Ask stands. */
-    @Test fun aServerPairedAfterTheFirstStartGetsNoMove() {
-        oldSetting("auto", pairedAtFirstStart = listOf("another"))
-        serverKeeps("default")
-        rig.connect()
-        settled()
-        assertTrue(moves().isEmpty())
-        assertEquals("default", rig.hub.claude?.startMode)
-        assertNull(rig.hub.startModeOwed)
-        assertEquals("the other's still owed", "auto", NewSessionMemory.startModeToMove(rig.storage, "another"))
-    }
-
-    /** Older, and paired later: it isn't owed the old value either, so nothing here opens on it. */
-    @Test fun anOlderServerPairedLaterIsntOwedIt() {
-        oldSetting("auto", pairedAtFirstStart = listOf("another"))
-        serverKeeps(null)
-        rig.connect()
-        settled()
-        assertEquals("default", NewSessionMemory.startsIn(AgentKind.CLAUDE, rig.hub, NewSessionMemory.load(rig.storage)))
-    }
-
-    /** Older, and paired at the first start: it opens on the old value until it's updated. */
-    @Test fun anOlderServerPairedAtTheFirstStartOpensOnIt() {
-        oldSetting("auto")
-        serverKeeps(null)
-        rig.connect()
-        settled()
-        assertEquals("auto", NewSessionMemory.startsIn(AgentKind.CLAUDE, rig.hub, NewSessionMemory.load(rig.storage)))
-    }
-
-    @Test fun anUnusableOldSettingMovesNothing() {
-        for (bad in listOf("bypassPermissions", "workspace-write", "danger-full-access", "default")) {
-            oldSetting(bad)
-            assertNull(bad, NewSessionMemory.startModeToMove(rig.storage, rig.serverId))
-        }
-        serverKeeps("default")
-        rig.connect()
-        settled()
-        assertTrue(moves().isEmpty())
-    }
-
-    /** A move that failed tries again with the next snapshot: it isn't marked done. */
-    @Test fun aMoveThatFailedTriesAgain() {
-        oldSetting("auto")
-        serverKeeps("default")
-        daemon.on("POST", "/v1/claude") { json(500, JSONObject().put("error", JSONObject().put("code", "boom").put("message", "no"))) }
-        rig.connect()
-        rig.until("it tried") { moves().size == 1 }
-        settled()
-        assertEquals("auto", NewSessionMemory.startModeToMove(rig.storage, rig.serverId))
-        daemon.ok("POST", "/v1/claude", JSONObject().put("claude", JSONObject().put("available", true).put("startMode", "auto")))
-        nextSnapshot()
-        rig.until("it moved") { rig.hub.claude?.startMode == "auto" }
-        rig.until("it's marked") { NewSessionMemory.startModeToMove(rig.storage, rig.serverId) == null }
+        assertTrue(daemon.calls("POST", "/v1/claude").isEmpty())
+        assertEquals("default", opensOn(AgentKind.CLAUDE))
     }
 }

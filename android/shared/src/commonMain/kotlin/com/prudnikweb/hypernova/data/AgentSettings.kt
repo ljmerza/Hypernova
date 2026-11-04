@@ -97,6 +97,7 @@ data class AgentSettingsReply(val claude: AgentSettingsFile, val codex: AgentSet
                 mcpServers = names(o.arr("mcpServers")),
                 hookEvents = names(o.arr("hookEvents")),
                 hidden = o.int("hidden") ?: 0,
+                hiddenHooks = o.int("hiddenHooks") ?: 0,
             )
         }
 
@@ -200,7 +201,7 @@ data class ShownSetting(val key: String, val state: String, val text: String?, v
 @Immutable
 data class PluginSetting(val name: String, val on: Boolean?)
 
-/** A null is something other than the expected list in the file. [hidden]: names the server held back. */
+/** A null is something other than the expected list in the file. [hidden]: names the server held back, of all the lists; [hiddenHooks]: of [hookEvents], the one still shown. */
 @Immutable
 data class ClaudeSettingsSummary(
     val allow: Int?,
@@ -210,6 +211,7 @@ data class ClaudeSettingsSummary(
     val mcpServers: List<String>?,
     val hookEvents: List<String>?,
     val hidden: Int,
+    val hiddenHooks: Int = 0,
 )
 
 @Immutable
@@ -219,30 +221,11 @@ data class CodexSettingsSummary(val projects: Int?, val mcpServers: List<String>
 @Immutable
 data class McpName(val name: String, val scope: String, val project: String?)
 
-/** [names] to show of a group, and how many more it has. [project] null: every project on the server. */
-@Immutable
-data class McpGroup(val project: String?, val names: List<String>, val more: Int)
-
 /** Claude Code's MCP servers on a server (docs/PROTOCOL.md, "Agent settings"). [state] is `~/.claude.json`'s. */
 @Immutable
 data class ClaudeMcp(val state: String, val servers: List<McpName>, val hidden: Int, val foldersNotRead: Int) {
-    /** The servers to show, grouped: the server's own first, then each project's by name, each with a cap. */
-    fun groups(): Pair<List<McpGroup>, Int> {
-        val own = servers.filter { it.scope == USER || it.project == null }.map { it.name }.distinct()
-        val projects = servers.filter { it.scope != USER && it.project != null }
-            .groupBy({ it.project!! }, { it.name })
-            .toSortedMap(String.CASE_INSENSITIVE_ORDER)
-            .map { (project, names) -> group(project, names.distinct()) }
-        val shown = projects.take(GROUPS_SHOWN)
-        return (if (own.isEmpty()) shown else listOf(group(null, own)) + shown) to projects.size - shown.size
-    }
-
-    private fun group(project: String?, names: List<String>) = McpGroup(project, names.take(NAMES_SHOWN), (names.size - NAMES_SHOWN).coerceAtLeast(0))
-
     companion object {
         const val USER = "user"
-        const val GROUPS_SHOWN = 12
-        const val NAMES_SHOWN = 12
     }
 }
 

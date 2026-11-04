@@ -63,7 +63,8 @@
         "Stop",
         "PreToolUse"
       ],
-      "hidden": 0
+      "hidden": 0,
+      "hiddenHooks": 0
     },
     "mcp": {
       "state": "ok",

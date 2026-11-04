@@ -154,8 +154,8 @@ private enum class Picking { Project, Model, Mode, Effort }
  * into, then the choices as chips (the project, the model with its provider, Claude Code's effort,
  * the permission mode), each opening its picker, and Start always in reach at the foot with the
  * attachments and the mic. It starts on the project it was opened for ([initialProject]: a path or
- * a name), else the last one used, with the last model and effort, and in the mode that server keeps
- * for that agent (Fork: NewSessionMemory.startsIn; never Bypass). Frosted over the chart.
+ * a name), else the last one used, with the last model and effort, and in that agent's own setting on
+ * that server (Fork: NewSessionMemory.startsIn; never Bypass). Frosted over the chart.
  */
 @Composable
 fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Unit, launch: Long = 0L) {
@@ -183,7 +183,7 @@ fun NewSessionSheet(hub: Hub, initialProject: String?, onStarted: (String) -> Un
         mutableStateOf(healthy?.id ?: memory.provider?.takeIf { id -> providers.any { it.id == id } } ?: providers.firstOrNull()?.id)
     }
     var model by rememberSaveable { mutableStateOf(memory.model(providerId)) }
-    // Fork: this server's mode for Claude Code, each time; changed here, it's this session's only, and it
+    // Fork: Claude Code's own setting on this server, each time; changed here, it's this session's only, and it
     // goes with this hub: a pick on another server, Bypass with it, doesn't come along.
     var modePick by rememberSaveable(hub) { mutableStateOf<String?>(null) }
     val mode = modePick ?: NewSessionMemory.startsIn(AgentKind.CLAUDE, hub, memory)

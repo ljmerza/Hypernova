@@ -121,7 +121,7 @@ internal fun NewSessionPane(hub: Hub, shell: Shell, server: String, onBack: (() 
     val healthy = if (stopped) providers.healthyOther(account, null, opened) else null
     val providerId = remember { healthy?.id ?: memory.provider?.takeIf { id -> providers.any { it.id == id } } ?: providers.firstOrNull()?.id }
     val provider = providers.firstOrNull { it.id == providerId } ?: providers.firstOrNull()
-    // That server's mode for each agent (NewSessionMemory.startsIn); changed here, it's this session's only.
+    // Each agent's own setting on that server (NewSessionMemory.startsIn); changed here, it's this session's only.
     var modePick by remember(hub) { mutableStateOf<String?>(null) }
     val mode = modePick ?: NewSessionMemory.startsIn(AgentKind.CLAUDE, hub, memory)
     var codexModePick by remember(hub) { mutableStateOf<String?>(null) }

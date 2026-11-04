@@ -190,11 +190,12 @@ test('Claude Code: a secret in every place that must stay, and only the list and
     mcpServers: ['home-assistant'],
     hookEvents: ['Stop'],
     hidden: 0,
+    hiddenHooks: 0,
   })
   assert.deepEqual(valueOf(r, 'effortLevel'), { key: 'effortLevel', state: 'set', value: 'high' })
   assert.deepEqual(valueOf(r, 'permissions.defaultMode'), { key: 'permissions.defaultMode', state: 'set', value: 'plan' })
   // The only keys in the reply are the reply's own.
-  const allowed = new Set(['state', 'values', 'summary', 'key', 'value', 'rules', 'allow', 'ask', 'deny', 'plugins', 'name', 'on', 'mcpServers', 'hookEvents', 'hidden'])
+  const allowed = new Set(['state', 'values', 'summary', 'key', 'value', 'rules', 'allow', 'ask', 'deny', 'plugins', 'name', 'on', 'mcpServers', 'hookEvents', 'hidden', 'hiddenHooks'])
   for (const k of everyKey(r)) assert.ok(allowed.has(k), `an unexpected key: ${k}`)
 })
 
@@ -284,7 +285,7 @@ test('every shown value is its type and shape; anything else is unrecognised, no
 test('an unset key says unset, and the list is the same keys in the same order each time', () => {
   const r = claudeFile('empty', {})
   assert.deepEqual(r.values, CLAUDE_SHOWN.map((s) => ({ key: s.key, state: 'unset' })))
-  assert.deepEqual(r.summary, { rules: { allow: 0, ask: 0, deny: 0 }, plugins: [], mcpServers: [], hookEvents: [], hidden: 0 })
+  assert.deepEqual(r.summary, { rules: { allow: 0, ask: 0, deny: 0 }, plugins: [], mcpServers: [], hookEvents: [], hidden: 0, hiddenHooks: 0 })
   const c = codexFile('empty-codex', '')
   assert.deepEqual(c.values, CODEX_SHOWN.map((s) => ({ key: s.key, state: 'unset' })))
   assert.deepEqual(c.summary, { projects: 0, mcpServers: [], hidden: 0 })
@@ -322,6 +323,8 @@ test('names are checked too: one that might be a secret or isn’t a name is cou
   // Neither on nor off (the extended form): null, not a guess.
   assert.deepEqual(r.summary!.plugins, [{ name: 'good', on: null }, { name: 'plain', on: false }])
   assert.equal(r.summary!.hidden, 6)
+  // Only the hook event's: the list a client still shows names of, so its count says only what's missing from that list.
+  assert.equal(r.summary!.hiddenHooks, 1)
   const c = codexFile('bad-names-codex', `[mcp_servers."${secret('CodexMcpName')}"]\n[mcp_servers."two words"]\n[mcp_servers.fine]\n`)
   assert.ok(!JSON.stringify(c).includes('sk-ant'))
   assert.deepEqual(c.summary, { projects: 0, mcpServers: ['fine'], hidden: 2 })
@@ -336,7 +339,7 @@ test('past the cap: the first names, and the rest counted', () => {
 
 test('a summary whose table is something else is null, not a count', () => {
   const r = claudeFile('bad-shapes', { permissions: 'all', enabledPlugins: 3, mcpServers: [secret('Array')], hooks: secret('Hooks') })
-  assert.deepEqual(r.summary, { rules: { allow: null, ask: null, deny: null }, plugins: null, mcpServers: null, hookEvents: null, hidden: 0 })
+  assert.deepEqual(r.summary, { rules: { allow: null, ask: null, deny: null }, plugins: null, mcpServers: null, hookEvents: null, hidden: 0, hiddenHooks: 0 })
   assert.ok(!JSON.stringify(r).includes('sk-ant'))
   const p = claudeFile('bad-rules', { permissions: { allow: 'Bash', deny: [] } })
   assert.deepEqual(p.summary!.rules, { allow: null, ask: 0, deny: 0 })
@@ -514,7 +517,7 @@ test('the route: a secret anywhere in ~/.claude.json or a .mcp.json, and none of
       { name: 'project-one', scope: 'project', project: 'routed' },
     ])
     // What a phone can change adds only these, each a hash, a word on the fixed list or a flag (agent-settings-edit.ts).
-    const allowed = new Set(['effort', 'rows', 'model', 'hash', 'editable', 'choices', 'loosens', 'undo', 'whyNot', 'state', 'values', 'summary', 'key', 'value', 'rules', 'allow', 'ask', 'deny', 'plugins', 'name', 'on', 'mcpServers', 'hookEvents', 'hidden', 'mcp', 'servers', 'scope', 'project', 'foldersNotRead'])
+    const allowed = new Set(['effort', 'rows', 'model', 'hash', 'editable', 'choices', 'loosens', 'undo', 'whyNot', 'state', 'values', 'summary', 'key', 'value', 'rules', 'allow', 'ask', 'deny', 'plugins', 'name', 'on', 'mcpServers', 'hookEvents', 'hidden', 'hiddenHooks', 'mcp', 'servers', 'scope', 'project', 'foldersNotRead'])
     for (const k of everyKey(body.claude)) assert.ok(allowed.has(k), `an unexpected key: ${k}`)
   } finally {
     rmSync(join(CLAUDE, '.claude.json'))

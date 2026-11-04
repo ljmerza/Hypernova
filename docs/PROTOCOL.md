@@ -466,8 +466,8 @@ Snapshot = {
     loginContinue?: boolean,      // sessions the lost login stopped carry on by themselves once it's back
                                   // (settings.loginContinue, see After signing in again); absent: an older daemon
     startMode?: string            // what a client's New session form opens on for Claude Code here: "default",
-                                  // "acceptEdits", "plan" or "auto" (settings.startModes, see POST /v1/claude);
-                                  // absent: an older daemon
+                                  // "acceptEdits", "plan" or "auto", from its own settings.json (see "What a form
+                                  // opens on", under POST /v1/claude); absent: an older daemon
   },
   codex?: Codex | null            // Codex as a second agent (see Codex); null: not installed here; absent: an older daemon
 }
@@ -1179,7 +1179,8 @@ Codex = {
   usage: null | {fiveHour: Window | null, sevenDay: Window | null, limited: boolean, observedAt: number | null}
                         // Codex's own windows (a plan may have only the week); limited: one is used up
   startMode?: string    // what a client's New session form opens on for Codex here: "read-only" or
-                        // "workspace-write" (settings.startModes, see POST /v1/codex); absent: an older daemon
+                        // "workspace-write", from its own config.toml (see "What a form opens on", under
+                        // POST /v1/claude); absent: an older daemon
 }
 ```
 
@@ -1723,10 +1724,13 @@ ClaudeSummary = {
   plugins: {name, on: boolean | null}[] | null,   // the name before "@marketplace"; on null: neither
   mcpServers: string[] | null,     // names in settings.json's `mcpServers` only: what an older app reads
   hookEvents: string[] | null,     // the keys of `hooks`
-  hidden: number,                  // names not sent
+  hidden: number,                  // names not sent, of these lists: what an older app shows
+  hiddenHooks: number,             // the part of `hidden` that's hook events; absent from an older daemon
 }
 
 CodexSummary = {projects: number | null, mcpServers: string[] | null, hidden: number}
+// An app now shows only `rules`, `hookEvents` and `projects` of these, and no `claude.mcp`: a row manages each of
+// the others. They stay on the wire for older apps.
 
 ClaudeMcp = {               // there whatever settings.json's state; absent from an older daemon
   state: "ok" | "missing" | "malformed" | "unreadable",   // Claude Code's own config file's
@@ -2826,13 +2830,11 @@ Errors). All take the bearer token except the local fire route.
 
 #### POST /v1/codex
 
-- **Body:** `{enabled?: boolean, startMode?: "read-only" | "workspace-write"}`, at least one
+- **Body:** `{enabled: boolean}`
 - **Answer:** `200 {codex}`
-- **Refusals:** 400 `bad_value`, `bad_mode` (a `startMode` that isn't one of those two, which goes for
-  `danger-full-access` and `never`: nothing in the body is saved); 409 `no_codex` (turning on a Codex that
-  isn't installed or is too old)
-- **Rules:** Codex on or off for Hypernova. See Codex (a second agent). `startMode`: what a client's New
-  session form opens on for Codex on this server (see `POST /v1/claude`); every client hears `{t:"codex"}`.
+- **Refusals:** 400 `bad_value`; 400 `start_mode_moved` (a body with `startMode` and no `enabled`: see `POST /v1/claude`);
+  409 `no_codex` (turning on a Codex that isn't installed or is too old)
+- **Rules:** Codex on or off for Hypernova. See Codex (a second agent).
 
 #### POST /v1/codex/refresh
 
@@ -2850,23 +2852,34 @@ Errors). All take the bearer token except the local fire route.
 
 #### POST /v1/claude
 
-- **Body:** `{agents?: boolean, loginContinue?: boolean, startMode?: string, moveStartMode?: string}`, at least one
+- **Body:** `{agents?: boolean, loginContinue?: boolean}`, at least one
 - **Answer:** `200 {claude}` (the snapshot's `claude`)
-- **Refusals:** 400 `bad_value`; `bad_mode` (a `startMode` or `moveStartMode` that isn't `default`,
-  `acceptEdits`, `plan` or `auto`, which goes for `bypassPermissions`: nothing in the body is saved)
+- **Refusals:** 400 `bad_value`; 400 `start_mode_moved` (a body with `startMode` and neither of those: an older app's row)
 - **Rules:** `agents`: sessions in `claude agents` on or off (`settings.claudeAgents`, see Session
   menu). `loginContinue`: sessions the lost login stopped carry on by themselves once it's back, on
   unless set to false (`settings.loginContinue`, see After signing in again). Saved and taken at
   once, without a restart. Every client hears `{t:"claude"}`.
-- **New sessions start in:** `startMode` is what a client's New session form opens on for Claude Code on this
-  server (`settings.startModes`, each agent's its own). It's only that: `POST /v1/sessions` still takes the
-  mode each session names and checks it as before, a client that names none gets what it always did, and
-  neither the agents' own files nor a terminal's `claude` or `codex` follow it. A value on disk that isn't one
-  of the agent's modes reads as unset, so a hand-edited file can't widen: `default`, `read-only`. A client
-  checks again as it reads, and with no `startMode` (an older daemon) opens on what it has for that server. `moveStartMode`: the
-  same, only where nothing usable is saved yet, for a phone moving its old phone-wide setting here once. A client
-  sends neither to a daemon that doesn't report `startMode`. Decided in docs/DECISIONS.md, "New sessions start
-  in, per server and agent".
+- **What a form opens on:** the snapshot's `claude.startMode` and `codex.startMode`, read by the daemon from the agent's
+  own user-level file, for that one purpose, through the fixed list (`daemon/src/start-modes.ts`). There's no route to
+  set it: changing it is `PUT /v1/agents/settings` on `permissions.defaultMode` or `sandbox_mode`, the JSON tab, or the
+  file itself. Any of those reaches every client as `{t:"claude"}` or `{t:"codex"}`: at once from a route here, within
+  about 3 seconds from a terminal or by hand. `POST /v1/sessions` still takes the mode each session names and checks it as
+  before, and a form always names one, so `--permission-mode default` holds against whatever the file says.
+
+  | | The file says | It opens on |
+  |---|---|---|
+  | Claude Code | `default`, `acceptEdits`, `plan`, `auto` | That |
+  | Claude Code | `bypassPermissions`, `dontAsk`, `manual`, a word it doesn't know, not set; the file missing, malformed or unreadable | `default` |
+  | Codex | `sandbox_mode = "workspace-write"`, with `approval_policy` `on-request` or not set | `workspace-write` |
+  | Codex | Anything else: `read-only`, `danger-full-access`, approval `never`, `untrusted`, `on-failure` or a table, not set; the file missing, malformed or unreadable | `read-only` |
+
+  A client checks again as it reads (`NewSessionMemory.startsIn`). With no `startMode`, an older daemon: Ask, and for Codex
+  that device's last mode. v0.27.0's daemon still sends what it kept, and a client opens on that. Decided in
+  docs/DECISIONS.md, "One starting mode, the agent's own".
+- **An app from v0.27.0** still sends two fields, and neither writes anything. `startMode` alone, here or on
+  `POST /v1/codex`, is refused with `start_mode_moved`, whose words its row shows. `moveStartMode` alone answers
+  `200 {claude}` with nothing changed, so it stops trying and forgets its old value. Beside a real field, each is
+  ignored as any unknown field is.
 
 #### POST /v1/sessions/{id}/switch/preview
 
