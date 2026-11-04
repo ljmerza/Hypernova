@@ -233,6 +233,18 @@ fun plain(md: String): String = md
     .replace(Spaces, " ")
     .trim()
 
+private val PATH_ALONE = Regex("""~(/[^\s/`]+)+/?|(/[^\s/`]+){2,}/?""")
+
+/**
+ * [text]'s paths, a line each, if every line of it is one file path and nothing else, with or
+ * without backticks; null otherwise. It takes two folders to count, or a `~/`, so a lone
+ * `/compact` stays a command's name. A path with a space in it isn't recognised.
+ */
+fun pathsAlone(text: String): String? {
+    val lines = text.trim().lines().map { it.trim().removeSurrounding("`") }
+    return if (lines.all { PATH_ALONE.matches(it) }) lines.joinToString("\n") else null
+}
+
 /**
  * A cell as it's drawn: `<br>` (Claude's way to break a line in a cell) as a line break, except
  * inside code. While the cell is still being [typing], an unclosed ** or ` at its end is hidden

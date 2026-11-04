@@ -15,7 +15,9 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import com.prudnikweb.hypernova.R
@@ -279,6 +281,17 @@ class ChatMoreTest {
         rule.onNodeWithText("export const parse", substring = true, useUnmergedTree = true).assertExists()
         rule.onNodeWithText("```", substring = true, useUnmergedTree = true).assertDoesNotExist()
         rule.snap("chat_markdown")
+    }
+
+    @Test fun aPathOnItsOwnLineCopiesOnALongPressAndOpensNoMenu() {
+        val path = "/home/me/.claude/plans/handoff.md"
+        val reply = "The handoff is saved.\n\n$path"
+        chat(FakeHub(transcripts = mapOf(Samples.ZETA to listOf(Item.User("u1", "Where?"), Item.Assistant("a1", reply)))), Samples.ZETA)
+        // A real press: a code block's copy is its own gesture, with no semantic long click to call.
+        rule.onNodeWithText(path, useUnmergedTree = true).performTouchInput { longClick() }
+        rule.waitForIdle()
+        assertEquals(path, context.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString())
+        rule.onNodeWithText(str(R.string.chat_quote)).assertDoesNotExist()
     }
 
     // ─── A3, A4: a plan, and questions ───

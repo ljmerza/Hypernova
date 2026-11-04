@@ -9,6 +9,24 @@ import org.junit.Test
 class LinksTest {
     private fun urls(text: String) = Links.find(text).map { it.url }
 
+    @Test fun aParagraphOfOnlyPathsIsKnown() {
+        assertEquals("/home/me/.claude/plans/a.md", pathsAlone("  /home/me/.claude/plans/a.md\n"))
+        assertEquals("/home/me/a.md", pathsAlone("`/home/me/a.md`"))
+        assertEquals("~/plans/a.md", pathsAlone("~/plans/a.md"))
+        assertEquals("/srv/app/", pathsAlone("/srv/app/"))
+        assertEquals("/a/b.md\n/c/d.md", pathsAlone("/a/b.md\n/c/d.md"))
+    }
+
+    @Test fun anythingElseIsNotAPathAlone() {
+        assertNull(pathsAlone("/compact"))
+        assertNull(pathsAlone("and/or"))
+        assertNull(pathsAlone("see /home/me/a.md"))
+        assertNull(pathsAlone("/home/me/a.md is the handoff"))
+        assertNull(pathsAlone("/a/b.md\nand one more"))
+        assertNull(pathsAlone("https://example.com/a/b"))
+        assertNull(pathsAlone("/home/my files/a.md"))
+    }
+
     @Test fun bareAddressesInProse() {
         val t = "The repo now exists at https://github.com/secondlife/webcorelib, with a worktree."
         val f = Links.find(t)

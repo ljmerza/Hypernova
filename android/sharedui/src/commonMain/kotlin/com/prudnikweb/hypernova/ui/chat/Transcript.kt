@@ -102,6 +102,7 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.withLink
 import com.prudnikweb.hypernova.data.MarkdownTable
 import com.prudnikweb.hypernova.data.isRule
+import com.prudnikweb.hypernova.data.pathsAlone
 import com.prudnikweb.hypernova.data.tableAt
 import com.prudnikweb.hypernova.data.Links
 import androidx.compose.ui.unit.dp
@@ -562,7 +563,14 @@ internal fun fenceLanguage(line: String): String? =
 internal fun blocks(src: String, streaming: Boolean = false): List<Block> {
     val out = ArrayList<Block>()
     val para = StringBuilder()
-    fun flush() { if (para.isNotBlank()) out += Block.Para(para.toString().trim()); para.clear() }
+    // A paragraph of nothing but paths is drawn as code, so a long press copies it (the owner, 2026-11-04).
+    fun flush() {
+        if (para.isNotBlank()) {
+            val paths = pathsAlone(para.toString())
+            out += if (paths != null) Block.Code(paths) else Block.Para(para.toString().trim())
+        }
+        para.clear()
+    }
     val lines = src.lines()
     var i = 0
     while (i < lines.size) {

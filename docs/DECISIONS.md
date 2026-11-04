@@ -4527,3 +4527,11 @@ The owner: "if no agents are running but there is a shell running then the list 
 7. **The mark's place.** On the phone, after the card's chips, in words rather than a chip, on the row that's always there: the card is no taller. A card with an ask leaves it out, as its pills keep the room. On a narrow phone (320 dp, tested, with the baseline `home_card_shell_mark_narrow`) it fits beside the chip and the mode's words. Short of room the mode's words give way to their glyph, as they did; with several chips as well (AUTO, Codex, held prompts) on that width the mark is what gets cut, which wasn't tested. On the desktop, on the top line beside the short id, so the row is the same height.
 8. **Not proven:** a real model's session (measured against the scripted provider, Claude Code 2.1.318); a real phone; Stay awake on a Mac, where it only applies; a persistent Monitor's 12 hours, tested with the clock moved and never lived through; the Agent SDK's sessions, which weren't measured. Codex's sessions list no background commands, so nothing here reaches them.
 
+
+## A path alone on its line is a box (2026-11-04)
+
+The owner: "paths should be in a box and press down copied like commands".
+
+1. **A paragraph of a reply that is only a file path, or only paths, draws as a code block**, with the code block's own long press to copy. The message's menu doesn't open over it.
+2. **It counts as a path with two folders or a `~/`,** so a lone `/compact` stays text. A path with a space in it isn't recognised.
+3. **A path inside a sentence or a bullet stays where it is.** Boxing it would break the sentence up.
