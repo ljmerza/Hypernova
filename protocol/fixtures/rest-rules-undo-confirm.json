@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "confirm_needed",
+    "message": "Putting this back lets more through: Bash(npm run test:*) goes on Allow. Bash(npm run test:*) comes off Deny."
+  }
+}

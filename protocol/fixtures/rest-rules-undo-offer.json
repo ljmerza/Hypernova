@@ -1,0 +1,4 @@
+{
+  "needsConfirm": true,
+  "change": "Bash(npm run test:*) goes on Allow. Bash(npm run test:*) comes off Deny."
+}

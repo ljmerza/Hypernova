@@ -1,0 +1,66 @@
+{
+  "agent": "claude",
+  "supported": true,
+  "where": "~/.claude/settings.json",
+  "whyNot": null,
+  "hash": "file-hash",
+  "lists": {
+    "allow": {
+      "rules": [
+        {
+          "index": 0,
+          "text": "Bash(npm run test:*)",
+          "masked": false
+        },
+        {
+          "index": 1,
+          "text": "Bash",
+          "masked": false,
+          "broad": "Claude Code can run any command without asking. That’s close to Bypass."
+        },
+        {
+          "index": 2,
+          "text": "Bash(curl -H \"Authorization: Bearer <hidden on the server 1>\" *)",
+          "masked": true
+        },
+        {
+          "index": 3,
+          "text": "Read",
+          "masked": false,
+          "broad": "Claude Code can read any file it can reach without asking, keys and tokens included.",
+          "overriddenBy": "ask",
+          "overrides": "Read"
+        },
+        {
+          "index": 4,
+          "text": "Bash(",
+          "masked": false,
+          "problem": "Rules are written Tool or Tool(content), and have to end at the closing \")\"."
+        }
+      ],
+      "others": 0
+    },
+    "ask": {
+      "rules": [
+        {
+          "index": 0,
+          "text": "Read",
+          "masked": false
+        }
+      ],
+      "others": 0
+    },
+    "deny": {
+      "rules": [
+        {
+          "index": 0,
+          "text": "Read(~/.ssh/**)",
+          "masked": false
+        }
+      ],
+      "others": 0
+    }
+  },
+  "undo": null,
+  "state": "ok"
+}

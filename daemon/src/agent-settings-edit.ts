@@ -16,6 +16,7 @@ import { accessSync, closeSync, constants, existsSync, fchmodSync, fchownSync, f
 import { basename, dirname, join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { agentSettings, CLAUDE_SHOWN, CODEX_SHOWN, codexHome, modelIdFits, shown, type AgentSettingsReply, type ShownValue } from './agent-settings.ts'
+import { LIST_WORDS, maskedRule, RULE_LISTS, type RuleList } from './rule-text.ts'
 import { OTHER, scanToml, type TomlStatement, type TomlValue } from './toml-reader.ts'
 import { CLAUDE_DIR, log, SUPPORT } from './util.ts'
 
@@ -430,6 +431,75 @@ export function tomlEdit(t: string, key: string, value: string): string {
   return next
 }
 
+/** One change to a list of strings. An index counts everything in the list, whatever it is. */
+export type ListChange = { op: 'add'; text: string } | { op: 'replace'; index: number; text: string } | { op: 'remove'; index: number }
+
+/**
+ * [t] with one element of the list at [path] added, replaced or taken out: only those bytes, the same care as [jsonEdit],
+ * and what comes out is compared. A list that isn't there is made. Anything else where a list belongs is `unsupported_shape`.
+ */
+export function jsonListEdit(t: string, path: readonly string[], change: ListChange): string {
+  const before = parseJson(t)
+  if (!before) throw malformed()
+  let open = skipSpace(t, 0)
+  let member: Member | undefined
+  for (const [i, name] of path.entries()) {
+    member = membersOf(t, open).members.filter((x) => x.name === name).at(-1)
+    if (!member) break
+    if (i < path.length - 1) {
+      if (t[member.valueFrom] !== '{') throw shape()
+      open = member.valueFrom
+    }
+  }
+  let next: string
+  if (!member) {
+    if (change.op !== 'add') throw shape()
+    next = jsonEditPath(t, path, [change.text])
+  } else {
+    if (t[member.valueFrom] !== '[') throw shape()
+    const items: { from: number; to: number }[] = []
+    let i = skipSpace(t, member.valueFrom + 1)
+    while (t[i] !== ']') {
+      const to = valueEnd(t, i)
+      items.push({ from: i, to })
+      i = skipSpace(t, to)
+      if (t[i] === ',') i = skipSpace(t, i + 1)
+    }
+    const close = i
+    if (change.op === 'add') {
+      const last = items.at(-1)
+      if (last) next = splice(t, last.to, last.to, `,${leadOf(t, last.from)}${JSON.stringify(change.text)}`)
+      else {
+        // Laid out as the level it's in, for a list that's going to grow.
+        const lead = leadOf(t, member.keyFrom)
+        const inner = lead.includes('\n') ? `${lead}  ` : ''
+        next = splice(t, member.valueFrom + 1, close, `${inner}${JSON.stringify(change.text)}${inner ? lead : ''}`)
+      }
+    } else {
+      const at = items[change.index]
+      if (!at) throw shape()
+      if (change.op === 'replace') next = splice(t, at.from, at.to, JSON.stringify(change.text))
+      else if (items.length === 1) next = splice(t, member.valueFrom + 1, close, '')
+      else if (change.index === 0) next = splice(t, at.from, items[1]!.from, '')
+      else next = splice(t, items[change.index - 1]!.to, at.to, '')
+    }
+  }
+  const want = structuredClone(before)
+  let holder: Record<string, unknown> = want
+  for (const name of path.slice(0, -1)) {
+    if (!isTable(holder[name])) holder[name] = {}
+    holder = holder[name] as Record<string, unknown>
+  }
+  const leaf = path.at(-1)!
+  const list = [...((holder[leaf] as unknown[] | undefined) ?? [])]
+  if (change.op === 'add') list.push(change.text)
+  else if (change.op === 'replace') list[change.index] = change.text
+  else list.splice(change.index, 1)
+  holder[leaf] = list
+  if (!isDeepStrictEqual(parseJson(next), want)) throw shape()
+  return next
+}
+
 /** The file's next text with [key] at [value]; [text] null: a file to create, with that one key. */
 function edited(agent: Agent, text: string | null, key: string, value: Value | null): string {
   const model = agent === 'claude' ? effortModel(key) : null
@@ -511,6 +581,9 @@ function syncFolder(dir: string): void {
 /** A value's words in the log: only what the phone could be shown. */
 const inLog = (v: ShownValue) => (v.state === 'set' ? String(v.value) : v.state === 'unset' ? '(not set)' : '(unrecognised)')
 
+/** The key a change to the permission rules goes by, in the last change and the reply. Not a key in the file. */
+export const RULES_KEY = 'permissions.rules'
+
 /** What the last change wrote, for Undo. Its values have been checked, as the phone's are. */
 type Last = { wrote: string; backup: string | null; key: string; before: ShownValue; after: Value | null }
 
@@ -548,10 +621,44 @@ function undoOffer(agent: Agent, hash: string | null): UndoOffer | null {
   if (hash === null) return null
   const last = readLast(agent)
   if (!last || last.wrote !== hash) return null
+  // Offered on its own screen, in its own words: rulesUndo.
   const rule = ruleOf(agent, last.key)
   if (!rule || !restorable(rule, last.before)) return null
   const to = last.before.state === 'set' ? last.before.value : null
   return { key: last.key, to, loosens: loosens(last.key, last.after === null ? { key: last.key, state: 'unset' } : { key: last.key, state: 'set', value: last.after }, to) }
+}
+
+const listOf = (doc: unknown, list: RuleList): string[] => {
+  const p = isTable(doc) ? doc.permissions : undefined
+  const l = isTable(p) ? p[list] : undefined
+  return Array.isArray(l) ? l.filter((r): r is string => typeof r === 'string') : []
+}
+
+/** What going from [from] to [to] loosens, in words with secrets kept back: a rule new to Allow, or gone from Ask or Deny. Empty: it only tightens. */
+export function rulesLoosened(from: unknown, to: unknown): string[] {
+  const out: string[] = []
+  for (const list of RULE_LISTS) {
+    const a = listOf(from, list)
+    const b = listOf(to, list)
+    if (list === 'allow') for (const r of b) if (!a.includes(r)) out.push(`${maskedRule(r).shown} goes on Allow.`)
+    if (list !== 'allow') for (const r of a) if (!b.includes(r)) out.push(`${maskedRule(r).shown} comes off ${LIST_WORDS[list]}.`)
+  }
+  return out
+}
+
+/** What Undo would do to the rules, if the last change here was to them and the file is still what it left. */
+export function rulesUndo(hash: string | null, dirs: Dirs = {}): { needsConfirm: boolean; change: string } | null {
+  if (hash === null) return null
+  const last = readLast('claude')
+  if (!last || last.wrote !== hash || last.key !== RULES_KEY) return null
+  try {
+    const now = readCurrent(fileOf('claude', dirs))
+    const before = last.backup === null ? {} : JSON.parse(readFileSync(join(backupDir(), basename(last.backup)), 'utf8'))
+    const asks = rulesLoosened(now ? JSON.parse(now.bytes.toString('utf8')) : {}, before)
+    return { needsConfirm: asks.length > 0, change: asks.join(' ') }
+  } catch {
+    return null
+  }
 }
 
 // ── The routes ───────────────────────────────────────────────────────────
@@ -595,7 +702,7 @@ function effortRows(text: string | null, models: readonly EffortModel[]): Effort
   return { rows, choices: [...EFFORT_LEVELS.map((value) => ({ value, loosens: false })), { value: null, loosens: false }] }
 }
 
-function fieldsOf(agent: Agent, dirs: Dirs, models: ModelList): EditFields {
+export function fieldsOf(agent: Agent, dirs: Dirs, models: ModelList): EditFields {
   const file = fileOf(agent, dirs)
   const none = (hash: string | null, whyNot: WhyNot): EditFields => ({ hash, editable: [], undo: null, whyNot })
   let cur: Current
@@ -674,19 +781,8 @@ function checked(body: unknown): { rule: Rule; agent: Agent; key: string; value:
   return { rule, agent, key: rule.key, value, expected }
 }
 
-/**
- * PUT /v1/agents/settings. Everything on the file happens in one synchronous stretch, so two phones
- * can't interleave here; another program can only be caught by [hash] looked at again last thing.
- * [testHooks]: a test's way into that last moment.
- */
-export async function changeSetting(body: unknown, models: () => Promise<ModelList>, dirs: Dirs = {}, testHooks: { beforeRename?: () => void } = {}): Promise<Change> {
-  const { rule, agent, key, value, expected } = checked(body)
-  if (rule.of === 'models') {
-    const list = await models().catch(() => null)
-    if (!list) throw new EditRefused(409, 'models_unavailable', 'Codex’s models aren’t known right now, so this can’t be changed.')
-    if (typeof value !== 'string' || !modelIdFits(value) || !list.some((m) => m.value === value)) throw new EditRefused(403, 'value_not_allowed', 'That value can’t be chosen from a phone.')
-  }
-
+/** The file a change is for, as it is now, or why it can't be changed. */
+export function openForEdit(agent: Agent, dirs: Dirs, expected: string | null): { file: string; cur: Current; text: string | null } {
   const file = fileOf(agent, dirs)
   const cur = readCurrent(file)
   if ((cur?.hash ?? null) !== expected) throw changed()
@@ -702,15 +798,13 @@ export async function changeSetting(body: unknown, models: () => Promise<ModelLi
       throw new EditRefused(409, 'file_read_only', 'That file is read-only on the server. Nothing was written.')
     }
   }
+  return { file, cur, text }
+}
 
-  const before: ShownValue = text === null ? { key, state: 'unset' } : currentValue(agent, text, key)
-  const loosened = loosens(key, before, value)
-  if ((before.state === 'set' && before.value === value && cur) || (value === null && before.state === 'unset')) {
-    return { ok: true, agent, key, value, changed: false, hash: cur?.hash ?? '', loosened: false, undo: cur ? undoOffer(agent, cur.hash) : null }
-  }
-  const next = Buffer.from(edited(agent, text, key, value), 'utf8')
+/** [next] into [file], with its backup and what Undo needs. The one write of a change through this route. Answers the new hash. */
+export function writeEdit(agent: Agent, file: string, cur: Current, nextText: string, expected: string | null, key: string, before: ShownValue, after: Value | null, testHooks: { beforeRename?: () => void } = {}): string {
+  const next = Buffer.from(nextText, 'utf8')
   const wrote = sha256(next)
-
   let backup = null as string | null
   try {
     writeAtomic(file, next, cur?.stat ?? null, () => {
@@ -732,11 +826,35 @@ export async function changeSetting(body: unknown, models: () => Promise<ModelLi
   // The file is written, whatever comes next: a failure here only costs the Undo.
   try {
     mkdirSync(backupDir(), { recursive: true, mode: 0o700 })
-    saveLast(agent, { wrote, backup, key, before, after: value })
+    saveLast(agent, { wrote, backup, key, before, after })
     pruneBackups(agent)
   } catch (e) {
     log('agent settings: backup bookkeeping failed', agent, (e as NodeJS.ErrnoException).code ?? 'error')
   }
+  return wrote
+}
+
+/**
+ * PUT /v1/agents/settings. Everything on the file happens in one synchronous stretch, so two phones
+ * can't interleave here; another program can only be caught by [hash] looked at again last thing.
+ * [testHooks]: a test's way into that last moment.
+ */
+export async function changeSetting(body: unknown, models: () => Promise<ModelList>, dirs: Dirs = {}, testHooks: { beforeRename?: () => void } = {}): Promise<Change> {
+  const { rule, agent, key, value, expected } = checked(body)
+  if (rule.of === 'models') {
+    const list = await models().catch(() => null)
+    if (!list) throw new EditRefused(409, 'models_unavailable', 'Codex’s models aren’t known right now, so this can’t be changed.')
+    if (typeof value !== 'string' || !modelIdFits(value) || !list.some((m) => m.value === value)) throw new EditRefused(403, 'value_not_allowed', 'That value can’t be chosen from a phone.')
+  }
+
+  const { file, cur, text } = openForEdit(agent, dirs, expected)
+
+  const before: ShownValue = text === null ? { key, state: 'unset' } : currentValue(agent, text, key)
+  const loosened = loosens(key, before, value)
+  if ((before.state === 'set' && before.value === value && cur) || (value === null && before.state === 'unset')) {
+    return { ok: true, agent, key, value, changed: false, hash: cur?.hash ?? '', loosened: false, undo: cur ? undoOffer(agent, cur.hash) : null }
+  }
+  const wrote = writeEdit(agent, file, cur, edited(agent, text, key, value), expected, key, before, value, testHooks)
   log(`agent settings: ${agent} ${key} ${inLog(before)} -> ${value === null ? '(not set)' : String(value)}${loosened ? ' (loosens)' : ''}`)
   return { ok: true, agent, key, value, changed: true, hash: wrote, loosened, undo: undoOffer(agent, wrote) }
 }
@@ -754,8 +872,19 @@ export function undoChange(body: unknown, dirs: Dirs = {}): Undone {
   const file = fileOf(agent, dirs)
   const cur = readCurrent(file)
   if (!cur || cur.hash !== expected || cur.hash !== last.wrote) throw changed()
+  const rules = last.key === RULES_KEY
   const rule = ruleOf(agent, last.key)
-  if (!rule || !restorable(rule, last.before)) throw new EditRefused(409, 'undo_refused', 'What was there before can’t be set from a phone. Its backup is on the server.')
+  if (!rules && (!rule || !restorable(rule, last.before))) throw new EditRefused(409, 'undo_refused', 'What was there before can’t be set from a phone. Its backup is on the server.')
+  // Going back is a change too: a tightening's Undo can loosen, and takes the same confirm.
+  let rulesAsk: string[] = []
+  if (rules) {
+    try {
+      rulesAsk = rulesLoosened(JSON.parse(cur.bytes.toString('utf8')), last.backup === null ? {} : JSON.parse(readFileSync(join(backupDir(), basename(last.backup)), 'utf8')))
+    } catch {
+      throw new EditRefused(409, 'nothing_to_undo', 'There’s no change here to undo.')
+    }
+    if (rulesAsk.length && body.confirmed !== true) throw new EditRefused(403, 'confirm_needed', `Putting this back lets more through: ${rulesAsk.join(' ')}`)
+  }
   try {
     accessSync(file, constants.W_OK)
   } catch {
@@ -763,7 +892,7 @@ export function undoChange(body: unknown, dirs: Dirs = {}): Undone {
   }
 
   const to = last.before.state === 'set' ? last.before.value : null
-  const loosened = loosens(last.key, last.after === null ? { key: last.key, state: 'unset' } : { key: last.key, state: 'set', value: last.after }, to)
+  const loosened = rules ? rulesAsk.length > 0 : loosens(last.key, last.after === null ? { key: last.key, state: 'unset' } : { key: last.key, state: 'set', value: last.after }, to)
   let hash: string | null = null
   try {
     if (last.backup === null) {
