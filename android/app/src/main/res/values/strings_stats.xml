@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
-<!-- Statistics: how much Claude worked on the Mac (ui/stats/, docs/PROTOCOL.md "Statistics"). The mark in Home's top bar opens it.
+<!-- Statistics: how much Claude worked on the Mac (ui/stats/, docs/PROTOCOL.md "Statistics"). A row on Settings' tab opens it.
      With Codex at work in the range (or leading), the hero, streak, footer and loading line take strings_stats_agents.xml's words. -->
 <resources>
     <string name="stats_title">Statistics</string>

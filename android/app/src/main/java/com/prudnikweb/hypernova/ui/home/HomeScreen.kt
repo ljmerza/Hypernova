@@ -22,9 +22,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,11 +60,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.offset
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.zIndex
 import com.prudnikweb.hypernova.ui.components.clipboardText
-import com.prudnikweb.hypernova.ui.stats.StatsScreen
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.Answer
@@ -107,7 +103,7 @@ import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.LocalHaze
-import com.prudnikweb.hypernova.ui.components.NovaMark
+import com.prudnikweb.hypernova.ui.components.HomeMark
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
@@ -223,6 +219,8 @@ fun HomeScreen(
     everywhere: Everywhere? = null,
     /** The tab on screen; the app keeps it across computers ([rememberHomeTab]). */
     tabState: MutableState<Tab> = rememberSaveable { mutableStateOf(Tab.Sessions) },
+    /** Set by the mark, here or on a screen over Home: Sessions at the top of its list, then Home clears it. */
+    toTop: MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
     val haze = LocalHaze.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -240,18 +238,9 @@ fun HomeScreen(
         ServerPicker(AllHome.picks(everywhere.servers.map { it.first }), everywhere.onNewSession, onDismiss = { pickingServer = false })
     }
     val newSession = if (everywhere != null) ({ pickingServer = true }) else onNewSession
-    // Statistics, opened by tapping the mark: a screen of its own over Home, which fades back as it
-    // comes forward (the way a session opens), and Back returns. Only what Home draws leaves, so
-    // its tab and scroll are where they were.
-    var statsOpen by rememberSaveable { mutableStateOf(false) }
-    val statsAnim = remember { Animatable(if (statsOpen) 1f else 0f) }
-    LaunchedEffect(statsOpen) { statsAnim.animateTo(if (statsOpen) 1f else 0f, tween(Motion.REVEAL, easing = Motion.Expo)) }
-    val homeShown by remember { derivedStateOf { !statsOpen || statsAnim.value < 1f } }
-    val statsShown by remember { derivedStateOf { statsOpen || statsAnim.value > 0f } }
-    BackHandler(enabled = statsOpen) { statsOpen = false }
     // Fork (owner, 2026-10-30): Back from History, Automations or Settings goes to Sessions; on
     // Sessions it closes the app only when pressed twice, the first press says so.
-    BackHandler(enabled = !statsOpen && tab != Tab.Sessions) { tab = Tab.Sessions }
+    BackHandler(enabled = tab != Tab.Sessions) { tab = Tab.Sessions }
     val backToast = LocalToast.current
     val backAgain = stringResource(R.string.home_back_again)
     val allNoAutomations = stringResource(R.string.all_servers_no_automations)
@@ -259,17 +248,30 @@ fun HomeScreen(
     LaunchedEffect(everywhere != null) { if (everywhere != null && tab == Tab.Automations) tab = Tab.Sessions }
     var backArmed by remember { mutableStateOf(false) }
     LaunchedEffect(backArmed) { if (backArmed) { delay(2_000); backArmed = false } }
-    BackHandler(enabled = !statsOpen && tab == Tab.Sessions && !backArmed) { backArmed = true; backToast(backAgain) }
+    BackHandler(enabled = tab == Tab.Sessions && !backArmed) { backArmed = true; backToast(backAgain) }
     // Searching Home's sessions (idea HM8): the lens in the top bar opens a field under it; Back or
     // its cross closes it and clears the words. Leaving Sessions closes it too.
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val closeSearch = { searchOpen = false; searchQuery = "" }
-    BackHandler(enabled = !statsOpen && tab == Tab.Sessions && searchOpen) { closeSearch() }
+    BackHandler(enabled = tab == Tab.Sessions && searchOpen) { closeSearch() }
     LaunchedEffect(tab) { if (tab != Tab.Sessions) closeSearch() }
     val context = LocalContext.current
-    val openStats = { statsOpen = true }
     val list = rememberLazyListState()
+    // The mark (owner, 2026-11-03: "reset back to the home screen"): Sessions, at the top of its list, from any tab or
+    // from Statistics. The server chosen, the filter and the sort stay; a search is gone, as on leaving the tab.
+    // Waits for Sessions to be drawn: its list isn't laid out while another tab shows.
+    if (toTop.value) LaunchedEffect(tab) {
+        if (tab != Tab.Sessions) return@LaunchedEffect
+        closeSearch()
+        withFrameNanos { }
+        list.scrollToItem(0)
+        toTop.value = false
+    }
+    val goHome = {
+        toTop.value = true
+        tab = Tab.Sessions
+    }
     // "2m ago" labels refresh on their own, not only when a session changes.
     val now by produceState(System.currentTimeMillis()) {
         while (true) { delay(30_000); value = System.currentTimeMillis() }
@@ -367,22 +369,20 @@ fun HomeScreen(
         snapshotFlow { toAutomations.value }.filter { it }.collect {
             toAutomations.value = false
             tab = Tab.Automations
-            statsOpen = false
         }
     }
     if (toAccount != null) LaunchedEffect(toAccount) {
         snapshotFlow { toAccount.value }.filter { it }.collect {
             toAccount.value = false
             // A search hides the account card: closed, the list is about to be laid out with it again.
-            val fromTab = tab != Tab.Sessions || statsOpen || (searchOpen && searchQuery.isNotBlank())
+            val fromTab = tab != Tab.Sessions || (searchOpen && searchQuery.isNotBlank())
             tab = Tab.Sessions
-            statsOpen = false
             closeSearch()
             if (!accountCardShown(hub.account, System.currentTimeMillis())) return@collect
             // Asked for, the account card is back even if it was swiped away.
             AttentionStore.undo(ACCOUNT_CARD)
             val at = accountIndex()
-            // From History, Settings or Statistics the list still holds its last layout, from before
+            // From History or Settings the list still holds its last layout, from before
             // it left the screen: scrolling on that would land wrong, so wait for the one it's about
             // to get.
             if (fromTab) snapshotFlow { list.layoutInfo }.drop(1).first()
@@ -396,7 +396,6 @@ fun HomeScreen(
     LaunchedEffect(settingsAsked) {
         if (com.prudnikweb.hypernova.ui.settings.SettingsJump.wanted() == null) return@LaunchedEffect
         tab = Tab.Settings
-        statsOpen = false
     }
 
     if (filtering && tab == Tab.Sessions) {
@@ -418,18 +417,7 @@ fun HomeScreen(
         HomeSortSheet(homeSort, HomeSort.offered(everywhere != null), onPick = { HomeSortPref.set(context, it) }, onDismiss = { sorting = false })
     }
 
-    if (homeShown) Box(
-        Modifier
-            .fillMaxSize()
-            // Closing Statistics, Home comes back over it.
-            .zIndex(if (statsOpen) 0f else 1f)
-            .graphicsLayer {
-                val k = statsAnim.value
-                alpha = 1f - k
-                scaleX = 1f + 0.02f * k
-                scaleY = scaleX
-            },
-    ) {
+    Box(Modifier.fillMaxSize()) {
         when (tab) {
             // With "All servers" the cards above the sessions are the one picked last's, and say so.
             Tab.Sessions -> androidx.compose.runtime.CompositionLocalProvider(com.prudnikweb.hypernova.ui.components.LocalAttentionFrom provides everywhere?.pickedName) { LazyColumn(
@@ -657,13 +645,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Fork: the mark alone (owner, 2026-10-30); the word "hypernova" made the bar crowded.
-                // It's the way into Statistics.
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.stats_open_label), onClick = openStats),
-                    contentAlignment = Alignment.CenterStart,
-                ) { NovaMark(size = 22.dp) }
+                HomeMark(goHome)
                 // Fork: the new-session (and new-automation) pill sits up here, small, instead of
                 // over the tabs, so the bottom bar is just the tabs; 30dp, the Mac's chip's height.
                 if (tab == Tab.Sessions) {
@@ -724,21 +706,6 @@ fun HomeScreen(
             // All servers (owner, 2026-10-31): Automations are one server's; History lists every server's; Settings shows what the phone keeps.
             BottomTabs(tab) { to -> if (everywhere != null && to == Tab.Automations) backToast(allNoAutomations) else tab = to }
         }
-    }
-
-    if (statsShown) Box(
-        Modifier
-            .fillMaxSize()
-            // Opening, it comes forward over Home.
-            .zIndex(if (statsOpen) 1f else 0f)
-            .graphicsLayer {
-                val k = statsAnim.value
-                alpha = k
-                scaleX = 0.97f + 0.03f * k
-                scaleY = scaleX
-            },
-    ) {
-        StatsScreen(hub, onBack = { statsOpen = false }, servers = everywhere?.servers?.map { (st, h) -> com.prudnikweb.hypernova.data.StatsServer(st.id, st.name, h) })
     }
 }
 

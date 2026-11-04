@@ -17,9 +17,17 @@ class SettingsPlanTest {
     private fun page(s: ServerFacts, all: Boolean = false, testing: Boolean = false) = SettingsPlan.serverParts(s, all, testing).map { it.key }
 
     @Test fun theTabIsTheServersThenThePhone() {
-        assertEquals(listOf("servers", "phone", "display", "about"), tab(listOf("z2")))
+        assertEquals(listOf("servers", "statistics", "phone", "display", "about"), tab(listOf("z2")))
         // The Terminal engine trial only once the testing tools are unlocked, just before About.
-        assertEquals(listOf("servers", "phone", "display", "termEngine", "about"), tab(listOf("z2"), testing = true))
+        assertEquals(listOf("servers", "statistics", "phone", "display", "termEngine", "about"), tab(listOf("z2"), testing = true))
+    }
+
+    @Test fun statisticsAreOnTheTabForWhatsOnScreenAndNeedAServer() {
+        // The same row with one server and with All servers, not on a server's page: it follows the choice on screen.
+        assertEquals(listOf("servers", "statistics", "phone", "display", "about"), tab(listOf("z2", "shed")))
+        assertEquals(listOf("mac", "providers", "files"), page(shed))
+        // Nothing paired: nothing to count.
+        assertEquals(listOf("servers", "phone", "display", "about"), tab(emptyList()))
     }
 
     @Test fun aRowPerServerInTheOrderGiven() {

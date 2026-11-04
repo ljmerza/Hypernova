@@ -131,6 +131,31 @@ class SettingsNavigationTest {
         rule.onNodeWithText(str(R.string.st_all_phone)).assertExists()
     }
 
+    // Statistics moved here from the logo (owner, 2026-11-03).
+    @Test fun statisticsOpensFromTheTabKeepsTheTabsAndBackIsTheTab() {
+        pair("z2")
+        val vm = show()
+        settingsTab()
+        rule.onNodeWithText(str(R.string.st_stats_desc, "z2")).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.stats_title)).assertIsDisplayed().performClick()
+        rule.waitForIdle()
+        assertEquals(Route.Statistics, vm.nav.top)
+        rule.onNodeWithText(str(R.string.sessions).uppercase()).assertIsDisplayed()
+        systemBack()
+        assertEquals(Route.Home, vm.nav.top)
+        rule.onNodeWithText(str(R.string.st_all_phone)).assertExists()
+    }
+
+    @Test fun withAllServersItsRowSaysEveryServer() {
+        pair("z2")
+        pair("gym")
+        val vm = show()
+        vm.showAll()
+        rule.waitForIdle()
+        settingsTab()
+        rule.onNodeWithText(str(R.string.st_stats_desc_all)).assertIsDisplayed()
+    }
+
     @Test fun aSubPageIsStillThereWhenTheActivityIsRecreated() {
         pair("z2")
         val vm = HubViewModel(AndroidCore.app)

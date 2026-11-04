@@ -22,6 +22,8 @@ sealed interface Route {
     data class Terminal(val sessionId: String) : Route { override val key = "terminal:$sessionId" }
     /** One of a session's agents: its own transcript, read-only. */
     data class Agent(val sessionId: String, val agentId: String) : Route { override val key = "agent:$sessionId:$agentId" }
+    /** How much the agents worked: on the server on screen, or on every one with All servers. From Settings. */
+    data object Statistics : Route { override val key = "statistics" }
     data object Providers : Route { override val key = "providers" }
     /** An agent's user-level settings on this server, to view: [agent] is [AgentSettingsReply.CLAUDE] or [AgentSettingsReply.CODEX]. */
     data class AgentSettings(val agent: String) : Route { override val key = "agent-settings:$agent" }
@@ -123,7 +125,7 @@ fun sessionStack(stack: List<Route>, id: String, fresh: Boolean = false): List<R
  * decided on.
  */
 val Route.isSettingsPage: Boolean get() = when (this) {
-    Route.Providers, is Route.ProviderEdit, is Route.AgentSettings, is Route.McpServers, is Route.McpServerPage, is Route.McpEdit,
+    Route.Statistics, Route.Providers, is Route.ProviderEdit, is Route.AgentSettings, is Route.McpServers, is Route.McpServerPage, is Route.McpEdit,
     is Route.Plugins, is Route.PluginPage, is Route.PluginBrowse, is Route.Skills, is Route.AgentEnv, is Route.AgentRaw,
     Route.ConnectionLog, is Route.ServerSettings, Route.NotificationSettings, Route.TopBarSettings, Route.CardSwipeSettings,
     Route.TypingVoiceSettings, Route.LogSettings -> true

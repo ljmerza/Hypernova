@@ -191,6 +191,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 |---|---|---|
 | Three groups, what a card says, state chips | There | Two panes instead of cards (DECISIONS, "The desktop client's two panes") |
 | Allow and Deny on the card | Partly | In the pane, with Allow only beside the whole command (rule 3 of "The desktop app"), on purpose and stricter than the phone. A question or a plan is answered on the phone |
+| The logo goes to the list at its top | There | From a session, History, New session and Settings: the same `HomeMark` |
 | Search, filter, sort | Not yet | The list is A to Z in each group |
 | Unread dot | Not yet | |
 | Usage cards | Not yet | Only the chart's week behind the list |

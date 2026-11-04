@@ -241,6 +241,7 @@ val Str.id: Int
         Str.err_terminal -> R.string.err_terminal
         Str.err_upload -> R.string.err_upload
         Str.exit_code -> R.string.exit_code
+        Str.home_mark_label -> R.string.home_mark_label
         Str.headline_limit -> R.string.headline_limit
         Str.headline_limit_claude -> R.string.headline_limit_claude
         Str.headline_no_credit -> R.string.headline_no_credit

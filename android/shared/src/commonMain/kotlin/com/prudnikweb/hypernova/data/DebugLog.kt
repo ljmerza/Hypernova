@@ -421,6 +421,7 @@ val Route.debugWords: String
         is Route.Web -> if (preview) "a preview" else "a web page"
         is Route.Terminal -> "terminal of session $sessionId"
         is Route.Agent -> "agent $agentId of session $sessionId"
+        Route.Statistics -> "statistics"
         Route.Providers -> "providers"
         is Route.AgentSettings -> "agent settings"
         is Route.McpServers -> "MCP servers"

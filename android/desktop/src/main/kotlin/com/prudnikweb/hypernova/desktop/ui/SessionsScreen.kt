@@ -4,7 +4,7 @@ import com.prudnikweb.hypernova.ui.components.Activity
 import com.prudnikweb.hypernova.ui.components.CountMark
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.MacMoon
-import com.prudnikweb.hypernova.ui.components.NovaMark
+import com.prudnikweb.hypernova.ui.components.HomeMark
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
@@ -53,6 +53,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -232,7 +233,7 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
                 Unit
             }
             val sessionList = @Composable { m: Modifier ->
-                if (onSessions) SessionList(hub, groups, list, stale, chosenId.takeIf { twoPanes }, cursor.takeIf { !twoPanes }, m, onRow)
+                if (onSessions) SessionList(hub, groups, list, stale, chosenId.takeIf { twoPanes }, cursor.takeIf { !twoPanes }, shell, m, onRow)
                 else HistoryList(hub, history, past, full, stale, chosenId.takeIf { twoPanes }, cursor.takeIf { !twoPanes }, now, m, ::walk, onRow)
             }
             // Nothing to choose from, nothing to say beside it.
@@ -256,9 +257,15 @@ fun SessionsScreen(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
     }
 }
 
-/** The groups and their rows. It scrolls by itself: [state] is kept for this server, and nothing here moves it. */
+/** The groups and their rows. It scrolls by itself: [state] is kept for this server, and only the logo moves it. */
 @Composable
-private fun SessionList(hub: Hub, groups: List<Pair<Group, List<Session>>>, state: LazyListState, stale: Boolean, chosen: String?, cursor: String?, modifier: Modifier = Modifier, onChoose: (String) -> Unit) {
+private fun SessionList(hub: Hub, groups: List<Pair<Group, List<Session>>>, state: LazyListState, stale: Boolean, chosen: String?, cursor: String?, shell: Shell, modifier: Modifier = Modifier, onChoose: (String) -> Unit) {
+    // A frame first: coming back from another screen this is mid-layout, and a list can't be moved until it's laid out.
+    if (shell.toTop) LaunchedEffect(Unit) {
+        withFrameNanos { }
+        state.scrollToItem(0)
+        shell.toTop = false
+    }
     Box(modifier.testTag(LIST_TAG)) {
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -312,11 +319,11 @@ private fun TopBar(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
         Column(Modifier.fillMaxWidth()) {
             if (oneLine) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Identity(hub, Modifier.weight(1f))
+                    Identity(hub, shell, Modifier.weight(1f))
                     buttons()
                 }
             } else {
-                Identity(hub, Modifier.fillMaxWidth())
+                Identity(hub, shell, Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { buttons() }
             }
@@ -328,11 +335,11 @@ private fun TopBar(hub: Hub, statuses: List<ServerStatus>, shell: Shell) {
     }
 }
 
-/** The logo, the name and the link's chip, on one line whatever they say. */
+/** The logo, which is the way home, the name and the link's chip, on one line whatever they say. */
 @Composable
-private fun Identity(hub: Hub, modifier: Modifier = Modifier) {
+private fun Identity(hub: Hub, shell: Shell, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        NovaMark()
+        HomeMark(shell::goHome, target = 32.dp)
         HText(APP_NAME, style = Type.wordmark, maxLines = 1)
         ServerLink(hub, Modifier.weight(1f))
     }

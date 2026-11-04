@@ -4504,6 +4504,17 @@ The owner: "[between] my app and then the terminal there's two different timings
 9. **By kind of session:** a shared terminal has all of it. An SDK session has all of it from the transcript, tokens once a reply is whole. Codex has what it's doing, the turn, the step, at once and its own token count, none of it from a screen. A Mac older than this shows the activity line and the turn's time, with the stops in.
 10. **Background commands stay out** (the session sheet's Agents tab, another branch); a row of theirs would go last in the panel.
 
+## The logo goes home (2026-11-03)
+
+The owner: "the top left icon always goes to stats but I'm not a big fan of this it should always just go straight to the sessions list screen no matter where you are so that you can always just reset back to the quote unquote home screen we can move the stats into the settings or the stats link into the settings". This replaces "Tapping the sun opens Statistics" and every later line that says the mark opens them.
+
+1. **What it does:** Sessions, at the top of its list, from whichever tab is on. Tapped on Sessions it's still the top of the list. Tapped elsewhere the list doesn't come back where it was left.
+2. **What it leaves alone:** the server chosen, All servers included (he asked for that). **A judgement call, for him to look at: Home's filter and sort stay.** They're his kept choices ("Home filters", 5), a filter would be lost with no way back, and the chip over the list says it's on, with its cross one more tap away. A search does close: it's typed words, and leaving the tab already closes it.
+3. **Where it is:** Home's bar on all four tabs, as it was, and now Statistics' bar, which has room. On the desktop, its top bar, and its Settings, which goes over the top bar and had no logo.
+4. **Where it isn't, and why:** Settings' pages have the tabs, so Sessions is already one tap ("The tabs on Settings' pages"), and two controls doing that on one screen is clutter. The chat stays clean ("Rules that stand"), and an agent's own screen goes with it. A terminal, a file, a web page, What changed and an automation's runs are titled by what's open, a path or a page's name, so a bar there has no room to spare, and they are short detours with a Back. An automation's editor holds unsaved words, and a tap that throws them away shouldn't look this harmless.
+5. **Statistics moved to Settings' tab**, a row of its own under the servers, not on a server's own page: statistics follow what's on screen, one server or All servers added up, and a server's page is bound to that one server. Its line says which ("Hours, tokens and projects on z2", "Every server's hours and tokens, added up"). Nothing paired: no row.
+6. **It's a page of Settings now** (`Route.Statistics`, `isSettingsPage`), so it has the tabs and Back is the tab. Before it was a screen inside Home with its own fade and Back handlers, and all of that left Home.
+
 ## One shared UI module, split by folder, with checks (2026-11-03)
 
 The owner: "let's make sure that we are modularizing this correctly so shared components or whatever are properly architected I want to try to prioritize maintainability over all these different operating systems because I'll be adding a lot of features and customer ability". Of three ways, they chose one: "the option one is fine".

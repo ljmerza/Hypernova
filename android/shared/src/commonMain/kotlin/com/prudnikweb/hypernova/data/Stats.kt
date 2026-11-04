@@ -9,8 +9,8 @@ import java.time.LocalDate
 /*
  * Statistics: how much the agents worked on the Mac (docs/PROTOCOL.md, "Statistics"). The Mac adds
  * Claude Code's part up from its transcripts and counts Codex's turns as it follows them; every
- * total covers both, [Stats.claude] and [Stats.codex] split them. The Statistics screen (from the
- * mark in Home's top bar) draws it.
+ * total covers both, [Stats.claude] and [Stats.codex] split them. The Statistics screen (from
+ * Settings) draws it.
  */
 
 /**

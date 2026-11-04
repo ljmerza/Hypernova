@@ -245,6 +245,7 @@ enum class Str {
     err_terminal,
     err_upload,
     exit_code,
+    home_mark_label,
     headline_limit,
     headline_limit_claude,
     headline_no_credit,

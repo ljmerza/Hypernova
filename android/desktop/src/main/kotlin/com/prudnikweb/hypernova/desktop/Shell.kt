@@ -73,6 +73,21 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
     /** New session is up in the right pane. */
     var newSession by mutableStateOf(false)
 
+    /** The logo was pressed: the list goes to its top once it's on screen ([goHome]). */
+    var toTop by mutableStateOf(false)
+
+    /**
+     * The logo, wherever it's shown (owner, 2026-11-03: "reset back to the home screen"): the Sessions list at its top, with
+     * what was over it or beside it gone. The server on screen stays, and History keeps its own place for when it's next opened.
+     */
+    fun goHome() {
+        settings = false
+        newSession = false
+        page = Page.Sessions
+        Core.activeId?.let { choose(it, null) }
+        toTop = true
+    }
+
     /** A session started from the form: its form goes, and it's what's on screen. */
     fun started(server: String, session: String) {
         newSession = false

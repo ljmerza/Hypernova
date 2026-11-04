@@ -144,6 +144,8 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
     val homeTab = com.prudnikweb.hypernova.ui.home.rememberHomeTab(if (vm.allServers) "home:all" else "home:${vm.pairing?.token?.hashCode()}")
     // Counts the tabs tapped on Settings' pages: each starts the main Settings page again, at its top.
     val settingsFresh = rememberSaveable { mutableStateOf(0) }
+    // The logo, wherever it's shown: Home goes to the top of Sessions and clears this.
+    val toTop = remember { mutableStateOf(false) }
     var sheet by rememberSaveable { mutableStateOf(false) }
     // The project the new-session sheet opens on (a path, or the filtered project's name), and the
     // launch that asked for it: its own, not the list's filter, which lets go of a project with
@@ -349,7 +351,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
                 } else if (!covered && hub != null) {
                     Screens(
                         hub, vm, route, nav.depth, screens, homeTab, settingsFresh, focusProject, { focusProject = null },
-                        { sheetProject = focusProject; sheetServer = null; sheet = true }, toAccount, toAutomations,
+                        { sheetProject = focusProject; sheetServer = null; sheet = true }, toAccount, toAutomations, toTop,
                         onNewSessionOn = { server -> sheetProject = focusProject; sheetServer = server; sheet = true },
                     )
                 }
@@ -528,6 +530,7 @@ private fun Screens(
     onNewSession: () -> Unit,
     toAccount: androidx.compose.runtime.MutableState<Boolean>,
     toAutomations: androidx.compose.runtime.MutableState<Boolean>,
+    toTop: androidx.compose.runtime.MutableState<Boolean>,
     /** New session from "All servers", on the computer picked for it. */
     onNewSessionOn: (String) -> Unit = {},
 ) {
@@ -582,6 +585,7 @@ private fun Screens(
                     tabState = homeTab,
                     toAccount = toAccount,
                     toAutomations = toAutomations,
+                    toTop = toTop,
                     onAutomation = { id, template, runs -> nav.push(Route.AutomationEdit(id, template, runs)) },
                     servers = com.prudnikweb.hypernova.ui.home.ServerChoice(vm.servers, vm::switchServer, { vm.addServer(true) }, all = all, onAll = vm::showAll),
                     everywhere = if (!all) null else com.prudnikweb.hypernova.ui.home.Everywhere(
@@ -602,6 +606,8 @@ private fun Screens(
                 )
                 // Fork: a new route each time it's opened, so each opening lands at the latest (SessionScreen).
                 is Route.Session -> SessionScreen(shown, r.id, onBack = { nav.pop() }, opening = System.identityHashCode(r))
+                // The one on screen's, or with All servers every one's, whichever is chosen when it's opened.
+                Route.Statistics -> com.prudnikweb.hypernova.ui.stats.StatsScreen(shown, onBack = { nav.pop() }, servers = if (all) vm.everyHub.map { (st, h) -> com.prudnikweb.hypernova.data.StatsServer(st.id, st.name, h) } else null)
                 is Route.Files -> FilesScreen(shown, r, onBack = { nav.pop() })
                 is Route.FileView -> FileViewer(shown, r.path, onBack = { nav.pop() })
                 is Route.Web -> WebScreen(r.url, r.title, onBack = { nav.pop() }, preview = r.preview, port = r.port)
