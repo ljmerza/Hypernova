@@ -19,8 +19,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -130,6 +132,8 @@ internal fun WithMessageMenu(item: Item, onMenu: ((Item) -> Unit)?, content: @Co
  */
 @Composable
 internal fun ChatMenuHost(hub: Hub, session: Session, items: List<Item>, menuKey: String?, onQuote: (String) -> Unit, onDismiss: () -> Unit) {
+    var waitingEdit by remember(session.id) { mutableStateOf<com.prudnikweb.hypernova.data.WaitingEdit?>(null) }
+    waitingEdit?.let { WaitingEditSheet(hub, it, onClose = { waitingEdit = null }) }
     val item = menuKey?.let { k -> items.firstOrNull { it.key == k } } ?: return
     val context = LocalContext.current
     val toast = LocalToast.current
@@ -140,6 +144,7 @@ internal fun ChatMenuHost(hub: Hub, session: Session, items: List<Item>, menuKey
     MessageMenu(
         hub, item, ask,
         sessionId = session.id,
+        onWaitingEdit = { waitingEdit = it },
         onQuote = onQuote,
         onRewound = { r ->
             AttachDrafts.giveBack(r.sessionId, r.text)

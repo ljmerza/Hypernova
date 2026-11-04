@@ -1,12 +1,13 @@
 // Which commands wait in Claude Code's queue while Claude works, and which take no words after them
 // (commands.ts; measured on 2.1.318, with the real binary in prompt-order-e2e.test.ts).
-import { test } from 'node:test'
+import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const scratch = mkdtempSync(join(tmpdir(), 'hn-cmd-order-'))
+after(() => rmSync(scratch, { recursive: true, force: true }))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
 process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.HOME = scratch

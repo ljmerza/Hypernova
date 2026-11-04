@@ -73,10 +73,25 @@ object AttachDrafts {
     /** Text of a send that failed, waiting for its composer (which may be closed by then). */
     private val returned = mutableStateMapOf<String, String>()
     fun giveBack(key: String, text: String) {
-        if (text.isNotBlank()) returned[key] = listOfNotNull(returned[key], text).joinToString("\n")
+        if (text.isNotBlank()) returned[key] = returned[key]?.let { joined(it, text) } ?: text
     }
     fun givenBack(key: String): String? = returned[key]
     fun takeBack(key: String): String? = returned.remove(key)
+
+    /**
+     * Words that came back and words already in the box, as one draft: [back] first, as a send that
+     * failed goes ahead of what was typed since, unless it starts with a command. Anything after a command
+     * would be sent as that command's arguments (docs/DECISIONS.md, "A message after a command"), so
+     * then the other words go first and nothing in the box is a command.
+     */
+    fun joined(back: String, typed: String): String = when {
+        typed.isBlank() -> back
+        COMMAND.containsMatchIn(back) -> "$typed\n$back"
+        else -> "$back\n$typed"
+    }
+
+    /** As the Mac tells a command: "/name" and maybe more, not a path ("/Users/…"). */
+    private val COMMAND = Regex("^\\s*/[^\\s/]+(\\s|$)")
 }
 
 /**

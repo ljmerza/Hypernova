@@ -10,9 +10,11 @@ import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.Resolution
 import com.prudnikweb.hypernova.data.SendStatus
+import com.prudnikweb.hypernova.data.WaitingTooLate
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.json
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.msg
+import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.refusal
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
 import org.json.JSONArray
@@ -241,6 +243,93 @@ class ActionsTest {
         assertEquals(0, rig.hub.heldCount("s1"))
         // Taken back: no copy of it stands in as sent.
         assertTrue(rig.hub.transcript("s1").none { (it as? Item.User)?.text?.startsWith("deploy") == true })
+    }
+
+    @Test fun editingAHeldPromptStopsItBeingSentFirstThenSavesOrCancels() {
+        val h = JSONObject().put("id", "h1").put("text", "deploy").put("at", 1L)
+        connect(session("s1", state = "needs_you") { put("held", JSONArray().put(h)) })
+        val item = rig.hub.transcript("s1").filterIsInstance<Item.User>().single { it.heldId == "h1" }
+        daemon.ok("PUT", "/v1/sessions/s1/held/h1", JSONObject().put("session", session("s1", state = "needs_you") { put("held", JSONArray().put(JSONObject(h.toString()).put("editing", true))) }))
+        val edit = rig.call { rig.hub.openWaitingEdit("s1", item) }.getOrThrow()
+        assertTrue("the server is told before anything opens", last("PUT", "/v1/sessions/s1/held/h1").json.getBoolean("editing"))
+        assertTrue(rig.hub.transcript("s1").filterIsInstance<Item.User>().single { it.heldId == "h1" }.editing)
+        assertEquals("deploy", edit.text)
+        daemon.ok("PUT", "/v1/sessions/s1/held/h1", JSONObject().put("session", session("s1", state = "needs_you") { put("held", JSONArray().put(h)) }))
+        rig.hub.cancelWaitingEdit(edit)
+        rig.until("told it's no longer being edited") { !last("PUT", "/v1/sessions/s1/held/h1").json.getBoolean("editing") }
+        assertTrue(rig.call { rig.hub.saveWaitingEdit(edit, " deploy to staging ") }.isSuccess)
+        assertEquals("deploy to staging", last("PUT", "/v1/sessions/s1/held/h1").json.getString("text"))
+    }
+
+    @Test fun aHeldPromptThatLeftBeforeTheChoiceSaysSoInTheChatNotInAToast() {
+        val h = JSONObject().put("id", "h1").put("text", "deploy").put("at", 1L)
+        connect(session("s1", state = "needs_you") { put("held", JSONArray().put(h)) })
+        val item = rig.hub.transcript("s1").filterIsInstance<Item.User>().single { it.heldId == "h1" }
+        daemon.on("PUT", "/v1/sessions/s1/held/h1") { refusal(404, "no_held", "That message isn’t held any more: it was sent or removed.") }
+        val r = rig.call { rig.hub.openWaitingEdit("s1", item) }
+        assertTrue(r.exceptionOrNull() is WaitingTooLate)
+        daemon.on("DELETE", "/v1/sessions/s1/held/h1") { refusal(409, "sending", "That message is being sent right now.") }
+        assertTrue(rig.call { rig.hub.removeWaitingMessage("s1", item) }.exceptionOrNull() is WaitingTooLate)
+    }
+
+    @Test fun aServerFromBeforeItCouldHoldOneBackStillEdits() {
+        val h = JSONObject().put("id", "h1").put("text", "deploy").put("at", 1L)
+        connect(session("s1", state = "needs_you") { put("held", JSONArray().put(h)) })
+        val item = rig.hub.transcript("s1").filterIsInstance<Item.User>().single { it.heldId == "h1" }
+        daemon.on("PUT", "/v1/sessions/s1/held/h1") { refusal(400, "empty", "Write something first.") }
+        assertEquals("h1", rig.call { rig.hub.openWaitingEdit("s1", item) }.getOrThrow().heldId)
+    }
+
+    @Test fun aQueueEntryCanBeRemovedOrTakenOutOnlyWhenTheServerSaysSo() {
+        val q = { JSONArray().put(JSONObject().put("id", "q:1").put("text", "and the docs").put("at", 1L).put("clientId", JSONObject.NULL)) }
+        connect(session("s1", state = "working") { put("queue", q()); put("queued", 1); put("term", JSONObject().put("id", "t").put("mac", 0).put("phone", 0)) })
+        daemon.ok("GET", "/v1/sessions/s1/events", JSONObject().put("events", JSONArray()))
+        rig.hub.opened("s1")
+        rig.until("history") { !rig.hub.loadingTranscript("s1") }
+        val older = rig.hub.transcript("s1").filterIsInstance<Item.User>().single()
+        assertNull("an older server can't", older.queueId)
+        assertFalse(older.changeable)
+
+        daemon.push(JSONObject().put("t", "session").put("session", session("s1", state = "working") { put("queue", q()); put("queued", 1); put("queueEdit", true); put("term", JSONObject().put("id", "t").put("mac", 0).put("phone", 0)) }))
+        rig.until("it says so") { rig.hub.transcript("s1").filterIsInstance<Item.User>().singleOrNull()?.queueId == "q:1" }
+        val item = rig.hub.transcript("s1").filterIsInstance<Item.User>().single()
+        assertTrue(item.changeable)
+
+        val heldNow = JSONArray().put(JSONObject().put("id", "h9").put("text", "and the docs").put("at", 1L).put("editing", true))
+        daemon.ok("POST", "/v1/sessions/s1/queue/q:1/edit", JSONObject().put("session", session("s1", state = "working") { put("held", heldNow); put("queueEdit", true) }).put("heldId", "h9").put("text", "and the docs, whole"))
+        val edit = rig.call { rig.hub.openWaitingEdit("s1", item) }.getOrThrow()
+        assertEquals("h9", edit.heldId)
+        assertEquals("and the docs, whole", edit.text)
+        val shown = rig.hub.transcript("s1").filterIsInstance<Item.User>().single()
+        assertEquals("h9", shown.heldId)
+        assertTrue(shown.editing)
+
+        // Removing one that's still queued; and one Claude took first.
+        daemon.ok("DELETE", "/v1/sessions/s1/queue/q:1", JSONObject().put("session", session("s1", state = "working") { put("queueEdit", true) }))
+        assertTrue(rig.call { rig.hub.removeWaitingMessage("s1", item) }.isSuccess)
+        daemon.on("DELETE", "/v1/sessions/s1/queue/q:1") { refusal(404, "no_queued", "That message isn’t queued any more: Claude has it.") }
+        assertTrue(rig.call { rig.hub.removeWaitingMessage("s1", item) }.exceptionOrNull() is WaitingTooLate)
+    }
+
+    @Test fun anOfflineMessageBeingEditedDoesNotGoWhenTheServerComesBack() {
+        connect(session("s1"))
+        daemon.down = true
+        daemon.closeSocket()
+        rig.until("not linked") { rig.hub.link.state != LinkState.Connected && rig.hub.link.retryAt != null }
+        rig.call { rig.hub.send("s1", "when you're back", emptyList(), false) }
+        val item = rig.hub.waiting("s1").single()
+        val edit = rig.call { rig.hub.openWaitingEdit("s1", item) }.getOrThrow()
+        assertTrue(rig.hub.waiting("s1").single().editing)
+
+        daemon.ok("POST", "/v1/sessions/s1/prompt", JSONObject().put("session", session("s1", state = "working")))
+        daemon.down = false
+        rig.advance(30_100)
+        rig.until("linked") { rig.hub.link.state == LinkState.Connected }
+        rig.advance(3_000)
+        assertEquals("the link is back and it stays", 0, daemon.count("POST", "/v1/sessions/s1/prompt"))
+        assertTrue(rig.call { rig.hub.saveWaitingEdit(edit, "when you are back") }.isSuccess)
+        rig.until("saved, it goes") { daemon.count("POST", "/v1/sessions/s1/prompt") == 1 }
+        assertEquals("when you are back", last("POST", "/v1/sessions/s1/prompt").json.getString("text"))
     }
 
     // ─── Session settings ───

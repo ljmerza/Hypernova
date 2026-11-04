@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.test.withKeyDown
 import com.prudnikweb.hypernova.data.AttachDrafts
@@ -222,6 +223,31 @@ class ChatTest {
         waitForIdle()
         inChat(Ui.queued_label.text().uppercase(), substring = true).assertIsDisplayed()
         render("chat-queued")
+    }
+
+    @Test fun aRightClickOnAQueuedMessageEditsOrRemovesIt() = runDesktopComposeUiTest(1200, 900) {
+        history(user("u1", "Hello"))
+        val q = JSONArray().put(JSONObject().put("id", "q:1").put("text", "And the docs").put("at", 1L).put("clientId", JSONObject.NULL))
+        val term = JSONObject().put("id", "t").put("mac", 0).put("phone", 0)
+        d.snapshot = snapshot("z2", sessions = listOf(session("s1", state = "working", title = name) { put("projectName", "invoices").put("cwd", "/home/dev/invoices"); put("queue", q); put("queued", 1); put("queueEdit", true); put("term", term) }))
+        up()
+        until("queued") { Core.live?.transcript("s1")?.any { it is Item.User && it.queueId == "q:1" } == true }
+        waitForIdle()
+        val heldNow = JSONArray().put(JSONObject().put("id", "h1").put("text", "And the docs").put("at", 1L).put("editing", true))
+        d.ok("POST", "/v1/sessions/s1/queue/q:1/edit", JSONObject().put("session", session("s1", state = "working", title = name) { put("held", heldNow); put("queueEdit", true) }).put("heldId", "h1").put("text", "And the docs"))
+        inChat("And the docs").performMouseInput { rightClick() }
+        waitForIdle()
+        onNode(hasText(Ui.waiting_remove.text())).assertIsDisplayed()
+        onNode(hasText(Ui.waiting_edit.text())).performMouseInput { click() }
+        waitForIdle()
+        until("taken out") { d.count("POST", "/v1/sessions/s1/queue/q:1/edit") == 1 }
+        until("it says it's being edited") { Core.live?.transcript("s1")?.any { it is Item.User && it.editing } == true }
+        waitForIdle()
+        inChat(Ui.waiting_editing_label.text().uppercase(), substring = true).assertIsDisplayed()
+        d.ok("PUT", "/v1/sessions/s1/held/h1", JSONObject().put("session", session("s1", state = "working", title = name) { put("queueEdit", true) }))
+        onNode(hasText(Ui.waiting_save.text())).performClick()
+        until("saved") { d.count("PUT", "/v1/sessions/s1/held/h1") == 1 }
+        assertEquals("And the docs", d.calls("PUT", "/v1/sessions/s1/held/h1").last().json.getString("text"))
     }
 
     @Test fun shiftEnterIsANewLineAndNewLineModeNeverSends() = runDesktopComposeUiTest(1200, 900) {

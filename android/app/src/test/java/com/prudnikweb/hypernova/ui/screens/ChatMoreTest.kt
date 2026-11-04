@@ -61,6 +61,15 @@ class ChatMoreTest {
 
     /** A [FakeHub] with the calls these screens make that it doesn't record. */
     private class ChatHub(val base: FakeHub, var earlier: Boolean = false) : Hub by base {
+        // What a waiting message's menu calls, down to this hub's own recorders below.
+        override suspend fun removeWaitingMessage(sessionId: String, item: Item.User): Result<Unit> {
+            item.waitingId?.let { removeWaiting(it) }
+            return Result.success(Unit)
+        }
+        override suspend fun saveWaitingEdit(edit: com.prudnikweb.hypernova.data.WaitingEdit, text: String): Result<Unit> {
+            edit.waitingId?.let { editWaiting(it, text) }
+            return Result.success(Unit)
+        }
         override fun hasEarlier(id: String) = earlier
         override fun loadEarlier(id: String) { base.calls += "loadEarlier($id)" }
         override suspend fun autoContinue(sessionId: String, on: Boolean): Result<Unit> {
@@ -367,20 +376,49 @@ class ChatMoreTest {
         val hub = ChatHub(base)
         val w = Item.User("local-1", "when you're back", status = SendStatus.WaitingMac, waitingId = "w1")
         var open by androidx.compose.runtime.mutableStateOf(true)
-        rule.setContent { Harness(spy) { if (open) WaitingMenu(hub, w, onDismiss = { open = false }, sessionId = Samples.ZETA) } }
+        var editing by androidx.compose.runtime.mutableStateOf<com.prudnikweb.hypernova.data.WaitingEdit?>(null)
+        rule.setContent {
+            Harness(spy) {
+                if (open) WaitingMenu(hub, w, onDismiss = { open = false }, sessionId = Samples.ZETA, onEdit = { editing = it })
+                editing?.let { com.prudnikweb.hypernova.ui.session.WaitingEditSheet(hub, it, onClose = { editing = null }) }
+            }
+        }
         rule.onNodeWithText(str(R.string.waiting_edit)).assertExists()
         rule.snap("chat_waiting_menu")
         rule.onNodeWithText(str(R.string.waiting_remove)).performClick()
-        rule.waitForIdle()
+        rule.waitUntil(5000) { base.calls.isNotEmpty() }
         assertEquals(listOf("removeWaiting(w1)"), base.calls)
         open = true
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.waiting_edit)).performClick()
+        rule.waitUntil(5000) { editing != null }
         rule.waitForIdle()
         rule.onNode(hasSetTextAction()).performTextReplacement("when you are back, run the tests")
         rule.onNodeWithText(str(R.string.waiting_save)).performClick()
-        rule.waitForIdle()
+        rule.waitUntil(5000) { base.calls.size == 2 }
         assertEquals("editWaiting(w1, when you are back, run the tests)", base.calls.last())
+    }
+
+    @Test fun aQueuedMessagesLongPressOffersEditAndRemoveOnlyWhenTheServerCan() {
+        val hub = ChatHub(FakeHub())
+        val can = Item.User("queued:q:2", "Check the lexer as well", status = SendStatus.QueuedStep, queueId = "q:2")
+        var item by androidx.compose.runtime.mutableStateOf(can)
+        rule.setContent { Harness(spy) { com.prudnikweb.hypernova.ui.session.MessageMenu(hub, item, null, onQuote = {}, onRewound = {}, onDismiss = {}, sessionId = Samples.ZETA) } }
+        rule.onNodeWithText(str(R.string.waiting_edit)).assertExists()
+        rule.onNodeWithText(str(R.string.waiting_remove)).assertExists()
+        // An older server: the menu it always had, with nothing that couldn't be done.
+        item = can.copy(queueId = null)
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.waiting_edit)).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.chat_quote)).assertExists()
+    }
+
+    @Test fun aMessageBeingEditedSaysSoInsteadOfWhenItSends() {
+        val editing = Item.User("held:h1", "Check the lexer as well", status = SendStatus.Held, heldId = "h1", editing = true)
+        chat(FakeHub(transcripts = mapOf(Samples.MID to conversation + editing)), Samples.MID)
+        rule.onNodeWithText(str(R.string.waiting_editing_label), substring = true, ignoreCase = true, useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.waiting_editing_hint), substring = true, useUnmergedTree = true).assertExists()
+        rule.onNodeWithText(str(R.string.held_hint), substring = true, useUnmergedTree = true).assertDoesNotExist()
     }
 
     // ─── Q5: a prompt in Claude Code's queue, drawn ───

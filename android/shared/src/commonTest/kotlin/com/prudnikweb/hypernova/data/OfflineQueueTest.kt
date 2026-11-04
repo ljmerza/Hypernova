@@ -17,6 +17,46 @@ class OfflineQueueTest {
     private var t = 1_000L
     private fun queue(store: Mem = Mem()) = OfflineQueue(store) { t++ }
 
+    @Test fun oneBeingEditedIsNeverSentNorAnythingBehindItUntilTheOwnerHasFinished() {
+        val store = Mem()
+        val q = queue(store)
+        val a = q.add("s1", "first", emptyList())
+        val b = q.add("s1", "second", emptyList())
+        val other = q.add("s2", "elsewhere", emptyList())
+        assertTrue(q.startEditing(a.id))
+        assertEquals("the other session goes, this one waits", listOf(other.id), q.due().map { it.id })
+        assertFalse("what sends it is told no too", q.sending(a.id))
+        assertTrue("it shows, saying so", q.of("s1").first().item().editing)
+        // Closing the app doesn't send it either.
+        val again = OfflineQueue(store) { t++ }
+        assertEquals(listOf(other.id), again.due().map { it.id })
+        // Cancelled: as it was, first in line.
+        q.stopEditing(a.id)
+        assertEquals(listOf(a.id, other.id), q.due().map { it.id })
+        // Saved: the new words, and no longer being edited.
+        assertTrue(q.startEditing(a.id))
+        assertTrue(q.edit(a.id, "first, changed"))
+        assertEquals("first, changed", q.get(a.id)?.text)
+        assertEquals(listOf(a.id, other.id), q.due().map { it.id })
+        // On its way already: too late to stop it, and it says so.
+        assertTrue(q.sending(a.id))
+        assertFalse(q.startEditing(a.id))
+        assertFalse(q.startEditing("nope"))
+        q.sent(a.id)
+        assertEquals(b.id, q.due().first { it.sessionId == "s1" }.id)
+    }
+
+    @Test fun wordsThatComeBackNeverBecomeACommandsArguments() {
+        // A send that came back goes ahead of what was typed since, as ever.
+        assertEquals("said before\ntyped since", AttachDrafts.joined("said before", "typed since"))
+        assertEquals("said before", AttachDrafts.joined("said before", "  "))
+        // Unless it's a command: then everything after it would be its arguments.
+        assertEquals("read and stop\n/clear", AttachDrafts.joined("/clear", "read and stop"))
+        assertEquals("read and stop\n/compact keep it", AttachDrafts.joined("/compact keep it", "read and stop"))
+        // A path isn't a command.
+        assertEquals("/Users/me/a.png what is it\nand this", AttachDrafts.joined("/Users/me/a.png what is it", "and this"))
+    }
+
     @Test fun whatWaitsForASessionARewindReplacedWaitsForTheNewOne() {
         val store = Mem()
         val q = queue(store)

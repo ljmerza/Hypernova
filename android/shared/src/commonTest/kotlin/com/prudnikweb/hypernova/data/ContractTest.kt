@@ -491,6 +491,21 @@ class ContractTest {
             assertEquals(listOf("Also run the linter" to "client-held-1", "Then commit it, with a message" to "client-held-2"), s.held.map { it.text to it.clientId })
         },
         "rest-held-remove" to { o -> assertEquals(listOf("Then commit it, with a message"), Wire.session(o.obj("session")!!).held.map { it.text }) },
+        // LiveHub.openWaitingEdit, saveWaitingEdit, removeWaitingMessage.
+        "rest-held-editing" to { o -> assertEquals(listOf(false, true), Wire.session(o.obj("session")!!).held.map { it.editing }) },
+        "rest-queue-remove" to { o ->
+            val s = Wire.session(o.obj("session")!!)
+            assertEquals(listOf("Run the tests too"), s.queue.map { it.text })
+            assertTrue(s.queueEdit)
+        },
+        "rest-queue-edit" to { o ->
+            val s = Wire.session(o.obj("session")!!)
+            assertEquals(emptyList<WQueued>(), s.queue)
+            assertEquals(listOf(Triple(o.str("heldId"), "Run the tests too", true)), s.held.map { Triple(it.id, it.text, it.editing) })
+            assertEquals("Run the tests too", o.str("text"))
+        },
+        // ActionsTest: it says so in the chat, the daemon's notice.
+        "rest-queue-gone" to { o -> refusal(o, 404, "no_queued") },
         "rest-approval-answer" to { o -> assertTrue(o.bool("ok")) },
         // ErrorsTest.anApprovalAnsweredElsewhereSaysSoAndCountsAsDone: 409 `resolved`.
         "rest-approval-already" to { o -> refusal(o, 409, "resolved") },

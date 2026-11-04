@@ -104,6 +104,8 @@ data class WSession(
     val blockedCalls: Int = 0,
     /** Fork: prompts the Mac holds until Claude Code's input box is back, oldest first (docs/PROTOCOL.md, "Held prompts"). */
     val held: List<WQueued> = emptyList(),
+    /** One entry of [queue] can be removed or taken out to edit (docs/PROTOCOL.md, "Taking a prompt out of the queue"); not from an older Mac, nor a terminal started before it could. */
+    val queueEdit: Boolean = false,
     /** Claude Code's reasoning effort ("low"…"max"; docs/PROTOCOL.md, "A session's effort"); null: not known (its default), Codex, or an older Mac. */
     val effort: String? = null,
     /** When its turn started (docs/PROTOCOL.md, Session.turnStartedAt); null out of a turn, or from an older Mac. */
@@ -193,9 +195,10 @@ data class WPhase(val title: String, val detail: String?)
  * A prompt waiting until Claude can take it: in Claude Code's queue (typed while Claude works),
  * or behind the running prompt of an SDK session. [text] is cut at 300 characters (ending in
  * "…"); [clientId] names the phone send it came from, null when it was typed on the Mac.
+ * [editing]: a held one the owner has open to change, which nothing sends until they've finished.
  */
 @Immutable
-data class WQueued(val id: String, val text: String, val files: List<Attachment>, val at: Long, val clientId: String?)
+data class WQueued(val id: String, val text: String, val files: List<Attachment>, val at: Long, val clientId: String?, val editing: Boolean = false)
 
 /**
  * Queued prompts that left the queue without reaching Claude: [returned] to the terminal's input
@@ -718,7 +721,8 @@ object Wire {
             question = o.str("question")?.takeIf { it.isNotBlank() },
             blockedCalls = o.int("blockedCalls") ?: 0,
             held = o.arr("held").mapObjects(::queued),
-            effort = o.str("effort")?.takeIf { it.isNotBlank() },
+            queueEdit = o.bool("queueEdit"),
+            effort =o.str("effort")?.takeIf { it.isNotBlank() },
             turnStartedAt = o.long("turnStartedAt")?.takeIf { it > 0 },
             todo = o.obj("todo")?.let { t ->
                 val total = t.int("total") ?: 0
@@ -846,7 +850,7 @@ object Wire {
 
     private fun queued(o: JSONObject): WQueued? {
         val id = o.str("id") ?: return null
-        return WQueued(id, o.str("text").orEmpty(), o.arr("files").mapObjects(::attachment), o.long("at") ?: 0L, o.str("clientId")?.takeIf { it.isNotBlank() })
+        return WQueued(id, o.str("text").orEmpty(), o.arr("files").mapObjects(::attachment), o.long("at") ?: 0L, o.str("clientId")?.takeIf { it.isNotBlank() }, o.bool("editing"))
     }
 
     /** `notice.unsent`; an older daemon has none. */
