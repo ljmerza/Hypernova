@@ -170,6 +170,13 @@ test('one send holding /clear and words after it (the “/” list’s “/clear
   assert.ok(!hub.listSessions().some((s: any) => s.title?.startsWith('/clear read')), 'no session is titled with both')
 })
 
+test('/clear alone, as the “/” list sends it: the answer names the session it went on in, so a client moves there', { skip, timeout: 180_000 }, async () => {
+  const id = await atRest('cleared alone')
+  const r = await hold(id, '/clear', 'c-alone')
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.notEqual(r.json.session.id, id, 'it says where the conversation went')
+})
+
 test('the same with a line break (a send that came back to the box, ahead of what was typed since)', { skip, timeout: 180_000 }, async () => {
   const id = await atRest('joined by a line')
   const words = 'read and stop /tmp/two.md [Hypernova test]'

@@ -58,7 +58,7 @@
     <string name="paste_unusable">That can\'t be pasted here. If it\'s a file, attach it with the paperclip.</string>
     <string name="chat_quote">Quote</string>
     <string name="chat_read">Read aloud</string>
-    <string name="chat_read_hint">your Mac\'s voice</string>
+    <string name="chat_read_hint">the server\'s voice</string>
     <string name="chat_read_stop">Stop reading</string>
     <string name="chat_read_failed">Couldn\'t read it aloud.</string>
     <string name="chat_select">Select text</string>

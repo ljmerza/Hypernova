@@ -1299,6 +1299,7 @@ async function api(c: Ctx): Promise<void> {
       // A command with no use for words, and a message after it in the same send: each its own turn.
       const parts = files.length ? null : splitCommand(text)
       if (parts) return commandThenWords(at, parts, clientId, b.replace === true)
+      if (holdIt && isClear(text.trim())) return clearThenFollow(at, text.trim(), clientId)
       return holdIt ? promptOrHold(at, text, clientId) : promptSession(at, text, { replace: b.replace === true, clientId })
     })
     if (action === 'prompt') notePrompt(c.deviceId, c.local, b.via)
@@ -2014,6 +2015,18 @@ function goesOnIn(id: string): string {
 }
 
 const isClear = (command: string) => /^\/(clear|reset|new)$/.test(command)
+
+/** /clear alone. Once it has run, the answer names the session the terminal moved to, so a client goes there too. Waiting behind a turn, it hasn't moved yet. */
+async function clearThenFollow(id: string, command: string, clientId: string | undefined) {
+  const first = await promptOrHold(id, command, clientId)
+  if (first.queued || ('heldId' in first && first.heldId)) return first
+  noteCleared(first.id)
+  for (let i = 0; i < 80 && clearedTo(first.id) === first.id; i++) {
+    await new Promise((ok) => setTimeout(ok, 100))
+    scanTerms()
+  }
+  return { ...first, id: clearedTo(first.id) }
+}
 
 /**
  * "/clear read this" as a client sent it: the command, then the words as a message of their own. Held

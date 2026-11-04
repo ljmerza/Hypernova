@@ -21,7 +21,7 @@ import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { CLAUDE_DIR, SUPPORT, log, readJson, writeJson } from './util.ts'
 import { agentJobOf, agentStopped, broadcast, ensureParsed, getSession, pendingApprovals, resumeWith, view, type Session } from './hub.ts'
-import { isSdk, isSubscription, saveSettings, settings } from './store.ts'
+import { getManaged, isSdk, isSubscription, saveSettings, settings } from './store.ts'
 import { getAccount, providerStatus } from './account.ts'
 import { CONTINUE_TEXT, parseWhen, type Blocked, type BlockedKind, type LimitNotice, type Resume, type ResumeWhy } from './blockers.ts'
 import { answerMenu, attachAgentsTerm, attachDrifted, createSharedSession, pressKeys, sharedTerminalsAvailable, termChildPid, termOf, termScreen, typeInto, type Typed } from './terms.ts'
@@ -274,6 +274,12 @@ function signedInAgain(now: number): void {
     if (!r) continue
     const s = view(r)
     if (s.state === 'working' || s.state === 'starting' || gone(s) || typedSince(e.sid, e.since)) {
+      drop(e.sid)
+      continue
+    }
+    // An automation's run was already recorded as failed: signing in doesn't start it up again (the owner, 2026-11-04).
+    if (getManaged(e.sid)?.automation) {
+      log('resume', e.sid.slice(0, 8), 'signed in again: an automation, not carried on')
       drop(e.sid)
       continue
     }

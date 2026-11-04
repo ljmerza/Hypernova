@@ -669,7 +669,7 @@ fun SessionScreen(
                     enter = fadeIn(tween(Motion.FAST)) + expandVertically(tween(Motion.DIALOG, easing = Motion.Expo)),
                     exit = fadeOut(tween(Motion.FAST)) + shrinkVertically(tween(Motion.DIALOG, easing = Motion.Expo)),
                 ) {
-                    CommandSuggestions(commands, cmdQuery.orEmpty(), onPick = { draft = "/${it.name} " }, Modifier.padding(bottom = 10.dp))
+                    CommandSuggestions(commands, cmdQuery.orEmpty(), onPick = { c -> if (com.prudnikweb.hypernova.ui.session.sendsAtOnce(c)) { draft = ""; quickSend("/${c.name}") } else draft = "/${c.name} " }, Modifier.padding(bottom = 10.dp))
                 }
                 val picked = commands.picked(draft)
                 if (picked != null && picked.argumentHint.isNotBlank()) CommandHint(picked, Modifier.padding(start = 18.dp, end = 18.dp, bottom = 8.dp))

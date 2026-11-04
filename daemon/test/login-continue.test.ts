@@ -95,6 +95,18 @@ test('stopped by the login, then signed in: it continues once, as a notice row',
   assert.deepEqual(userEvent('e2', 2, CONTINUE_TEXT.loginManual), { id: 'e2', kind: 'notice', ts: 2, text: 'Continued after signing in again', tone: 'info' })
 })
 
+test('an automation the login stopped is not carried on: its run was already recorded as failed', async () => {
+  const id = session()
+  store.saveManaged({ ...store.getManaged(id)!, automation: { id: 'a1', name: 'Nightly', runId: 'r1' } })
+  stop(id)
+  await later()
+  signIn()
+  await later()
+  await later()
+  assert.deepEqual(sent, [], 'nothing typed')
+  assert.equal(blockedOf(id), null, 'and no card offering to')
+})
+
 test('what it types asks the session to take up the sub agents that failed', () => {
   assert.match(CONTINUE_TEXT.login, /SendMessage/)
   assert.match(CONTINUE_TEXT.login, /run them again/)

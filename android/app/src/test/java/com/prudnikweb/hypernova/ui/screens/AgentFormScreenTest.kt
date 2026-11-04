@@ -76,7 +76,7 @@ class AgentFormScreenTest {
         rule.onNodeWithText(text).performClick()
         rule.waitForIdle()
     }
-    private fun seen(text: String) = rule.onNodeWithText(text, substring = true).assertExists()
+    private fun seen(text: String) { org.junit.Assert.assertTrue("not on screen: $text", rule.onAllNodes(androidx.compose.ui.test.hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()) }
     private fun puts() = hub.calls.filter { it.first == "PUT" }
     private fun lastPut() = puts().last().third!!
     private fun field(label: String) = rule.onNode(hasContentDescription(label))
@@ -86,7 +86,8 @@ class AgentFormScreenTest {
         seen("Search names")
         seen(str(R.string.as_k_mode))
         seen("permissions.defaultMode")
-        seen(str(R.string.mode_title_bypass))
+        // The whole label: the row's own words say "Bypass" too.
+        rule.onNodeWithText(str(R.string.mode_title_bypass)).assertExists()
         scrollTo("showThinkingSummaries")
     }
 

@@ -4736,3 +4736,12 @@ The owner: "I want to be able to fully edit the settings from the ui". Offered t
 **When it applies:** the rows the app has checked keep their words ("The agents' settings, edited", 7). Every other row says it isn't known. Nothing else was measured.
 
 **User scope only.** A project's and a local file are the JSON tab's. `docs/LATER.md`, L132.
+
+## The owner's answers on 0.28's open questions (2026-11-04)
+
+1. **`/clear`, `/reset` and `/new` in the "/" list send at once**, and the client moves to the session the conversation went on in. "send it at once and move to the next session".
+2. **An automation's session isn't carried on after signing in.** Its run was already recorded as failed. "don't continue those".
+3. **Read aloud's hint says "the server's voice".** Servers are Linux now.
+4. **Kept as they are:** taking Claude Code's queue out and typing back what stays; notification buttons needing an unlocked phone; Continue and a blocked call's move still going to the bottom; 10 minutes of following `/clear`; "Being edited" with no timeout; `/clear [name]` from a client's box going as a message; the logo keeping Home's filter and sort; no logo on Settings' sub-pages.
+5. **For later:** LATER L140 to L143.
+

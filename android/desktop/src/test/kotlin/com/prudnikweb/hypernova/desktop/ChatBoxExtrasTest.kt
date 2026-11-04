@@ -70,6 +70,7 @@ class ChatBoxExtrasTest {
                 "commands",
                 JSONArray()
                     .put(JSONObject().put("name", "compact").put("description", "Compact the conversation").put("source", "builtin").put("argumentHint", "[instructions]"))
+                    .put(JSONObject().put("name", "clear").put("description", "Start the conversation again").put("source", "builtin"))
                     .put(JSONObject().put("name", "release-notes").put("description", "Write the notes").put("source", "user")),
             ),
         )
@@ -128,6 +129,16 @@ class ChatBoxExtrasTest {
         inPane("/release-notes", substring = true).performClick()
         waitForIdle()
         assertEquals("/release-notes ", ChatDrafts.of("s1"))
+    }
+
+    @Test fun clearInTheListSendsAtOnceAndLeavesTheBoxEmpty() = runDesktopComposeUiTest(1400, 1000) {
+        up()
+        box().performTextInput("/cl")
+        until("the list") { runCatching { inPane("/clear", substring = true).assertIsDisplayed() }.isSuccess }
+        inPane("/clear", substring = true).performClick()
+        until("it's sent") { d.count("POST", prompt) == 1 }
+        assertEquals("/clear", d.calls("POST", prompt).last().json.getString("text"))
+        assertEquals("", ChatDrafts.of("s1"))
     }
 
     @Test fun tabPutsTheBestMatchIn() = runDesktopComposeUiTest(1400, 1000) {

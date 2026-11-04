@@ -87,6 +87,9 @@ fun matching(all: List<SlashCommand>, q: String): List<SlashCommand> {
         .map { it.first }
 }
 
+/** Picking one of these in the "/" list sends it at once: it takes no words, and words after it would be a message anyway (the owner, 2026-11-04). */
+fun sendsAtOnce(command: SlashCommand): Boolean = command.name in setOf("clear", "reset", "new")
+
 /** Over the prompt box while a command is being typed: tap one to put it in the box. */
 @Composable
 fun CommandSuggestions(state: CommandsState, query: String, onPick: (SlashCommand) -> Unit, modifier: Modifier = Modifier) {

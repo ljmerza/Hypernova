@@ -136,7 +136,11 @@ test('real Claude Code: Bypass in settings.json, the form on Ask, and the sessio
   const ask = (await call('GET', '/v1/snapshot')).json.approvals.find((a: { sessionId: string }) => a.sessionId === asks)
   assert.ok(ask, 'an approval waits')
   assert.equal((await call('POST', `/v1/approvals/${ask.id}`, { decision: 'deny' })).status, 200)
-  await until('its turn over', () => viewOf(asks).state === 'idle', 60_000)
+  await until('its turn over', () => viewOf(asks).state === 'idle', 60_000).catch(async (e) => {
+    const snap = (await call('GET', '/v1/snapshot')).json
+    const left = snap.approvals.filter((a: { sessionId: string }) => a.sessionId === asks).map((a: { tool?: string; id: string; kind?: string }) => [a.kind, a.tool, a.id === ask.id ? 'the one denied' : 'another'])
+    throw new Error(`${(e as Error).message}; approvals left: ${JSON.stringify(left)}; plan left: ${plan.length}`)
+  })
   assert.equal(existsSync(marked), false, 'denied, it never ran')
 
   // The control: no mode named, as a plain terminal starts, and this same file does run it. So the test above can fail.

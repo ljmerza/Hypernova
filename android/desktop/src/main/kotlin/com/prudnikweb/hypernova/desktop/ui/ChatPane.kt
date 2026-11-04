@@ -308,7 +308,12 @@ internal fun ChatBox(hub: Hub, s: Session, shell: Shell, box: FocusRequester, mo
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         busy?.let { pending -> TerminalTextCard(pending, onReplace = { send(true) }, onOpen = null, onDismiss = { busy = null }) }
-        if (query != null) CommandSuggestions(commands, query, onPick = { ChatDrafts.set(sessionId, "/${it.name} ") })
+        if (query != null) CommandSuggestions(commands, query, onPick = { c ->
+            if (com.prudnikweb.hypernova.ui.session.sendsAtOnce(c)) {
+                ChatDrafts.set(sessionId, "/${c.name}")
+                send(false)
+            } else ChatDrafts.set(sessionId, "/${c.name} ")
+        })
         commands.picked(draft)?.takeIf { it.argumentHint.isNotBlank() }?.let { CommandHint(it, Modifier.padding(horizontal = 18.dp)) }
         if (attach.files.isNotEmpty()) DraftStrip(attach.files, attach::remove, side = 0.dp, onRetry = attach::retry)
         Row(verticalAlignment = Alignment.Bottom) {
