@@ -1,7 +1,14 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
-import com.prudnikweb.hypernova.data.strings
+import com.prudnikweb.hypernova.data.compactCount
+import com.prudnikweb.hypernova.data.groupedCount
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+import com.prudnikweb.hypernova.ui.platform.wordsNow
+
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Plural
+import com.prudnikweb.hypernova.data.Strings
 import com.prudnikweb.hypernova.data.SessionUsage
 import com.prudnikweb.hypernova.data.ChatRepo
 import com.prudnikweb.hypernova.data.ModelWeeks
@@ -12,14 +19,11 @@ import com.prudnikweb.hypernova.ui.automations.AutoIcon
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.flow.filter
-import android.content.res.Resources
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -59,17 +63,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.pluralStringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.UsageWindow
@@ -82,8 +83,6 @@ import com.prudnikweb.hypernova.ui.components.UsageMeterCompact
 import com.prudnikweb.hypernova.ui.components.usageSaid
 import com.prudnikweb.hypernova.ui.components.StatusChip
 import com.prudnikweb.hypernova.ui.fx.formatDuration
-import com.prudnikweb.hypernova.ui.stats.compact
-import com.prudnikweb.hypernova.ui.stats.grouped
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Motion
@@ -137,8 +136,7 @@ private const val GIT_TURN_GAP_MS = 60_000L
  */
 @Composable
 internal fun rememberTopBarGit(session: Session, edits: Int, linked: Boolean, load: suspend (String) -> Result<WorkChanges>): SheetGit? {
-    val context = LocalContext.current
-    val choice by remember { TopBarPref.state(context) }
+    val choice by remember { TopBarPref.state() }
     val on = TopBarItem.GIT in choice.items && session.cwd != null
     val inTurn = session.phase == Phase.Working || session.phase == Phase.Starting || session.phase == Phase.NeedsYou
     val moment by rememberUpdatedState(GitMoment(inTurn, edits, session.updatedAt, linked))
@@ -181,12 +179,11 @@ internal fun UsageStrip(
     hub: Hub, session: Session, usage: SessionUsage, agents: Int, git: SheetGit?, onCompact: () -> Unit, onOpen: () -> Unit, onAgents: () -> Unit, more: String,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val res = context.resources
-    val choice by remember { TopBarPref.state(context) }
+    val res = wordsNow()
+    val choice by remember { TopBarPref.state() }
     val pct = usage.contextPct
     val u = hub.usage
-    val model = stripModel(usage, session.model, res.getString(R.string.model_default))
+    val model = stripModel(usage, session.model, res.getString(Str.model_default))
     val plan = planShown(hub, session)
     // Up to 15 minutes old, as the Mac reads these weeks off /usage (modelWeekOf). The strip doesn't ask for a fresh look: the session sheet's Usage part does.
     val week = if (plan && TopBarItem.MODEL_WEEK in choice.items) modelWeekOf(u.models, model) else null
@@ -211,20 +208,20 @@ internal fun UsageStrip(
     val parts = choice.visible(facts, maxOf(clock, now))
     val five = UsageWindow.fiveHour(u, now)
     val seven = UsageWindow.sevenDay(u, now)
-    val mode = com.prudnikweb.hypernova.ui.home.modeLabel(session.mode)
+    val mode = modeWords(session.mode)
     val effort = session.effort?.takeIf { facts.effortShown }?.let { com.prudnikweb.hypernova.ui.home.claudeEffortTitle(it) }
     val turnMs = (maxOf(clock, now) - session.turnStartedAt).coerceAtLeast(0L)
     // The model's week as ModelWeekMeters has it: a weekday and time more than about a day off, a countdown nearer.
-    val is24 = android.text.format.DateFormat.is24HourFormat(context)
+    val is24 = SharedUi.platform.clock.style().is24Hour
     val weekTrail = week?.let { ModelWeeks.trail(it, now) }
     val weekWindow = week?.let { UsageWindow.of(it.pct, if (weekTrail == ModelWeeks.Trail.None) 0L else it.resetsAt ?: 0L, now, limited = it.full) }
     val weekOn = weekTrail as? ModelWeeks.Trail.On
     val weekSaid = if (week != null && weekWindow != null) {
-        val at = weekOn?.let { ModelWeeks.weekdayTimeSaid(it.at, is24) }?.let { (day, time) -> res.getString(R.string.usage_reset_day_at, day, time) }
-        usageSaid(res, res.getString(R.string.usage_name_model, week.label), weekWindow, at)
+        val at = weekOn?.let { ModelWeeks.weekdayTimeSaid(it.at, is24) }?.let { (day, time) -> res.getString(Str.usage_reset_day_at, day, time) }
+        usageSaid(res, res.getString(Str.usage_name_model, week.label), weekWindow, at)
     } else null
     val said = stripDescription(res, parts, usage, session, model, mode, effort, five, seven, agents, facts.shells, turnMs, facts.weekPace, git, weekSaid) + more
-    val agentsLabel = stringResource(R.string.top_bar_agents_open)
+    val agentsLabel = stringResource(Str.top_bar_agents_open)
     val shape = RoundedCornerShape(12.dp)
     val scroll = rememberScrollState()
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -234,7 +231,7 @@ internal fun UsageStrip(
                 .heightIn(min = 40.dp)
                 .clip(shape)
                 .glassChoice(false, 12.dp)
-                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.session_sheet_open), onClick = onOpen)
+                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(Str.session_sheet_open), onClick = onOpen)
                 .clearAndSetSemantics {
                     contentDescription = said
                     if (TopBarItem.AGENTS in parts) customActions = listOf(CustomAccessibilityAction(agentsLabel) { onAgents(); true })
@@ -254,16 +251,16 @@ internal fun UsageStrip(
                         ContextRing(pct, size = 16.dp)
                         Spacer(Modifier.width(7.dp))
                         HText(
-                            pct?.let { (if (usage.contextExact) "" else "≈") + res.getString(R.string.percent, it) } ?: "—",
+                            pct?.let { (if (usage.contextExact) "" else "≈") + res.getString(Str.percent, it) } ?: "—",
                             style = Type.monoSmall, color = ringColor(pct), maxLines = 1,
                         )
                     }
                     TopBarItem.MODE -> ModeTag(session.mode, mode, color = HN.inkMuted)
                     TopBarItem.EFFORT -> HText(effort?.lowercase().orEmpty(), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
-                    TopBarItem.FIVE_HOUR -> UsageMeterCompact(stringResource(R.string.usage_five_short), five, barWidth = 32.dp)
-                    TopBarItem.SEVEN_DAY -> UsageMeterCompact(stringResource(R.string.usage_seven_short), seven, barWidth = 32.dp)
+                    TopBarItem.FIVE_HOUR -> UsageMeterCompact(stringResource(Str.usage_five_short), five, barWidth = 32.dp)
+                    TopBarItem.SEVEN_DAY -> UsageMeterCompact(stringResource(Str.usage_seven_short), seven, barWidth = 32.dp)
                     TopBarItem.MODEL -> ModelChip(ModelNames.chip(model))
-                    TopBarItem.TOKENS -> GlyphFigure(Glyph.Token, compact(res, usage.tokens))
+                    TopBarItem.TOKENS -> GlyphFigure(Glyph.Token, compactCount(res, usage.tokens))
                     TopBarItem.COST -> HText(costWords(usage), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1)
                     TopBarItem.AGENTS -> Box(
                         Modifier
@@ -272,13 +269,13 @@ internal fun UsageStrip(
                         contentAlignment = Alignment.Center,
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (agents > 0) HText(pluralStringResource(R.plurals.top_bar_agents, agents, agents), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
-                            if (facts.shells > 0) HText(pluralStringResource(R.plurals.top_bar_shells, facts.shells, facts.shells), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
+                            if (agents > 0) HText(pluralStringResource(Plural.top_bar_agents, agents, agents), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
+                            if (facts.shells > 0) HText(pluralStringResource(Plural.top_bar_shells, facts.shells, facts.shells), style = Type.monoSmall, color = HN.accentDim, maxLines = 1)
                         }
                     }
                     TopBarItem.TURN -> GlyphFigure(Glyph.Timer, turnShort(turnMs))
                     // Always this neutral colour, never red or amber: a meter shows facts (docs/DECISIONS.md).
-                    TopBarItem.WEEK_PACE -> facts.weekPace?.let { HText(stringResource(R.string.top_bar_week_pace, it.day, it.figure), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1) }
+                    TopBarItem.WEEK_PACE -> facts.weekPace?.let { HText(stringResource(Str.top_bar_week_pace, it.day, it.figure), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1) }
                     TopBarItem.GIT -> git?.let { GitFigure(it) }
                     TopBarItem.MODEL_WEEK -> if (week != null && weekWindow != null) {
                         UsageMeterCompact(week.shortLabel, weekWindow, barWidth = 32.dp, resetText = weekOn?.let { ModelWeeks.weekdayTime(it.at, is24) })
@@ -305,7 +302,7 @@ private fun GitFigure(g: SheetGit) {
         AutoIcon(AutoGlyph.Branch, size = 12.dp, color = HN.inkDim, stroke = 1.1.dp)
         Spacer(Modifier.width(4.dp))
         HText(
-            g.branch ?: stringResource(R.string.session_sheet_detached), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1,
+            g.branch ?: stringResource(Str.session_sheet_detached), style = Type.monoSmall, color = HN.inkMuted, maxLines = 1,
             overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.widthIn(max = 120.dp),
         )
         if (g.linesChanged) {
@@ -368,7 +365,7 @@ private fun CompactChip(onClick: () -> Unit) {
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HText(stringResource(R.string.chat_compact), style = Type.small.copy(fontWeight = FontWeight(600)), color = HN.amber, maxLines = 1)
+            HText(stringResource(Str.chat_compact), style = Type.small.copy(fontWeight = FontWeight(600)), color = HN.amber, maxLines = 1)
         }
     }
 }
@@ -380,15 +377,15 @@ private fun CompactChip(onClick: () -> Unit) {
  */
 @Composable
 internal fun BlockedMark(count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val said = pluralStringResource(R.plurals.blocked_mark_said, count, count)
+    val said = pluralStringResource(Plural.blocked_mark_said, count, count)
     Box(
         modifier
             .heightIn(min = 44.dp)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(R.string.blocked_mark_open), onClick = onClick)
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClickLabel = stringResource(Str.blocked_mark_open), onClick = onClick)
             .clearAndSetSemantics { contentDescription = said },
         contentAlignment = Alignment.Center,
     ) {
-        StatusChip(pluralStringResource(R.plurals.blocked_chip, count, count), HN.amber)
+        StatusChip(pluralStringResource(Plural.blocked_chip, count, count), HN.amber)
     }
 }
 
@@ -426,30 +423,30 @@ internal fun money(usd: Double): String = when {
 
 /** TalkBack's one sentence for the bar: each part it shows ([parts]), in its order. */
 private fun stripDescription(
-    res: Resources, parts: List<TopBarItem>, u: SessionUsage, s: Session, model: String, mode: String, effort: String?,
+    res: Strings, parts: List<TopBarItem>, u: SessionUsage, s: Session, model: String, mode: String, effort: String?,
     five: UsageWindow, seven: UsageWindow, agents: Int, shells: Int, turnMs: Long, pace: WeekPace?, git: SheetGit?, modelWeek: String?,
 ): String = parts.joinToString(" ") { part ->
     when (part) {
         TopBarItem.CONTEXT -> {
             val pct = u.contextPct
             when {
-                pct == null -> res.getString(R.string.chat_context_unknown_said, com.prudnikweb.hypernova.ui.components.agentName(res.strings, s.codex))
-                u.contextExact -> res.getString(R.string.chat_context_said, pct)
-                else -> res.getString(R.string.chat_context_about_said, pct)
+                pct == null -> res.getString(Str.chat_context_unknown_said, com.prudnikweb.hypernova.ui.components.agentName(res, s.codex))
+                u.contextExact -> res.getString(Str.chat_context_said, pct)
+                else -> res.getString(Str.chat_context_about_said, pct)
             }
         }
-        TopBarItem.MODE -> res.getString(R.string.meta_mode_said, mode)
-        TopBarItem.EFFORT -> effort?.let { res.getString(R.string.ns_effort_said, it) }.orEmpty()
-        TopBarItem.FIVE_HOUR -> usageSaid(res, res.getString(R.string.usage_name_five), five)
-        TopBarItem.SEVEN_DAY -> usageSaid(res, res.getString(R.string.usage_name_seven), seven)
-        TopBarItem.MODEL -> res.getString(R.string.meta_model_said, model)
-        TopBarItem.TOKENS -> res.getString(R.string.chat_tokens_said, grouped(u.tokens))
-        TopBarItem.COST -> res.getString(if (u.costExact) R.string.top_bar_cost_said else R.string.top_bar_cost_about_said, costWords(u).removePrefix("≈"))
+        TopBarItem.MODE -> res.getString(Str.meta_mode_said, mode)
+        TopBarItem.EFFORT -> effort?.let { res.getString(Str.ns_effort_said, it) }.orEmpty()
+        TopBarItem.FIVE_HOUR -> usageSaid(res, res.getString(Str.usage_name_five), five)
+        TopBarItem.SEVEN_DAY -> usageSaid(res, res.getString(Str.usage_name_seven), seven)
+        TopBarItem.MODEL -> res.getString(Str.meta_model_said, model)
+        TopBarItem.TOKENS -> res.getString(Str.chat_tokens_said, groupedCount(u.tokens))
+        TopBarItem.COST -> res.getString(if (u.costExact) Str.top_bar_cost_said else Str.top_bar_cost_about_said, costWords(u).removePrefix("≈"))
         TopBarItem.AGENTS -> listOfNotNull(
-            res.getQuantityString(R.plurals.session_sheet_agents_said, agents, agents).takeIf { agents > 0 },
-            res.getQuantityString(R.plurals.session_sheet_shells_said, shells, shells).takeIf { shells > 0 },
+            res.getQuantityString(Plural.session_sheet_agents_said, agents, agents).takeIf { agents > 0 },
+            res.getQuantityString(Plural.session_sheet_shells_said, shells, shells).takeIf { shells > 0 },
         ).joinToString(" ")
-        TopBarItem.TURN -> res.getString(R.string.top_bar_turn_said, formatDuration(res, turnMs))
+        TopBarItem.TURN -> res.getString(Str.top_bar_turn_said, formatDuration(res, turnMs))
         TopBarItem.WEEK_PACE -> pace?.let { weekPaceSaid(res, it) }.orEmpty()
         TopBarItem.GIT -> git?.let { gitSaid(res, it) }.orEmpty()
         TopBarItem.MODEL_WEEK -> modelWeek.orEmpty()
@@ -457,19 +454,19 @@ private fun stripDescription(
 }
 
 /** "Branch main. In worktree topbar-items. 120 lines added and 30 removed." */
-private fun gitSaid(res: Resources, g: SheetGit): String = listOfNotNull(
-    g.branch?.let { res.getString(R.string.session_sheet_branch_said, it) } ?: res.getString(R.string.session_sheet_detached_said),
-    g.worktree?.let { res.getString(R.string.top_bar_git_worktree_said, it) },
-    if (g.linesChanged) res.getQuantityString(R.plurals.top_bar_git_lines_said, g.add, g.add, g.del) else null,
+private fun gitSaid(res: Strings, g: SheetGit): String = listOfNotNull(
+    g.branch?.let { res.getString(Str.session_sheet_branch_said, it) } ?: res.getString(Str.session_sheet_detached_said),
+    g.worktree?.let { res.getString(Str.top_bar_git_worktree_said, it) },
+    if (g.linesChanged) res.getQuantityString(Plural.top_bar_git_lines_said, g.add, g.add, g.del) else null,
 ).joinToString(" ")
 
 /** "Day 2 of 7, 10 points over an even week.", "… 8 points under an even week.", "… level with an even week." */
-private fun weekPaceSaid(res: Resources, p: WeekPace): String {
+private fun weekPaceSaid(res: Strings, p: WeekPace): String {
     val n = kotlin.math.abs(p.points)
     return when {
-        p.points > 0 -> res.getQuantityString(R.plurals.top_bar_week_pace_over_said, n, p.day, n)
-        p.points < 0 -> res.getQuantityString(R.plurals.top_bar_week_pace_under_said, n, p.day, n)
-        else -> res.getString(R.string.top_bar_week_pace_even_said, p.day)
+        p.points > 0 -> res.getQuantityString(Plural.top_bar_week_pace_over_said, n, p.day, n)
+        p.points < 0 -> res.getQuantityString(Plural.top_bar_week_pace_under_said, n, p.day, n)
+        else -> res.getString(Str.top_bar_week_pace_even_said, p.day)
     }
 }
 
@@ -497,14 +494,14 @@ internal fun UsageDetails(hub: Hub) {
     // The 5-hour window only while Claude Code reports one (owner, 2026-10-31: Max has none).
     if (usage.fiveHourReported) {
         val five = UsageWindow.fiveHour(usage, now)
-        UsageMeter(stringResource(R.string.five_hours), five, usageSaid(stringResource(R.string.usage_name_five), five))
+        UsageMeter(stringResource(Str.five_hours), five, usageSaid(stringResource(Str.usage_name_five), five))
         Spacer(Modifier.height(12.dp))
     }
     val seven = UsageWindow.sevenDay(usage, now)
-    UsageMeter(stringResource(R.string.seven_days), seven, usageSaid(stringResource(R.string.usage_name_seven), seven))
+    UsageMeter(stringResource(Str.seven_days), seven, usageSaid(stringResource(Str.usage_name_seven), seven))
     com.prudnikweb.hypernova.ui.home.ModelWeekMeters(usage.models, now, gap = 12.dp)
     Spacer(Modifier.height(6.dp))
-    HText(stringResource(R.string.chat_plan_note), style = Type.small, color = HN.inkDim)
+    HText(stringResource(Str.chat_plan_note), style = Type.small, color = HN.inkDim)
 }
 
 /** The plan's windows are about [session] and known: the strip's meters and the sheet's Usage part show. */

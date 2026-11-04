@@ -1,7 +1,9 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
-import android.content.res.Resources
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Strings
+import com.prudnikweb.hypernova.ui.platform.wordsNow
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -19,12 +21,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.UsageWindow
 import com.prudnikweb.hypernova.ui.fx.formatDuration
 import com.prudnikweb.hypernova.ui.theme.HN
@@ -115,7 +115,7 @@ fun DrawScope.usageBar(used: Float, colour: Color) {
 @Composable
 private fun MeterTag(p: UsageWindow, resetText: String?) {
     if (p.resetIn < 0L) return
-    val res = LocalContext.current.resources
+    val res = wordsNow()
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Glyph.Reload, size = 10.dp, color = HN.inkDim, stroke = 1.2.dp)
         Spacer(Modifier.width(4.dp))
@@ -138,17 +138,17 @@ private fun percent(v: Float): String = "${(v * 100).toInt().coerceIn(0, 100)}%"
  * a window whose meter shows a clock time rather than a countdown: "… resets on Tuesday at 3:56 PM."
  * (never "resets in Tue 3:56 PM").
  */
-fun usageSaid(res: Resources, name: String, p: UsageWindow, resetAt: String? = null): String {
+fun usageSaid(res: Strings, name: String, p: UsageWindow, resetAt: String? = null): String {
     val pct = (p.used * 100).toInt().coerceIn(0, 100)
     val at = resetAt != null
     val reset = resetAt ?: p.resetIn.takeIf { it >= 0 }?.let { formatDuration(res, it) }
     return when {
-        p.full && reset != null -> res.getString(if (at) R.string.usage_said_full_at else R.string.usage_said_full, name, reset)
-        p.full -> res.getString(R.string.usage_said_full_plain, name)
-        reset != null -> res.getString(if (at) R.string.usage_said_reset_at else R.string.usage_said_reset, name, pct, reset)
-        else -> res.getString(R.string.usage_said_plain, name, pct)
+        p.full && reset != null -> res.getString(if (at) Str.usage_said_full_at else Str.usage_said_full, name, reset)
+        p.full -> res.getString(Str.usage_said_full_plain, name)
+        reset != null -> res.getString(if (at) Str.usage_said_reset_at else Str.usage_said_reset, name, pct, reset)
+        else -> res.getString(Str.usage_said_plain, name, pct)
     }
 }
 
 @Composable
-fun usageSaid(name: String, p: UsageWindow, resetAt: String? = null): String = usageSaid(LocalContext.current.resources, name, p, resetAt)
+fun usageSaid(name: String, p: UsageWindow, resetAt: String? = null): String = usageSaid(wordsNow(), name, p, resetAt)

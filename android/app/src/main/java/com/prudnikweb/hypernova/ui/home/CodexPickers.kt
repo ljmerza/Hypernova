@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.home
 
 import androidx.compose.foundation.layout.Column
@@ -47,18 +48,6 @@ internal fun AgentChoice(agent: String, onChange: (String) -> Unit, modifier: Mo
         onChange,
         modifier,
     )
-}
-
-/** A reasoning effort as the pickers say it ("Low", "Extra high"); one this build doesn't know, as Codex calls it. */
-@Composable
-internal fun effortTitle(effort: String): String = when (effort) {
-    "none" -> stringResource(R.string.cx_effort_none)
-    "minimal" -> stringResource(R.string.cx_effort_minimal)
-    "low" -> stringResource(R.string.cx_effort_low)
-    "medium" -> stringResource(R.string.cx_effort_medium)
-    "high" -> stringResource(R.string.cx_effort_high)
-    "xhigh" -> stringResource(R.string.cx_effort_xhigh)
-    else -> effort.replaceFirstChar { it.uppercase() }
 }
 
 /** Codex's model [value] (null: its default) by its name, as a chip says it; [fallback] while the list isn't here. */

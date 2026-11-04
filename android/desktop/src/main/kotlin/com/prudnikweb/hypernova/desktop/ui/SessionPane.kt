@@ -69,6 +69,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.prudnikweb.hypernova.ui.LocalOpener
+import com.prudnikweb.hypernova.data.ChangesRepo
+import com.prudnikweb.hypernova.ui.session.fileEdits
+import com.prudnikweb.hypernova.ui.session.rememberQuickSend
+import com.prudnikweb.hypernova.ui.session.ChatUsage
+import com.prudnikweb.hypernova.ui.session.agentsAtWork
+import com.prudnikweb.hypernova.ui.session.chatListRows
+import com.prudnikweb.hypernova.ui.session.chatWorking
+import com.prudnikweb.hypernova.ui.session.rememberSessionUsage
+import com.prudnikweb.hypernova.ui.session.rememberTopBarGit
+import com.prudnikweb.hypernova.ui.session.sheetAgents
+import com.prudnikweb.hypernova.ui.session.stripMore
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.ui.session.ChatStatusBar
 import com.prudnikweb.hypernova.ui.session.linkWord
@@ -128,6 +139,15 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
     val links = remember(opener) { LinkHandler(opener) }
     val box = remember { FocusRequester() }
     val status = rememberStatusBar(hub, s, hub.transcript(s.id), hub.sending(s.id), away = if (hub.link.state == LinkState.Connected) null else linkWord(hub.link.state))
+    val items = hub.transcript(s.id)
+    val tail = chatListRows(items).tailKey
+    val linked = hub.link.state == LinkState.Connected
+    // Asked again as the transcript settles, and when the session's model changes, as on the phone.
+    val usage = rememberSessionUsage(s.id, "$tail|${chatWorking(hub, s, items)}|${s.model}")
+    val edits = remember(items) { fileEdits(items) }
+    val git = rememberTopBarGit(s, edits, linked) { ChangesRepo.load(it) }
+    var sheet by remember { mutableStateOf<SheetAt?>(null) }
+    val quick = rememberQuickSend(hub, s.id, onSent = { following.on = true }, onBusy = shell::say)
     CompositionLocalProvider(LocalUriHandler provides links) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val askMax = maxHeight * ASK_SHARE
@@ -141,6 +161,12 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
                 if (onBack != null) BackPill(onBack)
                 val card = Modifier.widthIn(max = PANE_MAX).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }
                 PaneAsk(hub, s, shell, askMax, card.heightIn(max = rest.coerceAtLeast(0.dp)))
+                // The top bar, between what it is and the chat: what Settings chose. A click opens the session sheet.
+                ChatUsage(
+                    hub, s, usage, agentsAtWork(s, sheetAgents(hub.agents(s.id))), git, onCompact = { quick("/compact") },
+                    onOpen = { sheet = SheetAt.Overview }, onAgents = { sheet = SheetAt.Agents }, onBlocked = { sheet = SheetAt.Blocked },
+                    more = stripMore(s), modifier = Modifier.widthIn(max = PANE_MAX).fillMaxWidth(),
+                )
                 ChatList(hub, s, shell, following, box, Modifier.weight(1f).widthIn(max = PANE_MAX).fillMaxWidth()) {
                     Facts(s, Modifier.fillMaxWidth())
                     SessionActions(hub, s, shell, Modifier.fillMaxWidth())
@@ -340,3 +366,6 @@ private fun PaneAskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: S
         }
     }
 }
+
+/** Which part of the session sheet a click on the top bar opens. */
+private enum class SheetAt { Overview, Agents, Blocked }

@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.settings
 
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -18,8 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -27,7 +27,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Hairline
@@ -50,12 +49,11 @@ import com.prudnikweb.hypernova.ui.theme.Type
  */
 @Composable
 internal fun TopBarSection() {
-    val context = LocalContext.current
-    val choice by remember { TopBarPref.state(context) }
-    fun set(c: TopBarChoice) = TopBarPref.set(context, c)
+    val choice by remember { TopBarPref.state() }
+    fun set(c: TopBarChoice) = TopBarPref.set(c)
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-            HText(stringResource(R.string.st_top_bar_desc), style = Type.small, color = HN.inkMuted)
+            HText(stringResource(Str.st_top_bar_desc), style = Type.small, color = HN.inkMuted)
             Spacer(Modifier.height(6.dp))
             val order = choice.order
             order.forEachIndexed { i, item ->
@@ -68,7 +66,7 @@ internal fun TopBarSection() {
             }
             if (!choice.isDefault) {
                 Spacer(Modifier.height(10.dp))
-                Pill(stringResource(R.string.st_top_bar_reset), { set(TopBarChoice.DEFAULT) }, kind = PillKind.Outline, height = 44.dp)
+                Pill(stringResource(Str.st_top_bar_reset), { set(TopBarChoice.DEFAULT) }, kind = PillKind.Outline, height = 44.dp)
                 Spacer(Modifier.height(4.dp))
             }
         }
@@ -104,8 +102,8 @@ private fun TopBarRow(item: TopBarItem, on: Boolean, first: Boolean, last: Boole
 
 @Composable
 private fun MoveArrow(up: Boolean, enabled: Boolean, name: String, onClick: () -> Unit) {
-    val said = stringResource(if (up) R.string.st_top_bar_up else R.string.st_top_bar_down, name)
-    val off = stringResource(R.string.st_top_bar_end)
+    val said = stringResource(if (up) Str.st_top_bar_up else Str.st_top_bar_down, name)
+    val off = stringResource(Str.st_top_bar_end)
     Box(
         Modifier
             .size(40.dp)
@@ -120,34 +118,34 @@ private fun MoveArrow(up: Boolean, enabled: Boolean, name: String, onClick: () -
     }
 }
 
-private fun itemName(item: TopBarItem): Int = when (item) {
-    TopBarItem.CONTEXT -> R.string.st_top_bar_context
-    TopBarItem.MODE -> R.string.st_top_bar_mode
-    TopBarItem.EFFORT -> R.string.st_top_bar_effort
-    TopBarItem.FIVE_HOUR -> R.string.st_top_bar_five
-    TopBarItem.SEVEN_DAY -> R.string.st_top_bar_seven
-    TopBarItem.MODEL -> R.string.st_top_bar_model
-    TopBarItem.TOKENS -> R.string.st_top_bar_tokens
-    TopBarItem.COST -> R.string.st_top_bar_cost
-    TopBarItem.AGENTS -> R.string.st_top_bar_agents
-    TopBarItem.TURN -> R.string.st_top_bar_turn
-    TopBarItem.WEEK_PACE -> R.string.st_top_bar_week_pace
-    TopBarItem.GIT -> R.string.st_top_bar_git
-    TopBarItem.MODEL_WEEK -> R.string.st_top_bar_model_week
+private fun itemName(item: TopBarItem): Str = when (item) {
+    TopBarItem.CONTEXT -> Str.st_top_bar_context
+    TopBarItem.MODE -> Str.st_top_bar_mode
+    TopBarItem.EFFORT -> Str.st_top_bar_effort
+    TopBarItem.FIVE_HOUR -> Str.st_top_bar_five
+    TopBarItem.SEVEN_DAY -> Str.st_top_bar_seven
+    TopBarItem.MODEL -> Str.st_top_bar_model
+    TopBarItem.TOKENS -> Str.st_top_bar_tokens
+    TopBarItem.COST -> Str.st_top_bar_cost
+    TopBarItem.AGENTS -> Str.st_top_bar_agents
+    TopBarItem.TURN -> Str.st_top_bar_turn
+    TopBarItem.WEEK_PACE -> Str.st_top_bar_week_pace
+    TopBarItem.GIT -> Str.st_top_bar_git
+    TopBarItem.MODEL_WEEK -> Str.st_top_bar_model_week
 }
 
-private fun itemBody(item: TopBarItem): Int = when (item) {
-    TopBarItem.CONTEXT -> R.string.st_top_bar_context_desc
-    TopBarItem.MODE -> R.string.st_top_bar_mode_desc
-    TopBarItem.EFFORT -> R.string.st_top_bar_effort_desc
-    TopBarItem.FIVE_HOUR -> R.string.st_top_bar_five_desc
-    TopBarItem.SEVEN_DAY -> R.string.st_top_bar_seven_desc
-    TopBarItem.MODEL -> R.string.st_top_bar_model_desc
-    TopBarItem.TOKENS -> R.string.st_top_bar_tokens_desc
-    TopBarItem.COST -> R.string.st_top_bar_cost_desc
-    TopBarItem.AGENTS -> R.string.st_top_bar_agents_desc
-    TopBarItem.TURN -> R.string.st_top_bar_turn_desc
-    TopBarItem.WEEK_PACE -> R.string.st_top_bar_week_pace_desc
-    TopBarItem.GIT -> R.string.st_top_bar_git_desc
-    TopBarItem.MODEL_WEEK -> R.string.st_top_bar_model_week_desc
+private fun itemBody(item: TopBarItem): Str = when (item) {
+    TopBarItem.CONTEXT -> Str.st_top_bar_context_desc
+    TopBarItem.MODE -> Str.st_top_bar_mode_desc
+    TopBarItem.EFFORT -> Str.st_top_bar_effort_desc
+    TopBarItem.FIVE_HOUR -> Str.st_top_bar_five_desc
+    TopBarItem.SEVEN_DAY -> Str.st_top_bar_seven_desc
+    TopBarItem.MODEL -> Str.st_top_bar_model_desc
+    TopBarItem.TOKENS -> Str.st_top_bar_tokens_desc
+    TopBarItem.COST -> Str.st_top_bar_cost_desc
+    TopBarItem.AGENTS -> Str.st_top_bar_agents_desc
+    TopBarItem.TURN -> Str.st_top_bar_turn_desc
+    TopBarItem.WEEK_PACE -> Str.st_top_bar_week_pace_desc
+    TopBarItem.GIT -> Str.st_top_bar_git_desc
+    TopBarItem.MODEL_WEEK -> Str.st_top_bar_model_week_desc
 }

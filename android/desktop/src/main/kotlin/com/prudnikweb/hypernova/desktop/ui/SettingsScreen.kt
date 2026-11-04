@@ -62,6 +62,7 @@ import com.prudnikweb.hypernova.desktop.KeyPlace
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.TokenPlace
 import com.prudnikweb.hypernova.desktop.Ui
+import com.prudnikweb.hypernova.ui.settings.TopBarSection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,6 +92,10 @@ fun SettingsScreen(shell: Shell) {
             DebugLogging(shell)
             Spacer(Modifier.height(16.dp))
             Typing()
+            Spacer(Modifier.height(16.dp))
+            Seam(Ui.st_top_bar.text())
+            Spacer(Modifier.height(8.dp))
+            TopBarSection()
         }
     }
 }

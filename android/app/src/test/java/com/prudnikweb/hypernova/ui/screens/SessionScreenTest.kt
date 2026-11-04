@@ -103,7 +103,7 @@ class SessionScreenTest {
         ),
     )
 
-    private fun gitOn() = TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.GIT, true))
+    private fun gitOn() = TopBarPref.set(TopBarChoice.DEFAULT.set(TopBarItem.GIT, true))
 
     /** Past the settling, so an ask that's due has been made. */
     private fun settle(ms: Long = 2_000) {
@@ -326,7 +326,7 @@ class SessionScreenTest {
         val choice = TopBarChoice.DEFAULT.set(TopBarItem.MODEL, true).set(TopBarItem.FIVE_HOUR, false).let { c ->
             (0 until c.order.indexOf(TopBarItem.MODEL)).fold(c) { acc, _ -> acc.move(TopBarItem.MODEL, -1) }
         }
-        TopBarPref.set(context, choice)
+        TopBarPref.set(choice)
         chat(FakeHub(), Samples.ZETA)
         val said = stripSaid()
         assertTrue(said, said.startsWith(str(R.string.meta_model_said, "Opus 5.5")))
@@ -335,7 +335,7 @@ class SessionScreenTest {
     }
 
     @Test fun topBarWeekPaceSaysTheDayAndThePoints() {
-        TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
+        TopBarPref.set(TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
         // Samples.usage: 18% used, three days left of the week, so 57% of it gone.
         chat(FakeHub(), Samples.ZETA)
         val said = stripSaid()
@@ -343,7 +343,7 @@ class SessionScreenTest {
     }
 
     @Test fun topBarWeekPaceHidesWhenThePlanIsStale() {
-        TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
+        TopBarPref.set(TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
         chat(FakeHub(usage = Samples.usage().copy(stale = true)), Samples.ZETA)
         rule.onNode(hasContentDescription("Day ", substring = true)).assertDoesNotExist()
     }
@@ -430,7 +430,6 @@ class SessionScreenTest {
     /** The three items alone, so a picture holds them all; the session runs Fable, whose week ends in [resetIn] ms. */
     private fun threeItems(resetIn: Long): FakeHub {
         TopBarPref.set(
-            context,
             TopBarChoice(TopBarChoice.DEFAULT.order, setOf(TopBarItem.WEEK_PACE, TopBarItem.GIT, TopBarItem.MODEL_WEEK)),
         )
         val fable = listOf(ModelWeek("Fable", 0.41f, Samples.NOW + resetIn))

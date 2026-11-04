@@ -1,23 +1,18 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
-import com.prudnikweb.hypernova.data.SessionUsage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -43,28 +38,6 @@ import kotlinx.coroutines.launch
 // The chat's quick wins (docs/DECISIONS.md, "Everyday quick wins"), as the session screen places
 // them: the usage strip under the status line, Claude's to-do list and the quick prompts over the
 // prompt box, and a message's long-press menu. Each piece lives in its own file beside this one.
-
-/**
- * The usage strip, once the Mac has answered (nothing before, so the header never shows zeros).
- * [usage] is the screen's ([rememberSessionUsage]): the session sheet ([onOpen]) shows it too.
- * After it, while calls refused without the owner wait, the blocked mark ([onBlocked]), with or
- * without the strip. [agents]: the agents at work, for the strip's count ([onAgents]: its tap).
- */
-@Composable
-internal fun ChatUsage(
-    hub: Hub, session: Session, usage: SessionUsage?, agents: Int, git: SheetGit?, onCompact: () -> Unit, onOpen: () -> Unit, onAgents: () -> Unit, onBlocked: () -> Unit, more: String,
-    modifier: Modifier = Modifier,
-) {
-    val blocked = session.blockedCalls
-    if (usage == null && blocked == 0) return
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (usage != null) UsageStrip(hub, session, usage, agents, git, onCompact, onOpen, onAgents, more, Modifier.weight(1f))
-        if (blocked > 0) {
-            if (usage != null) Spacer(Modifier.width(8.dp))
-            BlockedMark(blocked, onBlocked)
-        }
-    }
-}
 
 /** The quick prompts, while there's nothing in the box and Claude isn't at work. */
 @Composable

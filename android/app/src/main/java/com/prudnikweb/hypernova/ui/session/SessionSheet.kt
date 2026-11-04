@@ -574,13 +574,3 @@ internal fun SheetLink(text: String, trail: String?, onClick: () -> Unit, dim: B
     }
 }
 
-/**
- * What the header's line used to say, for TalkBack after the usage strip's own sentence: the
- * prompts queued (the mode and the agents at work are the strip's own parts now, when chosen in
- * Settings → Session top bar). Starts with a space; empty with none queued.
- */
-@Composable
-internal fun stripMore(s: Session): String {
-    val res = LocalContext.current.resources
-    return if (s.queued > 0) " " + res.getString(R.string.queued, s.queued) + "." else ""
-}

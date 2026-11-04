@@ -131,6 +131,7 @@ val Str.id: Int
         Str.au_now_no_plan -> R.string.au_now_no_plan
         Str.au_now_on_hold -> R.string.au_now_on_hold
         Str.au_now_signed_out -> R.string.au_now_signed_out
+        Str.au_when_day -> R.string.au_when_day
         Str.auto_deny_in -> R.string.auto_deny_in
         Str.awake_another_app -> R.string.awake_another_app
         Str.awake_backpack_ends_kept -> R.string.awake_backpack_ends_kept
@@ -175,6 +176,7 @@ val Str.id: Int
         Str.blocked_err_dismiss -> R.string.blocked_err_dismiss
         Str.blocked_err_load -> R.string.blocked_err_load
         Str.blocked_err_retry -> R.string.blocked_err_retry
+        Str.blocked_mark_open -> R.string.blocked_mark_open
         Str.blocked_provider -> R.string.blocked_provider
         Str.busy_body -> R.string.busy_body
         Str.busy_dismiss -> R.string.busy_dismiss
@@ -184,10 +186,15 @@ val Str.id: Int
         Str.by_terminal -> R.string.by_terminal
         Str.cancel -> R.string.cancel
         Str.changes_err -> R.string.changes_err
+        Str.chat_compact -> R.string.chat_compact
+        Str.chat_context_about_said -> R.string.chat_context_about_said
+        Str.chat_context_said -> R.string.chat_context_said
+        Str.chat_context_unknown_said -> R.string.chat_context_unknown_said
         Str.chat_copied -> R.string.chat_copied
         Str.chat_err_mac -> R.string.chat_err_mac
         Str.chat_err_old_mac -> R.string.chat_err_old_mac
         Str.chat_message_actions -> R.string.chat_message_actions
+        Str.chat_plan_note -> R.string.chat_plan_note
         Str.chat_quiet_on -> R.string.chat_quiet_on
         Str.chat_quiet_yesterday -> R.string.chat_quiet_yesterday
         Str.chat_read_failed -> R.string.chat_read_failed
@@ -198,6 +205,7 @@ val Str.id: Int
         Str.chat_time_yesterday -> R.string.chat_time_yesterday
         Str.chat_todo_done -> R.string.chat_todo_done
         Str.chat_todo_now -> R.string.chat_todo_now
+        Str.chat_tokens_said -> R.string.chat_tokens_said
         Str.check_always_title -> R.string.check_always_title
         Str.check_no_lock -> R.string.check_no_lock
         Str.claude -> R.string.claude
@@ -211,12 +219,20 @@ val Str.id: Int
         Str.copy_table -> R.string.copy_table
         Str.cost -> R.string.cost
         Str.cx_agent_codex -> R.string.cx_agent_codex
+        Str.cx_effort_high -> R.string.cx_effort_high
+        Str.cx_effort_low -> R.string.cx_effort_low
+        Str.cx_effort_medium -> R.string.cx_effort_medium
+        Str.cx_effort_minimal -> R.string.cx_effort_minimal
+        Str.cx_effort_none -> R.string.cx_effort_none
+        Str.cx_effort_xhigh -> R.string.cx_effort_xhigh
         Str.cx_err_models -> R.string.cx_err_models
         Str.cx_err_preview -> R.string.cx_err_preview
         Str.cx_err_switch -> R.string.cx_err_switch
         Str.cx_err_turn_off -> R.string.cx_err_turn_off
         Str.cx_err_turn_on -> R.string.cx_err_turn_on
         Str.cx_hint_went_on -> R.string.cx_hint_went_on
+        Str.cx_mode_label_can_edit -> R.string.cx_mode_label_can_edit
+        Str.cx_mode_label_read_only -> R.string.cx_mode_label_read_only
         Str.cx_went_on -> R.string.cx_went_on
         Str.debuglog_send_failed -> R.string.debuglog_send_failed
         Str.denied -> R.string.denied
@@ -229,6 +245,14 @@ val Str.id: Int
         Str.earlier_loading -> R.string.earlier_loading
         Str.earlier_show -> R.string.earlier_show
         Str.edit -> R.string.edit
+        Str.effort -> R.string.effort
+        Str.effort_default -> R.string.effort_default
+        Str.effort_default_desc -> R.string.effort_default_desc
+        Str.effort_high_desc -> R.string.effort_high_desc
+        Str.effort_low_desc -> R.string.effort_low_desc
+        Str.effort_max_desc -> R.string.effort_max_desc
+        Str.effort_medium_desc -> R.string.effort_medium_desc
+        Str.effort_xhigh_desc -> R.string.effort_xhigh_desc
         Str.elapsed_min_secs -> R.string.elapsed_min_secs
         Str.elapsed_secs -> R.string.elapsed_secs
         Str.empty_conversation -> R.string.empty_conversation
@@ -272,6 +296,7 @@ val Str.id: Int
         Str.err_terminal -> R.string.err_terminal
         Str.err_upload -> R.string.err_upload
         Str.exit_code -> R.string.exit_code
+        Str.five_hours -> R.string.five_hours
         Str.headline_limit -> R.string.headline_limit
         Str.headline_limit_claude -> R.string.headline_limit_claude
         Str.headline_no_credit -> R.string.headline_no_credit
@@ -319,6 +344,14 @@ val Str.id: Int
         Str.link_said_via -> R.string.link_said_via
         Str.link_unpaired -> R.string.link_unpaired
         Str.loading_conversation -> R.string.loading_conversation
+        Str.meta_mode_said -> R.string.meta_mode_said
+        Str.meta_model_said -> R.string.meta_model_said
+        Str.mode_label_accept -> R.string.mode_label_accept
+        Str.mode_label_auto -> R.string.mode_label_auto
+        Str.mode_label_bypass -> R.string.mode_label_bypass
+        Str.mode_label_default -> R.string.mode_label_default
+        Str.mode_label_dont_ask -> R.string.mode_label_dont_ask
+        Str.mode_label_plan -> R.string.mode_label_plan
         Str.model_default -> R.string.model_default
         Str.model_paid_q -> R.string.model_paid_q
         Str.more -> R.string.more
@@ -348,11 +381,13 @@ val Str.id: Int
         Str.notice_signed_out -> R.string.notice_signed_out
         Str.notice_signed_out_both -> R.string.notice_signed_out_both
         Str.notice_waiting -> R.string.notice_waiting
+        Str.ns_effort_said -> R.string.ns_effort_said
         Str.open_preview -> R.string.open_preview
         Str.open_preview_port -> R.string.open_preview_port
         Str.open_terminal -> R.string.open_terminal
         Str.other -> R.string.other
         Str.other_hint -> R.string.other_hint
+        Str.percent -> R.string.percent
         Str.pg_connect -> R.string.pg_connect
         Str.pg_dev_server -> R.string.pg_dev_server
         Str.pg_dev_server_port -> R.string.pg_dev_server_port
@@ -397,6 +432,7 @@ val Str.id: Int
         Str.provider_state_no_credit -> R.string.provider_state_no_credit
         Str.provider_state_other -> R.string.provider_state_other
         Str.question -> R.string.question
+        Str.queued -> R.string.queued
         Str.queued_dropped -> R.string.queued_dropped
         Str.queued_hint_reply -> R.string.queued_hint_reply
         Str.queued_hint_step -> R.string.queued_hint_step
@@ -418,6 +454,10 @@ val Str.id: Int
         Str.sending -> R.string.sending
         Str.session_allowed -> R.string.session_allowed
         Str.session_sheet_agents -> R.string.session_sheet_agents
+        Str.session_sheet_branch_said -> R.string.session_sheet_branch_said
+        Str.session_sheet_detached -> R.string.session_sheet_detached
+        Str.session_sheet_detached_said -> R.string.session_sheet_detached_said
+        Str.session_sheet_open -> R.string.session_sheet_open
         Str.session_sheet_open_agent -> R.string.session_sheet_open_agent
         Str.session_sheet_permissions -> R.string.session_sheet_permissions
         Str.session_sheet_tab_commands -> R.string.session_sheet_tab_commands
@@ -427,6 +467,7 @@ val Str.id: Int
         Str.session_tool_fetch -> R.string.session_tool_fetch
         Str.session_tool_read -> R.string.session_tool_read
         Str.session_tool_search -> R.string.session_tool_search
+        Str.seven_days -> R.string.seven_days
         Str.shell_desc -> R.string.shell_desc
         Str.shell_label -> R.string.shell_label
         Str.show_all -> R.string.show_all
@@ -440,6 +481,37 @@ val Str.id: Int
         Str.skip -> R.string.skip
         Str.sm_err -> R.string.sm_err
         Str.sm_too_old -> R.string.sm_too_old
+        Str.st_top_bar_agents -> R.string.st_top_bar_agents
+        Str.st_top_bar_agents_desc -> R.string.st_top_bar_agents_desc
+        Str.st_top_bar_context -> R.string.st_top_bar_context
+        Str.st_top_bar_context_desc -> R.string.st_top_bar_context_desc
+        Str.st_top_bar_cost -> R.string.st_top_bar_cost
+        Str.st_top_bar_cost_desc -> R.string.st_top_bar_cost_desc
+        Str.st_top_bar_desc -> R.string.st_top_bar_desc
+        Str.st_top_bar_down -> R.string.st_top_bar_down
+        Str.st_top_bar_effort -> R.string.st_top_bar_effort
+        Str.st_top_bar_effort_desc -> R.string.st_top_bar_effort_desc
+        Str.st_top_bar_end -> R.string.st_top_bar_end
+        Str.st_top_bar_five -> R.string.st_top_bar_five
+        Str.st_top_bar_five_desc -> R.string.st_top_bar_five_desc
+        Str.st_top_bar_git -> R.string.st_top_bar_git
+        Str.st_top_bar_git_desc -> R.string.st_top_bar_git_desc
+        Str.st_top_bar_mode -> R.string.st_top_bar_mode
+        Str.st_top_bar_mode_desc -> R.string.st_top_bar_mode_desc
+        Str.st_top_bar_model -> R.string.st_top_bar_model
+        Str.st_top_bar_model_desc -> R.string.st_top_bar_model_desc
+        Str.st_top_bar_model_week -> R.string.st_top_bar_model_week
+        Str.st_top_bar_model_week_desc -> R.string.st_top_bar_model_week_desc
+        Str.st_top_bar_reset -> R.string.st_top_bar_reset
+        Str.st_top_bar_seven -> R.string.st_top_bar_seven
+        Str.st_top_bar_seven_desc -> R.string.st_top_bar_seven_desc
+        Str.st_top_bar_tokens -> R.string.st_top_bar_tokens
+        Str.st_top_bar_tokens_desc -> R.string.st_top_bar_tokens_desc
+        Str.st_top_bar_turn -> R.string.st_top_bar_turn
+        Str.st_top_bar_turn_desc -> R.string.st_top_bar_turn_desc
+        Str.st_top_bar_up -> R.string.st_top_bar_up
+        Str.st_top_bar_week_pace -> R.string.st_top_bar_week_pace
+        Str.st_top_bar_week_pace_desc -> R.string.st_top_bar_week_pace_desc
         Str.state_ended -> R.string.state_ended
         Str.state_error -> R.string.state_error
         Str.state_idle -> R.string.state_idle
@@ -456,7 +528,10 @@ val Str.id: Int
         Str.state_starting -> R.string.state_starting
         Str.state_unavailable -> R.string.state_unavailable
         Str.state_working -> R.string.state_working
+        Str.stats_bn -> R.string.stats_bn
         Str.stats_day_tokens -> R.string.stats_day_tokens
+        Str.stats_k -> R.string.stats_k
+        Str.stats_mn -> R.string.stats_mn
         Str.stats_said_hm -> R.string.stats_said_hm
         Str.status_agent_done -> R.string.status_agent_done
         Str.status_agent_running -> R.string.status_agent_running
@@ -523,12 +598,31 @@ val Str.id: Int
         Str.thought_chars -> R.string.thought_chars
         Str.thought_for -> R.string.thought_for
         Str.tool_stopped -> R.string.tool_stopped
+        Str.top_bar_agents_open -> R.string.top_bar_agents_open
+        Str.top_bar_cost_about_said -> R.string.top_bar_cost_about_said
+        Str.top_bar_cost_said -> R.string.top_bar_cost_said
+        Str.top_bar_git_worktree_said -> R.string.top_bar_git_worktree_said
+        Str.top_bar_turn_said -> R.string.top_bar_turn_said
+        Str.top_bar_week_pace -> R.string.top_bar_week_pace
+        Str.top_bar_week_pace_even_said -> R.string.top_bar_week_pace_even_said
         Str.try_again -> R.string.try_again
         Str.unpaired_body -> R.string.unpaired_body
         Str.unpaired_body_linux -> R.string.unpaired_body_linux
         Str.untitled_session -> R.string.untitled_session
         Str.update_body -> R.string.update_body
         Str.update_title -> R.string.update_title
+        Str.usage_five_short -> R.string.usage_five_short
+        Str.usage_name_five -> R.string.usage_name_five
+        Str.usage_name_model -> R.string.usage_name_model
+        Str.usage_name_seven -> R.string.usage_name_seven
+        Str.usage_reset_day_at -> R.string.usage_reset_day_at
+        Str.usage_said_full -> R.string.usage_said_full
+        Str.usage_said_full_at -> R.string.usage_said_full_at
+        Str.usage_said_full_plain -> R.string.usage_said_full_plain
+        Str.usage_said_plain -> R.string.usage_said_plain
+        Str.usage_said_reset -> R.string.usage_said_reset
+        Str.usage_said_reset_at -> R.string.usage_said_reset_at
+        Str.usage_seven_short -> R.string.usage_seven_short
         Str.waiting_files_gone -> R.string.waiting_files_gone
         Str.waiting_gone_hint -> R.string.waiting_gone_hint
         Str.waiting_gone_label -> R.string.waiting_gone_label
@@ -582,6 +676,8 @@ val Plural.id: Int
         Plural.au_away_title -> R.plurals.au_away_title
         Plural.awake_minutes -> R.plurals.awake_minutes
         Plural.awake_seconds -> R.plurals.awake_seconds
+        Plural.blocked_chip -> R.plurals.blocked_chip
+        Plural.blocked_mark_said -> R.plurals.blocked_mark_said
         Plural.chat_quiet_days -> R.plurals.chat_quiet_days
         Plural.chat_quiet_hours -> R.plurals.chat_quiet_hours
         Plural.lines -> R.plurals.lines
@@ -592,6 +688,8 @@ val Plural.id: Int
         Plural.run_calls_done -> R.plurals.run_calls_done
         Plural.run_calls_now -> R.plurals.run_calls_now
         Plural.servers_elsewhere -> R.plurals.servers_elsewhere
+        Plural.session_sheet_agents_said -> R.plurals.session_sheet_agents_said
+        Plural.session_sheet_shells_said -> R.plurals.session_sheet_shells_said
         Plural.stats_said_hours -> R.plurals.stats_said_hours
         Plural.stats_said_minutes -> R.plurals.stats_said_minutes
         Plural.status_agents -> R.plurals.status_agents
@@ -600,5 +698,10 @@ val Plural.id: Int
         Plural.status_main_agents_said -> R.plurals.status_main_agents_said
         Plural.status_seconds_said -> R.plurals.status_seconds_said
         Plural.status_tokens_said_units -> R.plurals.status_tokens_said_units
+        Plural.top_bar_agents -> R.plurals.top_bar_agents
+        Plural.top_bar_git_lines_said -> R.plurals.top_bar_git_lines_said
+        Plural.top_bar_shells -> R.plurals.top_bar_shells
+        Plural.top_bar_week_pace_over_said -> R.plurals.top_bar_week_pace_over_said
+        Plural.top_bar_week_pace_under_said -> R.plurals.top_bar_week_pace_under_said
         Plural.turns -> R.plurals.turns
     }

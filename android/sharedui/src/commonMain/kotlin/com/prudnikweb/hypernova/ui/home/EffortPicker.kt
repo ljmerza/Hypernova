@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.home
 
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,10 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.ui.session.ChatSheet
 import com.prudnikweb.hypernova.ui.theme.HN
@@ -24,18 +24,18 @@ import com.prudnikweb.hypernova.ui.theme.Type
 
 /** A Claude Code effort as a chip and the picker say it: "Default" for none, else as Codex's are said ("Extra high", "Max"). */
 @Composable
-internal fun claudeEffortTitle(level: String?): String = if (level == null) stringResource(R.string.effort_default) else effortTitle(level)
+internal fun claudeEffortTitle(level: String?): String = if (level == null) stringResource(Str.effort_default) else effortTitle(level)
 
 /** What an effort does, in one line. */
 @Composable
 internal fun claudeEffortLine(level: String?): String = stringResource(
     when (level) {
-        "low" -> R.string.effort_low_desc
-        "medium" -> R.string.effort_medium_desc
-        "high" -> R.string.effort_high_desc
-        "xhigh" -> R.string.effort_xhigh_desc
-        "max" -> R.string.effort_max_desc
-        else -> R.string.effort_default_desc
+        "low" -> Str.effort_low_desc
+        "medium" -> Str.effort_medium_desc
+        "high" -> Str.effort_high_desc
+        "xhigh" -> Str.effort_xhigh_desc
+        "max" -> Str.effort_max_desc
+        else -> Str.effort_default_desc
     },
 )
 
@@ -46,7 +46,7 @@ internal fun claudeEffortLine(level: String?): String = stringResource(
  */
 @Composable
 internal fun EffortSheet(effort: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit, withDefault: Boolean = true) {
-    val title = stringResource(R.string.effort)
+    val title = stringResource(Str.effort)
     ChatSheet(title, onDismiss) {
         HText(title, style = Type.title, color = HN.ink)
         Spacer(Modifier.height(10.dp))

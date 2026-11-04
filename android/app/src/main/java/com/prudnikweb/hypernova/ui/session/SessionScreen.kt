@@ -159,8 +159,6 @@ import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val EDIT_TOOLS = setOf("Write", "Edit", "MultiEdit", "NotebookEdit")
-
 /** The top of the prompt box's bar, where the chat fades under its blur. */
 private val BAR_TOP = 40.dp
 
@@ -391,7 +389,7 @@ fun SessionScreen(
     // when the session's model changes (/model).
     val usage = usageOf(sessionId, "$tailKey|$working|${session.model}")
     // The top bar's git item, only while it's on: its route is asked when an edit tool has finished, not on a timer.
-    val fileEdits = remember(items) { items.count { it is Item.Diff || (it is Item.Tool && !it.running && !it.failed && it.verb in EDIT_TOOLS) } }
+    val fileEdits = remember(items) { fileEdits(items) }
     val git = rememberTopBarGit(session, fileEdits, linked, gitOf)
     // A limit, a sign-out or the provider stopped it: the card above the composer and its hint say so.
     val block = activeBlock(hub, session)
@@ -401,24 +399,7 @@ fun SessionScreen(
     // Continue after the away stop is on its way: a second tap doesn't send a second "continue".
     var continuing by remember(sessionId) { mutableStateOf(false) }
     // A double tap on a chip (or Compact) sends once.
-    var lastQuick by remember(sessionId) { mutableStateOf<Pair<String, Long>?>(null) }
-    val quickSend: (String) -> Unit = quick@{ text ->
-        val at = android.os.SystemClock.elapsedRealtime()
-        lastQuick?.let { (t, when_) -> if (t == text && at - when_ < QUICK_AGAIN_MS) return@quick }
-        lastQuick = text to at
-        follow = true
-        appScope.launch {
-            hub.send(sessionId, text)
-                .onSuccess { id -> if (id != sessionId) opener.switchSession(id) }
-                .onFailure { e ->
-                    when (e) {
-                        is TerminalBusy -> busy = e.pending
-                        is SessionSwitched -> opener.switchSession(e.to)
-                        else -> toast(e.message.orEmpty())
-                    }
-                }
-        }
-    }
+    val quickSend = rememberQuickSend(hub, sessionId, onSent = { follow = true }, onBusy = { busy = it })
     // "Show earlier" is the list's first item while it's there.
     val above = { if (hub.hasEarlier(sessionId)) 1 else 0 }
     val earlierAnchor = remember(sessionId) { mutableStateOf<String?>(null) }
@@ -890,9 +871,6 @@ private fun ModelSwitchHost(hub: Hub, s: Session) {
         tint = HN.amber,
     )
 }
-
-/** A second tap on the same quick prompt (or Compact) within this long is the same tap. */
-private const val QUICK_AGAIN_MS = 1500L
 
 /** A value no model has: the picker marks none. */
 private const val NONE_MARKED = "\u0000none"

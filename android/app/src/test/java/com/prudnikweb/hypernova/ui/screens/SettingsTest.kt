@@ -127,18 +127,18 @@ class SettingsTest {
         val model = str(R.string.st_top_bar_model)
         rule.onNode(isSwitch(model)).performScrollTo().performClick()
         rule.waitForIdle()
-        assertTrue(TopBarItem.MODEL in TopBarPref.state(context).value.shown)
+        assertTrue(TopBarItem.MODEL in TopBarPref.state().value.shown)
         // Up one: before the 7-day window.
         rule.onNode(hasContentDescription(str(R.string.st_top_bar_up, model))).performScrollTo().performClick()
         rule.waitForIdle()
-        val order = TopBarPref.state(context).value.order
+        val order = TopBarPref.state().value.order
         assertEquals(order.indexOf(TopBarItem.SEVEN_DAY) - 1, order.indexOf(TopBarItem.MODEL))
         // The first can't go up.
         rule.onNode(hasContentDescription(str(R.string.st_top_bar_up, str(R.string.st_top_bar_context)))).assertIsNotEnabled()
         rule.snap("settings_top_bar_changed")
         rule.onNodeWithText(str(R.string.st_top_bar_reset)).performScrollTo().performClick()
         rule.waitForIdle()
-        assertEquals(TopBarChoice.DEFAULT, TopBarPref.state(context).value)
+        assertEquals(TopBarChoice.DEFAULT, TopBarPref.state().value)
         rule.onNodeWithText(str(R.string.st_top_bar_reset)).assertDoesNotExist()
     }
 

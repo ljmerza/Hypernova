@@ -154,3 +154,28 @@ internal fun chatBoxHint(hub: Hub, s: Session, block: Blocked?): String = when {
     s.switchedTo != null -> stringResource(Str.cx_hint_went_on, com.prudnikweb.hypernova.ui.components.agentName(hub.session(s.switchedTo)?.codex ?: !s.codex))
     else -> block?.let { blockedHint(hub, s, it) } ?: stringResource(if (s.phase == Phase.Ended) Str.prompt_hint_ended else Str.prompt_hint)
 }
+
+/** Permission modes in plain words: "ask first", "accept edits", "plan"… */
+@Composable
+internal fun modeWords(mode: String): String = when (mode) {
+    "default" -> stringResource(Str.mode_label_default)
+    "acceptEdits" -> stringResource(Str.mode_label_accept)
+    "plan" -> stringResource(Str.mode_label_plan)
+    "auto" -> stringResource(Str.mode_label_auto)
+    "bypassPermissions" -> stringResource(Str.mode_label_bypass)
+    "dontAsk" -> stringResource(Str.mode_label_dont_ask)
+    // Codex's sandboxes (data/Codex.kt).
+    "read-only" -> stringResource(Str.cx_mode_label_read_only)
+    "workspace-write" -> stringResource(Str.cx_mode_label_can_edit)
+    else -> mode
+}
+
+/**
+ * What the header's line used to say, for TalkBack after the usage strip's own sentence: the prompts queued (the mode and the agents at work are the strip's own
+ * parts now, when chosen in Settings → Session top bar). Starts with a space; empty with none queued.
+ */
+@Composable
+internal fun stripMore(s: Session): String {
+    val res = wordsNow()
+    return if (s.queued > 0) " " + res.getString(Str.queued, s.queued) + "." else ""
+}

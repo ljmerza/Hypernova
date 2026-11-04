@@ -219,6 +219,7 @@ enum class Ui {
     link_copy,
     link_no_browser,
     st_enter_key,
+    st_top_bar,
     st_enter_key_desc,
     st_enter_send,
     st_enter_newline,

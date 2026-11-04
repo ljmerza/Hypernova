@@ -1,16 +1,17 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.home
 
-import android.text.format.DateFormat
+import com.prudnikweb.hypernova.ui.platform.SharedUi
+import com.prudnikweb.hypernova.ui.platform.wordsNow
+
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.ModelWeek
 import com.prudnikweb.hypernova.data.ModelWeeks
 import com.prudnikweb.hypernova.data.UsageWindow
@@ -29,9 +30,8 @@ import com.prudnikweb.hypernova.ui.components.usageSaid
 @Composable
 internal fun ModelWeekMeters(weeks: List<ModelWeek>, now: Long, gap: Dp = 14.dp) {
     if (weeks.isEmpty()) return
-    val ctx = LocalContext.current
-    val res = ctx.resources
-    val is24 = DateFormat.is24HourFormat(ctx)
+    val res = wordsNow()
+    val is24 = SharedUi.platform.clock.style().is24Hour
     for (w in weeks) {
         Spacer(Modifier.height(gap))
         val trail = ModelWeeks.trail(w, now)
@@ -40,10 +40,10 @@ internal fun ModelWeekMeters(weeks: List<ModelWeek>, now: Long, gap: Dp = 14.dp)
         // TalkBack hears the day in full, "on Tuesday at 3:56 PM", not "in Tue 3:56 PM".
         val on = trail as? ModelWeeks.Trail.On
         val resetText = on?.let { ModelWeeks.weekdayTime(it.at, is24) }
-        val resetAt = on?.let { ModelWeeks.weekdayTimeSaid(it.at, is24) }?.let { (day, time) -> stringResource(R.string.usage_reset_day_at, day, time) }
+        val resetAt = on?.let { ModelWeeks.weekdayTimeSaid(it.at, is24) }?.let { (day, time) -> stringResource(Str.usage_reset_day_at, day, time) }
         UsageMeter(
-            stringResource(R.string.seven_days), p,
-            usageSaid(res, stringResource(R.string.usage_name_model, w.label), p, resetAt),
+            stringResource(Str.seven_days), p,
+            usageSaid(res, stringResource(Str.usage_name_model, w.label), p, resetAt),
             resetText = resetText,
             model = w.label,
         )

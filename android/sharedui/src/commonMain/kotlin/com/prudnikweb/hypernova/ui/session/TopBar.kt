@@ -1,6 +1,6 @@
 package com.prudnikweb.hypernova.ui.session
 
-import android.content.Context
+import com.prudnikweb.hypernova.data.Core
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
@@ -248,7 +248,7 @@ fun turnShort(ms: Long): String {
 }
 
 /**
- * Settings → Session top bar, kept on this phone. One state for the whole app, so a change reaches
+ * Settings → Session top bar, kept on this device. One state for the whole app, so a change reaches
  * an open chat at once (as EnterKeyPref).
  */
 object TopBarPref {
@@ -256,13 +256,13 @@ object TopBarPref {
     private const val KEY = "session_top_bar"
     private var current: MutableState<TopBarChoice>? = null
 
-    fun state(context: Context): State<TopBarChoice> = holder(context)
+    fun state(): State<TopBarChoice> = holder()
 
-    fun set(context: Context, value: TopBarChoice) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, value.encode()).apply()
-        holder(context).value = value
+    fun set(value: TopBarChoice) {
+        Core.platform.storage.prefs(PREFS).edit().putString(KEY, value.encode()).apply()
+        holder().value = value
     }
 
-    private fun holder(context: Context): MutableState<TopBarChoice> = current
-        ?: mutableStateOf(TopBarChoice.decode(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null))).also { current = it }
+    private fun holder(): MutableState<TopBarChoice> = current
+        ?: mutableStateOf(TopBarChoice.decode(Core.platform.storage.prefs(PREFS).getString(KEY, null))).also { current = it }
 }

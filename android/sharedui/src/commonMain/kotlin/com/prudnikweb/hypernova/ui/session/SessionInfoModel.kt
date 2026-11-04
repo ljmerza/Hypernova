@@ -3,8 +3,10 @@ package com.prudnikweb.hypernova.ui.session
 import com.prudnikweb.hypernova.data.Finished
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
-import com.prudnikweb.hypernova.ui.automations.RunWords
-import com.prudnikweb.hypernova.ui.automations.Words
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Strings
+import com.prudnikweb.hypernova.data.clockTime
+import com.prudnikweb.hypernova.data.dayClock
 import com.prudnikweb.hypernova.data.WorkChanges
 import java.time.ZoneId
 
@@ -42,8 +44,8 @@ internal fun sheetTimeRows(s: Session, now: Long, zone: ZoneId = ZoneId.systemDe
 }
 
 /** When it started, as the widgets say a time: "14:05" today, "Mon 14:05" this week, "17 Oct 14:05" before. */
-internal fun startedWords(w: Words, at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-    RunWords.clockWords(w, at, now, zone)
+internal fun startedWords(res: Strings, h24: Boolean, at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): String =
+    dayClock(at, now, zone, res.locale, { clockTime(it, h24, res.locale) }, { day, time -> res.getString(Str.au_when_day, day, time) })
 
 /**
  * The GIT part: the branch (null: a detached HEAD), its [upstream] and how far apart, the linked

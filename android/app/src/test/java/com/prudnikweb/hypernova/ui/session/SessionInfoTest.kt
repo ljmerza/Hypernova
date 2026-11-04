@@ -60,11 +60,11 @@ class SessionInfoTest {
     }
 
     @Test fun startedSaysTheClockTimeThenTheDayThenTheDate() {
-        val w = XmlWords()
-        assertEquals("14:05", startedWords(w, at(2026, 10, 31, 14, 5), now, zone))
-        assertEquals("Wed 9:30", startedWords(w, at(2026, 10, 28, 9, 30), now, zone))
-        assertEquals("17 Oct 8:00", startedWords(w, at(2026, 10, 17, 8, 0), now, zone))
-        assertEquals("2:05 PM", startedWords(XmlWords(h24 = false, locale = Locale.US), at(2026, 10, 31, 14, 5), now, zone))
+        val w = com.prudnikweb.hypernova.data.live.XmlStrings
+        assertEquals("14:05", startedWords(w, true, at(2026, 10, 31, 14, 5), now, zone))
+        assertEquals("Wed 9:30", startedWords(w, true, at(2026, 10, 28, 9, 30), now, zone))
+        assertEquals("17 Oct 8:00", startedWords(w, true, at(2026, 10, 17, 8, 0), now, zone))
+        assertEquals("2:05 PM", startedWords(w, false, at(2026, 10, 31, 14, 5), now, zone))
     }
 
     @Test fun aheadAndBehindAsMarks() {

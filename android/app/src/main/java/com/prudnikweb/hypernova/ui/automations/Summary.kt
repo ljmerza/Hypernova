@@ -262,7 +262,7 @@ object Summary {
     /** "09:00" → "9:00", or "9:00 AM" on a 12-hour phone. */
     fun clock(w: Words, hhmm: String): String = runCatching { clock(w, LocalTime.parse(hhmm)) }.getOrDefault(hhmm)
 
-    fun clock(w: Words, t: LocalTime): String = DateTimeFormatter.ofPattern(if (w.h24) "H:mm" else "h:mm a", w.locale).format(t)
+    fun clock(w: Words, t: LocalTime): String = com.prudnikweb.hypernova.data.clockTime(t, w.h24, w.locale)
 
     // ─── Do ────────────────────────────────────────────────────────────────
 

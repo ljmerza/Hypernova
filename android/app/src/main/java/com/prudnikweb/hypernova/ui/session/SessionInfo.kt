@@ -34,7 +34,7 @@ import com.prudnikweb.hypernova.data.Finished
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.Session
-import com.prudnikweb.hypernova.ui.automations.rememberWords
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.ui.changes.ChangesDialog
 import com.prudnikweb.hypernova.data.ChangesRepo
 import com.prudnikweb.hypernova.data.WorkChanges
@@ -61,7 +61,8 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun TimePart(s: Session) {
     val res = LocalContext.current.resources
-    val words = rememberWords()
+    val words = LocalContext.current.resources.strings
+    val h24 = com.prudnikweb.hypernova.ui.platform.SharedUi.platform.clock.style().is24Hour
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -70,7 +71,7 @@ internal fun TimePart(s: Session) {
         }
     }
     for (row in sheetTimeRows(s, now)) when (row) {
-        is TimeRow.Started -> InfoRow(stringResource(R.string.session_sheet_started), startedWords(words, row.at, now))
+        is TimeRow.Started -> InfoRow(stringResource(R.string.session_sheet_started), startedWords(words, h24, row.at, now))
         is TimeRow.Running -> InfoRow(stringResource(if (row.ended) R.string.session_sheet_ran_for else R.string.session_sheet_running_for), formatDuration(res, row.ms))
         is TimeRow.Turn -> InfoRow(stringResource(R.string.session_sheet_this_turn), formatDuration(res, row.ms), valueColor = HN.accent)
         is TimeRow.Last -> InfoRow(stringResource(R.string.session_sheet_last_activity), agoWords(row.ago))

@@ -23,7 +23,17 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.prudnikweb.hypernova.data.ApprovalKind
+import com.prudnikweb.hypernova.data.Core
+import com.prudnikweb.hypernova.data.SessionSwitched
+import com.prudnikweb.hypernova.data.TerminalBusy
+import com.prudnikweb.hypernova.ui.LocalAppScope
+import com.prudnikweb.hypernova.ui.LocalOpener
+import com.prudnikweb.hypernova.ui.LocalToast
+import kotlinx.coroutines.launch
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.LinkState
@@ -220,6 +230,41 @@ internal fun LazyListScope.chatRows(
             is ChatRow.Asks -> AskStack(row.asks, rowModifier) { ask, m -> TranscriptItem(hub, sessionId, ask, m.fillMaxWidth()) }
             // Keyed by its menu: the next dialog is a new card, never the last one's buttons.
             is ChatRow.TermAsk -> key(row.ask.menuId) { termAsk(row, rowModifier) }
+        }
+    }
+}
+
+/** What writes a file. */
+internal val EDIT_TOOLS = setOf("Write", "Edit", "MultiEdit", "NotebookEdit")
+
+/** How many times the session has changed a file: the top bar's git item asks again as this moves. */
+internal fun fileEdits(items: List<Item>): Int = items.count { it is Item.Diff || (it is Item.Tool && !it.running && !it.failed && it.verb in EDIT_TOOLS) }
+
+/** A second tap on the same quick prompt (or Compact) within this long is the same tap. */
+private const val QUICK_AGAIN_MS = 1500L
+
+/** A quick prompt or Compact sent as it is, leaving the box alone. A double tap sends once. [onSent]: it's on its way. [onBusy]: text waiting in its terminal stopped it. */
+@Composable
+internal fun rememberQuickSend(hub: Hub, sessionId: String, onSent: () -> Unit, onBusy: (String) -> Unit): (String) -> Unit {
+    val opener = LocalOpener.current
+    val toast = LocalToast.current
+    val appScope = LocalAppScope.current
+    var last by remember(sessionId) { mutableStateOf<Pair<String, Long>?>(null) }
+    return quick@{ text ->
+        val at = Core.platform.ticks.elapsed()
+        last?.let { (t, whenSent) -> if (t == text && at - whenSent < QUICK_AGAIN_MS) return@quick }
+        last = text to at
+        onSent()
+        appScope.launch {
+            hub.send(sessionId, text)
+                .onSuccess { id -> if (id != sessionId) opener.switchSession(id) }
+                .onFailure { e ->
+                    when (e) {
+                        is TerminalBusy -> onBusy(e.pending)
+                        is SessionSwitched -> opener.switchSession(e.to)
+                        else -> toast(e.message.orEmpty())
+                    }
+                }
         }
     }
 }

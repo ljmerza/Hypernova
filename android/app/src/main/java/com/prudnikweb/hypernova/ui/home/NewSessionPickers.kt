@@ -16,12 +16,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,7 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,13 +81,11 @@ import com.prudnikweb.hypernova.data.ModelWeeks
 import com.prudnikweb.hypernova.data.Project
 import com.prudnikweb.hypernova.data.ProjectPick
 import com.prudnikweb.hypernova.data.Provider
-import com.prudnikweb.hypernova.data.ProviderWords
 import com.prudnikweb.hypernova.data.UsageWindow
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphButton
 import com.prudnikweb.hypernova.ui.components.GlyphFigure
-import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.Incidents
 import com.prudnikweb.hypernova.ui.components.LoadingLine
@@ -316,31 +310,6 @@ internal fun PartHeader(label: String, mono: Boolean = false, trail: String? = n
             HText(trail, style = Type.label.copy(letterSpacing = Type.label.letterSpacing * 0.5f), color = trailColor, maxLines = 1)
         }
     }
-}
-
-/** A row's end when it's the one chosen: a mint check; else the same room, empty. */
-@Composable
-internal fun ChosenMark(selected: Boolean) {
-    Box(Modifier.width(28.dp), contentAlignment = Alignment.CenterEnd) {
-        if (selected) Icon(Glyph.Check, size = 16.dp, color = HN.accent, stroke = 1.8.dp)
-    }
-}
-
-/** A list row a picker chooses with: 56dp at least, the chosen one on a faint mint wash. */
-@Composable
-internal fun Modifier.pickRow(selected: Boolean, said: String, onClick: () -> Unit, min: Dp = 56.dp): Modifier {
-    val view = LocalView.current
-    return this
-        .fillMaxWidth()
-        .heightIn(min = min)
-        .clip(RoundedCornerShape(12.dp))
-        .then(if (selected) Modifier.glassChoice(true, 12.dp) else Modifier)
-        .selectable(selected, interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.RadioButton) {
-            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            onClick()
-        }
-        .semantics { contentDescription = said }
-        .padding(horizontal = 10.dp, vertical = 8.dp)
 }
 
 /** The nav bar's height, below a picker's list. */
