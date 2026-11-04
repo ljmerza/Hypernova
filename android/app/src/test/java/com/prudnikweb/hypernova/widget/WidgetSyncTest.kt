@@ -244,7 +244,8 @@ class WidgetSyncTest {
         // the gap); the session still waits on the owner until the computer says otherwise.
         until("the approval gone") { shown.groups.single().rows.none { it.askId == "a1" } }
         assertEquals(WidgetModel.Kind.Waiting, row().kind)
-        assertTrue(draws.size >= 2)
+        // What's shown changes just before its picture is told of (WidgetSync.push), so the second may not be counted yet.
+        until("both pictures") { draws.size >= 2 }
         assertEquals(WidgetModel.Answering.Allowing, draws.first().groups.single().rows.single().answering)
     }
 
