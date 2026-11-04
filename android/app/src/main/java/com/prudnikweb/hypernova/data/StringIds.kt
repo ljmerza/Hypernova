@@ -5,6 +5,64 @@ import com.prudnikweb.hypernova.R
 /** The string resource behind a [Str]: named in full, so R8 keeps what's used and drops the rest. */
 val Str.id: Int
     get() = when (this) {
+        Str.as_rules -> R.string.as_rules
+        Str.as_saved -> R.string.as_saved
+        Str.as_undone -> R.string.as_undone
+        Str.as_undo_row -> R.string.as_undo_row
+        Str.as_saving -> R.string.as_saving
+        Str.try_again -> R.string.try_again
+        Str.loading -> R.string.loading
+        Str.cancel -> R.string.cancel
+        Str.as_why_link -> R.string.as_why_link
+        Str.as_why_read_only -> R.string.as_why_read_only
+        Str.as_why_no_folder -> R.string.as_why_no_folder
+        Str.pr_intro -> R.string.pr_intro
+        Str.pr_when -> R.string.pr_when
+        Str.pr_scope -> R.string.pr_scope
+        Str.pr_search -> R.string.pr_search
+        Str.pr_list_allow -> R.string.pr_list_allow
+        Str.pr_list_ask -> R.string.pr_list_ask
+        Str.pr_list_deny -> R.string.pr_list_deny
+        Str.pr_list_with -> R.string.pr_list_with
+        Str.pr_allow_body -> R.string.pr_allow_body
+        Str.pr_ask_body -> R.string.pr_ask_body
+        Str.pr_deny_body -> R.string.pr_deny_body
+        Str.pr_none -> R.string.pr_none
+        Str.pr_none_found -> R.string.pr_none_found
+        Str.pr_add -> R.string.pr_add
+        Str.pr_save -> R.string.pr_save
+        Str.pr_edit -> R.string.pr_edit
+        Str.pr_delete -> R.string.pr_delete
+        Str.pr_undo -> R.string.pr_undo
+        Str.pr_move_to -> R.string.pr_move_to
+        Str.pr_save_anyway -> R.string.pr_save_anyway
+        Str.pr_save_anyway_body -> R.string.pr_save_anyway_body
+        Str.pr_kind_command -> R.string.pr_kind_command
+        Str.pr_kind_read -> R.string.pr_kind_read
+        Str.pr_kind_edit -> R.string.pr_kind_edit
+        Str.pr_kind_site -> R.string.pr_kind_site
+        Str.pr_kind_mcp -> R.string.pr_kind_mcp
+        Str.pr_kind_text -> R.string.pr_kind_text
+        Str.pr_field_command -> R.string.pr_field_command
+        Str.pr_field_path -> R.string.pr_field_path
+        Str.pr_field_site -> R.string.pr_field_site
+        Str.pr_field_server -> R.string.pr_field_server
+        Str.pr_field_tool -> R.string.pr_field_tool
+        Str.pr_field_text -> R.string.pr_field_text
+        Str.pr_anything_after -> R.string.pr_anything_after
+        Str.pr_will_be -> R.string.pr_will_be
+        Str.pr_text_note -> R.string.pr_text_note
+        Str.pr_hidden -> R.string.pr_hidden
+        Str.pr_skipped -> R.string.pr_skipped
+        Str.pr_wins -> R.string.pr_wins
+        Str.pr_confirm_title -> R.string.pr_confirm_title
+        Str.pr_confirm_action -> R.string.pr_confirm_action
+        Str.pr_not_a_list -> R.string.pr_not_a_list
+        Str.pr_missing -> R.string.pr_missing
+        Str.pr_malformed -> R.string.pr_malformed
+        Str.pr_unreadable -> R.string.pr_unreadable
+        Str.pr_codex -> R.string.pr_codex
+        Str.pr_row_codex -> R.string.pr_row_codex
         Str.activity_ended -> R.string.activity_ended
         Str.activity_error -> R.string.activity_error
         Str.activity_limit -> R.string.activity_limit
@@ -439,6 +497,8 @@ val Str.id: Int
 /** The plurals resource behind a [Plural]. */
 val Plural.id: Int
     get() = when (this) {
+        Plural.pr_others -> R.plurals.pr_others
+        Plural.pr_codex_files -> R.plurals.pr_codex_files
         Plural.agent_tool_calls -> R.plurals.agent_tool_calls
         Plural.agents_count -> R.plurals.agents_count
         Plural.ask_show_all -> R.plurals.ask_show_all

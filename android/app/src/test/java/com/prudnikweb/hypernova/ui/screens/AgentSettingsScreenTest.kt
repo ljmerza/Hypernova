@@ -173,6 +173,26 @@ class AgentSettingsScreenTest {
     private fun seen(text: String) = rule.onNodeWithText(text, substring = true).performScrollTo().assertExists()
 
     @Config(qualifiers = "+h1800dp")
+    @Test fun permissionRulesIsARowWithItsCountsThatOpensThemAndTheOldRowIsGone() {
+        hub.answer = Result.success(AgentSettingsReply(claude, file(AgentSettingsFile.MISSING)))
+        var opened = 0
+        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, AgentSettingsReply.CLAUDE, onBack = {}, onRules = { opened++ }) } }
+        rule.waitForIdle()
+        rule.onAllNodes(androidx.compose.ui.test.hasText(str(R.string.as_rules), substring = false)).fetchSemanticsNodes().let { assertEquals("one row, not two", 1, it.size) }
+        seen(str(R.string.as_rules_value, "12", "1", "3"))
+        rule.onNodeWithText(str(R.string.as_rules)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(1, opened)
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun codexsRowSaysItHasNoSuchLists() {
+        hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MISSING), codex))
+        open(AgentSettingsReply.CODEX)
+        seen(str(R.string.pr_row_codex))
+    }
+
+    @Config(qualifiers = "+h1800dp")
     @Test fun claudeCodesValuesInWordsThenItsSummaries() {
         hub.answer = Result.success(AgentSettingsReply(claude, file(AgentSettingsFile.MISSING)))
         open(AgentSettingsReply.CLAUDE)
@@ -187,6 +207,8 @@ class AgentSettingsScreenTest {
         // Not set and unrecognised are each said.
         rule.onAllNodes(androidx.compose.ui.test.hasText(str(R.string.as_not_set), substring = true)).fetchSemanticsNodes().let { assertEquals(3, it.size) }
         seen(str(R.string.as_unrecognised))
+        // The count stays, on the row that opens them.
+        seen(str(R.string.as_rules))
         seen(str(R.string.as_rules_value, "12", "1", "3"))
         seen("formatter: ${str(R.string.as_on)}")
         seen("linter: ${str(R.string.as_off)}")
@@ -306,6 +328,7 @@ class AgentSettingsScreenTest {
         rule.onNodeWithText(str(R.string.as_account_five)).assertDoesNotExist()
     }
 
+    @Config(qualifiers = "+h1800dp")
     @Test fun eachStateOfTheFileIsSaidForItsAgent() {
         hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MALFORMED), file(AgentSettingsFile.UNREADABLE)))
         open(AgentSettingsReply.CLAUDE)
@@ -325,6 +348,7 @@ class AgentSettingsScreenTest {
         seen(str(R.string.as_missing_codex, hub.mac.name))
     }
 
+    @Config(qualifiers = "+h1800dp")
     @Test fun anOlderServerSaysItNeedsUpdatingWithNoTryAgain() {
         hub.answer = Result.failure(AgentSettingsTooOld(str(R.string.as_too_old)))
         open(AgentSettingsReply.CLAUDE)
@@ -332,6 +356,7 @@ class AgentSettingsScreenTest {
         rule.onNodeWithText(str(R.string.try_again)).assertDoesNotExist()
     }
 
+    @Config(qualifiers = "+h1800dp")
     @Test fun anotherFailureCanBeTriedAgain() {
         hub.answer = Result.failure(HubException("No network."))
         open(AgentSettingsReply.CLAUDE)
@@ -343,6 +368,7 @@ class AgentSettingsScreenTest {
         seen(str(R.string.as_k_effort))
     }
 
+    @Config(qualifiers = "+h1800dp")
     @Test fun aKeyWithoutWordsKeepsItsRawNameAndAValueItsOwnText() {
         val newer = AgentSettingsFile(AgentSettingsFile.OK, listOf(set("someNewKey", "brand-new"), set("effortLevel", "brand-new-level")), claude.claude, null)
         hub.answer = Result.success(AgentSettingsReply(newer, codex))

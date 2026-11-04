@@ -1065,7 +1065,6 @@
     <string name="as_summary">Also in the file</string>
     <string name="as_rules">Permission rules</string>
     <string name="as_rules_value">%1$s allow · %2$s ask · %3$s deny</string>
-    <string name="as_rules_body">How many of each are in this file. Projects can add more.</string>
     <string name="as_plugins">Plugins</string>
     <string name="as_mcp">MCP servers</string>
     <string name="raw_mode_settings">List</string>
@@ -1466,4 +1465,61 @@
     <string name="as_v_live">Live</string>
     <string name="as_v_friendly">Friendly</string>
     <string name="as_v_pragmatic">Pragmatic</string>
+
+    <!-- Permission rules (ui/settings/AgentRulesParts.kt). -->
+    <string name="pr_intro">Rules Claude Code follows on %1$s, from %2$s. Deny beats Ask, and Ask beats Allow, whichever is the wider.</string>
+    <string name="pr_when">A running session takes a change within a few seconds, from its next call. New sessions start with it.</string>
+    <string name="pr_scope">These are this server\'s own, for every project. A project can add more in its .claude folder: a session\'s sheet shows those in effect, and they aren\'t changed here.</string>
+    <string name="pr_search">Search rules</string>
+    <string name="pr_list_allow">Allow</string>
+    <string name="pr_list_ask">Ask</string>
+    <string name="pr_list_deny">Deny</string>
+    <string name="pr_list_with">%1$s %2$s</string>
+    <string name="pr_allow_body">Done without asking.</string>
+    <string name="pr_ask_body">Claude Code asks first, even where Allow or the mode would let it through.</string>
+    <string name="pr_deny_body">Refused. A whole tool here is taken away from Claude Code.</string>
+    <string name="pr_none">None here.</string>
+    <string name="pr_none_found">No rule has that in it.</string>
+    <string name="pr_add">Add a rule</string>
+    <string name="pr_save">Save</string>
+    <string name="pr_edit">Edit</string>
+    <string name="pr_delete">Delete</string>
+    <string name="pr_undo">Undo</string>
+    <string name="pr_move_to">Move to %1$s</string>
+    <string name="pr_save_anyway">Save as typed</string>
+    <string name="pr_save_anyway_body">Claude Code skips a rule it can\'t read, says so in claude doctor, and keeps the rest of the file. Keep it only if this check is behind your Claude Code.</string>
+    <string name="pr_kind_command">Command</string>
+    <string name="pr_kind_read">Read files</string>
+    <string name="pr_kind_edit">Edit files</string>
+    <string name="pr_kind_site">Website</string>
+    <string name="pr_kind_mcp">MCP tool</string>
+    <string name="pr_kind_text">As text</string>
+    <string name="pr_field_command">npm run test</string>
+    <string name="pr_field_path">~/notes/**</string>
+    <string name="pr_field_site">github.com</string>
+    <string name="pr_field_server">MCP server</string>
+    <string name="pr_field_tool">Tool (empty: all of them)</string>
+    <string name="pr_field_text">Bash(npm run test *)</string>
+    <string name="pr_anything_after">And anything after it</string>
+    <string name="pr_will_be">Saves as %1$s</string>
+    <string name="pr_text_note">Anything Claude Code reads as a rule: Tool, or Tool(content). Saving checks it.</string>
+    <string name="pr_hidden">Part of this stays on the server. Leave the hidden part as shown and it\'s kept, or type over it.</string>
+    <string name="pr_skipped">Claude Code skips this. %1$s</string>
+    <string name="pr_wins">%1$s wins over this: %2$s</string>
+    <string name="pr_confirm_title">Let this through on %1$s?</string>
+    <string name="pr_confirm_action">Yes, change it</string>
+    <string name="pr_not_a_list">%1$s isn\'t a list in the file, so Claude Code is skipping the whole file. Fix it on the server.</string>
+    <string name="pr_missing">There\'s no settings file on %1$s yet. Adding a rule makes one.</string>
+    <string name="pr_malformed">That file isn\'t valid JSON, so Claude Code isn\'t reading it. Fix it on the server.</string>
+    <string name="pr_unreadable">That file can\'t be read here: it\'s too big, or isn\'t a plain file.</string>
+    <string name="pr_codex">Codex has no allow, ask and deny lists. What it may do without asking comes from Approvals and Sandbox, on its settings.</string>
+    <string name="pr_row_codex">Codex doesn\'t have these lists</string>
+    <plurals name="pr_others">
+        <item quantity="one">%1$d entry here isn\'t text, and Claude Code drops it.</item>
+        <item quantity="other">%1$d entries here aren\'t text, and Claude Code drops them.</item>
+    </plurals>
+    <plurals name="pr_codex_files">
+        <item quantity="one">Its own command rules are small programs in ~/.codex/rules on %2$s: %1$d file. They aren\'t shown or changed here.</item>
+        <item quantity="other">Its own command rules are small programs in ~/.codex/rules on %2$s: %1$d files. They aren\'t shown or changed here.</item>
+    </plurals>
 </resources>

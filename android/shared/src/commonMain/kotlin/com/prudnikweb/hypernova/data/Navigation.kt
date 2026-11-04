@@ -41,6 +41,8 @@ sealed interface Route {
     data class Skills(val agent: String) : Route { override val key = "skills:$agent" }
     /** An agent's environment variables on this server, as a list to tick and add to. */
     data class AgentEnv(val agent: String) : Route { override val key = "agent-env:$agent" }
+    /** An agent's permission rules on this server: Allow, Ask and Deny, to search and change. */
+    data class AgentRules(val agent: String) : Route { override val key = "agent-rules:$agent" }
     /** One of Claude Code's settings files as raw JSON, folding as it goes. */
     data class AgentRaw(val agent: String) : Route { override val key = "agent-raw:$agent" }
     /** Settings › Logs › Connection log (data/ConnLog.kt). */
@@ -124,7 +126,7 @@ fun sessionStack(stack: List<Route>, id: String, fresh: Boolean = false): List<R
  */
 val Route.isSettingsPage: Boolean get() = when (this) {
     Route.Providers, is Route.ProviderEdit, is Route.AgentSettings, is Route.McpServers, is Route.McpServerPage, is Route.McpEdit,
-    is Route.Plugins, is Route.PluginPage, is Route.PluginBrowse, is Route.Skills, is Route.AgentEnv, is Route.AgentRaw,
+    is Route.Plugins, is Route.PluginPage, is Route.PluginBrowse, is Route.Skills, is Route.AgentEnv, is Route.AgentRaw, is Route.AgentRules,
     Route.ConnectionLog, is Route.ServerSettings, Route.NotificationSettings, Route.TopBarSettings, Route.CardSwipeSettings,
     Route.TypingVoiceSettings, Route.LogSettings -> true
     Route.Home, is Route.Session, is Route.Files, is Route.FileView, is Route.Web, is Route.Terminal, is Route.Agent, is Route.AutomationEdit -> false

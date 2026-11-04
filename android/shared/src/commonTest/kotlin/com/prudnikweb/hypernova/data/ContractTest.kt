@@ -1016,6 +1016,57 @@ class ContractTest {
             assertEquals("DISABLE_TELEMETRY: 0 → 1", u.change)
         },
         "rest-env-undone" to { o -> assertTrue(o.bool("ok")) },
+        "rest-rules" to { o ->
+            val r = AgentRulesReply.wire(o)
+            assertTrue(r.supported)
+            assertEquals("file-hash", r.hash)
+            assertEquals("~/.claude/settings.json", r.where)
+            assertTrue(r.editable)
+            assertNull(r.undo)
+            val allow = r.list(AgentRulesReply.ALLOW).rules!!
+            assertEquals(5, allow.size)
+            assertEquals("Bash(npm run test:*)", allow[0].text)
+            assertNotNull(allow[1].broad)
+            assertTrue(allow[2].masked)
+            assertTrue(allow[2].text.contains("<hidden on the server 1>"))
+            assertEquals(AgentRulesReply.ASK, allow[3].overriddenBy)
+            assertEquals("Read", allow[3].overrides)
+            assertNotNull(allow[4].problem)
+            assertEquals(1, r.list(AgentRulesReply.DENY).rules!!.size)
+        },
+        "rest-rules-codex" to { o ->
+            val r = AgentRulesReply.wire(o)
+            assertFalse(r.supported)
+            assertEquals(0, r.rulesFiles)
+            assertFalse(r.editable)
+        },
+        "rest-rules-confirm" to { o ->
+            val e = Api.errorOf(403, o.toString())
+            assertEquals(AgentRulesReply.CONFIRM_NEEDED, e.code)
+            assertTrue(e.serverMessage!!.contains("Bypass"))
+        },
+        "rest-rules-bad" to { o ->
+            val e = Api.errorOf(400, o.toString())
+            assertEquals(AgentRulesReply.BAD_RULE, e.code)
+            assertTrue(e.serverMessage!!.isNotBlank())
+        },
+        "rest-rules-stale" to { o -> assertEquals(AgentSettingRefused.FILE_CHANGED, Api.errorOf(409, o.toString()).code) },
+        "rest-rules-placeholder" to { o -> assertEquals("placeholder_unknown", Api.errorOf(400, o.toString()).code) },
+        "rest-rules-changed" to { o ->
+            val c = RuleChanged.wire(o)
+            assertTrue(c.changed)
+            assertEquals("file-hash", c.hash)
+            assertFalse(c.loosened)
+        },
+        "rest-rules-undo-offer" to { o ->
+            assertTrue(o.bool("needsConfirm"))
+            assertTrue(o.str("change")!!.contains("goes on Allow"))
+        },
+        "rest-rules-undo-confirm" to { o -> assertEquals(AgentRulesReply.CONFIRM_NEEDED, Api.errorOf(403, o.toString()).code) },
+        "rest-rules-undone" to { o ->
+            assertTrue(o.bool("ok"))
+            assertEquals("permissions.rules", o.str("key"))
+        },
         "rest-raw" to { o ->
             val r = RawFile.wire(o)
             assertEquals(Mcp.USER, r.scope)

@@ -76,7 +76,7 @@ import kotlinx.coroutines.launch
  * answers for itself, so this is the hub whose card was tapped, and nothing here changes several at once.
  */
 @Composable
-fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}, onJson: () -> Unit = {}) {
+fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}, onJson: () -> Unit = {}, onRules: () -> Unit = {}) {
     val bottom = screenBottom()
     val codex = agent == AgentSettingsReply.CODEX
     val server = hub.mac.name
@@ -177,6 +177,9 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                         NavRow(stringResource(R.string.as_skills), stringResource(R.string.as_skills_manage), onClick = onSkills)
                         Hairline(Modifier.fillMaxWidth())
                         NavRow(stringResource(R.string.env_title), stringResource(R.string.env_row), onClick = onEnv)
+                        Hairline(Modifier.fillMaxWidth())
+                        val counts = current?.claude?.let { c -> stringResource(R.string.as_rules_value, c.allow?.toString() ?: "?", c.ask?.toString() ?: "?", c.deny?.toString() ?: "?") }
+                        NavRow(stringResource(R.string.as_rules), if (codex) stringResource(R.string.pr_row_codex) else counts, onClick = onRules)
                     }
                 }
             }
@@ -480,9 +483,6 @@ private fun ClaudeSummaryCard(s: ClaudeSettingsSummary, mcp: ClaudeMcp?) {
     val unrecognised = stringResource(R.string.as_unrecognised)
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-            val count = { n: Int? -> n?.toString() ?: "?" }
-            ReadOnlyRow(stringResource(R.string.as_rules), stringResource(R.string.as_rules_value, count(s.allow), count(s.ask), count(s.deny)), HN.ink, stringResource(R.string.as_rules_body))
-            Hairline(Modifier.fillMaxWidth())
             NamesRow(
                 stringResource(R.string.as_plugins),
                 s.plugins?.map { p ->

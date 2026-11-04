@@ -1,7 +1,12 @@
 package com.prudnikweb.hypernova.data.live
 
+import com.prudnikweb.hypernova.data.AgentRulesReply
 import com.prudnikweb.hypernova.data.Mcp
+import com.prudnikweb.hypernova.data.RuleChange
 import com.prudnikweb.hypernova.data.agentEnv
+import com.prudnikweb.hypernova.data.agentRules
+import com.prudnikweb.hypernova.data.changeRule
+import com.prudnikweb.hypernova.data.undoRule
 import com.prudnikweb.hypernova.data.envFlip
 import com.prudnikweb.hypernova.data.envRemove
 import com.prudnikweb.hypernova.data.envSet
@@ -240,6 +245,40 @@ class SettingsCallsTest {
         answer("POST", "/v1/agents/env/undo", "rest-env-undone")
         rig.call { rig.hub.envUndo("claude") }.getOrThrow()
         assertEquals(1, daemon.count("POST", "/v1/agents/env/undo"))
+    }
+
+    @Test fun aRuleChangeGoesToTheSettingsRouteAndSaysWhatTheServerSaid() {
+        connect()
+        answer("GET", "/v1/agents/rules", "rest-rules")
+        val r = rig.call { rig.hub.agentRules("claude") }.getOrThrow()
+        assertEquals("file-hash", r.hash)
+        assertTrue(last("GET", "/v1/agents/rules").query.contains("agent=claude"))
+        answer("PUT", "/v1/agents/settings", "rest-rules-changed")
+        val done = rig.call { rig.hub.changeRule("claude", RuleChange.Move("allow", 2, "deny"), "h") }.getOrThrow()
+        assertTrue(done.changed)
+        val sent = JSONObject(last("PUT", "/v1/agents/settings").body)
+        assertEquals("h", sent.getString("expected"))
+        assertEquals("move", sent.getJSONObject("rule").getString("op"))
+        assertFalse(sent.has("confirmed"))
+        assertFalse(sent.has("key"))
+        rig.call { rig.hub.changeRule("claude", RuleChange.Add("allow", "Bash"), null, confirmed = true, asTyped = true) }.getOrThrow()
+        val again = JSONObject(last("PUT", "/v1/agents/settings").body)
+        assertTrue(again.isNull("expected"))
+        assertTrue(again.getBoolean("confirmed"))
+        assertTrue(again.getBoolean("asTyped"))
+        daemon.on("PUT", "/v1/agents/settings") { refusal(403, "confirm_needed", "It lets more through.") }
+        val e = rig.call { rig.hub.changeRule("claude", RuleChange.Add("allow", "Bash"), "h") }.exceptionOrNull() as AgentSettingRefused
+        assertEquals(AgentRulesReply.CONFIRM_NEEDED, e.code)
+        assertEquals("It lets more through.", e.message)
+        answer("POST", "/v1/agents/settings/undo", "rest-rules-undone")
+        rig.call { rig.hub.undoRule("claude", "h", confirmed = true) }.getOrThrow()
+        assertTrue(JSONObject(last("POST", "/v1/agents/settings/undo").body).getBoolean("confirmed"))
+    }
+
+    @Test fun anOlderServerHasNoRulesRouteAndSaysItNeedsUpdating() {
+        connect()
+        daemon.on("GET", "/v1/agents/rules") { refusal(404, "not_found", "Unknown endpoint.") }
+        assertTrue(rig.call { rig.hub.agentRules("claude") }.exceptionOrNull() is AgentSettingsTooOld)
     }
 
     @Test fun aRawFileGoesToItsRouteWithItsHashAndAFolderOnlyWhereItCounts() {
