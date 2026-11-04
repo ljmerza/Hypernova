@@ -61,6 +61,18 @@ OWN_LAYOUT = re.compile(r"App$|.*Screen$")
 JETBRAINS_POINTERS = re.compile(r"^org\.jetbrains\.compose\.((?:foundation:[\w-]+)|(?:animation:animation(?:-android)?)):", re.M)
 CLASSPATH_FILES = ("android/app/classpath-debug.txt", "android/app/classpath-release.txt")
 PREVIEW_IGNORE = ".*-preview/"
+# CLAUDE.md, "No fingerprints or screen locks". In code; a comment or a string may name them.
+BIOMETRIC_CODE = re.compile(
+    r"\b(?:BiometricPrompt|BiometricManager|FingerprintManager|OwnerCheck|createConfirmDeviceCredentialIntent"
+    r"|setDeviceCredentialAllowed|setUserAuthenticationRequired)\b|\bandroid\.hardware\.(?:biometrics|fingerprint)\b|\bandroidx\.biometric\b"
+)
+# In what declares a permission or a dependency, as plain text: a Gradle dependency is a string.
+BIOMETRIC_BUILD = re.compile(r"androidx\.biometric|USE_BIOMETRIC|USE_FINGERPRINT")
+BIOMETRIC_BUILD_FILES = (
+    "android/app/src/main/AndroidManifest.xml", "android/app/build.gradle.kts", "android/shared/build.gradle.kts",
+    "android/sharedui/build.gradle.kts", "android/desktop/build.gradle.kts", "android/gradle/libs.versions.toml",
+    *CLASSPATH_FILES,
+)
 
 TOKEN = re.compile(r'"""|"|//|/\*|`[^`\n]*`|\'(?:\\.|[^\\\'\n])[^\'\n]*\'|\{|\}')
 IN_STRING = re.compile(r'\\.|\$\{|"|\n')
@@ -337,6 +349,20 @@ def check_classpath(root: Path, out: List[Breach]) -> None:
                               "It's only a pointer to AndroidX's, and it stays off: compileOnly in sharedui's commonMain (docs/PLATFORMS.md, \"The shared drawing\")."))
 
 
+def check_no_biometric(root: Path, sources: List[Source], out: List[Breach]) -> None:
+    rule = "no-biometric"
+    todo = "The owner said no: CLAUDE.md, \"No fingerprints or screen locks\". What loosens permissions or runs code gets a one-tap confirm saying what it does."
+    for s in sources:
+        for i, line in enumerate(s.lines, 1):
+            for m in BIOMETRIC_CODE.finditer(line):
+                out.append(Breach(s.rel, i, rule, m.group(0), f"{m.group(0)} is a fingerprint or screen-lock check", todo))
+    for rel in BIOMETRIC_BUILD_FILES:
+        f = root / rel
+        if f.is_file():
+            for m in BIOMETRIC_BUILD.finditer(f.read_text(encoding="utf-8")):
+                out.append(Breach(rel, 0, rule, m.group(0), f"{m.group(0)} is there for a fingerprint or screen-lock check", todo))
+
+
 def check_preview_ignore(root: Path, out: List[Breach]) -> None:
     f = root / ".gitignore"
     lines = f.read_text(encoding="utf-8").splitlines() if f.is_file() else []
@@ -394,6 +420,7 @@ def check(root: Path) -> Tuple[List[Breach], int, int]:
     check_same_names("phone-desktop-same-name", desk_ui, phone_ui, "Don't copy: move the phone's into sharedui and use it from both (CLAUDE.md, \"The rules\"). If it's really another thing, give it another name.", OWN_LAYOUT, out)
     check_same_file({"app": app, "shared": [s for s in shared if "/src/commonMain/" in s.rel], "sharedui": sharedui, "desktop": desktop}, out)
     check_classpath(root, out)
+    check_no_biometric(root, sharedui + shared + app_all + desktop_all, out)
     check_preview_ignore(root, out)
     left, allowed = apply_allowlist(root, out)
     return left, allowed, len(sharedui) + len(shared) + len(app_all) + len(desktop_all)
