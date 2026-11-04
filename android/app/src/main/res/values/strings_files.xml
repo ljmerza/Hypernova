@@ -43,9 +43,9 @@
     <string name="st_browse_title">Browse outside projects</string>
     <string name="st_browse_desc">Open sessions\' folders in your home folder too, read only.</string>
     <string name="st_browse_why">A paired phone can then read those folders and download their files. Folders with keys and private data (.ssh, keychains, mail, browsers\' profiles, app data) and files with passwords stay locked whatever this says, and folders outside your home folder stay closed.</string>
-    <string name="st_browse_check_title">Open folders outside your projects</string>
+    <string name="st_browse_check_title">Open folders outside your projects?</string>
     <string name="st_browse_check_sub">Read only. Keys and private folders stay locked.</string>
-    <string name="st_browse_no_lock">Set up a screen lock on this phone first: this switch needs it.</string>
+    <string name="st_browse_check_action">Open them</string>
     <string name="err_browse_setting">Couldn\'t change Browse outside projects.</string>
     <string name="fl_locked_folder_row">Folder, %1$s, stays on the server</string>
 

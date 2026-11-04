@@ -317,7 +317,7 @@ data class AutomationInput(
     val trigger: Trigger,
     val action: Action,
     val template: String?,
-    /** Set only after the fingerprint check, for "No asking". */
+    /** Set only after the confirm, for "No asking". */
     val confirmBypass: Boolean = false,
     /** Set only after the owner agreed that it costs money (another provider). */
     val confirmPaid: Boolean = false,
@@ -325,12 +325,12 @@ data class AutomationInput(
     val steps: List<Step>? = null,
     val outputs: List<Output> = emptyList(),
     val budget: Budget? = null,
-    /** Set only after the fingerprint check, for a shell step. */
+    /** Set only after the confirm, for a shell step. */
     val confirmShell: Boolean = false,
 ) {
-    /** Any start step in No asking: Save asks for the fingerprint. */
+    /** Any start step in No asking: Save asks first. */
     val bypass: Boolean get() = flowSteps.any { (it.action as? Action.Start)?.permissionMode == AutoMode.NO_ASKING }
-    /** Any shell step: Save asks for the fingerprint, every time. */
+    /** Any shell step: Save asks first, every time. */
     val shell: Boolean get() = flowSteps.any { it.action is Action.Shell }
 
     /**

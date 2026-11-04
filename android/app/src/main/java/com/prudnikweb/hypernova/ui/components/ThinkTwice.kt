@@ -117,8 +117,8 @@ fun ModePicker(mode: String, onChange: (String) -> Unit, modifier: Modifier = Mo
             { m ->
                 if (m != mode && needsThinkTwice(m)) {
                     val pick = Incidents.next(context)
-                    // No list to show (the file is damaged): go on rather than block the choice.
-                    if (pick == null) onChange(m) else { incidentId = pick.id; asking = m }
+                    // No list to show (the file is damaged): go on rather than block the choice, but never into Bypass.
+                    if (pick != null) { incidentId = pick.id; asking = m } else if (m != "bypassPermissions") onChange(m)
                 } else onChange(m)
             },
             enabled = { it != "bypassPermissions" || bypassAvailable },

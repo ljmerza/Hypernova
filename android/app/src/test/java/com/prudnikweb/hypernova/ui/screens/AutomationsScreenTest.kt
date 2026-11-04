@@ -213,6 +213,31 @@ class AutomationsScreenTest {
         assertTrue("an edit isn't a new one", saved.isEmpty())
     }
 
+    @Test fun savingACommandOrNoAskingSaysWhatItDoesAndSetsItsFlagsOnlyWhenPressed() {
+        val steps = listOf(
+            com.prudnikweb.hypernova.data.Step("s1", null, com.prudnikweb.hypernova.data.Action.Shell("/home/owner/projects/hypernova", "npm test && ./deploy.sh")),
+            com.prudnikweb.hypernova.data.Step("s2", null, com.prudnikweb.hypernova.data.Action.Start("/home/owner/projects/hypernova", "Fix it", "anthropic", null, com.prudnikweb.hypernova.data.AutoMode.NO_ASKING, emptyList(), com.prudnikweb.hypernova.data.Then.NONE)),
+        )
+        val autos = FakeAutomations(AutoSamples.state(list = listOf(Samples.automation("au-sh", "Nightly", steps = steps)), features = setOf("steps", "ask", "shell")))
+        editor(hub(autos), "au-sh")
+        rule.onNode(hasText("Nightly") and SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText)).performScrollTo().performTextReplacement("Nightly deploy")
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.au_save)).assertIsEnabled().performClick()
+        rule.waitForIdle()
+        // Not pressed: nothing's saved.
+        assertTrue(autos.calls.toString(), autos.calls.none { it.startsWith("save(") })
+        val ask = spy.confirms.single()
+        assertEquals(str(R.string.wf_shell_title), ask.title)
+        assertTrue(ask.danger)
+        assertTrue(ask.body, ask.body.contains("npm test && ./deploy.sh"))
+        assertTrue(ask.body, ask.body.contains(str(R.string.au_bypass_body, "Nightly deploy")))
+        ask.onConfirm()
+        rule.waitForIdle()
+        assertTrue(autos.calls.toString(), "save(au-sh, Nightly deploy)" in autos.calls)
+        assertTrue(autos.lastInput!!.confirmShell)
+        assertTrue(autos.lastInput!!.confirmBypass)
+    }
+
     @Test fun aRefusedNameIsSaidUnderTheName() {
         val autos = FakeAutomations(AutoSamples.state())
         editor(hub(autos), "au-brief")

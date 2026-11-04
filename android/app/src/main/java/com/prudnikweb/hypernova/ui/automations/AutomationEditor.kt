@@ -89,7 +89,6 @@ import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.Incidents
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.data.flow
 import com.prudnikweb.hypernova.data.flowSteps
 import com.prudnikweb.hypernova.data.strings
@@ -323,23 +322,21 @@ fun AutomationEditor(
 
     /**
      * What every save asks first, as the Mac does: another provider costs money (a plain yes), and
-     * a start in No asking or a shell step needs the fingerprint or the screen lock (one check for
-     * both, every time). Then [go] with the confirmations set.
+     * a start in No asking or a shell step needs a confirm saying what it does (one for both, every
+     * time). Then [go] with the confirmations set.
      */
     fun confirmed(input: AutomationInput, go: (AutomationInput) -> Unit) {
         val paidBy = input.paidProvider(builtIn, providerOf(hub), costs(hub))
         fun check() {
             val ready = input.copy(confirmPaid = paidBy != null, confirmBypass = input.bypass, confirmShell = input.shell)
             if (!input.bypass && !input.shell) { go(ready); return }
-            val shell = input.shell
-            OwnerCheck.ask(
-                context,
-                title = res.getString(if (shell) R.string.wf_shell_title else R.string.au_bypass_title),
-                subtitle = input.name.ifBlank { res.getString(R.string.au_edit_new) },
-                noLock = res.getString(if (shell) R.string.wf_lock_needed else R.string.au_bypass_needed),
-                onOk = { go(ready) },
-                onFail = { msg -> if (msg != null) toast(msg) },
+            val name = input.name.ifBlank { res.getString(R.string.au_edit_new) }
+            val commands = input.flowSteps.mapNotNull { (it.action as? Action.Shell)?.command }
+            val says = listOfNotNull(
+                res.getString(R.string.au_bypass_body, name).takeIf { input.bypass },
+                res.getString(R.string.wf_shell_body, name, commands.joinToString("\n\n")).takeIf { input.shell },
             )
+            confirm(Confirm(res.getString(if (input.shell) R.string.wf_shell_title else R.string.au_bypass_title), says.joinToString("\n\n"), res.getString(R.string.au_save), danger = true) { go(ready) })
         }
         if (paidBy != null) {
             val provider = if (paidBy == AgentKind.CODEX_PROVIDER) res.getString(R.string.cx_agent_codex) else hub.providers.firstOrNull { it.id == paidBy }?.name ?: paidBy

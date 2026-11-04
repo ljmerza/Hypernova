@@ -46,9 +46,9 @@ import com.prudnikweb.hypernova.ui.theme.Type
 // The Always sheet (IDEAS PA2, PA3; docs/PROTOCOL.md, "Approvals"): opened by the approval card's
 // own Always, so the card in the chat stays as it was. Claude Code's rule, editable, with quick ways
 // to widen it, and where it goes: this session, this project (its local settings file) or
-// everywhere. Claude Code saves it itself; the fingerprint comes after Always allow.
+// everywhere. Claude Code saves it itself. The sheet is the confirm: Always allow answers.
 
-/** The scope's words on the sheet and in the fingerprint prompt. */
+/** The scope's words on the sheet. */
 @Composable
 internal fun alwaysScopeTitle(s: AlwaysScope): String = stringResource(
     when (s) {
@@ -58,19 +58,9 @@ internal fun alwaysScopeTitle(s: AlwaysScope): String = stringResource(
     },
 )
 
-/** The fingerprint prompt's line: the rules and where (`Bash(npm test *), in this project`). */
-internal fun alwaysCheckLine(res: android.content.res.Resources, a: Answer.AlwaysAs): String = res.getString(
-    when (a.scope) {
-        AlwaysScope.Session -> R.string.always_check_session
-        AlwaysScope.Project -> R.string.always_check_project
-        AlwaysScope.Everywhere -> R.string.always_check_everywhere
-    },
-    a.rules.joinToString(", "),
-)
-
 /**
  * Claude Code's rules for [item] ([Item.Approval.alwaysRules]), editable, and where they go. Always
- * allow hands [onSave] the answer; the caller asks for the fingerprint, then answers.
+ * allow hands [onSave] the answer, and the caller answers.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

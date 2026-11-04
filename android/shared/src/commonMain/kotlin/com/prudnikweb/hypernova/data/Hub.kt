@@ -299,7 +299,7 @@ interface Hub {
     /**
      * One key of the server's fixed list, from [expected], the hash the file was read with (docs/PROTOCOL.md,
      * "Agent settings"). Fails with [AgentSettingRefused] in the server's words, or [AgentSettingsTooOld].
-     * The screen asks for the owner's fingerprint first when it loosens a permission.
+     * The screen confirms first when it loosens a permission.
      */
     suspend fun changeAgentSetting(agent: String, key: String, value: Any, expected: String?): Result<SettingChange> = Result.failure(UnsupportedOperationException())
     /** The agent's last change put back, if the file is still what it wrote ([expected]). Fails as [changeAgentSetting] does. */
@@ -334,8 +334,8 @@ interface Hub {
     suspend fun extendAwake(): Result<Unit> = Result.failure(UnsupportedOperationException())
 
     /**
-     * Settings → Browse outside projects on the Mac ([Mac.browseOutsideProjects]). The screen asks for
-     * the fingerprint or the screen lock before turning it on (ui/components/OwnerCheck.kt).
+     * Settings → Browse outside projects on the Mac ([Mac.browseOutsideProjects]). The screen confirms
+     * before turning it on.
      */
     suspend fun setBrowseOutsideProjects(on: Boolean): Result<Unit> = Result.failure(UnsupportedOperationException())
 

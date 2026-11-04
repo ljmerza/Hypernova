@@ -59,7 +59,6 @@ import com.prudnikweb.hypernova.ui.components.Hairline
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.NavRow
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
@@ -75,8 +74,8 @@ private val SECRET_NAME = Regex("(^|_)(TOKEN|SECRET|PASSWORD|PASSWD|PASS|KEY|API
 
 /**
  * Agents & providers › an agent's Settings › Environment variables: a list to tick and add to (docs/DECISIONS.md,
- * "Environment variables from the phone"). The server keeps the list of what needs a fingerprint: when it asks, its message
- * is the exact change, shown on a confirm, then the fingerprint, then the same request says so.
+ * "Environment variables from the phone"). The server keeps the list of what needs a confirm: when it asks, its message
+ * is the exact change, shown on a confirm, then the same request says so.
  */
 @Composable
 fun AgentEnvScreen(hub: Hub, agent: String, onBack: () -> Unit) {
@@ -103,7 +102,7 @@ fun AgentEnvScreen(hub: Hub, agent: String, onBack: () -> Unit) {
     }
     val atFolder = if (codex) null else folder
 
-    /** Sends [send]; if the server wants the check, the confirm with its words, the fingerprint, and [send] again saying so. */
+    /** Sends [send]; if the server wants the check, the confirm with its words, and [send] again saying so. */
     fun act(done: () -> Unit = {}, send: suspend (confirmRun: Boolean) -> Result<*>) {
         busy = true
         trouble = null
@@ -115,18 +114,12 @@ fun AgentEnvScreen(hub: Hub, agent: String, onBack: () -> Unit) {
                     val what = e.message.orEmpty()
                     confirm(
                         Confirm(context.getString(R.string.env_check_title, server), what, context.getString(R.string.env_check_action), danger = true) {
-                            OwnerCheck.ask(
-                                context, context.getString(R.string.env_check_title, server), what.substringBefore(':'), context.getString(R.string.check_no_lock),
-                                onOk = {
-                                    busy = true
-                                    scope.launch {
-                                        send(true).onSuccess { done() }.onFailure { x -> trouble = x.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.as_edit_err) }
-                                        attempt++
-                                        busy = false
-                                    }
-                                },
-                                onFail = { msg -> if (msg != null) toast(msg) },
-                            )
+                            busy = true
+                            scope.launch {
+                                send(true).onSuccess { done() }.onFailure { x -> trouble = x.message?.takeIf { it.isNotBlank() } ?: context.getString(R.string.as_edit_err) }
+                                attempt++
+                                busy = false
+                            }
                         },
                     )
                 } else {

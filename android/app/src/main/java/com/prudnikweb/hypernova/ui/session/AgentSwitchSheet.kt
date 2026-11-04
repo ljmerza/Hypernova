@@ -369,14 +369,7 @@ internal fun AgentSwitchSheet(hub: Hub, s: Session, to: String, onSwitched: (Str
             mode,
             onPick = { m ->
                 picking = null
-                // Bypass waits for the fingerprint or the screen lock, as everywhere (docs/DECISIONS.md).
-                if (m == "bypassPermissions" && m != mode) {
-                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, context.getString(R.string.check_bypass_title), s.name,
-                        context.getString(R.string.check_no_lock),
-                        onOk = { mode = m }, onFail = { msg -> if (msg != null) error = msg },
-                    )
-                } else mode = m
+                mode = m
             },
             onDismiss = { picking = null },
             modes = if (toCodex) AgentKind.CODEX_MODES else MODES,

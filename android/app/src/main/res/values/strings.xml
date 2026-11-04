@@ -1024,7 +1024,6 @@
     <string name="as_loosen_body">%1$s: %2$s</string>
     <string name="as_loosen_action">Allow</string>
     <string name="as_loosen_generic">This allows more than the setting does now.</string>
-    <string name="as_check_title">Loosen a permission on %1$s</string>
     <string name="as_undo_row">Undo last change</string>
     <string name="as_undo_to">%1$s back to %2$s</string>
     <string name="as_undo_to_unset">%1$s back to not set</string>
@@ -1082,12 +1081,11 @@
     <string name="raw_bad_at">Line %1$d, column %2$d isn\'t valid JSON. Nothing is saved until it is.</string>
     <string name="raw_save">Save</string>
     <string name="raw_reopen">Open again</string>
-    <string name="raw_note">Saving writes all of this, folded parts too. Anything that runs code or widens a permission lists exactly what changes, then asks for your fingerprint.</string>
+    <string name="raw_note">Saving writes all of this, folded parts too. Anything that runs code or widens a permission lists exactly what changes and asks you to confirm.</string>
     <string name="raw_undo_body">Puts this file back as it was</string>
     <string name="raw_fold">Fold %1$s</string>
     <string name="raw_unfold">Unfold %1$s</string>
     <string name="raw_check_title">Change this on %1$s?</string>
-    <string name="raw_check_sub">A settings file</string>
     <string name="raw_check_action">Continue</string>
     <string name="raw_discard_title">Leave without saving?</string>
     <string name="raw_discard_body">What you\'ve typed here goes.</string>
@@ -1112,7 +1110,7 @@
     <string name="env_err">Couldn\'t read these.</string>
     <string name="env_hidden_value">Value stays on the server</string>
     <string name="env_overridden">%1$s overrides this</string>
-    <string name="env_guarded">Asks for your fingerprint</string>
+    <string name="env_guarded">Asks you to confirm</string>
     <string name="env_refused">Can only be removed from here</string>
     <string name="env_delete">Delete %1$s</string>
     <string name="env_switch">%1$s on or off</string>

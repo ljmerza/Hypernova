@@ -453,7 +453,7 @@ private fun ShellParams(hub: Hub, a: Action.Shell, chips: List<String>, env: Lis
     Spacer(Modifier.height(10.dp))
     HText(stringResource(R.string.wf_shell_note), style = Type.small, color = HN.inkDim)
     Spacer(Modifier.height(6.dp))
-    HText(stringResource(R.string.wf_shell_fingerprint), style = Type.small, color = HN.amber)
+    HText(stringResource(R.string.wf_shell_confirm), style = Type.small, color = HN.amber)
     if (pick) {
         ChoiceSheet(
             stringResource(R.string.au_project),

@@ -2,7 +2,6 @@
 
 package com.prudnikweb.hypernova.ui.screens
 
-import android.app.KeyguardManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -20,7 +19,6 @@ import com.prudnikweb.hypernova.data.BlockedCall
 import com.prudnikweb.hypernova.data.AlwaysScope
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.ModelSwitch
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.session.SessionScreen
 import com.prudnikweb.hypernova.ui.session.SessionSheet
 import org.junit.After
@@ -37,8 +35,7 @@ import org.robolectric.annotation.Config
 
 /**
  * The session sheet's pickers and the owner's check (FEATURES S2, S4, A2): the model picker driven
- * from the sheet, Auto and Bypass asked about twice, and the fingerprint or screen lock before
- * Bypass and before an Always rule is saved (OwnerCheck, its system prompt stood in for).
+ * from the sheet, Auto and Bypass asked about twice, and an Always rule saved from its sheet.
  */
 @RunWith(RobolectricTestRunner::class)
 class SheetMoreTest {
@@ -69,14 +66,11 @@ class SheetMoreTest {
 
     @Before fun setUp() = resetPrefs()
 
-    @After fun tearDown() {
-        OwnerCheck.prompt = null
-    }
+    @After fun tearDown() = incidents(null)
 
-    /** The phone has a screen lock (or not); a check that [passes] or is cancelled. */
-    private fun lock(secure: Boolean, passes: Boolean = true) {
-        shadowOf(context.getSystemService(KeyguardManager::class.java)).setIsDeviceSecure(secure)
-        OwnerCheck.prompt = { ok, fail -> if (passes) ok() else fail(null) }
+    /** What the think-twice card has to pick from, as a damaged file would leave it (null: read the file again). */
+    private fun incidents(list: List<com.prudnikweb.hypernova.ui.components.Incident>?) {
+        com.prudnikweb.hypernova.ui.components.Incidents::class.java.getDeclaredField("cache").apply { isAccessible = true }.set(null, list)
     }
 
     private fun sheet(hub: Hub, id: String) {
@@ -131,29 +125,28 @@ class SheetMoreTest {
         assertEquals(listOf("setMode(${Samples.ZETA}, auto)"), hub.calls)
     }
 
-    @Test fun bypassAsksTwiceThenForTheOwner() {
+    @Test fun bypassAsksToThinkTwiceAndOnlyThenGoes() {
         val hub = FakeHub()
         sheet(hub, Samples.ZETA)
-        // No screen lock: there's nothing to check, so Bypass doesn't go.
-        lock(secure = false)
         mode(R.string.mode_bypass)
-        rule.onNodeWithText(str(R.string.think_use_bypass)).performClick()
+        // Keep asking: nothing changes.
+        rule.onNodeWithText(str(R.string.think_keep)).performClick()
         rule.waitForIdle()
         assertTrue(hub.calls.isEmpty())
-        assertEquals(1, spy.toasts.size)
-        // The check cancelled: nothing, and nothing said.
-        lock(secure = true, passes = false)
-        mode(R.string.mode_bypass)
-        rule.onNodeWithText(str(R.string.think_use_bypass)).performClick()
-        rule.waitForIdle()
-        assertTrue(hub.calls.isEmpty())
-        assertEquals(1, spy.toasts.size)
-        // The owner's fingerprint: Bypass.
-        lock(secure = true)
         mode(R.string.mode_bypass)
         rule.onNodeWithText(str(R.string.think_use_bypass)).performClick()
         rule.waitForIdle()
         assertEquals(listOf("setMode(${Samples.ZETA}, bypassPermissions)"), hub.calls)
+    }
+
+    @Test fun withNoCaseToShowAutoGoesOnAndBypassDoesnt() {
+        incidents(emptyList())
+        val hub = FakeHub()
+        sheet(hub, Samples.ZETA)
+        mode(R.string.mode_bypass)
+        assertTrue("Bypass never goes without its card", hub.calls.isEmpty())
+        mode(R.string.mode_auto)
+        assertEquals(listOf("setMode(${Samples.ZETA}, auto)"), hub.calls)
     }
 
     @Test fun planNeedsNoSecondThought() {
@@ -164,26 +157,46 @@ class SheetMoreTest {
         assertEquals(listOf("setMode(${Samples.ZETA}, acceptEdits)"), hub.calls)
     }
 
-    // ─── A2: an Always rule is saved only after the owner's check ───
+    // ─── A2: an Always rule is saved from its sheet, which is its confirm ───
 
-    @Test fun anAlwaysRuleIsSavedOnlyAfterTheOwnersCheck() {
+    @Test fun anAlwaysRuleIsSavedFromItsSheetAndCancelSendsNothing() {
         val hub = FakeHub()
         rule.setContent { Harness(spy) { SessionScreen(hub, Samples.BUILD, onBack = {}, usageOf = { _, _ -> null }) } }
         rule.waitForIdle()
-        fun save() {
-            rule.onNodeWithText(str(R.string.always)).performClick()
-            rule.waitForIdle()
-            rule.onNodeWithText(str(R.string.always_save)).performClick()
-            rule.waitForIdle()
-        }
-        lock(secure = true, passes = false)
-        save()
-        assertTrue("cancelled: not answered", hub.calls.isEmpty())
+        rule.onNodeWithText(str(R.string.always)).performClick()
+        rule.waitForIdle()
+        assertTrue("nothing until it's pressed", hub.calls.isEmpty())
         rule.onNodeWithText(str(R.string.cancel)).performClick()
         rule.waitForIdle()
-        lock(secure = true)
-        save()
+        assertTrue("cancelled: not answered", hub.calls.isEmpty())
+        rule.onNodeWithText(str(R.string.always)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.always_save)).performClick()
+        rule.waitForIdle()
         assertEquals(listOf("answer(${Samples.BUILD}, ap-test, ${Answer.AlwaysAs(AlwaysScope.Project, listOf("Bash(npm test *)"))})"), hub.calls)
+        assertTrue("the sheet was the confirm", spy.confirms.isEmpty())
+    }
+
+    @Test fun anAlwaysWithNoRuleConfirmsBesideTheWholeCommand() {
+        val hub = object : Hub by FakeHub() {
+            val answers = mutableListOf<Answer>()
+            override fun transcript(id: String): List<com.prudnikweb.hypernova.data.Item> =
+                listOf(com.prudnikweb.hypernova.data.Item.Approval("ap-x", tool = "Bash", detail = "npm test -- --watch=false\nnpm run lint", reason = "", approvalId = "ap-x", canAlways = true))
+            override fun answer(sessionId: String, item: com.prudnikweb.hypernova.data.Item.Approval, answer: Answer) { answers += answer }
+        }
+        rule.setContent { Harness(spy) { SessionScreen(hub, Samples.BUILD, onBack = {}, usageOf = { _, _ -> null }) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.always)).performClick()
+        rule.waitForIdle()
+        val ask = spy.confirms.single()
+        assertEquals(str(R.string.always_confirm_title), ask.title)
+        assertTrue(ask.danger)
+        assertTrue(ask.body, ask.body.contains("npm test -- --watch=false\nnpm run lint"))
+        assertTrue(ask.body, ask.body.contains(str(R.string.always_means)))
+        assertTrue("nothing until it's pressed", hub.answers.isEmpty())
+        ask.onConfirm()
+        rule.waitForIdle()
+        assertEquals(listOf<Answer>(Answer.Always), hub.answers)
     }
 
     // ─── S2: the model picker, from the sheet ───

@@ -942,11 +942,11 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
         is Item.Terminal -> MiniTerminal(item, modifier, onPreview = preview)
         is Item.Diff -> DiffCard(item, modifier, onOpen = openOrPlan(item.path), onPreviewFile = { path -> opener.preview(path, null, path.substringAfterLast('/')) })
         is Item.Approval -> {
-            // "Always" waits for the fingerprint or the screen lock (docs/DECISIONS.md).
-            val context = LocalContext.current
-            val toast = LocalToast.current
-            val title = stringResource(R.string.check_always_title)
-            val noLock = stringResource(R.string.check_no_lock)
+            // "Always" with no rule to show on the sheet: a confirm saying what it does, beside the whole command.
+            val confirm = com.prudnikweb.hypernova.ui.LocalConfirm.current
+            val title = stringResource(R.string.always_confirm_title)
+            val means = stringResource(R.string.always_means)
+            val action = stringResource(R.string.always_save)
             // The card's own Always opens the Always sheet where Claude Code suggested a rule: the
             // rule, editable, and where it goes (AlwaysSheet.kt). The card itself is unchanged.
             var alwaysSheet by remember(item.key) { mutableStateOf(false) }
@@ -954,19 +954,11 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
                 if (a == Answer.Always && item.alwaysRules.isNotEmpty()) {
                     alwaysSheet = true
                 } else if (a == Answer.Always) {
-                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, title, item.detail.lineSequence().firstOrNull().orEmpty().take(80), noLock,
-                        onOk = { hub.answer(sessionId, item, a) }, onFail = { msg -> if (msg != null) toast(msg) },
-                    )
+                    confirm(com.prudnikweb.hypernova.data.Confirm(title, "$means\n\n${item.detail}", action, danger = true) { hub.answer(sessionId, item, a) })
                 } else hub.answer(sessionId, item, a)
             }, modifier = modifier)
             if (alwaysSheet && item.resolved == null) {
-                AlwaysSheet(item, onDismiss = { alwaysSheet = false }, onSave = { a ->
-                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, title, alwaysCheckLine(context.resources, a).take(120), noLock,
-                        onOk = { alwaysSheet = false; hub.answer(sessionId, item, a) }, onFail = { msg -> if (msg != null) toast(msg) },
-                    )
-                })
+                AlwaysSheet(item, onDismiss = { alwaysSheet = false }, onSave = { a -> alwaysSheet = false; hub.answer(sessionId, item, a) })
             }
         }
         is Item.Thinking -> ThinkingRow(item, modifier)

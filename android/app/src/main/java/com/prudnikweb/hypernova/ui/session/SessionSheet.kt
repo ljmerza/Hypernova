@@ -351,8 +351,8 @@ private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolea
 
 /**
  * What it may do: the permission mode, changed here as in the new-session sheet (Codex's two from
- * its next turn while one runs; Auto and Bypass behind the think-twice card, Bypass behind the
- * fingerprint too), or said with why it can't be; then the calls refused without the owner, with
+ * its next turn while one runs; Auto and Bypass behind the think-twice card), or said with why it
+ * can't be; then the calls refused without the owner, with
  * Allow & retry and Dismiss, while any wait (and once shown, until the sheet closes, so the last
  * one dismissed doesn't take the part away under the finger). Claude Code's rules in effect come
  * after it, read-only (RulesPart.kt). [atBlocked]: the calls into view once they're in, then
@@ -365,8 +365,6 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Bo
     val context = LocalContext.current
     val codexNextTurn = stringResource(R.string.cx_mode_next_turn)
     val bypassNextTurn = stringResource(R.string.mode_bypass_next_turn)
-    val bypassTitle = stringResource(R.string.check_bypass_title)
-    val noLock = stringResource(R.string.check_no_lock)
     when {
         change && s.codex -> com.prudnikweb.hypernova.ui.components.Segmented(
             AgentKind.CODEX_MODES.map { it to com.prudnikweb.hypernova.ui.home.modeTitle(it) },
@@ -380,18 +378,9 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Bo
         change -> com.prudnikweb.hypernova.ui.components.ModePicker(
             s.mode,
             { m ->
-                val go = {
-                    appScope.launch {
-                        hub.setMode(s.id, m).onSuccess { nextTurn -> if (nextTurn) toast(bypassNextTurn) }.onFailure { toast(it.message.orEmpty()) }
-                    }
+                if (m != s.mode) appScope.launch {
+                    hub.setMode(s.id, m).onSuccess { nextTurn -> if (nextTurn) toast(bypassNextTurn) }.onFailure { toast(it.message.orEmpty()) }
                 }
-                // Bypass waits for the fingerprint or the screen lock too (docs/DECISIONS.md).
-                if (m != s.mode && m == "bypassPermissions") {
-                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, bypassTitle, s.name, noLock,
-                        onOk = { go() }, onFail = { msg -> if (msg != null) toast(msg) },
-                    )
-                } else if (m != s.mode) go()
             },
             bypassAvailable = s.bypassAvailable,
         )

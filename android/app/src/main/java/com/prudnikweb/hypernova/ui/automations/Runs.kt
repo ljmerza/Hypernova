@@ -132,7 +132,7 @@ internal fun Runs(hub: Hub, a: Automation, w: Words, ctx: SummaryContext, now: L
                 onStop = { scope.launch { autos.stop(r.id).onFailure { toast(it.message.orEmpty()) } } },
                 onRetry = if (offline) null else ({ retry(r) }),
                 // Only a run that skipped what it wasn't allowed (dontAsk) offers this: no bypass to confirm,
-                // and no command to check the fingerprint for.
+                // and no command to confirm.
                 canAllow = start != null && Rules.kept(start.permissionMode) && WorkflowShape.stepsOf(a).none { it.action is Action.Shell },
                 allowed = start?.allowedTools.orEmpty().toSet(),
                 onAllow = { rule ->

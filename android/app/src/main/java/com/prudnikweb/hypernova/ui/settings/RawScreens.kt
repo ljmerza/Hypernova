@@ -62,7 +62,6 @@ import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.NavRow
-import com.prudnikweb.hypernova.ui.components.OwnerCheck
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
@@ -140,9 +139,7 @@ fun AgentRawScreen(hub: Hub, agent: String, onBack: () -> Unit) {
     }
     fun checked(what: String, resend: () -> Unit) {
         confirm(
-            Confirm(context.getString(R.string.raw_check_title, server), what, context.getString(R.string.raw_check_action), danger = true) {
-                OwnerCheck.ask(context, context.getString(R.string.raw_check_title, server), context.getString(R.string.raw_check_sub), context.getString(R.string.check_no_lock), onOk = resend, onFail = { msg -> if (msg != null) toast(msg) })
-            },
+            Confirm(context.getString(R.string.raw_check_title, server), what, context.getString(R.string.raw_check_action), danger = true, onConfirm = resend),
         )
     }
     fun save(hash: String?) {

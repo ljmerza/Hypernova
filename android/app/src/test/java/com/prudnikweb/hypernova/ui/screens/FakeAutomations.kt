@@ -28,6 +28,8 @@ import com.prudnikweb.hypernova.data.AutoMode
 class FakeAutomations(state: AutomationsState?) : AutomationBook(), Automations {
     val calls = mutableListOf<String>()
     var refuse: AutomationError? = null
+    /** What the last save sent, flags and all. */
+    var lastInput: AutomationInput? = null
 
     init {
         applySnapshot(state)
@@ -45,6 +47,7 @@ class FakeAutomations(state: AutomationsState?) : AutomationBook(), Automations 
     override suspend fun loadRuns(id: String, more: Boolean): Result<Unit> = answer("loadRuns", id, more) { setPage(id, page(id) ?: RunPage(listOfNotNull(automation(id)?.lastRun), more = false, total = null, skipped = null)) }
 
     override suspend fun save(id: String?, input: AutomationInput): Result<Automation> = answer("save", id, input.name) {
+        lastInput = input
         val a = (id?.let(::automation) ?: Samples.automation("au-new", input.name)).copy(name = input.name, enabled = input.enabled, trigger = input.trigger, action = input.action, steps = input.steps, outputs = input.outputs)
         apply(AutoMsg.Changed(a))
         a

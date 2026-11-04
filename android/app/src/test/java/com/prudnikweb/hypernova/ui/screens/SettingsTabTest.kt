@@ -250,7 +250,7 @@ class SettingsTabTest {
         assertEquals(listOf("The checklist isn't there."), spy.toasts)
     }
 
-    @Test fun browseOutsideProjectsOffAtOnceOnOnlyAfterTheScreenLock() {
+    @Test fun browseOutsideProjectsOffAtOnceOnOnlyAfterAConfirm() {
         val z2 = server("z2", 47391) { files(true) }
         z2.ok("POST", "/v1/mac/files", JSONObject().put("files", JSONObject().put("browseOutsideProjects", false)))
         pair(z2)
@@ -262,11 +262,18 @@ class SettingsTabTest {
         rule.waitUntil(5_000) { z2.count("POST", "/v1/mac/files") == 1 }
         assertFalse(z2.calls("POST", "/v1/mac/files").single().json.getBoolean("browseOutsideProjects"))
         rule.waitUntil(5_000) { Core.live?.mac?.browseOutsideProjects == false }
-        // On asks for the fingerprint or screen lock first; a phone with none can't, and says so.
+        // On asks first, saying what it opens; nothing goes until it's pressed.
         rule.onNode(isSwitch(browse)).performScrollTo().performClick()
         rule.waitForIdle()
-        assertEquals(listOf(str(R.string.st_browse_no_lock)), spy.toasts)
+        val ask = spy.confirms.single()
+        assertEquals(str(R.string.st_browse_check_title), ask.title)
+        assertEquals(str(R.string.st_browse_check_sub), ask.body)
+        assertTrue(ask.danger)
         assertEquals(1, z2.count("POST", "/v1/mac/files"))
+        z2.ok("POST", "/v1/mac/files", JSONObject().put("files", JSONObject().put("browseOutsideProjects", true)))
+        ask.onConfirm()
+        rule.waitUntil(5_000) { z2.count("POST", "/v1/mac/files") == 2 }
+        assertTrue(z2.calls("POST", "/v1/mac/files").last().json.getBoolean("browseOutsideProjects"))
     }
 
     @Test fun thePhonesOwnPartsKeepWhatsPicked() {
@@ -371,9 +378,10 @@ class SettingsTabTest {
         val shedId = Core.servers.single { it.pairing.macName == "shed" }.id
         val vm = show()
         clickText("shed")
-        // shed's Browse outside projects: on asks for the screen lock (none here), so nothing reaches either.
+        // shed's Browse outside projects: on asks first, so nothing reaches either until it's pressed.
         rule.onNode(isSwitch(str(R.string.st_browse_title))).performScrollTo().performClick()
         rule.waitForIdle()
+        assertEquals(str(R.string.st_browse_check_title), spy.confirms.single().title)
         assertEquals(0, z2.count("POST", "/v1/mac/files") + shed.count("POST", "/v1/mac/files"))
         // shed's checklist: shed's page.
         clickText(str(R.string.testing_checklist))
@@ -398,7 +406,7 @@ class SettingsTabTest {
         shed.ok("DELETE", "/v1/devices/me", JSONObject().put("ok", true))
         clickText("shed")
         clickText(str(R.string.forget_mac))
-        val ask = spy.confirms.single()
+        val ask = spy.confirms.last()
         assertEquals(str(R.string.forget_q, "shed"), ask.title)
         ask.onConfirm()
         until("shed forgotten") { Core.servers.size == 1 }

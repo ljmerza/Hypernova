@@ -90,10 +90,10 @@ data class AgentVersion(
 suspend fun Hub.agentVersion(agent: String): Result<AgentVersion> =
     agentExt("GET", "/v1/agents/version" + McpWire.query("agent" to agent)).map(AgentVersion::wire)
 
-/** Asks what's newest, now or from a look a few minutes old. Needs no fingerprint: it installs nothing. */
+/** Asks what's newest, now or from a look a few minutes old. Needs no confirm: it installs nothing. */
 suspend fun Hub.checkAgentVersion(agent: String): Result<AgentVersion> =
     agentExt("POST", "/v1/agents/version/check", JSONObject().put("agent", agent), slow = true).map(AgentVersion::wire)
 
-/** Starts the agent's own updater, and answers at once; [AgentVersion.job] follows. The caller has asked for the fingerprint first. */
+/** Starts the agent's own updater, and answers at once; [AgentVersion.job] follows. The caller has confirmed first. */
 suspend fun Hub.updateAgent(agent: String): Result<AgentVersion> =
     agentExt("POST", "/v1/agents/version/update", JSONObject().put("agent", agent).put("confirmRun", true), slow = true).map(AgentVersion::wire)

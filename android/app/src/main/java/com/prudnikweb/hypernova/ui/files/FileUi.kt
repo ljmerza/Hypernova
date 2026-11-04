@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.files
 
 import androidx.compose.foundation.Canvas
@@ -152,7 +153,7 @@ fun FileProblemCard(
                     if (p.kind == FileKind.Outside && root != null && onOpenProjects != null) add {
                         Pill(stringResource(R.string.fp_open_projects), { onOpenProjects(root) }, kind = PillKind.Primary, height = 40.dp)
                     }
-                    // The setting that would open it, next to what was there (the owner turns it on in Settings, with the fingerprint).
+                    // The setting that would open it, next to what was there (the owner turns it on in Settings, with a confirm).
                     if (p.settingOpens && onTurnOn != null) add {
                         Pill(stringResource(R.string.fp_turn_on), onTurnOn, kind = PillKind.Outline, height = 40.dp)
                     }
