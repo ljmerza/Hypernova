@@ -119,7 +119,7 @@ fun resetPrefs() {
     Samples.NOW = System.currentTimeMillis()
     (androidx.core.content.FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }.get(null) as MutableMap<*, *>).clear()
     EnterKeyPref.set(context, EnterKey.Send)
-    TopBarPref.set(context, TopBarChoice.DEFAULT)
+    TopBarPref.set(TopBarChoice.DEFAULT)
     CardSwipePref.set(context, CardSwipes())
     com.prudnikweb.hypernova.ui.home.HomeFilterPref.set(context, com.prudnikweb.hypernova.ui.home.HomeFilter.NONE)
     com.prudnikweb.hypernova.ui.term.TermEnginePref.set(context, com.prudnikweb.hypernova.ui.term.TermEngine.Xterm)

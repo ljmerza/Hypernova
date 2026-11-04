@@ -1283,7 +1283,7 @@ internal fun PermissionsBlock(a: Action.Start, error: String?, editable: Boolean
                     Box(Modifier.padding(top = 2.dp)) { Radio(on, color = warn) }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
-                        HText(modeTitle(m), style = Type.body, color = if (on) HN.ink else HN.inkMuted)
+                        HText(autoModeTitle(m), style = Type.body, color = if (on) HN.ink else HN.inkMuted)
                         HText(stringResource(modeBody(m)), style = Type.small, color = HN.inkDim)
                     }
                 }
@@ -1378,7 +1378,7 @@ private fun CodexPermissions(a: Action.Start, error: String?, editable: Boolean,
                     Box(Modifier.padding(top = 2.dp)) { Radio(on) }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
-                        HText(modeTitle(m), style = Type.body, color = if (on) HN.ink else HN.inkMuted)
+                        HText(autoModeTitle(m), style = Type.body, color = if (on) HN.ink else HN.inkMuted)
                         HText(stringResource(if (m == AgentKind.CAN_EDIT) R.string.cx_au_can_edit_body else R.string.cx_au_read_only_body), style = Type.small, color = HN.inkDim)
                     }
                 }

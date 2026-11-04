@@ -421,7 +421,7 @@ private fun RunStatus(hub: Hub, run: Run, line: RunLine, w: Words, ctx: SummaryC
 fun problemText(a: Automation): String? {
     val ranIn = a.lastRun?.permissionMode
     if (a.mode == AutoMode.AUTO && ranIn != null && ranIn != AutoMode.AUTO) {
-        return stringResource(R.string.au_problem_mode, modeTitle(ranIn))
+        return stringResource(R.string.au_problem_mode, autoModeTitle(ranIn))
     }
     return when (a.problem) {
         null -> null
@@ -432,7 +432,7 @@ fun problemText(a: Automation): String? {
         "no_project" -> stringResource(R.string.au_problem_no_project)
         "no_session" -> stringResource(R.string.au_problem_no_session)
         "no_provider" -> stringResource(R.string.au_problem_no_provider)
-        "mode_unavailable" -> stringResource(R.string.au_problem_mode, modeTitle(ranIn ?: AutoMode.ASK))
+        "mode_unavailable" -> stringResource(R.string.au_problem_mode, autoModeTitle(ranIn ?: AutoMode.ASK))
         "no_gh" -> stringResource(R.string.wf_problem_no_gh)
         "no_hooks" -> stringResource(R.string.wf_problem_no_hooks)
         "output_lost" -> stringResource(R.string.wf_problem_output_lost)
@@ -442,7 +442,7 @@ fun problemText(a: Automation): String? {
 
 /** A permission mode's name as the editor says it ("Allowed only", "Ask me"…). */
 @Composable
-fun modeTitle(mode: String): String = stringResource(
+fun autoModeTitle(mode: String): String = stringResource(
     when (mode) {
         AutoMode.ASK -> R.string.au_mode_ask
         AutoMode.EDITS -> R.string.au_mode_edits

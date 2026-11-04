@@ -2,6 +2,8 @@ package com.prudnikweb.hypernova.data.live
 
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Answer
+import com.prudnikweb.hypernova.data.AttachDrafts
+import com.prudnikweb.hypernova.data.sendPrompt
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.LinkState
 import com.prudnikweb.hypernova.data.PaidModel
@@ -144,6 +146,51 @@ class ErrorsTest {
         val e = rig.call { rig.hub.send("s1", "hello", emptyList(), false) }.exceptionOrNull()
         assertTrue("$e", e is SessionSwitched)
         assertEquals("s9", (e as SessionSwitched).to)
+    }
+
+    /** What [sendPrompt] said, and what it put back in the boxes. */
+    private fun promptToS1(): Triple<List<String>, String?, String?> {
+        val said = ArrayList<String>()
+        rig.call {
+            sendPrompt(rig.hub, "s1", "hello", emptyList(), false, onSwitch = { said += "switch $it" }, onBusy = { said += "busy $it" }, onFail = { said += "fail $it" })
+            Result.success(Unit)
+        }
+        return Triple(said, AttachDrafts.takeBack("s1"), AttachDrafts.takeBack("s9"))
+    }
+
+    @Test fun aPromptThatGoesPutsNothingBack() {
+        connect(session("s1"))
+        daemon.ok("POST", "/v1/sessions/s1/prompt", JSONObject().put("session", session("s1")))
+        val (said, here, there) = promptToS1()
+        assertEquals(emptyList<String>(), said)
+        assertNull(here)
+        assertNull(there)
+    }
+
+    @Test fun aPromptStoppedByTheTerminalComesBackAndSaysWhy() {
+        connect(session("s1"))
+        daemon.on("POST", "/v1/sessions/s1/prompt") { refusal(409, "typing", "There's text in the terminal") { put("pending", "half a sentence") } }
+        val (said, here, there) = promptToS1()
+        assertEquals(listOf("busy half a sentence"), said)
+        assertEquals("hello", here)
+        assertNull(there)
+    }
+
+    @Test fun aPromptToAConversationThatWentOnWaitsInThatBox() {
+        connect(session("s1"))
+        daemon.on("POST", "/v1/sessions/s1/prompt") { refusal(409, "switched", "It went on in Codex") { put("to", "s9") } }
+        val (said, here, there) = promptToS1()
+        assertEquals(listOf("switch s9"), said)
+        assertNull(here)
+        assertEquals("hello", there)
+    }
+
+    @Test fun aPromptTheServerRefusesComesBackInItsWords() {
+        connect(session("s1"))
+        daemon.on("POST", "/v1/sessions/s1/prompt") { refusal(409, "busy", "The terminal is starting") }
+        val (said, here, _) = promptToS1()
+        assertEquals(listOf("fail The terminal is starting"), said)
+        assertEquals("hello", here)
     }
 
     @Test fun anyOther409IsTheServersOwnWords() {

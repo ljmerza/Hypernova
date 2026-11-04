@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.automations
 
 import com.prudnikweb.hypernova.R
@@ -37,18 +38,8 @@ object RunWords {
     }
 
     /** When it's due, as the widgets say it: "9:00" today, "Mon 9:00" this week, "17 Oct 9:00" later. */
-    fun clockWords(w: Words, t: Long, now: Long, zone: ZoneId): String {
-        val at = Instant.ofEpochMilli(t).atZone(zone)
-        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-        val time = Summary.clock(w, at.toLocalTime())
-        val days = ChronoUnit.DAYS.between(today, at.toLocalDate())
-        return when {
-            days == 0L -> time
-            // This week either way: a reset ahead, or one a skipped run waited for.
-            days in -6..6 -> w.s(R.string.au_when_day, DateTimeFormatter.ofPattern("EEE", w.locale).format(at), time)
-            else -> w.s(R.string.au_when_day, DateTimeFormatter.ofPattern("d MMM", w.locale).format(at), time)
-        }
-    }
+    fun clockWords(w: Words, t: Long, now: Long, zone: ZoneId): String =
+        com.prudnikweb.hypernova.data.dayClock(t, now, zone, w.locale, { Summary.clock(w, it) }, { day, time -> w.s(R.string.au_when_day, day, time) })
 
     /** "Next Mon 9:00". */
     fun next(w: Words, t: Long, now: Long, zone: ZoneId): String = w.s(R.string.au_next, clockWords(w, t, now, zone))

@@ -67,7 +67,37 @@ import com.prudnikweb.hypernova.desktop.doingLine
 import com.prudnikweb.hypernova.desktop.factsOf
 import com.prudnikweb.hypernova.desktop.inChatWords
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.prudnikweb.hypernova.ui.LocalOpener
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.runtime.DisposableEffect
+import com.prudnikweb.hypernova.ui.components.popupGlass
+import com.prudnikweb.hypernova.ui.home.MenuPage
+import com.prudnikweb.hypernova.ui.home.SessionMenu
+import com.prudnikweb.hypernova.ui.session.ModelPickerHost
+import com.prudnikweb.hypernova.ui.session.SessionSheet
+import com.prudnikweb.hypernova.ui.session.SessionSheetBody
+import com.prudnikweb.hypernova.data.ChangesRepo
+import com.prudnikweb.hypernova.ui.session.fileEdits
+import com.prudnikweb.hypernova.ui.session.rememberQuickSend
+import com.prudnikweb.hypernova.ui.session.ChatUsage
+import com.prudnikweb.hypernova.ui.session.agentsAtWork
+import com.prudnikweb.hypernova.ui.session.chatListRows
+import com.prudnikweb.hypernova.ui.session.chatWorking
+import com.prudnikweb.hypernova.ui.session.rememberSessionUsage
+import com.prudnikweb.hypernova.ui.session.rememberTopBarGit
+import com.prudnikweb.hypernova.ui.session.sheetAgents
+import com.prudnikweb.hypernova.ui.session.stripMore
+import com.prudnikweb.hypernova.data.LinkState
+import com.prudnikweb.hypernova.ui.session.ChatStatusBar
+import com.prudnikweb.hypernova.ui.session.linkWord
+import com.prudnikweb.hypernova.ui.session.rememberStatusBar
+import com.prudnikweb.hypernova.ui.chat.LinkAsk
+import com.prudnikweb.hypernova.ui.chat.LinkHandler
 
 /** The tag of the pane beside the list, for the tests. */
 const val PANE_TAG = "session-pane"
@@ -117,20 +147,56 @@ private fun BackPill(onBack: () -> Unit) {
 @Composable
 private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: (() -> Unit)?) {
     val following = remember { ChatFollowing() }
-    val links = remember { DeskLinks(shell) }
+    val opener = LocalOpener.current
+    val links = remember(opener) { LinkHandler(opener) }
     val box = remember { FocusRequester() }
+    val status = rememberStatusBar(hub, s, hub.transcript(s.id), hub.sending(s.id), away = if (hub.link.state == LinkState.Connected) null else linkWord(hub.link.state))
+    val items = hub.transcript(s.id)
+    val tail = chatListRows(items).tailKey
+    val linked = hub.link.state == LinkState.Connected
+    // Asked again as the transcript settles, and when the session's model changes, as on the phone.
+    val usage = rememberSessionUsage(s.id, "$tail|${chatWorking(hub, s, items)}|${s.model}")
+    val edits = remember(items) { fileEdits(items) }
+    val git = rememberTopBarGit(s, edits, linked) { ChangesRepo.load(it) }
+    var sheet by ChatKeys.sheetAt
+    var modelOpen by remember { mutableStateOf(false) }
+    // Escape puts the sheet away before it goes on to the window's keys, and the window's keys open it (SessionsScreen).
+    DisposableEffect(Unit) {
+        val escape = { (sheet != null).also { if (it) sheet = null } }
+        val toggle = { sheet = if (sheet == null) SheetAt.Overview else null }
+        ChatKeys.escape = escape
+        ChatKeys.sheet = toggle
+        onDispose {
+            if (ChatKeys.escape === escape) ChatKeys.escape = null
+            if (ChatKeys.sheet === toggle) ChatKeys.sheet = null
+            // Choosing another session folds it, as leaving the phone's chat does.
+            sheet = null
+        }
+    }
+    val quick = rememberQuickSend(hub, s.id, onBusy = shell::say)
     CompositionLocalProvider(LocalUriHandler provides links) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val askMax = maxHeight * ASK_SHARE
+            val statusMax = maxHeight * STATUS_SHARE
             // The box always has its room, in the smallest window too: the card gives way, what's asked scrolling above its pills.
             val rest = maxHeight - BOX_ROOM - if (onBack != null) BACK_ROOM else 0.dp
+            val window = LocalWindowInfo.current.containerSize.width / LocalDensity.current.density
+            val beside = window >= SHEET_BESIDE.value
+            val open = sheet
+            Row(Modifier.fillMaxSize()) {
             Column(
-                Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                Modifier.weight(1f).fillMaxHeight().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (onBack != null) BackPill(onBack)
                 val card = Modifier.widthIn(max = PANE_MAX).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }
-                AskCard(hub, s, shell, askMax, card.heightIn(max = rest.coerceAtLeast(0.dp)))
+                PaneAsk(hub, s, shell, askMax, card.heightIn(max = rest.coerceAtLeast(0.dp)))
+                // The top bar, between what it is and the chat: what Settings chose. A click opens the session sheet.
+                ChatUsage(
+                    hub, s, usage, agentsAtWork(s, sheetAgents(hub.agents(s.id))), git, onCompact = { quick("/compact") },
+                    onOpen = { sheet = SheetAt.Overview }, onAgents = { sheet = SheetAt.Agents }, onBlocked = { sheet = SheetAt.Blocked },
+                    more = stripMore(s), modifier = Modifier.widthIn(max = PANE_MAX).fillMaxWidth(),
+                )
                 ChatList(hub, s, shell, following, box, Modifier.weight(1f).widthIn(max = PANE_MAX).fillMaxWidth()) {
                     Facts(s, Modifier.fillMaxWidth())
                     SessionActions(hub, s, shell, Modifier.fillMaxWidth())
@@ -138,16 +204,51 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
                     HText(if (s.inHistory) Ui.desk_pane_in_history.text() else Ui.desk_pane_phone_only.text(), note, style = Type.small, color = HN.inkDim)
                     s.automation?.takeIf { s.inHistory }?.let { HText(Ui.desk_pane_runs_phone.format(it.name), note, style = Type.small, color = HN.inkDim) }
                 }
-                ChatBox(hub, s, shell, following, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
+                // The status bar over the box, as on the phone; opened, it keeps to a share of the pane, and the chat has the rest.
+                ChatStatusBar(hub, s, status, Modifier.widthIn(max = PANE_MAX).fillMaxWidth().heightIn(max = statusMax))
+                ChatBox(hub, s, shell, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
             }
-            LinkAsk(links, shell)
+            // The session sheet beside the chat where there's room, so both can be read; else over it as the phone's card. The content is the same.
+            if (open != null && beside) key(open) {
+                var menuPage by remember { mutableStateOf<MenuPage?>(null) }
+                Column(
+                    Modifier.width(SHEET_WIDTH).fillMaxHeight().padding(top = 8.dp, end = 16.dp, bottom = 16.dp).testTag(SHEET_TAG)
+                        .popupGlass(null, radius = 20.dp).padding(start = 18.dp, end = 18.dp, top = 16.dp),
+                ) {
+                    SessionSheetBody(
+                        hub, s, usage, onModel = { modelOpen = true }, onSwitchAgent = { shell.say(Ui.desk_switch_on_phone.text()) },
+                        onRetried = {},onEmptied = { sheet = null }, onDismiss = { sheet = null }, onMenu = { menuPage = it },
+                        atBlocked = open == SheetAt.Blocked, atAgents = open == SheetAt.Agents, onCompact = { quick("/compact") },
+                    )
+                }
+                menuPage?.let { SessionMenu(hub, s, { menuPage = null }, start = it) }
+            }
+            }
+            if (open != null && !beside) key(open) {
+                SessionSheet(
+                    hub, s, usage, onModel = { modelOpen = true }, onSwitchAgent = { shell.say(Ui.desk_switch_on_phone.text()) },
+                    onRetried = {},onEmptied = { sheet = null }, onDismiss = { sheet = null },
+                    atBlocked = open == SheetAt.Blocked, atAgents = open == SheetAt.Agents, onCompact = { quick("/compact") },
+                )
+            }
+            ModelPickerHost(hub, s, modelOpen, onDismiss = { modelOpen = false })
+            LinkAsk(
+                links, shell::say,
+                browse = { url, done ->
+                    Core.scope.launch {
+                        val opened = withContext(Dispatchers.IO) { shell.desk.browse(url) }
+                        done(opened)
+                    }
+                },
+                copy = { url -> shell.desk.copy(url) },
+            )
         }
     }
 }
 
 /** Its project and short id, its name, what it's doing, its state, and what it asks, in full, with Deny and Allow. */
 @Composable
-private fun AskCard(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Modifier = Modifier) {
+private fun PaneAsk(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Modifier = Modifier) {
     val ask = hub.approval(s.id)
     val offer = remember(ask, s) { CardOffer.of(ask, s) }
     val needs = s.state == SessionState.NeedsYou
@@ -208,7 +309,7 @@ private fun AskCard(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Mo
                 Box(Modifier.weight(1f)) { StateChip(s, block) }
                 if (offer is CardOffer.Whole || offer is CardOffer.NotWhole) {
                     Spacer(Modifier.width(8.dp))
-                    AskPills(hub, s.id, offer, shell)
+                    PaneAskPills(hub, s.id, offer, shell)
                 }
             }
         }
@@ -240,6 +341,9 @@ private val FACT_LABEL = 128.dp
 
 /** The share of the pane what's asked may take before it scrolls: the chat and the box need the rest. */
 private const val ASK_SHARE = 0.4f
+
+/** The share of the pane the status bar may take, opened. */
+private const val STATUS_SHARE = 0.45f
 
 /** What the pane keeps for the box and the gaps round it, and for Back. */
 private val BOX_ROOM = 88.dp
@@ -275,7 +379,7 @@ private fun NotWholeCommand(offer: CardOffer.NotWhole) {
  * "Denying…" in their place; one that didn't get through brings them back, and says so on the card and in the toast.
  */
 @Composable
-private fun AskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell) {
+private fun PaneAskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell) {
     var going by remember(offer.id) { mutableStateOf<Boolean?>(null) }
     var failed by remember(offer.id) { mutableStateOf(false) }
     var askingAlways by remember(offer.id) { mutableStateOf(false) }
@@ -330,3 +434,15 @@ private fun AskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell
         )
     }
 }
+
+/** The tag of the session sheet's panel, for the tests. */
+const val SHEET_TAG = "session-sheet"
+
+/** How wide the sheet is beside the chat: all its tabs in view, as a mouse can't drag a row sideways. */
+internal val SHEET_WIDTH = 580.dp
+
+/** From a window this wide the sheet goes beside the chat: the list, a readable chat and the sheet. Under it, the sheet comes up over the chat. */
+private val SHEET_BESIDE = 1560.dp
+
+/** Which part of the session sheet a click on the top bar opens. */
+internal enum class SheetAt { Overview, Agents, Blocked }

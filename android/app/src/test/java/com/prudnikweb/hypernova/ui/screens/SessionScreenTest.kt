@@ -14,6 +14,10 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -103,7 +107,7 @@ class SessionScreenTest {
         ),
     )
 
-    private fun gitOn() = TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.GIT, true))
+    private fun gitOn() = TopBarPref.set(TopBarChoice.DEFAULT.set(TopBarItem.GIT, true))
 
     /** Past the settling, so an ask that's due has been made. */
     private fun settle(ms: Long = 2_000) {
@@ -260,6 +264,44 @@ class SessionScreenTest {
         assertEquals(listOf("send(${Samples.ZETA}, ship it)"), hub.calls)
     }
 
+    /** A long chat, and what a send puts at its end. */
+    private fun longChat() = List(120) { Item.Assistant("a$it", "Reply number $it") }
+
+    private fun sendAndArrive(hub: FakeHub, chatItems: List<Item>) {
+        box().performTextInput("carry on")
+        box().performKeyInput { pressKey(Key.Enter) }
+        rule.waitForIdle()
+        assertEquals(listOf("send(${Samples.ZETA}, carry on)"), hub.calls.filter { it.startsWith("send(") })
+        rule.runOnIdle { hub.transcriptMap = hub.transcriptMap + (Samples.ZETA to chatItems + Item.User("u-new", "carry on")) }
+        settle()
+    }
+
+    /** The owner: "allow me to be able to send messages but it'll stay where I'm at". docs/DECISIONS.md, "Sending never moves the chat". */
+    @Test fun sendingWhileScrolledBackLeavesTheChatWhereItIs() {
+        val items = longChat()
+        val hub = FakeHub(transcripts = mapOf(Samples.ZETA to items))
+        chat(hub, Samples.ZETA)
+        // A finger, as only a drag or a scroll that went backward stops following.
+        repeat(2) { rule.onNode(hasScrollAction() and hasAnyDescendant(hasText("Reply number", substring = true))).performTouchInput { swipeDown() } }
+        settle()
+        rule.onNodeWithText(str(R.string.jump_latest)).assertIsDisplayed()
+        val first = rule.onAllNodes(hasText("Reply number", substring = true)).onFirst()
+        val words = first.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString("") { it.text }
+        val top = first.getUnclippedBoundsInRoot().top
+        sendAndArrive(hub, items)
+        assertEquals(top, rule.onNodeWithText(words).getUnclippedBoundsInRoot().top)
+        rule.onNodeWithText(str(R.string.jump_latest)).assertIsDisplayed()
+    }
+
+    @Test fun sendingAtTheEndKeepsFollowing() {
+        val items = longChat()
+        val hub = FakeHub(transcripts = mapOf(Samples.ZETA to items))
+        chat(hub, Samples.ZETA)
+        settle()
+        sendAndArrive(hub, items)
+        rule.onNodeWithText("carry on").assertIsDisplayed()
+    }
+
     @Test fun enterIsANewLineWhenTheSettingIsNewLine() {
         EnterKeyPref.set(context, EnterKey.NewLine)
         val hub = FakeHub()
@@ -326,7 +368,7 @@ class SessionScreenTest {
         val choice = TopBarChoice.DEFAULT.set(TopBarItem.MODEL, true).set(TopBarItem.FIVE_HOUR, false).let { c ->
             (0 until c.order.indexOf(TopBarItem.MODEL)).fold(c) { acc, _ -> acc.move(TopBarItem.MODEL, -1) }
         }
-        TopBarPref.set(context, choice)
+        TopBarPref.set(choice)
         chat(FakeHub(), Samples.ZETA)
         val said = stripSaid()
         assertTrue(said, said.startsWith(str(R.string.meta_model_said, "Opus 5.5")))
@@ -335,7 +377,7 @@ class SessionScreenTest {
     }
 
     @Test fun topBarWeekPaceSaysTheDayAndThePoints() {
-        TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
+        TopBarPref.set(TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
         // Samples.usage: 18% used, three days left of the week, so 57% of it gone.
         chat(FakeHub(), Samples.ZETA)
         val said = stripSaid()
@@ -343,7 +385,7 @@ class SessionScreenTest {
     }
 
     @Test fun topBarWeekPaceHidesWhenThePlanIsStale() {
-        TopBarPref.set(context, TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
+        TopBarPref.set(TopBarChoice.DEFAULT.set(TopBarItem.WEEK_PACE, true))
         chat(FakeHub(usage = Samples.usage().copy(stale = true)), Samples.ZETA)
         rule.onNode(hasContentDescription("Day ", substring = true)).assertDoesNotExist()
     }
@@ -430,7 +472,6 @@ class SessionScreenTest {
     /** The three items alone, so a picture holds them all; the session runs Fable, whose week ends in [resetIn] ms. */
     private fun threeItems(resetIn: Long): FakeHub {
         TopBarPref.set(
-            context,
             TopBarChoice(TopBarChoice.DEFAULT.order, setOf(TopBarItem.WEEK_PACE, TopBarItem.GIT, TopBarItem.MODEL_WEEK)),
         )
         val fable = listOf(ModelWeek("Fable", 0.41f, Samples.NOW + resetIn))

@@ -114,7 +114,7 @@ fun UpdateBar(fraction: Float?, modifier: Modifier = Modifier, color: Color = HN
 
 /** "18.4 MB of 45.1 MB" (or only what has come while the Mac hasn't said the size). */
 @Composable
-private fun sizeText(read: Long, total: Long): String {
+private fun downloadedText(read: Long, total: Long): String {
     val res = LocalContext.current.resources
     fun mb(b: Long) = res.getString(R.string.update_mb, b / 1_048_576.0)
     return if (total > 0) res.getString(R.string.update_size, mb(read), mb(total)) else mb(read)

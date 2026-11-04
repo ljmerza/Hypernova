@@ -5,14 +5,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.unit.Dp
 import com.prudnikweb.hypernova.data.EnterKey
+import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.data.Incident
 import com.prudnikweb.hypernova.data.Plural
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.Strings
+import com.prudnikweb.hypernova.data.Upload
+import kotlinx.coroutines.CoroutineScope
 import java.util.Locale
 
 /*
@@ -29,6 +36,10 @@ interface UiPlatform {
     val input: UiInput
     val clock: UiClock
     val diagrams: UiDiagrams
+    val overlays: UiOverlays
+    val images: UiImages
+    val reading: UiReading
+    val screens: UiScreens
 }
 
 /** The one in this process. */
@@ -67,8 +78,26 @@ interface UiDevice {
     @Composable fun copier(): Copier
     /** How tall the screen or the window is: the share an approval may take of it goes by this. */
     @Composable fun windowHeightDp(): Int
+    /** Whether what's leaving the screen now only leaves for a moment, as the phone's activity is recreated on a rotation: a screen's "you've left" isn't true then. */
+    @Composable fun recreating(): () -> Boolean
+    /** The system's way to a web page, for a link the app itself gives: a story's source, a sign-in page. What's in a chat asks first (LinkAsk). */
+    @Composable fun browser(): Browser
+    /** The think-twice card's cases. */
+    @Composable fun incidents(): IncidentSource
     /** A glow round a filled capsule: its own shape, blurred, outside it. */
     fun blurOutside(paint: Paint, radius: Float)
+}
+
+fun interface Browser {
+    /** [onFail] where it can't be opened. */
+    fun open(url: String, onFail: () -> Unit)
+}
+
+/** Real cases where an agent with too much freedom did damage: docs/DECISIONS.md. */
+interface IncidentSource {
+    /** A random one, never the one shown last unless it's the only one. Null with no list to show: the choice goes on rather than being blocked. */
+    fun next(): Incident?
+    fun byId(id: String?): Incident?
 }
 
 /** A small physical answer to a press. */
@@ -86,6 +115,8 @@ interface Copier {
     fun copy(label: String, text: String)
     /** [words] where the system doesn't show its own word for it. */
     fun sayCopied(words: String)
+    /** Whether the system shows its own confirmation of a copy. Where it doesn't, the app's toast can. */
+    val saysCopied: Boolean
 }
 
 /** Fingers and a keyboard, or a pointer and a keyboard: what differs in how a thing is pressed, selected and typed in. */
@@ -109,6 +140,10 @@ interface UiInput {
      * once (not while it repeats); Nothing swallows it. [shiftEnter] is told when a Shift+Enter is let through to the field in Send mode.
      */
     fun enterKey(modifier: Modifier, setting: EnterKey, canSend: () -> Boolean, onSend: () -> Unit, shiftEnter: (Boolean) -> Unit): Modifier
+    /** What opens a message's menu ([open]): a long press on the phone ([pressed], for its tick), the other mouse button here. Assistive tech is offered it as [label]. */
+    fun messageMenu(modifier: Modifier, label: String, pressed: () -> Unit, open: () -> Unit): Modifier
+    /** Whether that press leaves no way to select a message's words: the phone's menu then offers a page for it, and a mouse needs none. */
+    val menuTakesThePress: Boolean
 }
 
 /** This device's way of telling the time. */
@@ -121,6 +156,55 @@ interface UiClock {
 
 @Immutable
 data class ClockStyle(val locale: Locale, val is24Hour: Boolean)
+
+/** The window a floating glass card comes up in ([com.prudnikweb.hypernova.ui.components.GlassDialog], GlassSheet). The card itself is shared. */
+interface UiOverlays {
+    /**
+     * Over everything, with a scrim: outside the card or Back or Escape calls [onDismiss]. [pane] names it to assistive tech, [tint] warms the scrim (Bypass).
+     * [content] gets whether the card should be on screen yet, for its arrival.
+     */
+    @Composable fun Window(onDismiss: () -> Unit, pane: String, tint: Color?, content: @Composable (shown: Boolean) -> Unit)
+}
+
+/** What one system's picked files are, for [com.prudnikweb.hypernova.ui.session.AttachState]: a content:// address on the phone, a file on a computer. */
+interface AttachSource {
+    /** Its name, and its size (-1 when unknown). */
+    fun nameAndSize(source: Any): Pair<String, Long>
+    fun isImage(source: Any, name: String): Boolean
+    /** Whether it can go at this size. */
+    fun fits(image: Boolean, size: Long): Boolean
+    /** A small preview for the box. */
+    suspend fun thumbnail(source: Any): ImageBitmap?
+    /** Ready to upload, by this system's rules for a photo. */
+    suspend fun read(source: Any): Upload
+    /** Our own copy has gone up: it goes. */
+    suspend fun discard(source: Any)
+}
+
+/** Pictures attached to prompts: the system's decoder, and what's kept of them by their path on the computer, so a sent one shows at once. */
+interface UiImages {
+    /** A small preview of image bytes, or null when they aren't an image this system can read. */
+    fun thumbnail(bytes: ByteArray): ImageBitmap?
+    fun cached(path: String): ImageBitmap?
+    fun keep(path: String, image: ImageBitmap)
+}
+
+/** A message read aloud here: the phone has a voice; what has none reads nothing and shows nothing ([canRead] false). */
+interface UiReading {
+    val canRead: Boolean
+    /** The message being read, by its key, or null. */
+    val now: String?
+    /** Reads it aloud, or stops if it's the one being read. */
+    fun toggle(hub: Hub, key: String, text: String, scope: CoroutineScope, toast: (String) -> Unit, sessionId: String?)
+    /** On the message being read: its wave. */
+    @Composable fun Mark(modifier: Modifier)
+}
+
+/** A screen the shared drawing opens and only some systems have yet. What hasn't one says where it is. */
+interface UiScreens {
+    /** What changed in the session's folder. */
+    @Composable fun WhatChanged(hub: Hub, s: Session, onDismiss: () -> Unit)
+}
 
 /** A closed ```mermaid block: the phone draws it in a web view; what has none says what it is. */
 interface UiDiagrams {

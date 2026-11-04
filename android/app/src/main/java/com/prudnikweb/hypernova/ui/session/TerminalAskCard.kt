@@ -46,9 +46,6 @@ import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 
-/** A /login from the box or the Commands tab goes to the app's own sign-in, not into the terminal. */
-internal fun isSignInCommand(text: String): Boolean = text.trim() == "/login"
-
 /**
  * Claude Code's own sign-in in the session's terminal (typed there, or in a job): its menus lead to an
  * address and a code prompt, which aren't a menu, so cards can't finish it. Where to go instead.

@@ -235,9 +235,9 @@ private fun ChangesList(hub: Hub, session: Session, onBack: () -> Unit, onOpen: 
                     }
                     if (c.more) item("more") { Note(stringResource(R.string.changes_more)) }
                     if (c.scoped && c.others > 0) item("others") {
-                        Toggle(pluralStringResource(R.plurals.changes_others, c.others, c.others), stringResource(R.string.changes_show_all)) { all = true }
+                        DiffToggle(pluralStringResource(R.plurals.changes_others, c.others, c.others), stringResource(R.string.changes_show_all)) { all = true }
                     } else if (!c.scoped && all) item("only") {
-                        Toggle(null, stringResource(R.string.changes_only_session)) { all = false }
+                        DiffToggle(null, stringResource(R.string.changes_only_session)) { all = false }
                     }
                     if (c.hidden > 0) item("hidden") { Note(pluralStringResource(R.plurals.changes_hidden, c.hidden, c.hidden)) }
                 }
@@ -260,7 +260,7 @@ private fun Empty(text: String) {
 private fun Note(text: String) = HText(text, style = Type.small, color = HN.inkDim)
 
 @Composable
-private fun Toggle(body: String?, action: String, onClick: () -> Unit) {
+private fun DiffToggle(body: String?, action: String, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

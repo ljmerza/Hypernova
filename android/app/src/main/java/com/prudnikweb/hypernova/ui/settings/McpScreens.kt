@@ -2,6 +2,8 @@
 
 package com.prudnikweb.hypernova.ui.settings
 
+import com.prudnikweb.hypernova.ui.mcp.AgentSettingsFailure
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -67,7 +69,6 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
-import com.prudnikweb.hypernova.data.AgentSettingsTooOld
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Mcp
 import com.prudnikweb.hypernova.data.McpFacts
@@ -91,6 +92,7 @@ import com.prudnikweb.hypernova.ui.mcp.McpLoginSheet
 import com.prudnikweb.hypernova.ui.mcp.McpToolRow
 import com.prudnikweb.hypernova.ui.mcp.mcpStatusColor
 import com.prudnikweb.hypernova.ui.mcp.mcpScopeWord
+import com.prudnikweb.hypernova.data.id
 import com.prudnikweb.hypernova.ui.mcp.mcpStatusWord
 import com.prudnikweb.hypernova.ui.mcp.mcpToolMark
 import com.prudnikweb.hypernova.ui.components.GlassCard
@@ -298,26 +300,18 @@ private fun McpServerRow(name: String, scope: String, how: String, status: Strin
         Column(Modifier.weight(1f)) {
             HText(name, style = Type.body, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
-            val under = listOf(stringResource(mcpScopeWord(scope)), how).filter { it.isNotBlank() }.joinToString(" · ")
+            val under = listOf(stringResource(mcpScopeWord(scope).id), how).filter { it.isNotBlank() }.joinToString(" · ")
             HText(under, style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(12.dp))
-        HText(stringResource(mcpStatusWord(status)), style = Type.monoSmall, color = mcpStatusColor(status), maxLines = 1)
+        HText(stringResource(mcpStatusWord(status).id), style = Type.monoSmall, color = mcpStatusColor(status), maxLines = 1)
         Spacer(Modifier.width(8.dp))
         Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)
     }
 }
 
 @Composable
-internal fun McpFailure(e: Throwable?, @StringRes fallback: Int, onRetry: () -> Unit) {
-    Column(Modifier.padding(horizontal = 4.dp)) {
-        HText(e?.message?.takeIf { it.isNotBlank() } ?: stringResource(fallback), style = Type.small, color = HN.amber)
-        if (e !is AgentSettingsTooOld) {
-            Spacer(Modifier.height(10.dp))
-            Pill(stringResource(R.string.try_again), onRetry, kind = PillKind.Outline, height = 40.dp)
-        }
-    }
-}
+internal fun McpFailure(e: Throwable?, @StringRes fallback: Int, onRetry: () -> Unit) = AgentSettingsFailure(e, stringResource(fallback), onRetry)
 
 /** One server: where it's defined, how it's set up, and how it's doing from [folder]. */
 @Composable
@@ -493,7 +487,7 @@ private fun StatusCard(live: Result<McpLiveReply>?, mine: McpLive?) {
                 live == null -> LoadingLine(stringResource(R.string.mcp_status_checking))
                 live.isFailure -> HText(live.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: stringResource(R.string.mcp_status_err), style = Type.small, color = HN.amber)
                 else -> {
-                    HText(stringResource(mcpStatusWord(mine?.status)), style = Type.body, color = mcpStatusColor(mine?.status))
+                    HText(stringResource(mcpStatusWord(mine?.status).id), style = Type.body, color = mcpStatusColor(mine?.status))
                     mine?.serverName?.let { n -> HText(listOfNotNull(n, mine.version).joinToString(" "), style = Type.monoSmall, color = HN.inkMuted, modifier = Modifier.padding(top = 2.dp)) }
                     mine?.error?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 4.dp)) }
                 }

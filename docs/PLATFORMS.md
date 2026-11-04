@@ -74,6 +74,10 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 | `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
 | `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
 | `ui.stats` | Statistics: `StatsBody.kt` (the widths, the states, the range switch), `StatsHero.kt`, `StatsDays.kt`, `StatsLists.kt`. Its sums are `:shared`'s (`StatsBoard`, `DayChart`, `StatWords`), and each app gives it a place: `app/.../ui/stats/StatsPage.kt`, `desktop/.../ui/StatsPane.kt` |
+| `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`, `Rows.kt` (`FieldLabel`, `ToggleRow`, `NavRow`, `InfoRow`, `ConfirmDialog`, `Segmented`), `Popups.kt` (`GlassDialog`, `GlassSheet`), `AgentWords.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
+| `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `LinkAsk.kt` (where a link goes, and the question), `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
+| `ui.session` | A session's screen, as far as it's moved. `ChatList.kt` (what the list shows, following its tail, Show earlier), `TranscriptItem.kt` (one item), `SessionWords.kt` (what's said of a session, what can be changed), `TerminalTextCard.kt`, `StatusBar.kt`, `StatusModel.kt`, `TodoPanel.kt`, `SessionSheetModel.kt`, `SessionInfoModel.kt`, `TopBar.kt`, `UsageStrip.kt`, `ChatUsage.kt`, `AttachParts.kt`, `AlwaysSheet.kt`, `ChatSheet.kt`, `WhyAsked.kt`, `WithMessageMenu.kt`. Same package as the phone's, so its screens' imports stayed |
+| `ui` | `Locals.kt`: `LocalToast`, `LocalAppScope`, `Opener`: what a screen asks of the app round it. The desktop's `Opener` says what it has no screen for is on the phone |
 
 **The seams** (`UiPlatform`), each implemented in `app/.../ui/AndroidUiPlatform.kt` and `desktop/.../DesktopUiPlatform.kt` and handed over once, with `SharedUi.install`, before anything draws:
 
@@ -82,15 +86,24 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 | `UiWords` | The app's words by `Str`, `Plural`, and as a `Strings` | Compose's `stringResource`, through `StringIds` | `DesktopStrings`, reworded for the computer on screen |
 | `UiFonts` | Manrope and JetBrains Mono at a weight; what mono asks of its font | `res/font`; nothing | The copies in its resources; ligatures off |
 | `UiDevice` | Haptics, the clipboard, how tall the window is, a blurred glow | The view's, the context's, `LocalConfiguration`, `BlurMaskFilter` | None, AWT's, the window's, Skia's |
-| `UiInput` | How tall a pill is to the touch, a hand and a ring on a pill, a long press on code, selecting output, the Enter key | 48 dp, none, copies it, a long press on the row, `EnterKeyPref` | 0, both, nothing (a mouse selects), `SelectionContainer`, its own `EnterKeyPref` |
+| `UiInput` | How tall a pill is to the touch, a hand and a ring on a pill, a long press on code, selecting output, the Enter key, what opens a message's menu | 48 dp, none, copies it, a long press on the row, `EnterKeyPref`, a long press | 0, both, nothing (a mouse selects), `SelectionContainer`, its own `EnterKeyPref`, the other mouse button |
 | `UiClock` | The locale and 12 or 24 hours; a skeleton's pattern | `DateFormat` | The locale's short time; English's order for the chat's skeletons, as `getBestDateTimePattern` is JDK 19's and this builds for 17 |
 | `UiDiagrams` | A closed mermaid block | `Mermaid.kt`, the web view | Says it's a diagram, and shows its source |
+| `UiOverlays` | The window a floating card comes up in. The card is shared | `GlassWindow`: Android's dialog window, the app behind blurred | A popup over the window, dimmed, in the middle |
+| `UiOwner` | The owner's own check, and why what's behind it isn't offered | `OwnerCheck`: the fingerprint or the screen lock | None: it never calls `onOk`, and says to use the phone. A check that can't pass, so nothing is weakened |
+| `UiImages` | A picture's preview, and those kept by path | `Picked`, `Thumbs` | Skia's decoder, and the last 40 |
+| `UiReading` | A message being read aloud | `ReadAloud`, `SpeakingMark` | Nothing reads here (`canRead` false) |
 
 **The toolchain, checked with a dependency report before anything moved:** a new Kotlin Multiplatform module with JetBrains' Compose coordinates added six modules to `:app`'s runtime classpath, each only a pointer to AndroidX's same 1.12.1 artifact: `foundation`, `foundation-android`, `foundation-layout`, `foundation-layout-android`, `animation` and `animation-android` under `org.jetbrains.compose`, a `.pom` and a `.module` with no jar or aar. `:sharedui` takes those two as `compileOnly` in `commonMain`, AndroidX's in `androidMain` at the app's BOM and JetBrains' in `desktopMain`. `:app`'s classpath is then the same list, debug and release, plus the project itself, compared line by line. JetBrains' `ui`, `runtime` and `runtime-saveable` were already there, through Haze. The release APK went from 10163069 to 10179521 bytes: the words' `Str` entries and their ids, and the seams' classes.
 
 **A new string in the shared drawing** is a line in `Str.kt` (or `Plural`) and in `StringIds.kt`, as for the data layer, and `WordsTest` holds it to the phone's text. `:app` and `:desktop` are the module's Kotlin friends, as `:app` is `:shared`'s.
 
 **What the desktop's chat doesn't have yet,** for the parity list: the terminal, the usage strip and the session sheet's tabs, a message's menu (Copy, Quote, Read aloud, Rewind, its exact time), the "/" list, `/btw` and its card, voice, attaching files and their pictures, This session on an ask, a terminal's other menus (`MenuCard`), the status bar and to-do list, a blocked session's card and Continue, the switch line, an agent's own screen, opening a file, previews. What opens one of these from the chat says it's on the phone.
+**What the desktop's session doesn't have yet,** for the parity list: the terminal, Read aloud, `/btw` and its card, voice, Always and This session on an ask, a terminal's other menus (`MenuCard`), a blocked session's card and Continue, the switch line and the switch itself, an agent's own screen, opening a file, What changed, previews. What opens one of these says it's on the phone.
+
+**The session screen's size on the phone:** the release APK went from 10284273 to 10349813 bytes (65540 more): the words' `Str` entries and their ids, and the seams' classes.
+
+**How the sheet and the menu reach the desktop:** `SessionSheetBody` is the sheet's content, whatever it opens in. Floating cards are shared (`Popups.kt`) with each system's window behind `UiOverlays`. What's awkward: `Opener` is a class of lambdas rather than a small interface, kept because the phone's tests build it, and its words on the desktop come from `Ui`, so they can't be `Str`s. `UiOwner` holds the fingerprint on the phone. The owner has since said there'll be no fingerprints (CLAUDE.md, 2026-11-04), and another branch is taking them away: the seam should go with them. A few of the phone's words exist twice for the moment (LATER L132). A `TextFieldState` box stayed the phone's, for its keyboard's pictures: the desktop's is `Field`, so the two boxes share what's round them, and not the box.
 
 ## The rules' checks (2026-11-03)
 
@@ -125,7 +138,7 @@ cd android && ./gradlew :app:writeRuntimeClasspath   # after a chosen change: co
 
 **What they can't see:**
 
-- Logic copied under another name, or a part renamed to get past them. `ChatPane.kt` mirroring `SessionScreen` is the case today (LATER L130). This stays review's job.
+- Logic copied under another name, or a part renamed to get past them. This stays review's job. `ChatPane.kt` once mirrored `SessionScreen` that way; both now use `ui.session.ChatList.kt`, and `sendPrompt` in `:shared`.
 - Same-named plain functions and values between the shells and `sharedui`, and members or local functions anywhere. Only `desktop-no-kit` looks at plain functions and values, and only at the top level.
 - Something built in a shell that could be shared. They catch what's forbidden, not what's missing.
 - A name reached without being written: reflection, or a string handed to `Class.forName`. Comments and strings are skipped on purpose.
@@ -139,9 +152,9 @@ cd android && ./gradlew :app:writeRuntimeClasspath   # after a chosen change: co
 
 | Where | What |
 |---|---|
-| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopTokens.kt` (each server's token, off the disk), `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `DesktopUiPlatform.kt` (what the shared drawing asks: above, "The shared drawing"), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
+| `desktop/src/main/.../desktop/` | `DesktopPlatform.kt` (the seams), `DesktopStorage.kt` (the folder, owner-only files, settings), `DesktopKeys.kt`, `DesktopTokens.kt` (each server's token, off the disk), `Keychain.kt` (each system's program for a secret), `DesktopStrings.kt` (the table, `Ui`: the screens' words), `Cards.kt` (what a card says and offers, plain Kotlin), `Shell.kt` (the window's state and the pairing), `TrayAlerts.kt` (the tray, what an alert says, the focus), `Scale.kt` (how big everything is drawn, and the zoom), `DesktopUiPlatform.kt` (what the shared drawing asks: above, "The shared drawing"), `DeskAttach.kt` (a prompt's files, by the phone's rules), `Main.kt`, `AppName.kt` (the visible name: one line for the rename) |
 | `desktop/src/main/.../desktop/ui/` | `App.kt`, `TokenWait.kt` (the window's root, and a server waiting for its keychain), `PairScreen.kt`, `SessionsScreen.kt` (the list, and when it's one pane or two), `HistoryList.kt` (History's list), `SessionPane.kt` (the chosen session), `ChatPane.kt` (its chat's list, the box and where a link goes), `SessionActions.kt` (its Rename, Stop and Remove from list), `Modal.kt` (a question over the window), `NewSessionPane.kt` (New session), `AtlasTheme.kt` (the motion and the clock); `AtlasPlate.kt` (the chart, the one part of Atlas still copied: `fx/Atlas.kt` draws on `android.graphics`) |
-| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `HistoryTest`, `SessionActionsTest`, `NewSessionTest`, `ChatTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
+| `desktop/src/test/` | `PlatformTest`, `KeychainTest`, `KeychainTokensTest`, `WordsTest`, `CardsTest`, `ScaleTest`; through the real screen, `PairingTest`, `KeychainPairingTest`, `TokenWaitTest`, `TokenGateTest`, `TokenGoneTest`, `ApproveTest`, `PanesTest`, `HistoryTest`, `SessionActionsTest`, `NewSessionTest`, `ChatTest`, `StatusBarTest`, `TopBarTest`, `SessionSheetTest`, `MessageMenuTest`, `ChatBoxExtrasTest`, `TrayAlertsTest` (`FakeDaemon`, real mutual TLS on loopback), `RendersTest` (pictures in `build/renders`), `DemoServerTest` (a running demo server) |
 | `desktop/src/probe/` | `PackageProbe.kt`: in no package; pairs an installed one from inside its own Java, for `scripts/test-client-package.sh` |
 | `desktop/packaging/`, `desktop/icons/` | `client-names.sh` (the package's names: two lines for the rename), `legal/`, `deb-menu-optional.sh`; the icons, and what makes them |
 
@@ -215,6 +228,20 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Background commands ("1 shell"): the Agents tab's list and the count | Not yet | `:shared` has them (`AgentBoard.shells`, `Session.shellsRunning`); needs the agents tab or a row in the pane |
 | A list's quiet "1 shell" mark, and a Monitor as Working | There | `Session.plainShells` and `Session.busy` in `:shared`; on the phone beside the card's chips, on the desktop on the row's top line. The chat's status bar saying "Waiting for its Monitor" is the phone's: the desktop has no status bar yet |
 | Session sheet: switch model, effort or mode; Blocked; rules in effect; why it asked; agents tab; commands tab; git; another provider or agent | Not yet | Each needs a request of its own |
+| Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Partly | The transcript, the box, the queue and the offline queue are there, the phone's own drawing (`:sharedui`). No quick prompts: "The shared drawing" lists what isn't |
+| A message's menu: Copy, Quote, Rewind, its exact time, a waiting prompt's Edit and Remove | There | The phone's own (`MessageMenu.kt`, `WaitingMenu.kt`), on the other mouse button. No Select page: a mouse selects the words where they are |
+| Read aloud from a message | Not yet | LATER L131: it needs a player and a voice |
+| The "/" list in the box, its hint | There | The phone's own (`Commands.kt`), and Tab puts the best match in |
+| Attaching files to a prompt: uploaded at once, shown, retried, waited for; a picture from the clipboard | There | `AttachState` is shared, with the phone's rules (`DeskAttach.kt` scales a photo as `Picked.kt` does). The system's file dialog for the paperclip, Ctrl+V for a picture. No camera. Whether Skia keeps a photo's location and turns it upright isn't checked: LATER L133 |
+| A prompt's sent pictures and files | There | Their pictures come from the server (`SentFiles`). Opening a file says it's on the phone |
+| The top bar (usage strip): the context ring, mode, effort, the plan's windows and any of the items Settings chooses, Compact past 85%, the blocked mark | There | The phone's own (`ui.session.UsageStrip.kt`, `TopBar.kt`), between the card and the chat. Settings has the phone's row for what it shows (`ui.settings.TopBarSection.kt`), kept on this computer |
+| The status bar and its details: what it's doing, to-dos, the agents, the whole command, the turn's time and tokens, Stop | There | The phone's own (`ui.session.StatusBar.kt`), over the box. An agent's row says its screen is on the phone. Opened, it keeps to 45% of the pane |
+| Answer a question or a plan, Always, Allow these N | Partly | Questions and plans are answered in the chat. Always also needs an owner check the desktop hasn't got |
+| Session sheet: what the list already knows (folder, model, mode, where it runs, agents, queue, context, times) | There | In the pane, and the sheet's Session tab |
+| Background commands ("1 shell"): the Agents tab's list and the count | There | The sheet's Agents tab (`ShellsPart.kt`) |
+| Session sheet: switch model, effort or mode; Blocked; rules in effect; why it asked; agents tab; MCP tab; commands tab; git; the actions | There | The phone's own content (`ui.session.SessionSheet.kt`). It's beside the chat from a window 1560 dp wide, else the phone's card over it. **No Bypass:** it isn't offered, and it says why (`UiOwner`). What needs the owner's check on the phone (Always) says to use the phone |
+| Session sheet: another agent | Not yet | The sheet's line says it's on the phone: `AgentSwitchSheet.kt` waits for the new session's pickers |
+| Session sheet: another provider, What changed, Files, a live terminal, an agent's own screen | Not yet | Each says it's on the phone (the desktop's `Opener`, `UiScreens`) |
 
 **History**
 
@@ -230,7 +257,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 |---|---|---|
 | Prompt, folder and folder browser, new project, agent, mode | There | In the right pane. Skills after a prompt reach the server as typed. Auto and Bypass ask to think twice, as on the phone, without the story's link. Bypass is chosen each time and never kept |
 | Model and effort pickers | Not yet | It starts on the default, and says so |
-| The "/" list, attachments | Not yet | |
+| The "/" list, attachments | Not yet | In a session's box they're there; New session's form hasn't them |
 | Dictation | Not meant to be, for now | Desktop dictation is research only (below, "Desktop dictation") |
 | Share into the app, launcher shortcuts | Not meant to be | Android's; a desktop has the clipboard |
 

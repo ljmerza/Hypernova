@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -56,6 +57,9 @@ import com.prudnikweb.hypernova.desktop.offersRename
 import com.prudnikweb.hypernova.desktop.removeBody
 import kotlinx.coroutines.launch
 
+/** The tag of the pane's Rename, Stop and Remove, for the tests: the status bar has a Stop of its own. */
+const val ACTIONS_TAG = "session-actions"
+
 /**
  * The phone's session menu (ui/home/SessionMenu.kt) as buttons in the pane: Rename, Stop and Remove from list, as
  * [MenuOffer] has them, in its words. Remove asks first and says what it closes; Stop goes at once, as on the phone.
@@ -69,7 +73,7 @@ internal fun SessionActions(hub: Hub, s: Session, shell: Shell, modifier: Modifi
     if (!rename && !offer.stop && !offer.delete) return
     var renaming by remember(s.id) { mutableStateOf(false) }
     var removing by remember(s.id) { mutableStateOf(false) }
-    GlassCard(modifier) {
+    GlassCard(modifier.testTag(ACTIONS_TAG)) {
         Column(Modifier.padding(16.dp)) {
             if (renaming) RenameForm(hub, s) { renaming = false }
             else FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onLast
@@ -29,6 +31,7 @@ import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.approval
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.session
 import com.prudnikweb.hypernova.data.live.FakeDaemon.Companion.snapshot
 import com.prudnikweb.hypernova.desktop.DesktopRig.choose
+import com.prudnikweb.hypernova.desktop.ui.ACTIONS_TAG
 import com.prudnikweb.hypernova.desktop.DesktopRig.inPane
 import com.prudnikweb.hypernova.desktop.DesktopRig.pairedWith
 import com.prudnikweb.hypernova.desktop.DesktopRig.render
@@ -85,8 +88,10 @@ class SessionActionsTest {
         waitForIdle()
     }
 
+    private fun ComposeUiTest.inActions(word: String) = onNode(hasText(word) and hasAnyAncestor(hasTestTag(ACTIONS_TAG)))
+
     private fun ComposeUiTest.press(word: String) {
-        onNodeWithText(word).performClick()
+        (if (word == Ui.session_stop.text()) inActions(word) else onNodeWithText(word)).performClick()
         waitForIdle()
     }
 
@@ -103,7 +108,7 @@ class SessionActionsTest {
         choose(resting)
         inPane(Ui.session_rename.text()).assertIsDisplayed()
         inPane(Ui.session_remove.text()).assertIsDisplayed()
-        inPane(Ui.session_stop.text()).assertDoesNotExist()
+        inActions(Ui.session_stop.text()).assertDoesNotExist()
         render("50-actions")
     }
 
@@ -112,7 +117,7 @@ class SessionActionsTest {
         choose(working)
         inPane(Ui.session_rename.text()).assertIsDisplayed()
         inPane(Ui.session_remove.text()).assertDoesNotExist()
-        inPane(Ui.session_stop.text()).assertDoesNotExist()
+        inActions(Ui.session_stop.text()).assertDoesNotExist()
     }
 
     /** Rename types /rename into the session (daemon/src/http.ts), which would resume it: History's pane starts nothing. */
@@ -123,7 +128,7 @@ class SessionActionsTest {
         inPane(ended).assertIsDisplayed()
         inPane(Ui.session_rename.text()).assertDoesNotExist()
         inPane(Ui.session_remove.text()).assertDoesNotExist()
-        inPane(Ui.session_stop.text()).assertDoesNotExist()
+        inActions(Ui.session_stop.text()).assertDoesNotExist()
     }
 
     // ─── Stop ───

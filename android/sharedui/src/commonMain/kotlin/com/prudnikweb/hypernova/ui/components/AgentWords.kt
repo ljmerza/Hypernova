@@ -1,0 +1,28 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
+package com.prudnikweb.hypernova.ui.components
+
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Strings
+import androidx.compose.runtime.Composable
+import com.prudnikweb.hypernova.ui.platform.stringResource
+
+/**
+ * "Claude" or "Codex", for the words that name a session's agent ("Claude is still at work",
+ * "Codex didn't start"): one helper for every screen (data/AgentLead.kt says which agent leads).
+ */
+@Composable
+fun agentName(codex: Boolean): String = stringResource(if (codex) Str.cx_agent_codex else Str.claude)
+
+/** [agentName] outside composition (notifications, widgets, run words). */
+fun agentName(res: Strings, codex: Boolean): String = res.getString(if (codex) Str.cx_agent_codex else Str.claude)
+
+/**
+ * One of three wordings, by the agents in use on the paired computer (data/AgentLead.kt): [claude]
+ * where Claude Code is alone (the words from before Codex, unchanged), [codex] where Codex leads
+ * (Claude Code isn't installed), [both] while both are in use.
+ */
+fun <T> byAgents(claudeState: com.prudnikweb.hypernova.data.ClaudeState?, codexState: com.prudnikweb.hypernova.data.CodexState?, claude: T, codex: T, both: T): T = when {
+    com.prudnikweb.hypernova.data.AgentLead.both(claudeState, codexState) -> both
+    com.prudnikweb.hypernova.data.AgentLead.codexLeads(claudeState, codexState) -> codex
+    else -> claude
+}

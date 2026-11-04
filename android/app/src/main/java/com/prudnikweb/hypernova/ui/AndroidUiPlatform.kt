@@ -1,5 +1,33 @@
 package com.prudnikweb.hypernova.ui
 
+import kotlinx.coroutines.CoroutineScope
+
+import com.prudnikweb.hypernova.data.Hub
+import com.prudnikweb.hypernova.data.Session
+import com.prudnikweb.hypernova.ui.changes.ChangesDialog
+import com.prudnikweb.hypernova.ui.platform.UiScreens
+
+import android.content.Intent
+import android.net.Uri
+import com.prudnikweb.hypernova.ui.components.Incidents
+import com.prudnikweb.hypernova.ui.platform.Browser
+import com.prudnikweb.hypernova.ui.platform.IncidentSource
+
+import androidx.activity.compose.LocalActivity
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import com.prudnikweb.hypernova.data.Picked
+import com.prudnikweb.hypernova.data.Thumbs
+import com.prudnikweb.hypernova.ui.components.GlassWindow
+import com.prudnikweb.hypernova.ui.platform.UiImages
+import com.prudnikweb.hypernova.ui.platform.UiOverlays
+import com.prudnikweb.hypernova.ui.platform.UiReading
+import com.prudnikweb.hypernova.ui.session.ReadAloud
+import com.prudnikweb.hypernova.ui.voice.SpeakingMark
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -59,6 +87,10 @@ object AndroidUiPlatform : UiPlatform {
     override val input: UiInput = PhoneInput
     override val clock: UiClock = PhoneClock
     override val diagrams: UiDiagrams = PhoneDiagrams
+    override val overlays: UiOverlays = PhoneOverlays
+    override val images: UiImages = PhoneImages
+    override val reading: UiReading = PhoneReading
+    override val screens: UiScreens = PhoneScreens
 }
 
 private object PhoneWords : UiWords {
@@ -106,6 +138,8 @@ private class ContextCopier(private val context: Context) : Copier {
     }
 
     // Android 13 and newer show their own "copied" preview.
+    override val saysCopied: Boolean = Build.VERSION.SDK_INT >= 33
+
     override fun sayCopied(words: String) {
         if (Build.VERSION.SDK_INT < 33) Toast.makeText(context, words, Toast.LENGTH_SHORT).show()
     }
@@ -127,6 +161,33 @@ private object PhoneDevice : UiDevice {
     @Composable
     override fun windowHeightDp(): Int = LocalConfiguration.current.screenHeightDp
 
+    @Composable
+    override fun browser(): Browser {
+        val context = LocalContext.current
+        return remember(context) {
+            Browser { url, onFail ->
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure { onFail() }
+            }
+        }
+    }
+
+    @Composable
+    override fun incidents(): IncidentSource {
+        val context = LocalContext.current
+        return remember(context) {
+            object : IncidentSource {
+                override fun next() = Incidents.next(context)
+                override fun byId(id: String?) = Incidents.byId(context, id)
+            }
+        }
+    }
+
+    @Composable
+    override fun recreating(): () -> Boolean {
+        val activity = LocalActivity.current
+        return { activity?.isChangingConfigurations == true }
+    }
+
     override fun blurOutside(paint: Paint, radius: Float) {
         // Drawn by the GPU since Android 9; the app needs 10.
         paint.asFrameworkPaint().maskFilter = BlurMaskFilter(radius, BlurMaskFilter.Blur.OUTER)
@@ -134,6 +195,17 @@ private object PhoneDevice : UiDevice {
 }
 
 private object PhoneInput : UiInput {
+    override val menuTakesThePress: Boolean = true
+
+    override fun messageMenu(modifier: Modifier, label: String, pressed: () -> Unit, open: () -> Unit): Modifier = modifier
+        .pointerInput(Unit) {
+            detectTapGestures(onLongPress = {
+                pressed()
+                open()
+            })
+        }
+        .semantics { onLongClick(label) { open(); true } }
+
     override val minTouchTarget: Dp = 48.dp
 
     @Composable
@@ -170,4 +242,32 @@ private object PhoneClock : UiClock {
 private object PhoneDiagrams : UiDiagrams {
     @Composable
     override fun Diagram(source: String) = MermaidBlock(source)
+}
+
+/** Android's dialog window (components/Glass.kt). */
+private object PhoneOverlays : UiOverlays {
+    @Composable
+    override fun Window(onDismiss: () -> Unit, pane: String, tint: Color?, content: @Composable (shown: Boolean) -> Unit) = GlassWindow(onDismiss, pane, tint, content)
+}
+
+private object PhoneImages : UiImages {
+    override fun thumbnail(bytes: ByteArray): ImageBitmap? = Picked.thumbnail(bytes)
+    override fun cached(path: String): ImageBitmap? = Thumbs.get(path)
+    override fun keep(path: String, image: ImageBitmap) = Thumbs.put(path, image)
+}
+
+private object PhoneReading : UiReading {
+    override val canRead: Boolean = true
+    override val now: String? get() = ReadAloud.reading
+
+    override fun toggle(hub: Hub, key: String, text: String, scope: CoroutineScope, toast: (String) -> Unit, sessionId: String?) =
+        ReadAloud.toggle(hub, key, text, scope, toast, sessionId)
+
+    @Composable
+    override fun Mark(modifier: Modifier) = SpeakingMark(modifier)
+}
+
+private object PhoneScreens : UiScreens {
+    @Composable
+    override fun WhatChanged(hub: Hub, s: Session, onDismiss: () -> Unit) = ChangesDialog(hub, s, onDismiss)
 }
