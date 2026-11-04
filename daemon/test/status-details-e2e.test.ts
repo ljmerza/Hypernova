@@ -170,6 +170,17 @@ test('real Claude Code: the app’s turn clock and tokens against its spinner', 
   assert.ok(viewOf(queued).turn!.tokens! <= 400, `its tokens started again: ${viewOf(queued).turn!.tokens}`)
   await idle(queued)
 
+  // ── Two prompts queued while one command runs: the box's dim hint isn't unsent words ──
+  plan.push({ blocks: [bash('sleep 10')], outputTokens: 100 }, { blocks: [{ text: 'Both taken.' }], outputTokens: 30 })
+  const two = await start('[Hypernova test] two queued')
+  await until('its command', () => viewOf(two).turn?.step?.command === 'sleep 10', 20_000)
+  await until('the box', async () => (await call('POST', `/v1/sessions/${two}/prompt`, { text: '[Hypernova test] queued one' })).status === 200, 5000)
+  await until('the first in the queue', () => viewOf(two).queued === 1, 5000)
+  const another = await call('POST', `/v1/sessions/${two}/prompt`, { text: '[Hypernova test] queued two' })
+  assert.equal(another.status, 200, `a second prompt queued: ${JSON.stringify(another.json)}`)
+  await until('both in the queue', () => viewOf(two).queued === 2, 5000)
+  await idle(two)
+
   // ── A dialog that stands: neither clock counts it ──
   plan.push({ blocks: [bash('sleep 3')], outputTokens: 400 }, { blocks: [bash('touch needs-approval')], outputTokens: 400 }, { blocks: [bash('sleep 4')], outputTokens: 400 }, { blocks: [{ text: 'Done.' }], outputTokens: 30 })
   const asks = await start('[Hypernova test] asks')

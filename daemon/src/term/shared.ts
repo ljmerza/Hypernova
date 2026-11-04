@@ -175,6 +175,35 @@ export function boxText(lines: string[], b: { top: number; bottom: number }): st
     .join('\n')
     .trim()
 }
+/** A row of the terminal's screen, as `@xterm/headless` has it. */
+type ScreenRow = { length: number; getCell(x: number): { getChars(): string; isDim(): number; isInverse(): number } | undefined }
+/**
+ * A row of the input box with what isn't typed left blank: dim text, a placeholder or a suggestion, and
+ * the one letter of it under the cursor, which Claude Code draws inverse and not dim (2.1.317: "Press up
+ * to edit…" is an inverse P and then dim letters; "x /he" with a suggestion, an inverse l and a dim p).
+ * That letter looks just like a typed one under the cursor, so only what follows tells them apart: dim
+ * text. A suggestion shows only with the cursor at the end, so the cursor on a typed letter is never
+ * followed by any (measured), and with nothing dim after it a letter counts as typed: it may be someone's
+ * unsent words, and calling those empty could lose them.
+ */
+export function typedOf(row: ScreenRow): string {
+  let s = ''
+  for (let x = 0; x < row.length; x++) {
+    const cell = row.getCell(x)
+    if (!cell) break
+    s += cell.isDim() || (cell.isInverse() && dimFollows(row, x)) ? ' ' : cell.getChars() || ' '
+  }
+  return s
+}
+/** The next thing shown on the row after column [x] is dim. */
+function dimFollows(row: ScreenRow, x: number): boolean {
+  for (let i = x + 1; i < row.length; i++) {
+    const cell = row.getCell(i)
+    if (!cell) return false
+    if (cell.getChars().trim()) return !!cell.isDim()
+  }
+  return false
+}
 /**
  * A prompt as the pastes that type it. Claude Code folds a long paste (measured on 2.1.316: five
  * lines, or 1,586 characters on one; two lines stay whole) into "[Pasted text #1]", and a box that

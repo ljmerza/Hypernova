@@ -11,7 +11,7 @@ import { appendFileSync, chmodSync, readFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { LOGS, rollLog, writeJson } from '../util.ts'
-import { DATA, Frames, MSG, boxLines, codexProxyPath, frame, isWorking, metaPath, modeOf, msg, pasteParts, registryBusy, sockPath, type HolderSpec, type Role, type TermMeta, type TermState } from './shared.ts'
+import { DATA, Frames, MSG, boxLines, codexProxyPath, frame, isWorking, metaPath, modeOf, msg, pasteParts, registryBusy, sockPath, typedOf, type HolderSpec, type Role, type TermMeta, type TermState } from './shared.ts'
 
 type Client = { sock: Socket; role: Role; cols: number; rows: number; at: number; ready: boolean; pending: Buffer[] | null; detaching: boolean }
 
@@ -434,12 +434,7 @@ function findBox(): { text: string; above: string[]; below: string[] } | null {
     const body = lines.slice(at.top + 1, at.bottom)
     const text = body
       .map((l, k) => {
-        let s = ''
-        for (let x = 0; l.line && x < l.line.length; x++) {
-          const cell = l.line.getCell(x)
-          if (!cell) break
-          s += cell.isDim() ? ' ' : cell.getChars() || ' '
-        }
+        const s = l.line ? typedOf(l.line) : ''
         return k === 0 ? s.replace(/^\s*[❯>!]\s?/, '') : s
       })
       .join('\n')
