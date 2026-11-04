@@ -246,7 +246,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Agents boards, an agent's own screen | Not yet | Only a count in the pane |
 | Settings: debug logging | There | The desktop's only part of the phone's Settings |
 | Settings: where the key and tokens are, alerts | Desktop only | |
-| Settings: an agent's permission rules | There | The phone's own parts (`sharedui`'s `ui/settings/AgentRulesParts.kt`), from Settings on the server on screen. It does all the phone does (docs/DECISIONS.md, "Permission rules, edited") |
+| Settings: an agent's permission rules | Partly | The phone's own parts (`sharedui`'s `ui/settings/AgentRulesParts.kt`), from Settings on the server on screen, and written to do all the phone does (docs/DECISIONS.md, "Permission rules, edited"). Not settled: `RulesScreenTest` sometimes stays on Loading after the server has been asked, not yet explained, and it hasn't run against a real server |
 | Settings: providers, account and sign-in, agents' settings, MCP, plugins, skills, environment, versions | Not yet | |
 | Settings: notifications per group, Read aloud, top bar, typing, display, the server's switches (auto-update, debug, Browse outside projects, Stay awake), checklist, connection log | Not yet | |
 
