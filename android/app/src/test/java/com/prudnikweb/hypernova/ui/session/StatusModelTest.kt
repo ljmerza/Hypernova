@@ -9,6 +9,8 @@ import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.TurnNow
+import com.prudnikweb.hypernova.data.TurnStep
 import com.prudnikweb.hypernova.data.WAgent
 import com.prudnikweb.hypernova.data.WPhase
 import com.prudnikweb.hypernova.data.WWorkflow
@@ -439,5 +441,90 @@ class StatusModelTest {
         // 75 steps leave 12 pixels each, the shortest that still reads; more goes back to one line.
         assertEquals(true, stepsFit(75, 900f, 4f))
         assertEquals(false, stepsFit(76, 900f, 4f))
+    }
+
+    // ─── The bar's number, and what the opened bar says (owner, 2026-11-03) ───
+
+    private val at = 1_800_000_000_000L
+    private val eight16 = (8 * 60 + 16) * 1000L
+
+    private fun barAgent(startedAt: Long) = BarAgent("a", "Survey", null, null, startedAt, null)
+
+    @Test fun theBarsNumberIsTheTurnsTimeWhenThatsKnownHoweverLongTheBarHasShown() {
+        // The owner's bar: it had shown for 9 seconds, the turn had run 8m 16s.
+        assertEquals(eight16, barClockMs(at - eight16, TurnNow(), emptyList(), shownSince = at - 9000, now = at))
+        assertEquals("8:16", clockText(barClockMs(at - eight16, TurnNow(), emptyList(), at - 9000, at)))
+        // An older Mac says when it began, and nothing else: the same.
+        assertEquals(eight16, barClockMs(at - eight16, null, emptyList(), at - 9000, at))
+    }
+
+    @Test fun aStopForTheOwnersAnswerIsLeftOutAsTheTerminalLeavesItOut() {
+        // Measured on 2.1.317: 6s before a dialog that stood 25 seconds, 7s after it.
+        assertEquals(7000L, turnClockMs(at - 32_000, TurnNow(waitedMs = 25_000), at))
+        // One going on holds it still.
+        assertEquals(6000L, turnClockMs(at - 32_000, TurnNow(waitingSince = at - 26_000), at))
+        assertEquals(6000L, turnClockMs(at - 32_000, TurnNow(waitingSince = at - 26_000), at + 60_000 - 60_000))
+        assertEquals(1000L, turnClockMs(at - 32_000, TurnNow(waitedMs = 25_000, waitingSince = at - 6000), at))
+    }
+
+    @Test fun nothingKnownOfATurnFallsBackInOrder() {
+        // Only its agents at work: no turn, the oldest agent's time.
+        assertEquals(null, turnClockMs(0L, null, at))
+        assertEquals(60_000L, barClockMs(0L, null, listOf(barAgent(at - 60_000), barAgent(at - 1000)), at - 9000, at))
+        // Nothing at all: how long this bar has shown, only then.
+        assertEquals(9000L, barClockMs(0L, null, emptyList(), at - 9000, at))
+        // A server clock ahead of the phone's is 0, never a minus.
+        assertEquals(0L, barClockMs(at + 5000, null, emptyList(), at, at))
+    }
+
+    @Test fun durationsReadAsTheSpinnerWritesThem() {
+        assertEquals("0s", spinnerDuration(0))
+        assertEquals("59s", spinnerDuration(59_900))
+        assertEquals("1m 3s", spinnerDuration(63_000))
+        assertEquals("8m 16s", spinnerDuration(eight16))
+        assertEquals("1h 0m 0s", spinnerDuration(3_600_000))
+        assertEquals("1h 2m 3s", spinnerDuration(3_723_000))
+        assertEquals("1d 2h 3m", spinnerDuration(93_780_000))
+        // Its rounding above a minute, where 60 carries.
+        assertEquals("2m 0s", spinnerDuration(119_600))
+    }
+
+    @Test fun theDetailsSayWhatsKnownAndNoMore() {
+        val whole = "cd ~/projects/_worktrees/x && gh run watch 123\necho done"
+        val d = barDetails("Bash: cd ~/projects/_worktrees/x && gh run watch 123", at - eight16, TurnNow(tokens = 2900, step = TurnStep("Bash", whole, at - 133_000, 6)), at)
+        assertEquals("$ $whole", d.doing)
+        assertEquals(true, d.isCommand)
+        assertEquals(eight16, d.turnMs)
+        assertEquals(2900L, d.tokens)
+        assertEquals(133_000L, d.stepMs)
+        assertEquals(6, d.atOnce)
+        // One command isn't "at once".
+        assertEquals(0, barDetails("Bash: x", at, TurnNow(step = TurnStep("Bash", "x", at, 1)), at).atOnce)
+        // Nothing known: no rows at all, and the folded line's own word isn't said twice.
+        val none = barDetails("Thinking", 0L, null, at)
+        assertEquals(false, none.any)
+        assertEquals(null, barDetails("Writing", at, TurnNow(), at).doing)
+        assertEquals(null, barDetails("Retrying (1 of 3)", at, TurnNow(), at).doing)
+    }
+
+    @Test fun anOlderMacsDetailsAreItsActivityLineAndTheTurnsStart() {
+        val d = barDetails("Bash: npm test", at - 5000, null, at)
+        assertEquals("$ npm test", d.doing)
+        assertEquals(5000L, d.turnMs)
+        assertEquals(null, d.tokens)
+        assertEquals(null, d.stepMs)
+        assertEquals(0, d.atOnce)
+        // A file tool's line whole, the path the folded line cuts to its name.
+        assertEquals("Edit: /home/me/a/b/App.kt", barDetails("Edit: /home/me/a/b/App.kt", at, null, at).doing)
+        assertEquals("$ go", barDetails("$ go", at, null, at).doing)
+    }
+
+    @Test fun whatItsDoingIsMaskedByTheExistingRules() {
+        val key = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789"
+        // Whether or not the Mac masked it first (an older one sends its activity as it is).
+        val fromTurn = barDetails("Bash: x", at, TurnNow(step = TurnStep("Bash", "curl -u me:hunter2hunter2 https://x && echo $key", at, 1)), at).doing!!
+        assertEquals(false, fromTurn.contains(key))
+        assertEquals(false, fromTurn.contains("hunter2"))
+        assertEquals(false, barDetails("Bash: API_KEY=$key npm test", at, null, at).doing!!.contains(key))
     }
 }

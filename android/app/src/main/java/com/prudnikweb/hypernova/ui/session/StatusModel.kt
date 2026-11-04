@@ -8,7 +8,9 @@ import com.prudnikweb.hypernova.data.AgentState
 import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Phase
+import com.prudnikweb.hypernova.data.Secrets
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.TurnNow
 import com.prudnikweb.hypernova.data.WorkflowView
 
 /*
@@ -252,6 +254,89 @@ internal fun clockText(ms: Long): String {
     val m = s % 3600 / 60
     val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+/**
+ * This turn's time, as Claude Code's spinner counts it: from when it went into the turn, less the
+ * stops for the owner's answer (measured on 2.1.317: a dialog that stood 25 seconds added nothing).
+ * A stop going on holds it still. Without [turn] (an older Mac) the stops count too. Null when no turn
+ * is known; the clocks are the server's start and this phone's now, as everywhere in the app.
+ */
+internal fun turnClockMs(turnStartedAt: Long, turn: TurnNow?, now: Long): Long? {
+    if (turnStartedAt <= 0L) return null
+    val stopped = turn?.waitingSince?.let { (now - it).coerceAtLeast(0L) } ?: 0L
+    return (now - turnStartedAt - (turn?.waitedMs ?: 0L) - stopped).coerceAtLeast(0L)
+}
+
+/**
+ * The folded bar's number, one thing however you came to the screen: the turn's time ([turnClockMs]).
+ * The main agent done and only its agents at work is no turn: how long the oldest of them has run.
+ * Only with neither (an older Mac) how long this bar has shown, from [shownSince].
+ */
+internal fun barClockMs(turnStartedAt: Long, turn: TurnNow?, agents: List<BarAgent>, shownSince: Long, now: Long): Long =
+    turnClockMs(turnStartedAt, turn, now)
+        ?: agents.minOfOrNull { it.startedAt }?.let { (now - it).coerceAtLeast(0L) }
+        ?: (now - shownSince).coerceAtLeast(0L)
+
+/** What the opened bar says of the turn, each null (or [atOnce] 0) when it isn't known: no row. */
+internal data class BarDetails(
+    /** What it's doing, whole: the command as `$ …`, or the tool's line. Null for what the folded line says in full ("Thinking"). */
+    val doing: String?,
+    val isCommand: Boolean,
+    val turnMs: Long?,
+    val tokens: Long?,
+    val stepMs: Long?,
+    /** How many commands run at once, from two up. */
+    val atOnce: Int,
+) {
+    val any: Boolean get() = doing != null || turnMs != null || tokens != null || stepMs != null || atOnce > 0
+}
+
+/** How much of what it's doing the panel masks and shows: the Mac sends 2,000 characters at most, an older one a line. */
+private const val DOING_MAX = 4000
+
+/** The panel's rows, from what the session says now. An older Mac has no [turn]: its activity line and the turn's start, no more. */
+internal fun barDetails(activity: String, turnStartedAt: Long, turn: TurnNow?, now: Long): BarDetails {
+    val step = turn?.step
+    val line = activity.trim()
+    val colon = line.indexOf(':')
+    val tool = if (colon in 1..40) line.substring(0, colon) else ""
+    val command = step?.command
+        ?: line.removePrefix("$ ").takeIf { line.startsWith("$ ") }
+        ?: line.substring(colon + 1).trim().takeIf { tool in COMMAND_TOOLS && it.isNotEmpty() }
+    val toolLine = line.takeIf { command == null && tool.isNotBlank() && !tool.contains(' ') }
+    return BarDetails(
+        doing = command?.let { "$ " + Secrets.maskCommand(it.take(DOING_MAX)) } ?: toolLine?.let { Secrets.mask(it.take(DOING_MAX)) },
+        isCommand = command != null,
+        turnMs = turnClockMs(turnStartedAt, turn, now),
+        tokens = turn?.tokens,
+        stepMs = step?.let { (now - it.startedAt).coerceAtLeast(0L) },
+        atOnce = step?.running?.takeIf { it >= 2 } ?: 0,
+    )
+}
+
+private val COMMAND_TOOLS = setOf("Bash", "BashOutput", "PowerShell")
+
+/**
+ * How long, as Claude Code's spinner writes it: 42s, 8m 16s, 1h 2m 3s, 1d 2h 3m (its own function, read
+ * from 2.1.317: seconds cut under a minute, rounded above it, where 60 carries).
+ */
+internal fun spinnerDuration(ms: Long): String {
+    val t = ms.coerceAtLeast(0L)
+    if (t < 60_000L) return "${t / 1000}s"
+    var d = t / 86_400_000L
+    var h = t % 86_400_000L / 3_600_000L
+    var m = t % 3_600_000L / 60_000L
+    var s = Math.round(t % 60_000L / 1000.0)
+    if (s == 60L) { s = 0; m++ }
+    if (m == 60L) { m = 0; h++ }
+    if (h == 24L) { h = 0; d++ }
+    return when {
+        d > 0 -> "${d}d ${h}h ${m}m"
+        h > 0 -> "${h}h ${m}m ${s}s"
+        m > 0 -> "${m}m ${s}s"
+        else -> "${s}s"
+    }
 }
 
 /**

@@ -1,7 +1,8 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 // Codex's thread items as Hypernova's events (normalize.ts, Ev): live from the app-server's
 // notifications, and a thread's history when it's opened (docs/specs/codex-app-server.md).
 import { randomUUID } from 'node:crypto'
-import { emitEvent, ensureParsed, getSession, notice, putEvent, resolveSession, setState, upsertSession } from '../hub.ts'
+import { emitEvent, ensureParsed, getSession, notice, noteThreadOutput, putEvent, resolveSession, setState, upsertSession } from '../hub.ts'
 import { maskSecrets, newToolEvent, userEvent, type Diff, type Ev, type ToolEv } from '../normalize.ts'
 import { withAttachments } from '../attachments.ts'
 import { tail, trimText } from '../util.ts'
@@ -322,6 +323,7 @@ export function handleNotification(m: RpcMessage): void {
       const l = liveOf(id)
       noteCodexTokens({ thread: id, cwd: getSession(id)!.cwd, at: l.at || now, total: turnTokens(t?.total), last: turnTokens(t?.last), inTurn: l.turn != null || now - l.endedAt < 10_000 })
       if (window > 0 && used >= 0) upsertSession(id, { contextPct: Math.min(100, Math.round((used / window) * 100)) })
+      noteThreadOutput(id, Number(t?.total?.outputTokens), Number(t?.last?.outputTokens))
       return
     }
     case 'thread/name/updated': {

@@ -115,6 +115,12 @@
       "blocked": null,
       "automation": null,
       "turnStartedAt": 1800000000000,
+      "turn": {
+        "waitedMs": 0,
+        "waitingSince": 1800000000000,
+        "tokens": null,
+        "step": null
+      },
       "todo": {
         "active": "Running the tests",
         "done": 1,
@@ -190,6 +196,12 @@
       "blocked": null,
       "automation": null,
       "turnStartedAt": 1800000000000,
+      "turn": {
+        "waitedMs": 0,
+        "waitingSince": 1800000000000,
+        "tokens": null,
+        "step": null
+      },
       "endedBy": null,
       "browsable": true,
       "outsideProjects": false,
@@ -310,6 +322,12 @@
       "blocked": null,
       "automation": null,
       "turnStartedAt": 1800000000000,
+      "turn": {
+        "waitedMs": 0,
+        "waitingSince": 1800000000000,
+        "tokens": null,
+        "step": null
+      },
       "endedBy": null,
       "browsable": true,
       "outsideProjects": false,
@@ -346,6 +364,12 @@
       "blocked": null,
       "automation": null,
       "turnStartedAt": 1800000000000,
+      "turn": {
+        "waitedMs": 0,
+        "waitingSince": 1800000000000,
+        "tokens": null,
+        "step": null
+      },
       "endedBy": null,
       "browsable": true,
       "outsideProjects": false,
@@ -388,6 +412,12 @@
       "blocked": null,
       "automation": null,
       "turnStartedAt": 1800000000000,
+      "turn": {
+        "waitedMs": 0,
+        "waitingSince": null,
+        "tokens": null,
+        "step": null
+      },
       "question": null,
       "agentOutdated": {
         "runs": "2.1.312",
@@ -471,6 +501,12 @@
       "blocked": null,
       "automation": null,
       "turnStartedAt": 1800000000000,
+      "turn": {
+        "waitedMs": 0,
+        "waitingSince": 1800000000000,
+        "tokens": null,
+        "step": null
+      },
       "endedBy": null,
       "browsable": true,
       "outsideProjects": false,

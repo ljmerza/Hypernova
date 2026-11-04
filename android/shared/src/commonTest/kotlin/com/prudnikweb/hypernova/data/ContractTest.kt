@@ -141,9 +141,20 @@ class ContractTest {
             assertEquals(LIMITED, a.sessionId)
             assertNull(a.login)
         },
+        "ws-session-turn" to { o ->
+            val s = Wire.session(ws(o, "session").obj("session")!!)
+            assertEquals(T, s.turnStartedAt)
+            assertEquals(TurnNow(0L, null, 2900L, TurnStep("Bash", "npm test", T, 2)), s.turn)
+        },
+        "ws-session-turn-waiting" to { o ->
+            val s = Wire.session(ws(o, "session").obj("session")!!)
+            assertEquals(TurnNow(0L, T, 2900L, null), s.turn)
+        },
         "ws-session-limited" to { o ->
             val s = Wire.session(ws(o, "session").obj("session")!!)
             assertEquals(LIMITED, s.id)
+            // Out of a turn, and what an older daemon sends: none.
+            assertNull(s.turn)
             assertEquals(Blocked("limit", "You've hit your session limit · resets 2am", T, null, null), s.blocked)
             assertNull(s.turnStartedAt)
         },

@@ -18,6 +18,11 @@ import { errorAnswer, matches, parseFault, type Fault } from './faults.ts'
 export type Balance = { remaining: number | null; usedToday: number; freeLeft: number; freeLimit: number } | { status: number }
 export type LogLine = { at: number; sid: string; method: string; path: string; status: number; ms: number; fault: string | null }
 export type Fake = { server: Server; port: number; token: string; url: string; close: () => Promise<void> }
+/**
+ * A reply a test scripted for one request (startFake's [script]): text and tool calls, in order, each
+ * tool call as Anthropic streams it, with the output tokens it reports and a wait before it starts.
+ */
+export type Scripted = { blocks: Array<{ text: string } | { tool: string; input: Record<string, unknown> }>; outputTokens?: number; waitMs?: number }
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', 'localhost'])
 /** OpenRouter's catalogue as `/or/v1/models` answers it (a few entries in its real shape). */
@@ -35,7 +40,7 @@ export const CANNED = 'Fake provider here. Nothing went to a model.'
  * Start the fake on [host]:[port] (0: any free port). [dir] keeps the control token. Refuses any
  * address but loopback: it must never answer anything but this Mac.
  */
-export async function startFake(o: { port?: number; host?: string; dir: string; token?: string; onMessages?: (sid: string, body: Record<string, any>) => void }): Promise<Fake> {
+export async function startFake(o: { port?: number; host?: string; dir: string; token?: string; onMessages?: (sid: string, body: Record<string, any>) => void; script?: (sid: string, body: Record<string, any>) => Scripted | null }): Promise<Fake> {
   const host = o.host ?? '127.0.0.1'
   if (!LOOPBACK.has(host)) throw new Error(`the fake provider only listens on loopback, not ${host}`)
   mkdirSync(o.dir, { recursive: true, mode: 0o700 })
@@ -167,7 +172,9 @@ export async function startFake(o: { port?: number; host?: string; dir: string; 
     const model = typeof body.model === 'string' ? body.model : 'fake-model'
     if (body.stream !== true) return send(res, 200, message(model, reply))
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
-    const events = stream(model, reply)
+    const scripted = f ? null : (o.script?.(sid, body) ?? null)
+    if (scripted?.waitMs) await new Promise((r) => setTimeout(r, scripted.waitMs))
+    const events = scripted ? streamScripted(model, scripted) : stream(model, reply)
     if (f?.kind === 'cut') {
       // Some of the reply, then the connection drops mid-stream.
       const text = events.join('')
@@ -230,6 +237,27 @@ function stream(model: string, text: string): string[] {
     ev('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: words.length } }),
     ev('message_stop', { type: 'message_stop' }),
   ]
+}
+
+/** A scripted reply as Anthropic's server-sent events. */
+function streamScripted(model: string, s: Scripted): string[] {
+  const ev = (name: string, data: unknown) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`
+  const m = message(model, '')
+  const out = [ev('message_start', { type: 'message_start', message: { ...m, content: [], stop_reason: null, usage: { ...m.usage, output_tokens: 1 } } })]
+  s.blocks.forEach((b, index) => {
+    if ('text' in b) {
+      out.push(ev('content_block_start', { type: 'content_block_start', index, content_block: { type: 'text', text: '' } }))
+      out.push(ev('content_block_delta', { type: 'content_block_delta', index, delta: { type: 'text_delta', text: b.text } }))
+    } else {
+      out.push(ev('content_block_start', { type: 'content_block_start', index, content_block: { type: 'tool_use', id: `toolu_fake_${randomBytes(9).toString('hex')}`, name: b.tool, input: {} } }))
+      out.push(ev('content_block_delta', { type: 'content_block_delta', index, delta: { type: 'input_json_delta', partial_json: JSON.stringify(b.input) } }))
+    }
+    out.push(ev('content_block_stop', { type: 'content_block_stop', index }))
+  })
+  const calls = s.blocks.some((b) => 'tool' in b)
+  out.push(ev('message_delta', { type: 'message_delta', delta: { stop_reason: calls ? 'tool_use' : 'end_turn', stop_sequence: null }, usage: { output_tokens: s.outputTokens ?? 12 } }))
+  out.push(ev('message_stop', { type: 'message_stop' }))
+  return out
 }
 
 function headerOf(req: IncomingMessage, name: string): string {

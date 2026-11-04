@@ -104,6 +104,8 @@ data class Session(
     val turnStartedAt: Long = 0L,
     /** Claude's to-do list in short (docs/PROTOCOL.md, Session.todo): a Working card's "Running the tests 3/7". */
     val todo: TodoNow? = null,
+    /** What the status bar's opened panel says of the turn under way (docs/PROTOCOL.md, Session.turn); null out of a turn, or from an older Mac. */
+    val turn: TurnNow? = null,
 ) {
     /** A Codex session: no rewind, no other provider, no carrying on by itself, Codex's two modes. */
     val codex: Boolean get() = agent == AgentKind.CODEX
@@ -158,6 +160,18 @@ data class Session(
  */
 @Immutable
 data class TodoNow(val active: String?, val done: Int, val total: Int)
+
+/**
+ * A turn under way (docs/PROTOCOL.md, Session.turn): the stops for the owner's answer so far, which
+ * Claude Code's spinner doesn't count ([waitedMs]; [waitingSince] the one going on), its [tokens] as
+ * that spinner counts them, and the [step] it's on. What isn't known is null.
+ */
+@Immutable
+data class TurnNow(val waitedMs: Long = 0L, val waitingSince: Long? = null, val tokens: Long? = null, val step: TurnStep? = null)
+
+/** The call a turn is on: its [tool], its whole [command] if it has one (masked), since when, and how many commands [running] at once. */
+@Immutable
+data class TurnStep(val tool: String, val command: String?, val startedAt: Long, val running: Int)
 
 /** The Claude Code a `claude agents` job's process [runs] ("2.1.312") and the one [installed] since ("2.1.314"). */
 @Immutable

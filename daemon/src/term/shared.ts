@@ -194,6 +194,34 @@ export function pasteParts(text: string): string[] {
  */
 export const isWorking = (b: { above: string[]; below: string[] }) =>
   b.above.some((l) => /^\s*[^\p{L}\p{N}\s]\s+[\p{L}\- ]+…/u.test(l)) || b.below.some((l) => /esc to interrupt/i.test(l))
+/**
+ * What Claude Code's spinner says, read from the lines above its box: its turn's time and its tokens
+ * ("✢ Moonwalking… (8m 16s · ↓ 2.9k tokens)", "✢ Brewing… (running PostToolUse hook · 27s · ↓ 3.8k
+ * tokens)", 2.1.317). Null when no line reads as one, and a part that doesn't read is null: the wording
+ * changes between versions. [tokens] is only as exact as the screen: "2.9k" reads as 2900.
+ */
+export function spinnerOf(above: string[]): { seconds: number | null; tokens: number | null } | null {
+  for (let i = above.length - 1; i >= 0; i--) {
+    const m = /^\s*[^\p{L}\p{N}\s]\s+[\p{L}\- ]+…\s*\((.*?)\)?\s*$/u.exec(above[i]!)
+    if (!m) continue
+    const parts = m[1]!.split('·').map((p) => p.trim())
+    const seconds = parts.map(spinnerSeconds).find((n) => n !== null) ?? null
+    const tokens = parts.map(spinnerTokens).find((n) => n !== null) ?? null
+    return seconds === null && tokens === null ? null : { seconds, tokens }
+  }
+  return null
+}
+function spinnerSeconds(part: string): number | null {
+  const m = /^(?:(\d+)d\s*)?(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?$/.exec(part)
+  if (!m || !part) return null
+  return Number(m[1] ?? 0) * 86400 + Number(m[2] ?? 0) * 3600 + Number(m[3] ?? 0) * 60 + Number(m[4] ?? 0)
+}
+function spinnerTokens(part: string): number | null {
+  const m = /^↓\s*([\d,]+(?:\.\d+)?)\s*([kmb])?\s+tokens?$/i.exec(part)
+  if (!m) return null
+  const unit = { k: 1e3, m: 1e6, b: 1e9 }[m[2]?.toLowerCase() ?? ''] ?? 1
+  return Math.round(Number(m[1]!.replace(/,/g, '')) * unit)
+}
 /** Claude Code's own word on it: its session registry says "busy" while it works. */
 export function registryBusy(childPid: number | null | undefined): boolean {
   if (!childPid) return false

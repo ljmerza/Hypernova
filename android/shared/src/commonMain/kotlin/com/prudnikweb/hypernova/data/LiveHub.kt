@@ -1088,6 +1088,7 @@ class LiveHub(
             blockedCalls = w.blockedCalls,
             turnStartedAt = w.turnStartedAt ?: 0L,
             todo = w.todo,
+            turn = w.turn,
         )
     }
 

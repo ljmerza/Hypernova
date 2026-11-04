@@ -1,0 +1,15 @@
+ ▐▛███▛█   Claude Code v2.1.317
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   /tmp/proj
+❯ [Hypernova test] first
+  Sleeping 12 · 8s
+  ⎿  $ sleep 12 (8s)
+     (ctrl+b to run in background)
+❯ [Hypernova test] queued two
+  ctrl+x ctrl+s to send now
+✽ Shenaniganing… (9s · ↓ 800 tokens)
+                                                                                ◐ medium · /effort
+────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ Press up to edit queued messages
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ← for agents

@@ -150,6 +150,7 @@
       "blocked": null,
       "automation": null,
       "turnStartedAt": "@now-12m",
+      "turn": { "waitedMs": 0, "waitingSince": null, "tokens": 18400, "step": { "tool": "Bash", "command": "cd services/dedup && go vet ./... && go test -race -count=50 -timeout=20m ./dedup/... 2>&1 | tee /tmp/dedup-race.log | tail -n 40", "startedAt": "@now-2m", "running": 2 } },
       "todo": {
         "active": "Running the race detector",
         "done": 2,
