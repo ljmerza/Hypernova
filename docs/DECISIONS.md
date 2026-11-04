@@ -4369,3 +4369,54 @@ Two things point 6 and 7 of "The tabs on Settings' pages" left as they were.
 ## Taking a photo asks for the camera first (2026-11-03)
 
 The owner: "trying to take a picture crashes the app". Scan added the camera permission to the manifest, and Android refuses `ACTION_IMAGE_CAPTURE` with a SecurityException to an app that declares that permission without holding it, as far as Android's documents say. So a photo for an attachment crashed in v0.26.0 for anyone who hadn't allowed the camera. Camera now asks for the permission first, says so if it's refused, and catches the exception as a backstop.
+
+## The session sheet's MCP tab (2026-11-03)
+
+The owner: "in the session top bar menu that pops up there should be a new tab for MCPs for us to manage the MCPs like reload them or disconnect whatever you can do in the terminal." (Dictated, "NPCs" in the original.) It replaces "Nothing on the chat screen ... the session sheet's copy of the menu leaves it out" of "A session's MCP servers" 1 only for the sheet: the chat screen itself has nothing new. Routes: `docs/PROTOCOL.md`, "A session's MCP connections".
+
+### What was measured first
+
+Claude Code 2.1.317 in a throwaway home, against the fake provider and a tiny real server that notes each start with its pid and parent's pid. Codex 0.164.0 in a throwaway `CODEX_HOME`, with a real thread and no turn.
+
+| | Measured |
+|---|---|
+| Settings' reconnect (`POST /v1/agents/mcp/reconnect`) | **Doesn't reach a running session.** It connects from a process of its own and says "connected"; the session's server keeps its pid. Killed under the session (`kill -9`), it stays gone after Settings' reconnect |
+| Settings' toggle | **Doesn't reach a running session either.** The file says off; the session's process keeps running and its `/mcp` says connected. Its `/mcp enable` then answers `"x" is still available in this session, but another session disabled it`, and its `/mcp reconnect` `x was disabled in another session — disable and re-enable it in /mcp, or restart, to reconnect` |
+| `/mcp`'s screens | The list (`✔` connected, `✘` failed, `◯` off, `…` connecting, `⚠` needs sign-in, with a tool count, by scope, `↓ n more` past the screen, a name cut with `…` when narrow), a server's page (status, **its whole command or URL, its file**, then View tools, Reconnect, Disable, or Authenticate, or Re-authenticate and Clear authentication), and the tools (names and read-only or destructive) |
+| What those options do | Reconnect ends the server's process and starts a new one; tools it added since reach the model at its next turn (a deferred-tools note, seen in the request). Disable ends it and adds the name to the folder's `disabledMcpServers`; Enable starts it and takes the name off. Another running session in that folder isn't touched |
+| Typed forms | `/mcp reconnect <name>`, `/mcp enable <name>`, `/mcp disable <name>` do the same with no menu, names with spaces too, and answer in words (`Successfully reconnected to x`, `Failed to reconnect to x`, `MCP server "x" disabled`, `is already disabled`, `not found`, `x requires authentication`). `all` means every server. `/mcp reconnect all` only retries what's down |
+| Busy (a 40 s turn) | **`/mcp` opens and every typed form runs at once, beside the turn, never queued.** The answer shows for a moment in the row above the box, right-aligned. Esc closes the dialog and the turn goes on; with no dialog up, Esc would stop the turn |
+| What it leaves behind | A typed action is a local command in the transcript (`/mcp disable x`, its answer), so it shows in the chat as one, and goes to the model at its next turn under Claude Code's "run directly" caveat, as in a terminal. Opening `/mcp` and closing it writes nothing to the transcript. Each one goes in that terminal's ↑ history |
+| A dead server, by itself | Killed under a session, its `/mcp` still said connected, 2 tools, while nothing was running: Claude Code's own view, which this can only repeat. A reconnect fixes it |
+| A `claude agents` job | Through `claude attach`, the same screens and forms, on the job's own process (the new server's parent) |
+| An SDK session | Each turn is one process. In a turn, `mcpServerStatus()`, `reconnectMcpServer()` and `toggleMcpServer()` all work on that process, though it was started with a string prompt; the toggle reaches the file too. After the turn the same call fails: there's nothing between turns, and the next turn connects afresh and honours the file. **Such a turn also starts a project's server nobody approved**: measured, and the known `non_interactive` rule of "Managing MCP servers" 4 |
+| Sign-in | `claude mcp login` (Settings' way) changes nothing in a running session until `/mcp reconnect <name>` there, which then connects. `/mcp`'s own Authenticate shows the address and takes the pasted one on its screen |
+| Not reaching a running session | A server added to the file: not listed, `MCP server "x" not found`, until a restart. A project's server approved after it started: the same. A server removed from the file: it keeps it, and reconnects it. **A changed definition in the file is what the next reconnect or enable runs** |
+| Codex | `mcpServerStatus/list` with a `threadId` gives `runtimeStatus`, that thread's connection (`failed` for one killed under it, the rest `connected`). `config/value/write` then `config/mcpServer/reload` reach a loaded thread: off stops the server, on starts it. The reload brings back what's down and left a healthy server's pid alone, and there's no reload of one server. A thread not loaded is `thread not found` |
+
+### The ways it could go
+
+1. **Settings' routes, with the tab as a second door.** Cheap, and what's measured above says it would say "reconnected" while the session stays broken. Out.
+2. **Drive `/mcp`'s menus by keys for everything.** It works, but each action is a walk through a list that scrolls and resets its cursor on the way back, past a page that prints the command, while another person may be at that terminal.
+3. **Each kind through what reaches it, picked.** In a terminal or job, `/mcp <action> <name>` typed by `typeInto`, as `/btw` is; `/mcp` opened and read off the screen only to look (status, tool counts, a tool list), then closed. In an SDK turn, control requests on that turn's process. At rest, the folder's list, said to count from its next turn. Codex, the thread's own status and the reload. The menu is walked only for View tools, which has no typed form.
+
+**Why 3:** it's the only one where the session's own state comes back, the typed forms are Claude Code's own interface for this and work while it's busy, and they need no walk past the page that prints a command.
+
+### What was decided
+
+1. **Never saying what didn't happen.** After every action the state is read back and that decides the `outcome`: `/mcp`'s own words alone never make it `done`. Connected and no answer on the screen is `unconfirmed`, since it isn't known to be a new connection. An older answer on the screen isn't this one: answers are counted first.
+2. **What each kind offers,** decided on the server so a client can't get it wrong: reconnect and off or on for a terminal, a job or a turn; off or on at rest, for its next turn, with no reconnect; off or on for Codex, reconnect only for what's down; nothing for a terminal not shared or an ended session, which show what a new session in the folder would get and say that's what it is.
+3. **Off and on count further than the session:** the folder's list, so new sessions there too, and the tab says so, as Claude Code's own does. Other running sessions keep theirs. For Codex it's everywhere, and it says that.
+4. **Off in the file but on in the session** (another session, or Settings) is said on the row. "Keep on for new sessions" only changes the list, through Settings' own toggle, since `/mcp enable` won't and the connection needn't drop.
+5. **A look opens `/mcp` in that terminal for a moment,** so the tab looks once as it's opened and at Check again, never on a timer, and a tool list only when it's asked for. Anyone at that terminal sees it flick. While it's up `watchMenus` leaves that session alone, or the phones would be offered it as a question.
+6. **Esc only while a dialog of `/mcp` is on the screen,** checked just before it's pressed: with none, Esc would stop Claude's turn. There's still a moment between the look and the key.
+7. **It won't type over anything.** Words in the box, a question or a menu up, a session still starting: nothing's typed, and it says why with Open the live terminal.
+8. **Sign in is Settings' own sheet,** then a reconnect in the session, read back: signing in reaches a session only then. At rest it says its next turn connects. A claude.ai connector has no sign-in here.
+9. **A name the terminal cut** is made whole from the files that name it. If it can't be (a plugin's on a narrow terminal), the row has no actions and points at the terminal, since a guessed name could be another server. A server called `all` is refused, as `/mcp` takes that for every server.
+10. **Adding, removing and changing stay in Settings,** behind their fingerprint, with a link there. The tab's actions are those of "Managing MCP servers from the phone": enable, disable and reconnect of an existing server need no check. **The cost of that:** a reconnect or an enable runs what the file says now, so a definition changed outside Hypernova since the session started runs without one, as it would at Claude Code's next start or its own reconnect. The daemon doesn't know what a session started with.
+11. **Nothing on the screen goes further than `mcp-screen.ts`:** a row's name, status and count, a page's options, a tool's name and hints. A page's command and file line are never read, and screens aren't logged. `claude mcp get` still isn't run and `~/.claude.json` stays closed.
+12. **One place for what's shared:** `ui/mcp/McpParts.kt` has what Settings' screens and the tab say alike, status words, tool rows, the sign-in sheet, moved out of `McpScreens.kt`. `sessionMcp`'s allow-list says how each runs. The Home card's read-only sheet stays as it was.
+
+### Not proven
+
+A real provider's OAuth page from a phone, a plugin's or a claude.ai connector's row (the section words are from the binary, no such server here), and Codex through the daemon's real connection to a live shared app-server: its calls were measured on an app-server of the test's own, and the route's are tested with a stand-in. No real phone yet.
