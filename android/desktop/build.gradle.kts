@@ -218,7 +218,19 @@ tasks.withType<Test>().configureEach {
     systemProperty("java.awt.headless", "true")
     // Core is one object per process, as it is on a phone: a new process per test class.
     forkEvery = 1
-    maxParallelForks = 1
+    // Three side by side. CI's runner has 4 CPUs, and a fourth was no faster (docs/DECISIONS.md, "CI's Android job, split in two").
+    maxParallelForks = 3
     // Where the screen tests leave their pictures for someone to look at.
     systemProperty("hypernova.renders", layout.buildDirectory.dir("renders").get().asFile.path)
+}
+
+// Gradle deals test classes to its forks in turn, in the order it finds them, whatever their size. Alphabetically, the slow
+// ones pile up on one or two forks, so the slowest are found first. A class left off this list still runs, after these.
+val slowestTestClasses = listOf("ChatTest", "PanesTest", "NewSessionTest", "RendersTest", "SessionActionsTest", "ApproveTest", "HistoryTest")
+tasks.named<Test>("test") {
+    val classes = testClassesDirs
+    testClassesDirs = files(
+        slowestTestClasses.map { name -> classes.asFileTree.matching { include("**/$name.class") } },
+        classes.asFileTree.matching { slowestTestClasses.forEach { exclude("**/$it.class") } },
+    )
 }
