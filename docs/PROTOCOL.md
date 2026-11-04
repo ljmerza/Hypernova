@@ -3245,7 +3245,8 @@ A paired phone only, each of them: anything else is 401 `unauthorized`. An older
 
 File paths must be ones a client may browse (see Files: the projects folder and, with Browse outside
 projects on, sessions' own folders in the home folder) or one of the device's attachments. Anything
-else is 403 `outside_projects`, or `locked_folder` for a key place.
+else is 403 `outside_projects`, or `locked_folder` for a key place. The one exception, for
+`GET /v1/file` without `download=1`, is under Files, "Agents' plans".
 
 #### GET /v1/files
 
@@ -6637,7 +6638,8 @@ a look would bring up a dialog on the server: it counts as there, and the listin
   `CLAUDE_CONFIG_DIR`).
 
 A listing of the folder that holds one shows it as a locked row (`locked: "folder"`). It is never
-listed, read or downloaded (403 `locked_folder`), and a preview never serves a file in one.
+listed, read or downloaded (403 `locked_folder`), and a preview never serves a file in one. The one
+exception is "Agents' plans", below, and it is for reading only.
 
 #### The setting
 
@@ -6663,6 +6665,30 @@ downloaded. A link is judged by where it leads (one leading outside the folders 
 `locked: "outside"`), and a file is opened as the path that was checked, never through a link put
 there since (404 `not_found`).
 
+#### Agents' plans
+
+The one way into a key place, for viewing alone: a regular file named `*.md` (any case) whose real
+path is in or under `~/.codex/plans/` or `<CLAUDE_DIR>/plans/`, `GET /v1/file` without `download=1`.
+The rule is `isAgentPlan` in `daemon/src/secretfiles.ts` and `agentPlan` in `daemon/src/files.ts`.
+"Browse outside projects" has no say in it, on or off, and neither does the session's folder.
+
+- The answer carries `X-Hypernova-View-Only: 1`, and a `too_large` refusal `viewOnly: true`, so a
+  client doesn't offer Share, Save or Open with. The viewer's limit applies as for any file.
+- Still 403 `locked_folder`: `download=1`, every listing (`/v1/files`, `/v1/folders`) of the plans
+  folder, of a folder inside it and of the folder above it, a preview, and everything else in those
+  folders, such as `auth.json`, `config.toml`, credentials, sessions and databases.
+- It's judged on the real path. A link named `x.md`, a folder link in `plans`, or a `plans` that is
+  itself a link opens only if what it leads to is a plan by this rule, and `..` is folded first. A
+  link from elsewhere that leads to a plan opens that plan; one that leads anywhere else in the
+  folder doesn't. A `.md` that `isSecretFile` turns away (`.env.md`, `plans/.ssh/x.md`) stays closed.
+- A plan that isn't there is 404 `not_found`, as any file gone.
+- Everything else in the daemon still counts these files as in a key place: `checkPath`,
+  `allowedPath`, `workPath`, `reach` and `keyPlace` are unchanged.
+
+Claude Code's default is `<config dir>/plans` (its `plansDirectory` setting moves plans into the
+project, where a project's rules apply). Codex 0.164.0's binary names no plans folder, so what writes to
+`~/.codex/plans` isn't Codex by itself: a skill or a prompt, as far as can be told.
+
 #### Viewing and downloading
 
 The limits are on `GET /v1/file`. 500 MB is a safe default the owner may change. The Android app
@@ -6677,7 +6703,7 @@ writes a download to a file, never memory, and resumes a dropped one with `Range
 | 403 | `outside_projects` | outside the folders above; carries `projectsRoot`, and `setting: "browseOutsideProjects"` when turning that on would open it (a session's folder in the home folder) | **Open projects**; with `setting`, **Turn on in Settings** too |
 | 403 | `locked_folder` | a key place or inside one, however it was reached | none: it stays on the server |
 | 403 | `secret_file` | a file with keys, or a folder inside `.ssh` and the like | none: it stays on the server |
-| 413 | `too_large` | past the limit; carries `size` and `max` (bytes) | **Download** for a view over 20 MB; else none |
+| 413 | `too_large` | past the limit; carries `size` and `max` (bytes), and `viewOnly: true` for an agent's plan | **Download** for a view over 20 MB, unless `viewOnly`; else none |
 | 404 | `not_found` | it isn't there any more (inside a folder a client may open) | go up a folder |
 | 404 | `attachment_gone` | an attachment of the client's, removed after 30 days | none |
 | 400 | `not_a_dir` / `is_dir` | a file asked for as a folder, or a folder as a file | open it the other way |

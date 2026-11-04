@@ -87,6 +87,17 @@ class FilesLiveTest {
         daemon.down = false
     }
 
+    @Test fun aFileTheServerOnlyShowsSaysSoAndOthersDont() {
+        connect()
+        daemon.on("GET", "/v1/file") { MockResponse().setResponseCode(200).setHeader("Content-Type", "text/markdown; charset=utf-8").setHeader("X-Hypernova-View-Only", "1").setBody("# Plan\n") }
+        assertTrue(rig.call { rig.hub.file("/home/me/.codex/plans/handoff.md") }.getOrThrow().viewOnly)
+        daemon.on("GET", "/v1/file") { MockResponse().setResponseCode(200).setHeader("Content-Type", "text/markdown; charset=utf-8").setBody("# Readme\n") }
+        assertFalse(rig.call { rig.hub.file("/home/me/Projects/files-demo/README.md") }.getOrThrow().viewOnly)
+        // Too large to show, and no download either: the refusal says so.
+        daemon.on("GET", "/v1/file") { refusal(413, "too_large", "Too big to show.") { put("size", 30_000_000L).put("max", 20_971_520L).put("viewOnly", true) } }
+        assertTrue(FileProblem.of(rig.call { rig.hub.file("/home/me/.codex/plans/huge.md") }.exceptionOrNull()).viewOnly)
+    }
+
     @Test fun aFilesBytesComeWithTheirType() {
         connect()
         daemon.on("GET", "/v1/file") { MockResponse().setResponseCode(200).setHeader("Content-Type", "text/markdown; charset=utf-8").setBody("# Files demo\n") }

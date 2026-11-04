@@ -44,6 +44,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Box
@@ -623,25 +624,38 @@ internal fun blocks(src: String, streaming: Boolean = false): List<Block> {
 fun Markdown(text: String, modifier: Modifier = Modifier, color: Color = HN.inkMuted, streaming: Boolean = false) {
     val parsed = remember(text, streaming) { blocks(text, streaming) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (b in parsed) {
-            when (b) {
-                is Block.Para -> HText(markdownLite(b.text), style = Type.body, color = color)
-                is Block.Heading -> HText(
-                    markdownLite(b.text),
-                    style = if (b.level <= 2) Type.heading.copy(fontWeight = FontWeight(600)) else Type.body.copy(fontWeight = FontWeight(600)),
-                    color = HN.ink,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-                is Block.Bullet -> Row(Modifier.padding(start = (b.indent * 14).dp)) {
-                    HText(b.mark, style = Type.body, color = HN.accentDim, modifier = Modifier.width(if (b.mark.length > 1) 24.dp else 16.dp))
-                    HText(markdownLite(b.text), style = Type.body, color = color, modifier = Modifier.weight(1f))
-                }
-                is Block.Code -> CodeBlock(b.text)
-                is Block.Mermaid -> DiagramBlock(b.source)
-                is Block.Table -> MdTable(b.table, color)
-                Block.Rule -> MdRule()
-            }
+        for (b in parsed) MarkdownBlock(b, color)
+    }
+}
+
+/** A whole document's [Markdown], parsed ahead: it can be long, so off the main thread. */
+class MarkdownDocument internal constructor(internal val blocks: List<Block>)
+
+fun markdownDocument(text: String): MarkdownDocument = MarkdownDocument(blocks(text))
+
+/** [doc] as a list's rows, a block to a row and drawn as [Markdown] draws it, so a long document scrolls as a list does. */
+fun LazyListScope.markdownRows(doc: MarkdownDocument, color: Color = HN.inkMuted) {
+    items(doc.blocks.size) { MarkdownBlock(doc.blocks[it], color) }
+}
+
+@Composable
+private fun MarkdownBlock(b: Block, color: Color) {
+    when (b) {
+        is Block.Para -> HText(markdownLite(b.text), style = Type.body, color = color)
+        is Block.Heading -> HText(
+            markdownLite(b.text),
+            style = if (b.level <= 2) Type.heading.copy(fontWeight = FontWeight(600)) else Type.body.copy(fontWeight = FontWeight(600)),
+            color = HN.ink,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        is Block.Bullet -> Row(Modifier.padding(start = (b.indent * 14).dp)) {
+            HText(b.mark, style = Type.body, color = HN.accentDim, modifier = Modifier.width(if (b.mark.length > 1) 24.dp else 16.dp))
+            HText(markdownLite(b.text), style = Type.body, color = color, modifier = Modifier.weight(1f))
         }
+        is Block.Code -> CodeBlock(b.text)
+        is Block.Mermaid -> DiagramBlock(b.source)
+        is Block.Table -> MdTable(b.table, color)
+        Block.Rule -> MdRule()
     }
 }
 

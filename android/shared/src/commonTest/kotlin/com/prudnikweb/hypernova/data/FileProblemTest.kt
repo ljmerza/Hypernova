@@ -25,6 +25,11 @@ class FileProblemTest {
         }
     }
 
+    @Test fun `a file the server only shows offers no download`() {
+        assertTrue(FileProblem.of(FileFailure("x", status = 413, code = "too_large", viewOnly = true)).viewOnly)
+        assertFalse(FileProblem.of(fail(413, "too_large")).viewOnly)
+    }
+
     @Test fun `outside carries the projects folder and too_large its numbers`() {
         assertEquals("/Users/me/Programming", FileProblem.of(fail(403, "outside_projects", root = "/Users/me/Programming")).projectsRoot)
         val big = FileProblem.of(fail(413, "too_large", size = 120_000_000, max = 20_971_520))

@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,7 +55,11 @@ import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.ScreenScaffold
+import com.prudnikweb.hypernova.ui.components.Segmented
+import com.prudnikweb.hypernova.ui.chat.MarkdownDocument
 import com.prudnikweb.hypernova.ui.chat.isWebPage
+import com.prudnikweb.hypernova.ui.chat.markdownDocument
+import com.prudnikweb.hypernova.ui.chat.markdownRows
 import com.prudnikweb.hypernova.ui.home.tilde
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
@@ -68,21 +74,25 @@ private val TEXT_EXT = setOf(
     "kt", "kts", "java", "swift", "py", "rb", "go", "rs", "c", "h", "cpp", "hpp", "m", "sh", "zsh", "bash", "gradle", "properties", "ini", "cfg",
     "conf", "env", "sql", "csv", "tsv", "log", "gitignore", "lock", "svg", "vue", "svelte", "astro", "dart", "lua", "php", "pl", "r", "scala",
 )
+private val MARKDOWN_EXT = setOf("md", "markdown")
 private const val MAX_TEXT = 512 * 1024
 
 private fun ext(path: String) = path.substringAfterLast('/').substringAfterLast('.', "").lowercase(Locale.ROOT)
 
 private sealed interface Shown {
     data class Image(val bitmap: ImageBitmap) : Shown
-    data class Text(val lines: List<String>, val truncated: Boolean) : Shown
+    /** [document]: Markdown's Formatted view; null for any other text. */
+    data class Text(val lines: List<String>, val truncated: Boolean, val document: MarkdownDocument? = null) : Shown
     /** No preview here: the file goes to another app or to a folder. */
     data object Binary : Shown
 }
 
 /**
- * One file: images zoom, text and code scroll in mono, web pages open as a preview. Everything else (PDFs, archives,
+ * One file: images zoom, text and code scroll in mono, web pages open as a preview. Markdown opens in mono too, with a
+ * switch to Formatted (owner, 2026-11-03: "raw by default"; each opening starts there). Everything else (PDFs, archives,
  * office files, videos, a file past what the viewer loads) offers Share, Save and Open with, which download it
- * (streamed to the cache, with progress and Cancel) first. Those three are there for images and text too.
+ * (streamed to the cache, with progress and Cancel) first. Those three are there for images and text too, but not for a
+ * file the server only shows ([FileBytes.viewOnly], an agent's plan).
  */
 @Composable
 fun FileViewer(hub: Hub, path: String, onBack: () -> Unit) {
@@ -93,6 +103,8 @@ fun FileViewer(hub: Hub, path: String, onBack: () -> Unit) {
     var shown by remember { mutableStateOf<Shown?>(null) }
     var problem by remember { mutableStateOf<FileProblem?>(null) }
     var reload by remember { mutableStateOf(0) }
+    var viewOnly by remember { mutableStateOf(false) }
+    var formatted by remember(path) { mutableStateOf(false) }
     val e = ext(path)
     val name = path.substringAfterLast('/')
     val job = remember(path) { DownloadJob(scope, name, null, downloadDir(context, path)) { t, r, s, p -> hub.download(path, t, r, s, p) } }
@@ -104,6 +116,7 @@ fun FileViewer(hub: Hub, path: String, onBack: () -> Unit) {
         hub.file(path)
             .onSuccess { f ->
                 job.servedMime = f.mime
+                viewOnly = f.viewOnly
                 shown = withContext(Dispatchers.Default) { decode(f.bytes, f.mime, e) }
             }
             .onFailure { problem = FileProblem.of(it) }
@@ -120,10 +133,18 @@ fun FileViewer(hub: Hub, path: String, onBack: () -> Unit) {
                     Modifier.padding(start = 12.dp), kind = PillKind.Primary, height = 40.dp, leading = Glyph.Globe,
                 )
             }
+        } else if ((shown as? Shown.Text)?.document != null) {
+            {
+                Segmented(
+                    listOf(false to stringResource(R.string.fv_raw), true to stringResource(R.string.fv_formatted)), formatted, { formatted = it },
+                    Modifier.padding(start = 12.dp),
+                )
+                if (viewOnly) HText(stringResource(R.string.fv_view_only), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 12.dp, top = 8.dp))
+            }
         } else null,
     ) { top, source ->
         val p = problem
-        val dockShown = p == null || job.state !is DlState.Idle
+        val dockShown = !viewOnly && (p == null || job.state !is DlState.Idle)
         val shift = bottom + if (dockShown) 112.dp else 0.dp
         when (val s = shown) {
             null -> Box(Modifier.fillMaxSize().padding(top = top, start = 16.dp, end = 16.dp)) {
@@ -132,7 +153,7 @@ fun FileViewer(hub: Hub, path: String, onBack: () -> Unit) {
                         p, forFolder = false, Modifier.padding(vertical = 8.dp), projectsRoot = hub.projectsRoot,
                         onOpenProjects = { r -> opener.files(r, r.trimEnd('/').substringAfterLast('/').ifEmpty { r }) },
                         onRetry = { reload++ },
-                        onDownload = { job.run() },
+                        onDownload = if (p.viewOnly) null else ({ job.run() }),
                         onOpenOther = if (p.kind == FileKind.WrongKind) ({ opener.files(path, name) }) else null,
                         onTurnOn = if (hub.mac.browseOutsideProjects == false) ({ opener.settings(com.prudnikweb.hypernova.ui.settings.SettingsJump.FILES) }) else null,
                     )
@@ -154,8 +175,22 @@ fun FileViewer(hub: Hub, path: String, onBack: () -> Unit) {
             }
             is Shown.Text -> {
                 val gutter = s.lines.size.toString().length
-                LazyColumn(
+                // One each, so going to the other view and back keeps the place in both.
+                val rawList = rememberLazyListState()
+                val documentList = rememberLazyListState()
+                if (formatted && s.document != null) LazyColumn(
                     Modifier.fillMaxSize().then(source),
+                    state = documentList,
+                    contentPadding = PaddingValues(top = top, bottom = shift + 24.dp, start = 16.dp, end = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    markdownRows(s.document)
+                    if (s.truncated) {
+                        item { HText(stringResource(R.string.file_too_big), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 12.dp)) }
+                    }
+                } else LazyColumn(
+                    Modifier.fillMaxSize().then(source),
+                    state = rawList,
                     contentPadding = PaddingValues(top = top, bottom = shift + 24.dp, start = 12.dp, end = 16.dp),
                 ) {
                     itemsIndexed(s.lines) { i, line ->
@@ -194,8 +229,8 @@ private fun decode(bytes: ByteArray, mime: String?, ext: String): Shown {
     if (!texty && head.any { it == 0.toByte() }) return Shown.Binary
     if (head.any { it == 0.toByte() }) return Shown.Binary
     val truncated = bytes.size > MAX_TEXT
-    val text = String(if (truncated) bytes.copyOf(MAX_TEXT) else bytes, Charsets.UTF_8)
-    return Shown.Text(text.replace("\t", "    ").lines(), truncated)
+    val text = String(if (truncated) bytes.copyOf(MAX_TEXT) else bytes, Charsets.UTF_8).replace("\t", "    ")
+    return Shown.Text(text.lines(), truncated, if (ext in MARKDOWN_EXT) markdownDocument(text) else null)
 }
 
 /** Pinch to zoom, drag to pan (as far as the zoomed picture reaches), double-tap to reset. */

@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 import { basename, join, sep } from 'node:path'
 
 // Files that hold credentials stay on the Mac: the phone can see them in a folder listing, but never
@@ -39,6 +40,19 @@ export const KEY_PLACES: readonly string[] = [
   '.mozilla', '.thunderbird', '.config/google-chrome', '.config/chromium', '.config/BraveSoftware',
   '.config/microsoft-edge', '.config/vivaldi', '.config/opera', '.local/share/keyrings', '.config/Bitwarden',
 ]
+
+/**
+ * The one way into a key place, read only (docs/PROTOCOL.md, "Agents' plans"): a Markdown file in an
+ * agent's `plans` folder, or a folder under it. Owner, 2026-11-03: "should be able to view MD files".
+ * [real] is a real path and [agentFolders] are the agents' folders as real paths, so a link can't lead
+ * here by name or lead out unseen, and a `plans` that is itself a link doesn't count: its files' real
+ * paths are somewhere else. Case counts, since a Mac's realpath already gives the disk's own spelling.
+ * The caller also checks that it's a regular file (files.ts, agentPlan).
+ */
+export function isAgentPlan(real: string, agentFolders: readonly string[]): boolean {
+  if (!/^.+\.md$/i.test(basename(real)) || isSecretFile(real)) return false
+  return agentFolders.some((folder) => real.startsWith(join(folder, 'plans') + sep))
+}
 
 /** [KEY_PLACES] as full paths under [home]. */
 export const keyPlacesIn = (home: string): string[] => KEY_PLACES.map((p) => join(home, ...p.split('/')))

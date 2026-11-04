@@ -41,11 +41,13 @@ class FileFailure(
     val projectsRoot: String? = null,
     /** The setting that would open it ("browseOutsideProjects"), when the Mac says one would. */
     val setting: String? = null,
+    /** The server shows this file but won't download it, so a download is no next step. */
+    val viewOnly: Boolean = false,
 ) : HubException(message) {
     companion object {
         fun of(e: ApiException, message: String?): FileFailure = FileFailure(
             message ?: e.message.orEmpty(), e.problem, e.status, e.code,
-            e.error?.long("size"), e.error?.long("max"), e.error?.str("projectsRoot"), e.error?.str("setting"),
+            e.error?.long("size"), e.error?.long("max"), e.error?.str("projectsRoot"), e.error?.str("setting"), e.error?.optBoolean("viewOnly") == true,
         )
     }
 }
@@ -63,6 +65,8 @@ data class FileProblem(
     val problem: Problem? = null,
     /** [FileKind.Outside]: Browse outside projects would open it ([BROWSE_SETTING]), so Settings is a real next step. */
     val setting: String? = null,
+    /** An agent's plan: too large to show, and no download to offer instead. */
+    val viewOnly: Boolean = false,
 ) {
     /** Whether "Turn on in Settings" can open it: the Mac said Browse outside projects would. */
     val settingOpens: Boolean get() = kind == FileKind.Outside && setting == BROWSE_SETTING
@@ -93,7 +97,7 @@ data class FileProblem(
             return FileProblem(
                 kind, retryable = kind == FileKind.Network, message = e.message.orEmpty(),
                 size = e.size, max = e.max, projectsRoot = e.projectsRoot, asFolder = e.code == "is_dir", problem = e.problem,
-                setting = e.setting,
+                setting = e.setting, viewOnly = e.viewOnly,
             )
         }
 

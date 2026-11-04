@@ -195,7 +195,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Phone | Desktop | |
 |---|---|---|
 | Automations: list, editor, runs, ask steps | Not yet | An automation's question isn't sent as an alert either: there's no screen to open (LATER L123) |
-| Files: browse, view, download, previews and the web page | Not yet | |
+| Files: browse, view, download, previews and the web page | Not yet | When the viewer comes it needs Markdown's Raw and Formatted switch, raw first, and to leave Share and Save off a file marked view only (docs/PROTOCOL.md, "Agents' plans"). The chat's Markdown is already in `sharedui`, with `markdownRows` for a long document |
 | What changed | Not yet | |
 | Statistics | Not yet | |
 | Agents boards, an agent's own screen | Not yet | Only a count in the pane |

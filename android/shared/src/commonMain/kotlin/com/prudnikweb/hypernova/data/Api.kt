@@ -169,7 +169,7 @@ class Api(val base: String, private val token: String?, private val fixed: NetRo
     suspend fun bytes(path: String, max: Long = 20L * 1024 * 1024): FileBytes {
         val r = execute(request(path).get().build(), max)
         if (r.code !in 200..299) throw errorOf(r.code, String(r.body))
-        return FileBytes(r.body, r.type)
+        return FileBytes(r.body, r.type, r.viewOnly)
     }
 
     /**
@@ -248,7 +248,7 @@ class Api(val base: String, private val token: String?, private val fixed: NetRo
         }
     }
 
-    private class Raw(val code: Int, val type: String?, val body: ByteArray)
+    private class Raw(val code: Int, val type: String?, val body: ByteArray, val viewOnly: Boolean = false)
 
     /** Runs [req] and reads the whole body on OkHttp's thread, never on the caller's. */
     private suspend fun execute(req: Request, max: Long, client: OkHttpClient = route().client): Raw = suspendCancellableCoroutine { cont ->
@@ -266,7 +266,7 @@ class Api(val base: String, private val token: String?, private val fixed: NetRo
                         if (len > max) throw ApiException(Problem.Server, 413, "too_large")
                         val bytes = body?.bytes() ?: ByteArray(0)
                         if (bytes.size > max) throw ApiException(Problem.Server, 413, "too_large")
-                        if (cont.isActive) cont.resume(Raw(r.code, body?.contentType()?.let { "${it.type}/${it.subtype}" }, bytes))
+                        if (cont.isActive) cont.resume(Raw(r.code, body?.contentType()?.let { "${it.type}/${it.subtype}" }, bytes, r.header("X-Hypernova-View-Only") == "1"))
                     }
                 } catch (e: Throwable) {
                     if (cont.isActive) cont.resumeWithException(Net.classify(e))

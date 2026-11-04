@@ -912,12 +912,17 @@ fun SessionScreen(
  * One transcript item, drawn as what it is (a session's own, or an agent's on its screen). Files
  * and previews open in the app; an agent's card opens that agent.
  */
+/** What may be a plan in an agent's folder, wherever that folder has been moved to. Only says a tap is worth trying: a wrong guess gets the server's own answer. */
+internal fun mayBeAgentPlan(path: String): Boolean = "/plans/" in path && path.endsWith(".md", ignoreCase = true)
+
 @Composable
 internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: Modifier, known: List<com.prudnikweb.hypernova.data.SlashCommand>? = null, onMenu: ((Item) -> Unit)? = null, named: Boolean = true) {
     val opener = LocalOpener.current
     val preview: (Int) -> Unit = { port -> opener.preview(null, port, "localhost:$port") }
     // Read rows and diff cards open their file only where the Mac lets the phone browse the folder.
     val openFile: ((String) -> Unit)? = if (hub.session(sessionId)?.browsable == false) null else opener.file
+    // An agent's plan may open where the session's folder doesn't: the server decides (docs/PROTOCOL.md, "Agents' plans").
+    val openOrPlan: (String?) -> ((String) -> Unit)? = { path -> openFile ?: opener.file.takeIf { path != null && mayBeAgentPlan(path) } }
     val openAgent: (String) -> Unit = { id -> opener.agent(sessionId, id) }
     when (item) {
         // [onMenu]: the session's chat gives its messages a long-press menu (ChatExtras.kt).
@@ -933,9 +938,9 @@ internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: M
             )
         }
         is Item.Assistant -> WithMessageMenu(item, onMenu) { menu -> AssistantMessage(item, modifier.then(menu), onPreview = preview, codex = hub.session(sessionId)?.codex == true, named = named) }
-        is Item.Tool -> ToolRow(item, modifier, onOpen = openFile, onPreview = preview)
+        is Item.Tool -> ToolRow(item, modifier, onOpen = openOrPlan(item.path), onPreview = preview)
         is Item.Terminal -> MiniTerminal(item, modifier, onPreview = preview)
-        is Item.Diff -> DiffCard(item, modifier, onOpen = openFile, onPreviewFile = { path -> opener.preview(path, null, path.substringAfterLast('/')) })
+        is Item.Diff -> DiffCard(item, modifier, onOpen = openOrPlan(item.path), onPreviewFile = { path -> opener.preview(path, null, path.substringAfterLast('/')) })
         is Item.Approval -> {
             // "Always" waits for the fingerprint or the screen lock (docs/DECISIONS.md).
             val context = LocalContext.current

@@ -3,15 +3,27 @@ package com.prudnikweb.hypernova.ui.screens
 import android.app.Application
 import android.content.Intent
 import android.os.Looper
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.FileBytes
 import com.prudnikweb.hypernova.data.FileEntry
 import com.prudnikweb.hypernova.data.FileFailure
+import com.prudnikweb.hypernova.data.Item
+import com.prudnikweb.hypernova.ui.session.TranscriptItem
 import com.prudnikweb.hypernova.data.Listing
 import com.prudnikweb.hypernova.data.Route
 import com.prudnikweb.hypernova.ui.files.FileViewer
@@ -28,7 +40,8 @@ import org.robolectric.Shadows.shadowOf
 /**
  * Files and a file (ui/files/Files.kt, FileViewer.kt) over a scripted hub: a folder's rows, into a
  * folder and back up, a file opened, a key file's row explained; a text file in mono with its line
- * numbers, and a file with no preview downloaded and handed to Share.
+ * numbers, a file with no preview downloaded and handed to Share; Markdown raw first with its switch,
+ * and an agent's plan, for reading only.
  */
 @RunWith(RobolectricTestRunner::class)
 class FilesScreensTest {
@@ -157,5 +170,147 @@ class FilesScreensTest {
         rule.onNodeWithText(str(R.string.fv_share)).performClick()
         rule.waitForIdle()
         assertEquals(1, hub.calls.count { it.startsWith("download(") })
+    }
+
+    // ─── Markdown: raw first, with the switch to formatted ───
+
+    private val MD = "# Handoff\n\nWhere **things** stand.\n\n- First step\n- Second step\n\n| Step | Who |\n|---|---|\n| Build | Codex |\n\n```\nnpm test\n```\n"
+
+    private fun markdown(hub: FeatureHub = FeatureHub(), viewOnly: Boolean = false, text: String = MD) =
+        hub.apply { fileAnswer = { Result.success(FileBytes(text.toByteArray(), "text/markdown", viewOnly)) } }
+
+    @Test fun markdownOpensRawAndSwitchesToFormattedAndBack() {
+        viewer(markdown(), "$ROOT/PLAN.md")
+        // Raw first: the source as written, line by line in mono, and the switch.
+        waitForText("# Handoff")
+        rule.onNodeWithText("- First step").assertExists()
+        rule.onNodeWithText(str(R.string.fv_raw)).assertIsSelected()
+        rule.onNodeWithText(str(R.string.fv_formatted)).assertIsNotSelected()
+        rule.onNodeWithText(str(R.string.fv_share)).assertExists()
+        rule.snap("file_markdown_raw")
+        // Formatted: the chat's own drawing, the marks gone.
+        rule.onNodeWithText(str(R.string.fv_formatted)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Handoff").assertExists()
+        rule.onNodeWithText("First step").assertExists()
+        rule.onNodeWithText("npm test").assertExists()
+        assertEquals(0, rule.onAllNodesWithText("# Handoff").fetchSemanticsNodes().size)
+        rule.onNodeWithText(str(R.string.fv_formatted)).assertIsSelected()
+        rule.snap("file_markdown_formatted")
+        rule.onNodeWithText(str(R.string.fv_raw)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("# Handoff").assertExists()
+    }
+
+    @Test fun openingMarkdownAgainStartsRawWhateverWasChosenBefore() {
+        val hub = markdown()
+        var opening by mutableIntStateOf(0)
+        rule.setContent { Harness(spy) { key(opening) { FileViewer(hub, "$ROOT/PLAN.md", onBack = {}) } } }
+        waitForText("# Handoff")
+        rule.onNodeWithText(str(R.string.fv_formatted)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.fv_formatted)).assertIsSelected()
+        opening++
+        rule.waitForIdle()
+        waitForText("# Handoff")
+        rule.onNodeWithText(str(R.string.fv_raw)).assertIsSelected()
+    }
+
+    @Test fun theSwitchIsThereForAnUppercaseName() {
+        viewer(markdown(), "$ROOT/NOTES.MD")
+        waitForText("# Handoff")
+        rule.onNodeWithText(str(R.string.fv_raw)).assertIsSelected()
+    }
+
+    @Test fun theSwitchIsThereForTheLongerName() {
+        viewer(markdown(), "$ROOT/notes.markdown")
+        waitForText("# Handoff")
+        rule.onNodeWithText(str(R.string.fv_raw)).assertIsSelected()
+    }
+
+    @Test fun aTextFileHasNoSwitch() {
+        viewer(FeatureHub().apply { fileAnswer = { Result.success(FileBytes("# not markdown\n".toByteArray(), "text/plain")) } }, "$ROOT/notes.txt")
+        waitForText("# not markdown")
+        assertEquals(0, rule.onAllNodesWithText(str(R.string.fv_formatted)).fetchSemanticsNodes().size)
+    }
+
+    @Test fun aLongDocumentScrollsToItsEndInBothViewsAndDrawsOnlyWhatsInView() {
+        val long = (1..4000).joinToString("\n\n") { "## Part $it\n\nWhat part $it says." }
+        viewer(markdown(text = long), "$ROOT/LONG.md")
+        waitForText("## Part 1")
+        // A list, not one long column: the far end isn't drawn until it's scrolled to.
+        rule.onNodeWithText(str(R.string.fv_formatted)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Part 1").assertExists()
+        assertEquals(0, rule.onAllNodesWithText("Part 4000").fetchSemanticsNodes().size)
+        rule.onNode(hasScrollAction()).performScrollToNode(hasText("Part 4000"))
+        rule.onNodeWithText("Part 4000").assertExists()
+        assertEquals(0, rule.onAllNodesWithText("Part 1").fetchSemanticsNodes().size)
+        // The other view keeps its own place, at the top; back here is still at the end.
+        rule.onNodeWithText(str(R.string.fv_raw)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("## Part 1").assertExists()
+        rule.onNodeWithText(str(R.string.fv_formatted)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Part 4000").assertExists()
+    }
+
+    @Test fun anAgentsPlanIsForReadingOnly() {
+        val hub = markdown(viewOnly = true)
+        viewer(hub, "/home/owner/.codex/plans/handoff.md")
+        waitForText("# Handoff")
+        rule.onNodeWithText(str(R.string.fv_raw)).assertIsSelected()
+        rule.onNodeWithText(str(R.string.fv_view_only)).assertExists()
+        for (s in listOf(R.string.fv_share, R.string.fv_save, R.string.fv_open_with)) assertEquals(0, rule.onAllNodesWithText(str(s)).fetchSemanticsNodes().size)
+        rule.snap("file_agent_plan")
+        rule.onNodeWithText(str(R.string.fv_formatted)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Handoff").assertExists()
+        assertEquals(0, rule.onAllNodesWithText(str(R.string.fv_share)).fetchSemanticsNodes().size)
+        assertTrue(hub.calls.none { it.startsWith("download(") })
+    }
+
+    @Test fun aProjectsMarkdownSaysNothingOfPlans() {
+        viewer(markdown(), "$ROOT/PLAN.md")
+        waitForText("# Handoff")
+        assertEquals(0, rule.onAllNodesWithText(str(R.string.fv_view_only)).fetchSemanticsNodes().size)
+    }
+
+    @Test fun aPlanTooLargeToShowOffersNoDownload() {
+        val hub = FeatureHub()
+        hub.fileAnswer = { Result.failure(FileFailure("Too large.", status = 413, code = "too_large", size = 30_000_000, max = 20_971_520, viewOnly = true)) }
+        viewer(hub, "/home/owner/.codex/plans/huge.md")
+        waitForText(str(R.string.fp_toolarge_title))
+        assertEquals(0, rule.onAllNodesWithText(str(R.string.fp_download_instead)).fetchSemanticsNodes().size)
+        assertEquals(0, rule.onAllNodesWithText(str(R.string.fv_raw)).fetchSemanticsNodes().size)
+    }
+
+    @Test fun aFileTooLargeToShowStillOffersADownload() {
+        val hub = FeatureHub()
+        hub.fileAnswer = { Result.failure(FileFailure("Too large.", status = 413, code = "too_large", size = 30_000_000, max = 20_971_520)) }
+        viewer(hub, "$ROOT/huge.md")
+        waitForText(str(R.string.fp_download_instead))
+    }
+
+    @Test fun aPlansRowOpensFromASessionWhoseFolderIsClosed() {
+        val closed = Samples.session("s-closed", "Outside", com.prudnikweb.hypernova.data.SessionState.Idle, 0).copy(browsable = false)
+        val hub = FakeHub(sessions = listOf(closed), approvals = emptyMap(), transcripts = emptyMap())
+        val plan = Item.Tool("t1", "Read", "handoff.md", path = "/home/owner/.codex/plans/handoff.md")
+        val other = Item.Tool("t2", "Read", "main.ts", path = "/home/owner/work/main.ts")
+        rule.setContent {
+            Harness(spy) {
+                androidx.compose.foundation.layout.Column {
+                    TranscriptItem(hub, "s-closed", plan, Modifier)
+                    TranscriptItem(hub, "s-closed", other, Modifier)
+                }
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithText("main.ts", useUnmergedTree = true).performClick()
+        rule.waitForIdle()
+        assertEquals(emptyList<String>(), spy.opened)
+        rule.onNodeWithText("handoff.md", useUnmergedTree = true).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("file:/home/owner/.codex/plans/handoff.md"), spy.opened)
     }
 }
