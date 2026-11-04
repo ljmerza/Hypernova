@@ -6,9 +6,6 @@ import com.prudnikweb.hypernova.data.Rewound
 import com.prudnikweb.hypernova.data.ChatRepo
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.view.HapticFeedbackConstants
-import android.view.View
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,17 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.onLongClick
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
@@ -41,26 +35,6 @@ import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 import kotlinx.coroutines.launch
-
-/**
- * A long-press opens a message's menu ([onOpen]), with a haptic tick; TalkBack offers it as the
- * message's long-press action, [label].
- */
-internal fun Modifier.messageMenu(view: View, label: String, onOpen: () -> Unit): Modifier = this
-    .pointerInput(Unit) {
-        detectTapGestures(onLongPress = {
-            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            onOpen()
-        })
-    }
-    .semantics { onLongClick(label) { onOpen(); true } }
-
-/** The words a message's menu acts on: what was sent, or Claude's reply as written. */
-internal fun Item.menuText(): String? = when (this) {
-    is Item.User -> text.takeIf { it.isNotBlank() }
-    is Item.Assistant -> text.takeIf { it.isNotBlank() }
-    else -> null
-}
 
 /** [text] as a quote at the head of a prompt: "> " lines, cut to a sensible length, then a blank line. */
 internal fun quoted(text: String, max: Int = 1200): String {

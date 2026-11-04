@@ -222,7 +222,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
         val pi = PendingIntent.getBroadcast(context, ("reply:" + keyed(server, sessionId)).hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
         // "Tell Claude what's next", or Codex for a Codex session.
         val codex = Core.hub(server)?.session(sessionId)?.codex == true
-        val input = androidx.core.app.RemoteInput.Builder(NotifyActions.KEY_REPLY).setLabel(context.getString(R.string.notif_reply_hint, com.prudnikweb.hypernova.ui.components.agentName(context.resources, codex))).build()
+        val input = androidx.core.app.RemoteInput.Builder(NotifyActions.KEY_REPLY).setLabel(context.getString(R.string.notif_reply_hint, com.prudnikweb.hypernova.ui.components.agentName(context.resources.strings, codex))).build()
         return NotificationCompat.Action.Builder(0, context.getString(R.string.notif_reply), pi)
             .addRemoteInput(input)
             .setAllowGeneratedReplies(false)

@@ -1,20 +1,20 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.components
 
-import android.content.res.Resources
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Strings
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
-import com.prudnikweb.hypernova.R
+import com.prudnikweb.hypernova.ui.platform.stringResource
 
 /**
  * "Claude" or "Codex", for the words that name a session's agent ("Claude is still at work",
  * "Codex didn't start"): one helper for every screen (data/AgentLead.kt says which agent leads).
  */
 @Composable
-fun agentName(codex: Boolean): String = stringResource(if (codex) R.string.cx_agent_codex else R.string.claude)
+fun agentName(codex: Boolean): String = stringResource(if (codex) Str.cx_agent_codex else Str.claude)
 
 /** [agentName] outside composition (notifications, widgets, run words). */
-fun agentName(res: Resources, codex: Boolean): String = res.getString(if (codex) R.string.cx_agent_codex else R.string.claude)
+fun agentName(res: Strings, codex: Boolean): String = res.getString(if (codex) Str.cx_agent_codex else Str.claude)
 
 /**
  * One of three wordings, by the agents in use on the paired computer (data/AgentLead.kt): [claude]

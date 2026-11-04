@@ -8,23 +8,18 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.R
@@ -38,12 +33,10 @@ import com.prudnikweb.hypernova.data.Thumbs
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.LocalToast
-import com.prudnikweb.hypernova.ui.chat.LocalSelectableText
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.theme.Motion
 import com.prudnikweb.hypernova.ui.voice.SpeakingBar
-import com.prudnikweb.hypernova.ui.voice.SpeakingMark
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -98,30 +91,6 @@ internal fun ReadingPill(items: List<Item>) {
     val key = ReadAloud.reading ?: return
     if (items.none { it.key == key }) return
     Pill(stringResource(R.string.chat_read_stop), ReadAloud::stop, kind = PillKind.Ghost, height = 40.dp)
-}
-
-/**
- * A message as the session's chat draws it: with its long-press menu ([onMenu]) instead of text
- * selection, for the owner's messages and Claude's replies.
- */
-@Composable
-internal fun WithMessageMenu(item: Item, onMenu: ((Item) -> Unit)?, content: @Composable (Modifier) -> Unit) {
-    if (onMenu == null || item.menuText() == null) return content(Modifier)
-    val view = LocalView.current
-    val label = stringResource(R.string.chat_message_actions)
-    // One gesture detector per message, kept while a reply streams in (a new one would drop a
-    // long-press under way).
-    val open by rememberUpdatedState(onMenu)
-    val latest by rememberUpdatedState(item)
-    val menu = remember(item.key, label) { Modifier.messageMenu(view, label) { open?.invoke(latest) } }
-    CompositionLocalProvider(LocalSelectableText provides false) {
-        // The message being read aloud wears the speaking wave at its corner. Always in a box, so
-        // the message isn't rebuilt when reading starts or stops.
-        Box {
-            content(menu)
-            if (ReadAloud.reading == item.key) SpeakingMark(Modifier.align(Alignment.TopEnd))
-        }
-    }
 }
 
 /**

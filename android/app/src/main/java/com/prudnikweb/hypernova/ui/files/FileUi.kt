@@ -1,3 +1,4 @@
+// Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.files
 
 import androidx.compose.foundation.Canvas
@@ -46,19 +47,6 @@ import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.Type
 import java.util.Locale
-
-/** "12.4 MB" in the app's units, up to gigabytes. */
-@Composable
-fun sizeText(bytes: Long): String {
-    val res = LocalContext.current.resources
-    val kb = 1024.0
-    return when {
-        bytes < 1024 -> res.getString(R.string.size_b, bytes.toInt())
-        bytes < 1024 * 1024 -> String.format(Locale.ROOT, res.getString(R.string.size_kb), bytes / kb)
-        bytes < 1024L * 1024 * 1024 -> String.format(Locale.ROOT, res.getString(R.string.size_mb), bytes / (kb * kb))
-        else -> String.format(Locale.ROOT, res.getString(R.string.size_gb), bytes / (kb * kb * kb))
-    }
-}
 
 /** A small drawn padlock (the shared glyph set has none). */
 @Composable

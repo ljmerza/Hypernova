@@ -43,9 +43,14 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.prudnikweb.hypernova.desktop.Ui
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.paneTitle
+import com.prudnikweb.hypernova.ui.platform.UiOverlays
 
 /** The whole window, for a [Modal]'s scrim. */
-private val WholeWindow = object : PopupPositionProvider {
+internal val WholeWindow = object : PopupPositionProvider {
     override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize) = IntOffset.Zero
 }
 
@@ -101,6 +106,37 @@ internal fun ConfirmModal(title: String, body: String, confirm: String, onConfir
                 confirm, onConfirm, if (cancel == null) Modifier.focusRequester(focus) else Modifier,
                 kind = if (danger) PillKind.Danger else PillKind.Primary,
             )
+        }
+    }
+}
+
+/**
+ * A floating card's window ([UiOverlays]): over the whole window, dimmed, as [Modal]. Outside the card or Escape puts it away, and it has the keys and the pointer while
+ * it's up. The card is the phone's own (GlassDialog, GlassSheet); it arrives at once, as a mouse hasn't a thumb to rise to, in the middle of the window.
+ */
+internal object DeskOverlays : UiOverlays {
+    @Composable
+    override fun Window(onDismiss: () -> Unit, pane: String, tint: Color?, content: @Composable (shown: Boolean) -> Unit) {
+        Popup(
+            popupPositionProvider = WholeWindow,
+            onDismissRequest = onDismiss,
+            properties = PopupProperties(focusable = true),
+            onKeyEvent = { e ->
+                if (e.type == KeyEventType.KeyDown && e.key == Key.Escape) {
+                    onDismiss()
+                    true
+                } else false
+            },
+        ) {
+            Box(
+                Modifier.fillMaxSize().background(HN.bg.copy(alpha = 0.6f)).then(if (tint != null) Modifier.background(tint.copy(alpha = 0.05f)) else Modifier)
+                    .pointerInput(Unit) { detectTapGestures { onDismiss() } }
+                    .semantics { paneTitle = pane }
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                content(true)
+            }
         }
     }
 }

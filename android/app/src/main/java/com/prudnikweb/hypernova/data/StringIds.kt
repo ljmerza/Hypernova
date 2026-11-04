@@ -42,7 +42,23 @@ val Str.id: Int
         Str.always -> R.string.always
         Str.always_allowed -> R.string.always_allowed
         Str.always_allowed_short -> R.string.always_allowed_short
+        Str.always_bad_rule -> R.string.always_bad_rule
+        Str.always_check_everywhere -> R.string.always_check_everywhere
+        Str.always_check_project -> R.string.always_check_project
+        Str.always_check_session -> R.string.always_check_session
         Str.always_means -> R.string.always_means
+        Str.always_rule -> R.string.always_rule
+        Str.always_rules -> R.string.always_rules
+        Str.always_save -> R.string.always_save
+        Str.always_scope_everywhere -> R.string.always_scope_everywhere
+        Str.always_scope_everywhere_body -> R.string.always_scope_everywhere_body
+        Str.always_scope_project -> R.string.always_scope_project
+        Str.always_scope_project_body -> R.string.always_scope_project_body
+        Str.always_scope_session -> R.string.always_scope_session
+        Str.always_scope_session_body -> R.string.always_scope_session_body
+        Str.always_suggested -> R.string.always_suggested
+        Str.always_where -> R.string.always_where
+        Str.always_whole_tool -> R.string.always_whole_tool
         Str.answered -> R.string.answered
         Str.answered_elsewhere -> R.string.answered_elsewhere
         Str.answered_on_mac -> R.string.answered_on_mac
@@ -68,6 +84,9 @@ val Str.id: Int
         Str.asks_bring_forward -> R.string.asks_bring_forward
         Str.asks_front_said -> R.string.asks_front_said
         Str.at_clock -> R.string.at_clock
+        Str.attach_open -> R.string.attach_open
+        Str.attach_remove -> R.string.attach_remove
+        Str.attach_retry -> R.string.attach_retry
         Str.attach_too_big -> R.string.attach_too_big
         Str.attach_unreadable -> R.string.attach_unreadable
         Str.au_and -> R.string.au_and
@@ -157,12 +176,18 @@ val Str.id: Int
         Str.blocked_err_load -> R.string.blocked_err_load
         Str.blocked_err_retry -> R.string.blocked_err_retry
         Str.blocked_provider -> R.string.blocked_provider
+        Str.busy_body -> R.string.busy_body
+        Str.busy_dismiss -> R.string.busy_dismiss
+        Str.busy_replace -> R.string.busy_replace
+        Str.busy_title -> R.string.busy_title
         Str.by_mac -> R.string.by_mac
         Str.by_terminal -> R.string.by_terminal
+        Str.cancel -> R.string.cancel
         Str.changes_err -> R.string.changes_err
         Str.chat_copied -> R.string.chat_copied
         Str.chat_err_mac -> R.string.chat_err_mac
         Str.chat_err_old_mac -> R.string.chat_err_old_mac
+        Str.chat_message_actions -> R.string.chat_message_actions
         Str.chat_quiet_on -> R.string.chat_quiet_on
         Str.chat_quiet_yesterday -> R.string.chat_quiet_yesterday
         Str.chat_read_failed -> R.string.chat_read_failed
@@ -171,6 +196,8 @@ val Str.id: Int
         Str.chat_time_said -> R.string.chat_time_said
         Str.chat_time_today -> R.string.chat_time_today
         Str.chat_time_yesterday -> R.string.chat_time_yesterday
+        Str.check_always_title -> R.string.check_always_title
+        Str.check_no_lock -> R.string.check_no_lock
         Str.claude -> R.string.claude
         Str.clock_hours -> R.string.clock_hours
         Str.clock_secs -> R.string.clock_secs
@@ -187,6 +214,7 @@ val Str.id: Int
         Str.cx_err_switch -> R.string.cx_err_switch
         Str.cx_err_turn_off -> R.string.cx_err_turn_off
         Str.cx_err_turn_on -> R.string.cx_err_turn_on
+        Str.cx_hint_went_on -> R.string.cx_hint_went_on
         Str.cx_went_on -> R.string.cx_went_on
         Str.debuglog_send_failed -> R.string.debuglog_send_failed
         Str.denied -> R.string.denied
@@ -201,6 +229,7 @@ val Str.id: Int
         Str.edit -> R.string.edit
         Str.elapsed_min_secs -> R.string.elapsed_min_secs
         Str.elapsed_secs -> R.string.elapsed_secs
+        Str.empty_conversation -> R.string.empty_conversation
         Str.err_agent -> R.string.err_agent
         Str.err_already_answered -> R.string.err_already_answered
         Str.err_answer -> R.string.err_answer
@@ -254,6 +283,16 @@ val Str.id: Int
         Str.held_err_remove -> R.string.held_err_remove
         Str.held_hint -> R.string.held_hint
         Str.held_label -> R.string.held_label
+        Str.hint_blocked_credits -> R.string.hint_blocked_credits
+        Str.hint_blocked_hold -> R.string.hint_blocked_hold
+        Str.hint_blocked_limit -> R.string.hint_blocked_limit
+        Str.hint_blocked_model -> R.string.hint_blocked_model
+        Str.hint_blocked_model_any -> R.string.hint_blocked_model_any
+        Str.hint_blocked_plan -> R.string.hint_blocked_plan
+        Str.hint_blocked_provider -> R.string.hint_blocked_provider
+        Str.hint_blocked_sign_in -> R.string.hint_blocked_sign_in
+        Str.hint_blocked_until -> R.string.hint_blocked_until
+        Str.hint_mac_away_queue -> R.string.hint_mac_away_queue
         Str.keep_planning -> R.string.keep_planning
         Str.kept_planning -> R.string.kept_planning
         Str.limit_credits -> R.string.limit_credits
@@ -264,7 +303,11 @@ val Str.id: Int
         Str.link_connected -> R.string.link_connected
         Str.link_connected_to -> R.string.link_connected_to
         Str.link_connecting -> R.string.link_connecting
+        Str.link_copy -> R.string.link_copy
+        Str.link_no_browser -> R.string.link_no_browser
         Str.link_offline -> R.string.link_offline
+        Str.link_open -> R.string.link_open
+        Str.link_open_title -> R.string.link_open_title
         Str.link_reconnecting -> R.string.link_reconnecting
         Str.link_said_awake_lid -> R.string.link_said_awake_lid
         Str.link_said_battery -> R.string.link_said_battery
@@ -273,8 +316,10 @@ val Str.id: Int
         Str.link_said_sleep_soon -> R.string.link_said_sleep_soon
         Str.link_said_via -> R.string.link_said_via
         Str.link_unpaired -> R.string.link_unpaired
+        Str.loading_conversation -> R.string.loading_conversation
         Str.model_default -> R.string.model_default
         Str.model_paid_q -> R.string.model_paid_q
+        Str.more -> R.string.more
         Str.notice_agent_asks -> R.string.notice_agent_asks
         Str.notice_finished -> R.string.notice_finished
         Str.notice_job_died -> R.string.notice_job_died
@@ -303,6 +348,7 @@ val Str.id: Int
         Str.notice_waiting -> R.string.notice_waiting
         Str.open_preview -> R.string.open_preview
         Str.open_preview_port -> R.string.open_preview_port
+        Str.open_terminal -> R.string.open_terminal
         Str.other -> R.string.other
         Str.other_hint -> R.string.other_hint
         Str.pg_connect -> R.string.pg_connect
@@ -333,6 +379,8 @@ val Str.id: Int
         Str.problem_unpaired -> R.string.problem_unpaired
         Str.problem_unpaired_linux -> R.string.problem_unpaired_linux
         Str.problem_unreachable -> R.string.problem_unreachable
+        Str.prompt_hint -> R.string.prompt_hint
+        Str.prompt_hint_ended -> R.string.prompt_hint_ended
         Str.provider_card_budget -> R.string.provider_card_budget
         Str.provider_card_down -> R.string.provider_card_down
         Str.provider_card_limited -> R.string.provider_card_limited
@@ -373,13 +421,31 @@ val Str.id: Int
         Str.shell_desc -> R.string.shell_desc
         Str.shell_label -> R.string.shell_label
         Str.show_all -> R.string.show_all
+        Str.size_b -> R.string.size_b
+        Str.size_gb -> R.string.size_gb
+        Str.size_kb -> R.string.size_kb
+        Str.size_mb -> R.string.size_mb
         Str.skill_desc -> R.string.skill_desc
         Str.skill_desc_args -> R.string.skill_desc_args
         Str.skill_label -> R.string.skill_label
         Str.skip -> R.string.skip
         Str.sm_err -> R.string.sm_err
         Str.sm_too_old -> R.string.sm_too_old
+        Str.state_ended -> R.string.state_ended
+        Str.state_error -> R.string.state_error
+        Str.state_idle -> R.string.state_idle
+        Str.state_key_refused -> R.string.state_key_refused
         Str.state_needs_you -> R.string.state_needs_you
+        Str.state_no_credit -> R.string.state_no_credit
+        Str.state_no_plan -> R.string.state_no_plan
+        Str.state_not_answering -> R.string.state_not_answering
+        Str.state_on_hold -> R.string.state_on_hold
+        Str.state_out_of_credits -> R.string.state_out_of_credits
+        Str.state_paused -> R.string.state_paused
+        Str.state_rate_limited -> R.string.state_rate_limited
+        Str.state_signed_out -> R.string.state_signed_out
+        Str.state_starting -> R.string.state_starting
+        Str.state_unavailable -> R.string.state_unavailable
         Str.state_working -> R.string.state_working
         Str.stats_day_tokens -> R.string.stats_day_tokens
         Str.su_failed -> R.string.su_failed
@@ -391,6 +457,7 @@ val Str.id: Int
         Str.thought_chars -> R.string.thought_chars
         Str.thought_for -> R.string.thought_for
         Str.tool_stopped -> R.string.tool_stopped
+        Str.try_again -> R.string.try_again
         Str.unpaired_body -> R.string.unpaired_body
         Str.unpaired_body_linux -> R.string.unpaired_body_linux
         Str.untitled_session -> R.string.untitled_session
@@ -431,6 +498,9 @@ val Str.id: Int
         Str.wf_err_timeout -> R.string.wf_err_timeout
         Str.wf_err_too_often -> R.string.wf_err_too_often
         Str.wf_err_url -> R.string.wf_err_url
+        Str.why_hypernova -> R.string.why_hypernova
+        Str.why_label -> R.string.why_label
+        Str.why_seam -> R.string.why_seam
         Str.workflow_label -> R.string.workflow_label
         Str.workflow_running_of -> R.string.workflow_running_of
         Str.you -> R.string.you

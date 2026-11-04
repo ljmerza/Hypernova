@@ -71,8 +71,10 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 | `ui.platform` | `UiPlatform.kt`, the only way out to an operating system, and the short ways to it (`Words.kt`, `Device.kt`) |
 | `ui.theme` | `Tokens.kt` (the palette, `HN`, `Motion`, the type scale), `Text.kt` (`HText`, `MotionPrefs`) |
 | `ui.fx` | `Ambient.kt` (the one clock), `Pace.kt`, `Countdown.kt` |
-| `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
-| `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
+| `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`, `Rows.kt` (`FieldLabel`, `ToggleRow`, `NavRow`, `InfoRow`, `ConfirmDialog`, `Segmented`), `Popups.kt` (`GlassDialog`, `GlassSheet`), `AgentWords.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
+| `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `LinkAsk.kt` (where a link goes, and the question), `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
+| `ui.session` | A session's screen, as far as it's moved. `ChatList.kt` (what the list shows, following its tail, Show earlier), `TranscriptItem.kt` (one item), `SessionWords.kt` (what's said of a session, what can be changed), `TerminalTextCard.kt`, `AttachParts.kt`, `AlwaysSheet.kt`, `ChatSheet.kt`, `WhyAsked.kt`, `WithMessageMenu.kt`. Same package as the phone's, so its screens' imports stayed |
+| `ui` | `Locals.kt`: `LocalToast`, `LocalAppScope`, `Opener`: what a screen asks of the app round it. The desktop's `Opener` says what it has no screen for is on the phone |
 
 **The seams** (`UiPlatform`), each implemented in `app/.../ui/AndroidUiPlatform.kt` and `desktop/.../DesktopUiPlatform.kt` and handed over once, with `SharedUi.install`, before anything draws:
 
@@ -81,9 +83,13 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 | `UiWords` | The app's words by `Str`, `Plural`, and as a `Strings` | Compose's `stringResource`, through `StringIds` | `DesktopStrings`, reworded for the computer on screen |
 | `UiFonts` | Manrope and JetBrains Mono at a weight; what mono asks of its font | `res/font`; nothing | The copies in its resources; ligatures off |
 | `UiDevice` | Haptics, the clipboard, how tall the window is, a blurred glow | The view's, the context's, `LocalConfiguration`, `BlurMaskFilter` | None, AWT's, the window's, Skia's |
-| `UiInput` | How tall a pill is to the touch, a hand and a ring on a pill, a long press on code, selecting output, the Enter key | 48 dp, none, copies it, a long press on the row, `EnterKeyPref` | 0, both, nothing (a mouse selects), `SelectionContainer`, its own `EnterKeyPref` |
+| `UiInput` | How tall a pill is to the touch, a hand and a ring on a pill, a long press on code, selecting output, the Enter key, what opens a message's menu | 48 dp, none, copies it, a long press on the row, `EnterKeyPref`, a long press | 0, both, nothing (a mouse selects), `SelectionContainer`, its own `EnterKeyPref`, the other mouse button |
 | `UiClock` | The locale and 12 or 24 hours; a skeleton's pattern | `DateFormat` | The locale's short time; English's order for the chat's skeletons, as `getBestDateTimePattern` is JDK 19's and this builds for 17 |
 | `UiDiagrams` | A closed mermaid block | `Mermaid.kt`, the web view | Says it's a diagram, and shows its source |
+| `UiOverlays` | The window a floating card comes up in. The card is shared | `GlassWindow`: Android's dialog window, the app behind blurred | A popup over the window, dimmed, in the middle |
+| `UiOwner` | The owner's own check, and why what's behind it isn't offered | `OwnerCheck`: the fingerprint or the screen lock | None: it never calls `onOk`, and says to use the phone. A check that can't pass, so nothing is weakened |
+| `UiImages` | A picture's preview, and those kept by path | `Picked`, `Thumbs` | Skia's decoder, and the last 40 |
+| `UiReading` | A message being read aloud | `ReadAloud`, `SpeakingMark` | Nothing reads here (`canRead` false) |
 
 **The toolchain, checked with a dependency report before anything moved:** a new Kotlin Multiplatform module with JetBrains' Compose coordinates added six modules to `:app`'s runtime classpath, each only a pointer to AndroidX's same 1.12.1 artifact: `foundation`, `foundation-android`, `foundation-layout`, `foundation-layout-android`, `animation` and `animation-android` under `org.jetbrains.compose`, a `.pom` and a `.module` with no jar or aar. `:sharedui` takes those two as `compileOnly` in `commonMain`, AndroidX's in `androidMain` at the app's BOM and JetBrains' in `desktopMain`. `:app`'s classpath is then the same list, debug and release, plus the project itself, compared line by line. JetBrains' `ui`, `runtime` and `runtime-saveable` were already there, through Haze. The release APK went from 10163069 to 10179521 bytes: the words' `Str` entries and their ids, and the seams' classes.
 
@@ -123,7 +129,7 @@ cd android && ./gradlew :app:writeRuntimeClasspath   # after a chosen change: co
 
 **What they can't see:**
 
-- Logic copied under another name, or a part renamed to get past them. `ChatPane.kt` mirroring `SessionScreen` is the case today (LATER L130). This stays review's job.
+- Logic copied under another name, or a part renamed to get past them. This stays review's job. `ChatPane.kt` once mirrored `SessionScreen` that way; both now use `ui.session.ChatList.kt`, and `sendPrompt` in `:shared`.
 - Same-named plain functions and values between the shells and `sharedui`, and members or local functions anywhere. Only `desktop-no-kit` looks at plain functions and values, and only at the top level.
 - Something built in a shell that could be shared. They catch what's forbidden, not what's missing.
 - A name reached without being written: reflection, or a string handed to `Class.forName`. Comments and strings are skipped on purpose.

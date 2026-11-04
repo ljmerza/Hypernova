@@ -25,6 +25,12 @@ import androidx.compose.ui.unit.dp
 import com.prudnikweb.hypernova.data.Core
 import com.prudnikweb.hypernova.data.DebugLog
 import com.prudnikweb.hypernova.desktop.Shell
+import com.prudnikweb.hypernova.desktop.Ui
+import com.prudnikweb.hypernova.ui.LocalAppScope
+import com.prudnikweb.hypernova.ui.LocalOpener
+import com.prudnikweb.hypernova.ui.LocalToast
+import com.prudnikweb.hypernova.ui.Opener
+import androidx.compose.runtime.remember
 
 /**
  * The window's content. Nothing paired, or "Pair another": the pairing field. Otherwise the server on
@@ -32,7 +38,9 @@ import com.prudnikweb.hypernova.desktop.Shell
  */
 @Composable
 fun App(shell: Shell, reduced: Boolean = false) {
+    val opener = remember(shell) { deskOpener(shell) }
     AtlasTheme(reduced) {
+        CompositionLocalProvider(LocalToast provides shell::say, LocalOpener provides opener, LocalAppScope provides Core.scope) {
         Box(Modifier.fillMaxSize().background(HN.bg)) {
             val hub = Core.live
             val pairing = hub == null || shell.adding
@@ -47,7 +55,36 @@ fun App(shell: Shell, reduced: Boolean = false) {
             shell.toast?.let { Toast(it, shell, Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp)) }
             shell.zoomNote?.let { ZoomNote(it, Modifier.align(Alignment.TopCenter)) }
         }
+        }
     }
+}
+
+/**
+ * Where the shared drawing's ways out go in this window: a session it can show; what it has no screen for yet says it's on the phone, rather than doing nothing.
+ * A file isn't one of those: a row with nothing to open just doesn't open ([Opener.opensFiles]).
+ */
+private fun deskOpener(shell: Shell): Opener {
+    val onPhone = { words: Ui -> shell.say(words.text()) }
+    val here = { id: String -> shell.choose(Core.activeId.orEmpty(), id) }
+    return Opener(
+        session = here,
+        switchSession = here,
+        files = { _, _ -> onPhone(Ui.desk_files_on_phone) },
+        file = { onPhone(Ui.desk_files_on_phone) },
+        preview = { _, _, _ -> onPhone(Ui.desk_preview_on_phone) },
+        web = { _, _ -> onPhone(Ui.desk_preview_on_phone) },
+        terminal = { onPhone(Ui.desk_terminal_on_phone) },
+        agent = { _, _ -> onPhone(Ui.desk_agent_on_phone) },
+        providers = { onPhone(Ui.desk_settings_on_phone) },
+        provider = { _, _ -> onPhone(Ui.desk_settings_on_phone) },
+        runAtReset = { onPhone(Ui.desk_settings_on_phone) },
+        automation = { onPhone(Ui.desk_settings_on_phone) },
+        connectionLog = { onPhone(Ui.desk_settings_on_phone) },
+        settings = { onPhone(Ui.desk_settings_on_phone) },
+        signIn = { onPhone(Ui.desk_settings_on_phone) },
+        mcpServers = { onPhone(Ui.desk_settings_on_phone) },
+        opensFiles = false,
+    )
 }
 
 /**

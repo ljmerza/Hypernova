@@ -1,5 +1,21 @@
 package com.prudnikweb.hypernova.ui
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import com.prudnikweb.hypernova.data.Picked
+import com.prudnikweb.hypernova.data.Thumbs
+import com.prudnikweb.hypernova.ui.components.GlassWindow
+import com.prudnikweb.hypernova.ui.components.OwnerCheck
+import com.prudnikweb.hypernova.ui.platform.OwnerAsk
+import com.prudnikweb.hypernova.ui.platform.UiImages
+import com.prudnikweb.hypernova.ui.platform.UiOverlays
+import com.prudnikweb.hypernova.ui.platform.UiOwner
+import com.prudnikweb.hypernova.ui.platform.UiReading
+import com.prudnikweb.hypernova.ui.session.ReadAloud
+import com.prudnikweb.hypernova.ui.voice.SpeakingMark
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -59,6 +75,10 @@ object AndroidUiPlatform : UiPlatform {
     override val input: UiInput = PhoneInput
     override val clock: UiClock = PhoneClock
     override val diagrams: UiDiagrams = PhoneDiagrams
+    override val overlays: UiOverlays = PhoneOverlays
+    override val owner: UiOwner = PhoneOwner
+    override val images: UiImages = PhoneImages
+    override val reading: UiReading = PhoneReading
 }
 
 private object PhoneWords : UiWords {
@@ -134,6 +154,17 @@ private object PhoneDevice : UiDevice {
 }
 
 private object PhoneInput : UiInput {
+    override val menuTakesThePress: Boolean = true
+
+    override fun messageMenu(modifier: Modifier, label: String, pressed: () -> Unit, open: () -> Unit): Modifier = modifier
+        .pointerInput(Unit) {
+            detectTapGestures(onLongPress = {
+                pressed()
+                open()
+            })
+        }
+        .semantics { onLongClick(label) { open(); true } }
+
     override val minTouchTarget: Dp = 48.dp
 
     @Composable
@@ -170,4 +201,38 @@ private object PhoneClock : UiClock {
 private object PhoneDiagrams : UiDiagrams {
     @Composable
     override fun Diagram(source: String) = MermaidBlock(source)
+}
+
+/** Android's dialog window (components/Glass.kt). */
+private object PhoneOverlays : UiOverlays {
+    @Composable
+    override fun Window(onDismiss: () -> Unit, pane: String, tint: Color?, content: @Composable (shown: Boolean) -> Unit) = GlassWindow(onDismiss, pane, tint, content)
+}
+
+/** The fingerprint or the screen lock (components/OwnerCheck.kt). */
+private object PhoneOwner : UiOwner {
+    override val canCheck: Boolean = true
+
+    @Composable
+    override fun asker(): OwnerAsk {
+        val context = LocalContext.current
+        return remember(context) { OwnerAsk { title, subtitle, noLock, onOk, onFail -> OwnerCheck.ask(context, title, subtitle, noLock, onOk, onFail) } }
+    }
+
+    @Composable
+    override fun bypassNote(): String? = null
+}
+
+private object PhoneImages : UiImages {
+    override fun thumbnail(bytes: ByteArray): ImageBitmap? = Picked.thumbnail(bytes)
+    override fun cached(path: String): ImageBitmap? = Thumbs.get(path)
+    override fun keep(path: String, image: ImageBitmap) = Thumbs.put(path, image)
+}
+
+private object PhoneReading : UiReading {
+    override val canRead: Boolean = true
+    override val now: String? get() = ReadAloud.reading
+
+    @Composable
+    override fun Mark(modifier: Modifier) = SpeakingMark(modifier)
 }

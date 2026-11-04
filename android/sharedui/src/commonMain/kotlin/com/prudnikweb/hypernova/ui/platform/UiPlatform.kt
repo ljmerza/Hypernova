@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.Font
@@ -29,6 +31,10 @@ interface UiPlatform {
     val input: UiInput
     val clock: UiClock
     val diagrams: UiDiagrams
+    val overlays: UiOverlays
+    val owner: UiOwner
+    val images: UiImages
+    val reading: UiReading
 }
 
 /** The one in this process. */
@@ -109,6 +115,10 @@ interface UiInput {
      * once (not while it repeats); Nothing swallows it. [shiftEnter] is told when a Shift+Enter is let through to the field in Send mode.
      */
     fun enterKey(modifier: Modifier, setting: EnterKey, canSend: () -> Boolean, onSend: () -> Unit, shiftEnter: (Boolean) -> Unit): Modifier
+    /** What opens a message's menu ([open]): a long press on the phone ([pressed], for its tick), the other mouse button here. Assistive tech is offered it as [label]. */
+    fun messageMenu(modifier: Modifier, label: String, pressed: () -> Unit, open: () -> Unit): Modifier
+    /** Whether that press leaves no way to select a message's words: the phone's menu then offers a page for it, and a mouse needs none. */
+    val menuTakesThePress: Boolean
 }
 
 /** This device's way of telling the time. */
@@ -121,6 +131,49 @@ interface UiClock {
 
 @Immutable
 data class ClockStyle(val locale: Locale, val is24Hour: Boolean)
+
+/** The window a floating glass card comes up in ([com.prudnikweb.hypernova.ui.components.GlassDialog], GlassSheet). The card itself is shared. */
+interface UiOverlays {
+    /**
+     * Over everything, with a scrim: outside the card or Back or Escape calls [onDismiss]. [pane] names it to assistive tech, [tint] warms the scrim (Bypass).
+     * [content] gets whether the card should be on screen yet, for its arrival.
+     */
+    @Composable fun Window(onDismiss: () -> Unit, pane: String, tint: Color?, content: @Composable (shown: Boolean) -> Unit)
+}
+
+/**
+ * The owner's own check before a step that lets Claude act without asking: the phone's fingerprint or screen lock. Nothing that asks here goes on without
+ * [OwnerAsk] calling its onOk, so a system with no such check ([canCheck] false) never lets the step through. docs/DECISIONS.md, "The desktop client's New session".
+ */
+interface UiOwner {
+    /** Whether this system has a check of its own. Where it hasn't, what needs one is on the phone. */
+    val canCheck: Boolean
+    @Composable fun asker(): OwnerAsk
+    /** Why a mode behind the check isn't offered here, or null where it is. */
+    @Composable fun bypassNote(): String?
+}
+
+fun interface OwnerAsk {
+    /** [onOk] only after a good check; [onFail] with a line to show, null when the owner cancelled. [noLock]: what to say on a device with nothing to check. */
+    fun ask(title: String, subtitle: String, noLock: String, onOk: () -> Unit, onFail: (String?) -> Unit)
+}
+
+/** Pictures attached to prompts: the system's decoder, and what's kept of them by their path on the computer, so a sent one shows at once. */
+interface UiImages {
+    /** A small preview of image bytes, or null when they aren't an image this system can read. */
+    fun thumbnail(bytes: ByteArray): ImageBitmap?
+    fun cached(path: String): ImageBitmap?
+    fun keep(path: String, image: ImageBitmap)
+}
+
+/** A message read aloud here: the phone has a voice; what has none reads nothing and shows nothing ([canRead] false). */
+interface UiReading {
+    val canRead: Boolean
+    /** The message being read, by its key, or null. */
+    val now: String?
+    /** On the message being read: its wave. */
+    @Composable fun Mark(modifier: Modifier)
+}
 
 /** A closed ```mermaid block: the phone draws it in a web view; what has none says what it is. */
 interface UiDiagrams {

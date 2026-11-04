@@ -66,6 +66,25 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import org.jetbrains.skia.FilterBlurMode
 import org.jetbrains.skia.MaskFilter
+import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.Rect as SkiaRect
+import org.jetbrains.skia.Surface
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import com.prudnikweb.hypernova.desktop.ui.DeskOverlays
+import com.prudnikweb.hypernova.ui.platform.OwnerAsk
+import com.prudnikweb.hypernova.ui.platform.UiImages
+import com.prudnikweb.hypernova.ui.platform.UiOverlays
+import com.prudnikweb.hypernova.ui.platform.UiOwner
+import com.prudnikweb.hypernova.ui.platform.UiReading
 
 /** The shared drawing on a computer: a pointer and a keyboard, no vibrations, this app's own copies of the fonts and the words. */
 object DesktopUiPlatform : UiPlatform {
@@ -75,6 +94,10 @@ object DesktopUiPlatform : UiPlatform {
     override val input: UiInput = DeskInput
     override val clock: UiClock = DeskClock
     override val diagrams: UiDiagrams = DeskDiagrams
+    override val overlays: UiOverlays = DeskOverlays
+    override val owner: UiOwner = DeskOwner
+    override val images: UiImages = DeskImages
+    override val reading: UiReading = NoReading
 }
 
 /** The phone's words from DesktopStrings, reworded for the computer on screen as the phone's Resources are. */
@@ -168,6 +191,18 @@ object EnterKeyPref {
 }
 
 private object DeskInput : UiInput {
+    /** A mouse has both: the main button selects a message's words, the other opens its menu. */
+    override val menuTakesThePress: Boolean = false
+
+    override fun messageMenu(modifier: Modifier, label: String, pressed: () -> Unit, open: () -> Unit): Modifier = modifier
+        .pointerInput(Unit) {
+            awaitEachGesture {
+                val e = awaitPointerEvent(PointerEventPass.Initial)
+                if (e.type == PointerEventType.Press && e.buttons.isSecondaryPressed) open()
+            }
+        }
+        .semantics { onLongClick(label) { open(); true } }
+
     /** A pointer is exact: a pill is as tall as it's drawn. */
     override val minTouchTarget: Dp = 0.dp
 
@@ -260,4 +295,52 @@ private object DeskDiagrams : UiDiagrams {
             CodeBlock(source)
         }
     }
+}
+
+/**
+ * No fingerprint and no screen lock a program can ask for, so nothing behind them goes on from here: the phone's rule stands, and [asker] only says where to do it.
+ * docs/DECISIONS.md, "The desktop client's New session".
+ */
+private object DeskOwner : UiOwner {
+    override val canCheck: Boolean = false
+
+    @Composable
+    override fun asker(): OwnerAsk = OwnerAsk { _, _, _, _, onFail -> onFail(Ui.desk_owner_on_phone.text()) }
+
+    @Composable
+    override fun bypassNote(): String? = Ui.desk_bypass_on_phone.text()
+}
+
+/** Skia's decoder, and the last few by path, as the phone's Thumbs. */
+private object DeskImages : UiImages {
+    private const val KEEP = 40
+    private const val THUMB_PX = 320
+    private val kept = object : LinkedHashMap<String, ImageBitmap>(KEEP, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?): Boolean = size > KEEP
+    }
+
+    override fun thumbnail(bytes: ByteArray): ImageBitmap? = runCatching {
+        val whole = SkiaImage.makeFromEncoded(bytes)
+        val scale = minOf(1f, THUMB_PX.toFloat() / maxOf(whole.width, whole.height))
+        val w = (whole.width * scale).toInt().coerceAtLeast(1)
+        val h = (whole.height * scale).toInt().coerceAtLeast(1)
+        val surface = Surface.makeRasterN32Premul(w, h)
+        surface.canvas.drawImageRect(whole, SkiaRect.makeWH(w.toFloat(), h.toFloat()))
+        surface.makeImageSnapshot().toComposeImageBitmap()
+    }.getOrNull()
+
+    @Synchronized override fun cached(path: String): ImageBitmap? = kept[path]
+
+    @Synchronized override fun keep(path: String, image: ImageBitmap) {
+        kept[path] = image
+    }
+}
+
+/** A computer's Read aloud isn't built: it needs a player, and the seam says none (`SpeechOutput`). LATER L131. */
+private object NoReading : UiReading {
+    override val canRead: Boolean = false
+    override val now: String? = null
+
+    @Composable
+    override fun Mark(modifier: Modifier) {}
 }

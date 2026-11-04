@@ -37,8 +37,6 @@ ALLOWED = [
             "The chart, the one part of Atlas still copied: the phone's fx/Atlas.kt draws on android.graphics."),
     Allowed("phone-desktop-same-name", DESK_UI + "SessionsScreen.kt", ("OfflineCard", "GroupSeam"), "L129",
             "Written after HomeScreen's private ones, which still take the phone's HomeGroup and strings."),
-    Allowed("phone-desktop-same-name", DESK_UI + "SessionPane.kt", ("AskCard", "AskPills"), "L129",
-            "A question on the pane, after the phone's Home and RunTimeline, which still sit in the phone's ui/."),
     Allowed("phone-desktop-same-name", DESK_UI + "NewSessionPane.kt", ("ProjectLine", "NewProjectForm", "FolderBrowser"), "L129",
             "New session's pickers, after NewSessionPickers.kt, which is still the phone's."),
     Allowed("phone-desktop-same-name", DESK_UI + "HistoryList.kt", ("HistoryList",), "L129",

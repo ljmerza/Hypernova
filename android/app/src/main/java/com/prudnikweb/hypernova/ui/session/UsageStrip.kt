@@ -1,6 +1,7 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.strings
 import com.prudnikweb.hypernova.data.SessionUsage
 import com.prudnikweb.hypernova.data.ChatRepo
 import com.prudnikweb.hypernova.data.ModelWeeks
@@ -432,7 +433,7 @@ private fun stripDescription(
         TopBarItem.CONTEXT -> {
             val pct = u.contextPct
             when {
-                pct == null -> res.getString(R.string.chat_context_unknown_said, com.prudnikweb.hypernova.ui.components.agentName(res, s.codex))
+                pct == null -> res.getString(R.string.chat_context_unknown_said, com.prudnikweb.hypernova.ui.components.agentName(res.strings, s.codex))
                 u.contextExact -> res.getString(R.string.chat_context_said, pct)
                 else -> res.getString(R.string.chat_context_about_said, pct)
             }

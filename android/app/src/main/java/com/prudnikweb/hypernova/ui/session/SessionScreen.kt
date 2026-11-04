@@ -3,20 +3,13 @@ package com.prudnikweb.hypernova.ui.session
 
 import com.prudnikweb.hypernova.ui.chat.AskStack
 import com.prudnikweb.hypernova.ui.chat.Asks
-import com.prudnikweb.hypernova.ui.chat.ChatRow
 import com.prudnikweb.hypernova.ui.chat.ChatTimeLabel
-import com.prudnikweb.hypernova.ui.chat.ItemFadeIn
-import com.prudnikweb.hypernova.ui.chat.ShowEarlier
 import com.prudnikweb.hypernova.ui.chat.TIME_LABEL_GAP
-import com.prudnikweb.hypernova.ui.chat.ToolRunRow
-import com.prudnikweb.hypernova.ui.chat.ToolRuns
-import com.prudnikweb.hypernova.ui.chat.chatTail
 import com.prudnikweb.hypernova.ui.chat.followTail
 import com.prudnikweb.hypernova.ui.platform.enterKey
 import com.prudnikweb.hypernova.data.Todo
 import com.prudnikweb.hypernova.data.SessionUsage
 import com.prudnikweb.hypernova.data.ChatRepo
-import androidx.compose.ui.text.input.VisualTransformation
 import com.prudnikweb.hypernova.ui.components.glassChoice
 import com.prudnikweb.hypernova.ui.components.rememberFieldValue
 import com.prudnikweb.hypernova.ui.components.CommandHighlight
@@ -40,7 +33,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,7 +55,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -82,22 +73,18 @@ import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.ui.text.SpanStyle
 import com.prudnikweb.hypernova.data.CommandRun
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.MotionDurationScale
-import kotlin.coroutines.coroutineContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -116,12 +103,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AccountWords
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.AttachDrafts
+import com.prudnikweb.hypernova.data.sendPrompt
 import com.prudnikweb.hypernova.data.Aside
 import com.prudnikweb.hypernova.data.Asides
 import com.prudnikweb.hypernova.data.SessionSwitched
@@ -129,7 +116,6 @@ import com.prudnikweb.hypernova.data.Blocked
 import com.prudnikweb.hypernova.data.healthyOther
 import com.prudnikweb.hypernova.ui.home.SignInPanel
 import com.prudnikweb.hypernova.ui.home.continueLabel
-import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.ChangesRepo
 import com.prudnikweb.hypernova.data.WorkChanges
@@ -145,32 +131,18 @@ import com.prudnikweb.hypernova.ui.LocalOpener
 import com.prudnikweb.hypernova.ui.LocalAppScope
 import com.prudnikweb.hypernova.ui.LocalToast
 import com.prudnikweb.hypernova.ui.components.Activity
-import com.prudnikweb.hypernova.ui.chat.AgentCard
-import com.prudnikweb.hypernova.ui.chat.WorkflowCard
-import com.prudnikweb.hypernova.ui.chat.ApprovalBlock
-import com.prudnikweb.hypernova.ui.chat.AssistantMessage
 import com.prudnikweb.hypernova.ui.components.BlurredBottom
 import com.prudnikweb.hypernova.ui.components.BlurredTop
-import com.prudnikweb.hypernova.ui.chat.CommandOutputRow
-import com.prudnikweb.hypernova.ui.chat.DiffCard
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph
 import com.prudnikweb.hypernova.ui.components.GlyphButton
 import com.prudnikweb.hypernova.ui.components.Icon
 import com.prudnikweb.hypernova.ui.components.LoadingLine
 import com.prudnikweb.hypernova.ui.components.LocalHaze
-import com.prudnikweb.hypernova.ui.chat.MiniTerminal
-import com.prudnikweb.hypernova.ui.chat.NoticeRow
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
-import com.prudnikweb.hypernova.ui.chat.ResultRow
 import com.prudnikweb.hypernova.ui.components.Seam
-import com.prudnikweb.hypernova.ui.chat.ThinkingRow
-import com.prudnikweb.hypernova.ui.chat.ToolRow
-import com.prudnikweb.hypernova.ui.chat.UserMessage
 import com.prudnikweb.hypernova.ui.components.Z
-import com.prudnikweb.hypernova.ui.fx.FrameBudget
-import com.prudnikweb.hypernova.ui.fx.Pace
 import com.prudnikweb.hypernova.ui.theme.HN
 import com.prudnikweb.hypernova.ui.theme.HText
 import com.prudnikweb.hypernova.ui.theme.LocalMotion
@@ -183,10 +155,8 @@ import com.prudnikweb.hypernova.ui.voice.VoiceInput
 import com.prudnikweb.hypernova.ui.voice.askAgain
 import com.prudnikweb.hypernova.ui.voice.openAppSettings
 import com.prudnikweb.hypernova.ui.voice.rememberVoiceInput
-import com.prudnikweb.hypernova.ui.voice.voiceTail
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 
 private val EDIT_TOOLS = setOf("Write", "Edit", "MultiEdit", "NotebookEdit")
@@ -318,28 +288,7 @@ fun SessionScreen(
             tray = false
             // The app's scope: leaving the screen doesn't cancel the send.
             appScope.launch {
-                var sent = false
-                // The conversation went on with the other agent: the words wait in that session's box.
-                var movedTo: String? = null
-                try {
-                    hub.send(sessionId, text, files.mapNotNull { it.attachment }, replace)
-                        .onSuccess { id -> sent = true; if (id != sessionId) opener.switchSession(id) }
-                        .onFailure { e ->
-                            when (e) {
-                                is TerminalBusy -> busy = e.pending
-                                is SessionSwitched -> movedTo = e.to
-                                else -> toast(e.message.orEmpty())
-                            }
-                        }
-                } finally {
-                    // Failed or cancelled: the text and the files go back into the box
-                    // (even if you've left the session meanwhile).
-                    if (!sent) {
-                        AttachDrafts.giveBack(movedTo ?: sessionId, text)
-                        AttachDrafts.restore(movedTo ?: sessionId, files)
-                    }
-                    movedTo?.let { opener.switchSession(it) }
-                }
+                sendPrompt(hub, sessionId, text, files, replace, onSwitch = opener.switchSession, onBusy = { busy = it }, onFail = toast)
             }
         }
     }
@@ -390,16 +339,7 @@ fun SessionScreen(
     // mouse wheel) that stops away from the end stops following; one that stops at the
     // end, or "Jump to latest", resumes it.
     var follow by rememberSaveable { mutableStateOf(true) }
-    LaunchedEffect(list) {
-        list.interactionSource.interactions.collect { if (it is DragInteraction.Start) follow = false }
-    }
-    LaunchedEffect(list) {
-        // The app itself only ever scrolls forward, so any scroll that went backward was
-        // the user's (touch, TalkBack, mouse wheel, keyboard), wherever it came from.
-        snapshotFlow { list.isScrollInProgress }.filter { !it }.collect {
-            if (!list.canScrollForward) follow = true else if (list.lastScrolledBackward) follow = false
-        }
-    }
+    FollowWithTheList(list) { follow = it }
     // Voice (ui/voice): the mic where Send is while the box is empty, its words into the draft.
     val voice = rememberVoiceInput(hub, text = { draft }, setText = { draft = it }, onSend = { follow = true; send(false) })
     LaunchedEffect(voice.available) { if (voice.available) voice.firstSeen() }
@@ -413,32 +353,20 @@ fun SessionScreen(
             if (follow && d > 0) list.scrollBy(d.toFloat())
         }
     }
-    // Prompts waiting in the queue sit under Claude's live output, so what grows is the last
-    // item above them.
-    val liveAt = items.indexOfLast { !(it is Item.User && (it.queued || it.waiting || it.held)) }
-    val tailKey = listOfNotNull(items.getOrNull(liveAt)?.let(::chatTail), items.lastOrNull()?.takeIf { items.lastIndex != liveAt }?.let(::chatTail)).joinToString("|")
-    // Fork: the list's rows (ToolRuns.kt): runs of three or more tool calls (MCP calls from one)
-    // fold into one line, and only the first reply after each message carries Claude's name. A run
-    // opens on a tap and stays as the owner left it; the run Claude is working in folds too, its
-    // latest call under the line (docs/DECISIONS.md, "MCP and tool runs fold like Claude Code").
-    // Fork: a tool's permission card goes once it's answered, as in Claude Code's terminal; only a
-    // denial stays (worth seeing later). Questions and plans stay: their answers are the content.
-    // Fork: the asks still waiting are one stack, the last row of all, under prompts waiting in the
-    // queue too (AskStack.kt).
-    val (chat, asks) = Asks.split(items.filterNot { it is Item.Approval && it.kind == com.prudnikweb.hypernova.data.ApprovalKind.Tool && it.resolved != null && it.resolved != com.prudnikweb.hypernova.data.Resolution.Denied })
     // Fork: Claude Code's own permission dialog in its terminal is an ask too, in the asks' place.
-    val termAsk = TerminalAsk.of(session).takeIf { asks.isEmpty() }
-    val rows = ToolRuns.rows(chat).let { if (asks.isEmpty()) it else it + ChatRow.Asks(asks) }.let { if (termAsk == null) it else it + ChatRow.TermAsk(termAsk) }
-    val labelled = ToolRuns.labelled(items)
+    val model = chatListRows(items, TerminalAsk.of(session))
+    val termAsk = model.termAsk
+    val rows = model.rows
+    val tailKey = model.tailKey
     val runOpen = remember(sessionId) { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
-    val liveRowKey = items.getOrNull(liveAt)?.let { live -> rows.lastOrNull { it.has(live.key) } }?.key
     // Fork: each opening of the session (from Home, a notification, the banner) lands at the latest
     // and follows it. The app keeps a screen's saved state after it's closed, so the list used to
     // come back where it was left, not following if it had been scrolled up. Coming back from a
     // screen opened over it (an agent, a file) still keeps the place: that's the same opening.
     val openedAs = rememberSaveable { intArrayOf(opening) }
     // Fork: the ask whose start the list last scrolled to (AskStack.kt, Asks.toShow).
-    var shownAsk by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
+    val shownAskState = rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
+    var shownAsk by shownAskState
     if (openedAs[0] != opening) {
         openedAs[0] = opening
         follow = true
@@ -455,8 +383,7 @@ fun SessionScreen(
     // The Mac isn't linked (asleep, away, reconnecting): nothing here is live, so nothing says
     // "working" with a ticking clock; the status line and the bar say where the Mac is instead.
     val linked = hub.link.state == LinkState.Connected
-    val working = linked && (sending || session.phase == Phase.Starting ||
-        (session.state == SessionState.Working && items.none { it is Item.Approval && it.resolved == null }))
+    val working = chatWorking(hub, session, items)
     // The status bar above the composer: while it shows, the header line below doesn't repeat it.
     val statusBar = rememberStatusBar(hub, session, items, sending, away = if (linked) null else linkWord(hub.link.state), todosOf = todosOf)
     val workingSince = remember(sessionId, working) { System.currentTimeMillis() }
@@ -492,41 +419,13 @@ fun SessionScreen(
                 }
         }
     }
-    // "Show earlier": the item that was first stays where the eye is, with the last of the
-    // earlier ones just above it, instead of the list jumping to the new start.
-    var earlierAnchor by remember(sessionId) { mutableStateOf<String?>(null) }
-    LaunchedEffect(items.size) {
-        val k = earlierAnchor ?: return@LaunchedEffect
-        // The anchor's row: its own, or the folded run it's in.
-        val i = rows.indexOfFirst { it.has(k) }
-        if (i > 0) {
-            earlierAnchor = null
-            // The "Show earlier" row (if still there) is the list's first item.
-            list.scrollToItem(i - 1 + if (hub.hasEarlier(sessionId)) 1 else 0)
-        }
-    }
-    // The tail's glide steps at the live pace's rate (30 a second on a cool phone, fewer as it
-    // warms: ui/fx/Pace.kt).
+    // "Show earlier" is the list's first item while it's there.
+    val above = { if (hub.hasEarlier(sessionId)) 1 else 0 }
+    val earlierAnchor = remember(sessionId) { mutableStateOf<String?>(null) }
+    KeepPlaceOverEarlier(list, items, rows, earlierAnchor, above)
     val motion = LocalMotion.current
-    val glideFps by rememberUpdatedState(FrameBudget.fps(Pace.Live, motion.heat, motion.powerSave))
-    LaunchedEffect(tailKey, barPx, items.size, working) {
-        if (!follow || items.isEmpty()) return@LaunchedEffect
-        val last = items.getOrNull(liveAt)
-        // Fork: only once for each ask. Every run of this (the bar's height changing as "Jump to
-        // latest" folds away, say) went back to the ask's start, so scrolling past the bottom of a
-        // tall one jumped the list back up. After that it follows the end like anything else.
-        val ask = Asks.toShow(last, shownAsk)
-        if (last is Item.Approval && ask != null) {
-            shownAsk = ask
-            // A new question or plan can be taller than the screen: show where it starts.
-            withFrameNanos { }
-            // An approval is never folded: its own row in the list (the stack's, AskStack.kt), after
-            // "Show earlier" when that's there.
-            list.animateScrollToItem(rows.indexOfFirst { it.has(last.key) }.coerceAtLeast(0) + if (hub.hasEarlier(sessionId)) 1 else 0)
-        } else {
-            followTail(list, glideFps, motion.reduced)
-        }
-    }
+    val glideFps by rememberGlideFps()
+    FollowChatTail(list, items, model, working, following = { follow }, shownAsk = shownAskState, above = above, also = barPx)
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -536,60 +435,17 @@ fun SessionScreen(
             // Fork: 10dp between rows (was 18), so more of a session fits on the screen.
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (items.isEmpty()) {
-                item(key = "empty") {
-                    when {
-                        loading -> LoadingLine(stringResource(R.string.loading_conversation), Modifier.padding(top = 8.dp))
-                        loadError != null -> Column(Modifier.padding(top = 8.dp)) {
-                            HText(loadError, style = Type.body, color = HN.danger)
-                            // Another try only helps once the Mac is linked (the status line says when it isn't).
-                            if (linked) {
-                                Spacer(Modifier.height(12.dp))
-                                Pill(stringResource(R.string.try_again), { hub.reloadTranscript(sessionId) }, kind = PillKind.Outline, height = 44.dp)
-                            }
-                        }
-                        else -> HText(stringResource(R.string.empty_conversation), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 8.dp))
-                    }
-                }
-            }
-            // The start of a long session is further back: a way to it, at the top.
-            if (items.isNotEmpty() && hub.hasEarlier(sessionId)) {
-                item(key = "earlier") {
-                    ShowEarlier(hub.loadingEarlier(sessionId)) {
-                        earlierAnchor = items.first().key
-                        hub.loadEarlier(sessionId)
-                    }
-                }
-            }
-            items(rows, key = { it.key }) { row ->
-                // New items fade in, and nothing else moves by itself: with the list's default
-                // placement spring, a card under one that grows (a command's output streaming in)
-                // glided after it and was drawn over it, and an item that left (a run replaced,
-                // a prompt delivered, an approval that moved to its own event) faded out where it
-                // was while its successor slid over it: the same Bash card, "exit 0" and all,
-                // drawn twice, a little apart, while the tail followed Claude's output.
-                val rowModifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = ItemFadeIn, placementSpec = null, fadeOutSpec = null)
-                when (row) {
-                    is ChatRow.One -> TranscriptItem(hub, sessionId, row.item, rowModifier, known = known, onMenu = { menuKey = it.key }, named = row.item.key in labelled)
-                    is ChatRow.Run -> {
-                        val open = runOpen[row.key] ?: false
-                        val live = row.running || (working && row.key == liveRowKey)
-                        ToolRunRow(row, open, live, onToggle = { runOpen[row.key] = !open }, modifier = rowModifier) { member ->
-                            TranscriptItem(hub, sessionId, member, Modifier.fillMaxWidth(), known = known, onMenu = { menuKey = it.key })
-                        }
-                    }
-                    is ChatRow.Asks -> AskStack(row.asks, rowModifier) { ask, m -> TranscriptItem(hub, sessionId, ask, m.fillMaxWidth()) }
-                    // Keyed by its menu: the next dialog is a new card, never the last one's buttons.
-                    is ChatRow.TermAsk -> androidx.compose.runtime.key(row.ask.menuId) {
-                        TerminalAskCard(
-                            row.ask,
-                            onPick = { choice -> appScope.launch { hub.answerMenu(sessionId, row.ask.menuId, choice).onFailure { toast(it.message.orEmpty()) } } },
-                            onOpen = { opener.terminal(sessionId) },
-                            modifier = rowModifier,
-                        )
-                    }
-                }
-            }
+            chatRows(
+                hub, sessionId, items, model, working, runOpen, earlierAnchor, known = known, onMenu = { menuKey = it.key },
+                termAsk = { row, rowModifier ->
+                    TerminalAskCard(
+                        row.ask,
+                        onPick = { choice -> appScope.launch { hub.answerMenu(sessionId, row.ask.menuId, choice).onFailure { toast(it.message.orEmpty()) } } },
+                        onOpen = { opener.terminal(sessionId) },
+                        modifier = rowModifier,
+                    )
+                },
+            )
         }
 
         // The time over the chat (ChatTimeLabel.kt). Here, under both bars, so it can't cover them
@@ -864,12 +720,7 @@ fun SessionScreen(
                 DictationCapsuleHost(voice)
                 Composer(
                     text = draft,
-                    hint = when {
-                        !linked -> stringResource(R.string.hint_mac_away_queue)
-                        // Gone on with the other agent: a prompt here goes there (the send says so).
-                        session.switchedTo != null -> stringResource(R.string.cx_hint_went_on, com.prudnikweb.hypernova.ui.components.agentName(hub.session(session.switchedTo)?.codex ?: !session.codex))
-                        else -> block?.let { blockedHint(hub, session, it) } ?: stringResource(if (session.phase == Phase.Ended) R.string.prompt_hint_ended else R.string.prompt_hint)
-                    },
+                    hint = chatBoxHint(hub, session, block),
                     onText = { draft = it },
                     attach = attach,
                     trayOpen = tray,
@@ -909,90 +760,6 @@ fun SessionScreen(
 }
 
 /**
- * One transcript item, drawn as what it is (a session's own, or an agent's on its screen). Files
- * and previews open in the app; an agent's card opens that agent.
- */
-/** What may be a plan in an agent's folder, wherever that folder has been moved to. Only says a tap is worth trying: a wrong guess gets the server's own answer. */
-internal fun mayBeAgentPlan(path: String): Boolean = "/plans/" in path && path.endsWith(".md", ignoreCase = true)
-
-@Composable
-internal fun TranscriptItem(hub: Hub, sessionId: String, item: Item, modifier: Modifier, known: List<com.prudnikweb.hypernova.data.SlashCommand>? = null, onMenu: ((Item) -> Unit)? = null, named: Boolean = true) {
-    val opener = LocalOpener.current
-    val preview: (Int) -> Unit = { port -> opener.preview(null, port, "localhost:$port") }
-    // Read rows and diff cards open their file only where the Mac lets the phone browse the folder.
-    val openFile: ((String) -> Unit)? = if (hub.session(sessionId)?.browsable == false) null else opener.file
-    // An agent's plan may open where the session's folder doesn't: the server decides (docs/PROTOCOL.md, "Agents' plans").
-    val openOrPlan: (String?) -> ((String) -> Unit)? = { path -> openFile ?: opener.file.takeIf { path != null && mayBeAgentPlan(path) } }
-    val openAgent: (String) -> Unit = { id -> opener.agent(sessionId, id) }
-    when (item) {
-        // [onMenu]: the session's chat gives its messages a long-press menu (ChatExtras.kt).
-        is Item.User -> WithMessageMenu(item, onMenu) { menu ->
-            val appScope = LocalAppScope.current
-            val toast = LocalToast.current
-            UserMessage(
-                item, modifier.then(menu), known = known,
-                codex = hub.session(sessionId)?.codex == true,
-                onStartNew = item.waitingId?.let { w -> { appScope.launch { hub.startFromWaiting(w).onSuccess { opener.switchSession(it) }.onFailure { toast(it.message.orEmpty()) } } } },
-                // Attachments are the Mac's own copies (its attachments folder), wherever the session is.
-                files = { SentFiles(item.files, hub, opener.file) },
-            )
-        }
-        is Item.Assistant -> WithMessageMenu(item, onMenu) { menu -> AssistantMessage(item, modifier.then(menu), onPreview = preview, codex = hub.session(sessionId)?.codex == true, named = named) }
-        is Item.Tool -> ToolRow(item, modifier, onOpen = openOrPlan(item.path), onPreview = preview)
-        is Item.Terminal -> MiniTerminal(item, modifier, onPreview = preview)
-        is Item.Diff -> DiffCard(item, modifier, onOpen = openOrPlan(item.path), onPreviewFile = { path -> opener.preview(path, null, path.substringAfterLast('/')) })
-        is Item.Approval -> {
-            // "Always" waits for the fingerprint or the screen lock (docs/DECISIONS.md).
-            val context = LocalContext.current
-            val toast = LocalToast.current
-            val title = stringResource(R.string.check_always_title)
-            val noLock = stringResource(R.string.check_no_lock)
-            // The card's own Always opens the Always sheet where Claude Code suggested a rule: the
-            // rule, editable, and where it goes (AlwaysSheet.kt). The card itself is unchanged.
-            var alwaysSheet by remember(item.key) { mutableStateOf(false) }
-            ApprovalBlock(item, onAnswer = { a ->
-                if (a == Answer.Always && item.alwaysRules.isNotEmpty()) {
-                    alwaysSheet = true
-                } else if (a == Answer.Always) {
-                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, title, item.detail.lineSequence().firstOrNull().orEmpty().take(80), noLock,
-                        onOk = { hub.answer(sessionId, item, a) }, onFail = { msg -> if (msg != null) toast(msg) },
-                    )
-                } else hub.answer(sessionId, item, a)
-            }, modifier = modifier)
-            if (alwaysSheet && item.resolved == null) {
-                AlwaysSheet(item, onDismiss = { alwaysSheet = false }, onSave = { a ->
-                    com.prudnikweb.hypernova.ui.components.OwnerCheck.ask(
-                        context, title, alwaysCheckLine(context.resources, a).take(120), noLock,
-                        onOk = { alwaysSheet = false; hub.answer(sessionId, item, a) }, onFail = { msg -> if (msg != null) toast(msg) },
-                    )
-                })
-            }
-        }
-        is Item.Thinking -> ThinkingRow(item, modifier)
-        is Item.Result -> ResultRow(item, modifier)
-        is Item.Notice -> if (item.command != null) CommandOutputRow(item.key, item.text, item.tone, modifier) else NoticeRow(item, modifier)
-        is Item.AgentCard -> AgentCard(item, openAgent, modifier)
-        is Item.WorkflowCard -> WorkflowCard(item, openAgent, modifier)
-    }
-}
-
-/** The Mac isn't linked yet or now (not unpaired): what's on screen may be stale. */
-internal fun macAway(hub: Hub): Boolean =
-    hub.link.state != LinkState.Connected && hub.link.state != LinkState.Unpaired
-
-/** The link's state in a word, for the status line ("Reconnecting", "Offline"). */
-@Composable
-internal fun linkWord(state: LinkState): String = stringResource(
-    when (state) {
-        LinkState.Connecting -> R.string.link_connecting
-        LinkState.Reconnecting -> R.string.link_reconnecting
-        LinkState.Unpaired -> R.string.link_unpaired
-        else -> R.string.link_offline
-    },
-)
-
-/**
  * A session or agent screen opened before the Mac has said what it has (from a notification with
  * the Mac away, or the app restarted on this screen): a header with Back, where the link is, and
  * a way to try now. It turns into the screen as soon as the session arrives.
@@ -1013,29 +780,6 @@ internal fun WaitingForMac(hub: Hub, onBack: () -> Unit) {
         }
     }
 }
-
-/**
- * The session's model and permission mode can be changed from here: not once it has ended, and
- * not for a terminal session the Mac only watches (its terminal isn't shared). A Codex session's
- * are Codex's own, changed over its app-server wherever it was started.
- */
-internal fun canChange(s: Session): Boolean =
-    s.phase != Phase.Ended && (s.codex || s.term != null || s.origin == "hypernova")
-
-/**
- * The permission mode can be changed from here: as [canChange], and a `claude agents` job's too,
- * terminal or not (the Mac attaches to the job and presses Shift+Tab there, docs/PROTOCOL.md).
- */
-internal fun canChangeMode(s: Session): Boolean = canChange(s) || jobModeChangeable(s)
-
-/**
- * The model can be changed from here: as the mode ([canChangeMode]), a `claude agents` job's too
- * (the Mac attaches to the job and types `/model` there, as for the effort).
- */
-internal fun canChangeModel(s: Session): Boolean = canChangeMode(s)
-
-/** A `claude agents` job that hasn't ended: its mode, effort and model change through `claude attach`. */
-internal fun jobModeChangeable(s: Session): Boolean = s.phase != Phase.Ended && s.agentJob != null
 
 /**
  * The session sheet's Model part: the model the session runs, as its chip, and a way to another
@@ -1156,93 +900,6 @@ private const val NONE_MARKED = "\u0000none"
 private fun elapsedText(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)
     return if (s < 60) "${s}s" else "${s / 60}m ${s % 60}s"
-}
-
-@Composable
-private fun phaseLabel(s: Session): String = when (s.phase) {
-    Phase.Starting -> stringResource(R.string.state_starting)
-    Phase.Error -> stringResource(R.string.state_error)
-    Phase.Ended -> stringResource(R.string.state_ended)
-    else -> when (s.state) {
-        SessionState.Working -> stringResource(R.string.state_working)
-        SessionState.NeedsYou -> stringResource(R.string.state_needs_you)
-        SessionState.Idle -> stringResource(R.string.state_idle)
-    }
-}
-
-/**
- * What stops Claude replying in [s] now, or null. Looked at again when its limit resets (not on
- * a clock), and as the account and providers change.
- */
-@Composable
-private fun activeBlock(hub: Hub, s: Session): Blocked? {
-    val b = s.blocked ?: return null
-    val now by produceState(System.currentTimeMillis(), b) {
-        val until = b.resetsAt?.let { it - System.currentTimeMillis() }
-        if (until != null && until > 0) {
-            kotlinx.coroutines.delay(until + 500)
-            value = System.currentTimeMillis()
-        }
-    }
-    return s.activeBlock(hub.account, hub.providers, now)
-}
-
-/**
- * The status line's word for a block: PAUSED at a limit, UNAVAILABLE for a model with nothing to
- * wait for, else what the owner has to fix.
- */
-@Composable
-private fun blockLabel(b: Blocked, provider: com.prudnikweb.hypernova.data.ProviderStatus? = null): String = stringResource(
-    when (b.kind) {
-        Blocked.LOGGED_OUT -> R.string.state_signed_out
-        Blocked.NO_SUBSCRIPTION -> R.string.state_no_plan
-        Blocked.ON_HOLD -> R.string.state_on_hold
-        Blocked.NO_CREDIT -> R.string.state_no_credit
-        // Another provider's own trouble ([provider]: its status).
-        Blocked.PROVIDER -> when (provider?.state) {
-            "no_credit" -> R.string.state_out_of_credits
-            "bad_key" -> R.string.state_key_refused
-            "limited" -> R.string.state_rate_limited
-            "down" -> R.string.state_not_answering
-            else -> R.string.state_paused
-        }
-        else -> if (b.unavailable()) R.string.state_unavailable else R.string.state_paused
-    },
-)
-
-/** The model a one-model limit rests ("Opus"), from the account or Claude Code's line. */
-@Composable
-private fun restingModel(hub: Hub, b: Blocked): String =
-    AccountWords.label(LocalContext.current.strings, b, hub.account).replace(Regex("\\s+limit$", RegexOption.IGNORE_CASE), "")
-
-/**
- * A model block with no reset: not a limit to wait out but a model this plan can't use, or one
- * that needs usage credits ("Claude Opus is not available with the Claude Pro plan"). Not private:
- * Home's chip for the session can say the same.
- */
-internal fun Blocked.unavailable(): Boolean = kind == Blocked.MODEL && resetsAt == null && autoResumeAt == null
-
-/** The other everyday model to switch to: Opus can't reply means Sonnet, and the other way round. */
-@Composable
-private fun otherModel(hub: Hub, b: Blocked): String {
-    val about = if (b.unavailable()) b.text else restingModel(hub, b)
-    return if (about.contains("sonnet", ignoreCase = true) && !about.contains("opus", ignoreCase = true)) "opus" else "sonnet"
-}
-
-/** The composer's hint while Claude can't reply: "Claude can't reply until 2:00". */
-@Composable
-private fun blockedHint(hub: Hub, s: Session, b: Blocked): String {
-    val context = LocalContext.current
-    return when (b.kind) {
-        Blocked.LIMIT -> b.resetsAt?.let { stringResource(R.string.hint_blocked_until, AccountWords.clock(context.strings, it)) } ?: stringResource(R.string.hint_blocked_limit)
-        Blocked.MODEL -> b.resetsAt?.let { stringResource(R.string.hint_blocked_model, restingModel(hub, b), AccountWords.clock(context.strings, it)) } ?: stringResource(R.string.hint_blocked_model_any)
-        Blocked.LOGGED_OUT -> stringResource(R.string.hint_blocked_sign_in)
-        Blocked.SIGNED_IN -> stringResource(R.string.prompt_hint)
-        Blocked.NO_SUBSCRIPTION -> stringResource(R.string.hint_blocked_plan)
-        Blocked.ON_HOLD -> stringResource(R.string.hint_blocked_hold)
-        Blocked.NO_CREDIT -> stringResource(R.string.hint_blocked_credits)
-        else -> stringResource(R.string.hint_blocked_provider, hub.providers.firstOrNull { it.id == s.providerId }?.name ?: s.model)
-    }
 }
 
 /**
@@ -1700,33 +1357,6 @@ internal class EnterGuard(private val shiftEnter: BooleanArray, private val type
         if (com.prudnikweb.hypernova.data.EnterKeys.typedNewline(originalText, asCharSequence())) {
             revertAllChanges()
             typed()
-        }
-    }
-}
-
-/**
- * The session's terminal has text in its input box that isn't sent (typed on the Mac, or put
- * back there by an interrupt), so the prompt didn't go. Replace it, or go and look.
- */
-@Composable
-private fun TerminalTextCard(pending: String, onReplace: () -> Unit, onOpen: () -> Unit, onDismiss: () -> Unit) {
-    GlassCard(Modifier.fillMaxWidth(), accent = HN.amber) {
-        Column(Modifier.padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 14.dp)) {
-            // × lets it go once the text was dealt with in the terminal some other way.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HText(stringResource(R.string.busy_title), style = Type.heading, color = HN.ink, modifier = Modifier.weight(1f))
-                GlyphButton(Glyph.Cross, stringResource(R.string.busy_dismiss), onDismiss)
-            }
-            Column(Modifier.padding(end = 10.dp)) {
-                HText(pending, style = Type.monoSmall, color = HN.inkMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(6.dp))
-                HText(stringResource(R.string.busy_body), style = Type.small, color = HN.inkDim)
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Pill(stringResource(R.string.busy_replace), onReplace, Modifier.weight(1f), kind = PillKind.Primary)
-                    Pill(stringResource(R.string.open_terminal), onOpen, kind = PillKind.Outline, leading = Glyph.Terminal)
-                }
-            }
         }
     }
 }

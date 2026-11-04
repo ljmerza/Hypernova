@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Str
+import com.prudnikweb.hypernova.data.Strings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,13 +24,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AlwaysDraft
 import com.prudnikweb.hypernova.data.AlwaysScope
 import com.prudnikweb.hypernova.data.Answer
@@ -52,18 +53,18 @@ import com.prudnikweb.hypernova.ui.theme.Type
 @Composable
 internal fun alwaysScopeTitle(s: AlwaysScope): String = stringResource(
     when (s) {
-        AlwaysScope.Session -> R.string.always_scope_session
-        AlwaysScope.Project -> R.string.always_scope_project
-        AlwaysScope.Everywhere -> R.string.always_scope_everywhere
+        AlwaysScope.Session -> Str.always_scope_session
+        AlwaysScope.Project -> Str.always_scope_project
+        AlwaysScope.Everywhere -> Str.always_scope_everywhere
     },
 )
 
 /** The fingerprint prompt's line: the rules and where (`Bash(npm test *), in this project`). */
-internal fun alwaysCheckLine(res: android.content.res.Resources, a: Answer.AlwaysAs): String = res.getString(
+internal fun alwaysCheckLine(res: Strings, a: Answer.AlwaysAs): String = res.getString(
     when (a.scope) {
-        AlwaysScope.Session -> R.string.always_check_session
-        AlwaysScope.Project -> R.string.always_check_project
-        AlwaysScope.Everywhere -> R.string.always_check_everywhere
+        AlwaysScope.Session -> Str.always_check_session
+        AlwaysScope.Project -> Str.always_check_project
+        AlwaysScope.Everywhere -> Str.always_check_everywhere
     },
     a.rules.joinToString(", "),
 )
@@ -76,7 +77,7 @@ internal fun alwaysCheckLine(res: android.content.res.Resources, a: Answer.Alway
 @Composable
 internal fun AlwaysSheet(item: Item.Approval, onDismiss: () -> Unit, onSave: (Answer.AlwaysAs) -> Unit) {
     var draft by remember(item.key) { mutableStateOf(AlwaysDraft.of(item.alwaysRules, item.alwaysScope)) }
-    val title = stringResource(R.string.check_always_title)
+    val title = stringResource(Str.check_always_title)
     GlassSheet(title, onDismiss) {
         HText(title, style = Type.heading, color = HN.ink)
         Spacer(Modifier.height(6.dp))
@@ -90,7 +91,7 @@ internal fun AlwaysSheet(item: Item.Approval, onDismiss: () -> Unit, onSave: (An
             WhyLine(it)
         }
         Spacer(Modifier.height(16.dp))
-        FieldLabel(stringResource(if (draft.texts.size > 1) R.string.always_rules else R.string.always_rule))
+        FieldLabel(stringResource(if (draft.texts.size > 1) Str.always_rules else Str.always_rule))
         val parsed = draft.parsed
         draft.texts.forEachIndexed { i, text ->
             if (i > 0) Spacer(Modifier.height(12.dp))
@@ -98,15 +99,15 @@ internal fun AlwaysSheet(item: Item.Approval, onDismiss: () -> Unit, onSave: (An
             Field(
                 text, { draft = draft.edit(i, it) },
                 mono = true, error = rule == null,
-                label = stringResource(R.string.always_rule),
+                label = stringResource(Str.always_rule),
                 keyboard = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done),
             )
             if (rule == null) {
                 Spacer(Modifier.height(6.dp))
-                HText(stringResource(R.string.always_bad_rule), style = Type.small, color = HN.danger)
+                HText(stringResource(Str.always_bad_rule), style = Type.small, color = HN.danger)
             } else if (rule.content == null) {
                 Spacer(Modifier.height(6.dp))
-                HText(stringResource(R.string.always_whole_tool, rule.tool), style = Type.small, color = HN.amber)
+                HText(stringResource(Str.always_whole_tool, rule.tool), style = Type.small, color = HN.amber)
             }
             // Quick ways to widen it, and back to Claude Code's own once changed.
             val back = draft.suggestedAt(i)
@@ -114,21 +115,21 @@ internal fun AlwaysSheet(item: Item.Approval, onDismiss: () -> Unit, onSave: (An
             if (back != null || wider.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (w in wider) RuleChip(w.toString()) { draft = draft.set(i, w) }
-                    if (back != null) RuleChip(stringResource(R.string.always_suggested), quiet = true) { draft = draft.edit(i, back) }
+                    for (w in wider) AlwaysRuleChip(w.toString()) { draft = draft.set(i, w) }
+                    if (back != null) AlwaysRuleChip(stringResource(Str.always_suggested), quiet = true) { draft = draft.edit(i, back) }
                 }
             }
         }
         Spacer(Modifier.height(18.dp))
-        FieldLabel(stringResource(R.string.always_where))
+        FieldLabel(stringResource(Str.always_where))
         Segmented(AlwaysScope.entries.map { it to alwaysScopeTitle(it) }, draft.scope, { draft = draft.copy(scope = it) })
         Spacer(Modifier.height(8.dp))
         HText(
             stringResource(
                 when (draft.scope) {
-                    AlwaysScope.Session -> R.string.always_scope_session_body
-                    AlwaysScope.Project -> R.string.always_scope_project_body
-                    AlwaysScope.Everywhere -> R.string.always_scope_everywhere_body
+                    AlwaysScope.Session -> Str.always_scope_session_body
+                    AlwaysScope.Project -> Str.always_scope_project_body
+                    AlwaysScope.Everywhere -> Str.always_scope_everywhere_body
                 },
             ),
             style = Type.small, color = HN.inkDim,
@@ -136,15 +137,15 @@ internal fun AlwaysSheet(item: Item.Approval, onDismiss: () -> Unit, onSave: (An
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.weight(1f))
-            Pill(stringResource(R.string.cancel), onDismiss, kind = PillKind.Ghost, height = 44.dp)
-            Pill(stringResource(R.string.always_save), { onSave(Answer.AlwaysAs(draft.scope, draft.rules)) }, kind = PillKind.Primary, height = 44.dp, enabled = draft.valid)
+            Pill(stringResource(Str.cancel), onDismiss, kind = PillKind.Ghost, height = 44.dp)
+            Pill(stringResource(Str.always_save), { onSave(Answer.AlwaysAs(draft.scope, draft.rules)) }, kind = PillKind.Primary, height = 44.dp, enabled = draft.valid)
         }
     }
 }
 
 /** A rule to widen to, in mono (or a quiet word), as a small capsule. */
 @Composable
-private fun RuleChip(text: String, quiet: Boolean = false, onClick: () -> Unit) {
+private fun AlwaysRuleChip(text: String, quiet: Boolean = false, onClick: () -> Unit) {
     val shape = RoundedCornerShape(10.dp)
     HText(
         text, style = if (quiet) Type.small else Type.monoSmall, color = if (quiet) HN.inkMuted else HN.accent,

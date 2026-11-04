@@ -1,7 +1,6 @@
 // Modified by Leonardo Merza, 2026. See NOTICE.
 package com.prudnikweb.hypernova.ui.session
 
-import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,7 +28,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalView
+import com.prudnikweb.hypernova.ui.platform.rememberHaptics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -59,7 +58,7 @@ internal fun ChatSheet(
  */
 @Composable
 internal fun SheetAction(glyph: ChatGlyph, label: String, onClick: () -> Unit, hint: String? = null, color: Color = HN.ink) {
-    val view = LocalView.current
+    val haptics = rememberHaptics()
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val shape = RoundedCornerShape(14.dp)
@@ -70,7 +69,7 @@ internal fun SheetAction(glyph: ChatGlyph, label: String, onClick: () -> Unit, h
             .clip(shape)
             .background(if (pressed) HN.ink.copy(alpha = 0.06f) else Color.Transparent)
             .clickable(interaction, indication = null, role = Role.Button) {
-                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                haptics.tick()
                 onClick()
             }
             .padding(horizontal = 6.dp),

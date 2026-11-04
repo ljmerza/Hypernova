@@ -65,7 +65,12 @@ import com.prudnikweb.hypernova.desktop.doingLine
 import com.prudnikweb.hypernova.desktop.factsOf
 import com.prudnikweb.hypernova.desktop.inChatWords
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.prudnikweb.hypernova.ui.LocalOpener
+import com.prudnikweb.hypernova.ui.chat.LinkAsk
+import com.prudnikweb.hypernova.ui.chat.LinkHandler
 
 /** The tag of the pane beside the list, for the tests. */
 const val PANE_TAG = "session-pane"
@@ -115,7 +120,8 @@ private fun BackPill(onBack: () -> Unit) {
 @Composable
 private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: (() -> Unit)?) {
     val following = remember { ChatFollowing() }
-    val links = remember { DeskLinks(shell) }
+    val opener = LocalOpener.current
+    val links = remember(opener) { LinkHandler(opener) }
     val box = remember { FocusRequester() }
     CompositionLocalProvider(LocalUriHandler provides links) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -128,7 +134,7 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
             ) {
                 if (onBack != null) BackPill(onBack)
                 val card = Modifier.widthIn(max = PANE_MAX).fillMaxWidth().graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }
-                AskCard(hub, s, shell, askMax, card.heightIn(max = rest.coerceAtLeast(0.dp)))
+                PaneAsk(hub, s, shell, askMax, card.heightIn(max = rest.coerceAtLeast(0.dp)))
                 ChatList(hub, s, shell, following, box, Modifier.weight(1f).widthIn(max = PANE_MAX).fillMaxWidth()) {
                     Facts(s, Modifier.fillMaxWidth())
                     SessionActions(hub, s, shell, Modifier.fillMaxWidth())
@@ -138,14 +144,23 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
                 }
                 ChatBox(hub, s, shell, following, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
             }
-            LinkAsk(links, shell)
+            LinkAsk(
+                links, shell::say,
+                browse = { url, done ->
+                    Core.scope.launch {
+                        val opened = withContext(Dispatchers.IO) { shell.desk.browse(url) }
+                        done(opened)
+                    }
+                },
+                copy = { url -> shell.desk.copy(url) },
+            )
         }
     }
 }
 
 /** Its project and short id, its name, what it's doing, its state, and what it asks, in full, with Deny and Allow. */
 @Composable
-private fun AskCard(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Modifier = Modifier) {
+private fun PaneAsk(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Modifier = Modifier) {
     val ask = hub.approval(s.id)
     val offer = remember(ask, s) { CardOffer.of(ask, s) }
     val needs = s.state == SessionState.NeedsYou
@@ -206,7 +221,7 @@ private fun AskCard(hub: Hub, s: Session, shell: Shell, askMax: Dp, modifier: Mo
                 Box(Modifier.weight(1f)) { StateChip(s, block) }
                 if (offer is CardOffer.Whole || offer is CardOffer.NotWhole) {
                     Spacer(Modifier.width(8.dp))
-                    AskPills(hub, s.id, offer, shell)
+                    PaneAskPills(hub, s.id, offer, shell)
                 }
             }
         }
@@ -273,7 +288,7 @@ private fun NotWholeCommand(offer: CardOffer.NotWhole) {
  * "Denying…" in their place; one that didn't get through brings them back, and says so on the card and in the toast.
  */
 @Composable
-private fun AskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell) {
+private fun PaneAskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell) {
     var going by remember(offer.id) { mutableStateOf<Boolean?>(null) }
     var failed by remember(offer.id) { mutableStateOf(false) }
     fun send(allow: Boolean) {

@@ -2,6 +2,7 @@ package com.prudnikweb.hypernova.desktop
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -466,10 +467,9 @@ class ChatTest {
         shell.desk = desk
         try {
             clickLink("See https://example.com/doc")
-            inPane(Ui.link_open_title.text()).assertIsDisplayed()
+            onNodeWithText(Ui.link_open_title.text()).assertIsDisplayed()
             assertTrue("nothing yet", browsed.isEmpty())
-            render("chat-link")
-            inPane(Ui.link_open.text()).performClick()
+            onNodeWithText(Ui.link_open.text()).performClick()
             until("the browser") { browsed.isNotEmpty() }
             assertEquals("https://example.com/doc", browsed.single())
         } finally {
@@ -485,11 +485,11 @@ class ChatTest {
         shell.desk = desk
         try {
             clickLink("See https://example.com/doc")
-            inPane(Ui.cancel.text()).performClick()
+            onNodeWithText(Ui.cancel.text()).performClick()
             waitForIdle()
-            inPane(Ui.link_open_title.text()).assertDoesNotExist()
+            onNodeWithText(Ui.link_open_title.text()).assertDoesNotExist()
             clickLink("See https://example.com/doc")
-            inPane(Ui.link_copy.text()).performClick()
+            onNodeWithText(Ui.link_copy.text()).performClick()
             waitForIdle()
             assertEquals("https://example.com/doc", desk.copied.single())
             assertTrue(browsed.isEmpty())

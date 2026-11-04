@@ -1,5 +1,6 @@
 package com.prudnikweb.hypernova.ui.session
 
+import com.prudnikweb.hypernova.data.Str
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,13 +11,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.Hub
 import com.prudnikweb.hypernova.data.Session
 import com.prudnikweb.hypernova.data.TerminalAsk
@@ -38,8 +38,8 @@ import com.prudnikweb.hypernova.ui.theme.Type
  */
 @Composable
 internal fun WhyLine(why: Why, modifier: Modifier = Modifier, label: Boolean = true) {
-    val lead = stringResource(R.string.why_label)
-    val reading = stringResource(R.string.why_hypernova)
+    val lead = stringResource(Str.why_label)
+    val reading = stringResource(Str.why_hypernova)
     val mono = Type.mono.let { SpanStyle(fontFamily = it.fontFamily, fontWeight = it.fontWeight, fontSize = it.fontSize, color = HN.accent) }
     val text = buildAnnotatedString {
         if (label) withStyle(SpanStyle(color = HN.inkDim)) { append("$lead ") }
@@ -63,7 +63,7 @@ internal fun WhyAskedPart(hub: Hub, s: Session) {
         Spacer(Modifier.height(14.dp))
         Hairline(Modifier.fillMaxWidth())
         Spacer(Modifier.height(10.dp))
-        HText(stringResource(R.string.why_seam).uppercase(), style = Type.label, color = HN.inkDim)
+        HText(stringResource(Str.why_seam).uppercase(), style = Type.label, color = HN.inkDim)
         Spacer(Modifier.height(8.dp))
         for (a in asks) {
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {

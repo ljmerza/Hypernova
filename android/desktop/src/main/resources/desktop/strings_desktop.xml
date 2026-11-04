@@ -24,6 +24,9 @@
     <string name="desk_ask_plan">A plan to review.</string>
     <string name="desk_reply_below">Reply in the box below.</string>
     <string name="desk_preview_on_phone">Previews open on your phone.</string>
+    <string name="desk_files_on_phone">Files open on your phone.</string>
+    <string name="desk_terminal_on_phone">A session\'s live terminal is on your phone.</string>
+    <string name="desk_settings_on_phone">That\'s in the phone\'s app, for now.</string>
     <string name="desk_agent_on_phone">An agent\'s own screen is on your phone.</string>
     <string name="desk_diagram_note">A diagram. It draws on your phone, and this is what it\'s made from.</string>
     <string name="desk_not_whole">This can\'t be read whole here, so there\'s no Allow. Deny it, or answer it on your phone.</string>
@@ -35,6 +38,7 @@
     <string name="desk_pane_phone_only">The terminal isn\'t in this app yet. Open this session on your phone for it.</string>
     <string name="desk_pane_in_history">This session is in History. You can read it here, and writing in it resumes it.</string>
     <string name="desk_pane_runs_phone">This is the newest run of %1$s. Its other runs are on your phone, under Automations.</string>
+    <string name="desk_owner_on_phone">This waits for a fingerprint or a screen lock, which this computer can\'t check. Do it on your phone.</string>
     <string name="desk_bypass_on_phone">Bypass waits for a fingerprint or a screen lock, which this computer can\'t check. Choose it on your phone.</string>
     <string name="desk_new_defaults">It starts on the default model and effort. To choose others, start it on your phone.</string>
     <string name="desk_more_asks">%1$d more waiting after this one.</string>
