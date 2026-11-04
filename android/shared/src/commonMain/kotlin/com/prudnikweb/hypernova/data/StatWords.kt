@@ -55,14 +55,16 @@ object StatWords {
             unit *= THOUSAND
             i++
         }
-        // Tenths, rounded, then up a unit if that's reached it: 999,960 is 1M, not 1000k.
-        var tenths = (n * 10 + unit / 2) / unit
-        if (tenths >= THOUSAND * 10 && i < units.lastIndex) {
+        // Up a unit if rounding reaches it: 999,960 is 1M, not 1000k.
+        var rounded = (n + unit / 2) / unit
+        if (rounded >= THOUSAND && i < units.lastIndex) {
+            unit *= THOUSAND
             i++
-            tenths /= THOUSAND
+            rounded = (n + unit / 2) / unit
         }
-        val whole = tenths / 10
-        val figure = if (whole >= 10 || tenths % 10 == 0L) ((tenths + 5) / 10).toString() else "$whole${decimal(res)}${tenths % 10}"
+        // Each from n itself: rounded to tenths and then again, 12.46M would read 13M.
+        val tenths = (n * 10 + unit / 2) / unit
+        val figure = if (tenths >= 100 || tenths % 10 == 0L) rounded.toString() else "${tenths / 10}${decimal(res)}${tenths % 10}"
         return res.getString(units[i], figure)
     }
 

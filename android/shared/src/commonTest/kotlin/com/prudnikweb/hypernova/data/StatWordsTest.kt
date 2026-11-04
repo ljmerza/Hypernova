@@ -60,6 +60,15 @@ class StatWordsTest {
         )) assertEquals("$n", said, StatWords.count(res, n))
     }
 
+    @Test fun aCountIsRoundedOnceNotTwice() {
+        // 12.46M is 12M: rounded to tenths first it would be 12.5, and then 13.
+        assertEquals("12M", StatWords.count(res, 12_460_000L))
+        assertEquals("13M", StatWords.count(res, 12_500_000L))
+        assertEquals("124k", StatWords.count(res, 124_460L))
+        // Rounding that reaches the next unit says that unit.
+        assertEquals("1M", StatWords.count(res, 999_600L))
+    }
+
     @Test fun aCountThatStaysWhole() {
         assertEquals("738", StatWords.whole(res, 738))
         assertEquals("1,402", StatWords.whole(res, 1_402))
