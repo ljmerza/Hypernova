@@ -543,7 +543,6 @@ enum class Str {
     untitled_session,
     update_body,
     update_title,
-    cancel,
     waiting_editing_hint,
     waiting_editing_label,
     waiting_edit,

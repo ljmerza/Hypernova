@@ -540,7 +540,6 @@ val Str.id: Int
         Str.untitled_session -> R.string.untitled_session
         Str.update_body -> R.string.update_body
         Str.update_title -> R.string.update_title
-        Str.cancel -> R.string.cancel
         Str.waiting_editing_hint -> R.string.waiting_editing_hint
         Str.waiting_editing_label -> R.string.waiting_editing_label
         Str.waiting_edit -> R.string.waiting_edit
