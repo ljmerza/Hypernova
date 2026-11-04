@@ -185,7 +185,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
     val model = bar.model
     val last = remember { arrayOfNulls<BarModel>(1) }
     if (model != null) last[0] = model
-    // The turn's clock: from the moment the bar appears, through a stop for your answer.
+    // Only for a Mac that doesn't say when the turn began (barClockMs): from the moment the bar appears.
     var since by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val alive = model != null
     LaunchedEffect(alive) { if (alive) since = System.currentTimeMillis() }
@@ -209,7 +209,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
         if (shown != null) {
             Column {
                 val opener = com.prudnikweb.hypernova.ui.LocalOpener.current
-                StatusCard(shown, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }, modifier = Modifier.weight(1f, fill = false)) {
+                StatusCard(shown, session, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }, modifier = Modifier.weight(1f, fill = false)) {
                     if (!stopping) {
                         stopping = true
                         hub.interrupt(session.id)
@@ -222,7 +222,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
 }
 
 @Composable
-private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowView?, barAgents: List<BarAgent>, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onOpenAgent: (String) -> Unit, modifier: Modifier = Modifier, onStop: () -> Unit) {
+private fun StatusCard(model: BarModel, session: Session, todos: List<Todo>, workflow: WorkflowView?, barAgents: List<BarAgent>, open: Boolean, onToggle: () -> Unit, since: Long, away: String?, stopping: Boolean, codex: Boolean, onOpenAgent: (String) -> Unit, modifier: Modifier = Modifier, onStop: () -> Unit) {
     // Ticks once a second while the card is on screen and the Mac is linked; gone with it.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(away == null) {
@@ -234,7 +234,7 @@ private fun StatusCard(model: BarModel, todos: List<Todo>, workflow: WorkflowVie
     val tone by animateColorAsState(if (away != null) HN.inkDim else toneColor(model.tone), tween(300), label = "statusTone")
     val res = LocalContext.current.resources
     val said = away ?: sayText(model.say)
-    val turnMs = now - since
+    val turnMs = barClockMs(session.turnStartedAt, session.turn, barAgents, since, now)
     // A running workflow's own time and tokens, as Claude Code's footer writes them (19m08s,
     // ↓ 181.1k); otherwise the turn's clock.
     val run = workflow?.takeIf { model.hasWorkflow }

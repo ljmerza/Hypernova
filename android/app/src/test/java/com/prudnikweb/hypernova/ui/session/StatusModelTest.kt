@@ -9,6 +9,7 @@ import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.TurnNow
 import com.prudnikweb.hypernova.data.WAgent
 import com.prudnikweb.hypernova.data.WPhase
 import com.prudnikweb.hypernova.data.WWorkflow
@@ -439,5 +440,39 @@ class StatusModelTest {
         // 75 steps leave 12 pixels each, the shortest that still reads; more goes back to one line.
         assertEquals(true, stepsFit(75, 900f, 4f))
         assertEquals(false, stepsFit(76, 900f, 4f))
+    }
+
+    // ─── The bar's number (owner, 2026-11-03) ───
+
+    private val at = 1_800_000_000_000L
+    private val eight16 = (8 * 60 + 16) * 1000L
+
+    private fun barAgent(startedAt: Long) = BarAgent("a", "Survey", null, null, startedAt, null)
+
+    @Test fun theBarsNumberIsTheTurnsTimeWhenThatsKnownHoweverLongTheBarHasShown() {
+        // The owner's bar: it had shown for 9 seconds, the turn had run 8m 16s.
+        assertEquals(eight16, barClockMs(at - eight16, TurnNow(), emptyList(), shownSince = at - 9000, now = at))
+        assertEquals("8:16", clockText(barClockMs(at - eight16, TurnNow(), emptyList(), at - 9000, at)))
+        // An older Mac says when it began, and nothing else: the same.
+        assertEquals(eight16, barClockMs(at - eight16, null, emptyList(), at - 9000, at))
+    }
+
+    @Test fun aStopForTheOwnersAnswerIsLeftOutAsTheTerminalLeavesItOut() {
+        // Measured on 2.1.317: 6s before a dialog that stood 25 seconds, 7s after it.
+        assertEquals(7000L, turnClockMs(at - 32_000, TurnNow(waitedMs = 25_000), at))
+        // One going on holds it still.
+        assertEquals(6000L, turnClockMs(at - 32_000, TurnNow(waitingSince = at - 26_000), at))
+        assertEquals(6000L, turnClockMs(at - 32_000, TurnNow(waitingSince = at - 26_000), at + 60_000 - 60_000))
+        assertEquals(1000L, turnClockMs(at - 32_000, TurnNow(waitedMs = 25_000, waitingSince = at - 6000), at))
+    }
+
+    @Test fun nothingKnownOfATurnFallsBackInOrder() {
+        // Only its agents at work: no turn, the oldest agent's time.
+        assertEquals(null, turnClockMs(0L, null, at))
+        assertEquals(60_000L, barClockMs(0L, null, listOf(barAgent(at - 60_000), barAgent(at - 1000)), at - 9000, at))
+        // Nothing at all: how long this bar has shown, only then.
+        assertEquals(9000L, barClockMs(0L, null, emptyList(), at - 9000, at))
+        // A server clock ahead of the phone's is 0, never a minus.
+        assertEquals(0L, barClockMs(at + 5000, null, emptyList(), at, at))
     }
 }

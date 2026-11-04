@@ -9,6 +9,7 @@ import com.prudnikweb.hypernova.data.ApprovalKind
 import com.prudnikweb.hypernova.data.Item
 import com.prudnikweb.hypernova.data.Phase
 import com.prudnikweb.hypernova.data.SessionState
+import com.prudnikweb.hypernova.data.TurnNow
 import com.prudnikweb.hypernova.data.WorkflowView
 
 /*
@@ -253,6 +254,28 @@ internal fun clockText(ms: Long): String {
     val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
 }
+
+/**
+ * This turn's time, as Claude Code's spinner counts it: from when it went into the turn, less the
+ * stops for the owner's answer (measured on 2.1.317: a dialog that stood 25 seconds added nothing).
+ * A stop going on holds it still. Without [turn] (an older Mac) the stops count too. Null when no turn
+ * is known; the clocks are the server's start and this phone's now, as everywhere in the app.
+ */
+internal fun turnClockMs(turnStartedAt: Long, turn: TurnNow?, now: Long): Long? {
+    if (turnStartedAt <= 0L) return null
+    val stopped = turn?.waitingSince?.let { (now - it).coerceAtLeast(0L) } ?: 0L
+    return (now - turnStartedAt - (turn?.waitedMs ?: 0L) - stopped).coerceAtLeast(0L)
+}
+
+/**
+ * The folded bar's number, one thing however you came to the screen: the turn's time ([turnClockMs]).
+ * The main agent done and only its agents at work is no turn: how long the oldest of them has run.
+ * Only with neither (an older Mac) how long this bar has shown, from [shownSince].
+ */
+internal fun barClockMs(turnStartedAt: Long, turn: TurnNow?, agents: List<BarAgent>, shownSince: Long, now: Long): Long =
+    turnClockMs(turnStartedAt, turn, now)
+        ?: agents.minOfOrNull { it.startedAt }?.let { (now - it).coerceAtLeast(0L) }
+        ?: (now - shownSince).coerceAtLeast(0L)
 
 /**
  * One agent at work as the opened bar lists it, the way Claude Code's footer does (owner,
