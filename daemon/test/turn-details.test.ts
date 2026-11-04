@@ -2,7 +2,7 @@
 // the stops for the owner's answer, its tokens, the step it's on and how many commands run at once.
 import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, realpathSync } from 'node:fs'
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -19,6 +19,7 @@ const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms))
 // A running Bash call has a timer watching its output: ended here, or the process stays up for it.
 after(() => {
   for (const r of hub.listSessionRecs()) for (const e of r.parse?.events ?? []) if (e.kind === 'tool') e.status = 'done'
+  rmSync(scratch, { recursive: true, force: true })
 })
 
 test('spinner lines Claude Code really wrote: its time and tokens, or nothing when it doesn’t read as one', () => {
